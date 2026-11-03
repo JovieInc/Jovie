@@ -6,7 +6,13 @@
 # Backup files (*.backup, *.bak) are intentionally NOT allowlisted (JOV-3215).
 
 [extend]
-# Use the default gitleaks config as a base
+# Load the upstream default gitleaks ruleset (~150 rules: AWS, GitHub,
+# Stripe, Slack, OpenAI, private keys, ...) as the base. Without
+# `useDefault = true` gitleaks silently ran ONLY the two custom rules at the
+# bottom of this file — the config looked layered but detected almost nothing
+# (JOV-8895). Extend MERGES the default global allowlist with the one below,
+# so default path exclusions (gitleaks.toml, images, lockfiles) stay in force.
+useDefault = true
 # See: https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
 
 # =============================================================================
@@ -20,10 +26,19 @@ description = "Narrow allowlist for test fixtures, examples, and templates"
 # Regex patterns for paths to ignore
 paths = [
     # Test directories and fixtures (anchored — avoid matching paths like contests/)
+    #
+    # WHY this broad test-path allowlist stays (JOV-8895, measured 2026-10-25):
+# with the default ruleset loaded, a scan of the current tree WITHOUT these
+# six entries reports 36 findings, every one a synthetic test value (fake API
+# keys, JWT stubs, hex literals) in test/spec/fixture/mock files. Excluding
+# whole test paths is the only volume-feasible shape until each test value is
+# individually regex-excluded; new code that must be scanned should live
+# outside these paths. Specific known fake values that appear OUTSIDE test
+# paths are excluded by value regexes below instead of path excludes.
     '''(?:^|/)tests?/''',
     '''(?:^|/)__tests__/''',
-    '''(?i)\.test\.(ts|tsx|js|jsx)$''',
-    '''(?i)\.spec\.(ts|tsx|js|jsx)$''',
+    '''(?i)\.test\.(ts|tsx|js|jsx|mjs|cjs)$''',
+    '''(?i)\.spec\.(ts|tsx|js|jsx|mjs|cjs)$''',
     '''(?:^|/)fixtures?/''',
     '''(?:^|/)mocks?/''',
 
@@ -59,9 +74,21 @@ paths = [
     # Log files from test runs
     '''\.log$''',
 
+    # SonarQube issue-export snapshots (machine-generated dumps under
+    # .issues/; random issue keys/hashes trip the default entropy rules —
+    # ~7.4k findings in full history, all from deleted snapshots).
+    '''(?:^|/)\.issues/''',
+    # Symphony runtime state/cache receipts (sha256 package digests).
+    '''(?:^|/)\.symphony/''',
+    # Generated release-notes ledger: sha256 receipt digests (contentKey,
+    # runtime evidence) trip the default entropy rules on every regeneration.
+    # Root CHANGELOG.md only — human-authored changelogs elsewhere stay scanned.
+    '''^CHANGELOG\.md$''',
+
     # Gitleaks self-test fixtures (intentionally contain leak-shaped strings)
-    '''scripts/security/gitleaks-fixture\.txt$''',
     '''scripts/security/gitleaks-backup-fixture\.txt$''',
+    '''scripts/security/gitleaks-default-fixture\.txt$''',
+    '''scripts/security/gitleaks-fixture\.txt$''',
 ]
 
 # Regex patterns for content to ignore (false positive patterns)
@@ -97,6 +124,32 @@ regexes = [
     '''127\.0\.0\.1''',
     '''0\.0\.0\.0''',
 
+    # Known fake / public-by-design values outside allowlisted test paths
+    # (JOV-8895 full-history triage — every entry below is a synthetic value or
+    # a public-by-design identifier, never a real credential):
+    # Clerk/Stripe publishable keys (pk_test_/pk_live_): public-by-design
+    # frontend identifiers — the secret forms are sk_/rk_ and stay detected by
+    # the clerk-secret-key custom rule and the default stripe rule. Covers the
+    # synthetic base64 dev-subdomain values pinned in CI workflows and a
+    # historical iOS auth test.
+    '''pk_(?:test|live)_[A-Za-z0-9]{20,}''',
+    # Supabase publishable keys are public-by-design client identifiers
+    # (like anon keys; see .agents/skills/gstack/supabase/config.sh).
+    '''sb_publishable_[A-Za-z0-9_]+''',
+    # Historical deterministic CI FLAGS_SECRET test value (ci.yml, removed
+    # 2026-03; signs feature flags in test envs, not a credential).
+    '''E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w=''',
+    # Supabase demo anon JWT from the public docs (iss: supabase-demo), used
+    # by one-off 2025-08 artist-seed scripts since deleted.
+    '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZS1kZW1v''',
+    # Email-campaign seed identifiers in a since-consolidated migration.
+    '''claim_invite_followup_[0-9]+''',
+    # Trivial fake hex literal used by iOS API client tests.
+    '''0123456789abcdef''',
+    # Docs placeholders (docs/integration-checklist.md).
+    '''YOUR_ANON_KEY''',
+    '''eyJhbGciOiJIUzI1NiIs\.\.\.''',
+
     # Generic placeholder patterns
     '''xxxx''',
     '''XXXX''',
@@ -114,6 +167,9 @@ regexes = [
 # cf1705240 — .github/workflows/ci.yml clerk-secret-key (placeholder sk_test)
 # a42024fdc — env.e2e.example neon-postgres-connection-string (example URL)
 # 32fdcd9db — docs/neon-migrations.md + scripts/neon-migrate-preview.ts neon
+# d3a1c08cc — docs/auth/provider-targets.jsonl generic-api-key: sha256
+#             provider digests in a docs ledger (file since removed; JOV-8895
+#             default-rules triage)
 commits = [
     "75ef52d12656b4841c3080ea0d20ff2f74b37c63",
     "43c4cb941945c42daba65a75b486004bd1ba1fdf",
@@ -121,6 +177,7 @@ commits = [
     "cf17052409b43df7dc641777881d5ee219ff6c58",
     "a42024fdc946a59d54e889ff482a2fe537e92dc2",
     "32fdcd9db04562643a52e2dbc6e305f7ea5481f2",
+    "d3a1c08cc4c8971434c04be2ce9bad783a6e6284",
 ]
 
 # =============================================================================

@@ -18,6 +18,10 @@ import { resolveUserState } from '@/lib/auth/gate';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
 import { isProofBlockingPublication } from '@/lib/claim/claim-verification';
+import {
+  type LegacyNudge,
+  legacyNudgeForDashboard,
+} from '@/lib/claim/legacy-verification';
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import type { DbOrTransaction } from '@/lib/db';
 import { DB_CONFIG, isRetryableError } from '@/lib/db/client/retry';
@@ -164,6 +168,11 @@ export interface DashboardData {
   isFirstSession?: boolean;
   /** Settled server-derived Inbox availability for conditional shell navigation. */
   inboxNavigation?: InboxNavigationAvailability;
+  /**
+   * Grandfathered claim waiting for a real proof (claim-verify spec Q2).
+   * Null when the selected profile is not a legacy claim. No UI reads it yet.
+   */
+  legacyNudge?: LegacyNudge | null;
 }
 
 export interface ProfileCompletionStep {
@@ -914,6 +923,7 @@ async function fetchDashboardBaseWithSession(
     profileCompletion: buildProfileCompletion(selected, false),
     bioLinkActivation: null,
     inboxNavigation,
+    legacyNudge: legacyNudgeForDashboard(selected.settings, new Date()),
     dashboardLoadError: undefined,
     isFirstSession: deriveIsFirstSession(selected),
   };
@@ -1020,6 +1030,24 @@ async function fetchDashboardCoreWithSession(
       clerkUserId,
       selected.id
     ).catch((error: unknown) => {
+      // Expected transient timeouts on a fail-soft supplementary read are
+      // log-only (JOV-5754, same doctrine as the inbox-count and tipping
+      // reads): Neon cold-start PG statement timeouts, idle-in-transaction
+      // terminations, and JS-level query timeouts are infrastructure
+      // conditions, not data bugs. Drizzle names the failing statement —
+      // typically set_config('statement_timeout', $1, true) — so reporting
+      // them pages Sentry with this fingerprint (JOV-8864) instead of the
+      // graceful UNKNOWN fallback that already shipped to the user.
+      if (isQueryTimeoutError(error) || isPostgresTimeoutError(error)) {
+        logger.warn(
+          '[avatar-quality] avatar read timed out; degrading to unknown quality',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
+        return UNKNOWN_AVATAR_QUALITY;
+      }
+
       Sentry.captureException(error, {
         level: 'warning',
         tags: {

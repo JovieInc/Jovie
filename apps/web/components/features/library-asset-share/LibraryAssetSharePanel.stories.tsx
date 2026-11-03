@@ -114,11 +114,11 @@ type Story = StoryObj<typeof meta>;
 export const ShareLinkRow: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByLabelText('URL To Copy')).toHaveValue(
-      'jov.ie/p/story-private'
-    );
     await expect(
-      canvas.getByRole('button', { name: 'Copy to clipboard' })
+      canvas.getByTestId('library-asset-share-url-r1')
+    ).toHaveTextContent('jov.ie/p/story-private');
+    await expect(
+      canvas.getByRole('button', { name: 'Copy link' })
     ).toBeVisible();
     await expect(
       within(canvasElement.ownerDocument.body).queryByRole('menu')
@@ -147,9 +147,9 @@ export const PublicActions: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const body = within(canvasElement.ownerDocument.body);
-    await expect(canvas.getByLabelText('URL To Copy')).toHaveValue(
-      'jov.ie/a/example/drive'
-    );
+    await expect(
+      canvas.getByTestId('library-asset-share-url-r1')
+    ).toHaveTextContent('jov.ie/a/example/drive');
     await userEvent.click(
       canvas.getByRole('button', { name: 'Share link actions for Drive' })
     );
@@ -196,8 +196,8 @@ export const GenerateLink: Story = {
   play: async ({ canvasElement, args }) => {
     await waitFor(async () => {
       await expect(
-        within(canvasElement).getByLabelText('URL To Copy')
-      ).toHaveValue('jov.ie/p/story-private');
+        within(canvasElement).getByTestId('library-asset-share-url-r1')
+      ).toHaveTextContent('jov.ie/p/story-private');
     });
     await expect(args.onShareChange).toHaveBeenCalledWith(
       asset.id,
@@ -216,9 +216,9 @@ export const VisibilityToggle: Story = {
     await userEvent.click(
       await body.findByRole('menuitem', { name: 'Make public' })
     );
-    await expect(canvas.getByLabelText('URL To Copy')).toHaveValue(
-      'jov.ie/a/example/drive'
-    );
+    await expect(
+      canvas.getByTestId('library-asset-share-url-r1')
+    ).toHaveTextContent('jov.ie/a/example/drive');
     await expect(args.onShareChange).toHaveBeenCalledWith(
       asset.id,
       publicShare
@@ -236,9 +236,9 @@ export const RevokePrivateLink: Story = {
     await userEvent.click(
       await body.findByRole('menuitem', { name: 'Revoke private link' })
     );
-    await expect(canvas.getByLabelText('URL To Copy')).toHaveValue(
-      'jov.ie/p/story-rotated'
-    );
+    await expect(
+      canvas.getByTestId('library-asset-share-url-r1')
+    ).toHaveTextContent('jov.ie/p/story-rotated');
     await expect(args.onShareChange).toHaveBeenCalledWith(
       asset.id,
       expect.objectContaining({ accessToken: 'story-rotated' })

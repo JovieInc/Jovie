@@ -21,13 +21,16 @@ export interface AiReceipt {
   readonly cacheReadTokens: number;
   readonly cacheWriteTokens: number;
   readonly outputTokens: number;
+  /** Provider that served the call; spend is split by it in the capacity registry. */
+  readonly provider: 'gateway' | 'workers-ai';
   /** cacheRead / input; 0 when there was no input. */
   readonly cacheHitRatio: number;
 }
 
 export function buildAiReceipt(
   functionId: string | undefined,
-  usage: AiUsageLike | undefined
+  usage: AiUsageLike | undefined,
+  provider: AiReceipt['provider'] = 'gateway'
 ): AiReceipt {
   const inputTokens = usage?.inputTokens ?? 0;
   const cacheReadTokens = usage?.inputTokenDetails?.cacheReadTokens ?? 0;
@@ -38,6 +41,7 @@ export function buildAiReceipt(
     cacheReadTokens,
     cacheWriteTokens: usage?.inputTokenDetails?.cacheWriteTokens ?? 0,
     outputTokens: usage?.outputTokens ?? 0,
+    provider,
     cacheHitRatio:
       inputTokens > 0 ? Number((cacheReadTokens / inputTokens).toFixed(3)) : 0,
   };
