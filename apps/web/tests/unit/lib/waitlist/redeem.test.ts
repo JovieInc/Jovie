@@ -202,6 +202,7 @@ describe('redeemWaitlistInviteToken', () => {
     const columns = txWithInsert.where.mock.calls.flatMap(call =>
       drizzleColumns(call[0])
     );
+    expect(columns).toContain('waitlist_entries.canonical');
     expect(columns).toContain('users.id');
     expect(columns).not.toContain('users.clerk_id');
   });

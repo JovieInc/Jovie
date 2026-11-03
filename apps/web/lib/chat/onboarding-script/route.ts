@@ -12,8 +12,7 @@ import {
 import {
   decideFallbackTurn,
   type FallbackTurn,
-  handleFromArtistName,
-  requestedHandleFrom,
+  handleCardEventForConfirmation,
   resolveGuardedStep,
   type ServerArtistConfirmation,
 } from './engine';
@@ -127,7 +126,7 @@ function pickerEvent(query: string) {
 export function turnFromArtistConfirmation(
   confirmation: ServerArtistConfirmation,
   state: OnboardingTurnState,
-  uiMessages: readonly UIMessage[]
+  uiMessages: readonly UIMessage[] = []
 ): FallbackTurn {
   const hasData = state.spotifyFollowers !== null;
   const line = scriptedLine(
@@ -137,39 +136,24 @@ export function turnFromArtistConfirmation(
   const part = confirmation.historyMessage.parts[0] as unknown as
     | { input: Record<string, unknown>; output: Record<string, unknown> }
     | undefined;
-  // The line says "confirm the handle below", so the handle card ships in
-  // the same turn — mirroring the engine's artist-select turn. Without it
-  // the visitor faced the prompt with no confirm control until they typed a
-  // reply (JOV-10168, 2026-10-31 signed-out replay).
-  const handle =
-    requestedHandleFrom(uiMessages, null, true) ??
-    handleFromArtistName(state.spotifyArtistName ?? '');
   return {
     line,
     text: renderLine(line, {
       name: state.spotifyArtistName,
       followers: state.spotifyFollowers,
     }),
-    toolEvents: [
-      ...(part
-        ? [
-            {
-              toolName: 'confirmSpotifyArtist',
-              input: part.input,
-              output: part.output,
-            },
-          ]
-        : []),
-      {
-        toolName: 'checkHandle',
-        input: { handle },
-        output: {
-          action: 'check_handle',
-          handle,
-          summary: `Checking @${handle}.`,
-        },
-      },
-    ],
+    // The line points at the handle card below, so the card ships in this
+    // turn (same builder as the engine's confirmation path).
+    toolEvents: part
+      ? [
+          {
+            toolName: 'confirmSpotifyArtist',
+            input: part.input,
+            output: part.output,
+          },
+          handleCardEventForConfirmation(uiMessages, state.spotifyArtistName),
+        ]
+      : [],
     guardedStep: 'artist_select',
   };
 }

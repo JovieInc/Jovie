@@ -132,7 +132,6 @@ const RAW_PUBLIC_COMMERCIAL_FOOTER_LINKS = [
   { href: APP_ROUTES.PRICING, label: 'Pricing' },
   { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
   { href: APP_ROUTES.SMART_LINKS, label: 'Music Smart Links' },
-  { href: APP_ROUTES.CARD, label: 'Jovie Card' },
 ] as const satisfies readonly MarketingFooterLink[];
 
 export const PUBLIC_COMMERCIAL_FOOTER_LINKS: readonly MarketingFooterLink[] =

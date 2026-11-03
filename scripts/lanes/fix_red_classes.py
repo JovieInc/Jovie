@@ -48,6 +48,11 @@ UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
 BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?## ?(?:Red-before-green|Blast radius)",
                        re.IGNORECASE)
+# Source Validation includes passing fixtures that print quota/network errors.
+# A concrete component error needs regression coverage, never an infra retry.
+COMPONENT_TEST_TEXT = re.compile(
+    r"::error file=[^\s:]+::\[test-not-touched\] Component changed but test "
+    r"((?:apps/web|packages/ui)/[\w./-]+\.(?:test|spec)\.[jt]sx?) was not touched in this diff\.")
 # The internal customer-changelog decision. A second note is `ambiguous`, so a body that already
 # contains one is never stamped again. The quota form is the attempt>1 mask of the same defect:
 # the guard could not re-read the body, so the log no longer says missing-metadata.
@@ -120,6 +125,7 @@ _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
+    ("component-test-evidence", COMPONENT_TEST_TEXT, AGENT),
     ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),
     # Before platform-infra: a Source Validation log can carry passing-test
     # rate-limit lines beside the guard error that actually failed the job.
@@ -201,6 +207,8 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
             and stamp_internal_changelog(pr.get("body")) is not None:
         cls, action, signature = "changelog-metadata", STAMP_CHANGELOG, ""
     files = []
+    if cls == "component-test-evidence":
+        files = sorted({test for name in names for test in COMPONENT_TEST_TEXT.findall(logs.get(name) or "")})
     if cls == "ci-fast-wiring":
         for name in names:
             found = UNWIRED.search(logs.get(name) or "")
@@ -1032,6 +1040,48 @@ def wire_ci_fast(root: Path, files: list[str]) -> list[str]:
     if added:
         atomic_write_text(lanes, text)
     return added
+
+
+def _ensure_objects(literal: str) -> str:
+    """Add the objects map install_release archives, unless this flat dict already has one."""
+    if not literal.startswith("{") or not literal.endswith("}") or "\n" in literal or "**" in literal:
+        return literal
+    if re.search(r"""['"]objects['"]\s*:""", literal):
+        return literal
+    body = literal[1:-1].rstrip()
+    suffix = "" if not body.strip() or body.endswith(",") else ","
+    return "{" + body + suffix + ' "objects": {"scripts/lanes": "f" * 40}}'
+
+
+def _complete_block(block: str) -> str:
+    names = set()
+    for match in re.finditer(r"return_value\s*=\s*([A-Za-z_]\w*)\b", block):
+        if match.end() < len(block) and block[match.end()] == ".":
+            continue
+        names.add(match.group(1))
+
+    def rewrite(found):
+        return found.group(1) + _ensure_objects(found.group(2))
+
+    for name in sorted(names):
+        block = re.sub(rf"(?m)^(\s*{re.escape(name)}\s*=\s*)(\{{[^\n]*\}})", rewrite, block)
+    return re.sub(r"(return_value\s*=\s*)(\{[^\n]*\})", rewrite, block)
+
+
+def complete_release_identity_stubs(source: str) -> str:
+    """Fill one-line release_identity fixtures that install_release will archive.
+
+    A top-level function or test method that both stubs release_identity and calls
+    install_release needs an objects map: install_release archives sorted(bundle["objects"])
+    before prove-staging. On 2026-10-29 that KeyError failed Source Validation for an
+    incomplete custody stub, and the update backoff test uses the same shape. Multiline
+    literals and **spreads stay as written. The checked-in lane runner tests are a fixed
+    point of this function.
+    """
+    parts = re.split(r"(?=^(?:def |    def ))", source, flags=re.M)
+    return "".join(
+        _complete_block(part) if "install_release" in part and "release_identity" in part else part
+        for part in parts)
 
 
 # ---- measurement ---------------------------------------------------------------------------------
