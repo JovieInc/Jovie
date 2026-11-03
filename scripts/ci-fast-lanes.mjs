@@ -741,6 +741,7 @@ export const STRUCTURAL_PYTEST_FILES = Object.freeze([
   'scripts/tests/test_runner_routing.py',
   'scripts/tests/test_signal_watch.py',
   'scripts/tests/test_x_grok.py',
+  'scripts/tests/test_pr_remediation_swarm.py',
 ]);
 
 /**
@@ -1275,6 +1276,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/verify-patched-dependencies.test.mjs',
   'scripts/lib/__tests__/incident-dedupe.test.mjs',
   'scripts/lib/__tests__/ci-capacity.test.mjs',
+  'scripts/lib/__tests__/merge-queue-speed.test.mjs',
   'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
 ]);
 export const MESH_HOST_ACK_COVERAGE_COMMAND =
