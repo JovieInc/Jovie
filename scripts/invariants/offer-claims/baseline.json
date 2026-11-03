@@ -150,7 +150,7 @@
     "refund_guarantee_claim": 1
   },
   "apps/web/data/marketing/renderedCopyCoverage.ts": {
-    "free_forever_claim": 4,
+    "free_forever_claim": 3,
     "recurring_price": 4,
     "plan_price": 3,
     "billing_claim": 4

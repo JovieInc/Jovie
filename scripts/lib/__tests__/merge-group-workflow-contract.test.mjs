@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -1793,7 +1794,11 @@ describe('merge_group workflow contract', () => {
   });
 
   it('materializes a release-consumable intake receipt for equal-tree no-op groups', () => {
-    const root = mkdtempSync(join(tmpdir(), 'noop-intake-receipt-'));
+    // Node resolves module URLs through macOS's /var symlink. Match that
+    // canonical path so the copied classifiers recognize their CLI entrypoint.
+    const root = realpathSync(
+      mkdtempSync(join(tmpdir(), 'noop-intake-receipt-'))
+    );
     const laneDir = join(root, 'product-lane-classification');
     mkdirSync(laneDir);
     writeFileSync(join(laneDir, 'changed-paths.txt'), '');
@@ -4844,6 +4849,14 @@ describe('merge-queue green enroll scan window and failure hold', () => {
     // revision failure hold, may re-enroll an unchanged removed head.
     expect(ENROLL).toContain("removalReason === 'manual'");
     expect(ENROLL).toContain("failure.action === 'allow' &&");
+    // 2026-10-29 ejection re-enroll: a non-human removal with no revision
+    // failure hold is re-admitted (bounded); a failure hold still blocks first
+    // and admission never runs from a cron (JOV-INV-042).
+    expect(ENROLL).toContain("failureBeforeReenroll === 'allow'");
+    expect(ENROLL).toContain("reason: 'ejection-reenroll'");
+    expect(ENROLL).toContain('removalsOnHead < REENROLL_MAX_REMOVALS');
+    expect(ENROLL).toContain('!humanDequeued');
+    expect(ENROLL).not.toMatch(/^\s{2}schedule:/m);
     for (const runtimePath of [
       'scripts/merge-group-failure-hold.mjs',
       'scripts/lib/merge-queue-guard.mjs',

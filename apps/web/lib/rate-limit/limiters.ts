@@ -143,6 +143,18 @@ export const anonymousOnboardingChatFirstTouchLimiter = createRateLimiter(
   RATE_LIMITERS.anonymousOnboardingChatFirstTouch
 );
 
+/** Fail-open /start unverified budgets. Redis only: an outage denies. */
+export const anonymousOnboardingChatUnverifiedIpLimiter = createRateLimiter(
+  RATE_LIMITERS.anonymousOnboardingChatUnverifiedIp,
+  { requireRedis: true }
+);
+export const anonymousOnboardingChatUnverifiedGlobalLimiter = createRateLimiter(
+  RATE_LIMITERS.anonymousOnboardingChatUnverifiedGlobal,
+  {
+    requireRedis: true,
+  }
+);
+
 /** Canary passage tokens for the /start bot check (JOV-9625). Redis only. */
 export const syntheticPassageTokenLimiter = createRateLimiter(
   RATE_LIMITERS.syntheticPassageToken,
@@ -882,7 +894,7 @@ export async function checkAiChatRateLimitForPlan(
     }
 
     // The dedicated production chat-health canary (see
-    // `isChatHealthCanaryEmail`) skips only the weekly quota so deploy probes
+    // `isWeeklyQuotaExemptCanaryEmail`) skips only the weekly quota so deploy probes
     // cannot exhaust any account's allowance; the hourly burst limiter above
     // still caps its spend.
     if (options.skipWeeklyQuota === true) return burstAllowed;
