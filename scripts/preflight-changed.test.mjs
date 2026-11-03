@@ -13,12 +13,17 @@ import {
 } from './lib/preflight-changed.mjs';
 import { evaluateFleetRules } from './pr-fleet-rules.mjs';
 import {
+  baseRefCandidates,
+  changedFiles,
   downgradeHostRed,
   GENERATORS,
   HEAVY_GUARDS,
+  hostSlotted,
   invariantTestFiles,
+  main,
   NARROWED,
   parseArgs,
+  resolveBaseRef,
   typecheckTargets,
 } from './preflight-changed.mjs';
 
@@ -101,7 +106,7 @@ test('PR body lint names every missing section and prints a filled template', ()
   });
   const ids = r.errors.map(e => e.id);
   assert.ok(ids.includes('red-before-green'));
-  assert.ok(ids.includes('blast-radius'));
+  assert.ok(r.warnings.some(w => w.id === 'blast-radius'));
   assert.ok(ids.includes('locked-areas'));
   assert.ok(ids.includes('changelog-marker'));
   assert.match(r.template, /## Red-before-green/);
@@ -183,6 +188,7 @@ test('typecheck targets are the affected packages only', () => {
     'pkg:@jovie/ovie',
     'scripts',
     'web',
+    'web-stories',
     'web-tests',
   ]);
 });
@@ -209,7 +215,7 @@ test('web source changes typecheck test consumers without a changed test file', 
       [file('apps/web/lib/leads/route-lead.ts')],
       process.cwd()
     ).sort(),
-    ['pkg:@jovie/ovie', 'web', 'web-tests']
+    ['pkg:@jovie/ovie', 'web', 'web-stories', 'web-tests']
   );
   assert.deepEqual(
     typecheckTargets(
@@ -227,11 +233,40 @@ test('web source changes typecheck test consumers without a changed test file', 
   );
 });
 
+test('story changes select the story compiler omitted by the app and test projects', () => {
+  const story =
+    'apps/web/components/features/opportunity-inbox/OpportunityInboxEmptyState.stories.tsx';
+  assert.ok(
+    typecheckTargets([file(story)], process.cwd()).includes('web-stories')
+  );
+  assert.deepEqual(
+    typecheckTargets([file(story, 'removed')], process.cwd()),
+    []
+  );
+  assert.deepEqual(
+    typecheckTargets([file('apps/web/tests/unit/a.test.ts')], process.cwd()),
+    ['web-tests']
+  );
+});
+
 test('arguments parse and unknown flags fail', () => {
   assert.equal(parseArgs(['--no-coverage', '--base', 'dev']).coverage, false);
   assert.throws(() => parseArgs(['--nope']));
   assert.ok(HEAVY_GUARDS.has('merged-with-base-invariants'));
   assert.ok(GENERATORS.some(g => g.id === 'workflow-topology'));
+});
+
+test('route and policy changes select launch inventory regeneration before guards', () => {
+  const generator = GENERATORS.find(g => g.id === 'artist-launch-inventory');
+  assert.ok(generator);
+  for (const source of [
+    'apps/web/app/api/admin/reference-review/route.ts',
+    'scripts/artist-launch-policy.mjs',
+    'scripts/artist-launch-contract.mjs',
+    'docs/product/generated/artist-launch-inventory.json',
+  ])
+    assert.ok(generator.when.test(source), source);
+  assert.equal(generator.when.test('apps/web/lib/unrelated.ts'), false);
 });
 
 test('host-only reds are downgraded on macOS but real reds are not', () => {
@@ -290,4 +325,151 @@ test('merge-tree conflict output yields the conflicting paths', () => {
     'apps/web/a.ts',
     'b.ts deleted in HEAD and modified in x',
   ]);
+});
+
+test('a scripts/ .mjs-only change still runs the checkJs scripts typecheck', () => {
+  assert.deepEqual(
+    typecheckTargets([file('scripts/lib/__tests__/a.test.mjs')], process.cwd()),
+    ['scripts']
+  );
+  assert.deepEqual(typecheckTargets([file('docs/a.mjs')], process.cwd()), []);
+});
+
+test('heavy checks run through the host typecheck slot and keep their quoting', () => {
+  const cmd =
+    "cd apps/web && NODE_OPTIONS=--max-old-space-size=8192 pnpm exec tsc --noEmit -p 'tsconfig x.json'";
+  const wrapped = hostSlotted(cmd);
+  assert.match(wrapped, /^node scripts\/typecheck-slot\.mjs -- bash -c '/);
+  const r = spawnSync(
+    'bash',
+    ['-c', `printf '%s' ${wrapped.slice(wrapped.indexOf("'"))}`],
+    { encoding: 'utf8' }
+  );
+  assert.equal(r.stdout, cmd);
+});
+
+const gitIn = (cwd, args) => {
+  const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+};
+
+/**
+ * A repo whose HEAD and remote-tracking origin/main share one base commit,
+ * with an install fixture preflight's provenance guard accepts (no remote).
+ */
+function baseFixtureRepo(label) {
+  const repo = mkdtempSync(path.join(tmpdir(), `preflight-base-${label}-`));
+  writeFileSync(path.join(repo, 'pnpm-lock.yaml'), 'lockfileVersion: 9.0\n');
+  mkdirSync(path.join(repo, 'node_modules/.pnpm'), { recursive: true });
+  writeFileSync(
+    path.join(repo, 'node_modules/.pnpm/lock.yaml'),
+    'lockfileVersion: 9.0\n'
+  );
+  mkdirSync(path.join(repo, 'apps/web/node_modules'), { recursive: true });
+  gitIn(repo, ['init', '-b', 'main']);
+  gitIn(repo, ['config', 'user.email', 'preflight@test.jovie']);
+  gitIn(repo, ['config', 'user.name', 'Preflight Test']);
+  gitIn(repo, ['add', '-A']);
+  gitIn(repo, ['commit', '-m', 'base']);
+  gitIn(repo, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  return repo;
+}
+
+const commitOnFeature = (repo, name) => {
+  gitIn(repo, ['checkout', '-qb', 'feature']);
+  writeFileSync(path.join(repo, name), `${name}\n`);
+  gitIn(repo, ['add', '-A']);
+  gitIn(repo, ['commit', '-m', name]);
+};
+
+test('base ref candidates never double-prefix a qualified ref', () => {
+  assert.deepEqual(baseRefCandidates('main'), ['origin/main', 'main']);
+  assert.deepEqual(baseRefCandidates('origin/main'), ['origin/main']);
+  assert.deepEqual(baseRefCandidates('refs/remotes/origin/main'), [
+    'refs/remotes/origin/main',
+  ]);
+});
+
+test('changedFiles discovers real changes for a qualified remote ref', () => {
+  const repo = baseFixtureRepo('qualified');
+  try {
+    commitOnFeature(repo, 'changed.txt');
+    const qualified = changedFiles(repo, 'origin/main');
+    assert.ok(qualified.mergeBase);
+    assert.deepEqual(
+      qualified.files.map(f => f.filename),
+      ['changed.txt']
+    );
+    const bare = changedFiles(repo, 'main');
+    assert.deepEqual(bare.files, qualified.files);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test('changedFiles reports an unresolvable base as no diff base, not an empty change set', () => {
+  const repo = baseFixtureRepo('unresolved');
+  try {
+    commitOnFeature(repo, 'changed.txt');
+    assert.equal(resolveBaseRef(repo, 'origin/nope'), null);
+    assert.deepEqual(changedFiles(repo, 'origin/nope'), {
+      mergeBase: '',
+      files: [],
+    });
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test('preflight exits clean on a valid clean branch but fails an invalid base ref', async () => {
+  const env = { ...process.env, JOVIE_PREFLIGHT_LEDGER: 'off' };
+  const clean = baseFixtureRepo('clean');
+  try {
+    gitIn(clean, ['checkout', '-qb', 'feature']);
+    const lines = [];
+    const code = await main({
+      argv: [
+        '--repo',
+        clean,
+        '--base',
+        'origin/main',
+        '--no-typecheck',
+        '--no-coverage',
+      ],
+      env,
+      log: line => lines.push(String(line)),
+    });
+    assert.equal(code, 0);
+    assert.ok(
+      lines.some(l => l.includes('no changes vs origin/main')),
+      lines.join('\n')
+    );
+  } finally {
+    rmSync(clean, { recursive: true, force: true });
+  }
+  const bad = baseFixtureRepo('badref');
+  try {
+    gitIn(bad, ['checkout', '-qb', 'feature']);
+    const lines = [];
+    const code = await main({
+      argv: [
+        '--repo',
+        bad,
+        '--base',
+        'origin/nope',
+        '--no-typecheck',
+        '--no-coverage',
+      ],
+      env,
+      log: line => lines.push(String(line)),
+    });
+    assert.equal(code, 1);
+    assert.ok(
+      lines.some(l => l.includes("'origin/nope'")),
+      lines.join('\n')
+    );
+    assert.ok(!lines.some(l => /no changes/.test(l)), lines.join('\n'));
+  } finally {
+    rmSync(bad, { recursive: true, force: true });
+  }
 });

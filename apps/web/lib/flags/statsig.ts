@@ -154,7 +154,8 @@ async function cleanupStatsigClientAfterInitFailure(
 
 async function runStatsigInit(): Promise<void> {
   const serverSecret = env.STATSIG_SERVER_SECRET;
-  if (!serverSecret) {
+  // Preserve the sensitive-placeholder guard from #24032.
+  if (!serverSecret || !serverSecret.startsWith('secret-')) {
     if (!statsigWarnedNoSecret) {
       logger.warn(
         '[Statsig] Server secret not configured - feature flags will use defaults'
@@ -166,12 +167,16 @@ async function runStatsigInit(): Promise<void> {
 
   let statsig: Statsig | null = null;
   initStartedAt = Date.now();
+
   try {
     statsig = getStatsigClient(serverSecret);
-    await withTimeout(statsig.initialize(), {
+    const result = await withTimeout(statsig.initialize(), {
       timeoutMs: STATSIG_INIT_TIMEOUT_MS,
       context: 'Statsig initialization',
     });
+    if (!result.isSuccess) {
+      throw new Error(result.error || 'Statsig initialization failed');
+    }
     statsigInitialized = true;
     // Measurable: init outcome + latency per cold start.
     logger.info(

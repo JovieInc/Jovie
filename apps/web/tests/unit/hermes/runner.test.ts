@@ -65,6 +65,91 @@ describe('Hermes CLI worker runner', () => {
     ).toThrow('Unsupported Hermes runtime');
   });
 
+  it('preserves explicit transport policy instead of silently downgrading it', () => {
+    const routePolicy = {
+      mode: 'controlled_benchmark',
+      allowedTransports: ['mcp'],
+      allowedTools: ['fleet.register'],
+      requireRouteAttestation: true,
+    };
+    expect(parseHermesPayload({ ...basePayload, routePolicy })).toHaveProperty(
+      'routePolicy',
+      routePolicy
+    );
+  });
+
+  it('rejects controlled runtimes before a shell or HTTP bypass can start', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const available = vi.fn(() => true);
+    for (const mode of ['controlled_benchmark', 'policy_bound'] as const) {
+      for (const runtime of ['codex-cli', 'claude-code', 'ruflo'] as const) {
+        const status = await runHermesCliWorker({
+          payload: {
+            ...basePayload,
+            runtime,
+            routePolicy: {
+              mode,
+              allowedTransports: ['mcp'],
+              allowedTools: ['fleet.register'],
+              requireRouteAttestation: true,
+            },
+          },
+          workspace: process.cwd(),
+          runtimeAvailableCheck: available,
+          runtimeCommand: {
+            executable: process.execPath,
+            args: ['-e', 'process.exit(99)'],
+            stdin: null,
+          },
+        });
+        expect(status).toBe(78);
+        expect(
+          JSON.parse(String(log.mock.calls.at(-1)?.[0])).routeReceipt
+        ).toMatchObject({
+          status: 'blocked',
+          actualRuntime: null,
+          events: [],
+          unknownRoute: true,
+          policyDecision: 'deny',
+          benchmarkEligible: false,
+          isolation: 'none',
+        });
+      }
+    }
+    expect(available).not.toHaveBeenCalled();
+  });
+
+  it('never logs command arguments, executable paths, prompts, credentials or OTPs', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await runHermesCliWorker({
+      payload: {
+        ...basePayload,
+        dryRun: true,
+        prompt: 'OTP canary-private-value',
+      },
+      workspace: process.cwd(),
+      runtimeCommand: {
+        executable: '/canary-private-value',
+        args: ['--token', 'canary-private-value'],
+        stdin: 'canary-private-value',
+      },
+    });
+    expect(JSON.stringify(log.mock.calls)).not.toContain(
+      'canary-private-value'
+    );
+    expect(
+      JSON.parse(String(log.mock.calls.at(-1)?.[0])).routeReceipt
+    ).toMatchObject({
+      status: 'dry_run',
+      events: [],
+      actualRuntime: null,
+      unknownRoute: true,
+    });
+    expect(() =>
+      parseHermesPayload({ ...basePayload, routePolicy: { mode: 'typo' } })
+    ).toThrow();
+  });
+
   it('normalizes allowed paths and rejects traversal', () => {
     expect(
       normalizeHermesAllowedPaths(['./apps/web/', '././apps/web', 'apps/web'])
@@ -216,6 +301,7 @@ describe('Hermes CLI worker runner', () => {
       'let count = 0;',
       "const timer = setInterval(() => { fs.appendFileSync(target, '1'); count += 1; if (count === 10) { clearInterval(timer); } }, 15);",
     ].join('');
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const killSpy = vi.spyOn(process, 'kill');
 
     try {
@@ -241,6 +327,22 @@ describe('Hermes CLI worker runner', () => {
 
       expect(status).toBe(0);
       expect(await readFile(artifactPath, 'utf8')).toBe('1111111111');
+      expect(
+        JSON.parse(String(log.mock.calls.at(-1)?.[0])).routeReceipt
+      ).toMatchObject({
+        status: 'succeeded',
+        actualRuntime: 'unknown',
+        unknownRoute: true,
+        benchmarkEligible: false,
+        policyDecision: 'report_only',
+        events: [
+          {
+            boundary: 'subprocess',
+            transport: 'cli',
+            executable: 'unrecognized',
+          },
+        ],
+      });
       expect(killSpy).not.toHaveBeenCalled();
     } finally {
       await rm(workspace, { recursive: true, force: true });

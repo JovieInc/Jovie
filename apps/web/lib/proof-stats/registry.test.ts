@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { formatProofValue } from './format';
 import {
   getProofStat,
   listProofStats,
@@ -18,7 +19,7 @@ describe('proof-stat registry', () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const stat of listProofStats()) {
       if (stat.visibility === 'public')
-        expect(stat.methodology, stat.id).toBeTruthy();
+        expect(stat.methodology, stat.id).toMatch(/^\/proof\/methodology#/);
     }
     expect(PROOF_STAT_REGISTRY.milestones).toContain(100_000);
     expect(getProofStat('accounts_total')?.display.rounding.mode).toBe('floor');
@@ -64,5 +65,18 @@ describe('proof-stat registry', () => {
       ])
     ).toBe(false);
     expect(parse([{ ...accounts, methodology: null }])).toBe(false);
+  });
+  it('never rounds a comparative platform count above what was measured', () => {
+    for (const id of ['profile_lcp_rank', 'profile_js_bytes_rank']) {
+      const stat = getProofStat(id);
+      expect(stat?.unit, id).toBe('count');
+      expect(stat?.display.rounding, id).toMatchObject({
+        mode: 'floor',
+        step: 1,
+      });
+      expect(stat ? formatProofValue(3, stat.display.rounding) : null, id).toBe(
+        '3'
+      );
+    }
   });
 });

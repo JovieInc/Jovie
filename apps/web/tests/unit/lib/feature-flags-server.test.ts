@@ -14,8 +14,8 @@ const {
     getEvaluationDetails: () => ({ reason: 'Unrecognized' }),
     value: false,
   }));
-  const initializeMock = vi.fn().mockResolvedValue({ success: true });
-  const shutdownMock = vi.fn().mockResolvedValue({ success: true });
+  const initializeMock = vi.fn().mockResolvedValue({ isSuccess: true });
+  const shutdownMock = vi.fn().mockResolvedValue({ isSuccess: true });
 
   return {
     envState: {
@@ -115,8 +115,8 @@ describe('Statsig server initialization', () => {
     mockCookiesGet.mockReset().mockReturnValue(undefined);
     mockIsAdmin.mockReset().mockResolvedValue(false);
     mockGetFlagOverrideMap.mockReset().mockResolvedValue({});
-    initializeMock.mockReset().mockResolvedValue({ success: true });
-    shutdownMock.mockReset().mockResolvedValue({ success: true });
+    initializeMock.mockReset().mockResolvedValue({ isSuccess: true });
+    shutdownMock.mockReset().mockResolvedValue({ isSuccess: true });
     statsigConstructorMock.mockClear();
     captureWarningMock.mockClear();
     delete process.env.NODE_ENV;
@@ -152,12 +152,25 @@ describe('Statsig server initialization', () => {
     expect(statsigWarnings).toHaveLength(1);
   });
 
+  it('never builds a Statsig client from the vercel pull [SENSITIVE] placeholder', async () => {
+    envState.STATSIG_SERVER_SECRET = '[SENSITIVE]';
+
+    const { checkGateForUser } = await import('@/lib/flags/statsig');
+    await checkGateForUser(
+      'user-1',
+      LEGACY_STATSIG_GATE_KEYS.SUBSCRIBE_CTA_EXPERIMENT
+    );
+
+    expect(statsigConstructorMock).not.toHaveBeenCalled();
+    expect(initializeMock).not.toHaveBeenCalled();
+  });
+
   it('creates a fresh Statsig client after initialization fails', async () => {
     vi.useFakeTimers();
     envState.STATSIG_SERVER_SECRET = 'secret-server-key';
     initializeMock
       .mockRejectedValueOnce(new Error('network unavailable'))
-      .mockResolvedValueOnce({ success: true });
+      .mockResolvedValueOnce({ isSuccess: true });
 
     const { checkGateForUser } = await import('@/lib/flags/statsig');
 
@@ -188,6 +201,49 @@ describe('Statsig server initialization', () => {
       expect.objectContaining({ route: 'statsig-init' })
     );
     vi.useRealTimers();
+  });
+
+  it('retries after an SDK-resolved failure instead of evaluating uninitialized gates', async () => {
+    vi.useFakeTimers();
+    try {
+      envState.STATSIG_SERVER_SECRET = 'secret-server-key';
+      envState.VERCEL_ENV = 'production';
+      initializeMock
+        .mockResolvedValueOnce({
+          isSuccess: false,
+          error: 'operation timed out',
+        })
+        .mockResolvedValueOnce({ isSuccess: true });
+      getFeatureGateMock.mockReturnValue({
+        getEvaluationDetails: () => ({ reason: 'Network' }),
+        value: false,
+      });
+      const { checkGateForUser } = await import('@/lib/flags/statsig');
+
+      await expect(checkGateForUser('user-1', 'test-gate', true)).resolves.toBe(
+        true
+      );
+      expect(getFeatureGateMock).not.toHaveBeenCalled();
+      expect(shutdownMock).toHaveBeenCalledTimes(1);
+      expect(captureWarningMock).toHaveBeenCalledWith(
+        'Statsig init failed; flags serving defaults',
+        expect.objectContaining({ message: 'operation timed out' }),
+        expect.objectContaining({ route: 'statsig-init' })
+      );
+      await vi.advanceTimersByTimeAsync(4_999);
+      await expect(checkGateForUser('user-2', 'test-gate', true)).resolves.toBe(
+        true
+      );
+      expect(initializeMock).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(checkGateForUser('user-3', 'test-gate', true)).resolves.toBe(
+        false
+      );
+      expect(initializeMock).toHaveBeenCalledTimes(2);
+      expect(statsigConstructorMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('falls back when Statsig initialization times out', async () => {

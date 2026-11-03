@@ -49,6 +49,10 @@ const NON_PRODUCT = /\.(test|spec|stories)\.[jt]sx?$/;
  */
 const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   'apps/web/components/marketing/FaqSection.tsx',
+  // /proof/methodology states the rules behind every public number; a clamp
+  // would cut a rule title, so its h1/h2 stay complete.
+  'apps/web/app/(marketing)/proof/methodology/page.tsx',
+  'apps/web/components/marketing/proof/ProofMethodology.tsx',
   // Artist Profiles section value propositions stay complete at phone widths.
   'apps/web/components/marketing/artist-profile/ArtistProfileSectionHeader.tsx',
   'apps/web/components/marketing/artist-notifications/ArtistNotificationsHero.tsx',
