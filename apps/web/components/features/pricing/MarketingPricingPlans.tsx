@@ -57,7 +57,6 @@ function MarketingPricingPlanCard({
         aria-hidden='true'
       />
       <div className='marketing-pricing-plan-card__header'>
-        <span className='marketing-pricing-plan-card__badge'>{plan.badge}</span>
         <p className='marketing-pricing-plan-card__name'>{plan.name}</p>
         <p className='marketing-pricing-plan-card__body'>{plan.body}</p>
       </div>

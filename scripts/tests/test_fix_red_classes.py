@@ -543,5 +543,53 @@ class MeasureTest(unittest.TestCase):
         self.assertEqual(classes.breaker_n([]), classes.DEFAULT_BREAKER_N)
 
 
+class ReleaseIdentityStubTest(unittest.TestCase):
+    SNIPPET = """
+class T(unittest.TestCase):
+    def test_backoff(self):
+        identity = patch.object(lane, "release_identity", return_value={"bundleDigest": "t1", "sourceCommit": "a" * 40})
+        lane.install_release(host)
+
+    def test_custody(self):
+        bundle = {"bundleDigest": "b" * 64, "sourceCommit": "a" * 40}
+        patch.object(lane, "release_identity", return_value=bundle)
+        lane.install_release(self.host)
+
+    def test_multiline(self):
+        bundle = {
+            "bundleDigest": "b" * 64,
+        }
+        patch.object(lane, "release_identity", return_value=bundle)
+        lane.install_release(self.host)
+
+    def test_other(self):
+        bundle = {"bundleDigest": "keep"}
+        patch.object(lane, "release_identity", return_value=bundle)
+
+    def test_spread(self):
+        with patch.object(lane, "release_identity", return_value={**self.manifest, "sourceCommit": "b" * 40}):
+            lane.install_release(self.host)
+"""
+
+    def test_stubs_that_reach_install_release_gain_objects_once(self):
+        once = classes.complete_release_identity_stubs(self.SNIPPET)
+        self.assertEqual(classes.complete_release_identity_stubs(once), once)
+        self.assertIn(
+            'return_value={"bundleDigest": "t1", "sourceCommit": "a" * 40, "objects": {"scripts/lanes": "f" * 40}}',
+            once)
+        self.assertIn(
+            'bundle = {"bundleDigest": "b" * 64, "sourceCommit": "a" * 40, "objects": {"scripts/lanes": "f" * 40}}',
+            once)
+        self.assertIn('bundle = {\n            "bundleDigest": "b" * 64,\n        }', once)
+        self.assertIn('bundle = {"bundleDigest": "keep"}', once)
+        self.assertIn('{**self.manifest, "sourceCommit": "b" * 40}', once)
+        self.assertEqual(once.count('"objects"'), 2)
+
+    def test_checked_in_lane_runner_tests_need_no_further_stub_completion(self):
+        path = Path(__file__).resolve().parents[1] / "tests" / "test_lane_runner.py"
+        text = path.read_text()
+        self.assertEqual(classes.complete_release_identity_stubs(text), text)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,7 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { delimiter, resolve } from 'node:path';
 import { load as parseYaml } from 'js-yaml';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -67,6 +73,70 @@ const WORKFLOW = readFileSync(
 const NOW = Date.parse('2026-09-28T00:00:00Z');
 const DAY = 86_400_000;
 const ago = days => new Date(NOW - days * DAY).toISOString();
+
+describe('escape trace workflow failure propagation', () => {
+  /** @typedef {{ name?: string, run?: string, 'continue-on-error'?: boolean }} TraceStep */
+  /** @typedef {{ steps: TraceStep[], 'continue-on-error'?: boolean }} TraceJob */
+  const workflow = /** @type {{ jobs: Record<string, TraceJob> }} */ (
+    parseYaml(WORKFLOW)
+  );
+  const job = Object.values(workflow.jobs).find(job =>
+    job.steps.some(
+      step => step.name === 'Trace escapes to the PRs that introduced them'
+    )
+  );
+  const step = job.steps.find(
+    step => step.name === 'Trace escapes to the PRs that introduced them'
+  );
+
+  it.each([
+    [23, 0, 23, ['git']],
+    [0, 42, 42, ['git', 'node']],
+    [0, 0, 0, ['git', 'node']],
+  ])(
+    'preserves fetch=%i and report=%i failures',
+    (gitExit, nodeExit, expected, calls) => {
+      const root = mkdtempSync(resolve(tmpdir(), 'escape-trace-'));
+      const callsPath = resolve(root, 'calls');
+      try {
+        for (const [command, code] of Object.entries({
+          git: gitExit,
+          node: nodeExit,
+        })) {
+          const path = resolve(root, command);
+          writeFileSync(
+            path,
+            `#!/bin/sh\nprintf '%s\\n' '${command}' >> "$TRACE_CALLS"\nexit ${code}\n`
+          );
+          chmodSync(path, 0o755);
+        }
+        const result = spawnSync(
+          'bash',
+          ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', step.run],
+          {
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              PATH: root + delimiter + process.env.PATH,
+              GH_TOKEN: 'test-token',
+              TRACE_CALLS: callsPath,
+            },
+          }
+        );
+        expect(result.error).toBeUndefined();
+        expect(result.status, result.stderr).toBe(expected);
+        expect(readFileSync(callsPath, 'utf8').trim().split('\n')).toEqual(
+          calls
+        );
+        // A nonzero shell exit must also fail the Actions step and job.
+        expect(step['continue-on-error'] ?? false).toBe(false);
+        expect(job['continue-on-error'] ?? false).toBe(false);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  );
+});
 
 const run = (createdAt, updatedAt, opts = {}) => ({
   event: 'pull_request',

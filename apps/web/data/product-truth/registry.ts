@@ -782,6 +782,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
     nonMarketing:
       'investor brief section order; default off until founder design approval',
   },
+  CLAIM_LEGACY_PROOF_SWEEP: {
+    nonMarketing:
+      'daily sweep over grandfathered claims; default off; no public capability claim',
+  },
 } as const satisfies Readonly<Record<ProductFlagKey, FlagCapabilityBinding>>;
 
 /**
