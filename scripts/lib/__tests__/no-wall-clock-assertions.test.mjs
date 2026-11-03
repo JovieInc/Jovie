@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   findWallClockAssertions,
+  listGatingTestFiles,
   scanRepo,
 } from '../wall-clock-assertions.mjs';
 
@@ -16,6 +17,93 @@ const baseline = JSON.parse(
 ).files;
 
 describe('wall-clock assertion detector', () => {
+  it('reports the assertion line once after blank lines and comments', () => {
+    expect(
+      findWallClockAssertions(
+        '\n\n// timing check\nassert.ok(elapsed < 1000);\n'
+      )
+    ).toEqual([4]);
+  });
+
+  it('keeps opt-outs attached to the actual wrapped assertion', () => {
+    expect(
+      findWallClockAssertions(
+        '\n\n// wall-clock-ok: injected clock\nexpect(\n  elapsedMs\n).toBeLessThan(5);\n'
+      )
+    ).toEqual([]);
+    expect(
+      findWallClockAssertions(
+        'expect(\n  elapsedMs\n).toBeLessThan(5); // wall-clock-ok: injected clock\n'
+      )
+    ).toEqual([]);
+  });
+
+  it('ignores fixture strings and comments without excluding test files', () => {
+    expect(listGatingTestFiles(REPO_ROOT)).toContain(
+      'scripts/lib/__tests__/no-wall-clock-assertions.test.mjs'
+    );
+    expect(
+      findWallClockAssertions(
+        readFileSync(fileURLToPath(import.meta.url), 'utf8')
+      )
+    ).toEqual([]);
+    expect(
+      findWallClockAssertions(
+        '// expect(elapsed).toBeLessThan(5);\n' +
+          'const fixture = `assert.ok(elapsed < 1);`;\n' +
+          'expect(elapsed).toBeLessThan(5);\n'
+      )
+    ).toEqual([3]);
+  });
+
+  it('finds assertions past four lines and in semicolon-free code', () => {
+    expect(
+      findWallClockAssertions(
+        'expect(\n\n\n\n\n elapsed\n).toBeLessThan(5)\nassert.ok(duration < 10)\n'
+      )
+    ).toEqual([1, 8]);
+  });
+
+  it('does not apply an inline opt-out to the next assertion', () => {
+    expect(
+      findWallClockAssertions(
+        'expect(elapsed).toBeLessThan(5); // wall-clock-ok: injected clock\n' +
+          'assert.ok(Date.now() - started < 1000);'
+      )
+    ).toEqual([2]);
+  });
+
+  it('detects clock reads on either side of a comparison', () => {
+    expect(
+      findWallClockAssertions(
+        'assert.ok(1000 > elapsed);\nexpect(500).toBeGreaterThan(Date.now() - start);'
+      )
+    ).toEqual([1, 2]);
+    expect(
+      findWallClockAssertions('expect(expiresAt).toBeGreaterThan(Date.now());')
+    ).toEqual([]);
+  });
+
+  it('keeps clock comparisons executable inside TSX and template expressions', () => {
+    expect(
+      findWallClockAssertions(
+        'const view = <div />;\nexpect(Date.now() - started).toBeGreaterThan(0);',
+        'x.test.tsx'
+      )
+    ).toEqual([2]);
+    expect(
+      findWallClockAssertions('const text = `${assert.ok(elapsed < 5)}`;')
+    ).toEqual([1]);
+    expect(
+      findWallClockAssertions('expect("elapsed").toBeLessThan(5);')
+    ).toEqual([]);
+    expect(
+      findWallClockAssertions(
+        'assert.ok(elapsed < 5, "wall-clock-ok: only a string");'
+      )
+    ).toEqual([1]);
+  });
+
   it('flags duration comparisons in JS and Python', () => {
     expect(
       findWallClockAssertions(

@@ -117,3 +117,21 @@ describe('reserved fixture artists', () => {
     ).rejects.toBeInstanceOf(ProdcertFixtureUnavailableError);
   });
 });
+
+describe('admitted canary reserved artist', () => {
+  it('is never in the shared pool and is skipped by the selector', async () => {
+    const { ADMITTED_CANARY_RESERVED_ARTIST, SHARED_E2E_ARTIST_POOL } =
+      await import('./prodcert-artist-fixture');
+    expect(
+      SHARED_E2E_ARTIST_POOL.map(artist => artist.spotifyId)
+    ).not.toContain(ADMITTED_CANARY_RESERVED_ARTIST.spotifyId);
+    const probed: string[] = [];
+    await expect(
+      selectUnclaimedCertArtist([ADMITTED_CANARY_RESERVED_ARTIST], async id => {
+        probed.push(id);
+        return false;
+      })
+    ).rejects.toBeInstanceOf(ProdcertFixtureUnavailableError);
+    expect(probed).toEqual([]);
+  });
+});

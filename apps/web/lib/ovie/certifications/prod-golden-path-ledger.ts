@@ -264,6 +264,34 @@ export async function readProdGoldenPathLedger(
     : parseProdGoldenPathLedger(raw);
 }
 
+/**
+ * A surface is certified while its latest production receipt passed within
+ * this window. Post-deploy probes certify after every promotion, so a day
+ * without a passing receipt means the certification is no longer current.
+ */
+export const PROD_GOLDEN_PATH_CERTIFICATION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const CLOCK_SKEW_MS = 5 * 60 * 1000;
+
+/**
+ * Surfaces with a current production certification, in launch order. The
+ * production alias perf gate blocks only on these (Tim 2026-10-31): the
+ * blocking set grows as surfaces certify, and a missing ledger certifies
+ * nothing, so it can never block.
+ */
+export function certifiedProdGoldenPathSurfaces(
+  ledger: ProdGoldenPathLedger | null,
+  now: number = Date.now(),
+  maxAgeMs: number = PROD_GOLDEN_PATH_CERTIFICATION_MAX_AGE_MS
+): ProdGoldenPathSurfaceId[] {
+  if (!ledger) return [];
+  return PROD_GOLDEN_PATH_SURFACE_IDS.filter(id => {
+    const latest = ledger.surfaces[id]?.latest;
+    if (!latest || latest.status !== 'passed') return false;
+    const endedAt = Date.parse(latest.endedAt);
+    return endedAt <= now + CLOCK_SKEW_MS && now - endedAt <= maxAgeMs;
+  });
+}
+
 export type ProdGoldenPathRecordResult = {
   readonly recorded: readonly ProdGoldenPathSurfaceId[];
   /** Receipts not newer than the stored latest for their surface. */

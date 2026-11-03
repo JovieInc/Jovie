@@ -31,7 +31,9 @@ describe('VoicePageContent source contract', () => {
     const stepArticles = screen.getAllByRole('article');
     expect(stepArticles).toHaveLength(VOICE_PAGE_STEPS.length);
     for (const [index, step] of VOICE_PAGE_STEPS.entries()) {
-      expect(within(stepArticles[index]).getByText(step.n)).toBeInTheDocument();
+      expect(
+        within(stepArticles[index]).queryByText(/^0\d$/)
+      ).not.toBeInTheDocument();
       expect(
         within(stepArticles[index]).getByRole('heading', {
           level: 3,

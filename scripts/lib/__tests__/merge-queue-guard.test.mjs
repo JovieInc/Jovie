@@ -1062,6 +1062,7 @@ describe('absolute update-branch subprocess deadline', () => {
   });
 
   it('returns verification_failure for a hung post-mutation command and permits the next run', async () => {
+    const clock = fakeClock();
     const gh = ghSequence({ mutation: asynchronousMutationSnapshot() });
     let mutationReturned = false;
     let hungTimeoutMs = null;
@@ -1081,6 +1082,7 @@ describe('absolute update-branch subprocess deadline', () => {
       dryRun: false,
       ghJsonImpl: hungGhJson,
       integrationProofImpl: gh.integrationProofImpl,
+      nowImpl: clock.nowImpl,
       operationBudgetMs: 80,
     });
 

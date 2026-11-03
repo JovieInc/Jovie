@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import { NextResponse } from 'next/server';
+import { getAdminMercuryMetrics } from '@/lib/admin/mercury-metrics';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -41,6 +42,22 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const ROUTE = '/api/internal/ovie/summer-cards';
+
+/** Mercury cash for the capital gate (read-only MERCURY_API_TOKEN); any failure is unknown, never abundant. */
+async function readCashPosition() {
+  try {
+    const m = await getAdminMercuryMetrics();
+    if (!m.isConfigured || !m.isAvailable) return null;
+    return {
+      balanceUsd: m.balanceUsd,
+      burnUsdPer30d: m.burnRateAvailable
+        ? (m.burnRateUsd * 30) / Math.max(1, m.burnWindowDays)
+        : null,
+    };
+  } catch {
+    return null;
+  }
+}
 
 async function recordReceipt(key: string, receipt: Readonly<{ id: string }>) {
   const backend = postgresRecordBackend();
@@ -175,7 +192,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (spendIntent.success || spendOutcome.success) {
     try {
       const receipt = spendIntent.success
-        ? evaluateSpendIntent(spendIntent.data)
+        ? evaluateSpendIntent(spendIntent.data, await readCashPosition())
         : buildSpendOutcomeReceipt(spendOutcome.data!);
       const recorded = await recordReceipt(
         `spend-receipt:${receipt.id}`,
