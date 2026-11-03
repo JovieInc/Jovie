@@ -7,6 +7,7 @@ import {
   attachReceiptToReleaseBody,
   buildChangelogWriterProofReceipt,
   CHANGELOG_PR_BODY_MARKER,
+  gh,
   main,
   RELEASE_PR_WRITER_EVIDENCE,
   releasePrEligibleForWriterProof,
@@ -211,8 +212,8 @@ describe('publisher writer-proof execution', () => {
       args.includes('PATCH') ? '{}' : JSON.stringify(pullRequest())
     );
     expect(main(argv, { github, repository: 'JovieInc/Jovie' })).toBe(0);
-    expect(github).toHaveBeenCalledTimes(2);
-    const patch = github.mock.calls[1][0];
+    expect(github).toHaveBeenCalledTimes(3);
+    const patch = github.mock.calls[2][0];
     expect(patch.slice(0, 4)).toEqual([
       'api',
       '-X',
@@ -265,6 +266,148 @@ describe('publisher writer-proof execution', () => {
     expect(main(argv, { github, repository: 'JovieInc/Jovie' })).toBe(0);
     expect(github).toHaveBeenCalledTimes(1);
   });
+
+  it('preserves concurrent body metadata by rebuilding after a fresh read', () => {
+    const updated = `${PUBLISHER_BODY}\n<!-- another-receipt/v1 -->`;
+    let reads = 0;
+    const github = vi.fn(args =>
+      args.includes('PATCH')
+        ? '{}'
+        : JSON.stringify(
+            pullRequest(HEAD, ++reads === 1 ? PUBLISHER_BODY : updated)
+          )
+    );
+    expect(main(argv, { github })).toBe(0);
+    expect(github).toHaveBeenCalledTimes(5);
+    expect(github.mock.calls[4][0][5]).toContain('<!-- another-receipt/v1 -->');
+  });
+
+  it('refuses a head change observed immediately before writing', () => {
+    let reads = 0;
+    const github = vi.fn(() =>
+      JSON.stringify(pullRequest(++reads === 1 ? HEAD : OTHER_HEAD))
+    );
+    expect(main(argv, { github })).toBe(1);
+    expect(github).toHaveBeenCalledTimes(2);
+  });
+
+  it('reads back an uncertain successful PATCH before retrying and avoids a duplicate write', () => {
+    let body = PUBLISHER_BODY;
+    const github = vi.fn(args => {
+      if (!args.includes('PATCH'))
+        return JSON.stringify(pullRequest(HEAD, body));
+      body = args[5].slice('body='.length);
+      throw Object.assign(new Error('connection reset'), { retryable: true });
+    });
+    expect(main(argv, { github })).toBe(0);
+    expect(github).toHaveBeenCalledTimes(4);
+    expect(
+      github.mock.calls.filter(([args]) => args.includes('PATCH'))
+    ).toHaveLength(1);
+  });
+
+  it('bounds transient PATCH recovery to three writes with fresh reads before each', () => {
+    const github = vi.fn(args => {
+      if (!args.includes('PATCH')) return JSON.stringify(pullRequest());
+      throw Object.assign(new Error('HTTP 503'), { retryable: true });
+    });
+    expect(() => main(argv, { github })).toThrow('HTTP 503');
+    expect(
+      github.mock.calls.map(([args]) =>
+        args.includes('PATCH') ? 'PATCH' : 'GET'
+      )
+    ).toEqual([
+      'GET',
+      'GET',
+      'PATCH',
+      'GET',
+      'GET',
+      'PATCH',
+      'GET',
+      'GET',
+      'PATCH',
+    ]);
+  });
+
+  it('does not add retries to shared-client GET failures or permanent PATCH failures', () => {
+    for (const failRead of [true, false]) {
+      const github = vi.fn(args => {
+        if (failRead || args.includes('PATCH'))
+          throw new Error('quota or authorization refused');
+        return JSON.stringify(pullRequest());
+      });
+      expect(() => main(argv, { github })).toThrow(
+        'quota or authorization refused'
+      );
+      expect(github).toHaveBeenCalledTimes(failRead ? 1 : 3);
+    }
+  });
+
+  it('does not retry an ineligible publisher PR', () => {
+    const github = vi.fn(() =>
+      JSON.stringify({ ...pullRequest(), user: { login: 'itstimwhite' } })
+    );
+    expect(main(argv, { github })).toBe(1);
+    expect(github).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    {
+      method: 'PATCH',
+      status: 1,
+      stderr: 'HTTP 502 Bad Gateway',
+      retryable: true,
+    },
+    { method: 'PATCH', status: 1, stderr: 'connection reset', retryable: true },
+    {
+      method: 'GET',
+      status: 1,
+      stderr: 'HTTP 502 Bad Gateway',
+      retryable: false,
+    },
+    {
+      method: 'PATCH',
+      status: 1,
+      stderr: 'HTTP 429 rate limit',
+      retryable: false,
+    },
+    {
+      method: 'PATCH',
+      status: 1,
+      stderr: 'HTTP 403 forbidden',
+      retryable: false,
+    },
+    { method: 'PATCH', status: 75, stderr: 'quota deferred', retryable: false },
+  ])(
+    'classifies $method/$stderr without bypassing the budgeted client',
+    ({ method, status, stderr, retryable }) => {
+      const args =
+        method === 'PATCH'
+          ? ['api', '-X', 'PATCH', 'repos/JovieInc/Jovie/pulls/4164']
+          : ['api', 'repos/JovieInc/Jovie/pulls/4164'];
+      const run = vi.fn(() => ({ status, stderr, stdout: '' }));
+      let failure;
+      try {
+        gh(args, run);
+      } catch (error) {
+        failure = error;
+      }
+      expect(failure).toBeInstanceOf(Error);
+      expect(Boolean(failure.retryable)).toBe(retryable);
+      expect(run).toHaveBeenCalledTimes(1);
+      expect(run.mock.calls[0].slice(0, 2)).toEqual([
+        process.execPath,
+        [
+          'packages/api-client/cli.ts',
+          'gh',
+          '--priority',
+          'default',
+          '--',
+          ...args,
+        ],
+      ]);
+    }
+  );
 
   it.each([
     { helperExit: 0, originExit: 0 },
