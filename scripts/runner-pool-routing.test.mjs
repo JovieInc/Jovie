@@ -5,7 +5,7 @@ import { runInNewContext } from 'node:vm';
 import { load } from 'js-yaml';
 
 const workflow = name =>
-  /** @type {{ jobs: Record<string, { 'runs-on': string }> }} */ (
+  /** @type {{ jobs: Record<string, { 'runs-on': string, steps?: Array<{ run?: string }> }> }} */ (
     load(
       readFileSync(
         new URL(`../.github/workflows/${name}.yml`, import.meta.url),
@@ -109,11 +109,7 @@ test('Fleet Rules never executes fork checkout code on the persistent pool', () 
   );
 });
 
-for (const file of [
-  'auto-ready-agent-drafts',
-  'lane-fix-relay',
-  'merge-queue-green-enroll',
-]) {
+for (const file of ['lane-fix-relay', 'merge-queue-green-enroll']) {
   const jobs = Object.values(workflow(file).jobs).filter(job =>
     job['runs-on']?.includes('RUNNER_CONTROL_PLANE')
   );
@@ -135,3 +131,11 @@ for (const file of [
     }
   });
 }
+
+test('Auto-Ready fleet controllers retain the hosted CLI contract', () => {
+  const jobs = workflow('auto-ready-agent-drafts').jobs;
+  for (const id of ['auto-ready', 'green-source']) {
+    assert.equal(jobs[id]['runs-on'], 'ubuntu-latest');
+    assert.ok(jobs[id].steps.some(step => step.run === 'gh --version'));
+  }
+});
