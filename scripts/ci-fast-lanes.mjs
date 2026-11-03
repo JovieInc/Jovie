@@ -1274,6 +1274,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/verify-patched-dependencies.test.mjs',
   'scripts/lib/__tests__/incident-dedupe.test.mjs',
   'scripts/lib/__tests__/ci-capacity.test.mjs',
+  'scripts/lib/__tests__/merge-queue-speed.test.mjs',
   'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
 ]);
 export const MESH_HOST_ACK_COVERAGE_COMMAND =
