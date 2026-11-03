@@ -20,13 +20,15 @@ vi.mock('@/components/molecules/drawer', () => ({
     entityHeader,
     children,
     isOpen,
+    scrollStrategy = 'child',
   }: {
     readonly entityHeader?: ReactNode;
     readonly children: ReactNode;
     readonly isOpen: boolean;
+    readonly scrollStrategy?: 'child' | 'shell';
   }) =>
     isOpen ? (
-      <aside>
+      <aside data-scroll-strategy={scrollStrategy}>
         {entityHeader}
         {children}
       </aside>
@@ -126,6 +128,16 @@ describe('AiCrawlerDetailPanel', () => {
       screen.getByText('No AI crawler visits recorded yet.')
     ).toBeInTheDocument();
     expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
+  });
+
+  it('gives the long crawler list an explicit shell-owned scroll region', () => {
+    render(<AiCrawlerDetailPanel isOpen onClose={() => undefined} />);
+
+    // P1.3/P3.1: pinned stats plus one shell-owned scroller keeps long crawler
+    // lists scrollable without a second nested scroll owner.
+    expect(
+      document.querySelector('aside[data-scroll-strategy="shell"]')
+    ).not.toBeNull();
   });
 
   it('gates the teaser behind the canonical Artist Presence upsell', () => {

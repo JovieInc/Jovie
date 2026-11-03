@@ -28,6 +28,7 @@ import {
   formatStructuralTimings,
   LANE_COMMANDS,
   LANE_GROUPS,
+  LANES_COVERAGE_COMMAND,
   laneFailureExcerpt,
   MARKETING_CERTIFICATION_COMMAND,
   runCommandPool,
@@ -46,6 +47,28 @@ import {
   VALIDATION_LIFECYCLE_COVERAGE_COMMAND,
   webCiContractTestsCommand,
 } from '../../ci-fast-lanes.mjs';
+
+it('selects capacity behavior and coverage on collector, fixture and registry changes', () => {
+  for (const file of [
+    'scripts/capacity/forecast.py',
+    'scripts/tests/test_capacity_forecast.py',
+    'scripts/tests/test_neon_collector.py',
+    'ops/registry/capacity-resources.json',
+  ]) {
+    const guards = selectSourceGuards('pull_request', [file]);
+    const guard = guards.find(item => item.id === 'capacity-forecast');
+    expect(guard, file).toBeDefined();
+    expect(guard.command).toContain('coverage run --branch -m unittest');
+    expect(guard.command).toContain('scripts.tests.test_capacity_forecast');
+    expect(guard.command).toContain('scripts.tests.test_neon_collector');
+    expect(guard.command).toContain('--fail-under=60');
+  }
+  expect(
+    selectSourceGuards('pull_request', ['docs/unrelated.md']).some(
+      item => item.id === 'capacity-forecast'
+    )
+  ).toBe(false);
+});
 
 it('selects writing readiness regressions and the evaluator coverage command', async () => {
   const names = [
@@ -170,6 +193,10 @@ describe('Shared fenced-attempt coverage contract', () => {
     expect(command).toContain('scripts/tests/test_execution_attempt.py');
     expect(command).toContain('scripts/tests/test_backlog_admission.py');
     expect(command).toContain('scripts/tests/test_backlog_writer_guard.py');
+    expect(command).toContain('scripts/tests/test_board_intake.py');
+    expect(command).toContain(
+      '*/scripts/lanes/board_intake.py" --fail-under=85'
+    );
     expect(command).toContain(
       '*/scripts/lanes/backlog_writer_guard.py" --fail-under=90'
     );
@@ -444,7 +471,12 @@ describe('runStructural screenshot contract discovery', () => {
       expect(
         commands.includes(DESKTOP_INSTALLED_IDENTITY_COVERAGE_COMMAND)
       ).toBe(lane === 'mac');
-    }
+    },
+    // The first case pays the cold screenshot-contract discovery scan (5.4s of
+    // this file's 6.3s on an idle host). As structural command 1 it runs beside
+    // 60 others and crossed the 30s default, ejecting #23938 and #23706 from
+    // the merge queue on 2026-10-31. Assertions are unchanged.
+    120_000
   );
 
   it.each([
@@ -1352,6 +1384,7 @@ describe('structural command pool', () => {
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
     vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', 'skip');
     vi.stubEnv('CI_FAST_STRUCTURAL_WEB', 'skip');
+    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'skip');
     const started = [];
     await runStructural({
       concurrency: 3,
@@ -1360,11 +1393,63 @@ describe('structural command pool', () => {
         return { code: 0, output: '' };
       },
     });
-    // Merge group 38247843089: the 174.5s lanes pytest started last and set
-    // the 260s remaining wall; it must hold a slot from the start.
-    const head = started.slice(0, 2).join('\n');
-    expect(head).toContain('scripts/tests/test_lane_runner.py');
-    expect(head).toContain('lib/__tests__/merge-group-failure-hold.test.mjs');
+    // The lanes pytest left for ci-fast (structural lanes); the next pole
+    // (merge-group-failure-hold, 249s in 41250311104) holds a slot first.
+    expect(started.join('\n')).not.toContain(
+      'scripts/tests/test_lane_runner.py'
+    );
+    expect(started).not.toContain(LANES_COVERAGE_COMMAND);
+    expect(started.slice(0, 2).join('\n')).toContain(
+      'lib/__tests__/merge-group-failure-hold.test.mjs'
+    );
+  });
+
+  it('runs only the lanes coverage pytest in ci-fast (structural lanes)', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'operations');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', '');
+    vi.stubEnv('CI_FAST_STRUCTURAL_WEB', '');
+    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only');
+    const started = [];
+    await runStructural({
+      concurrency: 3,
+      execute: command => {
+        started.push(command);
+        return { code: 0, output: '' };
+      },
+    });
+    expect(started).toEqual([LANES_COVERAGE_COMMAND]);
+    // Every per-module coverage floor still runs, after the shards combine.
+    expect(LANES_COVERAGE_COMMAND).toContain('coverage combine');
+    expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(22);
+    expect(LANES_COVERAGE_COMMAND).toContain(
+      'priority_admission.py" --fail-under=80'
+    );
+    expect(LANES_COVERAGE_COMMAND).toContain(
+      'board_intake.py" --fail-under=85'
+    );
+    expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0]).toBe(
+      LANES_COVERAGE_COMMAND
+    );
+  });
+
+  it('does not also run lanes coverage in the structural python job', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'operations');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', 'only');
+    vi.stubEnv('CI_FAST_STRUCTURAL_WEB', '');
+    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', '');
+    const started = [];
+    await runStructural({
+      execute: command => {
+        started.push(command);
+        return { code: 0, output: '' };
+      },
+    });
+    expect(started.length).toBeGreaterThan(0);
+    expect(started).not.toContain(LANES_COVERAGE_COMMAND);
   });
 
   it('starts the slowest web commands first', async () => {
@@ -2200,6 +2285,7 @@ describe('source-read guard selection', () => {
       [
         'artist-launch-contract',
         'privacy-input-route-trackers',
+        'privacy-compliance',
         'merge-group-unit-guards',
         'node-environment-files',
       ],
@@ -2241,6 +2327,7 @@ describe('source-read guard selection', () => {
       [
         'artist-launch-contract',
         'privacy-input-route-trackers',
+        'privacy-compliance',
         'merge-group-unit-guards',
         'static-revalidate-policy',
         'art-direction',
@@ -2371,9 +2458,11 @@ describe('source-read guard selection', () => {
     const all = SOURCE_GUARDS.map(guard => guard.id);
     // Manual dispatch runs web Unit Tests and structural, which carry the rest.
     expect(selected('workflow_dispatch', ['README.md'])).toEqual([
+      'capacity-forecast',
       'native-design-system',
       'artist-launch-contract',
       'privacy-input-route-trackers',
+      'privacy-compliance',
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
@@ -2391,9 +2480,11 @@ describe('source-read guard selection', () => {
     expect(selected('pull_request', null)).toEqual(all);
     expect(selected('pull_request', [])).toEqual(all);
     expect(selected('merge_group', null)).toEqual([
+      'capacity-forecast',
       'native-design-system',
       'artist-launch-contract',
       'privacy-input-route-trackers',
+      'privacy-compliance',
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
@@ -2411,6 +2502,25 @@ describe('source-read guard selection', () => {
 
   it('points every guard at a test file that exists', () => {
     for (const guard of SOURCE_GUARDS) {
+      if (guard.id === 'capacity-forecast') {
+        const modules = [
+          ...guard.command.matchAll(/scripts\.tests\.test_[a-z_]+/gu),
+        ].map(match => match[0]);
+        expect(modules).toEqual([
+          'scripts.tests.test_capacity_forecast',
+          'scripts.tests.test_neon_collector',
+        ]);
+        for (const module of modules) {
+          expect(
+            readFileSync(
+              join(REPO_ROOT, `${module.replaceAll('.', '/')}.py`),
+              'utf8'
+            ),
+            module
+          ).toContain('unittest.TestCase');
+        }
+        continue;
+      }
       if (guard.id === 'native-design-system') {
         expect(guard.command).toContain('native-design-system.mjs');
         expect(guard.command).toContain('native-spacing-scale.mjs');
@@ -2439,6 +2549,19 @@ describe('source-read guard selection', () => {
         expect(
           readFileSync(
             join(REPO_ROOT, 'scripts/compliance/input-page-trackers.test.mjs'),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
+        continue;
+      }
+      if (guard.id === 'privacy-compliance') {
+        expect(guard.prOnly).toBe(false);
+        expect(guard.command).toContain(
+          'scripts/compliance/privacy-rules.test.mjs'
+        );
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'scripts/compliance/privacy-rules.test.mjs'),
             'utf8'
           )
         ).toContain("from 'node:test'");

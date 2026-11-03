@@ -24,7 +24,11 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-
+import { isAutomatedEmail } from '@/lib/customer-voice/classify';
+import {
+  CUSTOMER_VOICE_EMAIL_LOCAL_PARTS,
+  captureInboundSupportEmail,
+} from '@/lib/customer-voice/inbound-email.server';
 import { db } from '@/lib/db';
 import { emailThreads, inboundEmails } from '@/lib/db/schema/inbox';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -223,6 +227,34 @@ export async function POST(req: NextRequest) {
   const [localPart] = recipientEmail.split('@');
   const [username] = (localPart ?? '').split('+');
   if (!username) {
+    return NextResponse.json({ ok: true }, { headers: NO_STORE_HEADERS });
+  }
+
+  // Mail to Jovie itself (support@, help@, ...) is customer voice: it goes to
+  // Tim through Summer with a drafted reply. These local parts are reserved
+  // usernames, so no artist inbox can collide with them.
+  if (CUSTOMER_VOICE_EMAIL_LOCAL_PARTS.has(username.toLowerCase())) {
+    const full = await fetchFullEmail(data.email_id);
+    if (
+      isAutomatedEmail({
+        from: data.from,
+        subject: data.subject ?? null,
+        headers: full?.headers ?? null,
+      })
+    ) {
+      logger.info('Inbound support email skipped as automated', {
+        emailId: data.email_id,
+      });
+      return NextResponse.json({ ok: true }, { headers: NO_STORE_HEADERS });
+    }
+    await captureInboundSupportEmail({
+      from: data.from,
+      fromName: data.from_name ?? null,
+      subject: data.subject ?? null,
+      messageId: data.message_id ?? full?.headers?.['message-id'] ?? null,
+      text: full?.stripped_text || full?.text || data.subject || '',
+      localPart: username.toLowerCase(),
+    });
     return NextResponse.json({ ok: true }, { headers: NO_STORE_HEADERS });
   }
 

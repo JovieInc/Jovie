@@ -925,7 +925,7 @@
       },
       "atLimit": {
         "effect": "deny",
-        "note": "sends are rejected until midnight UTC: sign-in codes and receipts stop"
+        "note": "quota exhaustion rejects sends; use the provider reset timestamp: sign-in codes and receipts stop"
       },
       "leadTimeHours": 1,
       "mode": "level",
@@ -952,7 +952,7 @@
       },
       "atLimit": {
         "effect": "deny",
-        "note": "sends are rejected until the month rolls"
+        "note": "quota exhaustion rejects sends; use the provider reset timestamp"
       },
       "leadTimeHours": 72,
       "mode": "level",
