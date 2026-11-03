@@ -167,6 +167,36 @@ test('companion edits present in the diff clear the checklist', () => {
   );
 });
 
+test('disk fixture companion requires the exact version before local publication', () => {
+  const fixture = 'scripts/tests/test_disk_guard.py';
+  const policy = 'scripts/lanes/qualification_guard.py';
+  // Published SHA-256 test vector for "abc"; no candidate Python is executed.
+  const digest =
+    'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
+  const check = (text, policyText) =>
+    companionChecklist([file(fixture)], p =>
+      p === fixture ? text : p === policy ? policyText : ''
+    );
+  for (const policyText of ['', 'REVIEWED_FIXTURE_SHA256 = ("old",)']) {
+    const [item] = check('abc', policyText);
+    assert.ok(item, 'fixture changes need a companion check');
+    assert.equal(item.done, false);
+    assert.match(item.hint, new RegExp(digest));
+    assert.match(item.hint, /test_the_repo_fixture_is_a_reviewed_version/);
+  }
+  const policyText = `REVIEWED_FIXTURE_SHA256 = ("${digest}",)`;
+  assert.equal(check('abc', policyText)[0].done, true);
+  assert.equal(
+    check('abcd', policyText)[0].done,
+    false,
+    'a later fixture edit invalidates the companion pin'
+  );
+  assert.deepEqual(
+    companionChecklist([file('README.md')], () => ''),
+    []
+  );
+});
+
 test('two new migrations violate the single-migration rule', () => {
   const m = n => file(`apps/web/drizzle/migrations/${n}_x.sql`, 'added');
   const items = companionChecklist([m('0151'), m('0152')], () => '');
@@ -188,6 +218,7 @@ test('typecheck targets are the affected packages only', () => {
     'pkg:@jovie/ovie',
     'scripts',
     'web',
+    'web-stories',
     'web-tests',
   ]);
 });
@@ -214,7 +245,7 @@ test('web source changes typecheck test consumers without a changed test file', 
       [file('apps/web/lib/leads/route-lead.ts')],
       process.cwd()
     ).sort(),
-    ['pkg:@jovie/ovie', 'web', 'web-tests']
+    ['pkg:@jovie/ovie', 'web', 'web-stories', 'web-tests']
   );
   assert.deepEqual(
     typecheckTargets(
@@ -232,11 +263,40 @@ test('web source changes typecheck test consumers without a changed test file', 
   );
 });
 
+test('story changes select the story compiler omitted by the app and test projects', () => {
+  const story =
+    'apps/web/components/features/opportunity-inbox/OpportunityInboxEmptyState.stories.tsx';
+  assert.ok(
+    typecheckTargets([file(story)], process.cwd()).includes('web-stories')
+  );
+  assert.deepEqual(
+    typecheckTargets([file(story, 'removed')], process.cwd()),
+    []
+  );
+  assert.deepEqual(
+    typecheckTargets([file('apps/web/tests/unit/a.test.ts')], process.cwd()),
+    ['web-tests']
+  );
+});
+
 test('arguments parse and unknown flags fail', () => {
   assert.equal(parseArgs(['--no-coverage', '--base', 'dev']).coverage, false);
   assert.throws(() => parseArgs(['--nope']));
   assert.ok(HEAVY_GUARDS.has('merged-with-base-invariants'));
   assert.ok(GENERATORS.some(g => g.id === 'workflow-topology'));
+});
+
+test('route and policy changes select launch inventory regeneration before guards', () => {
+  const generator = GENERATORS.find(g => g.id === 'artist-launch-inventory');
+  assert.ok(generator);
+  for (const source of [
+    'apps/web/app/api/admin/reference-review/route.ts',
+    'scripts/artist-launch-policy.mjs',
+    'scripts/artist-launch-contract.mjs',
+    'docs/product/generated/artist-launch-inventory.json',
+  ])
+    assert.ok(generator.when.test(source), source);
+  assert.equal(generator.when.test('apps/web/lib/unrelated.ts'), false);
 });
 
 test('host-only reds are downgraded on macOS but real reds are not', () => {
@@ -441,5 +501,63 @@ test('preflight exits clean on a valid clean branch but fails an invalid base re
     assert.ok(!lines.some(l => /no changes/.test(l)), lines.join('\n'));
   } finally {
     rmSync(bad, { recursive: true, force: true });
+  }
+});
+
+test('private data guard uses an absolute XDG cache when home is unavailable', async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'preflight-xdg-'));
+  try {
+    const repo = path.join(root, 'repo');
+    const cache = path.join(root, 'cache');
+    const home = path.join(root, 'unavailable-home');
+    const sha = 'a'.repeat(40);
+    mkdirSync(path.join(repo, '.github/workflows'), { recursive: true });
+    mkdirSync(path.join(cache, 'jovie-preflight'), { recursive: true });
+    writeFileSync(home, 'not a directory');
+    writeFileSync(
+      path.join(repo, '.github/workflows/private-data-guard.yml'),
+      `jobs:\n  guard:\n    uses: JovieInc/ci/.github/workflows/guard.yml@${sha}\n`
+    );
+    writeFileSync(
+      path.join(cache, 'jovie-preflight', `private-data-${sha}.py`),
+      'import os, sys\nprint(os.environ["FAIL_ON_FINDINGS"])\nsys.exit(7)\n'
+    );
+    const runner = `import { privateDataCheck } from ${JSON.stringify(new URL('./preflight-changed.mjs', import.meta.url).href)};
+const r = await privateDataCheck(${JSON.stringify(repo)}, process.env, 'base');
+console.log(JSON.stringify(r));`;
+    const result = spawnSync(
+      process.execPath,
+      ['--input-type=module', '-e', runner],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, HOME: home, XDG_CACHE_HOME: cache },
+      }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const output = JSON.parse(result.stdout.trim());
+    assert.equal(output.code, 7);
+    assert.match(output.out, /true/);
+
+    const fallbackHome = path.join(root, 'fallback-home');
+    const fallbackCache = path.join(fallbackHome, '.cache/jovie-preflight');
+    mkdirSync(fallbackCache, { recursive: true });
+    writeFileSync(
+      path.join(fallbackCache, `private-data-${sha}.py`),
+      'import sys\nsys.exit(8)\n'
+    );
+    for (const invalid of ['', 'relative-cache']) {
+      const fallback = spawnSync(
+        process.execPath,
+        ['--input-type=module', '-e', runner],
+        {
+          encoding: 'utf8',
+          env: { ...process.env, HOME: fallbackHome, XDG_CACHE_HOME: invalid },
+        }
+      );
+      assert.equal(fallback.status, 0, fallback.stderr);
+      assert.equal(JSON.parse(fallback.stdout.trim()).code, 8, invalid);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

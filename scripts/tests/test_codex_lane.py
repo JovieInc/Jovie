@@ -89,6 +89,9 @@ class Isolated(unittest.TestCase):
         self.host_env.start()
         self.addCleanup(self.host_env.stop)
         os.environ.pop("CODEX_LANE_AUTH_MODE", None)
+        # Capacity tests may enter worker() on the real Gem host. Never discover
+        # production repository bindings or reexec into the installed worker.
+        os.environ["LANES_EXECUTION_BACKEND"] = "local-test"
 
     def tearDown(self):
         codex.ACCOUNTS_ROOT, codex.STATE = self.saved
@@ -118,6 +121,22 @@ class IsolatedSetUpHostModeTest(unittest.TestCase):
                 case.tearDown()
                 case.doCleanups()
             self.assertEqual(os.environ.get("CODEX_LANE_AUTH_MODE"), "subscription-pool")
+
+    def test_fixture_disables_live_bindings_even_when_host_is_gem(self):
+        from scripts.lanes import lane_runner as runner
+        with patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "production"}):
+            case = AccountsTest("test_only_chatgpt_profiles_are_accounts")
+            case.setUp()
+            try:
+                with patch.object(runner, "HOST", "gem"), \
+                        patch.object(runner, "read_json", side_effect=AssertionError("no production policy read")), \
+                        patch.object(runner, "sh", side_effect=AssertionError("no GitHub or worktree command")), \
+                        patch.object(runner.os, "execv", side_effect=AssertionError("no process replacement")):
+                    self.assertEqual(runner.bindings.extra_bindings(runner), [])
+            finally:
+                case.tearDown()
+                case.doCleanups()
+            self.assertEqual(os.environ["LANES_EXECUTION_BACKEND"], "production")
 
     def test_mode_pinned_by_a_subclass_restores_inherited_host_mode_on_cleanup(self):
         class Pinned(Isolated):
@@ -392,6 +411,172 @@ for line in sys.stdin:
                     patch.object(codex.subprocess, 'Popen', side_effect=AssertionError('private launch')):
                 with self.assertRaises(ValueError):
                     codex.app_server_calls(name, calls)
+
+    def test_metadata_notifications_do_not_hide_a_buffered_response(self):
+        self.cli.write_text(f'''#!{sys.executable}
+import json, os, sys
+for line in sys.stdin:
+    request = json.loads(line)
+    if 'id' not in request:
+        continue
+    messages = [{{'method': 'account/updated', 'params': {{}}}},
+                {{'id': request['id'], 'result': {{'method': request['method'], 'label': 'café'}}}}]
+    os.write(sys.stdout.fileno(), ''.join(json.dumps(message, ensure_ascii=False) + '\\n'
+                                        for message in messages).encode())
+''')
+        self.cli.chmod(0o700)
+        with codex.lease('current-login') as handle:
+            result = codex.app_server_calls('current-login', codex.CURRENT_METADATA_CALLS,
+                                            timeout=2, lease_handle=handle)
+        self.assertEqual(result, [{'method': method, 'label': 'café'}
+                                  for method, _ in codex.CURRENT_METADATA_CALLS])
+
+    def test_metadata_frames_can_split_utf8_and_keep_unrelated_ids_separate(self):
+        writes = []
+        chunks = []
+        class Input:
+            def write(self, value):
+                writes.append(json.loads(value))
+                request = writes[-1]
+                if 'id' not in request:
+                    return
+                payload = (json.dumps({'id': -1, 'result': {'unrelated': True}}) + '\n' +
+                           json.dumps({'id': request['id'], 'result': {'label': 'café'}},
+                                      ensure_ascii=False) + '\n').encode()
+                split = payload.index('é'.encode()) + 1
+                chunks.extend([payload[:3], payload[3:split], payload[split:]])
+            def flush(self): pass
+            def close(self): pass
+        proc = SimpleNamespace(stdin=Input(), stdout=SimpleNamespace(fileno=lambda: 123, close=lambda: None))
+        with codex.lease('current-login') as handle, \
+                patch.object(codex.subprocess, 'Popen', return_value=proc), \
+                patch.object(codex.select, 'select', return_value=([proc.stdout], [], [])), \
+                patch.object(codex.os, 'read', side_effect=lambda *_: chunks.pop(0)), \
+                patch.object(codex, 'reap_current_metadata') as reap:
+            result = codex.app_server_calls('current-login', codex.CURRENT_METADATA_CALLS,
+                                            timeout=.5, lease_handle=handle)
+        self.assertEqual(result, [{'label': 'café'}] * 3)
+        self.assertEqual([row['method'] for row in writes],
+                         ['initialize', 'initialized', *[method for method, _ in codex.CURRENT_METADATA_CALLS]])
+        reap.assert_called_once_with(proc)
+
+    def test_incomplete_metadata_frame_at_eof_still_reaps_the_lease_holder(self):
+        proc = SimpleNamespace(stdin=io.StringIO(), stdout=SimpleNamespace(fileno=lambda: 123, close=lambda: None))
+        with codex.lease('current-login') as handle, \
+                patch.object(codex.subprocess, 'Popen', return_value=proc), \
+                patch.object(codex.select, 'select', return_value=([proc.stdout], [], [])), \
+                patch.object(codex.os, 'read', side_effect=[b'{"id":1', b'']), \
+                patch.object(codex, 'reap_current_metadata') as reap:
+            with self.assertRaisesRegex(TimeoutError, 'initialize: app-server response unavailable'):
+                codex.app_server_calls('current-login', codex.CURRENT_METADATA_CALLS,
+                                       timeout=.5, lease_handle=handle)
+            self.assertFalse(handle.closed, 'the caller retains the account lease')
+        reap.assert_called_once_with(proc)
+
+    def test_metadata_keeps_a_partial_notification_between_requests(self):
+        chunks, requests = [], []
+        class Input:
+            def write(self, value):
+                request = json.loads(value)
+                if 'id' not in request:
+                    return
+                requests.append(request['method'])
+                response = json.dumps({'id': request['id'], 'result': {'method': request['method']}}).encode() + b'\n'
+                if request['id'] == 1:
+                    chunks.append(response + b'{"method":"account/')
+                elif request['id'] == 2:
+                    chunks.append(b'updated","params":{}}\n' + response)
+                else:
+                    chunks.append(response)
+            def flush(self): pass
+            def close(self): pass
+        proc = SimpleNamespace(stdin=Input(), stdout=SimpleNamespace(fileno=lambda: 123, close=lambda: None))
+        with codex.lease('current-login') as handle, \
+                patch.object(codex.subprocess, 'Popen', return_value=proc), \
+                patch.object(codex.select, 'select', return_value=([proc.stdout], [], [])), \
+                patch.object(codex.os, 'read', side_effect=lambda *_: chunks.pop(0)), \
+                patch.object(codex, 'reap_current_metadata') as reap:
+            result = codex.app_server_calls('current-login', codex.CURRENT_METADATA_CALLS,
+                                            timeout=.5, lease_handle=handle)
+        self.assertEqual(result, [{'method': method} for method, _ in codex.CURRENT_METADATA_CALLS])
+        self.assertEqual(requests, ['initialize', *[method for method, _ in codex.CURRENT_METADATA_CALLS]])
+        self.assertEqual(chunks, [])
+        reap.assert_called_once_with(proc)
+
+    def test_metadata_uses_one_deadline_across_all_requests(self):
+        now, chunks, waits = [0.0], [], []
+        class Input:
+            def write(self, value):
+                request = json.loads(value)
+                if 'id' in request:
+                    chunks.append(json.dumps({'id': request['id'], 'result': {}}).encode() + b'\n')
+            def flush(self): pass
+            def close(self): pass
+        proc = SimpleNamespace(stdin=Input(), stdout=SimpleNamespace(fileno=lambda: 123, close=lambda: None))
+        def wait(_read, _write, _error, timeout):
+            waits.append(timeout)
+            now[0] += min(.4, timeout)
+            return ([proc.stdout] if timeout >= .4 else [], [], [])
+        with codex.lease('current-login') as handle, \
+                patch.object(codex.subprocess, 'Popen', return_value=proc), \
+                patch.object(codex.time, 'monotonic', side_effect=lambda: now[0]), \
+                patch.object(codex.select, 'select', side_effect=wait), \
+                patch.object(codex.os, 'read', side_effect=lambda *_: chunks.pop(0)), \
+                patch.object(codex, 'reap_current_metadata') as reap:
+            with self.assertRaisesRegex(TimeoutError, 'account/rateLimits/read: app-server response unavailable'):
+                codex.app_server_calls('current-login', codex.CURRENT_METADATA_CALLS,
+                                       timeout=1, lease_handle=handle)
+            self.assertFalse(handle.closed)
+        self.assertEqual(len(waits), 3)
+        for actual, expected in zip(waits, [1, .6, .2]):
+            self.assertAlmostEqual(actual, expected)
+        self.assertEqual(now, [1.0])
+        reap.assert_called_once_with(proc)
+
+    def test_metadata_partial_record_waits_only_to_the_deadline(self):
+        now, waits = [0.0], []
+        stdout = SimpleNamespace(fileno=lambda: 123, close=lambda: None)
+        proc = SimpleNamespace(stdin=io.StringIO(), stdout=stdout)
+        def wait(_read, _write, _error, timeout):
+            waits.append(timeout)
+            if len(waits) == 1:
+                now[0] = .2
+                return ([stdout], [], [])
+            now[0] += timeout
+            return ([], [], [])
+        with codex.lease('current-login') as handle, \
+                patch.object(codex.subprocess, 'Popen', return_value=proc), \
+                patch.object(codex.time, 'monotonic', side_effect=lambda: now[0]), \
+                patch.object(codex.select, 'select', side_effect=wait), \
+                patch.object(codex.os, 'read', return_value=b'{"id":1') as read, \
+                patch.object(codex, 'reap_current_metadata') as reap:
+            with self.assertRaisesRegex(TimeoutError, 'initialize: app-server response unavailable'):
+                codex.app_server_calls('current-login', codex.CURRENT_METADATA_CALLS,
+                                       timeout=1, lease_handle=handle)
+            self.assertFalse(handle.closed)
+        self.assertEqual(waits, [1, .8])
+        self.assertEqual(now, [1.0])
+        read.assert_called_once()
+        reap.assert_called_once_with(proc)
+
+    def test_metadata_eof_protocol_errors_and_invalid_json_fail_closed_and_reap(self):
+        cases = [(b'', TimeoutError), (b'not-json\n', json.JSONDecodeError),
+                 (b'{"id":1,"error":{"message":"private payload"}}\n', RuntimeError)]
+        for frame, error in cases:
+            with self.subTest(frame=frame):
+                proc = SimpleNamespace(stdin=io.StringIO(), stdout=SimpleNamespace(fileno=lambda: 123, close=lambda: None))
+                with codex.lease('current-login') as handle, \
+                        patch.object(codex.subprocess, 'Popen', return_value=proc), \
+                        patch.object(codex.select, 'select', return_value=([proc.stdout], [], [])), \
+                        patch.object(codex.os, 'read', return_value=frame), \
+                        patch.object(codex, 'reap_current_metadata') as reap:
+                    with self.assertRaises(error) as raised:
+                        codex.app_server_calls('current-login', codex.CURRENT_METADATA_CALLS,
+                                               timeout=.5, lease_handle=handle)
+                    self.assertNotIn('private payload', str(raised.exception))
+                    self.assertFalse(handle.closed)
+                self.assertTrue(proc.stdin.closed)
+                reap.assert_called_once_with(proc)
 
     def test_observer_preserves_all_auth_quota_and_execution_banks(self):
         before = {'exhaustedUntil': 1_100_000, 'lastKind': 'auth', 'runs': 12, 'lastUsed': 999_999,
@@ -1150,7 +1335,10 @@ class SubscriptionPoolTest(Isolated):
                     patch.object(host, "slots", return_value=5) as provider_cap, \
                     patch.object(host, "intake_slots", return_value=5), \
                     patch.object(runner.autoscale, "host_ceiling", return_value=5) as global_cap, \
-                    patch.object(runner, "worker_with_slot", side_effect=admitted) as work:
+                    patch.object(runner, "worker_with_slot", side_effect=admitted) as work, \
+                    patch.object(runner, "sh", side_effect=AssertionError("no GitHub or worktree command")), \
+                    patch.object(runner.bindings, "_work_one", side_effect=AssertionError("no production binding")), \
+                    patch.object(runner.os, "execv", side_effect=AssertionError("no process replacement")):
                 self.assertEqual(runner.worker(host, "codex"), 0)  # Other providers consume the same ceiling.
                 work.assert_not_called()
                 other.release()

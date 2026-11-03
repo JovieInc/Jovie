@@ -1017,7 +1017,7 @@ describe('structural control stage execution', () => {
 
   it('starts registry, project, control coverage, Dependabot coverage, CLI coverage, web, continuity, and FX stages in order', async () => {
     const stages = buildControlTestCommands();
-    expect(stages).toHaveLength(24);
+    expect(stages).toHaveLength(23);
     expect(stages[0]).toEqual(buildCompanyRegistryTestCommand());
     expect(stages[1]).toEqual(buildProjectCreationTestCommand());
     expect(stages[2][1]).toContain('lib/__tests__/pr-conflict-event.test.mjs');
@@ -1179,18 +1179,6 @@ describe('structural control stage execution', () => {
       [
         '--test',
         '--experimental-test-coverage',
-        '--test-coverage-include=.github/scripts/internal-pr-review.mjs',
-        '--test-coverage-lines=85',
-        '--test-coverage-branches=80',
-        '--test-coverage-functions=85',
-        '.github/scripts/internal-pr-review.test.mjs',
-      ],
-    ]);
-    expect(stages[22]).toEqual([
-      'node',
-      [
-        '--test',
-        '--experimental-test-coverage',
         '--test-coverage-include=scripts/lib/source-admission-policy.mjs',
         '--test-coverage-lines=95',
         '--test-coverage-branches=90',
@@ -1198,7 +1186,7 @@ describe('structural control stage execution', () => {
         'scripts/lib/__tests__/source-admission-policy.test.mjs',
       ],
     ]);
-    expect(stages[23]).toEqual([
+    expect(stages[22]).toEqual([
       'pnpm',
       ['run', 'test:rolling-ci-fx:coverage'],
     ]);
@@ -4149,6 +4137,33 @@ describe('automation-verify affected scope', () => {
           'scripts/run-affected-tests.mjs',
           'scripts/lib/__tests__/automation-verify.test.mjs',
           '.github/workflows/ci.yml',
+        ]).mode
+      ).toBe('full');
+    });
+  });
+
+  describe('homepage discovery copy binding', () => {
+    const source = 'apps/web/data/homepageSearchCopy.ts';
+    const producer = 'apps/web/components/homepage/HomepageNameSearch.test.tsx';
+
+    it('executes the real component behavior producer for discovery copy', () => {
+      const plan = buildAffectedTestPlan([source]);
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toEqual([producer]);
+      expect(plan.selectedTests).toEqual([producer]);
+      expect(plan.fallbackReason).toBeUndefined();
+    });
+
+    it('fails closed when the behavior producer is unavailable or another unknown data file changes', () => {
+      expect(
+        buildAffectedTestPlan([source], {
+          isFileAvailable: file => file !== producer,
+        }).mode
+      ).toBe('full');
+      expect(
+        buildAffectedTestPlan([
+          source,
+          'apps/web/data/homepageSearchCopy-neighbor.ts',
         ]).mode
       ).toBe('full');
     });

@@ -72,6 +72,12 @@ export const NARROWED = {
 /** Generators whose output must be committed. `write` rewrites, `check` verifies. */
 export const GENERATORS = [
   {
+    id: 'artist-launch-inventory',
+    when: /^apps\/web\/app\/|^scripts\/artist-launch-|^docs\/product\/generated\/artist-launch-inventory\.json$/,
+    write: 'node scripts/artist-launch-contract.mjs --write',
+    check: 'node scripts/artist-launch-contract.mjs --check',
+  },
+  {
     id: 'workflow-topology',
     when: /^\.github\/workflows\/[^/]+\.ya?ml$|^scripts\/ci-workflow-topology\.mjs$/,
     write: 'node scripts/ci-workflow-topology.mjs --write',
@@ -327,14 +333,18 @@ function loadBody(args, cwd) {
 }
 
 /** Run the shared Private Data Guard from the pinned JovieInc/ci workflow. */
-async function privateDataCheck(cwd, env, mergeBase) {
+export async function privateDataCheck(cwd, env, mergeBase) {
   const wfPath = path.join(cwd, '.github/workflows/private-data-guard.yml');
   if (!existsSync(wfPath)) return { skip: 'no private-data-guard workflow' };
   const wf = /** @type {any} */ (yamlLoad(readFileSync(wfPath, 'utf8')));
   const job = Object.values(wf.jobs ?? {})[0] ?? {};
   const m = String(job.uses ?? '').match(/^JovieInc\/ci\/(.+)@([0-9a-f]{40})$/);
   if (!m) return { skip: 'guard is not a pinned JovieInc/ci workflow' };
-  const cache = path.join(homedir(), '.cache', 'jovie-preflight');
+  const cacheRoot =
+    env.XDG_CACHE_HOME && path.isAbsolute(env.XDG_CACHE_HOME)
+      ? env.XDG_CACHE_HOME
+      : path.join(homedir(), '.cache');
+  const cache = path.join(cacheRoot, 'jovie-preflight');
   mkdirSync(cache, { recursive: true });
   const file = path.join(cache, `private-data-${m[2]}.py`);
   if (!existsSync(file)) {
@@ -404,8 +414,10 @@ export function typecheckTargets(files, cwd) {
     if (web) {
       out.add(isTest ? 'web-tests' : 'web');
       if (!isTest) {
-        // Source changes also affect test consumers and Ovie's TS graph.
+        // App, test and story projects have separate includes. Prop changes
+        // can break stories even when both the app and test projects compile.
         out.add('web-tests');
+        out.add('web-stories');
         out.add('pkg:@jovie/ovie');
       }
     } else if (/^scripts\//.test(f.filename)) out.add('scripts');
@@ -442,6 +454,8 @@ function typecheckCommand(target, cwd) {
     return `cd apps/web && ${cap} pnpm exec node ../../scripts/typecheck-singleflight.mjs -- tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo`;
   if (target === 'web-tests')
     return `cd apps/web && ${cap} node ../../scripts/typecheck-singleflight.mjs -- node ../../scripts/typecheck-web-tests.mjs`;
+  if (target === 'web-stories')
+    return `cd apps/web && ${cap} node ../../scripts/typecheck-singleflight.mjs -- node ../../scripts/typecheck-web-stories.mjs`;
   if (target === 'scripts') return `${cap} pnpm typecheck:scripts`;
   return `${cap} pnpm --filter ${target.slice(4)} run typecheck`;
 }
