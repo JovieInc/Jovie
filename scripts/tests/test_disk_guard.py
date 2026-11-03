@@ -701,6 +701,14 @@ class RetiredHostLoopTest(unittest.TestCase):
             return SimpleNamespace(returncode=0, stdout="", stderr="")
         return subprocess.run(args, env=kwargs.pop("env", None) or self.env, **kwargs)
 
+    def private_cache(self, workspace):
+        """A retired Elixir workspace's private per-checkout pnpm store (JOV-8270:
+        ~4.5 GB each on Gem, no tracked files, regenerable by construction)."""
+        blob = workspace / ".symphony/package-cache/pnpm-store/v10/blob"
+        blob.parent.mkdir(parents=True, exist_ok=True)
+        blob.write_text("retired private cache")
+        return blob
+
     def test_retired_workspaces_hold_unsaved_work_without_private_archive_never_through_mounts(self):
         origin = self.root / "origin.git"
         self.git("init", "-q", "--bare", str(origin), cwd=self.root)
@@ -715,13 +723,29 @@ class RetiredHostLoopTest(unittest.TestCase):
         plain = root / "JOV-4"; (plain / "node_modules/x").mkdir(parents=True); (plain / "notes.md").write_text("n")
         mounted = self.checkout(root, "JOV-5", origin)
         fresh = self.checkout(root, "JOV-6", origin)
-        self.age(clean, dirty, orphan, plain, mounted)
+        # JOV-8270: every retired Elixir workspace also held a private pnpm store
+        # and kept network-trace provenance beside it under .symphony/package-cache.
+        for workspace in (dirty, orphan, plain, mounted):
+            self.private_cache(workspace)
+        (dirty / ".symphony/package-cache/network-trace").write_text("retain provenance")
+        busy = self.checkout(root, "JOV-7", origin)
+        self.private_cache(busy)
+        shared = self.root / "shared/pnpm-store/blob"  # the shared store lives outside workspaces
+        shared.parent.mkdir(parents=True)
+        shared.write_text("shared store")
+        self.age(clean, dirty, orphan, plain, mounted, busy)
         os.utime(fresh / "a.txt", (NOW, NOW))
+
+        def run(args, **kwargs):
+            if args[0] == "lsof":  # a live process works inside the busy workspace
+                return SimpleNamespace(returncode=0, stdout=f"p4242\nn{busy}/app\n", stderr="")
+            return self.run_cmd(args, **kwargs)
+
         report = self.report()
         with patch.dict(os.environ, {**self.env, "LANES_SWEEP_ARCHIVE_GH": ""}, clear=True), \
                 patch.object(guard, "free_pct", return_value=10.0), \
                 patch.object(guard, "mount_points", return_value={mounted}):
-            guard.sweep_retired_workspaces(SimpleNamespace(state=self.root), self.run_cmd, NOW, report, roots=[root])
+            guard.sweep_retired_workspaces(SimpleNamespace(state=self.root), run, NOW, report, roots=[root])
         self.assertFalse(clean.exists())
         self.assertTrue(dirty.exists())
         self.assertEqual((dirty / "wip.txt").read_text(), "unsaved")
@@ -739,6 +763,22 @@ class RetiredHostLoopTest(unittest.TestCase):
         self.assertTrue((mounted / "a.txt").exists())
         self.assertIn(f"preserved mounted workspace {mounted}", report["actions"])
         self.assertTrue(fresh.exists(), "recently used workspaces stay")
+        self.assertTrue(busy.exists() and (busy / "a.txt").exists(),
+                        "a live process keeps its whole workspace")
+        # JOV-8270 acceptance: reclamation clears only inactive generated private
+        # stores; live, mounted, protected and shared roots survive with their bytes.
+        self.assertEqual((dirty / ".symphony/package-cache/network-trace").read_text(),
+                         "retain provenance", "held work retains its provenance in place")
+        for workspace in (dirty, orphan):
+            self.assertEqual((workspace / ".symphony/package-cache/pnpm-store/v10/blob").read_text(),
+                             "retired private cache", "an archive hold preserves the whole workspace")
+        self.assertFalse((plain / ".symphony/package-cache/pnpm-store").exists(),
+                         "an unverifiable inactive workspace loses only regenerable bytes")
+        self.assertTrue((mounted / ".symphony/package-cache/pnpm-store/v10/blob").exists(),
+                        "a mounted workspace survives whole, private store included")
+        self.assertTrue((busy / ".symphony/package-cache/pnpm-store/v10/blob").exists(),
+                        "a live workspace survives whole, private store included")
+        self.assertEqual(shared.read_text(), "shared store", "the shared pnpm store is never touched")
         self.assertEqual(report["errors"], [])
 
     def test_retired_workspaces_need_a_low_filesystem_and_a_mount_table(self):
