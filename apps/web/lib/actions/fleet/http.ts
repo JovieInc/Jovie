@@ -97,7 +97,8 @@ export async function handleFleetInvocation(
     const result = await deps.dispatcher.invoke(
       id as FleetActionId,
       await readFleetHttpBody(request),
-      token
+      token,
+      'rest'
     );
     if (
       result.status === 'completed' &&

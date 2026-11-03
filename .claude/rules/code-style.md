@@ -327,6 +327,25 @@ grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
 
 **Why:** A bug in one file often indicates a systemic issue. Patching one instance while leaving others creates inconsistency and delays future debugging.
 
+### Escape classes (replay of 19 post-merge fixes, 2026-10-28)
+
+Most escapes were not logic bugs; they were a missed consumer or a guard that
+assumed its environment. Before opening a PR, check the class that applies:
+
+- **Moved, renamed or deleted source:** `git grep` the old path, export and
+  fixture name for consumers (stories, desktop token readers, lanes readers,
+  `testMatch` lists). A new producer or spec must be registered where its
+  runner enumerates it.
+- **CI guard or workflow step:** run it against the merge of base and PR head,
+  not the head alone, and gate any proof behind the flag it depends on.
+- **Test files:** a helper named `setup` is a pytest hook; assertions on wall
+  time need a frozen clock.
+- **Auth, config flags:** a route that calls `unauthorized()` or `forbidden()`
+  needs the matching Next.js config flag in the same PR.
+
+Every escape is traced by `scripts/review-escapes.mjs` and feeds
+`docs/metrics/review-replay-cases.jsonl`.
+
 ## Self-Improvement Loop
 
 After any correction from a human reviewer:
@@ -462,27 +481,14 @@ Reference docs for common agent lookups:
 
 ## Review evidence (agents)
 
-Use the existing internal review tooling, not CodeRabbit availability, to review
-changes. Before committing, inspect the exact scoped diff for correctness,
-regression coverage, and migration/security risks; resolve actionable findings
-and record the reviewed files and findings' dispositions.
-
-On PR open or synchronize, the existing JOV-7400 workflow
-(`.github/workflows/internal-review.yml`) runs
-`node .github/scripts/internal-pr-review.mjs` against trusted base code and reads
-the PR diff as data. Record its event-head comment/run receipt and the disposition
-of any actionable findings. Verify that the reviewed diff matches the recorded
-head before claiming exact-head review: the current script stamps the event SHA
-but fetches a mutable PR diff, so that marker alone does not prove the binding.
-If review or head binding is missing, incomplete, or unavailable, record that
-outcome without claiming a clean exact-head review. It remains advisory: absence,
-latency, quota, or billing must not block commit, publication, or merge. Required
+There is no AI PR reviewer. The internal advisory reviewer and the shadow review
+kernel were retired 2026-10-28: on a 19-case replay of merged PRs that later
+needed a fix, four Workers AI models recalled 3 of 19 real bugs (16%), no two
+models agreed on a real bug, and about 96% of findings were unconfirmed.
+Before committing, inspect the exact scoped diff for correctness, regression
+coverage, and migration/security risks. Required
 CI, qualification receipts, security checks, branch protection, and native merge
-queue admission remain unchanged and own merge correctness.
-
-CodeRabbit is optional supplementary review. Do not wait for its availability,
-rate limits, credits, or billing, and do not purchase capacity to unblock work.
-If used, evaluate and resolve actionable findings just as for internal review;
-provider availability and an actual correctness finding are different evidence.
-The manual gbrain-aware Claude reviewer (`claude-review.yml`) was deleted
-2026-10-12 after 30 days with no runs.
+queue admission own merge correctness. Third-party reviewers are optional
+supplementary evidence; do not wait for them or buy capacity for them. Any
+future reviewer must beat the escape replay set
+(`docs/metrics/review-replay-cases.jsonl`) before adoption.

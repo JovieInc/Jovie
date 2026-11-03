@@ -1,0 +1,27 @@
+{
+  "schema": "company.buyer-personas/v1",
+  "note": "Moved from scripts/buyer-eval/rubric.mjs ARCHETYPES (PR #23952). Archetypes only, no PII; Tier B real-signup personas stay in ~/.local/state/jovie-buyer-eval/personas.",
+  "archetypes": [
+    {
+      "id": "working-artist",
+      "brief": "Independent artist who earns a living from music: about 80k monthly Spotify listeners, tours regionally, sells merch, releases every 6-8 weeks. Spends about $250/month on software (distribution, mailing list, design, a link page). Very busy; buys tools that visibly earn or save more than they cost, and cancels ones that do not."
+    },
+    {
+      "id": "manager",
+      "brief": "Artist manager with 4 artists between 20k and 400k monthly listeners. Runs release calendars in spreadsheets and DMs. Pays for team tools when they save hours each week or catch missed revenue. Needs it to work across several artists, not just one."
+    },
+    {
+      "id": "creator-entrepreneur",
+      "brief": "Creator who launches things for a living: a podcast with 60k subscribers, a YouTube channel, a merch line and paid sponsorships. Uses several paid tools (Beacons, ConvertKit, Shopify). Not a musician. Pays for anything that clearly moves revenue."
+    },
+    {
+      "id": "skeptic",
+      "brief": "Artist with 15k monthly listeners who has paid for two link-in-bio and pre-save tools and saw no measurable lift. Distrusts AI hype and fake urgency. Converts only on concrete proof about their own career, shown before paying."
+    },
+    {
+      "id": "control-link-in-bio",
+      "control": true,
+      "brief": "Small online seller with no music, video or podcast. Wants a free link-in-bio page in two minutes. Has never paid for software and will not."
+    }
+  ]
+}
