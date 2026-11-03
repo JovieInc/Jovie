@@ -62,6 +62,10 @@ it('selects capacity behavior and coverage on collector, fixture and registry ch
     expect(guard.command).toContain('scripts.tests.test_capacity_forecast');
     expect(guard.command).toContain('scripts.tests.test_neon_collector');
     expect(guard.command).toContain('--fail-under=60');
+    expect(guard.command).toContain('python3 -m venv');
+    expect(guard.command).toContain(
+      '--require-hashes -r .github/requirements/pytest.txt'
+    );
   }
   expect(
     selectSourceGuards('pull_request', ['docs/unrelated.md']).some(
