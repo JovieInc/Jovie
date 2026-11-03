@@ -167,6 +167,36 @@ test('companion edits present in the diff clear the checklist', () => {
   );
 });
 
+test('disk fixture companion requires the exact version before local publication', () => {
+  const fixture = 'scripts/tests/test_disk_guard.py';
+  const policy = 'scripts/lanes/qualification_guard.py';
+  // Published SHA-256 test vector for "abc"; no candidate Python is executed.
+  const digest =
+    'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
+  const check = (text, policyText) =>
+    companionChecklist([file(fixture)], p =>
+      p === fixture ? text : p === policy ? policyText : ''
+    );
+  for (const policyText of ['', 'REVIEWED_FIXTURE_SHA256 = ("old",)']) {
+    const [item] = check('abc', policyText);
+    assert.ok(item, 'fixture changes need a companion check');
+    assert.equal(item.done, false);
+    assert.match(item.hint, new RegExp(digest));
+    assert.match(item.hint, /test_the_repo_fixture_is_a_reviewed_version/);
+  }
+  const policyText = `REVIEWED_FIXTURE_SHA256 = ("${digest}",)`;
+  assert.equal(check('abc', policyText)[0].done, true);
+  assert.equal(
+    check('abcd', policyText)[0].done,
+    false,
+    'a later fixture edit invalidates the companion pin'
+  );
+  assert.deepEqual(
+    companionChecklist([file('README.md')], () => ''),
+    []
+  );
+});
+
 test('two new migrations violate the single-migration rule', () => {
   const m = n => file(`apps/web/drizzle/migrations/${n}_x.sql`, 'added');
   const items = companionChecklist([m('0151'), m('0152')], () => '');
@@ -254,6 +284,19 @@ test('arguments parse and unknown flags fail', () => {
   assert.throws(() => parseArgs(['--nope']));
   assert.ok(HEAVY_GUARDS.has('merged-with-base-invariants'));
   assert.ok(GENERATORS.some(g => g.id === 'workflow-topology'));
+});
+
+test('route and policy changes select launch inventory regeneration before guards', () => {
+  const generator = GENERATORS.find(g => g.id === 'artist-launch-inventory');
+  assert.ok(generator);
+  for (const source of [
+    'apps/web/app/api/admin/reference-review/route.ts',
+    'scripts/artist-launch-policy.mjs',
+    'scripts/artist-launch-contract.mjs',
+    'docs/product/generated/artist-launch-inventory.json',
+  ])
+    assert.ok(generator.when.test(source), source);
+  assert.equal(generator.when.test('apps/web/lib/unrelated.ts'), false);
 });
 
 test('host-only reds are downgraded on macOS but real reds are not', () => {

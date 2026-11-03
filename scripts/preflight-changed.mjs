@@ -72,6 +72,12 @@ export const NARROWED = {
 /** Generators whose output must be committed. `write` rewrites, `check` verifies. */
 export const GENERATORS = [
   {
+    id: 'artist-launch-inventory',
+    when: /^apps\/web\/app\/|^scripts\/artist-launch-|^docs\/product\/generated\/artist-launch-inventory\.json$/,
+    write: 'node scripts/artist-launch-contract.mjs --write',
+    check: 'node scripts/artist-launch-contract.mjs --check',
+  },
+  {
     id: 'workflow-topology',
     when: /^\.github\/workflows\/[^/]+\.ya?ml$|^scripts\/ci-workflow-topology\.mjs$/,
     write: 'node scripts/ci-workflow-topology.mjs --write',

@@ -5005,16 +5005,24 @@ class RunAgentTest(unittest.TestCase):
             self.assertFalse(lane.retry_held_cleanup())
 
     def test_gate_command_timeout_kills_a_term_ignoring_descendant(self):
-        marker = Path(tempfile.mkdtemp()) / "pids"
-        script = f"trap '' TERM; sleep 300 & echo $! > {marker}; wait"
-        started = time.monotonic()
-        result = subprocess.run([sys.executable, str(Path(lane.__file__).resolve()), "gate-command",
-                                 "--timeout", "1", "--", "sh", "-c", script], timeout=60,
-                                capture_output=True, text=True)
-        self.assertEqual(result.returncode, 124)
-        self.assertLess(time.monotonic() - started, 45)
-        with self.assertRaises(ProcessLookupError):
-            os.kill(int(marker.read_text()), 0)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            home = root / "home"
+            home.mkdir()
+            # The CLI acquires lifecycle ownership before running the command;
+            # its state must be independent of a drained host running pytest.
+            env = {**os.environ, "HOME": str(home), "LANES_STATE": str(root / "state"),
+                   "LANES_SELFTEST": "1", "LANES_EXECUTION_BACKEND": "local-test"}
+            marker = root / "pids"
+            script = f"trap '' TERM; sleep 300 & echo $! > {marker}; wait"
+            started = time.monotonic()
+            result = subprocess.run([sys.executable, str(Path(lane.__file__).resolve()), "gate-command",
+                                     "--timeout", "1", "--", "sh", "-c", script], timeout=60,
+                                    capture_output=True, text=True, cwd=root, env=env)
+            self.assertEqual(result.returncode, 124, f"stdout: {result.stdout}\nstderr: {result.stderr}")
+            self.assertLess(time.monotonic() - started, 45)
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int(marker.read_text()), 0)
 
     def test_cancellation_does_not_signal_a_reused_root_process_group(self):
         original = {10: (1, 10, "S", "original")}

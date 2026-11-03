@@ -159,9 +159,11 @@ export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
   'git worktree add -q --detach "$t/wt" HEAD',
   'trap \'git worktree remove --force "$t/wt" >/dev/null 2>&1 || true; rm -rf "$t"\' EXIT',
   'cd "$t/wt"',
-  'git fetch -q --no-tags origin "$B" || true',
-  'git -c user.name=ci -c user.email=ci@invalid merge -q --no-edit "origin/$B" >/dev/null 2>&1 || { echo "merge with base conflicts; skipped"; exit 0; }',
-  'files="$(git diff --name-only "origin/$B" HEAD)"',
+  'git fetch -q --no-tags origin "$B"',
+  'base="$(git rev-parse --verify "FETCH_HEAD^{commit}")"',
+  // Inspect the merged tree without creating a commit or requiring dependency-backed commit hooks.
+  'git -c user.name=ci -c user.email=ci@invalid merge --no-commit --no-ff --quiet "$base" || { merge_status=$?; conflicts="$(git diff --name-only --diff-filter=U)"; if [ -n "$conflicts" ]; then echo "merge with base conflicts: $conflicts" >&2; else echo "merge with base failed (status $merge_status)" >&2; fi; exit "$merge_status"; }',
+  'files="$(git diff --name-only "$base" --)"',
   'cand=""',
   // The qualification guard pins the sha256 of scripts/tests/test_disk_guard.py; editing that fixture without
   // adding its hash ejected seven merge groups and six bystanders (#23280, 2026-10-25), so run its pinning test.
@@ -1090,6 +1092,7 @@ export const SCRIPT_CONTRACT_NODE_COMMAND = `${PR_OPEN_COVERAGE_COMMAND} && ${DE
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
+  'scripts/lib/__tests__/gh-api-hold-retry.test.mjs',
   'scripts/lib/__tests__/prod-cert.test.mjs',
   'scripts/lib/__tests__/self-hosted-workspace-reset-contract.test.mjs',
   'scripts/lib/__tests__/ci-timing-collector.test.mjs',
@@ -1234,6 +1237,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/visual-snapshot-compare.test.mjs',
   'scripts/lib/__tests__/web-test-selectors.test.mjs',
   'scripts/lib/__tests__/web-vitest-fast-runner.test.mjs',
+  'scripts/lib/__tests__/ci-unit-selection.test.mjs',
   'scripts/lib/__tests__/merge-group-fail-fast.test.mjs',
   'scripts/lib/__tests__/merge-group-local-evidence.test.mjs',
   'scripts/lib/__tests__/merge-group-token-budget.test.mjs',
