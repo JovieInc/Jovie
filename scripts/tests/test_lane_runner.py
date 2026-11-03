@@ -8084,6 +8084,30 @@ class FixRedTest(unittest.TestCase):
                 self.assertEqual(lane.file_breaker_signals(host, linear), 0)
             intake.assert_called_once()
 
+    def test_sole_typecheck_baseline_lock_cites_16597_once_per_head(self):
+        log = (
+            "##[error]locked-areas: cite GBrain: <slug/page> or Locking PR: #<number> "
+            "in Locked areas for apps/web/typecheck-tests-baseline.json."
+        )
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(lane.pr_events, "ensure_red_before_green", return_value=True) as ensure:
+            _, receipt, agent, again = self.run_gate(tmp, log)
+            self.assertEqual(receipt["reasons"], ["infra-rerun:baseline-lock"])
+            self.assertEqual(receipt["failureFingerprint"]["cls"], "baseline-lock")
+            agent.assert_not_called()
+            again.assert_not_called()
+            ensure.assert_called_once()
+            self.assertEqual(ensure.call_args.kwargs["locking_pr"], 16597)
+            self.assertIn("typecheck-tests-baseline.json", ensure.call_args.args[1])
+            _, second, agent2, _ = self.run_gate(tmp, log)
+            agent2.assert_called_once()
+            self.assertNotEqual(second["reasons"][:1], ["infra-rerun:baseline-lock"])
+        cited = {**self.pr(), "body": "## Locked areas\nLocking PR: #16597\n"}
+        with tempfile.TemporaryDirectory() as tmp:
+            _, receipt, agent, _ = self.run_gate(tmp, log, pr=cited)
+            agent.assert_called_once()
+            self.assertNotEqual(receipt["reasons"][:1], ["infra-rerun:baseline-lock"])
+
     def test_changelog_quota_mask_stamps_the_internal_note_once_per_head(self):
         body = "## Summary\nadmin label\n"
         log = "Error: github-quota-deferred: PR metadata read hit GitHub primary-rate-limit\n"

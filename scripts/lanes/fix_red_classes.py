@@ -31,11 +31,12 @@ from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, CITE_BASELINE_LOCK, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent")
+    "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "cite-baseline-lock", "agent")
 DETERMINISTIC = frozenset({
-    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE})
+    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED,
+    REGISTER_DOMAIN, ATOMIC_WRITE, CITE_BASELINE_LOCK})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -48,6 +49,14 @@ UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
 BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?## ?(?:Red-before-green|Blast radius)",
                        re.IGNORECASE)
+# Fleet Rules names every locked path in one sentence. Only the web test
+# typecheck baseline has a known locking PR (#16597 restored the CI-matching
+# selector and baseline). A comma-separated extra path stays with the model.
+TYPECHECK_TESTS_BASELINE = "apps/web/typecheck-tests-baseline.json"
+BASELINE_LOCKING_PR = 16597
+BASELINE_LOCK_TEXT = re.compile(
+    r"locked-areas: cite GBrain: <slug/page> or Locking PR: #<number> in Locked areas for "
+    + re.escape(TYPECHECK_TESTS_BASELINE) + r"\.")
 # The internal customer-changelog decision. A second note is `ambiguous`, so a body that already
 # contains one is never stamped again. The quota form is the attempt>1 mask of the same defect:
 # the guard could not re-read the body, so the log no longer says missing-metadata.
@@ -134,6 +143,9 @@ SIGNATURES = (
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     ("atomic-write", ATOMIC_TEXT, ATOMIC_WRITE),
+    # Before pr-body: a Fleet log often prints red-before-green beside this
+    # citation. One edit writes both; a second locked path still falls through.
+    ("baseline-lock", BASELINE_LOCK_TEXT, CITE_BASELINE_LOCK),
     ("pr-body", BODY_TEXT, AGENT),
 )
 BEHIND_CLASS = "stale-branch"
@@ -163,6 +175,17 @@ def fingerprint_key(cls: str, names: list[str], signature: str = "") -> str:
     if cls in {"other", "mixed"}:
         parts.append(signature)
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:12]
+
+
+def baseline_locking_pr(text: str) -> int | None:
+    """Locking PR when the locked-areas sentence names only the web test typecheck baseline.
+
+    The path must sit immediately before the sentence period. A comma-separated
+    extra path is a different lock and returns None.
+    """
+    if BASELINE_LOCK_TEXT.search(str(text or "")):
+        return BASELINE_LOCKING_PR
+    return None
 
 
 def stamp_internal_changelog(body) -> str | None:

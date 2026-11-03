@@ -7212,10 +7212,35 @@ def stamp_changelog_decision(host: Host, pr: dict) -> bool:
     return edited.returncode == 0
 
 
+def cite_baseline_lock(host: Host, pr: dict) -> bool:
+    """Cite Locking PR #16597 for a sole web test typecheck baseline failure.
+
+    False when the live body already has Locked areas or GitHub rejects the edit
+    (the model then gets the head). The same excerpt can also complete Red-before-green.
+    """
+    logs = failed_logs(host, pr) or {}
+    excerpt = "\n".join(logs.values())
+    try:
+        return pr_events.ensure_red_before_green(
+            pr, excerpt, locking_pr=fix_red_classes.BASELINE_LOCKING_PR)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return False
+
+
 def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str | None:
     """Run the no-model action for a routed class once per head; the reason on success (None: use the model)."""
-    if not route or route["action"] not in {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN, fix_red_classes.STAMP_CHANGELOG}:
+    handled = {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN, fix_red_classes.STAMP_CHANGELOG,
+               fix_red_classes.CITE_BASELINE_LOCK}
+    if not route or route["action"] not in handled:
         return None
+    if route["action"] == fix_red_classes.CITE_BASELINE_LOCK:
+        # A body that already cites a lock is a different defect. Do not spend the claim.
+        visible = re.sub(r"<!--[\s\S]*?-->", "", str(pr.get("body") or ""))
+        if re.search(r"^#{1,6}\s+Locked areas\s*$", visible, re.I | re.M):
+            return None
+        if not claim_route(host, pr, route["action"]):
+            return None
+        return "infra-rerun:baseline-lock" if cite_baseline_lock(host, pr) else None
     if route["action"] == fix_red_classes.STAMP_CHANGELOG:
         # No body, or a note already present: do not spend the once-per-head claim. An invalid
         # note is a different defect and still belongs to the model.
@@ -8186,7 +8211,9 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 install_dependencies(host, worktree, log)
                 excerpt = failure_excerpt(pr)
                 try:
-                    pr_events.ensure_red_before_green(pr, excerpt)
+                    locking_pr = fix_red_classes.baseline_locking_pr(excerpt)
+                    pr_events.ensure_red_before_green(
+                        pr, excerpt, **({} if locking_pr is None else {"locking_pr": locking_pr}))
                 except (OSError, subprocess.SubprocessError, ValueError):
                     pass  # evidence is best effort; the repair itself must still run
                 prompt = render_fix_prompt(pr, excerpt)
