@@ -31,7 +31,7 @@ function createTxMock(
   entryRows: Array<Record<string, unknown>>,
   userRows: Array<Record<string, unknown>> = []
 ) {
-  const updateSet = vi.fn(() => ({
+  const updateSet = vi.fn((_value: Record<string, unknown>) => ({
     where: vi.fn().mockResolvedValue(undefined),
   }));
   const select = vi.fn(() => ({
