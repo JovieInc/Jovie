@@ -35,6 +35,10 @@ function fixture(t, { disabled, configured = true, debug } = {}) {
       get(key, fallback) {
         return key === 'telemetry.enabled' ? configured : fallback;
       }
+      set(key, value) {
+        assert.equal(key, 'telemetry.enabled');
+        configured = value;
+      }
     },
     'next/dist/compiled/is-docker': () => true,
     '../server/ci-info': { isCI: true },
@@ -100,7 +104,7 @@ function fixture(t, { disabled, configured = true, debug } = {}) {
     calls,
     dir,
     files: () =>
-      readdirSync(dir, { recursive: true }).filter(file =>
+      readdirSync(dir, { recursive: true, encoding: 'utf8' }).filter(file =>
         file.endsWith('.json')
       ),
   };
@@ -140,20 +144,56 @@ for (const [name, options] of disabledCases) {
     );
     assert.equal(
       aborted,
-      false,
-      'disabled flush must leave queue controllers alone'
+      true,
+      'full-queue flush must preserve controller cleanup'
     );
   });
 }
 
 test('disabled explicit event batch cannot bypass the guard', t => {
   const f = fixture(t, { disabled: '1' });
+  let aborted = false;
+  const pending = f.telemetry.record(event, true);
+  pending._controller = {
+    abort() {
+      aborted = true;
+    },
+  };
   f.telemetry.flushDetached({
     mode: 'dev',
     dir: '/owned/project',
     distDir: f.dir,
     events: [event],
   });
+  assert.equal(f.calls.length, 0);
+  assert.deepEqual(f.files(), []);
+  assert.equal(
+    aborted,
+    false,
+    'explicit batches must leave the full queue alone'
+  );
+});
+
+test('opting out after record preserves queued-controller cleanup', async t => {
+  const f = fixture(t);
+  assert.equal(f.telemetry.isDisabled, false);
+  let aborted = false;
+  const pending = f.telemetry.record(event, true);
+  pending._controller = {
+    abort() {
+      aborted = true;
+    },
+  };
+  f.telemetry.setEnabled(false);
+  assert.equal(f.telemetry.isDisabled, true);
+  f.telemetry.flushDetached({
+    mode: 'dev',
+    dir: '/owned/project',
+    distDir: null,
+    events: null,
+  });
+  await pending;
+  assert.equal(aborted, true);
   assert.equal(f.calls.length, 0);
   assert.deepEqual(f.files(), []);
 });

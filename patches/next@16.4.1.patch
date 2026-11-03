@@ -149,14 +149,14 @@ index bfd79032122f9c193c2352744d58e7999eb62730..9b1d6290b5ac59c38d2a72dc37e9f649
                      return {
                          finished: true,
 diff --git a/dist/telemetry/storage.js b/dist/telemetry/storage.js
-index ba404888c825ff94c670869a87a830a19c3fea86..f90db8f9169c703a82399519d99ae0927fba0939 100644
+index ba404888c825ff94c670869a87a830a19c3fea86..6523d75f9d88638ef609f61906e6443e0098edf4 100644
 --- a/dist/telemetry/storage.js
 +++ b/dist/telemetry/storage.js
-@@ -158,6 +158,7 @@ class Telemetry {
-         // detached process to submit the records without blocking
-         // the main process from exiting
-         this.flushDetached = ({ mode, dir, distDir, events })=>{
+@@ -171,6 +171,7 @@ class Telemetry {
+                     }
+                 });
+             }
 +            if (this.isDisabled) return;
-             // Nudges detach only their own events; shutdown flushes the full queue.
-             const allEvents = events ?? [];
-             if (events === null) {
+             if (allEvents.length === 0) {
+                 // No events to flush
+                 return;
