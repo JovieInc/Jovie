@@ -429,12 +429,15 @@ process.exit(first ? 124 : (result.status ?? 1));
 `
         );
         chmodSync(join(bin, 'git'), 0o755);
-        const workflow = load(
-          readFileSync(
-            join(repoRoot, '.github/workflows/pr-size-guard.yml'),
-            'utf8'
-          )
-        );
+        const workflow =
+          /** @type {{jobs: Record<string, {'timeout-minutes': number, steps: Array<{name: string, run: string}>}>}} */ (
+            load(
+              readFileSync(
+                join(repoRoot, '.github/workflows/pr-size-guard.yml'),
+                'utf8'
+              )
+            )
+          );
         const job = workflow.jobs['merge-group-size'];
         const step = job.steps.find(
           s => s.name === 'Enforce combined-tree payload and member size policy'
@@ -475,7 +478,7 @@ process.exit(first ? 124 : (result.status ?? 1));
         const fetches = readFileSync(trace, 'utf8')
           .trim()
           .split(String.fromCharCode(10))
-          .map(JSON.parse);
+          .map(line => JSON.parse(line));
         expect(fetches[0]).toContain('--filter=blob:none');
         expect(
           fetches.filter(args => args.includes('--filter=blob:limit=1g'))
