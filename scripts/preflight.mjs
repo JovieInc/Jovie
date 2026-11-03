@@ -20,7 +20,8 @@
  *   --list       print the derived plan and exit (no execution)
  *   --body-file  also lint the PR body with the Fleet Rules policy
  *   --hook       pre-push mode: honour JOVIE_PREFLIGHT=0 and skip when HEAD has
- *                no commits ahead of the base
+ *                no commits ahead of the base; retain every source check,
+ *                including commands excluded by standalone preflight
  *
  * The changelog guard needs a token: export GH_TOKEN (your gh login token) to
  * run it locally; without one that step is listed as skipped.
@@ -32,9 +33,11 @@
 import { spawn, spawnSync } from 'node:child_process';
 import {
   appendFileSync,
+  closeSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   realpathSync,
 } from 'node:fs';
@@ -46,6 +49,72 @@ import { load as yamlLoad } from 'js-yaml';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const WORKFLOW_PATH = '.github/workflows/source-validation.yml';
 export const JOB_ID = 'deterministic';
+
+/** Read-only integration proof; source checks and the native queue stay required. */
+export async function hookBaseProof({ base, cwd, env, expectedHead = '' }) {
+  const deadline = Date.now() + 60_000;
+  const run = args => {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new Error('mergeability proof deadline exceeded');
+    return spawnSync('git', args, {
+      cwd,
+      env: { ...env, GIT_TERMINAL_PROMPT: '0' },
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: remaining,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+  };
+  const ref = `refs/remotes/origin/${base}`;
+  if (run(['check-ref-format', `refs/heads/${base}`]).status !== 0)
+    throw new Error('invalid base branch');
+  if (
+    run([
+      'fetch',
+      '--no-tags',
+      '--no-write-fetch-head',
+      '--no-recurse-submodules',
+      '-q',
+      'origin',
+      `refs/heads/${base}:${ref}`,
+    ]).status !== 0
+  )
+    throw new Error(`cannot fetch origin/${base}; mergeability is unknown`);
+  const commit = name => {
+    const r = run(['rev-parse', '--verify', '-q', `${name}^{commit}`]);
+    const oid = r.stdout?.trim();
+    if (r.status !== 0 || !/^[0-9a-f]{40,64}$/.test(oid ?? ''))
+      throw new Error(`cannot resolve ${name}; mergeability is unknown`);
+    return oid;
+  };
+  const baseSha = commit(ref);
+  const headSha = commit('HEAD');
+  if (expectedHead && headSha !== expectedHead)
+    throw new Error(
+      'source head changed during its checks; rerun qualification'
+    );
+  const merged = run(['merge-tree', '--write-tree', baseSha, headSha]);
+  const treeSha = merged.stdout?.split('\n')[0]?.trim();
+  if (merged.status === 1 && /^[0-9a-f]{40,64}$/.test(treeSha ?? '')) {
+    const { parseMergeConflicts } = await import('./lib/preflight-changed.mjs');
+    const paths = parseMergeConflicts(merged.stdout);
+    throw new Error(
+      `merge conflict with origin/${base}${paths.length ? `: ${paths.join(', ')}` : ''}; resolve before pushing`
+    );
+  }
+  if (merged.status !== 0 || !/^[0-9a-f]{40,64}$/.test(treeSha ?? ''))
+    throw new Error(`cannot prove mergeability with origin/${base}`);
+  const tree = run(['cat-file', '-t', treeSha]);
+  if (tree.status !== 0 || tree.stdout?.trim() !== 'tree')
+    throw new Error(`cannot prove mergeability with origin/${base}`);
+  if (commit('HEAD') !== headSha)
+    throw new Error('source head changed during mergeability proof');
+  if (commit(ref) !== baseSha)
+    throw new Error(
+      'base moved during mergeability proof; rerun qualification'
+    );
+  return { headSha, baseSha, treeSha };
+}
 
 /** Keep hook-local Git routing out of gates that create fixture repositories. */
 export function buildPreflightEnv(source = process.env, cwd = ROOT) {
@@ -197,7 +266,9 @@ export function lineExclusion(line) {
 }
 
 /** Excluded lines of a statement, and the statement with them made no-ops. */
-export function applyExclusions(statement) {
+export function applyExclusions(statement, { qualification = false } = {}) {
+  // Qualification preserves every source check; standalone preflight stays light.
+  if (qualification) return { text: statement, excluded: [] };
   const excluded = [];
   const text = statement
     .split('\n')
@@ -229,7 +300,13 @@ export function prepareStatement(statement, { flockPath = '' } = {}) {
   // `exit` would end the process; contain it in a subshell.
   if (/\bexit\b/.test(text)) text = `( ${text}\n)`;
   // Typechecks share gem's CPU: serialize them under the host lock.
-  if (flockPath) text = text.replace(TYPECHECK, `$1flock ${flockPath} $2`);
+  if (flockPath) {
+    const quotedLock = `'${flockPath.replace(/'/g, `'\\''`)}'`;
+    text = text.replace(
+      TYPECHECK,
+      (_match, indent, command) => `${indent}flock ${quotedLock} ${command}`
+    );
+  }
   return text;
 }
 
@@ -257,12 +334,26 @@ const MARK = '@@PF';
 /** The bash program for one step; markers delimit each statement's output. */
 export function buildProgram(statements, envVars, opts = {}) {
   const lines = ['exec 2>&1', 'set -uo pipefail'];
+  if (opts.qualification) {
+    // Collect parent-shell failures, but stop a failed subshell so a later
+    // success cannot hide it from the workflow's background wait/status guard.
+    lines.push('set -E');
+    lines.push(
+      `trap '__pf_failure=$?; if (( BASH_SUBSHELL > 0 )); then exit "$__pf_failure"; fi' ERR`
+    );
+  }
   for (const [key, value] of Object.entries(envVars))
     lines.push(`export ${key}=${JSON.stringify(String(value))}`);
   statements.forEach((statement, index) => {
     lines.push(`printf '\\n${MARK}-BEGIN ${index}\\n'`);
-    lines.push(prepareStatement(applyExclusions(statement).text, opts));
-    lines.push(`__pf_rc=$?; printf '\\n${MARK}-END ${index} %s\\n' "$__pf_rc"`);
+    if (opts.qualification) lines.push('__pf_failure=0');
+    lines.push(prepareStatement(applyExclusions(statement, opts).text, opts));
+    lines.push('__pf_rc=$?');
+    if (opts.qualification)
+      lines.push(
+        'if [ "$__pf_failure" -ne 0 ]; then __pf_rc=$__pf_failure; fi'
+      );
+    lines.push(`printf '\\n${MARK}-END ${index} %s\\n' "$__pf_rc"`);
   });
   return lines.join('\n');
 }
@@ -439,9 +530,19 @@ export async function main({
   }
   const childEnv = buildPreflightEnv(env, cwd);
   const workflowFile = path.resolve(cwd, args.workflow ?? WORKFLOW_PATH);
-  // A branch behind base fails CI on files it never saw (#23313: a missing
-  // scripts/anti-slop/run.mjs). Bring base in first; the hook only reports.
-  if (!args.list) {
+  let hookProof = null;
+  if (args.hook && !args.list) {
+    try {
+      hookProof = await hookBaseProof({ base: args.base, cwd, env: childEnv });
+      log(
+        `[preflight] mergeable head=${hookProof.headSha} base=${hookProof.baseSha} tree=${hookProof.treeSha}`
+      );
+    } catch (error) {
+      log(`[preflight] ${error.message}`);
+      return 1;
+    }
+    // Interactive preflight retains its existing ordinary forward merge.
+  } else if (!args.list) {
     spawnSync('git', ['fetch', '--no-tags', '-q', 'origin', args.base], {
       cwd,
       env: childEnv,
@@ -458,12 +559,6 @@ export async function main({
         ['merge-base', '--is-ancestor', `origin/${args.base}`, 'HEAD'],
         { cwd, env: childEnv }
       ).status !== 0;
-    if (behind && args.hook) {
-      log(
-        `[preflight] branch is behind origin/${args.base}; merge it, then push.`
-      );
-      return 1;
-    }
     if (behind) {
       log(`[preflight] merging origin/${args.base} into the branch first`);
       const merged = spawnSync(
@@ -509,9 +604,30 @@ export async function main({
       spawnSync('which', ['flock'], { cwd, env: childEnv }).status !== 0
     )
       return '';
-    return path.join(homedir(), '.cache', 'gem-typecheck.lock');
+    const prepareLock = root => {
+      mkdirSync(root, { recursive: true });
+      const file = path.join(root, 'gem-typecheck.lock');
+      closeSync(openSync(file, 'a'));
+      return file;
+    };
+    try {
+      // Retain the existing host lock even when callers have different XDG roots.
+      return prepareLock(path.join(homedir(), '.cache'));
+    } catch (error) {
+      const code = /** @type {NodeJS.ErrnoException} */ (error).code;
+      if (
+        !['EACCES', 'EPERM', 'EROFS', 'ENOENT', 'ENOTDIR'].includes(
+          code ?? ''
+        ) ||
+        !procEnv.XDG_CACHE_HOME ||
+        !path.isAbsolute(procEnv.XDG_CACHE_HOME)
+      )
+        throw error;
+      // Restricted-host agents must share one fallback root to share the mutex.
+      // A failed fallback remains an error; never silently drop serialization.
+      return prepareLock(procEnv.XDG_CACHE_HOME);
+    }
   })();
-  if (flockPath) mkdirSync(path.dirname(flockPath), { recursive: true });
 
   const plan = steps.map(step => {
     const script = substitute(step.run, values);
@@ -562,7 +678,7 @@ export async function main({
         GITHUB_BASE_REF: args.base,
         GITHUB_EVENT_NAME: 'pull_request',
       },
-      { flockPath }
+      { flockPath, qualification: args.hook }
     );
     const seen = new Set();
     let mark = Date.now();
@@ -572,7 +688,9 @@ export async function main({
       const took = Date.now() - mark;
       mark = Date.now();
       const label = labelFor(statements[index]);
-      for (const item of applyExclusions(statements[index]).excluded)
+      for (const item of applyExclusions(statements[index], {
+        qualification: args.hook,
+      }).excluded)
         excluded.push({ step: step.name, ...item });
       timings.push({ step: step.name, label, ms: took });
       if (code !== 0) {
@@ -634,6 +752,29 @@ export async function main({
     }
   }
 
+  if (hookProof && failures.length === 0) {
+    try {
+      const refreshed = await hookBaseProof({
+        base: args.base,
+        cwd,
+        env: childEnv,
+        expectedHead: hookProof.headSha,
+      });
+      if (refreshed.baseSha !== hookProof.baseSha)
+        log(
+          `[preflight] base moved; mergeable head=${refreshed.headSha} base=${refreshed.baseSha} tree=${refreshed.treeSha}`
+        );
+      hookProof = refreshed;
+    } catch (error) {
+      failures.push({
+        step: 'Mergeability',
+        label: error.message,
+        code: 1,
+        output: [],
+      });
+    }
+  }
+
   log('\n== preflight summary');
   for (const item of skipped) log(`  SKIPPED: ${item.name} (${item.reason})`);
   for (const item of excluded)
@@ -658,6 +799,7 @@ export async function main({
     {
       at: new Date().toISOString(),
       head: headSha,
+      ...(hookProof ? { mergeability: hookProof } : {}),
       durationMs: Date.now() - started,
       red: failures.map(f => `${f.step}: ${f.label}`),
       timings: timings.filter(t => t.ms >= 1000),

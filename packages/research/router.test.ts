@@ -300,6 +300,8 @@ describe('router', () => {
   });
 
   it('coalesces concurrent identical queries into one execution', async () => {
+    const now = Date.parse(sampleResult().createdAt);
+    state = new ResearchState(dir, () => now);
     let release!: () => void;
     const gate = new Promise<void>(r => {
       release = r;

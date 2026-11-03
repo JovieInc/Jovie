@@ -212,27 +212,54 @@ def c_neon(spec: dict, now: float) -> dict | None:
     return None
 
 
+def _resend_count(value: object) -> bool:
+    # Counts cross a JSON/float-based forecast boundary; booleans are not counts.
+    return type(value) is int and 0 <= value <= 2 ** 53 - 1
+
+
+def _resend_reset_at(value: object, now: float) -> float | None:
+    if not isinstance(value, str) or "T" not in value:
+        return None
+    try:
+        reset = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if reset.tzinfo is None:
+            return None
+        timestamp = reset.timestamp()
+    except (ValueError, OverflowError, OSError):
+        return None
+    return timestamp if timestamp > now else None
+
+
 def c_resend(spec: dict, now: float) -> dict | None:
-    """Emails sent today (UTC) or this month vs the plan quota. Needs a full-access key: the production
-    key is send-only (401 on list), so this reads RESEND_READ_KEY and is a GAP until Tim mints one."""
+    """Read authoritative account quota, including sent AND received email.
+
+    Adopt Resend GET /usage through the shared HTTP wrapper. Sent listings
+    cannot establish total quota. Keep GAP for unavailable evidence, unlimited
+    or changed limits the current registry cannot represent, and expired resets.
+    Reset boundaries come from the provider, never a locally derived calendar.
+    RESEND_READ_KEY is existing read authority; absence does not create a key.
+    """
+    window_name = spec.get("window")
+    window = {"day": "daily", "month": "monthly"}.get(window_name) if isinstance(window_name, str) else None
+    configured_limit = spec.get("limit")
+    if not window or not _resend_count(configured_limit) or configured_limit == 0:
+        return None
     token = os.environ.get("RESEND_READ_KEY") or run(
         ["doppler", "secrets", "get", "RESEND_READ_KEY", "-p", "agent-mesh", "-c", "prd", "--plain"])
-    if not token:
+    if not token or not token.strip():
         return None
-    day = datetime.fromtimestamp(now, timezone.utc)
-    floor = day.replace(hour=0, minute=0, second=0).strftime("%Y-%m-%d") if spec["window"] == "day" \
-        else day.strftime("%Y-%m-01")
-    count, after = 0, ""
-    for _ in range(100):
-        page = _http_json(f"https://api.resend.com/emails?limit=100{after}", token.strip())
-        rows = (page or {}).get("data")
-        if not rows:
-            break
-        count += sum(1 for r in rows if r["created_at"][:10] >= floor)
-        if rows[-1]["created_at"][:10] < floor or not page.get("has_more"):
-            break
-        after = f"&after={rows[-1]['id']}"
-    return {"value": count, "limit": spec["limit"]}
+    payload = _http_json("https://api.resend.com/usage", token.strip())
+    if not isinstance(payload, dict) or payload.get("object") != "usage" \
+            or not isinstance(payload.get("emails"), dict):
+        return None
+    usage = payload["emails"].get(window)
+    if not isinstance(usage, dict) or any(not _resend_count(usage.get(key))
+                                          for key in ("used", "limit", "sent", "received")):
+        return None
+    if usage["limit"] != configured_limit or usage["used"] != usage["sent"] + usage["received"] \
+            or _resend_reset_at(usage.get("resets_at"), now) is None:
+        return None
+    return {"value": usage["used"], "limit": usage["limit"], "resetsAt": usage["resets_at"]}
 
 
 def c_manual(spec: dict, now: float) -> dict | None:
@@ -276,6 +303,11 @@ def slope_per_hour(points: list[tuple[float, float]]) -> float | None:
 def evaluate(res: dict, reading: dict | None, history: list[tuple[float, float]], now: float) -> dict:
     row = {"id": res["id"], "group": res["group"], "label": res["label"], "unit": res.get("unit", ""),
            "leadTimeHours": res["leadTimeHours"], "atLimit": res["atLimit"]["effect"]}
+    if reading is not None and res["collector"]["type"] == "resend":
+        if not _resend_count(reading.get("value")) or not _resend_count(reading.get("limit")) \
+                or reading["limit"] == 0 or reading["limit"] != res["collector"].get("limit") \
+                or _resend_reset_at(reading.get("resetsAt"), now) is None:
+            reading = None
     if reading is None:
         return {**row, "status": "GAP", "why": "no collector reading" if res["collector"]["type"] != "none"
                 else res["collector"].get("note", "collector not wired")}
@@ -286,6 +318,8 @@ def evaluate(res: dict, reading: dict | None, history: list[tuple[float, float]]
     ttl = INF if not burn or burn <= 0 else max(0.0, (limit - value) / burn)
     frac = value / limit if limit else 0.0
     row.update(value=value, limit=limit, frac=round(frac, 3), burnPerHour=burn, ttlHours=ttl, observedAt=reading.get("observedAt"))
+    if res["collector"]["type"] == "resend":
+        row["resetsAt"] = reading["resetsAt"]
     max_age = res.get("maxAgeDays")
     stale = bool(reading.get("observedAt") and max_age and (now - parse_iso(reading["observedAt"])) > max_age * 86400)
     if frac >= 1:
@@ -410,10 +444,20 @@ def main(argv: list[str] | None = None) -> int:
         if own and kind in COLLECTORS:
             reading = COLLECTORS[kind](res["collector"], now)
             if reading and args.cmd == "collect" and kind != "manual":
-                fresh.append({"t": now, "id": res["id"], "host": local, "value": reading["value"], "limit": reading["limit"]})
+                sample = {"t": now, "id": res["id"], "host": local, "value": reading["value"], "limit": reading["limit"]}
+                if kind == "resend":
+                    sample["resetsAt"] = reading["resetsAt"]
+                fresh.append(sample)
         elif not own and hist:
             last = next(r for r in reversed(merged) if r.get("id") == res["id"])
             reading, hist = {"value": last["value"], "limit": last["limit"]}, hist[:-1]
+            if "resetsAt" in last:
+                reading["resetsAt"] = last["resetsAt"]
+        if kind == "resend" and reading:
+            reset = _resend_reset_at(reading.get("resetsAt"), now)
+            same_window = {(r["t"], r["value"]) for r in merged if r.get("id") == res["id"]
+                           and reset is not None and _resend_reset_at(r.get("resetsAt"), now) == reset}
+            hist = [point for point in hist if point in same_window]
         row = evaluate(res, reading, hist, now)
         row = apply_collector_error(row, res)
         if reading is None and not own and kind != "none":
