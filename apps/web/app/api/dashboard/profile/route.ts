@@ -1,39 +1,18 @@
 import { NextResponse } from 'next/server';
 import { isCanonicalUuid } from '@/lib/auth/profile-access';
-import {
-  requireAuth,
-  withDbSession,
-  withDbSessionTx,
-} from '@/lib/auth/session';
-import { db } from '@/lib/db';
+import { requireAuth, withDbSession } from '@/lib/auth/session';
 import { isUniqueViolation } from '@/lib/db/errors';
 import { dashboardQuery } from '@/lib/db/query-timeout';
-import { syncSocialLinksFromPrimaryMusicUrls } from '@/lib/db/social-links-sync';
-import { hasAdvancedFeatures } from '@/lib/entitlements/registry';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { applyProfileUpdate } from '@/lib/domain/profile';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
-import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 import { logger } from '@/lib/utils/logger';
-import { refreshAppleWalletProfilePassForProfileId } from '@/lib/wallet/apple/profile-pass';
-import type { ProfileUpdateInput } from './lib';
-import {
-  addAvatarCacheBust,
-  buildProfileUpdateContext,
-  finalizeProfileResponse,
-  getProfileByClerkId,
-  getProfileUpdatePreflight,
-  NO_STORE_HEADERS,
-  parseProfileUpdates,
-  readWritableProfileUsername,
-  updateProfileRecords,
-  validateUpdatesPayload,
-} from './lib';
+import { getProfileByClerkId, NO_STORE_HEADERS } from './lib';
 
 // Use Node.js runtime for compatibility with DB libs and server analytics
 export const runtime = 'nodejs';
 
-async function parseProfileUpdateRequest(req: Request, appUserId: string) {
+async function parseProfileUpdateRequest(req: Request) {
   const parsedBody = await parseJsonBody<{
     updates?: Record<string, unknown>;
     expectedVersion?: unknown;
@@ -63,35 +42,11 @@ async function parseProfileUpdateRequest(req: Request, appUserId: string) {
       { status: 400, headers: NO_STORE_HEADERS }
     );
   }
-  const updatesValidation = validateUpdatesPayload(updates);
-  if (!updatesValidation.ok) {
-    return updatesValidation.response;
-  }
-
-  let currentUsername: string | null = null;
-  if (typeof updates.username === 'string' && isCanonicalUuid(profileId)) {
-    currentUsername = await withDbSessionTx(
-      tx => readWritableProfileUsername(tx, appUserId, profileId),
-      { clerkUserId: appUserId }
-    );
-  }
-
-  const parsedUpdatesResult = parseProfileUpdates(updatesValidation.updates, {
-    currentUsername,
-  });
-  if (!parsedUpdatesResult.ok) {
-    return parsedUpdatesResult.response;
-  }
-
-  const parsedUpdates: ProfileUpdateInput = parsedUpdatesResult.parsed;
-  const context = buildProfileUpdateContext(parsedUpdates);
-
   return {
-    parsedUpdates,
+    updates,
     profileId,
     expectedVersion:
       expectedVersion === undefined ? undefined : Number(expectedVersion),
-    ...context,
   } as const;
 }
 
@@ -139,92 +94,20 @@ export async function GET() {
 export async function PUT(req: Request) {
   try {
     const appUserId = await requireAuth();
-    const parsedRequest = await parseProfileUpdateRequest(req, appUserId);
+    const parsedRequest = await parseProfileUpdateRequest(req);
     if (parsedRequest instanceof NextResponse) return parsedRequest;
 
-    const {
-      parsedUpdates,
-      dbProfileUpdates,
-      displayNameForUserUpdate,
-      avatarUrl,
-      usernameUpdate,
-      expectedVersion,
-      profileId,
-    } = parsedRequest;
-    if (parsedUpdates.settings?.require_double_opt_in === false) {
-      const entitlements = await getCurrentUserEntitlements();
-      if (!hasAdvancedFeatures(entitlements.plan)) {
-        return NextResponse.json(
-          { error: 'Double opt-in can only be disabled on Max.' },
-          { status: 403, headers: NO_STORE_HEADERS }
-        );
-      }
-    }
-    const avatarPreflight =
-      avatarUrl === undefined
-        ? undefined
-        : await withDbSessionTx(
-            tx => getProfileUpdatePreflight(tx, appUserId, profileId),
-            { clerkUserId: appUserId }
-          );
-    if (avatarPreflight instanceof NextResponse) return avatarPreflight;
-
-    const precomputedAvatarTheme =
-      avatarUrl === undefined ||
-      avatarUrl === avatarPreflight?.avatarUrl ||
-      (expectedVersion !== undefined &&
-        expectedVersion !== avatarPreflight?.profileEditVersion)
-        ? undefined
-        : await buildThemeWithProfileAccent({
-            existingTheme: null,
-            sourceUrl: avatarUrl,
-          });
-
-    const result = await withDbSessionTx(
-      tx =>
-        updateProfileRecords({
-          tx,
-          appUserId,
-          profileId,
-          dbProfileUpdates,
-          displayNameForUserUpdate,
-          usernameUpdate,
-          expectedVersion,
-          precomputedAvatarTheme,
-          ...(avatarPreflight === undefined
-            ? {}
-            : {
-                avatarPreflightVersion: avatarPreflight.profileEditVersion,
-              }),
-        }),
-      { clerkUserId: appUserId }
-    );
-
-    if (result instanceof NextResponse) return result;
-
-    const { updatedProfile, oldUsernameNormalized } = result;
-    await Promise.all([
-      syncSocialLinksFromPrimaryMusicUrls(db, updatedProfile.id, {
-        spotifyUrl: dbProfileUpdates.spotifyUrl as string | null | undefined,
-        appleMusicUrl: dbProfileUpdates.appleMusicUrl as
-          | string
-          | null
-          | undefined,
-        youtubeUrl: dbProfileUpdates.youtubeUrl as string | null | undefined,
-      }),
-      refreshAppleWalletProfilePassForProfileId(updatedProfile.id),
-      finalizeProfileResponse({
-        updatedProfile,
-        oldUsernameNormalized,
-        clerkUserId: appUserId,
-        privacyChanged:
-          parsedUpdates.isPublic !== undefined ||
-          parsedUpdates.settings?.searchable !== undefined,
-      }),
-    ]);
+    // The write is the shared domain function (also used by chat confirm-edit).
+    const result = await applyProfileUpdate({
+      appUserId,
+      profileId: parsedRequest.profileId,
+      updates: parsedRequest.updates,
+      expectedVersion: parsedRequest.expectedVersion,
+    });
+    if (!result.ok) return result.response;
 
     return NextResponse.json(
-      { profile: addAvatarCacheBust(updatedProfile) },
+      { profile: result.profile },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {

@@ -319,8 +319,8 @@ describe('OvieShippingStateCard', () => {
     expect(metricValue('Staging')).toBe('26.9.16 a1b2c3d');
     expect(metricValue('Production')).toBe('26.9.15 ee7401f');
     expect(metricValue('Behind Main')).toBe('54');
-    expect(metricValue('Merge to Prod')).toBe('n/a');
-    expect(metricValue('LYB Deploy')).toBe('n/a');
+    expect(metricValue('Merge to Prod')).toMatch(/^Unknown/);
+    expect(metricValue('LYB Deploy')).toMatch(/^Unknown/);
     expect(metricValue('CI Green')).toBe('Yes');
     expect(metricValue('Summer')).toBe('Up');
     expect(
@@ -385,7 +385,7 @@ describe('OvieShippingStateCard', () => {
     });
   });
 
-  it('fails soft per metric: a missing source reads n/a without blanking the card', async () => {
+  it('fails soft per metric: a missing source reads Unknown with its source, never a bare n/a', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse(200, {
         ...projection,
@@ -423,11 +423,23 @@ describe('OvieShippingStateCard', () => {
     await waitFor(() => {
       expect(panel()).toHaveAttribute('data-truth', 'degraded');
     });
-    expect(metricValue('Merged Today')).toBe('n/a');
-    expect(metricValue('Jovie / LYB / Summer')).toBe('n/a / n/a / n/a');
-    expect(metricValue('Merged 7d')).toBe('n/a');
-    expect(metricValue('Summer')).toBe('n/a');
-    expect(metricValue('Lanes Running')).toBe('7/9 stale');
+    expect(metricValue('Merged Today')).toMatch(/^Unknown/);
+    // The unknown names its source, so the operator knows where to look.
+    expect(metricValue('Merged Today')).toMatch(/^Unknown\s*GitHub/);
+    expect(
+      screen
+        .getByTestId('hud-delivery-metrics')
+        .querySelectorAll('[data-measured="unknown"]').length
+    ).toBeGreaterThan(0);
+    expect(screen.getByTestId('hud-delivery-metrics')).not.toHaveTextContent(
+      /\bn\/a\b/
+    );
+    expect(metricValue('Jovie / LYB / Summer')).toMatch(/^Unknown/);
+    expect(metricValue('Merged 7d')).toMatch(/^Unknown/);
+    expect(metricValue('Summer')).toMatch(/^Unknown/);
+    expect(metricValue('Lanes Running')).toMatch(
+      /^7\/9\s*(stale|\d+[smhd] old)$/
+    );
     expect(metricValue('Merge Queue')).toBe('2');
     expect(metricValue('Behind Main')).toBe('54');
     expect(screen.getByText('GitHub GraphQL returned 502')).toBeTruthy();
@@ -449,8 +461,8 @@ describe('OvieShippingStateCard', () => {
       );
     });
     expect(screen.queryByText('0')).toBeNull();
-    expect(metricValue('Merged Today')).toBe('n/a');
-    expect(metricValue('Lanes Running')).toBe('n/a');
+    expect(metricValue('Merged Today')).toMatch(/^Unknown/);
+    expect(metricValue('Lanes Running')).toMatch(/^Unknown/);
   });
 
   it('ages a connected projection to stale at its deadline without another read', async () => {
@@ -521,7 +533,7 @@ describe('OvieShippingStateCard', () => {
     );
     expect(panel).toHaveAttribute('data-connection', 'disconnected');
     expect(screen.getByText('Shipping-state request timed out')).toBeTruthy();
-    expect(metricValue('Merged Today')).toBe('n/a');
+    expect(metricValue('Merged Today')).toMatch(/^Unknown/);
     expect(screen.queryByText('0')).toBeNull();
   });
 

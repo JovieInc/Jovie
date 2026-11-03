@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-10-30T19:36:32.021Z",
-  "winsTotal": 24,
+  "at": "2026-11-03T14:54:41.132Z",
+  "winsTotal": 32,
   "winsVerified": 1,
-  "winsClaimed": 11,
+  "winsClaimed": 15,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 4,
-  "winsPendingMeasure": 4,
-  "winsLast7d": 24,
+  "winsPendingMeasure": 8,
+  "winsLast7d": 32,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -18,7 +18,7 @@
     },
     {
       "theme": "merge-throughput",
-      "total": 14,
+      "total": 16,
       "verified": 0,
       "ready": false
     },
@@ -48,6 +48,36 @@
     },
     {
       "theme": "golden-path-reliability",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "runner-pin",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "golden-path",
+      "total": 2,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "hydration-correctness",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "neon-egress",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "false-green",
       "total": 1,
       "verified": 0,
       "ready": false
@@ -149,6 +179,38 @@
     {
       "id": "win-2026-10-30-the-staging-production-bind-now-rides",
       "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-eliminate-the-false-failing-publication-transport",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-coherent-grouped-codeql-releases-pass-the",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-the-runner-pin-gate-is-green",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-31-typed-handles-are-honored-and-freed",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-removes-the-client-side-hydration-re",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-certification-ingest-reads-the-6-5",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-the-shared-outcome-verifier-rejects-all",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-31-sign-up-in-the-claim-chat",
+      "status": "pending-measure"
     }
   ]
 }

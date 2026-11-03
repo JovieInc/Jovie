@@ -8,31 +8,25 @@
   "highConfidenceFloor": 0.6,
   "reviewerCooldownS": 21600,
   "proposer": {
-    "name": "claude-opus",
-    "model": "claude-opus-5-5",
+    "name": "hyperagent-glm-proposer",
+    "model": "z-ai/glm-5.3",
     "timeoutS": 900,
-    "maxBudgetUsd": 3,
-    "stdin": true,
-    "env": "~/.config/jovie-lanes/claude.env",
-    "health": ["claude", "auth", "status"],
-    "healthy": "\"loggedIn\": true",
+    "health": ["hyperagent", "models", "--json"],
+    "healthy": "models",
     "cmd": [
-      "claude",
-      "-p",
+      "hyperagent",
+      "execute",
+      "--role",
+      "research",
       "--model",
-      "claude-opus-5-5",
-      "--output-format",
-      "json",
-      "--json-schema",
-      "{schema}",
-      "--tools",
-      "",
-      "--no-session-persistence",
-      "--setting-sources",
-      "",
-      "--strict-mcp-config",
-      "--max-budget-usd",
-      "{max_budget_usd}"
+      "z-ai/glm-5.3",
+      "--agent-id",
+      "cmtj3n2q901i407adklzzq01t",
+      "--json",
+      "--timeout",
+      "840",
+      "-p",
+      "{prompt}"
     ]
   },
   "reviewers": [
@@ -124,5 +118,28 @@
       "-p",
       "{prompt}"
     ]
+  },
+  "judgmentProposer": {
+    "name": "hyperagent-opus-judgment",
+    "model": "claude-opus-5-5",
+    "timeoutS": 1560,
+    "health": ["hyperagent", "models", "--json"],
+    "healthy": "models",
+    "cmd": [
+      "hyperagent",
+      "execute",
+      "--role",
+      "research",
+      "--model",
+      "claude-opus-5-5",
+      "--agent-id",
+      "{agent_id}",
+      "--json",
+      "--timeout",
+      "1500",
+      "-p",
+      "{prompt}"
+    ],
+    "agentId": null
   }
 }

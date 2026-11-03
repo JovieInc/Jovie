@@ -15,10 +15,12 @@ Pure functions over parsed values; lane_runner owns every side effect (gh, git, 
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import re
 import sys
+import symtable
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,11 +31,11 @@ from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "merge-narrowed-preflight", "register-domain-writes", "agent")
+    "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent")
 DETERMINISTIC = frozenset({
-    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN})
+    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -46,6 +48,11 @@ UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
 BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?## ?(?:Red-before-green|Blast radius)",
                        re.IGNORECASE)
+# Source Validation includes passing fixtures that print quota/network errors.
+# A concrete component error needs regression coverage, never an infra retry.
+COMPONENT_TEST_TEXT = re.compile(
+    r"::error file=[^\s:]+::\[test-not-touched\] Component changed but test "
+    r"((?:apps/web|packages/ui)/[\w./-]+\.(?:test|spec)\.[jt]sx?) was not touched in this diff\.")
 # The internal customer-changelog decision. A second note is `ambiguous`, so a body that already
 # contains one is never stamped again. The quota form is the attempt>1 mask of the same defect:
 # the guard could not re-read the body, so the log no longer says missing-metadata.
@@ -75,8 +82,12 @@ CONSERVATIVE_UTILITY = re.compile(
 SNAP_STEP = {"2.5": "2", "3.5": "3"}
 SPACING_SCAN_PREFIXES = ("apps/web/app/", "apps/web/components/", "packages/ui/")
 NON_PRODUCT_SPACING = re.compile(r"\.(?:test|spec|stories)\.[tj]sx?$")
-# Source Validation's merge probe. Only this one file has a deterministic union:
-# both sides append to the same NARROWED vitest command. Any other path stays a model fix.
+# Source Validation's merge probe. Deterministic unions:
+# - NARROWED vitest command in scripts/preflight-changed.mjs
+# - shell && chains (node --test or vitest paths, plus added prefixes)
+# - quoted list entries (both sides only add 'path', lines)
+# - one-line comma-separated identifier lists (main order, then head-only tokens)
+# Any other hunk stays a model fix.
 NARROWED_PREFLIGHT = "scripts/preflight-changed.mjs"
 NARROWED_CONFLICT = re.compile(
     r"This PR conflicts with \S+ in: scripts/preflight-changed\.mjs\s*\. "
@@ -106,9 +117,15 @@ _NARROWED_HUNK = re.compile(
 _NARROWED_SIDE = re.compile(
     r"\A(?P<prefix>(?:[ \t]*command:\n)?)(?P<cindent>[ \t]*)'(?P<command>[^'\n]+)',\n"
     r"(?P<nindent>[ \t]*)note: '(?P<note>[^'\n]+)',\n?\Z")
+_QUOTED_LIST_ENTRY = re.compile(r"^[ \t]*'[^'\n]+',[ \t]*$")
+_IDENT_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9-]*")
+_AND_CHAIN_LINE = re.compile(
+    r"""^(?P<indent>[ \t]*)(?P<prefix>(?:"[^"\n]+"\s*:\s*)?)(?P<q>['"])(?P<command>[^'"\n]*&&[^'"\n]*)(?P=q)(?P<suffix>,?)\s*$""")
+_JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
+    ("component-test-evidence", COMPONENT_TEST_TEXT, AGENT),
     ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),
     # Before platform-infra: a Source Validation log can carry passing-test
     # rate-limit lines beside the guard error that actually failed the job.
@@ -122,7 +139,7 @@ SIGNATURES = (
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
-    ("atomic-write", ATOMIC_TEXT, AGENT),
+    ("atomic-write", ATOMIC_TEXT, ATOMIC_WRITE),
     ("pr-body", BODY_TEXT, AGENT),
 )
 BEHIND_CLASS = "stale-branch"
@@ -190,6 +207,8 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
             and stamp_internal_changelog(pr.get("body")) is not None:
         cls, action, signature = "changelog-metadata", STAMP_CHANGELOG, ""
     files = []
+    if cls == "component-test-evidence":
+        files = sorted({test for name in names for test in COMPONENT_TEST_TEXT.findall(logs.get(name) or "")})
     if cls == "ci-fast-wiring":
         for name in names:
             found = UNWIRED.search(logs.get(name) or "")
@@ -316,6 +335,184 @@ def _vitest_prefix_and_files(segment: str) -> tuple[str, list[str]] | None:
     if "vitest run" not in prefix:
         return None
     return prefix, files
+
+
+def _file_list_prefix_and_files(segment: str) -> tuple[str, list[str]] | None:
+    """A vitest invocation, or `node --test` plus test paths and nothing else."""
+    vitest = _vitest_prefix_and_files(segment)
+    if vitest:
+        return vitest
+    if not segment.startswith("node --test"):
+        return None
+    files = _NARROWED_TEST.findall(segment)
+    if not files:
+        return None
+    prefix = segment
+    for name in files:
+        prefix = re.sub(rf"(^|\s){re.escape(name)}(?=\s|$)", " ", prefix)
+    prefix = re.sub(r"\s+", " ", prefix).strip()
+    if prefix != "node --test":
+        return None
+    return prefix, files
+
+
+def _opaque_command_key(segment: str) -> tuple[str, ...]:
+    """Identity of one && segment. Flags-only commands key on the executable."""
+    tokens = segment.split()
+    if len(tokens) >= 2 and not tokens[1].startswith("-"):
+        return tokens[0], tokens[1]
+    return (tokens[0],)
+
+
+def merge_and_chain(ours: str, theirs: str) -> str | None:
+    """Union two shell `&&` chains. Base segments stay in base order, then
+    head-only segments. `node --test` and vitest paths union the same way.
+    The same script with different arguments, a changed runner, or quotes
+    returns None."""
+    ours_parts = _split_shell_and(str(ours or "").strip())
+    theirs_parts = _split_shell_and(str(theirs or "").strip())
+    if not ours_parts or not theirs_parts:
+        return None
+
+    def classify(parts: list[str]) -> tuple[list[tuple[str, list[str]]], list[str]] | None:
+        lists = []
+        opaque = []
+        seen: dict[tuple[str, ...], str] = {}
+        for part in parts:
+            parsed = _file_list_prefix_and_files(part)
+            if parsed:
+                lists.append(parsed)
+                continue
+            key = _opaque_command_key(part)
+            if seen.get(key, part) != part:
+                return None
+            seen[key] = part
+            opaque.append(part)
+        if len(lists) > 1:
+            return None
+        return lists, opaque
+
+    ours_split = classify(ours_parts)
+    theirs_split = classify(theirs_parts)
+    if not ours_split or not theirs_split:
+        return None
+    ours_lists, ours_opaque = ours_split
+    theirs_lists, theirs_opaque = theirs_split
+    if len(ours_lists) != len(theirs_lists):
+        return None
+    if ours_lists and ours_lists[0][0] != theirs_lists[0][0]:
+        return None
+    theirs_by = {_opaque_command_key(part): part for part in theirs_opaque}
+    ours_by = {_opaque_command_key(part): part for part in ours_opaque}
+    for key in set(theirs_by) & set(ours_by):
+        if theirs_by[key] != ours_by[key]:
+            return None
+    files: list[str] = []
+    merged_list = None
+    if theirs_lists:
+        for name in theirs_lists[0][1] + ours_lists[0][1]:
+            if name not in files:
+                files.append(name)
+        merged_list = f"{theirs_lists[0][0]} {' '.join(files)}"
+    result: list[str] = []
+    for segment in theirs_parts:
+        result.append(merged_list if _file_list_prefix_and_files(segment) else segment)
+    list_at = next((index for index, segment in enumerate(ours_parts) if _file_list_prefix_and_files(segment)), None)
+    for index, segment in enumerate(ours_parts):
+        if _file_list_prefix_and_files(segment) or segment in result:
+            continue
+        if merged_list and list_at is not None and index < list_at:
+            result.insert(result.index(merged_list), segment)
+        else:
+            result.append(segment)
+    return " && ".join(result)
+
+
+def _and_chain_commands(lines: list[str]) -> tuple[list[re.Match[str]], list[str]] | None:
+    found = []
+    other = []
+    for line in lines:
+        match = _AND_CHAIN_LINE.match(line)
+        if match:
+            found.append(match)
+        else:
+            other.append(line)
+    if len(found) != 1:
+        return None
+    return found, other
+
+
+def _json_key_conflicts(ours: list[str], theirs: list[str]) -> bool:
+    """Two different values for one JSON key are an edit, not an addition."""
+    theirs_by: dict[str, str] = {}
+    for line in theirs:
+        match = _JSON_KEY.match(line)
+        if match:
+            theirs_by[match.group(1)] = line
+    for line in ours:
+        match = _JSON_KEY.match(line)
+        if match and match.group(1) in theirs_by and theirs_by[match.group(1)] != line:
+            return True
+    return False
+
+
+def _resolve_and_chain_hunk(ours: str, theirs: str) -> str | None:
+    ours_parsed = _and_chain_commands(ours.splitlines())
+    theirs_parsed = _and_chain_commands(theirs.splitlines())
+    if not ours_parsed or not theirs_parsed:
+        return None
+    ours_command, ours_other = ours_parsed
+    theirs_command, theirs_other = theirs_parsed
+    ours_match, theirs_match = ours_command[0], theirs_command[0]
+    if ours_match.group("q") != theirs_match.group("q") \
+            or ours_match.group("indent") != theirs_match.group("indent") \
+            or ours_match.group("prefix") != theirs_match.group("prefix") \
+            or ours_match.group("suffix") != theirs_match.group("suffix"):
+        return None
+    if _json_key_conflicts(ours_other, theirs_other):
+        return None
+    merged = merge_and_chain(ours_match.group("command"), theirs_match.group("command"))
+    if merged is None:
+        return None
+    command_line = (
+        f"{theirs_match.group('indent')}{theirs_match.group('prefix')}"
+        f"{theirs_match.group('q')}{merged}{theirs_match.group('q')}{theirs_match.group('suffix')}")
+    lines = []
+    for line in theirs.splitlines():
+        match = _AND_CHAIN_LINE.match(line)
+        lines.append(command_line if match else line)
+    for line in ours_other:
+        if line not in lines:
+            lines.append(line)
+    ending = "\n" if ours.endswith("\n") or theirs.endswith("\n") else ""
+    return "\n".join(lines) + ending
+
+
+def resolve_and_chain_text(text: str) -> str | None:
+    """Replace conflict hunks that are only a shell `&&` chain, plus lines added
+    on one side. None when any hunk has another shape, so the caller aborts."""
+    if "<<<<<<<" not in str(text or ""):
+        return None
+    hunks = list(_NARROWED_HUNK.finditer(text))
+    if not hunks:
+        return None
+    cleared = _NARROWED_HUNK.sub("", text)
+    if "<<<<<<<" in cleared or ">>>>>>>" in cleared:
+        return None
+    pieces = []
+    last = 0
+    for hunk in hunks:
+        resolved = _resolve_and_chain_hunk(hunk.group("ours"), hunk.group("theirs"))
+        if resolved is None:
+            return None
+        pieces.append(text[last:hunk.start()])
+        pieces.append(resolved)
+        last = hunk.end()
+    pieces.append(text[last:])
+    resolved = "".join(pieces)
+    if "<<<<<<<" in resolved or ">>>>>>>" in resolved or resolved == text:
+        return None
+    return resolved
 
 
 def merge_narrowed_guard_command(ours: str, theirs: str) -> str | None:
@@ -447,6 +644,131 @@ def resolve_preflight_narrowed_text(text: str) -> str | None:
         pieces.append(
             f"{ours.group('prefix')}{ours.group('cindent')}'{command}',\n"
             f"{ours.group('nindent')}note: '{note}',\n")
+        last = hunk.end()
+    pieces.append(text[last:])
+    resolved = "".join(pieces)
+    if "<<<<<<<" in resolved or ">>>>>>>" in resolved:
+        return None
+    return resolved
+
+
+def merge_additive_quoted_entries(ours: str, theirs: str) -> str | None:
+    """Union two conflict sides that only add quoted list entries.
+
+    Main's order stays, then head-only lines. A blank side, a non-entry line, or a
+    repeated path with different text returns None."""
+
+    def rows(side: str) -> list[str] | None:
+        if not str(side or "").endswith("\n"):
+            return None
+        lines = side[:-1].split("\n")
+        if not lines or any(_QUOTED_LIST_ENTRY.fullmatch(line) is None for line in lines):
+            return None
+        return lines
+
+    ours_rows = rows(ours)
+    theirs_rows = rows(theirs)
+    if ours_rows is None or theirs_rows is None:
+        return None
+    seen: list[str] = []
+    for line in theirs_rows + ours_rows:
+        if line not in seen:
+            seen.append(line)
+    return "\n".join(seen) + "\n"
+
+
+def merge_additive_identifier_list(ours: str, theirs: str) -> str | None:
+    """Union two one-line comma-separated identifier lists.
+
+    Main's order stays, then head-only tokens. A trailing period must match.
+    Prose, a second line, a reordered shared token, or a repeated token returns None."""
+
+    def parse(side: str) -> tuple[str, list[str], bool] | None:
+        if not str(side or "").endswith("\n"):
+            return None
+        line = side[:-1]
+        if "\n" in line:
+            return None
+        indent = line[:len(line) - len(line.lstrip(" \t"))]
+        body = line.strip()
+        period = body.endswith(".")
+        if period:
+            body = body[:-1].rstrip()
+        if not body or body.endswith(","):
+            return None
+        tokens = [part.strip() for part in body.split(",")]
+        if any(_IDENT_TOKEN.fullmatch(part) is None for part in tokens):
+            return None
+        if len(tokens) != len(set(tokens)) or body != ", ".join(tokens):
+            return None
+        return indent, tokens, period
+
+    ours_parsed = parse(ours)
+    theirs_parsed = parse(theirs)
+    if not ours_parsed or not theirs_parsed:
+        return None
+    indent, ours_tokens, ours_period = ours_parsed
+    theirs_indent, theirs_tokens, theirs_period = theirs_parsed
+    if indent != theirs_indent or ours_period != theirs_period:
+        return None
+    theirs_set = set(theirs_tokens)
+    ours_set = set(ours_tokens)
+    if [token for token in ours_tokens if token in theirs_set] != [token for token in theirs_tokens if token in ours_set]:
+        return None
+    merged = list(theirs_tokens)
+    for token in ours_tokens:
+        if token not in merged:
+            merged.append(token)
+    text = indent + ", ".join(merged)
+    if theirs_period:
+        text += "."
+    return text + "\n"
+
+
+def resolve_additive_identifier_list_text(text: str) -> str | None:
+    """Replace conflict hunks that are only a one-line identifier list. None when any
+    hunk has another shape, so the caller leaves that merge to a model."""
+    if "<<<<<<<" not in str(text or ""):
+        return None
+    hunks = list(_NARROWED_HUNK.finditer(text))
+    if not hunks:
+        return None
+    if "<<<<<<<" in _NARROWED_HUNK.sub("", text) or ">>>>>>>" in _NARROWED_HUNK.sub("", text):
+        return None
+    pieces = []
+    last = 0
+    for hunk in hunks:
+        merged = merge_additive_identifier_list(hunk.group("ours"), hunk.group("theirs"))
+        if merged is None:
+            return None
+        pieces.append(text[last:hunk.start()])
+        pieces.append(merged)
+        last = hunk.end()
+    pieces.append(text[last:])
+    resolved = "".join(pieces)
+    if "<<<<<<<" in resolved or ">>>>>>>" in resolved:
+        return None
+    return resolved
+
+
+def resolve_additive_quoted_list_text(text: str) -> str | None:
+    """Replace conflict hunks that are only quoted list entries. None when any hunk
+    has another shape, so the caller leaves that merge to a model."""
+    if "<<<<<<<" not in str(text or ""):
+        return None
+    hunks = list(_NARROWED_HUNK.finditer(text))
+    if not hunks:
+        return None
+    if "<<<<<<<" in _NARROWED_HUNK.sub("", text) or ">>>>>>>" in _NARROWED_HUNK.sub("", text):
+        return None
+    pieces = []
+    last = 0
+    for hunk in hunks:
+        merged = merge_additive_quoted_entries(hunk.group("ours"), hunk.group("theirs"))
+        if merged is None:
+            return None
+        pieces.append(text[last:hunk.start()])
+        pieces.append(merged)
         last = hunk.end()
     pieces.append(text[last:])
     resolved = "".join(pieces)
@@ -621,6 +943,80 @@ def register_direct_domain_writes(root: Path, log: str) -> list[str]:
     return added
 
 
+def repair_atomic_state_writes(root: Path, log: str) -> list[str]:
+    """Repair only ratchet-named write_text calls with an existing atomic writer import.
+
+    Unknown signatures, open modes, imports and paths stay with the agent. The
+    caller still runs the ratchet and behavior tests before publication.
+    """
+    if not ATOMIC_TEXT.search(log):
+        return []
+    hits = re.findall(r"\('([A-Za-z_]\w*\.py)', '([A-Za-z_]\w*)', 'write_text'\)", log)
+    lanes = (Path(root) / "scripts/lanes").resolve()
+    changed = []
+    for filename in sorted({name for name, _ in hits}):
+        path = lanes / filename
+        if path.is_symlink() or path.resolve().parent != lanes:
+            continue
+        try:
+            source = path.read_text()
+            tree = ast.parse(source)
+        except (OSError, SyntaxError):
+            continue
+        if not any(isinstance(n, ast.ImportFrom) and n.module == "atomic_state" and n.level == 0
+                   and any(a.name == "atomic_write_text" and a.asname is None for a in n.names)
+                   for n in tree.body):
+            continue
+        symbol = symtable.symtable(source, str(path), "exec").lookup("atomic_write_text")
+        if symbol.is_assigned() or sum((a.asname or a.name) == "atomic_write_text"
+                                      for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom))
+                                      for a in n.names) != 1:
+            continue
+        functions = {fn for name, fn in hits if name == filename}
+        lines = source.encode().splitlines(keepends=True)
+        offsets = [0]
+        for line in lines:
+            offsets.append(offsets[-1] + len(line))
+        edits = {}
+        for fn in tree.body:
+            if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)) or fn.name not in functions:
+                continue
+            if any(isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda))
+                   for child in fn.body for n in ast.walk(child)):
+                continue
+            # A local binding could shadow the imported helper.
+            if any((isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store) and n.id == "atomic_write_text")
+                   or (isinstance(n, ast.arg) and n.arg == "atomic_write_text") for n in ast.walk(fn)):
+                continue
+            for statement in ast.walk(fn):
+                call = statement.value if isinstance(statement, ast.Expr) else None
+                if not (isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute)
+                        and call.func.attr == "write_text" and 1 <= len(call.args) <= 2
+                        and not any(isinstance(a, ast.Starred) for a in call.args)
+                        and all(k.arg == "encoding" for k in call.keywords)):
+                    continue
+                if sum(isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "write_text"
+                       for n in ast.walk(call)) != 1:
+                    continue
+                receiver = ast.get_source_segment(source, call.func.value)
+                arguments = [ast.get_source_segment(source, a) for a in call.args]
+                arguments += [f"{k.arg}={ast.get_source_segment(source, k.value)}" for k in call.keywords]
+                start = offsets[call.lineno - 1] + call.col_offset
+                end = offsets[call.end_lineno - 1] + call.end_col_offset
+                edits[start] = (end, f"atomic_write_text({receiver}, {', '.join(arguments)})".encode())
+        data = source.encode()
+        for start, (end, replacement) in sorted(edits.items(), reverse=True):
+            data = data[:start] + replacement + data[end:]
+        if edits:
+            try:
+                ast.parse(data)
+            except SyntaxError:
+                continue
+            atomic_write_text(path, data.decode())
+            changed.append(f"scripts/lanes/{filename}")
+    return changed
+
+
 def wire_ci_fast(root: Path, files: list[str]) -> list[str]:
     """Append each unwired script test to the matching ci-fast list; return the files added. A file that
     is missing, already listed or outside scripts/ is left alone (the model path handles it)."""
@@ -644,6 +1040,48 @@ def wire_ci_fast(root: Path, files: list[str]) -> list[str]:
     if added:
         atomic_write_text(lanes, text)
     return added
+
+
+def _ensure_objects(literal: str) -> str:
+    """Add the objects map install_release archives, unless this flat dict already has one."""
+    if not literal.startswith("{") or not literal.endswith("}") or "\n" in literal or "**" in literal:
+        return literal
+    if re.search(r"""['"]objects['"]\s*:""", literal):
+        return literal
+    body = literal[1:-1].rstrip()
+    suffix = "" if not body.strip() or body.endswith(",") else ","
+    return "{" + body + suffix + ' "objects": {"scripts/lanes": "f" * 40}}'
+
+
+def _complete_block(block: str) -> str:
+    names = set()
+    for match in re.finditer(r"return_value\s*=\s*([A-Za-z_]\w*)\b", block):
+        if match.end() < len(block) and block[match.end()] == ".":
+            continue
+        names.add(match.group(1))
+
+    def rewrite(found):
+        return found.group(1) + _ensure_objects(found.group(2))
+
+    for name in sorted(names):
+        block = re.sub(rf"(?m)^(\s*{re.escape(name)}\s*=\s*)(\{{[^\n]*\}})", rewrite, block)
+    return re.sub(r"(return_value\s*=\s*)(\{[^\n]*\})", rewrite, block)
+
+
+def complete_release_identity_stubs(source: str) -> str:
+    """Fill one-line release_identity fixtures that install_release will archive.
+
+    A top-level function or test method that both stubs release_identity and calls
+    install_release needs an objects map: install_release archives sorted(bundle["objects"])
+    before prove-staging. On 2026-10-29 that KeyError failed Source Validation for an
+    incomplete custody stub, and the update backoff test uses the same shape. Multiline
+    literals and **spreads stay as written. The checked-in lane runner tests are a fixed
+    point of this function.
+    """
+    parts = re.split(r"(?=^(?:def |    def ))", source, flags=re.M)
+    return "".join(
+        _complete_block(part) if "install_release" in part and "release_identity" in part else part
+        for part in parts)
 
 
 # ---- measurement ---------------------------------------------------------------------------------

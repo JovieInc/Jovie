@@ -67,7 +67,7 @@ function fixture(
       encoding: 'utf8',
     }).trim();
   const bash = (script, extra = {}) =>
-    spawnSync('bash', ['-c', script], {
+    spawnSync('bash', ['--norc', '-c', script], {
       cwd: repo,
       env: { ...env, ...extra },
       encoding: 'utf8',
