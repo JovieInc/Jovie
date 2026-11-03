@@ -1,0 +1,244 @@
+{
+  "schemaVersion": 1,
+  "note": "Golden Path contract modules: every transition from claim link or homepage to first real use, plus public profiles and smart links. Each module must have a mutation floor in scripts/mutation-score-baseline.json or sit in golden-path-assurance-baseline.json pendingBaseline (which only shrinks). Priority = stage volume x risk weight; volumes are overridable with --stage-counts from the Ovie Growth golden-path report.",
+  "riskWeights": {
+    "money": 5,
+    "auth": 5,
+    "identity": 4,
+    "routing": 2
+  },
+  "stageVolume30d": {
+    "source": "conversion worker, prod read-only SELECTs 2026-10-25 (fleet/conversion.md): server_analytics artist_signup funnel and acquisition_journeys; refresh via --stage-counts",
+    "profile-view": 28156,
+    "start": 4079,
+    "claim-link-open": 340,
+    "claim-start": 34,
+    "claimed": 4,
+    "upgrade-viewed": 10,
+    "paid": 1
+  },
+  "modules": [
+    {
+      "path": "app/claim/[token]/route.ts",
+      "step": "claim-link",
+      "stage": "claim-link-open",
+      "risk": "identity"
+    },
+    {
+      "path": "app/claim/start/route.ts",
+      "step": "claim-link",
+      "stage": "claim-start",
+      "risk": "identity"
+    },
+    {
+      "path": "app/[username]/claim/route.ts",
+      "step": "claim-link",
+      "stage": "claim-link-open",
+      "risk": "identity"
+    },
+    {
+      "path": "lib/security/claim-token.ts",
+      "step": "claim-link",
+      "stage": "claim-link-open",
+      "risk": "identity"
+    },
+    {
+      "path": "lib/claim/finalize.ts",
+      "step": "ownership",
+      "stage": "claimed",
+      "risk": "identity"
+    },
+    {
+      "path": "lib/claim/claim-verification.ts",
+      "step": "ownership",
+      "stage": "claimed",
+      "risk": "identity"
+    },
+    {
+      "path": "lib/onboarding/claim-profile.ts",
+      "step": "ownership",
+      "stage": "claimed",
+      "risk": "identity"
+    },
+    {
+      "path": "lib/onboarding/ownership-gate.ts",
+      "step": "ownership",
+      "stage": "claimed",
+      "risk": "identity"
+    },
+    {
+      "path": "lib/auth/profile-access.ts",
+      "step": "ownership",
+      "stage": "claimed",
+      "risk": "identity"
+    },
+    {
+      "path": "lib/waitlist/golden-path-admission.ts",
+      "step": "admission",
+      "stage": "start",
+      "risk": "identity"
+    },
+    {
+      "path": "lib/auth/email-otp-sender.ts",
+      "step": "signup",
+      "stage": "start",
+      "risk": "auth"
+    },
+    {
+      "path": "lib/auth/oauth-provider-error-return.ts",
+      "step": "signup",
+      "stage": "start",
+      "risk": "auth"
+    },
+    {
+      "path": "lib/auth/request-session.ts",
+      "step": "session",
+      "stage": "claimed",
+      "risk": "auth"
+    },
+    {
+      "path": "lib/auth/proxy-state.ts",
+      "step": "session",
+      "stage": "claimed",
+      "risk": "auth"
+    },
+    {
+      "path": "lib/auth/proxy-request-handler.ts",
+      "step": "session",
+      "stage": "claimed",
+      "risk": "auth"
+    },
+    {
+      "path": "app/api/stripe/webhooks/route.ts",
+      "step": "webhook",
+      "stage": "paid",
+      "risk": "money"
+    },
+    {
+      "path": "lib/stripe/webhooks/handlers/checkout-handler.ts",
+      "step": "webhook",
+      "stage": "paid",
+      "risk": "money"
+    },
+    {
+      "path": "lib/stripe/webhooks/handlers/subscription-handler.ts",
+      "step": "webhook",
+      "stage": "paid",
+      "risk": "money"
+    },
+    {
+      "path": "lib/stripe/webhooks/handlers/charge-handler.ts",
+      "step": "webhook",
+      "stage": "paid",
+      "risk": "money"
+    },
+    {
+      "path": "lib/stripe/webhooks/handlers/payment-handler.ts",
+      "step": "webhook",
+      "stage": "paid",
+      "risk": "money"
+    },
+    {
+      "path": "lib/stripe/webhooks/utils.ts",
+      "step": "webhook",
+      "stage": "paid",
+      "risk": "money"
+    },
+    {
+      "path": "lib/billing/webhook-replay.ts",
+      "step": "webhook",
+      "stage": "paid",
+      "risk": "money"
+    },
+    {
+      "path": "lib/db/billing-status.ts",
+      "step": "entitlement",
+      "stage": "paid",
+      "risk": "money"
+    },
+    {
+      "path": "lib/stripe/customer-sync/update-status.ts",
+      "step": "entitlement",
+      "stage": "paid",
+      "risk": "money"
+    },
+    {
+      "path": "lib/entitlements/creator-plan.ts",
+      "step": "entitlement",
+      "stage": "paid",
+      "risk": "money"
+    },
+    {
+      "path": "lib/stripe/price-contract.ts",
+      "step": "offer",
+      "stage": "upgrade-viewed",
+      "risk": "money"
+    },
+    {
+      "path": "lib/billing/offer-truth.ts",
+      "step": "offer",
+      "stage": "upgrade-viewed",
+      "risk": "money"
+    },
+    {
+      "path": "lib/music-resolver/smart-link.ts",
+      "step": "smart-link",
+      "stage": "profile-view",
+      "risk": "routing"
+    },
+    {
+      "path": "lib/analytics/smart-link-admission.ts",
+      "step": "smart-link",
+      "stage": "profile-view",
+      "risk": "routing"
+    },
+    {
+      "path": "lib/utils/bot-detection.ts",
+      "step": "smart-link",
+      "stage": "profile-view",
+      "risk": "routing"
+    },
+    {
+      "path": "app/go/[id]/route.ts",
+      "step": "smart-link",
+      "stage": "profile-view",
+      "risk": "routing"
+    },
+    {
+      "path": "app/r/isrc/[isrc]/route.ts",
+      "step": "smart-link",
+      "stage": "profile-view",
+      "risk": "routing"
+    },
+    {
+      "path": "app/[username]/s/[platform]/route.ts",
+      "step": "smart-link",
+      "stage": "profile-view",
+      "risk": "routing"
+    },
+    {
+      "path": "app/[username]/[slug]/_lib/data.ts",
+      "step": "smart-link",
+      "stage": "profile-view",
+      "risk": "routing"
+    },
+    {
+      "path": "app/[username]/_lib/public-profile-loader.ts",
+      "step": "public-profile",
+      "stage": "profile-view",
+      "risk": "routing"
+    },
+    {
+      "path": "app/[username]/_lib/alias-collision-decision.ts",
+      "step": "public-profile",
+      "stage": "profile-view",
+      "risk": "routing"
+    },
+    {
+      "path": "lib/profile/public-profile-indexing-policy.ts",
+      "step": "public-profile",
+      "stage": "profile-view",
+      "risk": "routing"
+    }
+  ]
+}

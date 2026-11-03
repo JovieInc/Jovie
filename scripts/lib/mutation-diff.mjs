@@ -17,6 +17,17 @@ import ts from 'typescript';
 
 export const WEB_ROOT = 'apps/web';
 
+/**
+ * Escape glob metacharacters so a literal path is a safe Stryker `--mutate`
+ * pattern. Next.js dynamic segments (`app/claim/[token]/route.ts`) and route
+ * groups (`(auth)`) are character classes and groups to a glob, so an
+ * unescaped path matched zero files and the module could never be scored.
+ * @param {string} path
+ */
+export function escapeGlobPath(path) {
+  return path.replace(/[\\[\](){}*?!+@]/gu, '\\$&');
+}
+
 /** apps/web-relative prefixes where a weak test costs money, access, or trust. */
 export const HIGH_RISK_PREFIXES = Object.freeze([
   'app/api/billing/',
@@ -30,6 +41,17 @@ export const HIGH_RISK_PREFIXES = Object.freeze([
   'lib/idempotency.ts',
   'lib/stripe/',
   'proxy.ts',
+  // Golden Path contract modules (scripts/golden-path-assurance.json).
+  'app/claim/',
+  'app/go/',
+  'app/r/isrc/',
+  'lib/analytics/smart-link-admission.ts',
+  'lib/db/billing-status.ts',
+  'lib/music-resolver/smart-link.ts',
+  'lib/onboarding/claim-profile.ts',
+  'lib/onboarding/ownership-gate.ts',
+  'lib/security/claim-token.ts',
+  'lib/waitlist/golden-path-admission.ts',
 ]);
 
 const SOURCE_EXTENSION = /\.(?:ts|tsx)$/u;

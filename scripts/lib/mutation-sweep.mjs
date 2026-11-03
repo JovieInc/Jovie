@@ -52,12 +52,12 @@ export function normalizeState(raw) {
  * pure function of source + tests and tests change slowly.
  * @param {ReturnType<typeof emptyState>} state
  * @param {{ file: string, blob: string, testCount: number }[]} candidates
- * @param {{ max: number, now?: number, staleDays?: number }} options
+ * @param {{ max: number, now?: number, staleDays?: number, priority?: Map<string, number> }} options
  */
 export function pickBatch(
   state,
   candidates,
-  { max, now = Date.now(), staleDays = 30 }
+  { max, now = Date.now(), staleDays = 30, priority = new Map() }
 ) {
   const dayMs = 86_400_000;
   const ranked = [];
@@ -79,8 +79,12 @@ export function pickBatch(
   }
   // Within a rank: oldest run first, then the module with the most tests
   // (richest signal per mutation-minute is roughly test depth), then name.
+  // Golden Path contract modules (higher traffic x risk first) outrank the
+  // rest of the crawl; modules without a weight keep the rank order below.
   ranked.sort(
     (a, b) =>
+      (priority.get(b.candidate.file) ?? 0) -
+        (priority.get(a.candidate.file) ?? 0) ||
       a.rank - b.rank ||
       a.at - b.at ||
       b.candidate.testCount - a.candidate.testCount ||

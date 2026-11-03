@@ -15,6 +15,7 @@ import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 import {
   createTestSelector,
+  escapeGlobPath,
   findRelatedTests,
   HIGH_RISK_PREFIXES,
   readExecutedTests,
@@ -997,4 +998,21 @@ describe('target V8 receipt rejects phantom runtime relationships', () => {
       }
     }
   );
+});
+
+describe('escapeGlobPath', () => {
+  it('escapes Next.js dynamic segments and route groups', () => {
+    expect(escapeGlobPath('app/claim/[token]/route.ts')).toBe(
+      'app/claim/\\[token\\]/route.ts'
+    );
+    expect(escapeGlobPath('app/(auth)/[...slug]/page.tsx')).toBe(
+      'app/\\(auth\\)/\\[...slug\\]/page.tsx'
+    );
+  });
+
+  it('leaves a plain path unchanged', () => {
+    expect(escapeGlobPath('lib/claim/finalize.ts')).toBe(
+      'lib/claim/finalize.ts'
+    );
+  });
 });
