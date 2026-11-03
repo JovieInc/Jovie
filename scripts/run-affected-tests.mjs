@@ -15,6 +15,8 @@ import {
   isBlogContentCandidatePath,
 } from './lib/blog-content-ci.mjs';
 
+import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
+
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
 // retain the entire suite in memory. They still need a finite wall-clock
@@ -34,6 +36,15 @@ const GLOBAL_TEST_INPUTS = new Set([
 const TESTABLE_FILE = /\.(?:[cm]?[jt]sx?|json)$/;
 const VITEST_TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
 const KNOWN_VITEST_FIXTURE_TESTS = new Map([
+  [
+    'apps/web/data/designSystem/surfaceCensus.json',
+    [
+      'scripts/lib/__tests__/design-surface-census.test.mjs',
+      'apps/web/lib/content-records/marketing-page.test.ts',
+    ],
+  ],
+  // Shared brand tokens have broad runtime and test consumers. Keep the
+  // full-suite fallback until selection can prove their complete coverage.
   [
     'apps/web/tests/unit/design-system/arbitrary-values.baseline.json',
     ['apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'],
@@ -1300,6 +1311,19 @@ export function buildAffectedTestPlan(changedFiles, options) {
     nodeTestArgs: [],
     retouchPromptCoverage: false,
     ...plan,
+    censusValidation: files.includes(
+      'apps/web/data/designSystem/surfaceCensus.json'
+    ),
+    ...(files.includes('apps/web/data/designSystem/surfaceCensus.json') &&
+    plan.mode === 'full' &&
+    isFileAvailable('scripts/lib/__tests__/design-surface-census.test.mjs')
+      ? {
+          scriptVitestTests: unique([
+            ...(plan.scriptVitestTests ?? []),
+            'scripts/lib/__tests__/design-surface-census.test.mjs',
+          ]),
+        }
+      : {}),
     ...(lanePythonCoverage
       ? {
           lanePythonCoverage: true,
@@ -2235,9 +2259,12 @@ function planAffectedTests(
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'
     );
   }
-  for (const file of files) {
-    mandatoryTests.push(...(KNOWN_VITEST_FIXTURE_TESTS.get(file) ?? []));
-  }
+  const fixtureProducers = files.flatMap(
+    file => KNOWN_VITEST_FIXTURE_TESTS.get(file) ?? []
+  );
+  mandatoryTests.push(
+    ...fixtureProducers.filter(test => !test.startsWith('scripts/'))
+  );
   const hasHomepageSystemBGuardInput = files.some(isHomepageSystemBGuardInput);
   if (hasHomepageSystemBGuardInput) {
     mandatoryTests.push(...HOMEPAGE_SYSTEM_B_STYLE_GUARD_TESTS);
@@ -2331,6 +2358,7 @@ function planAffectedTests(
   ]);
   const pythonUnittestTests = unique([]);
   const scriptVitestTests = unique([
+    ...fixtureProducers.filter(test => test.startsWith('scripts/')),
     ...(isExactPerformanceProfilerRepairPrimary ||
     isExactPerformanceProfilerRepairWithSelectorLegacy
       ? PERFORMANCE_PROFILER_REPAIR_SCRIPT_TESTS
@@ -2982,6 +3010,7 @@ export function buildControlCoverageCommands() {
     '--coverage.include=lib/native-queue-eval.mjs',
     '--coverage.include=native-queue-eval.mjs',
     '--coverage.include=run-affected-tests.mjs',
+    '--coverage.include=lib/git-base-ref.mjs',
     '--coverage.include=lib/github-open-prs-rest.mjs',
     '--coverage.include=lib/pr-conflict-event.mjs',
     '--coverage.include=lib/pr-conflict-handler.mjs',
@@ -3048,6 +3077,14 @@ export function buildSelectedTestCommands(
   head
 ) {
   const commands = [];
+  if (
+    plan.censusValidation ||
+    plan.scriptVitestTests.includes(
+      'scripts/lib/__tests__/design-surface-census.test.mjs'
+    )
+  ) {
+    commands.push(['node', ['scripts/design-surface-census.mjs', base]]);
+  }
   if (plan.lanePythonCoverage) {
     // Qualification must fail when the CI-pinned Python dependencies are absent,
     // even on a local host; the structural wrapper's local skip is not proof.
@@ -3343,7 +3380,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (args.includes('--control')) {
     process.exit(await runControlTestCommands());
   }
-  const base = argValue(args, '--base', 'origin/main');
+  let base = argValue(args, '--base', 'origin/main');
   const maxWorkers = argValue(args, '--max-workers', '2');
   const shardConcurrency = argValue(args, '--shard-concurrency', '2');
   const shardTimeoutMs = positiveDurationMs(
@@ -3364,6 +3401,24 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     DEFAULT_PROGRESS_INTERVAL_MS
   );
   const explicitFiles = argValue(args, '--changed-files-json', '');
+  if (!explicitFiles) {
+    const resolved = resolveBaseRef(REPO_ROOT, base);
+    if (!resolved) {
+      console.error(
+        `[affected-tests] base ref '${base}' does not resolve to a commit (tried ${baseRefCandidates(base).join(', ')})`
+      );
+      process.exit(1);
+    }
+    // Use one snapshot for selection, blog classification and coverage.
+    base = execFileSync(
+      'git',
+      ['rev-parse', '--verify', `${resolved}^{commit}`],
+      {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      }
+    ).trim();
+  }
   const files = explicitFiles ? JSON.parse(explicitFiles) : changedFiles(base);
   const prerequisitesAvailable = BLOG_CERTIFICATION_PROOFS.every(file =>
     existsSync(resolve(REPO_ROOT, file))
