@@ -266,9 +266,13 @@ describe('publisher writer-proof execution', () => {
     expect(github).toHaveBeenCalledTimes(1);
   });
 
-  it.each([0, 1])(
-    'the publisher passes its exact PR and commit and preserves helper exit %s',
-    helperExit => {
+  it.each([
+    { helperExit: 0, originExit: 0 },
+    { helperExit: 1, originExit: 0 },
+    { helperExit: 0, originExit: 1 },
+  ])(
+    'the publisher emits origin before proof and propagates $helperExit/$originExit failures',
+    ({ helperExit, originExit }) => {
       const workflow = load(
         readFileSync(
           new URL(
@@ -282,8 +286,7 @@ describe('publisher writer-proof execution', () => {
         step => step.run?.includes('gh pr create --draft')
       ).run;
       const start = publish.indexOf('gh pr create --draft');
-      const end = publish.indexOf('python3 scripts/shipping_origin.py', start);
-      const script = publish.slice(start, end);
+      const script = publish.slice(start);
       const result = spawnSync(
         'bash',
         [
@@ -297,21 +300,32 @@ describe('publisher writer-proof execution', () => {
         else return 1; fi
       }
       git() { [ "$1 $2" = 'rev-parse HEAD' ] && echo ${HEAD}; }
-      node() { printf '%s\\n' "$@"; return ${helperExit}; }
+      python3() { echo emitted-origin >&2; return ${originExit}; }
+      node() { echo attached-proof >&2; printf '%s\\n' "$@"; return ${helperExit}; }
       ${script}
     `,
         ],
         { encoding: 'utf8' }
       );
-      expect(result.status, result.stderr).toBe(helperExit);
-      expect(result.stderr).toContain('created-draft');
-      expect(result.stdout.trim().split('\n')).toEqual([
-        'scripts/attach-changelog-writer-proof.mjs',
-        '--pr',
-        String(PR_NUMBER),
-        '--head',
-        HEAD,
-      ]);
+      expect(result.status, result.stderr).toBe(originExit || helperExit);
+      expect(result.stderr.trim().split('\n')).toEqual(
+        originExit
+          ? ['created-draft', 'emitted-origin']
+          : ['created-draft', 'emitted-origin', 'attached-proof']
+      );
+      expect(
+        result.stdout.trim() ? result.stdout.trim().split('\n') : []
+      ).toEqual(
+        originExit
+          ? []
+          : [
+              'scripts/attach-changelog-writer-proof.mjs',
+              '--pr',
+              String(PR_NUMBER),
+              '--head',
+              HEAD,
+            ]
+      );
     }
   );
 });
