@@ -25,6 +25,7 @@ import { getDeterministicTestBetterAuthUserId } from '../../../apps/web/lib/auth
 import { db } from '../../../apps/web/lib/db';
 import { users } from '../../../apps/web/lib/db/schema/auth';
 import { baUsers } from '../../../apps/web/lib/db/schema/better-auth';
+import { chatConversations } from '../../../apps/web/lib/db/schema/chat';
 import { creatorProfiles } from '../../../apps/web/lib/db/schema/profiles';
 import {
   CANARY_SEED_SPEC_VERSION,
@@ -37,6 +38,9 @@ import {
 } from '../../../apps/web/lib/synthetic/returning-canary-seed-spec';
 
 const APPLY = process.argv.includes('--apply');
+// --reset-chat: delete the returning canary's chat threads (messages cascade) so
+// each certification run starts with an empty history. Owned rows only.
+const RESET_CHAT = process.argv.includes('--reset-chat');
 
 function log(step: string, detail: unknown): void {
   console.log(`[canary-seed] ${step}`, JSON.stringify(detail));
@@ -57,6 +61,7 @@ async function loadOwned(spec: CanarySeedIdentity) {
       spotifyId: creatorProfiles.spotifyId,
       spotifyUrl: creatorProfiles.spotifyUrl,
       avatarUrl: creatorProfiles.avatarUrl,
+      isPublic: creatorProfiles.isPublic,
     })
     .from(users)
     .leftJoin(creatorProfiles, eq(creatorProfiles.userId, users.id))
@@ -126,6 +131,7 @@ async function seedReturning(): Promise<void> {
       spotifyId: row.spotifyId,
       spotifyUrl: row.spotifyUrl,
       avatarUrl: row.avatarUrl,
+      isPublic: row.isPublic,
     },
     artist,
     Boolean(bound)
@@ -148,6 +154,7 @@ async function seedReturning(): Promise<void> {
           ...(set.spotify_id ? { spotifyId: String(set.spotify_id) } : {}),
           ...(set.spotify_url ? { spotifyUrl: String(set.spotify_url) } : {}),
           ...(set.avatar_url ? { avatarUrl: String(set.avatar_url) } : {}),
+          ...(set.is_public === true ? { isPublic: true } : {}),
           ...(artist
             ? {
                 genres: [...artist.genres],
@@ -191,7 +198,53 @@ async function seedChatHealth(): Promise<void> {
   const spec = CHAT_HEALTH_CANARY_SEED;
   const existing = await loadOwned(spec);
   if (existing?.profileId) {
-    log('chat-health', { state: 'exists', profileId: existing.profileId });
+    // Converge, not just create: a cleanup that unpublishes test accounts
+    // left this canary private, and the app shell then sends it to /start.
+    const plan = planCanaryProfileUpdate(
+      spec,
+      {
+        profileId: existing.profileId,
+        ownerEmail: existing.email ?? '',
+        username: existing.username,
+        displayName: existing.displayName,
+        bio: existing.bio,
+        spotifyId: existing.spotifyId,
+        spotifyUrl: existing.spotifyUrl,
+        avatarUrl: existing.avatarUrl,
+        isPublic: existing.isPublic,
+      },
+      null,
+      false
+    );
+    log('chat-health', {
+      state: 'exists',
+      profileId: existing.profileId,
+      plan,
+    });
+    const set = plan[0]?.set;
+    if (APPLY && set) {
+      await db
+        .update(creatorProfiles)
+        .set({
+          ...(set.username ? { username: String(set.username) } : {}),
+          ...(set.username_normalized
+            ? { usernameNormalized: String(set.username_normalized) }
+            : {}),
+          ...(set.display_name
+            ? { displayName: String(set.display_name) }
+            : {}),
+          ...(set.bio ? { bio: String(set.bio) } : {}),
+          ...(set.is_public === true ? { isPublic: true } : {}),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(creatorProfiles.id, existing.profileId),
+            eq(creatorProfiles.userId, existing.userId)
+          )
+        );
+      log('chat-health', { state: 'converged', profileId: existing.profileId });
+    }
     return;
   }
   log('chat-health', { state: 'missing', willCreate: APPLY });
@@ -243,8 +296,26 @@ async function seedChatHealth(): Promise<void> {
   log('chat-health', { state: 'created', profileId });
 }
 
+async function resetReturningChat(): Promise<void> {
+  const spec = RETURNING_CANARY_SEED;
+  const row = await loadOwned(spec);
+  if (!row) throw new Error('Returning canary not found');
+  const owned = await db
+    .select({ id: chatConversations.id })
+    .from(chatConversations)
+    .where(eq(chatConversations.userId, row.userId));
+  log('reset-chat', { email: spec.email, threads: owned.length, apply: APPLY });
+  if (APPLY && owned.length > 0) {
+    await db
+      .delete(chatConversations)
+      .where(eq(chatConversations.userId, row.userId));
+    log('reset-chat', { state: 'deleted', threads: owned.length });
+  }
+}
+
 async function main(): Promise<void> {
   log('start', { version: CANARY_SEED_SPEC_VERSION, apply: APPLY });
+  if (RESET_CHAT) await resetReturningChat();
   await seedReturning();
   await seedChatHealth();
   log('done', { apply: APPLY });

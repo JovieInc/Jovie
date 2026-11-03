@@ -75,7 +75,7 @@ function renderComponent() {
 
 function typeQuery(query: string) {
   return userEvent.type(
-    screen.getByPlaceholderText(/Search for your artist/i),
+    screen.getByPlaceholderText(/Artist name or Spotify link/i),
     query
   );
 }
@@ -99,7 +99,7 @@ describe('OnboardingDspStep truthful artist status', () => {
     renderComponent();
     const user = userEvent.setup();
     await user.type(
-      screen.getByPlaceholderText(/Search for your artist/i),
+      screen.getByPlaceholderText(/Artist name or Spotify link/i),
       'Nova'
     );
     await user.tab();

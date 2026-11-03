@@ -12,6 +12,7 @@ import {
 import {
   releaseGoldenPathTestBindings,
   selectGoldenPathArtist,
+  unpublishGoldenPathTestProfiles,
 } from './helpers/claim-dogfood-fixtures';
 import { completeGoldenPathBillingJourney } from './helpers/golden-path-billing';
 import { openHomeWelcome } from './helpers/golden-path-home-welcome';
@@ -22,7 +23,6 @@ import {
   watchKeyframeErrors,
 } from './helpers/golden-path-keyframes';
 import { interceptGoldenPathTrackingCalls } from './helpers/golden-path-tracking';
-import { ratchetGeometry } from './utils/ratchet-geometry';
 import {
   installRuntimeAutomationBypass,
   resetAuthStatePreservingOnboardingSession,
@@ -180,18 +180,15 @@ async function verifyHomeWelcome(page: Page) {
           `[data-testid="chat-composer-surface"] button[aria-label=${JSON.stringify(name)}]`
         );
     }
-    // ratchet: JOV-9612
-    await ratchetGeometry('home composer essentials', async () => {
-      expect(
-        await inspectEssentialViewport(page, [
-          ...selectors,
-          '[data-testid="chat-empty-state-greeting-text"]',
-          '[data-testid="chat-empty-state-next-step"]',
-          '[data-testid="chat-composer-surface"]',
-          '[aria-label="Chat message input" i]',
-        ])
-      ).toEqual({ supported: true, findings: [] });
-    });
+    expect(
+      await inspectEssentialViewport(page, [
+        ...selectors,
+        '[data-testid="chat-empty-state-greeting-text"]',
+        '[data-testid="chat-empty-state-next-step"]',
+        '[data-testid="chat-composer-surface"]',
+        '[aria-label="Chat message input" i]',
+      ])
+    ).toEqual({ supported: true, findings: [] });
     const centering = await measureCenter();
     expect(centering).not.toBeNull();
     if (centering)
@@ -230,10 +227,7 @@ async function verifyHomeWelcome(page: Page) {
       expect(before).not.toBeNull();
       expect(after).not.toBeNull();
       if (before && after) {
-        // ratchet: JOV-9612
-        await ratchetGeometry('home composer y shift', () => {
-          expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1);
-        });
+        expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1);
       }
       await assertGeometry();
       if (viewport.width === 1440) {
@@ -852,7 +846,9 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
   // (or the prod-cert pool) starts from an unclaimed artist.
   test.afterAll(async () => {
     if (!process.env.DATABASE_URL) return;
-    await releaseGoldenPathTestBindings(neon(process.env.DATABASE_URL));
+    const teardownSql = neon(process.env.DATABASE_URL);
+    await releaseGoldenPathTestBindings(teardownSql);
+    await unpublishGoldenPathTestProfiles(teardownSql);
   });
 
   test.beforeEach(() => {
@@ -1253,6 +1249,14 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     // with their music imported. Render it as an anonymous fan would —
     // fresh browser context, no auth — the way a real fan clicking a link
     // in bio would land here.
+    // Test-account profiles 404 publicly by policy (lib/profile/test-profile-policy).
+    // This run must render its own profile as a fan, so mark just this profile
+    // directly-viewable; afterAll teardown unpublishes it.
+    await sql`
+      UPDATE creator_profiles
+      SET settings = coalesce(settings, '{}'::jsonb) || '{"testProfileDirectUrlExempt": true}'::jsonb
+      WHERE username_normalized = ${uniqueHandle.toLowerCase()}
+    `;
     const fanContext = await browser.newContext({
       storageState: { cookies: [], origins: [] },
     });

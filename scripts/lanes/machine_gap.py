@@ -48,9 +48,18 @@ def fingerprint(title: str, labels=()) -> str:
 
 
 def check_fingerprint(pr: dict) -> str:
-    names = sorted({str(c.get("name")) for c in pr.get("statusCheckRollup") or []
-                    if str(c.get("conclusion") or "").upper() in {"FAILURE", "TIMED_OUT", "CANCELLED"}
-                    and str(c.get("name") or "").lower() not in {"pr ready", "ci summary"}})
+    """Hash the failing check names. A CANCELLED sibling does not open a second class when a
+    FAILURE or TIMED_OUT is present: Fleet Rules Evidence cancelled beside Source Validation
+    recorded fix-red-6c3efaf400 on seven unrelated lane runs (2026-10-29..31). A rollup that
+    is only cancelled still fingerprints those names."""
+    red = {"FAILURE", "TIMED_OUT", "CANCELLED"}
+    hard = {"FAILURE", "TIMED_OUT"}
+    skip = {"pr ready", "ci summary"}
+    checks = [c for c in pr.get("statusCheckRollup") or []
+              if str(c.get("conclusion") or "").upper() in red and str(c.get("name") or "").lower() not in skip]
+    if any(str(c.get("conclusion") or "").upper() in hard for c in checks):
+        checks = [c for c in checks if str(c.get("conclusion") or "").upper() in hard]
+    names = sorted({str(c.get("name")) for c in checks})
     return "fix-red-" + hashlib.sha256("|".join(names).encode()).hexdigest()[:10]
 
 
