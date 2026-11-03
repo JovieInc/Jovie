@@ -113,6 +113,7 @@ HERE = Path(__file__).resolve().parent
 # silently deferred every lane draft's gate after #22301 changed the fixture (2026-10-20
 # 17:26Z to 2026-10-21): 45 jovie-bot drafts were never qualified or promoted.
 REVIEWED_FIXTURE_SHA256 = (
+    "7371802bd9234c367bc60ff2be0c1edb517f74a0b0dd62183ae7421a92629939",  # #23119 (JOV-8270 retired private-store reclamation proof)
     "53d4b1b3b46143fec03da0f02788a8409778d06ff59aadec14e8002c70d77304",  # JOV-8517 (owned home and fail-closed probe)
     "aa24ace3f9cf6fc485806d2c8395c9344e7680cc4e8b7fd5c126d777515e4f0c",  # 0fa7c7a (#22301)
     "be680e72198db2174f6c0ac5fe05157a4a03f7bd791941c9254f13b21d0686fb",  # 5db1a60 (#22010)

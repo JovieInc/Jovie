@@ -16,12 +16,12 @@ export function SidebarInboxLink({
   const hasRuntimeUpdate = Boolean(useRuntimeUpdate()?.available);
   const pending = availability?.state === 'available';
   const label = pending
-    ? `Inbox — ${availability?.pendingCount} Items Need Attention`
+    ? `Inbox — ${availability?.pendingCount} items need attention`
     : availability?.state === 'empty'
-      ? 'Inbox — All Caught Up'
-      : 'Inbox — Status Unavailable';
+      ? 'Inbox — all caught up'
+      : 'Inbox';
   const accessibleLabel = hasRuntimeUpdate
-    ? `${label}; App Update Available`
+    ? `${label}; app update available`
     : label;
   return (
     <Tooltip label={accessibleLabel} side='bottom'>

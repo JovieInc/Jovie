@@ -106,6 +106,99 @@ function hookGitFixture({ behind = true, conflict = false, during = '' } = {}) {
   return { root, cwd, origin, marker, env, head, gitAt, run };
 }
 
+test('hook preserves the legacy lock and uses shared XDG only when home is unavailable', t => {
+  const realFlock = spawnSync('which', ['flock'], { encoding: 'utf8' });
+  if (realFlock.status !== 0)
+    return t.skip('flock is unavailable on this host');
+  const f = hookGitFixture({ behind: false, during: 'pnpm typecheck' });
+  try {
+    const bin = path.join(f.root, 'bin');
+    const unavailableHome = path.join(f.root, 'unavailable-home');
+    const fallbackHome = path.join(f.root, 'fallback-home');
+    const cache = path.join(f.root, "cache $literal's area");
+    const executed = path.join(f.root, 'typecheck-ran');
+    mkdirSync(bin);
+    mkdirSync(fallbackHome);
+    writeFileSync(unavailableHome, 'not a directory');
+    writeFileSync(
+      path.join(bin, 'pnpm'),
+      '#!/bin/sh\n"$PREFLIGHT_REAL_FLOCK" -n "$PREFLIGHT_EXPECTED_LOCK" true\n[ "$?" -eq 1 ] || exit 98\nprintf "%s" "$*" > "$PREFLIGHT_TYPECHECK_MARKER"\nexit 17\n',
+      { mode: 0o755 }
+    );
+    const runner = `import { main } from ${JSON.stringify(new URL('./preflight.mjs', import.meta.url).href)};
+process.exitCode = await main({argv: ['--hook', '--workflow', 'fixture.yml'], cwd: ${JSON.stringify(f.cwd)}});`;
+    for (const [home, xdg, expectedCache] of [
+      [unavailableHome, cache, cache],
+      [
+        fallbackHome,
+        path.join(f.root, 'xdg-one'),
+        path.join(fallbackHome, '.cache'),
+      ],
+      [
+        fallbackHome,
+        path.join(f.root, 'xdg-two'),
+        path.join(fallbackHome, '.cache'),
+      ],
+      [fallbackHome, 'relative-cache', path.join(fallbackHome, '.cache')],
+      [fallbackHome, '', path.join(fallbackHome, '.cache')],
+      [fallbackHome, undefined, path.join(fallbackHome, '.cache')],
+    ]) {
+      rmSync(executed, { force: true });
+      const result = spawnSync(
+        process.execPath,
+        ['--input-type=module', '-e', runner],
+        {
+          encoding: 'utf8',
+          timeout: 30_000,
+          env: {
+            ...f.env,
+            HOME: home,
+            XDG_CACHE_HOME: xdg,
+            PATH: `${bin}${path.delimiter}${f.env.PATH}`,
+            PREFLIGHT_TYPECHECK_MARKER: executed,
+            PREFLIGHT_REAL_FLOCK: realFlock.stdout.trim(),
+            PREFLIGHT_EXPECTED_LOCK: path.join(
+              expectedCache,
+              'gem-typecheck.lock'
+            ),
+          },
+        }
+      );
+      assert.equal(result.status, 1, result.stderr);
+      assert.match(result.stdout, /FAIL \(17\)/, result.stderr);
+      assert.equal(readFileSync(executed, 'utf8'), 'typecheck');
+      assert.ok(existsSync(path.join(expectedCache, 'gem-typecheck.lock')));
+      if (xdg && path.isAbsolute(xdg) && xdg !== expectedCache)
+        assert.equal(existsSync(path.join(xdg, 'gem-typecheck.lock')), false);
+      assert.equal(readFileSync(unavailableHome, 'utf8'), 'not a directory');
+    }
+
+    for (const xdg of [undefined, '', 'relative-cache', unavailableHome]) {
+      rmSync(executed, { force: true });
+      const result = spawnSync(
+        process.execPath,
+        ['--input-type=module', '-e', runner],
+        {
+          encoding: 'utf8',
+          timeout: 30_000,
+          env: {
+            ...f.env,
+            HOME: unavailableHome,
+            XDG_CACHE_HOME: xdg,
+            PATH: `${bin}${path.delimiter}${f.env.PATH}`,
+            PREFLIGHT_TYPECHECK_MARKER: executed,
+          },
+        }
+      );
+      assert.equal(result.status, 1, result.stderr);
+      assert.equal(existsSync(executed), false);
+      assert.match(result.stderr, /ENOTDIR|EEXIST/);
+    }
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
 test('hook qualifies a clean behind-base source without changing its head', async () => {
   const f = hookGitFixture();
   try {
@@ -504,6 +597,7 @@ async function runPlan(text, extraEnv = {}) {
     env: {
       JOVIE_PREFLIGHT_LEDGER: 'off',
       PATH: process.env.PATH,
+      XDG_CACHE_HOME: path.join(dir, 'cache'),
       ...extraEnv,
     },
     log: line => lines.push(line),
