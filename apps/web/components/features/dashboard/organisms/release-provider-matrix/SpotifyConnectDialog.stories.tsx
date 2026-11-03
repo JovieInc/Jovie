@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { type ComponentProps, useEffect } from 'react';
+import { expect, userEvent, within } from 'storybook/test';
 import { SpotifyConnectDialog } from './SpotifyConnectDialog';
 
 const SEARCH_RESULTS = [
@@ -42,9 +43,22 @@ const SEARCH_RESULTS = [
     popularity: 25,
   },
 ] as const;
-function SpotifyConnectDialogStory(
-  args: ComponentProps<typeof SpotifyConnectDialog>
-) {
+
+type SearchResponder = (query: string) => Response | Promise<Response>;
+
+const respondWithResults: SearchResponder = () => Response.json(SEARCH_RESULTS);
+const respondEmpty: SearchResponder = () => Response.json([]);
+const respondUnavailable: SearchResponder = () =>
+  Response.json({ error: 'Spotify search is unavailable' }, { status: 404 });
+const respondForeverPending: SearchResponder = () =>
+  new Promise<Response>(() => {});
+
+function SpotifyConnectDialogStory({
+  respond = respondWithResults,
+  ...args
+}: ComponentProps<typeof SpotifyConnectDialog> & {
+  respond?: SearchResponder;
+}) {
   useEffect(() => {
     const previousFetch = window.fetch;
     window.fetch = async (input, init) => {
@@ -56,10 +70,7 @@ function SpotifyConnectDialogStory(
             : input.url;
       const url = new URL(rawUrl, window.location.href);
       if (url.pathname === '/api/spotify/search') {
-        return new Response(JSON.stringify(SEARCH_RESULTS), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        return respond(url.searchParams.get('q') ?? '');
       }
       return previousFetch(input, init);
     };
@@ -67,7 +78,7 @@ function SpotifyConnectDialogStory(
     return () => {
       window.fetch = previousFetch;
     };
-  }, []);
+  }, [respond]);
 
   return (
     <div className='min-h-144'>
@@ -75,17 +86,30 @@ function SpotifyConnectDialogStory(
     </div>
   );
 }
+
+async function typeQuery(canvasElement: HTMLElement, query: string) {
+  const canvas = within(canvasElement.ownerDocument.body);
+  const input = canvas.getByRole('combobox', {
+    name: 'Search Spotify artists or paste a link',
+  });
+  await userEvent.type(input, query);
+  return { canvas, input };
+}
+
+const renderWithResponse = (respond: SearchResponder) =>
+  function Story(args: ComponentProps<typeof SpotifyConnectDialog>) {
+    return <SpotifyConnectDialogStory {...args} respond={respond} />;
+  };
+
 const meta = {
   title: 'Features/Dashboard/Releases/SpotifyConnectDialog',
   component: SpotifyConnectDialog,
   parameters: {
     layout: 'centered',
-    jovie: {
-      uncoveredProps: ['releases', 'artistName', 'isLoading'],
-    },
   },
   args: {
     open: true,
+    connected: false,
     onOpenChange: () => undefined,
   },
   render: args => <SpotifyConnectDialogStory {...args} />,
@@ -95,3 +119,49 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const Loading: Story = {
+  render: renderWithResponse(respondForeverPending),
+  play: async ({ canvasElement }) => {
+    const { canvas } = await typeQuery(canvasElement, 'tim white');
+    expect(await canvas.findByRole('status', { busy: true })).toBeVisible();
+  },
+};
+
+export const Empty: Story = {
+  render: renderWithResponse(respondEmpty),
+  play: async ({ canvasElement }) => {
+    const { canvas } = await typeQuery(canvasElement, 'zzz');
+    expect(await canvas.findByText(/No artists match/)).toBeVisible();
+  },
+};
+
+export const Error: Story = {
+  render: renderWithResponse(respondUnavailable),
+  play: async ({ canvasElement }) => {
+    const { canvas } = await typeQuery(canvasElement, 'tim white');
+    expect(await canvas.findByRole('alert')).toHaveTextContent(
+      /Spotify search is unavailable/
+    );
+  },
+};
+
+export const Connected: Story = {
+  args: {
+    connected: true,
+    connectedArtistName: 'Tim White',
+  },
+};
+
+export const Rtl: Story = {
+  args: {
+    connected: true,
+    connectedArtistName:
+      'Timothy White the Third and His Very Long Sibling Ensemble Collective',
+  },
+  render: args => (
+    <div dir='rtl' className='min-h-144'>
+      <SpotifyConnectDialogStory {...args} respond={respondEmpty} />
+    </div>
+  ),
+};

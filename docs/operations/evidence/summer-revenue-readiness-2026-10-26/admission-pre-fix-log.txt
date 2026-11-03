@@ -1,0 +1,9 @@
+◇ injected env (0) from .env.test
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.fast.mts:16:41). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+Both esbuild and oxc options were set. oxc options will be used and esbuild options will be ignored. The following esbuild options were set: `{ target: 'esnext', format: 'esm' }`
+JSON report written to /tmp/jovie-readiness-evidence/admission-prefixed.json
+undefined
+/workspace/Jovie/apps/web:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run tests/unit/lib/waitlist/auto-accept.test.ts tests/unit/lib/waitlist/qualification.test.ts tests/unit/lib/waitlist/access-request.test.ts --maxWorkers=2 --reporter=json --outputFile=/tmp/jovie-readiness-evidence/admission-prefixed.json

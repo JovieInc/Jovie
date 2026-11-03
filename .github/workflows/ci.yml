@@ -231,6 +231,18 @@ jobs:
     runs-on: [self-hosted, Linux, X64, "${{ 'jovie-runner-image-canary' }}"]
     timeout-minutes: 20
     steps:
+      - name: Reset workspace git state (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          # Fixed runners reuse one workspace; a sparse checkout left by an earlier job hides files
+          # (.nvmrc, .github/scripts) from this full checkout (PR Fleet Rules merge_group 40908938908).
+          if [[ -d .git ]]; then
+            git sparse-checkout disable 2>/dev/null || true
+            git config --local --unset-all core.sparseCheckout 2>/dev/null || true
+            git config --local --unset-all core.sparseCheckoutCone 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi
       - name: Checkout exact PR head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -524,7 +536,7 @@ jobs:
       )
     # Hosted-only root of the PR DAG. Self-hosted cancel/hang here cascades into
     # SKIPPED risk/ci-fast/unit leaves and a red PR Ready (JOV-3464 drain).
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       run_build: ${{ steps.detect.outputs.run_build || 'false' }}
@@ -540,6 +552,8 @@ jobs:
       run_golden_eval_set: ${{ steps.detect.outputs.run_golden_eval_set || 'false' }}
       run_e2e: ${{ steps.detect.outputs.run_e2e || 'false' }}
       run_golden_path: ${{ steps.detect.outputs.run_golden_path || 'false' }}
+      # Empty (run the model review) unless the diff touched no UI files; see detect step.
+      golden_path_no_ui_diff: ${{ steps.detect.outputs.golden_path_no_ui_diff || '' }}
       # JOV-5960: selects the source-lane visual snapshot compare on homepage
       # PRs so a skipped compare can never read as green there.
       run_homepage_visual: ${{ steps.homepage-visual.outputs.run_homepage_visual || 'false' }}
@@ -966,6 +980,9 @@ jobs:
             echo "run_golden_path=false" >> "$GITHUB_OUTPUT"
           fi
 
+          # No UI file changed: skip the paid golden-path model review (empty = review runs)
+          echo "$CHANGED_FILES" | grep -q -E '^(apps/web/(app|components|styles|public)/|apps/web/.*\.(css|scss|tsx)$|packages/ui/)' || echo "golden_path_no_ui_diff=true" >> "$GITHUB_OUTPUT"
+
           # Drizzle paths
           DRIZZLE_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts))'
           if echo "$CHANGED_FILES" | grep -q -E "$DRIZZLE_PATTERN"; then
@@ -1110,7 +1127,9 @@ jobs:
     name: Merge Group Admission
     needs: [ci-path-changes]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'merge_group' }}
-    runs-on: ubuntu-latest
+    # Merge-gate pool (docs/ci/merge-queue-alternatives.md): hosted by default;
+    # repo variable MERGE_GATE_POOL=fixed routes back to the gem pool.
+    runs-on: ${{ vars.MERGE_GATE_POOL == 'fixed' && fromJSON('["self-hosted","Linux","X64","jovie-fixed"]') || 'ubuntu-latest' }}
     # Must exceed MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS (66 min) plus the
     # 6-minute check poll plus setup/checkout. The helper sleeps until
     # x-ratelimit-reset inside that window. A hard cancel would eject the
@@ -1221,10 +1240,22 @@ jobs:
   # PR on a different queue SHA, and cancels each one whose queue ref git no
   # longer lists. Only the cancel itself spends GITHUB_TOKEN quota (the App
   # has actions:read). Any failed read logs and exits 0; it gates nothing.
+      - name: Clear sparse checkout for the next job on this workspace
+        if: always() && runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          # Fixed runners reuse one workspace; a leftover sparse checkout hides .github/scripts from the next job.
+          if [[ -d .git ]]; then
+            git sparse-checkout disable 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi
+
   ci-merge-group-supersede:
     name: Merge Group Supersede Older Runs
     if: ${{ github.event_name == 'merge_group' }}
-    runs-on: ubuntu-latest
+    # Merge-gate pool (docs/ci/merge-queue-alternatives.md): hosted by default;
+    # repo variable MERGE_GATE_POOL=fixed routes back to the gem pool.
+    runs-on: ${{ vars.MERGE_GATE_POOL == 'fixed' && fromJSON('["self-hosted","Linux","X64","jovie-fixed"]') || 'ubuntu-latest' }}
     timeout-minutes: 3
     permissions:
       actions: write
@@ -1619,7 +1650,7 @@ jobs:
         (needs.ci-path-changes.outputs.run_homepage_visual == 'true' ||
         needs.ci-path-changes.outputs.run_marketing_dom == 'true'))
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -1683,17 +1714,15 @@ jobs:
           # renders none of these values. NEXT_DISABLE_TOOLBAR is extra: turbo
           # does not hash it and the root layout reads it at prerender to keep
           # the cookie banner and dev chrome out of the baselines.
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
           NEXT_PUBLIC_APP_URL: http://localhost:3230
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
-          NEXT_PUBLIC_CLERK_MOCK: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_AUTH_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
           NEXT_DISABLE_TOOLBAR: '1'
-          CLERK_SECRET_KEY: sk_test_mock
           E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'
           E2E_TEST_AUTH_PERSONA: creator-ready
@@ -1742,13 +1771,11 @@ jobs:
           CI: 'true'
           E2E_SKIP_WEB_SERVER: '1'
           DATABASE_URL: postgresql://localhost/noop
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
           NEXT_PUBLIC_APP_URL: http://localhost:3230
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
-          CLERK_SECRET_KEY: sk_test_mock
           NEXT_DISABLE_TOOLBAR: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
-          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_AUTH_MOCK: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'
@@ -1793,13 +1820,11 @@ jobs:
           ROUTE_DOM_CERTIFICATION_SCOPE: marketing
           ROUTE_DOM_CERTIFICATION_OUTPUT_DIR: test-results/route-dom-certification
           DATABASE_URL: postgresql://localhost/noop
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
           NEXT_PUBLIC_APP_URL: http://localhost:3230
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
-          CLERK_SECRET_KEY: sk_test_mock
           NEXT_DISABLE_TOOLBAR: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
-          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_AUTH_MOCK: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
       # The exact-route capture (console errors, axe quality checks, HTTP
@@ -1849,13 +1874,11 @@ jobs:
           CI: 'true'
           SCREENSHOT_BUILD_MODE: pr-premerge
           DATABASE_URL: postgresql://localhost/noop
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
           NEXT_PUBLIC_APP_URL: http://localhost:3230
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
-          CLERK_SECRET_KEY: sk_test_mock
           NEXT_DISABLE_TOOLBAR: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
-          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_AUTH_MOCK: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
       - name: Upload homepage visual failure evidence
@@ -1991,7 +2014,7 @@ jobs:
     # JOV-5454: live Storybook certification needs Chromium plus bounded
     # build/serve budget inside the structural lane.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -2011,6 +2034,7 @@ jobs:
     env:
       CI_FAST_STRUCTURAL_PYTEST: skip
       CI_FAST_STRUCTURAL_WEB: skip
+      CI_FAST_STRUCTURAL_LANES: skip
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
       # Match prior Structural Contract job so actionlint/shellcheck is hermetic.
       SHELLCHECK_OPTS: >-
@@ -2027,11 +2051,17 @@ jobs:
         # event.before, and guardrail merge-base with origin/<base>.
         # A full-depth checkout also fetched every branch and tag (~4k ref
         # lines of log noise before any work). --unshallow deepens HEAD fully.
-        # Guards in this job read historical blobs (git show <merge-base>:path,
-        # rename-detecting diffs), so the fetch stays full, not blobless. It
-        # runs in the background while dependencies install instead of
-        # serially before them; "Fetch base-branch history" below waits for
-        # it and fails closed before any history consumer runs.
+        # Commits and trees only (--filter=blob:none): the full-blob fetch was
+        # 2.0 GB / 259 s against real origin versus 186 MB / 11 s blobless, and
+        # on shared runners it stalled past the 540 s await deadline (runs
+        # 40743490765, 40739458941), ejecting the PR from the merge queue.
+        # Guards here still read historical blobs (git show <merge-base>:path);
+        # each such read lazily fetches just that blob, so the job token is
+        # exported through GIT_CONFIG_* (never written to .git/config) for the
+        # promisor remote. A stalled attempt is aborted and retried instead of
+        # hanging to the deadline. The fetch runs in the background while
+        # dependencies install; "Fetch base-branch history" below waits for it
+        # and fails closed before any history consumer runs.
         shell: bash
         env: &base-fetch-start-env
           GH_TOKEN: ${{ github.token }}
@@ -2042,10 +2072,20 @@ jobs:
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
           mkdir -p "$BASE_FETCH_DIR"
           rm -f "$BASE_FETCH_DIR/status" "$BASE_FETCH_DIR/status.tmp"
+          {
+            echo "GIT_CONFIG_COUNT=1"
+            echo "GIT_CONFIG_KEY_0=http.https://github.com/.extraheader"
+            echo "GIT_CONFIG_VALUE_0=$AUTH_HEADER"
+          } >> "$GITHUB_ENV"
           (
             set +e
-            git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
-            echo "$?" > "$BASE_FETCH_DIR/status.tmp"
+            for attempt in 1 2 3; do
+              timeout 150 git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+              fetch_rc=$?
+              [[ "$fetch_rc" == 0 ]] && break
+              echo "base-branch fetch attempt $attempt exited $fetch_rc"
+            done
+            echo "$fetch_rc" > "$BASE_FETCH_DIR/status.tmp"
             mv "$BASE_FETCH_DIR/status.tmp" "$BASE_FETCH_DIR/status"
           ) < /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &
           echo "Base-branch history fetch started in the background (pid $!)."
@@ -2059,6 +2099,11 @@ jobs:
       # idles awaiting the base-branch fetch instead of serially before the
       # structural lane (10s of merge-group run 36270458408's critical path).
       # Unconditional: a strict superset of the former structural-only gate.
+      - name: Set up Go for source-pinned actionlint
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.10'
+          cache: false
       - name: Run actionlint
         run: bash .github/scripts/run-actionlint.sh
       - name: Fetch base-branch history
@@ -2194,7 +2239,7 @@ jobs:
 
           # Component receipts are executable test evidence; Storybook config and
           # the shared-UI token audit feed structural component proof.
-          STRUCTURAL_UI_PATTERN='^(apps/web/data/marketing/|apps/web/lib/agent-os/certification[^/]*\.ts$|apps/web/lib/acquisition/certification-store[^/]*\.ts$|apps/web/app/.*\.(tsx|css)$|apps/web/components/|apps/web/\.storybook/|apps/web/package\.json$|apps/web/scripts/(check-reliability-detectors|lint-contrast-|lint-motion-css|lint-no-native-dialogs|lint-ui-feel|next-proxy-guard|seo-ratchet-|tailwind-guard)|apps/web/tests/|apps/web/styles/|packages/ui/|package\.json$|DESIGN\.md$|design\.tokens\.json$|scripts/(component-|design-|ds-offscale|screen-certification|shared-ui-visual-arbitrary|story-coverage|storybook-story-quality|ui-story-coverage)|scripts/lib/__tests__/(component-|design-|screen-certification|story-coverage|storybook-story-quality|ui-story-coverage))'
+          STRUCTURAL_UI_PATTERN='^(apps/web/data/marketing/|apps/web/lib/agent-os/certification[^/]*\.ts$|apps/web/lib/acquisition/certification-store[^/]*\.ts$|apps/web/app/.*\.(tsx|css)$|apps/web/components/|apps/web/\.storybook/|apps/web/package\.json$|apps/web/scripts/(check-reliability-detectors|lint-contrast-|lint-motion-css|lint-no-native-dialogs|lint-composite-field|lint-design-noise|lint-ui-feel|next-proxy-guard|seo-ratchet-|tailwind-guard)|apps/web/tests/|apps/web/styles/|packages/ui/|package\.json$|DESIGN\.md$|design\.tokens\.json$|scripts/(component-|design-|ds-offscale|screen-certification|shared-ui-visual-arbitrary|story-coverage|storybook-story-quality|ui-story-coverage)|scripts/lib/__tests__/(component-|design-|screen-certification|story-coverage|storybook-story-quality|ui-story-coverage))'
           STRUCTURAL_DESKTOP_PATTERN='^scripts/desktop-release-(assets|guard|publisher)(\.test)?\.mjs$|^apps/desktop/electron-builder\.yml$|^apps/desktop/scripts/notarize-release-dmg\.cjs$'
           # A new scripts test must prove it is wired into a lane (inventory guard)
           # before the queue; #18714 was ejected for an unwired one.
@@ -2220,6 +2265,7 @@ jobs:
             echo "privacy=false"
             echo "tasks=false"
             echo "desktop_update=false"
+            echo "dsp=false"
             echo "run=false"
           } >> "$GITHUB_OUTPUT"
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
@@ -2230,6 +2276,7 @@ jobs:
           CRAWLER_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/organisms/ai-crawler/AiCrawler(DetailPanel|IntelligenceCard)(\.stories)?\.tsx|tests/e2e/storybook-ai-crawler\.spec\.ts)$'
           TASKS_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/tasks/(Task(DataTable|ListRow)(\.stories)?\.tsx|TasksPageClient\.tsx)|components/organisms/table/(atoms/TableCell\.tsx|table\.types\.ts|organisms/VirtualizedTableRow\.tsx|molecules/TaskProjectionListRow\.tsx)|tests/e2e/storybook-task-row-geometry\.spec\.ts)$'
           DESKTOP_UPDATE_STORYBOOK_PATTERN='^apps/web/(components/organisms/desktop-update/DesktopUpdateModal(\.stories)?\.tsx|tests/e2e/storybook-desktop-update-modal\.spec\.ts)$'
+          DSP_STORYBOOK_PATTERN='^apps/web/(components/shell/DspAvatarStack(\.mobile-drawer)?(\.stories|\.test)?\.tsx|components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow(\.stories)?\.tsx|components/organisms/release-sidebar/ReleaseSidebarSections\.tsx|components/molecules/drawer/RightDrawer\.tsx|lib/a11y/modal-focus-boundary\.ts|tests/e2e/storybook-dsp-details\.spec\.ts)$'
           # Overlay primitives, their layer tokens, and the
           # collision harness re-prove stacking, focus, and viewport fit.
           OVERLAY_STORYBOOK_PATTERN='^(packages/ui/atoms/(dialog|alert-dialog|sheet|popover|dropdown-menu|context-menu|select|tooltip)\.tsx|packages/ui/lib/(overlay-styles|overlay-focus|dropdown-styles|utils)\.ts|apps/web/styles/tailwind-foundation\.css|apps/web/\.storybook/stories/overlay-collisions\.stories\.tsx|apps/web/tests/e2e/storybook-overlay-collisions\.spec\.ts)$'
@@ -2263,6 +2310,12 @@ jobs:
           if grep -qE "$DESKTOP_UPDATE_STORYBOOK_PATTERN" "$changed_files"; then
             {
               echo "desktop_update=true"
+              echo "run=true"
+            } >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qE "$DSP_STORYBOOK_PATTERN" "$changed_files"; then
+            {
+              echo "dsp=true"
               echo "run=true"
             } >> "$GITHUB_OUTPUT"
           fi
@@ -2302,7 +2355,7 @@ jobs:
       - &structural-python
         name: Set up Python (structural regression tests)
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
           cache: pip
@@ -2357,6 +2410,7 @@ jobs:
           RUN_PRIVACY: ${{ steps.storybook-browser.outputs.privacy }}
           RUN_TASKS: ${{ steps.storybook-browser.outputs.tasks }}
           RUN_DESKTOP_UPDATE: ${{ steps.storybook-browser.outputs.desktop_update }}
+          RUN_DSP: ${{ steps.storybook-browser.outputs.dsp }}
           STORYBOOK_BASE_URL: http://localhost:6006
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
@@ -2385,6 +2439,9 @@ jobs:
           fi
           if [[ "$RUN_DESKTOP_UPDATE" == 'true' ]]; then
             specs+=(tests/e2e/storybook-desktop-update-modal.spec.ts)
+          fi
+          if [[ "$RUN_DSP" == 'true' ]]; then
+            specs+=(tests/e2e/storybook-dsp-details.spec.ts)
           fi
           test "${#specs[@]}" -gt 0
           pnpm exec storybook dev -p 6006 --no-open &
@@ -2438,7 +2495,7 @@ jobs:
     # runtime behavior. The aggregate makes this required on PR and merge-group
     # heads whenever the bounded profile surface selector matches.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -2545,9 +2602,8 @@ jobs:
           E2E_SKIP_SEED: '1'
           E2E_SKIP_WARMUP: '1'
           E2E_WEB_SERVER_COMMAND: pnpm run dev:fast
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
-          NEXT_PUBLIC_CLERK_MOCK: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_AUTH_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
           PUBLIC_NOAUTH_SMOKE: '1'
           PROFILE_ADMISSION_DIAGNOSTICS: '1'
@@ -2580,6 +2636,7 @@ jobs:
         ci-profile-admission-browser,
         ci-fast-structural-python,
         ci-fast-structural-web,
+        ci-fast-structural-lanes,
       ]
     if: >-
       always() &&
@@ -2601,13 +2658,14 @@ jobs:
           PROFILE_BROWSER_RESULT: ${{ needs.ci-profile-admission-browser.result }}
           STRUCTURAL_PYTHON_RESULT: ${{ needs.ci-fast-structural-python.result }}
           STRUCTURAL_WEB_RESULT: ${{ needs.ci-fast-structural-web.result }}
+          STRUCTURAL_LANES_RESULT: ${{ needs.ci-fast-structural-lanes.result }}
         run: |
           set -euo pipefail
-          if [[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" || "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$STRUCTURAL_WEB_RESULT" != "success" ]]; then
-            echo "::error title=ci-fast failed closed::typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT structural-python=$STRUCTURAL_PYTHON_RESULT structural-web=$STRUCTURAL_WEB_RESULT"
+          if [[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" || "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$STRUCTURAL_WEB_RESULT" != "success" || "$STRUCTURAL_LANES_RESULT" != "success" ]]; then
+            echo "::error title=ci-fast failed closed::typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT structural-python=$STRUCTURAL_PYTHON_RESULT structural-web=$STRUCTURAL_WEB_RESULT structural-lanes=$STRUCTURAL_LANES_RESULT"
             exit 1
           fi
-          echo "All ci-fast lane groups passed: typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT structural-python=$STRUCTURAL_PYTHON_RESULT structural-web=$STRUCTURAL_WEB_RESULT"
+          echo "All ci-fast lane groups passed: typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT structural-python=$STRUCTURAL_PYTHON_RESULT structural-web=$STRUCTURAL_WEB_RESULT structural-lanes=$STRUCTURAL_LANES_RESULT"
 
   ci-promptfoo-evals:
     name: Promptfoo Evals (deterministic)
@@ -2742,7 +2800,7 @@ jobs:
     # CPU-bound structural sum) off remaining's pool. Chromium serves the
     # tests/unit/ci Playwright contracts; no Python/Elixir command runs here.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -2810,6 +2868,47 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+  ci-fast-structural-lanes:
+    name: ci-fast (structural lanes)
+    # The lanes coverage pytest (four shards + per-module coverage floors) set
+    # remaining's whole structural wall (478s of 478s, merge group
+    # 41250311104) while contending for 4 vCPU; it runs alone here.
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    timeout-minutes: 20
+    if: *ci-fast-gate
+    env:
+      CI_FAST_STRUCTURAL_LANES: only
+    steps:
+      - *shallow-checkout
+      - name: Start base-branch history fetch
+        shell: bash
+        env: *base-fetch-start-env
+        run: *base-fetch-start
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
+      - name: Fetch base-branch history
+        shell: bash
+        timeout-minutes: 10
+        env: *base-fetch-await-env
+        run: *base-fetch-await
+      - name: Decide structural lane
+        id: structural
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: *structural-decision
+      - *structural-python
+      - *structural-pytest
+      - name: Run lanes coverage pytest
+        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
+        env: *structural-run-env
+        run: node scripts/ci-fast-lanes.mjs
+
   ci-knip:
     name: Knip (dead code)
     # Detect unused files, dependencies, and exports
@@ -2853,7 +2952,7 @@ jobs:
           neon_api_key: ${{ secrets.NEON_API_KEY }}
           neon_project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_limit: '10'
-          protected_branches: 'main,development,preview,br-main,br-production'
+          protected_branches: 'main,production,prod,development,preview,br-main,br-production'
           cleanup_threshold: '7'
 
       - name: Determine owned ephemeral branch name
@@ -2912,7 +3011,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
-          PROTECTED_BRANCHES: main,development,preview,br-main,br-production
+          PROTECTED_BRANCHES: main,production,prod,development,preview,br-main,br-production
         run: bash scripts/ci/verify-neon-branch-admission.sh
 
       - name: Resolve certification DATABASE_URL
@@ -3242,7 +3341,7 @@ jobs:
           needs.ci-path-changes.outputs.run_web == 'true'
         )
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
@@ -3288,11 +3387,10 @@ jobs:
           TURBO_CACHE: ${{ github.event_name == 'merge_group' && 'local:r' || env.TURBO_CACHE }}
           # Merge-group code is PR-controlled. This deterministic mock key is
           # intentionally public and keeps the combined lane secret-free.
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
           NEXT_PUBLIC_APP_URL: http://localhost:3230
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
-          NEXT_PUBLIC_CLERK_MOCK: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_AUTH_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
@@ -3356,7 +3454,6 @@ jobs:
           CI: true
           HUD_KIOSK_TOKEN: layout-guard-ci
           HUD_AGENT_RUNS_FIXTURES: '1'
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
           # A failed first attempt that passes on retry leaves Playwright's
           # error-context.md behind. Without this the artifact guard counts it
           # as an unknown binary and fails the step although every test passed
@@ -3537,7 +3634,7 @@ jobs:
           needs.ci-path-changes.outputs.run_web == 'true'
         )
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -3545,11 +3642,14 @@ jobs:
     # The 162 Storybook specs took 4.0m of a 6.6m job on two workers and set
     # the merge-group wall (end p50 7.3m over 18 web merge groups on
     # 2026-10-12). Playwright --shard splits the same fullyParallel spec list
-    # across two runners; the aggregates read the matrix result.
+    # across runners; the aggregates read the matrix result. Three shards since
+    # 2026-11-01: on two, the matrix step was 276s p50 and the shards ended
+    # at 12.2 of 14.4 min, the next tail once ci-fast (remaining) stopped
+    # waiting on the lanes pytest.
     strategy:
       fail-fast: true
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3]
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -3584,7 +3684,7 @@ jobs:
       # Web-independent checks ride here, off the Build + Layout tail.
       - name: Check extension and observability ingest
         if: matrix.shard == 1
-        run: pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test && pnpm --filter @jovie/canary-otp typecheck && pnpm --filter @jovie/canary-otp test
+        run: pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test && pnpm --filter @jovie/canary-otp typecheck && pnpm --filter @jovie/canary-otp test && pnpm --filter @jovie/mesh-hub typecheck && pnpm --filter @jovie/mesh-hub test
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
       # Surface-elevation matrix (JOV-2156): screenshot every allowed/banned
@@ -3613,6 +3713,7 @@ jobs:
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
                 pnpm exec playwright test \
                   tests/e2e/storybook-agent-status.spec.ts \
+                  tests/e2e/storybook-chat-composer-streaming.spec.ts \
                   tests/e2e/storybook-destructive-button.spec.ts \
                   tests/e2e/storybook-download-visual.spec.ts \
                   tests/e2e/storybook-elevation.spec.ts \
@@ -3625,9 +3726,11 @@ jobs:
                   tests/e2e/storybook-overlay-collisions.spec.ts \
                   tests/e2e/storybook-spotify-connect.spec.ts \
                   tests/e2e/storybook-ovie-privacy-boundary.spec.ts \
+                  tests/e2e/storybook-onboarding-dsp-strip-clearance.spec.ts \
                   tests/e2e/storybook-onboarding-recovery.spec.ts \
                   tests/e2e/storybook-task-row-geometry.spec.ts \
                   tests/e2e/storybook-desktop-update-modal.spec.ts \
+                  tests/e2e/storybook-dsp-details.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
                   --workers=2 --shard="$STORYBOOK_SHARD"
               exit 0
@@ -3638,11 +3741,12 @@ jobs:
           exit 1
         env:
           STORYBOOK_BASE_URL: http://localhost:6006
-          STORYBOOK_SHARD: ${{ matrix.shard }}/2
+          STORYBOOK_SHARD: ${{ matrix.shard }}/3
           MERGE_GROUP_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
           CI: true
           JOVIE_STORYBOOK_MANUAL_AXE: '1'
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           # Name the blocked file when the artifact guard stops the step;
           # "exit 1" alone left the JOV-6541 failures undiagnosable.
@@ -3654,14 +3758,15 @@ jobs:
         with:
           name: combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
           path: apps/web/test-results/
+          allow-images: 'true'
           allow-markdown: 'true'
           retention-days: 3
       - name: Upload input Storybook evidence
-        if: ${{ success() && hashFiles('apps/web/test-results/storybook-input-evidence/**') != '' }}
+        if: ${{ success() && (hashFiles('apps/web/test-results/storybook-input-evidence/**') != '' || hashFiles('apps/web/test-results/storybook-dsp-details-*/last-provider.png') != '') }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
-          path: apps/web/test-results/storybook-input-evidence/
+          path: apps/web/test-results/{storybook-input-evidence/**,storybook-dsp-details-*/last-provider.png}
           allow-images: 'true'
           retention-days: 7
 
@@ -3946,14 +4051,13 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm turbo build --filter=@jovie/web
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_APP_URL: http://localhost:3100
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3100
           # This shared artifact feeds bypass-based smoke/mobile evidence. The
           # real-Clerk golden path builds its own artifact below so these public
           # compile-time flags cannot leak into that lane.
-          NEXT_PUBLIC_CLERK_MOCK: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_AUTH_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
@@ -4004,7 +4108,7 @@ jobs:
     needs: [ci-path-changes, ci-build-public]
     # Manual hosted evidence using the shared deep-lane build artifact.
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 8
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
@@ -4110,7 +4214,6 @@ jobs:
           CI: true
           HUD_KIOSK_TOKEN: layout-guard-ci
           HUD_AGENT_RUNS_FIXTURES: '1'
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           # Same retry-leaves-error-context.md case as the combined-head guard.
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
 
@@ -4126,7 +4229,7 @@ jobs:
     name: Mobile Overflow Guard (${{ matrix.width }}px)
     needs: [ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     strategy:
@@ -4238,7 +4341,6 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
@@ -4270,8 +4372,8 @@ jobs:
           export E2E_USE_TEST_AUTH_BYPASS=1
           export E2E_TEST_AUTH_PERSONA=creator-ready
           export NEXT_PUBLIC_E2E_MODE=1
-          export NEXT_PUBLIC_CLERK_MOCK=1
-          export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
+          export NEXT_PUBLIC_AUTH_MOCK=1
+          export NEXT_PUBLIC_AUTH_PROXY_DISABLED=1
           export HOSTNAME=localhost
 
           OVERFLOW_PORT=$((3210 + ${{ strategy.job-index }}))
@@ -4313,10 +4415,8 @@ jobs:
           E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_TEST_AUTH_PERSONA: creator-ready
           NEXT_PUBLIC_E2E_MODE: '1'
-          NEXT_PUBLIC_CLERK_MOCK: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          NEXT_PUBLIC_AUTH_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           URL_ENCRYPTION_KEY: mobile-overflow-ci-url-encryption-key
           AI_GATEWAY_API_KEY: mobile-overflow-ci
@@ -4341,7 +4441,7 @@ jobs:
     needs: [ci-build-public, ci-path-changes, neon-db]
     # Manual hosted evidence only; never starts from a source PR event.
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true', PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true' }
     strategy:
@@ -4457,7 +4557,6 @@ jobs:
         if: steps.download-build.outcome != 'success'
         run: pnpm --filter=@jovie/web run build
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
@@ -4494,8 +4593,8 @@ jobs:
           }
           trap cleanup EXIT
 
-          export NEXT_PUBLIC_CLERK_MOCK=1
-          export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
+          export NEXT_PUBLIC_AUTH_MOCK=1
+          export NEXT_PUBLIC_AUTH_PROXY_DISABLED=1
           # GHA sets HOSTNAME to the runner name. Next standalone otherwise uses
           # its 0.0.0.0 bind address for absolute redirects, which turns a
           # same-origin Lighthouse request into cross-origin CORS/HTTP noise.
@@ -4582,8 +4681,6 @@ jobs:
           PUBLIC_LIGHTHOUSE_SHARD_INDEX: ${{ matrix.shard }}
           PUBLIC_LIGHTHOUSE_TOTAL_SHARDS: '4'
           PROFILE_MOBILE_PERF_BUDGETS: '1'
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           DATABASE_URL: ${{ env.DATABASE_URL }}
           PUBLIC_NOAUTH_SMOKE: '1'
           URL_ENCRYPTION_KEY: lighthouse-public-ci-url-encryption-key
@@ -4620,7 +4717,7 @@ jobs:
           needs.ci-path-changes.outputs.run_golden_path == 'true'
         )
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -4629,11 +4726,26 @@ jobs:
       group: neon-endpoint-pool-ci-lighthouse-dashboard-pr-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
       cancel-in-progress: false
     steps:
+      - name: Check Lighthouse identity prerequisite
+        id: lighthouse-identity
+        shell: bash
+        env:
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+        run: |
+          if [ -z "$E2E_CLERK_USER_ID" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "E2E_CLERK_USER_ID not set — skipping dashboard Lighthouse."
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.lighthouse-identity.outputs.available == 'true'
         with:
           fetch-depth: 1
 
       - name: Check for relevant changes
+        if: steps.lighthouse-identity.outputs.available == 'true'
         id: check_changes
         shell: bash
         run: |
@@ -4647,29 +4759,29 @@ jobs:
           fi
 
       - name: Skip notification
-        if: steps.check_changes.outputs.run_full_ci != 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci != 'true')
         run: echo "Skipping dashboard Lighthouse — no dashboard-relevant paths changed."
 
       - uses: ./.github/actions/setup-node-pnpm
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true')
 
       - name: Setup Playwright (Chromium)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true')
         uses: ./.github/actions/setup-playwright
 
       - name: Create ephemeral Neon database branch (with retry)
         id: neon-branch
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true')
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: dashboard-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+          protected_branches: main,production,prod,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true')
         id: resolve-dashboard-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -4679,11 +4791,11 @@ jobs:
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
       - name: Export DATABASE_URL
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true')
         run: echo "DATABASE_URL=${{ steps.resolve-dashboard-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true')
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -4692,7 +4804,7 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Download build artifact
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true')
         id: download-build
         continue-on-error: true
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -4701,21 +4813,20 @@ jobs:
           path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
-        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome == 'success'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome == 'success')
         run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
       - name: Build app fallback for dashboard Lighthouse
-        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome != 'success'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome != 'success')
         run: pnpm --filter=@jovie/web run build
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
           SKIP_SKILLS_CATALOG_SYNC: '1'
 
       - name: Run authenticated dashboard Lighthouse
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true')
         run: |
           cd apps/web
 
@@ -4725,8 +4836,8 @@ jobs:
           fi
 
           export E2E_USE_TEST_AUTH_BYPASS=1
-          export NEXT_PUBLIC_CLERK_MOCK=1
-          export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
+          export NEXT_PUBLIC_AUTH_MOCK=1
+          export NEXT_PUBLIC_AUTH_PROXY_DISABLED=1
 
           if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
             echo "Standalone server not found — dashboard Lighthouse cannot start."
@@ -4757,8 +4868,6 @@ jobs:
         env:
           CI: true
           BASE_URL: http://localhost:3000
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           DATABASE_URL: ${{ env.DATABASE_URL }}
           URL_ENCRYPTION_KEY: lighthouse-dashboard-ci-url-encryption-key
           AI_GATEWAY_API_KEY: lighthouse-dashboard-ci
@@ -4768,7 +4877,7 @@ jobs:
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
 
       - name: Upload dashboard Lighthouse artifacts
-        if: always() && steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (always() && steps.check_changes.outputs.run_full_ci == 'true')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: lighthouse-dashboard-pr-${{ github.run_id }}-${{ github.run_attempt }}
@@ -4777,7 +4886,7 @@ jobs:
           retention-days: 3
 
       - name: Cleanup ephemeral Neon branch
-        if: always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.neon-branch.outputs.branch_id != ''
+        if: steps.lighthouse-identity.outputs.available == 'true' && (always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.neon-branch.outputs.branch_id != '')
         continue-on-error: true
         run: |
           curl -sS -X DELETE \
@@ -4806,32 +4915,48 @@ jobs:
           needs.ci-path-changes.outputs.run_golden_path == 'true'
         )
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
     timeout-minutes: 30
     steps:
+      - name: Check Lighthouse identity prerequisite
+        id: lighthouse-identity
+        shell: bash
+        env:
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+        run: |
+          if [ -z "$E2E_CLERK_USER_ID" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "E2E_CLERK_USER_ID not set — skipping onboarding Lighthouse."
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.lighthouse-identity.outputs.available == 'true'
         with:
           fetch-depth: 1
 
       - uses: ./.github/actions/setup-node-pnpm
+        if: steps.lighthouse-identity.outputs.available == 'true'
 
       - name: Setup Playwright (Chromium)
+        if: steps.lighthouse-identity.outputs.available == 'true'
         uses: ./.github/actions/setup-playwright
 
       - name: Download Neon DB connection artifact
         # Reuse the shared ephemeral branch from neon-db to avoid parallel endpoint limits.
         # neon-db is dispatch-only; merge-group runs fall back to DATABASE_URL_MAIN.
-        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success')
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
-        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success')
         id: resolve-onboarding-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -4840,16 +4965,16 @@ jobs:
           fallback_json_key: db_url
 
       - name: Export DATABASE_URL (ephemeral branch)
-        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success')
         run: echo "DATABASE_URL=${{ steps.resolve-onboarding-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
       - name: Export DATABASE_URL (main — non-DB PR)
         # No ephemeral branch was created; use the stable main DB for SSR reads.
-        if: needs.ci-path-changes.outputs.run_neon != 'true' || needs.neon-db.result != 'success'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (needs.ci-path-changes.outputs.run_neon != 'true' || needs.neon-db.result != 'success')
         run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
-        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success')
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -4858,6 +4983,7 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Download build artifact
+        if: steps.lighthouse-identity.outputs.available == 'true'
         id: download-build
         continue-on-error: true
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -4866,20 +4992,20 @@ jobs:
           path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
-        if: steps.download-build.outcome == 'success'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.download-build.outcome == 'success')
         run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
       - name: Build app fallback for onboarding Lighthouse
-        if: steps.download-build.outcome != 'success'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.download-build.outcome != 'success')
         run: pnpm --filter=@jovie/web run build
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
           SKIP_SKILLS_CATALOG_SYNC: '1'
 
       - name: Run authenticated onboarding Lighthouse
+        if: steps.lighthouse-identity.outputs.available == 'true'
         run: |
           cd apps/web
 
@@ -4889,8 +5015,8 @@ jobs:
           fi
 
           export E2E_USE_TEST_AUTH_BYPASS=1
-          export NEXT_PUBLIC_CLERK_MOCK=1
-          export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
+          export NEXT_PUBLIC_AUTH_MOCK=1
+          export NEXT_PUBLIC_AUTH_PROXY_DISABLED=1
 
           if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
             echo "Standalone server not found — onboarding Lighthouse cannot start."
@@ -4921,8 +5047,6 @@ jobs:
         env:
           CI: true
           BASE_URL: http://localhost:3000
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           DATABASE_URL: ${{ env.DATABASE_URL }}
           URL_ENCRYPTION_KEY: lighthouse-onboarding-ci-url-encryption-key
           AI_GATEWAY_API_KEY: lighthouse-onboarding-ci
@@ -4932,7 +5056,7 @@ jobs:
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
 
       - name: Upload onboarding Lighthouse artifacts
-        if: always()
+        if: steps.lighthouse-identity.outputs.available == 'true' && (always())
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: lighthouse-onboarding-pr-${{ github.run_id }}-${{ github.run_attempt }}
@@ -4945,7 +5069,7 @@ jobs:
     # Reuse the shared neon-db artifact when run_neon=true; non-DB admin PRs read DATABASE_URL_MAIN.
     needs: [ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.neon-db.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -5006,7 +5130,6 @@ jobs:
         if: steps.download-build.outcome != 'success'
         run: pnpm --filter=@jovie/web run build
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
@@ -5022,8 +5145,8 @@ jobs:
           fi
 
           export E2E_USE_TEST_AUTH_BYPASS=1
-          export NEXT_PUBLIC_CLERK_MOCK=1
-          export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
+          export NEXT_PUBLIC_AUTH_MOCK=1
+          export NEXT_PUBLIC_AUTH_PROXY_DISABLED=1
 
           if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
             echo "Standalone server not found — admin Lighthouse cannot start."
@@ -5054,8 +5177,6 @@ jobs:
         env:
           CI: true
           BASE_URL: http://localhost:3000
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           DATABASE_URL: ${{ env.DATABASE_URL }}
           URL_ENCRYPTION_KEY: lighthouse-admin-ci-url-encryption-key
           AI_GATEWAY_API_KEY: lighthouse-admin-ci
@@ -5079,7 +5200,7 @@ jobs:
     needs: [ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -5140,7 +5261,6 @@ jobs:
         if: steps.download-build.outcome != 'success'
         run: pnpm --filter=@jovie/web run build
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
@@ -5156,8 +5276,8 @@ jobs:
           fi
 
           export E2E_USE_TEST_AUTH_BYPASS=1
-          export NEXT_PUBLIC_CLERK_MOCK=1
-          export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
+          export NEXT_PUBLIC_AUTH_MOCK=1
+          export NEXT_PUBLIC_AUTH_PROXY_DISABLED=1
 
           if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
             echo "Standalone server not found — chat Lighthouse cannot start."
@@ -5188,8 +5308,6 @@ jobs:
         env:
           CI: true
           BASE_URL: http://localhost:3000
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           DATABASE_URL: ${{ env.DATABASE_URL }}
           URL_ENCRYPTION_KEY: lighthouse-chat-ci-url-encryption-key
           AI_GATEWAY_API_KEY: lighthouse-chat-ci
@@ -5337,8 +5455,8 @@ jobs:
         env:
           NEXT_PUBLIC_APP_URL: http://localhost:3100
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3100
-          NEXT_PUBLIC_CLERK_MOCK: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_AUTH_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
@@ -5422,7 +5540,7 @@ jobs:
     # Phase 0: quarantine generic fixed-runner routing until all five named
     # services have immutable warm-canary receipts. Combined heads use explicit
     # hosted capacity, so this change's own merge group gets the safe fast path.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -5559,14 +5677,28 @@ jobs:
             pnpm turbo test:fast --filter=@jovie/web -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
             echo "🔍 Merge group: Running affected test suite"
-            # Run affected tests against the merge-group base SHA.
-            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
+            # run_web includes Ovie/CLI and inputs outside Turbo's graph.
+            # Keep affected tasks; explicitly run web if it was not selected.
+            pnpm turbo test:fast --affected --dry=json > "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json"
+            UNIT_SELECTION_MODE="$(node scripts/ci-unit-selection.mjs < "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json")"
+            # Preserve sibling packages' existing empty-shard policy.
+            pnpm turbo test:fast --affected --filter='!@jovie/web' -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
+            WEB_CACHE_FLAG=""
+            if [[ "$UNIT_SELECTION_MODE" == "affected-and-web" ]]; then
+              echo "Affected graph omitted web; running the selected web lane explicitly"
+              pnpm turbo test:fast --filter=@jovie/web --dry=json > "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json"
+              node scripts/ci-unit-selection.mjs --require-web < "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json"
+              # Unknown dependency edges are also absent from cache inputs.
+              WEB_CACHE_FLAG="--force"
+            fi
+            # Override the wrapper's empty-suite success only for web shards.
+            pnpm turbo test:fast --filter=@jovie/web $WEB_CACHE_FLAG -- $VITEST_CI_FLAGS $RETRY_FLAG --passWithNoTests=false --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           else
             echo "🔍 Manual dispatch: Running critical + interaction tests (no base_ref available)"
             # Non-main manual dispatches have no base_ref. Run the critical and
             # interaction suites; main dispatches take the full-suite branch above.
             # --passWithNoTests: some shards may have no files matching the filter
-            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --passWithNoTests --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction" $OUTPUT_FLAG
+            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --passWithNoTests --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} critical interaction $OUTPUT_FLAG
           fi
       - name: Run quarantined unit tests (retries)
         # Unsharded: one shard runs it, not every shard (~12s each). Its cost is
@@ -5743,8 +5875,6 @@ jobs:
       - name: Run exact-head coverage shard
         id: coverage-shard
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
-          CLERK_SECRET_KEY: sk_test_dummy_secret_for_coverage_run_only
           EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
           COVERAGE_BASE: ${{ steps.coverage-base.outputs.sha }}
           COVERAGE_SHARD: ${{ matrix.shard }}/4
@@ -5986,7 +6116,7 @@ jobs:
     # Manual hosted axe-core WCAG 2.1 AA evidence using the shared build artifact.
     needs: [ci-build-public, ci-path-changes, neon-db]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
@@ -6133,7 +6263,6 @@ jobs:
           SMOKE_ONLY: '1'
           CI: true
           DATABASE_URL: ${{ env.DATABASE_URL }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           URL_ENCRYPTION_KEY: a11y-public-ci-url-encryption-key
           AI_GATEWAY_API_KEY: a11y-public-ci
 
@@ -6154,7 +6283,7 @@ jobs:
     # Manual hosted evidence only (when the build artifact is present).
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
@@ -6215,7 +6344,6 @@ jobs:
             pnpm turbo build --filter=@jovie/web
           fi
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
@@ -6253,8 +6381,8 @@ jobs:
           export E2E_USE_TEST_AUTH_BYPASS=1
           export E2E_TEST_AUTH_PERSONA=creator-ready
           export NEXT_PUBLIC_E2E_MODE=1
-          export NEXT_PUBLIC_CLERK_MOCK=1
-          export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
+          export NEXT_PUBLIC_AUTH_MOCK=1
+          export NEXT_PUBLIC_AUTH_PROXY_DISABLED=1
           export HOSTNAME=localhost
 
           PORT=3270 node .next/standalone/apps/web/server.js &
@@ -6280,9 +6408,8 @@ jobs:
           E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_TEST_AUTH_PERSONA: creator-ready
           NEXT_PUBLIC_E2E_MODE: '1'
-          NEXT_PUBLIC_CLERK_MOCK: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_AUTH_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
           URL_ENCRYPTION_KEY: a11y-authed-ci-url-encryption-key
           AI_GATEWAY_API_KEY: a11y-authed-ci
 
@@ -6303,7 +6430,7 @@ jobs:
     # The shared manual Neon producer is mandatory; no fallback branch can race it.
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
     if: ${{ always() && needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.neon-db.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     concurrency:
@@ -6409,12 +6536,10 @@ jobs:
           export E2E_USE_TEST_AUTH_BYPASS=1
           export VERCEL_ENV=development
           export E2E_TEST_AUTH_PERSONA=creator-ready
-          export NEXT_PUBLIC_CLERK_MOCK=1
-          export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
-          export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
+          export NEXT_PUBLIC_AUTH_MOCK=1
+          export NEXT_PUBLIC_AUTH_PROXY_DISABLED=1
           export NEXT_PUBLIC_TURNSTILE_SITE_KEY="1x00000000000000000000AA"
           export TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
-          export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
           export NEXT_PUBLIC_E2E_MODE=1
           export E2E_TEST_MODE=1
           export NEXT_DISABLE_TOOLBAR=1
@@ -6469,8 +6594,6 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           BETTER_AUTH_URL: http://localhost:3240
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3240
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           # Flaky retries leave error-context.md. Scan and redact it; do not
@@ -6495,7 +6618,7 @@ jobs:
     # Manual golden-path evidence prefers the shared Neon branch. A failed
     # database-certification job still runs this lane through the fallback
     # branch so certification writes a certificate (JOV-8614).
-    # Unlike ci-e2e-smoke this must NOT set NEXT_PUBLIC_CLERK_MOCK or
+    # Unlike ci-e2e-smoke this must NOT set NEXT_PUBLIC_AUTH_MOCK or
     # E2E_USE_TEST_AUTH_BYPASS — required mode fails closed if either is present.
     # PRs and the merge queue stay off this lane: the spec has a 900s timeout.
     # Main pushes run this same job, including queue-proven pushes that skip
@@ -6508,13 +6631,19 @@ jobs:
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
     if: ${{ always() && !cancelled() && ((github.event_name == 'workflow_dispatch' && needs.ci-path-changes.result == 'success' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure')) || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     continue-on-error: ${{ github.event_name == 'push' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     outputs:
       journey_outcome: ${{ steps.canonical_journey.outcome }}
       certification_outcome: ${{ steps.canonical_certification.outcome }}
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      # Retried-and-passed tests (start-entry-continuity retries twice) and any
+      # failed attempt leave Playwright's error-context.md. Without this the
+      # guard blocks it as an unknown binary and turns a passed-on-retry flake
+      # into a red job (runs 40548451564, 40643816453). It is not a secret
+      # finding: markdown is still redacted and credential-scanned.
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
       # Preview – jovie secret STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY is
       # the active test-mode USD 1200/month price. The assertion stays
       # fail-closed; true reports a contract breach instead of a missing secret.
@@ -6563,7 +6692,7 @@ jobs:
           branch_name: golden-path-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production
+          protected_branches: main,production,prod,development,preview,br-main,br-production
 
       - name: Resolve DATABASE_URL (fallback Neon ephemeral)
         if: needs.neon-db.result != 'success'
@@ -6611,7 +6740,6 @@ jobs:
         # bypass artifact consumed by smoke/mobile jobs.
         run: pnpm turbo build --filter=@jovie/web --force
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_APP_URL: http://localhost:3250
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3250
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
@@ -6660,8 +6788,6 @@ jobs:
           # GHA HOSTNAME is the runner machine name; pin loopback so BA redirects
           # and form origin checks stay on localhost:3250.
           export HOSTNAME=localhost
-          export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
-          export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
           export SESSION_SECRET="${{ secrets.SESSION_SECRET }}"
           export FLAGS_SECRET="${{ secrets.FLAGS_SECRET }}"
           # Pending claim cookies need a signing key on this isolated server.
@@ -6706,6 +6832,8 @@ jobs:
           JOURNEY_EVIDENCE_REPORT: ${{ runner.temp }}/journey-evidence/playwright-report.json
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.GOLDEN_PATH_REVIEW_GATEWAY_KEY }}
+          # Workers AI (Cloudflare credits) is tried first by the reviewer; unset = Gateway only.
+          GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN: ${{ secrets.GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN }}
           VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL }}
           # The runner also needs the database and deterministic E2E OTP flag.
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -6714,8 +6842,6 @@ jobs:
           GOLDEN_PATH_REQUIRED: '1'
           BETTER_AUTH_URL: http://localhost:3250
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3250
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
@@ -6730,7 +6856,7 @@ jobs:
       # the auth/billing journey evidence, which is built from the journey step.
       - name: Review golden-path keyframes (visual verdict)
         id: visual_review
-        if: ${{ !cancelled() && steps.canonical_journey.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.canonical_journey.outcome == 'success' && needs.ci-path-changes.outputs.golden_path_no_ui_diff != 'true' }}
         run: |
           cd "$GITHUB_WORKSPACE"
           # JOV-5489: recorded visual review of the golden-path keyframes. A
@@ -6742,6 +6868,7 @@ jobs:
           # journey keyframes are declared public (failure captures never are).
           review() {
             AI_GATEWAY_API_KEY="$GOLDEN_PATH_REVIEW_GATEWAY_KEY" \
+              WORKERS_AI_TOKEN="$GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN" \
               PLAYWRIGHT_ARTIFACT_PATHS=apps/web/test-results/golden-path-keyframes \
               PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES=true \
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
@@ -6757,6 +6884,8 @@ jobs:
           fi
         env:
           GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.GOLDEN_PATH_REVIEW_GATEWAY_KEY }}
+          # Workers AI (Cloudflare credits) is tried first by the reviewer; unset = Gateway only.
+          GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN: ${{ secrets.GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN }}
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL }}
 
@@ -6961,7 +7090,7 @@ jobs:
     # Removed push-to-main trigger — merge queue validates PRs before merge.
     needs: [ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     concurrency:
@@ -6996,7 +7125,7 @@ jobs:
           branch_name: admin-smoke-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+          protected_branches: main,production,prod,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -7055,8 +7184,6 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
           CI: true
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_CLERK_ADMIN_USERNAME: ${{ secrets.E2E_CLERK_ADMIN_USERNAME }}
           E2E_CLERK_ADMIN_PASSWORD: ${{ secrets.E2E_CLERK_ADMIN_PASSWORD }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
@@ -7162,7 +7289,6 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
 
@@ -7172,7 +7298,7 @@ jobs:
     # Opt-in validation lane for risky PRs. Keep it off the main deploy critical path.
     needs: [ci-path-changes, ci-build-public, neon-db, ci-e2e-migrate]
     if: ${{ needs.ci-path-changes.result == 'success' && needs.ci-e2e-migrate.outputs.run_full_ci == 'true' && github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     strategy:
@@ -7271,9 +7397,6 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
           E2E_SKIP_SEED: '1'
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
@@ -7307,9 +7430,6 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
           E2E_SKIP_SEED: '1'
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
@@ -7569,6 +7689,10 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           set -euo pipefail
+          # GitHub masks secret substrings in the DEPLOYMENT_URL env dump, which
+          # removes the hostname. The base64 line keeps an openable URL for the
+          # funnel gate without printing a second plaintext copy.
+          echo "DEPLOYMENT_URL_B64: $(printf '%s' "$DEPLOYMENT_URL" | base64 -w0)"
           inspect_wait_status=0
           ./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
             --wait \
@@ -7639,7 +7763,9 @@ jobs:
         ci-lighthouse-onboarding-pr,
       ]
     if: ${{ always() && github.event_name == 'merge_group' }}
-    runs-on: ubuntu-latest
+    # Merge-gate pool (docs/ci/merge-queue-alternatives.md): hosted by default;
+    # repo variable MERGE_GATE_POOL=fixed routes back to the gem pool.
+    runs-on: ${{ vars.MERGE_GATE_POOL == 'fixed' && fromJSON('["self-hosted","Linux","X64","jovie-fixed"]') || 'ubuntu-latest' }}
     timeout-minutes: 2
     steps:
       - name: Evaluate combined-head checks
@@ -7832,13 +7958,45 @@ jobs:
   # Storybook a11y evidence lives exclusively in the scheduled visual-a11y.yml
   # storybook-a11y lane; the duplicate manual ci-storybook-a11y job was removed
   # (JOV-4326) so the evidence has a single owner.
+  ci-slop-guard:
+    name: Slop Guard
+    # Company anti-slop ratchets (JOV-9975). Policy, tool versions and tool configs live in
+    # JovieInc/ci (policy/JovieInc__Jovie/); this repo owns only config/slop-guard/baseline.json,
+    # which may only shrink. Feeds PR Ready, so a red guard blocks the merge.
+    needs: [ci-path-changes]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    env:
+      HAS_BOT_KEY: ${{ secrets.JOVIE_BOT_PRIVATE_KEY != '' && secrets.JOVIE_BOT_APP_ID != '' && github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - *shallow-checkout
+      - uses: ./.github/actions/setup-node-pnpm
+      # Optional: with the jovie-bot App secrets, fixed debt lowers the baseline automatically.
+      # Without them (or on forks) auto-shrink is skipped and the guard stays warn-only for that part.
+      - name: Mint jovie-bot token
+        id: bot
+        if: env.HAS_BOT_KEY == 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+      - uses: JovieInc/ci/actions/slop-guard@dc568f8b92fd8b3681e2f3c56b39a9bda5700d0d # JovieInc/ci#12
+        with:
+          auto-shrink: ${{ steps.bot.outputs.token != '' }}
+          token: ${{ steps.bot.outputs.token || github.token }}
+
   ci-pr-ready:
     name: ${{ github.event_name == 'pull_request' && 'PR Ready' || 'PR Ready (source inactive)' }}
     # The source aggregate stays deterministic: exact-head V8 coverage runs in
     # parallel with the fast lanes, while build/layout integration stays on the
     # merge-group head. Migration Guard, Fork PR Gate, and PR Size Guard remain
     # separately required ruleset contexts.
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare]
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-slop-guard]
     if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -7853,6 +8011,7 @@ jobs:
           SECRET_SCAN_RESULT="${{ needs.ci-secret-scan.result }}"
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
+          SLOP_RESULT="${{ needs.ci-slop-guard.result }}"
           COVERAGE_RESULT="${{ needs.ci-exact-head-coverage.result }}"
           RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
@@ -7874,6 +8033,7 @@ jobs:
             echo "| Exact-head Coverage | $COVERAGE_RESULT | \`pnpm --filter @jovie/web test:coverage && node scripts/check-changed-test-coverage.mjs --base <base-sha> --head <head-sha>\` |"
             echo "| Secret Scan | $SECRET_SCAN_RESULT | \`./scripts/security/scan-secrets.sh ci-pr origin/main\` |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT | \`node scripts/golden-path-lock.mjs merge-gate\` |"
+            echo "| Slop Guard (size, pass-through, dead code, duplication) | $SLOP_RESULT | \`node ../ci/actions/slop-guard/slop-guard.mjs --policy <ci>/policy/JovieInc__Jovie/policy.json\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
             echo "| Visual Snapshot Compare (homepage + marketing DOM PRs) | $VISUAL_COMPARE_RESULT | \`node scripts/visual-snapshot-compare.mjs compare\` |"
             echo
@@ -7895,6 +8055,10 @@ jobs:
           fi
           if [[ "$RISK_RESULT" != "success" ]]; then
             echo "❌ CI risk classifier did not pass (result: $RISK_RESULT)"
+            exit 1
+          fi
+          if [[ "$SLOP_RESULT" != "success" ]]; then
+            echo "❌ Slop Guard did not pass (result: $SLOP_RESULT); see the job log for the offender and its budget"
             exit 1
           fi
 
@@ -8288,7 +8452,7 @@ jobs:
     name: Extended Smoke (manual)
     needs: [ci-path-changes, ci-build-public, neon-db, ci-e2e-tests]
     if: ${{ needs.ci-path-changes.result == 'success' && always() && github.event_name == 'workflow_dispatch' && needs.neon-db.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: Preview – jovie
     timeout-minutes: 20
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
@@ -8353,15 +8517,14 @@ jobs:
           cp -r apps/web/public apps/web/.next/standalone/apps/web/public
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_APP_URL: http://localhost:3260
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3260
           # Keep rebuild fallback equivalent to the shared ci-build artifact.
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
           # NEXT_PUBLIC_* must be present at build time for standalone smoke runs.
           NEXT_PUBLIC_E2E_MODE: '1'
-          NEXT_PUBLIC_CLERK_MOCK: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_AUTH_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
@@ -8380,18 +8543,16 @@ jobs:
           export NEXT_PUBLIC_APP_URL=http://localhost:3260
           export BETTER_AUTH_URL=http://localhost:3260
           export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3260
-          export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
           export NEXT_PUBLIC_TURNSTILE_SITE_KEY="1x00000000000000000000AA"
           export TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
-          export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
           export SESSION_SECRET="${{ secrets.SESSION_SECRET }}"
           # In-memory rate limiter and cache (NODE_ENV=test / E2E_TEST_MODE / CI /
           # VERCEL_ENV=development). Do not export UPSTASH_REDIS_REST_*.
           export NEXT_PUBLIC_E2E_MODE=1
           export E2E_TEST_MODE=1
           export NEXT_DISABLE_TOOLBAR=1
-          export NEXT_PUBLIC_CLERK_MOCK=1
-          export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
+          export NEXT_PUBLIC_AUTH_MOCK=1
+          export NEXT_PUBLIC_AUTH_PROXY_DISABLED=1
           export E2E_USE_TEST_AUTH_BYPASS=1
           export E2E_TEST_AUTH_PERSONA=creator-ready
           export E2E_CLERK_USER_ID="${{ secrets.E2E_CLERK_USER_ID }}"
@@ -8440,15 +8601,13 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           BETTER_AUTH_URL: http://localhost:3260
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3260
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
           TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           NEXT_PUBLIC_E2E_MODE: '1'
           NEXT_DISABLE_TOOLBAR: '1'
-          NEXT_PUBLIC_CLERK_MOCK: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_AUTH_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_TEST_AUTH_PERSONA: creator-ready
           E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}

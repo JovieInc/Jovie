@@ -22,6 +22,9 @@
  * suite; this file stays DOM-free so it can also certify server captures.
  */
 
+import { claims } from '@/lib/billing/offer/claims';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
+import { getPaidPlanAdditionNames } from '@/lib/billing/public-pricing-features';
 import type {
   MarketingCopyLineBinding,
   MarketingCopyLineRole,
@@ -30,6 +33,9 @@ import type {
   MarketingCopySectionBrief,
   MarketingCopySectionDraft,
 } from './copy';
+
+/** Paid CTA label: plan plus price, from offer truth (JOV-9692). */
+const PRO_CTA_LABEL = getPublicPriceClaim('pro').ctaLabel;
 
 export interface RenderedCopyCoverageEntry {
   readonly surfaceId: string;
@@ -308,9 +314,8 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         candidateId: 'pricing-plan-free-v1',
         controlHeadline: 'Free plan',
         headline: 'Free',
-        body: 'Your Jovie profile stays free forever. Downgrading restores Jovie branding and keeps audience capture.',
+        body: 'Your Jovie profile stays free forever and keeps audience capture.',
         supportingText: [
-          'Free forever',
           '$0',
           'Claim my free profile',
           'Public Jovie profile and audience capture',
@@ -320,9 +325,8 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
           ['headline', { claim: 'free-forever' }],
           ['body', { claim: 'free-forever' }],
           ['supporting:0', { claim: 'free-forever' }],
-          ['supporting:1', { claim: 'free-forever' }],
-          ['supporting:2', { action: 'claim-free' }],
-          ['supporting:3', { claim: 'free-forever' }],
+          ['supporting:1', { action: 'claim-free' }],
+          ['supporting:2', { claim: 'free-forever' }],
         ],
       }),
       pricingSection({
@@ -330,21 +334,24 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         candidateId: 'pricing-plan-pro-v1',
         controlHeadline: 'Pro plan',
         headline: 'Artist Presence',
-        body: 'Self-serve. Cancel anytime.',
+        body: `Self-serve. ${claims(['billing.cancel_short', 'billing.refund'])}`,
         supportingText: [
-          'Self-serve',
           '$12/mo',
-          'Claim your profile',
-          'Public Jovie profile and audience capture',
+          PRO_CTA_LABEL,
+          ...getPaidPlanAdditionNames(),
         ],
         claimIds: ['pro-price'],
         lineBindings: [
           ['headline', { claim: 'pro-price' }],
           ['body', { claim: 'pro-price' }],
           ['supporting:0', { claim: 'pro-price' }],
-          ['supporting:1', { claim: 'pro-price' }],
-          ['supporting:2', { action: 'claim-pro' }],
-          ['supporting:3', { claim: 'pro-price' }],
+          ['supporting:1', { action: 'claim-pro' }],
+          ...getPaidPlanAdditionNames().map(
+            (_, index): [string, { claim: string }] => [
+              `supporting:${index + 2}`,
+              { claim: 'pro-price' },
+            ]
+          ),
         ],
       }),
       pricingSection({
@@ -353,14 +360,13 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         controlHeadline: 'Enterprise plan',
         headline: 'Enterprise',
         body: 'Scope by agreement.',
-        supportingText: ['Contact sales', 'Custom', 'Contact sales'],
+        supportingText: ['Custom', 'Contact sales'],
         claimIds: ['enterprise-custom'],
         lineBindings: [
           ['headline', { claim: 'enterprise-custom' }],
           ['body', { claim: 'enterprise-custom' }],
           ['supporting:0', { claim: 'enterprise-custom' }],
-          ['supporting:1', { claim: 'enterprise-custom' }],
-          ['supporting:2', { action: 'contact-sales' }],
+          ['supporting:1', { action: 'contact-sales' }],
         ],
       }),
       pricingSection({
@@ -368,11 +374,11 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         candidateId: 'pricing-compare-v1',
         controlHeadline: 'Feature comparison',
         headline: 'Compare All Features',
-        body: 'Public Jovie profile and audience capture.',
+        body: 'What each plan includes.',
         claimIds: ['free-forever'],
         lineBindings: [
           ['headline', { outcome: 'choose-plan' }],
-          ['body', { claim: 'free-forever' }],
+          ['body', { outcome: 'choose-plan' }],
         ],
       }),
       pricingSection({
@@ -381,18 +387,12 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         controlHeadline: 'Pick a plan',
         headline: 'Get Started',
         body: 'Artist Presence is $12/month. Claim your profile.',
-        supportingText: [
-          'Claim my free profile',
-          'Claim your profile',
-          'Contact sales',
-        ],
+        supportingText: [PRO_CTA_LABEL],
         claimIds: ['pro-price'],
         lineBindings: [
           ['headline', { outcome: 'choose-plan' }],
           ['body', { claim: 'pro-price' }],
-          ['supporting:0', { action: 'claim-free' }],
-          ['supporting:1', { action: 'claim-pro' }],
-          ['supporting:2', { action: 'contact-sales' }],
+          ['supporting:0', { action: 'claim-pro' }],
         ],
       }),
     ],

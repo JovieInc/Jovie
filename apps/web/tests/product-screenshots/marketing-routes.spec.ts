@@ -4,7 +4,6 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_EXACT_PUBLIC_ROUTE_TARGETS } from '@/data/marketing';
-import { PRE_SAVE_FIXTURE } from '@/data/preSaveCopy';
 import { MARKETING_EXACT_ROUTE_VISUAL_QA_ENTRIES } from '@/lib/agent-os/visual-qa/coverage';
 import { SCREENSHOT_VIEWPORTS } from '@/lib/screenshots/registry';
 import {
@@ -146,13 +145,12 @@ test.describe('Exact marketing route screenshots', () => {
 test.describe('Pre-save countdown contrast', () => {
   test.describe.configure({ mode: 'parallel', retries: 0 });
 
-  const releaseAt = Date.parse(PRE_SAVE_FIXTURE.releaseAt);
+  // The demo release is always ~3 weeks out relative to the page clock, so the
+  // countdown renders days, hours and minutes (never years).
   const scenarios = [
-    { name: 'multiple years', minutesLeft: 730 * 24 * 60, units: ['YRS'] },
-    { name: 'one year', minutesLeft: 365 * 24 * 60, units: ['YR'] },
     {
       name: 'days, hours and minutes',
-      minutesLeft: 2 * 24 * 60 + 3 * 60 + 4,
+      now: new Date('2026-10-29T12:00:00.000Z'),
       units: ['D', 'H', 'M'],
     },
   ];
@@ -162,9 +160,7 @@ test.describe('Pre-save countdown contrast', () => {
       test(`${scenario.name} units stay readable on ${viewport}`, async ({
         page,
       }) => {
-        await page.clock.setFixedTime(
-          new Date(releaseAt - scenario.minutesLeft * 60_000)
-        );
+        await page.clock.setFixedTime(scenario.now);
         await page.emulateMedia({ reducedMotion: 'reduce' });
         await page.setViewportSize(SCREENSHOT_VIEWPORTS[viewport]);
         await page.goto(APP_ROUTES.PRODUCT_PRE_SAVE);
@@ -412,5 +408,67 @@ test.describe('Instant merch hero media stability', () => {
         }
       });
     }
+  }
+});
+
+test.describe('UTM links hero panel stability', () => {
+  for (const width of [390, 768, 1024, 1440]) {
+    test(`builder arrival at ${width}px keeps the hero still`, async ({
+      browser,
+      baseURL,
+    }) => {
+      // CI saw utm-links-panel grow 424px -> 775px about 370ms after load
+      // and push the hero copy (CLS 0.0686). Deterministic probe: with the
+      // server render only, take the builder out (an island that has not
+      // painted yet) and require the copy, the panel and the next band to
+      // keep their geometry.
+      const context = await browser.newContext({
+        baseURL,
+        viewport: { width, height: 900 },
+        javaScriptEnabled: false,
+        reducedMotion: 'reduce',
+      });
+      try {
+        const page = await context.newPage();
+        const response = await page.goto('/product/utm-links', {
+          waitUntil: 'load',
+        });
+        expect(response?.status()).toBe(200);
+        await page.evaluate(() => document.fonts.ready);
+        const measure = async () => ({
+          copy: await page
+            .getByRole('heading', { level: 1, name: 'UTM links' })
+            .boundingBox(),
+          panel: await page.getByTestId('utm-links-panel').boundingBox(),
+          footer: await page
+            .locator('footer, [role="contentinfo"]')
+            .first()
+            .boundingBox(),
+        });
+        const complete = await measure();
+        const builder = await page.getByTestId('utm-builder').elementHandle();
+        if (!builder) throw new Error('Missing UTM builder');
+        await builder.evaluate(element => {
+          const marker = document.createComment('utm-builder');
+          element.before(marker);
+          (element as Element & { restoreMarker?: Comment }).restoreMarker =
+            marker;
+          element.remove();
+        });
+        expect(
+          await measure(),
+          'builder arrival must not change hero layout'
+        ).toEqual(complete);
+        await builder.evaluate(element => {
+          const marker = (element as Element & { restoreMarker?: Comment })
+            .restoreMarker;
+          if (!marker) throw new Error('Missing builder restore marker');
+          marker.replaceWith(element);
+        });
+        expect(await measure(), 'restored builder geometry').toEqual(complete);
+      } finally {
+        await context.close();
+      }
+    });
   }
 });

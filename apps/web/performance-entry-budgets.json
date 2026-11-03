@@ -4,7 +4,8 @@
   {
     "id": "claim-link",
     "path": "/[handle]?claim=1",
-    "lcpMs": 4000,
+    "ratchet": "JOV-9611: temporary 7000ms baseline (Tim, 2026-10-28, launch first); drive back to 4000",
+    "lcpMs": 7000,
     "cls": 0.05
   }
 ]

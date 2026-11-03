@@ -843,6 +843,35 @@
         "check": "vision:hierarchy",
         "evidence": []
       }
+    },
+    {
+      "id": "ASR-039",
+      "title": "No motion effect ships without a reduced-motion rest state, a static fallback and a perf budget",
+      "statement": "Every canvas, WebGL or scroll-driven motion effect on marketing is registered in docs/design-system/motion-effects.json with a prefers-reduced-motion rest state, a static fallback and a gzip, frame-rate and offscreen-pause budget.",
+      "rationale": "Motion carries the story between scenes and must never cost the page: the rest state is the designed state, the budget keeps it cheap.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-26",
+        "ref": "Motion and shader language spec, docs/design-system/motion-effects.json"
+      },
+      "scope": ["marketing"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/invariants/art-direction/surface-media.mjs",
+        "evidence": [
+          "scripts/invariants/art-direction/surface-media.mjs",
+          "docs/design-system/motion-effects.json"
+        ],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
+          }
+        ]
+      }
     }
   ],
   "judges": [

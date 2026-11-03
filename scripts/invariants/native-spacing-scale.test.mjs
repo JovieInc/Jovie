@@ -88,16 +88,18 @@ describe('native spacing-scale detector (JOV-5865)', () => {
     const baseline = {
       surfaces: { ios: { conservative: 12, strict: 12, files: 1 } },
     };
-    for (const event of /** @type {const} */ (['local', 'pull_request'])) {
+    // An improvement never fails a PR: it passes with a notice to lower the floor.
+    for (const event of /** @type {const} */ ([
+      'local',
+      'pull_request',
+      'merge_group',
+    ])) {
       const verdict = evaluateNativeSpacingScale({ measured, baseline, event });
-      assert.equal(verdict.ok, false);
-      assert.match(verdict.issues[0], /lower the baseline to 10/);
+      assert.equal(verdict.ok, true);
+      assert.deepEqual(verdict.issues, []);
+      if (event !== 'merge_group')
+        assert.match(verdict.warnings[0], /lower the baseline to 10/);
     }
-    assert.equal(
-      evaluateNativeSpacingScale({ measured, baseline, event: 'merge_group' })
-        .ok,
-      true
-    );
     baseline.surfaces.ios.conservative = 10;
     assert.equal(
       evaluateNativeSpacingScale({ measured, baseline, event: 'pull_request' })

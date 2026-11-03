@@ -12,7 +12,7 @@ import {
 } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 import { z } from 'zod';
-import { CACHE_TAGS, createProfileTag } from '@/lib/cache/tags';
+import { createProfileTag } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
 import { discogReleases } from '@/lib/db/schema/content';
@@ -549,8 +549,8 @@ export function publicMerchUrl(username: string, cardId: string): string {
   return `${baseUrl}/${username}/merch/${cardId}`;
 }
 
+/** Merch cards render inside one artist's profile snapshot (profile:<handle>). */
 function revalidatePublicProfile(usernameNormalized: string): void {
-  revalidateTag(CACHE_TAGS.PUBLIC_PROFILE, 'max');
   revalidateTag(createProfileTag(usernameNormalized), 'max');
 }
 

@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { deflateSync } from 'node:zlib';
 import {
+  CAPTURE_ATTEMPTS,
+  captureScreen,
   contentDensity,
   decodePng,
   frameDifference,
@@ -17,6 +19,7 @@ import {
   renderHtml,
   screenBackground,
   screenFile,
+  settleDeadline,
   sourceHash,
   validateStorefront,
   verifyOutput,
@@ -336,6 +339,51 @@ function writeSet(out, spec, mutate = {}) {
     })
   );
 }
+
+test('settleDeadline keeps screenshot latency out of the settle budget', () => {
+  const startedAt = 1_000;
+  const settleMs = 5_000;
+  // Waiting budget: settleMs * 18, unchanged from the pre-JOV-7952 floor.
+  assert.equal(settleDeadline({ settleMs, startedAt }), startedAt + 90_000);
+  // A cold hosted runner spending 30s+ per frame is latency, not settling.
+  assert.equal(
+    settleDeadline({ settleMs, startedAt, shotMs: 120_000 }),
+    startedAt + 90_000 + 120_000
+  );
+});
+
+test('captureScreen relaunches a stalled fixture once, then fails bounded', async () => {
+  const input = {
+    udid: 'udid',
+    file: 'raw/chat.png',
+    spec: loadStorefront(),
+    screen: loadStorefront().screens[0],
+    settleMs: 5_000,
+  };
+  const buffer = png(1320, 2868);
+  // First launch stalls on the cold simulator; the relaunch settles.
+  const stalled = [];
+  const stalls = async args => {
+    stalled.push(args);
+    if (stalled.length === 1) {
+      throw new Error('chat: screen never settled');
+    }
+    return buffer;
+  };
+  assert.equal(await captureScreen(input, { attempt: stalls }), buffer);
+  assert.equal(stalled.length, 2);
+  // A screen that never settles fails after the bounded attempts, not forever.
+  let launches = 0;
+  const never = async () => {
+    launches++;
+    throw new Error('chat: screen body is empty');
+  };
+  await assert.rejects(
+    () => captureScreen(input, { attempt: never }),
+    /screen body is empty/
+  );
+  assert.equal(launches, CAPTURE_ATTEMPTS);
+});
 
 test('verifyOutput passes a fresh set and fails stale or malformed ones', () => {
   const spec = loadStorefront();

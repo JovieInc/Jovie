@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import test from 'node:test';
 
 const { load } = createRequire(import.meta.url)('js-yaml');
@@ -38,3 +40,22 @@ test('the liveness job marks its bucket after the check, even when the check fai
     '${{ steps.bucket.outputs.bucket }}'
   );
 });
+
+for (const [event, seen, due] of [
+  ['workflow_run', 'true', 'false'],
+  ['workflow_run', 'false', 'true'],
+  ['workflow_run', '', 'true'],
+  ['workflow_dispatch', 'true', 'true'],
+]) {
+  test(`gate returns due=${due} for ${event} with cache-hit=${seen}`, () => {
+    const output = join(
+      mkdtempSync(join(tmpdir(), 'liveness-gate-')),
+      'output'
+    );
+    const step = workflow.jobs.gate.steps.find(step => step.id === 'due');
+    execFileSync('bash', ['-e', '-c', step.run], {
+      env: { ...process.env, EVENT: event, SEEN: seen, GITHUB_OUTPUT: output },
+    });
+    assert.equal(readFileSync(output, 'utf8'), `due=${due}\n`);
+  });
+}
