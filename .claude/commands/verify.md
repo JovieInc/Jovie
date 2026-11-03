@@ -163,20 +163,12 @@ const [x, setX] = useState(0);
 if (condition) setX(1); // This causes loop!
 ```
 
-## 7. Internal Review Evidence
+## 7. Review Evidence
 
-Follow the canonical review policy in `.claude/rules/code-style.md`. Inspect the
-exact scoped diff before commit, then record the existing internal PR review's
-event-head comment/run receipt, verified reviewed-diff/head binding, and actionable
-findings' dispositions. The
-JOV-7400 workflow runs `node .github/scripts/internal-pr-review.mjs` on PR open
-or synchronize; it is advisory, not a required check.
-
-Review correctness, regression coverage, and migration/security risks. Resolve
-actual actionable findings or document evidence showing why they do not apply.
-Report missing or incomplete review accurately; availability, latency, quota,
-or billing must not hold shipping. Required qualification, CI, security, and
-merge-queue gates still apply. CodeRabbit is optional supplementary evidence.
+There is no AI PR reviewer (retired 2026-10-28, see `.claude/rules/code-style.md`).
+Inspect the exact scoped diff before commit for correctness, regression coverage,
+and migration/security risks; resolve actual findings or document evidence that
+they do not apply. Required CI, security, and merge-queue gates still apply.
 
 ## 8. Run Affected Tests
 

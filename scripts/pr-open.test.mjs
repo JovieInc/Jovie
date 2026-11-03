@@ -504,6 +504,53 @@ function localRepo() {
   };
 }
 
+test('new PR checks use remote main when local main is stale', async () => {
+  const { repo, cleanup } = localRepo();
+  const bodyDir = mkdtempSync(path.join(tmpdir(), 'pr-open-remote-base-'));
+  const bodyFile = path.join(bodyDir, 'body.md');
+  const git = args =>
+    execFileSync('git', args, { cwd: repo, encoding: 'utf8' });
+  try {
+    git(['checkout', '-b', 'feature']);
+    git(['branch', '-f', 'main', 'origin/main']);
+    writeFileSync(path.join(repo, 'unrelated-baseline.json'), '{}\n');
+    git(['add', '.']);
+    git(['commit', '-m', 'chore: upstream baseline']);
+    git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    writeFileSync(path.join(repo, 'new.txt'), 'feature\n');
+    git(['add', '.']);
+    git(['commit', '-m', 'chore: feature']);
+    writeFileSync(
+      bodyFile,
+      draftBody({
+        title: 'chore(ci): feature',
+        files: [file('new.txt')],
+        summary: 'Checks the feature against current remote main.',
+      })
+    );
+    const output = [];
+    const code = await main(
+      ['check', '--repo', repo, '--body-file', bodyFile],
+      line => output.push(line),
+      {
+        execute: (command, args) =>
+          command === 'git' && args[0] !== 'show'
+            ? okText(git(args))
+            : fakeDiffRunner(command, args),
+      }
+    );
+    assert.equal(code, 0, output.join('\n'));
+    assert.doesNotMatch(output.join('\n'), /locked-areas/);
+    assert.notEqual(
+      git(['rev-parse', 'main']),
+      git(['rev-parse', 'origin/main'])
+    );
+  } finally {
+    cleanup();
+    rmSync(bodyDir, { recursive: true, force: true });
+  }
+});
+
 test('check reports lane-map waiting as pending without a failure', async () => {
   const pr = targetPr(42);
   const output = [];
