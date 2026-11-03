@@ -773,3 +773,80 @@ test('a Doppler read failure is reported as the skip cause, not as missing secre
     'the misleading "missing secrets" wording must not be the reported cause'
   );
 });
+
+test('an unrelated required skip is not attributed to OTP configuration', () => {
+  const fileSystem = createMemoryFileSystem({
+    'other.json': JSON.stringify({
+      suites: [
+        {
+          specs: [
+            {
+              title: 'other prerequisite',
+              tests: [{ status: 'skipped', results: [] }],
+            },
+          ],
+        },
+      ],
+    }),
+  });
+  const result = parseSyntheticTestResults({
+    resultFiles: [
+      {
+        name: 'synthetic-production-waitlist',
+        path: 'other.json',
+        required: true,
+      },
+    ],
+    fileSystem,
+    otpSkipReason: 'synthetic-otp-unavailable: unrelated OTP read failure',
+  });
+  assert.equal(result.testStatus, 'failed');
+  assert.ok(
+    result.failedTests.includes(
+      'synthetic-production-waitlist: other prerequisite'
+    )
+  );
+  assert.equal(
+    result.failedTests.some(line => line.startsWith('Skip cause:')),
+    false
+  );
+});
+
+test('OTP cause is retained when an OTP marker follows another annotation', () => {
+  const fileSystem = createMemoryFileSystem({
+    'waitlist.json': JSON.stringify({
+      suites: [
+        {
+          specs: [
+            {
+              title: 'mixed reasons',
+              tests: [
+                {
+                  status: 'skipped',
+                  annotations: [
+                    { description: 'synthetic-robot-auth-unavailable' },
+                    { description: 'synthetic-otp-unavailable' },
+                  ],
+                  results: [],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }),
+  });
+  const result = parseSyntheticTestResults({
+    resultFiles: [
+      {
+        name: 'synthetic-production-waitlist',
+        path: 'waitlist.json',
+        required: true,
+      },
+    ],
+    fileSystem,
+    otpSkipReason: 'authoritative OTP cause',
+  });
+  assert.equal(result.testStatus, 'failed');
+  assert.ok(result.failedTests.includes('Skip cause: authoritative OTP cause'));
+});

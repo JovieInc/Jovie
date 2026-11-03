@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -252,6 +258,7 @@ printf '%s' '{"E2E_PROD_OTP_CHECK_TOKEN":"retried-otp-token"}'
       }
     );
     assert.equal(result.status, 0, result.stderr);
+    assert.equal(readFileSync(join(root, 'doppler-calls'), 'utf8'), '3');
     assert.match(result.stderr, /E2E_PROD_OTP_CHECK_TOKEN source=doppler/);
     const exported = readFileSync(join(root, 'github-env'), 'utf8');
     assert.match(exported, /retried-otp-token/);
@@ -266,7 +273,8 @@ test('CLI reports a Doppler resolution failure without masquerading as missing',
   try {
     writeFakeDoppler(
       root,
-      `if [ "$1 $2" = "secrets download" ]; then
+      `printf x >> "$TMPDOPPLERCOUNT"
+if [ "$1 $2" = "secrets download" ]; then
   exit 7
 fi
 exit 1
@@ -291,11 +299,13 @@ exit 1
           GITHUB_STEP_SUMMARY: join(root, 'summary.md'),
           DOPPLER_TOKEN: 'doppler-token',
           DOPPLER_RETRY_BACKOFF_MS: '10,10',
+          TMPDOPPLERCOUNT: join(root, 'doppler-calls'),
           CRON_SECRET: '',
           E2E_PROD_OTP_CHECK_TOKEN: '',
         },
       }
     );
+    assert.equal(readFileSync(join(root, 'doppler-calls'), 'utf8'), 'xxx');
     // The step continues so the Doppler-free canaries still run; the failure
     // is surfaced as ::error:: and the OTP skip reason names the truth.
     assert.equal(result.status, 0, result.stderr);
@@ -338,5 +348,85 @@ exit 1
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('unconfigured Doppler performs zero calls and reports no attempts', () => {
+  const root = mkdtempSync(
+    join(tmpdir(), 'jovie-resolve-secrets-unconfigured-')
+  );
+  try {
+    const calls = join(root, 'calls');
+    writeFakeDoppler(root, 'echo called >> "$CALLS"; exit 7');
+    const result = spawnSync(
+      process.execPath,
+      [SCRIPT.pathname, '--name', 'E2E_PROD_OTP_CHECK_TOKEN'],
+      {
+        encoding: 'utf8',
+        timeout: 5_000,
+        env: {
+          PATH: `${root}:${process.env.PATH}`,
+          CALLS: calls,
+          GITHUB_ENV: join(root, 'env'),
+          GITHUB_OUTPUT: join(root, 'output'),
+        },
+      }
+    );
+    assert.equal(result.error, undefined);
+    assert.equal(result.signal, null);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(existsSync(calls), false);
+    assert.match(result.stderr, /DOPPLER_TOKEN unconfigured/);
+    assert.doesNotMatch(result.stderr, /title=Tim-only OTP secrets absent/);
+    assert.doesNotMatch(result.stderr, /after 3 attempts/);
+    assert.match(result.stderr, /no Doppler read attempted/);
+    assert.match(
+      readFileSync(join(root, 'output'), 'utf8'),
+      /no Doppler read attempted/
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('non-object Doppler responses fail resolution; an empty object verifies absence', () => {
+  for (const [payload, expected, expectedCalls] of [
+    ['[]', 'doppler-error', 3],
+    ['42', 'doppler-error', 3],
+    ['false', 'doppler-error', 3],
+    ['null', 'doppler-error', 3],
+    ['{}', 'missing', 1],
+  ]) {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-resolve-shape-'));
+    try {
+      writeFakeDoppler(root, `printf x >> "$CALLS"\nprintf '%s' '${payload}'`);
+      const result = spawnSync(
+        process.execPath,
+        [SCRIPT.pathname, '--name', 'E2E_PROD_OTP_CHECK_TOKEN'],
+        {
+          encoding: 'utf8',
+          timeout: 5_000,
+          env: {
+            PATH: `${root}:${process.env.PATH}`,
+            CALLS: join(root, 'calls'),
+            DOPPLER_TOKEN: 'fixture-token',
+            DOPPLER_RETRY_BACKOFF_MS: '0,0',
+          },
+        }
+      );
+      assert.equal(result.error, undefined);
+      assert.equal(result.signal, null);
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stderr, new RegExp(`source=${expected}\\b`), payload);
+      if (expected === 'doppler-error')
+        assert.match(result.stderr, /invalid-json-shape/);
+      assert.equal(
+        readFileSync(join(root, 'calls'), 'utf8').length,
+        expectedCalls,
+        payload
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 });

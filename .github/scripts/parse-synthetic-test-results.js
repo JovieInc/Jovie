@@ -42,6 +42,11 @@ const DEFAULT_RESULT_FILES = (
     required: true,
   },
   {
+    name: 'synthetic-start-chat',
+    path: 'apps/web/test-results/synthetic-start-chat-results.json',
+    required: true,
+  },
+  {
     name: 'synthetic-legacy-otp',
     path: 'apps/web/test-results/synthetic-legacy-otp-results.json',
     required: legacyCanaryEnabled,
@@ -66,11 +71,15 @@ function collectSpecs(suites = [], source, required = true) {
   return specs;
 }
 
-function acknowledgedSkipText(testCase) {
+function acknowledgedSkipText(testCase, marker = null) {
   const chunks = [];
   const push = value => {
     if (typeof value !== 'string') return;
-    if (!ACKNOWLEDGED_SKIP_MARKERS.some(marker => value.includes(marker))) {
+    if (
+      !(marker
+        ? value.includes(marker)
+        : ACKNOWLEDGED_SKIP_MARKERS.some(item => value.includes(item)))
+    ) {
       return;
     }
     chunks.push(value.replace(/\s+/g, ' ').trim());
@@ -272,8 +281,10 @@ function parseSyntheticTestResults({
       : []),
     // The resolver's OTP_SKIP_REASON is the authoritative cause (it knows
     // whether secrets were verified absent vs. a Doppler read failure) —
-    // attach it whenever a required skip is what failed the run.
-    ...(requiredSkipped.length > 0 && otpReason
+    // attach it only when a required skip identifies OTP as its cause.
+    ...(requiredSkipped.some(({ testCase }) =>
+      acknowledgedSkipText(testCase, OTP_SKIP_MARKER)
+    ) && otpReason
       ? [`Skip cause: ${otpReason}`]
       : []),
   ];

@@ -59,12 +59,26 @@ export function resolveSyntheticSecret({ name, githubValue, dopplerValue }) {
       ? {
           value: normalizeSecret(dopplerValue.value),
           error: normalizeSecret(dopplerValue.error),
+          attempts: dopplerValue.attempts,
         }
       : { value: normalizeSecret(dopplerValue), error: '' };
   if (doppler.value) return { name, value: doppler.value, source: 'doppler' };
   if (doppler.error)
-    return { name, value: '', source: 'doppler-error', error: doppler.error };
+    return {
+      name,
+      value: '',
+      source: 'doppler-error',
+      error: doppler.error,
+      ...(Number.isInteger(doppler.attempts)
+        ? { attempts: doppler.attempts }
+        : {}),
+    };
   return { name, value: '', source: 'missing' };
+}
+
+function attemptText(attempts) {
+  if (attempts === 0) return 'with no Doppler read attempted';
+  return Number.isInteger(attempts) ? `after ${attempts} attempts` : '';
 }
 
 export function resolveSyntheticSecrets({ names, env, dopplerValues }) {
@@ -83,6 +97,9 @@ export function resolveSyntheticSecrets({ names, env, dopplerValues }) {
     entry =>
       requestedOtp.includes(entry.name) && entry.source === 'doppler-error'
   );
+  const errorAttempts = new Set(erroredOtp.map(entry => entry.attempts));
+  const sharedAttempts =
+    errorAttempts.size === 1 ? erroredOtp[0]?.attempts : undefined;
   const otpAvailable =
     requestedOtp.length === 0 ||
     (missingOtp.length === 0 && erroredOtp.length === 0);
@@ -96,7 +113,7 @@ export function resolveSyntheticSecrets({ names, env, dopplerValues }) {
           .map(entry => entry.name)
           .join(
             ', '
-          )} from Doppler jovie-web/prd after ${DOPPLER_READ_ATTEMPTS} attempts (${erroredOtp
+          )} from Doppler jovie-web/prd ${attemptText(sharedAttempts)} (${erroredOtp
           .map(entry => entry.error)
           .join(
             '; '
@@ -141,13 +158,13 @@ export function describeDopplerFailure(result) {
 
 /**
  * One batched read for every name that is empty in the environment. Returns
- * `{ values, error }`: `values` maps the names Doppler actually served, and a
+ * `{ values, error, attempts }`: `values` maps the names Doppler actually served, and a
  * non-empty `error` (after all attempts) marks the whole read as failed so
  * callers can distinguish "absent" from "could not read".
  */
 export function readDopplerSecrets(names) {
   if (!normalizeSecret(process.env.DOPPLER_TOKEN)) {
-    return { values: {}, error: 'DOPPLER_TOKEN unconfigured' };
+    return { values: {}, error: 'DOPPLER_TOKEN unconfigured', attempts: 0 };
   }
   let lastError = '';
   for (let attempt = 1; attempt <= DOPPLER_READ_ATTEMPTS; attempt++) {
@@ -178,13 +195,22 @@ export function readDopplerSecrets(names) {
     if (!result.error && result.status === 0) {
       try {
         const parsed = JSON.parse(result.stdout ?? '{}');
+        if (
+          parsed === null ||
+          typeof parsed !== 'object' ||
+          Array.isArray(parsed)
+        )
+          throw new TypeError('invalid-json-shape');
         const values = {};
         for (const name of names) {
           if (typeof parsed[name] === 'string') values[name] = parsed[name];
         }
-        return { values, error: '' };
-      } catch {
-        lastError = 'unparseable-json';
+        return { values, error: '', attempts: attempt };
+      } catch (error) {
+        lastError =
+          error instanceof SyntaxError
+            ? 'unparseable-json'
+            : 'invalid-json-shape';
       }
     } else {
       lastError = describeDopplerFailure(result);
@@ -193,7 +219,7 @@ export function readDopplerSecrets(names) {
       sleep(DOPPLER_RETRY_BACKOFF_MS[attempt - 1]);
     }
   }
-  return { values: {}, error: lastError };
+  return { values: {}, error: lastError, attempts: DOPPLER_READ_ATTEMPTS };
 }
 
 function publish(name, value) {
@@ -226,12 +252,16 @@ function main() {
   );
   const dopplerValues = {};
   let dopplerError = '';
+  let dopplerAttempts = 0;
   if (needsDoppler.length > 0) {
     const fetched = readDopplerSecrets(needsDoppler);
     dopplerError = fetched.error;
+    dopplerAttempts = fetched.attempts;
     for (const name of needsDoppler) {
       dopplerValues[name] =
-        name in fetched.values ? fetched.values[name] : { error: dopplerError };
+        name in fetched.values
+          ? fetched.values[name]
+          : { error: dopplerError, attempts: dopplerAttempts };
     }
   }
   const result = resolveSyntheticSecrets({
@@ -245,7 +275,7 @@ function main() {
     if (!entry.value) {
       if (entry.source === 'doppler-error') {
         process.stderr.write(
-          `::error title=Synthetic secret resolution failed::${entry.name}: Doppler jovie-web/prd read failed after ${DOPPLER_READ_ATTEMPTS} attempts (${entry.error}). This is a resolution failure, not a missing secret; re-run the workflow or check DOPPLER_TOKEN_PRD.\n`
+          `::error title=Synthetic secret resolution failed::${entry.name}: Doppler jovie-web/prd read failed ${attemptText(entry.attempts)} (${entry.error}). This is a resolution failure, not a missing secret; re-run the workflow or check DOPPLER_TOKEN_PRD.\n`
         );
       } else if (!OTP_SECRET_NAMES.includes(entry.name)) {
         process.stderr.write(
@@ -276,7 +306,7 @@ function main() {
     }
     if (result.otpSkipReason) {
       process.stderr.write(
-        `::warning title=Tim-only OTP secrets absent::${result.otpSkipReason}\n`
+        `::warning title=${result.resolved.some(entry => OTP_SECRET_NAMES.includes(entry.name) && entry.source === 'doppler-error') ? 'OTP secret resolution failed' : 'Tim-only OTP secrets absent'}::${result.otpSkipReason}\n`
       );
     }
   }
