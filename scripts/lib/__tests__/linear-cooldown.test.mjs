@@ -384,8 +384,7 @@ describe('shared linear cooldown', () => {
           }
         );
       if (variant === 'nonprivate') {
-        // Creation modes are filtered by umask; exercise the unsafe mode even
-        // when the runner creates private files by default.
+        // Creation modes are masked by the host umask; make this unsafe fixture explicit.
         fs.chmodSync(pending, 0o644);
         assert.equal(fs.statSync(pending).mode & 0o777, 0o644);
       }
