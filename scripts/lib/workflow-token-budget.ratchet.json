@@ -79,12 +79,6 @@
     ".github/workflows/pr-conflict-handler.yml": {
       "token-api-call": 5
     },
-    ".github/workflows/pr-review-learn.yml": {
-      "token-api-call": 1
-    },
-    ".github/workflows/pr-review.yml": {
-      "token-api-call": 1
-    },
     ".github/workflows/pr-size-guard-label-override.yml": {
       "token-api-call": 1
     },

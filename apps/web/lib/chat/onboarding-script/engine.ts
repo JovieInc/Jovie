@@ -121,6 +121,32 @@ function typedHandleFrom(message: UIMessage | null): string | null {
   return handle && validateUsername(handle).isValid ? handle : null;
 }
 
+/**
+ * The handle the visitor asked for, newest first: a handle typed in the latest
+ * message, else the `jov.ie/<handle>` they claimed from the homepage or a
+ * claim link ("I want to claim jov.ie/name."). The artist-name slug is only a
+ * fallback; it must never replace a handle the visitor named (2026-10-31
+ * golden-path walk: homepage claim of jov.ie/unmarkedpave became
+ * @unmarkedpavement, and the sign-up card then said "Claim @unmarkedpave").
+ */
+function requestedHandleFrom(
+  uiMessages: readonly UIMessage[],
+  latest: UIMessage | null,
+  latestIsWidgetEvent: boolean
+): string | null {
+  const typed = latestIsWidgetEvent ? null : typedHandleFrom(latest);
+  if (typed) return typed;
+  for (let i = uiMessages.length - 1; i >= 0; i -= 1) {
+    const message = uiMessages[i];
+    if (message?.role !== 'user') continue;
+    const claimed = /\bjov\.ie\/@?([a-z0-9_-]{2,30})\b/i
+      .exec(messageText(message))?.[1]
+      ?.toLowerCase();
+    if (claimed && validateUsername(claimed).isValid) return claimed;
+  }
+  return null;
+}
+
 function findWidgetEventInHistory(
   messages: readonly UIMessage[],
   eventType: string
@@ -258,6 +284,31 @@ export function handleFromArtistName(name: string): string {
     .replaceAll(/[^a-z0-9]+/g, '')
     .slice(0, 30);
   return slug || 'artist';
+}
+
+/**
+ * The handle card that ships with an artist confirmation: the visitor's own
+ * requested handle (typed, else the claimed `jov.ie/<handle>`), else the
+ * artist-name slug. One builder for the engine and the system-1 route so the
+ * two confirmation paths cannot drift (2026-10-31: the system-1 path said
+ * "confirm the handle below" with no card under it).
+ */
+export function handleCardEventForConfirmation(
+  uiMessages: readonly UIMessage[],
+  artistName: string | null
+): FallbackToolEvent {
+  const handle =
+    requestedHandleFrom(uiMessages, null, true) ??
+    handleFromArtistName(artistName ?? '');
+  return {
+    toolName: 'checkHandle',
+    input: { handle },
+    output: {
+      action: 'check_handle',
+      handle,
+      summary: `Checking @${handle}.`,
+    },
+  };
 }
 
 /**
@@ -645,6 +696,9 @@ export async function decideFallbackTurn(
     const line = hasData
       ? pick('confirm_artist')
       : pick('confirm_artist_no_data');
+    // The line says "claim a handle next", so the handle card ships in the
+    // same turn. Without it the visitor faced a prompt with no control and
+    // had to guess what to type (2026-10-31 golden-path walk).
     return {
       line,
       text: renderLine(line, {
@@ -657,6 +711,7 @@ export async function decideFallbackTurn(
           input: { spotifyArtistId: selectedArtistId },
           output: output as unknown as Record<string, unknown>,
         },
+        handleCardEventForConfirmation(uiMessages, state.spotifyArtistName),
       ],
       guardedStep: 'artist_select',
     };
@@ -704,7 +759,9 @@ export async function decideFallbackTurn(
       WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED
     );
   if (!existingHandleCheck) {
-    const handle = handleFromArtistName(state.spotifyArtistName ?? '');
+    const handle =
+      requestedHandleFrom(uiMessages, latest, Boolean(latestEvent)) ??
+      handleFromArtistName(state.spotifyArtistName ?? '');
     const line = pick('handle');
     return {
       line,
@@ -737,7 +794,9 @@ export async function decideFallbackTurn(
       (typeof existingHandleCheck.handle === 'string'
         ? String(existingHandleCheck.handle)
         : handleFromArtistName(state.spotifyArtistName ?? ''));
-    const line = pick('ask_audience');
+    // The social-link card ships with this turn, so the line asks for the
+    // link; the audience question waits until the link is attached.
+    const line = pick('attach_social');
     return {
       line,
       text: renderLine(line, {}),

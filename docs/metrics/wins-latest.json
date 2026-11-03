@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-10-31T08:38:24.324Z",
-  "winsTotal": 28,
+  "at": "2026-11-03T14:54:41.132Z",
+  "winsTotal": 32,
   "winsVerified": 1,
-  "winsClaimed": 14,
+  "winsClaimed": 15,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 4,
-  "winsPendingMeasure": 5,
-  "winsLast7d": 28,
+  "winsPendingMeasure": 8,
+  "winsLast7d": 32,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -60,6 +60,24 @@
     },
     {
       "theme": "golden-path",
+      "total": 2,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "hydration-correctness",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "neon-egress",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "false-green",
       "total": 1,
       "verified": 0,
       "ready": false
@@ -172,6 +190,22 @@
     },
     {
       "id": "win-2026-10-30-the-runner-pin-gate-is-green",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-31-typed-handles-are-honored-and-freed",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-removes-the-client-side-hydration-re",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-certification-ingest-reads-the-6-5",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-the-shared-outcome-verifier-rejects-all",
       "status": "claimed"
     },
     {

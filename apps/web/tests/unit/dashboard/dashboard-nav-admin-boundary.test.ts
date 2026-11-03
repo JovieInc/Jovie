@@ -126,7 +126,7 @@ describe('exclusive customer vs OV navigation', () => {
     }
     expect(ADMIN_WORKSPACE_TABS.shipping.map(tab => tab.label)).toEqual([
       'Pipeline',
-      'Customer Reality',
+      'Product',
       'Timeline',
     ]);
     expect(ADMIN_WORKSPACE_TABS.operations.map(tab => tab.label)).toEqual([

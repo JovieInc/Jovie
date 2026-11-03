@@ -89,6 +89,71 @@ export function stageMetrics(alerts, deployedAt) {
   };
 }
 
+export const BLIND_FINGERPRINT = 'secadv-blind-source';
+
+/**
+ * Dependabot alerts unreadable (the Jovie Bot installation lacks the
+ * "Dependabot alerts: read" permission, run 40924917151). A silent zero would
+ * read as "no advisories", so write a blind receipt and file ONE owned Linear
+ * card naming the grant; the findings loop counts the blind source as a breach.
+ * The check remains red while blind; syncing requires a successful repair card.
+ */
+export async function recordBlindSource(
+  { repo, error, dryRun = false, check = false, now },
+  {
+    resolveLabel = resolveLabelId,
+    upsert = /** @type {(input: Parameters<typeof upsertLinearIssueByTitleFingerprint>[0]) => Promise<{ok: boolean, action?: string}>} */ (
+      upsertLinearIssueByTitleFingerprint
+    ),
+  } = {}
+) {
+  const receipt = {
+    schema: 'jovie.security-advisory-receipt/v1',
+    observedAt: now.toISOString(),
+    repo,
+    blind: true,
+    reason: String(error?.message ?? error).slice(0, 200),
+    actions: [],
+  };
+  const receiptPath =
+    process.env.RECEIPT_PATH || 'security-advisory-receipt.json';
+  // Preserve evidence even if the repair-card write fails or is unconfigured.
+  writeFileSync(receiptPath, JSON.stringify(receipt, null, 2));
+  if (!dryRun && !check) {
+    if (!process.env.LINEAR_API_KEY)
+      throw new Error(
+        'LINEAR_API_KEY is required to report a blind advisory source'
+      );
+    const devin = await resolveLabel('devin', process.env.LINEAR_API_KEY);
+    if (!devin) throw new Error('Linear label "devin" not found');
+    const r = await upsert({
+      fingerprint: BLIND_FINGERPRINT,
+      title: `Grant Dependabot alerts read to the Jovie Bot app [${BLIND_FINGERPRINT}]`,
+      description:
+        'The Security Advisory Loop cannot read Dependabot alerts: the Jovie Bot GitHub App installation lacks "Dependabot alerts: read" (create-github-app-token 422). ' +
+        'Grant it in the app settings and accept the installation update; the next loop run (clock every 4h or push) then reads alerts and files owned work. ' +
+        'Until then advisories are unobserved. Needs Tim (Ovie card): app permission changes are an owner action.',
+      priority: 2,
+      createStateName: 'Todo',
+      reopenTerminal: true,
+      createLabelIds: devin ? [devin] : [],
+    });
+    receipt.actions.push({
+      fingerprint: BLIND_FINGERPRINT,
+      ok: r.ok,
+      action: r.action,
+    });
+  }
+  writeFileSync(receiptPath, JSON.stringify(receipt, null, 2));
+  console.log(JSON.stringify({ ...receipt, actions: receipt.actions.length }));
+  if (process.env.GITHUB_ACTIONS === 'true')
+    console.log(
+      `::warning::Dependabot alerts unreadable (${receipt.reason}); loop is blind.`
+    );
+  if (receipt.actions.some(action => !action.ok))
+    throw new Error('Failed to persist the blind advisory repair card');
+}
+
 async function main() {
   const argv = new Set(process.argv.slice(2));
   const check = argv.has('--check');
@@ -96,16 +161,25 @@ async function main() {
   const repo = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
   const alertsToken = process.env.ALERTS_TOKEN || process.env.GH_TOKEN;
   const now = new Date();
-  const alerts = [
-    ...(await gh(
-      [`repos/${repo}/dependabot/alerts?state=open&per_page=100`],
-      alertsToken
-    )),
-    ...(await gh(
-      [`repos/${repo}/dependabot/alerts?state=fixed&per_page=100`],
-      alertsToken
-    )),
-  ];
+  let alerts;
+  try {
+    alerts = [
+      ...(await gh(
+        [`repos/${repo}/dependabot/alerts?state=open&per_page=100`],
+        alertsToken
+      )),
+      ...(await gh(
+        [`repos/${repo}/dependabot/alerts?state=fixed&per_page=100`],
+        alertsToken
+      )),
+    ];
+  } catch (error) {
+    // Quota deferral (75) is not blindness: let the caller defer the run.
+    if (error.exitCode === 75) throw error;
+    await recordBlindSource({ repo, error, dryRun, check, now });
+    if (check) process.exitCode = 1;
+    return;
+  }
   const deployedAt = await latestProductionDeploy(repo, process.env.GH_TOKEN);
   const exceptions = JSON.parse(
     readFileSync(
