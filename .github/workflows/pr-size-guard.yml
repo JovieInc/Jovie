@@ -142,10 +142,9 @@ jobs:
         # job below judges the members it was asked about. The helper is absent
         # on the pinned bootstrap base; a missing file or a failed fetch falls
         # back to the API inside the policy. Blob sizes are not in the tree
-        # object. This checkout is a blob:none partial clone, so a fetch
-        # without --refetch does not backfill those sizes. --refetch asks for
-        # the blobs. Otherwise ls-tree times out and the trees API 403 ejects
-        # an in-cap group.
+        # object. Fetch only commit/tree metadata here; the existing local
+        # evidence helper performs one bounded full-blob backfill when needed.
+        # Unmeasured bytes remain unknown and the final size policy fails closed.
         run: |
           set -euo pipefail
           mkdir -p "$MERGE_GROUP_POLICY_CACHE_DIR"
@@ -162,7 +161,7 @@ jobs:
               GCM_INTERACTIVE=never \
               GIT_LFS_SKIP_SMUDGE=1 \
                 timeout --kill-after=5s 70s \
-                  git fetch --refetch --filter=blob:limit=1g --no-tags --depth=2 origin "$GROUP_HEAD" \
+                  git fetch --refetch --filter=blob:none --no-tags --depth=2 origin "$GROUP_HEAD" \
                   || true
               node scripts/lib/merge-group-local-evidence.mjs || true
             )

@@ -3316,7 +3316,15 @@ ${selectedGateScript}`,
       'node scripts/lib/merge-group-member-policy.mjs --policy=size'
     );
     expect(sizeGuard).toContain('--filter=blob:limit=1g');
-    expect(sizeGuard).not.toContain('--filter=blob:none');
+    expect(sizeGuard).toContain(
+      'git fetch --refetch --filter=blob:none --no-tags --depth=2 origin "$GROUP_HEAD"'
+    );
+    expect(sizeGuard).not.toContain(
+      'git fetch --refetch --filter=blob:limit=1g --no-tags --depth=2'
+    );
+    expect(sizeGuard).toContain(
+      'node scripts/lib/merge-group-local-evidence.mjs || true'
+    );
     expect(MEMBER_POLICY).toContain('await enforceCombinedTreePayload({');
     expect(MEMBER_POLICY).toContain('/git/trees/${treeSha}?recursive=1');
     expect(MEMBER_POLICY).not.toContain("from 'node:child_process'");
