@@ -572,13 +572,13 @@ jobs:
       - *quota-prime
       - *quota-runtime
       - *proof-reuse
-      # TruffleHog reads the object store directly and cannot use a partial
-      # clone (#13994), so this job keeps the full-blob history fetch.
+      # Fetch full blobs and complete ancestry for the source and current base
+      # only. TruffleHog reads the object store directly (#13994).
       - if: steps.reuse.outputs.reuse != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
       - &reused-setup
         if: steps.reuse.outputs.reuse != 'true'
@@ -588,8 +588,10 @@ jobs:
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           SECURITY_GATE_ENABLED: ${{ vars.SECURITY_GATE_ENABLED }}
+          SECURITY_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+          SECURITY_BASE_REF: ${{ github.base_ref }}
         run: |
-          git fetch --no-tags origin "${{ github.base_ref }}"
+          ./scripts/security/prepare-evidence-history.sh "$SECURITY_SOURCE_SHA" "$SECURITY_BASE_REF"
           base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
           ./scripts/security/scan-secrets.sh ci-pr "$base_sha"
           ./scripts/security/verify-gitleaks-coverage.sh
