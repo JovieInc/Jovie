@@ -436,14 +436,18 @@ function loadBody(args, cwd) {
 }
 
 /** Run the shared Private Data Guard from the pinned JovieInc/ci workflow. */
-async function privateDataCheck(cwd, env, mergeBase) {
+export async function privateDataCheck(cwd, env, mergeBase) {
   const wfPath = path.join(cwd, '.github/workflows/private-data-guard.yml');
   if (!existsSync(wfPath)) return { skip: 'no private-data-guard workflow' };
   const wf = /** @type {any} */ (yamlLoad(readFileSync(wfPath, 'utf8')));
   const job = Object.values(wf.jobs ?? {})[0] ?? {};
   const m = String(job.uses ?? '').match(/^JovieInc\/ci\/(.+)@([0-9a-f]{40})$/);
   if (!m) return { skip: 'guard is not a pinned JovieInc/ci workflow' };
-  const cache = path.join(homedir(), '.cache', 'jovie-preflight');
+  const cacheRoot =
+    env.XDG_CACHE_HOME && path.isAbsolute(env.XDG_CACHE_HOME)
+      ? env.XDG_CACHE_HOME
+      : path.join(homedir(), '.cache');
+  const cache = path.join(cacheRoot, 'jovie-preflight');
   mkdirSync(cache, { recursive: true });
   const file = path.join(cache, `private-data-${m[2]}.py`);
   if (!existsSync(file)) {
