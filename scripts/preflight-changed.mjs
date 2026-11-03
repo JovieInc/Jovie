@@ -172,7 +172,93 @@ export function parseArgs(argv) {
   return a;
 }
 
+// Commands own separate POSIX groups so deadlines can terminate descendants.
+// Track those groups while they are live so an outer cancellation or normal
+// process exit cannot leave them behind.
+const activeCommandGroups = new Set();
+let commandHandlersInstalled = false;
+let cancelledCommandCode = 0;
+let cancellationTimer;
+
+function stopOwnedCommand(record) {
+  const { child } = record;
+  try {
+    if (process.platform === 'win32' || !child.pid) child.kill('SIGKILL');
+    else process.kill(-child.pid, 'SIGKILL');
+  } catch (error) {
+    if (error.code !== 'ESRCH') child.kill('SIGKILL');
+  }
+  child.stdout.destroy();
+  child.stderr.destroy();
+}
+
+function removeCommandHandlers() {
+  if (!commandHandlersInstalled) return;
+  process.removeListener('SIGTERM', onCommandTerm);
+  process.removeListener('SIGINT', onCommandInt);
+  process.removeListener('SIGHUP', onCommandHup);
+  process.removeListener('exit', onCommandExit);
+  commandHandlersInstalled = false;
+}
+
+/** @param {NodeJS.Signals} signal */
+function finishCommandCancellation(signal) {
+  clearTimeout(cancellationTimer);
+  removeCommandHandlers();
+  // Preserve another owner's signal handling if one exists. Otherwise retain
+  // Node's ordinary signal termination after our owned children have closed.
+  if (process.listenerCount(signal) === 0) process.kill(process.pid, signal);
+}
+
+/** @param {NodeJS.Signals} signal @param {number} code */
+function cancelCommands(signal, code) {
+  if (cancelledCommandCode) return;
+  cancelledCommandCode = code;
+  process.exitCode = code;
+  for (const record of activeCommandGroups) stopOwnedCommand(record);
+  if (activeCommandGroups.size === 0) finishCommandCancellation(signal);
+  else {
+    cancellationTimer = setTimeout(
+      () => finishCommandCancellation(signal),
+      1000
+    );
+  }
+}
+
+function onCommandTerm() {
+  cancelCommands('SIGTERM', 143);
+}
+function onCommandInt() {
+  cancelCommands('SIGINT', 130);
+}
+function onCommandHup() {
+  cancelCommands('SIGHUP', 129);
+}
+function onCommandExit() {
+  for (const record of activeCommandGroups) stopOwnedCommand(record);
+}
+
+function trackCommand(record) {
+  if (!commandHandlersInstalled) {
+    process.on('SIGTERM', onCommandTerm);
+    process.on('SIGINT', onCommandInt);
+    process.on('SIGHUP', onCommandHup);
+    process.on('exit', onCommandExit);
+    commandHandlersInstalled = true;
+  }
+  activeCommandGroups.add(record);
+}
+
+function untrackCommand(record) {
+  activeCommandGroups.delete(record);
+  if (activeCommandGroups.size === 0 && !cancelledCommandCode) {
+    removeCommandHandlers();
+  }
+}
+
 export function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
+  if (cancelledCommandCode)
+    return Promise.resolve({ code: cancelledCommandCode, out: '', ms: 0 });
   return new Promise(resolve => {
     const t0 = Date.now();
     const child = spawn('bash', ['-c', cmd], {
@@ -186,6 +272,8 @@ export function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: process.platform !== 'win32',
     });
+    const record = { child };
+    trackCommand(record);
     let out = '';
     let timedOut = false;
     const take = d => {
@@ -198,19 +286,15 @@ export function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
       timedOut = true;
       // A shell can exit before its descendants close inherited output pipes.
       // Kill its whole POSIX group, then close our pipe ends so timeout settles.
-      try {
-        if (process.platform === 'win32' || !child.pid) child.kill('SIGKILL');
-        else process.kill(-child.pid, 'SIGKILL');
-      } catch (error) {
-        if (error.code !== 'ESRCH') child.kill('SIGKILL');
-      }
-      child.stdout.destroy();
-      child.stderr.destroy();
+      stopOwnedCommand(record);
     }, timeoutMs);
     child.on('close', (code, signal) => {
       clearTimeout(timer);
+      untrackCommand(record);
       resolve({
-        code: timedOut ? 124 : (code ?? (signal ? 137 : 1)),
+        code: timedOut
+          ? 124
+          : cancelledCommandCode || (code ?? (signal ? 137 : 1)),
         out,
         ms: Date.now() - t0,
       });

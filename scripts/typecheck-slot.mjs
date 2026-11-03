@@ -38,7 +38,11 @@ function run(argv, env = process.env) {
       detached: !managedGroup,
       env,
     });
-    for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+    for (const signal of /** @type {NodeJS.Signals[]} */ ([
+      'SIGINT',
+      'SIGTERM',
+      'SIGHUP',
+    ])) {
       process.on(signal, () => {
         try {
           if (managedGroup) child.kill(signal);

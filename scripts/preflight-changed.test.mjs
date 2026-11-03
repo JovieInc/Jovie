@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -648,6 +648,152 @@ test('preflight-managed host slots still serialize concurrent commands', {
       `slot commands overlapped: ${rows.join(',')}`
     );
   } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+for (const mode of ['SIGTERM', 'SIGINT', 'exit']) {
+  test(`outer ${mode} cleans a detached preflight host-slot child`, {
+    skip: process.platform === 'win32',
+  }, async () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'preflight-cancel-'));
+    const pidFile = path.join(directory, 'child.pid');
+    const moduleUrl = new URL('./preflight-changed.mjs', import.meta.url).href;
+    const command = `node scripts/typecheck-slot.mjs -- bash -c 'echo $$ > "$GEM_TEST_PID_FILE"; exec sleep 30'`;
+    const source = `import { sh } from ${JSON.stringify(moduleUrl)}; ${mode === 'exit' ? 'setTimeout(() => process.exit(0), 500);' : ''} await sh(${JSON.stringify(command)}, { cwd: process.cwd(), env: process.env, timeoutMs: 30000 });`;
+    const outer = spawn(
+      process.execPath,
+      ['--input-type=module', '-e', source],
+      {
+        cwd: process.cwd(),
+        detached: true,
+        stdio: 'ignore',
+        env: {
+          ...process.env,
+          GEM_TEST_PID_FILE: pidFile,
+          GEM_TYPECHECK_SLOTS: '1',
+          GEM_TYPECHECK_SLOT_HELD: '0',
+          GEM_TYPECHECK_LOCK_DIR: directory,
+        },
+      }
+    );
+    let childPid;
+    let stopped = false;
+    try {
+      const startedDeadline = Date.now() + 4000;
+      while (!existsSync(pidFile) && Date.now() < startedDeadline)
+        await new Promise(resolve => setTimeout(resolve, 20));
+      assert.ok(existsSync(pidFile), 'host-slot child must start');
+      childPid = Number(readFileSync(pidFile, 'utf8'));
+      const closed = new Promise((resolve, reject) => {
+        const watchdog = setTimeout(
+          () => reject(new Error('outer process did not terminate')),
+          4000
+        );
+        outer.once('close', (code, signal) => {
+          clearTimeout(watchdog);
+          resolve({ code, signal });
+        });
+      });
+      if (mode !== 'exit') process.kill(-outer.pid, mode);
+      const result = await closed;
+      if (mode !== 'exit') assert.equal(result.signal, mode);
+      else assert.equal(result.code, 0);
+      const deadline = Date.now() + 1000;
+      while (!stopped && Date.now() < deadline) {
+        try {
+          process.kill(childPid, 0);
+          if (process.platform === 'linux')
+            stopped =
+              readFileSync(`/proc/${childPid}/stat`, 'utf8').split(' ')[2] ===
+              'Z';
+        } catch (error) {
+          if (error.code !== 'ESRCH' && error.code !== 'ENOENT') throw error;
+          stopped = true;
+        }
+        if (!stopped) await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      assert.equal(stopped, true, 'owned host-slot descendant must stop');
+    } finally {
+      if (outer.exitCode === null && outer.signalCode === null) {
+        try {
+          process.kill(-outer.pid, 'SIGKILL');
+        } catch {}
+      }
+      if (!childPid && existsSync(pidFile))
+        childPid = Number(readFileSync(pidFile, 'utf8'));
+      if (childPid && !stopped) {
+        try {
+          process.kill(childPid, 'SIGKILL');
+        } catch {}
+      }
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+}
+
+test('outer cancellation stops all concurrent preflight command groups', {
+  skip: process.platform !== 'linux',
+}, async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'preflight-cancel-many-'));
+  const files = ['a', 'b'].map(name => path.join(directory, `${name}.pid`));
+  const moduleUrl = new URL('./preflight-changed.mjs', import.meta.url).href;
+  const source = `import { sh } from ${JSON.stringify(moduleUrl)}; const run = name => sh('echo $$ > "$GEM_TEST_DIR/' + name + '.pid"; exec sleep 30', { cwd: process.cwd(), env: process.env, timeoutMs: 30000 }); await Promise.all([run('a'), run('b')]);`;
+  const outer = spawn(process.execPath, ['--input-type=module', '-e', source], {
+    cwd: process.cwd(),
+    detached: true,
+    stdio: 'ignore',
+    env: { ...process.env, GEM_TEST_DIR: directory },
+  });
+  let pids = [];
+  let stopped = false;
+  try {
+    const deadline = Date.now() + 4000;
+    while (!files.every(existsSync) && Date.now() < deadline)
+      await new Promise(resolve => setTimeout(resolve, 20));
+    assert.ok(files.every(existsSync), 'both commands must start');
+    pids = files.map(file => Number(readFileSync(file, 'utf8')));
+    const closed = new Promise((resolve, reject) => {
+      const watchdog = setTimeout(
+        () => reject(new Error('outer cancellation hung')),
+        4000
+      );
+      outer.once('close', (_code, signal) => {
+        clearTimeout(watchdog);
+        resolve(signal);
+      });
+    });
+    process.kill(-outer.pid, 'SIGTERM');
+    assert.equal(await closed, 'SIGTERM');
+    const stopDeadline = Date.now() + 1000;
+    while (!stopped && Date.now() < stopDeadline) {
+      stopped = pids.every(pid => {
+        try {
+          return (
+            readFileSync(`/proc/${pid}/stat`, 'utf8').split(' ')[2] === 'Z'
+          );
+        } catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+          return true;
+        }
+      });
+      if (!stopped) await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    assert.equal(stopped, true, 'all owned command groups must stop');
+  } finally {
+    if (outer.exitCode === null && outer.signalCode === null) {
+      try {
+        process.kill(-outer.pid, 'SIGKILL');
+      } catch {}
+    }
+    if (!stopped) {
+      for (const file of files) {
+        if (!existsSync(file)) continue;
+        try {
+          process.kill(Number(readFileSync(file, 'utf8')), 'SIGKILL');
+        } catch {}
+      }
+    }
     rmSync(directory, { recursive: true, force: true });
   }
 });
