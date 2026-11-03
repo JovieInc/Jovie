@@ -92,7 +92,7 @@ function sweep(pages: SeoSweepPage[], llmsTxt: string | null = null) {
 function assertBaselineRouteCoverage(
   paths: readonly string[],
   manifest: readonly RouteManifestEntry[] = MARKETING_ROUTE_MANIFEST,
-  videoEnabled = FEATURE_FLAGS.SHOW_PRODUCT_DEMO_VIDEO
+  videoEnabled: boolean = FEATURE_FLAGS.SHOW_PRODUCT_DEMO_VIDEO
 ) {
   const swept = new Set(sweepTargets(manifest).map(target => target.pathname));
   for (const path of paths) {

@@ -2191,27 +2191,66 @@ export interface MarketingExactPublicRouteTarget {
   readonly sourceSha: 'capture-time-git-sha';
 }
 
-/** Exact, non-internal active page routes consumed by both capture systems. */
-export const MARKETING_EXACT_PUBLIC_ROUTE_TARGETS: readonly MarketingExactPublicRouteTarget[] =
-  MARKETING_ROUTE_MANIFEST.filter(
-    entry =>
-      entry.status === 'active' &&
-      (entry.healthCheck?.expected ?? 'page') === 'page' &&
-      !entry.url.includes('*') &&
-      !isRenderFixturePathname(entry.url)
-  ).map(entry => ({
-    url: entry.url,
-    glob: entry.glob,
-    fixturePath: entry.healthCheck?.path ?? entry.url,
-    expectedPath: entry.healthCheck?.path ?? entry.url,
-    sourcePath: `apps/web/app/${entry.glob}`,
-    disposition: getRouteDisposition(entry),
-    viewports: ['desktop', 'mobile'],
-    stateMatrix:
-      entry.url === '/waitlist' ? ['anonymous-public'] : ['anonymous-default'],
-    expectedRuntimeSelector: entry.healthCheck?.waitFor ?? 'main',
-    sourceSha: 'capture-time-git-sha',
-  }));
+/** Exact active public pages and single-hop recoveries consumed by both captures. */
+export function getMarketingExactPublicRouteTargets(
+  manifest: readonly RouteManifestEntry[] = MARKETING_ROUTE_MANIFEST
+): readonly MarketingExactPublicRouteTarget[] {
+  return manifest.flatMap<MarketingExactPublicRouteTarget>(entry => {
+    if (
+      entry.status !== 'active' ||
+      entry.url.includes('*') ||
+      isRenderFixturePathname(entry.url)
+    )
+      return [];
+    const expected = entry.healthCheck?.expected ?? 'page';
+    let expectedPath = entry.healthCheck?.path ?? entry.url;
+    if (expected === 'redirect') {
+      const destinations = entry.healthCheck?.allowedFinalPaths;
+      if (destinations?.length !== 1) return [];
+      const destination = destinations[0]!;
+      const origin = 'https://route-contract.invalid';
+      const parsed = new URL(destination, origin);
+      if (
+        parsed.origin !== origin ||
+        parsed.pathname !== destination ||
+        !destination.startsWith('/') ||
+        destination.includes('*')
+      )
+        return [];
+      const canonical = manifest.find(
+        candidate => candidate.url === destination
+      );
+      if (
+        !canonical ||
+        canonical.status !== 'active' ||
+        (canonical.healthCheck?.expected ?? 'page') !== 'page' ||
+        isRenderFixturePathname(destination)
+      )
+        return [];
+      expectedPath = destination;
+    } else if (expected !== 'page') return [];
+    return [
+      {
+        url: entry.url,
+        glob: entry.glob,
+        fixturePath: entry.healthCheck?.path ?? entry.url,
+        expectedPath,
+        sourcePath: `apps/web/app/${entry.glob}`,
+        disposition: getRouteDisposition(entry),
+        viewports: ['desktop', 'mobile'],
+        stateMatrix:
+          entry.url === '/waitlist'
+            ? ['anonymous-public']
+            : ['anonymous-default'],
+        expectedRuntimeSelector: entry.healthCheck?.waitFor ?? 'main',
+        sourceSha: 'capture-time-git-sha',
+      },
+    ];
+  });
+}
+
+export const MARKETING_EXACT_PUBLIC_ROUTE_TARGETS =
+  getMarketingExactPublicRouteTargets();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lookup helpers (used by the manifest gate)

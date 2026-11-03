@@ -12,6 +12,7 @@ import {
   MARKETING_ROUTE_HEALTH_TARGETS,
   MARKETING_ROUTE_MANIFEST,
 } from '@/data/marketing';
+import { getMarketingExactPublicRouteTargets } from '@/data/marketing/routeManifest';
 import { isProductionBlockedDebugPath } from '@/lib/security/production-blocked-routes';
 
 const PRODUCT_UPDATE_OWNER =
@@ -367,7 +368,7 @@ describe('marketing route health contract', () => {
     }
   });
 
-  it('generates exact capture targets only for active public pages', () => {
+  it('generates exact captures for active pages and source-bound demo recoveries', () => {
     const expectedGlobs = MARKETING_ROUTE_MANIFEST.filter(
       entry =>
         entry.status === 'active' &&
@@ -378,8 +379,88 @@ describe('marketing route health contract', () => {
     ).map(entry => entry.glob);
 
     expect(
-      MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.map(entry => entry.glob)
-    ).toEqual(expectedGlobs);
+      MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.map(entry => entry.glob).sort()
+    ).toEqual(
+      [
+        ...expectedGlobs,
+        '(marketing)/demo/video/page.tsx',
+        '(marketing)/demovideo/page.tsx',
+      ].sort()
+    );
+    for (const path of ['/demo/video', '/demovideo']) {
+      expect(
+        MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.find(target => target.url === path)
+      ).toMatchObject({
+        fixturePath: path,
+        expectedPath: '/product',
+        sourcePath: `apps/web/app/(marketing)${path}/page.tsx`,
+      });
+    }
+  });
+
+  it('excludes ambiguous, malformed and unavailable redirect capture targets', () => {
+    const alias = MARKETING_ROUTE_MANIFEST.find(
+      entry => entry.url === '/demo/video'
+    )!;
+    const product = MARKETING_ROUTE_MANIFEST.find(
+      entry => entry.url === '/product'
+    )!;
+    for (const destinations of [
+      [],
+      ['/product', '/pricing'],
+      ['//evil.example/product'],
+      ['https://evil.example/product'],
+      ['/product?x=1'],
+      ['/product#x'],
+      ['/a/../product'],
+      ['/missing'],
+      ['/renders'],
+    ]) {
+      expect(
+        getMarketingExactPublicRouteTargets([
+          {
+            ...alias,
+            healthCheck: {
+              path: alias.url,
+              expected: 'redirect',
+              allowedFinalPaths: destinations,
+            },
+          },
+          product,
+        ]).some(target => target.url === alias.url),
+        destinations.join(',')
+      ).toBe(false);
+    }
+    for (const entry of [
+      { ...alias, status: 'deprecated' as const },
+      {
+        ...alias,
+        healthCheck: { path: alias.url, expected: 'not-found' as const },
+      },
+    ]) {
+      expect(
+        getMarketingExactPublicRouteTargets([entry, product]).some(
+          target => target.url === alias.url
+        )
+      ).toBe(false);
+    }
+    for (const target of [
+      { ...product, status: 'removed' as const },
+      {
+        ...product,
+        healthCheck: {
+          path: '/product',
+          expected: 'redirect' as const,
+          allowedFinalPaths: ['/pricing'],
+        },
+      },
+    ]) {
+      expect(
+        getMarketingExactPublicRouteTargets([alias, target]).some(
+          target => target.url === alias.url
+        )
+      ).toBe(false);
+    }
   });
 
   it('records an exact not-found probe when no published dynamic fixture exists', () => {
