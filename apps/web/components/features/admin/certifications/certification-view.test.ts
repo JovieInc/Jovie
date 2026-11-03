@@ -82,10 +82,32 @@ describe('certification view helpers', () => {
       all: 3,
       working: 1,
       review_ready: 1,
+      needs_evidence: 0,
       founder_locked: 1,
       shipped: 0,
       monitored: 0,
     });
+  });
+
+  it('splits review-ready rows Tim cannot decide into Needs Evidence', () => {
+    const ready = rows.find(row => row.state === 'review_ready');
+    if (!ready) throw new Error('fixture needs a review-ready row');
+    const undecidable = {
+      ...ready,
+      decision: { ...ready.decision, available: false, evidenceDigest: null },
+    };
+    const mixed = [...rows, undecidable];
+    expect(countRowsByState(mixed)).toMatchObject({
+      review_ready: 1,
+      needs_evidence: 1,
+      all: 4,
+    });
+    expect(
+      filterCertificationRows(mixed, { state: 'needs_evidence', domain: 'all' })
+    ).toEqual([undecidable]);
+    expect(
+      filterCertificationRows(mixed, { state: 'review_ready', domain: 'all' })
+    ).toEqual([ready]);
   });
 
   it('marks inventories stale only past the freshness window', () => {

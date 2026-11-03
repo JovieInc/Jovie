@@ -36,6 +36,7 @@ FP = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 WORKSTREAM_LABEL = "ws:symphony-throughput"
 FACTORY_LABEL = "factory"
 MAX_PER_PASS = 3          # a pass never floods the pool; the rest wait for the next pass
+WASTE_PER_PASS = 1        # standing waste share: filed on top of MAX_PER_PASS so other signals never starve it
 
 
 def read_signals(directory: Path) -> tuple[list[dict], list[str]]:
@@ -104,7 +105,7 @@ def body(row: dict) -> str:
     return f"{text}{units}\n\n<!-- factory-evidence:{digest} -->"
 
 
-EXTRA_LABELS = frozenset({"machine-gap"})
+EXTRA_LABELS = frozenset({"machine-gap", "waste"})
 
 
 def extra_labels(row: dict) -> list[str]:
@@ -232,6 +233,7 @@ def apply(linear, items: list[dict], limit: int = MAX_PER_PASS, *, covered=None,
     labels = {l["name"]: l["id"] for l in team["labels"]["nodes"]}
     results = []
     filed = 0
+    filed_waste = 0
     for item in items:
         fp_label = item["labels"][-1]
         marker = EVIDENCE.search(item["description"])
@@ -258,7 +260,8 @@ def apply(linear, items: list[dict], limit: int = MAX_PER_PASS, *, covered=None,
             remember(item, digest, prior["identifier"])
             results.append({"fingerprint": item["fingerprint"], "action": "exists", "issue": prior["identifier"]})
             continue
-        if filed >= limit:
+        waste = "waste" in item["labels"]
+        if (filed_waste >= WASTE_PER_PASS) if waste else (filed >= limit):
             results.append({"fingerprint": item["fingerprint"], "action": "deferred"})
             continue
         ids = []
@@ -272,7 +275,8 @@ def apply(linear, items: list[dict], limit: int = MAX_PER_PASS, *, covered=None,
         created = data["issueCreate"]
         if created.get("success") is not True or not (created.get("issue") or {}).get("identifier"):
             raise RuntimeError("linear: factory issue readback mismatch")
-        filed += 1
+        filed_waste += waste
+        filed += not waste
         remember(item, digest, created["issue"]["identifier"])
         results.append({"fingerprint": item["fingerprint"], "action": "filed", "issue": created["issue"]["identifier"]})
     return results

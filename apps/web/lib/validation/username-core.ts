@@ -96,6 +96,7 @@ export const RESERVED_USERNAMES = [
 
   // Features
   'pricing',
+  'proof',
   'compare',
   'alternatives',
   'directory',

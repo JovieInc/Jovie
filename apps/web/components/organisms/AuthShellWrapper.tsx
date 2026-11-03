@@ -40,6 +40,7 @@ import { RightRailKeyboardHandler } from '@/hooks/RightRailKeyboardHandler';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { useGlobalShortcutActions } from '@/hooks/useGlobalShortcutActions';
+import { OPERATOR_SEQUENCE_SHORTCUTS } from '@/lib/ovie/operator-commands';
 import type { AppShellMode } from '@/types/app-shell';
 import { AuthShell } from './AuthShell';
 import { CommandPalette, CommandPaletteMainSurface } from './CommandPalette';
@@ -71,9 +72,12 @@ export interface AuthShellWrapperProps {
 /**
  * KeyboardShortcutsHandler - Handles keyboard shortcuts with access to context
  */
-function KeyboardShortcutsHandler() {
+function KeyboardShortcutsHandler({ mode }: Readonly<{ mode: AppShellMode }>) {
   const { open, isOpen } = useKeyboardShortcuts();
-  useDashboardShortcuts({ onOpenShortcutsModal: open });
+  useDashboardShortcuts({
+    onOpenShortcutsModal: open,
+    ...(mode === 'ov' ? { shortcuts: OPERATOR_SEQUENCE_SHORTCUTS } : {}),
+  });
   useGlobalShortcutActions();
   return isOpen ? <KeyboardShortcutsSheet /> : null;
 }
@@ -342,7 +346,7 @@ export function AuthShellWrapper({
               >
                 {children}
               </AuthShellWrapperInner>
-              <KeyboardShortcutsHandler />
+              <KeyboardShortcutsHandler mode={mode} />
               {!isWorkspaceLocked ? <CommandPalette /> : null}
             </ShellSidebarOverrideProvider>
           </HeaderActionsProvider>

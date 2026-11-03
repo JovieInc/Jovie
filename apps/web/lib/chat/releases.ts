@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
 import { getCanvasStatusFromMetadata } from '@/lib/services/canvas/service';
@@ -26,7 +26,12 @@ export async function fetchReleasesForChat(
       metadata: discogReleases.metadata,
     })
     .from(discogReleases)
-    .where(eq(discogReleases.creatorProfileId, profileId))
+    .where(
+      and(
+        eq(discogReleases.creatorProfileId, profileId),
+        isNull(discogReleases.deletedAt)
+      )
+    )
     .orderBy(desc(discogReleases.releaseDate))
     .limit(50);
 

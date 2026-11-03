@@ -29,6 +29,7 @@ One skill for design-system work across Pen and code. Read this page, pick the r
 | Anything that touches a `.pen` file, the `pen` CLI or `mcp__pencil__*` | [guides/pen-operations.md](guides/pen-operations.md) |
 | Make code match Pen, or Pen match code; drift ledger; conformance gate; Storybook evidence | [guides/code-parity.md](guides/code-parity.md) |
 | Component certificate, benchmark judgment, alignment and a11y rules, what "done" means | [guides/certification.md](guides/certification.md) |
+| Landing page, hero or feature imagery on any marketing page; "make it look designed" | Landing imagery section below, spec in [docs/marketing/IMAGERY.md](../../../docs/marketing/IMAGERY.md) |
 | Marketing motion and shaders: matte field, hero zoom, shell parallax, chat takeover; motion budgets; registering an effect (ASR-039) | [guides/motion.md](guides/motion.md) |
 
 Surface-specific rules that stay where they are: `docs/marketing/AGENT_GUIDE.md` (marketing), `.claude/rules/ui.md`, `docs/design-system/state-matrix.md`, `docs/design-system/component-ownership.json`.
@@ -51,3 +52,17 @@ Surface-specific rules that stay where they are: `docs/marketing/AGENT_GUIDE.md`
 | `/design-shotgun` | Visual variants and taste feedback | Choosing tokens |
 | `/design-html` | Design Lab approved-proposal HTML prototypes (dispatch code depends on it) | Product UI (product UI is code in `apps/web` and `packages/ui`) |
 | `/design-consultation` | Removed from the Claude Code skill list on 2026-10-25: the system exists, a new one must not be proposed per task. The gstack source remains under `.agents/skills/gstack/` for the design-authority guard. | |
+
+## Landing imagery (mandatory for every marketing page)
+
+Imagery is never an afterthought. Any hero or feature section on a marketing page gets its imagery from the pipeline, in this order. Spec and bans: [docs/marketing/IMAGERY.md](../../../docs/marketing/IMAGERY.md).
+
+1. **Pick the medium first** (`apps/web/data/marketing/factory/mediaDecision.ts`): real UI shot, abstract plate, or type only. People only if in `approved-people.json`.
+2. **Real UI:** declare a shot in `apps/web/lib/screenshots/product-shots.ts` (demo route renders the live component with canary data, crop = the moment, padding, frame, `displayWidth`, sources). Never mock, never generate UI, never crop a full viewport. A shot in a device frame matches the frame's screen aspect and fills it; effective text is at least 11px.
+3. **Art-direct:** compose it in `apps/web/lib/imagery/stages.ts` and render with `<ImageryStage>` (plate, hero shot, one supporting fragment, one lit wedge, declared quiet zone). Page code uses `<ProductShot>` or `<ImageryStage>`, never a raw `<img>`, `next/image` or CSS `url()`.
+4. **Plates:** `pnpm --filter @jovie/web imagery:plate --id <id>` (Workers AI through `packages/api-client`, canon prompt template: matte, one accent, no text, no people, no objects).
+5. **Render on Gem** (never the Mac): `pnpm --filter @jovie/web shots:render --stale` against the demo-mode server, one preflight at a time.
+6. **Verify:** `pnpm --filter @jovie/web imagery:verify` runs the cold-screenshot test (a fresh judge sees only the image and answers "what is wrong with this?") and the dogfood judge rubric. Fix every major finding and re-run; an unverified asset fails CI.
+7. **Ship:** stale shots, plates and stages regenerate on deploy; the guard `imagery-provenance` (`scripts/invariants/art-direction/imagery-provenance.mjs`) fails a marketing page whose hero or feature image did not come from this pipeline (shrink-only ratchet).
+
+Before/after evidence in the PR: Pen reference, before, after, at 1440 and 390.

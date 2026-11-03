@@ -62,7 +62,7 @@ const VALID_REPOSITORY = Object.freeze(
 );
 const VALID_RULESET = Object.freeze(
   JSON.parse(
-    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":20,"grouping_strategy":"ALLGREEN","max_entries_to_build":10,"max_entries_to_merge":10,"merge_method":"SQUASH","min_entries_to_merge":1,"min_entries_to_merge_wait_minutes":0}}]}`
+    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":30,"grouping_strategy":"HEADGREEN","max_entries_to_build":4,"max_entries_to_merge":10,"merge_method":"SQUASH","min_entries_to_merge":1,"min_entries_to_merge_wait_minutes":0}}]}`
   )
 );
 const VALID_WORKFLOW = `name: CI
@@ -85,8 +85,8 @@ const VALID_BRANCH_PROTECTION_REF = Object.freeze({
   minimumEntriesToMergeWaitTime: number,
 }} */
 const VALID_LIVE_QUEUE_CONFIGURATION = Object.freeze({
-  checkResponseTimeout: 1200,
-  maximumEntriesToBuild: 10,
+  checkResponseTimeout: 1800,
+  maximumEntriesToBuild: 4,
   maximumEntriesToMerge: 10,
   mergeMethod: 'SQUASH',
   minimumEntriesToMerge: 1,
@@ -98,6 +98,7 @@ function prState(overrides = {}) {
     number: 14359,
     state: 'OPEN',
     isDraft: false,
+    baseRefName: 'main',
     headRefOid: HEAD,
     labels: { nodes: [] },
     isInMergeQueue: false,
@@ -738,8 +739,8 @@ describe('native live preflight', () => {
             } },
             { type: 'MERGE_QUEUE', parameters: {
               __typename: 'MergeQueueParameters',
-              checkResponseTimeoutMinutes: 20, groupingStrategy: 'ALLGREEN',
-              maxEntriesToBuild: 10, maxEntriesToMerge: 10, mergeMethod: 'SQUASH',
+              checkResponseTimeoutMinutes: 30, groupingStrategy: 'HEADGREEN',
+              maxEntriesToBuild: 4, maxEntriesToMerge: 10, mergeMethod: 'SQUASH',
               minEntriesToMerge: 1, minEntriesToMergeWaitMinutes: 0,
             } },
           ] },
@@ -845,7 +846,7 @@ describe('native live preflight', () => {
     ['malformed integration', live => { live.rules.nodes[0].parameters.requiredStatusChecks[0].integrationId = '123'; }],
     ['different integration', live => { live.rules.nodes[0].parameters.requiredStatusChecks[0].integrationId = 123; }],
     ['seconds mistaken for minutes', live => { live.rules.nodes[1].parameters.checkResponseTimeoutMinutes = 3600; }],
-    ['different grouping', live => { live.rules.nodes[1].parameters.groupingStrategy = 'HEADGREEN'; }],
+    ['different grouping', live => { live.rules.nodes[1].parameters.groupingStrategy = 'ALLGREEN'; }],
     ['different build concurrency', live => { live.rules.nodes[1].parameters.maxEntriesToBuild = 3; }],
     ['different max group', live => { live.rules.nodes[1].parameters.maxEntriesToMerge = 2; }],
     ['different method', live => { live.rules.nodes[1].parameters.mergeMethod = 'MERGE'; }],
@@ -1072,7 +1073,7 @@ describe('native live preflight', () => {
   });
 
   it.each([
-    1, 2, 6, 10,
+    1, 2, 3, 4,
   ])('allows supported build count %s during rollout and rollback with truthful readback', buildCount => {
     const result = validateNativePreflightEvidence({
       ruleset: VALID_RULESET,
@@ -1088,9 +1089,9 @@ describe('native live preflight', () => {
     expect(result.policyReadback.observed.max_entries_to_build).toBe(
       buildCount
     );
-    expect(result.policyReadback.matched).toBe(buildCount === 10);
+    expect(result.policyReadback.matched).toBe(buildCount === 4);
     expect(result.policyReadback.drift).toEqual(
-      buildCount === 10 ? [] : ['max_entries_to_build']
+      buildCount === 4 ? [] : ['max_entries_to_build']
     );
   });
 
@@ -1131,7 +1132,7 @@ describe('native live preflight', () => {
 
   it.each([
     ['check_response_timeout_minutes', 21],
-    ['grouping_strategy', 'HEADGREEN'],
+    ['grouping_strategy', 'ALLGREEN'],
     ['max_entries_to_merge', 6],
   ])('still rejects %s drift while using rollback build concurrency', (field, value) => {
     const result = validateNativePreflightEvidence({
@@ -1193,7 +1194,7 @@ describe('native live preflight', () => {
     expect(liveGraphql.policyReadback).toMatchObject({
       matched: true,
       drift: [],
-      observed: { max_entries_to_build: 10 },
+      observed: { max_entries_to_build: 4 },
     });
   });
 
@@ -1206,7 +1207,7 @@ describe('native live preflight', () => {
     expect(result).toMatchObject({ ready: true });
     expect(result.policyReadback).toMatchObject({
       matched: true,
-      observed: { max_entries_to_build: 10 },
+      observed: { max_entries_to_build: 4 },
     });
     const liveConfigCall = runner.mock.calls.find(([args]) =>
       queryText(args).includes('MergeQueueLiveConfiguration')
@@ -1265,14 +1266,14 @@ describe('native live preflight', () => {
       branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
       liveQueueConfiguration: {
         ...VALID_LIVE_QUEUE_CONFIGURATION,
-        checkResponseTimeout: 1800,
+        checkResponseTimeout: 2400,
         minimumEntriesToMerge: 1,
         minimumEntriesToMergeWaitTime: 0,
       },
     });
     expect(actualTimeoutDrift.ok).toBe(false);
     expect(actualTimeoutDrift.errors).toContain(
-      'merge_queue check_response_timeout_minutes must be 20'
+      'merge_queue check_response_timeout_minutes must be 30'
     );
     expect(actualTimeoutDrift.errors).toContain(
       'native queue policy readback drifted: check_response_timeout_minutes'
@@ -1324,7 +1325,7 @@ describe('native live preflight', () => {
       ready: true,
       policyReadback: {
         matched: true,
-        observed: { max_entries_to_build: 10 },
+        observed: { max_entries_to_build: 4 },
       },
     });
   });
@@ -2257,6 +2258,16 @@ describe('native enrollment', () => {
     });
     await expect(enroll(runner)).rejects.toMatchObject({
       code: 'head_changed',
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('refuses to arm a PR whose base is not main before invoking enrollment', async () => {
+    const runner = createNativeRunner({
+      states: [prState({ baseRefName: 'feat/parent-branch' })],
+    });
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'non_main_base',
     });
     expect(invokedEnrollment(runner)).toBe(false);
   });

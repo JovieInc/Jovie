@@ -13,9 +13,9 @@ inputs:
     required: false
     default: '10'
   protected_branches:
-    description: 'Comma-separated list of branch names to never delete'
+    description: 'Extra branch names to never delete. production, prod, main, br-main, br-production, backup-*, and any branch Neon reports as default or protected are never deleted regardless of this list.'
     required: false
-    default: 'main,production,development,br-main,br-production'
+    default: 'main,production,prod,development,br-main,br-production'
   cleanup_threshold:
     description: 'Start cleanup when this many branches exist (should be less than limit)'
     required: false
@@ -126,6 +126,13 @@ runs:
             fi
           done
 
+          # Hard-coded floor, independent of what the caller passed in.
+          case "$(echo "$branch_name" | tr '[:upper:]' '[:lower:]')" in
+            production|prod|main|master|br-main|br-production|backup|backup-*|backup_*|backup.*)
+              is_protected_branch=true
+              ;;
+          esac
+
           if [ "$is_protected_branch" = true ]; then
             echo "Skipping protected branch: $branch_name"
             continue
@@ -172,6 +179,14 @@ runs:
           if ! node "$GITHUB_WORKSPACE/scripts/ci/neon-orphan-reaper.mjs" \
             --prove-completed-owner "$branch_name"; then
             echo "Skipping branch without completed workflow proof: $branch_name"
+            continue
+          fi
+
+          # Neon is the authority on default/protected. Fail closed when the
+          # flags cannot be read or the branch is default/protected/reserved.
+          if ! node "$GITHUB_WORKSPACE/scripts/ci/neon-orphan-reaper.mjs" \
+            --assert-deletable "$branch_name"; then
+            echo "Skipping branch that is default, protected, reserved, or unverifiable: $branch_name"
             continue
           fi
 

@@ -387,6 +387,11 @@ async function sendSubscriptionConfirmationEmail(
       id: dedupKey,
       dedupKey,
       category: 'transactional',
+      emailRoute: {
+        stream: 'transactional',
+        purpose: 'fan-subscription-confirmed',
+        consent: 'opt-in',
+      },
       subject: `Notifications on for ${artistName} on Jovie`,
       text: `Thanks for turning on notifications. We'll email you when ${artistName} drops new music.\n\nManage your notification settings anytime: ${profileUrl}/notifications`,
       html: `
@@ -426,6 +431,11 @@ async function sendSubscriptionVerificationEmail(
       id: dedupKey,
       dedupKey,
       category: 'transactional',
+      emailRoute: {
+        stream: 'transactional',
+        purpose: 'fan-subscription-verify',
+        consent: 'auth-request',
+      },
       subject: `Your verification code for ${artistName}`,
       text: `Use this code to confirm notifications for ${artistName}: ${otpCode}. This code expires in ${EMAIL_OTP_TTL_MINUTES} minutes.`,
       html: `

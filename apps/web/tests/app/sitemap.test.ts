@@ -230,7 +230,6 @@ describe('sitemap', () => {
         'https://jov.ie/artist-profiles',
         'https://jov.ie/solutions/artists',
         'https://jov.ie/product',
-        'https://jov.ie/youtube-thumbnails',
         'https://jov.ie/tim',
         'https://jov.ie/tim/album',
         'https://jov.ie/tim/album/album',
@@ -758,18 +757,18 @@ describe('sitemap', () => {
 describe('sitemap publication inventory fixtures (JOV-6263)', () => {
   const generatedAt = new Date('2026-09-16T20:30:02.784Z');
   const manifest: SitemapManifestRoute[] = [
-    { url: '/youtube-thumbnails', status: 'active', recipeId: 'feature' },
+    { url: '/smart-links', status: 'active', recipeId: 'feature' },
     { url: '/artist-profiles', status: 'active', recipeId: 'artist-lp' },
   ];
   const hubs = [
     { url: 'https://jov.ie/artist-profiles' },
-    { url: 'https://jov.ie/youtube-thumbnails' },
+    { url: 'https://jov.ie/smart-links' },
   ];
 
   it('flags an omitted commercial page, QA identity, and request-time lastmod', () => {
     expect(
       collectSitemapInventoryViolations(hubs.slice(0, 1), { manifest })
-    ).toContain('omitted commercial page: /youtube-thumbnails');
+    ).toContain('omitted commercial page: /smart-links');
     expect(
       collectSitemapInventoryViolations(
         [...hubs, { url: 'https://jov.ie/tmoc0g1x9dwmk71' }],
@@ -795,7 +794,7 @@ describe('sitemap publication inventory fixtures (JOV-6263)', () => {
       collectSitemapInventoryViolations(
         [
           { url: 'https://jov.ie/artist-profiles' },
-          { url: 'https://jov.ie/youtube-thumbnails' },
+          { url: 'https://jov.ie/smart-links' },
           { url: 'https://jov.ie/music' },
           { url: 'https://jov.ie/privacy' },
         ],
