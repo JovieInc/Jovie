@@ -306,6 +306,22 @@ describe('publisher writer-proof execution', () => {
     ).toHaveLength(1);
   });
 
+  it('retries a transient PATCH when readback confirms the receipt is still absent', () => {
+    let writes = 0;
+    const github = vi.fn(args => {
+      if (!args.includes('PATCH')) return JSON.stringify(pullRequest());
+      if (++writes === 1)
+        throw Object.assign(new Error('HTTP 502'), { retryable: true });
+      return '{}';
+    });
+    expect(main(argv, { github })).toBe(0);
+    expect(
+      github.mock.calls.map(([args]) =>
+        args.includes('PATCH') ? 'PATCH' : 'GET'
+      )
+    ).toEqual(['GET', 'GET', 'PATCH', 'GET', 'GET', 'PATCH']);
+  });
+
   it('bounds transient PATCH recovery to three writes with fresh reads before each', () => {
     const github = vi.fn(args => {
       if (!args.includes('PATCH')) return JSON.stringify(pullRequest());
@@ -416,15 +432,18 @@ describe('publisher writer-proof execution', () => {
   ])(
     'the publisher emits origin before proof and propagates $helperExit/$originExit failures',
     ({ helperExit, originExit }) => {
-      const workflow = load(
-        readFileSync(
-          new URL(
-            '../../../.github/workflows/production-controller.yml',
-            import.meta.url
-          ),
-          'utf8'
-        )
-      );
+      const workflow =
+        /** @type {{jobs: Record<string, {steps: Array<{run?: string}>}>}} */ (
+          load(
+            readFileSync(
+              new URL(
+                '../../../.github/workflows/production-controller.yml',
+                import.meta.url
+              ),
+              'utf8'
+            )
+          )
+        );
       const publish = workflow.jobs['publish-customer-changelog'].steps.find(
         step => step.run?.includes('gh pr create --draft')
       ).run;
@@ -444,7 +463,10 @@ describe('publisher writer-proof execution', () => {
       }
       git() { [ "$1 $2" = 'rev-parse HEAD' ] && echo ${HEAD}; }
       python3() { echo emitted-origin >&2; return ${originExit}; }
-      node() { echo attached-proof >&2; printf '%s\\n' "$@"; return ${helperExit}; }
+      node() {
+        if [ "$1" = packages/api-client/cli.ts ]; then echo ${PR_NUMBER};
+        else echo attached-proof >&2; printf '%s\\n' "$@"; return ${helperExit}; fi
+      }
       ${script}
     `,
         ],

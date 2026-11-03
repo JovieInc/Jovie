@@ -134,9 +134,13 @@ export function attachReceiptToReleaseBody({
 // GitHub reads/writes go through the shared budgeted client
 // (packages/api-client/cli.ts gh) per .claude/rules/external-apis.md and the
 // external-api-guard ratchet — never a bare `gh` subprocess. Exit 75 is the
-// client's quota deferral: fail closed so the next controller run retries.
+// client's quota deferral: fail closed without starting another retry loop.
 const API_CLIENT_CLI = 'packages/api-client/cli.ts';
 
+/**
+ * @param {string[]} args
+ * @param {(command: string, args: string[], options: { encoding: 'utf8', maxBuffer: number }) => { error?: Error, status: number | null, stdout: string, stderr: string }} [run]
+ */
 export function gh(args, run = spawnSync) {
   const result = run(
     process.execPath,
