@@ -8,6 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
+import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 
 // gh-api-hold.sh retries transient GitHub gateway failures (5xx, 408,
@@ -105,6 +106,31 @@ exit 0
 }
 
 describe('gh-api-hold.sh transient retry', () => {
+  it('recovers a transient failure with the TestFlight authorize step retry budget', () => {
+    const workflow = load(
+      readFileSync(
+        new URL(
+          '../../../.github/workflows/ios-testflight.yml',
+          import.meta.url
+        ),
+        'utf8'
+      )
+    );
+    const authorize = workflow.jobs['authorize-release'].steps.find(
+      step => step.id === 'authorize'
+    );
+    expect(authorize.env.GH_API_RETRY_ATTEMPTS).toBe('3');
+    expect(authorize.env.GH_API_RETRY_SECONDS).toBe('2');
+    const result = runHold({
+      failures: 2,
+      error: 'gh: HTTP 503: service unavailable',
+      retryAttempts: authorize.env.GH_API_RETRY_ATTEMPTS,
+      retrySeconds: authorize.env.GH_API_RETRY_SECONDS,
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.calls).toBe(3);
+    expect(result.slept).toBe('2\n2');
+  });
   it('retries a transient 5xx and succeeds within the attempt budget', () => {
     const result = runHold({
       failures: 1,
