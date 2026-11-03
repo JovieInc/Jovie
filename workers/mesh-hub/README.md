@@ -44,7 +44,7 @@ and a stand-in are not proof of an agent completing a task.
 ## Task board (swarm)
 
 `Board` (a singleton Durable Object, `src/board.ts`) is the fleet task board:
-post, claim with a lease, update, done, answer, cancel, reassign and caps, over REST
+post, claim with a lease, update, note, done, answer, cancel, reassign and caps, over REST
 (`/v1/board/*`) or a mesh send `to: "board"`. Notices go out as ordinary mail
 from kind `board`, so push, at-least-once delivery and `mail.stale` apply. Expired
 leases return to the pool (alarm plus the cron sweep). `fanout` creates children
@@ -54,6 +54,22 @@ another agent; only the poster or an orchestrator (`summer`, `claude`) may, the
 stage log records `reassigned` with from/to, and the new assignee gets a fresh
 `task.open` notice carrying `reassigned`. Protocol: JovieInc/ci
 `canon/MESH-SWARM.md`.
+
+Plaintext replies to task or merge notices record an informational `note` stage,
+never execution acceptance. They do not claim work, renew a lease, change task
+timestamps or results, complete a task, release a merge, or notify the poster.
+Read notes with `GET /v1/board/task?id=<id>` in `stages`. Notes accept up to
+8,000 characters and retain the first 500; repeating the same retained note from
+the same sender on a task is a replay without another stage. Only the assignee
+(if set) and current claimant (if claimed) may leave a note. Closed tasks and
+parents waiting on children reject notes. `POST /v1/board/note {id, note}` and
+structured mesh `{op: "note", id, note}` use the same contract. A successful
+response means the note was recorded, not that execution was accepted.
+
+Completion requires an explicit validated `POST /v1/board/done {id, result}` or
+structured mesh `{op: "done", id, result}`. Its existing ownership, implicit
+claim on open tasks, failure status and replay semantics still apply. Plaintext
+question replies remain answers; only the question poster may close a question.
 
 `worker/mesh-worker.mjs` is the reference executor: it long-polls one kind's
 mailbox, works board tasks from trusted posters with `codex exec` (read-only,

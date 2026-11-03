@@ -1,6 +1,6 @@
 /**
  * Fleet task board (JOV-10081): the smallest swarm layer on the mesh hub.
- * Protocol: JovieInc/ci canon/MESH-SWARM.md. Ops are post, claim, update, done, answer,
+ * Protocol: JovieInc/ci canon/MESH-SWARM.md. Ops are post, claim, update, note, done, answer,
  * cancel, reassign and caps. Claims are leases; an expired lease returns the task to the pool and
  * re-notifies capable agents. A post with `fanout` makes child tasks plus a merge task
  * that opens when every child is terminal. Every stage is timestamped per task and agent.
@@ -510,6 +510,32 @@ export class BoardStore {
     return this.extend(task, from, input, now, 'progress');
   }
 
+  /** Informational only: recording a reply accepts no work and changes no task state. */
+  note(from: string, input: Record<string, unknown>, now: number) {
+    const task = this.mustGet(input.id);
+    if (TERMINAL.has(task.status)) throw new HubError(409, 'task_closed');
+    if (task.type === 'question')
+      throw new HubError(409, 'questions_are_answered_not_claimed');
+    if (task.status === 'claimed' && task.claimant !== from)
+      throw new HubError(409, 'not_claimant');
+    if (task.status === 'waiting')
+      throw new HubError(409, 'waiting_on_children');
+    if (task.assignee && task.assignee !== from)
+      throw new HubError(409, 'assigned_elsewhere');
+    const note = text(input.note, 'note', BOARD.maxText).slice(0, 500);
+    const replay =
+      this.sql
+        .exec(
+          "SELECT id FROM stages WHERE taskId = ? AND actor = ? AND stage = 'note' AND note = ? LIMIT 1",
+          task.id,
+          from,
+          note
+        )
+        .toArray().length > 0;
+    if (!replay) this.stage(task.id, from, 'note', now, note);
+    return { recorded: true, replay, task };
+  }
+
   done(
     from: string,
     input: Record<string, unknown>,
@@ -536,7 +562,7 @@ export class BoardStore {
     else if (task.assignee && task.assignee !== from)
       throw new HubError(409, 'assigned_elsewhere');
     if (task.status === 'open' && task.type !== 'question') {
-      // Implicit claim (a reply that is the work): stage it so timing stays honest.
+      // Explicit done may include the claim: stage it so timing stays honest.
       task.attempts++;
       task.claimedAt = now;
       task.firstClaimedAt ??= now;
@@ -873,6 +899,8 @@ export class BoardStore {
         return this.claim(from, input, now);
       case 'update':
         return this.update(from, input, now);
+      case 'note':
+        return this.note(from, input, now);
       case 'done':
         return this.done(from, input, active, now);
       case 'answer':
@@ -889,7 +917,8 @@ export class BoardStore {
 
 /**
  * A mesh send to `board`: a JSON body `{op, ...}`, or a plain-text reply whose inReplyTo is a
- * board notice. A reply to a question notice is an answer; to a task notice it is `done`.
+ * board notice. A reply to a question notice is an answer; to a task notice it is a
+ * nonterminal note. Completion requires an explicit structured `done` operation.
  */
 export function parseBoardSend(
   body: string,
@@ -911,5 +940,5 @@ export function parseBoardSend(
   if (!task) throw new HubError(422, 'board_needs_op_or_reply');
   return task.type === 'question'
     ? { op: 'answer', input: { id: task.id, answer: body } }
-    : { op: 'done', input: { id: task.id, result: body } };
+    : { op: 'note', input: { id: task.id, note: body } };
 }

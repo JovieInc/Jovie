@@ -278,7 +278,7 @@ test('done replays for the same result; a closed task rejects a different one', 
   assert.deepEqual(toPoster, ['task.done']);
 });
 
-test('mesh sends: JSON op, or a plain reply to a notice becomes done/answer', () => {
+test('mesh sends: JSON op, or a plain reply to a notice becomes note/answer', () => {
   const store = board();
   store.post('summer', { id: 'm', title: 't' }, ACTIVE, 1);
   store.post('summer', { id: 'mq', type: 'question', title: 'q' }, ACTIVE, 1);
@@ -290,8 +290,8 @@ test('mesh sends: JSON op, or a plain reply to a notice becomes done/answer', ()
   assert.deepEqual(
     parseBoardSend('All 3 claims verified.', 'board:t:m:4', lookup),
     {
-      op: 'done',
-      input: { id: 'm', result: 'All 3 claims verified.' },
+      op: 'note',
+      input: { id: 'm', note: 'All 3 claims verified.' },
     }
   );
   // Summer's reply form: `${to}:${correlationId}`.
@@ -385,5 +385,216 @@ test('reassign refuses non-poster non-orchestrators, claimed tasks and bad targe
   assert.equal(
     store.stages('ra-2').some(s => s.stage === 'reassigned'),
     false
+  );
+});
+
+// Exercise the same parse -> apply path used by Board.fromMesh, over real SQLite.
+function meshReply(store, from, body, id, now = 10) {
+  const parsed = parseBoardSend(body, `board:t:${id}:1`, id => store.get(id));
+  return store.apply(from, parsed.op, parsed.input, ACTIVE, now);
+}
+
+for (const status of ['open', 'claimed']) {
+  for (const reply of [
+    'I cannot execute this task. I can only read and reply.',
+    'ACK, received.',
+    'The relevant file is workers/mesh-hub/src/board.ts.',
+  ]) {
+    test(`plaintext ${status} task reply is informational: ${reply}`, () => {
+      const store = board();
+      store.post(
+        'codex',
+        { id: 'info', title: 'Repair', to: 'summer' },
+        ACTIVE,
+        1
+      );
+      if (status === 'claimed') store.claim('summer', { id: 'info' }, 2);
+      const before = store.get('info');
+      const stages = store.stages('info');
+      const pending = notices(store);
+      const metrics = store.metrics(3_600_000, 10);
+      const out = meshReply(store, 'summer', reply, 'info');
+      assert.equal(out.recorded, true);
+      assert.equal(out.claimed, undefined);
+      assert.deepEqual(store.get('info'), before);
+      assert.deepEqual(notices(store), pending);
+      assert.deepEqual(store.metrics(3_600_000, 10), metrics);
+      assert.deepEqual(store.stages('info'), [
+        ...stages,
+        {
+          at: new Date(10).toISOString(),
+          actor: 'summer',
+          stage: 'note',
+          note: reply,
+        },
+      ]);
+      assert.equal(meshReply(store, 'summer', reply, 'info', 11).replay, true);
+      assert.equal(store.stages('info').length, stages.length + 1);
+      assert.deepEqual(store.get('info'), before);
+    });
+  }
+}
+
+test('informational replies preserve assignee and claimant bounds without orchestrator override', () => {
+  const store = board();
+  store.post('codex', { id: 'bound', title: 'Repair', to: 'aeon' }, ACTIVE, 1);
+  assert.throws(
+    () => meshReply(store, 'summer', 'ACK', 'bound'),
+    /assigned_elsewhere/
+  );
+  store.post('codex', { id: 'pool', title: 'Repair' }, ACTIVE, 1);
+  store.claim('aeon', { id: 'pool' }, 2);
+  const before = store.get('pool');
+  for (const from of ['codex', 'summer', 'claude', 'grokbot']) {
+    assert.throws(() => meshReply(store, from, 'ACK', 'pool'), /not_claimant/);
+  }
+  assert.deepEqual(store.get('pool'), before);
+  assert.equal(
+    store.stages('pool').some(s => s.stage === 'note'),
+    false
+  );
+});
+
+test('child and merge replies cannot release a merge or close a waiting parent', () => {
+  const store = board();
+  store.post(
+    'codex',
+    {
+      id: 'parent',
+      title: 'Repair',
+      fanout: [{ title: 'child', to: 'summer' }],
+    },
+    ACTIVE,
+    1
+  );
+  meshReply(store, 'summer', 'Cannot execute.', 'parent.1');
+  assert.equal(store.get('parent.1').status, 'open');
+  assert.equal(store.get('parent').status, 'waiting');
+  assert.equal(store.get('parent.merge'), null);
+  assert.throws(
+    () => meshReply(store, 'codex', 'ACK', 'parent'),
+    /waiting_on_children/
+  );
+  meshReply(
+    store,
+    'summer',
+    '{"op":"done","id":"parent.1","result":"child evidence"}',
+    'parent.1',
+    11
+  );
+  const merge = store.get('parent.merge');
+  meshReply(store, 'codex', 'ACK', 'parent.merge', 12);
+  assert.deepEqual(store.get('parent.merge'), merge);
+  assert.equal(store.get('parent').status, 'waiting');
+  meshReply(
+    store,
+    'codex',
+    '{"op":"done","id":"parent.merge","result":"merged evidence"}',
+    'parent.merge',
+    13
+  );
+  assert.equal(store.get('parent').status, 'done');
+});
+
+test('notes are bounded, validated and cannot append to closed tasks or questions', () => {
+  const store = board();
+  store.post('codex', { id: 'note-bound', title: 'Repair' }, ACTIVE, 1);
+  const before = store.get('note-bound');
+  meshReply(store, 'summer', 'x'.repeat(BOARD.maxText), 'note-bound');
+  assert.equal(store.stages('note-bound').at(-1).note, 'x'.repeat(500));
+  for (const note of ['', 42, null, 'x'.repeat(BOARD.maxText + 1)]) {
+    assert.throws(
+      () =>
+        store.apply('summer', 'note', { id: 'note-bound', note }, ACTIVE, 11),
+      /invalid_note/
+    );
+  }
+  assert.throws(
+    () =>
+      store.apply('summer', 'note', { id: 'missing', note: 'ACK' }, ACTIVE, 11),
+    /task_not_found/
+  );
+  assert.deepEqual(store.get('note-bound'), before);
+  store.done('summer', { id: 'note-bound', result: 'evidence' }, ACTIVE, 12);
+  assert.throws(
+    () => meshReply(store, 'summer', 'ACK', 'note-bound', 13),
+    /task_closed/
+  );
+  store.post(
+    'codex',
+    { id: 'note-q', type: 'question', title: 'Why?' },
+    ACTIVE,
+    1
+  );
+  assert.throws(
+    () =>
+      store.apply('summer', 'note', { id: 'note-q', note: 'ACK' }, ACTIVE, 11),
+    /questions_are_answered/
+  );
+});
+
+test('explicit structured done keeps validation, ownership, implicit claim and replay semantics', () => {
+  const store = board();
+  store.post(
+    'codex',
+    { id: 'explicit', title: 'Repair', to: 'summer' },
+    ACTIVE,
+    1
+  );
+  const done = '{"op":"done","id":"explicit","result":"verified evidence"}';
+  assert.throws(
+    () =>
+      meshReply(store, 'summer', '{"op":"done","id":"explicit"}', 'explicit'),
+    /invalid_result/
+  );
+  assert.throws(
+    () => meshReply(store, 'aeon', done, 'explicit'),
+    /assigned_elsewhere/
+  );
+  assert.equal(store.get('explicit').status, 'open');
+  const out = meshReply(store, 'summer', done, 'explicit');
+  assert.equal(out.task.status, 'done');
+  assert.equal(out.task.claimant, 'summer');
+  assert.equal(out.task.attempts, 1);
+  assert.equal(meshReply(store, 'summer', done, 'explicit', 11).replay, true);
+  assert.throws(
+    () => meshReply(store, 'aeon', done, 'explicit', 12),
+    /task_closed/
+  );
+  assert.equal(
+    store.stages('explicit').filter(s => s.stage === 'done').length,
+    1
+  );
+  store.post('codex', { id: 'claimed-explicit', title: 'Repair' }, ACTIVE, 1);
+  store.claim('summer', { id: 'claimed-explicit' }, 2);
+  const failed =
+    '{"op":"done","id":"claimed-explicit","status":"failed","result":"verified failure"}';
+  assert.throws(
+    () => meshReply(store, 'aeon', failed, 'claimed-explicit'),
+    /not_claimant/
+  );
+  assert.equal(
+    meshReply(store, 'summer', failed, 'claimed-explicit').task.status,
+    'failed'
+  );
+});
+
+test('plaintext question replies still answer without claiming or completing', () => {
+  const store = board();
+  store.post(
+    'codex',
+    { id: 'reply-q', type: 'question', title: 'Which branch?' },
+    ACTIVE,
+    1
+  );
+  meshReply(store, 'summer', 'main', 'reply-q');
+  const task = store.get('reply-q');
+  assert.deepEqual(task.answers, [{ from: 'summer', at: 10, text: 'main' }]);
+  assert.equal(task.status, 'open');
+  assert.equal(task.claimant, null);
+  assert.equal(task.doneAt, null);
+  assert.equal(
+    JSON.parse(notices(store).find(n => n.to === 'codex').body).event,
+    'question.answered'
   );
 });
