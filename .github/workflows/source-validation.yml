@@ -261,7 +261,7 @@ jobs:
           [ "$merging" != true ] || git -c user.name=source-validation -c user.email=source-validation@invalid merge --no-commit --no-ff --quiet "$trusted_ref" >/dev/null 2>&1 || merge_ok=false
           [ "$merge_ok" = true ] || { conflicts="$(git diff --name-only --diff-filter=U | tr '\n' ' ')"; echo "::error title=merge conflict with ${GITHUB_BASE_REF:-base}::This PR conflicts with ${GITHUB_BASE_REF:-base} in: ${conflicts:-unknown files}. Resolve the conflict (lane-fix-conflict); source guards judge the merged tree and cannot run on a conflicted one."; echo "merge conflict with ${GITHUB_BASE_REF:-base}: ${conflicts:-unknown files}"; exit 1; }
           export SOURCE_GUARD_MODULE="$guard_root/scripts/ci-fast-lanes.mjs"
-          node --input-type=module -e '
+          node --input-type=module <<'JS'
             import { spawnSync } from "node:child_process";
             import { randomUUID } from "node:crypto";
             const { selectSourceGuards, listAllChangedFiles } = await import(process.env.SOURCE_GUARD_MODULE);
@@ -282,7 +282,7 @@ jobs:
               if (code !== 0 && exitCode === 0) exitCode = code;
             }
             process.exitCode = exitCode;
-          '
+          JS
       - name: Restore exact source head after merged guards
         id: source_guard_restore
         if: always() && steps.source_guard_merge.outputs.restore_head == 'true'
@@ -368,6 +368,28 @@ jobs:
           trap 'rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts/design-frontend-skill-check.mjs | tar -x -C "$guard_root"
           node "$guard_root/scripts/design-frontend-skill-check.mjs" --diff-base "$trusted_ref"
+      # ASR-036: the brand is spelled Jovie (domain jov.ie) in the PR title, body
+      # and every commit message. Runs the trusted base copy; skips until that
+      # copy exists on the base branch.
+      - name: Check brand spelling in PR text and commit messages
+        shell: bash
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_BRANCH: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$BASE_BRANCH"
+          trusted_ref="$(git rev-parse --verify "refs/remotes/origin/$BASE_BRANCH^{commit}")"
+          if ! git cat-file -e "$trusted_ref:scripts/anti-slop/brand-name-messages.mjs" 2>/dev/null; then
+            echo "brand-name guard not on $BASE_BRANCH yet; skipping"
+            exit 0
+          fi
+          guard_root="$(mktemp -d "$RUNNER_TEMP/brand-guard.XXXXXX")"
+          trap 'rm -rf "$guard_root"' EXIT
+          git archive "$trusted_ref" scripts/anti-slop | tar -x -C "$guard_root"
+          node "$guard_root/scripts/anti-slop/brand-name-messages.mjs" "$trusted_ref" "$HEAD_SHA"
       # The merge group's Path Changes job runs this trusted classifier and
       # fails PR Ready on any path no lane rule maps, ejecting the whole group.
       # Run the same classifier here so the PR fails before enqueue instead.

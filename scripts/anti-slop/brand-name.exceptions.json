@@ -1,0 +1,65 @@
+{
+  "note": "Exact frozen source text and intentional regression fixtures; exceptions mask only the matching span.",
+  "exceptions": [
+    {
+      "file": "canon/PRODUCT.md",
+      "match": "**EVENT:** Tim White, 2026-10-20: \"jovie and ovie same app shell, same nav,\nsame sidebar, same presence system, same chat composer and ui. when we improve\nwe improve both. just different content/user. but jovie is to run closed loop\ncreator career, ovie is to run closed loop company, you can launch creative\nreleases on jovie and company release on ovie. they should be mirrors, where\npossible in terms of DS and IA.\"",
+      "reason": "Verbatim founder decision, EVENT Tim White 2026-10-20 in canon/PRODUCT.md; preserve the full frozen quotation."
+    },
+    {
+      "file": "apps/web/tests/unit/marketing/header-brand-config.test.ts",
+      "match": "headlineNamesBrand('Jovies everywhere')",
+      "reason": "Intentional whole-word negative assertion: Jovies must not count as the brand in header-brand-config.test.ts."
+    },
+    {
+      "file": "canon/CAPACITY.md",
+      "match": "Prepaid credits (AI_GATEWAY_API_KEY, team jovie)",
+      "reason": "Literal Vercel team identifier in ops/registry/capacity.json providers[].plan.name, rendered unchanged by scripts/capacity-registry.mjs canon --write."
+    },
+    {
+      "file": "apps/web/lib/ovie/generated/invariant-stewardship.current-week.json",
+      "match": "Company identity records must use Jovi Technology Inc and explicitly retire legacy Jovi Inc or Meet Jovi identity where still present.",
+      "reason": "Exact historical identity statement P08-company-identity, sourced in the generated artifact to gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20, dated 2026-08-22; legacy legal names are evidence."
+    },
+    {
+      "file": "docs/product/lyb-health-trust-boundary.md",
+      "match": "JOV-6017 (Jovi health agent + isolated memory",
+      "reason": "Existing referenced JOV-6017 issue title names the LYB health agent; preserve the cited title."
+    },
+    {
+      "file": "docs/product/lyb-launch-contract.md",
+      "match": "Jovi works backward from the date using available evidence and constraints. Persists and delivers one feasible next action with rationale and uncertainty.",
+      "reason": "Exact LYB launch.directive assertion in the Receive first value row refers to the Jovi coach, identified earlier in the same contract; preserve the existing agent contract."
+    },
+    {
+      "file": "workers/mesh-hub/src/scan.ts",
+      "match": "const COMPANY_EMAIL_DOMAINS = new Set([\n  'jov.ie',\n  'jovie.com',",
+      "reason": "Literal historical email-domain compatibility identifier in the existing scanBody allowlist, not a prose product-domain claim; changing it would alter PII filtering behavior."
+    },
+    {
+      "file": "docs/designs/jov-5909-wordmark-o-favicon-implementation-contract.md",
+      "match": "geometric JOVIE letters",
+      "reason": "Source-backed glyph description of wordmark-letters.ts: uppercase letters identify the drawn glyphs, not prose brand casing. Preserve the existing implementation record."
+    },
+    {
+      "file": "commit 3ce9dca0e29780a21a36e524aa251c8092abdb51",
+      "match": "Flags Jovy, Jovee, Jovei, Jovvie, Jovies, J0vie, near-misses, jovie.com or\njovie.io and wrong casing in prose; Jovi only in agent context. Zero baseline.",
+      "reason": "Exact negative spelling examples in published PR23363 implementation commit 3ce9dca0e29780a21a36e524aa251c8092abdb51. The original immutable message describes the scanner; preserve published history. This does not exempt any other text or commit."
+    },
+    {
+      "file": "apps/web/app/brand/page.tsx",
+      "match": "<h2 className={sectionHeading}>JOVIE.</h2>",
+      "reason": "Exact uppercase wordmark specimen in WordmarkSection, immediately presenting the drawn Wordmark component. The glyph specimen is a visual source fact, not prose brand casing."
+    },
+    {
+      "file": "apps/web/components/organisms/home-loop/fixtures.ts",
+      "match": "Enable it for project jovie only",
+      "reason": "Exact Vercel project identifier in the vercel-concurrency fixture decisionDefault.summary. Changing the lowercase identifier would misstate the project targeted by the recorded decision."
+    },
+    {
+      "file": "apps/web/lib/tracking/fire-subscribe-event.ts",
+      "match": "label: 'jovie'",
+      "reason": "Exact machine tracking label for Jovie's own marketing pixel in pixelConfigs, paired with the creator label. This runtime identifier is not presentation copy."
+    }
+  ]
+}
