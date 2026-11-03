@@ -267,10 +267,39 @@ jobs:
           # event's base SHA remains older, so repository hygiene can charge
           # main growth to this PR. Source policy must inspect the exact head.
           ref: ${{ github.event.pull_request.head.sha }}
-          # The repository hygiene and screenshot checks compare with the PR's
-          # exact merge base, which requires the full ancestry of both tips.
-          fetch-depth: 0
+          # Fetch the exact event head first; the next step retrieves complete
+          # ancestry for only that commit and the current base branch.
+          fetch-depth: 1
+          filter: blob:none
           persist-credentials: false
+
+      - name: Fetch exact PR and current base ancestry
+        env:
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$PR_BASE_REF" =~ ^[A-Za-z0-9._/-]+$ ]] || exit 1
+          git check-ref-format "refs/heads/$PR_BASE_REF" >/dev/null
+          [[ "$PR_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$(git rev-parse HEAD)" == "$PR_HEAD_SHA" ]] || exit 1
+          [[ "$(git rev-parse --is-shallow-repository)" == true ]] || exit 1
+          [[ -n "$GH_TOKEN" ]] || exit 1
+          # checkout does not persist credentials. Append one read-only HTTP
+          # header to inherited per-process Git config, without writing .git/config.
+          (
+            config_count="${GIT_CONFIG_COUNT:-0}"
+            [[ "$config_count" =~ ^[0-9]{1,4}$ ]] || exit 1
+            config_count=$((10#$config_count))
+            auth_header="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+            export "GIT_CONFIG_KEY_${config_count}=http.https://github.com/.extraheader"
+            export "GIT_CONFIG_VALUE_${config_count}=$auth_header"
+            export GIT_CONFIG_COUNT=$((config_count + 1))
+            export GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never
+            git fetch --filter=blob:none --no-tags --unshallow origin "$PR_HEAD_SHA" \
+              "+refs/heads/$PR_BASE_REF:refs/remotes/origin/$PR_BASE_REF"
+          )
 
       - name: Resolve exact PR merge base
         id: pr-merge-base
@@ -296,6 +325,46 @@ jobs:
           [[ "$merge_base" =~ ^[0-9a-f]{40}$ ]] || exit 1
           echo "base_tip=$base_tip" >> "$GITHUB_OUTPUT"
           echo "sha=$merge_base" >> "$GITHUB_OUTPUT"
+
+      - name: Hydrate and verify policy snapshot objects
+        env:
+          PR_BASE_SHA: ${{ steps.pr-merge-base.outputs.base_tip }}
+          PR_MERGE_BASE: ${{ steps.pr-merge-base.outputs.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ -n "$GH_TOKEN" ]] || exit 1
+          for sha in "$PR_BASE_SHA" "$PR_MERGE_BASE" "$PR_HEAD_SHA"; do
+            [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          done
+          base_tree="$(git rev-parse --verify "$PR_BASE_SHA^{tree}")"
+          head_tree="$(git rev-parse --verify "$PR_HEAD_SHA^{tree}")"
+          merge_tree="$(git rev-parse --verify "$PR_MERGE_BASE^{tree}")"
+          (
+            config_count="${GIT_CONFIG_COUNT:-0}"
+            [[ "$config_count" =~ ^[0-9]{1,4}$ ]] || exit 1
+            config_count=$((10#$config_count))
+            auth_header="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+            export "GIT_CONFIG_KEY_${config_count}=http.https://github.com/.extraheader"
+            export "GIT_CONFIG_VALUE_${config_count}=$auth_header"
+            export GIT_CONFIG_COUNT=$((config_count + 1))
+            export GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never
+            # --refetch is essential: Git may otherwise negotiate away trees
+            # already present and silently leave their referenced blobs missing.
+            git fetch --refetch --no-tags --no-filter origin "$base_tree" "$head_tree" "$merge_tree"
+          )
+          # Fail closed even if a server accepts a fetch but omits an object.
+          # All later policy steps must use local evidence, never lazy network.
+          git --no-lazy-fetch --version >/dev/null
+          export GIT_NO_LAZY_FETCH=1
+          for tree in "$base_tree" "$head_tree" "$merge_tree"; do
+            git ls-tree -r --format='%(objecttype) %(objectname)' "$tree" |
+              awk '$1 == "blob" {print $2}' |
+              git cat-file --batch-check='%(objectname) %(objecttype) %(objectsize)' |
+              awk '$2 != "blob" || $3 !~ /^[0-9]+$/ {bad=1} END {exit bad}'
+          done
+          echo 'GIT_NO_LAZY_FETCH=1' >> "$GITHUB_ENV"
 
       - name: Enforce projected combined-tree byte budget
         # merge_group enforces maxTrackedBytes on base + members and ejects the
