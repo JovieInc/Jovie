@@ -426,7 +426,12 @@ export function OnboardingSpotifyArtistPickerCard({
         <input
           id={fieldId}
           value={query}
-          onChange={event => setQuery(event.target.value)}
+          onChange={event => {
+            // Typing is browsing: the proposal swap is for the agent's
+            // prefilled query only, never for keystrokes in this field.
+            setBrowsing(true);
+            setQuery(event.target.value);
+          }}
           placeholder='Search Spotify artists'
           className='min-w-0 flex-1 bg-transparent text-sm leading-6 text-primary-token placeholder:text-quaternary-token focus:outline-none'
           disabled={disabled}

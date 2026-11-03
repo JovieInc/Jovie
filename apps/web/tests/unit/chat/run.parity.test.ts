@@ -349,6 +349,18 @@ describe('executeChatTurn — parity assertions', () => {
     expect(setExtra).not.toHaveBeenCalled();
   });
 
+  it('streams chat with low reasoning so the first word is not held behind thinking', async () => {
+    const turn = await executeChatTurn({
+      ...baseInput,
+      uiMessages: [userMessage('What should I do this week?')],
+      planLimits: paidPlanLimits,
+    });
+    const opts = (
+      turn.streamResult as unknown as { __opts: { reasoning?: unknown } }
+    ).__opts;
+    expect(opts.reasoning).toBe('low');
+  });
+
   it('passes a plan-aware stopWhen step cap to streamText', async () => {
     const paidTurn = await executeChatTurn({
       ...baseInput,

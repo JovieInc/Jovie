@@ -56,7 +56,11 @@ export function projectWhatsNew(
 ): WhatsNewFeed {
   const entries: WhatsNewEntry[] = [];
 
-  for (const release of releases) {
+  // Newest first even when a post sits out of order in CHANGELOG.md (stable sort).
+  const newestFirst = [...releases].sort((left, right) =>
+    right.date.localeCompare(left.date)
+  );
+  for (const release of newestFirst) {
     if (entries.length >= limit) break;
     const outcomes = projectCustomerChangelog([release]);
     const lead = outcomes[0];
@@ -90,6 +94,35 @@ export function projectWhatsNew(
     changelogUrl: `${baseUrl}/changelog`,
     entries,
   };
+}
+
+/** What the viewer has already done; gates entries that ask for an action. */
+export interface WhatsNewUserState {
+  readonly hasClaimedHandle: boolean;
+}
+
+/**
+ * Entries whose headline asks the viewer to do something. Once the viewer has
+ * done it, the entry is stale for them. Add a rule here, not a one-off check.
+ */
+const WHATS_NEW_ACTION_RULES: readonly {
+  readonly pattern: RegExp;
+  readonly isComplete: (state: WhatsNewUserState) => boolean;
+}[] = [
+  {
+    pattern:
+      /\b(choose|claim|pick|reserve|get)\b.*\b(jovie link|handle|username)\b/i,
+    isComplete: state => state.hasClaimedHandle,
+  },
+];
+
+export function isWhatsNewActionComplete(
+  entry: Pick<WhatsNewEntry, 'title'>,
+  state: WhatsNewUserState
+): boolean {
+  return WHATS_NEW_ACTION_RULES.some(
+    rule => rule.pattern.test(entry.title) && rule.isComplete(state)
+  );
 }
 
 export interface UnseenWhatsNew {

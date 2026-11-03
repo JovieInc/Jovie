@@ -42,6 +42,69 @@ function customerStoryIdentity(outcomeKey) {
   };
 }
 
+/**
+ * Customer-facing groups for a catch-up post, in display order.
+ * @type {[string, string, RegExp][]}
+ */
+const CATCH_UP_GROUPS = [
+  ['mac-app', 'Mac app', /\bmac\b|\bcmd\+/i],
+  [
+    'sidebar-and-inbox',
+    'Sidebar and inbox',
+    /\bsidebar\b|\binbox\b|\bnotes\b|\baccount menu\b|\bnavigation\b/i,
+  ],
+  ['profiles-work-and-onboarding', 'Profiles, releases and onboarding', /./],
+];
+const CATCH_UP_BULLET_MAX = 240;
+
+/**
+ * Catch-up mode (explicit, one-off): fold a backlog of single-outcome drafts
+ * into at most three area stories (one lead plus up to three bullets each) so
+ * a long gap publishes as one post instead of three outcomes a day. Each
+ * bullet is an outcome's own approved copy mapped to its own claim; outcomes
+ * that do not fit stay deferred, never rewritten or dropped.
+ */
+export function groupCatchUpDrafts(draftsByOutcome, windowKey) {
+  const buckets = new Map(CATCH_UP_GROUPS.map(group => [group[0], []]));
+  for (const draft of [...draftsByOutcome.values()].sort((a, b) =>
+    a.id.localeCompare(b.id)
+  )) {
+    const group = CATCH_UP_GROUPS.find(([, , pattern]) =>
+      pattern.test(`${draft.summary} ${draft.id}`)
+    );
+    buckets.get(group[0]).push(draft);
+  }
+  const grouped = new Map();
+  const leftover = [];
+  for (const [key, title] of CATCH_UP_GROUPS) {
+    const members = buckets.get(key);
+    if (!members.length) continue;
+    const [lead, ...rest] = members;
+    const fits = rest.filter(
+      draft => draft.summary.length <= CATCH_UP_BULLET_MAX
+    );
+    const bullets = fits.slice(0, 3);
+    leftover.push(...members.filter(d => d !== lead && !bullets.includes(d)));
+    const used = [lead, ...bullets];
+    const id = `catch-up-${windowKey}-${key}`;
+    const sections = new Set(used.map(draft => draft.section));
+    grouped.set(id, {
+      id,
+      ...customerStoryIdentity(id),
+      section: sections.size === 1 ? lead.section : 'Changed',
+      summary: `${title}: ${lead.summary}`,
+      availability: lead.availability,
+      bullets: bullets.map(draft => ({
+        text: draft.summary,
+        claimIds: [...draft.claimIds],
+      })),
+      sourceIds: used.flatMap(draft => draft.sourceIds),
+      claimIds: used.flatMap(draft => draft.claimIds),
+    });
+  }
+  return { grouped, leftover };
+}
+
 function validateCustomerStoryIdentity(value) {
   return (
     ENTRY_ID_RE.test(value?.entryId ?? '') &&
@@ -330,6 +393,7 @@ export function planDailyPublication({
   candidates,
   windowKey,
   observedAt,
+  catchUp = false,
 }) {
   assertPublicationBinding(marker, buildInfo, controller);
   if (
@@ -455,6 +519,24 @@ export function planDailyPublication({
   }
   // Explicit backlog: never silently discard a fourth customer outcome.
   const deferred = [];
+  if (catchUp && !currentDay) {
+    const { grouped, leftover } = groupCatchUpDrafts(
+      draftsByOutcome,
+      windowKey
+    );
+    for (const draft of leftover) deferred.push(...draft.sourceIds);
+    draftsByOutcome.clear();
+    for (const [id, draft] of grouped) draftsByOutcome.set(id, draft);
+    // Sources of folded-out outcomes must not be evaluated as published.
+    const keep = new Set(
+      [...grouped.values()].flatMap(draft => draft.sourceIds)
+    );
+    sources.splice(
+      0,
+      sources.length,
+      ...sources.filter(item => keep.has(item.id))
+    );
+  }
   const drafts = [...draftsByOutcome.values()].sort((a, b) =>
     a.id.localeCompare(b.id)
   );

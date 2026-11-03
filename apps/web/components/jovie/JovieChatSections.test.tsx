@@ -159,6 +159,22 @@ describe('ChatInlineError', () => {
     expect(alert).not.toHaveTextContent('Summer Didn’t Finish That Reply');
   });
 
+  it('renders nothing for the weekly plan limit owned by ChatUsageAlert', () => {
+    const { container } = render(
+      <ChatInlineError
+        chatError={{
+          type: 'rate_limit',
+          message:
+            'You have reached your weekly AI message limit. Upgrade to Artist Presence for 70 messages per week.',
+        }}
+        onRetry={vi.fn()}
+        isLoading={false}
+        isSubmitting={false}
+      />
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('uses the operator presentation in ov chat mode', () => {
     renderInlineError('ov');
 

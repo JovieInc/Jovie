@@ -16,6 +16,19 @@ export const proofStatObservationSchema = z
       .strict()
       .nullable()
       .optional(),
+    /** Comparative stats: every measured entrant, for the ranked chart. */
+    breakdown: z
+      .array(
+        z
+          .object({
+            label: z.string().trim().min(1).max(60),
+            value: z.number().finite().min(0),
+            self: z.boolean(),
+          })
+          .strict()
+      )
+      .max(12)
+      .optional(),
   })
   .strict();
 export const PROOF_STATS_EVENT_LIMIT = 50;
@@ -53,6 +66,14 @@ export function validateProofStatsRecord(data: ProofStatsRecord): string[] {
     }
     if (stat.unit === 'ratio' && observation.value > 1) {
       errors.push(`observations.${id}: a ratio must be between 0 and 1`);
+    }
+    if (
+      observation.breakdown &&
+      observation.breakdown.filter(entry => entry.self).length !== 1
+    ) {
+      errors.push(
+        `observations.${id}: a breakdown has exactly one Jovie entry`
+      );
     }
     if (stat.legalClass === 'plain' && observation.approval) {
       errors.push(
