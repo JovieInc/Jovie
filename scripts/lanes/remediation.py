@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import time
 from datetime import datetime, timezone
 
 import machine_gap
@@ -61,11 +62,19 @@ LOCKFILES = frozenset({"pnpm-lock.yaml"})
 # Conflicts confined to machine-derived files resolve without a model: take main's copy,
 # run the file's canonical regenerator, push. JOV-6837 covered the lockfile; JOV-7594
 # extends the same deterministic rung to the generated workflow topology so Symphony PRs
-# stop hand-merging `.gen.` output.
+# stop hand-merging `.gen.` output. rule-scopes.json hashes are derived from
+# .claude/rules; --write rebuilds them from the merged rule files.
 GENERATED_RESOLVERS = {
+    "canon/SOURCES_OF_TRUTH.md": ("node", "scripts/sources-of-truth.mjs", "--write"),
     ".github/workflow-topology.gen.yml": ("pnpm", "ci:topology:write"),
     "pnpm-lock.yaml": ("pnpm", "install", "--lockfile-only", "--ignore-scripts"),
+    # Integrity record of the scoped rule files: recomputed from the merged rule bodies.
+    "scripts/agent-context/rule-scopes.json": ("node", "scripts/agent-context/rule-scopes.mjs", "--write"),
 }
+# Append-only registries: both sides' added lines are the merge (git merge-file --union), so a
+# conflict is never a model's call.
+UNION_MERGE_FILES = frozenset({"canon/automation-registry.jsonl"})
+RESOLVABLE_CONFLICT_FILES = frozenset(GENERATED_RESOLVERS) | UNION_MERGE_FILES
 # Only a secret-like file is a human call; an oversize diff is split by a repair lane and a
 # lockfile without its manifest is fixed by one (Tim 2026-10-12: no dead-end holds).
 DIFF_POLICY = frozenset({"secret-file"})
@@ -187,10 +196,6 @@ def escalation_enabled() -> bool:
 
 def notify_tim() -> bool:
     return _flag("LANES_ESCALATION_NOTIFY_TIM", False)
-
-
-def lift_human_holds() -> bool:
-    return _flag("LANES_ESCALATION_LIFT_HUMAN_HOLDS", False)
 
 
 def per_head_cap() -> int:
@@ -369,9 +374,54 @@ def review_authority_ask(pr: dict) -> str | None:
     return None
 
 
+DECISION_DEADLINE_S = 48 * 3600
+
+
+def decision_ask_evidence(pr: dict, held: dict | None = None) -> list[str]:
+    """Why a PR carries a reserved decision (strategy/pricing/credential/taste, retired
+    needs-human, sensitive surface, human review that asks for authority). EVENT 2026-10-28:
+    this is an ask for an Ovie card, never a reason to park or hold the PR."""
+    labels = _labels(pr)
+    why = []
+    if _strategy(pr):
+        why.append("strategy/pricing/credential/taste content")
+    if "needs-human" in labels:
+        why.append("needs-human label (retired; does not pause)")
+    if _held_reason(pr, held) in DIFF_POLICY:
+        why.append(_held_reason(pr, held))
+    if "sensitive-surface" in labels or pr.get("sensitiveSurface"):
+        why.append("sensitive-surface")
+    if ask := review_authority_ask(pr):
+        why.append(f"review evidence carries a {ask} decision")
+    return why
+
+
+def decision_card(pr: dict, classified: dict, now: float | None = None) -> dict:
+    """A non-blocking Ovie decision card payload (docs/operations/DECISION_DEFAULT_CONTRACT.md).
+    The default ships if Tim is silent; spend and outbound asks default to no action."""
+    evidence = list(classified.get("decisionAsk") or classified.get("evidence") or [])
+    text = " ".join(evidence).lower()
+    reserved = bool(re.search(r"credential|spend|billing|legal|outbound|price|pricing", text))
+    at = time.time() if now is None else now
+    return {"schema": "jovie.lanes-decision-ask/v1", "pr": pr.get("number"), "head": pr.get("headRefOid"),
+            "evidence": evidence[:6], "blocking": False,
+            "defaultDecision": "reject" if reserved else "approve",
+            "defaultIfSilent": ("no action: the change ships disabled behind its flag" if reserved
+                                else "the change ships behind its flag as written; feedback arrives as a follow-up"),
+            "decideBy": at + DECISION_DEADLINE_S}
+
+
 def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None = None,
                      main_rollup=None) -> dict:
-    """One blocker class from the reconcile fields the lanes already read."""
+    """One blocker class from the reconcile fields the lanes already read. A reserved
+    decision rides along as `decisionAsk` evidence; it never changes the class."""
+    classified = _classify_blocker(pr, held, attempts, main_rollup)
+    ask = decision_ask_evidence(pr, held)
+    return {**classified, "decisionAsk": ask} if ask else classified
+
+
+def _classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None = None,
+                      main_rollup=None) -> dict:
     attempts = attempts or {}
     labels = _labels(pr)
     evidence: list[str] = []
@@ -385,21 +435,12 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
     if obsolete:
         return blocker("obsolete", None, [obsolete], "surface-only")
 
-    if _strategy(pr) or "needs-human" in labels or reason in DIFF_POLICY \
-            or "sensitive-surface" in labels or pr.get("sensitiveSurface"):
-        why = []
-        if _strategy(pr):
-            why.append("strategy/pricing/credential/taste content")
-        if "needs-human" in labels:
-            why.append("needs-human label")
-        if reason in DIFF_POLICY:
-            why.append(reason)
-        if "sensitive-surface" in labels or pr.get("sensitiveSurface"):
-            why.append("sensitive-surface")
-        return blocker("needs-human-decision", reason or "human-gate", why, "tim-decides")
+    if reason in DIFF_POLICY:
+        # A machine security gate (a secret-like file in the diff), not a human gate: it stays
+        # blocking and terminal-surfaces once; nothing is labeled and no human is asked to hold.
+        return blocker("needs-human-decision", reason, [reason], "surface-only")
 
-    held_here = bool(labels & {"hold", "gated", "incident", "do-not-merge", "tim-hold", "tim:hold", "hold:tim"})
-    stop_labels = bool(labels & {"needs-human", "do-not-merge", "tim-hold", "tim:hold", "hold:tim"})
+    held_here = bool(labels & {"hold", "gated", "incident"})
     human_review = pr.get("reviewDecision") == "CHANGES_REQUESTED" and (
         bool(human_threads) or not bot_threads)
     # A current human thread can carry a real founder decision (spend, billing,
@@ -408,25 +449,21 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
     # tim-decides instead of being routed as prescribed implementation.
     thread_ask = review_authority_ask(pr)
     if thread_ask:
+        # A reserved decision (spend, credentials, legal, outbound, price): the agent must not act
+        # on it, so the repair surfaces once as a non-blocking Ovie ask. Nothing is labeled or held.
         return blocker("needs-human-decision", "changes-requested",
                        ["current human review requires authority",
                         f"review evidence carries a {thread_ask} decision"],
-                       "tim-decides")
-
-    if held_here and not _actionable(note):
-        return blocker("needs-human-decision", "hold",
-                       [note[:240] or "human hold without a fix"], "tim-decides")
-    if pr.get("codeownersBlocked") or "codeowners" in labels:
-        return blocker("needs-human-decision", "codeowners",
-                       ["missing required human approval"], "tim-decides")
+                       "ovie-card")
+    # A bare machine hold with no fix and a CODEOWNERS block are not human gates: the hold
+    # contract releases the first by receipt, and review is a machine (LLM) gate, not a label.
 
     # GitHub computes mergeability asynchronously. UNKNOWN is missing evidence,
     # not a failed repair or a human decision; the next pass reads it again.
     if merge == "UNKNOWN":
         return blocker("ready", "awaiting", ["mergeStateStatus=UNKNOWN"], "wait")
 
-    if human_review and not held_here and not stop_labels and not thread_ask \
-            and not (pr.get("codeownersBlocked") or "codeowners" in labels):
+    if human_review and not held_here and not thread_ask:
         # Tim 2026-10-15: ordinary requested changes ship through the automated
         # review-fix ladder; only a human gate (strategy/taste/credential) waits.
         # The fix prompt already embeds the reviewers' own words (review_excerpt),
@@ -505,13 +542,13 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
 
     if pr.get("isDraft") and _green(pr):
         return blocker("ready", "draft", ["lane draft is green"], "ready-green")
-    return blocker("needs-human-decision", "unclassified", ["no autonomous rung matched"], "tim-decides")
+    return blocker("ready", "awaiting", ["no autonomous rung matched; waiting on the next event"], "wait")
 
 
 def classify_event(event: dict) -> dict:
     """Same classes as classify_blocker, plus main-red when main itself is the failure."""
     if not isinstance(event, dict):
-        return blocker("needs-human-decision", "malformed", ["event was not an object"], "tim-decides")
+        return blocker("obsolete", "malformed", ["event was not an object"], "surface-only")
     source = event.get("source")
     if source == "pr" or event.get("pr"):
         pr = event.get("pr") if isinstance(event.get("pr"), dict) else event.get("subject") or {}
@@ -895,7 +932,7 @@ def surface_body(pr: dict, classified: dict, reason: str) -> str:
     subtype = f" ({classified['subtype']})" if classified.get("subtype") else ""
     return (f"🤖 lanes: `{classified['cls']}`{subtype} — {reason}.\n"
             f"Evidence: {evidence}.\n"
-            f"Decision needed: {decision}.\n"
+            f"Decision: {decision}. Non-blocking: nothing waits on this; a default ships if unanswered.\n"
             + surface_marker(pr.get("number"), pr.get("headRefOid") or ""))
 
 

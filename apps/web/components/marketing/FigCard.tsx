@@ -16,11 +16,7 @@ export function FigCard({ title, description, icon, className }: FigCardProps) {
     <div
       className={cn('homepage-surface-card rounded-xl p-6 md:p-7', className)}
     >
-      {icon && (
-        <div className='mb-5 flex h-9 w-9 items-center justify-center rounded-xl border border-subtle bg-surface-1 text-secondary-token'>
-          {icon}
-        </div>
-      )}
+      {icon && <div className='mb-5 text-secondary-token'>{icon}</div>}
 
       <h3 className='text-base font-medium leading-snug tracking-[-0.017em] text-primary-token'>
         {title}

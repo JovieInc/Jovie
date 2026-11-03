@@ -29,7 +29,7 @@ export interface QualificationConfig {
   /**
    * Deterministic interview-score result from
    * `lib/waitlist/interview-scoring.ts`. When present and `admit` is true,
-   * a gate-on signup is approved instead of waitlisted
+   * a gate-on signup may be approved after readiness and capacity checks
    * (`qualified_interview_signal`).
    */
   readonly interview?: {
@@ -107,6 +107,28 @@ export function evaluateWaitlistQualification(params: {
     };
   }
 
+  // Fit and a reserved slot cannot waive the existing identity/readiness hold.
+  // Missing evidence has the same fail-closed result as an explicit hold.
+  if (
+    !params.config.goldenPath?.admit ||
+    params.config.autoAcceptReserved === false
+  ) {
+    const holdReason =
+      params.config.autoAcceptReserved === false
+        ? 'hold_capacity_full'
+        : (params.config.goldenPath?.reason ?? 'hold_golden_path_not_green');
+    return {
+      qualified: true,
+      status: 'waitlisted',
+      reasonCode:
+        params.config.autoAcceptReserved === false ||
+        holdReason === 'hold_capacity_full'
+          ? 'waitlist_capacity_full'
+          : 'waitlist_gate_enabled',
+      details: { mode: params.config.mode, goldenPathHold: holdReason },
+    };
+  }
+
   if (params.config.interview?.admit) {
     return {
       qualified: true,
@@ -116,18 +138,6 @@ export function evaluateWaitlistQualification(params: {
         mode: params.config.mode,
         interviewScore: params.config.interview.score,
         interviewSignals: params.config.interview.signals,
-      },
-    };
-  }
-
-  if (params.config.goldenPath?.admit) {
-    return {
-      qualified: true,
-      status: 'approved',
-      reasonCode: 'qualified_golden_path_resolved_artist',
-      details: {
-        mode: params.config.mode,
-        goldenPath: params.config.goldenPath.reason,
       },
     };
   }
@@ -143,17 +153,11 @@ export function evaluateWaitlistQualification(params: {
 
   return {
     qualified: true,
-    status: 'waitlisted',
-    reasonCode:
-      params.config.autoAcceptReserved === false ||
-      params.config.goldenPath?.reason === 'hold_capacity_full'
-        ? 'waitlist_capacity_full'
-        : 'waitlist_gate_enabled',
+    status: 'approved',
+    reasonCode: 'qualified_golden_path_resolved_artist',
     details: {
       mode: params.config.mode,
-      ...(params.config.goldenPath
-        ? { goldenPathHold: params.config.goldenPath.reason }
-        : {}),
+      goldenPath: params.config.goldenPath.reason,
     },
   };
 }

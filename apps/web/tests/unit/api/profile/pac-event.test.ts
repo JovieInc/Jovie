@@ -360,6 +360,24 @@ describe('POST /api/profile/pac-event', () => {
     expect(mockLogStatsigEvent).not.toHaveBeenCalled();
   });
 
+  it('skips the anonymous per-IP bucket in E2E test mode', async () => {
+    // Matrix shards share one 127.0.0.1 bucket across parallel tests; the
+    // anonymous budget 429s a healthy app (public-profile-smoke, run
+    // 41153386766). Test mode skips the bucket (same allowance as auth OTP).
+    vi.stubEnv('E2E_TEST_MODE', '1');
+    mockPublicProfilePacEventLimiterLimit.mockResolvedValue({
+      success: false,
+      degraded: false,
+      unavailable: false,
+    });
+
+    const response = await POST(buildRequest(buildPayload()));
+
+    expect(response.status).not.toBe(429);
+    expect(mockPublicProfilePacEventLimiterLimit).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
+  });
+
   it.each([
     { success: true, degraded: true },
     { success: false, unavailable: true },

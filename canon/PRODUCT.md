@@ -143,6 +143,7 @@ These rules are enforceable. A proposal, issue, or PR that breaks one is rejecte
 3. **Users do not pick the AI model.** Model, provider, temperature, and prompt choice are Jovie's job. This kind of configurability ships only as a deep feature after paying Pro-level customers ask for it.
 4. **Opinionated defaults over settings.** Pick the right default and ship it. A setting is allowed only when the platform requires it (OS permissions, legal consent, unsubscribe) or when users genuinely differ and no default can be right for most of them.
 5. **One control, not a matrix.** When a control is unavoidable, ship the single system-standard one (on/off, revoke, delete), never a per-item grid.
+6. **No dead ends.** Every rendered control works in the user's current runtime (JOV-INV-046). A control that cannot work here is not rendered: no "not available", "coming soon" or "use X instead" copy, no disabled control without an actionable reason, no no-op button, no link to an unbuilt route. Permission and entitlement prompts that lead to a working path, and transient errors with retry, are fine.
 
 ### Capability classification
 
@@ -290,6 +291,7 @@ Do not optimize for:
 | 2026-10-21 | Ovie is one no-scroll Home plus a collapsed Tools group. | Tim White |
 | 2026-10-20 | Jovie and Ovie mirror one shell and IA; Ovie Home is a living canvas. | Tim White |
 | 2026-10-15 | Recorded September 3 lock: YouTube artist loop first; APIs/MCPs are a core line on the same contract and workstream. | Tim White / JOV-5891 |
+| 2026-10-28 | "Opinions" rule 6: no dead ends (JOV-INV-046). | Tim White |
 | 2026-09-26 | "Opinions: outcomes over knobs" rules and capability classification (table-stakes / outcome-deepening / configurability held / taste). | Tim White |
 | 2026-08-28 | Continuous-optimization doctrine, learning hierarchy, safe transfer, and objective hierarchy. | Tim White / JOV-4045 |
 | 2026-07-17 | Created as domain canon under `/canon`. | Tim White |

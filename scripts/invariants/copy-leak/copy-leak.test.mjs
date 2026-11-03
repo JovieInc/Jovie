@@ -109,6 +109,26 @@ test('all visible source forms are scanned, including nested expressions and spl
   );
 });
 
+test('breadcrumb diagnostics use plain identifiers without exempting adjacent copy', () => {
+  for (const name of [
+    'statement_timeout_guard',
+    'server_analytics_timeout_guard',
+    'server_analytics_timeout_restore',
+  ]) {
+    const source = `Sentry.addBreadcrumb({ message: \`[${name}] set_config failed: \${error.message}\` });`;
+    const findings = scan(fixture, source);
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].rule, 'unresolved-prompt');
+    const corrected = source.replace(`[${name}]`, `${name}:`);
+    assert.deepEqual(scan(fixture, corrected), []);
+    assert.ok(
+      scan(fixture, `${corrected} const label = '[Your headline]';`).some(
+        hit => hit.rule === 'unresolved-prompt'
+      )
+    );
+  }
+});
+
 test('headline length applies after concatenation', () => {
   const half = 'A useful musical release headline with context ';
   assert.ok(

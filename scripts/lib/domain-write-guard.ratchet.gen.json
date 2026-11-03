@@ -23,9 +23,6 @@
     "apps/web/app/api/admin/roles/route.ts": {
       "users": 2
     },
-    "apps/web/app/api/admin/set-plan/route.ts": {
-      "users": 1
-    },
     "apps/web/app/api/artist/theme/route.ts": {
       "creatorProfiles": 1
     },
@@ -38,9 +35,6 @@
     "apps/web/app/api/canvas/generate/route.ts": {
       "discogReleases": 1
     },
-    "apps/web/app/api/chat/confirm-edit/route.ts": {
-      "creatorProfiles": 1
-    },
     "apps/web/app/api/chat/confirm-link/route.ts": {
       "socialLinks": 2
     },
@@ -48,7 +42,7 @@
       "socialLinks": 1
     },
     "apps/web/app/api/cron/billing-reconciliation/route.ts": {
-      "users": 2
+      "users": 1
     },
     "apps/web/app/api/dashboard/audience/members/route.ts": {
       "audienceMembers": 1
@@ -143,7 +137,7 @@
       "creatorProfiles": 1
     },
     "apps/web/app/app/(shell)/dashboard/releases/actions.ts": {
-      "discogReleases": 4,
+      "discogReleases": 3,
       "discogRecordings": 1,
       "discogTracks": 1,
       "creatorProfiles": 5
@@ -278,9 +272,6 @@
     },
     "apps/web/lib/ingestion/status-manager.ts": {
       "creatorProfiles": 7
-    },
-    "apps/web/lib/leads/route-lead.ts": {
-      "creatorProfiles": 1
     },
     "apps/web/lib/merch/first-sale-text.ts": {
       "creatorProfiles": 1

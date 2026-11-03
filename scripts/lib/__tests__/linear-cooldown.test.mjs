@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import { mkdtempSync, rmSync } from 'node:fs';
+import { createRequire, syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, it } from 'node:test';
@@ -35,6 +36,14 @@ afterEach(() => {
   fs.rmSync(root, { recursive: true, force: true });
   fs.mkdirSync(root, { recursive: true });
 });
+
+function deferredSignal() {
+  let resolve = () => {};
+  const promise = new Promise(done => {
+    resolve = () => done(undefined);
+  });
+  return { promise, resolve };
+}
 
 describe('shared linear cooldown', () => {
   it('has no blocking filesystem calls in the shared request helper', () => {
@@ -157,6 +166,235 @@ describe('shared linear cooldown', () => {
     }
   });
 
+  it('waits for an overlapping atomic publication before returning the latest deadline', async t => {
+    fs.chmodSync(root, 0o700);
+    const key = 'overlapping-publication-secret';
+    const now = 1_700_000_000_000;
+    const laterReset = now + 120_000;
+    const writer = credentialBackoff(key, root);
+    const reader = credentialBackoff(key, root);
+    await writer.publish(now + 30_000);
+
+    const fetch = t.mock.method(globalThis, 'fetch', async () => {
+      throw new Error('this filesystem regression must not make requests');
+    });
+    const fsPromises = createRequire(import.meta.url)('node:fs/promises');
+    const originalRename = fsPromises.rename;
+    const originalReaddir = fsPromises.readdir;
+    const renameReached = deferredSignal();
+    const releaseRename = deferredSignal();
+    const pendingObserved = deferredSignal();
+    const readWaiting = deferredSignal();
+    const waitingCallbacks = [];
+    let monotonic = 0;
+    let waitCount = 0;
+    t.mock.method(performance, 'now', () => monotonic);
+    t.mock.method(globalThis, 'setTimeout', callback => {
+      waitCount += 1;
+      if (waitCount === 1) waitingCallbacks.push(callback);
+      else {
+        monotonic += 600;
+        queueMicrotask(callback);
+      }
+      readWaiting.resolve();
+      return 0;
+    });
+    const operations = [];
+    let publishing;
+    fsPromises.rename = async (source, destination) => {
+      if (
+        String(destination).startsWith(join(writer.directory, `${laterReset}-`))
+      ) {
+        renameReached.resolve();
+        await releaseRename.promise;
+      }
+      return originalRename(source, destination);
+    };
+    fsPromises.readdir = async (...args) => {
+      const names = await originalReaddir(...args);
+      if (
+        String(args[0]) === reader.directory &&
+        names.some(name => String(name).startsWith('.pending-'))
+      ) {
+        pendingObserved.resolve();
+      }
+      return names;
+    };
+    syncBuiltinESMExports();
+
+    try {
+      publishing = writer.publish(laterReset);
+      operations.push(publishing);
+      const publicationResult = Promise.allSettled([publishing]);
+      await renameReached.promise;
+      const reading = reader.read(now);
+      operations.push(reading);
+      let readSettled = false;
+      const readResult = Promise.allSettled([reading]).then(result => {
+        readSettled = true;
+        return result;
+      });
+      await pendingObserved.promise;
+      await Promise.race([readWaiting.promise, readResult]);
+      assert.equal(readSettled, false, 'admission must wait for publication');
+      releaseRename.resolve();
+      assert.deepEqual(await publicationResult, [
+        { status: 'fulfilled', value: undefined },
+      ]);
+      waitingCallbacks.splice(0).forEach(callback => callback());
+      assert.equal(fetch.mock.callCount(), 0);
+      assert.deepEqual(await readResult, [
+        { status: 'fulfilled', value: laterReset },
+      ]);
+      assert.equal(await reader.read(now), laterReset);
+      assert.equal(fetch.mock.callCount(), 0);
+    } finally {
+      releaseRename.resolve();
+      await Promise.allSettled([publishing]);
+      waitingCallbacks.splice(0).forEach(callback => callback());
+      await Promise.allSettled(operations);
+      fsPromises.rename = originalRename;
+      fsPromises.readdir = originalReaddir;
+      syncBuiltinESMExports();
+    }
+  });
+
+  it('fails closed on an abandoned pending publication under one total wait bound', async t => {
+    fs.chmodSync(root, 0o700);
+    const store = credentialBackoff('abandoned-publication-secret', root);
+    fs.mkdirSync(store.directory, { mode: 0o700 });
+    const pending = join(
+      store.directory,
+      '.pending-00000000-0000-4000-8000-000000000000'
+    );
+    fs.writeFileSync(pending, JSON.stringify({ schema: 1, resetAt: 120_000 }), {
+      mode: 0o600,
+    });
+    let monotonic = 0;
+    const clock = t.mock.method(performance, 'now', () => monotonic);
+    const waits = t.mock.method(globalThis, 'setTimeout', callback => {
+      assert.ok(
+        monotonic < 1_200,
+        'rescanning must not reset the wait deadline'
+      );
+      monotonic += 600;
+      queueMicrotask(callback);
+      return 0;
+    });
+    const fetch = t.mock.method(globalThis, 'fetch', async () => {
+      throw new Error('pending publication must not admit a network request');
+    });
+    await assert.rejects(store.read(0), { code: 'BACKOFF_STATE_INVALID' });
+    assert.equal(waits.mock.callCount(), 2);
+    assert.ok(clock.mock.callCount() >= 3);
+    assert.equal(fetch.mock.callCount(), 0);
+    assert.equal(
+      fs.existsSync(pending),
+      true,
+      'readers never delete a publisher staging file'
+    );
+  });
+
+  for (const removed of ['staging', 'scope']) {
+    it(`fails closed when observed ${removed} disappears without a committed record`, async t => {
+      fs.chmodSync(root, 0o700);
+      const store = credentialBackoff('aborted-publication-secret', root);
+      fs.mkdirSync(store.directory, { mode: 0o700 });
+      const pending = join(
+        store.directory,
+        '.pending-00000000-0000-4000-8000-000000000000'
+      );
+      fs.writeFileSync(pending, '{', { mode: 0o600 });
+      let monotonic = 0;
+      t.mock.method(performance, 'now', () => monotonic);
+      const waits = t.mock.method(globalThis, 'setTimeout', callback => {
+        assert.ok(
+          monotonic < 1_200,
+          'aborted publication must retain the total bound'
+        );
+        fs.rmSync(removed === 'scope' ? store.directory : pending, {
+          recursive: true,
+          force: true,
+        });
+        monotonic += 600;
+        queueMicrotask(callback);
+        return 0;
+      });
+      await assert.rejects(store.read(0), { code: 'BACKOFF_STATE_INVALID' });
+      assert.equal(waits.mock.callCount(), removed === 'scope' ? 1 : 2);
+    });
+  }
+
+  it('does not restart the publication wait budget for a legacy scope', async t => {
+    fs.chmodSync(root, 0o700);
+    const legacyRoot = join(root, 'legacy');
+    const key = 'shared-publication-deadline-secret';
+    const store = credentialBackoff(key, root, { legacyRoots: [legacyRoot] });
+    const legacyScope = join(legacyRoot, credentialHash(key));
+    fs.mkdirSync(store.directory, { mode: 0o700 });
+    fs.mkdirSync(legacyScope, { recursive: true, mode: 0o700 });
+    const id = '00000000-0000-4000-8000-000000000000';
+    const pending = join(store.directory, `.pending-${id}`);
+    fs.writeFileSync(pending, JSON.stringify({ schema: 1, resetAt: 30_000 }), {
+      mode: 0o600,
+    });
+    fs.writeFileSync(join(legacyScope, `.pending-${id}`), '{', { mode: 0o600 });
+    let monotonic = 0;
+    t.mock.method(performance, 'now', () => monotonic);
+    const waits = t.mock.method(globalThis, 'setTimeout', callback => {
+      assert.ok(
+        monotonic < 1_200,
+        'legacy scope must share the original deadline'
+      );
+      if (monotonic === 0)
+        fs.renameSync(pending, join(store.directory, `30000-${id}.json`));
+      monotonic += 600;
+      queueMicrotask(callback);
+      return 0;
+    });
+    await assert.rejects(store.read(0), { code: 'BACKOFF_STATE_INVALID' });
+    assert.equal(waits.mock.callCount(), 2);
+  });
+
+  for (const variant of [
+    'unknown-name',
+    'nonprivate',
+    'symlink',
+    'directory',
+    'oversized',
+  ]) {
+    it(`fails immediately on ${variant} staging without treating it as a live publication`, async t => {
+      fs.chmodSync(root, 0o700);
+      const store = credentialBackoff(`invalid-pending-${variant}`, root);
+      fs.mkdirSync(store.directory, { mode: 0o700 });
+      const pending = join(
+        store.directory,
+        variant === 'unknown-name'
+          ? '.pending-abcd'
+          : '.pending-00000000-0000-4000-8000-000000000000'
+      );
+      if (variant === 'symlink') fs.symlinkSync('/dev/null', pending);
+      else if (variant === 'directory') fs.mkdirSync(pending, { mode: 0o700 });
+      else
+        fs.writeFileSync(
+          pending,
+          variant === 'oversized' ? 'x'.repeat(257) : '{',
+          {
+            mode: variant === 'nonprivate' ? 0o644 : 0o600,
+          }
+        );
+      const waits = t.mock.method(globalThis, 'setTimeout', () => {
+        throw new Error('unsafe staging must fail immediately');
+      });
+      await assert.rejects(store.read(0), { code: 'BACKOFF_STATE_INVALID' });
+      assert.equal(waits.mock.callCount(), 0);
+      assert.equal(
+        fs.lstatSync(pending).isSymbolicLink(),
+        variant === 'symlink'
+      );
+    });
+  }
+
   it('a failed publish never throws', async () => {
     const key = 'unwritable-secret';
     const blocker = join(root, 'blocked');
@@ -174,6 +412,24 @@ describe('shared linear cooldown', () => {
     } finally {
       process.env.LINEAR_COOLDOWN_STATE_DIR = previousDir;
     }
+  });
+
+  it('LINEAR_COOLDOWN_FALLBACK_DIR overrides the fallback location', () => {
+    const override = join(root, 'fallback-override');
+    const previousFallback = process.env.LINEAR_COOLDOWN_FALLBACK_DIR;
+    process.env.LINEAR_COOLDOWN_FALLBACK_DIR = override;
+    try {
+      assert.equal(fallbackCooldownRoot(), override);
+    } finally {
+      if (previousFallback === undefined)
+        delete process.env.LINEAR_COOLDOWN_FALLBACK_DIR;
+      else process.env.LINEAR_COOLDOWN_FALLBACK_DIR = previousFallback;
+    }
+    const uid = process.getuid ? process.getuid() : 'shared';
+    assert.equal(
+      fallbackCooldownRoot(),
+      join(tmpdir(), `jovie-linear-cooldown-${uid}`)
+    );
   });
 
   it('an unwritable state dir still backs siblings off and reports (JOV-7577)', async () => {

@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
 import { CapacityBoard } from '@/components/features/admin/capacity/CapacityBoard';
+import { FleetAuditPanel } from '@/components/features/admin/fleet-audit/FleetAuditPanel';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { APP_ROUTES } from '@/constants/routes';
 import { getAdminCapacity } from '@/lib/admin/capacity';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { getFleetAuditSummary } from '@/lib/ovie/fleet-audit.server';
 
 export const metadata: Metadata = { title: 'Capacity | Ovie' };
 
@@ -24,7 +26,10 @@ export default async function AdminCapacityPage({
     ? params.provider[0]
     : params.provider;
   const now = Date.now();
-  const capacity = await getAdminCapacity(now);
+  const [capacity, fleetAudit] = await Promise.all([
+    getAdminCapacity(now),
+    getFleetAuditSummary(),
+  ]);
 
   return (
     <AdminPage
@@ -42,6 +47,7 @@ export default async function AdminCapacityPage({
         registryUpdatedAt={capacity.registryUpdatedAt}
         liveOverlay={capacity.liveOverlay}
       />
+      <FleetAuditPanel initial={fleetAudit} />
     </AdminPage>
   );
 }

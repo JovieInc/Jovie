@@ -1,6 +1,10 @@
 import type { UIMessage } from 'ai';
 import { describe, expect, it, vi } from 'vitest';
 import { normalizeArtistMetrics } from '@/lib/onboarding/canonical-metrics';
+import {
+  advanceOnboardingProfileDraft,
+  emptyOnboardingProfileDraft,
+} from '@/lib/onboarding/profile-draft';
 import { getSpotifyArtist } from '@/lib/spotify';
 import {
   buildConfirmSpotifyArtistOutput,
@@ -10,6 +14,23 @@ import {
 } from './onboarding-tool-impls';
 
 vi.mock('server-only', () => ({}));
+const catalogMocks = vi.hoisted(() => ({
+  fetchPreview: vi.fn().mockResolvedValue(null),
+  recordFunnelStep: vi.fn().mockResolvedValue(undefined),
+  recordStage: vi.fn().mockResolvedValue(true),
+}));
+vi.mock('@/lib/onboarding/catalog-preview.server', () => ({
+  fetchOnboardingCatalogPreview: catalogMocks.fetchPreview,
+}));
+vi.mock('@/lib/analytics/signup-funnel.server', () => ({
+  recordFunnelStep: catalogMocks.recordFunnelStep,
+}));
+vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
+  recordArtistOfferStage: catalogMocks.recordStage,
+}));
+vi.mock('next/headers', () => ({
+  cookies: async () => ({ get: () => undefined }),
+}));
 vi.mock('@/lib/spotify', () => ({
   getSpotifyArtist: vi.fn(),
   buildSpotifyArtistUrl: (id: string) =>
@@ -286,6 +307,60 @@ describe('confirmSpotifyArtist tool (JOV-7134)', () => {
   });
 });
 
+describe('adaptive job access and current offer', () => {
+  it('does not reuse music qualification for a founder job or an unresolved priority', async () => {
+    const state = createOnboardingTurnState({
+      sessionId: 'multiple-jobs',
+      turnCount: 3,
+      messages: [assistantMessage],
+    });
+    state.profileDraft = advanceOnboardingProfileDraft(
+      emptyOnboardingProfileDraft(),
+      {
+        id: 'founder',
+        text: 'I am a founder https://company.example I want buyer contact',
+      }
+    );
+    const tools = buildOnboardingTools(state);
+    await expect(
+      tools.proposeNextStep.execute?.({}, {} as never)
+    ).resolves.toMatchObject({ decision: { kind: 'waitlist' } });
+    await expect(
+      tools.proposeCheckout.execute?.({ plan: 'free' }, {} as never)
+    ).resolves.toMatchObject({ action: 'checkout_unavailable' });
+    state.profileDraft = advanceOnboardingProfileDraft(state.profileDraft, {
+      id: 'role-conflict',
+      text: 'I am also a musician',
+    });
+    await expect(
+      tools.proposeNextStep.execute?.({}, {} as never)
+    ).resolves.toMatchObject({
+      decision: {
+        kind: 'needs_more_info',
+        rationale: 'role_priority_required',
+      },
+    });
+  });
+
+  it.each(['free', 'pro'] as const)(
+    'rejects Max and permits self-service %s for a qualified artist',
+    async plan => {
+      const state = createOnboardingTurnState({
+        sessionId: 'artist-offer',
+        turnCount: 3,
+        messages: [assistantMessage],
+      });
+      const tools = buildOnboardingTools(state);
+      await expect(
+        tools.proposeCheckout.execute?.({ plan: 'max' }, {} as never)
+      ).resolves.toMatchObject({ action: 'checkout_unavailable' });
+      await expect(
+        tools.proposeCheckout.execute?.({ plan }, {} as never)
+      ).resolves.toMatchObject({ action: 'propose_checkout', plan });
+    }
+  );
+});
+
 describe('confirmed artist field provenance', () => {
   const id = '1Cs0zKBU1kc0i8ypK3B9ai';
   const artist = {
@@ -318,6 +393,62 @@ describe('confirmed artist field provenance', () => {
       fetchedAt: output.metrics?.updatedAt,
     });
     expect(state.artistMetrics).toEqual(output.metrics);
+  });
+
+  it('carries the real catalog into the preview and records the funnel step (JOV-9758)', async () => {
+    vi.mocked(getSpotifyArtist).mockResolvedValueOnce(artist);
+    const catalog = {
+      total: 24,
+      releases: [
+        {
+          id: 'album1',
+          title: 'Latest single',
+          releaseType: 'single' as const,
+          releaseDate: '2026-08-14',
+          artworkUrl: 'https://i.scdn.co/image/album1',
+          spotifyUrl: 'https://open.spotify.com/album/album1',
+        },
+      ],
+    };
+    catalogMocks.fetchPreview.mockResolvedValueOnce(catalog);
+    const state = createOnboardingTurnState({
+      sessionId: 'catalog-fixture',
+      turnCount: 1,
+    });
+    const output = await buildConfirmSpotifyArtistOutput(id, state);
+    expect(catalogMocks.fetchPreview).toHaveBeenCalledWith(id);
+    expect(output.catalog).toEqual(catalog);
+    expect(state.catalogPreview).toEqual(catalog);
+    await vi.waitFor(() =>
+      expect(catalogMocks.recordFunnelStep).toHaveBeenCalledWith({
+        funnel: 'artist_signup',
+        step: 'catalog_preview',
+        surface: 'onboarding',
+      })
+    );
+
+    // A later turn rehydrates the catalog from history without refetching.
+    const rehydrated = createOnboardingTurnState({
+      sessionId: 'catalog-fixture',
+      turnCount: 2,
+      messages: [
+        {
+          id: 'assistant-catalog',
+          role: 'assistant',
+          parts: [
+            {
+              type: 'dynamic-tool',
+              toolName: 'confirmSpotifyArtist',
+              toolCallId: 'tool-confirm-catalog',
+              state: 'output-available',
+              input: { spotifyArtistId: id },
+              output,
+            },
+          ],
+        },
+      ],
+    });
+    expect(rehydrated.catalogPreview).toEqual(catalog);
   });
 
   it('rejects wrong-identity API data before it can contaminate the accumulator', async () => {

@@ -182,7 +182,9 @@ function inspectGateFile(file, config) {
       if (raised(file.before, file.after, key)) add(kind, key);
     }
   }
-  if (isShrinkOnly(file.path) && file.after != null && grew(file.before ?? '', file.after)) {
+  // A brand-new ledger (no prior version) introduces a ratchet; it is not a
+  // loosening. Growth of an existing ledger still trips this.
+  if (isShrinkOnly(file.path) && file.before != null && file.after != null && grew(file.before, file.after)) {
     add('shrink-only-growth', 'count increased');
   }
   if (isThresholdPath(file.path) && file.before != null && file.after != null) {

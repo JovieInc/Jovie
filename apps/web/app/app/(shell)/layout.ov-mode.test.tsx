@@ -39,6 +39,9 @@ vi.mock('next/navigation', () => ({
   },
 }));
 
+vi.mock('@/components/features/admin/OvieRouteUsageBeacon', () => ({
+  OvieRouteUsageBeacon: () => null,
+}));
 vi.mock('@/components/organisms/AppShellSkeleton', () => ({
   AppShellSkeleton: ({ main }: { readonly main?: ReactNode }) => (
     <div data-testid='app-shell-skeleton'>{main}</div>

@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull, lte } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import {
@@ -91,6 +91,9 @@ async function sendVerificationEmail(
 ): Promise<void> {
   const emailContent = getChangelogVerifyEmail({ verificationToken });
   await sendEmail({
+    stream: 'transactional',
+    purpose: 'changelog-subscribe-verify',
+    consent: 'opt-in',
     to: email,
     subject: emailContent.subject,
     text: emailContent.text,
@@ -135,10 +138,21 @@ async function handleExistingSubscriber(
     }
   }
 
+  const sentAt = Date.now();
   const verificationToken = crypto.randomUUID();
-  const tokenExpiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
+  const tokenExpiresAt = new Date(sentAt + VERIFICATION_TOKEN_TTL_MS);
 
-  await db
+  // Atomic cooldown claim. The read above may be stale: two concurrent
+  // requests for the same address (from different IPs, so the per-IP limiter
+  // does not serialize them) can both observe an elapsed cooldown. The
+  // update only lands while the persisted tokenExpiresAt still places the
+  // last send outside the cooldown window, so exactly one request can mint
+  // a fresh confirmation; the loser claims zero rows and gets the same 429
+  // contract the pre-check uses.
+  const resendFloor = new Date(
+    sentAt + VERIFICATION_TOKEN_TTL_MS - CONFIRMATION_RESEND_COOLDOWN_MS
+  );
+  const claimed = await db
     .update(productUpdateSubscribers)
     .set({
       verified: false,
@@ -149,7 +163,33 @@ async function handleExistingSubscriber(
       source: source ?? 'changelog_page',
       updatedAt: new Date(),
     })
-    .where(eq(productUpdateSubscribers.id, existing.id));
+    .where(
+      and(
+        eq(productUpdateSubscribers.id, existing.id),
+        existing.tokenExpiresAt
+          ? lte(productUpdateSubscribers.tokenExpiresAt, resendFloor)
+          : isNull(productUpdateSubscribers.tokenExpiresAt)
+      )
+    )
+    .returning({ id: productUpdateSubscribers.id });
+
+  if (claimed.length === 0) {
+    const retryAfterSeconds = Math.ceil(CONFIRMATION_RESEND_COOLDOWN_MS / 1000);
+    return NextResponse.json(
+      {
+        error:
+          'Confirmation email was just sent. Please wait before resending.',
+        retryAfterSeconds,
+      },
+      {
+        status: 429,
+        headers: {
+          ...NO_STORE_HEADERS,
+          'Retry-After': String(retryAfterSeconds),
+        },
+      }
+    );
+  }
 
   try {
     await sendVerificationEmail(email, verificationToken);

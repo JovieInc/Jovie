@@ -37,7 +37,7 @@ function fixture(enabled = true) {
       availability: 'available',
     },
   };
-  return { dispatcher, deps, envelope };
+  return { dispatcher, deps, envelope, backend };
 }
 function request(body: unknown, headers: Record<string, string> = {}) {
   return new Request('https://jov.ie/api/v1/actions/fleet.register/invoke', {
@@ -74,6 +74,22 @@ describe('fleet HTTP authority and canonical receipts', () => {
       'fleet.register',
       f.deps
     );
+    const result = await response.clone().json();
+    expect(result.receipt.route).toMatchObject({
+      requestedTransport: 'cli',
+      actualRuntime: 'jovie-server',
+      unknownRoute: true,
+      policyDecision: 'report_only',
+      benchmarkEligible: false,
+      status: 'succeeded',
+      events: [
+        { boundary: 'adapter', transport: 'rest', toolId: 'fleet.register' },
+      ],
+    });
+    const stored = await f.backend.get('ignored');
+    expect(JSON.stringify(stored)).toContain(
+      JSON.stringify(result.receipt.route)
+    );
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(await response.json()).toEqual(
@@ -97,6 +113,33 @@ describe('fleet HTTP authority and canonical receipts', () => {
       (await handleFleetControl(crossOrigin, 'status', f.deps)).status
     ).toBe(403);
     expect(f.deps.founder).not.toHaveBeenCalled();
+  });
+
+  it('attests REST even when a caller claims MCP and excludes request secrets', async () => {
+    const f = fixture();
+    const response = await handleFleetInvocation(
+      request(
+        {
+          ...f.envelope,
+          idempotencyKey: 'canary-private-key',
+          context: { ...f.envelope.context, channel: 'mcp' },
+        },
+        {
+          Authorization: 'Bearer canary-private-token',
+          'X-Otp': 'canary-private-otp',
+        }
+      ),
+      'fleet.register',
+      f.deps
+    );
+    const body = await response.json();
+    expect(body.receipt.route).toMatchObject({
+      requestedTransport: 'mcp',
+      events: [{ transport: 'rest' }],
+      unknownRoute: true,
+      status: 'failed',
+    });
+    expect(JSON.stringify(body.receipt.route)).not.toContain('canary-private');
   });
 
   it('preserves authentication denial and disabled-runtime status without granting authority', async () => {

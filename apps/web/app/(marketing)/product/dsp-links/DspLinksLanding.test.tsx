@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { displayDspUrl } from '@/components/molecules/inspector/DspQuietRow';
 import { buildDspFindUrl } from '@/components/molecules/inspector/dsp-find-url';
 import { DSP_LINKS_COPY, DSP_LINKS_FIXTURE } from '@/data/dspLinksCopy';
 import { DspLinksLanding } from './DspLinksLanding';
@@ -53,6 +54,8 @@ describe('DspLinksLanding', () => {
       const row = within(list).getByRole('link', { name: service.label });
       expect(row).toHaveAttribute('href', service.href);
       expect(row).toHaveAttribute('data-dsp-row', 'linked');
+      // The saved URL is visible, not just a bare service name.
+      expect(within(row).getByText(displayDspUrl(service.href))).toBeVisible();
     }
 
     const missing = within(list).getByTestId('dsp-link-pandora');

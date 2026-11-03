@@ -69,13 +69,6 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Run coverage
-        # Unit tests are auth-mocked at the SDK boundary — they do not need
-        # production Clerk keys. Per .claude/rules/auth.md, unprefixed CLERK_*
-        # secrets are the production keypair. Inject test-mode literals so
-        # CI never has prod-Clerk material in scope.
-        env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
-          CLERK_SECRET_KEY: sk_test_dummy_secret_for_coverage_run_only
         run: pnpm --filter @jovie/web test:coverage
 
       - name: Check RED-surface coverage drift
