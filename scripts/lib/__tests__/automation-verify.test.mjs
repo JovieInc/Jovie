@@ -3724,6 +3724,41 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
+  describe('agent-ready scanner producer binding', () => {
+    const producer = 'apps/web/lib/agent-ready/scan.test.ts';
+    const sources = [
+      'apps/web/lib/agent-ready/scan.mjs',
+      'apps/web/lib/agent-ready/agent-ready-floor.json',
+    ];
+
+    it.each(sources)(
+      'selects the real scanner and CLI behavior suite for %s',
+      source => {
+        const plan = buildAffectedTestPlan([source]);
+        expect(plan.mode).toBe('selected');
+        expect(plan.mandatoryTests).toContain(producer);
+        expect(plan.selectedTests).toContain(producer);
+        expect(buildSelectedTestCommands(plan, '1').flat(2)).toContain(
+          'lib/agent-ready/scan.test.ts'
+        );
+      }
+    );
+
+    it('fails closed if the producer disappears or an unknown source joins', () => {
+      expect(
+        buildAffectedTestPlan(sources, {
+          isFileAvailable: file => file !== producer,
+        }).mode
+      ).toBe('full');
+      expect(
+        buildAffectedTestPlan([
+          ...sources,
+          'apps/web/lib/agent-ready/unknown-scanner-helper.mjs',
+        ]).mode
+      ).toBe('full');
+    });
+  });
+
   it('fails closed when a web source has no test lane', () => {
     const plan = buildAffectedTestPlan(['apps/web/lib/unknown.ts']);
 

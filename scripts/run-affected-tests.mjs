@@ -35,6 +35,14 @@ const TESTABLE_FILE = /\.(?:[cm]?[jt]sx?|json)$/;
 const VITEST_TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
 const KNOWN_VITEST_FIXTURE_TESTS = new Map([
   [
+    'apps/web/lib/agent-ready/scan.mjs',
+    ['apps/web/lib/agent-ready/scan.test.ts'],
+  ],
+  [
+    'apps/web/lib/agent-ready/agent-ready-floor.json',
+    ['apps/web/lib/agent-ready/scan.test.ts'],
+  ],
+  [
     'apps/web/tests/unit/design-system/arbitrary-values.baseline.json',
     ['apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'],
   ],
