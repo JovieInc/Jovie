@@ -10,7 +10,9 @@ import {
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PublicClaimBanner } from '@/app/[username]/_components/PublicClaimBanner';
 import { AboutSection } from '@/components/features/profile/AboutSection';
+import { ProfileDrawerShell } from '@/components/features/profile/ProfileDrawerShell';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
@@ -1008,7 +1010,7 @@ describe('ProfileCompactTemplate', () => {
 
     const branding = await screen.findByTestId('profile-jovie-branding');
     expect(
-      within(branding).getByRole('link', { name: /Jovie home/i })
+      within(branding).getByRole('link', { name: /Made with Jovie/i })
     ).toHaveAttribute(
       'href',
       `/?utm_source=profile&utm_artist=${mockArtist.handle}`
@@ -1595,6 +1597,89 @@ describe('ProfileCompactTemplate', () => {
     replaceStateSpy.mockRestore();
   });
 
+  it('restores a stripped deep-link landing even when the strip never wakes React', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([]);
+    mockUseProfileShell.mockImplementation(() => ({
+      locationMode: 'listen',
+      notificationsContextValue: {
+        subscribedChannels: {},
+        subscriptionDetails: {},
+        setSubscribedChannels: vi.fn(),
+        setSubscriptionDetails: vi.fn(),
+        setState: vi.fn(),
+      },
+      notificationsController: {
+        contentPreferences: null,
+      },
+    }));
+    window.history.replaceState(null, '', '/artist-profiles');
+    window.history.pushState(null, '', '/test-artist?mode=listen&source=qr');
+    // Fresh trace ring: earlier tests in this file share the same window.
+    (window as unknown as Record<string, unknown>).__JOVIE_RUNTIME_TRACE__ =
+      undefined;
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    render(
+      <ProfileCompactTemplate
+        mode='listen'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          modeOverride: 'listen',
+          sourceOverride: 'qr',
+        })
+      );
+    });
+
+    const historyLengthAfterLanding = window.history.length;
+    // Next's entry updater strips the landed ?mode=… entry with a bare
+    // replaceState — no React wake, no rerender. On the standalone E2E
+    // server the strip lands LATE (post-hydration, ~seconds in): after the
+    // first fix's fixed 200/600/1400ms wake ticks had all fired, so the
+    // correction still never ran (verify run 41097577290). Delay the strip
+    // past that fixed window so only the 250ms strip detector can catch it.
+    await new Promise(resolve => setTimeout(resolve, 1800));
+    act(() => {
+      window.history.replaceState(window.history.state, '', '/test-artist');
+    });
+    pushStateSpy.mockClear();
+
+    // Deliberately NO view.rerender here: only the strip detector's wake
+    // may correct the strip.
+    await waitFor(
+      () => {
+        expect(`${window.location.pathname}${window.location.search}`).toBe(
+          '/test-artist?mode=listen&source=qr'
+        );
+      },
+      { timeout: 4500 }
+    );
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(window.history.length).toBe(historyLengthAfterLanding);
+
+    // Runtime-trace receipts (lib/testing/runtime-trace): the correction path
+    // is recorded so a red matrix run names the guard that fired.
+    const trace = (
+      window as unknown as {
+        __JOVIE_RUNTIME_TRACE__?: { events: { event: string }[] };
+      }
+    ).__JOVIE_RUNTIME_TRACE__;
+    expect(trace?.events.map(event => event.event)).toEqual(
+      expect.arrayContaining(['arrival', 'strip-correction-replace'])
+    );
+    expect(trace?.events.some(event => event.event === 'mode-push')).toBe(
+      false
+    );
+
+    pushStateSpy.mockRestore();
+  });
+
   it('does not revert a client Link navigation to a different mode', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([]);
     mockUseProfileShell.mockImplementation(() => ({
@@ -1826,6 +1911,129 @@ describe('ProfileCompactTemplate', () => {
     });
 
     expect(screen.getByTestId('profile-bottom-nav')).toBeInTheDocument();
+  });
+
+  describe('claim entry navigation', () => {
+    beforeEach(() => {
+      vi.stubEnv('NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE', '');
+      mockViewport('desktop');
+      // Keep the real drawer's Escape/focus lifecycle; only its heavy body
+      // is omitted from this history and claim-banner regression.
+      mockProfileUnifiedDrawer.mockImplementation(
+        (props: React.ComponentProps<typeof ProfileDrawerShell>) => (
+          <ProfileDrawerShell {...props} title='Menu'>
+            <button type='button'>Menu action</button>
+          </ProfileDrawerShell>
+        )
+      );
+    });
+
+    afterEach(() => vi.unstubAllEnvs());
+
+    const profile = () => (
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        profileBanner={
+          <PublicClaimBanner
+            profileHandle={mockArtist.handle}
+            displayName={mockArtist.name}
+            directClaimSupported
+            isClaimed={false}
+            visitorState='organic_unclaimed'
+          />
+        }
+      />
+    );
+
+    it.each([null, 'qr'])(
+      '%s source keeps claim intent through Escape, modes, and history',
+      async source => {
+        const query = new URLSearchParams({
+          claim: '1',
+          token: 'private-token',
+          email: 'private@example.com',
+        });
+        if (source) query.set('source', source);
+        window.history.replaceState(null, '', `/test-artist?${query}`);
+        render(profile());
+
+        const expectClaimIntent = () => {
+          expect(screen.getByTestId('claim-banner')).toHaveTextContent(
+            'Your profile is ready. Claim it to turn on release emails.'
+          );
+          expect(screen.getByTestId('claim-banner-cta')).toHaveAttribute(
+            'href',
+            '/test-artist/claim?next=auth'
+          );
+        };
+        const expectMode = (mode: string) => {
+          expect(screen.getByTestId('profile-compact-surface')).toHaveAttribute(
+            'data-mode',
+            mode
+          );
+          expect(
+            Object.fromEntries(new URLSearchParams(window.location.search))
+          ).toEqual({
+            claim: '1',
+            ...(source ? { source } : {}),
+            ...(mode === 'profile' ? {} : { mode }),
+          });
+          expectClaimIntent();
+        };
+
+        await waitFor(expectClaimIntent);
+        const menu = screen.getByRole('button', { name: 'Menu' });
+        menu.focus();
+        fireEvent.click(menu);
+        await screen.findByRole('dialog', { name: 'Menu' });
+        expectClaimIntent();
+        fireEvent.keyDown(document, { key: 'Escape' });
+        await waitFor(() => {
+          expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+          expectMode('profile');
+        });
+
+        const nav = () => within(screen.getByTestId('profile-bottom-nav'));
+        fireEvent.click(nav().getByRole('button', { name: 'Events' }));
+        await waitFor(() => expectMode('tour'));
+        fireEvent.click(nav().getByRole('button', { name: 'Home' }));
+        await waitFor(() => expectMode('profile'));
+        act(() => window.history.back());
+        await waitFor(() => expectMode('tour'));
+        act(() => window.history.forward());
+        await waitFor(() => expectMode('profile'));
+      }
+    );
+
+    it.each(['0', 'true', 'private-token'])(
+      'does not propagate unsupported claim=%s',
+      async claim => {
+        window.history.replaceState(
+          null,
+          '',
+          `/test-artist?claim=${claim}&source=qr&token=private-token`
+        );
+        render(profile());
+        expect(screen.getByTestId('claim-banner')).toHaveTextContent(
+          'This profile is unclaimed. Is it yours? Claim it with Spotify.'
+        );
+        fireEvent.click(
+          within(screen.getByTestId('profile-bottom-nav')).getByRole('button', {
+            name: 'Events',
+          })
+        );
+        await waitFor(() => {
+          expect(window.location.search).toBe('?mode=tour&source=qr');
+          expect(screen.getByTestId('claim-banner-cta')).toHaveAttribute(
+            'href',
+            '/test-artist/claim?next=auth'
+          );
+        });
+      }
+    );
   });
 
   it('does not push the profile URL over a claim-funnel navigation', async () => {

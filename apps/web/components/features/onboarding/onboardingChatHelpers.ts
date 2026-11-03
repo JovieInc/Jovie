@@ -15,6 +15,8 @@ import {
   type OnboardingWidgetEventType,
   parseWidgetEventFromMetadata,
 } from '@/lib/chat/onboarding-script/widget-events';
+import { readOnboardingCatalogPreview } from '@/lib/onboarding/catalog-preview';
+import { readOnboardingProfileDraft } from '@/lib/onboarding/profile-draft';
 import { type CheckoutCardPayload } from './ChatProposeCheckoutCard';
 import { type NextStepCardPayload } from './ChatProposeNextStepCard';
 import type {
@@ -88,6 +90,28 @@ export function isNextStepPayload(
     output !== null &&
     (output as ToolOutputWithAction).action === 'propose_next_step'
   );
+}
+
+/**
+ * Whether the transcript's latest completed `proposeNextStep` decision is
+ * terminal (`waitlist` or `instant_access`). Mirrors the claim route's
+ * `deriveTerminalDecisionKind`: such a transcript is waiting on a claim
+ * handoff, so a restored copy must claim on mount instead of waiting for a
+ * turn the visitor has no reason to send.
+ */
+export function endsInTerminalNextStep(
+  messages: readonly UIMessage[]
+): boolean {
+  for (const message of messages.toReversed()) {
+    for (const part of getToolParts(message).toReversed()) {
+      if (getToolName(part) !== 'proposeNextStep') continue;
+      if (part.state !== 'output-available') continue;
+      if (!isNextStepPayload(part.output)) continue;
+      const kind = part.output.decision?.kind;
+      return kind === 'waitlist' || kind === 'instant_access';
+    }
+  }
+  return false;
 }
 
 export function isCheckoutPayload(
@@ -272,6 +296,7 @@ export function artistFromConfirmedOutput(
     followers: artist.followers ?? null,
     popularity: artist.popularity ?? null,
     genres: artist.genres ?? [],
+    catalog: readOnboardingCatalogPreview(asRecord(output)?.catalog),
     dspMatches: [
       {
         id: 'spotify',
@@ -303,10 +328,13 @@ export function deriveProfileBuilderState({
   let handle: string | null = null;
   let confirmedHandle: string | null = null;
   const socialLinks: string[] = [];
+  let profileDraft: OnboardingProfileBuilderState['profileDraft'] = null;
 
   for (const message of messages) {
+    profileDraft = readOnboardingProfileDraft(message.metadata) ?? profileDraft;
     for (const part of getToolParts(message)) {
       const output = part.output;
+      profileDraft = readOnboardingProfileDraft(output) ?? profileDraft;
 
       if (isArtistConfirmedOutput(output)) {
         const confirmedArtist = artistFromConfirmedOutput(output);
@@ -329,6 +357,7 @@ export function deriveProfileBuilderState({
   }
 
   return {
+    profileDraft,
     artist,
     artistConfirmed,
     // Confirmed server output wins over stale proposal cards and their drafts.

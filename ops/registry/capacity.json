@@ -67,6 +67,122 @@
       ]
     }
   },
+  "modelFamilies": {
+    "schema": "jovie.model-families/v1",
+    "description": "The one place a concrete OpenAI model id lives. A family names a tier (luna, terra, sol, astra); latest is the newest member available on every required path (Tim: latest available on the OpenAI subscription seats, they get cheaper each round). The pricing paths and the codex-* rows of the lane model registry follow it; scripts/lanes/model_families.py sync moves it, check fails on drift, scripts/model-id-guard.mjs fails on a concrete id elsewhere. Aliases: openai:sol@latest.",
+    "preference": "latest-available",
+    "staleAlarmDays": 7,
+    "syncedAt": "2026-10-29T08:21:55Z",
+    "families": {
+      "openai:luna": {
+        "idPattern": "^gpt-(\\d+(?:\\.\\d+)?)-luna$",
+        "requiredPaths": ["api", "subscription"],
+        "registryIds": ["codex-luna"],
+        "latest": "gpt-6-luna",
+        "members": [
+          {
+            "id": "gpt-5.6-luna",
+            "firstSeen": "2026-10-25T01:30:00Z",
+            "paths": ["api", "subscription"],
+            "listPrice": {
+              "in": 0.2,
+              "out": 1.2
+            }
+          },
+          {
+            "id": "gpt-6-luna",
+            "firstSeen": "2026-10-29T08:21:40Z",
+            "paths": ["api", "subscription"],
+            "listPrice": {
+              "in": 0.1,
+              "out": 0.5
+            }
+          }
+        ],
+        "latestSince": "2026-10-29T08:21:40Z"
+      },
+      "openai:terra": {
+        "idPattern": "^gpt-(\\d+(?:\\.\\d+)?)-terra$",
+        "requiredPaths": ["api", "subscription"],
+        "registryIds": ["codex-terra"],
+        "latest": "gpt-6.1-terra",
+        "members": [
+          {
+            "id": "gpt-5.6-terra",
+            "firstSeen": "2026-10-25T01:30:00Z",
+            "paths": ["api", "subscription"],
+            "listPrice": {
+              "in": 2.0,
+              "out": 12.0
+            }
+          },
+          {
+            "id": "gpt-6.1-terra",
+            "firstSeen": "2026-10-29T08:21:40Z",
+            "paths": ["api", "subscription"],
+            "listPrice": {
+              "in": 1.0,
+              "out": 5.0
+            }
+          }
+        ],
+        "latestSince": "2026-10-29T08:21:40Z"
+      },
+      "openai:sol": {
+        "idPattern": "^gpt-(\\d+(?:\\.\\d+)?)-sol$",
+        "requiredPaths": ["api", "subscription"],
+        "registryIds": ["codex-sol"],
+        "latest": "gpt-6.1-sol",
+        "members": [
+          {
+            "id": "gpt-5.6-sol",
+            "firstSeen": "2026-10-25T01:30:00Z",
+            "paths": ["api", "subscription"],
+            "listPrice": {
+              "in": 4.0,
+              "out": 20.0
+            }
+          },
+          {
+            "id": "gpt-6-sol",
+            "firstSeen": "2026-10-29T08:21:40Z",
+            "paths": ["api", "subscription"],
+            "listPrice": {
+              "in": 2.0,
+              "out": 10.0
+            }
+          },
+          {
+            "id": "gpt-6.1-sol",
+            "firstSeen": "2026-10-29T08:21:40Z",
+            "paths": ["api", "subscription"],
+            "listPrice": {
+              "in": 2.0,
+              "out": 10.0
+            }
+          }
+        ],
+        "latestSince": "2026-10-29T08:21:40Z"
+      },
+      "openai:astra": {
+        "idPattern": "^gpt-(\\d+(?:\\.\\d+)?)-astra$",
+        "requiredPaths": ["api", "subscription"],
+        "registryIds": ["codex-astra"],
+        "latest": "gpt-6-astra",
+        "members": [
+          {
+            "id": "gpt-6-astra",
+            "firstSeen": "2026-10-25T01:30:00Z",
+            "paths": ["api", "subscription"],
+            "listPrice": {
+              "in": 10.0,
+              "out": 50.0
+            }
+          }
+        ]
+      }
+    }
+  },
   "pricing": {
     "listPriceSource": "scripts/backlog-orchestrator/config/model-registry.json (list_price_in and list_price_out, USD per million tokens; no cached-input price is recorded, so cached tokens are priced as input)",
     "subscriptionFloorFraction": 0.1,
@@ -74,15 +190,17 @@
     "rule": "Price every model by how it is accessed. API and credits paths cost tokens times the provider list price. A subscription path costs the plan's window price times the task's share of the usable quota, about a tenth of that while the account is behind its window pace (use it or lose it), the plain share while on pace, and rising linearly to the API list price as the account runs ahead of pace and nears exhaustion; an exhausted or lapsed account costs the API price and is not routable. The same model on two paths is two rows.",
     "paths": [
       {
-        "id": "gpt-5.6-luna@api",
-        "model": "gpt-5.6-luna",
+        "id": "gpt-6-luna@api",
+        "model": "gpt-6-luna",
+        "family": "openai:luna",
         "accessPath": "api",
         "modelRegistryId": "codex-luna",
         "funding": "cash"
       },
       {
-        "id": "gpt-5.6-luna@subscription:openai-codex",
-        "model": "gpt-5.6-luna",
+        "id": "gpt-6-luna@subscription:openai-codex",
+        "model": "gpt-6-luna",
+        "family": "openai:luna",
         "accessPath": "subscription",
         "modelRegistryId": "codex-luna",
         "provider": "openai-codex",
@@ -91,15 +209,17 @@
         "usableQuotaNote": "Unmeasured: the API-equivalent list-priced usage one weekly window allows. Needs per-run token counts joined to the account's used percent; until then USD is unknown and ranking uses the pace rule alone."
       },
       {
-        "id": "gpt-5.6-terra@api",
-        "model": "gpt-5.6-terra",
+        "id": "gpt-6.1-terra@api",
+        "model": "gpt-6.1-terra",
+        "family": "openai:terra",
         "accessPath": "api",
         "modelRegistryId": "codex-terra",
         "funding": "cash"
       },
       {
-        "id": "gpt-5.6-terra@subscription:openai-codex",
-        "model": "gpt-5.6-terra",
+        "id": "gpt-6.1-terra@subscription:openai-codex",
+        "model": "gpt-6.1-terra",
+        "family": "openai:terra",
         "accessPath": "subscription",
         "modelRegistryId": "codex-terra",
         "provider": "openai-codex",
@@ -107,17 +227,37 @@
         "usableQuotaApiUsd": null
       },
       {
-        "id": "gpt-5.6-sol@api",
-        "model": "gpt-5.6-sol",
+        "id": "gpt-6.1-sol@api",
+        "model": "gpt-6.1-sol",
+        "family": "openai:sol",
         "accessPath": "api",
         "modelRegistryId": "codex-sol",
         "funding": "cash"
       },
       {
-        "id": "gpt-5.6-sol@subscription:openai-codex",
-        "model": "gpt-5.6-sol",
+        "id": "gpt-6.1-sol@subscription:openai-codex",
+        "model": "gpt-6.1-sol",
+        "family": "openai:sol",
         "accessPath": "subscription",
         "modelRegistryId": "codex-sol",
+        "provider": "openai-codex",
+        "accounts": ["current-login", "jovie-pro", "lyb-pro"],
+        "usableQuotaApiUsd": null
+      },
+      {
+        "id": "gpt-6-astra@api",
+        "model": "gpt-6-astra",
+        "family": "openai:astra",
+        "accessPath": "api",
+        "modelRegistryId": "codex-astra",
+        "funding": "cash"
+      },
+      {
+        "id": "gpt-6-astra@subscription:openai-codex",
+        "model": "gpt-6-astra",
+        "family": "openai:astra",
+        "accessPath": "subscription",
+        "modelRegistryId": "codex-astra",
         "provider": "openai-codex",
         "accounts": ["current-login", "jovie-pro", "lyb-pro"],
         "usableQuotaApiUsd": null

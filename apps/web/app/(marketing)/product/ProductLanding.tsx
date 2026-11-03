@@ -1,50 +1,11 @@
-import {
-  MarketingHero,
-  MarketingHeroPhoto,
-  MarketingPageShell,
-  MarketingSurfaceCard,
-} from '@/components/marketing';
+import { HomepageHeroCanvas } from '@/components/homepage/hero-light/HomepageHeroCanvas';
+import { MarketingPageShell } from '@/components/marketing';
+import { ConnectedComponentsGallery } from '@/components/marketing/ConnectedComponentsGallery';
 import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
 import { PRODUCT_COPY } from '@/data/productCopy';
 import { ProductClaimHandleForm } from './ProductClaimHandleForm';
+import { ProductExploreLinks } from './ProductExploreLinks';
 import './ProductLanding.css';
-
-const PRODUCT_HERO_PHOTO = {
-  src: '/images/marketing-hero/product.webp',
-  width: 1600,
-  height: 901,
-} as const;
-
-function ProductClaimCard() {
-  const { claimCard } = PRODUCT_COPY;
-
-  return (
-    <MarketingSurfaceCard
-      variant='floating'
-      glowTone='none'
-      testId='product-claim-card'
-      className='product-claim-card w-full max-w-120'
-      contentClassName='flex flex-col gap-6 px-8 py-9 sm:px-9 sm:py-10'
-    >
-      <p className='product-claim-card__status'>{claimCard.status}</p>
-      <p className='product-claim-card__path text-primary-token'>
-        <span className='text-tertiary-token'>{claimCard.domain}</span>
-        <span>{claimCard.handle}</span>
-      </p>
-      <p className='max-w-sm text-base leading-relaxed text-secondary-token'>
-        {claimCard.outcome}
-      </p>
-      <p className='text-sm text-tertiary-token'>{claimCard.proof}</p>
-      <div className='product-claim-card__handle-form w-full'>
-        <ProductClaimHandleForm
-          domain={claimCard.domain}
-          placeholder={claimCard.handle}
-          submitLabel={claimCard.cta}
-        />
-      </div>
-    </MarketingSurfaceCard>
-  );
-}
 
 function ProductClose() {
   const { claimCard, close } = PRODUCT_COPY;
@@ -79,41 +40,37 @@ function ProductClose() {
   );
 }
 
+/**
+ * Product pages use the shader treatment: the same locked-light field and
+ * scroll-linked card the shared hero canvas ships. The cinematic treatment
+ * belongs to the company homepage; both read one design system.
+ */
 export function ProductLanding() {
-  const { hero } = PRODUCT_COPY;
+  const { hero, claimCard } = PRODUCT_COPY;
 
   return (
     <MarketingPageShell className='bg-base text-primary-token'>
-      <div className='product-hero marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'>
-        <MarketingHeroPhoto {...PRODUCT_HERO_PHOTO} />
-        <div
-          aria-hidden='true'
-          className='marketing-hero-backdrop pointer-events-none absolute inset-0'
-        />
-        <div className='hero-glow product-hero-glow pointer-events-none absolute inset-x-0 top-0' />
-        <MarketingHero
-          variant='split'
-          headingId='product-hero-heading'
-          testId='marketing-section-hero'
-          sectionVariant='split-claim-card'
-          sectionOwner='apps/web/app/(marketing)/product/ProductLanding.tsx'
-        >
-          <div className='max-w-xl'>
-            <p className='marketing-kicker'>{hero.kicker}</p>
-            <h1
-              id='product-hero-heading'
-              data-testid='product-hero-heading'
-              className='marketing-h1-linear marketing-h1-max-two-lines line-clamp-2 mt-6 text-primary-token'
-            >
-              {hero.headline}
-            </h1>
-            <p className='marketing-lead-linear mt-6 max-w-xl text-secondary-token'>
-              {hero.support}
-            </p>
-          </div>
-          <ProductClaimCard />
-        </MarketingHero>
-      </div>
+      <HomepageHeroCanvas
+        headingId='product-hero-heading'
+        headingTestId='product-hero-heading'
+        headline={hero.headline}
+        subhead={hero.support}
+        claim={{
+          domain: claimCard.domain,
+          placeholder: claimCard.handle,
+          action: claimCard.cta,
+        }}
+        supportNote={claimCard.proof}
+        profile={hero.profile}
+        sectionOwner='apps/web/app/(marketing)/product/ProductLanding.tsx'
+        sectionVariant='split-claim-card'
+        claimTestId='product-claim-card'
+        claimInputId='product-handle-input'
+        claimTestIdPrefix='product'
+        claimSubmitTestId='product-claim-cta'
+      />
+      <ConnectedComponentsGallery />
+      <ProductExploreLinks />
       <ProductClose />
     </MarketingPageShell>
   );

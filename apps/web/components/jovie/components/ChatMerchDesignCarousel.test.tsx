@@ -62,6 +62,24 @@ describe('ChatMerchDesignCarousel', () => {
     expect(screen.getByText('Do you like any of these?')).toBeInTheDocument();
   });
 
+  it('keeps the art clean: Select and the name sit below it, tiles share one height', () => {
+    render(<ChatMerchDesignCarousel result={result} />);
+
+    for (const card of screen.getAllByTestId('chat-merch-option-card')) {
+      const art = card.querySelector('[data-testid="chat-merch-option-art"]');
+      expect(art).not.toBeNull();
+      // Nothing overlays the artwork: no button, no gradient plate.
+      expect(art?.querySelector('button')).toBeNull();
+      expect(art?.children).toHaveLength(1);
+      const caption = card.querySelector(
+        '[data-testid="chat-merch-option-caption"]'
+      );
+      expect(caption?.querySelector('button')).not.toBeNull();
+      expect(card).toHaveClass('flex', 'flex-col', 'h-full');
+      expect(caption).toHaveClass('flex-1');
+    }
+  });
+
   it('keeps the product choice in the selected surface before creating a truthful pricing card', async () => {
     const user = userEvent.setup();
     mutateMock.mockImplementation(

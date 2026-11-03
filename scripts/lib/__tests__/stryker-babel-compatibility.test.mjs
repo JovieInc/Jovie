@@ -27,6 +27,7 @@ describe('Stryker TypeScript instrumentation', () => {
       for (const file of [
         'vitest.config.fast.mts',
         'scripts/vitest-duration-sequencer.mjs',
+        'scripts/vitest-local-workers.mjs',
         'tests/node-environment-files.json',
       ]) {
         mkdirSync(dirname(join(sandbox, file)), { recursive: true });

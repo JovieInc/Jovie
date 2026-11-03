@@ -6,6 +6,11 @@ import os from 'node:os';
  * concurrent hook runs reached load 17-21 and starved every lane (2026-10-25).
  * Idle machines keep the default; once the one-minute load is at or above half
  * the cores a run takes a quarter of them (min 2). VITEST_LOCAL_MAX_WORKERS wins.
+ * @param {{
+ *   env?: Record<string, string | undefined>,
+ *   cpus?: number,
+ *   load1?: number,
+ * }} [options]
  * @returns {number | undefined} undefined keeps vitest's default.
  */
 export function localMaxWorkers({

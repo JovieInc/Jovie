@@ -7,6 +7,7 @@ import { runGh } from '../packages/api-client/gh.ts';
 import { isTransientAdmissionFailureMessage } from './lib/merge-group-admission.mjs';
 import {
   attributeAgainstAheadRun,
+  attributeAgainstPeerRuns,
   CI_FAST_REMAINING_JOB,
 } from './lib/merge-group-ahead-attribution.mjs';
 import {
@@ -989,6 +990,29 @@ export function supersededByLiveEntry(pr, sourceHeadSha, groupHeadSha) {
   );
 }
 
+// HEADGREEN grouping (live ruleset 10512119, 2026-10-29): only the group head's
+// build gates the merge, so a failed build of an entry that still has entries
+// queued behind it, on the same live synthetic commit, did not eject it and a
+// later head can still land it. Holding it (durable failure status, dequeue,
+// auto-merge off) would turn a one-off intermediate flake into the ejection
+// HEADGREEN exists to avoid. The last queued entry has nothing behind it, so
+// its failure still holds, and so does a deterministic-source failure (a PR
+// that is itself broken must not wait to eject everyone behind it). Missing
+// queue data fails closed to the old behavior.
+export function coveredByLaterEntry(pr, sourceHeadSha, groupHeadSha) {
+  const entry = pr?.mergeQueueEntry;
+  const total = entry?.mergeQueue?.entries?.totalCount;
+  return (
+    pr?.state === 'OPEN' &&
+    String(pr?.headRefOid ?? '').toLowerCase() === sourceHeadSha &&
+    pr.isInMergeQueue === true &&
+    Number.isInteger(entry?.position) &&
+    Number.isInteger(total) &&
+    entry.position < total &&
+    liveEntryHeadSha(pr) === groupHeadSha
+  );
+}
+
 // A group's base is main or, behind other entries, the head of the group ahead
 // of it. Until that group's CI passes, a failure here can be the ahead entry's:
 // on 2026-10-12 #21393 was held as deterministic-source for a DESIGN.md check
@@ -1125,6 +1149,28 @@ export async function applyMergeGroupFailure(
       workflowRunAttempt: run.run_attempt,
       classification,
       superseded: true,
+      statusWritten: false,
+      dequeued: false,
+      dequeueOutcome: 'not-attempted',
+      autoMergeDisabled: false,
+    };
+  }
+  if (
+    !failedSteps?.includes?.(WORKFLOW_LOAD_STEP) &&
+    classification !== 'deterministic-source' &&
+    coveredByLaterEntry(current, sourceHeadSha, groupHeadSha)
+  ) {
+    return {
+      schema: FAILURE_HOLD_SCHEMA,
+      repository,
+      prNumber: front.prNumber,
+      sourceHeadSha,
+      mergeGroupHeadSha: groupHeadSha,
+      workflowRunId: run.id,
+      workflowRunAttempt: run.run_attempt,
+      classification,
+      skipped: true,
+      coveredByLaterEntry: true,
       statusWritten: false,
       dequeued: false,
       dequeueOutcome: 'not-attempted',
@@ -1374,7 +1420,7 @@ function graphql(query, variables) {
 }
 
 const TIMELINE_QUERY = `query($owner:String!,$name:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$name){pullRequest(number:$number){timelineItems(first:100,after:$cursor,itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT,PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT]){nodes{__typename ... on AddedToMergeQueueEvent{createdAt} ... on RemovedFromMergeQueueEvent{createdAt reason beforeCommit{oid}} ... on PullRequestCommit{commit{oid}} ... on HeadRefForcePushedEvent{createdAt afterCommit{oid}}} pageInfo{hasNextPage endCursor}}}}}`;
-const PR_QUERY = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id state headRefOid isInMergeQueue mergeQueueEntry{id headCommit{oid}} autoMergeRequest{enabledAt}}}}`;
+const PR_QUERY = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id state headRefOid isInMergeQueue mergeQueueEntry{id position headCommit{oid} mergeQueue{entries{totalCount}}} autoMergeRequest{enabledAt}}}}`;
 
 function readTimeline(repository, prNumber) {
   const [owner, name] = repository.split('/');
@@ -1531,6 +1577,90 @@ function ciFastRemainingLog(
   )
     return null;
   return gh(['api', `repos/${repository}/actions/jobs/${job.id}/logs`]);
+}
+
+// Shadow only (canon/MERGE_QUEUE_STEWARD.md invariant 4): did this group's
+// failing signal also fail in a recent group that does not contain the PR?
+// The verdict is logged, never applied: holds and enrollment are unchanged
+// until the shadow record qualifies a non-attributable class. Membership is
+// every queue entry ahead of main in the peer group (its base chain included),
+// so a PR riding in a peer's base counts as contained. Bounded to 5 peers and
+// never throws.
+export const PEER_RECURRENCE_WINDOW_MS = 6 * 60 * 60 * 1000;
+export const PEER_RECURRENCE_MAX_PEERS = 5;
+
+export function peerContainsPr(compareCommits, peerPrNumber, prNumber) {
+  if (peerPrNumber === prNumber) return true;
+  if (!Array.isArray(compareCommits)) return null;
+  const suffix = new RegExp(`\\(#${prNumber}\\)$`);
+  return compareCommits.some(commit =>
+    suffix.test(
+      String(commit?.commit?.message ?? '')
+        .split('\n')[0]
+        .trim()
+    )
+  );
+}
+
+export function readPeerRecurrence(repository, prNumber, run, jobs) {
+  try {
+    const currentCiFastLog = ciFastRemainingLog(repository, jobs);
+    const eligibility = attributeAgainstPeerRuns({
+      currentJobs: jobs,
+      currentCiFastLog,
+      peers: [],
+    });
+    if (!eligibility.reason.startsWith('signal-not-seen-without-pr:'))
+      return eligibility;
+    const end = Date.parse(run.updated_at ?? run.created_at);
+    const mainSha = ghJson(['api', `repos/${repository}/commits/main`]).sha;
+    const listed = ghJson([
+      'api',
+      `repos/${repository}/actions/workflows/${CI_WORKFLOW_ID}/runs?event=merge_group&status=failure&per_page=30`,
+    ]).workflow_runs;
+    const candidates = (Array.isArray(listed) ? listed : [])
+      .filter(peer => peer?.id !== run.id && peer?.conclusion === 'failure')
+      .filter(peer => {
+        const at = Date.parse(peer.created_at);
+        return at <= end && end - at <= PEER_RECURRENCE_WINDOW_MS;
+      })
+      .slice(0, PEER_RECURRENCE_MAX_PEERS);
+    const peers = candidates.map(peer => {
+      const peerJobs = restPages(
+        `repos/${repository}/actions/runs/${peer.id}/jobs?filter=latest`
+      );
+      const compare = ghJson([
+        'api',
+        `repos/${repository}/compare/${mainSha}...${peer.head_sha}`,
+      ]);
+      return {
+        runId: peer.id,
+        conclusion: peer.conclusion,
+        containsPr: peerContainsPr(
+          compare?.commits,
+          parseMergeQueueBranch(peer.head_branch)?.prNumber,
+          prNumber
+        ),
+        ciFastLog: ciFastRemainingLog(repository, peerJobs),
+      };
+    });
+    return {
+      ...attributeAgainstPeerRuns({
+        currentJobs: jobs,
+        currentCiFastLog,
+        peers,
+      }),
+      peersExamined: peers.map(({ runId, containsPr }) => ({
+        runId,
+        containsPr,
+      })),
+    };
+  } catch (error) {
+    return {
+      recurring: false,
+      reason: `evidence-read-failed:${error instanceof Error ? error.message.slice(0, 120) : 'unknown'}`,
+    };
+  }
 }
 
 // Only a completed, failed ahead run can prove this group's own failure; any
@@ -1744,6 +1874,26 @@ async function main(argv) {
     );
   }
   process.stdout.write(`${serialized}\n`);
+  if (preview === 'deterministic-source' && !result.skipped) {
+    const peerRecurrence = {
+      schema: 'jovie-merge-group-peer-recurrence/v1',
+      mode: 'shadow',
+      prNumber: front.prNumber,
+      workflowRunId: run.id,
+      ...readPeerRecurrence(repository, front.prNumber, run, jobs),
+    };
+    const line = JSON.stringify(peerRecurrence);
+    // Not a job output: failure_receipt stays the only trusted hold output.
+    if (process.env.GITHUB_STEP_SUMMARY)
+      appendFileSync(
+        process.env.GITHUB_STEP_SUMMARY,
+        `\n### Peer recurrence (shadow)\n\n\`${peerRecurrence.reason}\`\n\n\`\`\`json\n${line}\n\`\`\`\n`
+      );
+    if (peerRecurrence.recurring)
+      process.stdout.write(
+        `::notice title=peer recurrence (shadow)::#${front.prNumber} failing signals also failed without it in run(s) ${peerRecurrence.peerRunIds.join(', ')}\n`
+      );
+  }
 }
 
 if (

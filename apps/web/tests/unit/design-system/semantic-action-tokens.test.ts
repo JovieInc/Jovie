@@ -15,8 +15,8 @@ describe('shared action color contract', () => {
         'utf8'
       );
 
-      expect(source).toContain('bg-btn-primary');
-      expect(source).toContain('text-btn-primary-foreground');
+      expect(source).toContain("import { Button } from '@jovie/ui'");
+      expect(source).toContain("variant='primary'");
       expect(source).not.toMatch(/\bbg-white\b|\btext-black\b/);
     }
   });

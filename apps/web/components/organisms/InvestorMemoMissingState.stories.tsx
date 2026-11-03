@@ -9,7 +9,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'The exact root not-found body reached by web-187 when investor access is absent or the requested memo is not present in the checked-in manifest. This story proves only that shipped missing state; it does not load or reproduce investor memo content.',
+          'The exact root not-found body reached by web-187 when investor access is absent or the requested memo is not present in the private investor content manifest. This story proves only that shipped missing state; it does not load or reproduce investor memo content.',
       },
     },
     pen: {

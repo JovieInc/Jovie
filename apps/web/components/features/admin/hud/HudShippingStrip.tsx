@@ -33,6 +33,28 @@ function lybBehind(view: ShippingStateView): {
   return { value: count(lyb.behindMain), tone: 'neutral' };
 }
 
+const JOVIE_REPO = 'JovieInc/Jovie';
+
+/** Jovie merge-to-production lag p95 against its target; bad when over target. */
+function prodLag(view: ShippingStateView): {
+  readonly value: string;
+  readonly tone: 'neutral' | 'bad';
+} {
+  const lag = view.delivery.lanes.deployHealth?.lag?.find(
+    row => row.repo === JOVIE_REPO
+  );
+  if (!lag || lag.p95Min === null)
+    return { value: NOT_MEASURED, tone: 'neutral' };
+  const target = lag.targetP95Min === null ? '' : ` / ${lag.targetP95Min}m`;
+  return {
+    value: `p95 ${Math.round(lag.p95Min)}m${target}`,
+    tone:
+      lag.targetP95Min !== null && lag.p95Min > lag.targetP95Min
+        ? 'bad'
+        : 'neutral',
+  };
+}
+
 function ciLabel(view: ShippingStateView): string {
   if (view.ciGreen.value === null) return NOT_MEASURED;
   return view.ciGreen.value ? 'Green' : 'Failing';
@@ -113,6 +135,11 @@ export function HudShippingStrip({
         <Chip
           label='Behind Main'
           value={count(delivery.production.behindMain.value)}
+        />
+        <Chip
+          label='Prod Lag'
+          value={prodLag(view).value}
+          tone={prodLag(view).tone}
         />
         <Chip
           label='LYB Behind'
