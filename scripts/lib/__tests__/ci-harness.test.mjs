@@ -30,9 +30,11 @@ const manifest = loadCiHarnessManifest();
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 
 describe('Lighthouse identity admission', () => {
-  const workflow = load(
-    readFileSync(resolve(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8')
-  );
+  /** @typedef {{id?: string, uses?: string, name?: string, if?: string, run?: string, env?: Record<string, string>}} LighthouseStep */
+  const workflow =
+    /** @type {{jobs: Record<string, {steps: LighthouseStep[]}>}} */ (
+      load(readFileSync(resolve(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8'))
+    );
   const selected = (
     step,
     available,
