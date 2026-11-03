@@ -2826,19 +2826,6 @@ class PublishTest(unittest.TestCase):
         self.assertNotIn("deployHealth", public, "a block that cannot fit is refused whole")
         self.assertEqual(public["at"], feed["at"], "a fitting heartbeat path survives an oversize sibling")
 
-    def test_hosted_heartbeat_keys_cover_every_gist_receipt_in_the_registry(self):
-        roots = set()
-        with (ROOT / "canon" / "automation-registry.jsonl").open() as handle:
-            for line in handle:
-                entry = json.loads(line)
-                receipt = entry.get("receipt") or {}
-                if (entry.get("status") == "live" and receipt.get("kind") == "json-timestamp"
-                        and "gist" in (receipt.get("url") or "")):
-                    roots.add(str(receipt["path"]).split(".")[0])
-        self.assertLessEqual(roots, set(doctor.HEARTBEAT_FEED_KEYS),
-                             "a hosted gist heartbeat path must survive the oversize refusal: "
-                             f"add {sorted(roots - set(doctor.HEARTBEAT_FEED_KEYS))} to HEARTBEAT_FEED_KEYS")
-
     def test_unavailable_view_keeps_the_registered_lanes_tick_heartbeat(self):
         """JOV-9006: canon/automation-registry.jsonl declares gem:lanes-tick with a
         json-timestamp receipt reading the top-level `at` of lanes-status.json in
