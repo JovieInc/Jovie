@@ -27,13 +27,17 @@ vi.spyOn(crypto, 'scryptSync').mockImplementation((...args: unknown[]) => {
   return originalScryptSync(...(args as Parameters<typeof crypto.scryptSync>));
 });
 
-function createTxMock(entryRows: Array<Record<string, unknown>>) {
+function createTxMock(
+  entryRows: Array<Record<string, unknown>>,
+  userRows: Array<Record<string, unknown>> = []
+) {
   const updateSet = vi.fn(() => ({
     where: vi.fn().mockResolvedValue(undefined),
   }));
   const select = vi.fn(() => ({
     from: vi.fn(() => ({
       where: vi.fn(() => ({
+        limit: vi.fn().mockResolvedValue(userRows),
         for: vi.fn(() => ({
           limit: vi.fn().mockResolvedValue(entryRows),
         })),
@@ -516,19 +520,21 @@ describe('processWaitlistEmailJob — reserved/canary/test recipient skip', () =
 
   it('returns a terminal skip (no throw) when the welcome send is refused for a reserved recipient', async () => {
     mockSendNotification.mockResolvedValue(RESERVED_RECIPIENT_SKIP_DISPATCH);
-    const { tx, updateSet } = createTxMock([
-      {
-        id: '44444444-4444-4444-8444-444444444444',
-        email: 'founder-canary@example.com',
-        fullName: 'Canary',
-        status: 'signed_up',
-        waitlistEmailSentAt: null,
-        inviteEmailSentAt: null,
-        inviteTokenHash: null,
-        inviteTokenExpiresAt: null,
-        founderWelcomeSentAt: null,
-      },
-    ]);
+    const { tx, updateSet } = createTxMock(
+      [
+        {
+          id: '44444444-4444-4444-8444-444444444444',
+          email: 'founder-canary@example.com',
+          fullName: 'Canary',
+          status: 'signed_up',
+          waitlistEmailSentAt: null,
+          inviteEmailSentAt: null,
+          inviteTokenHash: null,
+          inviteTokenExpiresAt: null,
+        },
+      ],
+      [{ id: 'user-reserved-welcome', founderWelcomeSentAt: null }]
+    );
 
     const result = await processWaitlistEmailJob(tx, {
       entryId: '44444444-4444-4444-8444-444444444444',
