@@ -169,6 +169,8 @@ export async function createCheckoutSession({
   idempotencyKey,
   referralCode,
   correlation,
+  termsConsent,
+  trialEnd,
 }: {
   customerId: string;
   priceId: string;
@@ -179,6 +181,10 @@ export async function createCheckoutSession({
   idempotencyKey?: string;
   referralCode?: string;
   correlation?: CheckoutCorrelation;
+  /** Affirmative billing-terms opt-in captured before redirect (server time). */
+  termsConsent?: { readonly version: string; readonly acceptedAt: string };
+  /** Unix seconds: defer the first charge to the end of an entitlement trial. */
+  trialEnd?: number;
 }): Promise<Stripe.Checkout.Session> {
   try {
     const stripeClient = getStripe();
@@ -190,6 +196,12 @@ export async function createCheckoutSession({
       : undefined;
     const correlationMetadata = hasCheckoutCorrelation(correlation)
       ? toStripeCheckoutCorrelationMetadata(correlation)
+      : {};
+    const consentMetadata = termsConsent
+      ? {
+          terms_version: termsConsent.version,
+          terms_accepted_at: termsConsent.acceptedAt,
+        }
       : {};
     const session = await stripeClient.checkout.sessions.create(
       {
@@ -210,15 +222,18 @@ export async function createCheckoutSession({
           ...(plan ? { plan } : {}),
           ...(referralCode ? { referral_code: referralCode } : {}),
           ...correlationMetadata,
+          ...consentMetadata,
         },
 
         // Subscription settings
         subscription_data: {
+          ...(trialEnd ? { trial_end: trialEnd } : {}),
           metadata: {
             clerk_user_id: userId,
             ...(plan ? { plan } : {}),
             ...(referralCode ? { referral_code: referralCode } : {}),
             ...correlationMetadata,
+            ...consentMetadata,
           },
         },
 

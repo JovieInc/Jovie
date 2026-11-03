@@ -31,11 +31,15 @@ from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, AGENT = (
+# `apply-deterministic` runs one fixer per check when every check is deterministic but the
+# actions differ (red-before-green plus a spacing snap). A model is not hired for that mix.
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_EVIDENCE, APPLY_DETERMINISTIC, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent")
+    "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-evidence",
+    "apply-deterministic", "agent")
 DETERMINISTIC = frozenset({
-    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE})
+    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED,
+    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_EVIDENCE, APPLY_DETERMINISTIC})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -46,8 +50,13 @@ PLATFORM_TEXT = re.compile(
 QUOTA_TEXT = re.compile(r"github-quota-deferred|Fleet rule evidence is (?:missing|deferred)", re.IGNORECASE)
 UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
-BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?## ?(?:Red-before-green|Blast radius)",
-                       re.IGNORECASE)
+# The fleet annotation names the missing repair evidence. That edit is the PR body,
+# which the lane already knows how to fill. Generic "PR body is missing" / blast-radius
+# text stays a model fix: those sections are not rebuilt from the failing check URL.
+RED_BEFORE_GREEN = re.compile(r"red-before-green:", re.IGNORECASE)
+BODY_TEXT = re.compile(
+    r"PR body is missing|missing (?:a )?`?## ?(?:Red-before-green|Blast radius)",
+    re.IGNORECASE)
 # The internal customer-changelog decision. A second note is `ambiguous`, so a body that already
 # contains one is never stamped again. The quota form is the attempt>1 mask of the same defect:
 # the guard could not re-read the body, so the log no longer says missing-metadata.
@@ -134,6 +143,7 @@ SIGNATURES = (
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     ("atomic-write", ATOMIC_TEXT, ATOMIC_WRITE),
+    ("pr-body", RED_BEFORE_GREEN, REPAIR_EVIDENCE),
     ("pr-body", BODY_TEXT, AGENT),
 )
 BEHIND_CLASS = "stale-branch"
@@ -176,8 +186,11 @@ def stamp_internal_changelog(body) -> str | None:
 
 
 def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
-    """{cls, key, action, checks, signature, files}. `logs` maps a failing check name to its failed-job log;
-    a check with no log is `other`. A BEHIND branch with nothing deterministic to say is `stale-branch`."""
+    """{cls, key, action, checks, signature, files, actions?}. `logs` maps a failing check name to its
+    failed-job log; a check with no log is `other`. A BEHIND branch with nothing deterministic to say is
+    `stale-branch`. When every check has a deterministic fixer and those fixers differ, `action` is
+    `apply-deterministic` and `actions` lists them in check-name order. One shared deterministic action
+    stays that action. A mix that still needs a model stays `mixed`/`agent`."""
     logs = logs or {}
     names = sorted({str(check.get("name")) for check in real_failures(pr)})
     per_check = []
@@ -186,8 +199,14 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         hit = next(((cls, action) for cls, pattern, action in SIGNATURES if pattern.search(text)), None)
         per_check.append(hit or ("other", AGENT))
     classes = {cls for cls, _ in per_check}
+    ordered_actions: list[str] = []
+    for _, act in per_check:
+        if act not in ordered_actions:
+            ordered_actions.append(act)
     if len(classes) == 1:
         cls, action = per_check[0]
+    elif classes and ordered_actions and all(act in DETERMINISTIC for act in ordered_actions):
+        cls, action = "deterministic", APPLY_DETERMINISTIC
     elif classes:
         cls, action = "mixed", AGENT
     else:
@@ -208,8 +227,11 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         files = sorted(set(files))
     elif cls == "domain-write":
         files = sorted(_domain_write_hits("\n".join(logs.get(name) or "" for name in names)))
-    return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
-            "checks": names, "signature": signature, "files": files}
+    result = {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
+              "checks": names, "signature": signature, "files": files}
+    if action == APPLY_DETERMINISTIC:
+        result["actions"] = ordered_actions
+    return result
 
 
 def _snap_spacing_line(line: str) -> str:
