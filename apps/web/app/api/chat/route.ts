@@ -54,6 +54,7 @@ import {
   classifyGatewayAlert,
   resolveChatStreamErrorMessage,
 } from '@/lib/ai/gateway-errors';
+import { createReleaseTool } from '@/lib/ai/tools/create-release';
 import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
 import { createInspectPressSourceTool } from '@/lib/ai/tools/inspect-press-source';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
@@ -80,9 +81,11 @@ import {
   extractLastUserImageUrl,
   extractLastUserText,
 } from '@/lib/chat/message-text';
+import { resolveHasMusicLinks } from '@/lib/chat/music-link-presence';
 import { canUseOvChatMode, parseChatMode } from '@/lib/chat/ov-mode';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import { buildRelatedSuggestionsFraming } from '@/lib/chat/related-recommendations';
+import { countVisibleReleaseListenLinks } from '@/lib/chat/release-listen-links';
 import {
   updateOwnedReleaseGeneratedPitches,
   updateOwnedReleaseMetadata,
@@ -145,8 +148,6 @@ import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
-import { upsertRelease } from '@/lib/discography/queries';
-import { generateUniqueSlug } from '@/lib/discography/slug';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
@@ -229,6 +230,7 @@ import {
 } from '@/lib/services/pitch';
 import { isRetouchConfigured } from '@/lib/services/retouching/provider-gemini';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
+import { isWeeklyQuotaExemptCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
@@ -293,6 +295,8 @@ async function fetchArtistContext(
   startOfMonth.setUTCHours(0, 0, 0, 0);
   const startOfMonthISO = startOfMonth.toISOString();
 
+  // Release listen links render on the public profile too.
+  const releaseListenCount = countVisibleReleaseListenLinks(profileId);
   const [linkCounts, tipTotals, clickStats, profileViews] = await Promise.all([
     db
       .select({
@@ -348,7 +352,12 @@ async function fetchArtistContext(
     appleMusicUrl: result.appleMusicUrl,
     profileViews,
     hasSocialLinks: Number(linkCounts?.totalActive ?? 0) > 0,
-    hasMusicLinks: Number(linkCounts?.musicActive ?? 0) > 0,
+    hasMusicLinks: resolveHasMusicLinks({
+      dspSocialLinkCount: Number(linkCounts?.musicActive ?? 0),
+      releaseListenLinkCount: await releaseListenCount,
+      spotifyUrl: result.spotifyUrl,
+      appleMusicUrl: result.appleMusicUrl,
+    }),
     tippingStats: {
       tipClicks: Number(clickStats?.total ?? 0),
       tipsSubmitted: Number(tipTotals?.tipsSubmitted ?? 0),
@@ -1586,94 +1595,6 @@ function createMarkCanvasUploadedTool(
 }
 
 /**
- * Creates the createRelease tool for the AI to add new releases to the artist's discography.
- * This tool directly creates the release in the database and returns the result.
- */
-function createReleaseTool(resolvedProfileId: string) {
-  const createReleaseSchema = chatToolSchema({
-    title: z.string().min(1).max(200).describe('The title of the release'),
-    releaseType: z
-      .enum([
-        'single',
-        'ep',
-        'album',
-        'compilation',
-        'live',
-        'mixtape',
-        'other',
-      ])
-      .describe('The type of release'),
-    releaseDate: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
-      .optional()
-      .describe(
-        'Release date in ISO 8601 format (YYYY-MM-DD). Use the date the music was or will be released.'
-      ),
-    label: z.string().max(200).optional().describe('Record label name, if any'),
-    upc: z
-      .string()
-      .max(20)
-      .optional()
-      .describe('UPC/EAN barcode for the release, if known'),
-  });
-
-  return tool({
-    description:
-      "Create a new release in the artist's discography. Use this when the artist wants to add a release that isn't synced from Spotify — for example, a new single, EP, or album they want to set up smart links for. Ask for the title and release type at minimum before calling this tool.",
-    inputSchema: createReleaseSchema,
-    execute: async ({ title, releaseType, releaseDate, label, upc }) => {
-      try {
-        // Validate date if provided
-        let parsedDate: Date | null = null;
-        if (releaseDate) {
-          parsedDate = new Date(releaseDate);
-          if (Number.isNaN(parsedDate.getTime())) {
-            return {
-              success: false,
-              error: 'Invalid date. Please use YYYY-MM-DD format.',
-            };
-          }
-        }
-
-        const slug = await generateUniqueSlug(
-          resolvedProfileId,
-          title,
-          'release'
-        );
-
-        const release = await upsertRelease({
-          creatorProfileId: resolvedProfileId,
-          title,
-          slug,
-          releaseType,
-          releaseDate: parsedDate,
-          label: label ?? null,
-          upc: upc ?? null,
-          sourceType: 'manual',
-        });
-
-        return {
-          success: true,
-          release: {
-            id: release.id,
-            title: release.title,
-            slug: release.slug,
-            releaseType: release.releaseType,
-            releaseDate: release.releaseDate?.toISOString() ?? null,
-            label: release.label,
-          },
-        };
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Failed to create release';
-        return { success: false, error: message };
-      }
-    },
-  });
-}
-
-/**
  * Creates the writeWorldClassBio tool.
  * Produces an AllMusic-style draft using profile + DSP context.
  */
@@ -2079,7 +2000,7 @@ function buildChatTools(
       : {}),
     ...(resolvedProfileId
       ? {
-          createRelease: createReleaseTool(resolvedProfileId),
+          createRelease: createReleaseTool(resolvedProfileId, clerkUserId),
           generateReleasePitch: createGenerateReleasePitchTool(
             resolvedProfileId,
             {
@@ -2873,7 +2794,9 @@ export async function POST(req: Request) {
 
   // Rate limiting - plan-aware weekly quota + burst protection. For clients
   // that send clientTurnId, reservation/replay happens before quota charging.
-  const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan);
+  const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan, {
+    skipWeeklyQuota: isWeeklyQuotaExemptCanaryEmail(accountContext.email),
+  });
   if (!rateLimitResult.success) {
     const rateLimitMessage =
       accountContext.billingVerification === 'unavailable'
@@ -3097,7 +3020,7 @@ export async function POST(req: Request) {
       const failure = classifyChatStreamFailure(error);
       await markChatTurnTerminal({
         turnId: reservedTurn.turnId,
-        status: 'failed_model_error',
+        status: failure.terminalStatus,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,
       });
@@ -3198,6 +3121,8 @@ export async function POST(req: Request) {
     }
 
     return turn.streamResult.toUIMessageStreamResponse({
+      // Model reasoning restates prompt rules and is never rendered.
+      sendReasoning: false,
       headers: {
         ...corsHeaders,
         'x-request-id': requestId,
@@ -3321,7 +3246,7 @@ export async function POST(req: Request) {
       const failure = classifyChatStreamFailure(error);
       await markChatTurnTerminal({
         turnId: reservedTurn.turnId,
-        status: 'failed_model_error',
+        status: failure.terminalStatus,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,
       }).catch(() => null);

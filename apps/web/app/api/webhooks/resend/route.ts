@@ -102,6 +102,7 @@ interface ResendWebhookPayload {
  * @param payload - Raw request body
  * @param signature - svix-signature header value
  * @param timestamp - svix-timestamp header value
+ * @param messageId - svix-id header value
  * @param secret - Webhook signing secret
  * @returns true if signature is valid
  */
@@ -109,6 +110,7 @@ function verifySignature(
   payload: string,
   signature: string,
   timestamp: string,
+  messageId: string,
   secret: string
 ): boolean {
   try {
@@ -123,7 +125,7 @@ function verifySignature(
 
     // SVix signature format: v1,<base64-signature>
     const signatures = signature.split(' ');
-    const signedContent = `${timestamp}.${payload}`;
+    const signedContent = `${messageId}.${timestamp}.${payload}`;
 
     // Extract the actual secret (remove whsec_ prefix if present)
     const secretBytes = Buffer.from(
@@ -497,7 +499,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify signature
-    if (!verifySignature(body, svixSignature, svixTimestamp, webhookSecret)) {
+    if (
+      !verifySignature(
+        body,
+        svixSignature,
+        svixTimestamp,
+        svixId,
+        webhookSecret
+      )
+    ) {
       await captureCriticalError(
         'Invalid Resend webhook signature',
         new Error('Signature verification failed'),

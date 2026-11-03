@@ -1614,6 +1614,9 @@ describe('ProfileCompactTemplate', () => {
     }));
     window.history.replaceState(null, '', '/artist-profiles');
     window.history.pushState(null, '', '/test-artist?mode=listen&source=qr');
+    // Fresh trace ring: earlier tests in this file share the same window.
+    (window as unknown as Record<string, unknown>).__JOVIE_RUNTIME_TRACE__ =
+      undefined;
     const pushStateSpy = vi.spyOn(window.history, 'pushState');
 
     render(
@@ -1636,25 +1639,43 @@ describe('ProfileCompactTemplate', () => {
 
     const historyLengthAfterLanding = window.history.length;
     // Next's entry updater strips the landed ?mode=… entry with a bare
-    // replaceState — no React wake, no rerender (the standalone E2E server
-    // hits this ordering; the correction previously only ran on a wake).
+    // replaceState — no React wake, no rerender. On the standalone E2E
+    // server the strip lands LATE (post-hydration, ~seconds in): after the
+    // first fix's fixed 200/600/1400ms wake ticks had all fired, so the
+    // correction still never ran (verify run 41097577290). Delay the strip
+    // past that fixed window so only the 250ms strip detector can catch it.
+    await new Promise(resolve => setTimeout(resolve, 1800));
     act(() => {
       window.history.replaceState(window.history.state, '', '/test-artist');
     });
     pushStateSpy.mockClear();
 
-    // Deliberately NO view.rerender here: only the bounded post-mount wake
-    // ticks may correct the strip.
+    // Deliberately NO view.rerender here: only the strip detector's wake
+    // may correct the strip.
     await waitFor(
       () => {
         expect(`${window.location.pathname}${window.location.search}`).toBe(
           '/test-artist?mode=listen&source=qr'
         );
       },
-      { timeout: 3500 }
+      { timeout: 4500 }
     );
     expect(pushStateSpy).not.toHaveBeenCalled();
     expect(window.history.length).toBe(historyLengthAfterLanding);
+
+    // Runtime-trace receipts (lib/testing/runtime-trace): the correction path
+    // is recorded so a red matrix run names the guard that fired.
+    const trace = (
+      window as unknown as {
+        __JOVIE_RUNTIME_TRACE__?: { events: { event: string }[] };
+      }
+    ).__JOVIE_RUNTIME_TRACE__;
+    expect(trace?.events.map(event => event.event)).toEqual(
+      expect.arrayContaining(['arrival', 'strip-correction-replace'])
+    );
+    expect(trace?.events.some(event => event.event === 'mode-push')).toBe(
+      false
+    );
 
     pushStateSpy.mockRestore();
   });

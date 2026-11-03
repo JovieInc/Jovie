@@ -552,6 +552,8 @@ jobs:
       run_golden_eval_set: ${{ steps.detect.outputs.run_golden_eval_set || 'false' }}
       run_e2e: ${{ steps.detect.outputs.run_e2e || 'false' }}
       run_golden_path: ${{ steps.detect.outputs.run_golden_path || 'false' }}
+      # Empty (run the model review) unless the diff touched no UI files; see detect step.
+      golden_path_no_ui_diff: ${{ steps.detect.outputs.golden_path_no_ui_diff || '' }}
       # JOV-5960: selects the source-lane visual snapshot compare on homepage
       # PRs so a skipped compare can never read as green there.
       run_homepage_visual: ${{ steps.homepage-visual.outputs.run_homepage_visual || 'false' }}
@@ -977,6 +979,9 @@ jobs:
           else
             echo "run_golden_path=false" >> "$GITHUB_OUTPUT"
           fi
+
+          # No UI file changed: skip the paid golden-path model review (empty = review runs)
+          echo "$CHANGED_FILES" | grep -q -E '^(apps/web/(app|components|styles|public)/|apps/web/.*\.(css|scss|tsx)$|packages/ui/)' || echo "golden_path_no_ui_diff=true" >> "$GITHUB_OUTPUT"
 
           # Drizzle paths
           DRIZZLE_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts))'
@@ -2093,6 +2098,11 @@ jobs:
       # idles awaiting the base-branch fetch instead of serially before the
       # structural lane (10s of merge-group run 36270458408's critical path).
       # Unconditional: a strict superset of the former structural-only gate.
+      - name: Set up Go for source-pinned actionlint
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.10'
+          cache: false
       - name: Run actionlint
         run: bash .github/scripts/run-actionlint.sh
       - name: Fetch base-branch history
@@ -3588,11 +3598,14 @@ jobs:
     # The 162 Storybook specs took 4.0m of a 6.6m job on two workers and set
     # the merge-group wall (end p50 7.3m over 18 web merge groups on
     # 2026-10-12). Playwright --shard splits the same fullyParallel spec list
-    # across two runners; the aggregates read the matrix result.
+    # across runners; the aggregates read the matrix result. Three shards since
+    # 2026-11-01: on two, the matrix step was 276s p50 and the shards ended
+    # at 12.2 of 14.4 min, the next tail once ci-fast (remaining) stopped
+    # waiting on the lanes pytest.
     strategy:
       fail-fast: true
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3]
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -3627,7 +3640,7 @@ jobs:
       # Web-independent checks ride here, off the Build + Layout tail.
       - name: Check extension and observability ingest
         if: matrix.shard == 1
-        run: pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test && pnpm --filter @jovie/canary-otp typecheck && pnpm --filter @jovie/canary-otp test
+        run: pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test && pnpm --filter @jovie/canary-otp typecheck && pnpm --filter @jovie/canary-otp test && pnpm --filter @jovie/mesh-hub typecheck && pnpm --filter @jovie/mesh-hub test
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
       # Surface-elevation matrix (JOV-2156): screenshot every allowed/banned
@@ -3684,7 +3697,7 @@ jobs:
           exit 1
         env:
           STORYBOOK_BASE_URL: http://localhost:6006
-          STORYBOOK_SHARD: ${{ matrix.shard }}/2
+          STORYBOOK_SHARD: ${{ matrix.shard }}/3
           MERGE_GROUP_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
           CI: true
           JOVIE_STORYBOOK_MANUAL_AXE: '1'
@@ -5587,8 +5600,22 @@ jobs:
             pnpm turbo test:fast --filter=@jovie/web -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
             echo "🔍 Merge group: Running affected test suite"
-            # Run affected tests against the merge-group base SHA.
-            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
+            # run_web includes Ovie/CLI and inputs outside Turbo's graph.
+            # Keep affected tasks; explicitly run web if it was not selected.
+            pnpm turbo test:fast --affected --dry=json > "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json"
+            UNIT_SELECTION_MODE="$(node scripts/ci-unit-selection.mjs < "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json")"
+            # Preserve sibling packages' existing empty-shard policy.
+            pnpm turbo test:fast --affected --filter='!@jovie/web' -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
+            WEB_CACHE_FLAG=""
+            if [[ "$UNIT_SELECTION_MODE" == "affected-and-web" ]]; then
+              echo "Affected graph omitted web; running the selected web lane explicitly"
+              pnpm turbo test:fast --filter=@jovie/web --dry=json > "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json"
+              node scripts/ci-unit-selection.mjs --require-web < "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json"
+              # Unknown dependency edges are also absent from cache inputs.
+              WEB_CACHE_FLAG="--force"
+            fi
+            # Override the wrapper's empty-suite success only for web shards.
+            pnpm turbo test:fast --filter=@jovie/web $WEB_CACHE_FLAG -- $VITEST_CI_FLAGS $RETRY_FLAG --passWithNoTests=false --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           else
             echo "🔍 Manual dispatch: Running critical + interaction tests (no base_ref available)"
             # Non-main manual dispatches have no base_ref. Run the critical and
@@ -6728,6 +6755,8 @@ jobs:
           JOURNEY_EVIDENCE_REPORT: ${{ runner.temp }}/journey-evidence/playwright-report.json
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.GOLDEN_PATH_REVIEW_GATEWAY_KEY }}
+          # Workers AI (Cloudflare credits) is tried first by the reviewer; unset = Gateway only.
+          GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN: ${{ secrets.GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN }}
           VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL }}
           # The runner also needs the database and deterministic E2E OTP flag.
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -6750,7 +6779,7 @@ jobs:
       # the auth/billing journey evidence, which is built from the journey step.
       - name: Review golden-path keyframes (visual verdict)
         id: visual_review
-        if: ${{ !cancelled() && steps.canonical_journey.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.canonical_journey.outcome == 'success' && needs.ci-path-changes.outputs.golden_path_no_ui_diff != 'true' }}
         run: |
           cd "$GITHUB_WORKSPACE"
           # JOV-5489: recorded visual review of the golden-path keyframes. A
@@ -6762,6 +6791,7 @@ jobs:
           # journey keyframes are declared public (failure captures never are).
           review() {
             AI_GATEWAY_API_KEY="$GOLDEN_PATH_REVIEW_GATEWAY_KEY" \
+              WORKERS_AI_TOKEN="$GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN" \
               PLAYWRIGHT_ARTIFACT_PATHS=apps/web/test-results/golden-path-keyframes \
               PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES=true \
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
@@ -6777,6 +6807,8 @@ jobs:
           fi
         env:
           GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.GOLDEN_PATH_REVIEW_GATEWAY_KEY }}
+          # Workers AI (Cloudflare credits) is tried first by the reviewer; unset = Gateway only.
+          GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN: ${{ secrets.GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN }}
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL }}
 
@@ -7849,13 +7881,45 @@ jobs:
   # Storybook a11y evidence lives exclusively in the scheduled visual-a11y.yml
   # storybook-a11y lane; the duplicate manual ci-storybook-a11y job was removed
   # (JOV-4326) so the evidence has a single owner.
+  ci-slop-guard:
+    name: Slop Guard
+    # Company anti-slop ratchets (JOV-9975). Policy, tool versions and tool configs live in
+    # JovieInc/ci (policy/JovieInc__Jovie/); this repo owns only config/slop-guard/baseline.json,
+    # which may only shrink. Feeds PR Ready, so a red guard blocks the merge.
+    needs: [ci-path-changes]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    env:
+      HAS_BOT_KEY: ${{ secrets.JOVIE_BOT_PRIVATE_KEY != '' && secrets.JOVIE_BOT_APP_ID != '' && github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - *shallow-checkout
+      - uses: ./.github/actions/setup-node-pnpm
+      # Optional: with the jovie-bot App secrets, fixed debt lowers the baseline automatically.
+      # Without them (or on forks) auto-shrink is skipped and the guard stays warn-only for that part.
+      - name: Mint jovie-bot token
+        id: bot
+        if: env.HAS_BOT_KEY == 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+      - uses: JovieInc/ci/actions/slop-guard@dc568f8b92fd8b3681e2f3c56b39a9bda5700d0d # JovieInc/ci#12
+        with:
+          auto-shrink: ${{ steps.bot.outputs.token != '' }}
+          token: ${{ steps.bot.outputs.token || github.token }}
+
   ci-pr-ready:
     name: ${{ github.event_name == 'pull_request' && 'PR Ready' || 'PR Ready (source inactive)' }}
     # The source aggregate stays deterministic: exact-head V8 coverage runs in
     # parallel with the fast lanes, while build/layout integration stays on the
     # merge-group head. Migration Guard, Fork PR Gate, and PR Size Guard remain
     # separately required ruleset contexts.
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare]
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-slop-guard]
     if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -7870,6 +7934,7 @@ jobs:
           SECRET_SCAN_RESULT="${{ needs.ci-secret-scan.result }}"
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
+          SLOP_RESULT="${{ needs.ci-slop-guard.result }}"
           COVERAGE_RESULT="${{ needs.ci-exact-head-coverage.result }}"
           RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
@@ -7891,6 +7956,7 @@ jobs:
             echo "| Exact-head Coverage | $COVERAGE_RESULT | \`pnpm --filter @jovie/web test:coverage && node scripts/check-changed-test-coverage.mjs --base <base-sha> --head <head-sha>\` |"
             echo "| Secret Scan | $SECRET_SCAN_RESULT | \`./scripts/security/scan-secrets.sh ci-pr origin/main\` |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT | \`node scripts/golden-path-lock.mjs merge-gate\` |"
+            echo "| Slop Guard (size, pass-through, dead code, duplication) | $SLOP_RESULT | \`node ../ci/actions/slop-guard/slop-guard.mjs --policy <ci>/policy/JovieInc__Jovie/policy.json\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
             echo "| Visual Snapshot Compare (homepage + marketing DOM PRs) | $VISUAL_COMPARE_RESULT | \`node scripts/visual-snapshot-compare.mjs compare\` |"
             echo
@@ -7912,6 +7978,10 @@ jobs:
           fi
           if [[ "$RISK_RESULT" != "success" ]]; then
             echo "❌ CI risk classifier did not pass (result: $RISK_RESULT)"
+            exit 1
+          fi
+          if [[ "$SLOP_RESULT" != "success" ]]; then
+            echo "❌ Slop Guard did not pass (result: $SLOP_RESULT); see the job log for the offender and its budget"
             exit 1
           fi
 
