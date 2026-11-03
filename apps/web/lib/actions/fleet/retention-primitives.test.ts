@@ -263,7 +263,7 @@ describe('fleet compaction primitives', () => {
     expect(s.historySequences.helper).toBe(2);
   });
 
-  it('archives terminal invocations when the hot document exceeds the row budget, below the count threshold, without touching pinned work', () => {
+  it('archives terminal invocations when the hot state exceeds the row budget, below the count threshold, without touching pinned work', () => {
     const s = state();
     const result = invocation();
     for (let index = 0; index < 1200; index++) {
