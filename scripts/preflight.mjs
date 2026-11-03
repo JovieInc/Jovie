@@ -33,9 +33,11 @@
 import { spawn, spawnSync } from 'node:child_process';
 import {
   appendFileSync,
+  closeSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   realpathSync,
 } from 'node:fs';
@@ -298,7 +300,13 @@ export function prepareStatement(statement, { flockPath = '' } = {}) {
   // `exit` would end the process; contain it in a subshell.
   if (/\bexit\b/.test(text)) text = `( ${text}\n)`;
   // Typechecks share gem's CPU: serialize them under the host lock.
-  if (flockPath) text = text.replace(TYPECHECK, `$1flock ${flockPath} $2`);
+  if (flockPath) {
+    const quotedLock = `'${flockPath.replace(/'/g, `'\\''`)}'`;
+    text = text.replace(
+      TYPECHECK,
+      (_match, indent, command) => `${indent}flock ${quotedLock} ${command}`
+    );
+  }
   return text;
 }
 
@@ -596,9 +604,30 @@ export async function main({
       spawnSync('which', ['flock'], { cwd, env: childEnv }).status !== 0
     )
       return '';
-    return path.join(homedir(), '.cache', 'gem-typecheck.lock');
+    const prepareLock = root => {
+      mkdirSync(root, { recursive: true });
+      const file = path.join(root, 'gem-typecheck.lock');
+      closeSync(openSync(file, 'a'));
+      return file;
+    };
+    try {
+      // Retain the existing host lock even when callers have different XDG roots.
+      return prepareLock(path.join(homedir(), '.cache'));
+    } catch (error) {
+      const code = /** @type {NodeJS.ErrnoException} */ (error).code;
+      if (
+        !['EACCES', 'EPERM', 'EROFS', 'ENOENT', 'ENOTDIR'].includes(
+          code ?? ''
+        ) ||
+        !procEnv.XDG_CACHE_HOME ||
+        !path.isAbsolute(procEnv.XDG_CACHE_HOME)
+      )
+        throw error;
+      // Restricted-host agents must share one fallback root to share the mutex.
+      // A failed fallback remains an error; never silently drop serialization.
+      return prepareLock(procEnv.XDG_CACHE_HOME);
+    }
   })();
-  if (flockPath) mkdirSync(path.dirname(flockPath), { recursive: true });
 
   const plan = steps.map(step => {
     const script = substitute(step.run, values);
