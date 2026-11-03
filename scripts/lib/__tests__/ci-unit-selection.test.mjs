@@ -113,7 +113,10 @@ describe('selected web unit lane', () => {
       write('pnpm-workspace.yaml', 'packages:\n  - apps/*\n  - packages/*\n');
       // Cache is enabled: the fallback must not replay a stale passing web task.
       write('turbo.json', JSON.stringify({ tasks: { 'test:fast': {} } }));
-      write('.gitignore', '.turbo\nruntime-input.txt\nunit-selection-*.json\n');
+      write(
+        '.gitignore',
+        '.turbo\nruntime-input.txt\nunit-selection-*.json\nfixture-bin/\n'
+      );
       for (const [path, name, token] of [
         ['apps/web', '@jovie/web', 'WEB_EXECUTED'],
         ['apps/ovie', '@jovie/ovie', 'OVIE_EXECUTED'],
@@ -171,6 +174,7 @@ describe('selected web unit lane', () => {
         TURBO_SCM_BASE: base,
         TURBO_SCM_HEAD: base,
         TURBO_TELEMETRY_DISABLED: '1',
+        TURBO_CACHE: 'local:rw',
         RUNNER_TEMP: dir,
         SHARD_SLUG: '1-1',
         VITEST_CI_FLAGS: '',
@@ -178,6 +182,85 @@ describe('selected web unit lane', () => {
         OUTPUT_FLAG: '',
         PATH: `${join(root, 'node_modules/.bin')}:${process.env.PATH}`,
       };
+      // Keep the production branch verbatim and use real Turbo/package scripts.
+      // Repeated package-manager startup is not this selection contract's subject.
+      const fixtureBin = join(dir, 'fixture-bin');
+      mkdirSync(fixtureBin);
+      const shellQuote = value => `'${value.replaceAll("'", "'\"'\"'")}'`;
+      const turboLauncher = join(fixtureBin, 'turbo');
+      writeFileSync(
+        turboLauncher,
+        [
+          '#!/bin/sh',
+          'set -eu',
+          'if [ -n "${SELECTION_ARGV_FILE:-}" ]; then',
+          '  printf "%s\\0" "$@" > "$SELECTION_ARGV_FILE"',
+          '  printf "%s" "$SELECTION_SMOKE_MARKER" > "$SELECTION_ENV_FILE"',
+          'fi',
+          `exec ${shellQuote(turbo)} "$@"`,
+          '',
+        ].join('\n'),
+        { mode: 0o700 }
+      );
+      const realPnpm = realpathSync(
+        execFileSync('which', ['pnpm'], { encoding: 'utf8' }).trim()
+      );
+      env.PATH = `${fixtureBin}:${env.PATH}`;
+      const smokeArgs = ['test:fast', '--affected', '--dry=json'];
+      const smoke = label =>
+        spawnSync('pnpm', ['turbo', ...smokeArgs], {
+          cwd: dir,
+          env: {
+            ...env,
+            SELECTION_ARGV_FILE: join(fixtureBin, `${label}.argv`),
+            SELECTION_ENV_FILE: join(fixtureBin, `${label}.env`),
+            SELECTION_SMOKE_MARKER: 'selection-smoke',
+          },
+          encoding: 'utf8',
+        });
+      // Before installing the adapter, real pnpm resolves this same launcher.
+      const realSmoke = smoke('real');
+      expect(realSmoke.status, `${realSmoke.stdout}\n${realSmoke.stderr}`).toBe(
+        0
+      );
+      writeFileSync(
+        join(fixtureBin, 'pnpm'),
+        [
+          '#!/bin/sh',
+          'set -eu',
+          'case "${1-}" in',
+          `  turbo) shift; exec ${shellQuote(turboLauncher)} "$@" ;;`,
+          '  run) [ "${2-}" = test:fast ] || exit 64; exec ' +
+            shellQuote(realPnpm) +
+            ' "$@" ;;',
+          '  *) exit 64 ;;',
+          'esac',
+          '',
+        ].join('\n'),
+        { mode: 0o700 }
+      );
+      const adapterSmoke = smoke('adapter');
+      expect(
+        adapterSmoke.status,
+        `${adapterSmoke.stdout}\n${adapterSmoke.stderr}`
+      ).toBe(0);
+      for (const label of ['real', 'adapter']) {
+        expect(readFileSync(join(fixtureBin, `${label}.argv`), 'utf8')).toBe(
+          `${smokeArgs.join('\0')}\0`
+        );
+        expect(readFileSync(join(fixtureBin, `${label}.env`), 'utf8')).toBe(
+          'selection-smoke'
+        );
+      }
+      expect(JSON.parse(realSmoke.stdout).tasks).toEqual(
+        JSON.parse(adapterSmoke.stdout).tasks
+      );
+      expect(
+        spawnSync(join(fixtureBin, 'pnpm'), ['unsupported'], {
+          cwd: dir,
+          env,
+        }).status
+      ).toBe(64);
       const run = args =>
         spawnSync(turbo, ['run', 'test:fast', ...args], {
           cwd: dir,
