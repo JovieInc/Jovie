@@ -1,5 +1,7 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { load } from 'js-yaml';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -449,11 +451,22 @@ describe('publisher writer-proof execution', () => {
       ).run;
       const start = publish.indexOf('gh pr create --draft');
       const script = publish.slice(start);
-      const result = spawnSync(
-        'bash',
-        [
-          '-euc',
-          `
+      const fixtureHome = mkdtempSync(
+        join(tmpdir(), 'changelog-shell-startup-')
+      );
+      writeFileSync(
+        join(fixtureHome, '.bashrc'),
+        "printf '%s\\n' fixture-startup-noise >&2\n"
+      );
+      let result;
+      try {
+        result = spawnSync(
+          'bash',
+          [
+            '--noprofile',
+            '--norc',
+            '-euc',
+            `
       branch=release/daily-changelog-test
       RUNNER_TEMP=/tmp
       gh() {
@@ -469,9 +482,22 @@ describe('publisher writer-proof execution', () => {
       }
       ${script}
     `,
-        ],
-        { encoding: 'utf8' }
-      );
+          ],
+          {
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              HOME: fixtureHome,
+              SHLVL: '0',
+              SSH_CLIENT: 'fixture',
+              BASH_ENV: undefined,
+              ENV: undefined,
+            },
+          }
+        );
+      } finally {
+        rmSync(fixtureHome, { recursive: true, force: true });
+      }
       expect(result.status, result.stderr).toBe(originExit || helperExit);
       expect(result.stderr.trim().split('\n')).toEqual(
         originExit
