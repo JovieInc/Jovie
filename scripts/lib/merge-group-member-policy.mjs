@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { isSizeExcluded } from './pr-size-exclusions.mjs';
 import { evaluatePrSizePolicy } from './pr-size-guard-policy.mjs';
 import {
   HYGIENE_LIMITS,
@@ -28,16 +29,14 @@ const OPINIONATED_REVIEW_STATES = new Set([
   'CHANGES_REQUESTED',
   'DISMISSED',
 ]);
-const SIZE_EXCLUSION_PATTERN =
-  /pnpm-lock\.yaml|package-lock\.json|yarn\.lock|\.lock$|\/generated\/|\.gen\.|__snapshots__\/|\.snap$|\.svg$|\.po$|\/dist\/|\/build\/|\.min\.|drizzle\/migrations\/meta\//;
 const REGULAR_FILE_MODES = new Set(['100644', '100755']);
 const MAX_API_RESPONSE_BYTES = 64 * 1024 * 1024;
 const MAX_API_REQUEST_MS = 10_000;
 // Short requests still give up inside a minute. Rate-limit holds and 5xx
 // backoff use MERGE_GROUP_JOB_BUDGET_MS so a reset inside the Size Guard job
-// can finish as a pass. The job clock includes provisioning (69s observed);
-// 100s of in-script hold still ends before the 3-minute killer. A cancelled
-// required check ejects the group the same way a red one does.
+// can finish as a pass. The outer job clock also includes checkout, the
+// separately bounded fetch, and provisioning. A cancelled required check
+// ejects the group the same way a red one does.
 export const MERGE_GROUP_POLICY_DEADLINE_MS = 45_000;
 export const MERGE_GROUP_JOB_BUDGET_MS = 100_000;
 
@@ -307,7 +306,7 @@ export function countSizeGuardFiles(files) {
     ) {
       fail('pull request file metadata is malformed');
     }
-    if (SIZE_EXCLUSION_PATTERN.test(file.filename)) continue;
+    if (isSizeExcluded(file.filename)) continue;
     lines += file.additions + file.deletions;
     count += 1;
   }

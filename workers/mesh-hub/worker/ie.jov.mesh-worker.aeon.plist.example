@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>ie.jov.mesh-worker.aeon</string>
+<key>ProgramArguments</key><array><string>/opt/homebrew/bin/node</string><string>__HOME__/.jovie/mesh/worker/mesh-worker.mjs</string></array>
+<key>EnvironmentVariables</key><dict>
+<key>MESH_KIND</key><string>aeon</string>
+<key>MESH_TOKEN_FILE</key><string>__HOME__/.jovie/mesh/aeon/token</string>
+<key>MESH_CAPS</key><string>research,review,code</string>
+<key>CODEX_BIN</key><string>/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex</string>
+<key>PATH</key><string>/opt/homebrew/bin:/usr/bin:/bin</string>
+</dict>
+<key>KeepAlive</key><true/><key>RunAtLoad</key><true/><key>ThrottleInterval</key><integer>10</integer>
+<key>StandardErrorPath</key><string>__HOME__/.jovie/mesh/aeon/worker.err</string>
+</dict></plist>

@@ -23,6 +23,14 @@ import {
 export const MARKETING_CERTIFICATION_LEDGER_SCHEMA_VERSION = 1 as const;
 export const MARKETING_CERTIFICATION_STORE_KEY =
   'jovie:certification:v1:marketing-components' as const;
+/** Append-only audit chunks: `${prefix}:${identityId}:${chunkNo}`. Never rewritten or deleted. */
+export const MARKETING_CERTIFICATION_AUDIT_ARCHIVE_PREFIX =
+  'jovie:certification:v1:marketing-components:audit' as const;
+/** The hot ledger row keeps only the newest audit events per record; the rest moves to the archive. */
+export const MARKETING_CERTIFICATION_HOT_AUDIT_PER_RECORD = 10;
+const COMPACT_AUDIT_AT = 40;
+/** The hot row is read on every ingest and inventory view: it must stay small. */
+export const MARKETING_CERTIFICATION_LEDGER_MAX_BYTES = 256 * 1024;
 
 import {
   type CertificationRecordBackend,
@@ -40,6 +48,8 @@ export interface MarketingCertificationRecord {
   readonly packetUpdatedAt: string;
   readonly decisions: readonly FounderCertificationDecision[];
   readonly auditHistory: readonly CertificationAuditEvent[];
+  /** Number of append-only audit chunks already moved out of this row (see compactAudit). */
+  readonly auditArchiveChunks?: number;
   readonly updatedAt: string;
 }
 
@@ -926,6 +936,8 @@ function parseLedger(stored: unknown): MarketingCertificationLedger {
       Number.isNaN(Date.parse(record.packetUpdatedAt)) ||
       !Array.isArray(record.decisions) ||
       !Array.isArray(record.auditHistory) ||
+      (record.auditArchiveChunks !== undefined &&
+        !Number.isInteger(record.auditArchiveChunks)) ||
       typeof record.updatedAt !== 'string' ||
       Number.isNaN(Date.parse(record.updatedAt)) ||
       !record.decisions.every(decision =>
@@ -1255,6 +1267,37 @@ function extendLedgerRegistry(
   };
 }
 
+/**
+ * What a packet means, without the volatile bookkeeping (push SHA, run URL, per-run
+ * digests). The producer re-posts every entry on nearly every main push; identical
+ * meaning must not rewrite the MB-sized ledger or append audit noise.
+ */
+export function certificationPacketMeaning(
+  packet: CertificationReviewPacket
+): string {
+  const receipts = (
+    list: readonly CertificationEvidenceReceipt[] | undefined
+  ) => (list ?? []).map(r => [r.id, r.tier, r.status, r.summary]);
+  const p = packet as unknown as Record<string, unknown>;
+  return JSON.stringify([
+    packet.subject,
+    // Without a content digest the commit SHA is the only identity, so it counts.
+    packet.source
+      ? [
+          (packet.source as { digest?: string }).digest ?? packet.source.sha,
+          packet.source.paths,
+        ]
+      : null,
+    receipts(packet.canonicalReferences),
+    receipts(packet.invariantEvaluation),
+    receipts(packet.testsCoverage),
+    receipts(packet.visualProof),
+    p.itemMedia,
+    p.requiredVariants,
+    p.operational,
+  ]);
+}
+
 export class MarketingCertificationStore {
   private readonly entries: readonly MarketingRegistryEntry[];
   private readonly entryById: ReadonlyMap<string, MarketingRegistryEntry>;
@@ -1306,12 +1349,33 @@ export class MarketingCertificationStore {
           `Certification packet ${entry.id} is not newer than the persisted packet.`
         );
       }
+      if (
+        !isInitialPlaceholder &&
+        certificationPacketMeaning(existing.packet) ===
+          certificationPacketMeaning(packet)
+      ) {
+        const unchanged = projectEntry(entry, existing, evaluatedAt);
+        if (unchanged.evaluation !== 'failed') {
+          return {
+            ledger,
+            result: {
+              row: unchanged.row,
+              entryOutcomes: evaluateLedgerEntries(
+                ledger,
+                this.entries,
+                evaluatedAt
+              ),
+            },
+          };
+        }
+      }
       const admission = evaluateCertificationAdmission({
         decisions: existing.decisions,
         evaluatedAt,
         packet,
       });
       const nextRecord: MarketingCertificationRecord = {
+        ...existing,
         auditHistory: [...existing.auditHistory, ...admission.auditHistory],
         decisions: existing.decisions,
         identityId: entry.id,
@@ -1612,7 +1676,8 @@ export class MarketingCertificationStore {
     // One persisted read per attempt: the ledger is ~MBs, and a separate
     // ensureLedger read here doubled egress on every write. Registry extension
     // happens in parse; a missing ledger is initialized by the helper.
-    return mutateCertificationRecord({
+    let needsCompaction = false;
+    const result = await mutateCertificationRecord({
       backend: this.backend,
       key: MARKETING_CERTIFICATION_STORE_KEY,
       initialize: () => this.ensureLedger(initializedAt),
@@ -1620,8 +1685,112 @@ export class MarketingCertificationStore {
         extendLedgerRegistry(parseLedger(raw), this.entries, initializedAt),
       validate: ledger =>
         assertLedgerMatchesRegistry(ledger, this.entries, initializedAt),
-      update,
+      update: ledger => {
+        const next = update(ledger);
+        needsCompaction = Object.values(next.ledger.records).some(
+          record => record.auditHistory.length > COMPACT_AUDIT_AT
+        );
+        return next;
+      },
       error: message => new MarketingCertificationPersistenceError(message),
     });
+    if (needsCompaction) {
+      // Best effort: the write above already succeeded, compaction retries on the next write.
+      await this.compactAudit().catch(() => undefined);
+    }
+    return result;
+  }
+
+  /**
+   * Move old audit events out of the hot ledger row into append-only chunk rows.
+   * Archive first (setIfAbsent), then trim the ledger by compare-and-set, so a crash
+   * between the two never loses history; a retry reuses the existing chunk.
+   */
+  async compactAudit(): Promise<void> {
+    for (
+      let attempt = 0;
+      attempt < MAX_COMPARE_AND_SET_ATTEMPTS;
+      attempt += 1
+    ) {
+      const raw = await this.backend.get(MARKETING_CERTIFICATION_STORE_KEY);
+      const json = certificationRecordJson(raw);
+      if (json === null) return;
+      const ledger = parseLedger(json);
+      const records: Record<string, MarketingCertificationRecord> = {
+        ...ledger.records,
+      };
+      let changed = false;
+      for (const [id, record] of Object.entries(ledger.records)) {
+        if (record.auditHistory.length <= COMPACT_AUDIT_AT) continue;
+        const chunkNo = record.auditArchiveChunks ?? 0;
+        const key = `${MARKETING_CERTIFICATION_AUDIT_ARCHIVE_PREFIX}:${id}:${chunkNo}`;
+        const moved = record.auditHistory.slice(
+          0,
+          record.auditHistory.length -
+            MARKETING_CERTIFICATION_HOT_AUDIT_PER_RECORD
+        );
+        const inserted = await this.backend.setIfAbsent(
+          key,
+          JSON.stringify({ identityId: id, chunkNo, events: moved }),
+          PERSISTENCE_TTL_SECONDS
+        );
+        let archivedCount = moved.length;
+        if (!inserted) {
+          // A previous attempt archived this chunk; trim exactly what it holds.
+          const existing = certificationRecordJson(await this.backend.get(key));
+          const stored = existing
+            ? (JSON.parse(existing) as { events?: unknown })
+            : null;
+          if (!stored || !Array.isArray(stored.events)) continue;
+          archivedCount = Math.min(
+            stored.events.length,
+            record.auditHistory.length
+          );
+        }
+        records[id] = {
+          ...record,
+          auditArchiveChunks: chunkNo + 1,
+          auditHistory: record.auditHistory.slice(archivedCount),
+        };
+        changed = true;
+      }
+      if (!changed) return;
+      const next = JSON.stringify({ ...ledger, records });
+      if (
+        await this.backend.compareAndSet(
+          MARKETING_CERTIFICATION_STORE_KEY,
+          json,
+          next,
+          PERSISTENCE_TTL_SECONDS
+        )
+      ) {
+        return;
+      }
+    }
+  }
+
+  /** Full audit history for one identity: archived chunks in order, then the hot tail. */
+  async readAuditHistory(
+    identityId: string
+  ): Promise<readonly CertificationAuditEvent[]> {
+    const raw = await this.backend.get(MARKETING_CERTIFICATION_STORE_KEY);
+    const json = certificationRecordJson(raw);
+    if (json === null) return [];
+    const record = parseLedger(json).records[identityId];
+    if (!record) return [];
+    const events: CertificationAuditEvent[] = [];
+    for (let n = 0; n < (record.auditArchiveChunks ?? 0); n += 1) {
+      const chunk = certificationRecordJson(
+        await this.backend.get(
+          `${MARKETING_CERTIFICATION_AUDIT_ARCHIVE_PREFIX}:${identityId}:${n}`
+        )
+      );
+      if (!chunk) continue;
+      const parsed = JSON.parse(chunk) as {
+        events?: CertificationAuditEvent[];
+      };
+      events.push(...(parsed.events ?? []));
+    }
+    return [...events, ...record.auditHistory];
   }
 }

@@ -180,6 +180,15 @@ function resetScrollLock() {
 describe('ProfileDrawerShell keyboard modal contract', () => {
   afterEach(resetScrollLock);
 
+  it('places the standalone drawer and backdrop on the sheet layer above cookie consent', () => {
+    renderOpenShell('standalone');
+
+    expect(screen.getByTestId('profile-drawer-overlay')).toHaveClass('z-sheet');
+    expect(screen.getByTestId('profile-menu-drawer').parentElement).toHaveClass(
+      'z-sheet'
+    );
+  });
+
   it('rejects the deliberate-red non-modal menu fixture', () => {
     const { container } = render(
       <div data-deliberate-red=''>
@@ -247,6 +256,53 @@ describe('ProfileDrawerShell keyboard modal contract', () => {
     expect(sheet).not.toBeNull();
     expect(sheet?.className).toContain('w-full');
     expect(sheet?.className).toContain('inset-x-0');
+  });
+
+  it('centres the secondary title block against the 44px header buttons', () => {
+    render(
+      <ProfileDrawerShell
+        open
+        onOpenChange={vi.fn()}
+        title='Share Profile'
+        subtitle='Copy the link or post it anywhere.'
+        onBack={vi.fn()}
+        navigationLevel='secondary'
+        presentation='embedded'
+        dataTestId='profile-menu-drawer'
+      >
+        <button type='button'>Copy Link</button>
+      </ProfileDrawerShell>
+    );
+    // The 42px slot held ~31px of text top-aligned, so the title sat ~5px
+    // above the buttons' centre (blind critique of the share shot).
+    const slot = screen.getByTestId('profile-drawer-title-slot');
+    expect(slot.className).toContain('flex-col');
+    expect(slot.className).toContain('justify-center');
+  });
+
+  it('renders a direct task sheet with close only and a floating edge', () => {
+    render(
+      <ProfileDrawerShell
+        open
+        onOpenChange={vi.fn()}
+        title='Share Profile'
+        navigationLevel='direct'
+        floating
+        presentation='embedded'
+        dataTestId='profile-menu-drawer'
+      >
+        <button type='button'>Copy Link</button>
+      </ProfileDrawerShell>
+    );
+
+    expect(
+      screen.getByTestId('profile-drawer-direct-header')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('profile-drawer-close-button')
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('profile-drawer-back-button')).toBeNull();
+    expect(document.querySelector('.profile-drawer-floating')).not.toBeNull();
   });
 
   it('keeps Escape dismissal across a breakpoint presentation change while open', () => {
