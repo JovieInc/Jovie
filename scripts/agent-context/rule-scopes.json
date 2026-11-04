@@ -12,7 +12,7 @@
   {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
-    "bodySha256": "0ed7ad76c677a300e1f5ed1f853f773e05a52e27b7e3a71ec29101089834010f"
+    "bodySha256": "1bd8b0d403e47bcb0b23fdbd8e8afc642136d978489bb415a7db05169bb98d4c"
   },
   {
     "file": ".claude/rules/code-style.md",
@@ -101,7 +101,7 @@
       "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "196fc8918b6923e4d1b4d67430c4dc91b2bf7e88b85f92e1e833ad103971d3d0"
+    "bodySha256": "e5839d7117c7952d97d4954d44afa73a7005c0c6f211a170022905b91aa12f63"
   },
   {
     "file": ".claude/rules/macos.md",
@@ -205,7 +205,7 @@
       "**/vitest.config.*",
       "**/playwright.config.*"
     ],
-    "bodySha256": "2de4743474d59b6c724837d470568f896f811368f79f2e5b83d84f71880909f0"
+    "bodySha256": "b435ddb3d1618cd410c0dd3200197fec57c537bf4bfa91dc72abbfb8c1e05ce7"
   },
   {
     "file": ".claude/rules/ui.md",

@@ -3,6 +3,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCAN_SCRIPT="$REPO_ROOT/scripts/security/scan-secrets.sh"
+export SCAN_TEST_BASELINE_SOURCE="$REPO_ROOT/scripts/security/gitleaks-staged-public-digests.b64"
 # The repair path is CI-only by default; these scenarios exercise it locally.
 export SECRET_SCAN_ALLOW_LOCAL_REPAIR=1
 TEST_ROOT="$(mktemp -d)"
@@ -24,6 +25,11 @@ case "${1:-}" in
     printf '%s\n' "${SCAN_TEST_STAGED_FILES:-}"
     ;;
   show)
+    if [[ "${2:-}" == ':scripts/security/gitleaks-staged-public-digests.b64' ]]; then
+      [[ "${SCAN_TEST_BASELINE_MISSING:-}" != 1 ]] || exit 1
+      cat "$SCAN_TEST_BASELINE_SOURCE"
+      exit 0
+    fi
     [[ "${SCAN_TEST_PIN_READ_ERROR:-}" != 1 ]] || exit 42
     cat "$SCAN_TEST_PIN_SOURCE"
     ;;
@@ -170,6 +176,19 @@ run_gitleaks_scenario() {
     bash "$SCAN_SCRIPT" "$mode" origin/main >"$TEST_ROOT/$scenario.$mode.output" 2>&1 || status=$?
   printf '%s\n' "$status"
 }
+
+# The staged baseline must be the exact, reviewed set of public digests.
+# Gitleaks itself silently accepts a missing baseline, so the wrapper must
+# reject missing or modified staged bytes before invoking either scanner.
+status="$(SCAN_TEST_BASELINE_MISSING=1 run_gitleaks_scenario baseline-missing pre-commit)"
+[[ $status -ne 0 ]] || fail 'missing staged Gitleaks baseline must fail closed'
+[[ ! -s "$TEST_ROOT/baseline-missing.pre-commit.gitleaks-calls" ]] \
+  || fail 'Gitleaks must not run with a missing staged baseline'
+printf '%s\n' '[]' >"$TEST_ROOT/baseline-tampered.json"
+status="$(SCAN_TEST_BASELINE_SOURCE="$TEST_ROOT/baseline-tampered.json" run_gitleaks_scenario baseline-tampered pre-commit)"
+[[ $status -ne 0 ]] || fail 'modified staged Gitleaks baseline must fail closed'
+[[ ! -s "$TEST_ROOT/baseline-tampered.pre-commit.gitleaks-calls" ]] \
+  || fail 'Gitleaks must not run with a modified staged baseline'
 
 for mode in publication ci-pr full; do
   status="$(run_gitleaks_scenario gitleaks-corruption "$mode")"
