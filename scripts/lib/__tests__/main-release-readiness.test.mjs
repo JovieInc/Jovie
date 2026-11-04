@@ -722,7 +722,6 @@ esac
         writeFileSync(calls, '0');
         const slept = join(root, 'slept');
         writeFileSync(slept, '');
-        const reset = Math.floor(Date.now() / 1000) + resetOffset;
         writeFileSync(
           join(root, 'sleep'),
           `#!/bin/sh
@@ -738,7 +737,7 @@ n="$(cat "${calls}")"
 n=$((n + 1))
 printf '%s' "$n" > "${calls}"
 case "$*" in
-  *rate_limit*) printf '%s\\n' "${reset}"; exit 0 ;;
+  *rate_limit*) printf '%s\\n' "$(( $(date +%s) + ${resetOffset} ))"; exit 0 ;;
 esac
 if [ "$n" -eq 1 ]; then
   echo "API rate limit exceeded for installation" >&2

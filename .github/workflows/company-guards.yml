@@ -48,6 +48,7 @@ jobs:
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: node .company-ci/guards/run.mjs
+      # github-token-budget: 3 calls/run - pin drift lists commits on canon, guards, and this workflow
       - name: Pin drift
         env:
           CI_PIN: ${{ steps.pin.outputs.sha }}
