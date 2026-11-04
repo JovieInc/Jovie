@@ -164,6 +164,53 @@ test('a green wake needs Source Validation; failures wake from every listed work
   assert.ok(workflow.on.workflow_run.workflows.includes('Source Validation'));
   assert.ok(workflow.on.workflow_run.workflows.includes('PR Fleet Rules'));
   assert.ok(workflow.on.workflow_run.workflows.length >= 9);
+  // A red check does not pay the success debounce. Cancel-in-progress is false
+  // for failures, so the sleep only delayed repair.
+  assert.equal(
+    workflow.jobs.relay.steps[0].if,
+    "github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'"
+  );
+  assert.equal(workflow.jobs.relay.steps[0].run, 'sleep 20');
+});
+
+test('a CI success clears a settled lane-fix-red without sleeping', () => {
+  const job = workflow.jobs['clear-settled-red'];
+  assert.equal(job['timeout-minutes'], 3);
+  assert.match(job.if, /workflow_run\.name == 'CI'/);
+  assert.match(job.if, /conclusion == 'success'/);
+  assert.equal(
+    job.steps.some(step => /sleep/.test(step.run ?? '')),
+    false
+  );
+  assert.equal(
+    job.steps.find(
+      step => step.run === 'python3 scripts/lanes/pr_events.py relay'
+    ).env.MODE,
+    'relay'
+  );
+  assert.equal(job['runs-on'], 'ubuntu-24.04');
+  const mint = job.steps.find(step => step.id === 'read-token');
+  assert.equal(mint['continue-on-error'], undefined);
+});
+
+test('a red check wakes the lane host immediately', () => {
+  const job = workflow.jobs['wake-red'];
+  assert.match(JSON.stringify(job['runs-on']), /jovie-fixed/);
+  assert.match(job.if, /"failure","timed_out","startup_failure"/);
+  assert.equal(job.needs, 'rerun-unacquired');
+  assert.equal(
+    job.steps.some(step => /sleep/.test(step.run ?? '')),
+    false
+  );
+  assert.equal(
+    job.steps.find(step => step.name === 'Drop the red wake file').run,
+    'python3 scripts/lanes/pr_events.py wake'
+  );
+  const release = job.steps.find(
+    step => step.name === 'Release the shared sparse checkout'
+  );
+  assert.match(release.run, /sparse-checkout disable/);
+  assert.match(String(release.if), /always\(\)/);
 });
 
 test('main-branch failure wakes and the non-workflow_run signals are unchanged', () => {

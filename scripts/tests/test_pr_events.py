@@ -573,6 +573,39 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()), [])
         self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [])
 
+    def test_a_blocked_success_clears_lane_fix_red_when_every_required_check_succeeded(self):
+        # The check rollup is the event. Merge state can still say BLOCKED.
+        # No sleep: a pending or failed check keeps the label for its own completion.
+        blocked = pr(branch="cursor/fix", sha="h1", merge="BLOCKED", labels=["lane-fix-red"], state="OPEN")
+        passed = {"__typename": "CheckRun", "name": "CI", "conclusion": "SUCCESS",
+                  "completedAt": "2026-11-04T06:00:00Z"}
+        pending = {"__typename": "CheckRun", "name": "CI", "conclusion": None,
+                   "startedAt": "2026-11-04T06:00:00Z"}
+        failed = {**passed, "conclusion": "FAILURE"}
+        green_checks = {"data": {"repository": {"pullRequest": {"commits": {"nodes": [{"commit": {
+            "statusCheckRollup": {"contexts": {"nodes": [passed]}}}}]}}}}}
+        waiting_checks = {"data": {"repository": {"pullRequest": {"commits": {"nodes": [{"commit": {
+            "statusCheckRollup": {"contexts": {"nodes": [pending]}}}}]}}}}}
+        red_checks = {"data": {"repository": {"pullRequest": {"commits": {"nodes": [{"commit": {
+            "statusCheckRollup": {"contexts": {"nodes": [failed]}}}}]}}}}}
+        run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
+               "pull_requests": [{"number": 5}]}
+
+        settled = Shell({("gh", "pr", "view"): blocked, ("gh", "api", "graphql"): green_checks})
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, settled, set()),
+                         [(5, "cleared-red"), (5, "enroll-wake")])
+        self.assertEqual(settled.made("gh", "api", "-X", "DELETE"),
+                         [["gh", "api", "-X", "DELETE",
+                           f"repos/{events.REPO}/issues/5/labels/lane-fix-red"]])
+
+        waiting = Shell({("gh", "pr", "view"): blocked, ("gh", "api", "graphql"): waiting_checks})
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, waiting, set()), [])
+        self.assertEqual(waiting.made("gh", "api", "-X", "DELETE"), [])
+
+        failing = Shell({("gh", "pr", "view"): blocked, ("gh", "api", "graphql"): red_checks})
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, failing, set()), [])
+        self.assertEqual(failing.made("gh", "api", "-X", "DELETE"), [])
+
     def test_a_stale_success_and_a_red_event_do_not_clear_lane_fix_red(self):
         view = pr(branch="cursor/fix", sha="new", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
         stale = {"event": "pull_request", "conclusion": "success", "head_sha": "old",
@@ -3034,6 +3067,33 @@ class WakeFileTest(unittest.TestCase):
                 self.assertEqual(events.main(["wake", "--prs", "22868,bogus"]), 0)
             names = list((state / "wake").glob("red-*.json"))
             self.assertEqual([p.name for p in names], [f"red-22868-{'a' * 40}-1.json"])
+
+    def test_wake_cli_reads_the_red_event_when_no_prs_are_passed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            event = {"workflow_run": {"id": 4, "run_attempt": 1, "conclusion": "failure",
+                                      "head_sha": "b" * 40, "updated_at": "2026-11-04T06:00:00Z",
+                                      "pull_requests": [{"number": 24254}]}}
+            event_path = Path(tmp) / "event.json"
+            event_path.write_text(json.dumps(event))
+            state = Path(tmp) / "state"
+            with patch.dict(os.environ, {"LANES_STATE": str(state),
+                                         "GITHUB_EVENT_PATH": str(event_path)}):
+                self.assertEqual(events.main(["wake"]), 0)
+            path = state / "wake" / f"red-24254-{'b' * 40}-1.json"
+            self.assertEqual(json.loads(path.read_text())["redAt"], "2026-11-04T06:00:00Z")
+
+    def test_wake_cli_ignores_a_success_when_no_prs_are_passed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            event = {"workflow_run": {"id": 4, "run_attempt": 1, "conclusion": "success",
+                                      "head_sha": "b" * 40, "updated_at": "2026-11-04T06:00:00Z",
+                                      "pull_requests": [{"number": 24254}]}}
+            event_path = Path(tmp) / "event.json"
+            event_path.write_text(json.dumps(event))
+            state = Path(tmp) / "state"
+            with patch.dict(os.environ, {"LANES_STATE": str(state),
+                                         "GITHUB_EVENT_PATH": str(event_path)}):
+                self.assertEqual(events.main(["wake"]), 0)
+            self.assertFalse((state / "wake").exists())
 
     def test_wake_cli_writes_nothing_without_workflow_run_event(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -634,8 +634,8 @@ nodes:
       - repository_dispatch
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:relay
-    jobCount: 2
+    terminalReceipt: job:wake-red
+    jobCount: 4
   - name: Legacy Human Hold Scrub
     path: .github/workflows/legacy-human-hold-scrub.yml
     active: true

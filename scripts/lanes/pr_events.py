@@ -442,12 +442,17 @@ RED_CHECK_STATES = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR"
 NON_REQUIRED_CHECKS = frozenset({"tently"})
 
 
+def read_head_rollup(number: int, sh=run):
+    """One GraphQL read of the head check rollup. Callers own True, False, and None."""
+    owner, name = REPO.split("/", 1)
+    return sh(["gh", "api", "graphql", "-f", f"query={HEAD_CHECKS_QUERY}", "-F", f"owner={owner}",
+               "-F", f"name={name}", "-F", f"number={number}"])
+
+
 def head_red(number: int, sh=run) -> bool | None:
     """True only when the latest run of some check on the head failed. GitHub's rollup counts
     a CANCELLED (superseded) run as FAILURE even after its replacement passed. None: unreadable."""
-    owner, name = REPO.split("/", 1)
-    read = sh(["gh", "api", "graphql", "-f", f"query={HEAD_CHECKS_QUERY}", "-F", f"owner={owner}",
-               "-F", f"name={name}", "-F", f"number={number}"])
+    read = read_head_rollup(number, sh)
     try:
         commits = json.loads(read.stdout)["data"]["repository"]["pullRequest"]["commits"]["nodes"]
         nodes = ((commits[0]["commit"].get("statusCheckRollup") or {}).get("contexts") or {})["nodes"]
@@ -465,6 +470,34 @@ def head_red(number: int, sh=run) -> bool | None:
         if key and (key not in latest or at >= latest[key][0]):
             latest[key] = (at, state)
     return any(state in RED_CHECK_STATES for _, state in latest.values())
+
+
+def head_settled_green(number: int, sh=run) -> bool:
+    """True only when every required check on this head has completed success.
+
+    Pending, failed, cancelled, or unreadable is not green. The next check
+    completion is the event that asks again; this does not sleep or poll.
+    """
+    read = read_head_rollup(number, sh)
+    try:
+        commits = json.loads(read.stdout)["data"]["repository"]["pullRequest"]["commits"]["nodes"]
+        nodes = ((commits[0]["commit"].get("statusCheckRollup") or {}).get("contexts") or {})["nodes"]
+    except (ValueError, KeyError, IndexError, TypeError):
+        return False
+    if read.returncode or not isinstance(nodes, list) or not nodes:
+        return False
+    latest: dict = {}
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        key = node.get("name") or node.get("context")
+        at = node.get("completedAt") or node.get("startedAt") or node.get("createdAt") or ""
+        state = str(node.get("conclusion") or node.get("state") or "").upper()
+        if key and str(key).lower() in NON_REQUIRED_CHECKS:
+            continue
+        if key and (key not in latest or at >= latest[key][0]):
+            latest[key] = (at, state)
+    return bool(latest) and all(state == "SUCCESS" for _, state in latest.values())
 
 
 def red_label_justified(number: int, pr: dict, sh=run) -> bool:
@@ -492,7 +525,10 @@ def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
         return False
     if LANE_FIX_RED not in {label.lower() for label in label_names(pr)}:
         return False
-    if pr.get("mergeStateStatus") not in REQUIRED_GREEN:
+    # Merge state lags the check rollup (a success wake sees BLOCKED). The
+    # rollup is the event's evidence. A pending or failed check keeps the label
+    # until that check's own completion.
+    if pr.get("mergeStateStatus") not in REQUIRED_GREEN and not head_settled_green(number, sh):
         return False
     deleted = sh(["gh", "api", "-X", "DELETE",
                   f"repos/{REPO}/issues/{number}/labels/{LANE_FIX_RED}"])
@@ -2839,15 +2875,31 @@ def write_wake_file(state, *, pr, sha, run_id, run_attempt, red_at):
 
 
 def wake(argv: list[str]) -> int:
-    """Gem-side wake job: for each red PR in --prs, write a wake file from the
-    workflow_run event (red_at = updated_at). Local state only; no secret, no
-    GitHub writes — fix-now (and only fix-now) does everything after that."""
+    """Gem-side wake job: write a wake file from the workflow_run event
+    (red_at = updated_at). Local state only; no secret, no GitHub writes.
+    fix-now (and only fix-now) does everything after that.
+
+    The check completion is the event. With no --prs, the PRs on that event
+    are the targets. A success or an unrelated event writes nothing.
+    """
+    explicit = "--prs" in argv
     prs = []
-    if "--prs" in argv:
+    if explicit:
         for token in argv[argv.index("--prs") + 1].split(","):
             token = token.strip()
             if token.isdigit():
                 prs.append(int(token))
+    event_path = os.environ.get("GITHUB_EVENT_PATH")
+    payload = json.loads(Path(event_path).read_text()) if event_path and Path(event_path).exists() else {}
+    run = payload.get("workflow_run") or {}
+    if not explicit and run.get("conclusion") not in RED_CONCLUSIONS:
+        print("wake: not a red check")
+        return 0
+    if not prs:
+        for item in run.get("pull_requests") or []:
+            number = item.get("number") if isinstance(item, dict) else None
+            if isinstance(number, int) and number > 0:
+                prs.append(number)
     if not prs:
         print("wake: no red PRs")
         return 0
@@ -2855,9 +2907,6 @@ def wake(argv: list[str]) -> int:
     if state is None:
         print("wake: no lane state dir configured; nothing written")
         return 0
-    event_path = os.environ.get("GITHUB_EVENT_PATH")
-    payload = json.loads(Path(event_path).read_text()) if event_path and Path(event_path).exists() else {}
-    run = payload.get("workflow_run") or {}
     sha = run.get("head_sha")
     if not re.fullmatch(r"[0-9a-f]{40}", sha or ""):
         print("wake: event carries no pull-request head sha; nothing written")
