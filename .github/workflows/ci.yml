@@ -1131,11 +1131,11 @@ jobs:
     # repo variable MERGE_GATE_POOL=fixed routes back to the gem pool.
     runs-on: ${{ vars.MERGE_GATE_POOL == 'fixed' && fromJSON('["self-hosted","Linux","X64","jovie-fixed"]') || 'ubuntu-latest' }}
     # Must exceed MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS (66 min) plus the
-    # 6-minute check poll plus setup/checkout. The helper sleeps until
+    # 10-minute check poll plus setup/checkout. The helper sleeps until
     # x-ratelimit-reset inside that window. A hard cancel would eject the
     # group. The wait stays in the helper: a workflow sleep before a GitHub
     # read is polling debt (JOV-INV-042).
-    timeout-minutes: 75
+    timeout-minutes: 78
     outputs:
       admitted: ${{ steps.admission.outputs.admitted || 'false' }}
       obsolete: ${{ steps.admission.outputs.obsolete || 'false' }}
