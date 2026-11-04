@@ -1107,7 +1107,7 @@ nodes:
     triggeringStateTransition:
       - workflow_run
     terminalReceipt: job:heal-interrupted-marker
-    jobCount: 15
+    jobCount: 16
   - name: Production Marker Recovery
     path: .github/workflows/production-marker-recovery.yml
     active: true
