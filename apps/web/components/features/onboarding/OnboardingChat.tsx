@@ -7,6 +7,7 @@ import { DefaultChatTransport, type UIMessage } from 'ai';
 import dynamic from 'next/dynamic';
 import type { ReactNode } from 'react';
 import {
+  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -108,16 +109,15 @@ const loadChatProposeNextStepCard = () =>
   import('./ChatProposeNextStepCard').then(mod => mod.ChatProposeNextStepCard);
 
 // Inline import() inside dynamic() keeps Next's loadable preload metadata; the
-// loaders above resolve to the same chunks for idle preloading. Each `loading`
-// placeholder reserves the slot locally so a not-yet-fetched chunk never
-// suspends up to the route-level fallback.
+// loaders above resolve to the same chunks for idle preloading. Message rows
+// reveal together inside OnboardingMessageList; tool cards reserve their slots
+// locally so a pending chunk never suspends up to the route-level fallback.
 function ReservedChatSlot({ minHeightClass }: { minHeightClass: string }) {
   return <div aria-hidden='true' className={`w-full ${minHeightClass}`} />;
 }
 
-const ChatMessage = dynamic(
-  () => import('@/components/jovie/components').then(mod => mod.ChatMessage),
-  { loading: () => <ReservedChatSlot minHeightClass='min-h-10' /> }
+const ChatMessage = dynamic(() =>
+  import('@/components/jovie/components').then(mod => mod.ChatMessage)
 );
 const ToolPartsRenderer = dynamic(
   () => import('@/components/jovie/tool-ui').then(mod => mod.ToolPartsRenderer),
@@ -579,60 +579,65 @@ function OnboardingMessageList({
     selectedArtist: null,
   }).handle;
 
+  // A generic per-message placeholder cannot match both a wrapped user
+  // bubble and the thinking dots. Reveal the first transcript as one unit,
+  // including its speaker rows, while the surrounding composer stays mounted.
   return (
-    <div className='flex flex-col pb-4'>
-      {displayMessages.map((message, index) => {
-        const text = getMessageText(message);
-        const toolParts = getToolParts(message);
-        const isThinking = message.id === THINKING_PLACEHOLDER_ID;
-        const shouldRenderMessage =
-          isThinking || Boolean(text) || toolParts.length === 0;
-        // Pen R6As7U: one Jovie speaker row opens each agent turn; a run of
-        // assistant messages is one turn and keeps a single row.
-        const startsAgentTurn =
-          message.role === 'assistant' &&
-          displayMessages[index - 1]?.role !== 'assistant';
+    <Suspense fallback={null}>
+      <div className='flex flex-col pb-4'>
+        {displayMessages.map((message, index) => {
+          const text = getMessageText(message);
+          const toolParts = getToolParts(message);
+          const isThinking = message.id === THINKING_PLACEHOLDER_ID;
+          const shouldRenderMessage =
+            isThinking || Boolean(text) || toolParts.length === 0;
+          // Pen R6As7U: one Jovie speaker row opens each agent turn; a run of
+          // assistant messages is one turn and keeps a single row.
+          const startsAgentTurn =
+            message.role === 'assistant' &&
+            displayMessages[index - 1]?.role !== 'assistant';
 
-        return (
-          <div
-            key={message.id}
-            className='pb-5 transition-opacity duration-fast'
-          >
-            {startsAgentTurn ? <OnboardingSpeakerRow /> : null}
-            {shouldRenderMessage ? (
-              <ChatMessage
-                id={message.id}
-                role={message.role}
-                parts={(message.parts ?? []) as MessagePart[]}
-                isThinking={isThinking}
-                isStreaming={
-                  isStreaming && message.id === lastAssistantMessageId
-                }
-                renderTools={false}
-                showAssistantActions={false}
-              />
-            ) : null}
-            {!isThinking
-              ? renderOnboardingTools({
-                  messageId: message.id,
-                  toolParts,
-                  hasMessageText: Boolean(text),
-                  isBusy,
-                  onHandleCandidateChange,
-                  onConfirmHandle,
-                  onAttachAccount,
-                  onNoneOfTheseArtists,
-                  onSelectArtist,
-                  selectedArtistId,
-                  handleStepDone,
-                  socialStepDone,
-                  claimHandle,
-                })
-              : null}
-          </div>
-        );
-      })}
-    </div>
+          return (
+            <div
+              key={message.id}
+              className='pb-5 transition-opacity duration-fast'
+            >
+              {startsAgentTurn ? <OnboardingSpeakerRow /> : null}
+              {shouldRenderMessage ? (
+                <ChatMessage
+                  id={message.id}
+                  role={message.role}
+                  parts={(message.parts ?? []) as MessagePart[]}
+                  isThinking={isThinking}
+                  isStreaming={
+                    isStreaming && message.id === lastAssistantMessageId
+                  }
+                  renderTools={false}
+                  showAssistantActions={false}
+                />
+              ) : null}
+              {!isThinking
+                ? renderOnboardingTools({
+                    messageId: message.id,
+                    toolParts,
+                    hasMessageText: Boolean(text),
+                    isBusy,
+                    onHandleCandidateChange,
+                    onConfirmHandle,
+                    onAttachAccount,
+                    onNoneOfTheseArtists,
+                    onSelectArtist,
+                    selectedArtistId,
+                    handleStepDone,
+                    socialStepDone,
+                    claimHandle,
+                  })
+                : null}
+            </div>
+          );
+        })}
+      </div>
+    </Suspense>
   );
 }
 
