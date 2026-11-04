@@ -1,14 +1,24 @@
 """Deterministic coverage for receipt-first merged-PR attribution."""
 from __future__ import annotations
 
+import ast
+import errno
 import json
+import multiprocessing
+import os
+import shutil
+import subprocess
 from pathlib import Path
 import sys
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/lanes"))
+import atomic_state as state  # noqa: E402
+import ledger_archive  # noqa: E402
 import shipping_attribution as attribution  # noqa: E402
 
 
@@ -186,3 +196,393 @@ def test_duplicate_and_conflicting_origin_appends_preserve_original_bytes(tmp_pa
     row = attribution.attribute_pr(pr(), [receipt, conflict], "JovieInc/Jovie")
     assert row["origin"]["confidence"] == "unknown"
     assert row["evidenceErrors"][-1]["reason"] == "conflicting-exact-origin-receipts"
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_origin_nonfinite_extension_rejected_before_ledger_write(tmp_path, value):
+    path = tmp_path / "ledger.jsonl"
+    path.write_bytes(b'{"existing":true}\n')
+    before = path.read_bytes()
+    with pytest.raises(ValueError):
+        attribution.append_origin_receipt(path, {**source_origin("grokbot"), "extra": value})
+    assert path.read_bytes() == before
+
+
+# Canonical ledger writes use only synthetic rows and isolated files.
+
+def _writer(path, start, count, ready, go):
+    ready.put(True)
+    go.wait(10)
+    for index in range(count):
+        # Force repeated short writes while processes compete for the same lock.
+        real_write = os.write
+        with patch.object(state.os, "write", side_effect=lambda fd, data: real_write(fd, data[:997])):
+            state.append_json_object(Path(path), {"id": start + index, "text": "é" * 10000})
+
+
+def test_multiprocess_large_rows_remain_whole_with_short_writes(tmp_path):
+    ctx = multiprocessing.get_context("fork")
+    ready, go = ctx.Queue(), ctx.Event()
+    path = tmp_path / "runs/ledger.jsonl"
+    workers = [ctx.Process(target=_writer, args=(str(path), n * 8, 8, ready, go)) for n in range(4)]
+    for worker in workers:
+        worker.start()
+    try:
+        for _ in workers:
+            assert ready.get(timeout=10)
+        go.set()
+        for worker in workers:
+            worker.join(15)
+            assert worker.exitcode == 0
+    finally:
+        for worker in workers:
+            if worker.is_alive():
+                worker.terminate()
+                worker.join()
+    rows = [json.loads(line) for line in path.read_bytes().splitlines()]
+    assert sorted(r["id"] for r in rows) == list(range(32))
+    assert all(r["text"] == "é" * 10000 for r in rows)
+    assert attribution.read_ledger(path)["complete"] is True
+
+
+def test_single_unchecked_short_write_reproduces_partial_record(tmp_path):
+    path = tmp_path / "old.jsonl"
+    payload = (json.dumps({"text": "x" * 20000}) + "\n").encode()
+    real_write = os.write
+    fd = os.open(path, os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o600)
+    try:
+        with patch.object(os, "write", side_effect=lambda fd, data: real_write(fd, data[:8193])):
+            os.write(fd, payload)  # negative control: ignoring a short write tears the row
+    finally:
+        os.close(fd)
+    assert attribution.read_ledger(path)["complete"] is False
+
+
+@pytest.mark.parametrize("record", [None, [], 1, "{}", {"x": float("nan")},
+                                   {"x": [float("inf")]}, {"x": float("-inf")}, {"x": object()}])
+def test_invalid_input_has_no_filesystem_side_effect(tmp_path, record):
+    path = tmp_path / "absent/ledger.jsonl"
+    with pytest.raises((ValueError, TypeError)):
+        state.append_json_object(path, record)
+    assert not path.parent.exists()
+
+
+@pytest.mark.parametrize("serialized", ['{', '[]', 'null', '{"x":NaN}', '{"x":Infinity}',
+                                         '{"x":1e999}', '{}\n{}', '{\n"x":1}'])
+def test_invalid_serialized_records_rejected_before_io(tmp_path, serialized):
+    path = tmp_path / "absent/ledger.jsonl"
+    with patch.object(state.json, "dumps", return_value=serialized):
+        with pytest.raises(ValueError):
+            state.append_json_object(path, {})
+    assert not path.parent.exists()
+
+
+@pytest.mark.parametrize("failure", ["zero", "negative", "write", "fsync", "interrupt"])
+def test_failed_append_restores_every_original_byte(tmp_path, failure):
+    path = tmp_path / "ledger.jsonl"
+    before = b'{"kept": true}\n\n'
+    path.write_bytes(before)
+    real_write, real_sync = os.write, os.fsync
+    writes = 0
+    syncs = 0
+
+    def write(fd, data):
+        nonlocal writes
+        writes += 1
+        if writes == 1:
+            return real_write(fd, data[:3])
+        if failure == "zero":
+            return 0
+        if failure == "negative":
+            return -1
+        if failure == "write":
+            raise OSError(errno.ENOSPC, "fixture")
+        if failure == "interrupt":
+            raise KeyboardInterrupt()
+        return real_write(fd, data)
+
+    def sync(fd):
+        nonlocal syncs
+        syncs += 1
+        if failure == "fsync" and syncs == 1:
+            raise OSError(errno.EIO, "fixture")
+        return real_sync(fd)
+
+    with patch.object(state.os, "write", side_effect=write), patch.object(state.os, "fsync", side_effect=sync):
+        with pytest.raises((OSError, KeyboardInterrupt)):
+            state.append_json_object(path, {"text": "x" * 20000})
+    assert path.read_bytes() == before
+    state.append_json_object(path, {"after": True})
+    assert path.read_bytes().startswith(before)
+
+
+def test_rollback_error_reports_uncertain_outcome(tmp_path):
+    path = tmp_path / "ledger.jsonl"
+    with patch.object(state.os, "write", side_effect=OSError("fixture")), \
+            patch.object(state.os, "ftruncate", side_effect=OSError("fixture")):
+        with pytest.raises(OSError, match="rollback-uncertain"):
+            state.append_json_object(path, {})
+
+
+@pytest.mark.parametrize("tail", [b'{"valid":1}', b'{"torn":', b'not-json'])
+def test_unterminated_existing_tail_is_never_changed(tmp_path, tail):
+    path = tmp_path / "ledger.jsonl"
+    path.write_bytes(tail)
+    with pytest.raises(OSError, match="unterminated"):
+        state.append_json_object(path, {})
+    assert path.read_bytes() == tail
+
+
+def test_callback_sees_snapshot_and_failure_preserves_bytes(tmp_path):
+    path = tmp_path / "ledger.jsonl"
+    path.write_bytes(b'{"prior":1}\n')
+    def check(handle, record):
+        assert handle.read() == b'{"prior":1}\n'
+        assert record == {"next": 2}
+        raise ValueError("refused")
+    with pytest.raises(ValueError, match="refused"):
+        state.append_json_object(path, {"next": 2}, before_append=check)
+    assert path.read_bytes() == b'{"prior":1}\n'
+
+
+@pytest.mark.parametrize("kind", ["ledger", "lock"])
+def test_symlink_cannot_redirect_append(tmp_path, kind):
+    target = tmp_path / "target"
+    target.write_bytes(b'{"kept":1}\n')
+    path = tmp_path / "ledger.jsonl"
+    (path if kind == "ledger" else state.ledger_lock_path(path)).symlink_to(target)
+    with pytest.raises(OSError):
+        state.append_json_object(path, {})
+    assert target.read_bytes() == b'{"kept":1}\n'
+
+
+def test_path_drift_is_refused(tmp_path):
+    path = tmp_path / "ledger.jsonl"
+    path.write_bytes(b'{}\n')
+    actual = os.fstat
+    def moved(fd):
+        result = actual(fd)
+        return SimpleNamespace(st_mode=result.st_mode, st_dev=result.st_dev, st_ino=-1)
+    with patch.object(state.os, "fstat", side_effect=moved):
+        with pytest.raises(OSError, match="path-changed"):
+            state.append_json_object(path, {})
+    assert path.read_bytes() == b'{}\n'
+
+
+def test_finite_float_and_escaped_newlines_are_valid(tmp_path):
+    path = tmp_path / "ledger.jsonl"
+    state.append_json_object(path, {"float": 1.5, "text": "line\nline"})
+    assert json.loads(path.read_bytes()) == {"float": 1.5, "text": "line\nline"}
+
+
+def test_rotation_uses_append_lock(tmp_path):
+    import fcntl
+    path = tmp_path / "runs/ledger.jsonl"
+    state.append_json_object(path, {"id": 1})
+    with state.ledger_lock_path(path).open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        assert ledger_archive.rotate(tmp_path, settle_s=0)["status"] == "busy"
+    assert ledger_archive.rotate(tmp_path, settle_s=0)["status"] == "rotated"
+    state.append_json_object(path, {"id": 2})
+    assert [json.loads(r)["id"] for r in path.read_bytes().splitlines()] == [1, 2]
+
+
+def test_every_maintained_producer_routes_through_shared_helper():
+    root = Path(__file__).resolve().parents[1] / "lanes"
+    expected = {"lane_runner.py": 12, "hyperagent_repair.py": 1, "epics.py": 1,
+                "pr_events.py": 1, "bindings.py": 1, "taste_default.py": 1, "outcome_lane.py": 1}
+    calls_by_file = {}
+    for path in root.glob("*.py"):
+        source = path.read_text()
+        if "ledger.jsonl" not in source:
+            continue
+        tree = ast.parse(source)
+        calls_by_file[path.name] = [n for n in ast.walk(tree) if isinstance(n, ast.Call)]
+    for name, count in expected.items():
+        routed = [n for n in calls_by_file[name] if isinstance(n.func, ast.Name)
+                  and n.func.id == "append_json_object"]
+        assert len(routed) == count, name
+    # Catch literal canonical appends, including Path.open's argument-zero mode.
+    for name, calls in calls_by_file.items():
+        for call in calls:
+            if getattr(call.func, "id", getattr(call.func, "attr", "")) != "open":
+                continue
+            mode_index = 1 if isinstance(call.func, ast.Name) else 0
+            mode = call.args[mode_index] if len(call.args) > mode_index else None
+            is_append = isinstance(mode, ast.Constant) and isinstance(mode.value, str) and "a" in mode.value
+            assert not (is_append and "ledger.jsonl" in ast.unparse(call)), name
+
+
+
+@pytest.mark.parametrize("bad", [b'{broken}\n', b'[]\n', b'null\n', b'\xff\n', b'\xef\xbb\xbf{}\n'])
+def test_origin_existing_corruption_remains_failclosed_and_unchanged(tmp_path, bad):
+    path = tmp_path / "ledger.jsonl"
+    original = b'\n{"prior":true}\n' + bad
+    path.write_bytes(original)
+    with pytest.raises(OSError, match="origin-ledger-corrupt"):
+        attribution.append_origin_receipt(path, source_origin("grokbot"))
+    assert path.read_bytes() == original
+    if bad != b'\xff\n':
+        assert attribution.read_ledger(path)["complete"] is False
+
+
+def test_origin_blank_lines_and_unrelated_rows_are_preserved(tmp_path):
+    path = tmp_path / "ledger.jsonl"
+    original = b'\n{"prior":true}\n \t\r\n'
+    path.write_bytes(original)
+    attribution.append_origin_receipt(path, source_origin("grokbot"))
+    assert path.read_bytes().startswith(original)
+    assert attribution.read_ledger(path)["complete"] is True
+
+
+def _origin_contender(path, ready, go, results):
+    ready.put(True)
+    go.wait(10)
+    try:
+        attribution.append_origin_receipt(Path(path), source_origin("grokbot"))
+        results.put("appended")
+    except ValueError as error:
+        results.put(str(error))
+
+
+def test_concurrent_origin_duplicates_have_exactly_one_winner(tmp_path):
+    ctx = multiprocessing.get_context("fork")
+    ready, go, results = ctx.Queue(), ctx.Event(), ctx.Queue()
+    path = tmp_path / "runs/ledger.jsonl"
+    workers = [ctx.Process(target=_origin_contender, args=(str(path), ready, go, results)) for _ in range(3)]
+    for worker in workers:
+        worker.start()
+    try:
+        for _ in workers:
+            assert ready.get(timeout=10)
+        go.set()
+        for worker in workers:
+            worker.join(10)
+            assert worker.exitcode == 0
+        assert sorted(results.get(timeout=5) for _ in workers) == [
+            "appended", "duplicate-origin-receipt", "duplicate-origin-receipt"]
+    finally:
+        for worker in workers:
+            if worker.is_alive():
+                worker.terminate()
+                worker.join()
+    assert len(path.read_bytes().splitlines()) == 1
+
+
+def test_small_producers_execute_the_shared_writer_and_preserve_receipts(tmp_path):
+    # Only pure receipt functions, no lane/controller construction or installed bindings.
+    import pr_events
+    import taste_default
+    import outcome_lane
+    pr_events.ledger(SimpleNamespace(state=tmp_path), {"kind": "fixture", "text": "x" * 20000})
+    taste_default.ledger_row(tmp_path, "JOV-1", {"enteredAt": 1800000000}, "fixture", 1800000001)
+    outcome_lane.ledger(tmp_path, "JOV-1", {"at": "2026-01-01T00:00:00Z", "sha": "a" * 40},
+                        {"result": "fixture", "decision": "fixture"})
+    rows = [json.loads(r) for r in (tmp_path / "runs/ledger.jsonl").read_bytes().splitlines()]
+    assert [row["kind"] for row in rows] == ["fixture", "taste-decision", "outcome-verify"]
+    assert rows[0]["text"] == "x" * 20000
+    assert rows[1]["waitHours"] is None
+    assert rows[2]["sha"] == "a" * 40
+    with patch.object(taste_default, "append_json_object", side_effect=OSError("fixture")), \
+            patch.object(outcome_lane, "append_json_object", side_effect=OSError("fixture")):
+        taste_default.ledger_row(tmp_path, "JOV-1", {"enteredAt": 1800000000}, "fixture", 1800000001)
+        outcome_lane.ledger(tmp_path, "JOV-1", {}, {})
+    assert len((tmp_path / "runs/ledger.jsonl").read_bytes().splitlines()) == 3
+
+
+def _append_after_rotation_starts(path, started):
+    started.set()
+    state.append_json_object(Path(path), {"id": 2})
+
+
+def test_multiprocess_appender_waits_for_rotation_and_opens_current_inode(tmp_path):
+    path = tmp_path / "runs/ledger.jsonl"
+    state.append_json_object(path, {"id": 1})
+    ctx = multiprocessing.get_context("spawn")
+    started = ctx.Event()
+    worker = ctx.Process(target=_append_after_rotation_starts, args=(str(path), started))
+    def during_rename(_):
+        worker.start()
+        assert started.wait(10)
+        assert not path.exists()  # appender cannot recreate the path during rotation
+    try:
+        assert ledger_archive.rotate(tmp_path, sleep=during_rename)["status"] == "rotated"
+        worker.join(10)
+        assert worker.exitcode == 0
+    finally:
+        if worker.is_alive():
+            worker.terminate()
+            worker.join()
+    assert [json.loads(r)["id"] for r in path.read_bytes().splitlines()] == [1, 2]
+
+
+def test_rotation_without_runs_directory_preserves_no_ledger_contract(tmp_path):
+    assert ledger_archive.rotate(tmp_path)["status"] == "no-ledger"
+    assert not (tmp_path / "runs").exists()
+    (tmp_path / "runs").mkdir()
+    assert ledger_archive.rotate(tmp_path)["status"] == "no-ledger"
+
+
+def test_rotation_archives_old_objects_without_issue_metadata(tmp_path):
+    path = tmp_path / "runs/ledger.jsonl"
+    state.append_json_object(path, {"endedAt": "2020-01-01T00:00:00Z", "kept": "fixture"})
+    result = ledger_archive.rotate(tmp_path, now=1800000000, settle_s=0)
+    assert result["archived"] == 1
+    archived = list((path.parent / ledger_archive.ARCHIVE_DIR).glob("*.jsonl"))
+    assert len(archived) == 1
+    assert json.loads(archived[0].read_bytes())["kept"] == "fixture"
+    assert path.read_bytes() == b""
+
+
+
+def test_dependabot_origin_cli_runs_from_exact_sparse_checkout_manifest(tmp_path):
+    workflow = ROOT / ".github/workflows/dependabot-auto-merge.yml"
+    lines = workflow.read_text().splitlines()
+    start = next(i for i, line in enumerate(lines) if line.strip() == "sparse-checkout: |")
+    indent = len(lines[start]) - len(lines[start].lstrip())
+    patterns = []
+    for line in lines[start + 1:]:
+        if line.strip() and len(line) - len(line.lstrip()) <= indent:
+            break
+        if line.strip():
+            patterns.append(line.strip())
+    assert "scripts/shipping_origin.py" in patterns
+    assert "scripts/lanes/shipping_attribution.py" in patterns
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    # Materialize only tracked files selected by the real manifest, from current
+    # source bytes. No dependency injection, hidden helper copy or test stub.
+    listed = subprocess.run(["git", "ls-files", "-z", "--", *patterns], cwd=ROOT,
+                            capture_output=True, check=True).stdout
+    for relative in listed.decode().split("\0"):
+        if not relative:
+            continue
+        target = checkout / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / relative, target)
+    home, temporary = tmp_path / "home", tmp_path / "tmp"
+    home.mkdir(mode=0o700)
+    temporary.mkdir(mode=0o700)
+    env = {"PATH": os.defpath, "HOME": str(home), "TMPDIR": str(temporary),
+           "PYTHONPATH": "", "PYTHONNOUSERSITE": "1", "PYTHONDONTWRITEBYTECODE": "1"}
+    for arguments in (["scripts/shipping_origin.py", "--help"],
+                      ["scripts/shipping_origin.py", "emit-automation", "--help"],
+                      ["scripts/lanes/shipping_attribution.py", "--help"]):
+        result = subprocess.run([sys.executable, "-S", *arguments], cwd=checkout, env=env,
+                                capture_output=True, text=True, timeout=10)
+        assert result.returncode == 0, result.stderr
+        assert "usage:" in result.stdout
+
+
+
+@pytest.mark.parametrize("original", [
+    b'{}\r{"prior":true}\r\n',
+    '\u00a0\u2003\n{"prior":true}\n'.encode("utf-8"),
+    b'{"legacy":NaN}\n{"legacy":Infinity}\n',
+])
+def test_origin_scan_preserves_existing_reader_accepted_bytes(tmp_path, original):
+    path = tmp_path / "ledger.jsonl"
+    path.write_bytes(original)
+    attribution.append_origin_receipt(path, source_origin("grokbot"))
+    assert path.read_bytes().startswith(original)
+    assert attribution.read_ledger(path)["complete"] is True
