@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   resolveUserState: vi.fn().mockResolvedValue({
@@ -64,6 +64,23 @@ vi.mock('@/lib/waitlist/settings', () => ({
 import StartPage from './page';
 
 describe('StartPage', () => {
+  beforeEach(() => {
+    // Entry-prop cases exercise explicit reopening; default closure has dedicated route coverage.
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'false');
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('redirects an anonymous visitor to the waitlist when signup closure is unset', async () => {
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', undefined);
+    mocks.resolveUserState.mockResolvedValueOnce({
+      state: 'UNAUTHENTICATED',
+      redirectTo: '/signin',
+    });
+    await expect(
+      StartPage({ searchParams: Promise.resolve({}) })
+    ).rejects.toThrow('redirect:/waitlist');
+  });
+
   it('renders the onboarding shell without minting a server-component cookie', async () => {
     const result = await StartPage({ searchParams: Promise.resolve({}) });
 

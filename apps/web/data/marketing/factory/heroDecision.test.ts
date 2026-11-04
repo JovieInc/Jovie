@@ -130,6 +130,27 @@ function activeHeroBindings(): Map<string, string | null> {
 describe('hero code bindings', () => {
   const heroVariants = getMarketingSection('hero').variants;
 
+  it('binds the actual homepage to the locked centered native hero', () => {
+    expect(
+      auditHeroRoutes(activeHeroBindings()).find(row => row.url === '/')
+    ).toMatchObject({ expected: 'centered-homepage', mismatch: null });
+    expect(HERO_CODE_BINDING_BY_VARIANT['centered-homepage']).toMatchObject({
+      component: 'components/marketing/MarketingHero',
+      sectionVariantId: 'centered-none',
+    });
+  });
+
+  it('still rejects a left-content homepage against the same locked decision', () => {
+    expect(
+      auditHeroRoutes(new Map([['/', 'left-none']])).find(
+        row => row.url === '/'
+      )
+    ).toMatchObject({
+      expected: 'centered-homepage',
+      mismatch: 'wrong-variant',
+    });
+  });
+
   it('maps every locked Pen hero to an active code variant or an explicit gap', () => {
     expect(
       Object.fromEntries(
@@ -140,7 +161,7 @@ describe('hero code bindings', () => {
       )
     ).toMatchInlineSnapshot(`
       {
-        "centered-homepage": null,
+        "centered-homepage": "centered-none",
         "f-layout-desktop-screenshot": "split-screenshot-right",
         "left-buttons": null,
         "left-content": "left-none",
@@ -219,7 +240,7 @@ describe('route hero audit', () => {
     // mismatch means the route chose a hero the table does not allow.
     expect(summary).toMatchInlineSnapshot(`
       {
-        "/": "wrong-variant: split-claim-card -> centered-homepage",
+        "/": "ok: centered-homepage",
         "/about": "ok: left-content",
         "/alternatives/*": "ok: left-content",
         "/artist-notifications": "ok: f-layout-desktop-screenshot",
@@ -227,13 +248,13 @@ describe('route hero audit', () => {
         "/blog": "ok: left-content",
         "/blog/category/*": "ok: left-content",
         "/card": "ok: left-content",
-        "/cli": "unlocked-code-variant: centered-none -> npm-copy",
+        "/cli": "wrong-variant: centered-none -> npm-copy",
         "/compare/*": "ok: left-content",
         "/download": "ok: f-layout-desktop-screenshot",
         "/instant-merch": "ok: f-layout-desktop-screenshot",
         "/launch": "ok: f-layout-desktop-screenshot",
         "/pay": "ok: split-link-claim",
-        "/pricing": "unlocked-code-variant: centered-none -> left-buttons",
+        "/pricing": "wrong-variant: centered-none -> left-buttons",
         "/product": "ok: split-link-claim",
         "/product/command-palette": "ok: f-layout-desktop-screenshot",
         "/product/dsp-links": "ok: f-layout-desktop-screenshot",
@@ -261,7 +282,7 @@ describe('route hero audit', () => {
     const rows = auditHeroRoutes(
       new Map([
         ['/a', null],
-        ['/b', 'centered-none'],
+        ['/b', 'centered-phone'],
         ['/c', 'split-claim-card'],
         ['/d', 'left-none'],
       ]),

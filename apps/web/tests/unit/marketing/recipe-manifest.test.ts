@@ -1544,8 +1544,8 @@ describe('current acquisition source inventory (JOV-4065)', () => {
       binding => binding.kind === 'approved-section'
     );
     expect(entry.specVersion).toBe(MARKETING_SPEC_VERSION);
-    // Tim 2026-11-01: the five-beat homepage. The rendered contract
-    // (order, owners, copy, prices, media) lives in homepage-contract.test.
+    // The approved discovery, profile, relationships, and access chapters.
+    // The rendered contract lives in homepage-contract.test.
     expect(bindings.map(binding => binding.sectionId)).toEqual(
       MARKETING_RECIPES.find(recipe => recipe.id === 'homepage')?.sectionOrder
     );
@@ -1555,7 +1555,7 @@ describe('current acquisition source inventory (JOV-4065)', () => {
     // Source inventory is separate from deployed mounted and visual certification.
     expect(entry.bindingEvidence.status).toBe('verified');
     expect(bindings.map(binding => binding.variantId)).toEqual([
-      'left-none',
+      'centered-none',
       'split-setup',
       'editorial',
       'final-single-claim',

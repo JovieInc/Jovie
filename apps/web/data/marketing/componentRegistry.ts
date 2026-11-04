@@ -281,9 +281,9 @@ const SECTION_RESOLUTIONS = {
         rootBinding: "sectionVariant='centered-none'",
       },
       {
-        variantId: 'left-none',
+        variantId: 'centered-none',
         componentPath: 'apps/web/components/homepage/HomepageArtistProfile.tsx',
-        rootBinding: "sectionVariant='left-none'",
+        rootBinding: "sectionVariant='centered-none'",
       },
       {
         variantId: 'left-none',

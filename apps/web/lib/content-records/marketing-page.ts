@@ -36,7 +36,7 @@ const line = (max: number) =>
 const HeroSection = z
   .object({
     section: z.literal('hero'),
-    variant: z.literal('left-none'),
+    variant: z.literal('centered-none'),
     copy: z
       .object({
         subhead: line(220),
@@ -110,7 +110,7 @@ const HOMEPAGE_SECTION_SOURCE =
 export const SPEC_SECTION_REGISTRY: readonly SpecSectionRegistryEntry[] = [
   {
     section: 'hero',
-    variant: 'left-none',
+    variant: 'centered-none',
     component: 'HomepageArtistHero',
     source: HOMEPAGE_SECTION_SOURCE,
     censusGroup: 'home',
@@ -185,7 +185,7 @@ export const DEFAULT_HOME_SPEC: MarketingPageSpec = {
   sections: [
     {
       section: 'hero',
-      variant: 'left-none',
+      variant: 'centered-none',
       copy: {
         subhead: HOMEPAGE_COPY.hero.subhead,
         claimAction: HOMEPAGE_COPY.hero.claim.action,

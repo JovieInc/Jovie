@@ -301,7 +301,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       approvedVariantBinding(
         'apps/web/components/homepage/HomepageArtistProfile.tsx',
         'hero',
-        'left-none'
+        'centered-none'
       ),
       // The unsupported adoption strip is intentionally omitted until it has
       // an attributable permission or adoption receipt.

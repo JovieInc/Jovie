@@ -2,6 +2,8 @@
 import Link from 'next/link';
 import { WaitlistRoleForm } from '@/components/features/waitlist/WaitlistRoleForm';
 import { ArtistProfileSectionShell } from '@/components/marketing/artist-profile/ArtistProfileSectionShell';
+import { MarketingContainer } from '@/components/marketing/MarketingContainer';
+import { MarketingHero } from '@/components/marketing/MarketingHero';
 import { MarketingOfferSummary } from '@/components/marketing/MarketingOfferSummary';
 import { MarketingPhoneImage } from '@/components/marketing/MarketingPhoneImage';
 import { ProductShot } from '@/components/marketing/ProductShot';
@@ -26,46 +28,61 @@ export function HomepageArtistHero({
   copy?: HomepageCopy['hero'];
   headingId?: string;
 }>) {
+  const lastWord = copy.headline.lastIndexOf(' ');
   return (
-    <ArtistProfileSectionShell
-      className='homepage-discovery-hero'
-      containerClassName='homepage-discovery-hero__content'
-      sectionId='hero'
-      sectionVariant='left-none'
+    <MarketingHero
+      variant='centered'
+      className='homepage-discovery-hero public-container--bleed'
+      headingId={headingId}
+      testId='marketing-section-hero'
+      sectionVariant='centered-none'
       sectionOwner={OWNER}
-      penContractId={MARKETING_PEN_CONTRACT_IDS.section.hero}
     >
       <HomepageHeroLight animate={false} />
-      <div className='homepage-discovery-hero__lead'>
-        <h1
-          id={headingId}
-          className='marketing-type-display text-balance text-primary-token'
-        >
-          {copy.headline}
-        </h1>
-        <p className='marketing-type-lede text-pretty text-secondary-token homepage-discovery-hero__subhead'>
-          {copy.subhead}
-        </p>
-        <HomepageNameSearch />
-        <div className='homepage-discovery-hero__access'>
-          <Link
-            href={HOMEPAGE_COPY.access.href}
-            className='homepage-access-link focus-ring-themed'
+      <MarketingContainer
+        width='page'
+        className='homepage-discovery-hero__content'
+      >
+        <div className='homepage-discovery-hero__lead'>
+          <h1
+            id={headingId}
+            className='marketing-type-display text-balance text-primary-token'
           >
-            {copy.claim.action}
-          </Link>
-          <Link
-            href={HOMEPAGE_COPY.access.inviteHref}
-            className='focus-ring-themed'
-          >
-            {HOMEPAGE_COPY.access.invite}
-          </Link>
+            {lastWord < 0 ? (
+              copy.headline
+            ) : (
+              <>
+                {copy.headline.slice(0, lastWord)}{' '}
+                <span className='homepage-discovery-hero__last-word'>
+                  {copy.headline.slice(lastWord + 1)}
+                </span>
+              </>
+            )}
+          </h1>
+          <p className='marketing-type-lede text-pretty text-primary-token homepage-discovery-hero__subhead'>
+            {copy.subhead}
+          </p>
+          <HomepageNameSearch />
+          <div className='homepage-discovery-hero__access'>
+            <Link
+              href={HOMEPAGE_COPY.access.href}
+              className='homepage-access-link focus-ring-themed'
+            >
+              {copy.claim.action}
+            </Link>
+            <Link
+              href={HOMEPAGE_COPY.access.inviteHref}
+              className='focus-ring-themed'
+            >
+              {HOMEPAGE_COPY.access.invite}
+            </Link>
+          </div>
+          <p className='homepage-discovery-hero__note text-secondary-token'>
+            {copy.supportNote}
+          </p>
         </div>
-        <p className='homepage-discovery-hero__note text-secondary-token'>
-          {copy.supportNote}
-        </p>
-      </div>
-    </ArtistProfileSectionShell>
+      </MarketingContainer>
+    </MarketingHero>
   );
 }
 

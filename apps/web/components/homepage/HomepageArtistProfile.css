@@ -21,6 +21,7 @@
 .homepage-discovery-hero {
   isolation: isolate;
   overflow: hidden;
+  background-color: var(--noir-ion-canvas);
 }
 
 .homepage-discovery-hero__content {
@@ -29,17 +30,28 @@
 }
 
 .homepage-discovery-hero h1 {
-  max-width: 16ch;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.05;
+  margin-inline: auto;
+  max-width: 13em;
 }
 
 .homepage-discovery-hero__subhead {
-  margin-top: var(--space-6);
-  max-width: 38ch;
+  margin-top: var(--space-5);
+  margin-inline: auto;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-normal);
+  line-height: normal;
+  letter-spacing: normal;
+  opacity: 0.72;
 }
 
 .homepage-discovery {
   margin-top: var(--space-8);
+  margin-inline: auto;
   max-width: 30rem;
+  text-align: left;
 }
 
 .homepage-discovery__result:empty {
@@ -65,8 +77,9 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-5);
-  margin-top: var(--space-6);
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
   font-size: var(--text-sm);
 }
 
@@ -128,12 +141,19 @@
 }
 
 @media (min-width: 64rem) {
-  .homepage-discovery-hero h1 {
-    max-width: 26ch;
+  /* OxwR1 saved master: 200px top, 48px bottom. Height grows with the
+     live discovery and closed-signup controls instead of cropping them. */
+  .homepage-discovery-hero {
+    padding-top: calc(var(--space-40) + var(--space-10));
+    padding-bottom: var(--space-12);
   }
 
-  .homepage-discovery-hero__subhead {
-    max-width: 48ch;
+  .homepage-discovery-hero h1 {
+    font-size: calc(var(--text-5xl) + var(--space-8));
+  }
+
+  .homepage-discovery-hero__last-word {
+    display: block;
   }
 
   .homepage-profile__grid {

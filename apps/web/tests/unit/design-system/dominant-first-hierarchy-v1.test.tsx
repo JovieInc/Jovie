@@ -154,7 +154,10 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
 
     const support = hero.querySelector('.marketing-type-lede');
     expect(support).not.toBeNull();
-    expect(support).toHaveClass('text-secondary-token');
+    expect(support).toHaveClass(
+      'text-primary-token',
+      'homepage-discovery-hero__subhead'
+    );
     // Support copy must not itself be a heading — it recedes structurally,
     // it does not compete as a second thing to perceive first.
     expect(support?.tagName.toLowerCase()).not.toMatch(/^h[1-6]$/);
@@ -166,8 +169,16 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
       cssBlock(source, HEADLINE_SELECTOR),
       'font-size'
     );
+    const home = read('components/homepage/HomepageArtistProfile.css');
     const support = clampRangePx(
-      cssBlock(source, SUPPORT_SELECTOR),
+      cssBlock(home, '.homepage-discovery-hero__subhead'),
+      'font-size'
+    );
+    const desktop = clampRangePx(
+      cssBlock(
+        home.slice(home.lastIndexOf('.homepage-discovery-hero h1')),
+        '.homepage-discovery-hero h1'
+      ),
       'font-size'
     );
 
@@ -179,6 +190,11 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
     expect(headline.max / support.max).toBeGreaterThanOrEqual(
       MIN_DOMINANCE_RATIO
     );
+    expect(desktop.min / support.max).toBeGreaterThanOrEqual(
+      MIN_DOMINANCE_RATIO
+    );
+    expect(desktop).toEqual({ min: 80, max: 80 });
+    expect(support).toEqual({ min: 16, max: 16 });
 
     // Both roles read the one --ds-marketing-* ramp, never page clamps.
     expect(cssBlock(source, HEADLINE_SELECTOR)).toContain(
@@ -189,13 +205,25 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
     );
   });
 
-  it('keeps the headline at full ink weight while the support line recedes via a lighter ink token', () => {
-    // The hero paints ink through the semantic token utilities only; the
-    // homepage stylesheet must not re-mix or fade either ink.
+  it('keeps the headline at full ink while the native support opacity preserves readable contrast', () => {
+    // Saved OxwR1 declares Inter16 at .72 opacity. Preserve semantic ink
+    // tokens and verify the resulting support ink against the actual field.
     const source = read('components/homepage/HomepageArtistProfile.css');
     expect(source).not.toMatch(/--color-text-(?:primary|secondary)-token\s*:/);
     const support = cssBlock(source, '.homepage-discovery-hero__subhead');
     expect(support).not.toContain('color-mix');
+    const alpha = Number(/opacity:\s*([\d.]+);/.exec(support)?.[1]);
+    expect(alpha).toBe(0.72);
+    const primary = [0xf5, 0xf7, 0xfb];
+    const background = [0x03, 0x04, 0x06];
+    const supportInk = `#${primary
+      .map((channel, index) =>
+        Math.round(channel * alpha + background[index] * (1 - alpha))
+          .toString(16)
+          .padStart(2, '0')
+      )
+      .join('')}`;
+    expect(contrastRatio(supportInk, '#030406')).toBeGreaterThanOrEqual(4.5);
 
     const theme = read('styles/design-system.css');
     const tailwind = read('styles/tailwind-foundation.css');
@@ -203,7 +231,7 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
     expect(dark).toContain('--color-text-primary-token: #f5f7fb;');
     expect(dark).toContain('--color-text-secondary-token: #a0a5af;');
     expect(
-      contrastRatio('#f5f7fb', '#030406') / contrastRatio('#a0a5af', '#030406')
+      contrastRatio('#f5f7fb', '#030406') / contrastRatio(supportInk, '#030406')
     ).toBeGreaterThan(1.8);
     expect(tailwind).toContain(
       '--color-primary-token: var(--color-text-primary-token)'
