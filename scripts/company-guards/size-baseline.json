@@ -38,6 +38,7 @@
   ".github/scripts/testflight-release-lease.mjs": 643,
   ".github/scripts/testflight-release-lease.test.mjs": 1063,
   ".github/scripts/vercel-output-manifest.mjs": 542,
+  ".github/scripts/verify-main-release-readiness.mjs": 558,
   "apps/console/lib/factory-health.ts": 597,
   "apps/desktop/scripts/desktop-shell-contract.test.mjs": 2337,
   "apps/desktop/scripts/renderer-recovery.test.ts": 960,

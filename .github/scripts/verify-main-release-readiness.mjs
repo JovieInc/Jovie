@@ -184,7 +184,9 @@ export function hasExactSuccessfulMergeGroupProof({
       return false;
     }
 
-    const jobs = jobsByRun.get(run.id) ?? [];
+    const runId = Number(run.id);
+    if (!Number.isFinite(runId)) return false;
+    const jobs = jobsByRun.get(runId) ?? [];
     const prReady = jobs.some(
       job =>
         job.name === 'PR Ready' &&
