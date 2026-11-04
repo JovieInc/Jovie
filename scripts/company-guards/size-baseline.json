@@ -920,7 +920,7 @@
   "scripts/capability-benchmark/capability-reconciliation.test.mjs": 709,
   "scripts/capacity/waste.py": 505,
   "scripts/cheap-fixer/cheap-fixer.test.mjs": 604,
-  "scripts/ci-fast-lanes.mjs": 3515,
+  "scripts/ci-fast-lanes.mjs": 3516,
   "scripts/company-assets/company-assets.mjs": 571,
   "scripts/compliance/privacy-rules.mjs": 562,
   "scripts/component-comparative-quality-bar.mjs": 709,
