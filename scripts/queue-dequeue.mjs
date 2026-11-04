@@ -8,6 +8,8 @@
  * Failed attempts after append remain counted; read the native outcome before retry.
  * --dry-run is a read-only plan, not a reservation. Qualification uses fake gh.
  */
+// api-budget: github-user-core 20/hr - estimate: ten manual invocations/hr, at most two REST calls each before shared-client read retries.
+// api-budget: github-user-graphql 40/hr - estimate: ten manual invocations/hr, at most four GraphQL calls each; no polling loop.
 import { execFileSync } from 'node:child_process';
 import {
   appendFileSync,
@@ -22,7 +24,7 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const CODES = [
   'poison',
@@ -79,11 +81,22 @@ export function validate(args, state, history, nowMs) {
 }
 
 function defaultGh(args, input) {
-  return execFileSync('gh', args, {
-    encoding: 'utf8',
-    input,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
+  return execFileSync(
+    process.execPath,
+    [
+      fileURLToPath(new URL('../packages/api-client/cli.ts', import.meta.url)),
+      'gh',
+      '--priority',
+      'repair',
+      '--',
+      ...args,
+    ],
+    {
+      encoding: 'utf8',
+      input,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }
+  );
 }
 
 export function readHistory(logPath) {
@@ -249,6 +262,12 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     process.exitCode = run(process.argv.slice(2));
   } catch (error) {
     console.error(`queue-dequeue: ${error.message}`);
-    process.exitCode = 2;
+    process.exitCode =
+      error &&
+      typeof error === 'object' &&
+      'status' in error &&
+      error.status === 75
+        ? 75
+        : 2;
   }
 }
