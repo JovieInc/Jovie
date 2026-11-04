@@ -7859,11 +7859,11 @@ def Locked_free(host):
 class FixRedTest(unittest.TestCase):
     def setUp(self):
         disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
-        disk.start()
+        disk.start(); lane._FAILED_LOGS.clear(); self.addCleanup(lane._FAILED_LOGS.clear)
         self.addCleanup(disk.stop)
         self.real_reconcile_fix_target = lane.reconcile_fix_target
         lane.reconcile_fix_target = lambda pr: {**pr, "state": "OPEN", "mergedAt": None}
-        self.addCleanup(setattr, lane, "reconcile_fix_target", self.real_reconcile_fix_target)
+        denied = patch.object(lane, "gh_call", side_effect=lambda *a, **k: SimpleNamespace(returncode=1, stdout="", stderr="fixture: gh_call denied")); denied.start(); self.addCleanup(denied.stop); self.addCleanup(setattr, lane, "reconcile_fix_target", self.real_reconcile_fix_target)
 
     def pr(self, number=5, sha="h1", checks=None):
         return {"number": number, "title": "t", "headRefName": "devin/jov-1", "headRefOid": sha,
