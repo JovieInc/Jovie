@@ -8,6 +8,10 @@ import {
   getOnboardingRateLimitMessage,
 } from '@/lib/onboarding/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
+import {
+  recordInviteOpened,
+  recordInviteRedeemed,
+} from '@/lib/waitlist/invite-funnel';
 import { redeemWaitlistInviteToken } from '@/lib/waitlist/redeem';
 
 interface WaitlistInvitePageProps {
@@ -27,6 +31,9 @@ export default async function WaitlistInvitePage({
       />
     );
   }
+
+  // Invite funnel: first open of a real invite link (never throws).
+  await recordInviteOpened(token);
 
   const { userId } = await getCachedAuth();
   if (!userId) {
@@ -77,6 +84,8 @@ export default async function WaitlistInvitePage({
   });
 
   if (result.outcome === 'approved') {
+    // Invite funnel: account created and handed into the golden path.
+    await recordInviteRedeemed({ entryId: result.entryId, appUserId: userId });
     redirect(`${APP_ROUTES.START}?fresh_signup=true`);
   }
 

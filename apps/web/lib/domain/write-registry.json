@@ -103,6 +103,20 @@
       "tables": ["waitlistEntries", "creatorProfiles"]
     },
     {
+      "id": "waitlist.role-intake",
+      "entity": "waitlist/role-intake",
+      "module": "apps/web/lib/waitlist/role-entry.ts",
+      "exports": ["joinWaitlistWithRole"],
+      "tables": ["waitlistEntries"]
+    },
+    {
+      "id": "waitlist.invite-funnel",
+      "entity": "waitlist/invite-funnel",
+      "module": "apps/web/lib/waitlist/invite-funnel.ts",
+      "exports": ["recordInviteOpened", "recordInviteRedeemed"],
+      "tables": ["waitlistEntries"]
+    },
+    {
       "id": "synthetic.admitted-canary",
       "entity": "admitted production canary fixture",
       "module": "apps/web/lib/synthetic/admitted-canary.server.ts",

@@ -506,6 +506,17 @@ export const changelogSubscribeLimiter = createRateLimiter(
   }
 );
 
+/**
+ * Closed-signup waitlist join limiter
+ * Limit: 1 request per 10 seconds per IP
+ */
+export const waitlistJoinLimiter = createRateLimiter(
+  RATE_LIMITERS.waitlistJoin,
+  {
+    requireRedis: true,
+  }
+);
+
 // ============================================================================
 // Convenience Functions
 // ============================================================================
@@ -1365,6 +1376,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     health: healthLimiter,
     general: generalLimiter,
     changelogSubscribe: changelogSubscribeLimiter,
+    waitlistJoin: waitlistJoinLimiter,
     spotifySearch: spotifySearchLimiter,
     spotifySearchApi: spotifySearchApiLimiter,
     spotifyClaim: spotifyClaimLimiter,
