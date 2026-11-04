@@ -40,6 +40,11 @@ export async function certifyProfileModeHistory(
             '[data-testid="profile-bottom-nav"] [aria-current="page"]'
           )?.textContent ?? null,
         historyLength: history.length,
+        // Guard-level receipts from lib/testing/runtime-trace: which
+        // history-effect guard fired/blocked, in order (B/C diagnostics).
+        runtimeTrace:
+          (window as unknown as { __JOVIE_RUNTIME_TRACE__?: unknown })
+            .__JOVIE_RUNTIME_TRACE__ ?? null,
       }))),
     });
     await writeFile(

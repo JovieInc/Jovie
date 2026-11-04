@@ -997,6 +997,25 @@ describe('limiters.ts', () => {
       expect(mockLimit).toHaveBeenCalledTimes(2);
     });
 
+    it('skipWeeklyQuota keeps the hourly burst limit but never charges the weekly quota', async () => {
+      mockLimit.mockResolvedValue(makeAllowedResult());
+      const { checkAiChatRateLimitForPlan } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAiChatRateLimitForPlan('user-1', null, {
+        skipWeeklyQuota: true,
+      });
+      expect(result.success).toBe(true);
+      expect(mockLimit).toHaveBeenCalledTimes(1);
+
+      mockLimit.mockReset();
+      mockLimit.mockResolvedValue(makeDeniedResult());
+      const burstDenied = await checkAiChatRateLimitForPlan('user-1', null, {
+        skipWeeklyQuota: true,
+      });
+      expect(burstDenied.success).toBe(false);
+    });
+
     it('returns burst failure before checking weekly limit', async () => {
       mockLimit.mockResolvedValue(makeDeniedResult());
 

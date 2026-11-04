@@ -1,12 +1,12 @@
 {
   "schema": "jovie.motion-effects/v1",
-  "note": "Registry of marketing motion effects (ASR-039). Canvas, WebGL and rAF-loop code under the marketing roots ships only inside an effect listed here, with a reduced-motion rest state, a static fallback and a perf budget. Files ending in / are directory prefixes. Guide: .claude/skills/design-system/guides/motion.md. Checked by scripts/invariants/art-direction/surface-media.mjs.",
+  "note": "Registry of marketing motion effects (ASR-039). Canvas, WebGL and rAF-loop code under the marketing roots ships only inside an effect listed here, with a reduced-motion rest state, a static fallback and a perf budget. Files ending in / are directory prefixes. Guide: .claude/skills/design-system/guides/motion.md. Checked by scripts/invariants/art-direction/surface-media.mjs. Every WebGL or canvas-loop background also registers in apps/web/data/marketing/animatedBackgroundBudget.ts (static by default, <= 2ms per frame).",
   "effects": [
     {
       "id": "homepage-hero",
-      "summary": "Homepage hero light: CSS poster first, WebGL after idle.",
+      "summary": "Homepage hero light: static CSS poster by default; WebGL only when apps/web/data/marketing/animatedBackgroundBudget.ts enables it.",
       "files": ["apps/web/components/homepage/hero-light/"],
-      "fallback": "poster|shouldRunAmbientField|renderer\\s*!==\\s*['\"]webgl['\"]|mountCanvas\\s*\\?",
+      "fallback": "poster|renderer\\s*!==\\s*['\"]webgl['\"]|mountCanvas\\s*\\?",
       "reducedMotion": {
         "marker": "prefers-reduced-motion",
         "requiredIn": [
@@ -16,44 +16,23 @@
       "budget": { "gzipBytes": 7168, "fpsCap": null, "pausesOffscreen": true }
     },
     {
-      "id": "marketing-ambient-field",
-      "summary": "Accent ambient field behind a marketing section.",
-      "files": [
-        "apps/web/components/marketing/motion/MarketingAmbientField.tsx",
-        "apps/web/components/marketing/motion/ambient-field-gl.ts"
-      ],
-      "fallback": "poster|shouldRunAmbientField|renderer\\s*!==\\s*['\"]webgl['\"]|mountCanvas\\s*\\?",
+      "id": "marketing-hero-zoom",
+      "summary": "Hero shell zoom (CSS transforms, no GL).",
+      "files": ["apps/web/components/marketing/motion/hero-shell-zoom.ts"],
+      "fallback": "rest frame",
       "reducedMotion": {
         "marker": "prefers-reduced-motion",
         "requiredIn": [
-          "apps/web/components/marketing/motion/MarketingAmbientField.tsx"
-        ]
-      },
-      "budget": { "gzipBytes": 5120, "fpsCap": 30, "pausesOffscreen": true }
-    },
-    {
-      "id": "marketing-matte-motion",
-      "summary": "Matte field (WebGL2 section background) and the hero shell zoom (CSS transforms, no GL).",
-      "files": [
-        "apps/web/components/marketing/motion/matte-field-gl.ts",
-        "apps/web/components/marketing/motion/hero-shell-zoom.ts"
-      ],
-      "fallback": "static fallback|returns? null|rest frame",
-      "reducedMotion": {
-        "marker": "prefers-reduced-motion",
-        "requiredIn": [
-          "apps/web/components/marketing/motion/matte-field-gl.ts",
           "apps/web/components/marketing/motion/hero-shell-zoom.ts"
         ]
       },
       "budget": {
-        "gzipBytes": 3584,
+        "gzipBytes": 1536,
         "perFileGzipBytes": {
-          "apps/web/components/marketing/motion/matte-field-gl.ts": 2048,
           "apps/web/components/marketing/motion/hero-shell-zoom.ts": 1536
         },
-        "fpsCap": 30,
-        "pausesOffscreen": true
+        "fpsCap": null,
+        "pausesOffscreen": false
       }
     }
   ]

@@ -56,7 +56,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  play: async ({ canvasElement }) => {
+    const trigger = within(canvasElement).getByRole('button', {
+      name: 'View DSP Distribution Details +3',
+    });
+    await expect(trigger).toHaveAccessibleName(
+      'View DSP Distribution Details +3'
+    );
+  },
+};
 
 export const KeyboardDetails: Story = {
   play: async ({ canvasElement }) => {

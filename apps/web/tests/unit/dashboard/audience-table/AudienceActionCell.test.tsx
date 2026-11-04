@@ -99,9 +99,13 @@ describe('AudienceActionCell', () => {
       withTooltips
     );
     expect(screen.queryByRole('button', { name: /message/i })).toBeNull();
+    expect(
+      screen.getByText('No message action for anonymous visitors')
+    ).toHaveClass('sr-only');
+    expect(ctx.onSendNotification).not.toHaveBeenCalled();
   });
 
-  it('hides the message button for anonymous fans', () => {
+  it('describes the unavailable message action for anonymous visitors', () => {
     const ctx = makeStableContext();
     render(
       <AudienceTableStableProvider value={ctx}>
@@ -118,5 +122,9 @@ describe('AudienceActionCell', () => {
       withTooltips
     );
     expect(screen.queryByRole('button', { name: /message/i })).toBeNull();
+    expect(
+      screen.getByText('No message action for anonymous visitors')
+    ).toHaveClass('sr-only');
+    expect(ctx.onSendNotification).not.toHaveBeenCalled();
   });
 });

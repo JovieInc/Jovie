@@ -16,7 +16,11 @@ cd "$REPO_ROOT"
 # Use Git's complete list; preserve unrelated authentication and network env.
 git_local_env_names="$(git rev-parse --local-env-vars)"
 while IFS= read -r git_local_env_name; do
-  unset "$git_local_env_name"
+  # An empty list still yields one empty line from the here-string; skip it,
+  # since `unset ""` is an error that aborts the gate (seen in the fixture test).
+  if [ -n "$git_local_env_name" ]; then
+    unset "$git_local_env_name"
+  fi
 done <<< "$git_local_env_names"
 unset git_local_env_names git_local_env_name
 
@@ -32,7 +36,14 @@ if ! RESOLVED_NODE_BIN="$(bash scripts/hooks/resolve-repo-node.sh)"; then
   exit 1
 fi
 if [[ -n "$RESOLVED_NODE_BIN" ]]; then
+  # The nvm prefix also contains pnpm. Prepending that prefix hides a
+  # caller-supplied pnpm, so a fixture gate runs the real pnpm in a repo
+  # with no package.json whenever ambient Node is behind .nvmrc.
+  NODE_ONLY="$(mktemp -d "${TMPDIR:-/tmp}/jovie-node.XXXXXX")"
+  ln -s "$RESOLVED_NODE_BIN/node" "$NODE_ONLY/node"
+  trap 'rm -rf "$NODE_ONLY"' EXIT
   echo "[pre-push-gate] using repo-pinned Node at $RESOLVED_NODE_BIN (ambient: $(node --version 2>/dev/null || echo none))"
+  RESOLVED_NODE_BIN="$NODE_ONLY"
   export PATH="$RESOLVED_NODE_BIN:$PATH"
 fi
 
@@ -59,6 +70,9 @@ run_affected() {
   # skips it; JOVIE_SKIP_PRE_PUSH_GATE is the only other escape hatch.
   echo "[pre-push-gate] running preflight"
   node scripts/preflight.mjs --hook
+  # JOV-9727: path-scoped rules, PR body and companion edits. JOVIE_PREFLIGHT_CHANGED=0 skips it.
+  echo "[pre-push-gate] running preflight:changed"
+  node scripts/preflight-changed.mjs --hook --no-typecheck --no-coverage
   bash scripts/automation-verify.sh affected
 }
 
@@ -78,9 +92,18 @@ run_publication() {
     return 1
   fi
   git diff --check "${publication_base}..HEAD"
+  # Reuse the changed-file Biome guard so formatter failures never reach CI.
+  bash scripts/hooks/biome-pre-push.sh
+  # Catch missing component tests/stories before another Source Validation run.
+  node scripts/component-ship-gate.mjs --check-artifacts --diff-base="$publication_base"
   bash scripts/security/scan-secrets.sh publication origin/main
   node scripts/lib/policy-gate-liveness.mjs
   node --test scripts/hooks/pre-push-gate.test.mjs
+  # Same path-scoped Source Validation guards CI runs (one manifest:
+  # scripts/lib/source-validation-manifest.mjs), static checks only (--fast).
+  # JOVIE_PREFLIGHT_CHANGED=0 skips it.
+  echo "[pre-push-gate] running preflight:changed (fast)"
+  node scripts/preflight-changed.mjs --hook --fast
 }
 
 run_format() {

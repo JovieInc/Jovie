@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
+import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';
 
 function readWebSource(path: string): string {
   return readFileSync(resolve(process.cwd(), path), 'utf8');
@@ -48,8 +50,12 @@ describe('support route header contract', () => {
     // the artist-profile claim -> /start even while waitlisting; other routes
     // keep the front-door CTA.
     expect(headerSource).toContain(
-      "[APP_ROUTES.HOME]: { label: 'Claim your profile', href: APP_ROUTES.START }"
+      '[APP_ROUTES.HOME]: HOME_MARKETING_HEADER_CTA'
     );
+    expect(HOME_MARKETING_HEADER_CTA).toEqual({
+      label: 'Claim your profile',
+      href: APP_ROUTES.START,
+    });
     expect(headerSource).toContain("treatment: 'wordmark'");
     expect(headerSource).toContain('MARKETING_NAV_LINKS.map');
     // Canonical Pen header: the Customers flyout is the only glass flyout.
@@ -124,5 +130,25 @@ describe('support route header contract', () => {
     expect(headerStoryStart).toBeGreaterThanOrEqual(0);
     expect(footerStoryStart).toBeGreaterThan(headerStoryStart);
     expect(headerStory).toContain("<MarketingHeader variant='landing' />");
+  });
+
+  it('lets the published site-chrome nav replace the code-default links', () => {
+    const headerSource = readWebSource('components/site/MarketingHeader.tsx');
+    expect(headerSource).toContain('export interface MarketingHeaderChromeNav');
+    expect(headerSource).toContain('navLinks ?? chromeNav?.primary');
+    expect(headerSource).toContain('links: plainLinks(chromeNav.customers)');
+  });
+});
+
+describe('prerendered homepage pathname', () => {
+  it('MarketingHeader.tsx reads "/index" as "/" via usePublicPathname', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/site/MarketingHeader.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('usePublicPathname');
+    expect(source).not.toMatch(/\busePathname\b/);
   });
 });

@@ -1,0 +1,49 @@
+2026-10-31T21:43:03.7455112Z [ci-fast] structural: failure (416.2s)
+2026-10-31T21:43:03.7455969Z Structural command 1/61 failed (exit 1). Command: pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci…
+2026-10-31T21:43:03.7456627Z Test Files  1 failed | 1 passed (2)
+2026-10-31T21:43:03.7457306Z Tests  1 failed | 249 passed (250)
+2026-10-31T21:43:03.7458482Z ::error file=/home/runner/work/Jovie/Jovie/scripts/lib/__tests__/ci-fast-lanes.test.mjs,title=[workspace-scripts] lib/__tests__/ci-fast-lanes.test.mjs > runStructural screenshot contract discovery > …
+2026-10-31T21:43:03.7459994Z FAIL   workspace-scripts  lib/__tests__/ci-fast-lanes.test.mjs > runStructural screenshot contract discovery > selects installed-identity coverage only for the Mac lane (mac)
+2026-10-31T21:43:03.7460862Z Error: Test timed out in 30000ms.
+2026-10-31T21:43:03.7461059Z
+2026-10-31T21:43:03.7461195Z …Mac lane (mac)
+2026-10-31T21:43:03.7461572Z Error: Test timed out in 30000ms.
+2026-10-31T21:43:03.7462392Z If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+2026-10-31T21:43:03.7463229Z  ❯ lib/__tests__/ci-fast-lanes.test.mjs:432:26
+2026-10-31T21:43:03.7463671Z     430|   });
+2026-10-31T21:43:03.7463955Z     431|
+2026-10-31T21:43:03.7464270Z     432|   it.each(['mac', 'web'])(
+2026-10-31T21:43:03.7464679Z        |                          ^
+2026-10-31T21:43:03.7465235Z     433|     'selects installed-identity coverage only for the Mac lane (%s)',
+2026-10-31T21:43:03.7452682Z ##[error]Structural command 1/61 failed (exit 1). Command: pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci… | FAIL   workspace-scripts  lib/__tests__/ci-fast-lanes.test.mjs > runStructural screenshot contract discovery > selects installed-identity coverage only for the Mac lane (mac) | Error: Test timed out in 30000ms.
+2026-10-31T21:43:03.7454673Z [ci-fast] 1 lane(s) failed: structural
+2026-10-31T21:43:03.7455112Z [ci-fast] structural: failure (416.2s)
+2026-10-31T21:43:03.7455969Z Structural command 1/61 failed (exit 1). Command: pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci…
+2026-10-31T21:43:03.7456627Z Test Files  1 failed | 1 passed (2)
+2026-10-31T21:43:03.7457306Z Tests  1 failed | 249 passed (250)
+2026-10-31T21:43:03.7458482Z ::error file=/home/runner/work/Jovie/Jovie/scripts/lib/__tests__/ci-fast-lanes.test.mjs,title=[workspace-scripts] lib/__tests__/ci-fast-lanes.test.mjs > runStructural screenshot contract discovery > …
+2026-10-31T21:43:03.7459994Z FAIL   workspace-scripts  lib/__tests__/ci-fast-lanes.test.mjs > runStructural screenshot contract discovery > selects installed-identity coverage only for the Mac lane (mac)
+2026-10-31T21:43:03.7460862Z Error: Test timed out in 30000ms.
+2026-10-31T21:43:03.7461059Z
+2026-10-31T21:43:03.7461195Z …Mac lane (mac)
+2026-10-31T21:43:03.7461572Z Error: Test timed out in 30000ms.
+2026-10-31T21:43:03.7462392Z If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+2026-10-31T21:43:03.7463229Z  ❯ lib/__tests__/ci-fast-lanes.test.mjs:432:26
+2026-10-31T21:43:03.7463671Z     430|   });
+2026-10-31T21:43:03.7463955Z     431|
+2026-10-31T21:43:03.7464270Z     432|   it.each(['mac', 'web'])(
+2026-10-31T21:43:03.7464679Z        |                          ^
+2026-10-31T21:43:03.7465235Z     433|     'selects installed-identity coverage only for the Mac lane (%s)',
+2026-10-31T21:43:03.7465743Z     434|     async lane => {
+2026-10-31T21:43:03.7465934Z
+2026-10-31T21:43:03.7466192Z ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+2026-10-31T21:43:03.7466407Z
+2026-10-31T21:43:03.7467237Z #### Structural command timings (wall 416.2s, sum 703.4s, 3 commands)
+2026-10-31T21:43:03.7467701Z
+2026-10-31T21:43:03.7467878Z | # | Time | Result | Command |
+2026-10-31T21:43:03.7468195Z | --- | --- | --- | --- |
+2026-10-31T21:43:03.7468980Z | 61 | 416.2s | pass | `if python3 -c "import coverage, pytest, xdist" 2>/dev/null; then { lanes_retry() { lr_id="$1"; lr_r…` |
+2026-10-31T21:43:03.7470067Z | 34 | 230.5s | pass | `pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/merge-group-failure-ho…` |
+2026-10-31T21:43:03.7471142Z | 1 | 56.6s | exit 1 | `pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs…` |
+2026-10-31T21:43:03.7472026Z [ci-fast] wrote lane results → /home/runner/work/_temp/ci-fast-lanes-structural.json
+2026-10-31T21:43:03.7473879Z ##[error]Process completed with exit code 1.

@@ -12,6 +12,7 @@
  * - Redis write/read operability canary: hourly
  * - Daily acquisition-canary receipt freshness alarm: hourly
  * - Summer company-state reconciliation: every invocation
+ * - Proof stats (public counts) refresh + freshness withdrawal: hourly
  *
  * Each sub-job runs in an independent try-catch so one failure
  * doesn't block the others.
@@ -32,6 +33,10 @@ import {
   assertCanaryReceiptsFresh,
   CanaryReceiptFreshnessError,
 } from '@/lib/canaries/receipt-freshness';
+import {
+  getReleaseEmailCanaryStatus,
+  runReleaseEmailCanary,
+} from '@/lib/canaries/release-email.server';
 import { reconcileOrphanedAcceptedActions } from '@/lib/connectors/workflows/reconcile-orphaned-approved-actions';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db, withRetry } from '@/lib/db';
@@ -58,6 +63,7 @@ import { processLeadBatch } from '@/lib/leads/process-batch';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
 import { refreshCompanyStateCache } from '@/lib/ovie/company-state.server';
 import { applySummerCardDefaults } from '@/lib/ovie/summer-cards.server';
+import { refreshProofStats } from '@/lib/proof-stats/publish.server';
 import {
   probeRedisOperability,
   RedisOperabilityError,
@@ -161,18 +167,46 @@ export async function GET(request: Request) {
   // JOV-7895: reuse the hourly detector slot; two Redis reads, no new cron.
   // Missing, stale or unreadable reports fail loud through the existing Sentry
   // error path even when acquisition/outreach is disabled.
+  // JOV-9779: hourly release-email canary. Evaluates the canary release it
+  // triggered last hour, then triggers the next one; steps 4-5 below schedule
+  // and send it in this same invocation. One synthetic release and at most one
+  // email to the synthetic canary inbox per hour; nothing when unconfigured.
+  results.releaseEmailCanary =
+    minute < 15
+      ? await runSubJob('releaseEmailCanary', async () => {
+          const receipt = await runReleaseEmailCanary(new Date());
+          return { ...receipt } as unknown as Record<string, unknown>;
+        })
+      : { success: true, skipped: true };
+
   results.canaryReceiptFreshness =
     minute < 15
       ? await runSubJob('canaryReceiptFreshness', async () => {
-          const [auth, profile] = await Promise.all([
+          const [auth, profile, releaseEmail] = await Promise.all([
             getAuthSignupOnboardingCanaryStatus(),
             getPublicProfileCanaryStatus(),
+            getReleaseEmailCanaryStatus(),
           ]);
           return assertCanaryReceiptsFresh(
-            { 'auth-signup-onboarding': auth, 'public-profile': profile },
+            {
+              'auth-signup-onboarding': auth,
+              'public-profile': profile,
+              'release-email': releaseEmail,
+            },
             new Date()
           );
         })
+      : { success: true, skipped: true };
+
+  // Proof stats: hourly slot, four indexed counts plus one content-record
+  // version when a value or a publishable state changed. A stat that went
+  // stale is withdrawn here, which expires the cache tag so cached pages drop
+  // the number. No new schedule.
+  results.proofStats =
+    minute < 15
+      ? await runSubJob('proofStats', async () => ({
+          ...(await refreshProofStats(new Date())),
+        }))
       : { success: true, skipped: true };
 
   // JOV-7880: product truth every run; shipping and Linear hourly. Reads use the snapshot.

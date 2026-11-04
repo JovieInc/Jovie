@@ -4,35 +4,13 @@ import { Music2 } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
-
-const RELEASES = [
-  {
-    title: 'Signals',
-    type: 'Album',
-    meta: 'Feb 2022 · 12 tracks',
-    tone: 'primary',
-  },
-  {
-    title: 'Where It Goes',
-    type: 'Single',
-    meta: 'Jun 2020',
-    tone: 'secondary',
-  },
-  {
-    title: 'Fading Light',
-    type: 'EP',
-    meta: 'Nov 2019 · 5 tracks',
-    tone: 'tertiary',
-  },
-] as const;
+import {
+  formatCatalogRelease,
+  HOMEPAGE_PROFILE_PREVIEW_CATALOG,
+  type ProfileMockupRelease,
+} from './tim-white-catalog';
 
 const CTA_INTERVAL = 5000;
-
-const RELEASE_ART_TONE_CLASS = {
-  primary: 'bg-surface-1',
-  secondary: 'bg-surface-2',
-  tertiary: 'bg-surface-3',
-} as const satisfies Record<(typeof RELEASES)[number]['tone'], string>;
 
 /** Fallback values used when no profile data is provided */
 const FALLBACK = {
@@ -51,6 +29,12 @@ export interface ProfileMockupProps {
   readonly handle?: string | null;
   /** Avatar image URL from the real profile */
   readonly avatarUrl?: string | null;
+  /**
+   * Release rows with their date labels already formatted. Server routes pass
+   * these so the client hydrates the exact text the server rendered, whatever
+   * the visitor's clock says.
+   */
+  readonly releases?: readonly ProfileMockupRelease[];
 }
 
 export function ProfileMockup({
@@ -58,7 +42,9 @@ export function ProfileMockup({
   tagline,
   handle,
   avatarUrl,
-}: ProfileMockupProps = {}) {
+  releases = HOMEPAGE_PROFILE_PREVIEW_CATALOG.map(formatCatalogRelease),
+}: Readonly<ProfileMockupProps>) {
+  const leadRelease = releases[0];
   const displayName = name || FALLBACK.name;
   const displayTagline = tagline || FALLBACK.tagline;
   const displayHandle = handle || FALLBACK.handle;
@@ -87,7 +73,7 @@ export function ProfileMockup({
 
   return (
     <figure
-      aria-label='Profile preview showing adaptive CTA behavior'
+      aria-label='Profile Preview Showing Adaptive CTA Behavior'
       className='rounded-t-xl rounded-b-none overflow-hidden bg-surface-0 shadow-panel-ring font-sans'
     >
       <style>{`
@@ -143,28 +129,28 @@ export function ProfileMockup({
           </div>
         </div>
 
-        {/* Releases */}
-        <div className='flex flex-col gap-2.5 mb-5'>
-          {RELEASES.map(release => (
-            <div key={release.title} className='flex items-center gap-3'>
-              <div
-                className={cn(
-                  'w-10 h-10 rounded-md shrink-0 border border-subtle',
-                  RELEASE_ART_TONE_CLASS[release.tone]
-                )}
-                aria-hidden='true'
+        {/* Releases: the real catalog with its cover art. */}
+        <ul aria-label='Releases' className='mb-5 flex flex-col gap-2.5'>
+          {releases.map(release => (
+            <li key={release.title} className='flex items-center gap-3'>
+              <Image
+                src={release.artworkUrl}
+                alt={release.title}
+                width={40}
+                height={40}
+                className='h-10 w-10 shrink-0 rounded-md border border-subtle object-cover'
               />
               <div className='min-w-0'>
-                <div className='text-app font-medium text-primary-token truncate'>
+                <div className='truncate text-app font-medium text-primary-token'>
                   {release.title}
                 </div>
                 <div className='text-xs text-tertiary-token'>
-                  {release.type} · {release.meta}
+                  {release.releaseType} · {release.dateLabel}
                 </div>
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
 
         {/* CTA area */}
         <div className='relative h-10 overflow-hidden rounded-lg'>
@@ -188,7 +174,7 @@ export function ProfileMockup({
             )}
           >
             <Music2 className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
-            <span>Play Signals on Spotify</span>
+            <span>Play {leadRelease?.title} on Spotify</span>
           </div>
 
           {/* Progress bar */}
@@ -196,7 +182,7 @@ export function ProfileMockup({
             key={isListen ? 'listen' : 'subscribe'}
             value={0}
             max={100}
-            aria-label='Time until CTA switches'
+            aria-label='Time Until CTA Switches'
             className={cn(
               'profile-mockup-cta-progress absolute bottom-0 left-0 h-1 opacity-60 appearance-none [&::-moz-progress-bar]:bg-current [&::-webkit-progress-bar]:bg-transparent [&::-webkit-progress-value]:bg-current',
               isListen ? 'text-primary-token' : 'text-tertiary-token',
