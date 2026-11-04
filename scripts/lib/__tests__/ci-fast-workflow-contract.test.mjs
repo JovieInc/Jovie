@@ -96,7 +96,7 @@ const HOSTED_GROUP_JOBS = [
   },
   {
     jobId: 'ci-fast-structural-web',
-    nextJobId: 'ci-knip',
+    nextJobId: 'ci-fast-structural-lanes',
     jobName: 'ci-fast (structural web)',
   },
 ];
@@ -147,7 +147,7 @@ describe('ci-fast bounded parallel workflow', () => {
       .find(
         line =>
           line.includes('pnpm turbo test:fast --affected --') &&
-          line.includes('--passWithNoTests')
+          /--passWithNoTests(?:\s|$)/u.test(line)
       );
     const selectors = command?.match(
       /unit_excludes \}\}\s+(.+?)\s+\$OUTPUT_FLAG$/u
@@ -377,6 +377,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/tests/test_runner_routing.py',
       'scripts/tests/test_signal_watch.py',
       'scripts/tests/test_x_grok.py',
+      'scripts/tests/test_pr_remediation_swarm.py',
     ]);
     const shards = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command => {
       const [, keyword, files] = /-k "([^"]+)" (.+)$/u.exec(command) ?? [];
@@ -1521,7 +1522,9 @@ describe('ci-fast bounded parallel workflow', () => {
       relativePath: '.github/scripts/product-tool.mjs',
     },
   ])('runs scripts typecheck when $name', ({ relativePath }) => {
-    const repo = mkdtempSync(join(tmpdir(), 'ci-fast-product-script-'));
+    const fixture = mkdtempSync(join(tmpdir(), 'ci-fast-product-script-'));
+    const repo = join(fixture, 'repo');
+    const origin = join(fixture, 'origin.git');
     const binDir = join(repo, 'bin');
     const outPath = join(repo, 'ci-fast-lanes.json');
     const changedPath = join(repo, relativePath);
@@ -1545,6 +1548,12 @@ describe('ci-fast bounded parallel workflow', () => {
         ].join('\n')
       );
       chmodSync(join(binDir, 'pnpm'), 0o755);
+      // The source-read guard parses the real release inventory in its merged tree.
+      mkdirSync(join(repo, 'scripts/lanes'), { recursive: true });
+      writeFileSync(
+        join(repo, 'scripts/lanes/lane_runner.py'),
+        readFileSync(resolve(REPO_ROOT, 'scripts/lanes/lane_runner.py'))
+      );
       writeFileSync(changedPath, 'export const value = 1;\n');
       expect(runGit(['init', '--initial-branch=main']).status).toBe(0);
       expect(
@@ -1554,9 +1563,19 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(runGit(['add', '.']).status).toBe(0);
       expect(runGit(['commit', '-m', 'base']).status).toBe(0);
       const baseSha = runGit(['rev-parse', 'HEAD']).stdout.trim();
+      // Keep the bare origin outside the working repo so git add cannot stage it.
+      expect(
+        runGit(['init', '--bare', '--initial-branch=main', origin]).status
+      ).toBe(0);
+      expect(runGit(['remote', 'add', 'origin', origin]).status).toBe(0);
+      expect(runGit(['push', 'origin', 'HEAD:refs/heads/main']).status).toBe(0);
       writeFileSync(changedPath, 'export const value = 2;\n');
       expect(runGit(['add', '.']).status).toBe(0);
       expect(runGit(['commit', '-m', 'change product tool']).status).toBe(0);
+      const remoteBase = runGit(['ls-remote', 'origin', 'refs/heads/main']);
+      expect(remoteBase.status).toBe(0);
+      expect(remoteBase.stdout.trim()).toBe(`${baseSha}\trefs/heads/main`);
+      expect(runGit(['rev-parse', 'HEAD']).stdout.trim()).not.toBe(baseSha);
 
       const result = spawnSync(
         process.execPath,
@@ -1584,6 +1603,21 @@ describe('ci-fast bounded parallel workflow', () => {
 
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
       const payload = JSON.parse(readFileSync(outPath, 'utf8'));
+      if (relativePath.startsWith('scripts/')) {
+        const sourceGuards = payload.lanes.find(
+          lane => lane.id === 'source-guards'
+        );
+        expect(sourceGuards.status).toBe('success');
+        expect(sourceGuards.logExcerpt).toContain(
+          '[source-guards] lanes-selftest-changed-tests: exit 0'
+        );
+        expect(sourceGuards.logExcerpt).toContain(
+          'no changed release self-test lanes tests'
+        );
+        expect(runGit(['rev-parse', 'origin/main']).stdout.trim()).toBe(
+          baseSha
+        );
+      }
       expect(payload.lanes).toContainEqual(
         expect.objectContaining({
           id: 'scripts-typecheck',
@@ -1592,7 +1626,7 @@ describe('ci-fast bounded parallel workflow', () => {
         })
       );
     } finally {
-      rmSync(repo, { recursive: true, force: true });
+      rmSync(fixture, { recursive: true, force: true });
     }
   });
 
@@ -2765,7 +2799,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(remaining).not.toContain('ci-fast-typecheck');
 
     expect(aggregate).toMatch(
-      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*\]/s
+      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*ci-fast-structural-lanes,\s*\]/s
     );
     expect(aggregate).toMatch(/^  ci-fast:\n    name: ci-fast$/m);
     expect(aggregate).toMatch(/if: >-\s+always\(\)/);
@@ -2784,7 +2818,7 @@ describe('ci-fast bounded parallel workflow', () => {
       /PROFILE_BROWSER_RESULT: \$\{\{ needs\.ci-profile-admission-browser\.result \}\}/
     );
     expect(aggregate).toMatch(
-      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \]\]/
+      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \|\| "\$STRUCTURAL_LANES_RESULT" != "success" \]\]/
     );
     expect(aggregate).toMatch(
       /STRUCTURAL_WEB_RESULT: \$\{\{ needs\.ci-fast-structural-web\.result \}\}/
@@ -2810,12 +2844,31 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(python).not.toContain('CI_FAST_STRUCTURAL_WEB');
   });
 
+  it('runs the lanes coverage pytest alone in an aliased ci-fast job', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const lanes = jobBlock('ci-fast-structural-lanes', 'ci-knip');
+    expect(lanes).toMatch(
+      /^ {2}ci-fast-structural-lanes:\n {4}name: ci-fast \(structural lanes\)$/m
+    );
+    const aliases = lanes.match(/(?<= \*)[\w-]+/g);
+    expect(aliases).toHaveLength(10);
+    for (const name of aliases) expect(remaining).toContain(`&${name}`);
+    expect(remaining).toContain('CI_FAST_STRUCTURAL_LANES: skip');
+    expect(lanes).toContain('CI_FAST_STRUCTURAL_LANES: only');
+    expect(lanes).not.toContain('CI_FAST_STRUCTURAL_PYTEST');
+    expect(lanes).not.toContain('CI_FAST_STRUCTURAL_WEB');
+    expect(lanes).toContain('runs-on: ubuntu-24.04');
+  });
+
   it('runs the structural web commands in an aliased ci-fast job', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const web = jobBlock('ci-fast-structural-web', 'ci-knip');
+    const web = jobBlock('ci-fast-structural-web', 'ci-fast-structural-lanes');
     expect(web).toMatch(
       /^ {2}ci-fast-structural-web:\n {4}name: ci-fast \(structural web\)$/m
     );
@@ -2833,7 +2886,7 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('moves the slowest cheap lanes into a background web group without dropping any', () => {
-    const web = jobBlock('ci-fast-structural-web', 'ci-knip');
+    const web = jobBlock('ci-fast-structural-web', 'ci-fast-structural-lanes');
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'

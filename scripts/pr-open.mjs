@@ -810,15 +810,54 @@ export async function main(
     try {
       const bodyFile = path.join(dir, 'body.md');
       writeFileSync(bodyFile, body);
+      const branchResult = git(['branch', '--show-current']);
+      const branch = branchResult.stdout.trim();
+      const local = git(['rev-parse', 'HEAD']);
+      const expectedHead = local.stdout.trim();
+      if (
+        branchResult.status !== 0 ||
+        !branch ||
+        local.status !== 0 ||
+        !/^[0-9a-f]{40}$/.test(expectedHead)
+      )
+        throw new Error(
+          'publication-head: cannot resolve the intended branch and commit'
+        );
       if (!a.noPush) {
         const push = git(['push', '-u', 'origin', 'HEAD'], {
           stdio: 'inherit',
         });
         if (push.status !== 0) return push.status ?? 1;
       }
+      // A narrow origin.fetch may not map this branch to @{upstream}, even
+      // after a successful push. Prove the intended remote head, then name it
+      // explicitly; never recover by pushing again or bypassing publication gates.
+      const remoteRef = `refs/heads/${branch}`;
+      const published = git(
+        ['ls-remote', '--exit-code', '--heads', 'origin', remoteRef],
+        { timeout: 30_000 }
+      );
+      if (published.status !== 0)
+        throw new Error(
+          `publication-head: remote head unavailable for ${branch}`
+        );
+      const refs = published.stdout
+        .trim()
+        .split(/\r?\n/)
+        .map(line => line.trim().split(/\s+/));
+      if (
+        refs.length !== 1 ||
+        refs[0][0] !== expectedHead ||
+        refs[0][1] !== remoteRef
+      )
+        throw new Error(
+          `publication-head: remote head does not match the intended commit for ${branch}`
+        );
       const made = github(a.repo, [
         'pr',
         'create',
+        '--head',
+        branch,
         '--repo',
         REPOSITORY,
         '--base',
