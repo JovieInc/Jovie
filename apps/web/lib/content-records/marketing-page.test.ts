@@ -146,6 +146,31 @@ describe('marketing-page content kind', () => {
     expect(errorsOf(duplicate).join(' ')).toMatch(/appears twice/);
   });
 
+  it.each(['control', 'experiment'] as const)(
+    'requires jov.ie/you as section two in the %s',
+    target => {
+      const spec = cleanSpec();
+      const swapped = clone(spec.sections);
+      [swapped[1], swapped[2]] = [swapped[2]!, swapped[1]!];
+      if (target === 'control') {
+        spec.sections = swapped;
+      } else {
+        spec.experiment = {
+          id: 'profile-position',
+          hypothesis: 'The profile chapter keeps its approved position.',
+          metric: { funnel: 'artist_signup', step: 'cta_click' },
+          status: 'draft',
+          variants: [{ id: 'reordered', weight: 50, body: swapped }],
+        };
+      }
+      const path =
+        target === 'control' ? 'sections' : 'experiment.variants[0].body';
+      expect(errorsOf(spec)).toContain(
+        `${path}[1]: the homepage places jov.ie/you in section two`
+      );
+    }
+  );
+
   it('rejects markup and multi-line copy', () => {
     const spec = cleanSpec();
     loopOf(spec).copy.headline = 'Bold <b>claim</b>';

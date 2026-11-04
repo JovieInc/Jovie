@@ -419,6 +419,35 @@ test.describe('Homepage', () => {
     expect(errors).toEqual([]);
   });
 
+  test('keeps waitlist controls inside their chapter on narrow phones', async ({
+    page,
+  }) => {
+    for (const width of [320, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      await gotoHomepage(page);
+      const form = page.getByTestId('waitlist-role-form');
+      const chapter = await page.locator('.homepage-close__grid').boundingBox();
+      expect(chapter).not.toBeNull();
+      for (const control of [
+        form.getByRole('textbox', { name: 'Name', exact: true }),
+        form.getByRole('textbox', { name: 'Email address', exact: true }),
+        form.getByRole('button', { name: 'Join', exact: true }),
+      ]) {
+        await control.scrollIntoViewIfNeeded();
+        await expect(control).toBeInViewport();
+        const box = await control.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box!.x, `${width}px control left`).toBeGreaterThanOrEqual(
+          chapter!.x - 1
+        );
+        expect(
+          box!.x + box!.width,
+          `${width}px control right`
+        ).toBeLessThanOrEqual(chapter!.x + chapter!.width + 1);
+      }
+    }
+  });
+
   test('access actions reach the single role waitlist without an open signup claim', async ({
     page,
   }) => {

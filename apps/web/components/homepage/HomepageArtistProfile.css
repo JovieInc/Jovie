@@ -132,6 +132,11 @@
   justify-self: center;
 }
 
+/* The shared form is a grid item; let it shrink inside this page's column. */
+.homepage-waitlist__form form {
+  min-width: 0;
+}
+
 .homepage-waitlist__invite {
   display: inline-flex;
   align-items: center;

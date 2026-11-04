@@ -301,6 +301,9 @@ function sectionsViolations(
     }
   });
   if (generalPage) {
+    if (sections[1]?.section !== 'how-it-works') {
+      errors.push(`${path}[1]: the homepage places jov.ie/you in section two`);
+    }
     const hero = sections.find(entry => entry.section === 'hero');
     if (hero?.section === 'hero') {
       if (hero.copy.subhead !== HOMEPAGE_COPY.hero.subhead) {
