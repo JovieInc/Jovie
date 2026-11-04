@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   profileRows: [] as Array<{
     isClaimed: boolean | null;
     isPublic?: boolean | null;
+    username?: string | null;
   }>,
   proofPending: false,
   recordedStages: [] as string[],
@@ -75,6 +76,7 @@ describe('GET /api/billing/checkout-session', () => {
       priceId: 'price_pro',
       needsProfile: true,
       proofPending: false,
+      profileShareUrl: null,
     });
   });
 
@@ -83,6 +85,28 @@ describe('GET /api/billing/checkout-session', () => {
 
     const body = await (await GET(request())).json();
     expect(body.needsProfile).toBe(false);
+  });
+
+  it('hands out a share link only for a live, claimed page', async () => {
+    mocks.profileRows = [
+      { isClaimed: true, isPublic: true, username: 'artist' },
+    ];
+    const { GET } = await import('@/app/api/billing/checkout-session/route');
+    const live = await (await GET(request())).json();
+    expect(live.profileShareUrl).toMatch(/\/artist$/);
+
+    mocks.profileRows = [
+      { isClaimed: true, isPublic: false, username: 'artist' },
+    ];
+    const priv = await (await GET(request())).json();
+    expect(priv.profileShareUrl).toBeNull();
+
+    mocks.profileRows = [
+      { isClaimed: true, isPublic: true, username: 'artist' },
+    ];
+    mocks.proofPending = true;
+    const pending = await (await GET(request())).json();
+    expect(pending.profileShareUrl).toBeNull();
   });
 
   it('never reveals another user’s session', async () => {

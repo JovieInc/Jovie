@@ -1,6 +1,5 @@
 import { expect, type Page, type TestInfo, test } from '@playwright/test';
 import { inspectEssentialViewport } from './helpers/golden-path-keyframes';
-import { ratchetGeometry } from './utils/ratchet-geometry';
 import {
   installRuntimeAutomationBypass,
   ONBOARDING_SESSION_COOKIE_NAME,
@@ -10,6 +9,7 @@ import {
   inspectStartEntryEssentialViewport,
   installDelayedGuidanceLayoutProbe,
   installReplyLayoutProbe,
+  projectReplyLayoutEvidence,
 } from './utils/start-entry-layout';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -18,7 +18,6 @@ const prompt = 'I want to claim jov.ie/sam.';
 const startUrl =
   '/start?starter_prompt=I+want+to+claim+jov.ie%2Fsam.&handle=sam';
 
-// ratchet: JOV-9612 (strict zero-CLS and geometry restored there)
 async function expectZeroLayoutShift(
   metric:
     | {
@@ -31,9 +30,7 @@ async function expectZeroLayoutShift(
     | undefined,
   testInfo: TestInfo
 ) {
-  await ratchetGeometry('start layout shift', () =>
-    assertZeroLayoutShift(metric, testInfo)
-  );
+  assertZeroLayoutShift(metric, testInfo);
 }
 
 function assertZeroLayoutShift(
@@ -77,6 +74,8 @@ async function readReplyLayout(page: Page) {
     return {
       supported: metric.supported,
       total: metric.total,
+      windowStart: metric.windowStart,
+      measuredAt: performance.now(),
       entries: window.__claimLayoutEntries ?? [],
       composerFrames: window.__claimComposerFrames ?? [],
     };
@@ -96,11 +95,9 @@ async function draftProgress(page: Page) {
 }
 
 async function expectEssentials(page: Page) {
-  await ratchetGeometry('start essentials viewport', async () => {
-    expect(await inspectStartEntryEssentialViewport(page)).toEqual({
-      supported: true,
-      findings: [],
-    });
+  expect(await inspectStartEntryEssentialViewport(page)).toEqual({
+    supported: true,
+    findings: [],
   });
   expect(await draftProgress(page)).toEqual({ liveRegions: 0, sentClaims: 0 });
 }
@@ -258,14 +255,12 @@ test.describe('current-state essential actions (JOV-7771)', () => {
       await expectZeroLayoutShift(metric, testInfo);
       expect(metric?.first).toHaveLength(4);
       expect(metric?.guided).toHaveLength(4);
-      await ratchetGeometry('start guided y shift', () => {
-        for (let index = 0; index < 4; index++) {
-          expect(
-            Math.abs(metric!.first![index]! - metric!.guided![index]!),
-            `element ${index} (h1, composer, input, send) y first=${JSON.stringify(metric!.first)} guided=${JSON.stringify(metric!.guided)} firstDetail=${JSON.stringify(metric!.firstDetail)} guidedDetail=${JSON.stringify(metric!.guidedDetail)}`
-          ).toBeLessThanOrEqual(1);
-        }
-      });
+      for (let index = 0; index < 4; index++) {
+        expect(
+          Math.abs(metric!.first![index]! - metric!.guided![index]!),
+          `element ${index} (h1, composer, input, send) y first=${JSON.stringify(metric!.first)} guided=${JSON.stringify(metric!.guided)} firstDetail=${JSON.stringify(metric!.firstDetail)} guidedDetail=${JSON.stringify(metric!.guidedDetail)}`
+        ).toBeLessThanOrEqual(1);
+      }
       await expectEssentials(page);
       await expect(
         page.getByRole('textbox', { name: 'Chat message input', exact: false })
@@ -327,11 +322,25 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     });
   });
 
-  test('delayed interactive verification and its failure retain reachable draft and recovery', async ({
+  test('delayed interactive verification and its failure fail open without a dead end', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await installControlledVerification(page);
+    // JOV-10194: the starter prompt auto-submits once the check resolves, so
+    // capture the first send instead of calling the real model.
+    const sends: Array<{ turnstileToken?: string }> = [];
+    await page.route('**/api/chat', async route => {
+      if (route.request().method() !== 'POST') return route.continue();
+      sends.push(route.request().postDataJSON());
+      await route.fulfill({
+        headers: {
+          'content-type': 'text/event-stream',
+          'x-vercel-ai-ui-message-stream': 'v1',
+        },
+        body: 'data: {"type":"start","messageId":"reply"}\n\ndata: {"type":"text-start","id":"reply-text"}\n\ndata: {"type":"text-delta","id":"reply-text","delta":"Your draft is saved."}\n\ndata: {"type":"text-end","id":"reply-text"}\n\ndata: {"type":"finish","finishReason":"stop"}\n\ndata: [DONE]\n\n',
+      });
+    });
     await page.goto(startUrl);
     await expect
       .poll(() => page.evaluate(() => Boolean(window.__claimProviderFixture)))
@@ -343,16 +352,21 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     ).toHaveAttribute('data-turnstile-mount', 'inline');
     await expectEssentials(page);
     await page.evaluate(() => window.__claimProviderFixture?.fail());
+    // Settled signal first: the visitor's message went out on the fail-open
+    // marker and the reply rendered. Only then assert there is no dead end.
+    await expect(
+      page.getByTestId('chat-user-bubble').filter({ hasText: prompt })
+    ).toHaveCount(1);
+    await expect(page.getByText('Your draft is saved.')).toBeVisible();
+    expect(sends).toHaveLength(1);
+    expect(sends[0]?.turnstileToken).toMatch(/^jv-unverified:/);
     // Next.js owns a separate, empty route-announcer alert outside this shell.
-    const recoveryAlert = page.locator(
-      '[data-onboarding-session] [role="alert"]'
-    );
-    await expect(recoveryAlert).toHaveCount(1);
-    await expect(recoveryAlert).toBeVisible();
-    await expectEssentials(page);
+    await expect(
+      page.locator('[data-onboarding-session] [role="alert"]')
+    ).toHaveCount(0);
     await expect(
       page.getByRole('textbox', { name: 'Chat message input', exact: false })
-    ).toHaveValue(prompt);
+    ).toBeVisible();
   });
 
   test('fresh handoff submits once and restored history never resends its starter', async ({
@@ -421,7 +435,18 @@ test.describe('current-state essential actions (JOV-7771)', () => {
           requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
         )
     );
-    await expectZeroLayoutShift(await readReplyLayout(page), testInfo);
+    const handoffLayout = await readReplyLayout(page);
+    console.info(
+      '[start-reply-layout] ' +
+        JSON.stringify({
+          phase: 'navigation-to-handoff',
+          viewport: page.viewportSize(),
+          chatPosts,
+          ...projectReplyLayoutEvidence(handoffLayout),
+        })
+    );
+    expect(handoffLayout?.windowStart).toBe(0);
+    await expectZeroLayoutShift(handoffLayout, testInfo);
     releaseReply();
     await expect(page.getByText('Your draft is saved.')).toBeVisible();
     await page.evaluate(
@@ -430,7 +455,18 @@ test.describe('current-state essential actions (JOV-7771)', () => {
           requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
         )
     );
-    await expectZeroLayoutShift(await readReplyLayout(page), testInfo);
+    const replyLayout = await readReplyLayout(page);
+    console.info(
+      '[start-reply-layout] ' +
+        JSON.stringify({
+          phase: 'navigation-to-fixture-first-reply',
+          viewport: page.viewportSize(),
+          chatPosts,
+          ...projectReplyLayoutEvidence(replyLayout),
+        })
+    );
+    expect(replyLayout?.windowStart).toBe(0);
+    await expectZeroLayoutShift(replyLayout, testInfo);
     const afterReply = await input.boundingBox();
     expect(beforeReply).not.toBeNull();
     expect(afterReply).not.toBeNull();
@@ -469,7 +505,15 @@ test.describe('current-state essential actions (JOV-7771)', () => {
 
   test('deliberate red rejects independent clipping, obstruction, missing and duplicate actions', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    // Exercise the same strict boundary used by the measured journey. A
+    // report-only wrapper would swallow these failures and fail this control.
+    await expectZeroLayoutShift({ supported: true, total: 0 }, testInfo);
+    for (const total of [0.0000001, Number.NaN]) {
+      await expect(
+        expectZeroLayoutShift({ supported: true, total }, testInfo)
+      ).rejects.toThrow();
+    }
     await page.setViewportSize({ width: 390, height: 844 });
     await page.setContent(
       '<button id="action" style="position:fixed;left:20px;top:20px;width:120px;height:44px">Continue</button>'

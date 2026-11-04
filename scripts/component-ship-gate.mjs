@@ -24,7 +24,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
@@ -86,6 +86,7 @@ function parseArgs(argv) {
     captureDir: null,
     json: false,
     auditCoverageVia: false,
+    linkCoverageVia: false,
     checkArtifacts: false,
   };
   for (const arg of argv) {
@@ -101,6 +102,7 @@ function parseArgs(argv) {
     } else if (arg.startsWith('--capture-dir=')) {
       flags.captureDir = arg.slice('--capture-dir='.length);
     } else if (arg === '--audit-coverage-via') flags.auditCoverageVia = true;
+    else if (arg === '--link-coverage-via') flags.linkCoverageVia = true;
     else if (arg === '--check-artifacts') flags.checkArtifacts = true;
     else if (arg === '--json') flags.json = true;
     else if (arg === '--help' || arg === '-h') flags.help = true;
@@ -1543,6 +1545,37 @@ export function auditCoverageViaReceipts({ repoRoot = REPO_ROOT } = {}) {
   };
 }
 
+/** Explicit repair only: link an unambiguous, verified test without relaxing the gate. */
+export function linkCoverageViaReceipts(
+  changed,
+  { repoRoot = REPO_ROOT } = {}
+) {
+  const linked = [];
+  for (const sourceRel of changed.filter(isUnderShipScope)) {
+    const { testRel, base } = findAdjacentArtifacts(sourceRel, repoRoot);
+    const componentSource = readText(sourceRel, repoRoot);
+    if (testRel || parseCoverageVia(componentSource)) continue;
+    const candidates = changed.filter(
+      viaRel =>
+        TEST_FILE_RE.test(viaRel) &&
+        inspectCoverageViaReceipt({
+          viaRel,
+          sourceRel,
+          componentBase: base,
+          componentSource,
+          repoRoot,
+        }).ok
+    );
+    if (candidates.length !== 1) continue;
+    writeFileSync(
+      join(repoRoot, sourceRel),
+      `// @coverage-via ${candidates[0]}\n${componentSource}`
+    );
+    linked.push(sourceRel);
+  }
+  return linked;
+}
+
 function findChangedLegacyTest({
   changed,
   sourceRel,
@@ -2375,6 +2408,7 @@ function main(argv = process.argv.slice(2)) {
   --storybook-url=URL    Evaluate computed DOM from a running Storybook instance
   --capture-dir=PATH     Save desktop/compact rendered screenshots
   --audit-coverage-via   Whole-tree executable @coverage-via receipt audit
+  --link-coverage-via    Write missing receipts for one verified changed test; run the gate afterward
   --check-artifacts      Check changed component test/story prerequisites only
   --json                 Print machine-readable report`);
     return 0;
@@ -2398,6 +2432,16 @@ function main(argv = process.argv.slice(2)) {
       }
     }
     return audit.ok ? 0 : 1;
+  }
+
+  if (flags.linkCoverageVia) {
+    const linked = linkCoverageViaReceipts(
+      changedFiles(flags.diffBase ?? resolveDiffBase(null))
+    );
+    console.log(
+      JSON.stringify({ linked, next: 'Run the component ship gate' })
+    );
+    return 0;
   }
 
   const report = runComponentShipGate({

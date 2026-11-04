@@ -54,6 +54,8 @@ jobs:
 
       - name: Generate alerts-read App token
         id: app-token
+        # Keep token failures blocking. The intake still records blindness and
+        # files the deduped repair card when this permission is unavailable.
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
@@ -61,6 +63,7 @@ jobs:
           permission-vulnerability-alerts: read
 
       - name: Sync advisories to Linear and close the fixed-and-deployed
+        if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ github.token }}
           ALERTS_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -68,9 +71,11 @@ jobs:
         run: node scripts/security-advisory-intake.mjs
 
       - name: Ratchet - no advisory ages past its SLA silently
+        if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ github.token }}
           ALERTS_TOKEN: ${{ steps.app-token.outputs.token }}
+          RECEIPT_PATH: security-advisory-check-receipt.json
         run: node scripts/security-advisory-intake.mjs --check
 
       - name: Preserve stage-timing receipt
@@ -78,6 +83,8 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: security-advisory-receipt-${{ github.run_id }}
-          path: security-advisory-receipt.json
+          path: |
+            security-advisory-receipt.json
+            security-advisory-check-receipt.json
           retention-days: 30
           if-no-files-found: warn

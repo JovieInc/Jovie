@@ -36,7 +36,14 @@ if ! RESOLVED_NODE_BIN="$(bash scripts/hooks/resolve-repo-node.sh)"; then
   exit 1
 fi
 if [[ -n "$RESOLVED_NODE_BIN" ]]; then
+  # The nvm prefix also contains pnpm. Prepending that prefix hides a
+  # caller-supplied pnpm, so a fixture gate runs the real pnpm in a repo
+  # with no package.json whenever ambient Node is behind .nvmrc.
+  NODE_ONLY="$(mktemp -d "${TMPDIR:-/tmp}/jovie-node.XXXXXX")"
+  ln -s "$RESOLVED_NODE_BIN/node" "$NODE_ONLY/node"
+  trap 'rm -rf "$NODE_ONLY"' EXIT
   echo "[pre-push-gate] using repo-pinned Node at $RESOLVED_NODE_BIN (ambient: $(node --version 2>/dev/null || echo none))"
+  RESOLVED_NODE_BIN="$NODE_ONLY"
   export PATH="$RESOLVED_NODE_BIN:$PATH"
 fi
 
@@ -92,6 +99,11 @@ run_publication() {
   bash scripts/security/scan-secrets.sh publication origin/main
   node scripts/lib/policy-gate-liveness.mjs
   node --test scripts/hooks/pre-push-gate.test.mjs
+  # Same path-scoped Source Validation guards CI runs (one manifest:
+  # scripts/lib/source-validation-manifest.mjs), static checks only (--fast).
+  # JOVIE_PREFLIGHT_CHANGED=0 skips it.
+  echo "[pre-push-gate] running preflight:changed (fast)"
+  node scripts/preflight-changed.mjs --hook --fast
 }
 
 run_format() {

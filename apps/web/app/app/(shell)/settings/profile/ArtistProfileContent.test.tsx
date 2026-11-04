@@ -241,7 +241,7 @@ describe('ArtistProfileContent', () => {
     expect(screen.getByText('Profile fields')).toBeInTheDocument();
     expect(screen.getByText('Pay settings')).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Artist Rules' })
+      screen.getByRole('heading', { name: 'Artist rules' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Artist Rules' })

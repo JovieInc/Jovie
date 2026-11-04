@@ -2,11 +2,11 @@
 
 import { TooltipProvider } from '@jovie/ui';
 import { PacerProvider } from '@tanstack/react-pacer';
-import { usePathname } from 'next/navigation';
 import { ThemeProvider } from 'next-themes';
 import React, { useEffect, useMemo } from 'react';
 import { env } from '@/lib/env-client';
 import { useChunkErrorHandler } from '@/lib/hooks/useChunkErrorHandler';
+import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
 import { isThemeRoute } from '@/lib/theme/route-policy';
 import { isFormElement } from '@/lib/utils/keyboard';
@@ -288,7 +288,7 @@ export function CoreProviders({
   children,
   initialThemeMode = 'dark',
 }: CoreProvidersProps) {
-  const pathname = usePathname() ?? '';
+  const pathname = usePublicPathname() ?? '';
   const variant = useMemo(() => getCoreProviderVariant(pathname), [pathname]);
   const themeEnabled = useMemo(() => isThemeEnabledRoute(pathname), [pathname]);
   const isHomepageVariant = variant === 'homepage';
