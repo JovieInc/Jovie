@@ -7864,6 +7864,15 @@ class FixRedTest(unittest.TestCase):
         self.real_reconcile_fix_target = lane.reconcile_fix_target
         lane.reconcile_fix_target = lambda pr: {**pr, "state": "OPEN", "mergedAt": None}
         self.addCleanup(setattr, lane, "reconcile_fix_target", self.real_reconcile_fix_target)
+        # failed_logs reads job logs through gh_call; keep this suite off the live transport.
+        lane._FAILED_LOGS.clear()
+        self.addCleanup(lane._FAILED_LOGS.clear)
+        denied = patch.object(
+            lane, "gh_call",
+            side_effect=lambda args, **kwargs: SimpleNamespace(
+                returncode=1, stdout="", stderr="fixture: gh_call denied"))
+        denied.start()
+        self.addCleanup(denied.stop)
 
     def pr(self, number=5, sha="h1", checks=None):
         return {"number": number, "title": "t", "headRefName": "devin/jov-1", "headRefOid": sha,
@@ -7871,6 +7880,19 @@ class FixRedTest(unittest.TestCase):
                 "statusCheckRollup": checks if checks is not None else [
                     {"name": "ci-fast (remaining)", "status": "COMPLETED", "conclusion": "FAILURE",
                      "detailsUrl": "https://github.com/x/actions/runs/1/job/42"}]}
+
+    def test_failed_logs_stay_inside_the_fixture_transport(self):
+        # JOV-6507: failed_logs uses gh_call; without a suite stub it escapes FixRed sh mocks.
+        seen = []
+        denied = lane.gh_call
+        def capture(args, **kwargs):
+            seen.append(list(args))
+            return denied(args, **kwargs)
+        with tempfile.TemporaryDirectory() as tmp, patch.object(lane, "gh_call", side_effect=capture):
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            self.assertIsNone(lane.failed_logs(host, self.pr()))
+        self.assertEqual(seen, [["run", "view", "--repo", lane.REPO_SLUG, "--job", "42", "--log-failed"]])
+        self.assertEqual(denied(["probe"]).stderr, "fixture: gh_call denied")
 
     def test_unreadable_or_partial_open_state_is_not_treated_as_an_authorized_target(self):
         for payload in ("not json", "[]", '{"state":"OPEN"}', '{"state":"OPEN","headRefOid":"h1","headRefName":""}'):
