@@ -1160,7 +1160,7 @@
   "scripts/pr-open.mjs": 898,
   "scripts/pr-open.test.mjs": 945,
   "scripts/preflight-changed.mjs": 1011,
-  "scripts/preflight-changed.test.mjs": 1097,
+  "scripts/preflight-changed.test.mjs": 1101,
   "scripts/preflight.mjs": 832,
   "scripts/preflight.test.mjs": 1411,
   "scripts/prod-errors/prod_errors.py": 950,
