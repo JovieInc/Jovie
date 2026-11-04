@@ -121,7 +121,7 @@ function workflowStep(name, cwd, env) {
   });
 }
 
-function shallowFixture() {
+function shallowFixture(mainCommits = 80) {
   const root = mkdtempSync(join(tmpdir(), 'size-target-fetch-'));
   dirs.push(root);
   const source = join(root, 'source');
@@ -158,7 +158,7 @@ function shallowFixture() {
   ]);
   git(source, ['rm', '-q', 'historical-only.txt']);
   git(source, ['commit', '-q', '-m', 'remove historical file']);
-  for (let i = 0; i < 80; i++) commit(source, `main-${i}`);
+  for (let i = 0; i < mainCommits; i++) commit(source, `main-${i}`);
   const base = git(source, ['rev-parse', 'HEAD']);
   git(source, ['checkout', '-q', '--orphan', 'unrelated']);
   const unrelated = commit(source, 'unrelated');
@@ -351,32 +351,39 @@ describe('targeted complete ancestry for PR Size Guard', () => {
   });
 
   it('fails closed on wrong head, invalid or missing base, and missing token', () => {
-    for (const change of [
-      'wrong-head',
-      'invalid-base',
-      'missing-base',
-      'missing-token',
-    ]) {
-      const f = shallowFixture();
+    // Validation rejects these before fetch. One short clone covers the
+    // three pre-fetch failures. missing-base reaches fetch, so it gets its
+    // own clone. Four full 80-commit fixtures sat on the 30s timeout.
+    const shared = shallowFixture(1);
+    for (const change of ['wrong-head', 'invalid-base', 'missing-token']) {
       const result = workflowStep(
         'Fetch exact PR and current base ancestry',
-        f.clone,
+        shared.clone,
         {
-          PR_BASE_REF:
-            change === 'invalid-base'
-              ? '../invalid'
-              : change === 'missing-base'
-                ? 'missing'
-                : 'main',
-          PR_HEAD_SHA: change === 'wrong-head' ? 'a'.repeat(40) : f.head,
+          PR_BASE_REF: change === 'invalid-base' ? '../invalid' : 'main',
+          PR_HEAD_SHA: change === 'wrong-head' ? 'a'.repeat(40) : shared.head,
           GH_TOKEN: change === 'missing-token' ? '' : 'fixture-token',
         }
       );
       expect(result.status, change).not.toBe(0);
-      expect(git(f.clone, ['rev-parse', '--is-shallow-repository'])).toBe(
+      expect(git(shared.clone, ['rev-parse', '--is-shallow-repository'])).toBe(
         'true'
       );
     }
+    const fetched = shallowFixture(1);
+    const missingBase = workflowStep(
+      'Fetch exact PR and current base ancestry',
+      fetched.clone,
+      {
+        PR_BASE_REF: 'missing',
+        PR_HEAD_SHA: fetched.head,
+        GH_TOKEN: 'fixture-token',
+      }
+    );
+    expect(missingBase.status, 'missing-base').not.toBe(0);
+    expect(git(fetched.clone, ['rev-parse', '--is-shallow-repository'])).toBe(
+      'true'
+    );
   });
 });
 
