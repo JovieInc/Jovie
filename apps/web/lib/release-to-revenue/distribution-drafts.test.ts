@@ -266,44 +266,157 @@ describe('distribution draft decisions', () => {
     expect(untouched?.status).toBe('pending');
   });
 
-  it('dispatches an approved SMS draft to consented recipients via the provider', async () => {
-    const drafts = buildDistributionDrafts({
-      releaseTitle: 'Neon Sky',
-      releaseLink: 'https://jov.ie/timwhite/neon-sky',
-      merchDropLink: 'https://jov.ie/timwhite/merch',
-      platform: 'instagram',
-    });
-    const smsDraft = drafts.items.find(item => item.channel === 'sms');
-    mockPersistedRun(
-      { ...baseStepOutputs, distributionDrafts: drafts },
-      { smsRecipients: ['+15551234567', '+15557654321'] }
-    );
+  it.each([1, 25, 26, 500])(
+    'records all %i provider acceptances while retaining at most 25 message IDs',
+    async recipientCount => {
+      const drafts = buildDistributionDrafts({
+        releaseTitle: 'Neon Sky',
+        releaseLink: 'https://jov.ie/timwhite/neon-sky',
+        merchDropLink: null,
+        platform: 'instagram',
+      });
+      const smsDraft = drafts.items.find(item => item.channel === 'sms')!;
+      const smsRecipients = Array.from(
+        { length: recipientCount },
+        (_, index) => `+1555000${String(index).padStart(4, '0')}`
+      );
+      const providerIds = smsRecipients.map((_, index) => `SM_test_${index}`);
+      mockSendOutboundSms.mockImplementation(
+        async ({ to }: { to: string }) => ({
+          success: true,
+          providerMessageId: providerIds[smsRecipients.indexOf(to)],
+          status: 'queued',
+        })
+      );
+      const updateSet = mockPersistedRun(
+        { ...baseStepOutputs, distributionDrafts: drafts },
+        { smsRecipients }
+      );
 
-    const result = await approveDistributionDraft({
-      runId: 'run-1',
-      draftId: smsDraft?.id ?? '',
-      userId: 'user-1',
-    });
+      const result = await approveDistributionDraft({
+        runId: 'run-1',
+        draftId: smsDraft.id,
+        userId: 'user-1',
+      });
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) {
-      return;
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      expect(mockSendOutboundSms).toHaveBeenCalledTimes(recipientCount);
+      for (const phone of smsRecipients) {
+        expect(mockSendOutboundSms).toHaveBeenCalledWith({
+          to: phone,
+          body: smsDraft.body,
+          metadata: {
+            source: 'release_distribution',
+            runId: 'run-1',
+            draftId: smsDraft.id,
+            idempotencyKey: `run-1:${smsDraft.id}`,
+          },
+        });
+      }
+      // A queued provider response is acceptance, not confirmed delivery.
+      expect(result.draft.status).toBe('dispatched');
+      expect(result.draft.dispatchedAt).toBeTruthy();
+      expect(result.draft.delivery).toMatchObject({
+        provider: 'twilio',
+        state: 'accepted',
+        attemptedRecipients: recipientCount,
+        acceptedRecipients: recipientCount,
+        suppressedRecipients: 0,
+        providerMessageIds: providerIds.slice(0, 25),
+        retryable: false,
+      });
+      expect(result.draft.delivery?.acceptedAt).toBeTruthy();
+      expect(mockLogDelivery).toHaveBeenCalledTimes(recipientCount);
+      expect(mockLogDelivery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ providerMessageId: providerIds.at(-1) })
+      );
+      const finalWrite = updateSet.mock.calls.at(-1)?.[0] as {
+        stepOutputs: ReleaseToRevenueRunStepOutputs;
+      };
+      expect(finalWrite.stepOutputs.distributionDrafts?.items).toContainEqual(
+        result.draft
+      );
+      expect(mockRecordWorkflowRunOutcome).not.toHaveBeenCalled();
     }
+  );
 
-    expect(mockSendOutboundSms).toHaveBeenCalledTimes(2);
-    expect(mockSendOutboundSms).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: '+15551234567',
-        body: smsDraft?.body,
-      })
-    );
-    expect(result.draft.status).toBe('dispatched');
-    expect(result.draft.dispatchedAt).toBeTruthy();
-    expect(result.draft.delivery?.state).toBe('accepted');
-    expect(result.draft.delivery?.provider).toBe('twilio');
-    expect(result.draft.delivery?.providerMessageIds).toContain('SM_test_1');
-    expect(result.draft.delivery?.acceptedRecipients).toBe(2);
-  });
+  it.each([
+    { error: 'Twilio request failed with HTTP 400', retryable: false },
+    { error: 'Twilio request timed out', retryable: true },
+  ])(
+    'preserves partial acceptance and prevents approval replay after $error',
+    async failure => {
+      const drafts = buildDistributionDrafts({
+        releaseTitle: 'Neon Sky',
+        releaseLink: 'https://jov.ie/timwhite/neon-sky',
+        merchDropLink: null,
+        platform: 'instagram',
+      });
+      const smsDraft = drafts.items.find(item => item.channel === 'sms')!;
+      const smsRecipients = Array.from(
+        { length: 29 },
+        (_, index) => `+1555000${String(index).padStart(4, '0')}`
+      );
+      mockIsPhoneSmsSuppressed.mockImplementation(async (phone: string) => ({
+        suppressed: phone === smsRecipients[0],
+        reason: phone === smsRecipients[0] ? 'user_unsubscribed' : null,
+      }));
+      mockSendOutboundSms.mockImplementation(async ({ to }: { to: string }) =>
+        to === smsRecipients[1] || to === smsRecipients[28]
+          ? { success: false, ...failure }
+          : { success: true, providerMessageId: `SM_test_${to.slice(-4)}` }
+      );
+      const updateSet = mockPersistedRun(
+        { ...baseStepOutputs, distributionDrafts: drafts },
+        { smsRecipients }
+      );
+
+      const result = await approveDistributionDraft({
+        runId: 'run-1',
+        draftId: smsDraft.id,
+        userId: 'user-1',
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.draft.status).toBe('failed');
+      expect(result.draft.dispatchedAt).toBeUndefined();
+      expect(result.draft.delivery).toMatchObject({
+        state: 'failed',
+        attemptedRecipients: 28,
+        acceptedRecipients: 26,
+        suppressedRecipients: 1,
+        error: failure.error,
+        retryable: failure.retryable,
+        providerMessageIds: smsRecipients
+          .slice(2, 27)
+          .map(phone => `SM_test_${phone.slice(-4)}`),
+      });
+      expect(result.draft.delivery?.acceptedAt).toBeUndefined();
+      expect(mockSendOutboundSms).not.toHaveBeenCalledWith(
+        expect.objectContaining({ to: smsRecipients[0] })
+      );
+      expect(mockLogDelivery).toHaveBeenCalledTimes(29);
+      const finalWrite = updateSet.mock.calls.at(-1)?.[0] as {
+        stepOutputs: ReleaseToRevenueRunStepOutputs;
+      };
+      expect(finalWrite.stepOutputs.distributionDrafts?.items).toContainEqual(
+        result.draft
+      );
+      mockOwnedRun(finalWrite.stepOutputs, { smsRecipients });
+      expect(
+        await approveDistributionDraft({
+          runId: 'run-1',
+          draftId: smsDraft.id,
+          userId: 'user-1',
+        })
+      ).toMatchObject({ ok: false, code: 'already-decided' });
+      expect(mockSendOutboundSms).toHaveBeenCalledTimes(28);
+      expect(mockRecordWorkflowRunOutcome).not.toHaveBeenCalled();
+    }
+  );
 
   it('marks an approved SMS draft undeliverable when the provider is not configured', async () => {
     mockIsOutboundSmsEnabled.mockReturnValue(false);
@@ -358,7 +471,11 @@ describe('distribution draft decisions', () => {
     }
     expect(mockSendOutboundSms).not.toHaveBeenCalled();
     expect(result.draft.status).toBe('undeliverable');
-    expect(result.draft.delivery?.state).toBe('no-consented-recipients');
+    expect(result.draft.delivery).toMatchObject({
+      state: 'no-consented-recipients',
+      attemptedRecipients: 0,
+      acceptedRecipients: 0,
+    });
   });
 
   it('marks an approved SMS draft failed when the provider rejects the send', async () => {
