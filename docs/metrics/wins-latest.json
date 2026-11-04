@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-11-03T23:53:37.796Z",
-  "winsTotal": 34,
+  "at": "2026-11-04T20:41:04.781Z",
+  "winsTotal": 35,
   "winsVerified": 1,
   "winsClaimed": 15,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 4,
-  "winsPendingMeasure": 10,
-  "winsLast7d": 34,
+  "winsPendingMeasure": 11,
+  "winsLast7d": 35,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -60,7 +60,7 @@
     },
     {
       "theme": "golden-path",
-      "total": 2,
+      "total": 3,
       "verified": 0,
       "ready": false
     },
@@ -230,6 +230,10 @@
     },
     {
       "id": "win-2026-10-30-golden-path-model-review-makes-about",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-removes-placeholder-stale-and-duplicated-surfaces",
       "status": "pending-measure"
     }
   ]
