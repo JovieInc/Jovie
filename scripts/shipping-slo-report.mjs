@@ -595,6 +595,20 @@ export function buildReport(
   });
   if (mqDigest) gistSlo.mergeQueueSpeed = mqDigest;
 
+  // Test-quality loop (mutation score per surface, survivors killed, test minutes,
+  // flake budget) so Summer reads it with the rest of the Shipping SLO feed.
+  try {
+    const tq = JSON.parse(
+      readFileSync(
+        resolve(REPO_ROOT, 'docs/metrics/test-quality-latest.json'),
+        'utf8'
+      )
+    );
+    gistSlo.testQuality = { ...tq, survivorsByModule: undefined };
+  } catch {
+    // No report published yet.
+  }
+
   return {
     schemaVersion: 1,
     generatedAt: new Date(nowMs).toISOString(),

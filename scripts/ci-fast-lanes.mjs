@@ -1171,6 +1171,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/component-certificate-workflow.test.mjs',
   'scripts/lib/__tests__/mutation-sweep.test.mjs',
   'scripts/lib/__tests__/mutation-sweep-file-issues.test.mjs',
+  'scripts/lib/__tests__/test-quality-rank.test.mjs',
   'scripts/lib/__tests__/knip-web-tooling.test.mjs',
   'scripts/lib/__tests__/actions-cache-supersede.test.mjs',
   'scripts/lib/__tests__/ci-dependency-workspace.test.mjs',
