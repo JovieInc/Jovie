@@ -346,6 +346,8 @@ process.exit(report.ok ? 0 : 1);
             ...process.env,
             PATH: `${path.join(root, 'bin')}:${process.env.PATH}`,
             JOVIE_SKIP_PRE_PUSH_GATE: '',
+            // This spawn is the subject. An inherited hook depth refuses before the checker prints.
+            JOVIE_PREFLIGHT_DEPTH: '',
           },
         }
       );
