@@ -148,7 +148,7 @@ export function HomepageOwnership({
   );
 }
 
-/** The offer: free collects, Artist Presence sends. Prices from offer truth. */
+/** Legacy offer story; plan labels and prices remain owned by offer truth. */
 export function HomepageOffer({
   headline = HOMEPAGE_COPY.offer.headline,
   plansLinkLabel = HOMEPAGE_COPY.offer.plansLink.label,
@@ -222,7 +222,7 @@ export function HomepageClose({
   return (
     <ArtistProfileSectionShell
       id='waitlist'
-      className='homepage-artist-section homepage-waitlist'
+      className='homepage-waitlist'
       containerClassName='homepage-close__grid'
       sectionId='cta'
       sectionVariant='final-single-claim'

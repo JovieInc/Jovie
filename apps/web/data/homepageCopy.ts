@@ -34,8 +34,8 @@ export const HOMEPAGE_COPY = {
       'Jovie profile preview with Your Name, jov.ie/you, social links, and Get Updates',
   },
   ownership: {
-    headline: 'Keep the connection.',
-    body: 'When someone asks to hear from you, their email lands in your own list in Jovie. Keep your relationships in reach.',
+    headline: 'Your relationships, in reach.',
+    body: 'When someone asks to hear from you, their email lands in your own list in Jovie.',
     shot: 'home-subscriber-list',
     phoneShot: 'home-subscriber-list-phone',
   },

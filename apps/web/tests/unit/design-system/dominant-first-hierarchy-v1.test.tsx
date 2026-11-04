@@ -194,7 +194,7 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
     // homepage stylesheet must not re-mix or fade either ink.
     const source = read('components/homepage/HomepageArtistProfile.css');
     expect(source).not.toMatch(/--color-text-(?:primary|secondary)-token\s*:/);
-    const support = cssBlock(source, '.homepage-artist-hero__subhead');
+    const support = cssBlock(source, '.homepage-discovery-hero__subhead');
     expect(support).not.toContain('color-mix');
 
     const theme = read('styles/design-system.css');

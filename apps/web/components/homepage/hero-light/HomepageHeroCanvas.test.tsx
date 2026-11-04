@@ -98,27 +98,41 @@ describe('HomepageHeroCanvas', () => {
     ).toBe(true);
   });
 
-  it('paints each headline sentence beat on its own line without editing the copy', () => {
-    render(
-      <HomepageHeroCanvas
-        headingId='home-hero-heading'
-        headline={hero.headline}
-        subhead={hero.subhead}
-        claim={hero.claim}
-        supportNote={hero.supportNote}
-        proofShot={hero.proofShot}
-        sectionOwner='apps/web/components/homepage/HomepageArtistProfile.tsx'
-      />
-    );
+  it.each([
+    {
+      headline: hero.headline,
+      expectedBeats: ['Control how the world sees you.'],
+    },
+    {
+      headline: 'First sentence. Second sentence.',
+      expectedBeats: ['First sentence. ', 'Second sentence.'],
+    },
+  ])(
+    'preserves the sentence beats and accessible copy of $headline',
+    ({ headline, expectedBeats }) => {
+      render(
+        <HomepageHeroCanvas
+          headingId='home-hero-heading'
+          headline={headline}
+          subhead={hero.subhead}
+          claim={hero.claim}
+          supportNote={hero.supportNote}
+          proofShot={hero.proofShot}
+          sectionOwner='apps/web/components/homepage/HomepageArtistProfile.tsx'
+        />
+      );
 
-    const heading = screen.getByRole('heading', { level: 1 });
-    // Byte-identical accessible text: the beats only control wrapping.
-    expect(heading).toHaveTextContent(hero.headline);
-    const beats = heading.querySelectorAll(
-      '.homepage-hero-canvas__headline-beat'
-    );
-    expect(beats).toHaveLength(2);
-  });
+      const heading = screen.getByRole('heading', { level: 1 });
+      // Byte-identical accessible text: the beats only control wrapping.
+      expect(heading).toHaveTextContent(headline);
+      const beats = heading.querySelectorAll(
+        '.homepage-hero-canvas__headline-beat'
+      );
+      expect(Array.from(beats, beat => beat.textContent)).toEqual(
+        expectedBeats
+      );
+    }
+  );
 
   it('ships no partner-logo rail on the homepage hero', () => {
     render(

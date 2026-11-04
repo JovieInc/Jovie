@@ -35,12 +35,9 @@
     "retention-days": {
       "apps/web/app/app/(shell)/dashboard/actions/creator-profile.ts": 1,
       "apps/web/app/exp/shell-v1/ShellV1ExperimentClient.tsx": 1,
-      "apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx": 1,
       "apps/web/components/features/admin/FunnelMetricsStrip.tsx": 1,
       "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab.tsx": 2,
       "apps/web/components/features/library-share/LibraryShareDropCreator.tsx": 1,
-      "apps/web/components/organisms/billing/BillingActionsSection.tsx": 1,
-      "apps/web/content/investors/investor-memo.md": 1,
       "apps/web/content/legal/privacy.md": 2,
       "apps/web/data/product-truth/dogfood.ts": 3
     },

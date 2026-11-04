@@ -3727,6 +3727,7 @@ describe('automation-verify affected scope', () => {
   });
 
   describe('waitlist source producer bindings', () => {
+    /** @type {[string, string[]][]} */
     const bindings = [
       [
         'apps/web/lib/waitlist/role-entry.ts',

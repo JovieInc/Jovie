@@ -199,10 +199,11 @@ describe('the hero ships ungated and the viewport ships with it', () => {
       'utf8'
     );
 
-    expect(component).toContain('<HomepageHeroCanvas');
+    expect(component).toContain('<HomepageHeroLight animate={false} />');
+    expect(component).not.toContain('<HomepageHeroCanvas');
     expect(component).not.toContain('FEATURE_FLAGS');
-    // The light mounts unconditionally inside the field. The device gate is
-    // the only gate, and it runs in the browser, never at build time.
+    // The generic root uses the static light. The standalone canvas retains
+    // its browser device gate for the existing canvas stories.
     expect(canvas).toContain('<HomepageHeroLight');
     expect(canvas).not.toContain('FEATURE_FLAGS');
     expect(canvas).not.toMatch(/\bif\s*\(.*(?:flag|Flag)/);
