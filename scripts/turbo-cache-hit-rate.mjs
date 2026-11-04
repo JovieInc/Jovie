@@ -3,8 +3,8 @@
 // Usage: node scripts/turbo-cache-hit-rate.mjs <runId> [<runId> ...]
 // The CI timing collector records the same numbers as turbo_cache rows on a
 // sample of runs; this CLI is for ad-hoc before/after comparisons.
-// Local `gh` login spends the user REST bucket. One comparison is two run
-// logs; `gh run view --log` is one jobs page plus one download per job.
+// Local gh login spends the user REST bucket. One comparison is two run
+// logs. Fetching one full run log is one jobs page plus one download per job.
 // api-budget: github-user-core 90/hr - manual gh login only, not scheduled: one before/after an hour, two run logs, one jobs page plus about forty job-log downloads each
 import { runGh } from '../packages/api-client/gh.ts';
 import {
