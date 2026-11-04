@@ -465,4 +465,3 @@ def test_concurrent_origin_duplicates_have_exactly_one_winner(tmp_path):
                 worker.terminate()
                 worker.join()
     assert len(path.read_bytes().splitlines()) == 1
-
