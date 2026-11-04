@@ -19,6 +19,9 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 const holder = vi.hoisted(() => ({
   db: null as unknown,
   client: null as unknown,
+  copyExternalAvatarToStorage: vi
+    .fn()
+    .mockResolvedValue('https://blob.test/avatar.avif'),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -84,6 +87,11 @@ vi.mock('@/lib/leads/build-lead-catalog.server', () => ({
 }));
 vi.mock('@/lib/ingestion/flows/avatar-hosting', () => ({
   resolveHostedAvatarUrl: async () => 'https://blob.test/avatar.avif',
+}));
+// The real merge checks this URL again. Keep that second avatar-hosting
+// boundary inside the fixture rather than downloading from blob.test.
+vi.mock('@/lib/ingestion/magic-profile-avatar', () => ({
+  copyExternalAvatarToStorage: holder.copyExternalAvatarToStorage,
 }));
 vi.mock('@/lib/ingestion/jobs', () => ({
   enqueueDspArtistDiscoveryJob: vi.fn().mockResolvedValue(undefined),
@@ -175,6 +183,11 @@ describe('outbound claim link, composed', () => {
       .select()
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, stored.creatorProfileId as string));
+    expect(holder.copyExternalAvatarToStorage).toHaveBeenCalledWith({
+      externalUrl: 'https://blob.test/avatar.avif',
+      handle: profile.usernameNormalized,
+      sourcePlatform: 'ingestion',
+    });
 
     // One token across lead and profile, stored hashed: the lead never holds
     // the plaintext, which is derived on demand from the hash inputs.

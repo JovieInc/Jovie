@@ -68,16 +68,25 @@ function fixture(t) {
 
 test('uses base source debt without expanding committed allowances; shrink passes', t => {
   const { repoRoot, write } = fixture(t);
-  assert.equal(evaluateBaseDesignRatchet({ repoRoot }).ok, true);
+  assert.equal(
+    evaluateBaseDesignRatchet({ repoRoot, baseRef: 'origin/main' }).ok,
+    true
+  );
   write('apps/web/app/page.tsx', 'const color = "var(--color-bg)";');
-  assert.equal(evaluateBaseDesignRatchet({ repoRoot }).ok, true);
+  assert.equal(
+    evaluateBaseDesignRatchet({ repoRoot, baseRef: 'origin/main' }).ok,
+    true
+  );
 });
 
 test('rejects new raw identities and an extra fork of an already duplicated component', t => {
   const { repoRoot, write } = fixture(t);
   write('apps/web/app/page.tsx', 'const color = "#445566 text-rose-500";');
   write('apps/web/components/b/Badge.tsx', 'export const Badge = 3;');
-  const result = evaluateBaseDesignRatchet({ repoRoot });
+  const result = evaluateBaseDesignRatchet({
+    repoRoot,
+    baseRef: 'origin/main',
+  });
   assert.equal(result.ok, false);
   assert.deepEqual(result.newIdentities, [
     'apps/web/app/page.tsx\traw-hex-color\t#445566',
@@ -113,7 +122,10 @@ test('locks in landed removals and does not grandfather feature-branch debt', t 
     '-m',
     'regrow'
   );
-  assert.equal(evaluateBaseDesignRatchet({ repoRoot }).ok, false);
+  assert.equal(
+    evaluateBaseDesignRatchet({ repoRoot, baseRef: 'origin/main' }).ok,
+    false
+  );
 });
 
 test('fails closed if the trusted base is missing', t => {
@@ -141,5 +153,28 @@ test('uses the target tip to reject regrowth on a stale feature branch', t => {
   );
   git('update-ref', 'refs/remotes/origin/main', 'HEAD');
   git('checkout', '--quiet', 'feature');
-  assert.equal(evaluateBaseDesignRatchet({ repoRoot }).ok, false);
+  assert.equal(
+    evaluateBaseDesignRatchet({ repoRoot, baseRef: 'origin/main' }).ok,
+    false
+  );
+});
+
+test('fixture base stays explicit under an external stacked branch environment', t => {
+  const { repoRoot } = fixture(t);
+  const previous = process.env.GITHUB_BASE_REF;
+  try {
+    process.env.GITHUB_BASE_REF = 'fixture-stacked-parent';
+    assert.equal(
+      evaluateBaseDesignRatchet({ repoRoot, baseRef: 'origin/main' }).ok,
+      true
+    );
+    // The real resolver still fails closed for an unavailable ambient base.
+    assert.throws(
+      () => evaluateBaseDesignRatchet({ repoRoot }),
+      /Cannot read trusted design base/
+    );
+  } finally {
+    if (previous === undefined) delete process.env.GITHUB_BASE_REF;
+    else process.env.GITHUB_BASE_REF = previous;
+  }
 });
