@@ -311,7 +311,7 @@ describe('targeted complete ancestry for PR Size Guard', () => {
 
   it('rejects failed hydration and a successful fetch that omits snapshot blobs', () => {
     for (const mode of ['fetch-fails', 'missing-blob']) {
-      const f = shallowFixture();
+      const f = shallowFixture(1);
       const fetched = workflowStep(
         'Fetch exact PR and current base ancestry',
         f.clone,
