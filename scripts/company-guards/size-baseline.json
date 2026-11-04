@@ -1053,7 +1053,7 @@
   "scripts/lib/__tests__/linear-sync-on-merge.test.mjs": 2891,
   "scripts/lib/__tests__/main-release-readiness.test.mjs": 1043,
   "scripts/lib/__tests__/merge-group-admission.test.mjs": 2300,
-  "scripts/lib/__tests__/merge-group-failure-hold.test.mjs": 3040,
+  "scripts/lib/__tests__/merge-group-failure-hold.test.mjs": 3042,
   "scripts/lib/__tests__/merge-group-local-evidence.test.mjs": 513,
   "scripts/lib/__tests__/merge-group-member-policy.test.mjs": 1565,
   "scripts/lib/__tests__/merge-group-victim-rearm.test.mjs": 924,
