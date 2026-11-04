@@ -18,6 +18,7 @@
  * - Release outcome reconciliation: every day (bounded 30-day snapshots)
  * - Founder-review upload lease cleanup: every day (private Blob orphans)
  * - AI Gateway spend: every day (admin Costs row + >$5/day alert)
+ * - Legacy claim sweep: every day when CLAIM_LEGACY_PROOF_SWEEP is on
  *
  * Each sub-job runs in an independent try-catch so one failure
  * doesn't block the others.
@@ -29,6 +30,7 @@ import { NextResponse } from 'next/server';
 import { purgeExpiredAgentDrafts } from '@/lib/agent-acquisition/draft-purge.server';
 import { recordDailyGatewaySpend } from '@/lib/ai/gateway-spend';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
+import { runLegacyClaimVerificationSweep } from '@/lib/claim/legacy-verification.server';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { sweepUnderEnrichedProfilesForCron } from '@/lib/discography/re-enrich';
 import { env } from '@/lib/env-server';
@@ -256,6 +258,12 @@ export async function GET(request: Request) {
   results.agentDraftPurge = await runSubJob(
     'agentDraftPurge',
     purgeExpiredAgentDrafts
+  );
+
+  // 12c. Grandfathered claims: 30-day nudge stage, then proof for 50k+
+  //     (claim-verify spec Q2). Reports skipped while the code flag is off.
+  results.legacyClaimSweep = await runSubJob('legacyClaimSweep', () =>
+    runLegacyClaimVerificationSweep()
   );
 
   // 13. Data retention — Sundays only (heavy operation)

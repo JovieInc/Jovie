@@ -1,4 +1,5 @@
 name: Lane Fix Relay
+# github-token-budget: 1 calls/run - one same-repository repair dispatch per failed workflow completion, through the shared client.
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
 # capability-gap: The shipping lanes on Gem have no inbound webhook, so this hop records a PR's failed CI, merge-queue removal, conflict, review feedback or green lane draft as a lane-fix-<kind> label that the lane runner reads each pass; it never pushes, readies, merges or enqueues.
@@ -47,12 +48,18 @@ concurrency:
   # Pushes to main supersede each other. Successful completions of every
   # required workflow for one PR share one slot, so a burst keeps a single
   # pending run and the newer one cancels the waiter before a Jovie Bot token
-  # is minted. Failures keep a per-workflow slot: a green wake must not cancel
-  # a red one, and a second workflow's success must not drop a failure signal.
+  # is minted. Every other wake (failures, deployment_status, reviews) shares ONE
+  # slot per PR: GitHub keeps one running and one pending run per group, so a
+  # branch-update storm queues at most two relay runs per PR instead of one per
+  # (event, workflow). 2026-10-28: 117 branch updates queued 166 relay runs ahead
+  # of required checks. The success slot stays separate, so a green wake never
+  # cancels a red one. Repair wakes leave the running event intact; only green
+  # completions and main pushes cancel in progress. Unscoped backfills also
+  # share one stable slot.
   # workflow_dispatch declares no inputs. event.inputs.pr_number is an
   # actionlint error (object type {}) and ejected the merge group.
-  group: ${{ github.event_name == 'push' && 'lane-fix-relay-push-main' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && format('lane-fix-relay-success-{0}', github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.event.workflow_run.id)) || format('lane-fix-relay-{0}-{1}-{2}', github.event_name, github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.event.deployment.sha || 'unscoped', github.event.workflow_run.name || github.event.workflow_run.conclusion || github.event.review.state || github.event.action || 'signal') }}
-  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'workflow_run' }}
+  group: ${{ github.event_name == 'push' && 'lane-fix-relay-push-main' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && format('lane-fix-relay-success-{0}', github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.event.workflow_run.id)) || format('lane-fix-relay-{0}', github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.event.deployment.sha || 'unscoped') }}
+  cancel-in-progress: ${{ github.event_name == 'push' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
 
 jobs:
   # A pull_request job GitHub never handed to a hosted runner is cancelled after
@@ -67,7 +74,7 @@ jobs:
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'failure'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_CONTROL_PLANE || '"ubuntu-latest"') }}
     timeout-minutes: 3
     permissions:
       actions: write
@@ -82,6 +89,7 @@ jobs:
           ref: main
           persist-credentials: false
           sparse-checkout: |
+            scripts/lib/github-rate-limit.mjs
             scripts/pr-unacquired-runner-rerun.mjs
           sparse-checkout-cone-mode: false
 
@@ -92,18 +100,14 @@ jobs:
           GH_REPOSITORY: ${{ github.repository }}
         run: node scripts/pr-unacquired-runner-rerun.mjs
 
-  # Success wakes come only from Source Validation (2026-10-26). It publishes PR Ready and
-  # Migration Guard and is the slowest required producer (minutes, against seconds for
-  # Fork PR Gate and PR Size Guard), so a head becomes required-green on its completion;
-  # waking on every other workflow's success started ~3 extra runs per head, each paying
-  # the 20 s debounce, a checkout, an App mint and several github.token calls (a stale
-  # lane-fix-red on a head whose last producer was not SV is cleared by the next SV
-  # completion or by Green Enroll). Failures still wake from every listed workflow.
-  # Success on a pull_request branch starts this job so a stale lane-fix-red
-  # can be deleted with this job's existing GITHUB_TOKEN (issues: write,
-  # pull-requests: write). `green` is still applied only to a lane draft
-  # (pr_events.in_scope). Non-lane successes skip the debounce sleep: they
-  # view one PR and delete only when that head is required-green.
+  # Success wakes of this heavy job come only from Source Validation (2026-10-26).
+  # Waking it on every other workflow's success started ~3 extra runs per head, each
+  # paying a debounce, a checkout, an App mint and several reads. A CI success, which
+  # can be the check that settles the rollup after Source Validation, is the separate
+  # clear-settled-red job: no debounce. Failures still wake from every listed workflow
+  # and do not sleep. `green` is still applied only to a lane draft
+  # (pr_events.in_scope). A stale lane-fix-red is deleted when the rollup is settled
+  # success, including while merge state still says BLOCKED.
   relay:
     name: Queue lane repair
     needs: rerun-unacquired
@@ -124,22 +128,23 @@ jobs:
       (github.event.workflow_run.head_branch == 'main' &&
        contains(fromJSON('["push","schedule","workflow_dispatch"]'), github.event.workflow_run.event) &&
        contains(fromJSON('["failure","timed_out","startup_failure","cancelled"]'), github.event.workflow_run.conclusion)))
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_CONTROL_PLANE || '"ubuntu-latest"') }}
     timeout-minutes: 5
     permissions:
       # actions: read for a red run's failed job logs; write to re-run a run that failed only
       # on GitHub's API quota (scripts/lib/github-rate-limit.mjs) instead of queueing repair.
       actions: write
-      contents: read
+      contents: write # Same-repository repository_dispatch uses GITHUB_TOKEN.
       issues: write
       pull-requests: write
       # A hand dequeue counts only with the failure hold's receipt on the head (pr_events.failure_held).
       statuses: read
     steps:
       - name: Debounce repeated workflow completions
-        # Every workflow_run sleeps before checkout and token mint. Cancel-in-progress
-        # then drops the older run in a burst before create-github-app-token runs.
-        if: github.event_name == 'workflow_run'
+        # Successful completions cancel older green wakes before the app token
+        # is minted. A red check does not sleep: cancel-in-progress is false for
+        # failures, so a debounce only delayed the repair.
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
         run: sleep 20
 
       - name: Checkout trusted lane policy
@@ -179,3 +184,120 @@ jobs:
           GH_READ_TOKEN: ${{ steps.read-token.outputs.token }}
           MODE: ${{ github.event_name == 'workflow_dispatch' && 'backfill' || 'relay' }}
         run: python3 scripts/lanes/pr_events.py "$MODE"
+
+      # 2026-10-29: this relay is the one topology-approved remediation dispatcher, but nothing
+      # ever sent `swarm-remediate`, so the swarm only ran when a person dispatched it (last
+      # automatic-era run 05:35Z). The first failed workflow on a same-repo PR head now wakes
+      # the swarm for that PR, in the same event, without waiting for a label or a sweep. The
+      # swarm's prepare gate dedupes per head (handled, in flight, sensitive, budget).
+      - name: Wake the PR Remediation Swarm for the failed head
+        if: >-
+          (github.event_name == 'workflow_run' &&
+          github.event.workflow_run.event == 'pull_request' &&
+          contains(fromJSON('["failure","timed_out"]'), github.event.workflow_run.conclusion) &&
+          github.event.workflow_run.head_repository.full_name == github.repository &&
+          github.event.workflow_run.pull_requests[0].number != null)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          WORKFLOW: ${{ github.event.workflow_run.name }}
+        run: |
+          PYTHONPATH=scripts python3 -m apiclient gh --priority repair -- api "repos/$GITHUB_REPOSITORY/dispatches" -f event_type=swarm-remediate \
+            -f "client_payload[pr]=$PR" -f "client_payload[sha]=$SHA"
+          echo "swarm-remediate pr=$PR sha=$SHA first_failed=$WORKFLOW at=$(date -u +%FT%TZ)"
+
+  # CI can finish after Source Validation. That completion is the event that
+  # settles the rollup. This job does not sleep and does not run for the fast
+  # producers. A head with no lane-fix-red returns after one read.
+  clear-settled-red:
+    name: Clear lane-fix-red when CI succeeded
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.name == 'CI'
+    # A new job cannot float. The control-plane expression stays on the two
+    # jobs already listed in the runner-pin allowlist.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout the relay
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/lanes
+            scripts/apiclient
+            packages/api-client/providers.json
+            scripts/lib/github-rate-limit.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Generate Jovie Bot read token
+        id: read-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.SYMPHONY_APP_ID }}
+          private-key: ${{ secrets.SYMPHONY_APP_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
+          permission-issues: read
+          permission-pull-requests: read
+          permission-statuses: read
+
+      - name: Clear a settled lane-fix-red
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_READ_TOKEN: ${{ steps.read-token.outputs.token }}
+          MODE: relay
+        run: python3 scripts/lanes/pr_events.py relay
+
+  # JOV-8931: the lane host has no inbound webhook. This job runs on the gem
+  # host and drops a wake file; jovie-lanes-wake.path runs fix-now the moment
+  # the file appears. The 5-minute lanes timer is only the fallback.
+  wake-red:
+    name: Wake the lane host for the failed head
+    needs: rerun-unacquired
+    if: >-
+      always() && needs.rerun-unacquired.outputs.requested != 'true' &&
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      contains(fromJSON('["failure","timed_out","startup_failure"]'), github.event.workflow_run.conclusion)
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - name: Reset workspace git state (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          if [[ -d .git ]]; then
+            git sparse-checkout disable 2>/dev/null || true
+            git config --local --unset-all core.sparseCheckout 2>/dev/null || true
+            git config --local --unset-all core.sparseCheckoutCone 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi
+
+      - name: Checkout the wake writer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+          sparse-checkout: scripts/lanes
+          sparse-checkout-cone-mode: false
+
+      - name: Drop the red wake file
+        run: python3 scripts/lanes/pr_events.py wake
+
+      - name: Release the shared sparse checkout
+        if: always()
+        run: |
+          git sparse-checkout disable 2>/dev/null || true
+          rm -f .git/info/sparse-checkout

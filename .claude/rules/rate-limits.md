@@ -27,3 +27,13 @@ Hyperagent), its basis (measured, documented, unmeasured) and its consumers.
   the registry owns the numbers. A new provider or limit goes into both
   `packages/api-client/providers.json` and the registry. Unmeasured limits are
   gaps to close (route the calls through the client so the ledger learns them).
+
+## Quota repair record (2026-11-02)
+
+- Fingerprints: `hold-contract:ambiguous-write-replay` and `hold-contract:incomplete-comment-evidence`.
+- Root cause: a lost POST response or deferred DELETE can leave a successful release comment behind; generic retries or the next sweep can duplicate it. Reading only the latest 100 comments can also omit a valid hold receipt.
+- Fix pattern: use the shared adapter with retries for reads and one attempt for ambiguous non-idempotent writes. Reconcile the existing comment against the current label application. Judge a release only when the comment connection is complete for the receipt window; otherwise keep the hold as incomplete evidence. Report unfinished work as pending, without claiming earlier mutations did not happen.
+- Successful rung and models: Codex subscription, builder `gpt-6.1-sol`, independent judge `gpt-6-luna`. This is source qualification, not a live quota recovery or cheap-fixer pilot.
+- Cost and time: provider cost unmeasured; the final 28-test command completed in 7.97 seconds. End-to-end repair and queue time are separate measurements.
+- Guard added: `scripts/hold-contract.test.mjs`, registered in the existing CI script-contract selector, exercises process-boundary quota deferral, ambiguous writes, subsequent reconciliation and incomplete receipt windows. Local result: 28 pass, 100% line coverage; hosted exact-head checks remain required.
+- Evidence: PR #23764. Retrieve these fingerprints before repeating the repair; preserve the real failure and exit-75 distinction and the existing hold rules.

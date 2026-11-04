@@ -18,6 +18,18 @@ const mockRecordDailyGatewaySpend = vi.hoisted(() => vi.fn());
 const mockRunMusicResolverParityCorpus = vi.hoisted(() => vi.fn());
 const mockReadShadowParitySummary = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
+const mockRunLegacyClaimSweep = vi.hoisted(() =>
+  vi.fn(async () => ({
+    skipped: true,
+    scanned: 0,
+    nudged: 0,
+    proofRequired: 0,
+  }))
+);
+
+vi.mock('@/lib/claim/legacy-verification.server', () => ({
+  runLegacyClaimVerificationSweep: mockRunLegacyClaimSweep,
+}));
 
 vi.mock('@/lib/agent-acquisition/draft-purge.server', () => ({
   purgeExpiredAgentDrafts: vi.fn(async () => ({
@@ -311,6 +323,11 @@ describe('GET /api/cron/daily-maintenance', () => {
         families: [],
       },
     });
+    expect(data.results.legacyClaimSweep).toEqual({
+      success: true,
+      data: { skipped: true, scanned: 0, nudged: 0, proofRequired: 0 },
+    });
+    expect(mockRunLegacyClaimSweep).toHaveBeenCalledTimes(1);
     expect(data.results.dataRetention.success).toBe(true);
   });
 

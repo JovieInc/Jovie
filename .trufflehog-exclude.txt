@@ -1,5 +1,6 @@
-scripts/security/gitleaks-fixture.txt
 scripts/security/gitleaks-backup-fixture.txt
+scripts/security/gitleaks-default-fixture.txt
+scripts/security/gitleaks-fixture.txt
 # Config, not a secret source. Listing historical detector-bait paths here
 # must not create new findings on the exclude file itself.
 .trufflehog-exclude.txt
