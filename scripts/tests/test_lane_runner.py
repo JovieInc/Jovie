@@ -5449,24 +5449,34 @@ class DispatchTest(unittest.TestCase):
         """Mirror sync and outbox flush ride the existing tick; Linear down never holds spawn."""
         client = SimpleNamespace(admit=lambda requests: False)
         for failure in (None, SystemExit("no LINEAR_API_KEY")):
-            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp, \
-                    patch.dict(os.environ, {"SYMPHONY_AUTOSCALE": "off", "LANES_SLOTS_CODEX": "1"}), \
-                    patch.object(lane.autoscale, "mode", return_value="off"), \
-                    patch.object(lane.disk_guard, "check", return_value={"freePct": 50, "admitted": True}), \
-                    patch.object(lane.worktree_sweep, "maybe_spawn", return_value="not-due"), \
-                    patch.object(lane, "ensure_full_history"), \
-                    patch.object(lane, "load_providers", return_value={"codex": {"slots": 1}}), \
-                    patch.object(lane, "provider_healthy", return_value=True), \
-                    patch.object(lane, "claim_remediation_events", return_value={}), \
-                    patch.object(lane, "Linear", side_effect=failure, return_value=client), \
-                    patch.object(lane.linear_sync, "tick", return_value={"JOV": {"outcome": "rate-limited"}}) as sync, \
-                    patch.object(lane.macos_pool, "sample", return_value={}), \
-                    patch.object(lane.epics, "reconcile", return_value={}), \
-                    patch.object(lane.escalation_reconcile, "due", return_value=False), \
-                    patch.object(lane.pr_events, "tick", return_value={}), \
-                    patch.object(lane.reason_lane, "tick", return_value={}), \
-                    patch.object(lane.doctor, "run"), \
-                    patch.object(lane.subprocess, "Popen") as spawn:
+            # A 19-item with is 19 blocks. Plus this for and the LANES_SELFTEST try
+            # that exceeds Python's 20-block limit, so the patches share one with.
+            with contextlib.ExitStack() as stack:
+                stack.enter_context(self.subTest(failure=failure))
+                tmp = stack.enter_context(tempfile.TemporaryDirectory())
+                stack.enter_context(patch.dict(
+                    os.environ, {"SYMPHONY_AUTOSCALE": "off", "LANES_SLOTS_CODEX": "1"}))
+                for target, name, kwargs in (
+                    (lane.autoscale, "mode", {"return_value": "off"}),
+                    (lane.disk_guard, "check", {"return_value": {"freePct": 50, "admitted": True}}),
+                    (lane.worktree_sweep, "maybe_spawn", {"return_value": "not-due"}),
+                    (lane, "ensure_full_history", {}),
+                    (lane, "load_providers", {"return_value": {"codex": {"slots": 1}}}),
+                    (lane, "provider_healthy", {"return_value": True}),
+                    (lane, "claim_remediation_events", {"return_value": {}}),
+                    (lane, "Linear", {"side_effect": failure, "return_value": client}),
+                    (lane.macos_pool, "sample", {"return_value": {}}),
+                    (lane.epics, "reconcile", {"return_value": {}}),
+                    (lane.escalation_reconcile, "due", {"return_value": False}),
+                    (lane.pr_events, "tick", {"return_value": {}}),
+                    (lane.reason_lane, "tick", {"return_value": {}}),
+                    (lane.doctor, "run", {}),
+                ):
+                    stack.enter_context(patch.object(target, name, **kwargs))
+                sync = stack.enter_context(patch.object(
+                    lane.linear_sync, "tick",
+                    return_value={"JOV": {"outcome": "rate-limited"}}))
+                spawn = stack.enter_context(patch.object(lane.subprocess, "Popen"))
                 # The dispatch self-test guard must open only for this assertion; restore
                 # the marker after — inside a release self-test it was already set, and
                 # losing it would un-hermetic every later module in the same process.
@@ -5497,26 +5507,34 @@ class DispatchTest(unittest.TestCase):
         """JOV-10343: the reconcile's one budgeted gh read must never run inside a release self-test.
         Its only guard is the LANES_SELFTEST marker; this pins that guard even when a reconcile is
         due, so the dispatch tick cannot spawn a second subprocess and refuse every release."""
-        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"SYMPHONY_AUTOSCALE": "off"}), \
-                patch.object(lane.autoscale, "mode", return_value="off"), \
-                patch.object(lane.disk_guard, "check", return_value={"freePct": 50, "admitted": True}), \
-                patch.object(lane.worktree_sweep, "maybe_spawn", return_value="not-due"), \
-                patch.object(lane, "ensure_full_history"), \
-                patch.object(lane, "load_providers", return_value={"codex": {"slots": 1}}), \
-                patch.object(lane, "provider_healthy", return_value=True), \
-                patch.object(lane, "claim_remediation_events", return_value={}), \
-                patch.object(lane, "collect_shipping_origin", return_value={}), \
-                patch.object(lane, "Linear", side_effect=SystemExit("no LINEAR_API_KEY")), \
-                patch.object(lane.linear_sync, "tick", return_value={}), \
-                patch.object(lane.macos_pool, "sample", return_value={}), \
-                patch.object(lane.epics, "reconcile", return_value={}), \
-                patch.object(lane.pr_events, "tick", return_value={}), \
-                patch.object(lane.reason_lane, "tick", return_value={}), \
-                patch.object(lane.continuity_clock, "tick", return_value={"status": "current"}), \
-                patch.object(lane.doctor, "run", return_value={}), \
-                patch.object(lane.escalation_reconcile, "due", return_value=True), \
-                patch.object(lane.escalation_reconcile, "fetch_labeled", side_effect=AssertionError("self-test leak")) as probe, \
-                patch.object(lane.subprocess, "Popen") as spawn:
+        # 21 context managers in one with exceed Python's 20-block limit.
+        with contextlib.ExitStack() as stack:
+            tmp = stack.enter_context(tempfile.TemporaryDirectory())
+            stack.enter_context(patch.dict(os.environ, {"SYMPHONY_AUTOSCALE": "off"}))
+            for target, name, kwargs in (
+                (lane.autoscale, "mode", {"return_value": "off"}),
+                (lane.disk_guard, "check", {"return_value": {"freePct": 50, "admitted": True}}),
+                (lane.worktree_sweep, "maybe_spawn", {"return_value": "not-due"}),
+                (lane, "ensure_full_history", {}),
+                (lane, "load_providers", {"return_value": {"codex": {"slots": 1}}}),
+                (lane, "provider_healthy", {"return_value": True}),
+                (lane, "claim_remediation_events", {"return_value": {}}),
+                (lane, "collect_shipping_origin", {"return_value": {}}),
+                (lane, "Linear", {"side_effect": SystemExit("no LINEAR_API_KEY")}),
+                (lane.linear_sync, "tick", {"return_value": {}}),
+                (lane.macos_pool, "sample", {"return_value": {}}),
+                (lane.epics, "reconcile", {"return_value": {}}),
+                (lane.pr_events, "tick", {"return_value": {}}),
+                (lane.reason_lane, "tick", {"return_value": {}}),
+                (lane.continuity_clock, "tick", {"return_value": {"status": "current"}}),
+                (lane.doctor, "run", {"return_value": {}}),
+                (lane.escalation_reconcile, "due", {"return_value": True}),
+            ):
+                stack.enter_context(patch.object(target, name, **kwargs))
+            probe = stack.enter_context(patch.object(
+                lane.escalation_reconcile, "fetch_labeled",
+                side_effect=AssertionError("self-test leak")))
+            spawn = stack.enter_context(patch.object(lane.subprocess, "Popen"))
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
             self.assertEqual(lane.dispatch(host), 0)
             probe.assert_not_called()
