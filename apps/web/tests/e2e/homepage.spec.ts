@@ -126,7 +126,7 @@ test.describe('Homepage', () => {
   test('loads readable product evidence at desktop and phone widths without overflow', async ({
     page,
   }) => {
-    for (const width of [1440, 390]) {
+    for (const width of [1440, 390, 320]) {
       await page.setViewportSize({ width, height: 900 });
       for (const image of await page.locator('main img:visible').all()) {
         await image.scrollIntoViewIfNeeded();
@@ -144,10 +144,16 @@ test.describe('Homepage', () => {
           () => document.documentElement.scrollWidth - innerWidth
         )
       ).toBeLessThanOrEqual(1);
+      // Inspect the hero while it is in view, after decoding the proof below it.
+      await page.evaluate(() => scrollTo(0, 0));
       const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
       expect(
         snapshot.findings.filter(finding =>
-          ['misaligned-text-stack', 'clipped-heading'].includes(finding.kind)
+          [
+            'misaligned-text-stack',
+            'clipped-heading',
+            'orphaned-line',
+          ].includes(finding.kind)
         )
       ).toEqual([]);
     }

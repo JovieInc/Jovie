@@ -28,7 +28,6 @@ export function HomepageArtistHero({
   copy?: HomepageCopy['hero'];
   headingId?: string;
 }>) {
-  const lastWord = copy.headline.lastIndexOf(' ');
   return (
     <MarketingHero
       variant='centered'
@@ -48,16 +47,7 @@ export function HomepageArtistHero({
             id={headingId}
             className='marketing-type-display text-balance text-primary-token'
           >
-            {lastWord < 0 ? (
-              copy.headline
-            ) : (
-              <>
-                {copy.headline.slice(0, lastWord)}{' '}
-                <span className='homepage-discovery-hero__last-word'>
-                  {copy.headline.slice(lastWord + 1)}
-                </span>
-              </>
-            )}
+            {copy.headline}
           </h1>
           <p className='marketing-type-lede text-pretty text-primary-token homepage-discovery-hero__subhead'>
             {copy.subhead}

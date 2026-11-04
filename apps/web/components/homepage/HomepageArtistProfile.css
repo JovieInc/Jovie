@@ -163,10 +163,6 @@
     font-size: calc(var(--text-5xl) + var(--space-8));
   }
 
-  .homepage-discovery-hero__last-word {
-    display: block;
-  }
-
   .homepage-profile__grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: var(--space-16);
