@@ -224,6 +224,10 @@ describe('publication range failures', () => {
     const env = {
       PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`,
       HOME: root,
+      // HOME is the fixture so scanners cannot write into the user home.
+      // The node pin still has to resolve from the host nvm, or a machine
+      // whose ambient Node is behind .nvmrc exits before the scan.
+      NVM_DIR: process.env.NVM_DIR ?? resolve(process.env.HOME ?? '', '.nvm'),
       GIT_CONFIG_COUNT: '3',
       GIT_CONFIG_KEY_0: 'maintenance.auto',
       GIT_CONFIG_VALUE_0: 'false',
