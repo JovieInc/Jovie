@@ -178,6 +178,10 @@ describe('pre-push gate Node and fanout wiring (JOV-4329)', () => {
     expect(huskyPrePush).toContain(
       'export AUTOMATION_VERIFY_SHARD_CONCURRENCY="${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-1}"'
     );
+    expect(huskyPrePush).toContain(
+      'export JOVIE_PREFLIGHT_JOBS="${JOVIE_PREFLIGHT_JOBS:-1}"'
+    );
+    expect(huskyPrePush).not.toMatch(/^JOVIE_PREFLIGHT_JOBS=1$/m);
   });
 
   it('keeps the documented max-workers knob in the verify bundle', () => {
