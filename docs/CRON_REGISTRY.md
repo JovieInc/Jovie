@@ -96,19 +96,19 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 
 | Cron Path | Schedule | Frequency |
 |-----------|----------|-----------|
-| `/api/cron/frequent` | `*/15 * * * *` | Every 15 minutes |
+| `/api/cron/frequent` | `*/30 * * * *` | Every 30 minutes (cut 2026-10-29 from `*/15 * * * *`: zero-user cost cut) |
 | `/api/cron/daily-maintenance` | `0 0 * * *` | Daily at midnight UTC |
 | `/api/cron/generate-insights` | `0 5 * * *` | Daily at 05:00 UTC |
-| `/api/cron/process-ingestion-jobs` | `*/6 * * * *` | Every 6 minutes (JOV-2500: lets Neon 5min autosuspend reclaim compute) |
-| `/api/cron/process-merch-fulfillment` | `*/10 * * * *` | Every 10 minutes |
+| `/api/cron/process-ingestion-jobs` | `*/30 * * * *` | Every 30 minutes (cut 2026-10-29 from `*/6 * * * *`: zero-user cost cut) (JOV-2500: lets Neon 5min autosuspend reclaim compute) |
+| `/api/cron/process-merch-fulfillment` | `*/30 * * * *` | Every 30 minutes (cut 2026-10-29 from `*/10 * * * *`: zero-user cost cut) |
 | `/api/cron/purge-pixel-ips` | `0 3 * * *` | Daily at 03:00 UTC |
-| `/api/cron/summarize-interviews` | `*/5 * * * *` | Every 5 minutes |
+| `/api/cron/summarize-interviews` | `0 * * * *` | Hourly (cut 2026-10-29 from `*/5 * * * *`: zero-user cost cut) |
 | `/api/cron/generate-playlist` | `0 6 * * *` | Daily at 06:00 UTC |
 | `/api/cron/process-pre-saves` | `0 2 * * *` | Daily at 02:00 UTC |
 | `/api/cron/monitor-metadata-submissions` | `0 * * * *` | Hourly |
 | `/api/cron/process-metadata-submissions` | `0 4 * * *` | Daily at 04:00 UTC |
-| `/api/cron/process-workflow-runs` | `*/6 * * * *` | Every 6 minutes (403 at the trusted-origin check on every call as of 2026-10-20) |
-| `/api/cron/voice-pipeline` | `*/5 * * * *` | Every 5 minutes (missing from the unused root `vercel.json`) |
+| `/api/cron/process-workflow-runs` | `0 * * * *` | Hourly (cut 2026-10-29 from `*/6 * * * *`: zero-user cost cut) (403 at the trusted-origin check on every call as of 2026-10-20) |
+| `/api/cron/voice-pipeline` | `0 * * * *` | Hourly (cut 2026-10-29 from `*/5 * * * *`: zero-user cost cut) (missing from the unused root `vercel.json`) |
 | `/api/cron/public-profile-canary` | `13 6 * * *` | Daily at 06:13 UTC |
 | `/api/cron/auth-signup-onboarding-canary` | `23 6 * * *` | Daily at 06:23 UTC (JOV-1871) |
 | `/api/cron/artist-daily-snapshots` | `15 9 * * *` | Daily at 09:15 UTC. No-op unless `ARTIST_DAILY_SNAPSHOTS` is true. YouTube Data API statistics when `YOUTUBE_DATA_API_KEY` is set; Wikimedia pageviews. Social HTML waits for isolated egress. |
