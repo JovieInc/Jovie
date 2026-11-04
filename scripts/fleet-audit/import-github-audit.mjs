@@ -42,7 +42,7 @@ function secret() {
   }
 }
 
-async function main(argv) {
+export async function main(argv) {
   const file = argv.find(a => !a.startsWith('--'));
   if (!file) {
     console.error(
@@ -82,7 +82,9 @@ async function main(argv) {
       console.error(`import failed: ${res.status}`);
       return 1;
     }
-    const out = await res.json();
+    const out = /** @type {{ attributed: number, unattributed: number }} */ (
+      await res.json()
+    );
     attributed += out.attributed;
     unattributed += out.unattributed;
   }
