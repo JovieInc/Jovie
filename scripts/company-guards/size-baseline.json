@@ -698,7 +698,7 @@
   "apps/web/tests/unit/api/connectors/google/callback.test.ts": 691,
   "apps/web/tests/unit/api/connectors/suggested-actions-approve-route.test.ts": 641,
   "apps/web/tests/unit/api/cron/billing-reconciliation.test.ts": 502,
-  "apps/web/tests/unit/api/cron/frequent.test.ts": 646,
+  "apps/web/tests/unit/api/cron/frequent.test.ts": 653,
   "apps/web/tests/unit/api/cron/schedule-release-notifications.test.ts": 566,
   "apps/web/tests/unit/api/cron/send-release-notifications.test.ts": 955,
   "apps/web/tests/unit/api/dashboard/social-links-cas.test.ts": 675,
