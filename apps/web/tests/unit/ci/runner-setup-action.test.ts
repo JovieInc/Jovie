@@ -812,9 +812,18 @@ describe('baked runner prerequisite contract', () => {
       '#!/usr/bin/env bash\nset -euo pipefail\nif [[ "${1:-}" == "cat-file" ]]; then\n  printf \'1\\n\' >> "${GIT_CAT_FILE_COUNT}"\nfi\nexec "${REAL_GIT}" "$@"\n'
     );
     chmodSync(gitWrapper, 0o755);
+    const environment = {
+      ...process.env,
+      GIT_INDEX_FILE: resolve(directory, 'index'),
+    };
+    execFileSync('git', ['read-tree', 'HEAD'], {
+      cwd: repoRoot,
+      env: environment,
+    });
     const buildTree = execFileSync('git', ['write-tree'], {
       cwd: repoRoot,
       encoding: 'utf8',
+      env: environment,
     }).trim();
     expect(buildTree).toMatch(/^[0-9a-f]{40}$/);
     const listedPaths = execFileSync(

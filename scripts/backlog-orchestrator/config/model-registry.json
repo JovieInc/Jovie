@@ -688,7 +688,7 @@
       "cost_tier": "gateway-budgeted-paid",
       "strengths": ["per-call-review-route"],
       "weaknesses": ["paid-gateway", "not-in-agent-route-chains"],
-      "notes": "PR review kernel only. Peak list price; quality provisional until replay outcomes exist.",
+      "notes": "Retired PR review kernel catalog entry; not an active agent route. Peak list price; quality provisional until replay outcomes exist.",
       "quality_by_capability": {
         "review": 74.2,
         "review-verify": 74.2
@@ -713,7 +713,7 @@
       "cost_tier": "gateway-budgeted-paid",
       "strengths": ["per-call-review-route"],
       "weaknesses": ["paid-gateway", "not-in-agent-route-chains"],
-      "notes": "PR review kernel only. Prices and quality mirror hyperagent-glm-5.3.",
+      "notes": "Retired PR review kernel catalog entry; not an active agent route. Prices and quality mirror hyperagent-glm-5.3.",
       "quality_by_capability": {
         "review": 66.9,
         "review-verify": 66.9

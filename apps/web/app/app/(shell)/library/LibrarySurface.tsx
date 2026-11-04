@@ -150,7 +150,6 @@ import {
   formatLibraryApprovalStatus,
   LIBRARY_APPROVAL_STATUSES,
   type LibraryApprovalStatus,
-  libraryApprovalStatusClasses,
   libraryApprovalStatusDotClasses,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
@@ -230,7 +229,7 @@ import {
   persistLibrarySavedView,
   readPersistedLibrarySavedView,
 } from './library-saved-views';
-import { PostReleasePanel } from './PostReleasePanel';
+import { PostReleasePanel, RightsholdersList } from './PostReleasePanel';
 import {
   YouTubeMerchRelationshipEditor,
   YouTubeOptimizationPanel,
@@ -2119,7 +2118,7 @@ function PreviewActionButton({
 
   return (
     <Button
-      variant='ghost'
+      variant={compact ? 'ghost' : 'secondary'}
       size='sm'
       type='button'
       onClick={event => onTogglePreview(asset, event)}
@@ -2180,8 +2179,7 @@ function ApprovalStatusEditor({
           aria-label='Approval Status'
           data-testid={`library-approval-status-select-${asset.id}`}
           className={cn(
-            'system-b-library-status-pill inline-flex h-6 max-w-full items-center gap-1 truncate rounded-full border px-2',
-            libraryApprovalStatusClasses(asset.approvalStatus),
+            '-ml-1 inline-flex h-6 max-w-full items-center justify-start gap-1 truncate px-1 font-normal text-primary-token hover:bg-surface-1 disabled:opacity-100',
             LIBRARY_BUTTON_FOCUS_CLASS
           )}
         >
@@ -2386,9 +2384,12 @@ function AssetDrawer({
       finding.status !== 'dismissed'
   );
   const hasPostReleaseActivity =
-    inspectorBundle.downloads.length > 0 ||
-    inspectorBundle.findings.length > 0 ||
-    inspectorBundle.rightsholders.length > 0;
+    inspectorBundle.downloads.length > 0 || inspectorBundle.findings.length > 0;
+  const showDestinationsSection =
+    current !== null &&
+    !isMerch &&
+    isDspQuietListScope(workKind ?? 'release') &&
+    current.providers.length > 0;
   const isPreviewPlaying =
     currentId !== null &&
     currentId === playingPreviewId &&
@@ -2448,8 +2449,17 @@ function AssetDrawer({
             title={current.title}
             subtitle={current.artist}
             meta={
-              <div className='flex h-6 min-w-0 items-center'>
-                <LibraryStatusGlyph asset={current} showLabel />
+              <div className='-ml-1 flex h-6 min-w-0 items-center'>
+                <LibraryStatusGlyph
+                  asset={current}
+                  showLabel
+                  labelOverride={
+                    current.lifecycleStatus === 'archived' ||
+                    current.approvalStatus === 'archived'
+                      ? undefined
+                      : formatLibraryStatus(current)
+                  }
+                />
               </div>
             }
             stableLayout
@@ -2483,46 +2493,35 @@ function AssetDrawer({
           >
             {activeTab === 'overview' ? (
               <>
-                {!isMerch && hasVerifiedLibraryAudioPreview(current) ? (
-                  <InspectorSection title='Preview' className='pb-3 first:pt-0'>
-                    <div className='flex items-center justify-between gap-2'>
-                      <span className='system-b-library-drawer-panel-copy min-w-0 flex-1 truncate text-secondary-token'>
-                        {current.title}
-                      </span>
-                      <PreviewActionButton
-                        asset={current}
-                        isPreviewPlaying={isPreviewPlaying}
-                        onTogglePreview={onTogglePreview}
-                        compact
-                        disabledTabIndex={closedTabIndex}
-                      />
-                    </div>
-                  </InspectorSection>
-                ) : null}
-
                 {!isMerch ? (
-                  <InspectorSection title='Actions'>
+                  <InspectorSection title='Actions' className='py-3 first:pt-0'>
                     <WorkInspectorActions
                       asset={current}
                       launches={workLaunches}
                       canPublish={profileId !== null}
                       disabled={!open}
                       onSharePrivately={openPrivateShare}
+                      preview={
+                        hasVerifiedLibraryAudioPreview(current) ? (
+                          <PreviewActionButton
+                            asset={current}
+                            isPreviewPlaying={isPreviewPlaying}
+                            onTogglePreview={onTogglePreview}
+                            disabledTabIndex={closedTabIndex}
+                          />
+                        ) : null
+                      }
                     />
                   </InspectorSection>
                 ) : null}
 
                 {presentation ? (
                   <InspectorSection
-                    title='Public presentation'
+                    title='Public Presentation'
                     className='py-3 first:pt-0'
                     data-testid='work-inspector-presentation'
                   >
                     <dl>
-                      <MetadataRow
-                        label='Lifecycle'
-                        value={formatLibraryStatus(current)}
-                      />
                       <MetadataRow
                         label='Public Page'
                         value={
@@ -2545,16 +2544,19 @@ function AssetDrawer({
                         label='Visitor Action'
                         value={presentation.primaryVisitorAction}
                       />
-                      <MetadataRow
-                        label='Destinations'
-                        value={
-                          presentation.destinationState === 'connected'
-                            ? presentation.destinations.join(', ')
-                            : presentation.destinationState === 'disconnected'
-                              ? 'Disconnected'
-                              : 'Not supported'
-                        }
-                      />
+                      {/* field-once-ok: row and Destinations section are exclusive */}
+                      {showDestinationsSection ? null : (
+                        <MetadataRow
+                          label='Destinations'
+                          value={
+                            presentation.destinationState === 'connected'
+                              ? presentation.destinations.join(', ')
+                              : presentation.destinationState === 'disconnected'
+                                ? 'Disconnected'
+                                : 'Not supported'
+                          }
+                        />
+                      )}
                     </dl>
                     {contextualBlockers.length > 0 ? (
                       <div className='space-y-1 border-l-2 border-warning pl-2'>
@@ -2732,15 +2734,19 @@ function AssetDrawer({
                     {!isMerch && current.source ? (
                       <MetadataRow
                         label='Source'
-                        value={`${capitalizeFirst(current.source.provider)} · ${current.source.canonicalId}`}
+                        value={capitalizeFirst(current.source.provider)}
                       />
                     ) : null}
                   </dl>
+                  {!isMerch ? (
+                    <RightsholdersList
+                      asset={current}
+                      bundle={inspectorBundle}
+                    />
+                  ) : null}
                 </InspectorSection>
 
-                {!isMerch &&
-                isDspQuietListScope(workKind ?? 'release') &&
-                current.providers.length > 0 ? (
+                {showDestinationsSection ? (
                   <InspectorSection title='Destinations' className='py-3'>
                     <div className='space-y-0.5'>
                       {current.providers.map(provider => (

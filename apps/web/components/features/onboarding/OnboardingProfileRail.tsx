@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { useEffect, useRef } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ProfileIdentityHeader } from '@/features/profile/ProfileIdentityHeader';
 import { ProfilePreviewBento } from '@/features/profile/ProfilePreviewBento';
@@ -201,7 +202,7 @@ function buildPreviewArtist(
     tagline:
       artist.tagline ??
       (followerLabel
-        ? `${followerLabel} Spotify followers (source: enrichment)`
+        ? `${followerLabel} Spotify followers`
         : (firstGenre ?? undefined)),
     theme: undefined,
     settings: undefined,
@@ -327,9 +328,42 @@ export function resolvePreviewArtist(
       tagline: draft.outcome,
     };
   }
-  if (state.artist) return state.artist;
-  if (!state.handle || state.socialLinks.length === 0) return null;
+  if (state.artist) {
+    // JOV-10169: the artist preview must never render a fabricated
+    // jov.ie/your-handle identity. Between the artist pick and a known
+    // handle, the rail stays empty (the shell falls back to the entry
+    // preview) instead of flashing the placeholder URL and /your-handle
+    // links.
+    if (!state.handle) return null;
+    return state.artist;
+  }
+  // Pen R6As7U: the draft profile is present as soon as a handle is known,
+  // before any artist or link is attached.
+  if (!state.handle) return null;
   return { id: `handle-${state.handle}`, name: state.handle, url: '' };
+}
+
+/**
+ * Pen R6As7U `SDt0M`: names the panel so the phone reads as the visitor's own
+ * draft. Pen sets the eyebrow in its canonical uppercase eyebrow style.
+ */
+function OnboardingDraftProfileHeader() {
+  return (
+    <header
+      className='system-b-onboarding-draft-header'
+      data-testid='onboarding-draft-profile-header'
+    >
+      <p className='system-b-onboarding-draft-eyebrow'>
+        Your profile, taking shape
+      </p>
+      <h2 className='system-b-onboarding-draft-title text-balance'>
+        Your Draft Profile
+      </h2>
+      <p className='system-b-onboarding-draft-lead'>
+        A first version from your link. Shape it as we talk.
+      </p>
+    </header>
+  );
 }
 
 export function OnboardingProfileRail({
@@ -341,6 +375,31 @@ export function OnboardingProfileRail({
 }) {
   const artist = resolvePreviewArtist(state);
   const isInline = placement === 'inline';
+  const railRef = useRef<HTMLElement>(null);
+
+  // JOV-8844 keyboard reachability, component-owned (JOV-7973): the side rail
+  // is a focusable scroll region, so Home/End must scroll it themselves rather
+  // than relying on the browser's default keyboard scrolling, which the live
+  // chat's focus/keyboard layers can shadow mid-journey — the golden-path
+  // reachability check intermittently found the rail still resting at its
+  // bottom edge after Home, clipping the preview badge at the scrollport top.
+  // Attached imperatively: this is scroll-region behavior, not element
+  // interactivity, so it stays out of the JSX a11y handler surface.
+  const hasArtist = artist !== null;
+  useEffect(() => {
+    const rail = railRef.current;
+    if (isInline || !rail) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Home' && event.key !== 'End') return;
+      event.preventDefault();
+      rail.scrollTo({
+        top: event.key === 'Home' ? 0 : rail.scrollHeight - rail.clientHeight,
+        behavior: 'auto',
+      });
+    };
+    rail.addEventListener('keydown', onKeyDown);
+    return () => rail.removeEventListener('keydown', onKeyDown);
+  }, [isInline, hasArtist]);
 
   if (!artist) return null;
 
@@ -369,6 +428,7 @@ export function OnboardingProfileRail({
 
   return (
     <aside
+      ref={railRef}
       aria-label='Profile Preview'
       tabIndex={isInline ? undefined : 0}
       className={cn(
@@ -392,6 +452,7 @@ export function OnboardingProfileRail({
         )}
       >
         <div className='flex min-h-0 w-full flex-col items-center'>
+          {isInline ? null : <OnboardingDraftProfileHeader />}
           <ProfilePreviewBento
             phoneContent={
               draft?.activeRole && draft.activeRole !== 'artist' && source ? (
@@ -451,11 +512,9 @@ export function OnboardingProfileRail({
                 Preview
               </span>
             }
-            caption={
-              state.profileDraft?.activeRole
-                ? `Draft · ${state.profileDraft.activeRole} · ${state.profileDraft.awaiting === 'review' ? 'Review' : 'In progress'}`
-                : 'Preview — not claimed yet'
-            }
+            // One caption for every path: internal draft state ("Draft · artist ·
+            // Review") is not visitor-facing (2026-10-31 golden-path walk).
+            caption='Preview · not claimed yet'
             overlay={<DspMatchStrip matches={dspMatches} />}
           />
           {previewArtist.tagline ? (

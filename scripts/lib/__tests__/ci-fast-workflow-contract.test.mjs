@@ -11,6 +11,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { load as loadYaml } from 'js-yaml';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
@@ -51,6 +52,7 @@ import {
   selectLanes,
   selectNodeRuntimeContractCommands,
   structuralLocks,
+  typecheckEnvironment,
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
@@ -94,7 +96,7 @@ const HOSTED_GROUP_JOBS = [
   },
   {
     jobId: 'ci-fast-structural-web',
-    nextJobId: 'ci-knip',
+    nextJobId: 'ci-fast-structural-lanes',
     jobName: 'ci-fast (structural web)',
   },
 ];
@@ -113,6 +115,30 @@ function jobBlock(jobId, nextJobId) {
   return WORKFLOW.slice(start, end);
 }
 
+/**
+ * @typedef {{run?: string, uses?: string, if?: string | boolean,
+ *   with?: {'go-version'?: string, cache?: boolean}}} ActionlintWorkflowStep
+ * @typedef {{jobs: Record<string, {steps?: ActionlintWorkflowStep[]}>}} ActionlintWorkflow
+ */
+function assertActionlintCompiler(steps) {
+  const lintIndex = steps.findIndex(step =>
+    step.run?.includes('bash .github/scripts/run-actionlint.sh')
+  );
+  expect(lintIndex, 'actionlint caller must exist').toBeGreaterThanOrEqual(0);
+  const setup = steps
+    .slice(0, lintIndex)
+    .filter(step => step.uses?.startsWith('actions/setup-go@'));
+  expect(setup, 'compiler setup must precede actionlint').toHaveLength(1);
+  expect(setup[0].uses).toBe(
+    'actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e'
+  );
+  expect(setup[0].with).toMatchObject({
+    'go-version': '1.26.10',
+    cache: false,
+  });
+  expect(setup[0].if).toBe(steps[lintIndex].if);
+}
+
 describe('ci-fast bounded parallel workflow', () => {
   it('selects both critical and interaction files for non-main manual units', () => {
     const unitJob = jobBlock('ci-unit-tests', 'ci-exact-head-coverage-shard');
@@ -121,7 +147,7 @@ describe('ci-fast bounded parallel workflow', () => {
       .find(
         line =>
           line.includes('pnpm turbo test:fast --affected --') &&
-          line.includes('--passWithNoTests')
+          /--passWithNoTests(?:\s|$)/u.test(line)
       );
     const selectors = command?.match(
       /unit_excludes \}\}\s+(.+?)\s+\$OUTPUT_FLAG$/u
@@ -351,6 +377,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/tests/test_runner_routing.py',
       'scripts/tests/test_signal_watch.py',
       'scripts/tests/test_x_grok.py',
+      'scripts/tests/test_pr_remediation_swarm.py',
     ]);
     const shards = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command => {
       const [, keyword, files] = /-k "([^"]+)" (.+)$/u.exec(command) ?? [];
@@ -417,7 +444,12 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(33);
+    expect(LANES_PYTEST_FILES).toHaveLength(35);
+    expect(whole).toContain('scripts/tests/test_board_intake.py');
+    expect(whole).toContain('scripts/tests/test_priority_admission.py');
+    expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS.join(' ')).toContain(
+      'priority_admission.py" --fail-under=80'
+    );
     expect(whole).toContain('scripts/tests/test_factory_signals.py');
     expect(whole).toContain('scripts/tests/test_factory_intake.py');
     expect(whole).toContain('scripts/tests/test_hyperagent_cli.py');
@@ -1486,7 +1518,9 @@ describe('ci-fast bounded parallel workflow', () => {
       relativePath: '.github/scripts/product-tool.mjs',
     },
   ])('runs scripts typecheck when $name', ({ relativePath }) => {
-    const repo = mkdtempSync(join(tmpdir(), 'ci-fast-product-script-'));
+    const fixture = mkdtempSync(join(tmpdir(), 'ci-fast-product-script-'));
+    const repo = join(fixture, 'repo');
+    const origin = join(fixture, 'origin.git');
     const binDir = join(repo, 'bin');
     const outPath = join(repo, 'ci-fast-lanes.json');
     const changedPath = join(repo, relativePath);
@@ -1510,6 +1544,12 @@ describe('ci-fast bounded parallel workflow', () => {
         ].join('\n')
       );
       chmodSync(join(binDir, 'pnpm'), 0o755);
+      // The source-read guard parses the real release inventory in its merged tree.
+      mkdirSync(join(repo, 'scripts/lanes'), { recursive: true });
+      writeFileSync(
+        join(repo, 'scripts/lanes/lane_runner.py'),
+        readFileSync(resolve(REPO_ROOT, 'scripts/lanes/lane_runner.py'))
+      );
       writeFileSync(changedPath, 'export const value = 1;\n');
       expect(runGit(['init', '--initial-branch=main']).status).toBe(0);
       expect(
@@ -1519,9 +1559,19 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(runGit(['add', '.']).status).toBe(0);
       expect(runGit(['commit', '-m', 'base']).status).toBe(0);
       const baseSha = runGit(['rev-parse', 'HEAD']).stdout.trim();
+      // Keep the bare origin outside the working repo so git add cannot stage it.
+      expect(
+        runGit(['init', '--bare', '--initial-branch=main', origin]).status
+      ).toBe(0);
+      expect(runGit(['remote', 'add', 'origin', origin]).status).toBe(0);
+      expect(runGit(['push', 'origin', 'HEAD:refs/heads/main']).status).toBe(0);
       writeFileSync(changedPath, 'export const value = 2;\n');
       expect(runGit(['add', '.']).status).toBe(0);
       expect(runGit(['commit', '-m', 'change product tool']).status).toBe(0);
+      const remoteBase = runGit(['ls-remote', 'origin', 'refs/heads/main']);
+      expect(remoteBase.status).toBe(0);
+      expect(remoteBase.stdout.trim()).toBe(`${baseSha}\trefs/heads/main`);
+      expect(runGit(['rev-parse', 'HEAD']).stdout.trim()).not.toBe(baseSha);
 
       const result = spawnSync(
         process.execPath,
@@ -1549,6 +1599,21 @@ describe('ci-fast bounded parallel workflow', () => {
 
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
       const payload = JSON.parse(readFileSync(outPath, 'utf8'));
+      if (relativePath.startsWith('scripts/')) {
+        const sourceGuards = payload.lanes.find(
+          lane => lane.id === 'source-guards'
+        );
+        expect(sourceGuards.status).toBe('success');
+        expect(sourceGuards.logExcerpt).toContain(
+          '[source-guards] lanes-selftest-changed-tests: exit 0'
+        );
+        expect(sourceGuards.logExcerpt).toContain(
+          'no changed release self-test lanes tests'
+        );
+        expect(runGit(['rev-parse', 'origin/main']).stdout.trim()).toBe(
+          baseSha
+        );
+      }
       expect(payload.lanes).toContainEqual(
         expect.objectContaining({
           id: 'scripts-typecheck',
@@ -1557,7 +1622,7 @@ describe('ci-fast bounded parallel workflow', () => {
         })
       );
     } finally {
-      rmSync(repo, { recursive: true, force: true });
+      rmSync(fixture, { recursive: true, force: true });
     }
   });
 
@@ -2274,7 +2339,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('keeps workflow contracts in the bounded CI control suite', () => {
     expect(PACKAGE_JSON.scripts['ci:control:test']).toBe(
-      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs && node scripts/invariants/duplicate-literals.mjs'
+      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs scripts/workflow-runner-pin-check.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs && node scripts/invariants/duplicate-literals.mjs'
     );
     expect(PACKAGE_JSON.scripts['ownership:check']).toBe(
       'node --test scripts/ownership-registry.test.mjs && node scripts/ownership-registry.mjs --report'
@@ -2601,10 +2666,11 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('runs actionlint from checksum-pinned binaries instead of a Docker action', () => {
+  it('runs the verified upstream actionlint fix without Docker rebuilds', () => {
     // A Docker action's image is built at job start even when its step is
     // skipped (~30s on the merge-queue critical path). The script pins the
-    // exact toolchain the image shipped and must fail closed on any drift.
+    // shellcheck/pyflakes versions the image shipped, plus actionlint's
+    // exact upstream stdin fix, must fail closed on any verification drift.
     const script = readFileSync(
       resolve(REPO_ROOT, '.github/scripts/run-actionlint.sh'),
       'utf8'
@@ -2622,13 +2688,22 @@ describe('ci-fast bounded parallel workflow', () => {
     ).toContain('run: bash .github/scripts/run-actionlint.sh');
 
     expect(script).toMatch(/^set -euo pipefail$/m);
-    expect(script).toContain("readonly ACTIONLINT_VERSION='1.7.12'");
+    expect(script).toContain(
+      "readonly ACTIONLINT_VERSION='1.7.12+fd33e9f582a0'"
+    );
+    expect(script).toContain(
+      "readonly ACTIONLINT_COMMIT='fd33e9f582a01a02885c93ae3775e1190cf63653'"
+    );
+    expect(script).toContain('GOTOOLCHAIN=local GOWORK=off');
+    expect(script).toContain('-mod=readonly');
+    expect(script).toContain('^TestProcessConcurrentStdinDoesNotDeadlock$');
+    expect(script).toContain('upstream stdin regression did not cover the fix');
     expect(script).toContain("readonly SHELLCHECK_VERSION='0.11.0'");
     expect(script).toContain("readonly PYFLAKES_VERSION='3.4.0'");
     // Release-download 5xx bursts outlast a 3-retry window (10-12 ejection).
     expect(script).toMatch(/--retry 6 --retry-all-errors --max-time 120/);
     for (const name of [
-      'ACTIONLINT_SHA256',
+      'ACTIONLINT_SOURCE_SHA256',
       'SHELLCHECK_TARBALL_SHA256',
       'SHELLCHECK_BINARY_SHA256',
       'PYFLAKES_WHEEL_SHA256',
@@ -2641,6 +2716,60 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(script).toContain('--fail');
     expect(script).toContain('-shellcheck="$tool_dir/shellcheck"');
     expect(script).toContain('-pyflakes="$tool_dir/pyflakes"');
+  });
+
+  it('provisions a verified compiler before every actual actionlint caller', () => {
+    const workflowsDir = resolve(REPO_ROOT, '.github/workflows');
+    const callers = [];
+    for (const file of readdirSync(workflowsDir)) {
+      if (!/\.ya?ml$/.test(file)) continue;
+      const source = readFileSync(join(workflowsDir, file), 'utf8');
+      if (!source.includes('bash .github/scripts/run-actionlint.sh')) continue;
+      const workflow = /** @type {ActionlintWorkflow} */ (loadYaml(source));
+      for (const [jobId, job] of Object.entries(workflow.jobs)) {
+        if (
+          !job.steps?.some(step =>
+            step.run?.includes('bash .github/scripts/run-actionlint.sh')
+          )
+        ) {
+          continue;
+        }
+        assertActionlintCompiler(job.steps);
+        callers.push(`${file}:${jobId}`);
+      }
+    }
+    expect(callers.sort()).toEqual([
+      'actionlint.yml:actionlint',
+      'ci.yml:ci-fast-remaining',
+      'source-validation.yml:deterministic',
+    ]);
+  });
+
+  it.each([
+    'missing setup',
+    'setup after lint',
+    'wrong action pin',
+    'wrong compiler version',
+    'implicit dependency cache',
+    'different condition',
+  ])('rejects an actionlint compiler prerequisite with %s', fault => {
+    const workflow = /** @type {ActionlintWorkflow} */ (loadYaml(WORKFLOW));
+    const steps = structuredClone(workflow.jobs['ci-fast-remaining'].steps);
+    const setupIndex = steps.findIndex(step =>
+      step.uses?.startsWith('actions/setup-go@')
+    );
+    const setup = steps[setupIndex];
+    if (fault === 'missing setup') steps.splice(setupIndex, 1);
+    if (fault === 'setup after lint') {
+      steps.splice(setupIndex, 1);
+      steps.push(setup);
+    }
+    if (fault === 'wrong action pin') setup.uses = 'actions/setup-go@main';
+    if (fault === 'wrong compiler version')
+      setup.with['go-version'] = '1.24.13';
+    if (fault === 'implicit dependency cache') delete setup.with.cache;
+    if (fault === 'different condition') setup.if = 'false';
+    expect(() => assertActionlintCompiler(steps)).toThrow();
   });
 
   it('keeps structural setup out of typecheck and fails closed in the aggregate', () => {
@@ -2657,7 +2786,7 @@ describe('ci-fast bounded parallel workflow', () => {
     // actionlint reads only checked-out workflows, so it runs unconditionally
     // in the idle wait for the background base-branch fetch.
     expect(remaining).toMatch(
-      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Run actionlint\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
+      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Set up Go for source-pinned actionlint\n\s+uses: actions\/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\.0\.0\n\s+with:\n\s+go-version: '1\.26\.10'\n\s+cache: false\n\s+- name: Run actionlint\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
     );
     expect(remaining.match(/run-actionlint\.sh/g)).toHaveLength(1);
     expect(remaining).toMatch(/actions\/setup-python/);
@@ -2666,7 +2795,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(remaining).not.toContain('ci-fast-typecheck');
 
     expect(aggregate).toMatch(
-      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*\]/s
+      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*ci-fast-structural-lanes,\s*\]/s
     );
     expect(aggregate).toMatch(/^  ci-fast:\n    name: ci-fast$/m);
     expect(aggregate).toMatch(/if: >-\s+always\(\)/);
@@ -2685,7 +2814,7 @@ describe('ci-fast bounded parallel workflow', () => {
       /PROFILE_BROWSER_RESULT: \$\{\{ needs\.ci-profile-admission-browser\.result \}\}/
     );
     expect(aggregate).toMatch(
-      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \]\]/
+      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \|\| "\$STRUCTURAL_LANES_RESULT" != "success" \]\]/
     );
     expect(aggregate).toMatch(
       /STRUCTURAL_WEB_RESULT: \$\{\{ needs\.ci-fast-structural-web\.result \}\}/
@@ -2711,12 +2840,31 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(python).not.toContain('CI_FAST_STRUCTURAL_WEB');
   });
 
+  it('runs the lanes coverage pytest alone in an aliased ci-fast job', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const lanes = jobBlock('ci-fast-structural-lanes', 'ci-knip');
+    expect(lanes).toMatch(
+      /^ {2}ci-fast-structural-lanes:\n {4}name: ci-fast \(structural lanes\)$/m
+    );
+    const aliases = lanes.match(/(?<= \*)[\w-]+/g);
+    expect(aliases).toHaveLength(10);
+    for (const name of aliases) expect(remaining).toContain(`&${name}`);
+    expect(remaining).toContain('CI_FAST_STRUCTURAL_LANES: skip');
+    expect(lanes).toContain('CI_FAST_STRUCTURAL_LANES: only');
+    expect(lanes).not.toContain('CI_FAST_STRUCTURAL_PYTEST');
+    expect(lanes).not.toContain('CI_FAST_STRUCTURAL_WEB');
+    expect(lanes).toContain('runs-on: ubuntu-24.04');
+  });
+
   it('runs the structural web commands in an aliased ci-fast job', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const web = jobBlock('ci-fast-structural-web', 'ci-knip');
+    const web = jobBlock('ci-fast-structural-web', 'ci-fast-structural-lanes');
     expect(web).toMatch(
       /^ {2}ci-fast-structural-web:\n {4}name: ci-fast \(structural web\)$/m
     );
@@ -2734,7 +2882,7 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('moves the slowest cheap lanes into a background web group without dropping any', () => {
-    const web = jobBlock('ci-fast-structural-web', 'ci-knip');
+    const web = jobBlock('ci-fast-structural-web', 'ci-fast-structural-lanes');
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
@@ -3345,14 +3493,33 @@ describe('CI diff selection on a divergent PR', () => {
         all: ['notes.md', 'pr-only.ts'],
         ts: ['pr-only.ts'],
       });
-      expect(select('merge_group', 'origin/main')).toEqual({
+      // Preserve exact two-tree removal coverage: the divergent head removes
+      // main-only.ts relative to main, but it is not part of the PR delta.
+      expect(select('push', 'origin/main')).toEqual({
         all: ['main-only.ts', 'notes.md', 'pr-only.ts'],
         ts: ['main-only.ts', 'pr-only.ts'],
+      });
+      expect(select('merge_group', 'origin/main')).toEqual({
+        all: ['notes.md', 'pr-only.ts'],
+        ts: ['pr-only.ts'],
       });
       expect(select('push')).toEqual({
         all: ['notes.md', 'pr-only.ts'],
         ts: ['pr-only.ts'],
       });
+      // A docs-only tail must still typecheck the preceding queue entry.
+      const precedingEntry = git('rev-parse', 'HEAD');
+      writeFileSync(join(repository, 'notes.md'), 'docs-only tail\n');
+      git('add', '.');
+      git('commit', '-m', 'docs-only tail');
+      expect(select('merge_group', precedingEntry).ts).toEqual(['pr-only.ts']);
+      expect(typecheckEnvironment(repository).TURBO_SCM_BASE).toBe(base);
+      expect(typecheckEnvironment(repository).TURBO_SCM_HEAD).toBe('HEAD');
+      // Other events retain their existing affected range.
+      vi.stubEnv('GITHUB_EVENT_NAME', 'pull_request');
+      expect(typecheckEnvironment(repository).TURBO_SCM_BASE).toBe(
+        precedingEntry
+      );
       git('update-ref', '-d', 'refs/remotes/origin/main');
       expect(select('pull_request', base)).toEqual({
         all: ['notes.md', 'pr-only.ts'],
