@@ -183,7 +183,18 @@ export function deriveSteps(workflowText, jobId = JOB_ID) {
   const job = doc?.jobs?.[jobId];
   if (!job || !Array.isArray(job.steps))
     throw new Error(`workflow has no job "${jobId}" with steps`);
-  return job.steps.map((step, index) => {
+  // Merged-source guards share the fourth required unit runner. Keep deriving
+  // their real commands locally after the hosted partition changes ownership.
+  const unitSteps = doc?.jobs?.unit?.steps ?? [];
+  const start = unitSteps.findIndex(step => step.id === 'source_guard_merge');
+  const end = unitSteps.findIndex(step => step.id === 'source_guard_proof');
+  if (jobId === JOB_ID && start >= 0 && end < start)
+    throw new Error('merged source guard transaction has no cleanup proof');
+  const steps =
+    jobId === JOB_ID && start >= 0
+      ? [...job.steps, ...unitSteps.slice(start, end + 1)]
+      : job.steps;
+  return steps.map((step, index) => {
     const name = step.name ?? step.id ?? `step ${index + 1}`;
     let skip = '';
     if (typeof step.run !== 'string') skip = 'uses an action (CI only)';
