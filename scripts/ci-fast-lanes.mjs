@@ -477,7 +477,8 @@ export const SOURCE_GUARDS = Object.freeze([
   Object.freeze({
     // Script contracts run only in the structural lane (merge groups); about
     // 37 group runs failed on them in the 7 days to 2026-10-12. Full lists
-    // for script/workflow/toolchain diffs, derived ones otherwise
+    // for workflow, toolchain, and non-test JS/TS under scripts/; derived
+    // ones otherwise, including non-JS files under scripts/
     // (scripts/lib/script-contract-affected.mjs). Resolved beside this module
     // because Source Validation loads guards from the trusted base archive.
     id: 'script-contracts',

@@ -423,20 +423,32 @@ jobs:
           TARGET_BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
-          [[ "$SOURCE_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          # bash 3.2 does not abort on a failing [[ ]] under set -e. macOS
+          # pre-push runs these contracts with /bin/bash; CI uses bash 4.
+          # Each gate exits itself so a mismatched head or a promisor remote
+          # cannot fall through to a successful fetch.
+          [[ "$SOURCE_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
           git check-ref-format "refs/heads/$TARGET_BASE_REF"
-          [[ "$(git rev-parse HEAD)" == "$SOURCE_HEAD_SHA" ]]
-          [[ -z "$(git config --get extensions.partialClone || true)" ]]
-          [[ "$(git config --bool --get remote.origin.promisor || true)" != true ]]
+          [[ "$(git rev-parse HEAD)" == "$SOURCE_HEAD_SHA" ]] || exit 1
+          [[ -z "$(git config --get extensions.partialClone || true)" ]] || exit 1
+          [[ "$(git config --bool --get remote.origin.promisor || true)" != true ]] || exit 1
           history_args=()
           if [[ "$(git rev-parse --is-shallow-repository)" == true ]]; then
             history_args+=(--unshallow)
           fi
-          git fetch --no-tags "${history_args[@]}" origin \
+          # bash 3.2 (macOS /bin/bash) with set -u treats an empty
+          # "${array[@]}" as unbound. CI's bash 4 accepts it. A deep history
+          # fetch with no --unshallow must work in both, or local pre-push
+          # fails a contract Linux never sees.
+          set -- --no-tags
+          if ((${#history_args[@]})); then
+            set -- "$@" "${history_args[@]}"
+          fi
+          git fetch "$@" origin \
             "+$SOURCE_HEAD_SHA:refs/remotes/origin/security-evidence-head" \
             "+refs/heads/$TARGET_BASE_REF:refs/remotes/origin/$TARGET_BASE_REF"
-          [[ "$(git rev-parse HEAD)" == "$SOURCE_HEAD_SHA" ]]
-          [[ "$(git rev-parse --is-shallow-repository)" == false ]]
+          [[ "$(git rev-parse HEAD)" == "$SOURCE_HEAD_SHA" ]] || exit 1
+          [[ "$(git rev-parse --is-shallow-repository)" == false ]] || exit 1
           git rev-list --objects --missing=error \
             "$SOURCE_HEAD_SHA" "refs/remotes/origin/$TARGET_BASE_REF" >/dev/null
       - &reused-setup

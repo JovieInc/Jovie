@@ -16,6 +16,33 @@ import { testsAffectedBy } from '../test-file-dependencies.mjs';
 
 const ROOT = join(import.meta.dirname, '../../..');
 
+test('a non-JS scripts path does not force the full contract lists', () => {
+  const root = mkdtempSync(join(tmpdir(), 'script-contract-affected-'));
+  const write = (path, body) => {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), body);
+  };
+  try {
+    write('scripts/unrelated.test.mjs', 'export {};\n');
+    const options = {
+      root,
+      node: ['scripts/unrelated.test.mjs'],
+      vitest: [],
+    };
+    for (const path of [
+      'scripts/lanes/lane_runner.py',
+      'scripts/tests/test_lane_runner.py',
+    ])
+      assert.deepEqual(selectScriptContracts([path], options), {
+        full: false,
+        node: [],
+        vitest: [],
+      });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('script, workflow and toolchain diffs run both full contract lists', () => {
   const node = ['scripts/lib/__tests__/script-contract-affected.test.mjs'];
   const vitest = ['scripts/lib/__tests__/ci-fast-lanes.test.mjs'];

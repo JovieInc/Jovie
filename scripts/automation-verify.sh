@@ -10,7 +10,12 @@ if ! RESOLVED_NODE_BIN="$(bash scripts/hooks/resolve-repo-node.sh)"; then
   exit 1
 fi
 if [[ -n "$RESOLVED_NODE_BIN" ]]; then
+  # Same as pre-push-gate.sh: pin node without replacing pnpm on PATH.
+  NODE_ONLY="$(mktemp -d "${TMPDIR:-/tmp}/jovie-node.XXXXXX")"
+  ln -s "$RESOLVED_NODE_BIN/node" "$NODE_ONLY/node"
+  trap 'rm -rf "$NODE_ONLY"' EXIT
   echo "[automation-verify] using repo-pinned Node at $RESOLVED_NODE_BIN (ambient: $(node --version 2>/dev/null || echo none))"
+  RESOLVED_NODE_BIN="$NODE_ONLY"
   export PATH="$RESOLVED_NODE_BIN:$PATH"
 fi
 

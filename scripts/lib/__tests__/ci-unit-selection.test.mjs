@@ -45,7 +45,9 @@ describe('selected web unit lane', () => {
     expect(`${result.stdout}\n${result.stderr}`).toContain(
       'No test files found'
     );
-  });
+    // Boots the real web runner. Suite budget is 60s; startup on a loaded
+    // pre-push host needs the longer bound. The status assertion stays.
+  }, 120_000);
 
   it('fails closed on missing or malformed evidence and selects a conservative fallback', () => {
     const task = {
