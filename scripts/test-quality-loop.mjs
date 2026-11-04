@@ -1,14 +1,18 @@
 #!/usr/bin/env node
 // Test-quality loop driver.
 //   node scripts/test-quality-loop.mjs rank [--out ranked.json] [--top 20]
-// Ranks apps/web modules by how high-touch they are (config/test-quality/surfaces.json
-// tier weight + git churn) so the mutation sweep expands from the top outward.
+// Ranks apps/web modules by how high-touch they are (tier weight + git churn)
+// so the mutation sweep expands from the top outward.
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { parseChurn, rankSurfaces } from './lib/test-quality-rank.mjs';
+import {
+  parseChurn,
+  rankSurfaces,
+  SURFACES_CONFIG_PATH,
+} from './lib/test-quality-rank.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { values, positionals } = parseArgs({
@@ -18,7 +22,7 @@ const { values, positionals } = parseArgs({
 
 if (positionals[0] === 'rank') {
   const config = JSON.parse(
-    readFileSync(join(repoRoot, 'config/test-quality/surfaces.json'), 'utf8')
+    readFileSync(join(repoRoot, SURFACES_CONFIG_PATH), 'utf8')
   );
   const log = spawnSync(
     'git',

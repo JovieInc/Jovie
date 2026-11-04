@@ -1,6 +1,9 @@
 // High-touch ranking for the test-quality loop: tier weight (revenue, auth,
 // golden path, traffic) plus git churn. Pure; the CLI feeds it git output.
 
+/** Repo-relative. scripts/ is already an operations lane; config/ is unmapped. */
+export const SURFACES_CONFIG_PATH = 'scripts/test-quality/surfaces.json';
+
 /**
  * @param {string} file path relative to apps/web
  * @param {{ tiers: { name: string, weight: number, prefixes: string[] }[] }} config
