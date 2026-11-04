@@ -5514,12 +5514,16 @@ class DispatchTest(unittest.TestCase):
 
     def test_escalation_reconcile_stays_hermetic_inside_the_release_selftest(self):
         """JOV-10343: the reconcile's one budgeted gh read must never run inside a release self-test.
-        Its only guard is the LANES_SELFTEST marker; this pins that guard even when a reconcile is
-        due, so the dispatch tick cannot spawn a second subprocess and refuse every release."""
+        LANES_SELFTEST is that guard. This sets the marker and drops the local-test backend so the
+        assertion pins the marker even when a reconcile is due."""
         # 21 context managers in one with exceed Python's 20-block limit.
         with contextlib.ExitStack() as stack:
             tmp = stack.enter_context(tempfile.TemporaryDirectory())
-            stack.enter_context(patch.dict(os.environ, {"SYMPHONY_AUTOSCALE": "off"}))
+            stack.enter_context(patch.dict(os.environ, {
+                "SYMPHONY_AUTOSCALE": "off",
+                "LANES_SELFTEST": "1",
+                "LANES_EXECUTION_BACKEND": "",
+            }))
             for target, name, kwargs in (
                 (lane.autoscale, "mode", {"return_value": "off"}),
                 (lane.disk_guard, "check", {"return_value": {"freePct": 50, "admitted": True}}),

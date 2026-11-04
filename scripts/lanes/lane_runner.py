@@ -10177,19 +10177,6 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 tick["boardIntake"] = board_intake.tick(host.state, Linear(host.linear_env))
             except (Exception, SystemExit) as error:  # the board never takes dispatch down
                 tick["boardIntakeError"] = f"{type(error).__name__}: {error}"[:200]
-        if not os.environ.get("LANES_SELFTEST") and escalation_reconcile.due(host.state):
-            try:
-                labeled = escalation_reconcile.fetch_labeled()
-                if labeled is not None:
-                    receipt = escalation_reconcile.reconcile(
-                        host.state, labeled, load_providers(),
-                        update_attempts=lambda change: update_json(host.state / "fix-attempts.json", change),
-                        remove_label=escalation_reconcile.remove_label_via(),
-                        slots=lambda name, default: host.slots(name, default))
-                    escalation_reconcile.stamp(host.state, receipt)
-                    tick["escalationReconcile"] = {k: (len(v) if isinstance(v, list) else v) for k, v in receipt.items()}
-            except (Exception, SystemExit) as error:  # a stale-escalation pass never takes dispatch down
-                tick["escalationReconcileError"] = f"{type(error).__name__}: {error}"[:200]
             try:  # measure the shared hosted-macOS pool (throttled); the LYB refill below reads it
                 tick["macosPool"] = macos_pool.sample(host.state)
             except (Exception, SystemExit) as error:  # a sampling fault never blocks dispatch
@@ -10207,6 +10194,23 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 tick["backlogDecompose"] = decompose_pass.maybe_spawn(host.state, [binding.key for binding in refill_for])
             except (Exception, SystemExit) as error:  # a refill fault never blocks dispatch
                 tick["backlogRefillError"] = f"{type(error).__name__}: {error}"[:200]
+        # A release self-test or local fixture never reads GitHub. fetch_labeled uses
+        # subprocess.run, and dispatch tests count that Popen as a worker spawn.
+        if (not os.environ.get("LANES_SELFTEST")
+                and os.environ.get("LANES_EXECUTION_BACKEND") != "local-test"
+                and escalation_reconcile.due(host.state)):
+            try:
+                labeled = escalation_reconcile.fetch_labeled()
+                if labeled is not None:
+                    receipt = escalation_reconcile.reconcile(
+                        host.state, labeled, load_providers(),
+                        update_attempts=lambda change: update_json(host.state / "fix-attempts.json", change),
+                        remove_label=escalation_reconcile.remove_label_via(),
+                        slots=lambda name, default: host.slots(name, default))
+                    escalation_reconcile.stamp(host.state, receipt)
+                    tick["escalationReconcile"] = {k: (len(v) if isinstance(v, list) else v) for k, v in receipt.items()}
+            except (Exception, SystemExit) as error:  # a stale-escalation pass never takes dispatch down
+                tick["escalationReconcileError"] = f"{type(error).__name__}: {error}"[:200]
         try:
             tick["linear"] = linear_sync.status(host.state)
         except Exception as error:
