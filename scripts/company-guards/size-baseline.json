@@ -1129,7 +1129,7 @@
   "scripts/lib/prod-cert.mjs": 518,
   "scripts/lib/product-lane-classifier.mjs": 1169,
   "scripts/lib/production-lane-range.mjs": 870,
-  "scripts/lib/remediation-signal.mjs": 599,
+  "scripts/lib/remediation-signal.mjs": 602,
   "scripts/lib/remediation-sweep.mjs": 650,
   "scripts/lib/rolling-ci-fx-finish.mjs": 621,
   "scripts/lib/rolling-ci-fx.mjs": 2230,
