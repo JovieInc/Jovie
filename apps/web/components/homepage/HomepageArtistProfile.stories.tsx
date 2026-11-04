@@ -15,7 +15,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'The homepage in five beats: the link, the loop (open, subscribe, release email), the list you own, the offer from offer truth, and the close. Every visual is a registry product shot.',
+          'General discovery, a profile preview, relationships, and one role-based waitlist. Product evidence reuses registered captures.',
       },
     },
   },
@@ -48,7 +48,6 @@ export const FullPage: Story = {
       <HomepageArtistHero />
       <HomepageLoop />
       <HomepageOwnership />
-      <HomepageOffer />
       <HomepageClose />
     </>
   ),

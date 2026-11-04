@@ -17,9 +17,6 @@
   "apps/eve-pilot/COMMERCIAL_GOVERNOR.md": {
     "recurring_price": 1
   },
-  "apps/web/app/(home)/page.tsx": {
-    "structured_offer_literal": 2
-  },
   "apps/web/app/(marketing)/card/JovieCardLanding.tsx": {
     "refund_guarantee_claim": 1
   },

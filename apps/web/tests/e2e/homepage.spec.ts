@@ -1,5 +1,4 @@
 import { HOMEPAGE_COPY } from '@/data/homepageCopy';
-import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 import { expect, test } from './setup';
 import { inspectRouteDom } from './utils/route-dom-detector';
 import { waitForHydration } from './utils/smoke-test-utils';
@@ -54,15 +53,14 @@ async function gotoHomepage(page: PlaywrightPage) {
   throw new Error('Homepage rendered a transient Next.js dev overlay');
 }
 
-// Artist-profile homepage (EVENT 2026-10-20): claim + live profile, three
-// real fan states, then the free offer and the same claim.
+// Approved 2026-11-02 general homepage: discovery, profile, relationships, role waitlist.
 test.describe('Homepage', () => {
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
     await gotoHomepage(page);
   });
 
-  test('renders the artist-profile hero with the jov.ie/ claim as the one primary action', async ({
+  test('renders the general identity promise with discovery and one invitation request', async ({
     page,
   }) => {
     const hero = page.getByTestId('marketing-section-hero');
@@ -70,75 +68,82 @@ test.describe('Homepage', () => {
       hero.getByRole('heading', { level: 1, name: HOMEPAGE_COPY.hero.headline })
     ).toBeVisible();
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
-
-    const cta = page.getByTestId('homepage-primary-cta');
-    await expect(cta).toBeVisible();
-    await expect(cta).toHaveText(HOMEPAGE_COPY.hero.claim.action);
-    await expect(page.getByTestId('homepage-claim-form')).toHaveAttribute(
-      'action',
-      '/start'
-    );
-    await expect(hero.getByText(HOMEPAGE_COPY.hero.supportNote)).toBeVisible();
-    // The proof is the real product: a registry shot cropped to the link,
-    // loaded eagerly as the LCP image.
-    const profile = hero
-      .getByTestId(`product-shot-${HOMEPAGE_COPY.hero.proofShot}`)
-      .getByRole('img');
-    await expect(profile).toBeVisible();
-    expect(
-      await profile.evaluate(image => (image as HTMLImageElement).naturalWidth)
-    ).toBeGreaterThan(0);
-    // Preserve main's visitor-focused claim: no founder card or retired search.
+    await expect(hero.getByText(HOMEPAGE_COPY.hero.subhead)).toBeVisible();
+    await expect(
+      hero.getByRole('textbox', { name: 'Search your name' })
+    ).toBeVisible();
+    await expect(
+      hero.getByRole('link', { name: HOMEPAGE_COPY.access.label })
+    ).toHaveAttribute('href', '#waitlist');
+    await expect(page.getByTestId('waitlist-role-form')).toHaveCount(1);
+    await expect(page.locator('form[action="/start"]')).toHaveCount(0);
     await expect(hero.getByText(/Tim White|Founder, Jovie/)).toHaveCount(0);
-    await expect(page.getByPlaceholder('Search your name')).toHaveCount(0);
-    await expect(page.getByText('Request access')).toHaveCount(0);
   });
 
-  test('claiming a handle hands off with the handle (/start, or /signup while waitlisted)', async ({
+  test('discovery uses public evidence and offers waitlist recovery for no result', async ({
     page,
   }) => {
-    await page.route('**/api/handle/**', route =>
+    await page.route('**/api/profile/search?**', route =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: '{"available":true}',
+        body: '{"profiles":[{"username":"example-fixture","name":"Example Fixture"}]}',
       })
     );
-    const startRequest = page.waitForRequest(
-      request =>
-        ['/start', '/signup'].includes(new URL(request.url()).pathname) &&
-        new URL(request.url()).searchParams.get('handle') === 'averyclaims',
-      { timeout: 15_000 }
+    await page
+      .getByRole('textbox', { name: 'Search your name' })
+      .fill('Example Fixture');
+    await page.getByRole('button', { name: 'Find me', exact: true }).click();
+    await expect(
+      page.getByRole('link', { name: /Example Fixture/ })
+    ).toHaveAttribute('href', '/example-fixture');
+    await page.route('**/api/profile/search?**', route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: '{"profiles":[]}',
+      })
     );
-    await page.locator('#homepage-claim-handle').fill('averyclaims');
-    await page.getByTestId('homepage-primary-cta').click();
-    await startRequest;
+    await page
+      .getByRole('textbox', { name: 'Search your name' })
+      .fill('Unknown Fixture');
+    await page.getByRole('button', { name: 'Find me', exact: true }).click();
+    await expect(
+      page.getByText(/No matching public profile yet/)
+    ).toBeVisible();
+    await expect(
+      page
+        .locator('search')
+        .getByRole('link', { name: HOMEPAGE_COPY.access.label })
+    ).toHaveAttribute('href', '#waitlist');
+    await expect(
+      page
+        .locator('search')
+        .getByRole('link', { name: HOMEPAGE_COPY.access.invite })
+    ).toHaveAttribute('href', '/signin');
   });
 
-  test('shows the loop as three cropped product shots without page overflow', async ({
+  test('loads readable product evidence at desktop and phone widths without overflow', async ({
     page,
   }) => {
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 900 });
-      const steps = page.getByTestId('homepage-loop-steps');
-      await steps.scrollIntoViewIfNeeded();
-      await expect(steps.getByRole('listitem')).toHaveCount(
-        HOMEPAGE_COPY.loop.steps.length
-      );
-      for (const step of HOMEPAGE_COPY.loop.steps) {
-        const shot = steps.getByTestId(`product-shot-${step.shot}`);
-        await shot.scrollIntoViewIfNeeded();
-        await expect(shot.getByRole('img')).toBeVisible();
-        await expect(
-          steps.getByText(step.title, { exact: true })
-        ).toBeVisible();
+      for (const image of await page.locator('main img:visible').all()) {
+        await image.scrollIntoViewIfNeeded();
+        await image.evaluate(async node => {
+          const image = node as HTMLImageElement;
+          await image.decode();
+          if (!image.naturalWidth) throw new Error('Product image failed');
+        });
       }
-      const overflow = await page.evaluate(
-        () =>
-          document.documentElement.scrollWidth -
-          document.documentElement.clientWidth
-      );
-      expect(overflow).toBeLessThanOrEqual(1);
+      await expect(
+        page.getByRole('heading', { level: 2, name: 'jov.ie/you' })
+      ).toBeVisible();
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth - innerWidth
+        )
+      ).toBeLessThanOrEqual(1);
       const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
       expect(
         snapshot.findings.filter(finding =>
@@ -148,7 +153,7 @@ test.describe('Homepage', () => {
     }
   });
 
-  test('mounts the link, loop, list, offer and close in order', async ({
+  test('mounts discovery, profile, relationships and the one role waitlist in order', async ({
     page,
   }) => {
     const headings = await page
@@ -158,18 +163,13 @@ test.describe('Homepage', () => {
       HOMEPAGE_COPY.hero.headline,
       HOMEPAGE_COPY.loop.headline,
       HOMEPAGE_COPY.ownership.headline,
-      HOMEPAGE_COPY.offer.headline,
       HOMEPAGE_COPY.close.headline,
     ]);
-    await expect(page.getByTestId('homepage-close-claim-cta')).toHaveText(
-      HOMEPAGE_COPY.hero.claim.action
+    await expect(page.getByRole('radio', { name: 'Myself' })).toHaveCount(1);
+    await expect(page.getByTestId('homepage-offer-summary-free')).toHaveCount(
+      0
     );
-    await expect(page.getByTestId('homepage-offer-summary-free')).toContainText(
-      '$0'
-    );
-    await expect(page.getByTestId('homepage-offer-summary-pro')).toContainText(
-      '/mo'
-    );
+    await expect(page.getByTestId('homepage-offer-summary-pro')).toHaveCount(0);
   });
 
   test('header is the canonical docked shell with the Customers flyout', async ({
@@ -194,10 +194,9 @@ test.describe('Homepage', () => {
       'href',
       '/signin'
     );
-    // The homepage never shows Request access; the header front door is /start.
     await expect(
-      header.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute('href', '/start');
+      header.getByRole('link', { name: HOMEPAGE_COPY.access.label })
+    ).toHaveAttribute('href', '#waitlist');
     await expect(
       header.getByRole('link', { name: 'Request access' })
     ).toHaveCount(0);
@@ -244,10 +243,12 @@ test.describe('Homepage', () => {
       for (const locator of [
         page.getByRole('heading', { level: 1 }),
         page.locator('#homepage-claim-handle'),
-        page.getByTestId('homepage-primary-cta'),
+        page
+          .getByTestId('marketing-section-hero')
+          .getByRole('link', { name: HOMEPAGE_COPY.access.label }),
       ]) {
-        await expect(locator).toBeInViewport();
         await locator.scrollIntoViewIfNeeded();
+        await expect(locator).toBeInViewport();
         const box = await locator.boundingBox();
         expect(box, 'element renders').not.toBeNull();
         expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
@@ -296,10 +297,10 @@ test.describe('Homepage', () => {
       const geometry = await page.evaluate(() => {
         const heading = document.querySelector('main h1');
         const container = document.querySelector(
-          '[data-testid="marketing-section-product-gallery"] .ap-section-container'
+          '[data-testid="marketing-section-how-it-works"] .ap-section-container'
         );
         if (!heading || !container) {
-          throw new Error('The hero and the product gallery must render');
+          throw new Error('The hero and the profile chapter must render');
         }
         return {
           headingLeft: heading.getBoundingClientRect().x,
@@ -389,113 +390,54 @@ test.describe('Homepage', () => {
     expect(errors).toEqual([]);
   });
 
-  /**
-   * JOV-6436: Public Get started CTAs land on same-origin /signup.
-   * /start remains the post-auth capture chat; /waitlist is the receipt.
-   */
-  test('all data-cta-sign-up elements navigate to signup (JOV-6436)', async ({
+  test('access actions reach the single role waitlist without an open signup claim', async ({
     page,
   }) => {
-    await gotoHomepage(page);
-
-    const ctaLinks = page.locator('[data-cta-sign-up="true"]');
-    const count = await ctaLinks.count();
-
-    // The homepage converts through the jov.ie/you claim (hero + close).
-    // Header sign-up anchors, when present, still land on /signup.
+    const hero = page.getByTestId('marketing-section-hero');
+    await hero.getByRole('link', { name: HOMEPAGE_COPY.access.label }).click();
+    await expect(page).toHaveURL(/#waitlist$/);
+    await expect(page.getByTestId('waitlist-role-form')).toBeInViewport();
     await expect(
       page.getByRole('button', { name: 'Claim', exact: true })
-    ).toHaveCount(2);
-
-    for (let i = 0; i < count; i += 1) {
-      const cta = ctaLinks.nth(i);
-      const tagName = await cta.evaluate(el => el.tagName.toLowerCase());
-
-      if (tagName === 'a') {
-        const href = await cta.getAttribute('href');
-        const isSignupRoute =
-          href === PUBLIC_WAITLIST_URL ||
-          href === '/signup' ||
-          (href?.startsWith('/signup?') ?? false);
-        expect(
-          isSignupRoute,
-          `CTA at index ${i} (href="${href}") must route to /signup`
-        ).toBe(true);
-      }
-    }
+    ).toHaveCount(0);
+    await expect(page.locator('main a[href="/signup"]')).toHaveCount(0);
   });
 });
 
-// User input must survive the transition from native SSR form to client owner.
-test.describe('Homepage claim readiness', () => {
-  for (const entry of ['fill', 'keyboard'] as const) {
-    test(`preserves server-entered handles through readiness (${entry})`, async ({
-      page,
-    }) => {
-      await page.setViewportSize({ width: 390, height: 844 });
-      await interceptAnalytics(page);
-      await page.route('**/api/journey/step', route =>
-        route.fulfill({ status: 200, body: '{}' })
-      );
-      await page.route('**/api/handle/check?**', route =>
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: '{"available":true}',
-        })
-      );
-      let releaseAssets = () => {};
-      const assetsReleased = new Promise<void>(resolve => {
-        releaseAssets = resolve;
-      });
-      await page.route('**/_next/static/**', async route => {
-        if (route.request().resourceType() === 'script') await assetsReleased;
-        await route.continue();
-      });
-      try {
-        await page.goto('/', {
-          waitUntil: 'commit',
-          timeout: HOMEPAGE_NAVIGATION_TIMEOUT,
-        });
-        const input = page.locator('#homepage-claim-handle');
-        await expect(input).toBeEditable();
-        const draft =
-          entry === 'fill' ? 'Jov6220EarlyFill' : 'jov6220earlykeys';
-        if (entry === 'fill') await input.fill(draft);
-        else await input.pressSequentially(draft);
-        await expect(input).toHaveValue(draft);
-        const normalized = draft.toLowerCase();
-        const availability = page.waitForResponse(response => {
-          const url = new URL(response.url());
-          return (
-            url.pathname === '/api/handle/check' &&
-            url.searchParams.get('handle') === normalized
-          );
-        });
-        releaseAssets();
-        expect((await availability).status()).toBe(200);
-        await expect(input).toHaveValue(normalized);
-        await expect(page.getByTestId('homepage-handle-status')).toContainText(
-          `@${normalized} is available`
-        );
-        const handoff = page.waitForRequest(request => {
-          const url = new URL(request.url());
-          return (
-            ['/start', '/signup'].includes(url.pathname) &&
-            url.searchParams.get('handle') === normalized
-          );
-        });
-        if (entry === 'fill')
-          await page.getByTestId('homepage-primary-cta').click();
-        else await input.press('Enter');
-        await handoff;
-      } finally {
-        releaseAssets();
-      }
-    });
-  }
+// Read-only discovery and invitation recovery replace the retired handle claim.
+test.describe('Homepage discovery recovery', () => {
+  test('keeps invitation recovery usable when discovery fails', async ({
+    page,
+  }) => {
+    await interceptAnalytics(page);
+    await page.route('**/api/profile/search?**', route =>
+      route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: '{"error":"Fixture unavailable"}',
+      })
+    );
+    await gotoHomepage(page);
+    await page
+      .getByRole('textbox', { name: 'Search your name' })
+      .fill('Example Fixture');
+    await page.getByRole('button', { name: 'Find me', exact: true }).click();
+    await expect(
+      page.getByText(/Search is unavailable right now/)
+    ).toBeVisible();
+    await expect(
+      page
+        .locator('search')
+        .getByRole('link', { name: HOMEPAGE_COPY.access.label })
+    ).toHaveAttribute('href', '#waitlist');
+    await expect(
+      page
+        .locator('search')
+        .getByRole('link', { name: HOMEPAGE_COPY.access.invite })
+    ).toHaveAttribute('href', '/signin');
+  });
 
-  test('preserves the native GET handle handoff without JavaScript', async ({
+  test('offers waitlist and invitation recovery without JavaScript', async ({
     browser,
     baseURL,
   }) => {
@@ -510,22 +452,17 @@ test.describe('Homepage claim readiness', () => {
         waitUntil: 'domcontentloaded',
         timeout: HOMEPAGE_NAVIGATION_TIMEOUT,
       });
-      const form = page.getByTestId('homepage-claim-form');
-      await expect(form).toHaveAttribute('action', '/start');
-      await expect(form).toHaveAttribute('method', 'get');
-      const input = page.locator('#homepage-claim-handle');
-      await expect(input).toHaveAttribute('name', 'handle');
-      await input.fill('jov6220native');
-      const handoff = page.waitForRequest(request => {
-        const url = new URL(request.url());
-        return (
-          request.method() === 'GET' &&
-          url.pathname === '/start' &&
-          url.searchParams.get('handle') === 'jov6220native'
-        );
-      });
-      await page.getByTestId('homepage-primary-cta').click();
-      await handoff;
+      await expect(
+        page
+          .locator('noscript')
+          .getByRole('link', { name: HOMEPAGE_COPY.access.label })
+      ).toHaveAttribute('href', '/waitlist');
+      await expect(
+        page
+          .locator('noscript')
+          .getByRole('link', { name: HOMEPAGE_COPY.access.invite })
+      ).toHaveAttribute('href', '/signin');
+      await expect(page.locator('form[action="/start"]')).toHaveCount(0);
     } finally {
       await context.close();
     }

@@ -92,7 +92,10 @@ describe('mounted homepage grid spine System B source contract', () => {
     );
     // The hero shares the section shell's container: one gutter, one width.
     const component = readFileSync(path.join(webRoot, componentPath), 'utf8');
-    expect(component).toContain('<HomepageHeroCanvas');
+    expect(component).toContain('<ArtistProfileSectionShell');
+    expect(component).toContain(
+      "containerClassName='homepage-discovery-hero__content'"
+    );
     expect(component).not.toContain('SHOW_HOMEPAGE_HERO_LIGHT');
     expect(css).not.toMatch(/--homepage-page-gutter|--ds-public-content-max/);
     for (const pattern of forbiddenSpineCssPatterns) {

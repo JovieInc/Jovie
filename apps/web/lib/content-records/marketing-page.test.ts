@@ -42,7 +42,6 @@ describe('marketing-page content kind', () => {
       'hero',
       'how-it-works',
       'feature-split',
-      'pricing',
       'cta',
     ]);
   });
@@ -54,9 +53,12 @@ describe('marketing-page content kind', () => {
     const hero = spec.sections[0];
     if (hero?.section !== 'hero') throw new Error('hero first');
     hero.copy.subhead = 'Smart links for your music.';
-    expect(errorsOf(spec)).toEqual([
-      expect.stringContaining('"music" is audience language'),
-    ]);
+    expect(errorsOf(spec)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('"music" is audience language'),
+        expect.stringContaining('approved discovery subhead'),
+      ])
+    );
   });
 
   it('rejects unknown records', () => {
@@ -65,6 +67,31 @@ describe('marketing-page content kind', () => {
       ok: false,
       errors: ['Unknown marketing-page key: pricing'],
     });
+  });
+
+  it('rejects stale home actions, music copy, and pricing even with current variants', () => {
+    const action = cleanSpec();
+    const hero = action.sections[0];
+    if (hero?.section !== 'hero') throw new Error('hero');
+    hero.copy.claimAction = 'Claim';
+    expect(errorsOf(action).join(' ')).toMatch(/role waitlist/);
+
+    const music = cleanSpec();
+    const relationship = music.sections.find(
+      section => section.section === 'feature-split'
+    );
+    if (relationship?.section !== 'feature-split')
+      throw new Error('relationship');
+    relationship.copy.body = 'Ready for the next release from Spotify.';
+    expect(errorsOf(music).join(' ')).toMatch(/retired music-specific/);
+
+    const pricing = cleanSpec();
+    pricing.sections.splice(3, 0, {
+      section: 'pricing',
+      variant: 'tier-cards-neutral',
+      copy: { headline: 'Compare plans.', plansLinkLabel: 'See plans' },
+    });
+    expect(errorsOf(pricing).join(' ')).toMatch(/does not place pricing/);
   });
 
   it('has no slot for the locked headline', () => {
@@ -109,8 +136,10 @@ describe('marketing-page content kind', () => {
 
     // A partial homepage (an older published record) falls back to default.
     const partial = cleanSpec();
-    partial.sections = partial.sections.filter(s => s.section !== 'pricing');
-    expect(errorsOf(partial).join(' ')).toMatch(/must place "pricing"/);
+    partial.sections = partial.sections.filter(
+      s => s.section !== 'feature-split'
+    );
+    expect(errorsOf(partial).join(' ')).toMatch(/must place "feature-split"/);
 
     const duplicate = cleanSpec();
     duplicate.sections.splice(1, 0, clone(duplicate.sections[1]!));
@@ -135,13 +164,16 @@ describe('marketing-page content kind', () => {
       status: 'running',
       variants: [{ id: 'sharper', weight: 50, body: variantBody }],
     };
-    expect(errorsOf(spec)).toEqual([
-      expect.stringContaining(
-        'experiment.variants[0].body[1].copy.headline: "fan"'
-      ),
-    ]);
+    expect(errorsOf(spec)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(
+          'experiment.variants[0].body[1].copy.headline: "fan"'
+        ),
+        expect.stringContaining('section two identifies jov.ie/you'),
+      ])
+    );
 
-    gallery.copy.headline = 'Every listen can become a subscriber.';
+    gallery.copy.headline = 'jov.ie/you';
     expect(errorsOf(spec)).toEqual([]);
   });
 

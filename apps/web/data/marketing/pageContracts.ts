@@ -50,8 +50,8 @@ export const MARKETING_PAGE_CONTRACTS = {
     url: APP_ROUTES.HOME,
     job: 'help visitors understand their public presence and start with their profile',
     proof: 'published profile and relationship examples',
-    successEvent: 'visitor starts the onboarding handoff',
-    primaryCta: START_CTA,
+    successEvent: 'visitor requests an invitation with their role',
+    primaryCta: { href: '/#waitlist', label: 'Join the waitlist' },
   },
   '(marketing)/new/page.tsx': {
     routeGlob: '(marketing)/new/page.tsx',

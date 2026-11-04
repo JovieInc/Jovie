@@ -281,9 +281,9 @@ const SECTION_RESOLUTIONS = {
         rootBinding: "sectionVariant='centered-none'",
       },
       {
-        variantId: 'split-claim-card',
+        variantId: 'left-none',
         componentPath: 'apps/web/components/homepage/HomepageArtistProfile.tsx',
-        rootBinding: "sectionVariant='split-claim-card'",
+        rootBinding: "sectionVariant='left-none'",
       },
       {
         variantId: 'left-none',
@@ -420,9 +420,9 @@ const SECTION_RESOLUTIONS = {
     ),
     occurrenceProofs: [
       {
-        variantId: '3-step-media',
+        variantId: 'split-setup',
         componentPath: 'apps/web/components/homepage/HomepageArtistProfile.tsx',
-        rootBinding: "sectionVariant='3-step-media'",
+        rootBinding: "sectionVariant='split-setup'",
       },
       {
         variantId: '3-step-strip',

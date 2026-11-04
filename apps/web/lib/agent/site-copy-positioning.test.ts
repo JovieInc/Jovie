@@ -72,17 +72,18 @@ describe('agent-facing site copy positioning (JOV-7638 follow-up)', () => {
     );
   });
 
-  it('leads the homepage markdown with the general identity, then the labeled artist offer', () => {
+  it('leads the homepage markdown with the general identity, then the approved profile and invitation path', () => {
     const body = buildHomepageMarkdown();
 
     expectCreatorPositioning(body);
     expect(body.startsWith(`# ${COMPANY_IDENTITY.headline}`)).toBe(true);
     expect(body).toContain(COMPANY_IDENTITY.definition);
-    expect(body).toContain('## Artist profiles');
+    expect(body).toContain(`## ${HOMEPAGE_COPY.hero.headline}`);
+    expect(body).toContain('https://jov.ie/#waitlist');
+    expect(body).toContain('https://jov.ie/signin');
     expect(body).toContain(HOMEPAGE_COPY.hero.subhead);
-    for (const item of HOMEPAGE_COPY.offer.included) {
-      expect(body).toContain(`- ${item.label}`);
-    }
+    expect(body).toContain(HOMEPAGE_COPY.loop.body);
+    expect(body).toContain(HOMEPAGE_COPY.ownership.body);
     expect(body).not.toContain('All your music');
     expect(body).not.toContain('Connect your music');
   });

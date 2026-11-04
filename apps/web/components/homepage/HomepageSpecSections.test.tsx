@@ -30,24 +30,28 @@ describe('HomepageSpecSections', () => {
     hero.copy.claimAction = 'Reserve';
     sectionOf(spec.sections, 'how-it-works').copy.headline = 'Spec loop.';
     sectionOf(spec.sections, 'feature-split').copy.body = 'Spec list body.';
-    sectionOf(spec.sections, 'pricing').copy.plansLinkLabel = 'See plans';
     sectionOf(spec.sections, 'cta').copy.headline = 'Spec close headline.';
 
     render(<HomepageSpecSections sections={spec.sections} />);
 
     expect(
-      screen.getByRole('heading', { level: 1, name: /be found/i })
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Control how the world sees you.',
+      })
     ).toBeTruthy();
     expect(screen.getByText('Spec subhead.')).toBeTruthy();
     expect(screen.getByText('Spec loop.')).toBeTruthy();
     expect(screen.getByText('Spec list body.')).toBeTruthy();
     expect(screen.getByText('Spec close headline.')).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'See plans' })).toBeTruthy();
-    // The closing claim mirrors the hero claim label.
-    expect(screen.getAllByRole('button', { name: 'Reserve' })).toHaveLength(2);
+    expect(screen.getByRole('link', { name: 'Reserve' })).toHaveAttribute(
+      'href',
+      '#waitlist'
+    );
+    expect(screen.getAllByTestId('waitlist-role-form')).toHaveLength(1);
   });
 
-  it('renders the five beats in spec order, each with its own heading', () => {
+  it('renders the four beats in spec order, each with its own heading', () => {
     const { container } = render(
       <HomepageSpecSections sections={DEFAULT_HOME_SPEC.sections} />
     );
@@ -58,7 +62,6 @@ describe('HomepageSpecSections', () => {
       'home-hero-heading',
       'homepage-loop-heading',
       'homepage-ownership-heading',
-      'homepage-offer-heading',
       'homepage-close-heading',
     ]);
   });

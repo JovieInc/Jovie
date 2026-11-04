@@ -19,11 +19,11 @@ import type { ContentKindDefinition } from './kind';
  * - Prices, plan names, and included features. Those come from offer truth
  *   and the entitlement registry (same price everywhere); copy slots reject
  *   currency and price-period text.
- * - Locked lines. The homepage headline is the company identity line
- *   (Tim, 2026-10-22) and has no slot.
+ * - Locked lines. The approved 2026-11-02 homepage headline has no slot;
+ *   home validation also preserves its discovery subhead and access action.
  */
 
-const MARKETING_PAGE_SPEC_SCHEMA_VERSION = 1;
+const MARKETING_PAGE_SPEC_SCHEMA_VERSION = 2;
 
 const line = (max: number) =>
   z
@@ -36,7 +36,7 @@ const line = (max: number) =>
 const HeroSection = z
   .object({
     section: z.literal('hero'),
-    variant: z.literal('split-claim-card'),
+    variant: z.literal('left-none'),
     copy: z
       .object({
         subhead: line(220),
@@ -49,7 +49,7 @@ const HeroSection = z
 const HowItWorksSection = z
   .object({
     section: z.literal('how-it-works'),
-    variant: z.literal('3-step-media'),
+    variant: z.literal('split-setup'),
     copy: z.object({ headline: line(90) }).strict(),
   })
   .strict();
@@ -110,7 +110,7 @@ const HOMEPAGE_SECTION_SOURCE =
 export const SPEC_SECTION_REGISTRY: readonly SpecSectionRegistryEntry[] = [
   {
     section: 'hero',
-    variant: 'split-claim-card',
+    variant: 'left-none',
     component: 'HomepageArtistHero',
     source: HOMEPAGE_SECTION_SOURCE,
     censusGroup: 'home',
@@ -118,7 +118,7 @@ export const SPEC_SECTION_REGISTRY: readonly SpecSectionRegistryEntry[] = [
   },
   {
     section: 'how-it-works',
-    variant: '3-step-media',
+    variant: 'split-setup',
     component: 'HomepageLoop',
     source: HOMEPAGE_SECTION_SOURCE,
     censusGroup: 'home',
@@ -176,7 +176,7 @@ export const MARKETING_PAGE_KEYS = ['home'] as const;
 export type MarketingPageKey = (typeof MARKETING_PAGE_KEYS)[number];
 
 /**
- * The code default: the five-beat homepage (Tim, 2026-11-01). A stored
+ * The code default: discovery, profile, relationships, and one waitlist (2026-11-02). A stored
  * spec must place every one of these sections (see `HOME_REQUIRED_SECTIONS`),
  * so an older published record falls back to this default instead of
  * rendering half a page.
@@ -185,7 +185,7 @@ export const DEFAULT_HOME_SPEC: MarketingPageSpec = {
   sections: [
     {
       section: 'hero',
-      variant: 'split-claim-card',
+      variant: 'left-none',
       copy: {
         subhead: HOMEPAGE_COPY.hero.subhead,
         claimAction: HOMEPAGE_COPY.hero.claim.action,
@@ -193,7 +193,7 @@ export const DEFAULT_HOME_SPEC: MarketingPageSpec = {
     },
     {
       section: 'how-it-works',
-      variant: '3-step-media',
+      variant: 'split-setup',
       copy: { headline: HOMEPAGE_COPY.loop.headline },
     },
     {
@@ -202,14 +202,6 @@ export const DEFAULT_HOME_SPEC: MarketingPageSpec = {
       copy: {
         headline: HOMEPAGE_COPY.ownership.headline,
         body: HOMEPAGE_COPY.ownership.body,
-      },
-    },
-    {
-      section: 'pricing',
-      variant: 'tier-cards-neutral',
-      copy: {
-        headline: HOMEPAGE_COPY.offer.headline,
-        plansLinkLabel: HOMEPAGE_COPY.offer.plansLink.label,
       },
     },
     {
@@ -291,6 +283,14 @@ function sectionsViolations(
           `${at}.copy.${slot}: "${icpTerm}" is audience language; general pages stay generic (MKT-D16)`
         );
       }
+      if (
+        generalPage &&
+        /\b(?:spotify|songs?|releases?|listeners?|catalog)\b/i.test(text)
+      ) {
+        errors.push(
+          `${at}.copy.${slot}: retired music-specific homepage copy is not part of the general identity brief`
+        );
+      }
       const lint = lintCopy(text, {
         register: 'jovie-marketing',
         headline: slot === 'headline',
@@ -301,6 +301,27 @@ function sectionsViolations(
     }
   });
   if (generalPage) {
+    const hero = sections.find(entry => entry.section === 'hero');
+    if (hero?.section === 'hero') {
+      if (hero.copy.subhead !== HOMEPAGE_COPY.hero.subhead) {
+        errors.push(
+          `${path}: the homepage keeps the approved discovery subhead`
+        );
+      }
+      if (hero.copy.claimAction !== HOMEPAGE_COPY.access.label) {
+        errors.push(`${path}: the homepage access action is the role waitlist`);
+      }
+    }
+    const profile = sections.find(entry => entry.section === 'how-it-works');
+    if (
+      profile?.section === 'how-it-works' &&
+      profile.copy.headline !== HOMEPAGE_COPY.loop.headline
+    ) {
+      errors.push(`${path}: section two identifies jov.ie/you`);
+    }
+    if (sections.some(entry => entry.section === 'pricing')) {
+      errors.push(`${path}: the closed-signup homepage does not place pricing`);
+    }
     for (const required of HOME_REQUIRED_SECTIONS) {
       if (!sections.some(entry => entry.section === required)) {
         errors.push(`${path}: the homepage must place "${required}"`);

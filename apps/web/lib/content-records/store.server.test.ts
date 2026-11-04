@@ -97,8 +97,12 @@ function invalidSpec() {
 
 function validSpec() {
   const spec = structuredClone(DEFAULT_HOME_SPEC);
-  const hero = spec.sections[0];
-  if (hero?.section === 'hero') hero.copy.subhead = 'A free profile for you.';
+  const relationship = spec.sections.find(
+    section => section.section === 'feature-split'
+  );
+  if (relationship?.section === 'feature-split')
+    relationship.copy.body =
+      'Keep your public links and relationships in reach.';
   return spec;
 }
 
@@ -151,6 +155,63 @@ describe('content record store', () => {
     expect(
       (await store.getLiveContent(MARKETING_PAGE_KIND, 'home')).source
     ).toBe('default');
+  });
+
+  it('falls back by validation for the actual retired homepage variants', async () => {
+    const legacy = structuredClone(DEFAULT_HOME_SPEC) as unknown as {
+      sections: {
+        section: string;
+        variant: string;
+        copy: Record<string, string>;
+      }[];
+    };
+    legacy.sections[0]!.variant = 'split-claim-card';
+    legacy.sections[0]!.copy.subhead =
+      'Smart links that turn listeners into subscribers. Jovie builds them from your Spotify name and emails your list when the next song is out.';
+    legacy.sections[0]!.copy.claimAction = 'Claim';
+    legacy.sections[1]!.variant = '3-step-media';
+    legacy.sections.splice(3, 0, {
+      section: 'pricing',
+      variant: 'tier-cards-neutral',
+      copy: {
+        headline: 'Collect for free. Send when you are ready.',
+        plansLinkLabel: 'Compare plans',
+      },
+    });
+    state.selectResults = [
+      [
+        {
+          versionId: 'retired-v1',
+          version: 1,
+          schemaVersion: 1,
+          data: legacy,
+          publishedAt: new Date(),
+        },
+      ],
+    ];
+    const live = await store.getLiveContent(MARKETING_PAGE_KIND, 'home');
+    expect(live).toMatchObject({ source: 'default', versionId: null });
+    expect(live.data).toBe(DEFAULT_HOME_SPEC);
+  });
+
+  it('falls back when shape-valid home data restores a claim conversion', async () => {
+    const stale = structuredClone(DEFAULT_HOME_SPEC);
+    const hero = stale.sections[0];
+    if (hero?.section !== 'hero') throw new Error('hero');
+    hero.copy.claimAction = 'Claim';
+    state.selectResults = [
+      [
+        {
+          versionId: 'stale-action',
+          version: 2,
+          data: stale,
+          publishedAt: new Date(),
+        },
+      ],
+    ];
+    expect((await store.getLiveContent(MARKETING_PAGE_KIND, 'home')).data).toBe(
+      DEFAULT_HOME_SPEC
+    );
   });
 
   it('refuses to store an invalid draft', async () => {

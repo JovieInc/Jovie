@@ -1,26 +1,22 @@
 // @coverage-via apps/web/tests/unit/home/homepage-contract.test.tsx
 import Link from 'next/link';
-import { ProductClaimHandleForm } from '@/app/(marketing)/product/ProductClaimHandleForm';
+import { WaitlistRoleForm } from '@/components/features/waitlist/WaitlistRoleForm';
 import { ArtistProfileSectionShell } from '@/components/marketing/artist-profile/ArtistProfileSectionShell';
 import { MarketingOfferSummary } from '@/components/marketing/MarketingOfferSummary';
+import { MarketingPhoneImage } from '@/components/marketing/MarketingPhoneImage';
 import { ProductShot } from '@/components/marketing/ProductShot';
 import { HOMEPAGE_COPY, type HomepageCopy } from '@/data/homepageCopy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
-import { HomepageHeroCanvas } from './hero-light/HomepageHeroCanvas';
+import { HomepageNameSearch } from './HomepageNameSearch';
+import { HomepageHeroLight } from './hero-light/HomepageHeroLight';
 import './HomepageArtistProfile.css';
 import './HomepageAtmosphere.css';
 
 const OWNER = 'apps/web/components/homepage/HomepageArtistProfile.tsx';
 
-/**
- * The homepage is one argument in five beats (Tim, 2026-11-01): the link,
- * the loop that turns a listen into a subscriber, the list you own, the
- * offer, and the close. Every visual is a registry product shot cropped to
- * one moment (lib/screenshots/product-shots.ts), never a full screen.
- * Copy slots come from the page spec; shots, prices, and inclusions stay in
- * code (`HOMEPAGE_COPY`, offer truth).
- */
+/** General identity discovery, one public profile, permissioned relationships,
+ * and one invitation request. Captures reuse shipped product components. */
 
 /** Hero: the locked headline, the loop in one line, the claim, the link. */
 export function HomepageArtistHero({
@@ -31,52 +27,82 @@ export function HomepageArtistHero({
   headingId?: string;
 }>) {
   return (
-    <HomepageHeroCanvas
-      headingId={headingId}
-      headline={copy.headline}
-      subhead={copy.subhead}
-      claim={copy.claim}
-      supportNote={copy.supportNote}
-      proofShot={HOMEPAGE_COPY.hero.proofShot}
+    <ArtistProfileSectionShell
+      className='homepage-discovery-hero'
+      containerClassName='homepage-discovery-hero__content'
+      sectionId='hero'
+      sectionVariant='left-none'
       sectionOwner={OWNER}
-      sectionVariant='split-claim-card'
-    />
+      penContractId={MARKETING_PEN_CONTRACT_IDS.section.hero}
+    >
+      <HomepageHeroLight animate={false} />
+      <div className='homepage-discovery-hero__lead'>
+        <h1
+          id={headingId}
+          className='marketing-type-display text-balance text-primary-token'
+        >
+          {copy.headline}
+        </h1>
+        <p className='marketing-type-lede text-pretty text-secondary-token homepage-discovery-hero__subhead'>
+          {copy.subhead}
+        </p>
+        <HomepageNameSearch />
+        <div className='homepage-discovery-hero__access'>
+          <Link
+            href={HOMEPAGE_COPY.access.href}
+            className='homepage-access-link focus-ring-themed'
+          >
+            {copy.claim.action}
+          </Link>
+          <Link
+            href={HOMEPAGE_COPY.access.inviteHref}
+            className='focus-ring-themed'
+          >
+            {HOMEPAGE_COPY.access.invite}
+          </Link>
+        </div>
+        <p className='homepage-discovery-hero__note text-secondary-token'>
+          {copy.supportNote}
+        </p>
+      </div>
+    </ArtistProfileSectionShell>
   );
 }
 
-/** The conversion loop: open, subscribe, the email on release day. */
+/** Section two: the existing template profile, cropped to its identity UI. */
 export function HomepageLoop({
   headline = HOMEPAGE_COPY.loop.headline,
 }: Readonly<{ headline?: string }>) {
   return (
     <ArtistProfileSectionShell
       className='homepage-artist-section'
+      containerClassName='homepage-profile__grid'
       sectionId='how-it-works'
-      sectionVariant='3-step-media'
+      sectionVariant='split-setup'
       sectionOwner={OWNER}
       penContractId={MARKETING_PEN_CONTRACT_IDS.section.howItWorks}
     >
-      <h2
-        id='homepage-loop-heading'
-        className='marketing-type-section text-balance text-primary-token homepage-artist-section__headline'
+      <div>
+        <h2
+          id='homepage-loop-heading'
+          className='marketing-type-section text-balance text-primary-token homepage-artist-section__headline'
+        >
+          {headline}
+        </h2>
+        <p className='marketing-type-lede text-pretty text-secondary-token homepage-ownership__body'>
+          {HOMEPAGE_COPY.loop.body}
+        </p>
+      </div>
+      <div
+        className='homepage-profile__preview'
+        data-testid='homepage-profile-preview'
       >
-        {headline}
-      </h2>
-      <ol className='homepage-loop__steps' data-testid='homepage-loop-steps'>
-        {HOMEPAGE_COPY.loop.steps.map(step => (
-          <li key={step.id} className='homepage-loop__step'>
-            <div className='homepage-loop__media'>
-              <ProductShot
-                id={step.shot}
-                staged
-                sizes='(min-width: 64rem) 22rem, 92vw'
-              />
-            </div>
-            <h3 className='homepage-loop__title text-balance'>{step.title}</h3>
-            <p className='homepage-loop__body text-pretty'>{step.body}</p>
-          </li>
-        ))}
-      </ol>
+        <MarketingPhoneImage
+          scenarioId={HOMEPAGE_COPY.loop.profileScenario}
+          altOverride={HOMEPAGE_COPY.loop.profileAlt}
+          sizes='(min-width: 64rem) 25rem, 90vw'
+        />
+      </div>
     </ArtistProfileSectionShell>
   );
 }
@@ -183,11 +209,11 @@ export function HomepageOffer({
   );
 }
 
-/** Close: start from your Spotify name, with the same claim as the hero. */
+/** One role-based waitlist; signup, verification, and submission stay owned
+ * by the canonical WaitlistRoleForm dependency. */
 export function HomepageClose({
   headline = HOMEPAGE_COPY.close.headline,
   subhead = HOMEPAGE_COPY.close.subhead,
-  claim = HOMEPAGE_COPY.hero.claim,
 }: Readonly<{
   headline?: string;
   subhead?: string;
@@ -195,7 +221,8 @@ export function HomepageClose({
 }>) {
   return (
     <ArtistProfileSectionShell
-      className='homepage-artist-section'
+      id='waitlist'
+      className='homepage-artist-section homepage-waitlist'
       containerClassName='homepage-close__grid'
       sectionId='cta'
       sectionVariant='final-single-claim'
@@ -212,30 +239,15 @@ export function HomepageClose({
         <p className='marketing-type-lede text-pretty text-secondary-token homepage-close__subhead'>
           {subhead}
         </p>
-        <div
-          className='homepage-close__claim'
-          data-testid='homepage-close-claim'
+        <Link
+          href={HOMEPAGE_COPY.access.inviteHref}
+          className='homepage-waitlist__invite focus-ring-themed'
         >
-          <ProductClaimHandleForm
-            domain={claim.domain}
-            placeholder={claim.placeholder}
-            submitLabel={claim.action}
-            inputId='homepage-close-claim-handle'
-            testIdPrefix='homepage-close'
-          />
-        </div>
+          {HOMEPAGE_COPY.access.invite}
+        </Link>
       </div>
-      <div className='homepage-close__media'>
-        <ProductShot
-          id={HOMEPAGE_COPY.close.shot}
-          className='homepage-shot--wide'
-          sizes='(min-width: 64rem) 30rem, 92vw'
-        />
-        <ProductShot
-          id={HOMEPAGE_COPY.close.phoneShot}
-          className='homepage-shot--phone'
-          sizes='92vw'
-        />
+      <div className='homepage-waitlist__form'>
+        <WaitlistRoleForm variant='general' headingLevel={3} />
       </div>
     </ArtistProfileSectionShell>
   );

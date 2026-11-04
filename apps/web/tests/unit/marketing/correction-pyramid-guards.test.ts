@@ -144,13 +144,13 @@ describe('correction pyramid guards', () => {
   it('keeps raw marketing JSX copy on the warn baseline', () => {
     const source = [
       '<h1>{copy.headline}</h1>',
-      '<p>Be found. Be understood.</p>',
+      '<p>Control how the world sees you.</p>',
       '<img alt="Tim White profile" />',
       '<button>Go</button>',
     ].join('\n');
     const hits = findRawJsxCopy(source);
     expect(hits.map(hit => hit.text)).toEqual([
-      'Be found. Be understood.',
+      'Control how the world sees you.',
       'Tim White profile',
     ]);
     expectWarnRatchet(scanRawJsx(repoRoot), jsxBaselinePath);
@@ -158,8 +158,10 @@ describe('correction pyramid guards', () => {
 
   it('locks the homepage H1 to the homepage copy module', () => {
     expect(HOMEPAGE_COPY.hero.headline).toBe(LOCKED_HOMEPAGE_H1);
-    expect(LOCKED_HOMEPAGE_H1).toBe('Be found. Be understood.');
-    expect(HOMEPAGE_COPY.seo.title).toBe('Jovie | Be found. Be understood.');
+    expect(LOCKED_HOMEPAGE_H1).toBe('Control how the world sees you.');
+    expect(HOMEPAGE_COPY.seo.title).toBe(
+      'Jovie | Control how the world sees you.'
+    );
     const hero = readFileSync(
       path.join(webRoot, 'components/homepage/HomepageArtistProfile.tsx'),
       'utf8'

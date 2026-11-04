@@ -2,10 +2,8 @@ import type { Metadata } from 'next';
 import { SignupFunnelBeacon } from '@/components/features/tracking/SignupFunnelBeacon';
 import { HomepageSpecSections } from '@/components/homepage/HomepageSpecSections';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
-import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { HOMEPAGE_COPY } from '@/data/homepageCopy';
-import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
@@ -117,43 +115,15 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-/**
- * The homepage JSON-LD speaks with the approved artist-profile launch
- * (JOV-8565): the WebSite and SoftwareApplication descriptions carry the
- * approved artist-profile landing-page copy, and billing claims come from
- * offer truth — the free-forever profile plus the self-serve monthly Pro
- * offer. Nothing here promises presence, monitoring, or unattended work as
- * live, and the SearchAction stays off until the route serves search.
- */
-const HOMEPAGE_LAUNCH_DESCRIPTION = ARTIST_PROFILE_COPY.seo.description;
-
-const HOMEPAGE_OFFERS = [
-  {
-    '@type': 'Offer' as const,
-    name: getPublicPriceClaim('free').displayName,
-    price: String(getPublicPriceClaim('free').priceUsd),
-    priceCurrency: 'USD',
-    description: getPublicPriceClaim('free').badge,
-    availability: 'https://schema.org/InStock',
-  },
-  {
-    '@type': 'Offer' as const,
-    name: getPublicPriceClaim('pro').displayName,
-    price: String(getPublicPriceClaim('pro').priceUsd),
-    priceCurrency: 'USD',
-    description: getPublicPriceClaim('pro').note,
-    availability: 'https://schema.org/InStock',
-  },
-];
-
+// Root structured data describes the general identity product. Closed signup
+// carries no in-stock billing offers or unsupported search-engine action.
 const WEBSITE_SCHEMA = buildWebsiteSchema({
   alternateName: [...COMPANY_IDENTITY.schemaAlternateNames],
-  description: HOMEPAGE_LAUNCH_DESCRIPTION,
+  description: COMPANY_IDENTITY.seoDescription,
 });
-
 const SOFTWARE_SCHEMA = buildSoftwareSchema(
-  HOMEPAGE_LAUNCH_DESCRIPTION,
-  HOMEPAGE_OFFERS
+  COMPANY_IDENTITY.seoDescription,
+  []
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
@@ -173,19 +143,8 @@ function HomePageShell({ children }: { readonly children: React.ReactNode }) {
   );
 }
 
-/**
- * The homepage sells the artist profile (EVENT 2026-10-20, Tim): the claim
- * and the live profile, three real fan states, then the free offer and the
- * same claim. The ORGANIZATION schema and page metadata keep the general
- * company identity; the WebSite and SoftwareApplication schemas speak with
- * the approved artist-profile launch (JOV-8565).
- *
- * Section order and copy slots come from the published `marketing-page/home`
- * content record, so copy changes go live without a code deploy. The page
- * stays static: the record is read at prerender and on publish-triggered
- * regeneration only (publish expires its cache tag), never per request, and
- * it falls back to the code default when nothing is published.
- */
+/** Published generic section records fall back to the current code default
+ * when their schema or complete homepage contract is no longer valid. */
 export default async function HomePage() {
   const spec = await getLiveContent(MARKETING_PAGE_KIND, 'home');
   return (

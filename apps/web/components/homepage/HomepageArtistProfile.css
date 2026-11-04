@@ -16,6 +16,143 @@
   max-width: 22ch;
 }
 
+/* The search is a utility; every access action reaches the one role form. */
+.homepage-discovery-hero {
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.homepage-discovery-hero__content {
+  position: relative;
+  z-index: 1;
+}
+
+.homepage-discovery-hero__lead {
+  max-width: 54rem;
+}
+
+.homepage-discovery-hero h1 {
+  max-width: 16ch;
+}
+
+.homepage-discovery-hero__subhead {
+  margin-top: var(--space-6);
+  max-width: 38ch;
+}
+
+.homepage-discovery {
+  margin-top: var(--space-8);
+  max-width: 30rem;
+}
+
+.homepage-discovery__result:empty {
+  display: none;
+}
+
+.homepage-discovery__result:not(:empty) {
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary-token);
+}
+
+.homepage-discovery__result li a {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-block: var(--space-3);
+  color: var(--color-text-primary-token);
+}
+
+.homepage-discovery-hero__access {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-5);
+  margin-top: var(--space-6);
+  font-size: var(--text-sm);
+}
+
+.homepage-access-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--space-11);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-full);
+  background: var(--color-text-primary-token);
+  color: var(--color-bg-base);
+  font-weight: var(--font-weight-medium);
+}
+
+.homepage-discovery-hero__note {
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.homepage-profile__grid {
+  display: grid;
+  align-items: center;
+  gap: var(--space-10);
+}
+
+/* Registry capture of the real template identity. The crop ends after the
+   social links and Get Updates, before the music example below the fold. */
+.homepage-profile__preview {
+  width: 100%;
+  max-width: 25rem;
+  aspect-ratio: 780 / 530;
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+}
+
+.homepage-profile__preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.homepage-waitlist {
+  scroll-margin-top: var(--public-shell-header-offset);
+}
+
+.homepage-waitlist__form {
+  width: 100%;
+  max-width: 28rem;
+  justify-self: center;
+}
+
+.homepage-waitlist__invite {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--space-11);
+  margin-top: var(--space-6);
+  font-size: var(--text-sm);
+}
+
+@media (min-width: 64rem) {
+  .homepage-discovery-hero__lead {
+    max-width: 64rem;
+  }
+
+  .homepage-discovery-hero h1 {
+    max-width: 26ch;
+  }
+
+  .homepage-discovery-hero__subhead {
+    max-width: 48ch;
+  }
+
+  .homepage-profile__grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-16);
+  }
+
+  .homepage-profile__preview {
+    justify-self: center;
+  }
+}
+
 /* ── Loop: three equal columns, shots on one baseline ───────────────────── */
 
 .homepage-loop__steps {
@@ -208,5 +345,12 @@
 
   .homepage-shot--phone {
     display: block;
+  }
+
+  /* Enlarge the real member rows instead of shrinking the full desktop
+     table into a phone. The window clips the less relevant right columns. */
+  .homepage-ownership__media .homepage-shot--phone .product-shot__image {
+    width: 180%;
+    max-width: none;
   }
 }

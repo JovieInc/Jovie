@@ -84,7 +84,7 @@ describe('section.pricing variant contract', () => {
     expect(homepagePricing).toContain("variant='tier-cards-recommended'");
   });
 
-  it('resolves pricing to neutral and keeps the offer beat on the homepage', () => {
+  it('resolves pricing to neutral and keeps pricing off the closed-signup homepage', () => {
     const sharedBrief = {
       businessObjective: 'Convert visitors to start',
       targetAudience: 'general' as const,
@@ -106,12 +106,10 @@ describe('section.pricing variant contract', () => {
         ?.variantId
     ).toBe('tier-cards-neutral');
     expect(homepage.recipeId).toBe('homepage');
-    // Tim 2026-11-01: the homepage states the offer truth (Free collects,
-    // Artist Presence sends). The shipped variant (neutral tier cards) is
-    // pinned by the route manifest and recipe-manifest tests.
+    // The approved general root asks for an invitation; pricing remains on /pricing.
     expect(
       homepage.sections.some(section => section.sectionId === 'pricing')
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('keeps the canonical section and pricing-recipe stories neutral', () => {

@@ -12,21 +12,7 @@ function toAbsolutePublicUrl(href: string): string {
   return `${BASE_URL}${href}`;
 }
 
-function renderFreeOffer(): string {
-  const { offer } = HOMEPAGE_COPY;
-  return [
-    `### ${offer.includedLabel}`,
-    '',
-    ...offer.included.map(item => `- ${item.label}`),
-  ].join('\n');
-}
-
-/**
- * Markdown representation of the public homepage for Accept: text/markdown.
- * Machine-readable identity stays general (company definition first); the
- * homepage's artist-profile offer follows as a labeled section. Visual-only
- * fan-moment copy is not projected here.
- */
+/** General root content and closed-signup recovery for text/markdown. */
 export function buildHomepageMarkdown(): string {
   const { hero } = HOMEPAGE_COPY;
 
@@ -34,13 +20,21 @@ export function buildHomepageMarkdown(): string {
 
 ${COMPANY_IDENTITY.definition}
 
-## Artist profiles
+## ${hero.headline}
 
 ${hero.subhead}
 
-${hero.claim.action} ${hero.claim.domain}${hero.claim.placeholder}: ${toAbsolutePublicUrl(APP_ROUTES.START)}
+${HOMEPAGE_COPY.access.label}: ${toAbsolutePublicUrl('/#waitlist')}
 
-${renderFreeOffer()}
+${HOMEPAGE_COPY.access.invite}: ${toAbsolutePublicUrl(HOMEPAGE_COPY.access.inviteHref)}
+
+## ${HOMEPAGE_COPY.loop.headline}
+
+${HOMEPAGE_COPY.loop.body}
+
+## ${HOMEPAGE_COPY.ownership.headline}
+
+${HOMEPAGE_COPY.ownership.body}
 
 ${buildSiteLlmsGuidance()}
 ## Recovery links

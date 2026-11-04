@@ -81,7 +81,6 @@ describe('semantic prior value requirements', () => {
       'hero',
       'how-it-works',
       'feature-split',
-      'pricing',
       'cta',
     ]);
     for (const [index, sectionId] of sectionIds.entries()) {

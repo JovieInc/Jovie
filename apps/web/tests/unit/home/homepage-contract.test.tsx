@@ -1,19 +1,14 @@
-// Homepage page contract (EVENT 2026-10-20, Tim: the homepage sells the
-// artist profile). One table-driven contract replaces the per-component
+// Homepage contract for the approved generic discovery brief (2026-11-02). One table-driven contract replaces the per-component
 // homepage locks: it renders the real `/` page module and checks the route
 // manifest, copy truth sources, the one primary action, product imagery, and
 // tokenized styles. Changing the page means changing its typed records, not
 // rewriting a dozen source-string guards.
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing';
 import { getMarketingRecipe } from '@/data/marketing/recipes';
-import {
-  formatPublicPriceDisplay,
-  getPublicPriceClaim,
-} from '@/lib/billing/offer-truth';
 import { PRICING_COMPARISON } from '@/lib/entitlements/registry';
 import { getEndUserPerfRouteById } from '@/scripts/performance-route-manifest';
 
@@ -88,6 +83,29 @@ const HOMEPAGE_STYLES = [
 ] as const;
 
 describe('homepage contract', { timeout: 60_000 }, () => {
+  it('serves the approved generic discovery brief with one role waitlist', async () => {
+    const { container } = await renderHomePage();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Control how the world sees you.'
+    );
+    expect(
+      screen.getByText(
+        'Find what the internet knows. Turn it into relationships.'
+      )
+    ).toBeVisible();
+    expect(
+      screen.getByRole('textbox', { name: 'Search your name' })
+    ).toBeVisible();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'jov.ie/you' })
+    ).toBeVisible();
+    expect(screen.getAllByTestId('waitlist-role-form')).toHaveLength(1);
+    expect(screen.getByRole('radio', { name: 'Myself' })).toBeVisible();
+    expect(container.querySelector('form[action="/start"]')).toBeNull();
+    expect(
+      container.querySelector('[data-testid="marketing-section-pricing"]')
+    ).toBeNull();
+  });
   beforeEach(() => {
     gate.WAITLIST_ENABLED = true;
   });
@@ -132,7 +150,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     expect(
       container.querySelector('[data-testid="homepage-hero-light"]')
     ).not.toBeNull();
-    expect(container.querySelector('.homepage-hero-canvas')).not.toBeNull();
+    expect(container.querySelector('.homepage-discovery-hero')).not.toBeNull();
     expect(container.querySelector('canvas')).toBeNull();
   });
 
@@ -148,36 +166,39 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     ).toEqual([
       HOMEPAGE_COPY.loop.headline,
       HOMEPAGE_COPY.ownership.headline,
-      HOMEPAGE_COPY.offer.headline,
       HOMEPAGE_COPY.close.headline,
     ]);
   });
 
   it.each([true, false])(
-    'keeps one primary action, the jov.ie/ claim into /start, with waitlist=%s',
+    'keeps signup closed and one canonical role form with legacy waitlist=%s',
     async waitlist => {
       gate.WAITLIST_ENABLED = waitlist;
       const { HOMEPAGE_COPY } = await loadCopy();
-      const { MARKETING_CTA_INTENTS } = await import(
-        '@/data/marketingCtaIntents'
-      );
       const { container } = await renderHomePage();
-
-      const forms = [...container.querySelectorAll('form')];
-      expect(forms).toHaveLength(2); // hero + terminal CTA, same action
-      for (const form of forms) {
-        expect(form).toHaveAttribute('action', '/start');
-        expect(
-          within(form).getByRole('button', {
-            name: HOMEPAGE_COPY.hero.claim.action,
-          })
-        ).toHaveAttribute('type', 'submit');
-      }
-      expect(screen.queryByText('Request access')).toBeNull();
-      expect(screen.getByText(HOMEPAGE_COPY.hero.supportNote)).toBeVisible();
-      expect(HOMEPAGE_COPY.hero.supportNote).toBe(
-        MARKETING_CTA_INTENTS.claimProfile.support
+      expect(container.querySelectorAll('form')).toHaveLength(2); // discovery + one invitation request
+      expect(screen.getAllByTestId('waitlist-role-form')).toHaveLength(1);
+      expect(
+        screen.getByRole('textbox', { name: 'Search your name' })
+      ).toBeVisible();
+      expect(screen.getByRole('button', { name: 'Find me' })).toHaveAttribute(
+        'type',
+        'submit'
       );
+      expect(screen.getByRole('button', { name: 'Join' })).toHaveAttribute(
+        'type',
+        'submit'
+      );
+      expect(
+        screen.getByRole('link', { name: HOMEPAGE_COPY.access.label })
+      ).toHaveAttribute('href', '#waitlist');
+      expect(container.querySelector('form[action="/start"]')).toBeNull();
+      expect(screen.getByText(HOMEPAGE_COPY.hero.supportNote)).toBeVisible();
+      expect(
+        screen
+          .getAllByRole('link', { name: HOMEPAGE_COPY.access.invite })
+          .every(link => link.getAttribute('href') === '/signin')
+      ).toBe(true);
     }
   );
 
@@ -190,24 +211,14 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     }
   });
 
-  it('states prices only through offer truth', async () => {
-    const { HOMEPAGE_COPY } = await loadCopy();
-    await renderHomePage();
-    for (const plan of [
-      HOMEPAGE_COPY.offer.plan,
-      HOMEPAGE_COPY.offer.paid.plan,
-    ]) {
-      const summary = screen.getByTestId(`homepage-offer-summary-${plan}`);
-      const claim = getPublicPriceClaim(plan);
-      expect(summary).toHaveAttribute('data-offer-plan', claim.plan);
-      expect(summary).toHaveTextContent(formatPublicPriceDisplay(claim));
-      expect(summary).toHaveTextContent(claim.badge);
-      // The plan name renders from offer truth too, never from copy.
-      expect(screen.getByRole('heading', { name: claim.displayName })).toBe(
-        summary.parentElement?.querySelector('h3')
-      );
-    }
-    // No source file on the page may type a price, plan name, or trial.
+  it('keeps billing offers off the closed-signup homepage', async () => {
+    const { container } = await renderHomePage();
+    expect(
+      container.querySelector('[data-testid="marketing-section-pricing"]')
+    ).toBeNull();
+    expect(container.textContent).not.toMatch(
+      /\$\s?\d|free forever|per month/i
+    );
     for (const path of HOMEPAGE_SOURCES) {
       expect(read(path), path).not.toMatch(
         /\$\s?\d|\d+\s?\/\s?mo\b|\bper month\b/i
@@ -239,7 +250,6 @@ describe('homepage contract', { timeout: 60_000 }, () => {
   });
 
   it('shows no person capture on the homepage (Tim, 2026-10-26)', async () => {
-    const { HOMEPAGE_COPY } = await loadCopy();
     const { container } = await renderHomePage();
     const images = [...container.querySelectorAll('main img, section img')];
     const sources = images.map(image => image.getAttribute('src') ?? '');
@@ -248,15 +258,14 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     // The hero crop starts at the handle, so no face is ever in frame.
     expect(sources.length).toBeGreaterThan(1);
     for (const source of sources) {
-      expect(source).toMatch(/^\/product-shots\/[a-z-]+\.webp\?v=\w+$/);
+      expect(source).toMatch(
+        /^\/(?:product-shots\/[a-z-]+\.webp|product-screenshots\/template-profile-live-phone\.png)\?v=\w+$/
+      );
     }
-    expect(sources[0]).toContain(`/${HOMEPAGE_COPY.hero.proofShot}.webp`);
-    const hero = container.querySelector(
-      '[data-testid="marketing-section-hero"]'
-    );
-    expect(hero?.querySelector('[data-testid="homepage-hero-proof"] img')).toBe(
-      images[0]
-    );
+    expect(sources[0]).toContain('/template-profile-live-phone.png');
+    expect(
+      container.querySelector('[data-testid="homepage-profile-preview"] img')
+    ).toBe(images[0]);
     // No person capture is wired anywhere in the homepage sources.
     for (const path of HOMEPAGE_SOURCES) {
       expect(read(path), path).not.toMatch(/tim-white|tim-profile/iu);
@@ -319,47 +328,21 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     expect(missing).toEqual([]);
   });
 
-  it('keeps the homepage JSON-LD on the approved artist-profile copy and canonical billing (JOV-8565)', async () => {
+  it('keeps structured data general and avoids in-stock offers during closed signup', async () => {
     const { container } = await renderHomePage();
-    const { ARTIST_PROFILE_COPY } = await import('@/data/artistProfileCopy');
+    const { COMPANY_IDENTITY } = await import('@/data/companyIdentity');
     const { BASE_URL } = await import('@/constants/app');
-
     const schemas = [
       ...container.querySelectorAll('script[type="application/ld+json"]'),
     ].map(script => JSON.parse(script.textContent ?? '{}'));
-    const website = schemas.find(s => s['@type'] === 'WebSite');
-    const software = schemas.find(s => s['@type'] === 'SoftwareApplication');
-
-    // The homepage WebSite schema speaks with the approved artist-profile
-    // landing-page copy, verbatim (JOV-8565) — not a hand-rolled line.
-    expect(website).toBeDefined();
-    expect(website.url).toBe(BASE_URL);
-    expect(website.description).toBe(ARTIST_PROFILE_COPY.seo.description);
-
-    // Billing claims come from offer truth: the free-forever profile and the
-    // self-serve monthly Pro offer. No hardcoded or stale prices.
-    const freeClaim = getPublicPriceClaim('free');
-    const proClaim = getPublicPriceClaim('pro');
-    const offers = software?.offers;
-    expect(Array.isArray(offers)).toBe(true);
-    expect(offers).toHaveLength(2);
-    expect(offers).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          price: String(freeClaim.priceUsd),
-          priceCurrency: 'USD',
-          availability: 'https://schema.org/InStock',
-        }),
-        expect.objectContaining({
-          price: String(proClaim.priceUsd),
-          priceCurrency: 'USD',
-          availability: 'https://schema.org/InStock',
-        }),
-      ])
+    const website = schemas.find(schema => schema['@type'] === 'WebSite');
+    const software = schemas.find(
+      schema => schema['@type'] === 'SoftwareApplication'
     );
-
-    // No fabricated social proof, and no speculative capability claims: the
-    // SearchAction stays off until the route serves search queries.
+    expect(website.url).toBe(BASE_URL);
+    expect(website.description).toBe(COMPANY_IDENTITY.seoDescription);
+    expect(software.description).toBe(COMPANY_IDENTITY.seoDescription);
+    expect(software.offers).toEqual([]);
     expect(software).not.toHaveProperty('aggregateRating');
     expect(website).not.toHaveProperty('potentialAction');
   });

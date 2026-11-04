@@ -1,76 +1,41 @@
 import { APP_ROUTES } from '@/constants/routes';
-import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
 
-/**
- * Homepage copy. The visible headline is locked to the company identity
- * line (Tim, 2026-10-22). The rest of the page still sells the artist
- * profile and its offer (EVENT 2026-10-20). Every visible line is either written here against
- * a shipped capability or reused from a claim-backed source:
- *
- * - This module stays light because the proxy imports it for the
- *   homepage markdown projection.
- * - Shot ids name registry product shots (lib/screenshots/product-shots.ts);
- *   no raw image paths.
- * - Price, badge, and plan note come from `offer-truth` only. Never type a
- *   price, plan name, or trial length into this file; add the offer to
- *   `lib/billing/offer-truth.ts` and read it here (JOV-8368 owns the paid
- *   artist-profile pilot).
- * - Free inclusions name `free: true` rows of the entitlement registry.
- *
- * The SEO description and structured data stay on `COMPANY_IDENTITY`
- * (general identity invariant). The title mirrors the visible headline.
+/** Approved general homepage brief (2026-11-02). Visible claims describe
+ * public discovery, profile links, and permissioned relationships only.
+ * Product evidence uses the existing screenshot registry, never invented UI.
+ * Legacy offer data remains for the existing isolated offer story; the root
+ * recipe does not mount a pricing section while public signup is closed.
  */
 
 export const HOMEPAGE_COPY = {
   seo: {
     // General enough for the company-identity invariant: no artist-only
     // definition in metadata. The description stays on COMPANY_IDENTITY.
-    title: 'Jovie | Be found. Be understood.',
+    title: 'Jovie | Control how the world sees you.',
   },
   hero: {
-    headline: 'Be found. Be understood.',
-    // The loop in one line (Tim, 2026-11-01): the smart link, the capture,
-    // the email on the next release. Builds from Spotify: entitlement
-    // `Auto-sync from Spotify`; release emails: `Release notifications`.
-    subhead:
-      'Smart links that turn listeners into subscribers. Jovie builds them from your Spotify name and emails your list when the next song is out.',
+    headline: 'Control how the world sees you.',
+    subhead: 'Find what the internet knows. Turn it into relationships.',
     claim: {
       domain: 'jov.ie/',
       placeholder: 'you',
-      action: 'Claim',
+      action: 'Join the waitlist',
     },
-    // Truthful under either waitlist state (shared CTA intent registry).
-    supportNote: MARKETING_CTA_INTENTS.claimProfile.support,
-    // Registry shot (lib/screenshots/product-shots.ts): the link from the
-    // handle down to the featured release. No face on `/` (Tim, 2026-10-26).
+    supportNote: 'Public signup is closed. Join the waitlist for an invite.',
+    // Retained for the standalone legacy canvas stories. The root uses the
+    // generic identity crop in section two instead of this release example.
     proofShot: 'home-profile-release',
   },
   loop: {
-    headline: 'Every listen can turn into a subscriber.',
-    steps: [
-      {
-        id: 'open',
-        title: 'The link opens their app',
-        body: 'One tap to Spotify, Apple Music, or YouTube Music. No menu of links to scan.',
-        shot: 'home-smart-link',
-      },
-      {
-        id: 'ask',
-        title: 'They ask for the next one',
-        body: 'Get Updates takes an email in one step, on every plan.',
-        shot: 'home-capture',
-      },
-      {
-        id: 'send',
-        title: 'Jovie writes on release day',
-        body: 'When the next song is out, everyone who asked gets it in their inbox.',
-        shot: 'home-release-email',
-      },
-    ],
+    headline: 'jov.ie/you',
+    body: 'One place for your public profile, the links that matter, and a way for people to keep in touch.',
+    profileScenario: 'template-profile-live-mobile',
+    profileAlt:
+      'Jovie profile preview with Your Name, jov.ie/you, social links, and Get Updates',
   },
   ownership: {
-    headline: 'The list is yours.',
-    body: 'Every email lands on your own list in Jovie, not a platform you rent, ready for the next release.',
+    headline: 'Keep the connection.',
+    body: 'When someone asks to hear from you, their email lands in your own list in Jovie. Keep your relationships in reach.',
     shot: 'home-subscriber-list',
     phoneShot: 'home-subscriber-list-phone',
   },
@@ -116,12 +81,16 @@ export const HOMEPAGE_COPY = {
     },
     plansLink: { label: 'Compare plans', href: APP_ROUTES.PRICING },
   },
+  access: {
+    label: 'Join the waitlist',
+    href: '#waitlist',
+    invite: 'Have an invite? Sign in',
+    inviteHref: '/signin',
+  },
   close: {
-    headline: 'Start from your Spotify name.',
+    headline: 'Make your presence your own.',
     subhead:
-      'Claim your name and search for yourself. Jovie imports your releases, old and new, and gives every one a smart link.',
-    shot: 'home-catalog',
-    phoneShot: 'home-catalog-phone',
+      'Tell us who you are and how you plan to use Jovie. We’ll email you when your invite is ready.',
   },
 } as const;
 
@@ -148,5 +117,6 @@ export interface HomepageCopy {
   readonly offer: Omit<CopyText<HomepageCopySource['offer']>, 'plan'> & {
     readonly plan: HomepageCopySource['offer']['plan'];
   };
+  readonly access: CopyText<HomepageCopySource['access']>;
   readonly close: CopyText<HomepageCopySource['close']>;
 }

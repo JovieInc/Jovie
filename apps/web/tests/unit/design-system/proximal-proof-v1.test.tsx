@@ -41,31 +41,29 @@ vi.mock('next/image', () => ({
 }));
 
 describe('JOV-INV-038 proximal-proof evaluator (homepage hero)', () => {
-  it('keeps the claim and its form in the hero section without a person capture', () => {
+  it('keeps read-only discovery beside the approved identity promise', () => {
     render(<HomepageArtistHero />);
-
     const hero = screen.getByTestId('marketing-section-hero');
-    const claim = screen.getByRole('heading', { level: 1 });
-    const form = within(hero).getByTestId('homepage-claim-form');
-
-    expect(hero.contains(claim)).toBe(true);
-    expect(hero.contains(form)).toBe(true);
+    expect(within(hero).getByRole('heading', { level: 1 })).toHaveTextContent(
+      HOMEPAGE_COPY.hero.headline
+    );
+    const input = within(hero).getByRole('textbox', {
+      name: 'Search your name',
+    });
+    expect(input.closest('form')).not.toHaveAttribute('action', '/start');
+    expect(within(hero).getByRole('button', { name: 'Find me' })).toBeVisible();
     expect(within(hero).queryByRole('img', { name: /Tim White/i })).toBeNull();
   });
 
-  it('binds the claim to /start and shows no unlabeled profile capture', () => {
+  it('offers the role waitlist and invitation recovery without claiming an account', () => {
     render(<HomepageArtistHero />);
-    const { claim } = HOMEPAGE_COPY.hero;
-    const form = screen.getByTestId('homepage-claim-form');
-
-    expect(form).toHaveAttribute('action', '/start');
-    expect(within(form).getByRole('textbox')).toHaveAttribute(
-      'placeholder',
-      claim.placeholder
-    );
     expect(
-      screen.queryByRole('img', { name: /Jovie artist profile/i })
-    ).toBeNull();
+      screen.getByRole('link', { name: HOMEPAGE_COPY.access.label })
+    ).toHaveAttribute('href', '#waitlist');
+    expect(
+      screen.getByRole('link', { name: HOMEPAGE_COPY.access.invite })
+    ).toHaveAttribute('href', '/signin');
+    expect(screen.getByText(HOMEPAGE_COPY.hero.supportNote)).toBeVisible();
     expect(
       screen.queryByText(/Claimed|Verified customer|Illustrative/i)
     ).toBeNull();

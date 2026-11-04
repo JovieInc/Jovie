@@ -163,18 +163,16 @@ export interface MarketingRecipe {
 
 export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
   // ── homepage (proven — reference: /) ─────────────────────────────────────
-  // EVENT 2026-10-20 (Tim): the homepage sells the artist profile. Company
-  // metadata and structured data stay general; the page body does not.
+  // Approved 2026-11-02 brief: generic identity discovery and a role waitlist.
   {
     id: 'homepage',
     label: 'Homepage',
     status: 'proven',
     referenceRoute: '/', // /new is a retired redirect, not a rendered reference
     audience: 'general',
-    // The link, the loop (open, subscribe, release email), the list you
-    // own, the offer, the close (Tim, 2026-11-01). Prices come from offer
-    // truth only; every visual is a registry product shot.
-    sectionOrder: ['hero', 'how-it-works', 'feature-split', 'pricing', 'cta'],
+    // Discovery, profile, relationships, invitation. Existing product captures
+    // supply proof; public signup stays closed.
+    sectionOrder: ['hero', 'how-it-works', 'feature-split', 'cta'],
     arc: [
       {
         beat: 'promise',
@@ -193,11 +191,6 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
       },
       {
         beat: 'action',
-        feeling: HOMEPAGE_COPY.offer.headline,
-        section: 'pricing',
-      },
-      {
-        beat: 'action',
         feeling: HOMEPAGE_COPY.close.headline,
         section: 'cta',
       },
@@ -206,7 +199,7 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
       oneBigIdea: HOMEPAGE_COPY.hero.subhead,
       seeFirst: 'hero',
       second: 'how-it-works',
-      third: 'pricing',
+      third: 'feature-split',
       emphasisBudget: {
         maxDisplayScaleMoments: 1,
         maxFullBleedBreaks: 1,
@@ -229,8 +222,7 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
       },
       {
         missing: 'a public paid artist-profile offer in offer truth',
-        fallback:
-          'state the free offer only and link to /pricing (JOV-8368 owns the paid pilot)',
+        fallback: 'keep the closed-signup role waitlist as the only conversion',
       },
     ],
     minContent: [
