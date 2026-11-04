@@ -34,6 +34,10 @@ const run = (overrides = {}) => ({
   display_title: 'Production Synthetic Monitoring (17 */6 * * *)',
   ...overrides,
 });
+/**
+ * @param {Array<ReturnType<typeof run>>} runs
+ * @param {Record<string, Array<ReturnType<typeof job>>>} [jobs]
+ */
 function githubFor(runs, jobs = { 100: [job()] }) {
   return {
     rest: vi.fn(async (_method, path) => ({
@@ -65,7 +69,7 @@ const trace = message => {
 trace('suite loaded');
 afterEach(context => {
   const { result } = context.task;
-  if (result?.status === 'fail') {
+  if (result?.state === 'fail') {
     trace(
       `FAILED ${context.task.name}: ${String(
         result.errors?.map(error => error.message).join(' || ') ?? ''
