@@ -4,6 +4,7 @@ import {
   isRateLimited,
   latencyByTool,
   parseMcpBody,
+  REQUIRED_OUTCOME_CHECKS,
 } from './cert-helpers';
 import { hashTools } from './hash';
 
@@ -28,7 +29,7 @@ export function normalizeBase(base: string): string {
   return trimmed.endsWith('/api/mcp') ? trimmed : `${trimmed}/api/mcp`;
 }
 
-/** Runs the live agent-path checks. Exit code: 1 on any FAIL, 75 when only rate limiting stopped it, else 0. */
+/** Exit 1 on FAIL or incomplete checks, 75 when rate limiting stopped the run. */
 export async function runCert(opts: CertOptions) {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const BASE = normalizeBase(opts.base);
@@ -266,10 +267,7 @@ export async function runCert(opts: CertOptions) {
       const prepStatus = str(findKey(prep.data, ['status']));
       record(
         'prepare_launch with release_url succeeds',
-        !prep.rejected &&
-          ['launch_draft_ready', 'draft_needs_input'].includes(
-            prepStatus ?? ''
-          ),
+        !prep.rejected && prepStatus === 'launch_draft_ready',
         { status: prepStatus },
         prep.ms
       );
@@ -288,7 +286,7 @@ export async function runCert(opts: CertOptions) {
       );
     } else skip('prepare_launch', 'no draft');
 
-    // Expected to FAIL until JOV-9760 returns a claim_url.
+    // HTTP status establishes reachability only, never a completed claim.
     if (claimUrl) {
       try {
         const res = await fetchImpl(claimUrl, {
@@ -311,6 +309,13 @@ export async function runCert(opts: CertOptions) {
         false,
         'no claim_url in create_draft or prepare_launch (JOV-9760)'
       );
+
+    // The current RPC probe has no authenticated claim, persisted profile/release/
+    // smart-link/attribution readback, or run-owned fixture cleanup. Keep that
+    // missing evidence explicit until the isolated claim harness supplies it.
+    // Do not turn a 200 error/sign-in page into an outcome receipt.
+    for (const check of REQUIRED_OUTCOME_CHECKS)
+      skip(check, 'not exercised by this RPC probe; see JOV-9760');
 
     if (!abortIfLimited()) {
       const empty = await call('artist.search_or_import', {
@@ -340,7 +345,8 @@ export async function runCert(opts: CertOptions) {
 
   const toolsListHash = await main();
   const failed = checks.some(c => c.status === 'FAIL');
-  const exitCode = failed ? 1 : rateLimited ? 75 : 0;
+  const complete = checks.length > 0 && checks.every(c => c.status === 'PASS');
+  const exitCode = failed ? 1 : rateLimited ? 75 : complete ? 0 : 1;
   const receipt = {
     run: RUN,
     base: BASE,

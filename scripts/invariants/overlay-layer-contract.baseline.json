@@ -10,7 +10,7 @@
     "packages/ui"
   ],
   "localStackingMax": 30,
-  "totalFindings": 73,
+  "totalFindings": 72,
   "files": {
     "apps/web/app/exp/component-checker/ComponentCheckerClient.tsx": {
       "z-50": 1
@@ -131,9 +131,6 @@
     },
     "apps/web/components/organisms/combobox/ComboboxDropdown.tsx": {
       "z-50": 1
-    },
-    "apps/web/components/organisms/CookieBannerSection.tsx": {
-      "z-[60]": 1
     },
     "apps/web/components/organisms/HeaderNav.tsx": {
       "zIndex:100": 1

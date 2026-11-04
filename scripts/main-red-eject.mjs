@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// api-budget: github-app-core 600/hr - estimate: 60 relevant wakes/hr x 10 REST reads/writes; manual apply is exceptional.
+// api-budget: github-app-graphql 300/hr - estimate: 60 relevant wakes/hr x 5 queue reads and actor-verified dequeue calls.
+// api-budget: github-actions-token 900/hr - estimate: 60 relevant wakes/hr x 15 substituted calls, never an additional polling loop.
 // Main-red ejection driver. A failing check must never stop the queue:
 // attribute the culprit, revert it through the compounding jump path, re-land it
 // as a repair PR, and free a conflicted queue head. See scripts/lib/main-red-eject.mjs.
@@ -21,10 +24,15 @@ import {
   checkKey,
   classifyEvidence,
   decideEject,
+  decideFailingHead,
   detectConsecutiveGroupFailure,
   detectStuckHead,
   FIX_RED_LABEL,
+  failingHeadComment,
+  failingRequiredChecks,
   failureSignature,
+  HEAD_STUCK_ALERT_MIN,
+  headDwell,
   INCIDENT_LABEL,
   INCIDENT_SCHEMA,
   MAX_LOOKBACK_COMMITS,
@@ -34,6 +42,7 @@ import {
   REOPEN_LABEL,
   REVERT_LABEL,
   readMarker,
+  shouldFailOver,
   titles,
   verifyJump,
 } from './lib/main-red-eject.mjs';
@@ -47,7 +56,19 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
  * @param {import('../packages/api-client/contract.ts').PriorityName} priority
  */
 async function gh(args, priority = 'repair') {
-  const r = await runGh(args, { priority });
+  let r = await runGh(args, { priority });
+  // The Jovie Bot installation shares one hourly budget with every other workflow
+  // (2026-10-31: exhausted for 5 h, queue head stuck). Fail over to the job's own
+  // GITHUB_TOKEN bucket instead of dying; the ledger keys buckets by credential.
+  if (r.code !== 0 && shouldFailOver(r, process.env.GH_FALLBACK_TOKEN)) {
+    console.error(
+      '::warning::github-app-quota-failover: Jovie Bot installation exhausted; retrying with GITHUB_TOKEN.'
+    );
+    r = await runGh(args, {
+      priority,
+      env: { ...process.env, GH_TOKEN: process.env.GH_FALLBACK_TOKEN },
+    });
+  }
   if (r.code !== 0)
     throw new Error(
       `gh ${args.slice(0, 3).join(' ')}: ${r.stderr.trim().slice(0, 300)}`
@@ -285,7 +306,7 @@ function commandProbe(cmd) {
 // ---- queue -----------------------------------------------------------------
 
 async function queueEntries() {
-  const q = `query($o:String!,$r:String!){repository(owner:$o,name:$r){mergeQueue(branch:"main"){entries(first:50){nodes{position state enqueuedAt pullRequest{number labels(first:30){nodes{name}}}}}}}}`;
+  const q = `query($o:String!,$r:String!){repository(owner:$o,name:$r){mergeQueue(branch:"main"){entries(first:50){nodes{position state enqueuedAt headCommit{oid} pullRequest{number labels(first:30){nodes{name}}}}}}}}`;
   const [o, r] = REPO.split('/');
   const out = JSON.parse(
     await gh(
@@ -296,6 +317,7 @@ async function queueEntries() {
   return (out.data.repository.mergeQueue?.entries.nodes ?? []).map(n => ({
     number: n.pullRequest.number,
     position: n.position,
+    sha: n.headCommit?.oid ?? null,
     state: n.state,
     enqueuedAt: n.enqueuedAt,
     compounding: n.pullRequest.labels.nodes.some(
@@ -304,9 +326,91 @@ async function queueEntries() {
   }));
 }
 
+const QUOTA_DEFERRED_CODE = 'dequeue_quota_deferred';
+
+/** A MergeQueueBackendError that is the installation bucket's rate-limit exhaustion. */
+function isInstallationQuotaExhaustion(error) {
+  return (
+    error?.name === 'MergeQueueBackendError' &&
+    error?.code === 'gh_command_failed' &&
+    /rate limit (already )?exceeded for installation ID \d+/i.test(
+      error.details?.stderr ?? ''
+    ) &&
+    shouldFailOver(
+      { code: 1, stderr: error.details?.stderr ?? '' },
+      process.env.GH_FALLBACK_TOKEN
+    )
+  );
+}
+
+/** Same contract as runGh's exit-75 defer: visible, retryable, not a verdict. */
+function quotaDeferredError(cause) {
+  const reason =
+    cause?.code === 'native_mutation_actor_unauthorized'
+      ? `fallback identity ${cause.details?.observedActor ?? 'unknown'} is not a trusted native queue mutation actor (mutation-actor check held)`
+      : `fallback token also exhausted: ${String(cause?.details?.stderr ?? cause?.message ?? '').slice(0, 160)}`;
+  return Object.assign(new Error(`Queue mutation deferred: ${reason}`), {
+    name: 'MergeQueueDeferError',
+    code: QUOTA_DEFERRED_CODE,
+    details: { cause: cause?.code ?? 'unknown_error' },
+  });
+}
+
 async function dequeue(number) {
+  // Only dequeuePullRequest is imported on the happy path: contract tests mock
+  // this module partially (main-red-eject-failing-head.test.mjs provides just
+  // dequeuePullRequest), and vitest fails closed on any other export access.
+  // createGhRunner is imported lazily inside the failover branch only.
   const { dequeuePullRequest } = await import('./merge-queue-backend.mjs');
-  return dequeuePullRequest({ backend: 'native', repository: REPO, number });
+  const attempt = runners =>
+    dequeuePullRequest({
+      backend: 'native',
+      repository: REPO,
+      number,
+      ...runners,
+    });
+  try {
+    return await attempt({});
+  } catch (error) {
+    // The gh()-wrapper failover above covers this script's own calls only;
+    // the backend spawns its own `gh` runners. When actor verification hits
+    // the exhausted installation bucket, retry on the fallback credential.
+    // Actor verification is the first backend call. Only retry there: a
+    // later failed read can follow a successful mutation, whose outcome must
+    // not be reported as an untouched, deferred dequeue.
+    if (
+      !isInstallationQuotaExhaustion(error) ||
+      !error.message.startsWith(
+        'verifying the native queue mutation actor failed'
+      )
+    )
+      throw error;
+    const fallback = process.env.GH_FALLBACK_TOKEN;
+    if (!fallback || fallback === process.env.GH_TOKEN) throw error;
+    console.error(
+      '::warning::github-app-quota-failover: Jovie Bot installation exhausted for the queue mutation; retrying actor verification with GITHUB_TOKEN.'
+    );
+    const { createGhRunner } = await import('./merge-queue-backend.mjs');
+    const runner = createGhRunner({
+      env: { ...process.env, GH_TOKEN: fallback },
+    });
+    try {
+      return await attempt({ runner, mutationRunner: runner });
+    } catch (fallbackError) {
+      // A refusal here is the mutation-actor safety check working, not a bug:
+      // GITHUB_TOKEN authenticates as github-actions[bot], which is not a
+      // trusted queue writer. Defer visibly instead of crashing.
+      if (
+        fallbackError?.code === 'native_mutation_actor_unauthorized' ||
+        (isInstallationQuotaExhaustion(fallbackError) &&
+          fallbackError.message.startsWith(
+            'verifying the native queue mutation actor failed'
+          ))
+      )
+        throw quotaDeferredError(fallbackError);
+      throw fallbackError;
+    }
+  }
 }
 
 /** Green Enroll is the only queue writer: dequeue first if already queued, then dispatch it. */
@@ -543,12 +647,70 @@ export async function reopen(revertPr) {
   return { reopened: true, pr: created.number };
 }
 
+// ---- failing head ----------------------------------------------------------
+
+async function mainCiGreen() {
+  const { workflow_runs } = await api(
+    `repos/${REPO}/actions/workflows/${CI_WORKFLOW}/runs?branch=main&event=push&per_page=1`,
+    'poll'
+  );
+  const latest = workflow_runs[0];
+  return latest?.status === 'completed' && latest.conclusion === 'success';
+}
+
+/** Dequeue a head whose merge group has a failed required check while main CI is green. */
+async function failingHead(head, doApply) {
+  if (!head.sha) return { failingHead: false };
+  const runs = [];
+  for (let page = 1; page <= 3; page += 1) {
+    const out = await api(
+      `repos/${REPO}/commits/${head.sha}/check-runs?per_page=100&page=${page}`,
+      'poll'
+    );
+    runs.push(...out.check_runs);
+    if (out.check_runs.length < 100) break;
+  }
+  const failing = failingRequiredChecks(runs);
+  if (!failing.length) return { failingHead: false };
+  const decision = decideFailingHead({
+    head: { ...head, position: 1 },
+    failing,
+    mainGreen: await mainCiGreen(),
+  });
+  if (!decision.dequeue || !doApply) return { failingHead: true, ...decision };
+  await dequeue(head.number);
+  // The dequeue is the fix; a failed comment must not undo or retry it.
+  await gh([
+    'api',
+    '-X',
+    'POST',
+    `repos/${REPO}/issues/${head.number}/comments`,
+    '-f',
+    `body=${failingHeadComment(head, failing)}`,
+  ]).catch(error =>
+    console.error(`::warning::failing-head comment failed: ${error.message}`)
+  );
+  return { failingHead: true, ...decision, dequeued: true };
+}
+
 // ---- stuck head ------------------------------------------------------------
 
 export async function stuckHead({ doApply = false, now = Date.now() } = {}) {
   const entries = await queueEntries();
   const head = entries.find(e => e.position === 1);
   if (!head) return { stuck: false };
+  // Stage metric (stable id = head PR): how long the queue head has sat at position 1.
+  const metric = headDwell(entries, now);
+  console.log(`stage-metric ${JSON.stringify(metric)}`);
+  if (doApply && metric.stuckMin > HEAD_STUCK_ALERT_MIN)
+    await incident(
+      `queue-head-stuck:${head.number}`,
+      `queue head #${head.number} stuck ${metric.stuckMin} min (${head.state})`,
+      `Queue head #${head.number} has been at position 1 for ${metric.stuckMin} min in state ${head.state} (alert threshold ${HEAD_STUCK_ALERT_MIN} min). Dequeue it if it is red.`
+    );
+  // Only an UNMERGEABLE head needs the first-sighting comment read: skip the call otherwise.
+  if (head.state !== 'UNMERGEABLE')
+    return { stuck: false, metric, ...(await failingHead(head, doApply)) };
   // First sighting is recorded on the PR (durable across runs); GitHub exposes no state-change time.
   const comments = await api(
     `repos/${REPO}/issues/${head.number}/comments?per_page=100`,
@@ -573,7 +735,36 @@ export async function stuckHead({ doApply = false, now = Date.now() } = {}) {
     return { ...verdict, recorded: true };
   }
   if (!verdict.stuck || !doApply) return verdict;
-  await dequeue(head.number);
+  let deferReason = null;
+  try {
+    await dequeue(head.number);
+  } catch (error) {
+    if (error?.code !== QUOTA_DEFERRED_CODE) throw error;
+    deferReason = error.message;
+  }
+  if (deferReason !== null) {
+    // Visible, honest deferred status (run 41227299023 crashed here): the
+    // mutation-actor check refused the fallback credential or both credential
+    // buckets are exhausted before a dequeue. The next ejector wake
+    // retries once quota heals (the first-sighting marker is already on the PR).
+    const note = `Queue head #${head.number} is UNMERGEABLE since ${verdict.since} but the dequeue is deferred — ${deferReason}. No dequeue or queue follow-up actions were performed (no labels, no conflict pass, no re-enqueue); incident reporting is attempted separately. The next ejector wake retries.`;
+    console.error(`::warning::queue-mutation-deferred: ${note}`);
+    await incident(
+      `unmergeable:${head.number}`,
+      `queue head #${head.number} UNMERGEABLE ${verdict.dwellMin} min (dequeue deferred)`,
+      note
+    ).catch(error =>
+      console.error(
+        `::warning::deferred dequeue incident failed: ${error.message}`
+      )
+    );
+    return {
+      ...verdict,
+      dequeued: false,
+      deferred: true,
+      reason: deferReason,
+    };
+  }
   await gh([
     'api',
     '-X',
@@ -588,7 +779,9 @@ export async function stuckHead({ doApply = false, now = Date.now() } = {}) {
       'run',
       'pr-remediation-swarm.yml',
       '-f',
-      `pr_numbers=${head.number}`,
+      // The swarm's workflow_dispatch input is `prs` (comma-separated); an
+      // undeclared input makes the dispatch fail with HTTP 422 (run 41122896980).
+      `prs=${head.number}`,
     ],
     'repair'
   );
@@ -610,6 +803,30 @@ export async function stuckHead({ doApply = false, now = Date.now() } = {}) {
     `Queue head #${head.number} was UNMERGEABLE since ${verdict.since}. Dequeued at ${dequeuedAt}, conflict pass dispatched, Green Enroll will re-enqueue.`
   );
   return { ...verdict, dequeued: true };
+}
+
+// ---- failure alert ---------------------------------------------------------
+
+/** The ejector must never fail silently: open/refresh an incident and ping Slack. */
+export async function alertFailure() {
+  const run = `https://github.com/${REPO}/actions/runs/${process.env.GITHUB_RUN_ID ?? ''}`;
+  const text = `Main Red Eject failed (${process.env.GITHUB_EVENT_NAME ?? 'unknown'}): ${run}. The queue head is not being watched until it recovers.`;
+  const out = { alerted: [] };
+  try {
+    await incident('ejector-failed', 'Main Red Eject workflow failing', text);
+    out.alerted.push('incident');
+  } catch (error) {
+    out.incidentError = String(error.message).slice(0, 200);
+  }
+  if (process.env.SLACK_WEBHOOK_URL) {
+    const res = await fetch(process.env.SLACK_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text }),
+    }).catch(() => null);
+    if (res?.ok) out.alerted.push('slack');
+  }
+  return out;
 }
 
 // ---- cli -------------------------------------------------------------------
@@ -637,6 +854,7 @@ if (process.argv[1] === import.meta.filename) {
     result = await stuckHead({
       doApply: values.apply === true && mode === 'apply',
     });
+  else if (cmd === 'alert-failure') result = await alertFailure();
   else throw new Error(`unknown command: ${cmd}`);
   const text = JSON.stringify(result, null, 2);
   if (values.out) writeFileSync(values.out, `${text}\n`);

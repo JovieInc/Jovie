@@ -254,6 +254,23 @@ export function normalizeKernelCertificationRow(
     href: resolveEvidenceHref(receipt.ref, packet.source),
   }));
 
+  // Golden-path runtime evidence (JOV-9625 outcome rework): preserve the
+  // production receipt's lifecycle state, per-surface browser counts and
+  // JPEG frame. Only golden-path projections carry the markers; every other
+  // packet leaves these fields absent.
+  const goldenPathDogfood = (packet.operational?.runtimeDogfood ?? []).find(
+    receipt => receipt.id.startsWith('prod-golden-path:')
+  );
+  const goldenPathStateMatch = goldenPathDogfood?.summary.match(
+    /\bstate=(certified|expired|missing)\b/
+  );
+  const goldenPathCountsMatch = goldenPathDogfood?.summary.match(
+    /\bconsoleErrors=(\d+); networkErrors=(\d+)\b/
+  );
+  const goldenPathScreenshot = packet.visualProof.find(receipt =>
+    receipt.id.startsWith('prod-golden-path-screenshot:')
+  );
+
   return {
     id: `${input.domain}:${packet.subject.id}`,
     domain: input.domain,
@@ -265,6 +282,28 @@ export function normalizeKernelCertificationRow(
       title: packet.subject.title,
     },
     state: admission.state,
+    ...(goldenPathDogfood
+      ? {
+          // Only a `state=` marker maps to a lifecycle state; blocked/failed
+          // receipts carry none, so the field stays absent rather than
+          // defaulting to 'missing' (JOV-9625 review rework).
+          ...(goldenPathStateMatch
+            ? {
+                goldenPathState: goldenPathStateMatch[1] as
+                  | 'certified'
+                  | 'expired'
+                  | 'missing',
+              }
+            : {}),
+          consoleErrorCount: goldenPathCountsMatch
+            ? Number(goldenPathCountsMatch[1])
+            : null,
+          networkErrorCount: goldenPathCountsMatch
+            ? Number(goldenPathCountsMatch[2])
+            : null,
+          screenshot: goldenPathScreenshot?.ref ?? null,
+        }
+      : {}),
     tiers,
     evidence,
     blockers: admission.blockers.map(blocker => ({

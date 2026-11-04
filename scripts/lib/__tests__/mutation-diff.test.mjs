@@ -279,12 +279,12 @@ describe('stryker.diff.config.mjs', () => {
 });
 
 describe('mutation-diff.yml', () => {
-  it('path-filters exactly the high-risk prefixes the CLI mutates', () => {
+  it('path-filters the high-risk prefixes plus the capacity.json re-arm', () => {
     const expected = HIGH_RISK_PREFIXES.map(prefix =>
       prefix.endsWith('/') ? `apps/web/${prefix}**` : `apps/web/${prefix}`
     ).sort();
-
-    expect([...workflow.on.push.paths].sort()).toEqual(expected);
+    expected.push('ops/registry/capacity.json');
+    expect([...workflow.on.push.paths].sort()).toEqual(expected.sort());
   });
 
   /**

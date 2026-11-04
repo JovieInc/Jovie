@@ -50,3 +50,20 @@ test('remoteHint fires only above 2x cores', () => {
   assert.equal(remoteHint({ load: 20, cores: 12, env: {} }), null);
   assert.equal(remoteHint({ load: 99, cores: 12, env: { CI: '1' } }), null);
 });
+
+test('remote script runs preflight inside the agent-preflight slice when installed', () => {
+  const s = buildRemoteScript({
+    slug: 'feat__x',
+    branch: 'feat/x',
+    sha: 'a'.repeat(40),
+    originUrl: 'git@github.com:JovieInc/Jovie.git',
+    slots: 2,
+    forward: [],
+    bodyB64: '',
+  });
+  assert.match(
+    s,
+    /agent-run" \] && RUN="\$HOME\/\.local\/bin\/agent-run preflight"/
+  );
+  assert.match(s, /timeout 45m nice -n 10 \$RUN pnpm preflight:changed/);
+});

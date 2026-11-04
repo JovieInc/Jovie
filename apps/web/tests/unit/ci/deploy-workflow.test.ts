@@ -1672,7 +1672,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verifyStep).toContain('EXPECTED_PRODUCTION_DEPLOYMENT_ID');
   });
 
-  it('measures production public-profile alias budgets as warning-only', () => {
+  it('blocks certified alias budgets beside post-deploy smoke', () => {
     const releaseWorkflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const controllerWorkflow = readFileSync(
       productionControllerWorkflowPath,
@@ -1690,26 +1690,30 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(aliasGate).toContain('setup-playwright');
     expect(aliasGate).toContain('--base-url https://jov.ie');
     expect(aliasGate).toContain('--runs 5');
-    // Post-promote production alias budgets must not fail the job on miss.
+    // The 2026-10-31 receipt graduated production alias budgets (14/14,
+    // JOV-8737), but a miss blocks only on routes whose golden-path surface
+    // holds a current certification in the Ovie ledger; the rest warn.
     expect(aliasGate).toContain('id: alias-perf');
+    expect(aliasGate).toContain('scripts/performance-budgets-guard.ts');
     expect(aliasGate).toContain(
-      'if ! pnpm exec tsx scripts/performance-budgets-guard.ts'
+      'https://jov.ie/api/internal/ovie/golden-path-evidence'
+    );
+    expect(aliasGate).toContain('scripts/lib/alias-gate-certified-routes.mjs');
+    expect(aliasGate).toMatch(
+      /if ! guard \$blocking; then[\s\S]*?echo "performance_status=failed" >> "\$GITHUB_OUTPUT"\s+exit 1\s+fi/
+    );
+    expect(aliasGate).toMatch(
+      /if ! guard \$warning; then[\s\S]*?::warning::[\s\S]*?status=warn\s+fi/
     );
     expect(aliasGate).toContain(
-      'echo "performance_status=warn" >> "$GITHUB_OUTPUT"'
+      'echo "performance_status=${status}" >> "$GITHUB_OUTPUT"'
     );
-    expect(aliasGate).toContain(
-      'echo "performance_status=passed" >> "$GITHUB_OUTPUT"'
-    );
-    expect(aliasGate).toContain('::warning::');
+    expect(aliasGate).toContain('::error::');
     expect(aliasGate).toContain(
       'performance_status: ${{ steps.alias-perf.outputs.performance_status }}'
     );
-    expect(aliasGate).not.toContain('fail_performance_gate');
     expect(aliasGate).not.toContain('continue-on-error: true');
-    expect(aliasGate).not.toMatch(
-      /if ! pnpm exec tsx scripts\/performance-budgets-guard\.ts[\s\S]*?exit 1/
-    );
+    expect(aliasGate).toContain('args+=(--route-id "$route")');
     const promoteJob = getJobBlock(releaseWorkflow, 'promote-production');
     const stagedPerformanceGate = getStepBlock(
       promoteJob,
@@ -1717,21 +1721,22 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     );
     expect(stagedPerformanceGate).toContain('--base-url "$deployment_url"');
     const stagedPublicProfileGate = stagedPerformanceGate.slice(
-      stagedPerformanceGate.lastIndexOf(
-        'if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts'
-      )
+      stagedPerformanceGate.indexOf('public_profile_budget_lane() {'),
+      stagedPerformanceGate.indexOf('entry_route_lighthouse_lane() {')
     );
-    // JOV-8338 graduated the exact staged-build budget independently
-    // (2026-10-21 receipt: staging 14/14 qualifying), so it fails closed with
-    // the exact-build failure subtype. Production canonical-alias budgets
-    // above stay warning-only (11/14, streak 0/14) until their own receipt
-    // graduates.
+    // JOV-8338 graduated the exact staged-build budget (staging 14/14). Like
+    // the post-promotion gate (#24006, Tim 2026-10-31), it blocks only routes
+    // whose golden-path surface is certified in the Ovie ledger; uncertified
+    // routes warn and file one Linear perf ticket.
     expect(stagedPublicProfileGate).toContain(
-      'fail_performance_gate "Exact staged-build public-profile alias budgets failed."'
+      'scripts/lib/alias-gate-certified-routes.mjs'
     );
+    expect(stagedPublicProfileGate).toMatch(
+      /if ! staged_alias_guard \$blocking; then\s+fail_performance_gate "Exact staged-build public-profile alias budgets failed on certified pages/
+    );
+    expect(stagedPublicProfileGate).toContain('staged-alias-perf-intake.mjs');
+    expect(stagedPublicProfileGate).toContain('--base-url "$deployment_url"');
     expect(stagedPublicProfileGate).not.toContain('continue-on-error: true');
-    expect(stagedPublicProfileGate).not.toContain('performance_status=warn');
-    expect(stagedPublicProfileGate).not.toContain('::warning::');
     for (const routeId of [
       'public-profile-listen',
       'public-profile-music',
@@ -1740,10 +1745,12 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'public-profile-tour',
       'public-profile-releases',
     ]) {
-      expect(aliasGate).toContain(`--route-id ${routeId}`);
+      // Routes are split into certified (blocking) and uncertified (warning)
+      // sets by scripts/lib/alias-gate-certified-routes.mjs before the guard.
+      expect(aliasGate).toMatch(new RegExp(`routes='[^']*\\b${routeId}\\b`));
     }
-    // Job success still blocks Production Verified. A budget miss only warns,
-    // and the gate is no longer an input to the release result.
+    // The gate runs beside smoke and still blocks Production Verified.
+    // It is not an input to the release result.
     expect(verified).toContain('production-public-profile-alias-gate,');
     expect(verified).toContain(
       'Public-profile alias gate:${{ needs.production-public-profile-alias-gate.result }}'
@@ -2206,6 +2213,9 @@ describe('canary health gate workflow', () => {
   });
 
   // Execute the production Bash, including privacy checks after identity passes.
+  // Local test:fast times out at 5s. CI allows 12s for this config. One
+  // identity case took 949ms alone and crossed 5s while the hook host was
+  // loaded. Use the CI budget. Status and request counts stay fail-closed.
   it.each([
     ['exact', 0, 1],
     ['sha-converges', 0, 2],
@@ -2483,7 +2493,8 @@ esac
       } finally {
         rmSync(root, { force: true, recursive: true });
       }
-    }
+    },
+    12_000
   );
 
   it('retries a safe OAuth test failure with clean artifacts and shared guard state', () => {
@@ -5718,7 +5729,7 @@ describe('full matrix authenticated release fixtures', () => {
     );
     expect(seedStep).toContain("E2E_USE_TEST_AUTH_BYPASS: '1'");
     expect(seedStep).toContain(
-      "github.event_name == 'push' || github.event.inputs.test_filter == ''"
+      "github.event_name == 'repository_dispatch' || github.event.inputs.test_filter == ''"
     );
     const seedIndex = job.indexOf(
       '- name: Seed authenticated release fixtures'
