@@ -1537,7 +1537,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - repository_dispatch
+      - push
       - workflow_dispatch
     terminalReceipt: job:report-scheduled-failure
     jobCount: 3
