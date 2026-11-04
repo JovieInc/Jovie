@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Input, Label, NativeSelect, Textarea } from '@jovie/ui';
+import { Checkbox } from '@jovie/ui/atoms/checkbox';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
@@ -272,11 +273,16 @@ export function SettingsRiderSection({
               autoComplete='new-password'
             />
             {meta.hasPassword ? (
-              <label className='flex items-center gap-2 text-app text-secondary-token'>
-                <input
-                  type='checkbox'
+              <label
+                htmlFor='remove-rider-password'
+                className='flex items-center gap-2 text-app text-secondary-token'
+              >
+                <Checkbox
+                  id='remove-rider-password'
                   checked={clearPassword}
-                  onChange={e => setClearPassword(e.target.checked)}
+                  onCheckedChange={checked =>
+                    setClearPassword(checked === true)
+                  }
                 />
                 Remove password protection
               </label>

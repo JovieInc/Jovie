@@ -31,9 +31,22 @@ vi.mock('@/features/profile/ProfileDrawerShell', () => ({
 }));
 
 vi.mock('@/features/release/SmartLinkShell', () => ({
-  SmartLinkShell: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
+  SmartLinkShell: ({
+    children,
+    heroMeta,
+  }: {
+    children: ReactNode;
+    heroMeta?: ReactNode;
+  }) => (
+    <div>
+      <div data-testid='hero-meta'>{heroMeta}</div>
+      {children}
+    </div>
   ),
+  SMART_LINK_HERO_TITLE_CLASS:
+    'text-2xl font-semibold leading-8 tracking-tight text-(--color-text-tooltip)',
+  SMART_LINK_HERO_ARTIST_CLASS:
+    'mt-1 block text-sm font-book leading-5 text-muted-foreground transition-colors duration-subtle hover:text-foreground',
 }));
 
 vi.mock('@/features/share/PublicShareMenu', () => ({
@@ -65,5 +78,16 @@ describe('VideoReleasePage', () => {
       'href',
       `/report?type=smart_link&target=${encodeURIComponent('/test-artist/video-slug')}`
     );
+
+    const title = screen.getByRole('heading', { name: 'Video' });
+    expect(title.tagName).toBe('H1');
+    expect(title.className).toContain('text-2xl');
+    expect(title.className).not.toContain('text-shadow');
+    const artist = screen.getByRole('link', { name: 'Test Artist' });
+    expect(artist).toHaveAttribute('href', '/test-artist');
+    expect(artist.className).not.toContain('text-shadow');
+    const hero = screen.getByTestId('hero-meta');
+    expect(hero).toContainElement(title);
+    expect(hero).toContainElement(artist);
   });
 });

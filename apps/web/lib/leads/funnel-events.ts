@@ -278,7 +278,7 @@ export async function lookupLeadByClaimToken(token: string): Promise<{
     .from(leads)
     .where(
       and(
-        or(eq(leads.claimToken, token), eq(leads.claimTokenHash, tokenHash)),
+        eq(leads.claimTokenHash, tokenHash),
         or(
           isNull(leads.claimTokenExpiresAt),
           gt(leads.claimTokenExpiresAt, now)

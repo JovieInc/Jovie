@@ -20,7 +20,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const DEFAULT_HOST = 'gem';
-export const DEFAULT_SLOTS = 4;
+// ponytail: 2 slots — Gem hit load 63/16 cores with 4 (2026-10-29); raise when lanes move off Gem.
+export const DEFAULT_SLOTS = 2;
 
 /** Filesystem-safe worktree name for a branch. */
 export function branchSlug(branch) {
@@ -115,7 +116,7 @@ body_args=()
 ${bodyB64 ? `mkdir -p "$ROOT/.bodies"; printf %s ${q(bodyB64)} | base64 -d > "$ROOT/.bodies/${slug}.md"; body_args=(--body-file "$ROOT/.bodies/${slug}.md")` : ''}
 echo "[preflight:remote] ${slug} @ ${sha.slice(0, 9)} slot $slot setup $(( $(date +%s) - t0 ))s" >&2
 set +e
-timeout 45m pnpm preflight:changed ${fwd} "\${body_args[@]}"
+timeout 45m nice -n 10 pnpm preflight:changed ${fwd} "\${body_args[@]}"
 rc=$?
 echo "[preflight:remote] exit $rc total $(( $(date +%s) - t0 ))s" >&2
 exit $rc

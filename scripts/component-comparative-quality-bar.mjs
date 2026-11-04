@@ -6,7 +6,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REPO_ROOT } from './component-ship-policy.mjs';
@@ -72,6 +72,29 @@ const CONTRACT_BY_FIXTURE_ID = new Map(
 );
 const REGISTRY_SOURCE_PATH =
   'scripts/lib/component-comparative-quality-bar-registry.mjs';
+
+/** Regenerate only the derived denominator after reviewing component path changes. */
+export function writeAtomMoleculeInventoryRatchet(repoRoot = REPO_ROOT) {
+  const registryPath = join(repoRoot, REGISTRY_SOURCE_PATH);
+  const source = readFileSync(registryPath, 'utf8');
+  const section =
+    /export const ATOM_MOLECULE_INVENTORY_RATCHET = deepFreeze\(\[[\s\S]*?\]\);/g;
+  if ([...source.matchAll(section)].length !== 1) {
+    throw new Error(
+      'expected exactly one inventory ratchet; no changes written'
+    );
+  }
+  const proposed = proposeAtomMoleculeInventoryRatchet(repoRoot);
+  const rows = proposed.map(
+    row =>
+      `  {\n    root: '${row.root}',\n    total: ${row.total},\n    sourceSetSha256:\n      '${row.sourceSetSha256}',\n  },`
+  );
+  const generated = `export const ATOM_MOLECULE_INVENTORY_RATCHET = deepFreeze([\n${rows.join('\n')}\n]);`;
+  const updated = source.replace(section, generated);
+  if (updated !== source) writeFileSync(registryPath, updated);
+  return proposed;
+}
+
 const TRUSTED_BASE_CACHE = new Map();
 const TRUSTED_REGISTRY_READER = `
 let source = '';
@@ -679,6 +702,8 @@ export function runComparativeQualityBar(options = {}) {
 const isMain =
   typeof process.argv[1] === 'string' &&
   resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isMain && process.argv.includes('--print-inventory-ratchet')) {
+if (isMain && process.argv.includes('--write-inventory-ratchet')) {
+  console.log(JSON.stringify(writeAtomMoleculeInventoryRatchet(), null, 2));
+} else if (isMain && process.argv.includes('--print-inventory-ratchet')) {
   console.log(JSON.stringify(proposeAtomMoleculeInventoryRatchet(), null, 2));
 }
