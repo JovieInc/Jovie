@@ -173,7 +173,7 @@ function generatedFixture() {
   const actual = load(
     fs.readFileSync(new URL(`../${workflowPath}`, import.meta.url), 'utf8')
   );
-  const selected = actual.jobs.deterministic.steps.filter(step =>
+  const selected = actual.jobs.unit.steps.filter(step =>
     [
       'source_guard_actions',
       'source_merge_dependencies',
@@ -183,9 +183,13 @@ function generatedFixture() {
   assert.equal(selected.length, 3);
   const document = {
     jobs: {
-      deterministic: {
+      unit: {
         steps: [
-          { id: 'source_guard_merge', run: 'echo dependency_changed=true' },
+          {
+            id: 'source_guard_merge',
+            if: "matrix.shard == '4/4'",
+            run: 'echo dependency_changed=true',
+          },
           ...selected,
         ],
       },
@@ -223,7 +227,7 @@ function generatedFixture() {
     '.github/actions/vendor/pnpm-action-setup/dist/index.js',
     'console.log("fixture");\n'
   );
-  const save = () => write(workflowPath, dump(document));
+  const save = () => write(workflowPath, dump(document, { lineWidth: -1 }));
   save();
   return { root, write, document, save };
 }
@@ -258,6 +262,12 @@ test('generated references require the same-job producer, order, and condition',
       steps[2].if = 'always()';
     },
     steps => {
+      steps[0].if = "matrix.shard == '1/4'";
+    },
+    steps => {
+      steps[1].if = steps[1].if.replace("'4/4'", "'1/4'");
+    },
+    steps => {
       steps[1]['continue-on-error'] = true;
     },
     steps => {
@@ -271,7 +281,7 @@ test('generated references require the same-job producer, order, and condition',
   ];
   for (const change of changes) {
     const f = generatedFixture();
-    change(f.document.jobs.deterministic.steps);
+    change(f.document.jobs.unit.steps);
     f.save();
     assert.ok(
       validateWorkflowReferences(f.root).some(error =>
@@ -282,7 +292,7 @@ test('generated references require the same-job producer, order, and condition',
   }
   const f = generatedFixture();
   f.document.jobs.foreign = {
-    steps: [{ ...f.document.jobs.deterministic.steps[2] }],
+    steps: [{ ...f.document.jobs.unit.steps[2] }],
   };
   f.save();
   assert.ok(
@@ -482,7 +492,7 @@ test('unknown or ambiguous generated-contract syntax stays red before installati
         "id: source_guard_actions\n        'id': innocent"
       ),
     source => source.replace('jobs:', 'jobs: &jobs'),
-    source => source.replace('deterministic:', 'deterministic: &job'),
+    source => source.replace('unit:', 'unit: &job'),
     source => source.replace('steps:', 'steps: &steps'),
     source =>
       source.replace(
