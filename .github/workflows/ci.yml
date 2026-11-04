@@ -7744,6 +7744,50 @@ jobs:
   # Deep Lighthouse runs only by manual dispatch. Production Lighthouse remains
   # a separate hosted post-deploy release probe.
 
+  # JOV-10687 / JOV-10682 E: explicit suite scope on merge-group proof.
+  # Today the merge group still runs the full web unit matrix when web is
+  # selected. Provenance only lets main skip duplicate unit/build work when
+  # this job claims full_web_units (or a legacy run has no scope job yet).
+  # ordinary_admission is reserved for a later shrink and must force main
+  # fallback — never let a smaller MQ pass stand in for full-suite proof.
+  ci-merge-suite-scope:
+    name: Merge Suite Scope / full_web_units
+    needs:
+      [
+        ci-path-changes,
+        ci-unit-tests,
+        ci-merge-group-ready,
+      ]
+    if: ${{ always() && github.event_name == 'merge_group' && needs.ci-merge-group-ready.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    steps:
+      - name: Claim full merge-suite proof scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_WEB="${{ needs.ci-path-changes.outputs.run_web }}"
+          BLOG_CONTENT_ONLY="${{ needs.ci-path-changes.outputs.blog_content_only }}"
+          UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
+          if [[ "$BLOG_CONTENT_ONLY" == "true" ]]; then
+            RUN_WEB=false
+          fi
+          if [[ "$RUN_WEB" == "true" && "$UNIT_RESULT" != "success" ]]; then
+            echo "::error::Cannot claim full_web_units without successful Unit Tests ($UNIT_RESULT)."
+            exit 1
+          fi
+          {
+            echo "### Merge suite scope"
+            echo
+            echo "- Claimed scope: \`full_web_units\`"
+            echo "- Web selected: \`$RUN_WEB\`"
+            echo "- Unit Tests: \`$UNIT_RESULT\`"
+            echo
+            echo "Main may reuse this merge-group proof to skip duplicate unit/build lanes."
+            echo "An \`ordinary_admission\` claim (future) must not authorize that skip."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Claimed merge suite scope: full_web_units (JOV-10687)"
+
   ci-merge-group-ready:
     name: ${{ github.event_name == 'merge_group' && 'PR Ready' || 'PR Ready (merge-group inactive)' }}
     # DB-risk heads reuse expiring Neon; browser preview lanes remain manual/post-merge.
