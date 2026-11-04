@@ -35,6 +35,17 @@ describe('TruncatedText', () => {
 
       expect(span).toHaveClass('custom-class');
     });
+
+    it('forwards an optional title to the text span', () => {
+      const { container } = render(
+        <TruncatedText title='A, B and 3 more'>A, B and 3 more</TruncatedText>
+      );
+      const span = container.querySelector('span');
+
+      // ds-cert:credit-format: truncated credit lines keep the full list
+      // reachable via title.
+      expect(span).toHaveAttribute('title', 'A, B and 3 more');
+    });
   });
 
   describe('truncation lines', () => {

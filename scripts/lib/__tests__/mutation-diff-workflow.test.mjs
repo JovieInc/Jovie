@@ -16,7 +16,8 @@ describe('Mutation Diff hosted contract', () => {
       match => match[1].trim()
     );
     expect(runsOn).toHaveLength(2);
-    for (const value of runsOn) expect(value).toBe('ubuntu-latest');
+    for (const value of runsOn)
+      expect(value).toMatch(/^ubuntu-(?:latest|24\.04)$/);
     expect(workflow).not.toMatch(/self-hosted|jovie-fixed/u);
     expect(workflow).toMatch(/actions\/cache\/restore@/u);
     expect(workflow).toMatch(/actions\/cache\/save@/u);

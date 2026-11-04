@@ -32,7 +32,7 @@
     "registry": "https://registry.npmjs.org"
   },
   "bin": {
-    "jovie": "./dist/cli.js"
+    "jovie": "dist/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

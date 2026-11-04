@@ -361,6 +361,57 @@ async function settleLayout(page: Page) {
   );
 }
 
+async function readIdentityPortraitGeometry(page: Page) {
+  return page.evaluate(() => {
+    const portraits = document.querySelectorAll<HTMLElement>(
+      '[data-testid="profile-identity-portrait"]'
+    );
+    const portrait = portraits[0];
+    const media = portrait?.firstElementChild;
+    const images = portrait?.querySelectorAll<HTMLImageElement>('img');
+    const image = images?.[0];
+    const portraitRect = portrait?.getBoundingClientRect();
+    const mediaRect = media?.getBoundingClientRect();
+    const imageRect = image?.getBoundingClientRect();
+    const fillsPortrait = (rect: DOMRect | undefined) =>
+      Boolean(
+        portraitRect &&
+          portraitRect.width > 0 &&
+          portraitRect.height > 0 &&
+          rect &&
+          rect.left <= portraitRect.left + 1 &&
+          rect.right >= portraitRect.right - 1 &&
+          rect.top <= portraitRect.top + 1 &&
+          rect.bottom >= portraitRect.bottom - 1
+      );
+    const radius = portrait ? getComputedStyle(portrait).borderRadius : '';
+    const circleRadius = radius.endsWith('%')
+      ? Number.parseFloat(radius) >= 50
+      : Number.parseFloat(radius) >= (portraitRect?.width ?? Infinity) / 2;
+
+    return {
+      count: portraits.length,
+      frame: portraitRect?.toJSON() ?? null,
+      media: mediaRect?.toJSON() ?? null,
+      circular: Boolean(
+        portraitRect &&
+          portraitRect.width > 0 &&
+          Math.abs(portraitRect.width - portraitRect.height) <= 1 &&
+          circleRadius
+      ),
+      mediaFills: fillsPortrait(mediaRect),
+      fallbackText: media?.textContent?.trim() ?? '',
+      image: {
+        count: images?.length ?? 0,
+        rect: imageRect?.toJSON() ?? null,
+        loaded: Boolean(image?.complete && image.naturalWidth > 0),
+        objectFit: image ? getComputedStyle(image).objectFit : null,
+        fills: fillsPortrait(imageRect),
+      },
+    };
+  });
+}
+
 async function collectViewportSnapshot(
   page: Page,
   rootSelector: string
@@ -798,18 +849,18 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
 });
 
 test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
+  const viewports = [
+    { label: 'compact 320', width: 320, height: 568 },
+    { label: 'iPhone mini', width: 375, height: 812 },
+    { label: 'iPhone', width: 390, height: 844 },
+    { label: 'iPhone max', width: 430, height: 932 },
+    { label: 'tablet', width: 768, height: 1024 },
+    { label: 'desktop', width: 1440, height: 1000 },
+  ] as const;
+
   test('public surface renders one featured card — no carousel — across the strict viewport matrix', async ({
     page,
   }, testInfo) => {
-    const viewports = [
-      { label: 'compact 320', width: 320, height: 568 },
-      { label: 'iPhone mini', width: 375, height: 812 },
-      { label: 'iPhone', width: 390, height: 844 },
-      { label: 'iPhone max', width: 430, height: 932 },
-      { label: 'tablet', width: 768, height: 1024 },
-      { label: 'desktop', width: 1440, height: 1000 },
-    ] as const;
-
     for (const viewport of viewports) {
       await page.setViewportSize({
         width: viewport.width,
@@ -841,12 +892,6 @@ test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
           '[data-testid="profile-home-rail"]'
         );
         const modeCard = pac?.querySelector<HTMLElement>('.profile-mode-card');
-        const portrait = document.querySelector<HTMLElement>(
-          '[data-testid="profile-identity-portrait"]'
-        );
-        const portraitImage = portrait?.querySelector<HTMLElement>('img');
-        const portraitRect = portrait?.getBoundingClientRect();
-        const imageRect = portraitImage?.getBoundingClientRect();
         const dockHost = document.querySelector<HTMLElement>(
           '[data-testid="profile-tab-bar"]'
         );
@@ -893,16 +938,6 @@ test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
           pacCopyFits: modeCard
             ? modeCard.scrollHeight <= modeCard.clientHeight + 1
             : false,
-          portraitFilled: Boolean(
-            portraitRect &&
-              imageRect &&
-              imageRect.left <= portraitRect.left + 1 &&
-              imageRect.right >= portraitRect.right - 1 &&
-              imageRect.top <= portraitRect.top + 1 &&
-              imageRect.bottom >= portraitRect.bottom - 1 &&
-              portraitImage &&
-              getComputedStyle(portraitImage).objectFit === 'cover'
-          ),
           glassDock: glassStyle
             ? {
                 backdropFilter: glassStyle.backdropFilter,
@@ -912,9 +947,10 @@ test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
             : null,
         };
       });
+      const portrait = await readIdentityPortraitGeometry(page);
 
       await testInfo.attach(`featured-card-${viewport.label}-geometry`, {
-        body: JSON.stringify(geometry, null, 2),
+        body: JSON.stringify({ ...geometry, portrait }, null, 2),
         contentType: 'application/json',
       });
 
@@ -949,10 +985,19 @@ test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
         geometry.pac?.aboveDock,
         `${viewport.label} featured card clears the bottom dock`
       ).toBe(true);
+      // The Calvin demo deliberately has no photo: its default-avatar URL
+      // resolves to initials. An unexpectedly missing real photo must never
+      // satisfy this contract; the image fixture below has separate guards.
       expect(
-        geometry.portraitFilled,
-        `${viewport.label} portrait image fills its circle`
-      ).toBe(true);
+        portrait,
+        `${viewport.label}: ${JSON.stringify(portrait)}`
+      ).toMatchObject({
+        count: 1,
+        circular: true,
+        mediaFills: true,
+        fallbackText: 'CH',
+        image: { count: 0 },
+      });
       expect(
         geometry.glassDock?.backdropFilter,
         `${viewport.label} dock keeps real backdrop blur`
@@ -965,6 +1010,61 @@ test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
         geometry.glassDock?.borderColor,
         `${viewport.label} dock keeps its hairline`
       ).not.toBe('rgba(0, 0, 0, 0)');
+    }
+  });
+
+  test('image-backed portrait fills the same compact circle across the strict viewport matrix', async ({
+    page,
+  }, testInfo) => {
+    for (const viewport of viewports) {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      });
+      await smokeNavigate(
+        page,
+        '/demo/showcase/tim-white-profile?presentation=compact-preview',
+        { timeout: 120_000 }
+      );
+      await waitForHydration(page);
+      await expect(page.getByTestId('profile-compact-surface')).toBeVisible();
+      const portraitImage = page
+        .getByTestId('profile-identity-portrait')
+        .locator('img');
+      await expect(portraitImage).toHaveCount(1);
+      await expect(portraitImage).toBeVisible();
+      await expect
+        .poll(
+          () =>
+            portraitImage.evaluate(image => {
+              const element = image as HTMLImageElement;
+              return element.complete && element.naturalWidth > 0;
+            }),
+          {
+            message: `${viewport.label} local portrait decodes`,
+            timeout: SMOKE_TIMEOUTS.VISIBILITY,
+          }
+        )
+        .toBe(true);
+      await settleLayout(page);
+
+      const portrait = await readIdentityPortraitGeometry(page);
+      await testInfo.attach(
+        `featured-card-${viewport.label}-portrait-geometry`,
+        {
+          body: JSON.stringify(portrait, null, 2),
+          contentType: 'application/json',
+        }
+      );
+      expect(
+        portrait,
+        `${viewport.label}: ${JSON.stringify(portrait)}`
+      ).toMatchObject({
+        count: 1,
+        circular: true,
+        mediaFills: true,
+        image: { count: 1, loaded: true, objectFit: 'cover', fills: true },
+      });
     }
   });
 

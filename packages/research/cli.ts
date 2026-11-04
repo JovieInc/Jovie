@@ -8,6 +8,7 @@
 import { parseArgs } from 'node:util';
 
 import { createProviderClients } from './credentials.ts';
+import { verifyResearchResult } from './outcome.ts';
 import { renderResult, sourcesTable } from './report.ts';
 import { last30daysScript } from './sources-web.ts';
 import { summarize } from './state.ts';
@@ -62,22 +63,24 @@ export async function main(
       throw new UsageError(`bad --fresh ${values.fresh}`);
     if (values.mode && !MODES.has(values.mode))
       throw new UsageError(`bad --mode ${values.mode}`);
-    const result = await wiring.router.research({
-      query,
-      freshness: values.fresh as Freshness | undefined,
-      mode: values.mode as Mode | undefined,
-      social: values.social,
-      localOnly: values.local,
-      maxTier:
-        values['max-tier'] === undefined
-          ? undefined
-          : Number(values['max-tier']),
-      refresh: values.refresh,
-      persist: !values['no-persist'],
-      caller: values.caller ?? process.env.JOVIE_AGENT_PROFILE ?? 'cli',
-    });
+    const result = verifyResearchResult(
+      await wiring.router.research({
+        query,
+        freshness: values.fresh as Freshness | undefined,
+        mode: values.mode as Mode | undefined,
+        social: values.social,
+        localOnly: values.local,
+        maxTier:
+          values['max-tier'] === undefined
+            ? undefined
+            : Number(values['max-tier']),
+        refresh: values.refresh,
+        persist: !values['no-persist'],
+        caller: values.caller ?? process.env.JOVIE_AGENT_PROFILE ?? 'cli',
+      })
+    );
     print(values.json ? result : renderResult(result));
-    return 0;
+    return result.verdict === 'degraded' ? 1 : 0;
   }
   if (command === 'stats') {
     const days = Number(values.days ?? 7);

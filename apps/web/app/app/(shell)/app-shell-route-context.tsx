@@ -9,6 +9,7 @@ import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import type { AppFlagName } from '@/lib/flags/contracts';
 import { getAppFlagValue } from '@/lib/flags/server';
+import { withTimeout } from '@/lib/resilience/primitives';
 import type { DashboardData } from './dashboard/actions';
 import { getDashboardShellData } from './dashboard/actions';
 
@@ -93,7 +94,23 @@ export async function loadAppShellRouteContext({
     }
   }
 
-  const dashboardData = await getDashboardShellData(userId);
+  // Bounded wait (JOV-8791 / resilience.spec.ts): a wedged shell-data read
+  // otherwise pins the whole document on the loading skeleton with no error
+  // path (matrix run 41165879189). Past the bound, degrade to the same error
+  // result this loader already returns for a failed read.
+  let dashboardData: DashboardData;
+  try {
+    dashboardData = await withTimeout(getDashboardShellData(userId), {
+      timeoutMs: 10_000,
+      context: `App shell data (${route})`,
+    });
+  } catch (error) {
+    await captureError(dashboardErrorLogMessage, error, { route });
+    return {
+      ok: false,
+      error: <PageErrorState message={dashboardErrorMessage} />,
+    };
+  }
   if (dashboardData.dashboardLoadError) {
     await captureError(
       dashboardErrorLogMessage,

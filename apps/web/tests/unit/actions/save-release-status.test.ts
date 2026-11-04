@@ -155,6 +155,7 @@ vi.mock('drizzle-orm', () => ({
   and: vi.fn((...args: unknown[]) => args),
   eq: vi.fn((left: unknown, right: unknown) => [left, right]),
   inArray: vi.fn(),
+  sql: vi.fn(() => ({})),
   isNotNull: vi.fn(),
   ne: vi.fn(),
 }));

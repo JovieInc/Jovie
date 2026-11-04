@@ -67,6 +67,15 @@ describe('CookieBannerSection consent sync', () => {
     vi.unstubAllEnvs();
   });
 
+  it('renders consent on the banner layer below modal profile sheets', async () => {
+    const mod = await import('@/components/organisms/CookieBannerSection');
+    setCookie('jv_cc_required=1');
+    render(<mod.CookieBannerSection />);
+
+    expect(screen.getByTestId('cookie-banner')).toHaveClass('z-banner');
+    expect(screen.getByRole('button', { name: 'Accept all' })).toBeVisible();
+  });
+
   it('uses the E2E-only pathname override to clear the public profile dock', async () => {
     vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
     const mod = await import('@/components/organisms/CookieBannerSection');
@@ -739,5 +748,55 @@ describe('CookieBannerMount global preferences controller', () => {
       expect(setConsentState).toHaveBeenCalledWith('rejected');
       expect(localStorage.getItem('jv_cc')).toContain('"essential":true');
     });
+  });
+
+  it('does not mount a second card when the page already server-rendered one', async () => {
+    setCookie('jv_cc_required=1');
+    const { CookieBannerMount } = await import(
+      '@/components/organisms/CookieBannerMount'
+    );
+    const { CookieBannerSection } = await import(
+      '@/components/organisms/CookieBannerSection'
+    );
+
+    render(
+      <>
+        <CookieBannerSection initialVisible />
+        <CookieBannerMount />
+      </>
+    );
+
+    await vi.waitFor(() => {
+      expect(globalThis.JVConsent).toBeDefined();
+    });
+    // Give the lazy Section import a chance to (wrongly) resolve.
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(screen.getAllByTestId('cookie-banner')).toHaveLength(1);
+  });
+
+  it('still mounts the lazy card when the page did not server-render one', async () => {
+    setCookie('jv_cc_required=1');
+    const { CookieBannerMount } = await import(
+      '@/components/organisms/CookieBannerMount'
+    );
+
+    render(<CookieBannerMount />);
+
+    await vi.waitFor(() => {
+      expect(screen.getAllByTestId('cookie-banner')).toHaveLength(1);
+    });
+  });
+});
+
+describe('prerendered homepage pathname', () => {
+  it('CookieBannerSection.tsx reads "/index" as "/" via usePublicPathname', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/organisms/CookieBannerSection.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('usePublicPathname');
+    expect(source).not.toMatch(/\busePathname\b/);
   });
 });

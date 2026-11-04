@@ -38,12 +38,14 @@ Price every model by how it is accessed. API and credits paths cost tokens times
 
 | Model | Path | Where | List $/MTok in / out | Note |
 |---|---|---|---|---|
-| gpt-5.6-luna | api | direct | 0.2 / 1.2 |  |
-| gpt-5.6-luna | subscription | openai-codex (current-login, jovie-pro, lyb-pro) | 0.2 / 1.2 | Unmeasured: the API-equivalent list-priced usage one weekly window allows. Needs per-run token counts joined to the account's used percent; until then USD is unknown and ranking uses the pace rule alone. |
-| gpt-5.6-terra | api | direct | 2 / 12 |  |
-| gpt-5.6-terra | subscription | openai-codex (current-login, jovie-pro, lyb-pro) | 2 / 12 |  |
-| gpt-5.6-sol | api | direct | 5 / 30 |  |
-| gpt-5.6-sol | subscription | openai-codex (current-login, jovie-pro, lyb-pro) | 5 / 30 |  |
+| gpt-6-luna | api | direct | 0.1 / 0.5 |  |
+| gpt-6-luna | subscription | openai-codex (current-login, jovie-pro, lyb-pro) | 0.1 / 0.5 | Unmeasured: the API-equivalent list-priced usage one weekly window allows. Needs per-run token counts joined to the account's used percent; until then USD is unknown and ranking uses the pace rule alone. |
+| gpt-6.1-terra | api | direct | 1 / 5 |  |
+| gpt-6.1-terra | subscription | openai-codex (current-login, jovie-pro, lyb-pro) | 1 / 5 |  |
+| gpt-6.1-sol | api | direct | 2 / 10 |  |
+| gpt-6.1-sol | subscription | openai-codex (current-login, jovie-pro, lyb-pro) | 2 / 10 |  |
+| gpt-6-astra | api | direct | 10 / 50 |  |
+| gpt-6-astra | subscription | openai-codex (current-login, jovie-pro, lyb-pro) | 10 / 50 |  |
 | moonshotai/kimi-k3 | credits | hyperagent (founding-500) | 0.6 / 2 |  |
 | moonshotai/kimi-k3.1-pro | credits | hyperagent (founding-500) | not listed | Gateway catalog per-token price once the model appears; no list price is recorded today |
 | glm-5.3 | credits | hyperagent (founding-500) | 0.3 / 1.2 |  |

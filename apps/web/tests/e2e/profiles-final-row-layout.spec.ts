@@ -9,9 +9,10 @@
  *     tests/e2e/profiles-final-row-layout.spec.ts --project=chromium
  */
 
-import type { Locator, Page } from '@playwright/test';
+import type { Locator } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { setTestAuthBypassSession } from '../helpers/auth';
+import { captureFirstSuggestionsResponse } from '../helpers/presence-suggestions-capture';
 import { expect, test } from './setup';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -103,75 +104,6 @@ async function readFinalRowMetrics(table: Locator): Promise<FinalRowMetrics> {
   });
 }
 
-/**
- * Captures the first real `/api/suggestions` response body in the test
- * process. Reading it later through `Response.json()` asks Chromium for the
- * body, which it evicts once the page navigates or reloads (the auth redirect
- * chain lands on /app/presence), failing with `Network.getResponseBody: No data
- * found`. The request still reaches the real server; the response is passed
- * through unchanged.
- */
-async function captureFirstSuggestionsResponse(page: Page): Promise<{
-  // Wrapped in an object: an async function that returns a bare promise
-  // adopts it, so awaiting the listener registration would wait for the
-  // capture itself and deadlock before the navigation that triggers the request.
-  readonly captured: Promise<{
-    readonly status: number;
-    readonly body: string;
-  }>;
-}> {
-  let resolveCapture: (value: {
-    readonly status: number;
-    readonly body: string;
-  }) => void = () => {};
-  const captured = new Promise<{
-    readonly status: number;
-    readonly body: string;
-  }>(resolve => {
-    resolveCapture = resolve;
-  });
-  let settled = false;
-  let lastError: { status: number; body: string } | null = null;
-  const giveUp = setTimeout(() => {
-    if (settled) return;
-    settled = true;
-    resolveCapture(lastError ?? { status: 0, body: '' });
-  }, 30_000);
-  // Read the body on the response event. route.fetch() plus continue() on an
-  // aborted redirect never resolves, and the test then waits until its own
-  // timeout with no assertion. A later successful response can still settle.
-  page.on('response', response => {
-    if (settled) return;
-    let pathname = '';
-    try {
-      pathname = new URL(response.url()).pathname;
-    } catch {
-      return;
-    }
-    if (pathname !== '/api/suggestions') return;
-    void response
-      .text()
-      .then(body => {
-        if (settled) return;
-        // The auth enter redirect can answer /api/suggestions with 404
-        // before the session cookie is on the document. Keep the first 200.
-        // Settling the 404 makes the retry pass and the first attempt write
-        // an error-context that the artifact guard rejects.
-        if (response.status() !== 200) {
-          lastError = { status: response.status(), body };
-          return;
-        }
-        settled = true;
-        clearTimeout(giveUp);
-        resolveCapture({ status: response.status(), body });
-      })
-      .catch(() => {
-        // Chromium evicts the body after navigation. Keep waiting.
-      });
-  });
-  return { captured };
-}
-
 function logMetrics(label: string, metrics: FinalRowMetrics) {
   console.log(`[profiles-final-row-layout] ${label}`, JSON.stringify(metrics));
 }
@@ -250,62 +182,80 @@ test('keeps page identity and review status readable at narrow widths', async ({
 }) => {
   test.setTimeout(120_000);
   await setTestAuthBypassSession(page, 'creator-ready');
-  const { captured: suggestionsResponse } =
-    await captureFirstSuggestionsResponse(page);
-  await page.goto(
-    `/api/dev/test-auth/enter?persona=creator-ready&fixture=profiles-final-row&redirect=${encodeURIComponent(APP_ROUTES.PRESENCE)}`
-  );
-  await page.waitForURL(/\/app\/presence(?:$|\?)/);
-  const response = await suggestionsResponse;
-  expect(response.status).toBe(200);
-  expect(JSON.parse(response.body)).toMatchObject({
-    success: true,
-    suggestions: expect.any(Array),
-  });
-  await page
-    .getByRole('button', { name: /^Review Suggestions \(\d+\)$/ })
-    .click();
-  await expect(page.getByTestId('suggested-connections-review')).toBeVisible();
-  await expect(
-    page.getByTestId('suggested-connections-error-state')
-  ).toHaveCount(0);
-  await page
-    .getByRole('button', { name: 'Close Suggestions', exact: true })
-    .click();
-  const workspace = page.getByTestId('profiles-workspace');
-  for (const width of [320, 390, 1280]) {
-    await page.setViewportSize({ width, height: 800 });
-    const table = workspace.getByRole('table');
-    const firstRow = table.locator('tbody tr').first();
-    await expect(firstRow.getByTestId('presence-page-identity')).toBeVisible();
-    await page.screenshot({
-      path: test.info().outputPath(`presence-before-${width}.png`),
-      fullPage: true,
+  const capture = await captureFirstSuggestionsResponse(page);
+  try {
+    capture.markNavigation('start');
+    await page.goto(
+      `/api/dev/test-auth/enter?persona=creator-ready&fixture=profiles-final-row&redirect=${encodeURIComponent(APP_ROUTES.PRESENCE)}`
+    );
+    capture.markNavigation('goto-complete');
+    await page.waitForURL(/\/app\/presence(?:$|\?)/);
+    capture.markNavigation('presence-url-ready');
+    const response = await capture.captured;
+    expect(response.status, capture.failureMessage()).toBe(200);
+    expect(JSON.parse(response.body), capture.failureMessage()).toMatchObject({
+      success: true,
+      suggestions: expect.any(Array),
     });
-    const bounds = await table.boundingBox();
-    expect(bounds).not.toBeNull();
-    expect(bounds!.width).toBeLessThanOrEqual(width);
-    if (width < 640) {
+    await page
+      .getByRole('button', { name: /^Review Suggestions \(\d+\)$/ })
+      .click();
+    await expect(
+      page.getByTestId('suggested-connections-review')
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('suggested-connections-error-state')
+    ).toHaveCount(0);
+    await page
+      .getByRole('button', { name: 'Close Suggestions', exact: true })
+      .click();
+    const workspace = page.getByTestId('profiles-workspace');
+    for (const width of [320, 390, 1280]) {
+      await page.setViewportSize({ width, height: 800 });
+      const table = workspace.getByRole('table');
+      const firstRow = table.locator('tbody tr').first();
       await expect(
-        table.getByRole('columnheader', { name: 'Status', exact: true })
-      ).toBeHidden();
-      const identityBounds = await firstRow.locator('td').first().boundingBox();
-      expect(identityBounds!.width).toBeGreaterThan(200);
-    }
-    await firstRow.focus();
-    await firstRow.press('Enter');
-    if (width < 640) {
-      await expect(
-        page.getByRole('dialog', { name: 'Presence details' })
+        firstRow.getByTestId('presence-page-identity')
       ).toBeVisible();
-    } else {
-      await expect(firstRow).toHaveAttribute('aria-selected', 'true');
+      await page.screenshot({
+        path: test.info().outputPath(`presence-before-${width}.png`),
+        fullPage: true,
+      });
+      const bounds = await table.boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.width).toBeLessThanOrEqual(width);
+      if (width < 640) {
+        await expect(
+          table.getByRole('columnheader', { name: 'Status', exact: true })
+        ).toBeHidden();
+        const identityBounds = await firstRow
+          .locator('td')
+          .first()
+          .boundingBox();
+        expect(identityBounds!.width).toBeGreaterThan(200);
+      }
+      await firstRow.focus();
+      await firstRow.press('Enter');
+      if (width < 640) {
+        await expect(
+          page.getByRole('dialog', { name: 'Presence details' })
+        ).toBeVisible();
+      } else {
+        await expect(firstRow).toHaveAttribute('aria-selected', 'true');
+      }
+      await page.screenshot({
+        path: test.info().outputPath(`presence-${width}.png`),
+        fullPage: true,
+      });
+      await page.keyboard.press('Escape');
+      await expect(table).toBeVisible();
     }
-    await page.screenshot({
-      path: test.info().outputPath(`presence-${width}.png`),
-      fullPage: true,
-    });
-    await page.keyboard.press('Escape');
-    await expect(table).toBeVisible();
+  } catch (error) {
+    // Keep first-attempt evidence in the job log even when its retry succeeds.
+    capture.dispose();
+    console.log(capture.failureMessage());
+    throw error;
+  } finally {
+    capture.dispose();
   }
 });

@@ -1,0 +1,8 @@
+
+ RUN  v5.0.5 /workspace/Jovie/scripts
+
+
+ Test Files  4 passed (4)
+      Tests  122 passed (122)
+   Start at  23:17:14
+   Duration  1.56s (tests 84%, import 11%, transform 4%, worker 1%)

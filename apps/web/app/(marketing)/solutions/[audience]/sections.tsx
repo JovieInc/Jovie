@@ -596,7 +596,10 @@ const ARTIST_SOLUTIONS_SECTION_RENDERERS = {
     sectionId: 'product-gallery',
     render: () => (
       <div data-testid={testIds.releaseCycle}>
-        <ArtistProfileReleaseCycleGallery releaseCycle={copy.releaseCycle} />
+        <ArtistProfileReleaseCycleGallery
+          releaseCycle={copy.releaseCycle}
+          id='bring-them-back-automatically'
+        />
       </div>
     ),
   },

@@ -1,8 +1,11 @@
 import { render, screen, within } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { ProfileHomeRail } from '@/features/profile/ProfileHomeRail';
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
+import { ProfilePacCard } from '@/features/profile/pac/ProfilePacCard';
 import type { PublicRelease } from '@/features/profile/releases/types';
+import { DEFAULT_PROFILE_PAC_ASSIGNMENT } from '@/lib/flags/profile-pac';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
@@ -237,16 +240,43 @@ describe('ProfileHomeRail', () => {
     expect(screen.queryByRole('link', { name: 'Listen' })).toBeNull();
   });
 
-  it('eager-loads latest-release artwork even when it is not the hero LCP', () => {
+  it.each(['interactive', 'preview'] as const)(
+    'keeps featured artwork eager and hints its priority only for %s profiles',
+    renderMode => {
+      render(
+        <ProfileHomeRail
+          artist={makeArtist()}
+          latestRelease={makeRelease()}
+          profileSettings={{ showOldReleases: true }}
+          tourDates={[]}
+          hasPlayableDestinations
+          renderMode={renderMode}
+          pacArtPriority={false}
+        />
+      );
+
+      const artwork = within(
+        screen.getByTestId('profile-pac-featured-art')
+      ).getByRole('img', { name: 'The Deep End artwork' });
+      expect(artwork).toHaveAttribute('loading', 'eager');
+      if (renderMode === 'interactive') {
+        expect(artwork).toHaveAttribute('fetchpriority', 'high');
+      } else {
+        expect(artwork).not.toHaveAttribute('fetchpriority');
+      }
+    }
+  );
+
+  it('does not promote artwork in an interactive nonfeatured rail card', () => {
     render(
-      <ProfileHomeRail
+      <ProfilePacCard
         artist={makeArtist()}
-        latestRelease={makeRelease()}
-        profileSettings={{ showOldReleases: true }}
-        tourDates={[]}
-        hasPlayableDestinations
-        renderMode='preview'
-        pacArtPriority={false}
+        release={{ ...makeRelease(), previewUrl: null }}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        renderMode='interactive'
+        presentation='rail'
+        layout='profile-landscape'
+        artPriority={false}
       />
     );
 
@@ -254,6 +284,36 @@ describe('ProfileHomeRail', () => {
       name: 'The Deep End artwork',
     });
     expect(artwork).toHaveAttribute('loading', 'eager');
+    expect(artwork).not.toHaveAttribute('fetchpriority');
+  });
+
+  it('emits the featured image hint and matching preload in server-rendered HTML', () => {
+    const html = renderToStaticMarkup(
+      <ProfileHomeRail
+        artist={makeArtist()}
+        latestRelease={makeRelease()}
+        profileSettings={{ showOldReleases: true }}
+        tourDates={[]}
+        hasPlayableDestinations
+        renderMode='interactive'
+        pacArtPriority={false}
+      />
+    );
+    const document = new DOMParser().parseFromString(html, 'text/html');
+    const artwork = document.querySelector(
+      '[data-testid="profile-pac-featured-art"] img'
+    );
+    expect(artwork?.getAttribute('fetchpriority')).toBe('high');
+    expect(artwork?.getAttribute('loading')).toBe('eager');
+    const sourceSet = artwork?.getAttribute('srcset');
+    expect(sourceSet).toBeTruthy();
+    const preload = Array.from(
+      document.querySelectorAll('link[rel="preload"][as="image"]')
+    ).find(link => link.getAttribute('imagesrcset') === sourceSet);
+    expect(preload?.getAttribute('fetchpriority')).toBe('high');
+    expect(preload?.getAttribute('imagesizes')).toBe(
+      artwork?.getAttribute('sizes')
+    );
   });
 
   it('renders tip-only inventory as a support PAC instead of a blank Listen card', () => {

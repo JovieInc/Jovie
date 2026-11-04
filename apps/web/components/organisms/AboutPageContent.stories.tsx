@@ -22,6 +22,7 @@ const meta = {
   component: AboutPageContent,
   parameters: {
     ...marketingFullscreenParameters,
+    chromatic: { viewports: [390, 1440] },
     docs: {
       description: {
         component: `${MARKETING_STORY_DESCRIPTION} Exact System B production body for web-016-about. This story owns the shared body only; route metadata, revalidation, FAQ, organization and breadcrumb schema construction, JSON-LD scripts, section taxonomy, and manifest evidence remain route- or owner-stacked.`,

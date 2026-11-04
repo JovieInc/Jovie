@@ -64,6 +64,12 @@ export interface ScreenshotScenario {
   readonly captureSelector?: string;
   readonly interaction?: ScreenshotInteraction;
   readonly publicExportPath?: string;
+  /**
+   * Browser clock for the capture: an ISO instant, or `'capture-week'` for
+   * the Monday 16:00 UTC of the week the capture runs. Use `'capture-week'`
+   * when the shot shows dates a visitor reads against today (upcoming shows),
+   * so recaptures on release keep them current while staying stable all week.
+   */
   readonly fixedNow?: string;
   readonly reducedMotion?: boolean;
   /**

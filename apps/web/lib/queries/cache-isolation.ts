@@ -25,6 +25,8 @@ export interface CacheScope {
   readonly profileId: string | null;
   readonly impersonationSubject: string | null;
   readonly ready: boolean;
+  /** One initial trusted user seed is awaiting its first live session ID. */
+  readonly bootstrapSessionPending?: boolean;
 }
 
 export interface CacheFenceEvent {
@@ -41,6 +43,7 @@ const EMPTY_SCOPE: CacheScope = {
   profileId: null,
   impersonationSubject: null,
   ready: false,
+  bootstrapSessionPending: false,
 };
 
 let scope: CacheScope = { ...EMPTY_SCOPE };
@@ -82,7 +85,13 @@ export function classifyCacheScopeChange(
 
   if (
     previous.sessionId !== next.sessionId &&
-    (previous.userId !== null || next.userId !== null)
+    (previous.userId !== null || next.userId !== null) &&
+    !(
+      previous.bootstrapSessionPending === true &&
+      previous.sessionId === null &&
+      previous.userId === next.userId &&
+      next.sessionId !== null
+    )
   ) {
     return 'account-change';
   }
@@ -119,12 +128,27 @@ function notifyFence(event: CacheFenceEvent): void {
 export function applyCacheScope(
   patch: Partial<CacheScope>
 ): CacheFenceEvent | null {
-  const next: CacheScope = {
+  let next: CacheScope = {
     ...scope,
     ...patch,
     ready: scope.ready || patch.ready === true,
   };
+  // A later mount or generic null session cannot re-arm this exception.
+  // A real fence consumes it, even when the first session is still pending.
+  next = {
+    ...next,
+    bootstrapSessionPending:
+      next.bootstrapSessionPending === true &&
+      next.userId !== null &&
+      next.sessionId === null &&
+      (!scope.ready ||
+        (scope.bootstrapSessionPending === true &&
+          scope.userId === next.userId)),
+  };
   const reason = classifyCacheScopeChange(scope, next);
+  if (reason !== null && reason !== 'hydrate') {
+    next = { ...next, bootstrapSessionPending: false };
+  }
   const previous = { ...scope };
   scope = next;
 

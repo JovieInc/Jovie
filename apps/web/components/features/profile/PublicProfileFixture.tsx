@@ -76,7 +76,7 @@ export function PublicProfileFixture({
           profileHandle={artist.handle}
           displayName={artist.name}
           directClaimSupported
-          claimRequiresVerification
+          claimRequiresVerification={state !== 'unclaimed-direct'}
           prefetch={false}
           isClaimed={state === 'claimed' || state === 'owner'}
           visitorState={

@@ -70,4 +70,27 @@ describe('MarketingPhoneStateGallery', () => {
       )
     ).toThrow(/Unknown screenshot scenario/);
   });
+
+  it('renders a caption-only state without a phone when no capture is given', () => {
+    render(
+      <MarketingPhoneStateGallery
+        states={[
+          {
+            id: 'caption-only',
+            title: 'Caption only',
+            body: 'No person is shown for this state.',
+          },
+        ]}
+        label='Caption states'
+      />
+    );
+    const region = screen.getByRole('region', { name: 'Caption states' });
+    const figure = within(region).getByRole('figure');
+    expect(within(figure).queryByRole('img')).toBeNull();
+    expect(figure.querySelector('.marketing-phone-gallery__phone')).toBeNull();
+    expect(within(figure).getByText('Caption only')).toBeVisible();
+    expect(
+      within(figure).getByText('No person is shown for this state.')
+    ).toBeVisible();
+  });
 });
