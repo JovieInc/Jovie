@@ -112,6 +112,66 @@ describe('product lane classifier', () => {
     ).toThrow(ProductLaneClassificationError);
   });
 
+  it('routes the mesh hub worker through the web gate, which runs its typecheck and tests', () => {
+    const receipt = classifyProductLanes([
+      'workers/mesh-hub/src/index.ts',
+      'workers/mesh-hub/src/core.test.mjs',
+      'workers/mesh-hub/package.json',
+      'workers/mesh-hub/wrangler.toml',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web']);
+    expect(() =>
+      classifyProductLanes(['workers/mesh-hub-other/src/index.ts'])
+    ).toThrow(ProductLaneClassificationError);
+  });
+
+  it('routes the prod-liveness probe worker through operations, not a product lane', () => {
+    const receipt = classifyProductLanes([
+      'workers/prod-liveness/.gitignore',
+      'workers/prod-liveness/src/index.ts',
+      'workers/prod-liveness/src/index.test.mjs',
+      'workers/prod-liveness/wrangler.toml',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['operations']);
+    expect(
+      receipt.classifications.every(item => item.rule === 'operations-tooling')
+    ).toBe(true);
+  });
+
+  it('routes the competitor-watch worker through operations, not a product lane', () => {
+    const receipt = classifyProductLanes([
+      'workers/competitor-watch/package.json',
+      'workers/competitor-watch/src/index.ts',
+      'workers/competitor-watch/wrangler.toml',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['operations']);
+    expect(
+      receipt.classifications.every(item => item.rule === 'operations-tooling')
+    ).toBe(true);
+  });
+
+  it('routes the summer-store and cron-hub workers through operations, not a product lane', () => {
+    const receipt = classifyProductLanes([
+      'workers/summer-store/src/index.ts',
+      'workers/summer-store/wrangler.toml',
+      'workers/cron-hub/src/index.ts',
+      'workers/cron-hub/wrangler.toml',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['operations']);
+    expect(
+      receipt.classifications.every(item => item.rule === 'operations-tooling')
+    ).toBe(true);
+    expect(() =>
+      classifyProductLanes(['workers/summer-store-other/src/index.ts'])
+    ).toThrow(ProductLaneClassificationError);
+  });
+
+  it('routes the slop-guard baseline through operations, not a product lane', () => {
+    const receipt = classifyProductLanes(['config/slop-guard/baseline.json']);
+    expect(receipt.selectedLanes).toEqual(['operations']);
+    expect(receipt.classifications[0].rule).toBe('operations-tooling');
+  });
+
   it('classifies retired knowledge-ingest paths as web after the workspace move', () => {
     const receipt = classifyProductLanes([
       'workers/knowledge-ingest/README.md',

@@ -39,6 +39,14 @@ test.describe('hydration-guard detector (unit)', () => {
     ).toBe(true);
   });
 
+  test('detects minified production hydration errors (React #418)', () => {
+    expect(
+      isHydrationMismatch(
+        'Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message'
+      )
+    ).toBe(true);
+  });
+
   test('detects "Text content does not match" pattern', () => {
     expect(
       isHydrationMismatch('Text content does not match server-rendered HTML.')
