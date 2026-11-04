@@ -168,6 +168,7 @@ export function AiCrawlerDetailPanel({
       headerMode='minimal'
       hideMinimalHeaderBar
       entityHeaderSurface='flat'
+      scrollStrategy='shell'
       entityHeader={
         <DrawerSurfaceCard variant='card' className='overflow-hidden'>
           <div className='relative p-3.5'>

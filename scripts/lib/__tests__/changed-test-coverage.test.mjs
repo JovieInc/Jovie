@@ -1,9 +1,11 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -808,4 +810,73 @@ describe('source scanner admission on the PR (JOV-6834)', () => {
         .relatedTests
     ).toEqual(['tests/unit/a.test.ts']);
   });
+});
+
+describe('local worker policy through the real coverage launcher', () => {
+  /** @type {Array<[string, string[], string | null]>} */
+  const cases = [
+    ['false', [], '--maxWorkers=3'],
+    ['false', ['--maxWorkers=6'], '--maxWorkers=6'],
+    ['true', [], null],
+  ];
+  it.each(cases)(
+    'preserves related seeds and worker precedence with CI=%s and args=%j',
+    (ci, extra, expected) => {
+      const fixture = mkdtempSync(join(tmpdir(), 'local-vitest-launcher-'));
+      const output = join(fixture, 'argv.json');
+      const capture =
+        "require('node:fs').writeFileSync(process.env.VITEST_CAPTURE_ARGS, JSON.stringify(process.argv.slice(2)));\n";
+      try {
+        writeFileSync(join(fixture, 'capture.cjs'), capture);
+        writeFileSync(
+          join(fixture, 'vitest'),
+          `#!/usr/bin/env node\n${capture}`
+        );
+        chmodSync(join(fixture, 'vitest'), 0o755);
+        writeFileSync(
+          join(fixture, 'vitest.cmd'),
+          '@echo off\r\nnode "%~dp0capture.cjs" %*\r\n'
+        );
+        const wrapper = resolve(
+          import.meta.dirname,
+          '../../../apps/web/scripts/vitest-wrapper.mjs'
+        );
+        execFileSync(
+          process.execPath,
+          [
+            wrapper,
+            '--',
+            'run',
+            '--coverage',
+            '--changed',
+            'unused-base',
+            ...extra,
+          ],
+          {
+            cwd: resolve(import.meta.dirname, '../../../apps/web'),
+            env: {
+              ...process.env,
+              PATH: `${fixture}${process.platform === 'win32' ? ';' : ':'}${process.env.PATH}`,
+              CI: ci,
+              VITEST_LOCAL_MAX_WORKERS: '3',
+              VITEST_CAPTURE_ARGS: output,
+              JOVIE_COVERAGE_INCLUDE: 'scripts/vitest-local-workers.mjs',
+              JOVIE_COVERAGE_RELATED_TESTS:
+                'tests/unit/ci/vitest-local-workers.test.ts',
+            },
+          }
+        );
+        /** @type {string[]} */
+        const args = JSON.parse(readFileSync(output, 'utf8'));
+        expect(args[0]).toBe('related');
+        expect(args).toContain('scripts/vitest-local-workers.mjs');
+        expect(args).toContain('tests/unit/ci/vitest-local-workers.test.ts');
+        expect(args).not.toContain('--changed');
+        const limits = args.filter(arg => arg.startsWith('--maxWorkers'));
+        expect(limits).toEqual(expected ? [expected] : []);
+      } finally {
+        rmSync(fixture, { recursive: true, force: true });
+      }
+    }
+  );
 });

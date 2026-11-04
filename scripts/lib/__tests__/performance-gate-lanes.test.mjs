@@ -41,17 +41,27 @@ describe('exact-build performance gate lanes', () => {
       '--runs 3',
       '--runs 5',
       '--route-id creator-tasks',
-      '--route-id public-profile-releases',
+      'public-profile-releases',
       '--lcp-report-only',
       'fail_performance_gate "Canonical six-route browser budgets failed',
-      'fail_performance_gate "Exact staged-build public-profile alias budgets failed."',
+      'fail_performance_gate "Exact staged-build public-profile alias budgets failed on certified pages (${blocking})."',
       'fail_performance_gate "Throttled-mobile entry-route CLS or measurement failed',
     ]) {
       expect(gate.run).toContain(needle);
     }
     expect(gate.run).not.toContain('|| true');
     expect(gate['continue-on-error']).toBeUndefined();
-    expect(gate.run).not.toContain('::warning::');
+    // Two warnings, both from the certified-only alias rule (Tim 2026-10-31):
+    // uncertified routes that miss, and an unreadable ledger (which also
+    // files a P1 so it is never silent).
+    const warnings = gate.run.match(/::warning::/g) ?? [];
+    expect(warnings).toHaveLength(2);
+    expect(gate.run).toMatch(
+      /if \[ "\$certification" != 'present' \]; then[\s\S]*?::warning::Golden-path certification ledger[\s\S]*?alias-ledger-unreadable-intake\.mjs/
+    );
+    expect(gate.run).toMatch(
+      /if ! staged_alias_guard \$warning; then\s+echo "::warning::Exact staged-build public-profile alias budgets missed on uncertified pages[\s\S]*?staged-alias-perf-intake\.mjs/
+    );
   });
 
   it('runs two lanes concurrently and fails unless both exit 0', () => {
@@ -69,7 +79,7 @@ describe('exact-build performance gate lanes', () => {
     expect(passed).toBeGreaterThan(decide);
   });
 
-  const run = failingMatch => {
+  const run = (failingMatch, { certify = false } = {}) => {
     const temp = mkdtempSync(join(tmpdir(), 'perf-lanes-'));
     try {
       const bin = join(temp, 'bin');
@@ -85,7 +95,15 @@ describe('exact-build performance gate lanes', () => {
       );
       stub(
         'node',
-        'echo \'{"cookies":[1]}\' > "$PERFORMANCE_AUTH_STATE_PATH"; exit 0'
+        [
+          'case "$1" in',
+          '  *alias-gate-certified-routes.mjs) shift;',
+          '    if [ -n "${CERTIFY:-}" ]; then echo certification=present; echo "blocking=$*";',
+          '    else echo certification=unavailable; echo "warning=$*"; fi; exit 0;;',
+          '  *staged-alias-perf-intake.mjs) echo "intake=$*" >> "$GITHUB_OUTPUT"; exit 0;;',
+          'esac',
+          'echo \'{"cookies":[1]}\' > "$PERFORMANCE_AUTH_STATE_PATH"; exit 0',
+        ].join('\n')
       );
       stub('jq', 'exit 0');
       stub(
@@ -107,6 +125,7 @@ describe('exact-build performance gate lanes', () => {
           GITHUB_WORKSPACE: temp,
           GITHUB_OUTPUT: join(temp, 'out'),
           DOPPLER_TOKEN: 'x',
+          CERTIFY: certify ? '1' : '',
           E2E_PROD_USER_EMAIL: 'e',
           DATABASE_URL: 'd',
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: 's',
@@ -129,13 +148,23 @@ describe('exact-build performance gate lanes', () => {
     expect(result.output).toContain('authenticated_performance_status=passed');
   });
 
-  for (const failing of [
-    'creator-tasks',
-    'public-profile-tip',
-    'lighthouse-entry-gate',
+  it('warns and files a perf ticket when an uncertified alias route misses', () => {
+    const result = run('public-profile-tip');
+    expect(result.status).toBe(0);
+    expect(result.output).toMatch(/^performance_status=passed$/m);
+    expect(result.output).toMatch(
+      /^intake=.*--routes public-profile-listen .*public-profile-tip/m
+    );
+    expect(result.stdout).toContain('::warning::');
+  });
+
+  for (const { failing, certify } of [
+    { failing: 'creator-tasks', certify: false },
+    { failing: 'public-profile-tip', certify: true },
+    { failing: 'lighthouse-entry-gate', certify: false },
   ]) {
-    it(`blocks promotion when ${failing} fails`, () => {
-      const result = run(failing);
+    it(`blocks promotion when ${failing} fails${certify ? ' on a certified page' : ''}`, () => {
+      const result = run(failing, { certify });
       expect(result.status).toBe(1);
       expect(result.output).toContain(
         'failure_subtype=exact_build_performance_failed'

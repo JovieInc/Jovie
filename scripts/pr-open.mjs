@@ -579,11 +579,20 @@ export async function refreshBodyChecks(
       );
   };
   try {
-    // The second event carries the exact final body; no commits, pushes or reruns.
-    edit(
-      `${body.trimEnd()}\n\n<!-- pr-open-refresh: ${Date.now()}-${process.pid} -->\n`
-    );
-    edit(body);
+    // A body or title change emits its own edited event carrying the exact
+    // final body, so one PATCH is one fresh flight. The marker round-trip is
+    // kept only for a byte-identical update, where GitHub emits no event at
+    // all and a forced mutation is the only way to request fresh checks
+    // (JOV-10354: the unconditional double PATCH doubled every update's
+    // Source Validation flights).
+    if (body === pr.body && title === pr.title) {
+      edit(
+        `${body.trimEnd()}\n\n<!-- pr-open-refresh: ${Date.now()}-${process.pid} -->\n`
+      );
+      edit(body);
+    } else {
+      edit(body);
+    }
     for (let attempt = 0; attempt < 5; attempt++) {
       const fresh = runs().filter(
         r =>
@@ -690,7 +699,7 @@ export async function main(
       }
     } else {
       const { changedFiles } = await import('./preflight-changed.mjs');
-      files = changedFiles(a.repo, a.base).files;
+      files = changedFiles(a.repo, baseRef).files;
       subjects = git(['log', '--format=%s', `origin/${a.base}..HEAD`])
         .stdout.trim()
         .split('\n')
@@ -801,15 +810,54 @@ export async function main(
     try {
       const bodyFile = path.join(dir, 'body.md');
       writeFileSync(bodyFile, body);
+      const branchResult = git(['branch', '--show-current']);
+      const branch = branchResult.stdout.trim();
+      const local = git(['rev-parse', 'HEAD']);
+      const expectedHead = local.stdout.trim();
+      if (
+        branchResult.status !== 0 ||
+        !branch ||
+        local.status !== 0 ||
+        !/^[0-9a-f]{40}$/.test(expectedHead)
+      )
+        throw new Error(
+          'publication-head: cannot resolve the intended branch and commit'
+        );
       if (!a.noPush) {
         const push = git(['push', '-u', 'origin', 'HEAD'], {
           stdio: 'inherit',
         });
         if (push.status !== 0) return push.status ?? 1;
       }
+      // A narrow origin.fetch may not map this branch to @{upstream}, even
+      // after a successful push. Prove the intended remote head, then name it
+      // explicitly; never recover by pushing again or bypassing publication gates.
+      const remoteRef = `refs/heads/${branch}`;
+      const published = git(
+        ['ls-remote', '--exit-code', '--heads', 'origin', remoteRef],
+        { timeout: 30_000 }
+      );
+      if (published.status !== 0)
+        throw new Error(
+          `publication-head: remote head unavailable for ${branch}`
+        );
+      const refs = published.stdout
+        .trim()
+        .split(/\r?\n/)
+        .map(line => line.trim().split(/\s+/));
+      if (
+        refs.length !== 1 ||
+        refs[0][0] !== expectedHead ||
+        refs[0][1] !== remoteRef
+      )
+        throw new Error(
+          `publication-head: remote head does not match the intended commit for ${branch}`
+        );
       const made = github(a.repo, [
         'pr',
         'create',
+        '--head',
+        branch,
         '--repo',
         REPOSITORY,
         '--base',

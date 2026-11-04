@@ -2,7 +2,7 @@
 // release-integrity repair 2, founder decision 2026-10-21).
 //
 // A candidate whose range artifact (`jovie.release-range-risk/v1`) affects
-// a golden-path surface, or is unknown, may be promoted only with successful, fresh,
+// a golden-path consequence, or is unknown, may be promoted only with successful, fresh,
 // exact-candidate evidence for BOTH the auth and billing journeys, produced by
 // a run that actually executed them. Never counted: dispatch success, skipped
 // tests, mocked providers, expired quarantine exclusions, exit-0 placeholders,
@@ -21,6 +21,8 @@
 export const EVIDENCE_SCHEMA = 'jovie.journey-evidence/v1';
 export const OVERRIDE_SCHEMA = 'jovie.promotion-recovery-override/v1';
 export const GATE_SCHEMA = 'jovie.promotion-journey-gate/v1';
+export const JOURNEY_POLICY_VERSION =
+  'jovie.promotion-journey-policy/2026-11-04.1';
 export const REQUIRED_JOURNEYS = ['auth', 'billing'];
 /** Evidence older than this at decision time is stale. */
 export const DEFAULT_FRESHNESS_MS = 6 * 60 * 60 * 1000;
@@ -32,31 +34,80 @@ const SHA = /^[0-9a-f]{40}$/;
 const AUTOMATION_APPROVER =
   /bot|github-actions|automation|system|claude|agent|hermes/i;
 
+// Bounded consequence mapping over the existing range-risk receipt, not a
+// replacement risk classifier. These entrypoints still select the Web lane,
+// medium release evidence and exact-route browser/visual checks. Their imported
+// shared owners are unchanged only when the COMPLETE range contains these
+// leaves alone. Any additional input retains the protected journey requirement.
+const ISOLATED_MARKETING_ENTRYPOINTS = new Set([
+  'apps/web/app/(marketing)/about/page.tsx',
+  'apps/web/app/(marketing)/artist-profiles/page.tsx',
+]);
+
 export function journeysRequired(range) {
   if (!range || range.schema !== 'jovie.release-range-risk/v1') return true;
   if (
-    !SHA.test(range.candidateSha ?? '') ||
-    !SHA.test(range.baseDeployedSha ?? '') ||
+    typeof range.candidateSha !== 'string' ||
+    !SHA.test(range.candidateSha) ||
+    typeof range.baseDeployedSha !== 'string' ||
+    !SHA.test(range.baseDeployedSha) ||
     range.unknown !== false
   )
     return true;
   const a = range.affects;
   if (
     !a ||
-    ['auth', 'billing', 'unknown'].some(key => typeof a[key] !== 'boolean')
+    [
+      'auth',
+      'billing',
+      'publicUi',
+      'proxy',
+      'database',
+      'config',
+      'automation',
+      'ci',
+      'agent',
+      'unknown',
+    ].some(key => typeof a[key] !== 'boolean')
   )
     return true;
-  // Every golden-path surface is a promotion input: sign-in, billing, the
-  // public profile and release pages, the proxy that routes them, and the
-  // database that holds the claim. Docs-, tests- and tooling-only ranges stay
-  // exempt because they grade as none of these.
-  return (
+  // Shared runtime/config and activation include the dependencies of claim,
+  // auth and billing even when the coarse receipt names neither directly.
+  if (
     a.auth === true ||
     a.billing === true ||
-    a.publicUi === true ||
     a.proxy === true ||
     a.database === true ||
+    a.config === true ||
+    a.automation === true ||
     a.unknown === true
+  )
+    return true;
+  if (a.publicUi !== true) return false;
+
+  // Never infer marketing independence from publicUi alone, a directory
+  // prefix, the newest commit, or a missing/contradictory path receipt.
+  return !(
+    range.baseDeployedSha !== range.candidateSha &&
+    range.level === 'medium' &&
+    a.ci === false &&
+    a.agent === false &&
+    Array.isArray(range.unknownReasons) &&
+    range.unknownReasons.length === 0 &&
+    Array.isArray(range.matchedRuleIds) &&
+    range.matchedRuleIds.length === 1 &&
+    range.matchedRuleIds[0] === 'public-ui' &&
+    range.requiresPreview === true &&
+    range.requiresSmoke === false &&
+    range.blocksUnattended === false &&
+    Array.isArray(range.paths) &&
+    range.paths.length > 0 &&
+    range.paths.every(
+      row =>
+        row?.class === 'public-ui' &&
+        row.level === 'medium' &&
+        ISOLATED_MARKETING_ENTRYPOINTS.has(row.path)
+    )
   );
 }
 
@@ -174,6 +225,7 @@ export function evaluatePromotion({
   const candidateSha = range?.candidateSha ?? null;
   const base = {
     schema: GATE_SCHEMA,
+    policyVersion: JOURNEY_POLICY_VERSION,
     candidateSha,
     evaluatedAt: now.toISOString(),
   };

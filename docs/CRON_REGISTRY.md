@@ -10,6 +10,10 @@
 > **JOV-5852:** execution follows information, not time. A GitHub Actions cron must declare `# clock-class:` (`skip-if-unchanged` | `production-liveness` | `temporal-resource` | `upstream-advisory`). Do not add a clock when a causal event already exists.
 > **JOV-INV-042 (2026-10-11):** GitHub cron is frozen. `scripts/lib/ci-schedule-inventory.mjs` keeps `CRON_KEEP_REASONS` (since 2026-10-12 every kept clock names its time-bound external fact, calendar window, real resource limit, or owner-tracked replacement), `ADMISSION_CRON_DEBT`, and `POLLING_DEBT`; each list only shrinks. Admission and landing are event-driven or run from the Gem lanes tick; no workflow polls GitHub state.
 
+## Shared scheduler rule (2026-10-31)
+
+One scheduler per platform ([`canon/schedulers.json`](../canon/schedulers.json)): Vercel `frequent`, Gem lanes tick, GitHub Production Continuity Guard (follow it with `workflow_run`), Summer heartbeat; Mac and Cloudflare are planned. A new timer-driven entry in `canon/automation-registry.jsonl` must set `clock.scheduler` to its platform's scheduler and `clock.whyNotEvent` to why no event (webhook, queue insert, deploy hook, relay connect) can do the job; `validateScheduling` fails CI otherwise. Pre-existing timers are `grandfathered` and that list only shrinks. Inventory with runs per day: `node scripts/automation-schedule-inventory.mjs`.
+
 ## Codex Workspace Automations
 
 Codex automations are heartbeats that wake one live goal thread; Codex is on-demand and is not a scheduler. The active ones are registered as `codex:*` in the registry with a migrate note (pause when the goal closes). The 2026-10-20 sweep archived 16 paused heartbeats to `~/.local/state/retired-loops/2026-10-20/codex-automations/` on the ops Mac. The `pr-comment-hardening-retro` and `weekly-agent-readiness` automations this page used to list were not installed there; their scripts (`scripts/pr-comment-retro.mjs`, `scripts/weekly-agent-readiness.mjs`) run on demand. Recurring needs go to the lanes tick, not a new Codex heartbeat.
@@ -31,7 +35,7 @@ Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on G
 | `Golden Path Nightly` | `23 9 * * *` UTC (skip-if-unchanged) + manual | JOV-6920: dispatches the real-auth + Stripe test-mode Golden Path lane in `ci.yml` on `main` and exits (skipped when main has a green Golden Path under 24 h old). The dispatched run's `Golden Path Report` job files one fingerprinted P0 Linear issue on red or resolves it on green; a red run reopens the existing issue into Todo. Acquisition eligibility reads that ci.yml job, not this dispatcher. Its completion also starts the daily `claim-checkout-dogfood.yml` run ($12 claim browser dogfood, Stripe test mode, `workflow_run`), which also runs after every successful Staging Controller and files its own fingerprinted issue. | `.github/workflows/golden-path-nightly.yml` |
 | `Security Scanning` | `0 14 * * 1` UTC (upstream-advisory) + push to `main` + manual | JOV-7565: weekly dependency/SAST baseline — upstream OSV/Semgrep advisories publish on their own clock, so push-only triggers can miss new findings on unchanged source. Uploads SARIF with read-contents/security-events only. | `.github/workflows/security.yml`, `scripts/security/` |
 | `VOC Mine` | `0 14 * * 1` UTC (upstream-advisory) + manual | JOV-7701: weekly mining of public complaints and payment objections about the tools Jovie replaces (app reviews, review pages, HN). Uploads anonymized classified items as a 90-day artifact. Skips until `VOC_TARGETS_JSON` and `EXA_API_KEY` secrets exist; on-demand runs publish dated receipts to gbrain `ops/voc/`. | `.github/workflows/voc-mine.yml`, `scripts/voc/README.md` |
-| `Remediation Sweep` | `11 8 * * *` UTC daily; `17 8 * * 1` UTC weekly + manual `dry_run` | JOV-7552/JOV-7592: files or reopens fingerprinted Linear issues when a watched failure returns. Weekly: open-draft rollup. Daily: `lane-fix-exhausted` older than 24h, hold labels idle more than 7d, terminal-red non-draft `summer-config` PRs, Summer receipt staleness, Vercel production ERROR, and the credentials/spend registry (`--mode credentials`: expiry 7d/1d, runway under 14 days, 50/80/100% caps, unowned secrets; `docs/COST_MONITORING.md` Layer 3). GitHub reads are limited to Jovie and summer-config. The Vercel job skips with a warning when no read-only token secret is set. | `.github/workflows/remediation-sweep.yml` |
+| `Remediation Sweep` | `11 8 * * *` UTC daily; `17 8 * * 1` UTC weekly + manual `dry_run` | JOV-7552/JOV-7592: files or reopens fingerprinted Linear issues when a watched failure returns. Weekly: open-draft rollup. Daily: `lane-fix-exhausted` older than 24h on unheld PRs (held PRs belong to the hold nag), hold labels idle more than 7d, terminal-red non-draft `summer-config` PRs, Summer receipt staleness, Vercel production ERROR, and the credentials/spend registry (`--mode credentials`: expiry 7d/1d, runway under 14 days, 50/80/100% caps, unowned secrets; `docs/COST_MONITORING.md` Layer 3). GitHub reads are limited to Jovie and summer-config. The Vercel job skips with a warning when no read-only token secret is set. | `.github/workflows/remediation-sweep.yml` |
 | `Production Synthetic Monitoring` | `17 */6 * * *` UTC for deep browser synthetics; `47 7 * * *` UTC for Web AI health; manual | Existing front-door/auth/profile coverage plus one daily production Gateway turn for web chat, insights, pitches, titles, and packaging. Web AI failures emit a redacted receipt, Slack alert, and high-priority Linear bug signal with the founder allowlist name. | `.github/workflows/synthetic-monitoring.yml` |
 | `Summer Eve identity check` | `17 * * * *` UTC (hourly) + `workflow_dispatch` + every pull request | Rejects a Summer per-deployment URL or deployment-id pin in source. On schedule, manual dispatch, and pull requests that touch the Summer bridge (the identity job only boots then; other PRs run the pin guard alone), confirms `https://summer.jov.ie/runtime/v1/identity` is source-bound production project `prj_LaVQva346cjp5XfrbAIIQUln7tPH`. A Vercel readback runs only when `SUMMER_PIN_CHECK_VERCEL_TOKEN` is present. | `.github/workflows/summer-eve-pin.yml` |
 
@@ -92,19 +96,19 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 
 | Cron Path | Schedule | Frequency |
 |-----------|----------|-----------|
-| `/api/cron/frequent` | `*/15 * * * *` | Every 15 minutes |
+| `/api/cron/frequent` | `*/30 * * * *` | Every 30 minutes (cut 2026-10-29 from `*/15 * * * *`: zero-user cost cut) |
 | `/api/cron/daily-maintenance` | `0 0 * * *` | Daily at midnight UTC |
 | `/api/cron/generate-insights` | `0 5 * * *` | Daily at 05:00 UTC |
-| `/api/cron/process-ingestion-jobs` | `*/6 * * * *` | Every 6 minutes (JOV-2500: lets Neon 5min autosuspend reclaim compute) |
-| `/api/cron/process-merch-fulfillment` | `*/10 * * * *` | Every 10 minutes |
+| `/api/cron/process-ingestion-jobs` | `*/30 * * * *` | Every 30 minutes (cut 2026-10-29 from `*/6 * * * *`: zero-user cost cut) (JOV-2500: lets Neon 5min autosuspend reclaim compute) |
+| `/api/cron/process-merch-fulfillment` | `*/30 * * * *` | Every 30 minutes (cut 2026-10-29 from `*/10 * * * *`: zero-user cost cut) |
 | `/api/cron/purge-pixel-ips` | `0 3 * * *` | Daily at 03:00 UTC |
-| `/api/cron/summarize-interviews` | `*/5 * * * *` | Every 5 minutes |
+| `/api/cron/summarize-interviews` | `0 * * * *` | Hourly (cut 2026-10-29 from `*/5 * * * *`: zero-user cost cut) |
 | `/api/cron/generate-playlist` | `0 6 * * *` | Daily at 06:00 UTC |
 | `/api/cron/process-pre-saves` | `0 2 * * *` | Daily at 02:00 UTC |
 | `/api/cron/monitor-metadata-submissions` | `0 * * * *` | Hourly |
 | `/api/cron/process-metadata-submissions` | `0 4 * * *` | Daily at 04:00 UTC |
-| `/api/cron/process-workflow-runs` | `*/6 * * * *` | Every 6 minutes (403 at the trusted-origin check on every call as of 2026-10-20) |
-| `/api/cron/voice-pipeline` | `*/5 * * * *` | Every 5 minutes (missing from the unused root `vercel.json`) |
+| `/api/cron/process-workflow-runs` | `0 * * * *` | Hourly (cut 2026-10-29 from `*/6 * * * *`: zero-user cost cut) (403 at the trusted-origin check on every call as of 2026-10-20) |
+| `/api/cron/voice-pipeline` | `0 * * * *` | Hourly (cut 2026-10-29 from `*/5 * * * *`: zero-user cost cut) (missing from the unused root `vercel.json`) |
 | `/api/cron/public-profile-canary` | `13 6 * * *` | Daily at 06:13 UTC |
 | `/api/cron/auth-signup-onboarding-canary` | `23 6 * * *` | Daily at 06:23 UTC (JOV-1871) |
 | `/api/cron/artist-daily-snapshots` | `15 9 * * *` | Daily at 09:15 UTC. No-op unless `ARTIST_DAILY_SNAPSHOTS` is true. YouTube Data API statistics when `YOUTUBE_DATA_API_KEY` is set; Wikimedia pageviews. Social HTML waits for isolated egress. |
@@ -157,6 +161,7 @@ Source: `apps/web/app/api/cron/frequent/route.ts`
 | 9 | aiCrawlerAnalytics | Every day | Syncs Cloudflare zone AI-crawl analytics into `ai_crawler_analytics_snapshots` per artist profile when configured |
 | 10 | releaseOutcomeReconciliation | Every day | Reconciles bounded release-workflow outcome snapshots and fails visibly on partial errors |
 | 11 | founderReviewUploadLeases | Every day | Deletes expired private founder-review uploads that never bound to a receipt; quarantines and reports cleanup failures |
+| 11c | legacyClaimSweep | Every day, only with `FEATURE_CLAIM_LEGACY_PROOF_SWEEP=true` | Grandfathered (legacy) claims: stamps the 30-day nudge stage once, then reopens 50k+ claims past the window as proof-only requests (page private) with a review card. Bounded to 200 rows per run; idempotent |
 | 12 | dataRetention | **Sundays only** | Heavy: purges old analytics, click events, audience members, pixel events, webhook events, audit logs, chat messages, ingestion jobs per retention policy |
 
 > **Note:** `scheduleNotifications` was previously listed here but has been called directly from `/api/cron/frequent` for sub-hourly scheduling. It is NOT a daily-maintenance sub-job. See AUTOMATION_AUDIT.md for rationale.

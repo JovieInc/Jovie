@@ -39,6 +39,24 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual(got["files"], ["scripts/a.test.mjs", "scripts/b.test.mjs"])
         self.assertEqual(got["checks"], ["Source Validation"])
 
+    def test_component_test_errors_outrank_mocked_infra_and_name_required_tests(self):
+        tests = ["apps/web/tests/components/profile/ProfileDrawerShell.interaction.test.tsx",
+                 "apps/web/tests/unit/cookie-banner-fixes.test.tsx"]
+        errors = [f"::error file=apps/web/components/{name}.tsx::[test-not-touched] "
+                  f"Component changed but test {test} was not touched in this diff. Update the test."
+                  for name, test in zip(["ProfileDrawerShell", "CookieBannerSection"], tests)]
+        log = "passing fixture: github-quota-deferred; API rate limit exceeded\n" + "\n".join(errors + errors)
+        got = classes.classify(pr("Source Validation", merge="BEHIND"), {"Source Validation": log})
+        self.assertEqual((got["cls"], got["action"]), ("component-test-evidence", "agent"))
+        self.assertEqual(got["files"], tests)
+        self.assertNotIn(got["action"], classes.DETERMINISTIC, "real regression coverage needs a repair")
+
+    def test_component_test_explanation_without_error_annotation_is_not_a_failure(self):
+        got = classes.classify(pr("Source Validation"), {"Source Validation":
+            "passing test explains [test-not-touched] Component changed but test "
+            "apps/web/tests/unit/example.test.tsx was not touched in this diff."})
+        self.assertEqual(got["cls"], "other")
+
     def test_mixed_classes_go_to_the_model_and_behind_branches_sync_main(self):
         mixed = classes.classify(pr("A", "B"), {"A": "API rate limit exceeded", "B": "AssertionError"})
         self.assertEqual((mixed["cls"], mixed["action"]), ("mixed", "agent"))
@@ -541,6 +559,54 @@ class MeasureTest(unittest.TestCase):
         rows = self.rows()
         self.assertEqual(classes.breaker_n(rows), 2)
         self.assertEqual(classes.breaker_n([]), classes.DEFAULT_BREAKER_N)
+
+
+class ReleaseIdentityStubTest(unittest.TestCase):
+    SNIPPET = """
+class T(unittest.TestCase):
+    def test_backoff(self):
+        identity = patch.object(lane, "release_identity", return_value={"bundleDigest": "t1", "sourceCommit": "a" * 40})
+        lane.install_release(host)
+
+    def test_custody(self):
+        bundle = {"bundleDigest": "b" * 64, "sourceCommit": "a" * 40}
+        patch.object(lane, "release_identity", return_value=bundle)
+        lane.install_release(self.host)
+
+    def test_multiline(self):
+        bundle = {
+            "bundleDigest": "b" * 64,
+        }
+        patch.object(lane, "release_identity", return_value=bundle)
+        lane.install_release(self.host)
+
+    def test_other(self):
+        bundle = {"bundleDigest": "keep"}
+        patch.object(lane, "release_identity", return_value=bundle)
+
+    def test_spread(self):
+        with patch.object(lane, "release_identity", return_value={**self.manifest, "sourceCommit": "b" * 40}):
+            lane.install_release(self.host)
+"""
+
+    def test_stubs_that_reach_install_release_gain_objects_once(self):
+        once = classes.complete_release_identity_stubs(self.SNIPPET)
+        self.assertEqual(classes.complete_release_identity_stubs(once), once)
+        self.assertIn(
+            'return_value={"bundleDigest": "t1", "sourceCommit": "a" * 40, "objects": {"scripts/lanes": "f" * 40}}',
+            once)
+        self.assertIn(
+            'bundle = {"bundleDigest": "b" * 64, "sourceCommit": "a" * 40, "objects": {"scripts/lanes": "f" * 40}}',
+            once)
+        self.assertIn('bundle = {\n            "bundleDigest": "b" * 64,\n        }', once)
+        self.assertIn('bundle = {"bundleDigest": "keep"}', once)
+        self.assertIn('{**self.manifest, "sourceCommit": "b" * 40}', once)
+        self.assertEqual(once.count('"objects"'), 2)
+
+    def test_checked_in_lane_runner_tests_need_no_further_stub_completion(self):
+        path = Path(__file__).resolve().parents[1] / "tests" / "test_lane_runner.py"
+        text = path.read_text()
+        self.assertEqual(classes.complete_release_identity_stubs(text), text)
 
 
 if __name__ == "__main__":
