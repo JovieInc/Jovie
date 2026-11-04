@@ -44,9 +44,15 @@ describe('(home) layout hydration', () => {
     expect(await renderHtml('/')).toBe(server);
   });
 
-  it('always renders the homepage page-contract marker and /start CTA', async () => {
+  it('always renders the homepage page-contract marker and role-waitlist CTA', async () => {
     const html = await renderHtml(null);
-    expect(html).toContain('data-primary-cta="true"');
-    expect(html).toContain('href="/start"');
+    const markup = document.createElement('div');
+    markup.innerHTML = html;
+    const contractCta = markup.querySelector('[data-primary-cta="true"]');
+    expect(contractCta).toHaveAttribute('href', '/#waitlist');
+    expect(contractCta).toHaveTextContent('Join the waitlist');
+    expect(
+      markup.querySelector('header a[href="#waitlist"]')
+    ).toHaveTextContent('Join the waitlist');
   });
 });

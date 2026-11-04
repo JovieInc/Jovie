@@ -3,13 +3,12 @@ import { resolveMarketingHeaderPrimaryCta } from '@/components/site/MarketingHea
 import { APP_ROUTES } from '@/constants/routes';
 import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { MARKETING_PAGE_CONTRACTS } from '@/data/marketing/pageContracts';
-import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
 
 /**
  * JOV-6860: the marketing header's primary CTA label must come from the one
  * waitlist-mode front-door source on every route. Per-route divergence (the
- * artist-profiles "Get started" drift) fails here. The homepage claim
- * → /start lock (JOV-5085) is the only sanctioned override.
+ * artist-profiles "Get started" drift) fails here. The homepage's canonical
+ * role waitlist is the only route-specific override.
  */
 const HEADER_MANIFEST_ROUTES = Object.values(MARKETING_PAGE_CONTRACTS)
   .map(contract => contract.url)
@@ -38,13 +37,13 @@ describe('marketing header CTA consistency', () => {
     });
   }
 
-  it('keeps the homepage header on the claim-profile intent → /start in both modes', () => {
+  it('keeps the homepage header on its role waitlist in both marketing modes', () => {
     for (const waitlistEnabled of [true, false]) {
       expect(
         resolveMarketingHeaderPrimaryCta(APP_ROUTES.HOME, waitlistEnabled)
       ).toEqual({
-        label: MARKETING_CTA_INTENTS.claimProfile.label,
-        href: MARKETING_CTA_INTENTS.claimProfile.href,
+        label: 'Join the waitlist',
+        href: '#waitlist',
       });
     }
   });

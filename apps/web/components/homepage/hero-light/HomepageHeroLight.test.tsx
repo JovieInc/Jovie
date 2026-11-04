@@ -151,15 +151,24 @@ describe('HomepageArtistHero', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       HOMEPAGE_COPY.hero.headline
     );
-    // PublicPageShell owns navigation; the hero keeps one claim form.
+    // PublicPageShell owns navigation; the hero keeps one discovery form.
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Jovie' })).toBeNull();
-    expect(screen.getAllByTestId('homepage-claim-form')).toHaveLength(1);
-    expect(screen.getByTestId('homepage-claim-form')).toHaveAttribute(
-      'action',
-      '/start'
-    );
+    const searchInput = screen.getByRole('textbox', {
+      name: 'Search your name',
+    });
+    expect(
+      searchInput.closest('search')?.querySelectorAll('form')
+    ).toHaveLength(1);
+    expect(searchInput.closest('form')).toHaveAttribute('action', '/waitlist');
+    expect(screen.queryByTestId('homepage-claim-form')).toBeNull();
+    expect(
+      screen.getByRole('link', { name: HOMEPAGE_COPY.hero.claim.action })
+    ).toHaveAttribute('href', '#waitlist');
+    expect(
+      screen.getByRole('link', { name: HOMEPAGE_COPY.access.invite })
+    ).toHaveAttribute('href', '/signin');
     const light = screen.getByTestId('homepage-hero-light');
     expect(light).toHaveAttribute('data-renderer', 'css');
     expect(light.querySelector('canvas')).toBeNull();
