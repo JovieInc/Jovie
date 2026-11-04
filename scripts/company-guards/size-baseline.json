@@ -1162,7 +1162,7 @@
   "scripts/preflight-changed.mjs": 1011,
   "scripts/preflight-changed.test.mjs": 1097,
   "scripts/preflight.mjs": 832,
-  "scripts/preflight.test.mjs": 1403,
+  "scripts/preflight.test.mjs": 1411,
   "scripts/prod-errors/prod_errors.py": 950,
   "scripts/prod-errors/test_prod_errors.py": 949,
   "scripts/public-benchmark/public-benchmark.mjs": 1053,

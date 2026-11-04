@@ -831,6 +831,9 @@ test('pre-push Git environment cannot redirect fixture writes into its linked wo
   const fixtureEnv = { ...process.env };
   for (const name of localNames.stdout.trim().split('\n'))
     delete fixtureEnv[name];
+  // The publication hook sets this on the test. This spawn is the preflight
+  // under test, not a nested re-entry.
+  delete fixtureEnv.JOVIE_PREFLIGHT_DEPTH;
   const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'pf-git-env-')));
   const parent = path.join(root, 'parent');
   const linked = path.join(root, 'linked');
@@ -1038,7 +1041,11 @@ jobs:
       ],
       {
         cwd: alias,
-        env: { ...process.env, JOVIE_PREFLIGHT_LEDGER: 'off' },
+        env: {
+          ...process.env,
+          JOVIE_PREFLIGHT_LEDGER: 'off',
+          JOVIE_PREFLIGHT_DEPTH: '',
+        },
         encoding: 'utf8',
         timeout: 30000,
       }
@@ -1081,6 +1088,7 @@ jobs:
         cwd: real,
         env: {
           ...process.env,
+          JOVIE_PREFLIGHT_DEPTH: '',
           TMPDIR: tempAlias,
           PREFLIGHT_CLASSIFIER: path.join(
             ROOT,
