@@ -71,11 +71,15 @@ function collectSpecs(suites = [], source, required = true) {
   return specs;
 }
 
-function acknowledgedSkipText(testCase) {
+function acknowledgedSkipText(testCase, marker = null) {
   const chunks = [];
   const push = value => {
     if (typeof value !== 'string') return;
-    if (!ACKNOWLEDGED_SKIP_MARKERS.some(marker => value.includes(marker))) {
+    if (
+      !(marker
+        ? value.includes(marker)
+        : ACKNOWLEDGED_SKIP_MARKERS.some(item => value.includes(item)))
+    ) {
       return;
     }
     chunks.push(value.replace(/\s+/g, ' ').trim());
@@ -263,8 +267,25 @@ function parseSyntheticTestResults({
     ...(skipped.length > 0
       ? [
           'Skipped tests:',
-          ...skipped.map(({ source, spec }) => `${source}: ${spec.title}`),
+          ...skipped.map(({ source, spec, testCase }) => {
+            // A skip that fails the run must name its cause inline: the
+            // Slack "Failed Tests" block and the Linear intake body are the
+            // only surfaces most readers see (JOV-6813 — a waitlist skip
+            // used to report as a bare "Skipped tests" line with no reason).
+            const reason = acknowledgedSkipText(testCase);
+            return reason
+              ? `${source}: ${spec.title} (skip reason: ${reason})`
+              : `${source}: ${spec.title}`;
+          }),
         ]
+      : []),
+    // The resolver's OTP_SKIP_REASON is the authoritative cause (it knows
+    // whether secrets were verified absent vs. a Doppler read failure) —
+    // attach it only when a required skip identifies OTP as its cause.
+    ...(requiredSkipped.some(({ testCase }) =>
+      acknowledgedSkipText(testCase, OTP_SKIP_MARKER)
+    ) && otpReason
+      ? [`Skip cause: ${otpReason}`]
       : []),
   ];
 

@@ -283,6 +283,11 @@ jobs:
               if [ "$i" -eq 3 ]; then exit 1; fi
             done
             node .github/scripts/materialize-vercel-static.mjs
+            # Source maps are for Sentry upload only; never publish them.
+            if find .vercel/output/static -name '*.map' -print -quit | grep -q .; then
+              echo "::error::Source maps leaked into .vercel/output/static."
+              exit 1
+            fi
             # Vercel's function trace references the generated robots response at
             # its public-file path even though the source route is app/robots.ts.
             test -f apps/web/.next/server/app/robots.txt.body
@@ -1043,6 +1048,10 @@ jobs:
           fi
           if ! node .github/scripts/materialize-vercel-static.mjs; then
             fail_stage "Production static asset materialization failed." production_artifact_failed
+          fi
+          # Source maps are for Sentry upload only; never publish them.
+          if find .vercel/output/static -name '*.map' -print -quit | grep -q .; then
+            fail_stage "Source maps leaked into the public static output." production_artifact_failed
           fi
 
           # Measure the exact cache subtree before a separate save action can

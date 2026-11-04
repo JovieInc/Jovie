@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -25,6 +26,38 @@ const registry = loadRegistry(repoRoot);
 const NOW = Date.parse('2026-10-20T19:35:00Z');
 const iso = minutesAgo => new Date(NOW - minutesAgo * 60_000).toISOString();
 describe('automation registry', () => {
+  it('keeps every hosted gist heartbeat root in the bounded public feed', () => {
+    // This checkout contract belongs here: immutable lanes release bundles do
+    // not include the automation registry (JOV-9115).
+    const keys = JSON.parse(
+      execFileSync(
+        'python3',
+        [
+          '-c',
+          [
+            'import ast,json,pathlib',
+            'tree=ast.parse(pathlib.Path("scripts/lanes/doctor.py").read_text())',
+            'value=next(n.value for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=="HEARTBEAT_FEED_KEYS" for t in n.targets))',
+            'print(json.dumps(ast.literal_eval(value)))',
+          ].join('; '),
+        ],
+        { cwd: repoRoot, encoding: 'utf8' }
+      )
+    );
+    const roots = registry.entries
+      .filter(
+        entry =>
+          entry.status === 'live' &&
+          entry.receipt?.kind === 'json-timestamp' &&
+          entry.receipt?.url?.includes('gist')
+      )
+      .map(entry => entry.receipt.path.split('.')[0]);
+    expect(roots.length).toBeGreaterThan(0);
+    expect([...new Set(roots)].filter(root => !keys.includes(root))).toEqual(
+      []
+    );
+  });
+
   it('validates the committed registry', () => {
     expect(registry.schema).toBe(REGISTRY_SCHEMA);
     expect(validateRegistry(registry)).toEqual([]);

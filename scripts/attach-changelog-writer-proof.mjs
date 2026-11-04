@@ -2,7 +2,7 @@
 /**
  * Attach the JOV-INV-022 writer-proof receipt
  *
- * api-budget: github-app-core 6/hr - one release-PR read and at most one body write per publish attempt (a few Production Controller runs per day) to the daily-changelog release PR.
+ * api-budget: github-app-core 27/hr - at most three attestation attempts (two PR reads and one body write each), with GET retries owned by the shared client to the daily-changelog release PR.
  *
  * The `publish-customer-changelog` job opens the release PR as a draft, and
  * Auto-Ready green-source undrafts a draft only when its body carries a
@@ -28,7 +28,10 @@
  * Fail-closed: exits non-zero when the PR is not the publisher's own release
  * PR shape, when the built receipt is incomplete, or when the GitHub update
  * fails. Re-runs are idempotent — an existing receipt is replaced only when
- * the head or evidence changed.
+ * the head or evidence changed. Transient PATCH failures get at most three
+ * attempts, each beginning with readback; GET retries and write spacing remain
+ * owned by the shared API client. Exhaustion still leaves the draft for the
+ * existing stale-publication reconciliation; this is not cross-run recovery.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -131,11 +134,15 @@ export function attachReceiptToReleaseBody({
 // GitHub reads/writes go through the shared budgeted client
 // (packages/api-client/cli.ts gh) per .claude/rules/external-apis.md and the
 // external-api-guard ratchet — never a bare `gh` subprocess. Exit 75 is the
-// client's quota deferral: fail closed so the next controller run retries.
+// client's quota deferral: fail closed without starting another retry loop.
 const API_CLIENT_CLI = 'packages/api-client/cli.ts';
 
-function gh(args) {
-  const result = spawnSync(
+/**
+ * @param {string[]} args
+ * @param {(command: string, args: string[], options: { encoding: 'utf8', maxBuffer: number }) => { error?: Error, status: number | null, stdout: string, stderr: string }} [run]
+ */
+export function gh(args, run = spawnSync) {
+  const result = run(
     process.execPath,
     [API_CLIENT_CLI, 'gh', '--priority', 'default', '--', ...args],
     { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }
@@ -143,14 +150,32 @@ function gh(args) {
   if (result.error) throw result.error;
   if (result.status === 75)
     throw new Error('GitHub quota deferred by the shared api-client ledger');
-  if (result.status !== 0)
-    throw new Error(
-      `gh ${args[0]} failed (exit ${result.status}): ${result.stderr.slice(-400)}`
+  if (result.status !== 0) {
+    // The shared client already retries GETs and defers quota/rate failures.
+    // PATCH is non-idempotent there: retry it only after a fresh PR readback.
+    const retryable =
+      args.includes('PATCH') &&
+      /HTTP 50[0234]|timed? ?out|unexpected EOF|connection reset|stream error|couldn't respond|ECONNRESET|ETIMEDOUT|EAI_AGAIN|Bad Gateway|Service Unavailable/i.test(
+        result.stderr
+      ) &&
+      !/rate.?limit|quota|HTTP (?:401|403|429)/i.test(result.stderr);
+    throw Object.assign(
+      new Error(
+        `gh ${args[0]} failed (exit ${result.status}): ${result.stderr.slice(-400)}`
+      ),
+      { retryable }
     );
+  }
   return result.stdout;
 }
 
-function main(argv) {
+function attachOnce(
+  argv,
+  {
+    github = gh,
+    repository = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie',
+  } = {}
+) {
   const flags = {};
   for (let index = 2; index < argv.length; index += 1) {
     if (!argv[index].startsWith('--')) continue;
@@ -161,9 +186,17 @@ function main(argv) {
   }
   const prNumber = Number.parseInt(String(flags.pr ?? ''), 10);
   const headSha = String(flags.head ?? '').toLowerCase();
-  const repository = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
-
-  const pr = JSON.parse(gh(['api', `repos/${repository}/pulls/${prNumber}`]));
+  const pr = JSON.parse(
+    github(['api', `repos/${repository}/pulls/${prNumber}`])
+  );
+  // Never attest the supplied commit if the release branch advanced. Check
+  // before even accepting an existing receipt for that earlier commit.
+  if (String(pr.head?.sha ?? '').toLowerCase() !== headSha) {
+    console.error(
+      `Refusing to attach a changelog writer proof to #${prNumber}: head-mismatch`
+    );
+    return 1;
+  }
   const authorLogin = pr.user?.login ?? '';
   const body = pr.body ?? '';
   const branch = pr.head?.ref ?? '';
@@ -219,7 +252,29 @@ function main(argv) {
     );
     return 0;
   }
-  gh([
+  const fresh = JSON.parse(
+    github(['api', `repos/${repository}/pulls/${prNumber}`])
+  );
+  if (
+    String(fresh.head?.sha ?? '').toLowerCase() !== headSha ||
+    fresh.head?.ref !== branch ||
+    fresh.user?.login !== authorLogin
+  ) {
+    console.error(
+      `Refusing to attach a changelog writer proof to #${prNumber}: pr-changed-before-write`
+    );
+    return 1;
+  }
+  if ((fresh.body ?? '') !== body) {
+    throw Object.assign(
+      new Error('Release PR body changed before writer proof write'),
+      { retryable: true }
+    );
+  }
+  // GitHub documents conditional GETs, but no compare-and-swap for PR bodies.
+  // This fresh read narrows the final GET -> PATCH race; it cannot eliminate it.
+  // https://docs.github.com/en/rest/pulls/pulls#update-a-pull-request
+  github([
     'api',
     '-X',
     'PATCH',
@@ -231,6 +286,20 @@ function main(argv) {
     `Attached ${receipt.schema} to #${prNumber} at ${headSha.slice(0, 12)}`
   );
   return 0;
+}
+
+/** Bounded recovery within this verified publisher attempt, never another PR. */
+export function main(argv, options = {}) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return attachOnce(argv, options);
+    } catch (error) {
+      if (!error.retryable || attempt === 3) throw error;
+      console.warn(
+        `Retrying changelog writer proof after readback (${attempt}/3): ${error.message}`
+      );
+    }
+  }
 }
 
 let directExecution = false;

@@ -292,13 +292,14 @@ export function validateWorkflowReferences(root = process.cwd()) {
       ];
       for (const command of pnpmCommands) {
         for (const match of command[0].matchAll(FILTER_PATTERN)) {
-          const filter = match[1].replace(/[),`]+$/, '');
-          if (
-            filter.startsWith('!') ||
-            filter.includes('*') ||
-            filter.includes('${')
-          )
-            continue;
+          const rawFilter = match[1].replace(/[),`]+$/, '');
+          // Shell quotes protect Turbo/pnpm's exclusion selector. An exact
+          // excluded package must resolve just like an included package.
+          const selector = /^(['"])(.*)\1$/.exec(rawFilter)?.[2] ?? rawFilter;
+          const filter = selector.startsWith('!')
+            ? selector.slice(1)
+            : selector;
+          if (filter.includes('*') || filter.includes('${')) continue;
           if (!workspaceNames.has(filter)) {
             errors.push(
               `${relativeWorkflow}:${index + 1}: pnpm workspace filter does not resolve: ${filter}`
