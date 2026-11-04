@@ -283,7 +283,7 @@ test('5: real locked paths require a GBrain or locking PR reference', () => {
 });
 
 test('test-quality ratchet config stays locked until the body cites the lock', () => {
-  const path = 'config/test-quality/ratchets.json';
+  const path = 'scripts/test-quality/ratchets.json';
   assert.equal(isLockedArea(path), true);
   const bare = check(pr(), [file(path)]);
   assert.ok(

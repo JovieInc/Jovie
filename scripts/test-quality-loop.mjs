@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Test-quality loop driver.
 //   node scripts/test-quality-loop.mjs rank [--out ranked.json] [--top 20]
-// Ranks apps/web modules by how high-touch they are (config/test-quality/surfaces.json
-// tier weight + git churn) so the mutation sweep expands from the top outward.
+// Ranks apps/web modules by how high-touch they are (tier weight + git churn)
+// so the mutation sweep expands from the top outward.
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -17,7 +17,11 @@ import {
   survivorMap,
   survivorsKilled,
 } from './lib/test-quality-metrics.mjs';
-import { parseChurn, rankSurfaces } from './lib/test-quality-rank.mjs';
+import {
+  parseChurn,
+  rankSurfaces,
+  SURFACES_CONFIG_PATH,
+} from './lib/test-quality-rank.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const cfg = rel => JSON.parse(readFileSync(join(repoRoot, rel), 'utf8'));
@@ -35,7 +39,7 @@ const { values, positionals } = parseArgs({
 
 if (positionals[0] === 'rank') {
   const config = JSON.parse(
-    readFileSync(join(repoRoot, 'config/test-quality/surfaces.json'), 'utf8')
+    readFileSync(join(repoRoot, SURFACES_CONFIG_PATH), 'utf8')
   );
   const log = spawnSync(
     'git',
@@ -65,10 +69,10 @@ if (positionals[0] === 'rank') {
       `${String(r.touch).padStart(4)}  ${r.tier.padEnd(14)} ${String(r.commits).padStart(3)}  ${r.file}`
     );
 } else if (positionals[0] === 'report' || positionals[0] === 'ratchet') {
-  const surfaces = cfg('config/test-quality/surfaces.json');
+  const surfaces = cfg(SURFACES_CONFIG_PATH);
   const state = JSON.parse(readFileSync(values.state, 'utf8'));
   const byTier = aggregateByTier(state, surfaces);
-  const ratchets = cfg('config/test-quality/ratchets.json');
+  const ratchets = cfg('scripts/test-quality/ratchets.json');
   const { violations, next } = evaluateFloors(
     byTier,
     ratchets.mutationScoreFloor
@@ -81,7 +85,7 @@ if (positionals[0] === 'rank') {
     if (values.update) {
       ratchets.mutationScoreFloor = next;
       writeFileSync(
-        join(repoRoot, 'config/test-quality/ratchets.json'),
+        join(repoRoot, 'scripts/test-quality/ratchets.json'),
         `${JSON.stringify(ratchets, null, 2)}\n`
       );
     }

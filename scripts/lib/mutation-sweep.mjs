@@ -51,7 +51,7 @@ export function normalizeState(raw) {
  * Unchanged modules are only re-scored after `staleDays`, because a score is a
  * pure function of source + tests and tests change slowly.
  * @param {ReturnType<typeof emptyState>} state
- * @param {{ file: string, blob: string, testCount: number }[]} candidates
+ * @param {{ file: string, blob: string, testCount: number, touch?: number }[]} candidates
  * @param {{ max: number, now?: number, staleDays?: number }} options
  */
 export function pickBatch(

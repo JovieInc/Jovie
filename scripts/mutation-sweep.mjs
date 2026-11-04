@@ -202,7 +202,7 @@ const GENERIC_STEMS = new Set([
   'types',
   'constants',
 ]);
-/** @type {{ file: string, blob: string, testCount: number }[]} */
+/** @type {{ file: string, blob: string, testCount: number, touch?: number }[]} */
 const candidates = [];
 /** @type {Record<string, number>} */
 const touchByFile = values['touch-file']
