@@ -1,0 +1,683 @@
+{
+  "schema": "jovie.proof-stats.registry/v1",
+  "rule": "Every public number Jovie states is a stat here. Copy binds to it as {stat:<id>}; nothing else may write the number. Observations (measured values) live in the proof-stats/observations content record, written only by lib/proof-stats. A stat renders only while it is fresh, over its threshold, public, and (comparative or health) approved by the founder; otherwise the component hides or shows the fallback, never a stale or false number. Methodology: docs/proof/STATS.md.",
+  "milestones": [1, 10, 100, 1000, 10000, 100000, 1000000],
+  "stats": [
+    {
+      "id": "accounts_total",
+      "label": "Artists and teams on Jovie",
+      "unit": "count",
+      "better": "higher",
+      "visibility": "public",
+      "legalClass": "plain",
+      "status": "live",
+      "source": {
+        "kind": "production",
+        "ref": "accounts_total",
+        "note": "Non-deleted users whose account is external: users.account_class is null and the email fails the internal/test/synthetic/canary rules (externalAccountSql, lib/accounts/internal-account.ts)."
+      },
+      "owner": "summer",
+      "refreshCadence": "hourly",
+      "freshnessSlaHours": 26,
+      "threshold": 1000,
+      "display": {
+        "sentence": "Trusted by {value} artists and teams",
+        "rounding": {
+          "mode": "floor",
+          "sigDigits": 1,
+          "suffix": "+",
+          "compact": true
+        }
+      },
+      "fallback": "Built for artists and the teams behind them",
+      "methodology": "/proof/methodology#accounts_total",
+      "publicMethod": "Accounts people created on Jovie. Team, test and automated accounts are excluded, and deleted accounts are not counted.",
+      "milestones": true,
+      "marketing": {
+        "value": 5,
+        "feasibility": 5,
+        "why": "Social proof on the homepage and pricing. Live today; displays from 1,000."
+      }
+    },
+    {
+      "id": "artists_claimed",
+      "label": "Artist profiles claimed",
+      "unit": "count",
+      "better": "higher",
+      "visibility": "public",
+      "legalClass": "plain",
+      "status": "live",
+      "source": {
+        "kind": "production",
+        "ref": "artists_claimed",
+        "note": "creator_profiles with is_claimed, excluding profiles owned by an internal account (notInternalProfileSql) and reserved identity handles. Unclaimed, ingested profiles never count."
+      },
+      "owner": "summer",
+      "refreshCadence": "hourly",
+      "freshnessSlaHours": 26,
+      "threshold": 500,
+      "display": {
+        "sentence": "{value} artists run their profile on Jovie",
+        "rounding": {
+          "mode": "floor",
+          "sigDigits": 1,
+          "suffix": "+",
+          "compact": true
+        }
+      },
+      "fallback": null,
+      "methodology": "/proof/methodology#artists_claimed",
+      "publicMethod": "Artist profiles that an artist or their team has claimed and runs. Profiles we prepared that nobody has claimed are not counted, nor are team or test profiles.",
+      "milestones": true,
+      "marketing": {
+        "value": 4,
+        "feasibility": 5,
+        "why": "Artist-specific proof for /artist-profiles. Live today."
+      }
+    },
+    {
+      "id": "smart_links_total",
+      "label": "Smart links created",
+      "unit": "count",
+      "better": "higher",
+      "visibility": "public",
+      "legalClass": "plain",
+      "status": "live",
+      "source": {
+        "kind": "production",
+        "ref": "smart_links_total",
+        "note": "Distinct (creator_profile_id, smart_link_slug) in smart_link_targets for profiles not owned by an internal account."
+      },
+      "owner": "summer",
+      "refreshCadence": "hourly",
+      "freshnessSlaHours": 26,
+      "threshold": 1000,
+      "display": {
+        "sentence": "{value} smart links created",
+        "rounding": {
+          "mode": "floor",
+          "sigDigits": 1,
+          "suffix": "+",
+          "compact": true
+        }
+      },
+      "fallback": null,
+      "methodology": "/proof/methodology#smart_links_total",
+      "publicMethod": "Release and track links created on Jovie profiles, counted once per link. Links on team or test profiles are excluded.",
+      "milestones": true,
+      "marketing": {
+        "value": 3,
+        "feasibility": 5,
+        "why": "Volume proof for release pages. Live today."
+      }
+    },
+    {
+      "id": "release_alerts_delivered",
+      "label": "Release alerts delivered",
+      "unit": "count",
+      "better": "higher",
+      "visibility": "public",
+      "legalClass": "plain",
+      "status": "live",
+      "source": {
+        "kind": "production",
+        "ref": "release_alerts_delivered",
+        "note": "fan_release_notifications with status sent, for profiles not owned by an internal account."
+      },
+      "owner": "summer",
+      "refreshCadence": "hourly",
+      "freshnessSlaHours": 26,
+      "threshold": 1000,
+      "display": {
+        "sentence": "{value} release alerts delivered",
+        "rounding": {
+          "mode": "floor",
+          "sigDigits": 1,
+          "suffix": "+",
+          "compact": true
+        }
+      },
+      "fallback": null,
+      "methodology": "/proof/methodology#release_alerts_delivered",
+      "publicMethod": "Release alerts sent to listeners who asked to hear about a release. Alerts from team or test profiles are excluded.",
+      "milestones": true,
+      "marketing": {
+        "value": 4,
+        "feasibility": 5,
+        "why": "Outcome proof: Jovie does the release-day work. Live today."
+      }
+    },
+    {
+      "id": "profile_ttfb_ms",
+      "label": "Profile server response, median",
+      "unit": "ms",
+      "better": "lower",
+      "visibility": "public",
+      "legalClass": "plain",
+      "status": "live",
+      "source": {
+        "kind": "benchmark",
+        "ref": "speed.ttfb.median",
+        "note": "Median TTFB of the Jovie flagship profile across N rendered loads in the weekly Public Profile Benchmark (scripts/public-benchmark, hosted runner). A claim about Jovie alone."
+      },
+      "owner": "summer",
+      "refreshCadence": "weekly",
+      "freshnessSlaHours": 216,
+      "threshold": null,
+      "ceiling": 200,
+      "display": {
+        "sentence": "Profiles start responding in under {value} ms",
+        "rounding": {
+          "mode": "ceil",
+          "step": 10
+        }
+      },
+      "fallback": null,
+      "methodology": "/proof/methodology#profile_ttfb_ms",
+      "publicMethod": "Time until a public Jovie profile starts responding, the median of repeated page loads in our weekly benchmark.",
+      "milestones": false,
+      "marketing": {
+        "value": 3,
+        "feasibility": 5,
+        "why": "Speed proof without naming anyone. Publishes only while the median stays under 200 ms."
+      }
+    },
+    {
+      "id": "profile_agent_score",
+      "label": "Profile agent-readiness score",
+      "unit": "score",
+      "better": "higher",
+      "visibility": "public",
+      "legalClass": "plain",
+      "status": "live",
+      "source": {
+        "kind": "benchmark",
+        "ref": "agent.score",
+        "note": "Agent-readiness rubric score (0 to 100) of the Jovie flagship profile in the weekly Public Profile Benchmark."
+      },
+      "owner": "summer",
+      "refreshCadence": "weekly",
+      "freshnessSlaHours": 216,
+      "threshold": 80,
+      "display": {
+        "sentence": "Scores {value}/100 for AI-agent readiness",
+        "rounding": {
+          "mode": "floor",
+          "step": 1
+        }
+      },
+      "fallback": null,
+      "methodology": "/proof/methodology#profile_agent_score",
+      "publicMethod": "A 0 to 100 score for how well AI assistants can read a public Jovie profile: crawler access, readable HTML, structured data and machine interfaces. Measured weekly.",
+      "milestones": false,
+      "marketing": {
+        "value": 4,
+        "feasibility": 5,
+        "why": "Positioning: profiles that AI assistants can read. Unique against link-in-bio tools."
+      }
+    },
+    {
+      "id": "profile_lcp_rank",
+      "label": "Profile load speed (LCP) against link-in-bio platforms",
+      "unit": "count",
+      "better": "lower",
+      "visibility": "public",
+      "legalClass": "comparative",
+      "status": "measuring",
+      "source": {
+        "kind": "benchmark",
+        "ref": "speed.lcp.median",
+        "claim": "profile-speed.lcp",
+        "note": "Median Lighthouse mobile LCP per platform flagship profile. Comparative: renders only when scripts/public-benchmark/claims.json marks profile-speed.lcp certified by the founder."
+      },
+      "owner": "summer",
+      "refreshCadence": "weekly",
+      "freshnessSlaHours": 216,
+      "threshold": null,
+      "display": {
+        "sentence": "Profiles load faster than {value} measured link-in-bio platforms",
+        "rounding": { "mode": "floor", "step": 1 }
+      },
+      "fallback": null,
+      "methodology": "/proof/methodology#profile_lcp_rank",
+      "publicMethod": "Largest contentful paint of a public profile on each platform, mobile, median of repeated loads. Shown only when Jovie is faster than every platform we could measure, by at least 10 percent.",
+      "milestones": false,
+      "marketing": {
+        "value": 5,
+        "feasibility": 3,
+        "why": "The headline comparison. Needs every comparator measured (platform-a blocks the bench user agent, platform-b returns 403 to rendered loads) and a founder approval card."
+      }
+    },
+    {
+      "id": "profile_js_bytes_rank",
+      "label": "Profile page weight against link-in-bio platforms",
+      "unit": "count",
+      "better": "lower",
+      "visibility": "public",
+      "legalClass": "comparative",
+      "status": "measuring",
+      "source": {
+        "kind": "benchmark",
+        "ref": "speed.bytes.median",
+        "claim": "profile-speed.bytes",
+        "note": "Median total byte weight per platform flagship profile. Comparative and approval-gated like profile_lcp_rank."
+      },
+      "owner": "summer",
+      "refreshCadence": "weekly",
+      "freshnessSlaHours": 216,
+      "threshold": null,
+      "display": {
+        "sentence": "Lighter than {value} measured link-in-bio platforms",
+        "rounding": { "mode": "floor", "step": 1 }
+      },
+      "fallback": null,
+      "methodology": "/proof/methodology#profile_js_bytes_rank",
+      "publicMethod": "Total bytes downloaded to show a public profile on each platform, median of repeated loads. Shown only when Jovie is lighter than every platform we could measure, by at least 10 percent.",
+      "milestones": false,
+      "marketing": {
+        "value": 3,
+        "feasibility": 3,
+        "why": "Supports the speed story on the spec grid."
+      }
+    },
+    {
+      "id": "agent_path_cert",
+      "label": "Agent-path certification checks passing",
+      "unit": "ratio",
+      "better": "higher",
+      "visibility": "public",
+      "legalClass": "plain",
+      "status": "proposed",
+      "source": {
+        "kind": "agent-score",
+        "ref": "agent-path-cert",
+        "note": "Passing checks over total in the agent-path certification (13/14 heading to 14/14). Producer: the weekly agent-readiness run (scripts/weekly-agent-readiness.mjs) posts passed/total."
+      },
+      "owner": "summer",
+      "refreshCadence": "weekly",
+      "freshnessSlaHours": 216,
+      "threshold": 1,
+      "display": {
+        "sentence": "Passes every agent-path certification check",
+        "rounding": {
+          "mode": "floor",
+          "step": 0.01
+        }
+      },
+      "fallback": null,
+      "methodology": "/proof/methodology#agent_path_cert",
+      "publicMethod": "The checks an AI agent runs to create, claim and update a Jovie profile end to end. Shown only when every check passes.",
+      "milestones": false,
+      "marketing": {
+        "value": 4,
+        "feasibility": 4,
+        "why": "Publish only at 14/14 (threshold 1.0): an all-pass claim, never a partial score."
+      }
+    },
+    {
+      "id": "agent_distribution_ready",
+      "label": "Agent marketplace readiness gate",
+      "unit": "ratio",
+      "better": "higher",
+      "visibility": "internal",
+      "legalClass": "plain",
+      "status": "proposed",
+      "source": {
+        "kind": "agent-score",
+        "ref": "agent-distribution:ready",
+        "note": "Share of agent marketplace listing checks passing. The gate name is agent-distribution:ready; no script in main computes it yet (establish work)."
+      },
+      "owner": "summer",
+      "refreshCadence": "weekly",
+      "freshnessSlaHours": 216,
+      "threshold": null,
+      "display": {
+        "sentence": "{value} of marketplace checks pass",
+        "rounding": {
+          "mode": "floor",
+          "step": 0.01
+        }
+      },
+      "fallback": null,
+      "methodology": null,
+      "milestones": false,
+      "marketing": {
+        "value": 2,
+        "feasibility": 2,
+        "why": "Internal until listed in a marketplace."
+      }
+    },
+    {
+      "id": "security_open_critical",
+      "label": "Open critical vulnerabilities",
+      "unit": "count",
+      "better": "lower",
+      "visibility": "public",
+      "legalClass": "plain",
+      "status": "proposed",
+      "source": {
+        "kind": "security",
+        "ref": "scripts/security/findings",
+        "note": "Count of open findings at critical severity after normalization (scripts/security/findings/normalize.mjs + policy.mjs) across Dependabot, code scanning and secret scanning. Aggregate only: no ids, packages, paths or dates are stored or published."
+      },
+      "owner": "summer",
+      "refreshCadence": "daily",
+      "freshnessSlaHours": 30,
+      "threshold": null,
+      "ceiling": 0,
+      "display": {
+        "sentence": "{value} open critical vulnerabilities",
+        "rounding": {
+          "mode": "exact"
+        }
+      },
+      "fallback": null,
+      "methodology": "/proof/methodology#security_open_critical",
+      "publicMethod": "Open security findings rated critical across dependency, code and secret scanning. Shown only when the count is zero.",
+      "milestones": false,
+      "marketing": {
+        "value": 3,
+        "feasibility": 4,
+        "why": "Trust page. Publishes only at zero (ceiling 0): a non-zero count is never shown."
+      }
+    },
+    {
+      "id": "security_patch_hours_p50",
+      "label": "Time to patch high and critical findings, median",
+      "unit": "hours",
+      "better": "lower",
+      "visibility": "public",
+      "legalClass": "plain",
+      "status": "proposed",
+      "source": {
+        "kind": "security",
+        "ref": "scripts/security/findings",
+        "note": "Median hours from a high or critical finding opening to its fix merging, trailing 90 days. Aggregate only."
+      },
+      "owner": "summer",
+      "refreshCadence": "daily",
+      "freshnessSlaHours": 30,
+      "threshold": null,
+      "ceiling": 72,
+      "display": {
+        "sentence": "High-severity fixes ship in under {value} hours",
+        "rounding": {
+          "mode": "ceil",
+          "step": 1
+        }
+      },
+      "fallback": null,
+      "methodology": "/proof/methodology#security_patch_hours_p50",
+      "publicMethod": "Median hours from a high or critical security finding to its fix reaching the main branch, over the last 90 days.",
+      "milestones": false,
+      "marketing": {
+        "value": 3,
+        "feasibility": 3,
+        "why": "Trust page. Publishes only under 72 hours."
+      }
+    },
+    {
+      "id": "security_dependabot_open",
+      "label": "Open Dependabot alerts",
+      "unit": "count",
+      "better": "lower",
+      "visibility": "internal",
+      "legalClass": "plain",
+      "status": "proposed",
+      "source": {
+        "kind": "security",
+        "ref": "github:dependabot-alerts",
+        "note": "Open Dependabot alerts, all severities. Internal: never public."
+      },
+      "owner": "summer",
+      "refreshCadence": "daily",
+      "freshnessSlaHours": 30,
+      "threshold": null,
+      "display": {
+        "sentence": "{value} open Dependabot alerts",
+        "rounding": {
+          "mode": "exact"
+        }
+      },
+      "fallback": null,
+      "methodology": null,
+      "milestones": false,
+      "marketing": {
+        "value": 1,
+        "feasibility": 5,
+        "why": "Internal health only."
+      }
+    },
+    {
+      "id": "security_secret_scan_clean",
+      "label": "Secret scan clean on main",
+      "unit": "ratio",
+      "better": "higher",
+      "visibility": "internal",
+      "legalClass": "plain",
+      "status": "proposed",
+      "source": {
+        "kind": "security",
+        "ref": "scripts/security/scan-secrets.sh",
+        "note": "1 when the last gitleaks run on main found nothing, else 0. Internal."
+      },
+      "owner": "summer",
+      "refreshCadence": "daily",
+      "freshnessSlaHours": 30,
+      "threshold": null,
+      "display": {
+        "sentence": "Secret scan clean: {value}",
+        "rounding": {
+          "mode": "exact"
+        }
+      },
+      "fallback": null,
+      "methodology": null,
+      "milestones": false,
+      "marketing": {
+        "value": 1,
+        "feasibility": 5,
+        "why": "Internal health only."
+      }
+    },
+    {
+      "id": "eng_merges_per_day",
+      "label": "Pull requests merged per day, trailing 7 days",
+      "unit": "count",
+      "better": "higher",
+      "visibility": "internal",
+      "legalClass": "plain",
+      "status": "proposed",
+      "source": {
+        "kind": "engineering",
+        "ref": "shipping-slo:throughput.merged_per_day",
+        "note": "From .github/workflows/shipping-slo.yml (scripts/shipping-slo-report.mjs), or the wins ledger when it publishes the same metric."
+      },
+      "owner": "summer",
+      "refreshCadence": "daily",
+      "freshnessSlaHours": 30,
+      "threshold": null,
+      "display": {
+        "sentence": "{value} changes shipped a day",
+        "rounding": {
+          "mode": "floor",
+          "step": 1
+        }
+      },
+      "fallback": null,
+      "methodology": null,
+      "milestones": true,
+      "marketing": {
+        "value": 3,
+        "feasibility": 5,
+        "why": "Company story (ships daily). Internal until Tim chooses to publish engineering proof."
+      }
+    },
+    {
+      "id": "eng_merge_to_prod_p50_minutes",
+      "label": "Merge to production, median minutes",
+      "unit": "minutes",
+      "better": "lower",
+      "visibility": "internal",
+      "legalClass": "plain",
+      "status": "proposed",
+      "source": {
+        "kind": "engineering",
+        "ref": "queue-timings:merge_to_production.p50",
+        "note": "Queue-timings feed and scripts/lanes/deploy_lag.py."
+      },
+      "owner": "summer",
+      "refreshCadence": "daily",
+      "freshnessSlaHours": 30,
+      "threshold": null,
+      "display": {
+        "sentence": "Fixes reach production in under {value} minutes",
+        "rounding": {
+          "mode": "ceil",
+          "step": 5
+        }
+      },
+      "fallback": null,
+      "methodology": null,
+      "milestones": false,
+      "marketing": {
+        "value": 3,
+        "feasibility": 4,
+        "why": "Responsiveness proof for customers once stable."
+      }
+    },
+    {
+      "id": "eng_mttr_minutes",
+      "label": "Mean time to restore, minutes",
+      "unit": "minutes",
+      "better": "lower",
+      "visibility": "internal",
+      "legalClass": "plain",
+      "status": "proposed",
+      "source": {
+        "kind": "engineering",
+        "ref": "shipping-slo:mttr",
+        "note": "Incident open to resolved, trailing 30 days."
+      },
+      "owner": "summer",
+      "refreshCadence": "daily",
+      "freshnessSlaHours": 30,
+      "threshold": null,
+      "display": {
+        "sentence": "Incidents resolved in {value} minutes on average",
+        "rounding": {
+          "mode": "ceil",
+          "step": 5
+        }
+      },
+      "fallback": null,
+      "methodology": null,
+      "milestones": false,
+      "marketing": {
+        "value": 2,
+        "feasibility": 3,
+        "why": "Internal reliability metric."
+      }
+    },
+    {
+      "id": "eng_deploys_per_day",
+      "label": "Production deploys per day",
+      "unit": "count",
+      "better": "higher",
+      "visibility": "internal",
+      "legalClass": "plain",
+      "status": "proposed",
+      "source": {
+        "kind": "engineering",
+        "ref": "shipping-slo:deploy_frequency",
+        "note": "Production promotions per day, trailing 7 days."
+      },
+      "owner": "summer",
+      "refreshCadence": "daily",
+      "freshnessSlaHours": 30,
+      "threshold": null,
+      "display": {
+        "sentence": "{value} production releases a day",
+        "rounding": {
+          "mode": "floor",
+          "step": 1
+        }
+      },
+      "fallback": null,
+      "methodology": null,
+      "milestones": false,
+      "marketing": {
+        "value": 2,
+        "feasibility": 4,
+        "why": "Internal DORA metric."
+      }
+    },
+    {
+      "id": "eng_ci_wait_p50_minutes",
+      "label": "CI wait, median minutes",
+      "unit": "minutes",
+      "better": "lower",
+      "visibility": "internal",
+      "legalClass": "plain",
+      "status": "proposed",
+      "source": {
+        "kind": "engineering",
+        "ref": "queue-timings:ci_wait.p50",
+        "note": "Queue-timings feed."
+      },
+      "owner": "summer",
+      "refreshCadence": "daily",
+      "freshnessSlaHours": 30,
+      "threshold": null,
+      "display": {
+        "sentence": "CI waits {value} minutes at the median",
+        "rounding": {
+          "mode": "ceil",
+          "step": 1
+        }
+      },
+      "fallback": null,
+      "methodology": null,
+      "milestones": false,
+      "marketing": {
+        "value": 1,
+        "feasibility": 4,
+        "why": "Internal throughput metric."
+      }
+    },
+    {
+      "id": "eng_agent_merged_share",
+      "label": "Share of merged pull requests authored by agents",
+      "unit": "ratio",
+      "better": "higher",
+      "visibility": "internal",
+      "legalClass": "plain",
+      "status": "proposed",
+      "source": {
+        "kind": "wins-ledger",
+        "ref": "agent_merged_share",
+        "note": "Wins ledger or throughput_sentinel: merged PRs whose author is an agent identity over all merged PRs, trailing 7 days."
+      },
+      "owner": "summer",
+      "refreshCadence": "daily",
+      "freshnessSlaHours": 30,
+      "threshold": null,
+      "display": {
+        "sentence": "{value} of changes written by agents",
+        "rounding": {
+          "mode": "floor",
+          "step": 0.01,
+          "percent": true
+        }
+      },
+      "fallback": null,
+      "methodology": null,
+      "milestones": false,
+      "marketing": {
+        "value": 3,
+        "feasibility": 4,
+        "why": "Company story for investors and hiring. Internal until Tim chooses."
+      }
+    }
+  ]
+}

@@ -4,11 +4,44 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
-import { SOURCE_GUARDS, selectSourceGuards } from '../../ci-fast-lanes.mjs';
+import {
+  SCRIPT_CONTRACT_NODE_COMMAND,
+  SCRIPT_CONTRACT_NODE_TESTS,
+  SOURCE_GUARDS,
+  scriptContractNodeArgs,
+  selectSourceGuards,
+} from '../../ci-fast-lanes.mjs';
 import { selectScriptContracts } from '../script-contract-affected.mjs';
 import { testsAffectedBy } from '../test-file-dependencies.mjs';
 
 const ROOT = join(import.meta.dirname, '../../..');
+
+test('a non-JS scripts path does not force the full contract lists', () => {
+  const root = mkdtempSync(join(tmpdir(), 'script-contract-affected-'));
+  const write = (path, body) => {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), body);
+  };
+  try {
+    write('scripts/unrelated.test.mjs', 'export {};\n');
+    const options = {
+      root,
+      node: ['scripts/unrelated.test.mjs'],
+      vitest: [],
+    };
+    for (const path of [
+      'scripts/lanes/lane_runner.py',
+      'scripts/tests/test_lane_runner.py',
+    ])
+      assert.deepEqual(selectScriptContracts([path], options), {
+        full: false,
+        node: [],
+        vitest: [],
+      });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test('script, workflow and toolchain diffs run both full contract lists', () => {
   const node = ['scripts/lib/__tests__/script-contract-affected.test.mjs'];
@@ -123,4 +156,50 @@ test('the CLI lists the selection for explicit paths', () => {
     result.stdout,
     /^\[script-contracts\] affected: 0 node, 0 vitest$/m
   );
+});
+
+test('Node contract coverage isolates the original behavior suites and preserves every selection once', () => {
+  const focused = [
+    'scripts/preflight.test.mjs',
+    'scripts/verify-workflow-references.test.mjs',
+  ];
+  const hosted =
+    'scripts/lib/__tests__/source-guard-dependency-generation.test.mjs';
+  for (const selection of [
+    [],
+    focused,
+    [hosted],
+    [focused[0], hosted, focused[1]],
+    SCRIPT_CONTRACT_NODE_TESTS,
+  ]) {
+    const batches = scriptContractNodeArgs(selection);
+    const selected = batches.flatMap(args =>
+      args.filter(arg => !arg.startsWith('--'))
+    );
+    assert.deepEqual([...selected].sort(), [...selection].sort());
+    for (const args of batches) {
+      const tests = args.filter(arg => !arg.startsWith('--'));
+      if (args.includes('--experimental-test-coverage')) {
+        assert.ok(tests.every(test => focused.includes(test)));
+        assert.ok(
+          args.includes('--test-coverage-include=scripts/preflight.mjs')
+        );
+        assert.ok(
+          args.includes(
+            '--test-coverage-include=scripts/lib/source-guard-action-snapshot.mjs'
+          )
+        );
+      } else {
+        assert.deepEqual(args, ['--test', ...tests]);
+        assert.ok(tests.every(test => !focused.includes(test)));
+      }
+    }
+  }
+  for (const file of [...focused, hosted]) {
+    assert.ok(SCRIPT_CONTRACT_NODE_TESTS.includes(file));
+    assert.ok(
+      selectScriptContracts(['scripts/preflight.mjs']).node.includes(file)
+    );
+    assert.equal(SCRIPT_CONTRACT_NODE_COMMAND.split(file).length, 2);
+  }
 });
