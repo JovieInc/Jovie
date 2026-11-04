@@ -51,7 +51,7 @@ export function normalizeState(raw) {
  * Unchanged modules are only re-scored after `staleDays`, because a score is a
  * pure function of source + tests and tests change slowly.
  * @param {ReturnType<typeof emptyState>} state
- * @param {{ file: string, blob: string, testCount: number }[]} candidates
+ * @param {{ file: string, blob: string, testCount: number, touch?: number }[]} candidates
  * @param {{ max: number, now?: number, staleDays?: number }} options
  */
 export function pickBatch(
@@ -77,11 +77,13 @@ export function pickBatch(
       at: known ? Date.parse(known.at) : 0,
     });
   }
-  // Within a rank: oldest run first, then the module with the most tests
+  // Within a rank: most high-touch surface first (test-quality loop ranking;
+  // 0 when no touch file is given), then oldest run, then the module with the most tests
   // (richest signal per mutation-minute is roughly test depth), then name.
   ranked.sort(
     (a, b) =>
       a.rank - b.rank ||
+      (b.candidate.touch ?? 0) - (a.candidate.touch ?? 0) ||
       a.at - b.at ||
       b.candidate.testCount - a.candidate.testCount ||
       a.candidate.file.localeCompare(b.candidate.file)

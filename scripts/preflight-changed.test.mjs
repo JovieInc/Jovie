@@ -1007,7 +1007,11 @@ export const selectSourceGuards = () => [{
       "export const selectManifestGuards = (paths, base) => [{ id: 'manifest-base-probe', name: 'manifest base branch', command: 'test ' + base + ' = main && git rev-parse --verify origin/' + base }];\n"
     );
     /** @type {NodeJS.ProcessEnv} */
-    const env = { ...process.env, JOVIE_PREFLIGHT_LEDGER: 'off' };
+    const env = {
+      ...process.env,
+      JOVIE_PREFLIGHT_LEDGER: 'off',
+      JOVIE_PREFLIGHT_DEPTH: '',
+    };
     delete env.NODE_TEST_CONTEXT;
     delete env.JOVIE_PR_BODY_FILE;
     for (const base of ['main', 'origin/main', 'refs/remotes/origin/main']) {

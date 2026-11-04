@@ -52,7 +52,7 @@ import autoscale  # noqa: E402
 import capacity_limit  # noqa: E402
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
-from atomic_state import atomic_write_text  # noqa: E402
+from atomic_state import append_json_object, atomic_write_text  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 import fleet_gate_emitter  # noqa: E402
@@ -144,7 +144,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_migration_renumber.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_migration_renumber.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -3519,8 +3519,7 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear: Linear | 
             receipt.update(hold("remote-adapter-unavailable"))
     receipt.update(endedAt=now_iso(), result={"verdict": receipt.get("verdict"), "pr": receipt.get("pr"),
                    "prUrl": receipt.get("prUrl"), "commit": receipt.get("headSha")})
-    with (runs / "ledger.jsonl").open("a") as ledger:
-        ledger.write(json.dumps(receipt) + "\n")
+    append_json_object(runs / "ledger.jsonl", receipt)
     return receipt
 
 
@@ -3553,8 +3552,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     except RecoveryHandoff as error:
         receipt.update(verdict="recovery-handoff", reasons=[str(error)], recovery=error.evidence,
                        endedAt=now_iso(), result={"verdict": "recovery-handoff", "pr": None, "commit": None})
-        with open(runs / "ledger.jsonl", "a") as ledger:
-            ledger.write(json.dumps(receipt) + "\n")
+        append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
     policy = {"attempts": MAX_FAILURES, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FAILURES,
               "spend": MAX_FAILURES, "mutations": MAX_FAILURES,
@@ -3580,8 +3578,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
         verdict = receipt["verdict"]
         receipt.update(endedAt=now_iso(),
                        result={"verdict": verdict, "commit": None, "pr": None, "prUrl": None})
-        with open(runs / "ledger.jsonl", "a") as ledger:
-            ledger.write(json.dumps(receipt) + "\n")
+        append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
     receipt["offer"]["accepted"] = True
     with open(runs / f"{run_id}.log", "w") as log:
@@ -3716,8 +3713,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
          "costs": {"apiCalls": 1}, "mutationsPerformed": receipt.get("pr") and ["pull_request"] or [],
          "confidence": "high" if result == "succeeded" else "unknown", "dependencies": [name]},
         coordination=coordination)
-    with open(runs / "ledger.jsonl", "a") as ledger:
-        ledger.write(json.dumps(receipt) + "\n")
+    append_json_object(runs / "ledger.jsonl", receipt)
     return receipt
 
 
@@ -8026,8 +8022,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
         )
         if branch_held:
             end_local_fix_attempt(host, pr, receipt)
-        with open(runs / "ledger.jsonl", "a") as ledger:
-            ledger.write(json.dumps(receipt) + "\n")
+        append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
     pr = live
     infra = infra_only_red(host, pr) if branch_held else None
@@ -8035,8 +8030,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
         receipt.update(verdict="skipped", reasons=[f"infra-rerun:{infra}"], endedAt=now_iso(),
                        result={"verdict": "skipped", "commit": None, "pr": pr["number"]})
         end_local_fix_attempt(host, pr, receipt)
-        with open(runs / "ledger.jsonl", "a") as ledger:
-            ledger.write(json.dumps(receipt) + "\n")
+        append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
     route = route_fix_red(host, pr) if branch_held else None
     if route:
@@ -8049,8 +8043,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             receipt.update(verdict="skipped", reasons=[reason], endedAt=now_iso(),
                            result={"verdict": "skipped", "commit": None, "pr": pr["number"]})
             end_local_fix_attempt(host, pr, receipt)
-            with open(runs / "ledger.jsonl", "a") as ledger:
-                ledger.write(json.dumps(receipt) + "\n")
+            append_json_object(runs / "ledger.jsonl", receipt)
             return receipt
     failure = {"checks": [(check.get("name"), check.get("conclusion")) for check in pr.get("statusCheckRollup") or []],
                "merge": pr.get("mergeStateStatus"), "review": pr.get("reviewDecision")}
@@ -8085,8 +8078,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             receipt["preservedRecoveryObservations"] = preserved_observations
         if branch_held:
             end_local_fix_attempt(host, pr, receipt)
-        with open(runs / "ledger.jsonl", "a") as ledger:
-            ledger.write(json.dumps(receipt) + "\n")
+        append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
     if preserved_observations:
         receipt["preservedRecoveryObservations"] = preserved_observations
@@ -8116,8 +8108,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             receipt["recovery"] = RecoveryHandoff(receipt["reasons"][0], preserved[0]).evidence
         receipt.update(endedAt=now_iso(),
                        result={"verdict": receipt["verdict"], "commit": None, "pr": pr["number"]})
-        with open(runs / "ledger.jsonl", "a") as ledger:
-            ledger.write(json.dumps(receipt) + "\n")
+        append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
     if preserved:
         worktree, prior = preserved
@@ -8324,8 +8315,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
          "confidence": "unknown" if target_unavailable else "high",
          "dependencies": [name, "github-target-state"] if target_unavailable else [name]}, coordination=coordination)
     opened.clear()
-    with open(runs / "ledger.jsonl", "a") as ledger:
-        ledger.write(json.dumps(receipt) + "\n")
+    append_json_object(runs / "ledger.jsonl", receipt)
     return receipt
 
 
@@ -8406,8 +8396,7 @@ def _adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim, *, sensitive: b
     receipt["endedAt"] = now_iso()
     receipt["result"] = {"verdict": receipt.get("verdict"), "commit": receipt.get("headSha"),
                          "pr": receipt.get("pr")}
-    with open(runs / "ledger.jsonl", "a") as ledger:
-        ledger.write(json.dumps(receipt) + "\n")
+    append_json_object(runs / "ledger.jsonl", receipt)
     return receipt
 
 
@@ -9168,7 +9157,7 @@ def finish_deferred_retry(host: Host, name: str, pr: dict, retry, context, *, sl
             issue, outcome = retry(live)
             if outcome and outcome.get("verdict") in ("landing", "verified-not-queued", "gate-timeout", "remote-repair-required"):
                 receipt = qualification_receipt(name, issue, outcome)
-                with (host.state / "runs/ledger.jsonl").open("a") as ledger: ledger.write(json.dumps(receipt) + "\n")
+                append_json_object(host.state / "runs/ledger.jsonl", receipt)
                 return receipt
         try:
             receipt = run_deferred_requeue(host, pr, invoke, slot=slot)

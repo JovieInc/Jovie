@@ -58,6 +58,18 @@ env:
   TURBO_TOKEN: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && secrets.TURBO_TOKEN || '' }}
   TURBO_TEAM: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && secrets.TURBO_TEAM || '' }}
   TURBO_CACHE: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && 'local:rw,remote:rw' || 'local:rw' }}
+  # Cloudflare R2 Turbo cache (infra/turbo-cache). Push, dispatch and
+  # merge_group (the exact tree main is about to be, after required PR checks)
+  # get the read-write token; pull_request gets a read-only token, so
+  # PR-controlled code can read artifacts but can never write or poison them.
+  # Every artifact is HMAC-signed (CF_TURBO_SIGNATURE_KEY); unsigned or
+  # wrongly-signed artifacts are rejected. No key means read-only everywhere. Fork PRs receive no secrets and stay local-only. The composite
+  # setup-node-pnpm action probes the Worker and falls back to the legacy
+  # Vercel cache above (push only) when it is unreachable.
+  CF_TURBO_URL: ${{ secrets.CF_TURBO_CACHE_URL }}
+  CF_TURBO_ROLE: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group') && 'rw' || 'ro' }}
+  CF_TURBO_TOKEN: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group') && secrets.CF_TURBO_CACHE_RW_TOKEN || secrets.CF_TURBO_CACHE_RO_TOKEN }}
+  CF_TURBO_SIGNATURE_KEY: ${{ secrets.CF_TURBO_SIGNATURE_KEY }}
   # JOV-2497: four-slot cross-PR pool caps Neon branch *creation* (one endpoint per branch).
   # Only jobs that call neon-create-branch-with-retry use the pool — artifact consumers
   # (Lighthouse/A11y/Mobile Overflow) reuse neon-db and must NOT share the pool or
@@ -7731,6 +7743,50 @@ jobs:
 
   # Deep Lighthouse runs only by manual dispatch. Production Lighthouse remains
   # a separate hosted post-deploy release probe.
+
+  # JOV-10687 / JOV-10682 E: explicit suite scope on merge-group proof.
+  # Today the merge group still runs the full web unit matrix when web is
+  # selected. Provenance only lets main skip duplicate unit/build work when
+  # this job claims full_web_units (or a legacy run has no scope job yet).
+  # ordinary_admission is reserved for a later shrink and must force main
+  # fallback — never let a smaller MQ pass stand in for full-suite proof.
+  ci-merge-suite-scope:
+    name: Merge Suite Scope / full_web_units
+    needs:
+      [
+        ci-path-changes,
+        ci-unit-tests,
+        ci-merge-group-ready,
+      ]
+    if: ${{ always() && github.event_name == 'merge_group' && needs.ci-merge-group-ready.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    steps:
+      - name: Claim full merge-suite proof scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_WEB="${{ needs.ci-path-changes.outputs.run_web }}"
+          BLOG_CONTENT_ONLY="${{ needs.ci-path-changes.outputs.blog_content_only }}"
+          UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
+          if [[ "$BLOG_CONTENT_ONLY" == "true" ]]; then
+            RUN_WEB=false
+          fi
+          if [[ "$RUN_WEB" == "true" && "$UNIT_RESULT" != "success" ]]; then
+            echo "::error::Cannot claim full_web_units without successful Unit Tests ($UNIT_RESULT)."
+            exit 1
+          fi
+          {
+            echo "### Merge suite scope"
+            echo
+            echo "- Claimed scope: \`full_web_units\`"
+            echo "- Web selected: \`$RUN_WEB\`"
+            echo "- Unit Tests: \`$UNIT_RESULT\`"
+            echo
+            echo "Main may reuse this merge-group proof to skip duplicate unit/build lanes."
+            echo "An \`ordinary_admission\` claim (future) must not authorize that skip."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Claimed merge suite scope: full_web_units (JOV-10687)"
 
   ci-merge-group-ready:
     name: ${{ github.event_name == 'merge_group' && 'PR Ready' || 'PR Ready (merge-group inactive)' }}
