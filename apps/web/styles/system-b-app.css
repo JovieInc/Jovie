@@ -112,6 +112,15 @@
   --system-b-chat-user-bubble-shadow: none;
 }
 
+/* A streamed starter response can stop at the dock's opening tag. Its
+   padding-only box must not paint before the instruction and input arrive.
+   The trailing HTML marker releases paint without waiting for hydration;
+   the heading stays visible and the original controls keep their identity. */
+.system-b-onboarding-chat[data-starter-handoff="true"]
+[data-dock="bottom"]:not(:has([data-onboarding-composer-complete])) {
+  visibility: hidden;
+}
+
 /* Specificity (not :where) so this beats the shared pill/rectangle shapes. */
 .system-b-onboarding-chat .system-b-chat-user-bubble {
   border-radius: calc(var(--radius-xl) + var(--space-0-5));
