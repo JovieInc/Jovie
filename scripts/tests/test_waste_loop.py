@@ -35,6 +35,15 @@ class Detectors(unittest.TestCase):
         self.assertEqual(w.detect(spec, 20, None, 10)["status"], "WASTE")
         self.assertEqual(w.detect(spec, 11, None, 10)["status"], "OK")
 
+    def test_open_asks_of_tim_have_a_ceiling_of_three(self):
+        # Tim 2026-10-30: Ovie Home showed 36 asks; doctrine says most default.
+        spec = SPECS["tim.open_asks"]
+        cls = next(c for c in REG["classes"] if any(m["id"] == "tim.open_asks" for m in c["metrics"]))
+        self.assertEqual(cls["id"], "tim-attention")
+        self.assertEqual(w.detect(spec, 36, None, None)["status"], "WASTE")
+        self.assertEqual(w.detect(spec, 3, None, None)["status"], "OK")
+        self.assertEqual(w.detect(spec, None, None, None)["status"], "GAP")
+
     def test_missing_reading_is_a_gap_never_ok(self):
         self.assertEqual(w.detect(SPECS["ci.cancelled_share"], None, None, None)["status"], "GAP")
 
@@ -151,6 +160,32 @@ class FirstPushGates(unittest.TestCase):
 
     def test_metric_is_registered_with_a_ceiling(self):
         self.assertEqual(SPECS["pr.first_push_gate_failure_rate"]["detector"]["kind"], "ceiling")
+
+
+class SummerCritic(unittest.TestCase):
+    @staticmethod
+    def opener(payload):
+        class R:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return json.dumps(payload).encode()
+        return lambda req, timeout: R()
+
+    def test_reads_failure_rates_from_the_critic_route(self):
+        sweep = {"turns": 40, "failureRate": 0.15, "rateByClass": {"noise-to-tim": 0.05}, "missedIncidents": 1}
+        self.assertEqual(w.col_summer(self.opener({"sweep": sweep})),
+                         {"turnFailureRate": 0.15, "noiseToTimRate": 0.05, "missedIncidents": 1})
+
+    def test_no_sweep_or_unreachable_is_a_gap(self):
+        self.assertEqual(w.col_summer(self.opener({"sweep": None})), {})
+        def down(req, timeout): raise OSError("down")
+        self.assertEqual(w.col_summer(down), {})
+
+    def test_metrics_live_in_tim_attention_and_any_missed_incident_is_waste(self):
+        tim = next(c for c in REG["classes"] if c["id"] == "tim-attention")
+        self.assertTrue({"summer.turn_failure_rate", "summer.noise_to_tim_rate", "summer.missed_incidents"} <= {m["id"] for m in tim["metrics"]})
+        self.assertEqual(w.detect(SPECS["summer.missed_incidents"], 1, None, None)["status"], "WASTE")
+        self.assertEqual(w.detect(SPECS["summer.missed_incidents"], 0, None, None)["status"], "OK")
 
 
 if __name__ == "__main__":

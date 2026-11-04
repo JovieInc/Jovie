@@ -170,6 +170,10 @@ describe('Shared fenced-attempt coverage contract', () => {
     expect(command).toContain('scripts/tests/test_execution_attempt.py');
     expect(command).toContain('scripts/tests/test_backlog_admission.py');
     expect(command).toContain('scripts/tests/test_backlog_writer_guard.py');
+    expect(command).toContain('scripts/tests/test_board_intake.py');
+    expect(command).toContain(
+      '*/scripts/lanes/board_intake.py" --fail-under=85'
+    );
     expect(command).toContain(
       '*/scripts/lanes/backlog_writer_guard.py" --fail-under=90'
     );
@@ -2205,6 +2209,7 @@ describe('source-read guard selection', () => {
       [
         'artist-launch-contract',
         'privacy-input-route-trackers',
+        'privacy-compliance',
         'merge-group-unit-guards',
         'node-environment-files',
       ],
@@ -2246,6 +2251,7 @@ describe('source-read guard selection', () => {
       [
         'artist-launch-contract',
         'privacy-input-route-trackers',
+        'privacy-compliance',
         'merge-group-unit-guards',
         'static-revalidate-policy',
         'art-direction',
@@ -2379,6 +2385,7 @@ describe('source-read guard selection', () => {
       'native-design-system',
       'artist-launch-contract',
       'privacy-input-route-trackers',
+      'privacy-compliance',
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
@@ -2399,6 +2406,7 @@ describe('source-read guard selection', () => {
       'native-design-system',
       'artist-launch-contract',
       'privacy-input-route-trackers',
+      'privacy-compliance',
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
@@ -2444,6 +2452,19 @@ describe('source-read guard selection', () => {
         expect(
           readFileSync(
             join(REPO_ROOT, 'scripts/compliance/input-page-trackers.test.mjs'),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
+        continue;
+      }
+      if (guard.id === 'privacy-compliance') {
+        expect(guard.prOnly).toBe(false);
+        expect(guard.command).toContain(
+          'scripts/compliance/privacy-rules.test.mjs'
+        );
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'scripts/compliance/privacy-rules.test.mjs'),
             'utf8'
           )
         ).toContain("from 'node:test'");

@@ -15,19 +15,11 @@ interface ProductShotProps {
   readonly sizes?: string;
   readonly priority?: boolean;
   readonly className?: string;
-  /**
-   * Stage the shot: a matte card with the UI floating inside on its own
-   * radius and hairline (Pen feature bento I8TdQv). Use when the shot sits
-   * beside other shots or inside a tile, so cards align at equal heights.
-   */
+  /** Frame the shot on a matte card when sharing a row with other tiles. */
   readonly staged?: boolean;
 }
 
-/**
- * The one way marketing pages show product imagery: a registry shot
- * (`lib/screenshots/product-shots.ts`), cropped to one moment, served as AVIF
- * with a WebP fallback at explicit dimensions so it cannot shift layout.
- */
+/** Render one registry moment with AVIF/WebP sources and explicit dimensions. */
 export function ProductShot({
   id,
   sizes,

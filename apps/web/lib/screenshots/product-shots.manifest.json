@@ -153,9 +153,9 @@
     "setup-claim-handle": {
       "width": 696,
       "height": 372,
-      "sourceHash": "f777bbe5bb9dfb8864039cec260bc11b7b2b674d7c6b4c45decf2dede125e9ac",
+      "sourceHash": "69afaf62a0d0c0a868ed2429d20bb784d6e88dfe577da73523f50afbe5765ee2",
       "specHash": "8e8165321af2f58428e0d98ae5f458702ea14d0331883630a01c31630c875ffd",
-      "renderedAt": "2026-11-02T02:30:20.528Z",
+      "renderedAt": "2026-11-04T05:58:27.756Z",
       "sources": [
         "apps/web/components/features/dashboard/organisms/onboarding/OnboardingHandleStep.tsx",
         "apps/web/components/features/dashboard/organisms/onboarding-v2/shared/types.ts",
@@ -163,16 +163,16 @@
         "apps/web/components/features/onboarding/OnboardingExperienceShell.tsx"
       ],
       "bytes": {
-        "avif": 8086,
-        "webp": 11838
+        "avif": 6200,
+        "webp": 10522
       }
     },
     "setup-connect-music": {
       "width": 972,
       "height": 530,
-      "sourceHash": "8a2b1a4382d958dbd451dc8fb27e4e89eeb4291d01ab3ed7a7344dbec152c6de",
+      "sourceHash": "26b72c248f9cfbbcb136ba4577345d8a6e495dd6aae80b17693a9ced0a433a79",
       "specHash": "cc187de12e7d6b300efb2e132d4520b657a8c2f8ae04e359d7589c5978325b90",
-      "renderedAt": "2026-11-02T02:30:24.504Z",
+      "renderedAt": "2026-11-04T05:58:31.524Z",
       "sources": [
         "apps/web/components/features/dashboard/organisms/onboarding/OnboardingDspStep.tsx",
         "apps/web/components/features/dashboard/organisms/onboarding-v2/shared/types.ts",
@@ -180,8 +180,8 @@
         "apps/web/components/features/onboarding/OnboardingExperienceShell.tsx"
       ],
       "bytes": {
-        "avif": 10992,
-        "webp": 15938
+        "avif": 6884,
+        "webp": 12996
       }
     },
     "setup-share-profile": {

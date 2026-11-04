@@ -50,6 +50,7 @@ import throughput_sentinel  # noqa: E402
 import deploy_health  # noqa: E402  (production deploy failure and lag incidents, Jovie + LogYourBody)
 import release_evidence  # noqa: E402  (release-evidence job red on main; production build stale)
 import release_gates  # noqa: E402  (every controller-derived release gate red 2+ runs; new blocker reasons)
+import integration_probes  # noqa: E402  (synthetic probes of the Gem integrations fleet work depends on)
 
 COOL_OFF_S = 6 * 3600
 # High (P1), not Urgent, though under an Urgent prefix: a stale build is a lag signal, not an outage.
@@ -621,6 +622,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "fileOverlap": file_overlap.doctor_view(state),
         **automation_observation(host, lane, now),
         "outcomeQueue": read_json(state / "outcome-queue.json", {}),
+        "integrationProbes": integration_probes.observe(state, lane.HOST, now),
         "deployHealth": deploy_health.sample(state, now)[0] if not os.environ.get("LANES_SELFTEST") else None,
         "releaseEvidence": release_evidence.sample(state, now)[0] if not os.environ.get("LANES_SELFTEST") else None,
         "releaseGates": release_gates.sample(state, now)[0] if not os.environ.get("LANES_SELFTEST") else None,
@@ -951,7 +953,13 @@ def provider_idle_with_qualified_work(obs: dict, provider: str) -> bool:
     account_ready = provider != "codex" or bool(account_state.get("unleasedAvailable"))
     slots, running = capacity.get("slots"), capacity.get("running")
     vacant = (type(slots) is int and type(running) is int and 0 <= running < slots)
-    return bool(pool and account_ready and vacant
+    # The pool is new-issue work. When autoscale closed this lane's intake by policy (WIP cap, CI
+    # runner backlog, quota deferral), that pool is unclaimable on purpose and a restart cannot
+    # change it: not an idle provider. 2026-10-26 -> 11-02 this false alarm on hyperagent (intake 0,
+    # no repair seats) exhausted the stay-up watchdog and kept the factory "unhealthy" for a week.
+    lane = (((obs.get("autoscale") or {}).get("lanes") or {}).get(provider) or {})
+    intake_closed = lane.get("intakeEffective") == 0 and bool(lane.get("intakeBlockers"))
+    return bool(pool and account_ready and vacant and not intake_closed
                 and provider in (tick.get("spawned") or []) and provider not in (tick.get("unhealthy") or []))
 
 
@@ -1020,10 +1028,13 @@ def codex_attribution(report: dict, now: float) -> dict:
         counts["unleasedAvailable"] += (free if type(free) is int and free >= 0 else int(not row["leased"])) \
             if row["available"] else 0
         if not row["available"]:
-            until = age_s(row.get("exhaustedUntil"), now)
+            # An account at or below the subsidy floor (codex_lane burn policy) is spent for new
+            # work until its window resets, like a recorded usage-limit hold.
+            floor_only = row.get("atFloor") is True and not row.get("exhaustedUntil")
+            until = age_s(row.get("floorUntil") if floor_only else row.get("exhaustedUntil"), now)
             if until is None or until >= 0:
                 return unknown
-            kind = row.get("lastKind")
+            kind = "limit" if floor_only else row.get("lastKind")
             if kind is not None and not isinstance(kind, str):
                 return unknown
             key = {"limit": "quotaBanked", "auth": "authCooldown", "rate": "rateCooldown"}.get(kind, "unknownCooldown")
@@ -1195,7 +1206,12 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["linear-app-credential-missing"] = (
             "no Jovie Lanes Linear app credential (~/.config/jovie-lanes/linear-app.env); lanes Linear "
             "access fails closed (no personal-key fallback) until the lanes host owner reinstalls it")
+    probed = obs.get("integrationProbes")
+    # A red probe of the same component is the more specific incident: one issue, not two.
+    same_incident = integration_probes.suppressed_silence(probed)
     for automation_id, row in sorted(((obs.get("automation") or {}).get("silent") or {}).items()):
+        if automation_id in same_incident:
+            continue
         age = row.get("ageS")
         alerts[f"automation-silent:{automation_id}"] = (
             f"registered automation {automation_id} left no fresh receipt at {row.get('location')} "
@@ -1205,6 +1221,7 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["automation-registry-unreadable"] = (
             f"origin/main:{AUTOMATION_REGISTRY} is unreadable ({watched.get('error') or 'missing or not JSONL'}); "
             "no Gem host-local automation receipt is being watched")
+    alerts.update(integration_probes.alerts(probed, obs.get("now") or time.time()))
     alerts.update(throughput_sentinel.judge(obs))
     alerts.update(deploy_health.judge(obs.get("deployHealth"), obs.get("now") or time.time()))
     alerts.update(release_evidence.judge(obs.get("releaseEvidence"), obs.get("now") or time.time()))
@@ -1409,6 +1426,19 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     return alerts
 
 
+def last_good_epoch(key: str, obs: dict, now: float) -> float | None:
+    """Last proof of life before a condition, where the doctor knows it (start of incident:undetected)."""
+    if key.startswith("probe-red:"):
+        entry = ((obs.get("integrationProbes") or {}).get("probes") or {}).get(key.split(":", 1)[1]) or {}
+        value = entry.get("lastGoodAt")
+        return float(value) if type(value) in (int, float) else None
+    if key.startswith("automation-silent:"):
+        row = ((obs.get("automation") or {}).get("silent") or {}).get(key.split(":", 1)[1]) or {}
+        age = row.get("ageS")
+        return now - age if type(age) in (int, float) else None
+    return None
+
+
 def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_name: str) -> dict[str, dict]:
     """Typed, generation-deduped evidence for every actionable doctor condition."""
     prior = previous.get("conditions") or {}
@@ -1467,6 +1497,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
                      obs.get("tickAge") if key.startswith(("tick-", "provider-", "spawn-")) else 0)
         action = ("dispatch-provider-workers" if key.startswith("provider-idle:") else
                   "retry-provider-health-probe" if key.startswith("provider-down:") else
+                  "bounded-unit-heal-then-verify-probe" if key.startswith("probe-red:") else
                   actions.get(key, "reconcile-control-plane-condition"))
         affected = resources.get(key) or ([provider] if provider else [key])
         receipts[key] = {
@@ -1481,6 +1512,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
             "affectedResources": affected,
             "firstObservedAt": epoch_iso(first),
             "firstObservedEpoch": first,
+            "lastGoodEpoch": old.get("lastGoodEpoch") if continuing else last_good_epoch(key, obs, now),
             "source": {"producer": "scripts/lanes/doctor.py", "status": source_status,
                        "observedAt": epoch_iso(now), "freshnessSeconds": freshness},
             "deadlineAt": epoch_iso(first + ESCALATION_S),
@@ -2067,6 +2099,9 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "gateWaitMaxS24h": obs.get("gateWaitMaxS24h"),
             "codexAvailable": account_state.get("unleasedAvailable"),
             "codexAttribution": account_state,
+            # Burn-before-reset ledger (codex_lane.subsidy_ledger): per-pool remaining %, reset,
+            # banked resets, burn order, the open reset proposal card and window-use metrics.
+            "subsidyLedger": (obs.get("codex") or {}).get("subsidyLedger"),
             "alerts": alerts, "conditions": conditions or {},
             "delivery": obs.get("delivery"),
             "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
@@ -2580,6 +2615,10 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         except Exception:
             tracker = None
     result = reconcile(alerts, previous, tracker, obs["now"], conditions)
+    try:  # incident stage events (detected, filed, cleared); a lost row only drops a sample
+        stage_events.journal_incidents(host.state, previous, result, lane.HOST, obs["now"])
+    except Exception:  # noqa: BLE001
+        pass
     if getattr(tracker, "linear", None) is not None:
         try:
             factory_signals.write(host.state, factory_signals.sentinel_signals(host.state))
