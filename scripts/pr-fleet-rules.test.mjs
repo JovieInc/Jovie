@@ -282,6 +282,26 @@ test('5: real locked paths require a GBrain or locking PR reference', () => {
   );
 });
 
+test('test-quality ratchet config stays locked until the body cites the lock', () => {
+  const path = 'config/test-quality/ratchets.json';
+  assert.equal(isLockedArea(path), true);
+  const bare = check(pr(), [file(path)]);
+  assert.ok(
+    bare.errors.some(
+      error => error.startsWith('locked-areas:') && error.includes(path)
+    )
+  );
+  assert.deepEqual(
+    check(
+      pr({
+        body: `${proof}\n## Locked areas\nGBrain: decisions/guardrail-ratchet-intent-discovery-20260624\nLocking PR: #22870`,
+      }),
+      [file(path)]
+    ).errors,
+    []
+  );
+});
+
 const event = {
   repository: { full_name: 'JovieInc/Jovie' },
   pull_request: { number: 1, head: { sha: 'a'.repeat(40) } },
