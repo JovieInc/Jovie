@@ -1,4 +1,11 @@
-import type { ShippingStateView } from '@/lib/ovie/shipping-state-client';
+import {
+  type DeployHealth,
+  measuredCount,
+} from '@/lib/ovie/shipping-state/contract';
+import {
+  createEmptyShippingStateView,
+  type ShippingStateView,
+} from '@/lib/ovie/shipping-state-client';
 import type { HudMetrics } from '@/types/hud';
 
 const okSource = {
@@ -45,13 +52,36 @@ export function cockpitMetrics(
   } as unknown as HudMetrics;
 }
 
-export const cockpitShipping = {
+const emptyShipping = createEmptyShippingStateView();
+
+export const cockpitShipping: ShippingStateView = {
+  ...emptyShipping,
   delivery: {
-    mergeQueueDepth: { value: 2 },
-    inFlight: { value: 1 },
-    merges: { last7Days: { value: 12 }, prior7Days: { value: 10 } },
-    production: { behindMain: { value: 3 } },
-    lanes: { deployHealth: null },
+    ...emptyShipping.delivery,
+    mergeQueueDepth: measuredCount(2),
+    inFlight: measuredCount(1),
+    merges: {
+      ...emptyShipping.delivery.merges,
+      last7Days: measuredCount(12),
+      prior7Days: measuredCount(10),
+    },
+    production: {
+      ...emptyShipping.delivery.production,
+      behindMain: measuredCount(3),
+    },
   },
-  ciGreen: { value: true },
-} as unknown as ShippingStateView;
+  ciGreen: { value: true, measurement: 'measured' },
+};
+
+/** Override only deploy health, retaining the complete shipping contract. */
+export function cockpitShippingWithDeployHealth(
+  deployHealth: DeployHealth | null
+): ShippingStateView {
+  return {
+    ...cockpitShipping,
+    delivery: {
+      ...cockpitShipping.delivery,
+      lanes: { ...cockpitShipping.delivery.lanes, deployHealth },
+    },
+  };
+}

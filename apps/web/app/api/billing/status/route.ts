@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { getEffectivePlan } from '@/lib/entitlements/registry';
 import { captureError } from '@/lib/error-tracking';
 import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { getRedis } from '@/lib/redis';
@@ -106,7 +107,7 @@ function buildBillingStatusPayload(params: {
 }): BillingStatusPayload {
   return {
     isPro: params.isPro,
-    plan: params.plan ?? 'free',
+    plan: getEffectivePlan(params.plan, params.isPro),
     stripeCustomerId: params.stripeCustomerId,
     stripeSubscriptionId: params.stripeSubscriptionId,
     trialStartedAt: params.trialStartedAt,

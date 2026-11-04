@@ -50,8 +50,8 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn(),
 }));
 
-vi.mock('@/lib/notifications/providers/resend', () => ({
-  ResendEmailProvider: vi.fn().mockImplementation(function () {
+vi.mock('@/lib/notifications/providers/gateway', () => ({
+  GatewayEmailProvider: vi.fn().mockImplementation(function () {
     return { sendEmail: mocks.sendEmail };
   }),
 }));
@@ -245,6 +245,9 @@ describe('dunning', () => {
         templateData
       );
       expect(mocks.sendEmail).toHaveBeenCalledExactlyOnceWith({
+        stream: 'transactional',
+        purpose: 'dunning-payment-failed',
+        consent: 'account-transaction',
         to: 'artist@example.test',
         subject: 'Payment failed',
         text: 'Payment failed text',

@@ -712,6 +712,12 @@ test('certifies every marketing route and public-profile open state', async ({
               timeout: 90_000,
             });
             expect.soft(response?.status(), target.url).toBeLessThan(400);
+            expect(new URL(page.url()).origin, target.url).toBe(
+              new URL(baseUrl).origin
+            );
+            expect(new URL(page.url()).pathname, target.url).toBe(
+              target.expectedPath
+            );
             phase = 'runtime selector';
             await expect(
               page.locator(target.expectedRuntimeSelector).first()

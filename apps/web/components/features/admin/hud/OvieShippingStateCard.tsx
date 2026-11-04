@@ -5,6 +5,7 @@ import { Ship } from 'lucide-react';
 import { useEffect } from 'react';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { MeasuredValue } from '@/components/molecules/MeasuredValue';
 import { computeRatePercent } from '@/lib/analytics/metrics';
 import { redactFilesystemPaths } from '@/lib/ovie/home/operator-copy';
 import type {
@@ -31,8 +32,6 @@ const TRUTH_LABEL: Record<ShippingStateView['truth'], string> = {
   recovery: 'Recovery',
 };
 
-const NOT_MEASURED = 'n/a';
-
 const FLAG_LABEL: Record<ShippingFlag, string> = {
   replay: 'Replay ignored',
   duplicate: 'Duplicate ignored',
@@ -46,53 +45,127 @@ const FLAG_LABEL: Record<ShippingFlag, string> = {
 
 type Delivery = ShippingStateView['delivery'];
 
-function formatCount(count: CountMeasurement): string {
-  return count.value === null
-    ? NOT_MEASURED
-    : count.value.toLocaleString('en-US');
+/** Display name of each delivery source, shown when its metric is unknown. */
+const SOURCE_LABEL: Record<string, string> = {
+  'lanes-status': 'Lanes feed',
+  'lane-pull-requests': 'Lane PRs',
+  'github-native-merge-queue': 'Merge queue',
+  'github-merges': 'GitHub',
+  'exact-sha-ci': 'CI',
+  'production-controller': 'Production controller',
+  'staging-controller': 'Staging controller',
+  'live-build-info': 'Live build',
+  'staging-build-info': 'Staging build',
+  'summer-runtime': 'Summer runtime',
+};
+
+const STALE_STATES = new Set(['stale', 'disconnected', 'degraded']);
+
+/** A metric's reading plus where it comes from; `text` null = no reading. */
+function MetricValue({
+  view,
+  sourceId,
+  text,
+  stale = false,
+  nowMs,
+}: Readonly<{
+  readonly view: ShippingStateView;
+  readonly sourceId: string;
+  readonly text: string | null;
+  readonly stale?: boolean;
+  readonly nowMs: number;
+}>) {
+  const evidence = view.sources?.[sourceId] ?? null;
+  const lastAt = evidence?.lastSuccessAt
+    ? Date.parse(evidence.lastSuccessAt)
+    : Number.NaN;
+  const ageMs = Number.isFinite(lastAt) ? Math.max(0, nowMs - lastAt) : null;
+  const source = SOURCE_LABEL[sourceId] ?? sourceId;
+  if (text === null) {
+    let reason = 'syncing';
+    if (evidence) reason = evidence.code ?? evidence.state;
+    else if (view.sources) reason = 'not reported';
+    return (
+      <MeasuredValue
+        state='unknown'
+        source={source}
+        reason={reason}
+        ageMs={ageMs}
+      />
+    );
+  }
+  const isStale =
+    stale || (evidence ? STALE_STATES.has(evidence.state) : false);
+  return (
+    <MeasuredValue
+      state={isStale ? 'stale' : 'measured'}
+      value={text}
+      source={source}
+      ageMs={ageMs}
+    />
+  );
 }
 
-function formatMeaning(meaning: ShippingMeaningView): string {
-  if (meaning.value === null) return NOT_MEASURED;
+function formatCount(count: CountMeasurement): string | null {
+  return count.value === null ? null : count.value.toLocaleString('en-US');
+}
+
+function formatMeaning(meaning: ShippingMeaningView): string | null {
+  if (meaning.value === null) return null;
   return meaning.value ? 'Yes' : 'No';
 }
 
-function formatLanes(lanes: Delivery['lanes']): string {
-  if (lanes.running.value === null || lanes.slots.value === null) {
-    return NOT_MEASURED;
-  }
-  const value = `${lanes.running.value}/${lanes.slots.value}`;
-  return lanes.stale ? `${value} stale` : value;
+function formatLanes(lanes: Delivery['lanes']): string | null {
+  if (lanes.running.value === null || lanes.slots.value === null) return null;
+  return `${lanes.running.value}/${lanes.slots.value}`;
 }
 
-function formatWeek(merges: Delivery['merges']): string {
+function formatRepoSplit(byRepo: Delivery['merges']['byRepo']): string | null {
+  const parts = [byRepo.Jovie, byRepo.LogYourBody, byRepo['summer-config']];
+  if (parts.every(part => part.value === null)) return null;
+  return parts.map(part => formatCount(part) ?? 'unknown').join(' / ');
+}
+
+function formatWeek(merges: Delivery['merges']): string | null {
   const last = merges.last7Days.value;
   const prior = merges.prior7Days.value;
-  if (last === null) return NOT_MEASURED;
+  if (last === null) return null;
   const total = last.toLocaleString('en-US');
   if (prior === null || prior === 0) return total;
   const change = computeRatePercent(last - prior, prior, 0);
   return `${total} (${change >= 0 ? '+' : ''}${change}% WoW)`;
 }
 
-function formatProduction(production: Delivery['production']): string {
-  if (!production.sha) return NOT_MEASURED;
+function formatProduction(production: Delivery['production']): string | null {
+  if (!production.sha) return null;
   const sha = production.sha.slice(0, 7);
   return production.version ? `${production.version} ${sha}` : sha;
 }
 
-function formatCertifiedHead(certifiedHead: Delivery['certifiedHead']): string {
-  return certifiedHead.sha ? certifiedHead.sha.slice(0, 7) : NOT_MEASURED;
+function formatCertifiedHead(
+  certifiedHead: Delivery['certifiedHead']
+): string | null {
+  return certifiedHead.sha ? certifiedHead.sha.slice(0, 7) : null;
 }
 
-function formatLybDeploy(health: DeliveryLanes['deployHealth']): string {
+function formatProdLag(health: DeliveryLanes['deployHealth']): string | null {
+  const lag = health?.lag?.find(row => row.repo === 'JovieInc/Jovie');
+  if (!lag || lag.p50Min === null || lag.p95Min === null) return null;
+  const target =
+    lag.targetP50Min === null || lag.targetP95Min === null
+      ? ''
+      : ` (target ${lag.targetP50Min} / ${lag.targetP95Min})`;
+  return `${Math.round(lag.p50Min)} / ${Math.round(lag.p95Min)} min${target}`;
+}
+
+function formatLybDeploy(health: DeliveryLanes['deployHealth']): string | null {
   const lyb = health?.repos.find(repo => repo.repo === 'JovieInc/LogYourBody');
-  if (!lyb) return NOT_MEASURED;
-  const behind =
-    lyb.behindMain === null ? NOT_MEASURED : `${lyb.behindMain} behind`;
-  return lyb.status === 'failing'
-    ? `Failing x${lyb.failedStreak}, ${behind}`
-    : behind;
+  if (!lyb) return null;
+  const behind = lyb.behindMain === null ? null : `${lyb.behindMain} behind`;
+  if (lyb.status === 'failing') {
+    return [`Failing x${lyb.failedStreak}`, behind].filter(Boolean).join(', ');
+  }
+  return behind ?? 'Passing';
 }
 
 const SUMMER_LABEL = { up: 'Up', down: 'Down', degraded: 'Degraded' } as const;
@@ -246,32 +319,59 @@ function ShippingStateBody({
   const flagLine = [...view.flags].map(flag => FLAG_LABEL[flag]).join(' · ');
   const stateDetail = [view.lastError, flagLine].filter(Boolean).join(' · ');
   const { delivery } = view;
-  const byRepo = delivery.merges.byRepo;
-  const rows = [
-    ['Lanes Running', formatLanes(delivery.lanes)],
-    ['Merge Queue', formatCount(delivery.mergeQueueDepth)],
-    ['Merged Today', formatCount(delivery.merges.today)],
-    ['In Flight', formatCount(delivery.inFlight)],
+  const rows: readonly (readonly [string, string, string | null, boolean?])[] =
     [
-      'Jovie / LYB / Summer',
-      [byRepo.Jovie, byRepo.LogYourBody, byRepo['summer-config']]
-        .map(formatCount)
-        .join(' / '),
-    ],
-    ['Merged 7d', formatWeek(delivery.merges)],
-    ['Certified HEAD', formatCertifiedHead(delivery.certifiedHead)],
-    ['Staging', formatProduction(delivery.staging)],
-    ['Production', formatProduction(delivery.production)],
-    ['Behind Main', formatCount(delivery.production.behindMain)],
-    ['LYB Deploy', formatLybDeploy(delivery.lanes.deployHealth)],
-    ['CI Green', formatMeaning(view.ciGreen)],
-    [
-      'Summer',
-      delivery.summer.availability
-        ? SUMMER_LABEL[delivery.summer.availability]
-        : NOT_MEASURED,
-    ],
-  ] as const;
+      [
+        'Lanes Running',
+        'lanes-status',
+        formatLanes(delivery.lanes),
+        delivery.lanes.stale,
+      ],
+      [
+        'Merge Queue',
+        'github-native-merge-queue',
+        formatCount(delivery.mergeQueueDepth),
+      ],
+      ['Merged Today', 'github-merges', formatCount(delivery.merges.today)],
+      ['In Flight', 'lane-pull-requests', formatCount(delivery.inFlight)],
+      [
+        'Jovie / LYB / Summer',
+        'github-merges',
+        formatRepoSplit(delivery.merges.byRepo),
+      ],
+      ['Merged 7d', 'github-merges', formatWeek(delivery.merges)],
+      [
+        'Certified HEAD',
+        'exact-sha-ci',
+        formatCertifiedHead(delivery.certifiedHead),
+      ],
+      ['Staging', 'staging-build-info', formatProduction(delivery.staging)],
+      ['Production', 'live-build-info', formatProduction(delivery.production)],
+      [
+        'Behind Main',
+        'live-build-info',
+        formatCount(delivery.production.behindMain),
+      ],
+      [
+        'Merge to Prod',
+        'lanes-status',
+        formatProdLag(delivery.lanes.deployHealth),
+      ],
+      [
+        'LYB Deploy',
+        'lanes-status',
+        formatLybDeploy(delivery.lanes.deployHealth),
+      ],
+      ['CI Green', 'exact-sha-ci', formatMeaning(view.ciGreen)],
+      [
+        'Summer',
+        'summer-runtime',
+        delivery.summer.availability
+          ? SUMMER_LABEL[delivery.summer.availability]
+          : null,
+      ],
+    ];
+  const nowMs = Date.now();
   const lanesDetail = lanesLine(delivery.lanes);
 
   return (
@@ -280,8 +380,20 @@ function ShippingStateBody({
         className='grid gap-2 sm:grid-cols-2'
         data-testid='hud-delivery-metrics'
       >
-        {rows.map(([label, value]) => (
-          <ContentMetricRow key={label} label={label} value={value} />
+        {rows.map(([label, sourceId, text, stale]) => (
+          <ContentMetricRow
+            key={label}
+            label={label}
+            value={
+              <MetricValue
+                view={view}
+                sourceId={sourceId}
+                text={text}
+                stale={stale}
+                nowMs={nowMs}
+              />
+            }
+          />
         ))}
       </div>
       <p
