@@ -88,13 +88,19 @@ export async function upsertTriptychComment({
     }
     return result.stdout;
   };
-  const comments = JSON.parse(
-    (await call([
-      'api',
-      '--paginate',
-      `repos/${repo}/issues/${pr}/comments`,
-    ])) || '[]'
-  );
+  // @json emits one compact page per line, even on gh versions without --slurp.
+  // Body newlines stay escaped inside each page; flatten only the page level.
+  const pages = await call([
+    'api',
+    '--paginate',
+    '--jq',
+    '@json',
+    `repos/${repo}/issues/${pr}/comments`,
+  ]);
+  const comments = pages
+    .split('\n')
+    .filter(line => line.trim())
+    .flatMap(line => JSON.parse(line));
   const previous = comments.filter(
     comment =>
       typeof comment.body === 'string' && comment.body.includes(COMMENT_MARKER)
