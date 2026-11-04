@@ -913,6 +913,7 @@
   "scripts/backlog-orchestrator/scorer.mjs": 614,
   "scripts/backlog-orchestrator/symphony-routing.mjs": 877,
   "scripts/backlog-orchestrator/triage-event-assess.mjs": 1000,
+  "scripts/buyer-eval/buyer-eval.test.mjs": 609,
   "scripts/capability-benchmark/capability-benchmark.mjs": 579,
   "scripts/capability-benchmark/capability-reconciliation.mjs": 1215,
   "scripts/capability-benchmark/capability-reconciliation.test.mjs": 709,
