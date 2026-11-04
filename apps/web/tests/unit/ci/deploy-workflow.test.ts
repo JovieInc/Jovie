@@ -2206,6 +2206,9 @@ describe('canary health gate workflow', () => {
   });
 
   // Execute the production Bash, including privacy checks after identity passes.
+  // Local test:fast times out at 5s. CI allows 12s for this config. One
+  // identity case took 949ms alone and crossed 5s while the hook host was
+  // loaded. Use the CI budget. Status and request counts stay fail-closed.
   it.each([
     ['exact', 0, 1],
     ['sha-converges', 0, 2],
@@ -2483,7 +2486,8 @@ esac
       } finally {
         rmSync(root, { force: true, recursive: true });
       }
-    }
+    },
+    12_000
   );
 
   it('retries a safe OAuth test failure with clean artifacts and shared guard state', () => {

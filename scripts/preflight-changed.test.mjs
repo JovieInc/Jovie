@@ -25,6 +25,7 @@ import {
   changedFiles,
   downgradeHostRed,
   failureSummaryLines,
+  failureTestPaths,
   GENERATORS,
   HEAVY_GUARDS,
   hostSlotted,
@@ -175,6 +176,20 @@ test('failure summary bounds context and labels an unrecognized or empty tail', 
   assert.match(tail[1], /^ordinary output 7:/);
   assert.match(tail[13], /^ordinary output 19:/);
   assert.deepEqual(failureSummaryLines(' \n\n'), [tail[0]]);
+});
+
+test('failure lines keep the test path after the output tail is discarded', () => {
+  const log = [
+    'not ok 3 - dispatch stays inside one block',
+    "  location: 'file:///repo/scripts/lib/__tests__/script-contract-affected.test.mjs:12:1'",
+    'ok 4 - passing test mentions scripts/lib/__tests__/ok.test.mjs',
+    'FAIL scripts/lib/__tests__/merge-queue-guard.test.mjs > admits a clean head',
+    '# fail 8',
+  ].join('\n');
+  assert.deepEqual(failureTestPaths(log), [
+    'scripts/lib/__tests__/script-contract-affected.test.mjs',
+    'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  ]);
 });
 
 test('changed invariant modules select their contract tests before push', () => {

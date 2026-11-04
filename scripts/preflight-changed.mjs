@@ -290,6 +290,27 @@ function untrackCommand(record) {
   }
 }
 
+const FAILURE_LINE = /(?:^|\b)(?:not ok\b|FAIL\b|location:|✖|×)/u;
+const TEST_PATH = /((?:[\w.@/-]+\/)?[\w.@-]+\.test\.[cm]?[jt]sx?)/u;
+
+/** Test files named by failure lines. The output tail is not a substitute:
+ * preflight keeps only the last 200KB, which dropped the names and left
+ * "8 failing tests" with nothing to fix. */
+export function failureTestPaths(text) {
+  const found = new Set();
+  for (const line of String(text).split('\n')) {
+    if (!FAILURE_LINE.test(line)) continue;
+    const match = TEST_PATH.exec(line);
+    if (!match) continue;
+    const raw = match[1];
+    const at = raw.lastIndexOf('scripts/');
+    const app = raw.lastIndexOf('apps/');
+    const rel = at >= 0 ? raw.slice(at) : app >= 0 ? raw.slice(app) : raw;
+    found.add(rel);
+  }
+  return [...found];
+}
+
 export function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
   if (cancelledCommandCode)
     return Promise.resolve({ code: cancelledCommandCode, out: '', ms: 0 });
@@ -309,8 +330,15 @@ export function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
     const record = { child };
     trackCommand(record);
     let out = '';
+    let carry = '';
+    const failedTests = new Set();
     let timedOut = false;
     const take = d => {
+      const text = carry + d.toString();
+      const lines = text.split('\n');
+      carry = lines.pop() ?? '';
+      for (const path of failureTestPaths(lines.join('\n')))
+        failedTests.add(path);
       out += d.toString();
       if (out.length > 400_000) out = out.slice(-200_000);
     };
@@ -325,11 +353,13 @@ export function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
     child.on('close', (code, signal) => {
       clearTimeout(timer);
       untrackCommand(record);
+      for (const path of failureTestPaths(carry)) failedTests.add(path);
       resolve({
         code: timedOut
           ? 124
           : cancelledCommandCode || (code ?? (signal ? 137 : 1)),
         out,
+        failedTests: [...failedTests],
         ms: Date.now() - t0,
       });
     });
@@ -925,6 +955,8 @@ export async function main({
   for (const w of results.filter(r => r.warn)) log(`\n[~] ${w.warn}`);
   for (const r of red) {
     log(`\n[ ] ${r.name}`);
+    for (const testPath of r.failedTests ?? [])
+      log(`      failed-test: ${testPath}`);
     for (const l of failureSummaryLines(r.out)) log(`      ${l}`);
   }
   for (const e of body.errors) log(`\n[ ] PR body: ${e.message}`);

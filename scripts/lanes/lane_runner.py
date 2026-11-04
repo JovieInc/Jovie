@@ -70,6 +70,7 @@ import slot_yield  # noqa: E402  (slot ceilings from measured merged-per-dollar)
 import update_drain  # noqa: E402  (drain gate admission while an update waits)
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
 import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
+import escalation_reconcile  # noqa: E402  (lane-fix-escalating is consumed, never parked)
 import board_intake  # noqa: E402  (mesh board work for codex, closed on verified outcomes)
 import ownership  # noqa: E402  (started-state live-owner invariant)
 import fleet_ledger  # noqa: E402  (external agent claims, stranded-claim view)
@@ -159,7 +160,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
-              "scripts/tests/test_board_intake.py", "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_priority_admission.py", "scripts/tests/test_macos_pool.py",
+              "scripts/tests/test_escalation_reconcile.py", "scripts/tests/test_board_intake.py", "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_priority_admission.py", "scripts/tests/test_macos_pool.py",
               "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
               "scripts/tests/test_pytest_hook_names.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
@@ -10193,6 +10194,23 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 tick["backlogDecompose"] = decompose_pass.maybe_spawn(host.state, [binding.key for binding in refill_for])
             except (Exception, SystemExit) as error:  # a refill fault never blocks dispatch
                 tick["backlogRefillError"] = f"{type(error).__name__}: {error}"[:200]
+        # A release self-test or local fixture never reads GitHub. fetch_labeled uses
+        # subprocess.run, and dispatch tests count that Popen as a worker spawn.
+        if (not os.environ.get("LANES_SELFTEST")
+                and os.environ.get("LANES_EXECUTION_BACKEND") != "local-test"
+                and escalation_reconcile.due(host.state)):
+            try:
+                labeled = escalation_reconcile.fetch_labeled()
+                if labeled is not None:
+                    receipt = escalation_reconcile.reconcile(
+                        host.state, labeled, load_providers(),
+                        update_attempts=lambda change: update_json(host.state / "fix-attempts.json", change),
+                        remove_label=escalation_reconcile.remove_label_via(),
+                        slots=lambda name, default: host.slots(name, default))
+                    escalation_reconcile.stamp(host.state, receipt)
+                    tick["escalationReconcile"] = {k: (len(v) if isinstance(v, list) else v) for k, v in receipt.items()}
+            except (Exception, SystemExit) as error:  # a stale-escalation pass never takes dispatch down
+                tick["escalationReconcileError"] = f"{type(error).__name__}: {error}"[:200]
         try:
             tick["linear"] = linear_sync.status(host.state)
         except Exception as error:
