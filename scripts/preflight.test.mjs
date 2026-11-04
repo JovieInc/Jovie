@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { snapshotSourceGuardActions } from './lib/source-guard-action-snapshot.mjs';
 import {
   applyExclusions,
   buildPreflightEnv,
@@ -1109,4 +1110,264 @@ test('body preflight supplies a valid internal-work repair only for a missing de
   );
   assert.deepEqual(internal.errors, []);
   assert.equal(internal.template, '');
+});
+
+function actionSnapshotFixture(t, setup = '') {
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'pf-actions-')));
+  const repo = path.join(root, 'repo');
+  const record = path.join(root, 'workspaces');
+  mkdirSync(repo);
+  const env = {
+    ...buildPreflightEnv(),
+    JOVIE_PREFLIGHT_LEDGER: 'off',
+    PREFLIGHT_SNAPSHOTS: record,
+    PREFLIGHT_SOURCE_WORKSPACE: repo,
+    // Ambient or step-level state cannot select someone else's generation.
+    SOURCE_GUARD_ACTION_WORKSPACE: repo,
+  };
+  const write = (name, content) => {
+    const destination = path.join(repo, name);
+    mkdirSync(path.dirname(destination), { recursive: true });
+    writeFileSync(destination, content);
+  };
+  const git = (...args) => {
+    const result = spawnSync(
+      'git',
+      ['-c', 'core.hooksPath=/dev/null', ...args],
+      {
+        cwd: repo,
+        env,
+        encoding: 'utf8',
+      }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trim();
+  };
+  const action = generation =>
+    `runs:\n  using: composite\n  steps:\n    - shell: bash\n      run: echo ${generation}\n`;
+  write('.gitignore', 'tmp/\nfixture.yml\n');
+  write('.github/actions/setup-node-pnpm/action.yml', action('first'));
+  write('.github/actions/setup-playwright/action.yml', action('browser'));
+  git('init', '-q', '-b', 'main');
+  git('config', 'user.name', 'Preflight snapshot fixture');
+  git('config', 'user.email', 'fixture@example.com');
+  git('add', '.');
+  git('-c', 'commit.gpgsign=false', 'commit', '-qm', 'first generation');
+  git('checkout', '-qb', 'subject');
+  git('remote', 'add', 'origin', repo);
+  const source = 'scripts/lib/source-guard-action-snapshot.mjs';
+  const step = deriveSteps(
+    readFileSync(path.join(ROOT, WORKFLOW_PATH), 'utf8')
+  ).find(candidate => candidate.name === 'Preserve merged action generation');
+  assert.ok(step, 'exercise the real workflow producer');
+  write(
+    'fixture.yml',
+    JSON.stringify({
+      jobs: {
+        [JOB_ID]: {
+          steps: [
+            {
+              name: 'Record attempt workspace',
+              run: `printf '%s\\n' "$RUNNER_TEMP" >> "$PREFLIGHT_SNAPSHOTS"\n${setup}`,
+            },
+            {
+              name: step.name,
+              // Use the original helper URL so coverage measures changed code.
+              run: step.run.replace(
+                source,
+                JSON.stringify(path.join(ROOT, source))
+              ),
+              env: { SOURCE_GUARD_ACTION_WORKSPACE: repo },
+            },
+            {
+              name: 'Other steps retain their own workspace',
+              run: 'test "$SOURCE_GUARD_ACTION_WORKSPACE" = "$PREFLIGHT_SOURCE_WORKSPACE"',
+            },
+          ],
+        },
+      },
+    })
+  );
+  const workspaces = () => {
+    try {
+      return readFileSync(record, 'utf8').trim().split('\n').filter(Boolean);
+    } catch (error) {
+      if (error.code === 'ENOENT') return [];
+      throw error;
+    }
+  };
+  t.after(() => {
+    for (const workspace of workspaces())
+      rmSync(workspace, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  });
+  return {
+    repo,
+    root,
+    write,
+    git,
+    action,
+    workspaces,
+    run: async () => {
+      const lines = [];
+      const code = await main({
+        argv: ['--workflow', path.join(repo, 'fixture.yml')],
+        cwd: repo,
+        env,
+        log: line => lines.push(line),
+      });
+      return { code, out: lines.join('\n') };
+    },
+    snapshot: workspace =>
+      path.join(
+        workspace,
+        'tmp/source-guard-actions/setup-node-pnpm/action.yml'
+      ),
+  };
+}
+
+test('real local qualification isolates retries, changed heads, stale artifacts and concurrent attempts', async t => {
+  const f = actionSnapshotFixture(t);
+  f.write('tmp/source-guard-actions/owner.txt', 'another attempt owns this\n');
+  const firstHead = f.git('rev-parse', 'HEAD');
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const result = await f.run();
+    assert.equal(result.code, 0, result.out);
+    assert.equal(f.git('rev-parse', 'HEAD'), firstHead);
+  }
+  const firstWorkspaces = f.workspaces();
+  assert.equal(firstWorkspaces.length, 2);
+  for (const workspace of firstWorkspaces)
+    assert.equal(
+      readFileSync(f.snapshot(workspace), 'utf8'),
+      f.action('first')
+    );
+
+  f.write('.github/actions/setup-node-pnpm/action.yml', f.action('second'));
+  f.git('add', '.github/actions/setup-node-pnpm/action.yml');
+  f.git('-c', 'commit.gpgsign=false', 'commit', '-qm', 'second generation');
+  assert.notEqual(f.git('rev-parse', 'HEAD'), firstHead);
+  const retry = await f.run();
+  assert.equal(retry.code, 0, retry.out);
+  const concurrent = await Promise.all([f.run(), f.run()]);
+  for (const result of concurrent) assert.equal(result.code, 0, result.out);
+  const workspaces = f.workspaces();
+  assert.equal(workspaces.length, 5);
+  assert.equal(new Set(workspaces).size, 5);
+  for (const workspace of workspaces.slice(2))
+    assert.equal(
+      readFileSync(f.snapshot(workspace), 'utf8'),
+      f.action('second')
+    );
+  for (const workspace of firstWorkspaces)
+    assert.equal(
+      readFileSync(f.snapshot(workspace), 'utf8'),
+      f.action('first')
+    );
+  assert.equal(
+    readFileSync(
+      path.join(f.repo, 'tmp/source-guard-actions/owner.txt'),
+      'utf8'
+    ),
+    'another attempt owns this\n'
+  );
+  assert.equal(f.git('status', '--porcelain'), '');
+});
+
+for (const [
+  name,
+  setup,
+  expected,
+] of /** @type {Array<[string, string, RegExp]>} */ ([
+  [
+    'malformed parent',
+    'printf owner > "$RUNNER_TEMP/tmp"',
+    /ordinary directory/,
+  ],
+  [
+    'linked parent',
+    'ln -s "$PREFLIGHT_SNAPSHOTS.outside" "$RUNNER_TEMP/tmp"',
+    /ordinary directory/,
+  ],
+  [
+    'occupied target',
+    'mkdir -p "$RUNNER_TEMP/tmp/source-guard-actions"; printf owner > "$RUNNER_TEMP/tmp/source-guard-actions/owner"',
+    /EEXIST/,
+  ],
+  [
+    'malformed target',
+    'mkdir "$RUNNER_TEMP/tmp"; printf owner > "$RUNNER_TEMP/tmp/source-guard-actions"',
+    /EEXIST/,
+  ],
+  [
+    'linked target',
+    'mkdir "$RUNNER_TEMP/tmp"; ln -s "$PREFLIGHT_SNAPSHOTS.outside" "$RUNNER_TEMP/tmp/source-guard-actions"',
+    /EEXIST/,
+  ],
+])) {
+  test(`real local qualification propagates ${name} snapshot failure without replacing its owner`, async t => {
+    const f = actionSnapshotFixture(t, setup);
+    const outside = path.join(f.root, 'workspaces.outside');
+    mkdirSync(outside);
+    writeFileSync(path.join(outside, 'owner'), 'outside owner');
+    const result = await f.run();
+    assert.equal(result.code, 1, result.out);
+    assert.match(result.out, expected);
+    assert.equal(
+      readFileSync(path.join(outside, 'owner'), 'utf8'),
+      'outside owner'
+    );
+    const [workspace] = f.workspaces();
+    if (name === 'occupied target')
+      assert.equal(
+        readFileSync(
+          path.join(workspace, 'tmp/source-guard-actions/owner'),
+          'utf8'
+        ),
+        'owner'
+      );
+    if (name === 'malformed target')
+      assert.equal(
+        readFileSync(path.join(workspace, 'tmp/source-guard-actions'), 'utf8'),
+        'owner'
+      );
+    if (name === 'malformed parent')
+      assert.equal(readFileSync(path.join(workspace, 'tmp'), 'utf8'), 'owner');
+  });
+}
+
+test('real local qualification reports a genuine source snapshot failure and succeeds only after repair', async t => {
+  const f = actionSnapshotFixture(t);
+  f.write(
+    '.github/actions/setup-node-pnpm/action.yml',
+    'runs:\n  using: node24\n  main: missing.js\n'
+  );
+  const failed = await f.run();
+  assert.equal(failed.code, 1, failed.out);
+  assert.match(failed.out, /payload does not resolve inside its package/);
+  f.write('.github/actions/setup-node-pnpm/action.yml', f.action('repaired'));
+  const repaired = await f.run();
+  assert.equal(repaired.code, 0, repaired.out);
+  const [failedWorkspace, repairedWorkspace] = f.workspaces();
+  assert.notEqual(failedWorkspace, repairedWorkspace);
+  assert.throws(() => readFileSync(f.snapshot(failedWorkspace)), /ENOENT/);
+  assert.equal(
+    readFileSync(f.snapshot(repairedWorkspace), 'utf8'),
+    f.action('repaired')
+  );
+});
+
+test('an explicit snapshot workspace rejects empty, relative, file and symlink destinations', t => {
+  const f = actionSnapshotFixture(t);
+  const file = path.join(f.root, 'file');
+  const link = path.join(f.root, 'link');
+  writeFileSync(file, 'workspace owner');
+  symlinkSync(f.repo, link, 'dir');
+  for (const workspace of ['', 'relative', file, link]) {
+    assert.throws(
+      () => snapshotSourceGuardActions(f.repo, workspace),
+      /workspace must be an (?:absolute|ordinary) directory/
+    );
+  }
+  assert.equal(readFileSync(file, 'utf8'), 'workspace owner');
 });
