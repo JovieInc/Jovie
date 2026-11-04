@@ -1423,6 +1423,7 @@ export function OnboardingChat({
         {...onboardingChatInputProps}
         pickerPlacement={sendLocalError ? 'flow' : 'overlay'}
       />
+      <span hidden aria-hidden='true' data-onboarding-composer-complete />
     </div>
   );
 
@@ -1431,6 +1432,7 @@ export function OnboardingChat({
       className='system-b-onboarding-chat relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)'
       aria-label='Jovie Onboarding Chat'
       data-testid='onboarding-chat'
+      data-starter-handoff={hasInitialStarterPrompt ? 'true' : undefined}
       data-picker-open={composerPickerOpen ? 'true' : undefined}
     >
       {/* Scroll area (flex-1) — upper content morphs on first message */}
