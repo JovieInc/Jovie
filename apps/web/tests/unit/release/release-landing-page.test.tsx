@@ -143,10 +143,10 @@ vi.mock('@/features/release/SmartLinkShell', () => ({
     'text-2xl font-semibold leading-[1.08] tracking-tight text-(--color-text-tooltip) [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]',
   SmartLinkShell: ({
     children,
-    heroOverlay,
-  }: ChildrenProps & { heroOverlay?: React.ReactNode }) => (
+    heroMeta,
+  }: ChildrenProps & { heroMeta?: React.ReactNode }) => (
     <div data-testid='smart-link-shell'>
-      {heroOverlay}
+      {heroMeta}
       {children}
     </div>
   ),
@@ -422,6 +422,30 @@ describe('@critical ReleaseLandingPage', () => {
     expect(screen.getByText('LYNX').tagName).toBe('SPAN');
     expect(screen.getByText('LYNX').closest('a')).toBeNull();
   });
+
+  it.each([
+    [{ name: ' DJ Nova ', handle: 'djnova' }],
+    [
+      { name: 'DJ Nova', handle: 'djnova' },
+      { name: ' DJ Nova ', handle: null },
+    ],
+    [
+      { name: 'DJ Nova', handle: 'djnova' },
+      { name: 'DJ Nova', handle: null },
+    ],
+  ])(
+    'preserves the first featured profile link after name normalization: %j',
+    (...featured) => {
+      render(
+        <ReleaseLandingPage {...defaultProps} featuredArtists={featured} />
+      );
+
+      const links = screen.getAllByRole('link', { name: 'DJ Nova' });
+      expect(links).toHaveLength(1);
+      expect(links[0]).toHaveAttribute('href', '/djnova');
+      expect(links[0]).toHaveTextContent(/^DJ Nova$/);
+    }
+  );
 
   it('featured artists line renders "feat." with linked names', () => {
     const featured = [

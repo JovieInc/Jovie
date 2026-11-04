@@ -75,6 +75,7 @@ vi.mock('@/lib/db/schema/content', () => ({
     creatorProfileId: 'discogReleases.creatorProfileId',
     title: 'discogReleases.title',
     releaseDate: 'discogReleases.releaseDate',
+    createdAt: 'discogReleases.createdAt',
     sourceType: 'discogReleases.sourceType',
   },
   providerLinks: {
@@ -262,6 +263,21 @@ describe('scheduleReleaseNotifications (scheduling path behind the policy)', () 
     );
   });
 
+  // JOV-9779: Spotify imports land after the release date, so a release first
+  // discovered in the window is scheduled when its release date is recent.
+  it('also matches releases discovered in the window with a release date in the last 72 hours', async () => {
+    await expect(scheduleReleaseNotifications()).rejects.toThrow();
+
+    expect(mockGte).toHaveBeenCalledWith(
+      'discogReleases.createdAt',
+      new Date('2026-03-24T17:45:00.000Z')
+    );
+    expect(mockGte).toHaveBeenCalledWith(
+      'discogReleases.releaseDate',
+      new Date('2026-03-21T18:00:00.000Z')
+    );
+  });
+
   it('schedules an eligible subscriber and upserts the release-day dedup key', async () => {
     const releaseDate = new Date('2026-03-24T18:05:00.000Z');
 
@@ -274,7 +290,7 @@ describe('scheduleReleaseNotifications (scheduling path behind the policy)', () 
             creatorProfileId: 'creator_1',
             title: 'Launch Day',
             releaseDate,
-            sourceType: 'spotify',
+            sourceType: 'ingested',
           },
         ])
       )
@@ -375,7 +391,7 @@ describe('scheduleReleaseNotifications (scheduling path behind the policy)', () 
             creatorProfileId: 'creator_1',
             title: 'Launch Day',
             releaseDate: new Date('2026-03-24T18:05:00.000Z'),
-            sourceType: 'spotify',
+            sourceType: 'ingested',
           },
         ])
       )
@@ -500,4 +516,51 @@ describe('fan release audience queue admission denial', () => {
       expect(mockDbInsert).not.toHaveBeenCalled();
     }
   );
+});
+
+// JOV-9779: with audience delivery denied, the scheduler reads only the
+// configured release-email canary profile and reports canary-only.
+describe('release-email canary carve-out under the audience denial', () => {
+  let mockedEnv: Record<string, unknown>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    audiencePolicy.open = false;
+    mockedEnv = (await import('@/lib/env-server')).env as unknown as Record<
+      string,
+      unknown
+    >;
+    mockDbSelect.mockReturnValue(createFromWhereChain([]));
+  });
+
+  afterEach(() => {
+    delete mockedEnv.RELEASE_EMAIL_CANARY_PROFILE_ID;
+    delete mockedEnv.RELEASE_EMAIL_CANARY_INBOX;
+  });
+
+  it('scopes the release query to the canary when configured', async () => {
+    mockedEnv.RELEASE_EMAIL_CANARY_PROFILE_ID =
+      '0de33b39-ebcf-42ef-bcdd-c22bd8577368';
+    mockedEnv.RELEASE_EMAIL_CANARY_INBOX =
+      'release-canary+synthetic-release-email@jovie.fm';
+
+    expect(await scheduleReleaseNotifications()).toMatchObject({
+      scheduled: 0,
+      releasesFound: 0,
+      canaryOnly: true,
+      policyBlocked: { reason: 'audience_delivery_disabled' },
+    });
+    expect(mockDbSelect).toHaveBeenCalledTimes(1);
+    expect(mockDbInsert).not.toHaveBeenCalled();
+  });
+
+  it('reads nothing when the configured inbox is a real address', async () => {
+    mockedEnv.RELEASE_EMAIL_CANARY_PROFILE_ID =
+      '0de33b39-ebcf-42ef-bcdd-c22bd8577368';
+    mockedEnv.RELEASE_EMAIL_CANARY_INBOX = 'fan@example.com';
+
+    const result = await scheduleReleaseNotifications();
+    expect(result).not.toHaveProperty('canaryOnly');
+    expect(mockDbSelect).not.toHaveBeenCalled();
+  });
 });

@@ -33,6 +33,9 @@ export const HYDRATION_MISMATCH_PATTERNS: readonly RegExp[] = [
   /Prop `.*` did not match/i,
   /Expected server HTML to contain/i,
   /In HTML, .* cannot be a descendant of/i,
+  // Production builds minify the messages above: 418 = text/HTML mismatch,
+  // 423 = recovered by client render, 425 = text content mismatch.
+  /Minified React error #(?:418|423|425)\b/,
 ] as const;
 
 /**

@@ -5,6 +5,7 @@ import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
+import { DRAWER_SUBHEADING_CLASSNAME } from '@/components/molecules/drawer/DrawerSectionHeading';
 import { InfoPopover } from '@/components/molecules/inspector';
 import { buildReleaseDownloadsRoute } from '@/constants/routes';
 import { selectFindingsForLibraryAsset } from '@/lib/library/inspector-scope';
@@ -190,6 +191,68 @@ function PresenceFindingRow({
   );
 }
 
+/** Rightsholder evidence for the asset; lives under About, not Activity. */
+export function RightsholdersList({
+  asset,
+  bundle,
+}: {
+  readonly asset: LibraryReleaseAsset;
+  readonly bundle: LibraryPostReleaseBundle;
+}) {
+  const relevantRightsholders = useMemo(
+    () => rightsholdersForAsset(asset, bundle.rightsholders),
+    [asset, bundle.rightsholders]
+  );
+  if (relevantRightsholders.length === 0) return null;
+  return (
+    <section className='pt-3' aria-labelledby='library-rightsholders-heading'>
+      <div className='flex items-center gap-1'>
+        <h3
+          id='library-rightsholders-heading'
+          className={DRAWER_SUBHEADING_CLASSNAME}
+        >
+          Rightsholders
+        </h3>
+        <InfoPopover label='About Rightsholders'>
+          Songview and MLC are public composition observations, not proof of
+          master ownership. A file or email does not grant rights.
+        </InfoPopover>
+      </div>
+      <div className='mt-2 divide-y divide-subtle'>
+        {relevantRightsholders.map(evidence => (
+          <div key={evidence.id} className='py-2 first:pt-0 last:pb-0'>
+            <div className='flex items-start justify-between gap-3 text-xs'>
+              <span className='min-w-0 truncate font-medium text-primary-token'>
+                {evidence.partyName}
+              </span>
+              <span className='shrink-0 text-tertiary-token'>
+                {EVIDENCE_LABELS[evidence.evidenceClass]}
+              </span>
+            </div>
+            <p className='mt-0.5 truncate text-2xs text-tertiary-token'>
+              {evidence.role} · {evidence.domain} ·{' '}
+              {evidence.sourceUrl &&
+              /^https?:\/\//i.test(evidence.sourceUrl) ? (
+                <a
+                  href={evidence.sourceUrl}
+                  target='_blank'
+                  rel='noreferrer'
+                  className='text-link hover:underline'
+                >
+                  {EVIDENCE_SOURCE_LABELS[evidence.source]}
+                </a>
+              ) : (
+                EVIDENCE_SOURCE_LABELS[evidence.source]
+              )}
+              {evidence.sourceWorkId ? ` · ${evidence.sourceWorkId}` : ''}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function PostReleasePanel({
   asset,
   creatorProfileId,
@@ -228,21 +291,13 @@ export function PostReleasePanel({
   const draftedFindingCount = relevantFindings.filter(
     finding => finding.status === 'drafted'
   ).length;
-  const relevantRightsholders = useMemo(
-    () => rightsholdersForAsset(asset, bundle.rightsholders),
-    [asset, bundle.rightsholders]
-  );
   const downloadFileLabel = downloads.length === 1 ? 'file' : 'files';
   const downloadsSummary =
     downloads.length > 0
       ? `${downloads.length} attested ${downloadFileLabel} live`
       : 'No attested download is live';
 
-  if (
-    downloads.length === 0 &&
-    relevantFindings.length === 0 &&
-    relevantRightsholders.length === 0
-  ) {
+  if (downloads.length === 0 && relevantFindings.length === 0) {
     return null;
   }
 
@@ -265,7 +320,7 @@ export function PostReleasePanel({
               <div className='flex items-center gap-1'>
                 <h3
                   id='library-downloads-heading'
-                  className='text-xs font-semibold text-primary-token'
+                  className={DRAWER_SUBHEADING_CLASSNAME}
                 >
                   Downloads
                 </h3>
@@ -292,57 +347,6 @@ export function PostReleasePanel({
         </section>
       ) : null}
 
-      {relevantRightsholders.length > 0 ? (
-        <section
-          className='border-t border-subtle pt-3'
-          aria-labelledby='library-rightsholders-heading'
-        >
-          <div className='flex items-center gap-1'>
-            <h3
-              id='library-rightsholders-heading'
-              className='text-xs font-semibold text-primary-token'
-            >
-              Rightsholders
-            </h3>
-            <InfoPopover label='About Rightsholders'>
-              Songview and MLC are public composition observations, not proof of
-              master ownership. A file or email does not grant rights.
-            </InfoPopover>
-          </div>
-          <div className='mt-2 divide-y divide-subtle'>
-            {relevantRightsholders.map(evidence => (
-              <div key={evidence.id} className='py-2 first:pt-0 last:pb-0'>
-                <div className='flex items-start justify-between gap-3 text-xs'>
-                  <span className='min-w-0 truncate font-medium text-primary-token'>
-                    {evidence.partyName}
-                  </span>
-                  <span className='shrink-0 text-tertiary-token'>
-                    {EVIDENCE_LABELS[evidence.evidenceClass]}
-                  </span>
-                </div>
-                <p className='mt-0.5 truncate text-2xs text-tertiary-token'>
-                  {evidence.role} · {evidence.domain} ·{' '}
-                  {evidence.sourceUrl &&
-                  /^https?:\/\//i.test(evidence.sourceUrl) ? (
-                    <a
-                      href={evidence.sourceUrl}
-                      target='_blank'
-                      rel='noreferrer'
-                      className='text-link hover:underline'
-                    >
-                      {EVIDENCE_SOURCE_LABELS[evidence.source]}
-                    </a>
-                  ) : (
-                    EVIDENCE_SOURCE_LABELS[evidence.source]
-                  )}
-                  {evidence.sourceWorkId ? ` · ${evidence.sourceWorkId}` : ''}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
       {relevantFindings.length > 0 ? (
         <section
           className='border-t border-subtle pt-3'
@@ -351,7 +355,7 @@ export function PostReleasePanel({
           <div className='flex items-center justify-between gap-3'>
             <h3
               id='library-presence-heading'
-              className='text-xs font-semibold text-primary-token'
+              className={DRAWER_SUBHEADING_CLASSNAME}
             >
               Presence
             </h3>
