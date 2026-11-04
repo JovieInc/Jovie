@@ -11,7 +11,7 @@ export function DemoHomepageEmailMoment({ html }: Readonly<{ html: string }>) {
       <iframe
         title='Release day email'
         srcDoc={html}
-        className='block h-[39rem] w-[31.25rem] [color-scheme:dark]'
+        className='block h-156 w-125 scheme-dark'
         data-testid='homepage-moment-email'
       />
     </div>

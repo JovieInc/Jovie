@@ -28,6 +28,23 @@ const fixture = 'apps/web/app/demo/copy/page.tsx';
 const clean = { schema: config.schema, entries: {} };
 const bad = 'concise headline. fits 1-2 lines.';
 
+test('reviewed capture selectors do not exempt visible registry copy', () => {
+  const path = 'apps/web/lib/screenshots/product-shots.ts';
+  const source = readFileSync(join(process.cwd(), path), 'utf8');
+  assert.deepEqual(scan(path, source), []);
+  assert.ok(
+    scan(path, `export const alt = '[Choose your headline]';`).some(
+      hit => hit.rule === 'unresolved-prompt'
+    )
+  );
+  assert.ok(
+    scan(
+      path,
+      `export const selector = '[data-testid="unreviewed-selector"] input';`
+    ).some(hit => hit.rule === 'unresolved-prompt')
+  );
+});
+
 test('each configured leak family is case insensitive and blocks real copy', () => {
   const cases = JSON.parse(
     readFileSync(new URL('positive-fixtures.json', import.meta.url), 'utf8')

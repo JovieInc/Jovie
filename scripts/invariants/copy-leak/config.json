@@ -41,6 +41,11 @@
     }
   ],
   "allow": [
+    {
+      "path": "apps/web/lib/screenshots/product-shots.ts",
+      "rules": { "unresolved-prompt": ["4e2a5dffc01329d2", "5a7b10e7c9c62757", "6cb584dc5f81e8b3", "67b0e41766652ced", "94e6fd6967dfb9ba", "04c06864b6f2bfee", "8afb8fb5ad45ac37"] },
+      "reason": "Exact reviewed Playwright capture selectors used only by the screenshot renderer, not displayed copy. Visible alt/caption and unknown selectors remain scanned; regression controls cover both."
+    },
     { "path": "apps/web/app/(dynamic)/playlists/page.tsx", "rules": { "coming-soon": ["63a6373720bb487a"] }, "reason": "Truthful unreleased music or unavailable capability state; never claims that a shipped offer is available." },
     { "path": "apps/web/app/(marketing)/blog/components/BlogRelatedPosts.tsx", "rules": { "writer-imperative": ["b4b02d9f43fff131"] }, "reason": "Exact product action, setting label, song title, or customer message; directs the product user, not a copy writer." },
     { "path": "apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx", "rules": { "writer-imperative": ["9558701ea945b39a"] }, "reason": "Exact product action, setting label, song title, or customer message; directs the product user, not a copy writer." },
