@@ -10,6 +10,10 @@ export AUTOMATION_VERIFY_MAX_WORKERS="${AUTOMATION_VERIFY_MAX_WORKERS:-1}"
 # Keep developer-machine pushes conservative. Dedicated orchestration hosts may
 # raise bounded shard concurrency after proving memory and timeout headroom.
 export AUTOMATION_VERIFY_SHARD_CONCURRENCY="${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-1}"
+# Three preflight guards at once each boot vitest and blow the per-test
+# budget for suites that pass alone. One guard at a time during the hook.
+# JOVIE_PREFLIGHT_JOBS overrides; standalone preflight stays at 3.
+export JOVIE_PREFLIGHT_JOBS="${JOVIE_PREFLIGHT_JOBS:-1}"
 
 # NOTE: git holds the ssh receive-pack connection open across this hook.
 # GitHub kills it after ~10 idle minutes, and a long gate then surfaces as

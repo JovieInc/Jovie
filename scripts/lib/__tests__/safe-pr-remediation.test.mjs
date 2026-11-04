@@ -104,6 +104,30 @@ describe('safe Eve lockfile remediation admission', () => {
     });
   });
 
+  it('admits the Eve contract pin-sync file alongside the dependency files', () => {
+    // Safe PR Remediation runs 41426524239/41427756418 (PR #24272): the Eve
+    // installation contract hardcodes the microsandbox/pnpm pins in lockstep
+    // with apps/eve-pilot/package.json, so a bump that moves one requires the
+    // pin-sync commit in the same PR. Refusing that file deadlocks the lane —
+    // the writer cannot commit the regenerated lockfile while the stale pin
+    // fails the test job, and the test job cannot pass until it lands.
+    const contractTestFile =
+      'apps/eve-pilot/tests/eve-installation-contract.test.ts';
+
+    expect(
+      classifyEveLockDrift(
+        candidate({ files: [...candidate().files, contractTestFile] })
+      )
+    ).toMatchObject({ eligible: true });
+    expect(
+      classifyEveLockDrift(
+        candidate({
+          files: [...candidate().files, 'apps/eve-pilot/agent/index.ts'],
+        })
+      )
+    ).toMatchObject({ eligible: false, reason: 'non-dependency-file-changed' });
+  });
+
   it.each([
     [
       'fork',

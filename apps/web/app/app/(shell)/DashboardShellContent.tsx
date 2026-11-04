@@ -4,15 +4,19 @@ import { UnavailablePage } from '@/components/UnavailablePage';
 import { APP_ROUTES } from '@/constants/routes';
 import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBannerWrapper';
 import { OperatorBannerWrapper } from '@/features/admin/OperatorBannerWrapper';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { shouldRenderOperatorChrome } from '@/lib/app-shell/workspaces';
 import { getUserBanStatus } from '@/lib/auth/ban-check';
 import { getFreshAuth } from '@/lib/auth/cached';
+import { captureError } from '@/lib/error-tracking';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { resolveAppShellRouteFlagNames } from '@/lib/flags/route-snapshots';
 import { getAppFlagsSnapshot } from '@/lib/flags/server';
 import { getOviePrivacyLockState } from '@/lib/ovie/privacy-lock/server';
 import { HydrateClient } from '@/lib/queries';
 import { getDehydratedState } from '@/lib/queries/server';
+import { withTimeout } from '@/lib/resilience/primitives';
+import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { MoneyVisibilityProvider } from '@/lib/workspace-lock/money-visibility';
 import {
   isMoneyHiddenCookieValue,
@@ -22,6 +26,7 @@ import type { AppShellMode } from '@/types/app-shell';
 import { DashboardLoadTracker } from './DashboardLoadTracker';
 import { DashboardShellPrivacyBoundary } from './DashboardShellPrivacyBoundary';
 import {
+  type DashboardData,
   getDashboardData,
   getDashboardShellData,
   setSidebarCollapsed,
@@ -97,15 +102,32 @@ export async function DashboardShellContent({
       initiallyLocked = true;
     }
   }
-  const [dashboardData, initialFlags] = initiallyLocked
-    ? [null, {}]
-    : await Promise.all([
-        useEssentialShell ? getDashboardShellData(userId) : getDashboardData(),
-        getAppFlagsSnapshot({
-          userId,
-          flagNames: resolveAppShellRouteFlagNames(pathname),
-        }),
-      ]);
+  let dashboardData: DashboardData | null = null;
+  let initialFlags: Awaited<ReturnType<typeof getAppFlagsSnapshot>> = {};
+  if (!initiallyLocked) {
+    try {
+      // The parent shell must settle too: a page's error is hidden while this
+      // outer Suspense boundary is still waiting on its own dashboard read.
+      [dashboardData, initialFlags] = await withTimeout(
+        Promise.all([
+          useEssentialShell
+            ? getDashboardShellData(userId)
+            : getDashboardData(),
+          getAppFlagsSnapshot({
+            userId,
+            flagNames: resolveAppShellRouteFlagNames(pathname),
+          }),
+        ]),
+        { timeoutMs: 10_000, context: 'App shell workspace data' }
+      );
+    } catch (error) {
+      throwIfRedirect(error);
+      void captureError('App shell workspace load failed', error, { pathname });
+      return (
+        <PageErrorState message='Failed to load your workspace. Please refresh the page.' />
+      );
+    }
+  }
   const showOperatorChrome = shouldRenderOperatorChrome(mode, {
     isAdmin: mode === 'ov' || Boolean(dashboardData?.isAdmin),
   });

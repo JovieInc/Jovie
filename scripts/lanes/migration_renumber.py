@@ -10,6 +10,10 @@ main's schema changes too; a real conflict raises Unmergeable and the model gets
 
 Pure helpers plus `renumber(root, git, base_ref, pr_number, others)` which edits the worktree and returns the
 changed paths. The caller commits, merges main and pushes.
+
+After restoring main's metadata and running `pnpm --filter @jovie/web drizzle:generate`, use
+`normalize_generated(root, git, base_ref, pr_number, others)` for sparse migration numbering.
+It renames generated artifacts without merging or rewriting snapshot contents.
 """
 from __future__ import annotations
 
@@ -68,6 +72,47 @@ def three_way(base, mine, theirs):
 def _numbers(paths) -> list[int]:
     return sorted({int(m.group(1)) for p in paths if p.startswith(MIG_DIR + "/") and "/" not in p[len(MIG_DIR) + 1:]
                    for m in [NUM.match(p[len(MIG_DIR) + 1:])] if m})
+
+
+def normalize_generated(root: Path, git, base_ref: str, pr_number: int,
+                        others: dict[int, list[int]]) -> list[str]:
+    """Keep generated journal indices/timestamps; number new artifacts above main's SQL files.
+
+    Drizzle increments the journal index, which can lag a hand-numbered migration.
+    Only append-only generated metadata is accepted. Validate every rename before editing.
+    """
+    root = Path(root)
+    base = json.loads(git("show", f"{base_ref}:{META}/_journal.json"))
+    journal_path = root / META / "_journal.json"
+    journal = json.loads(journal_path.read_text())
+    count = len(base["entries"])
+    if journal["entries"][:count] != base["entries"]:
+        raise Unmergeable("restore main's metadata and regenerate before normalizing")
+    entries = journal["entries"][count:]
+    matches = [NUM.fullmatch(f"{entry['tag']}.sql") for entry in entries]
+    if not all(matches):
+        raise Unmergeable("unsupported generated migration tag")
+    paths = git("ls-tree", "-r", "--name-only", base_ref, MIG_DIR).splitlines()
+    mapping = assign(pr_number, others, [int(m[1]) for m in matches], max([0, *_numbers(paths)]))
+    renames, changed = [], []
+    for entry, match in zip(entries, matches):
+        old = int(match[1])
+        if old not in mapping:
+            continue
+        tag = f"{mapping[old]:04d}_{match[2]}"
+        for before, after in ((f"{MIG_DIR}/{entry['tag']}.sql", f"{MIG_DIR}/{tag}.sql"),
+                              (f"{META}/{old:04d}_snapshot.json", f"{META}/{mapping[old]:04d}_snapshot.json")):
+            if not (root / before).is_file() or (root / after).exists():
+                raise Unmergeable("missing generated artifact or occupied destination")
+            renames.append((before, after))
+        entry["tag"] = tag
+    for before, after in renames:
+        (root / before).rename(root / after)
+        changed.extend((before, after))
+    if changed:
+        atomic_write_text(journal_path, json.dumps(journal, indent=2) + "\n")
+        changed.append(f"{META}/_journal.json")
+    return changed
 
 
 def renumber(root: Path, git, base_ref: str, pr_number: int, others: dict[int, list[int]]) -> list[str]:

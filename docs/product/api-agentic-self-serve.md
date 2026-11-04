@@ -2,7 +2,7 @@
 
 Owner: JOV-4875 / existing agent-native API workstream. Status: proposal only.
 Evidence checked: October 20, 2026, source base `68b1c4a7c31`.
-Pricing authority: [canonical proposal schema](../company/PRICING-STRATEGY.md#api-pricing-schema-proposal-jov-4875).
+Pricing authority: the private API pricing proposal schema (JOV-4875) in `JovieInc/Ops` at `jovie-private/docs/company/PRICING-STRATEGY.md`; public summary in [PRICING-STRATEGY.md](../company/PRICING-STRATEGY.md).
 
 ## Outcome, scope, and evidence
 
