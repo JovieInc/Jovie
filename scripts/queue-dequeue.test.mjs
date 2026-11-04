@@ -1,9 +1,17 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { run, validate } from './queue-dequeue.mjs';
+import { readHistory, run, validate } from './queue-dequeue.mjs';
 
 const NOW = Date.parse('2026-10-26T07:00:00Z');
 function fake({ inQueue = true, actor = 'agent' } = {}) {
@@ -144,6 +152,189 @@ test('dry run changes nothing', () => {
         c => c[0] === 'pr' || JSON.stringify(c).includes('dequeuePullRequest')
       )
     );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+const VALID_ARGS = [
+  '--pr',
+  '5',
+  '--reason',
+  'owned fixture proves a real refusal',
+];
+const noWriteCalls = calls =>
+  calls.every(
+    args =>
+      args[0] !== 'pr' &&
+      !args.some(value => String(value).includes('dequeuePullRequest'))
+  );
+
+test('malformed history never clears limits or permits a native write', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'qd-invalid-'));
+  try {
+    const logPath = join(dir, 'history.jsonl');
+    assert.deepEqual(readHistory(logPath), []);
+    const bad = [
+      '{broken',
+      'null',
+      JSON.stringify({ at: 'invalid-time', pr: 5, actor: 'agent' }),
+      JSON.stringify({
+        at: new Date(NOW).toISOString(),
+        pr: '5',
+        actor: 'agent',
+      }),
+      JSON.stringify({ at: new Date(NOW).toISOString(), pr: 5, actor: '' }),
+    ];
+    for (const contents of bad) {
+      writeFileSync(logPath, contents);
+      const { gh, calls } = fake();
+      assert.throws(
+        () => run(VALID_ARGS, { gh, now: () => NOW, logPath, out: () => {} }),
+        /history/
+      );
+      assert.ok(noWriteCalls(calls));
+      assert.equal(readFileSync(logPath, 'utf8'), contents);
+      assert.ok(!existsSync(`${logPath}.lock`));
+    }
+    const directory = join(dir, 'unreadable-as-file');
+    mkdirSync(directory);
+    assert.throws(() => readHistory(directory), /history is unreadable/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('an existing local exclusion refuses without touching it or calling GitHub', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'qd-held-'));
+  try {
+    const logPath = join(dir, 'history.jsonl');
+    writeFileSync(`${logPath}.lock`, 'retained ownership proof');
+    const { gh, calls } = fake();
+    assert.throws(
+      () => run(VALID_ARGS, { gh, now: () => NOW, logPath, out: () => {} }),
+      /history is locked/
+    );
+    assert.deepEqual(calls, []);
+    assert.equal(
+      readFileSync(`${logPath}.lock`, 'utf8'),
+      'retained ownership proof'
+    );
+    assert.ok(!existsSync(logPath));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the exclusion spans read, audit append, comment and mutation for cooperating callers', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'qd-concurrent-'));
+  try {
+    const logPath = join(dir, 'history.jsonl');
+    const outer = fake();
+    const inner = fake();
+    let nestedRefused = false;
+    let sawComment = false;
+    const gh = args => {
+      assert.ok(existsSync(`${logPath}.lock`));
+      if (args[0] === 'api' && args[1] === 'user') {
+        assert.throws(
+          () =>
+            run(VALID_ARGS, {
+              gh: inner.gh,
+              now: () => NOW,
+              logPath,
+              out: () => {},
+            }),
+          /history is locked/
+        );
+        nestedRefused = true;
+      }
+      if (args[0] === 'pr') {
+        assert.equal(readHistory(logPath).length, 1);
+        sawComment = true;
+      }
+      if (args.some(value => String(value).includes('dequeuePullRequest')))
+        assert.ok(sawComment);
+      return outer.gh(args);
+    };
+    assert.equal(
+      run(VALID_ARGS, { gh, now: () => NOW, logPath, out: () => {} }),
+      0
+    );
+    assert.ok(nestedRefused);
+    assert.deepEqual(inner.calls, []);
+    assert.equal(readHistory(logPath).length, 1);
+    assert.equal(statSync(logPath).mode & 0o777, 0o600);
+    assert.ok(!existsSync(`${logPath}.lock`));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a failed comment retains the charged attempt and releases only its exclusion', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'qd-comment-error-'));
+  try {
+    const logPath = join(dir, 'history.jsonl');
+    const fixture = fake();
+    let mutations = 0;
+    const gh = args => {
+      if (args[0] === 'pr') throw new Error('fixture comment rejected');
+      if (args.some(value => String(value).includes('dequeuePullRequest')))
+        mutations += 1;
+      return fixture.gh(args);
+    };
+    assert.throws(
+      () => run(VALID_ARGS, { gh, now: () => NOW, logPath, out: () => {} }),
+      /fixture comment rejected/
+    );
+    assert.equal(mutations, 0);
+    assert.equal(readHistory(logPath).length, 1);
+    assert.ok(!existsSync(`${logPath}.lock`));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('dry-run planning creates no ledger directory or exclusion', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'qd-dry-no-state-'));
+  try {
+    const parent = join(dir, 'not-created');
+    const { gh, calls } = fake();
+    assert.equal(
+      run([...VALID_ARGS, '--dry-run'], {
+        gh,
+        now: () => NOW,
+        logPath: join(parent, 'history.jsonl'),
+        out: () => {},
+      }),
+      0
+    );
+    assert.ok(!existsSync(parent));
+    assert.ok(noWriteCalls(calls));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a missing authenticated actor cannot produce an audited dequeue', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'qd-no-actor-'));
+  try {
+    const logPath = join(dir, 'history.jsonl');
+    const { gh, calls } = fake({ actor: '' });
+    const messages = [];
+    assert.equal(
+      run(VALID_ARGS, {
+        gh,
+        now: () => NOW,
+        logPath,
+        out: message => messages.push(message),
+      }),
+      1
+    );
+    assert.match(messages[0], /authenticated actor unavailable/);
+    assert.ok(noWriteCalls(calls));
+    assert.ok(!existsSync(logPath));
+    assert.ok(!existsSync(`${logPath}.lock`));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -1,17 +1,25 @@
 #!/usr/bin/env node
 /**
- * Guarded merge-queue dequeue. Every dequeue rebuilds the groups behind it (2026-10-25/26: 46
- * "manual" removals in 24h, half by the shared agent account, 14 re-enqueued within 5 minutes
- * as reorder-by-dequeue). This tool is the only sanctioned way for an agent to dequeue:
- *
- *   node scripts/queue-dequeue.mjs --pr 123 --reason "why, at least 15 characters" [--code poison]
- *
- * It requires a reason, refuses PRs that are not in the queue, refuses a third dequeue of the
- * same PR within an hour and more than 6 dequeues an hour from one actor, comments the reason on
- * the PR, appends a JSONL record, then dequeues. --dry-run prints the plan only.
+ * Manual, guarded dequeue helper. Requires a reason and a queued PR, records the
+ * attempt before commenting and dequeuing, and retains the existing hourly caps.
+ * History and exclusion are LOCAL to the configured file, not a fleet-wide quota.
+ * An unreadable history or an existing exclusion file refuses the operation.
+ * Killed attempts require ownership reconciliation; no stale lock is auto-removed.
+ * Failed attempts after append remain counted; read the native outcome before retry.
+ * --dry-run is a read-only plan, not a reservation. Qualification uses fake gh.
  */
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  closeSync,
+  fstatSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -52,6 +60,8 @@ export function validate(args, state, history, nowMs) {
     problems.push(`--code must be one of ${CODES.join(', ')}`);
   if (!state?.inQueue)
     problems.push(`#${args.pr} is not in the merge queue; nothing to dequeue`);
+  if (typeof state?.actor !== 'string' || !state.actor.trim())
+    problems.push('authenticated actor unavailable');
   const hourAgo = nowMs - 3600_000;
   const recent = history.filter(row => Date.parse(row.at) >= hourAgo);
   if (recent.filter(row => row.pr === args.pr).length >= PER_PR_PER_HOUR)
@@ -77,14 +87,51 @@ function defaultGh(args, input) {
 }
 
 export function readHistory(logPath) {
+  let text;
   try {
-    return readFileSync(logPath, 'utf8')
+    text = readFileSync(logPath, 'utf8');
+  } catch (error) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'ENOENT'
+    )
+      return [];
+    throw new Error(
+      'dequeue history is unreadable; refusing to reset hourly limits',
+      { cause: error }
+    );
+  }
+  let rows;
+  try {
+    rows = text
       .split('\n')
       .filter(Boolean)
       .map(line => JSON.parse(line));
-  } catch {
-    return [];
+  } catch (error) {
+    throw new Error(
+      'dequeue history is malformed; refusing to reset hourly limits',
+      { cause: error }
+    );
   }
+  for (const row of rows) {
+    if (
+      !row ||
+      typeof row !== 'object' ||
+      Array.isArray(row) ||
+      typeof row.at !== 'string' ||
+      !Number.isFinite(Date.parse(row.at)) ||
+      !Number.isSafeInteger(row.pr) ||
+      row.pr < 1 ||
+      typeof row.actor !== 'string' ||
+      !row.actor.trim()
+    )
+      throw new Error(
+        'dequeue history has an invalid record; refusing to reset hourly limits'
+      );
+  }
+  return rows;
 }
 
 export function run(
@@ -97,6 +144,47 @@ export function run(
   } = {}
 ) {
   const args = parseArgs(argv);
+  const options = { gh, now, logPath, out };
+  if (args.dryRun) return executeAttempt(args, options);
+  mkdirSync(dirname(logPath), { recursive: true, mode: 0o700 });
+  const lockPath = `${logPath}.lock`;
+  let fd;
+  try {
+    fd = openSync(lockPath, 'wx', 0o600);
+  } catch (error) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'EEXIST'
+    )
+      throw new Error(
+        'dequeue history is locked; reconcile the previous attempt before retrying'
+      );
+    throw error;
+  }
+  try {
+    writeFileSync(
+      fd,
+      `${JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() })}\n`
+    );
+    return executeAttempt(args, options);
+  } finally {
+    try {
+      const owned = fstatSync(fd);
+      const current = lstatSync(lockPath);
+      if (owned.dev !== current.dev || owned.ino !== current.ino)
+        throw new Error(
+          'dequeue exclusion changed ownership; retained for reconciliation'
+        );
+      unlinkSync(lockPath);
+    } finally {
+      closeSync(fd);
+    }
+  }
+}
+
+function executeAttempt(args, { gh, now, logPath, out }) {
   const actor = JSON.parse(gh(['api', 'user'])).login;
   const query =
     'query($n:Int!){repository(owner:"JovieInc",name:"Jovie"){pullRequest(number:$n){id mergeQueueEntry{state position}}}}';
@@ -127,7 +215,7 @@ export function run(
     return 0;
   }
   mkdirSync(dirname(logPath), { recursive: true });
-  appendFileSync(logPath, `${JSON.stringify(record)}\n`);
+  appendFileSync(logPath, `${JSON.stringify(record)}\n`, { mode: 0o600 });
   gh([
     'pr',
     'comment',
