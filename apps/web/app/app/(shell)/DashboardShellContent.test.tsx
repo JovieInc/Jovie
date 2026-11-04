@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   flags: vi.fn(),
   dehydrated: vi.fn(),
   essential: vi.fn(),
+  captureError: vi.fn(),
   boundaryMounts: 0,
 }));
 
@@ -41,6 +42,7 @@ vi.mock('@/lib/auth/ban-check', () => ({
   getUserBanStatus: async () => ({ isBanned: false }),
 }));
 vi.mock('@/lib/auth/cached', () => ({ getFreshAuth: mocks.getFreshAuth }));
+vi.mock('@/lib/error-tracking', () => ({ captureError: mocks.captureError }));
 vi.mock('@/lib/ovie/privacy-lock/server', () => ({
   getOviePrivacyLockState: mocks.privacyState,
 }));
@@ -173,9 +175,58 @@ describe('DashboardShellContent privacy decision', () => {
   afterEach(() => vi.clearAllMocks());
   beforeEach(() => {
     mocks.boundaryMounts = 0;
+    mocks.shellDashboard.mockReset().mockResolvedValue(dashboardData);
+    mocks.dashboard.mockReset().mockResolvedValue(dashboardData);
     mocks.flags.mockResolvedValue({});
     mocks.dehydrated.mockReturnValue({ private: 'cache' });
     mocks.essential.mockReturnValue(true);
+  });
+
+  it.each(['shell data', 'full data', 'flags'])(
+    'shows an error instead of holding the page behind the shell skeleton when %s stalls',
+    async stalledRead => {
+      vi.useFakeTimers();
+      try {
+        mocks.essential.mockReturnValue(stalledRead !== 'full data');
+        const stalledMock =
+          stalledRead === 'flags'
+            ? mocks.flags
+            : stalledRead === 'full data'
+              ? mocks.dashboard
+              : mocks.shellDashboard;
+        stalledMock.mockReturnValue(new Promise(() => {}));
+        let result: React.ReactNode;
+        const pending = shell(
+          'customer',
+          <div>Contacts page</div>,
+          '/app/contacts'
+        ).then(tree => {
+          result = tree;
+        });
+        await vi.advanceTimersByTimeAsync(10_001);
+        expect(result).toBeDefined();
+        await pending;
+        render(result);
+
+        expect(screen.getByRole('alert')).toHaveTextContent(
+          'Failed to load your workspace. Please refresh the page.'
+        );
+        expect(screen.queryByText('Contacts page')).not.toBeInTheDocument();
+        expect(stalledMock).toHaveBeenCalledOnce();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+
+  it('preserves a dashboard authentication redirect', async () => {
+    const redirect = Object.assign(new Error('redirect'), {
+      digest: 'NEXT_REDIRECT;replace;/signin;307;',
+    });
+    mocks.shellDashboard.mockRejectedValue(redirect);
+    await expect(
+      shell('customer', <div>Contacts page</div>, '/app/contacts')
+    ).rejects.toBe(redirect);
   });
 
   it('does not invoke dashboard data or serialize child pages while Ovie is locked', async () => {

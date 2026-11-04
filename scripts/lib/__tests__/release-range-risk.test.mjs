@@ -275,6 +275,194 @@ describe('release range risk fail-closed', () => {
   });
 });
 
+describe('isolated marketing entrypoint promotion applicability', () => {
+  const baseDeployedSha = 'a'.repeat(40);
+  const candidateSha = 'b'.repeat(40);
+  const leaves = [
+    'apps/web/app/(marketing)/about/page.tsx',
+    'apps/web/app/(marketing)/artist-profiles/page.tsx',
+  ];
+  const grade = paths =>
+    gradeReleaseRange({ baseDeployedSha, candidateSha, paths });
+
+  it.each(leaves)(
+    '%s keeps medium Web/preview proof without unrelated auth/billing journeys',
+    path => {
+      const artifact = grade([path]);
+      expect(artifact).toMatchObject({
+        level: 'medium',
+        unknown: false,
+        requiresPreview: true,
+        affects: { publicUi: true, auth: false, billing: false },
+      });
+      const plan = planProductionLaneRange({
+        deployedSha: baseDeployedSha,
+        currentSha: candidateSha,
+        cumulativeChangedPaths: [path],
+        commitsNewestFirst: [
+          {
+            sha: candidateSha,
+            firstParent: baseDeployedSha,
+            changedPaths: [path],
+          },
+        ],
+      });
+      expect(plan.runWeb).toBe(true);
+      expect(plan.selectedLanes).toEqual(['web']);
+      const receipt = buildReleaseRiskReceipt({
+        lineageSha: candidateSha,
+        deployableWeb: plan.runWeb,
+        mergeAt: '2026-11-04T00:00:00Z',
+        riskReceipt: tipReceipt(candidateSha, [path]),
+        rangeRisk: artifact,
+      });
+      expect(receipt.selectedLane).toBe('medium');
+      expect(receipt.requiredProof).toEqual(
+        expect.arrayContaining([
+          'selected-integration',
+          'exact-production-candidate',
+          'targeted-canary',
+          'risk-required-preview',
+          'verified-production-identity',
+        ])
+      );
+      expect(
+        evaluatePromotion({ range: artifact, evidence: [] })
+      ).toMatchObject({
+        decision: 'pass',
+        required: false,
+      });
+    }
+  );
+
+  it.each([
+    'apps/web/lib/auth/cached.ts',
+    'apps/web/lib/billing/offer-truth.ts',
+    'apps/web/app/api/onboarding/claim/route.ts',
+    'apps/web/components/providers/ClientProviders.tsx',
+    'apps/web/app/(marketing)/layout.tsx',
+    'apps/web/app/(marketing)/pricing/page.tsx',
+    'apps/web/app/(home)/page.tsx',
+    'apps/web/app/(home)/home.css',
+    'apps/web/data/marketingCtaIntents.ts',
+    'apps/web/data/artistProfileCopy.ts',
+    'apps/web/next.config.js',
+    'apps/web/proxy.ts',
+    'apps/web/lib/db/schema.ts',
+    'packages/auth-routing/src/index.ts',
+    'pnpm-lock.yaml',
+    'apps/web/lib/utils/json-ld.ts',
+  ])(
+    'an additional cumulative input %s retains protected journeys in either order',
+    path => {
+      for (const paths of [
+        [leaves[0], path],
+        [path, leaves[0]],
+      ]) {
+        expect(evaluatePromotion({ range: grade(paths) })).toMatchObject({
+          required: true,
+          decision: 'blocked',
+        });
+      }
+    }
+  );
+
+  it.each([
+    { paths: [] },
+    { paths: null },
+    { paths: [{ path: leaves[0], class: 'safe', level: 'low' }] },
+    { paths: [{ path: leaves[0], class: 'public-ui' }] },
+    { requiresPreview: false },
+    { requiresSmoke: true },
+    { blocksUnattended: true },
+    { level: 'low' },
+    { unknownReasons: ['unclassified path apps/web/lib/auth/cached.ts'] },
+    { unknownReasons: null },
+    { matchedRuleIds: ['auth-identity', 'public-ui'] },
+    { matchedRuleIds: null },
+    { candidateSha: [candidateSha] },
+    { baseDeployedSha: [baseDeployedSha] },
+    { baseDeployedSha: candidateSha },
+    {
+      affects: { auth: false, billing: false, publicUi: true, unknown: false },
+    },
+  ])(
+    'incomplete or contradictory leaf classification fails closed: %j',
+    extra => {
+      expect(
+        evaluatePromotion({ range: { ...grade([leaves[0]]), ...extra } })
+      ).toMatchObject({
+        required: true,
+        decision: 'blocked',
+      });
+    }
+  );
+
+  it('the real gate CLI accepts an isolated leaf while auth and billing are red', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'marketing-promotion-'));
+    roots.push(directory);
+    const rangePath = join(directory, 'range.json');
+    writeFileSync(rangePath, JSON.stringify(grade([leaves[0]])));
+    const evidenceArgs = ['auth', 'billing'].flatMap(journey => {
+      const evidencePath = join(directory, `failed-${journey}.json`);
+      writeFileSync(
+        evidencePath,
+        JSON.stringify({
+          schema: 'jovie.journey-evidence/v1',
+          journey,
+          candidateSha,
+          deploymentSha: candidateSha,
+          source: 'playwright-run',
+          runId: '123',
+          runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/123',
+          conclusion: 'failure',
+          completedAt: '2026-11-04T00:00:00Z',
+          tests: { total: 1, passed: 0, failed: 1, skipped: 0 },
+          providers:
+            journey === 'auth'
+              ? [{ name: 'auth', mode: 'real' }]
+              : [{ name: 'stripe', mode: 'test' }],
+          quarantinedExclusions: [],
+        })
+      );
+      return ['--evidence', evidencePath];
+    });
+    const result = spawnSync(
+      process.execPath,
+      [
+        fileURLToPath(
+          new URL('../../promotion-journey-gate.mjs', import.meta.url)
+        ),
+        '--range',
+        rangePath,
+        ...evidenceArgs,
+        '--now',
+        '2026-11-04T01:00:00Z',
+      ],
+      { encoding: 'utf8' }
+    );
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      decision: 'pass',
+      required: false,
+    });
+  });
+
+  it.each(['ci', 'agent'])(
+    'leaf exemption rejects a missing or contradictory %s flag',
+    flag => {
+      const artifact = grade([leaves[0]]);
+      for (const value of [undefined, null, 'false', true]) {
+        const affects = { ...artifact.affects, [flag]: value };
+        if (value === undefined) delete affects[flag];
+        expect(
+          evaluatePromotion({ range: { ...artifact, affects } })
+        ).toMatchObject({ required: true, decision: 'blocked' });
+      }
+    }
+  );
+});
+
 describe('release range risk (2026-10-22 gate false-unknown)', () => {
   /**
    * The exact changed-path set of the 2026-10-22 promotion wave

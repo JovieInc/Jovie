@@ -25,6 +25,7 @@ import {
   listAllChangedFiles,
   SCRIPT_CONTRACT_NODE_TESTS,
   SCRIPT_CONTRACT_VITEST_TESTS,
+  scriptContractNodeArgs,
 } from '../ci-fast-lanes.mjs';
 import { testsAffectedBy } from './test-file-dependencies.mjs';
 
@@ -82,7 +83,8 @@ async function main(args) {
     return 0;
   }
   const runs = [];
-  if (node.length > 0) runs.push(run(process.execPath, ['--test', ...node]));
+  for (const args of scriptContractNodeArgs(node))
+    runs.push(run(process.execPath, args));
   if (vitest.length > 0)
     runs.push(
       run('pnpm', [

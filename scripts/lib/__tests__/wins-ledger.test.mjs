@@ -1,5 +1,17 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
+import { load } from 'js-yaml';
 import {
   clusters,
   dueMeasurements,
@@ -109,6 +121,23 @@ test('n/a declines; malformed section errors; absent is silent', () => {
   assert.equal(parseWinSection('## Win\nn/a\n').declined, true);
   assert.deepEqual(winSectionErrors('## Summary\nx'), []);
   assert.ok(winSectionErrors('## Win\n- Claim: only a claim\n').length > 0);
+});
+
+// Data is not shipped as PRs: the workflow writes the Win to the runtime store
+// and never opens a ledger PR or commits to git.
+test('workflow records wins in the store and never opens a ledger PR', () => {
+  const text = readFileSync(
+    join(
+      resolve(import.meta.dirname, '../../..'),
+      '.github/workflows/wins-ledger.yml'
+    ),
+    'utf8'
+  );
+  const steps = /** @type {any} */ (load(text)).jobs.ingest.steps
+    .map(s => s.run ?? '')
+    .join('\n');
+  assert.match(steps, /wins-ledger\.mjs ingest --pr "\$PR_NUMBER" --store/);
+  assert.doesNotMatch(steps, /git (commit|push)|pr create/);
 });
 
 test('clusters trigger at ten verified wins only', () => {
@@ -232,4 +261,142 @@ test('delta, notification and weekly rollup', () => {
   assert.equal(row.secondsSavedPerMergeVerified, 117);
   assert.equal(row.mergedPrs, 2);
   assert.equal(row.leadTimeHoursP50, 6);
+});
+
+function withRollupCli({ count, readFails = false }, inspect) {
+  const root = mkdtempSync(join(tmpdir(), 'wins-rollup-cli-'));
+  const bin = join(root, 'bin');
+  const output = join(root, 'docs/metrics/wins-weekly.json');
+  const rowsFile = join(root, 'merged.json');
+  const callsFile = join(root, 'gh-calls.jsonl');
+  const sentinel = '{"previous":"complete snapshot"}\n';
+  try {
+    mkdirSync(bin);
+    mkdirSync(join(root, 'canon/wins'), { recursive: true });
+    mkdirSync(dirname(output), { recursive: true });
+    writeFileSync(
+      join(root, 'canon/wins/wins.jsonl'),
+      '# isolated CLI fixture\n'
+    );
+    writeFileSync(output, sentinel);
+    writeFileSync(
+      rowsFile,
+      JSON.stringify(
+        Array.from({ length: count }, () => ({
+          createdAt: '2026-10-28T00:00:00Z',
+          mergedAt: '2026-10-28T12:00:00Z',
+        }))
+      )
+    );
+    const gh = join(bin, 'gh');
+    writeFileSync(
+      gh,
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.WINS_CLI_CALLS_FILE, JSON.stringify(args) + '\\n');
+if (args[0] !== 'pr' || args[1] !== 'list' || args[args.indexOf('--limit') + 1] !== '500') {
+  console.error('unexpected fixture invocation'); process.exit(2);
+}
+if (process.env.WINS_CLI_READ_FAILS === '1') {
+  console.error('offline fixture read failure'); process.exit(2);
+}
+process.stdout.write(fs.readFileSync(process.env.WINS_CLI_ROWS_FILE, 'utf8'));
+`
+    );
+    chmodSync(gh, 0o755);
+    const result = spawnSync(
+      process.execPath,
+      [
+        resolve(import.meta.dirname, '../../wins-ledger.mjs'),
+        'rollup',
+        '--write',
+      ],
+      {
+        cwd: root,
+        encoding: 'utf8',
+        timeout: 15_000,
+        env: {
+          ...process.env,
+          PATH: [bin, dirname(process.execPath), process.env.PATH ?? ''].join(
+            delimiter
+          ),
+          JOVIE_API_STATE_DIR: join(root, 'api-state'),
+          JOVIE_GITHUB_CREDENTIAL: 'wins-rollup-cli-fixture',
+          GH_TOKEN: '',
+          GITHUB_TOKEN: '',
+          WINS_CLI_CALLS_FILE: callsFile,
+          WINS_CLI_ROWS_FILE: rowsFile,
+          WINS_CLI_READ_FAILS: readFails ? '1' : '0',
+        },
+      }
+    );
+    assert.ifError(result.error);
+    assert.equal(result.signal, null, 'the CLI must exit normally');
+    const callsText = readFileSync(callsFile, 'utf8');
+    assert.ok(
+      callsText.endsWith('\n'),
+      'the gh fixture emits newline-delimited JSON'
+    );
+    const calls = callsText
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line));
+    assert.equal(
+      calls.length,
+      1,
+      'the fixture must make only its one budgeted read'
+    );
+    assert.deepEqual(calls[0].slice(0, 6), [
+      'pr',
+      'list',
+      '--repo',
+      'JovieInc/Jovie',
+      '--state',
+      'merged',
+    ]);
+    inspect({ result, snapshot: readFileSync(output, 'utf8'), sentinel });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+test('rollup publishes the complete sub-cap cohort through the real CLI', () => {
+  withRollupCli({ count: 499 }, ({ result, snapshot }) => {
+    assert.equal(result.status, 0, result.stderr);
+    const out = JSON.parse(snapshot);
+    assert.equal(out.schema, 'jovie.wins-weekly/v1');
+    assert.equal(out.weeks[0].mergedPrs, 499);
+    assert.equal(out.weeks[0].leadTimeHoursP50, 12);
+    assert.deepEqual(JSON.parse(result.stdout), out);
+  });
+});
+
+test('rollup refuses a saturated cohort without overwriting the existing snapshot', () => {
+  withRollupCli({ count: 500 }, ({ result, snapshot, sentinel }) => {
+    assert.notEqual(
+      result.status,
+      0,
+      'a capped cohort cannot establish completeness'
+    );
+    assert.match(result.stderr, /cohort.*500.*limit.*completeness/i);
+    assert.equal(
+      result.stdout,
+      '',
+      'do not print an ordinary successful snapshot'
+    );
+    assert.equal(snapshot, sentinel);
+  });
+});
+
+test('rollup preserves the existing snapshot when its budgeted read fails', () => {
+  withRollupCli(
+    { count: 499, readFails: true },
+    ({ result, snapshot, sentinel }) => {
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /offline fixture read failure/);
+      assert.equal(result.stdout, '');
+      assert.equal(snapshot, sentinel);
+    }
+  );
 });

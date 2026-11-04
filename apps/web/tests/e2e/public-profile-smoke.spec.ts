@@ -134,6 +134,134 @@ test('public profile renders core elements within budget', async ({ page }) => {
   });
 });
 
+// Release (smart-link) pages are the fan-facing half of the artist golden
+// path. A profile that renders while its releases 404 or show the "Coming
+// soon" placeholder reached production unnoticed because nothing walked them.
+const RELEASE_PAGE_HANDLE = process.env.SMOKE_RELEASE_HANDLE ?? 'tim';
+// Historical slug shared outside Jovie before the release was re-slugged. It
+// must keep resolving to the live release (redirect to its current slug).
+const LEGACY_RELEASE_SLUG =
+  process.env.SMOKE_LEGACY_RELEASE_SLUG ?? 'take-me-over';
+const LEGACY_RELEASE_TARGET =
+  process.env.SMOKE_LEGACY_RELEASE_TARGET ?? 'take-me-over-2';
+// Known catalog gap: Tim's solo "Seaside Heights" is not imported yet. Until it
+// is, the bare slug must be a clean 404. It must not redirect to the Vigel
+// version (seaside-heights-3) and must not render a Coming soon placeholder.
+const MISSING_RELEASE_SLUG =
+  process.env.SMOKE_MISSING_RELEASE_SLUG ?? 'seaside-heights';
+const MISSING_RELEASE_WRONG_TARGET = 'seaside-heights-3';
+
+async function expectLiveReleasePage(
+  page: import('@playwright/test').Page,
+  path: string
+) {
+  const response = await page.goto(path, { waitUntil: 'domcontentloaded' });
+  expect(response?.status(), `${path} must return 200`).toBe(200);
+  const title = await page.title();
+  expect(title, `${path} rendered the Coming soon placeholder`).not.toMatch(
+    /^Coming soon/i
+  );
+  const heading = page.locator('h1').first();
+  await expect(heading, `${path} has no release title`).toBeVisible();
+  const headingText = (await heading.textContent())?.trim() ?? '';
+  expect(headingText, `${path} rendered a not-found heading`).not.toMatch(
+    /content not found|profile not found|get alerts first/i
+  );
+  await expect(
+    page
+      .locator('a[data-dsp-provider], a[href*="spotify"], a[href*="apple"]')
+      .first(),
+    `${path} has no streaming link`
+  ).toBeVisible();
+}
+
+test('every release linked from the profile renders a live release page', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.goto(`/${RELEASE_PAGE_HANDLE}`, { waitUntil: 'domcontentloaded' });
+  const hrefs = await page
+    .locator(`a[href^="/${RELEASE_PAGE_HANDLE}/"]`)
+    .evaluateAll(anchors =>
+      Array.from(
+        new Set(anchors.map(a => (a as HTMLAnchorElement).getAttribute('href')))
+      )
+    );
+  const releasePaths = hrefs
+    .filter((href): href is string => Boolean(href))
+    .map(href => href.split(/[?#]/)[0])
+    .filter(href => href.split('/').length === 3);
+  expect(
+    releasePaths.length,
+    `/${RELEASE_PAGE_HANDLE} links to no release pages`
+  ).toBeGreaterThan(0);
+  for (const path of releasePaths) {
+    await expectLiveReleasePage(page, path);
+  }
+});
+
+test('legacy release slug resolves to its current release page', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await expectLiveReleasePage(
+    page,
+    `/${RELEASE_PAGE_HANDLE}/${LEGACY_RELEASE_SLUG}`
+  );
+  expect(new URL(page.url()).pathname).toBe(
+    `/${RELEASE_PAGE_HANDLE}/${LEGACY_RELEASE_TARGET}`
+  );
+});
+
+test('an unimported release slug is a clean 404, not a placeholder or wrong release', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  const response = await page.goto(
+    `/${RELEASE_PAGE_HANDLE}/${MISSING_RELEASE_SLUG}`,
+    { waitUntil: 'domcontentloaded' }
+  );
+  expect(response?.status()).toBe(404);
+  expect(new URL(page.url()).pathname).not.toContain(
+    MISSING_RELEASE_WRONG_TARGET
+  );
+  expect(await page.title()).not.toMatch(/^Coming soon/i);
+  await expect(page.getByText(/coming soon/i)).toHaveCount(0);
+});
+
+// Fan follow/subscribe is the last step of the artist golden path. Production
+// must not email real or synthetic addresses on every monitor run, so the probe
+// proves the form renders and that the subscribe route validates and answers
+// (400 for a malformed address) instead of failing with a 5xx or timing out.
+test('fan subscribe form renders and the subscribe route validates input', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  const canaryHandle = process.env.SMOKE_CANARY_HANDLE ?? 'authqaprod';
+  const response = await page.goto(`/${canaryHandle}?mode=subscribe`, {
+    waitUntil: 'domcontentloaded',
+  });
+  expect(response?.status(), `/${canaryHandle}?mode=subscribe`).toBe(200);
+  await expect(
+    page.locator('input[type="email"]').first(),
+    'Subscribe mode has no email input'
+  ).toBeVisible({ timeout: 10_000 });
+
+  const invalid = await page.request.post('/api/notifications/subscribe', {
+    data: {
+      artistId: '00000000-0000-0000-0000-000000000000',
+      channel: 'email',
+      email: 'not-an-email',
+    },
+  });
+  expect(
+    invalid.status(),
+    'Subscribe route must reject a malformed email with a 4xx'
+  ).toBeGreaterThanOrEqual(400);
+  expect(invalid.status()).toBeLessThan(500);
+  expect(invalid.headers()['content-type'] ?? '').toContain('application/json');
+});
+
 test.describe('public profile document semantics @regression', () => {
   test.skip(!hasDatabase, 'Profile document semantics require a real database');
 
