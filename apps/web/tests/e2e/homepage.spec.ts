@@ -406,6 +406,67 @@ test.describe('Homepage', () => {
 
 // Read-only discovery and invitation recovery replace the retired handle claim.
 test.describe('Homepage discovery recovery', () => {
+  test('native discovery works while hydration scripts are still pending', async ({
+    page,
+  }) => {
+    let releaseAssets = () => {};
+    const assetsReleased = new Promise<void>(resolve => {
+      releaseAssets = resolve;
+    });
+    await page.route('**/_next/static/**', async route => {
+      if (route.request().resourceType() === 'script') await assetsReleased;
+      await route.continue();
+    });
+    try {
+      await page.goto('/', {
+        waitUntil: 'commit',
+        timeout: HOMEPAGE_NAVIGATION_TIMEOUT,
+      });
+      const input = page.getByRole('textbox', { name: 'Search your name' });
+      await expect(input).toBeEditable();
+      await input.fill('Private Pending Fixture');
+      await page
+        .getByRole('button', { name: 'Find me', exact: true })
+        .click({ noWaitAfter: true });
+      // The deliberately held scripts prevent load; the native navigation
+      // must commit independently of hydration and carry no form controls.
+      await page.waitForURL(
+        url => url.pathname === '/waitlist' && url.searchParams.size === 0,
+        { waitUntil: 'commit' }
+      );
+      expect(new URL(page.url()).searchParams.size).toBe(0);
+    } finally {
+      releaseAssets();
+    }
+  });
+
+  test('native discovery submission reaches the waitlist without leaking the entered name', async ({
+    browser,
+    baseURL,
+  }) => {
+    const context = await browser.newContext({
+      baseURL,
+      javaScriptEnabled: false,
+      viewport: { width: 390, height: 844 },
+    });
+    try {
+      const page = await context.newPage();
+      await page.goto('/', {
+        waitUntil: 'domcontentloaded',
+        timeout: HOMEPAGE_NAVIGATION_TIMEOUT,
+      });
+      await page
+        .getByRole('textbox', { name: 'Search your name' })
+        .fill('Private Fixture Name');
+      await page.getByRole('button', { name: 'Find me', exact: true }).click();
+      await expect(page).toHaveURL(
+        url => url.pathname === '/waitlist' && url.search === ''
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
   test('keeps invitation recovery usable when discovery fails', async ({
     page,
   }) => {

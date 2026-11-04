@@ -98,12 +98,11 @@ export function HomepageNameSearch({
           </Link>
         </p>
       </noscript>
-      <form onSubmit={search}>
+      <form action='/waitlist' onSubmit={search}>
         <CompositeField shape='pill' size='md' surface='page'>
           <input
             id='homepage-claim-handle'
             ref={input}
-            name='name'
             value={name}
             onChange={event => {
               request.current?.abort();

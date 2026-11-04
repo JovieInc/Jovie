@@ -16,6 +16,12 @@ function submit(name = 'Alex Example') {
 }
 
 describe('homepage read-only name discovery', () => {
+  it('uses a private waitlist fallback for native submission before hydration', () => {
+    render(<HomepageNameSearch />);
+    const input = screen.getByRole('textbox', { name: 'Search your name' });
+    expect(input.closest('form')).toHaveAttribute('action', '/waitlist');
+    expect(input).not.toHaveAttribute('name');
+  });
   it('shows a real public profile and preserves the waitlist and invite recovery', async () => {
     const fetch = vi.fn().mockResolvedValue({
       ok: true,
