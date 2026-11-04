@@ -36,125 +36,83 @@ function fixture(
 
 const success = stdout => ({ code: 0, stdout, stderr: '', deferred: false });
 
-test('upsert reads multi-page comments and deletes only prior marker comments after posting', async t => {
-  const pages = [
-    [
+for (const [name, paginated, attachments] of [
+  [
+    'upsert budgets every request and posts before deleting previous marker comments',
+    false,
+    true,
+  ],
+  [
+    'upsert reads multi-page comments and deletes only prior marker comments after posting',
+    true,
+    true,
+  ],
+  [
+    'older CLI without slurp or attachments can publish text after paginated listing',
+    true,
+    false,
+  ],
+]) {
+  test(name, async t => {
+    const comments = [
       { id: 7, body: COMMENT_MARKER },
       { id: 8, body: 'unrelated first page' },
-    ],
-    [
       { id: 9, body: null },
       { id: 10, body: `old\n${COMMENT_MARKER}` },
-    ],
-    [],
-  ];
-  const calls = [];
-  const exec = async args => {
-    calls.push(args);
-    if (args.includes('--paginate')) {
-      // --jq @json emits one compact page per line, including escaped body newlines.
-      return success(
-        pages
-          .map(page =>
-            JSON.stringify(page, null, args.includes('--jq') ? 0 : 2)
-          )
-          .join('\n')
-      );
-    }
-    if (args.includes('--help')) return success('--attach <file>');
-    if (args[0] === 'pr') inspectPost(args);
-    return success('');
-  };
-  const result = await upsertTriptychComment({ ...fixture(t), exec });
-  assert.deepEqual(result, { posted: true, removed: 2 });
-  assert.deepEqual(calls[0], [
-    'api',
-    '--paginate',
-    '--jq',
-    '@json',
-    'repos/JovieInc/Jovie/issues/12/comments',
-  ]);
-  assert.deepEqual(calls[1], ['pr', 'comment', '--help']);
-  assert.equal(calls[2][0], 'pr');
-  assert.equal(calls[2].filter(arg => arg === '--attach').length, 1);
-  assert.deepEqual(calls.slice(3), [
-    ['api', '-X', 'DELETE', 'repos/JovieInc/Jovie/issues/comments/7'],
-    ['api', '-X', 'DELETE', 'repos/JovieInc/Jovie/issues/comments/10'],
-  ]);
-});
-
-test('upsert budgets every request and posts before deleting previous marker comments', async t => {
-  const calls = [];
-  const exec = async (args, options) => {
-    assert.deepEqual(options, { priority: 'report', maxWaitMs: 5_000 });
-    calls.push(args);
-    if (args.includes('--help')) return success('--attach <file>');
-    if (args[0] === 'pr') inspectPost(args);
-    return success(
-      args[0] === 'api' && args[1] === '--paginate'
-        ? JSON.stringify([
-            { id: 7, body: `old\n${COMMENT_MARKER}` },
-            { id: 8, body: 'unrelated' },
-            { id: 9, body: null },
-            { id: 10, body: COMMENT_MARKER },
-          ])
-        : ''
-    );
-  };
-  const input = fixture(t);
-  const result = await upsertTriptychComment({ ...input, exec });
-  assert.deepEqual(result, { posted: true, removed: 2 });
-  assert.deepEqual(calls[0], [
-    'api',
-    '--paginate',
-    '--jq',
-    '@json',
-    'repos/JovieInc/Jovie/issues/12/comments',
-  ]);
-  assert.deepEqual(calls[1], ['pr', 'comment', '--help']);
-  assert.equal(calls[2].filter(arg => arg === '--attach').length, 1);
-  assert.deepEqual(calls.slice(3), [
-    ['api', '-X', 'DELETE', 'repos/JovieInc/Jovie/issues/comments/7'],
-    ['api', '-X', 'DELETE', 'repos/JovieInc/Jovie/issues/comments/10'],
-  ]);
-});
-
-test('older CLI without slurp or attachments can publish text after paginated listing', async t => {
-  const calls = [];
-  const exec = async args => {
-    calls.push(args);
-    if (args.includes('--slurp'))
-      return {
-        code: 1,
-        stdout: '',
-        stderr: 'unknown flag: --slurp',
-        deferred: false,
-      };
-    if (args.includes('--paginate'))
-      return success(
-        `${JSON.stringify([{ id: 7, body: COMMENT_MARKER }])}\n[]\n`
-      );
-    if (args.includes('--help'))
-      return success('Usage: gh pr comment --body-file');
-    if (args[0] === 'pr') {
-      const post = inspectPost(args);
-      assert.deepEqual(post.attachments, []);
-      assert.doesNotMatch(post.body, /!\[/);
-    }
-    return success('');
-  };
-  assert.deepEqual(await upsertTriptychComment({ ...fixture(t), exec }), {
-    posted: true,
-    removed: 1,
+    ];
+    const pages = paginated
+      ? [comments.slice(0, 2), comments.slice(2), []]
+      : [comments];
+    const calls = [];
+    const exec = async (args, options) => {
+      assert.deepEqual(options, { priority: 'report', maxWaitMs: 5_000 });
+      calls.push(args);
+      if (!attachments && args.includes('--slurp'))
+        return {
+          code: 1,
+          stdout: '',
+          stderr: 'unknown flag: --slurp',
+          deferred: false,
+        };
+      if (args.includes('--paginate')) {
+        // @json keeps body newlines escaped inside one compact page per line.
+        const indent = args.includes('--jq') ? 0 : 2;
+        return success(
+          pages.map(page => JSON.stringify(page, null, indent)).join('\n') +
+            '\n'
+        );
+      }
+      if (args.includes('--help'))
+        return success(
+          attachments ? '--attach <file>' : 'Usage: gh pr comment --body-file'
+        );
+      if (args[0] === 'pr') {
+        const post = inspectPost(args);
+        assert.equal(post.attachments.length, attachments ? 1 : 0);
+        if (!attachments) assert.doesNotMatch(post.body, /!\[/);
+      }
+      return success('');
+    };
+    assert.deepEqual(await upsertTriptychComment({ ...fixture(t), exec }), {
+      posted: true,
+      removed: 2,
+    });
+    assert.equal(calls.length, 5);
+    assert.deepEqual(calls[0], [
+      'api',
+      '--paginate',
+      '--jq',
+      '@json',
+      'repos/JovieInc/Jovie/issues/12/comments',
+    ]);
+    assert.deepEqual(calls[1], ['pr', 'comment', '--help']);
+    assert.equal(calls[2][0], 'pr');
+    assert.deepEqual(calls.slice(3), [
+      ['api', '-X', 'DELETE', 'repos/JovieInc/Jovie/issues/comments/7'],
+      ['api', '-X', 'DELETE', 'repos/JovieInc/Jovie/issues/comments/10'],
+    ]);
   });
-  assert.equal(calls.length, 4);
-  assert.deepEqual(calls[3], [
-    'api',
-    '-X',
-    'DELETE',
-    'repos/JovieInc/Jovie/issues/comments/7',
-  ]);
-});
+}
 
 test('upsert posts text only when the optional image is absent', async t => {
   const calls = [];
