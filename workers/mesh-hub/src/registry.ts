@@ -10,7 +10,7 @@ import {
   sha256Hex,
 } from './core.ts';
 import type { Env } from './env.ts';
-import { executorKinds } from './executor.ts';
+import { runtimeStatus } from './executor.ts';
 import type { Liveness } from './mailbox.ts';
 import {
   type AgentState,
@@ -463,11 +463,7 @@ export class Registry extends DurableObject<Env> {
           const live = await this.mailbox(agent.kind).liveness();
           return {
             ...agent,
-            // "ok" means can handle mail: a hub executor exists. A relay alone only stores it.
-            canHandle: Boolean(
-              this.env.AI &&
-                executorKinds(this.env.EXECUTOR_KINDS).has(agent.kind)
-            ),
+            ...runtimeStatus(agent.kind, this.env),
             connected: live.connected,
             lastPingAt: live.lastPingAt
               ? new Date(live.lastPingAt).toISOString()
@@ -478,6 +474,7 @@ export class Registry extends DurableObject<Env> {
         } catch {
           return {
             ...agent,
+            ...runtimeStatus(agent.kind, this.env),
             connected: null,
             lastPingAt: null,
             unhandled: null,

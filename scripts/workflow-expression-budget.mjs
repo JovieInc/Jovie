@@ -23,6 +23,7 @@
  * under the limit alone and over it once merged.
  */
 import { execFileSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
@@ -258,7 +259,7 @@ export function main(argv = process.argv.slice(2), cwd = process.cwd()) {
 
 if (
   process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
+  import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href
 ) {
   process.exitCode = main();
 }
