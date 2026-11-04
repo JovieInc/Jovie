@@ -886,6 +886,7 @@ describe('merge_group workflow contract', () => {
     expect(scope).toContain(
       'Cannot claim full_web_units without successful Unit Tests'
     );
+    expect(scope).toContain('runs-on: ubuntu-24.04');
     expect(CI_WORKFLOW).toContain('ordinary_admission');
   });
 

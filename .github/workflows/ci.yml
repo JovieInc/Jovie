@@ -7759,7 +7759,7 @@ jobs:
         ci-merge-group-ready,
       ]
     if: ${{ always() && github.event_name == 'merge_group' && needs.ci-merge-group-ready.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 1
     steps:
       - name: Claim full merge-suite proof scope
