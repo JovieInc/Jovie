@@ -1048,6 +1048,17 @@ nodes:
       - pull_request
     terminalReceipt: job:capture
     jobCount: 1
+  - name: Preflight Remote
+    path: .github/workflows/preflight-remote.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:gate
+    jobCount: 1
   - name: Private Data Guard
     path: .github/workflows/private-data-guard.yml
     active: true

@@ -47,6 +47,7 @@ import {
   newProdcertUserEmail,
   PRODCERT_RETURNING_CANARY_EMAIL,
 } from '@/lib/synthetic/prodcert-identities';
+import { issueGoldenPathInvitation } from '@/lib/testing/golden-path-invitation-fixture';
 import { redeemWaitlistInviteToken } from '@/lib/waitlist/redeem';
 import { hashWaitlistInviteToken } from '@/lib/waitlist/tokens';
 import { assertNewAccountAdmission } from './signup-admission';
@@ -214,6 +215,56 @@ function socialSignIn(fixture: ReturnType<typeof createAuth>) {
     asResponse: true,
   });
 }
+
+describe('Golden Path issued invitation fixture', () => {
+  const environment = { E2E_TEST_MODE: '1', VERCEL_ENV: 'development' };
+  const query = async (text: string, params: unknown[]) =>
+    (await client.query<{ id: string }>(text, params)).rows;
+
+  it('admits its first real OTP only after the invitation is persisted', async () => {
+    const email = 'gp-admitted+e2e@test.jovie.com';
+    const fixture = createAuth();
+    const denied = await otpSignIn(fixture, email);
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toMatchObject({
+      code: 'SIGNUP_INVITE_REQUIRED',
+    });
+    expect(await counts()).toEqual({ users: 0, sessions: 0, accounts: 0 });
+
+    const entryId = await issueGoldenPathInvitation(query, email, environment);
+    const admitted = await otpSignIn(fixture, email);
+    expect(admitted.status).toBe(200);
+    expect(await counts()).toMatchObject({ users: 1, sessions: 1 });
+    const { rows } = await client.query<{ id: string; redeemed: Date | null }>(
+      'SELECT id, invite_token_redeemed_at AS redeemed FROM waitlist_entries'
+    );
+    expect(rows).toEqual([{ id: entryId, redeemed: null }]);
+  });
+
+  it.each([
+    { E2E_TEST_MODE: '1', VERCEL_ENV: 'production' },
+    { E2E_TEST_MODE: '0', VERCEL_ENV: 'development' },
+  ])(
+    'refuses invitation fixture writes outside the isolated lane',
+    async env => {
+      await expect(
+        issueGoldenPathInvitation(query, 'gp-admitted+e2e@test.jovie.com', env)
+      ).rejects.toThrow('isolated test identity');
+      expect(
+        (await client.query('SELECT id FROM waitlist_entries')).rows
+      ).toEqual([]);
+    }
+  );
+
+  it('refuses non-fixture recipients before creating an invitation', async () => {
+    await expect(
+      issueGoldenPathInvitation(query, 'customer@example.com', environment)
+    ).rejects.toThrow('isolated test identity');
+    expect(
+      (await client.query('SELECT id FROM waitlist_entries')).rows
+    ).toEqual([]);
+  });
+});
 
 describe('new-account admission through Better Auth', () => {
   it('rejects a valid public OTP before any user or session is persisted', async () => {
