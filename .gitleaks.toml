@@ -60,6 +60,11 @@ paths = [
     '''package-lock\.json$''',
     '''yarn\.lock$''',
 
+    # Encoded list of public SHA-256 digests already on main. Gitleaks decodes
+    # one base64 layer, so a forward merge flags this file as if it were a new
+    # secret. The decoded baseline still blocks every other path.
+    '''scripts/security/gitleaks-staged-public-digests\.b64$''',
+
     # Plop templates (code generators)
     '''plop-templates/''',
 
