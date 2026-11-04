@@ -116,7 +116,10 @@ body_args=()
 ${bodyB64 ? `mkdir -p "$ROOT/.bodies"; printf %s ${q(bodyB64)} | base64 -d > "$ROOT/.bodies/${slug}.md"; body_args=(--body-file "$ROOT/.bodies/${slug}.md")` : ''}
 echo "[preflight:remote] ${slug} @ ${sha.slice(0, 9)} slot $slot setup $(( $(date +%s) - t0 ))s" >&2
 set +e
-timeout 45m nice -n 10 pnpm preflight:changed ${fwd} "\${body_args[@]}"
+# Fork-storm containment: run inside agent-preflight.slice (TasksMax 512) when installed on the host
+# (scripts/capacity/install-agent-slices.sh); otherwise a plain run.
+RUN=""; [ -x "$HOME/.local/bin/agent-run" ] && RUN="$HOME/.local/bin/agent-run preflight"
+timeout 45m nice -n 10 $RUN pnpm preflight:changed ${fwd} "\${body_args[@]}"
 rc=$?
 echo "[preflight:remote] exit $rc total $(( $(date +%s) - t0 ))s" >&2
 exit $rc
