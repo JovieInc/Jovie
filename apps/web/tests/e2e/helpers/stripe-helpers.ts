@@ -87,11 +87,15 @@ export async function getRequiredStripeTestContext(): Promise<{
   stripeClient: Stripe;
   priceId: string;
 }> {
-  const { accountId, priceId, secretKey } = getRequiredStripeTestConfig(
-    process.env
-  );
+  const { accountId, priceId, secretKey } = getRequiredStripeTestConfig({
+    STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY:
+      process.env.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY,
+    STRIPE_TEST_ACCOUNT_ID: process.env.STRIPE_TEST_ACCOUNT_ID,
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+  });
   const stripeClient = new Stripe(secretKey);
-  const account = await stripeClient.accounts.retrieve();
+  const account = await stripeClient.accounts.retrieve(null);
   assertStripeTestAccount(account.id, accountId);
   const price = await stripeClient.prices.retrieve(priceId);
   assertArtistVisibilityStripeTestPrice(price);
