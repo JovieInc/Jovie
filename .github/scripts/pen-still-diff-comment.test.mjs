@@ -11,19 +11,26 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import {
+  encodePng,
+  syntheticPair,
+} from '../../scripts/invariants/pen-still-diff-lib.mjs';
 
 import {
   COMMENT_MARKER,
   upsertTriptychComment,
 } from './pen-still-diff-comment.mjs';
 
-function fixture(t, { body = COMMENT_MARKER, withImage = true } = {}) {
+function fixture(
+  t,
+  { body = `${COMMENT_MARKER}\n![sample](triptych.png)`, withImage = true } = {}
+) {
   const dir = mkdtempSync(join(tmpdir(), 'pen-comment-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const bodyFile = join(dir, 'comment.md');
   const image = join(dir, 'triptych.png');
   writeFileSync(bodyFile, body);
-  if (withImage) writeFileSync(image, 'png');
+  if (withImage) writeFileSync(image, encodePng(syntheticPair().pen));
   return { pr: '12', repo: 'JovieInc/Jovie', bodyFile, image };
 }
 
@@ -34,6 +41,8 @@ test('upsert budgets every request and posts before deleting previous marker com
   const exec = async (args, options) => {
     assert.deepEqual(options, { priority: 'report', maxWaitMs: 5_000 });
     calls.push(args);
+    if (args.includes('--help')) return success('--attach <file>');
+    if (args[0] === 'pr') inspectPost(args);
     return success(
       args[0] === 'api' && args[1] === '--paginate'
         ? JSON.stringify([
@@ -48,19 +57,14 @@ test('upsert budgets every request and posts before deleting previous marker com
   const input = fixture(t);
   const result = await upsertTriptychComment({ ...input, exec });
   assert.deepEqual(result, { posted: true, removed: 2 });
-  assert.deepEqual(calls, [
-    ['api', '--paginate', 'repos/JovieInc/Jovie/issues/12/comments'],
-    [
-      'pr',
-      'comment',
-      '12',
-      '--repo',
-      'JovieInc/Jovie',
-      '--body-file',
-      input.bodyFile,
-      '--attach',
-      `${input.image}#Pen, render, and diff`,
-    ],
+  assert.deepEqual(calls[0], [
+    'api',
+    '--paginate',
+    'repos/JovieInc/Jovie/issues/12/comments',
+  ]);
+  assert.deepEqual(calls[1], ['pr', 'comment', '--help']);
+  assert.equal(calls[2].filter(arg => arg === '--attach').length, 1);
+  assert.deepEqual(calls.slice(3), [
     ['api', '-X', 'DELETE', 'repos/JovieInc/Jovie/issues/comments/7'],
     ['api', '-X', 'DELETE', 'repos/JovieInc/Jovie/issues/comments/10'],
   ]);
@@ -108,7 +112,11 @@ for (const [stage, failedCall, code, deferred, stderr, message] of [
       return success(JSON.stringify([{ id: 7, body: COMMENT_MARKER }]));
     };
     await assert.rejects(
-      () => upsertTriptychComment({ ...fixture(t), exec }),
+      () =>
+        upsertTriptychComment({
+          ...fixture(t, { body: COMMENT_MARKER }),
+          exec,
+        }),
       message
     );
     assert.equal(calls, failedCall);
@@ -123,12 +131,17 @@ function runCli(t, { mode = 'success', pr = '12', body = true } = {}) {
   writeFileSync(
     join(dir, 'gh'),
     `#!${process.execPath}
-const { appendFileSync } = require('node:fs');
+const { appendFileSync, readFileSync } = require('node:fs');
 const args = process.argv.slice(2);
 appendFileSync(process.env.PEN_TEST_CALLS, JSON.stringify(args) + '\\n');
+if (args.includes('--help')) { process.stdout.write('--attach <file>'); process.exit(0); }
+if (args.includes('--body-file')) {
+  const body = readFileSync(args[args.indexOf('--body-file') + 1], 'utf8');
+  if (!args.includes('--attach') && body.includes('![')) throw new Error('broken fallback embed');
+}
 if (args[0] === 'pr' && (process.env.PEN_TEST_MODE === 'deny' ||
     (process.env.PEN_TEST_MODE === 'text-only' && args.includes('--attach')))) {
-  process.stderr.write('permission denied');
+  process.stderr.write('permission denied; no comment was posted');
   process.exit(1);
 }
 if (args.includes('--paginate')) {
@@ -170,24 +183,24 @@ if (args.includes('--paginate')) {
 test('CLI awaits the shared client and records real ledger usage before exiting', t => {
   const result = runCli(t);
   assert.deepEqual(JSON.parse(result.stdout), { posted: true, removed: 1 });
-  assert.equal(result.calls.length, 3);
-  assert.ok(result.calls[1].includes('--attach'));
-  assert.ok(result.calls[2].includes('DELETE'));
+  assert.equal(result.calls.length, 4);
+  assert.ok(result.calls[2].includes('--attach'));
+  assert.ok(result.calls[3].includes('DELETE'));
   assert.ok(existsSync(join(result.dir, 'api-ledger', 'github.json')));
 });
 
 test('CLI falls back to text after an attachment failure, then removes the old comment', t => {
   const result = runCli(t, { mode: 'text-only' });
-  assert.match(result.stderr, /triptych attach failed/);
+  assert.deepEqual(JSON.parse(result.stdout), { posted: true, removed: 1 });
   assert.equal(result.calls.length, 5);
-  assert.ok(result.calls[1].includes('--attach'));
+  assert.ok(result.calls[2].includes('--attach'));
   assert.equal(result.calls[3].includes('--attach'), false);
   assert.ok(result.calls[4].includes('DELETE'));
 });
 
 test('CLI remains advisory and preserves old comments when both posting attempts fail', t => {
   const result = runCli(t, { mode: 'deny' });
-  assert.match(result.stderr, /comment skipped: permission denied/);
+  assert.match(result.stderr, /comment update failed: permission denied/);
   assert.equal(result.calls.length, 4);
   assert.ok(result.calls.every(args => !args.includes('DELETE')));
 });
@@ -203,3 +216,236 @@ test('CLI skips missing comment artifacts without making requests', t => {
   assert.match(result.stderr, /comment.md missing/);
   assert.deepEqual(result.calls, []);
 });
+
+// Integration fixtures are generated pixels only, never native/private stills.
+async function generatedArtifacts(t, count) {
+  const input = fixture(t);
+  const root = dirname(input.bodyFile);
+  const { encodePng, syntheticPair } = await import(
+    '../../scripts/invariants/pen-still-diff-lib.mjs'
+  );
+  const frames = Array.from({ length: count || 1 }, (_, index) => {
+    const { pen } = syntheticPair();
+    pen.data[0] ^= index * 31;
+    const stillPath = `${index}.png`;
+    writeFileSync(join(root, stillPath), encodePng(pen));
+    return {
+      sectionId: `fixture-${index}`,
+      mode: 'dark',
+      viewport: 1440,
+      penNodeId: `fixture-${index}`,
+      status: count ? 'active' : 'parked',
+      stillPath,
+      route: '/',
+    };
+  });
+  const manifest = join(root, 'manifest.json');
+  writeFileSync(
+    manifest,
+    JSON.stringify({ schema: 'pen-still-manifest/v1', frames })
+  );
+  const moduleUrl = new URL(
+    '../../scripts/invariants/pen-still-diff.mjs',
+    import.meta.url
+  ).href;
+  const script = `import { main } from ${JSON.stringify(moduleUrl)};
+    import { readFileSync } from 'node:fs'; import { join } from 'node:path';
+    await main(process.argv.slice(1), { root: ${JSON.stringify(root)},
+      capture: async frame => ({ png: readFileSync(join(${JSON.stringify(root)}, frame.stillPath)) }) });`;
+  const result = spawnSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      script,
+      '--',
+      '--manifest',
+      manifest,
+      '--out',
+      root,
+      '--base-url',
+      'http://fixture.invalid',
+    ],
+    { encoding: 'utf8' }
+  );
+  assert.equal(result.status, 0, result.stderr);
+  return input;
+}
+
+function inspectPost(args) {
+  const bodyFile = args[args.indexOf('--body-file') + 1];
+  const body = readFileSync(bodyFile, 'utf8');
+  const attachments = args.flatMap((arg, i) =>
+    arg === '--attach' ? [args[i + 1].split('#')[0]] : []
+  );
+  const references = [...body.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map(match =>
+    join(dirname(bodyFile), match[1])
+  );
+  assert.deepEqual(
+    [...new Set(references)].sort(),
+    [...attachments].sort(),
+    'every embed must have exactly one matching attachment'
+  );
+  return { bodyFile, body, attachments };
+}
+
+for (const count of [0, 1, 3])
+  test(`publisher integration attaches generated ${count || 'synthetic'} image names and exact bytes`, async t => {
+    const input = await generatedArtifacts(t, count);
+    const originalBody = readFileSync(input.bodyFile, 'utf8');
+    let posted = false;
+    await upsertTriptychComment({
+      ...input,
+      exec: async args => {
+        if (args.includes('--help')) return success('--attach <file>');
+        if (args[0] === 'api') return success('[]');
+        const { body, attachments } = inspectPost(args);
+        assert.equal(attachments.length, count || 1);
+        for (const path of attachments) {
+          const name = path.split('/').at(-1);
+          assert.notEqual(name, 'triptych.png');
+          assert.deepEqual(
+            readFileSync(path),
+            readFileSync(join(dirname(input.bodyFile), name))
+          );
+        }
+        if (!count) assert.match(body, /not design evidence/);
+        posted = true;
+        return success('');
+      },
+    });
+    assert.equal(posted, true);
+    assert.equal(readFileSync(input.bodyFile, 'utf8'), originalBody);
+  });
+
+test('publisher strips unsafe, missing, symlink and non-PNG embeds without attaching outside bytes', async t => {
+  const input = await generatedArtifacts(t, 0);
+  const { symlinkSync, mkdirSync } = await import('node:fs');
+  const dir = dirname(input.bodyFile);
+  const link = `triptych-${'a'.repeat(64)}.png`;
+  symlinkSync(input.image, join(dir, link));
+  const directory = `triptych-${'b'.repeat(64)}.png`;
+  mkdirSync(join(dir, directory));
+  const invalid = `triptych-${'c'.repeat(64)}.png`;
+  writeFileSync(join(dir, invalid), 'not a PNG');
+  const targets = [
+    '../triptych.png',
+    '/tmp/triptych.png',
+    'https://example.com/private.png',
+    '%2e%2e/triptych.png',
+    'sub/triptych.png',
+    'triptych.png#fragment',
+    `triptych-${'d'.repeat(64)}.png`,
+    'absent.png',
+    link,
+    directory,
+    invalid,
+  ];
+  writeFileSync(
+    input.bodyFile,
+    `${COMMENT_MARKER}\nPrivate design warning.\n${targets.map(path => `![unsafe](${path})`).join('\n')}\n<img src="file:///private.png">`
+  );
+  await upsertTriptychComment({
+    ...input,
+    exec: async args => {
+      if (args.includes('--help')) return success('--attach <file>');
+      if (args[0] === 'api') return success('[]');
+      const post = inspectPost(args);
+      assert.equal(post.attachments.length, 0);
+      assert.doesNotMatch(post.body, /!\[|<img/);
+      assert.match(post.body, /Private design warning/);
+      return success('');
+    },
+  });
+});
+
+test('publisher caps unique attachments at 50 and keeps all source artifacts', async t => {
+  const input = await generatedArtifacts(t, 0);
+  const dir = dirname(input.bodyFile);
+  const png = readFileSync(join(dir, 'synthetic-triptych.png'));
+  const names = Array.from(
+    { length: 51 },
+    (_, i) => `triptych-${i.toString(16).padStart(64, '0')}.png`
+  );
+  for (const name of names) writeFileSync(join(dir, name), png);
+  writeFileSync(
+    input.bodyFile,
+    `${COMMENT_MARKER}\n${[...names, names[0]].map(name => `![sample](${name})`).join('\n')}`
+  );
+  await upsertTriptychComment({
+    ...input,
+    exec: async args => {
+      if (args.includes('--help')) return success('--attach <file>');
+      if (args[0] === 'api') return success('[]');
+      const post = inspectPost(args);
+      assert.equal(post.attachments.length, 50);
+      assert.match(post.body, /artifact/i);
+      return success('');
+    },
+  });
+  for (const name of names)
+    assert.deepEqual(readFileSync(join(dir, name)), png);
+});
+
+for (const mode of [
+  'unsupported',
+  'help-failure',
+  'upload-denied',
+  'unknown-flag',
+  'uncertain',
+])
+  test(`publisher ${mode} behavior preserves honest image delivery`, async t => {
+    const input = await generatedArtifacts(t, 0);
+    let posts = 0;
+    let deletes = 0;
+    const run = () =>
+      upsertTriptychComment({
+        ...input,
+        exec: async args => {
+          if (args.includes('--help'))
+            return mode === 'help-failure'
+              ? { code: 1, stdout: '', stderr: 'help failed', deferred: false }
+              : success(
+                  mode === 'unsupported'
+                    ? 'no attachment support'
+                    : '--attach <file>'
+                );
+          if (args.includes('DELETE')) {
+            deletes++;
+            return success('');
+          }
+          if (args[0] === 'api')
+            return success(JSON.stringify([{ id: 7, body: COMMENT_MARKER }]));
+          posts++;
+          const post = inspectPost(args);
+          if (post.attachments.length)
+            return {
+              code: 1,
+              stdout: '',
+              deferred: false,
+              stderr:
+                mode === 'uncertain'
+                  ? 'connection reset'
+                  : mode === 'unknown-flag'
+                    ? 'unknown flag: --attach'
+                    : 'attaching files requires write access; no comment was posted',
+            };
+          assert.doesNotMatch(post.body, /!\[|uploaded|hosted/i);
+          assert.match(post.body, /not design evidence/);
+          assert.match(post.body, /artifact/i);
+          return success('');
+        },
+      });
+    if (mode === 'uncertain') {
+      await assert.rejects(run, /connection reset/);
+      assert.equal(posts, 1);
+      assert.equal(deletes, 0);
+    } else {
+      await run();
+      assert.equal(
+        posts,
+        ['upload-denied', 'unknown-flag'].includes(mode) ? 2 : 1
+      );
+      assert.equal(deletes, 1);
+    }
+  });

@@ -55,8 +55,22 @@ path separators, case-folding collisions, lossy slug collisions and overlong
 filenames. `receipt.json` and `comment.md` reference those exact images. A legacy
 `triptych.png` alias is written only for one compared image (or the sole
 synthetic sample), and removed when an output directory is reused for multiple
-comparisons. Multi-frame images are available together in the artifact directory;
-the existing comment publisher's single-image attachment remains a legacy path.
+comparisons. All images remain together in the existing artifact directory.
+
+The comment publisher attaches the exact generated filenames referenced in the
+body, using byte-preserving temporary copies beside its temporary body file so
+GitHub CLI can rewrite the references. It accepts only regular PNG files with
+generated names from the output directory, rejects symlinks and unsafe paths,
+and attaches at most 50 unique images. Missing, invalid and excess images become
+plain artifact notices, never broken embeds. Original artifacts are preserved.
+
+The publisher probes the installed CLI for `--attach` support. Unsupported CLIs
+post text only. If an attachment attempt explicitly reports that no comment was
+posted, the publisher retries once with all image embeds removed. Unknown or
+network failures do not retry because publication may already have happened.
+Previous comments are deleted only after a successful new post; a deletion
+failure does not repost. The workflow's current permissions can prevent image
+uploads, so a successful advisory job is not proof of hosted image delivery.
 
 When no image pair was compared, `synthetic-triptych.png` exercises the harness.
 It is explicitly labeled synthetic in the receipt and comment, never enters the
