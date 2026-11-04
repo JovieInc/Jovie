@@ -497,33 +497,38 @@ describe('missed-slot dispatch fallback', () => {
 
   it('keeps the dead-man red when the dispatch is rejected or errors', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
-    const rejected = withPost(githubFor(staleRun()), 403);
-    expect(
-      await main({
-        github: rejected,
-        env: {
-          GITHUB_REPOSITORY: repo,
-          SYNTHETIC_CANARY_DISPATCH: '1',
-          GITHUB_STEP_SUMMARY: join(mkdtempSync(tmpdir()), 's'),
-        },
-        now: NOW,
-      })
-    ).toBe(1);
-    const throwing = githubFor(staleRun());
-    throwing.rest.mockImplementation(async method => {
-      if (method === 'POST') throw new Error('sensitive response body');
-      return {
-        status: 200,
-        json: () => ({ workflow_runs: staleRun() }),
-      };
-    });
-    expect(
-      await main({
-        github: throwing,
-        env: { GITHUB_REPOSITORY: repo, SYNTHETIC_CANARY_DISPATCH: '1' },
-        now: NOW,
-      })
-    ).toBe(1);
+    const dir = mkdtempSync(join(tmpdir(), 'synthetic-dispatch-rejected-'));
+    try {
+      const rejected = withPost(githubFor(staleRun()), 403);
+      expect(
+        await main({
+          github: rejected,
+          env: {
+            GITHUB_REPOSITORY: repo,
+            SYNTHETIC_CANARY_DISPATCH: '1',
+            GITHUB_STEP_SUMMARY: join(dir, 's'),
+          },
+          now: NOW,
+        })
+      ).toBe(1);
+      const throwing = githubFor(staleRun());
+      throwing.rest.mockImplementation(async method => {
+        if (method === 'POST') throw new Error('sensitive response body');
+        return {
+          status: 200,
+          json: () => ({ workflow_runs: staleRun() }),
+        };
+      });
+      expect(
+        await main({
+          github: throwing,
+          env: { GITHUB_REPOSITORY: repo, SYNTHETIC_CANARY_DISPATCH: '1' },
+          now: NOW,
+        })
+      ).toBe(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
