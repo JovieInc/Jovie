@@ -573,6 +573,68 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()), [])
         self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [])
 
+    def test_a_lagging_blocked_success_rereads_until_required_green(self):
+        # 2026-11-04: SV succeeded on #24254 while the rollup was still BLOCKED.
+        # The label stayed and the head later went green with no second success wake.
+        blocked = pr(branch="cursor/fix", sha="h1", merge="BLOCKED", labels=["lane-fix-red"], state="OPEN")
+        clean = pr(branch="cursor/fix", sha="h1", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
+        views = [blocked, clean]
+
+        def view(_args):
+            return views.pop(0)
+
+        passed = {"__typename": "CheckRun", "name": "CI", "conclusion": "SUCCESS",
+                  "completedAt": "2026-11-04T06:00:00Z"}
+        checks = {"data": {"repository": {"pullRequest": {"commits": {"nodes": [{"commit": {
+            "statusCheckRollup": {"contexts": {"nodes": [passed]}}}}]}}}}}
+        shell = Shell({("gh", "pr", "view"): view, ("gh", "api", "graphql"): checks})
+        run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
+               "pull_requests": [{"number": 5}]}
+        with patch.object(events, "GREEN_REREAD_ATTEMPTS", 1), patch.object(events, "GREEN_REREAD_PAUSE_S", 0):
+            self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()),
+                             [(5, "cleared-red"), (5, "enroll-wake")])
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"),
+                         [["gh", "api", "-X", "DELETE",
+                           f"repos/{events.REPO}/issues/5/labels/lane-fix-red"]])
+
+    def test_a_lagging_success_keeps_lane_fix_red_when_the_head_stays_blocked_or_fails(self):
+        blocked = pr(branch="cursor/fix", sha="h1", merge="BLOCKED", labels=["lane-fix-red"], state="OPEN")
+        passed = {"__typename": "CheckRun", "name": "CI", "conclusion": "SUCCESS",
+                  "completedAt": "2026-11-04T06:00:00Z"}
+        failed = {**passed, "conclusion": "FAILURE"}
+        green_checks = {"data": {"repository": {"pullRequest": {"commits": {"nodes": [{"commit": {
+            "statusCheckRollup": {"contexts": {"nodes": [passed]}}}}]}}}}}
+        red_checks = {"data": {"repository": {"pullRequest": {"commits": {"nodes": [{"commit": {
+            "statusCheckRollup": {"contexts": {"nodes": [failed]}}}}]}}}}}
+        run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
+               "pull_requests": [{"number": 5}]}
+
+        def still_blocked(_args):
+            return blocked
+
+        waiting = Shell({("gh", "pr", "view"): still_blocked, ("gh", "api", "graphql"): green_checks})
+        with patch.object(events, "GREEN_REREAD_ATTEMPTS", 1), patch.object(events, "GREEN_REREAD_PAUSE_S", 0):
+            self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, waiting, set()), [])
+        self.assertEqual(waiting.made("gh", "api", "-X", "DELETE"), [])
+        self.assertEqual(len(waiting.made("gh", "pr", "view")), 2)
+
+        failing = Shell({("gh", "pr", "view"): still_blocked, ("gh", "api", "graphql"): red_checks})
+        with patch.object(events, "GREEN_REREAD_ATTEMPTS", 1), patch.object(events, "GREEN_REREAD_PAUSE_S", 0):
+            self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, failing, set()), [])
+        self.assertEqual(failing.made("gh", "api", "-X", "DELETE"), [])
+        self.assertEqual(len(failing.made("gh", "pr", "view")), 1)
+
+        moved = pr(branch="cursor/fix", sha="new", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
+        views = [blocked, moved]
+
+        def moved_head(_args):
+            return views.pop(0)
+
+        shifted = Shell({("gh", "pr", "view"): moved_head, ("gh", "api", "graphql"): green_checks})
+        with patch.object(events, "GREEN_REREAD_ATTEMPTS", 1), patch.object(events, "GREEN_REREAD_PAUSE_S", 0):
+            self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shifted, set()), [])
+        self.assertEqual(shifted.made("gh", "api", "-X", "DELETE"), [])
+
     def test_a_stale_success_and_a_red_event_do_not_clear_lane_fix_red(self):
         view = pr(branch="cursor/fix", sha="new", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
         stale = {"event": "pull_request", "conclusion": "success", "head_sha": "old",

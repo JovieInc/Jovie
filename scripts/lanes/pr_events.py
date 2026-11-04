@@ -499,6 +499,62 @@ def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
     return deleted.returncode == 0
 
 
+# Source Validation can finish while other required checks are still running, so the
+# only success wake sees BLOCKED and leaves lane-fix-red. The next wake for a success
+# is the following SV run or a main push. Three short re-reads cover that tail. A
+# failing or unreadable check list does not clear.
+GREEN_REREAD_ATTEMPTS = 3
+GREEN_REREAD_PAUSE_S = 15
+
+
+def view_pr(number: int, sh=run) -> dict | None:
+    viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json",
+                 "state,isDraft,headRefName,headRefOid,isCrossRepository,mergeStateStatus,labels"])
+    if viewed.returncode != 0:
+        return None
+    try:
+        body = json.loads(viewed.stdout or "{}")
+    except ValueError:
+        return None
+    return body if isinstance(body, dict) else None
+
+
+def reread_lagging_green(number: int, pr: dict, sha: str, sh=run, *,
+                         attempts: int | None = None,
+                         pause: float | None = None,
+                         sleep=time.sleep) -> dict:
+    """Re-read a success wake that is not required-green yet.
+
+    The caps are read at call time. Binding them as defaults would freeze the
+    import-time integers and ignore a test patch.
+
+    2026-11-04: Source Validation succeeded on #24254 while the rollup was still
+    BLOCKED, clear_stale left lane-fix-red, and the head later went green with no
+    second success wake. Re-read only when the label is present and no check on
+    this head is failing. A moved head is returned so the caller drops the stale sha.
+    """
+    if attempts is None:
+        attempts = GREEN_REREAD_ATTEMPTS
+    if pause is None:
+        pause = GREEN_REREAD_PAUSE_S
+    labels = {label.lower() for label in label_names(pr)}
+    if LANE_FIX_RED not in labels or pr.get("mergeStateStatus") in REQUIRED_GREEN:
+        return pr
+    if head_red(number, sh) is not False:
+        return pr
+    for _ in range(attempts):
+        sleep(pause)
+        nxt = view_pr(number, sh)
+        if nxt is None:
+            return pr
+        pr = nxt
+        if pr.get("headRefOid") != sha or pr.get("mergeStateStatus") in REQUIRED_GREEN:
+            return pr
+        if head_red(number, sh) is not False:
+            return pr
+    return pr
+
+
 def wake_green_enroll(number: int, sh=run) -> bool:
     """Dispatch Merge Queue Green Enroll for this exact PR (JOV-8788).
 
@@ -1205,6 +1261,11 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
             continue  # a newer head is already running CI; its own events speak for it
         # Only a success for this exact head. A red event can still show a lagging
         # CLEAN, and a missing sha is not evidence the required checks passed.
+        if kind == "green" and sha and LANE_FIX_RED in {label.lower() for label in label_names(pr)} \
+                and pr.get("mergeStateStatus") not in REQUIRED_GREEN:
+            pr = reread_lagging_green(number, pr, sha, sh)
+            if pr.get("headRefOid") != sha:
+                continue
         if kind == "green" and sha and clear_stale_lane_fix_red(number, pr, sh):
             cleared.append((number, "cleared-red"))
             pr["labels"] = [label for label in (pr.get("labels") or [])
