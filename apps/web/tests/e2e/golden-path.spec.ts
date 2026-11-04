@@ -2,6 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { productionUpstashCredentials } from '@/lib/redis-store';
+import { issueGoldenPathInvitation } from '@/lib/testing/golden-path-invitation-fixture';
 import {
   ensureSignedInUser,
   fillControlledInputUntilEnabled,
@@ -493,14 +494,19 @@ async function exerciseGoogleProviderRecovery(page: Page): Promise<void> {
 
 /**
  * Create a brand-new Better Auth test user through the visible email-OTP
- * signup surface. E2E_TEST_MODE supplies the deterministic 424242 code only
+ * sign-in surface after an issued invitation. E2E_TEST_MODE supplies the deterministic 424242 code only
  * for canonical +e2e test addresses.
  */
 async function createFreshUserOnce(page: import('@playwright/test').Page) {
   const email = `gp-${Date.now().toString(36)}+e2e@test.jovie.com`;
+  const sql = neon(process.env.DATABASE_URL!);
+  await issueGoldenPathInvitation(
+    async (query, params) => sql.query(query, params),
+    email
+  );
   const preparedAuth = await prepareBetterAuthEmailOtp(page, {
     email,
-    entryPath: '/signup',
+    entryPath: `${APP_ROUTES.SIGNIN}?redirect_url=${encodeURIComponent(APP_ROUTES.START)}`,
     recovery: {
       initialEmail: email.replace('gp-', 'gp-abandoned-'),
       resendCode: true,
