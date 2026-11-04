@@ -11,11 +11,10 @@ It covers lanes, Codex, Conductor, Claude-scratch and manual `jovie-wt-*` checko
 - A checkout retires when its branch's PR closed or merged (after a short grace), or when it
   has been idle for `idle_s`. Idle is the newest reflog entry or dirty-file mtime, never the
   directory mtime (git status and maintenance bump those).
-- Dirty or unpushed state is first committed off-index (`commit-tree`, no hooks, the
-  checkout is untouched) and pushed as `refs/jovie-preserved/sweep/<host>/<name>-<date>-<snapshot>`
-  (never a branch). A snapshot that is not proven secret-free is not published and the
-  checkout stays untouched. If the push fails, the checkout stays and loses only
-  regenerable build output.
+- Dirty or unpushed state is first committed off-index (`commit-tree`, the checkout
+  is untouched) and preserved only in the verified private archive, with full parent
+  history. Explicit archive credentials, private repository metadata and exact remote
+  readback are required. A clean secret scan alone never permits publication.
 - Preserved repairs (`.jovie-preserved-repair.json`) expire once their PR is closed or
   after `preserved_ttl_s`, through the same backup-then-remove path.
 - Standalone clones (own `.git` directory: ship workspaces, `bindings/*/worktrees/*`,
@@ -32,6 +31,7 @@ import fcntl
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -59,8 +59,8 @@ BUILD_DIRS = frozenset({"node_modules", ".next", ".turbo", "test-results", ".bui
                         ".pnpm-store", ".pnpm-store-private"})
 # Retired Elixir workspaces used this private store. Keep its cache bytes out of backups.
 LEGACY_PRIVATE_STORE = ".symphony/package-cache/pnpm-store"
-# Generated outputs and archive blobs never belong in a snapshot: JovieInc/Jovie is public and
-# refs/jovie-preserved/* is fetchable. On 2026-10-09 an `add -A` snapshot carried 1.3 GB of
+# Generated outputs and archive blobs never belong in a source snapshot.
+# On 2026-10-09 an `add -A` snapshot carried 1.3 GB of
 # outputs/ tarballs and builds (48 scanner hits, the weekly full scan red since 10-12).
 ARCHIVE_GLOBS = ("*.tar.gz", "*.tgz", "*.tar", "*.tar.bz2", "*.tar.xz", "*.zip", "*.7z")
 EXCLUDE = [f":(exclude,glob)**/{name}/**" for name in sorted(BUILD_DIRS)] + [f":(exclude){PRESERVED_REPAIR}",
@@ -179,8 +179,7 @@ def sweep_prefix() -> str:
 
 
 class SnapshotHeld(RuntimeError):
-    """The snapshot must not be published (secret finding, or the scan could not prove it
-    clean). Callers keep the checkout exactly as it is: no strip, no removal."""
+    """Preservation is unverified. Callers keep the checkout: no strip, no removal."""
 
     def __init__(self, name: str, reason: str):
         super().__init__(f"{name}: {reason}")
@@ -235,13 +234,65 @@ def scan_snapshot(path: Path, run, remote: str, sha: str) -> str | None:
     return None
 
 
-def backup(path: Path, info: dict, run, prefix: str, date: str) -> str | None:
+ARCHIVE_REPO = "JovieInc/Ops"
+ARCHIVE_URL = f"https://github.com/{ARCHIVE_REPO}.git"
+
+
+def archive_context(name: str):
+    """Select existing saved gh auth explicitly, never the PATH App shim or token env.
+    This neither reads tokens into Python nor changes the credential store."""
+    gh = os.environ.get("LANES_SWEEP_ARCHIVE_GH", "")
+    if not gh or not Path(gh).is_absolute() or not Path(gh).is_file() or not os.access(gh, os.X_OK):
+        raise SnapshotHeld(name, "archive-credentials-unconfigured")
+    env = {k: v for k, v in os.environ.items() if k not in {
+        "GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN",
+        "GH_CONFIG_DIR", "GH_HOST", "GH_REPO"}}
+    env.update(GH_HOST="github.com", GH_PROMPT_DISABLED="1", GIT_TERMINAL_PROMPT="0",
+               GIT_ASKPASS="", SSH_ASKPASS="", GIT_NO_REPLACE_OBJECTS="1")
+    return gh, env
+
+
+def verify_archive(name: str, run, gh: str, env: dict) -> int:
+    """Metadata is authority for privacy; scanners cannot establish it."""
+    try:
+        result = run([gh, "api", "--hostname", "github.com", f"repos/{ARCHIVE_REPO}"],
+                     capture_output=True, text=True, timeout=30, env=env)
+        data = json.loads(result.stdout) if result.returncode == 0 else None
+        valid = (isinstance(data, dict) and data.get("full_name") == ARCHIVE_REPO
+                 and data.get("private") is True and data.get("visibility") == "private"
+                 and data.get("archived") is False and data.get("disabled") is False
+                 and isinstance(data.get("permissions"), dict) and data["permissions"].get("push") is True
+                 and type(data.get("id")) is int and data["id"] > 0)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        valid = False
+    if not valid:
+        raise SnapshotHeld(name, "archive-private-metadata-unverified")
+    return data["id"]
+
+
+def backup(path: Path, info: dict, run, prefix: str, date: str) -> str:
     """Snapshot the checkout (tracked + untracked, minus build output) to
     refs/jovie-preserved/<prefix>/<name>-<date>-<snapshot>; returns that full ref.
-    Raises SnapshotHeld when the snapshot is not proven secret-free (the ref is public)."""
-    head = git(path, run, "rev-parse", "HEAD").stdout.strip()
-    if not head or not info["remote"]:
-        return None
+    Never uses the source remote as a destination. Any unverified archive holds the
+    original checkout, including its build output. The snapshot retains HEAD as parent."""
+    name = path.name if path.name not in {"Jovie", "LogYourBody"} else f"{path.parent.name}-{path.name}"
+    gh, archive_env = archive_context(name)
+    identity = verify_archive(name, run, gh, archive_env)
+    # URL rewrites can silently redirect an explicit URL to another repository.
+    rewrites = git(path, run, "config", "--get-regexp", r"^url\..*\.(insteadof|pushinsteadof)$")
+    if rewrites.returncode != 1:
+        raise SnapshotHeld(name, "archive-url-rewrite-unverified")
+    shallow = git(path, run, "rev-parse", "--is-shallow-repository")
+    replacements = git(path, run, "replace", "--list")
+    grafts = git(path, run, "rev-parse", "--path-format=absolute", "--git-path", "info/grafts")
+    if (shallow.returncode != 0 or shallow.stdout.strip() != "false"
+            or replacements.returncode != 0 or replacements.stdout.strip()
+            or grafts.returncode != 0 or not grafts.stdout.strip() or Path(grafts.stdout.strip()).exists()):
+        raise SnapshotHeld(name, "archive-ancestry-incomplete")
+    head_result = git(path, run, "rev-parse", "HEAD")
+    head = head_result.stdout.strip()
+    if head_result.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40,64}", head) or not info["remote"]:
+        raise SnapshotHeld(name, "archive-source-unverified")
     sha = head
     if info["dirty"]:
         index = path.parent / f".{path.name}.sweep-index"
@@ -252,29 +303,70 @@ def backup(path: Path, info: dict, run, prefix: str, date: str) -> str | None:
             try:
                 shutil.copyfile(real, index)
             except OSError:
-                git(path, run, "read-tree", "HEAD", env=env)
+                if git(path, run, "read-tree", "HEAD", env=env).returncode != 0:
+                    raise SnapshotHeld(name, "archive-snapshot-failed")
             if git(path, run, "add", "-A", "--", ".", *EXCLUDE, env=env, timeout=900).returncode != 0:
-                return None
-            tree = git(path, run, "write-tree", env=env).stdout.strip()
+                raise SnapshotHeld(name, "archive-snapshot-failed")
+            written = git(path, run, "write-tree", env=env)
+            tree = written.stdout.strip()
+            if written.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40,64}", tree):
+                raise SnapshotHeld(name, "archive-snapshot-failed")
             commit = git(path, run, "commit-tree", tree, "-p", head, "-m",
                          f"backup: uncommitted state of {path} ({date}, worktree sweep)")
-            if commit.returncode != 0 or not tree:
-                return None
+            if commit.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40,64}", commit.stdout.strip()):
+                raise SnapshotHeld(name, "archive-snapshot-failed")
             sha = commit.stdout.strip()
         finally:
             index.unlink(missing_ok=True)
-    name = path.name if path.name not in {"Jovie", "LogYourBody"} else f"{path.parent.name}-{path.name}"
     if held := scan_snapshot(path, run, info["remote"], sha):
         raise SnapshotHeld(name, held)
+    objects = git(path, run, "rev-list", "--objects", "--missing=print", sha,
+                  env={"GIT_NO_REPLACE_OBJECTS": "1"}, timeout=900)
+    if objects.returncode != 0 or not objects.stdout.strip() or any(
+            line.startswith("?") for line in objects.stdout.splitlines()):
+        raise SnapshotHeld(name, "archive-ancestry-incomplete")
     # Leave room for the date, snapshot and Git's ref lock suffix on long checkout names.
     name = re.sub(r"[^A-Za-z0-9._-]", "-", name)[:160]
     ref = f"{PRESERVED_REF}{prefix}/{name}-{date}-{sha}"
-    # Same-named checkouts and repeated sweeps must never overwrite an earlier snapshot.
-    # The empty expected value permits only creation (or an already identical ref),
-    # including when another writer races this push. Normal pre-push hooks still run.
-    pushed = git(path, run, "push", "-q", f"--force-with-lease={ref}:", info["remote"],
-                 f"{sha}:{ref}", timeout=900)
-    return ref if pushed.returncode == 0 else None
+    helper = f"!{shlex.quote(gh)} auth git-credential"
+    config = [("credential.helper", ""), (f"credential.{ARCHIVE_URL}.helper", ""),
+              (f"credential.{ARCHIVE_URL}.helper", helper), ("core.askPass", ""),
+              ("http.extraHeader", ""), (f"http.{ARCHIVE_URL}.extraHeader", ""),
+              ("http.followRedirects", "false")]
+
+    def archive_git(*args):
+        # Command-line resets must come after inherited config, even when an empty
+        # helper was already present earlier in GIT_CONFIG_*.
+        options = [option for key, value in config for option in ("-c", f"{key}={value}")]
+        return run(["git", "-C", str(path), *options, *args], capture_output=True, text=True, timeout=900,
+                   env=git_housekeeping.apply_housekeeping_env(archive_env))
+
+    def readback():
+        result = archive_git("ls-remote", "--refs", ARCHIVE_URL, ref)
+        if result.returncode != 0:
+            raise SnapshotHeld(name, "archive-readback-failed")
+        rows = result.stdout.splitlines()
+        if not rows:
+            return None
+        if rows != [f"{sha}\t{ref}"]:
+            raise SnapshotHeld(name, "archive-ref-collision")
+        return sha
+
+    try:
+        if readback() is None:
+            # Empty expected value allows creation only. Normal pre-push hooks run.
+            if verify_archive(name, run, gh, archive_env) != identity:
+                raise SnapshotHeld(name, "archive-identity-changed")
+            pushed = archive_git("push", "-q", f"--force-with-lease={ref}:", ARCHIVE_URL, f"{sha}:{ref}")
+            if pushed.returncode != 0:
+                raise SnapshotHeld(name, "archive-push-failed")
+        if readback() != sha:
+            raise SnapshotHeld(name, "archive-readback-failed")
+        if verify_archive(name, run, gh, archive_env) != identity:
+            raise SnapshotHeld(name, "archive-identity-changed")
+    except (OSError, subprocess.SubprocessError):
+        raise SnapshotHeld(name, "archive-transport-failed") from None
+    return ref
 
 
 def strip_build_dirs(path: Path) -> None:

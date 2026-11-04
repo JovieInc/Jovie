@@ -38,6 +38,7 @@ import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { load as yamlLoad } from 'js-yaml';
+import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
 import {
   companionChecklist,
   explainShipGate,
@@ -45,6 +46,9 @@ import {
   PR_BODY_SKELETON,
   parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
+
+export { baseRefCandidates, resolveBaseRef };
+
 import { checkInstallMatchesLockfile } from './lib/preflight-install.mjs';
 import { remoteHint } from './lib/remote-hint.mjs';
 
@@ -71,6 +75,12 @@ export const NARROWED = {
 
 /** Generators whose output must be committed. `write` rewrites, `check` verifies. */
 export const GENERATORS = [
+  {
+    id: 'artist-launch-inventory',
+    when: /^apps\/web\/app\/|^scripts\/artist-launch-|^docs\/product\/generated\/artist-launch-inventory\.json$/,
+    write: 'node scripts/artist-launch-contract.mjs --write',
+    check: 'node scripts/artist-launch-contract.mjs --check',
+  },
   {
     id: 'workflow-topology',
     when: /^\.github\/workflows\/[^/]+\.ya?ml$|^scripts\/ci-workflow-topology\.mjs$/,
@@ -166,26 +176,129 @@ export function parseArgs(argv) {
   return a;
 }
 
-function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
+// Commands own separate POSIX groups so deadlines can terminate descendants.
+// Track those groups while they are live so an outer cancellation or normal
+// process exit cannot leave them behind.
+const activeCommandGroups = new Set();
+let commandHandlersInstalled = false;
+let cancelledCommandCode = 0;
+let cancellationTimer;
+
+function stopOwnedCommand(record) {
+  const { child } = record;
+  try {
+    if (process.platform === 'win32' || !child.pid) child.kill('SIGKILL');
+    else process.kill(-child.pid, 'SIGKILL');
+  } catch (error) {
+    if (error.code !== 'ESRCH') child.kill('SIGKILL');
+  }
+  child.stdout.destroy();
+  child.stderr.destroy();
+}
+
+function removeCommandHandlers() {
+  if (!commandHandlersInstalled) return;
+  process.removeListener('SIGTERM', onCommandTerm);
+  process.removeListener('SIGINT', onCommandInt);
+  process.removeListener('SIGHUP', onCommandHup);
+  process.removeListener('exit', onCommandExit);
+  commandHandlersInstalled = false;
+}
+
+/** @param {NodeJS.Signals} signal */
+function finishCommandCancellation(signal) {
+  clearTimeout(cancellationTimer);
+  removeCommandHandlers();
+  // Preserve another owner's signal handling if one exists. Otherwise retain
+  // Node's ordinary signal termination after our owned children have closed.
+  if (process.listenerCount(signal) === 0) process.kill(process.pid, signal);
+}
+
+/** @param {NodeJS.Signals} signal @param {number} code */
+function cancelCommands(signal, code) {
+  if (cancelledCommandCode) return;
+  cancelledCommandCode = code;
+  process.exitCode = code;
+  for (const record of activeCommandGroups) stopOwnedCommand(record);
+  if (activeCommandGroups.size === 0) finishCommandCancellation(signal);
+  else {
+    cancellationTimer = setTimeout(
+      () => finishCommandCancellation(signal),
+      1000
+    );
+  }
+}
+
+function onCommandTerm() {
+  cancelCommands('SIGTERM', 143);
+}
+function onCommandInt() {
+  cancelCommands('SIGINT', 130);
+}
+function onCommandHup() {
+  cancelCommands('SIGHUP', 129);
+}
+function onCommandExit() {
+  for (const record of activeCommandGroups) stopOwnedCommand(record);
+}
+
+function trackCommand(record) {
+  if (!commandHandlersInstalled) {
+    process.on('SIGTERM', onCommandTerm);
+    process.on('SIGINT', onCommandInt);
+    process.on('SIGHUP', onCommandHup);
+    process.on('exit', onCommandExit);
+    commandHandlersInstalled = true;
+  }
+  activeCommandGroups.add(record);
+}
+
+function untrackCommand(record) {
+  activeCommandGroups.delete(record);
+  if (activeCommandGroups.size === 0 && !cancelledCommandCode) {
+    removeCommandHandlers();
+  }
+}
+
+export function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
+  if (cancelledCommandCode)
+    return Promise.resolve({ code: cancelledCommandCode, out: '', ms: 0 });
   return new Promise(resolve => {
     const t0 = Date.now();
     const child = spawn('bash', ['-c', cmd], {
       cwd,
-      env,
+      env: {
+        ...(env ?? process.env),
+        ...(process.platform === 'win32'
+          ? {}
+          : { JOVIE_PREFLIGHT_MANAGED_GROUP: '1' }),
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
     });
+    const record = { child };
+    trackCommand(record);
     let out = '';
+    let timedOut = false;
     const take = d => {
       out += d.toString();
       if (out.length > 400_000) out = out.slice(-200_000);
     };
     child.stdout.on('data', take);
     child.stderr.on('data', take);
-    const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
+    const timer = setTimeout(() => {
+      timedOut = true;
+      // A shell can exit before its descendants close inherited output pipes.
+      // Kill its whole POSIX group, then close our pipe ends so timeout settles.
+      stopOwnedCommand(record);
+    }, timeoutMs);
     child.on('close', (code, signal) => {
       clearTimeout(timer);
+      untrackCommand(record);
       resolve({
-        code: code ?? (signal ? 137 : 1),
+        code: timedOut
+          ? 124
+          : cancelledCommandCode || (code ?? (signal ? 137 : 1)),
         out,
         ms: Date.now() - t0,
       });
@@ -197,30 +310,6 @@ const git = (cwd, args) => {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
   return r.status === 0 ? r.stdout.trim() : '';
 };
-
-/**
- * Ref names to try for a diff base (JOV-10351). A bare branch name resolves
- * to its remote-tracking ref first, then the local branch; a name that is
- * already qualified (origin/main, refs/...) is never prefixed again.
- * @returns {string[]}
- */
-export function baseRefCandidates(base) {
-  const b = base.trim();
-  if (/^(?:origin\/|refs\/)/.test(b)) return [b];
-  return [`origin/${b}`, b];
-}
-
-/**
- * The first candidate that names a commit, or null when none does. Callers
- * must fail on null instead of treating it as 'no changes' (JOV-10351).
- * @returns {string|null}
- */
-export function resolveBaseRef(cwd, base) {
-  for (const candidate of baseRefCandidates(base))
-    if (git(cwd, ['rev-parse', '--verify', '--quiet', `${candidate}^{commit}`]))
-      return candidate;
-  return null;
-}
 
 /** Changed files vs the merge-base, including uncommitted and untracked.
  *  `base` must be a ref that resolves to a commit (see resolveBaseRef). */
@@ -327,14 +416,18 @@ function loadBody(args, cwd) {
 }
 
 /** Run the shared Private Data Guard from the pinned JovieInc/ci workflow. */
-async function privateDataCheck(cwd, env, mergeBase) {
+export async function privateDataCheck(cwd, env, mergeBase) {
   const wfPath = path.join(cwd, '.github/workflows/private-data-guard.yml');
   if (!existsSync(wfPath)) return { skip: 'no private-data-guard workflow' };
   const wf = /** @type {any} */ (yamlLoad(readFileSync(wfPath, 'utf8')));
   const job = Object.values(wf.jobs ?? {})[0] ?? {};
   const m = String(job.uses ?? '').match(/^JovieInc\/ci\/(.+)@([0-9a-f]{40})$/);
   if (!m) return { skip: 'guard is not a pinned JovieInc/ci workflow' };
-  const cache = path.join(homedir(), '.cache', 'jovie-preflight');
+  const cacheRoot =
+    env.XDG_CACHE_HOME && path.isAbsolute(env.XDG_CACHE_HOME)
+      ? env.XDG_CACHE_HOME
+      : path.join(homedir(), '.cache');
+  const cache = path.join(cacheRoot, 'jovie-preflight');
   mkdirSync(cache, { recursive: true });
   const file = path.join(cache, `private-data-${m[2]}.py`);
   if (!existsSync(file)) {
@@ -481,13 +574,14 @@ export async function main({
   });
   if (pinned.status === 0 && pinned.stdout.trim())
     childEnv.PATH = `${pinned.stdout.trim()}:${childEnv.PATH}`;
-  // Fetch the remote branch under its unqualified name; a base that arrives
-  // already remote-qualified (origin/main) maps back to 'main' (JOV-10351).
-  spawnSync(
-    'git',
-    ['fetch', '--no-tags', '-q', 'origin', args.base.replace(/^origin\//, '')],
-    { cwd }
+  // GitHub's environment contract is a logical branch name. Source guards
+  // prepend origin/ themselves; keep qualified refs only in CI_BASE_REF.
+  const branchBase = args.base.replace(
+    /^(?:refs\/remotes\/origin\/|refs\/heads\/|origin\/)/,
+    ''
   );
+  // Fetch the remote branch under its unqualified name (JOV-10351).
+  spawnSync('git', ['fetch', '--no-tags', '-q', 'origin', branchBase], { cwd });
   const baseRef = resolveBaseRef(cwd, args.base);
   if (!baseRef) {
     log(
@@ -497,7 +591,7 @@ export async function main({
   }
   Object.assign(childEnv, {
     NODE_OPTIONS: `--max-old-space-size=${HEAP_MB}`,
-    GITHUB_BASE_REF: args.base,
+    GITHUB_BASE_REF: branchBase,
     GITHUB_EVENT_NAME: 'pull_request',
     CI_BASE_REF: baseRef,
     // Copied guards compare their module URL to argv[1]; macOS /var -> /private/var
@@ -581,7 +675,7 @@ export async function main({
     pathToFileURL(path.join(cwd, 'scripts/lib/source-validation-manifest.mjs'))
       .href
   );
-  for (const g of manifest.selectManifestGuards(paths, args.base)) {
+  for (const g of manifest.selectManifestGuards(paths, branchBase)) {
     if (g.heavy && !args.thorough) {
       deferred.push(g.id);
       continue;
