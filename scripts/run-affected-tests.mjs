@@ -479,6 +479,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
   'scripts/lib/__tests__/golden-path-lock.test.mjs',
   'scripts/lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/golden-path-source-scope.test.mjs',
   'scripts/lib/__tests__/queue-deferral-receipt.test.mjs',
   'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
