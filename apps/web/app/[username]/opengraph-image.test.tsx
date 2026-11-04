@@ -123,6 +123,7 @@ describe('profile share image disclosure', () => {
     await render('imported-artist');
     expect(mocks.profile).toHaveBeenCalledWith('maya-vale', {
       skipCache: true,
+      throwOnError: true,
     });
   });
 
@@ -135,6 +136,7 @@ describe('profile share image disclosure', () => {
     );
     expect(mocks.profile).toHaveBeenCalledWith('maya-vale', {
       skipCache: true,
+      throwOnError: true,
     });
     expect(options).toMatchObject({ headers: { 'Cache-Control': 'no-store' } });
   });

@@ -366,6 +366,13 @@ function specRepository(t) {
     join(root, 'apps/web/node_modules'),
     'dir'
   );
+  // pnpm's .bin/tsx shim resolves tsx through <root>/node_modules/.pnpm.
+  if (existsSync(join(REPO_ROOT, 'node_modules')))
+    symlinkSync(
+      join(REPO_ROOT, 'node_modules'),
+      join(root, 'node_modules'),
+      'dir'
+    );
   writeFileSync(join(root, '.gitignore'), 'node_modules\n');
   writeFileSync(join(root, 'package.json'), '{"type":"module"}\n');
   writeFileSync(

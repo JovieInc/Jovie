@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-10-30T23:15:58.875Z",
-  "winsTotal": 27,
+  "at": "2026-11-03T23:53:37.796Z",
+  "winsTotal": 34,
   "winsVerified": 1,
-  "winsClaimed": 14,
+  "winsClaimed": 15,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 4,
-  "winsPendingMeasure": 4,
-  "winsLast7d": 27,
+  "winsPendingMeasure": 10,
+  "winsLast7d": 34,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -54,6 +54,42 @@
     },
     {
       "theme": "runner-pin",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "golden-path",
+      "total": 2,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "hydration-correctness",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "neon-egress",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "false-green",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "ovie-home",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "cost",
       "total": 1,
       "verified": 0,
       "ready": false
@@ -167,6 +203,34 @@
     {
       "id": "win-2026-10-30-the-runner-pin-gate-is-green",
       "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-31-typed-handles-are-honored-and-freed",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-removes-the-client-side-hydration-re",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-certification-ingest-reads-the-6-5",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-the-shared-outcome-verifier-rejects-all",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-31-sign-up-in-the-claim-chat",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-ovie-home-in-flight-done-today",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-30-golden-path-model-review-makes-about",
+      "status": "pending-measure"
     }
   ]
 }

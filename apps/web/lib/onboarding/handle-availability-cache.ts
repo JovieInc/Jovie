@@ -27,9 +27,18 @@ export async function getCachedHandleAvailability(
   if (!redis) return null;
 
   try {
-    const value = await redis.get<string>(getHandleCacheKey(handle));
-    if (value === null) return null;
-    return value === '1';
+    // Upstash deserializes stored values: '1' comes back as the number 1,
+    // so a strict `=== '1'` read every cached "available" as taken. Every
+    // handle checked twice within the TTL showed "is not available"
+    // (2026-10-31 golden-path walk; repro: check the same handle twice).
+    const value = await redis.get<string | number | boolean>(
+      getHandleCacheKey(handle)
+    );
+    if (value === null || value === undefined) return null;
+    const raw = String(value);
+    if (raw === '1' || raw === 'true') return true;
+    if (raw === '0' || raw === 'false') return false;
+    return null;
   } catch (error) {
     captureWarning('[handle-availability] Redis read failed', error);
     return null;
@@ -38,14 +47,15 @@ export async function getCachedHandleAvailability(
 
 /**
  * Read cache and project through the canonical availability contract.
- * Returns null on cache miss so callers can fall through to DB.
+ * Returns null on cache miss, and also on a cached "taken", which is advisory
+ * (stale entries outlive deleted rows), so callers fall through to the DB.
  */
 export async function getCachedHandleAvailabilityResult(
   handle: string
 ): Promise<HandleAvailabilityResult | null> {
   const cached = await getCachedHandleAvailability(handle);
-  if (cached === null) return null;
-  return toHandleAvailabilityResult({ handle, available: cached });
+  if (cached !== true) return null;
+  return toHandleAvailabilityResult({ handle, available: true });
 }
 
 export async function cacheHandleAvailability(
