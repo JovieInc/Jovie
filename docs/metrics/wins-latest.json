@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-11-03T15:32:35.314Z",
-  "winsTotal": 33,
+  "at": "2026-11-03T23:53:37.796Z",
+  "winsTotal": 34,
   "winsVerified": 1,
   "winsClaimed": 15,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 4,
-  "winsPendingMeasure": 9,
-  "winsLast7d": 33,
+  "winsPendingMeasure": 10,
+  "winsLast7d": 34,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -84,6 +84,12 @@
     },
     {
       "theme": "ovie-home",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "cost",
       "total": 1,
       "verified": 0,
       "ready": false
@@ -220,6 +226,10 @@
     },
     {
       "id": "win-2026-10-31-ovie-home-in-flight-done-today",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-30-golden-path-model-review-makes-about",
       "status": "pending-measure"
     }
   ]
