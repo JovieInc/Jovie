@@ -56,7 +56,22 @@ export function isReservedTestEmailDomain(domain: string): boolean {
   );
 }
 
+/**
+ * Synthetic canary mailboxes on jov.ie (`browse-ready+...`) have no inbox: sends
+ * bounce, burn the transactional quota and hurt sender reputation. The canaries
+ * read their sign-in code from the verification table, never from mail.
+ */
+const SYNTHETIC_CANARY_RECIPIENT = /^browse-ready\+[^@]+@jov\.ie$/u;
+
+export function isSyntheticCanaryRecipient(email: string): boolean {
+  return SYNTHETIC_CANARY_RECIPIENT.test(normalizeEmail(email));
+}
+
 export function getEmailSendBlockReason(email: string): string | null {
+  if (isSyntheticCanaryRecipient(email)) {
+    return 'Recipient is a synthetic canary mailbox with no inbox';
+  }
+
   const domain = getEmailDomain(email);
 
   if (!domain) {
@@ -196,6 +211,73 @@ export function isInternalOrTestAccountEmail(
     INTERNAL_TAG_PATTERN.test(localPart)
   );
 }
+
+// ============================================================================
+// Test-profile owner detection (public hiding + cleanup)
+//
+// Narrower than `isInternalOrTestAccountEmail`: plain team inboxes
+// (tim@jov.ie, anyone@timwhite.co) are real internal people whose profiles stay
+// public. Only addresses that are provably synthetic match. This is the ONE
+// classifier for "test profile": the public route, sitemap/discovery/search
+// filters and the cleanup script all call it.
+//
+// Patterns (each exact; a plain real address never matches):
+//   1. reserved test domains (example.com/net/org, .invalid, .localhost, .test)
+//   2. the dogfood mailbox domain test.jovie.com (+ subdomains)
+//   3. Clerk test tag `+clerk_test` (followed by `+` or end of local part), on
+//      ANY provider: Clerk only mints that tag for test-mode accounts
+//   4. `+synthetic-<x>` principal tag and `+jovie-prod-waitlist-canary`
+//   5. harness tags `+canary|+e2e|+prodcert|+dogfood` (optionally `-._+` suffix)
+//   6. jov.ie local parts `e2e` / `browse` (optionally `-`/`+` suffix): the team
+//      domain's harness mailboxes (e2e@jov.ie, browse-ready@jov.ie)
+// ============================================================================
+
+const JOV_IE_HARNESS_LOCAL_PART_PATTERN = /^(?:e2e|browse)(?:[-+]|$)/;
+
+export function isTestProfileOwnerEmail(
+  email: string | null | undefined
+): boolean {
+  if (!email) return false;
+  const normalized = normalizeEmail(email);
+  const atIndex = normalized.lastIndexOf('@');
+  if (atIndex <= 0 || atIndex === normalized.length - 1) return false;
+  const localPart = normalized.slice(0, atIndex);
+  const domain = normalized.slice(atIndex + 1);
+
+  if (isReservedTestEmailDomain(domain)) return true;
+  if (
+    DOGFOOD_ACCOUNT_EMAIL_DOMAINS.some(
+      d => domain === d || domain.endsWith(`.${d}`)
+    )
+  ) {
+    return true;
+  }
+  if (
+    CLERK_TEST_TAG_PATTERN.test(localPart) ||
+    SYNTHETIC_PRINCIPAL_TAG_PATTERN.test(localPart) ||
+    INTERNAL_TAG_PATTERN.test(localPart)
+  ) {
+    return true;
+  }
+  return (
+    domain === 'jov.ie' && JOV_IE_HARNESS_LOCAL_PART_PATTERN.test(localPart)
+  );
+}
+
+/**
+ * POSIX ERE twin of `isTestProfileOwnerEmail` for Postgres `~*` prefilters.
+ * Callers MUST re-check each candidate row with the JS classifier before
+ * mutating; a parity test pins the two together.
+ */
+export const TEST_PROFILE_OWNER_EMAIL_SQL_PATTERN = [
+  '@(.*\\.)?(example\\.(com|net|org)|invalid|localhost|test)$',
+  `@(.*\\.)?(${DOGFOOD_ACCOUNT_EMAIL_DOMAINS.map(d => d.replaceAll('.', '\\.')).join('|')})$`,
+  '^[^@]*\\+clerk_test(\\+[^@]*)?@',
+  '^[^@]*\\+synthetic-([a-z0-9])[^@]*@',
+  '^[^@]*\\+jovie-prod-waitlist-canary@',
+  `^[^@]*\\+(${INTERNAL_TAG_ALTERNATION})([-+._][^@]*)?@`,
+  '^(e2e|browse)([-+][^@]*)?@jov\\.ie$',
+].join('|');
 
 /**
  * Reporting cohort for events that may not carry a durable user id. Unknown

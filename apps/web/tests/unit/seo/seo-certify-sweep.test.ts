@@ -85,6 +85,26 @@ function sweep(pages: SeoSweepPage[], llmsTxt: string | null = null) {
 }
 
 describe('sweepTargets', () => {
+  it('certifies product instead of disabled demo redirect documents, and rejects a broken target', () => {
+    const paths = sweepTargets().map(target => target.pathname);
+    expect(paths).not.toContain('/demo/video');
+    expect(paths).not.toContain('/demovideo');
+    expect(paths).toContain('/product');
+    for (const status of [307, 404, 500]) {
+      const result = sweep([
+        {
+          target: target('/product'),
+          status,
+          html: html('/product', GOOD_BODY, PRODUCT_LD),
+          source: 'test',
+        },
+      ]);
+      expect(result[0]?.certification.checks).toContainEqual(
+        expect.objectContaining({ id: 'http-status', status: 'failed' })
+      );
+    }
+  });
+
   it('certifies the live homepage while the retired /new alias stays a redirect', () => {
     const paths = sweepTargets().map(target => target.pathname);
     expect(paths).toContain('/');
@@ -188,12 +208,12 @@ describe('per-record sweep (JOV-7283)', () => {
 describe('siblingPathMatcher', () => {
   it('matches exact published pages and one-segment wildcard children', () => {
     const matches = siblingPathMatcher([
-      entry('/card'),
+      entry('/pay'),
       entry('/compare/*', { recipeId: 'comparison' }),
       entry('/voice', { noindex: true }),
       entry('/new', { aliasOf: '/' }),
     ]);
-    expect(matches('/card')).toBe(true);
+    expect(matches('/pay')).toBe(true);
     expect(matches('/compare/linktree')).toBe(true);
     expect(matches('/compare/')).toBe(false);
     expect(matches('/compare/a/b')).toBe(false);
