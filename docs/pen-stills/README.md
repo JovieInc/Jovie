@@ -1,11 +1,14 @@
 # Pen stills
 
 Dark is the primary review mode. Light is a derived variant. The homepage
-headline stays locked: **Be found. Be understood.**
+manifest records the historical headline **Be found. Be understood.** This
+manifest and headline are unqualified inputs, not approval of the current
+homepage or authority to change its copy or Pen IDs.
 
-Canonical section stills are not in the repo yet. The diff is advisory until
-those PNGs land. Parked and fork frames stay in the manifest so the exclusion
-is explicit, and they are never captured.
+Canonical section stills are not in the repo yet. Provide authorized exports
+locally to qualify comparisons; do not commit native images or upload private
+screenshots. The default diff remains advisory. Parked and fork frames stay in
+the manifest so the exclusion is explicit, and they are never captured.
 
 ## Manifest
 
@@ -36,9 +39,30 @@ Each comparable frame reports section height ratio (render aspect / Pen
 aspect), mockup bbox aspect and area, text-block vertical centers, windowed
 SSIM against `PEN_STILL_TOLERANCES`, and a Pen | render | diff triptych.
 
-`--strict` exits 1 when a comparable frame misses tolerance. The default is
-advisory and exits 0. A missing PNG is `waiting`. When nothing is comparable
-the run still writes a synthetic triptych. That image is not a design verdict.
+`--strict` exits 0 only when at least one active frame exists and every active
+frame was compared and passed the existing tolerances. Missing stills or capture
+targets remain `waiting` but fail strict qualification, including mixed
+pass/waiting runs. Hash mismatches, unavailable captures, unreadable PNGs and
+out-of-tolerance comparisons also fail. Parked and fork frames remain excluded.
+Capture/read/decode failures are recorded as `comparison-unavailable` so other
+frames can still produce evidence. Receipt `advisory` and `pass` reflect the
+selected mode. Default advisory runs exit 0 for recorded comparison failures;
+invalid manifests and other command errors still exit nonzero.
+
+Each compared frame writes its own `triptych-<sha256>.png`, deterministically
+named from its section, mode and viewport identity. Full identity hashing avoids
+path separators, case-folding collisions, lossy slug collisions and overlong
+filenames. `receipt.json` and `comment.md` reference those exact images. A legacy
+`triptych.png` alias is written only for one compared image (or the sole
+synthetic sample), and removed when an output directory is reused for multiple
+comparisons. Multi-frame images are available together in the artifact directory;
+the existing comment publisher's single-image attachment remains a legacy path.
+
+When no image pair was compared, `synthetic-triptych.png` exercises the harness.
+It is explicitly labeled synthetic in the receipt and comment, never enters the
+frame results or compared-frame artifacts, and cannot satisfy strict qualification.
+Generated test fixtures prove harness behavior only, not design certification.
 
 `.github/workflows/pen-still-diff.yml` is not a required check. It posts the
-triptych on the pull request and uploads the same PNG as an artifact.
+advisory comment on the pull request and uploads the output directory as an
+artifact. This harness repair does not make that workflow a strict gate.
