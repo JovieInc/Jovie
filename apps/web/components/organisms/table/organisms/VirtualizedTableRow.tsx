@@ -164,7 +164,9 @@ function VirtualizedTableRowComponent<TData extends RowData>({
       } else {
         rowRefsMap.delete(rowIndex);
       }
-      if (shouldVirtualize && el && measureElement) {
+      // TanStack uses null ref notifications to release detached rows without
+      // waiting for another ResizeObserver delivery.
+      if (shouldVirtualize && measureElement) {
         measureElement(el);
       }
     },

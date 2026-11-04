@@ -16,6 +16,7 @@ import {
   useRightPanel,
 } from '@/contexts/RightPanelContext';
 import { AdminPeopleRightPanelProvider } from '@/features/admin/AdminPeopleRightPanelProvider';
+import { mockTableViewport } from '@/tests/utils/table-viewport';
 import type {
   AdminContactRow,
   AdminContactStageMetrics,
@@ -136,6 +137,8 @@ function jsonResponse(body: unknown, status = 200) {
     headers: { 'Content-Type': 'application/json' },
   });
 }
+
+mockTableViewport();
 
 describe('AdminContactsTable', () => {
   const browserMethods = [
