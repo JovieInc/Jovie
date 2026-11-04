@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { withLocalWorkerLimit } from './vitest-local-workers.mjs';
 
 // pnpm sometimes forwards an extra leading "--" to scripts (especially in CI),
 // which causes Vitest to stop parsing flags (treating them as test filters).
@@ -61,10 +62,12 @@ export function rewriteVitestArgs(rawArgs, includeText = '', relatedText = '') {
 
 const invokedDirectly = process.argv[1]?.endsWith('vitest-wrapper.mjs');
 if (invokedDirectly) {
-  const args = rewriteVitestArgs(
-    process.argv.slice(2),
-    process.env.JOVIE_COVERAGE_INCLUDE ?? '',
-    process.env.JOVIE_COVERAGE_RELATED_TESTS ?? ''
+  const args = withLocalWorkerLimit(
+    rewriteVitestArgs(
+      process.argv.slice(2),
+      process.env.JOVIE_COVERAGE_INCLUDE ?? '',
+      process.env.JOVIE_COVERAGE_RELATED_TESTS ?? ''
+    )
   );
   const result = spawnSync('vitest', args, {
     stdio: 'inherit',

@@ -282,7 +282,7 @@ test.describe('Content Gate — Public Pages', () => {
         path: APP_ROUTES.ARTIST_NOTIFICATIONS,
         name: 'Artist notifications',
         expectedUrl: /\/artist-notifications$/,
-        readyText: /reach your audience|automatically/i,
+        readyText: /capture every listener\.|reach listeners\./i,
         minLength: 150,
       },
       {

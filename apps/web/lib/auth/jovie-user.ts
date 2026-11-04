@@ -26,6 +26,8 @@ export interface JovieUserEmailAddress {
 export interface JovieUser {
   /** Better Auth user id. Evidence: `user?.id` (useUserButton.ts). */
   readonly id: string;
+  /** Only true when the trusted auth user explicitly verifies its email. */
+  readonly emailVerified?: boolean;
   /**
    * Better Auth stores exactly one email per user, so this is always a
    * single-element array. Evidence: `user?.emailAddresses?.[0]?.emailAddress`
@@ -81,6 +83,7 @@ export interface JovieUser {
 export interface BetterAuthSessionUser {
   readonly id: string;
   readonly email: string;
+  readonly emailVerified?: boolean;
   readonly name: string;
   readonly image?: string | null;
   readonly username?: string | null;
@@ -117,6 +120,7 @@ export function toJovieUser(sessionUser: BetterAuthSessionUser): JovieUser {
 
   return {
     id: sessionUser.id,
+    emailVerified: sessionUser.emailVerified === true,
     emailAddresses: [email],
     primaryEmailAddress: email,
     imageUrl: sessionUser.image ?? null,

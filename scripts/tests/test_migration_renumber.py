@@ -94,6 +94,42 @@ class RenumberTest(unittest.TestCase):
             git(root, "checkout", "-q", "-B", "pr", "main")
             self.assertEqual(mr.renumber(root, lambda *a: git(root, *a), "main", 5, {}), [])
 
+    def test_generated_metadata_is_renumbered_without_merging_snapshot_contents(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.build(root)
+            git(root, "checkout", "-q", "main")
+            (root / MIG / "0160_custom.sql").write_text("custom")
+            git(root, "add", "-A")
+            git(root, "commit", "-qm", "sparse numbering")
+            journal_path = root / META / "_journal.json"
+            journal = json.loads(journal_path.read_text())
+            original_entries = list(journal["entries"])
+            journal["entries"].append({"idx": 149, "tag": "0149_generated", "when": 40})
+            journal_path.write_text(json.dumps(journal))
+            (root / MIG / "0149_generated.sql").write_text("generated sql")
+            snapshot = self.snap("generated", "sTheirs", {"mine": 2, "theirs": 3})
+            (root / META / "0149_snapshot.json").write_text(snapshot)
+
+            changed = mr.normalize_generated(root, lambda *a: git(root, *a), "main", 5, {})
+
+            self.assertIn(f"{MIG}/0161_generated.sql", changed)
+            self.assertEqual((root / MIG / "0161_generated.sql").read_text(), "generated sql")
+            self.assertEqual((root / META / "0161_snapshot.json").read_text(), snapshot)
+            result = json.loads(journal_path.read_text())["entries"]
+            self.assertEqual(result[:-1], original_entries)
+            self.assertEqual(result[-1], {"idx": 149, "tag": "0161_generated", "when": 40})
+            self.assertEqual(mr.normalize_generated(root, lambda *a: git(root, *a), "main", 5, {}), [])
+
+    def test_generated_renumber_refuses_a_changed_base_journal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.build(root)
+            before = (root / META / "_journal.json").read_text()
+            with self.assertRaises(mr.Unmergeable):
+                mr.normalize_generated(root, lambda *a: git(root, *a), "main", 5, {})
+            self.assertEqual((root / META / "_journal.json").read_text(), before)
+
 
 class LaneFixTest(RenumberTest):
     def test_the_lane_fix_renumbers_merges_main_and_pushes_without_a_model(self):

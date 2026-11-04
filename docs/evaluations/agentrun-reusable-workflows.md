@@ -23,8 +23,8 @@ Summer → Symphony/Jovie Lanes path today:
   (`jev-shadow/v1`) typed evaluation behind fingerprinted, admission-bounded
   approvals with funding envelopes — exactly the "decision model for narrow
   uncertainty" role. It proposes; it never attests CI, merges, or closes issues.
-- **Review/CI:** `docs/evaluations/pr-review-kernel.md` — deterministic risk
-  floors, shadow receipt, merge authority stays with `github.ci` + merge queue.
+- **Review/CI:** merge authority stays with `github.ci` + merge queue (the
+  shadow review kernel was retired 2026-10-28).
 - **Repeatable-work receipts:** `AgentRunArtifact` contract (source, kind,
   modelRoute, allowedActions/forbiddenActions, costEstimateUsd) is already the
   canonical run-record shape; `backlog-orchestrator/reconcile.mjs` already emits
@@ -50,8 +50,8 @@ Summer → Symphony/Jovie Lanes path today:
   and a Pi-CLI-centric authoring path orthogonal to our lanes harness.
 - Security/egress: any `judge`/`route`/`sift` adoption would send issue/PR text
   through the TypeSafe path — duplicating, not extending, the existing
-  Jev/Gateway screen. Data-scope policy is already fixed in
-  `pr-review-kernel.md` (Tim, 2026-09-25).
+  Jev/Gateway screen. Data-scope policy was fixed by Tim on
+  2026-09-25 (egress only through the existing Jev/Gateway screen).
 - No durable scheduler, ledger, or lease semantics in the DSL — the host owns
   tools, delivery, storage. Adopting it would add a runtime while leaving us to
   re-implement the parts our orchestrator already has.
