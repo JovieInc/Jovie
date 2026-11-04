@@ -485,7 +485,7 @@ test('the relay skips the model-lane label only when a rerun was requested', () 
   );
   assert.equal(
     workflow.jobs.relay.steps[0].if,
-    "github.event_name == 'workflow_run'"
+    "github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'"
   );
   assert.doesNotMatch(String(workflow.concurrency.group), /github\.run_id/);
   assert.doesNotMatch(

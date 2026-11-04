@@ -467,6 +467,36 @@ def head_red(number: int, sh=run) -> bool | None:
     return any(state in RED_CHECK_STATES for _, state in latest.values())
 
 
+def head_settled_green(number: int, sh=run) -> bool:
+    """True only when every required check on this head has completed success.
+
+    Pending, failed, cancelled, or unreadable is not green. The next check
+    completion is the event that asks again; this does not sleep or poll.
+    """
+    owner, name = REPO.split("/", 1)
+    read = sh(["gh", "api", "graphql", "-f", f"query={HEAD_CHECKS_QUERY}", "-F", f"owner={owner}",
+               "-F", f"name={name}", "-F", f"number={number}"])
+    try:
+        commits = json.loads(read.stdout)["data"]["repository"]["pullRequest"]["commits"]["nodes"]
+        nodes = ((commits[0]["commit"].get("statusCheckRollup") or {}).get("contexts") or {})["nodes"]
+    except (ValueError, KeyError, IndexError, TypeError):
+        return False
+    if read.returncode or not isinstance(nodes, list) or not nodes:
+        return False
+    latest: dict = {}
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        key = node.get("name") or node.get("context")
+        at = node.get("completedAt") or node.get("startedAt") or node.get("createdAt") or ""
+        state = str(node.get("conclusion") or node.get("state") or "").upper()
+        if key and str(key).lower() in NON_REQUIRED_CHECKS:
+            continue
+        if key and (key not in latest or at >= latest[key][0]):
+            latest[key] = (at, state)
+    return bool(latest) and all(state == "SUCCESS" for _, state in latest.values())
+
+
 def red_label_justified(number: int, pr: dict, sh=run) -> bool:
     """May `lane-fix-red` go on this head? Only after a completed failure.
 
@@ -492,67 +522,14 @@ def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
         return False
     if LANE_FIX_RED not in {label.lower() for label in label_names(pr)}:
         return False
-    if pr.get("mergeStateStatus") not in REQUIRED_GREEN:
+    # Merge state lags the check rollup (a success wake sees BLOCKED). The
+    # rollup is the event's evidence. A pending or failed check keeps the label
+    # until that check's own completion.
+    if pr.get("mergeStateStatus") not in REQUIRED_GREEN and not head_settled_green(number, sh):
         return False
     deleted = sh(["gh", "api", "-X", "DELETE",
                   f"repos/{REPO}/issues/{number}/labels/{LANE_FIX_RED}"])
     return deleted.returncode == 0
-
-
-# Source Validation can finish while other required checks are still running, so the
-# only success wake sees BLOCKED and leaves lane-fix-red. The next wake for a success
-# is the following SV run or a main push. Three short re-reads cover that tail. A
-# failing or unreadable check list does not clear.
-GREEN_REREAD_ATTEMPTS = 3
-GREEN_REREAD_PAUSE_S = 15
-
-
-def view_pr(number: int, sh=run) -> dict | None:
-    viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json",
-                 "state,isDraft,headRefName,headRefOid,isCrossRepository,mergeStateStatus,labels"])
-    if viewed.returncode != 0:
-        return None
-    try:
-        body = json.loads(viewed.stdout or "{}")
-    except ValueError:
-        return None
-    return body if isinstance(body, dict) else None
-
-
-def reread_lagging_green(number: int, pr: dict, sha: str, sh=run, *,
-                         attempts: int | None = None,
-                         pause: float | None = None,
-                         sleep=time.sleep) -> dict:
-    """Re-read a success wake that is not required-green yet.
-
-    The caps are read at call time. Binding them as defaults would freeze the
-    import-time integers and ignore a test patch.
-
-    2026-11-04: Source Validation succeeded on #24254 while the rollup was still
-    BLOCKED, clear_stale left lane-fix-red, and the head later went green with no
-    second success wake. Re-read only when the label is present and no check on
-    this head is failing. A moved head is returned so the caller drops the stale sha.
-    """
-    if attempts is None:
-        attempts = GREEN_REREAD_ATTEMPTS
-    if pause is None:
-        pause = GREEN_REREAD_PAUSE_S
-    labels = {label.lower() for label in label_names(pr)}
-    if LANE_FIX_RED not in labels or pr.get("mergeStateStatus") in REQUIRED_GREEN:
-        return pr
-    if head_red(number, sh) is not False:
-        return pr
-    for _ in range(attempts):
-        sleep(pause)
-        nxt = view_pr(number, sh)
-        if nxt is None:
-            return pr
-        pr = nxt
-        if pr.get("headRefOid") != sha or pr.get("mergeStateStatus") in REQUIRED_GREEN:
-            return pr
-        if head_red(number, sh) is not False:
-            return pr
-    return pr
 
 
 def wake_green_enroll(number: int, sh=run) -> bool:
@@ -1261,11 +1238,6 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
             continue  # a newer head is already running CI; its own events speak for it
         # Only a success for this exact head. A red event can still show a lagging
         # CLEAN, and a missing sha is not evidence the required checks passed.
-        if kind == "green" and sha and LANE_FIX_RED in {label.lower() for label in label_names(pr)} \
-                and pr.get("mergeStateStatus") not in REQUIRED_GREEN:
-            pr = reread_lagging_green(number, pr, sha, sh)
-            if pr.get("headRefOid") != sha:
-                continue
         if kind == "green" and sha and clear_stale_lane_fix_red(number, pr, sh):
             cleared.append((number, "cleared-red"))
             pr["labels"] = [label for label in (pr.get("labels") or [])
@@ -2900,15 +2872,31 @@ def write_wake_file(state, *, pr, sha, run_id, run_attempt, red_at):
 
 
 def wake(argv: list[str]) -> int:
-    """Gem-side wake job: for each red PR in --prs, write a wake file from the
-    workflow_run event (red_at = updated_at). Local state only; no secret, no
-    GitHub writes — fix-now (and only fix-now) does everything after that."""
+    """Gem-side wake job: write a wake file from the workflow_run event
+    (red_at = updated_at). Local state only; no secret, no GitHub writes.
+    fix-now (and only fix-now) does everything after that.
+
+    The check completion is the event. With no --prs, the PRs on that event
+    are the targets. A success or an unrelated event writes nothing.
+    """
+    explicit = "--prs" in argv
     prs = []
-    if "--prs" in argv:
+    if explicit:
         for token in argv[argv.index("--prs") + 1].split(","):
             token = token.strip()
             if token.isdigit():
                 prs.append(int(token))
+    event_path = os.environ.get("GITHUB_EVENT_PATH")
+    payload = json.loads(Path(event_path).read_text()) if event_path and Path(event_path).exists() else {}
+    run = payload.get("workflow_run") or {}
+    if not explicit and run.get("conclusion") not in RED_CONCLUSIONS:
+        print("wake: not a red check")
+        return 0
+    if not prs:
+        for item in run.get("pull_requests") or []:
+            number = item.get("number") if isinstance(item, dict) else None
+            if isinstance(number, int) and number > 0:
+                prs.append(number)
     if not prs:
         print("wake: no red PRs")
         return 0
@@ -2916,9 +2904,6 @@ def wake(argv: list[str]) -> int:
     if state is None:
         print("wake: no lane state dir configured; nothing written")
         return 0
-    event_path = os.environ.get("GITHUB_EVENT_PATH")
-    payload = json.loads(Path(event_path).read_text()) if event_path and Path(event_path).exists() else {}
-    run = payload.get("workflow_run") or {}
     sha = run.get("head_sha")
     if not re.fullmatch(r"[0-9a-f]{40}", sha or ""):
         print("wake: event carries no pull-request head sha; nothing written")
