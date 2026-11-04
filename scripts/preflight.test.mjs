@@ -710,6 +710,25 @@ test('every step is either planned to run or skipped with a written reason', () 
   }
 });
 
+test('hosted partition retains merged guards in local preflight and rejects incomplete cleanup', () => {
+  const source = readFileSync(path.join(ROOT, WORKFLOW_PATH), 'utf8');
+  const steps = deriveSteps(source);
+  const guards = steps.filter(
+    step =>
+      step.name === 'Validate disk-read source contracts from trusted base'
+  );
+  assert.equal(guards.length, 1);
+  assert.equal(guards[0].skip, '');
+  assert.match(guards[0].run, /selectSourceGuards/);
+  assert.throws(
+    () =>
+      deriveSteps(
+        source.replace('id: source_guard_proof', 'id: missing_cleanup')
+      ),
+    /no cleanup proof/
+  );
+});
+
 test('the real Source Validation workflow yields the gates workers keep missing', () => {
   const steps = deriveSteps(
     readFileSync(path.join(ROOT, WORKFLOW_PATH), 'utf8')
@@ -780,16 +799,19 @@ test('every typecheck/build statement in the real workflow is excluded', () => {
 });
 
 test('steps run concurrently and still list every failure', async () => {
-  const slow = n => `      - name: Slow ${n}
-        run: node -e "setTimeout(() => process.exit(${n}), 700)"`;
-  const started = Date.now();
-  const { code, out } = await runPlan(workflow([slow(4), slow(5)].join('\n')), {
-    PREFLIGHT_JOBS: '3',
-  });
+  // Neither worker can finish until both have started. A serial runner exits
+  // with the hang-guard code instead of the expected failure code.
+  const rendezvous = n => `      - name: Rendezvous ${n}
+        run: node -e "const fs = require('node:fs'); fs.writeFileSync('started-${n}', ''); setTimeout(() => process.exit(99), 30000); setInterval(() => { if (fs.existsSync('started-4') && fs.existsSync('started-5')) process.exit(${n}); }, 10)"`;
+  const { code, out } = await runPlan(
+    workflow([rendezvous(4), rendezvous(5)].join('\n')),
+    {
+      PREFLIGHT_JOBS: '3',
+    }
+  );
   assert.equal(code, 1);
   assert.match(out, /FAIL \(4\)/);
   assert.match(out, /FAIL \(5\)/);
-  assert.ok(Date.now() - started < 1400 + 3000);
 });
 
 test('commands inside a compound statement are excluded line by line', () => {

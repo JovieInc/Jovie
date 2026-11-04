@@ -29,6 +29,98 @@ const fixtureEnv = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
 );
 
+test('merged guards occupy only the existing fourth unit shard after exact-head tests', () => {
+  const steps = workflow.jobs.unit.steps;
+  const prepare = steps.findIndex(step => step.id === 'source_guard_merge');
+  const unit = steps.findIndex(
+    step => step.name === 'Run web unit tests related to the exact PR diff'
+  );
+  assert.ok(
+    prepare > unit,
+    'merged qualification must follow exact-head unit tests in their runner'
+  );
+  assert.equal(
+    workflow.jobs.deterministic.steps.some(
+      step => step.id === 'source_guard_merge'
+    ),
+    false
+  );
+  assert.equal(workflow.jobs.unit.permissions['pull-requests'], 'read');
+  assert.deepEqual(workflow.jobs.unit.strategy.matrix.shard, [
+    '1/4',
+    '2/4',
+    '3/4',
+    '4/4',
+  ]);
+  for (const step of steps.slice(prepare)) {
+    assert.match(step.if, /matrix\.shard == '4\/4'/, step.name);
+  }
+  assert.ok(workflow.jobs.ready.needs.includes('unit'));
+});
+
+test('metadata reuse and no unit diff still provision the guard shard only', () => {
+  const steps = workflow.jobs.unit.steps;
+  const names = [
+    'Checkout exact source head for unit and merged guard proofs',
+    'Fetch head and base history only',
+    'Setup Node.js and pnpm',
+    'Setup Playwright warm path',
+    'Prepare merged source guard generation',
+    guardName,
+  ];
+  for (const shard of workflow.jobs.unit.strategy.matrix.shard) {
+    for (const reuse of ['true', 'false']) {
+      for (const web of ['true', 'false']) {
+        const context = {
+          matrix: { shard },
+          steps: {
+            reuse: { outputs: { reuse } },
+            scope: { outputs: { web, ui: 'false', ovie: 'false' } },
+          },
+        };
+        for (const name of names) {
+          const step = steps.find(item => item.name === name);
+          assert.ok(step, name);
+          const transactionStep = name === guardName || name === names[4];
+          const setup = name === names[2] || name === names[3];
+          const expected =
+            shard === '4/4' ||
+            (!transactionStep &&
+              reuse !== 'true' &&
+              (!setup || web === 'true'));
+          assert.equal(
+            expression(step.if, context),
+            expected,
+            `${name}: ${shard}/${reuse}/${web}`
+          );
+        }
+        const unit = steps.find(
+          item =>
+            item.name === 'Run web unit tests related to the exact PR diff'
+        );
+        assert.equal(
+          expression(unit.if, context),
+          reuse !== 'true' && web === 'true'
+        );
+      }
+    }
+  }
+});
+
+test('other unit shards never mutate the checkout or execute merged guards', t => {
+  for (const shard of ['1/4', '2/4', '3/4']) {
+    const f = fixture(t, write => write('pnpm-lock.yaml', 'changed lock\n'));
+    const result = transaction(f, { shard });
+    assert.equal(result.failed, false, result.text);
+    assert.equal(f.guards().length, 0);
+    assert.deepEqual(
+      f.installs().map(row => row.phase),
+      ['initial']
+    );
+    assert.equal(f.git('status', '--porcelain'), '');
+  }
+});
+
 // Only the network/toolchain installation boundary is simulated. Every Git
 // transaction, workflow condition, guard shell and dependency receipt check
 // below executes the checked-in implementation.
@@ -258,7 +350,7 @@ function interpolate(value, context) {
 }
 
 function transaction(f, options = {}) {
-  const steps = workflow.jobs.deterministic.steps;
+  const steps = workflow.jobs.unit.steps;
   const start = steps.findIndex(step => step.id === 'source_guard_merge');
   const end = steps.findIndex(step => step.id === 'source_guard_proof');
   assert.ok(
@@ -274,6 +366,7 @@ function transaction(f, options = {}) {
   const posts = [];
   let failed = false;
   const context = {
+    matrix: { shard: options.shard ?? '4/4' },
     steps: state,
     github: {
       base_ref: 'main',
@@ -712,13 +805,14 @@ test('merge conflict is named without installing or qualifying a conflicted tree
   restored(f);
 });
 
-test('local tracked edits and untracked files survive without a merge or reinstall', t => {
+test('tracked edits left by unit tests fail closed and survive without a merge or reinstall', t => {
   const f = fixture(t, write => write('pnpm-lock.yaml', 'changed lock\n'));
   f.write('feature.txt', 'local work not committed\n');
   f.write('untracked.txt', 'local untracked work\n');
   const before = f.git('status', '--porcelain');
   const result = transaction(f);
-  assert.equal(result.failed, false, result.text);
+  assert.equal(result.failed, true, result.text);
+  assert.match(result.text, /Exact-head tests modified tracked source/);
   assert.equal(f.git('status', '--porcelain'), before);
   assert.equal(
     readFileSync(join(f.repo, 'feature.txt'), 'utf8'),
@@ -732,7 +826,7 @@ test('local tracked edits and untracked files survive without a merge or reinsta
     f.installs().map(row => row.phase),
     ['initial']
   );
-  assert.equal(f.guards()[0].dependencyInputDigest, f.headDigest);
+  assert.equal(f.guards().length, 0);
   assert.equal(
     validateDependencyWorkspace(f.repo).dependencyInputDigest,
     f.headDigest
