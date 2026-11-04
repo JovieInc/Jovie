@@ -231,6 +231,11 @@ class CadenceClocksTest(unittest.TestCase):
     def posts(self):
         return [call[-1] for call in self.calls if "POST" in call]
 
+    @unittest.skipUnless(
+        (ROOT / ".github/workflows").is_dir()
+        and (ROOT / "canon/automation-registry.jsonl").is_file(),
+        "release trees carry no workflows or automation registry",
+    )
     def test_daily_evidence_clocks_preserve_manual_runs_and_deadman_receipts(self):
         registry = {row["id"]: row for row in map(json.loads,
             (ROOT / "canon/automation-registry.jsonl").read_text().splitlines()) if "id" in row}
