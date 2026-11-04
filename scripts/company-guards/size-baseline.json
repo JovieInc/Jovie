@@ -734,7 +734,7 @@
   "apps/web/tests/unit/ci/deploy-workflow.test.ts": 5757,
   "apps/web/tests/unit/ci/ios-testflight-authorization.test.ts": 1698,
   "apps/web/tests/unit/ci/neon-endpoint-admission.test.ts": 768,
-  "apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts": 3181,
+  "apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts": 3196,
   "apps/web/tests/unit/ci/production-marker-state.test.ts": 2871,
   "apps/web/tests/unit/ci/production-release-staging.test.ts": 622,
   "apps/web/tests/unit/ci/runner-setup-action.test.ts": 1436,
