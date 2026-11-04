@@ -710,6 +710,25 @@ test('every step is either planned to run or skipped with a written reason', () 
   }
 });
 
+test('hosted partition retains merged guards in local preflight and rejects incomplete cleanup', () => {
+  const source = readFileSync(path.join(ROOT, WORKFLOW_PATH), 'utf8');
+  const steps = deriveSteps(source);
+  const guards = steps.filter(
+    step =>
+      step.name === 'Validate disk-read source contracts from trusted base'
+  );
+  assert.equal(guards.length, 1);
+  assert.equal(guards[0].skip, '');
+  assert.match(guards[0].run, /selectSourceGuards/);
+  assert.throws(
+    () =>
+      deriveSteps(
+        source.replace('id: source_guard_proof', 'id: missing_cleanup')
+      ),
+    /no cleanup proof/
+  );
+});
+
 test('the real Source Validation workflow yields the gates workers keep missing', () => {
   const steps = deriveSteps(
     readFileSync(path.join(ROOT, WORKFLOW_PATH), 'utf8')
