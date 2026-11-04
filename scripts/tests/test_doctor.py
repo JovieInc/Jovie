@@ -3239,8 +3239,7 @@ class SearchPopulationCoverageTest(unittest.TestCase):
             fetch_page=lambda lo, hi: {"issueCount": len(rows), "nodes": rows})
 
     def test_sparse_origin_emitter_does_not_import_the_merge_reader(self):
-        # Sparse emitters include the receipt writer helper. Reporting's
-        # optional merge reader must not expand the origin emitter dependency set.
+        # The receipt writer is in the sparse emitter. The merge reader must stay out of that set.
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             for relative in ("scripts/shipping_origin.py", "scripts/lanes/shipping_attribution.py",
