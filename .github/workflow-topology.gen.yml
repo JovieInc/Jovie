@@ -424,7 +424,7 @@ nodes:
     allowedConsumers:
       - Test Flakiness Report
     triggeringStateTransition:
-      - push
+      - repository_dispatch
       - workflow_dispatch
     terminalReceipt: job:notify
     jobCount: 3
@@ -848,7 +848,7 @@ nodes:
       - Lane Fix Relay
       - Test Flakiness Report
     triggeringStateTransition:
-      - push
+      - repository_dispatch
       - workflow_dispatch
     terminalReceipt: job:notify
     jobCount: 4
@@ -1465,7 +1465,7 @@ nodes:
     allowedConsumers:
       - SonarCloud
     triggeringStateTransition:
-      - push
+      - repository_dispatch
       - workflow_dispatch
     terminalReceipt: job:audit
     jobCount: 1
