@@ -145,6 +145,7 @@ describe('closed public signup (PUBLIC_SIGNUP_CLOSED)', () => {
   it('path 3: an invite link creates the account and enters the golden path', async () => {
     mocks.getCachedAuth.mockResolvedValue({ userId: 'user_invitee' });
     mocks.getCachedCurrentUser.mockResolvedValue({
+      emailVerified: true,
       emailAddresses: [{ emailAddress: 'invitee@example.com' }],
     });
     mocks.redeemWaitlistInviteToken.mockResolvedValue({
@@ -162,6 +163,10 @@ describe('closed public signup (PUBLIC_SIGNUP_CLOSED)', () => {
       })
     ).rejects.toThrow('NEXT_REDIRECT:/start?fresh_signup=true');
 
+    expect(mocks.getCachedAuth).toHaveBeenCalledWith({ session: 'fresh' });
+    expect(mocks.getCachedCurrentUser).toHaveBeenCalledWith({
+      session: 'fresh',
+    });
     expect(mocks.recordInviteOpened).toHaveBeenCalledWith('invite-token');
     expect(mocks.redeemWaitlistInviteToken).toHaveBeenCalledWith(
       expect.objectContaining({

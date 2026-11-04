@@ -90,11 +90,18 @@ describe('mounted homepage grid spine System B source contract', () => {
       path.join(webRoot, 'components/homepage/HomepageArtistProfile.css'),
       'utf8'
     );
-    // The hero shares the section shell's container: one gutter, one width.
+    // The centered hero and proof chapters share the canonical page container.
     const component = readFileSync(path.join(webRoot, componentPath), 'utf8');
     expect(component).toContain('<ArtistProfileSectionShell');
-    expect(component).toContain(
-      "containerClassName='homepage-discovery-hero__content'"
+    const hero = component.slice(
+      component.indexOf('export function HomepageArtistHero('),
+      component.indexOf('export function HomepageLoop(')
+    );
+    expect(hero).toMatch(
+      /<MarketingHero\s[^>]*variant='centered'[^>]*sectionVariant='centered-none'[^>]*>/
+    );
+    expect(hero).toMatch(
+      /<MarketingContainer\s+width='page'\s+className='homepage-discovery-hero__content'\s*>/
     );
     expect(component).not.toContain('SHOW_HOMEPAGE_HERO_LIGHT');
     expect(css).not.toMatch(/--homepage-page-gutter|--ds-public-content-max/);
