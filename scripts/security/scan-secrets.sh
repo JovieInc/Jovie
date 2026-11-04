@@ -145,11 +145,32 @@ run_gitleaks_checked() {
 }
 
 run_gitleaks_pre_commit() {
+  # These exact findings are public source/artifact SHA-256 values already on
+  # main, not credentials. A forward merge can stage those evidence records
+  # again. Gitleaks compares each baseline finding's path, rule, match, secret,
+  # and position; all other findings remain blocking. CI/history scans do not
+  # use this baseline.
+  local encoded baseline status
+  encoded="$(mktemp)"
+  baseline="$(mktemp)"
+  # Store the public baseline encoded because its literal match strings would
+  # themselves trigger the scanner. Decode only the pinned staged bytes.
+  if ! git show ':scripts/security/gitleaks-staged-public-digests.b64' >"$encoded" \
+    || ! node -e 'const fs = require("node:fs"); const crypto = require("node:crypto"); const text = fs.readFileSync(process.argv[1], "utf8").trim(); const bytes = Buffer.from(text, "base64"); if (bytes.toString("base64") !== text || crypto.createHash("sha256").update(bytes).digest("hex") !== "940e3fe1b1e76ced4011368f5a94d3fc4abc6016f22d2a6a458e4277141e0b75") process.exit(1); fs.writeFileSync(process.argv[2], bytes, {mode: 0o600});' "$encoded" "$baseline"; then
+    rm -f "$encoded" "$baseline"
+    echo '::error title=Secret scan baseline invalid::The staged public-digest baseline is missing or modified.' >&2
+    return 1
+  fi
+  rm -f "$encoded"
   echo "Running gitleaks protect on staged changes..."
+  status=0
   run_gitleaks_checked staged protect \
     --staged \
     --config "$REPO_ROOT/.gitleaks.toml" \
-    --verbose
+    --baseline-path "$baseline" \
+    --verbose || status=$?
+  rm -f "$baseline"
+  return "$status"
 }
 
 run_gitleaks_ci_pr() {

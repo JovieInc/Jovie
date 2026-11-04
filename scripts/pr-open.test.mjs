@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -585,7 +594,11 @@ test('open fills its new self URL after ordinary publication', async () => {
     const execute = (command, args) =>
       args[0] === 'log'
         ? okText('perf(ci): cheaper')
-        : fakeDiffRunner(command, args);
+        : args[0] === 'branch'
+          ? okText('fixture/source')
+          : args[0] === 'ls-remote'
+            ? okText(`${'c'.repeat(40)}\trefs/heads/fixture/source\n`)
+            : fakeDiffRunner(command, args);
     const github = (_cwd, args) => {
       if (args[1] === 'create')
         return okText('https://github.com/JovieInc/Jovie/pull/42');
@@ -648,3 +661,285 @@ test('draft resolves the current branch explicitly for gh --repo', async () => {
     cleanup();
   }
 });
+
+test('draft uses the remote base when local main is stale without borrowing upstream locked changes', async () => {
+  const { repo, cleanup } = localRepo();
+  const git = args => execFileSync('git', args, { cwd: repo, stdio: 'ignore' });
+  try {
+    git(['checkout', '-b', 'fixture/marketing-source']);
+    git(['branch', '-f', 'main', 'HEAD']);
+    mkdirSync(path.join(repo, 'apps/web/lib/auth'), { recursive: true });
+    writeFileSync(
+      path.join(repo, 'apps/web/lib/auth/current-main.ts'),
+      'export const current = true;\n'
+    );
+    git(['add', '.']);
+    git(['-c', 'core.hooksPath=/dev/null', 'commit', '-m', 'upstream auth']);
+    git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    mkdirSync(path.join(repo, 'scripts'), { recursive: true });
+    writeFileSync(
+      path.join(repo, 'scripts/marketing-source.test.mjs'),
+      'export const regression = true;\n'
+    );
+    git(['add', '.']);
+    git([
+      '-c',
+      'core.hooksPath=/dev/null',
+      'commit',
+      '-m',
+      'chore(marketing): current source',
+    ]);
+    const out = [];
+    const code = await main(
+      [
+        'draft',
+        '--repo',
+        repo,
+        '--base',
+        'main',
+        '--title',
+        'chore(marketing): current source',
+      ],
+      x => out.push(x),
+      {
+        github: () => ({
+          status: 1,
+          stdout: '',
+          stderr: 'no pull requests found',
+        }),
+        diagnose: () => {},
+      }
+    );
+    assert.equal(code, 0);
+    assert.match(out.join('\n'), /marketing-source.test.mjs/);
+    assert.doesNotMatch(
+      out.join('\n'),
+      /Locked areas|current-main.ts|canon-ownership-json/
+    );
+  } finally {
+    cleanup();
+  }
+});
+
+function publicationFixture(mode = 'normal') {
+  const root = mkdtempSync(path.join(tmpdir(), 'pr-open-publication-'));
+  const repo = path.join(root, 'repo');
+  const remote = path.join(root, 'remote.git');
+  const bin = path.join(root, 'bin');
+  const hooks = path.join(root, 'hooks');
+  const calls = path.join(root, 'gh.jsonl');
+  const pushes = path.join(root, 'pushes');
+  const guards = path.join(root, 'guards');
+  const env = { ...process.env };
+  // These owned Git fixtures must never inherit a hook's repository selectors.
+  for (const key of Object.keys(env))
+    if (key.startsWith('GIT_')) delete env[key];
+  const git = args =>
+    execFileSync('git', args, {
+      cwd: repo,
+      env,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+  mkdirSync(repo);
+  mkdirSync(bin);
+  mkdirSync(hooks);
+  try {
+    git(['init', '-b', 'main']);
+    git(['config', 'user.email', 'publication@example.invalid']);
+    git(['config', 'user.name', 'Publication fixture']);
+    git(['config', 'core.hooksPath', hooks]);
+    git(['init', '--bare', '-b', 'main', remote]);
+    mkdirSync(path.join(repo, 'scripts/lib'), { recursive: true });
+    writeFileSync(path.join(repo, '.gitignore'), 'packages/\n');
+    writeFileSync(
+      path.join(repo, 'scripts/lib/product-lane-classifier.mjs'),
+      "import fs from 'node:fs'; fs.appendFileSync(process.env.FIXTURE_GUARDS, 'classifier\\n');\n"
+    );
+    writeFileSync(
+      path.join(repo, 'scripts/check-changed-test-coverage.mjs'),
+      "import fs from 'node:fs'; fs.appendFileSync(process.env.FIXTURE_GUARDS, 'coverage\\n'); console.log(JSON.stringify({applicable:false}));\n"
+    );
+    git(['add', '.']);
+    git(['commit', '-m', 'chore: fixture base']);
+    git(['remote', 'add', 'origin', remote]);
+    git([
+      'config',
+      '--replace-all',
+      'remote.origin.fetch',
+      '+refs/heads/main:refs/remotes/origin/main',
+    ]);
+    git(['push', '-u', 'origin', 'main']);
+    const base = git(['rev-parse', 'HEAD']);
+    git(['checkout', '-b', 'feature/publication']);
+    writeFileSync(
+      path.join(repo, 'notes.txt'),
+      'documented publication fixture\n'
+    );
+    git(['add', '.']);
+    git(['commit', '-m', 'chore(docs): fixture publication']);
+    const head = git(['rev-parse', 'HEAD']);
+    if (mode === 'mismatch')
+      git(['push', 'origin', `${base}:refs/heads/feature/publication`]);
+    if (mode === 'detached') git(['checkout', '--detach', 'HEAD']);
+    mkdirSync(path.join(repo, 'packages'));
+    cpSync(
+      path.join(import.meta.dirname, '../packages/api-client'),
+      path.join(repo, 'packages/api-client'),
+      {
+        recursive: true,
+        filter: source => !source.split(path.sep).includes('node_modules'),
+      }
+    );
+    writeFileSync(
+      path.join(hooks, 'pre-push'),
+      `#!/usr/bin/env node
+require('node:fs').appendFileSync(process.env.FIXTURE_PUSHES, 'push\\n');
+`
+    );
+    chmodSync(path.join(hooks, 'pre-push'), 0o755);
+    writeFileSync(
+      path.join(bin, 'gh'),
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.FIXTURE_GH_CALLS, JSON.stringify(args) + '\\n');
+if (args[0] !== 'pr' || args[1] !== 'create') process.exit(2);
+if (!args.includes('--head')) {
+  console.error('aborted: you must first push the current branch to a remote, or use the --head flag'); process.exit(1);
+}
+if (args[args.indexOf('--head') + 1] !== 'feature/publication' || !args.includes('--draft')) process.exit(2);
+console.log('https://github.com/JovieInc/Jovie/pull/42');
+`
+    );
+    chmodSync(path.join(bin, 'gh'), 0o755);
+    // Keep the CLI's pre-existing homedir metrics writer inside this fixture,
+    // without changing HOME or any production path/authorization behavior.
+    const preload = path.join(root, 'isolated-metrics.mjs');
+    writeFileSync(
+      preload,
+      `import os from 'node:os';
+import { syncBuiltinESMExports } from 'node:module';
+os.homedir = () => process.env.FIXTURE_RECORD_HOME;
+syncBuiltinESMExports();
+`
+    );
+    const body = path.join(root, 'body.md');
+    writeFileSync(
+      body,
+      draftBody({
+        title: 'chore(docs): fixture publication',
+        files: [file('notes.txt', 'added')],
+        summary: 'Publishes an owned documentation fixture.',
+      })
+    );
+    Object.assign(env, {
+      PATH: [bin, path.dirname(process.execPath), env.PATH ?? ''].join(
+        path.delimiter
+      ),
+      FIXTURE_PUSHES: pushes,
+      FIXTURE_GUARDS: guards,
+      FIXTURE_GH_CALLS: calls,
+      FIXTURE_RECORD_HOME: path.join(root, 'record-home'),
+      JOVIE_API_STATE_DIR: path.join(root, 'api-state'),
+      JOVIE_GITHUB_CREDENTIAL: 'pr-open-publication-fixture',
+      GH_TOKEN: '',
+      GITHUB_TOKEN: '',
+    });
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        preload,
+        path.join(import.meta.dirname, 'pr-open.mjs'),
+        'open',
+        '--repo',
+        repo,
+        '--draft',
+        '--body-file',
+        body,
+        '--title',
+        'chore(docs): fixture publication',
+        ...(mode === 'normal' ? [] : ['--no-push']),
+      ],
+      { cwd: repo, env, encoding: 'utf8', timeout: 15_000 }
+    );
+    assert.ifError(result.error);
+    assert.equal(result.signal, null);
+    return {
+      root,
+      repo,
+      git,
+      result,
+      head,
+      calls: existsSync(calls)
+        ? readFileSync(calls, 'utf8')
+            .trim()
+            .split('\n')
+            .map(s => JSON.parse(s))
+        : [],
+      pushes: existsSync(pushes)
+        ? readFileSync(pushes, 'utf8').trim().split('\n')
+        : [],
+      guards: existsSync(guards) ? readFileSync(guards, 'utf8') : '',
+      cleanup: () => rmSync(root, { recursive: true, force: true }),
+    };
+  } catch (error) {
+    rmSync(root, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+test('actual new draft publication verifies the pushed head with a main-only fetch refspec', () => {
+  const f = publicationFixture();
+  try {
+    assert.equal(
+      f.git(['config', '--get-all', 'remote.origin.fetch']),
+      '+refs/heads/main:refs/remotes/origin/main'
+    );
+    assert.equal(
+      f
+        .git([
+          'ls-remote',
+          '--heads',
+          'origin',
+          'refs/heads/feature/publication',
+        ])
+        .split(/\s+/)[0],
+      f.head
+    );
+    assert.equal(f.pushes.length, 1, 'normal push hook runs exactly once');
+    assert.match(f.guards, /classifier/);
+    assert.match(f.guards, /coverage/);
+    assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
+    assert.equal(
+      f.calls.length,
+      1,
+      'create once after the single successful push'
+    );
+    assert.equal(
+      f.calls[0][f.calls[0].indexOf('--head') + 1],
+      'feature/publication'
+    );
+  } finally {
+    f.cleanup();
+  }
+});
+
+for (const mode of ['unknown', 'mismatch', 'detached']) {
+  test(`actual new draft publication refuses ${mode} intended head without creating or pushing`, () => {
+    const f = publicationFixture(mode);
+    try {
+      assert.notEqual(f.result.status, 0);
+      assert.equal(f.pushes.length, 0);
+      assert.equal(
+        f.calls.length,
+        0,
+        'refusal happens before the GitHub create call'
+      );
+      assert.match(f.result.stdout, /publication-head/);
+    } finally {
+      f.cleanup();
+    }
+  });
+}

@@ -1383,6 +1383,9 @@ describe('merge-group source revision mapping', () => {
 
 describe('failure classification and revision-scoped suppression', () => {
   it('classifies deterministic source checks separately from infrastructure', () => {
+    expect(classify('failure', ['Run lanes coverage pytest'])).toBe(
+      'deterministic-source'
+    );
     expect(classify('failure', ['Run structural ci-fast lane'])).toBe(
       'deterministic-source'
     );
