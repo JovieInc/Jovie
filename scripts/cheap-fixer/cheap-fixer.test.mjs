@@ -524,3 +524,81 @@ test('terminal receipts retain event identity and malformed-event failures', () 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('Jev verdict rejects missing, malformed and inherited labels', () => {
+  for (const result of [
+    null,
+    {},
+    { answers: {} },
+    { answers: { verdict: { type: 'text', choice: 'approve' } } },
+    { answers: { verdict: { type: 'choice', choice: 'constructor' } } },
+    { answers: { verdict: { type: 'choice', choice: '__proto__' } } },
+  ]) {
+    assert.deepEqual(interpretPatchVerdict(result), { invalid: true });
+  }
+});
+
+test('Jev approval requires finite confidence at the exact floor', () => {
+  const verdict = probability =>
+    interpretPatchVerdict({
+      answers: {
+        verdict: {
+          type: 'choice',
+          choice: 'approve',
+          probabilities: { approve: probability },
+        },
+      },
+    }).detail;
+  for (const probability of [
+    undefined,
+    null,
+    '1',
+    Number.NaN,
+    Infinity,
+    -Infinity,
+  ]) {
+    const detail = verdict(probability);
+    assert.equal(detail.decision.approved, false);
+    assert.equal(detail.decision.confidence, null);
+    assert.equal(detail.shadow, true);
+  }
+  const missing = interpretPatchVerdict({
+    answers: { verdict: { type: 'choice', choice: 'approve' } },
+  });
+  assert.equal(missing.detail.decision.approved, false);
+  for (const [probability, confidence, approved] of [
+    [-1, 0, false],
+    [0.799, 0.799, false],
+    [0.8, 0.8, true],
+    [2, 1, true],
+  ]) {
+    assert.equal(verdict(probability).decision.confidence, confidence);
+    assert.equal(verdict(probability).decision.approved, approved);
+  }
+});
+
+test('patch verdict requests reject absent diffs and bound untrusted diff bytes', () => {
+  const base = {
+    sourceSha: 'a'.repeat(40),
+    artifactSha256: 'b'.repeat(64),
+    failureClass: 'generated',
+    workflow: 'CI',
+    job: 'unit',
+    log: 'synthetic failure',
+  };
+  for (const diff of [undefined, null, '', '  ']) {
+    assert.throws(
+      () => preparePatchVerdictRequest({ ...base, diff }),
+      /diff required/
+    );
+  }
+  const prefix = '+' + 'x'.repeat(7999);
+  const request = preparePatchVerdictRequest({
+    ...base,
+    diff: prefix + 'OUTSIDE_BOUND',
+  });
+  const diff = request.state.split('\nPROPOSED DIFF:\n')[1];
+  assert.equal(Buffer.byteLength(diff), 8000);
+  assert.equal(diff, prefix);
+  assert.equal(request.questions.verdict.type, 'choice');
+});
