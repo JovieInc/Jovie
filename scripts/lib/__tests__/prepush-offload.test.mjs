@@ -9,8 +9,9 @@ import {
 } from '../prepush-offload.mjs';
 
 test('load above cores x 1.5 offloads to Gem; at or below stays local', () => {
-  assert.equal(chooseMode({ load: 16, cores: 10 }), 'remote');
-  assert.equal(chooseMode({ load: 15, cores: 10 }), 'local');
+  // Explicit env: ambient CI in agent hosts would force local via process.env.
+  assert.equal(chooseMode({ load: 16, cores: 10, env: {} }), 'remote');
+  assert.equal(chooseMode({ load: 15, cores: 10, env: {} }), 'local');
   assert.equal(chooseMode({ load: 50, cores: 10, env: { CI: '1' } }), 'local');
   assert.equal(
     chooseMode({ load: 1, cores: 10, env: { JOVIE_PREPUSH_REMOTE: '1' } }),
