@@ -9,17 +9,35 @@
  */
 export const DEPTH_VAR = 'JOVIE_PREFLIGHT_DEPTH';
 
+/**
+ * @param {string} name
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {string | null}
+ */
 export function nestedPreflightMessage(name, env = process.env) {
   if (!env[DEPTH_VAR]) return null;
   return `[${name}] refusing to run: nested preflight (${DEPTH_VAR}=${env[DEPTH_VAR]}). A preflight check re-entered a preflight or the pre-push gate; fix the caller.`;
 }
 
-/** Environment for children of a preflight: marks them as nested. */
+/**
+ * Environment for children of a preflight: marks them as nested.
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {NodeJS.ProcessEnv}
+ */
 export function withPreflightDepth(env = process.env) {
-  return { ...env, [DEPTH_VAR]: String(Number(env[DEPTH_VAR] || 0) + 1) };
+  /** @type {NodeJS.ProcessEnv} */
+  const next = { ...env };
+  next[DEPTH_VAR] = String(Number(env[DEPTH_VAR] || 0) + 1);
+  return next;
 }
 
-/** CLI-entrypoint guard: returns an exit code when nested, else null. */
+/**
+ * CLI-entrypoint guard: returns an exit code when nested, else null.
+ * @param {string} name
+ * @param {NodeJS.ProcessEnv} [env]
+ * @param {(message: string) => void} [err]
+ * @returns {1 | null}
+ */
 export function guardNested(name, env = process.env, err = console.error) {
   const message = nestedPreflightMessage(name, env);
   if (!message) return null;
