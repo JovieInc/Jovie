@@ -521,7 +521,9 @@ test('timeout terminates descendants that retain preflight output pipes', {
   let stopped = false;
   let watchdog;
   try {
-    const started = Date.now();
+    // Promptness is the race against this 2000ms watchdog. A Date.now()
+    // delta flakes on a loaded runner after the race has already been won
+    // (JOV-10086, merge group 41739789064).
     const result = await Promise.race([
       sh(`sleep 30 & echo $! > "${pidFile}"; echo started; exit 0`, {
         cwd: directory,
@@ -532,7 +534,11 @@ test('timeout terminates descendants that retain preflight output pipes', {
         (_, reject) =>
           (watchdog = setTimeout(
             () =>
-              reject(new Error('preflight timeout left its output pipe open')),
+              reject(
+                new Error(
+                  'timeout must settle promptly: preflight timeout left its output pipe open'
+                )
+              ),
             2000
           ))
       ),
@@ -543,7 +549,6 @@ test('timeout terminates descendants that retain preflight output pipes', {
       0,
       'timed-out work must fail even if its shell exited zero'
     );
-    assert.ok(Date.now() - started < 2000, 'timeout must settle promptly');
     assert.match(result.out, /started/);
     const deadline = Date.now() + 1000;
     while (!stopped && Date.now() < deadline) {

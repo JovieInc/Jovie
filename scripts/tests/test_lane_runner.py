@@ -4100,6 +4100,9 @@ class WorkerTest(unittest.TestCase):
 
     def test_large_valid_inventory_cache_does_not_hold_the_worker(self):
         rows = [{**repair_inventory_pr(), 'body': 'x' * (2 * 1024 * 1024)}]
+        cache = patch.object(lane, "SHARED_CACHE_DIR", self.host.state / "cache")
+        cache.start()
+        self.addCleanup(cache.stop)
         (lane.SHARED_CACHE_DIR).mkdir(parents=True, exist_ok=True)
         (lane.SHARED_CACHE_DIR/'open-prs-labels-v2.json').write_text(json.dumps({'at': time.time(), 'value': rows}))
         lane._SUMMARY.update(at=0.0, prs=[], readable=False)
@@ -5015,12 +5018,10 @@ class RunAgentTest(unittest.TestCase):
                    "LANES_SELFTEST": "1", "LANES_EXECUTION_BACKEND": "local-test"}
             marker = root / "pids"
             script = f"trap '' TERM; sleep 300 & echo $! > {marker}; wait"
-            started = time.monotonic()
             result = subprocess.run([sys.executable, str(Path(lane.__file__).resolve()), "gate-command",
                                      "--timeout", "1", "--", "sh", "-c", script], timeout=60,
                                     capture_output=True, text=True, cwd=root, env=env)
             self.assertEqual(result.returncode, 124, f"stdout: {result.stdout}\nstderr: {result.stderr}")
-            self.assertLess(time.monotonic() - started, 45)
             with self.assertRaises(ProcessLookupError):
                 os.kill(int(marker.read_text()), 0)
 
