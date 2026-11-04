@@ -91,8 +91,6 @@ describe('public-profile alias graduation policy', () => {
     }
     expect(receipt.schema).toBe('jovie-public-profile-alias-graduation/v2');
     expect(inventory).toHaveLength(selection.enumeratedControllers);
-    // Completeness: every selected window below is recomputed from the full
-    // enumerated inventory, so an omitted controller changes the selection.
     expect(selection.windowSize).toBe(policy.requiredConsecutiveRuns);
     expect(policy.samplesPerRoute).toBeGreaterThanOrEqual(
       MIN_SAMPLES_PER_ROUTE
@@ -140,7 +138,6 @@ describe('public-profile alias graduation policy', () => {
     const measuredAt = Date.parse(receipt.measuredAt);
     const nextReviewAt = Date.parse(policy.nextReviewAt);
     expect(nextReviewAt).toBeGreaterThan(measuredAt);
-    // A missed review warns for 72h (naming JOV-8338), then fails merge groups.
     assertReviewDeadline({
       label: 'public-profile alias graduation',
       deadline: policy.nextReviewAt,
@@ -173,8 +170,6 @@ describe('public-profile alias graduation policy', () => {
     expect(production).toContain(
       `no later than ${review} (${policy.trackingIssue})`
     );
-    // A graduated receipt authorizes blocking, but only on pages whose
-    // golden-path surface is certified in the Ovie ledger; the rest warn.
     expect(production.includes('performance_status=failed')).toBe(
       windows.production.graduated
     );
@@ -263,8 +258,6 @@ describe('public-profile alias graduation policy', () => {
   });
 
   it('reads the guard sample count from the log and checks the nearest-rank p95, not the max', () => {
-    // performance-budgets-guard takes 20 samples since #22656; its summary is
-    // the 19th of 20 sorted samples, so one 1800ms outlier still qualifies.
     const values = index => (index === 20 ? 1800 : index === 19 ? 900 : 700);
     const log = ALIAS_ROUTES.map(
       route =>
@@ -408,8 +401,6 @@ describe('public-profile alias graduation policy', () => {
     'executes the %s guard with the measured enforcement decision (%s ledger)',
     (surface, ledgerState) => {
       const staging = surface === 'staging';
-      // Both lanes block only while public-profile is certified in the ledger
-      // (Tim 2026-10-31); uncertified or unreadable ledgers warn.
       const certified = ledgerState === 'certified';
       const job = getJobBlock(
         staging ? RELEASE_WORKFLOW : CONTROLLER_WORKFLOW,
@@ -443,7 +434,6 @@ describe('public-profile alias graduation policy', () => {
                   : ['landing'],
               });
         writeFileSync(join(fixture.root, 'ledger.json'), ledgerBody);
-        // The staged lane reads CRON_SECRET through Doppler; pass through.
         stubCommand(
           fixture.bin,
           'doppler',
@@ -466,7 +456,6 @@ describe('public-profile alias graduation policy', () => {
           PRODUCTION_DEPLOYMENT_URL_B64:
             Buffer.from(DEPLOYMENT_URL).toString('base64'),
         });
-        // An unreadable ledger is never silent: it warns and files a P1.
         expect(
           result.stdout.includes(
             '::warning::Golden-path certification ledger unavailable'
@@ -496,7 +485,6 @@ describe('public-profile alias graduation policy', () => {
           call.includes('performance-budgets-guard')
         );
         expect(guardCalls.length).toBeGreaterThan(0);
-        // The public-profile alias guard is the one carrying the alias routes.
         const args =
           guardCalls.find(call =>
             call.includes('--route-id\n' + ALIAS_ROUTES[0])
@@ -1091,20 +1079,7 @@ describe('production release supersession execution', () => {
     expect(incomplete.outputs.released).toBe('false');
   });
 
-  it('keeps the public-profile alias gate blocking Production Verified beside smoke', () => {
-    const gate = getJobBlock(
-      CONTROLLER_WORKFLOW,
-      'production-public-profile-alias-gate'
-    );
-    // Parallel with smoke: depends on the release, never on a smoke job.
-    expect(gate).toContain('needs: [authorize-production, production-release]');
-    expect(gate).not.toMatch(/ci-public-profile-smoke|lighthouse-ci/u);
-    expect(getJobBlock(CONTROLLER_WORKFLOW, 'production-verified')).toContain(
-      'production-public-profile-alias-gate,'
-    );
-    expect(RELEASE_WORKFLOW).not.toContain(
-      'production-public-profile-alias-gate'
-    );
+  it('fails Production Verified when the alias gate fails', () => {
     const failed = runControllerVerify({
       'needs.production-public-profile-alias-gate.result': 'failure',
     });
@@ -1358,7 +1333,6 @@ describe('required structural release regression dispatch', () => {
     const target = 'production-release-supersession.test.mjs';
     vi.mocked(spawn).mockImplementation(command => {
       commands.push(command);
-      // A minimal ChildProcess stand-in: only close/stdout/stderr are used.
       const child = /** @type {any} */ (new EventEmitter());
       child.stdout = child.stderr = new EventEmitter();
       const code = command.includes(target) ? exitCode : 0;

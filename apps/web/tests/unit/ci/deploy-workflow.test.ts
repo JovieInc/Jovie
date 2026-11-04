@@ -1690,9 +1690,6 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(aliasGate).toContain('setup-playwright');
     expect(aliasGate).toContain('--base-url https://jov.ie');
     expect(aliasGate).toContain('--runs 5');
-    // The 2026-10-31 receipt graduated production alias budgets (14/14,
-    // JOV-8737), but a miss blocks only on routes whose golden-path surface
-    // holds a current certification in the Ovie ledger; the rest warn.
     expect(aliasGate).toContain('id: alias-perf');
     expect(aliasGate).toContain('scripts/performance-budgets-guard.ts');
     expect(aliasGate).toContain(
@@ -1724,10 +1721,6 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       stagedPerformanceGate.indexOf('public_profile_budget_lane() {'),
       stagedPerformanceGate.indexOf('entry_route_lighthouse_lane() {')
     );
-    // JOV-8338 graduated the exact staged-build budget (staging 14/14). Like
-    // the post-promotion gate (#24006, Tim 2026-10-31), it blocks only routes
-    // whose golden-path surface is certified in the Ovie ledger; uncertified
-    // routes warn and file one Linear perf ticket.
     expect(stagedPublicProfileGate).toContain(
       'scripts/lib/alias-gate-certified-routes.mjs'
     );
