@@ -366,7 +366,7 @@ function fixtureRelayClient(body, config = {}) {
         status: config.status ?? 200,
         headers: new Headers(),
         text: config.text ?? JSON.stringify(body),
-        fromCache: false,
+        fromCache: null,
         attempts: 1,
         json: () => JSON.parse(JSON.stringify(body)),
       };
@@ -526,6 +526,7 @@ test('shared relay rejects missing credentials, failed responses, truncation and
       ),
     }),
     error => {
+      assert.ok(error instanceof Error);
       assert.equal(error.message, `workers-ai relay 503: ${'x'.repeat(200)}`);
       return true;
     }

@@ -161,7 +161,7 @@ export async function callRelay({
   schemaName = 'audience_judgement',
   timeoutMs = 300_000,
   maxTokens = MAX_OUTPUT_TOKENS,
-  baseUrl,
+  baseUrl = undefined,
   env = process.env,
   createClient = createApiClient,
 }) {
@@ -218,7 +218,7 @@ export async function callRelay({
  * contaminated sample is recorded in `failures` and excluded; callers
  * abstain when too few coherent samples remain.
  * @param {{ model: string, prompt: string, content: any[], schema: object, samples?: number,
- *   parse?: (answer: any) => any, call?: typeof callRelay, timeoutMs?: number, schemaName?: string }} options
+ *   parse?: (answer: any) => any, call?: typeof callRelay, timeoutMs?: number, schemaName?: string, maxTokens?: number }} options
  */
 export async function sampleJudge({
   model,

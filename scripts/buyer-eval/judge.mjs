@@ -113,7 +113,7 @@ export async function judgeBuyer({
   samples = DEFAULT_SAMPLES,
   model = STRONG_MODEL,
   timeoutMs = 600_000,
-  call,
+  call = undefined,
   encode = encodeFrames,
 }) {
   // Tier A archetypes (and Tier B on a walk that is not their own) watch a
