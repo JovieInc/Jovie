@@ -44,14 +44,6 @@ export {
   getPaidWelcomeSubject,
   getPaidWelcomeText,
 } from './paid-welcome';
-export type { ProductUpdateTemplateData } from './product-update';
-export {
-  getProductUpdateEmail,
-  getProductUpdateHtml,
-  getProductUpdateSubject,
-  getProductUpdateText,
-  getProductUpdateUnsubscribeHeaders,
-} from './product-update';
 export type { TipThankYouTemplateData } from './tip-thank-you';
 export {
   getTipThankYouEmail,
