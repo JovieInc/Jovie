@@ -140,6 +140,12 @@
   font-size: var(--text-sm);
 }
 
+@media (max-width: 23.99rem) {
+  .homepage-discovery-hero h1 {
+    font-size: calc(var(--text-4xl) - var(--space-1));
+  }
+}
+
 @media (min-width: 64rem) {
   /* OxwR1 saved master: 200px top, 48px bottom. Height grows with the
      live discovery and closed-signup controls instead of cropping them. */

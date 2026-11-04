@@ -181,6 +181,14 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
       ),
       'font-size'
     );
+    const compact = cssBlock(
+      home.slice(home.indexOf('@media (max-width: 23.99rem)')),
+      '.homepage-discovery-hero h1'
+    );
+    expect(compact).toContain('calc(var(--text-4xl) - var(--space-1))');
+    const compactSize =
+      toPx('var(--text-4xl)', tokenTable()) -
+      toPx('var(--space-1)', tokenTable());
 
     expect(headline.min).toBeGreaterThan(support.min);
     expect(headline.max).toBeGreaterThan(support.max);
@@ -191,6 +199,9 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
       MIN_DOMINANCE_RATIO
     );
     expect(desktop.min / support.max).toBeGreaterThanOrEqual(
+      MIN_DOMINANCE_RATIO
+    );
+    expect(compactSize / support.max).toBeGreaterThanOrEqual(
       MIN_DOMINANCE_RATIO
     );
     expect(desktop).toEqual({ min: 80, max: 80 });

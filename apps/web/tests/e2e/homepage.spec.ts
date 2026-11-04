@@ -263,6 +263,7 @@ test.describe('Homepage', () => {
     page,
   }) => {
     for (const viewport of [
+      { width: 320, height: 406 },
       { width: 390, height: 844 },
       { width: 768, height: 1024 },
       { width: 1440, height: 900 },
@@ -286,7 +287,9 @@ test.describe('Homepage', () => {
     }
   });
 
-  test('aligns the hero with the shared section spine', async ({ page }) => {
+  test('centers the locked hero inside the shared section spine', async ({
+    page,
+  }) => {
     for (const viewport of [
       { width: 390, height: 844 },
       { width: 768, height: 1024 },
@@ -296,21 +299,47 @@ test.describe('Homepage', () => {
       await gotoHomepage(page);
       const geometry = await page.evaluate(() => {
         const heading = document.querySelector('main h1');
+        const heroContainer = document.querySelector(
+          '.homepage-discovery-hero__content'
+        );
+        const subhead = document.querySelector(
+          '.homepage-discovery-hero__subhead'
+        );
         const container = document.querySelector(
           '[data-testid="marketing-section-how-it-works"] .ap-section-container'
         );
-        if (!heading || !container) {
+        if (!heading || !heroContainer || !subhead || !container) {
           throw new Error('The hero and the profile chapter must render');
         }
         return {
-          headingLeft: heading.getBoundingClientRect().x,
+          headingCenter:
+            heading.getBoundingClientRect().x +
+            heading.getBoundingClientRect().width / 2,
+          viewportCenter: innerWidth / 2,
+          headingWidth: heading.getBoundingClientRect().width,
+          headingFontSize: getComputedStyle(heading).fontSize,
+          subheadFontSize: getComputedStyle(subhead).fontSize,
+          heroSpineLeft: heroContainer.getBoundingClientRect().x,
+          heroSpineWidth: heroContainer.getBoundingClientRect().width,
           spineLeft: container.getBoundingClientRect().x,
+          spineWidth: container.getBoundingClientRect().width,
         };
       });
       expect(
-        Math.abs(geometry.headingLeft - geometry.spineLeft),
+        Math.abs(geometry.heroSpineLeft - geometry.spineLeft),
         `${viewport.width}px: ${JSON.stringify(geometry)}`
       ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(geometry.heroSpineWidth - geometry.spineWidth)
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(geometry.headingCenter - geometry.viewportCenter)
+      ).toBeLessThanOrEqual(1);
+      expect(geometry.subheadFontSize).toBe('16px');
+      if (viewport.width === 1440) {
+        expect(geometry.headingFontSize).toBe('80px');
+        expect(geometry.headingWidth).toBe(1040);
+      }
     }
   });
 
