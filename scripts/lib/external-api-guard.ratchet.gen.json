@@ -67,9 +67,6 @@
     ".github/scripts/dependency-parity-evidence.mjs": {
       "gh-subprocess": 1
     },
-    ".github/scripts/internal-pr-review.mjs": {
-      "provider-host": 2
-    },
     ".github/scripts/mac-lane.sh": {
       "gh-shell": 1
     },
@@ -165,12 +162,6 @@
     ".github/workflows/pr-conflict-handler.yml": {
       "gh-shell": 25
     },
-    ".github/workflows/pr-review-learn.yml": {
-      "gh-shell": 2
-    },
-    ".github/workflows/pr-review.yml": {
-      "gh-shell": 2
-    },
     ".github/workflows/pr-size-guard-label-override.yml": {
       "gh-shell": 1
     },
@@ -184,7 +175,7 @@
       "gh-shell": 6
     },
     ".github/workflows/production-controller.yml": {
-      "gh-shell": 17
+      "gh-shell": 16
     },
     ".github/workflows/production-marker-recovery.yml": {
       "gh-shell": 4
@@ -606,9 +597,6 @@
     },
     "scripts/pr-conflict-handler.mjs": {
       "gh-subprocess": 1
-    },
-    "scripts/pr-review/cli.mjs": {
-      "provider-host": 1
     },
     "scripts/pr-size-guard-label-override.mjs": {
       "gh-subprocess": 1

@@ -432,7 +432,8 @@ class SecretHygieneTest(unittest.TestCase):
             # "selftest-skipped" before running the job (merge group 40193646918, 12:42Z).
             os.environ.pop("LANES_SELFTEST", None)
             os.environ.pop("LANES_EXECUTION_BACKEND", None)
-            result = credentials_spend.tick(state, release, run=run, now=NOW, linear_token=lambda _s: FAKE_SECRET)
+            result = credentials_spend.tick(state, release, run=run, now=NOW,
+                                            home=Path(tmp.name), linear_token=lambda _s: FAKE_SECRET)
         self.assertEqual(result["status"], "ok")
         self.assertEqual(captured["env"]["LINEAR_ACCESS_TOKEN"], FAKE_SECRET)  # the child did get it
         for path in state.rglob("*"):
