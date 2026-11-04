@@ -4,7 +4,8 @@
  *
  *   pnpm --filter @jovie/web agent-path:cert -- --base https://jov.ie [--query "Tim White"] [--release-url <url>] [--out receipt.json]
  *
- * Exit 1 on any FAIL, 75 when only RATE_LIMITED stopped the run, 2 on a fatal error.
+ * This RPC probe does not yet exercise claim persistence or fixture cleanup.
+ * Exit 1 on any FAIL or incomplete check, 75 on RATE_LIMITED, 2 on a fatal error.
  */
 import { writeFile } from 'node:fs/promises';
 import { runCert } from '@/lib/agent-distribution/cert-run';

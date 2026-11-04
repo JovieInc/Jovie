@@ -86,12 +86,18 @@ CLOCKS = (
     # Hourly stateless probe of Summer's fast chat path through production (P0 2026-10-25).
     Clock("summerCanary", "ovie-summer-canary.yml", "clock_summer_canary", 3600,
           "summer-canary-clock.json", github_cron=False),
+    # Weekly re-measure of the published jov.ie vs Linktree claims; flags any that stopped being true.
+    Clock("vsLinktreeClaims", "vs-linktree-claims.yml", "clock_vs_linktree_claims", 7 * 86400,
+          "vs-linktree-claims-clock.json", github_cron=False),
     # Production golden-path certification freshness (JOV-9822): consumers need all eight
     # surfaces green on the served SHA within 24 h. Promotions certify on workflow_run; this
     # 12 h clock covers quiet days. workflow_run runs are mostly neutral, so they never count.
     Clock("prodGoldenPathCert", "postdeploy-probes.yml", "clock_prod_golden_path_cert", 12 * 3600,
           "prod-golden-path-cert-clock.json", github_cron=False,
           ignored_events=frozenset({"workflow_run"})),
+    # Hourly Vercel budget forecast and runtime-log signatures (2026-10-29 pause went unwarned ~1 h).
+    Clock("spendGuard", "spend-guard.yml", "clock_spend_guard", 3600,
+          "spend-guard-clock.json", github_cron=False),
 )
 CONTINUITY = CLOCKS[0]
 

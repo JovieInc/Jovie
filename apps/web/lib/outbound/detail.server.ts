@@ -7,6 +7,7 @@ import type { ContactCertificationInspection } from '@/lib/contacts/certificatio
 import { contactDedupeKey } from '@/lib/contacts/lifecycle';
 import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
+import { resolveLeadClaimToken } from '@/lib/leads/lead-claim-token';
 import {
   type OutboundLeadIdentity,
   recordOutboundDecision,
@@ -29,13 +30,23 @@ export async function loadOutboundLead(
       contactEmail: leads.contactEmail,
       instagramHandle: leads.instagramHandle,
       creatorProfileId: leads.creatorProfileId,
-      claimToken: leads.claimToken,
+      claimTokenHash: leads.claimTokenHash,
+      claimTokenExpiresAt: leads.claimTokenExpiresAt,
       avatarUrl: leads.avatarUrl,
     })
     .from(leads)
     .where(eq(leads.id, leadId))
     .limit(1);
-  return lead ?? null;
+  if (!lead) return null;
+  const { claimTokenHash, claimTokenExpiresAt, ...identity } = lead;
+  return {
+    ...identity,
+    claimToken: await resolveLeadClaimToken({
+      id: lead.id,
+      claimTokenHash,
+      claimTokenExpiresAt,
+    }),
+  };
 }
 
 /** The JOV-7321 per-fact inspection for the lead's canonical contact. */

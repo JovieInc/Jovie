@@ -282,6 +282,26 @@ test('5: real locked paths require a GBrain or locking PR reference', () => {
   );
 });
 
+test('test-quality ratchet config stays locked until the body cites the lock', () => {
+  const path = 'scripts/test-quality/ratchets.json';
+  assert.equal(isLockedArea(path), true);
+  const bare = check(pr(), [file(path)]);
+  assert.ok(
+    bare.errors.some(
+      error => error.startsWith('locked-areas:') && error.includes(path)
+    )
+  );
+  assert.deepEqual(
+    check(
+      pr({
+        body: `${proof}\n## Locked areas\nGBrain: decisions/guardrail-ratchet-intent-discovery-20260624\nLocking PR: #22870`,
+      }),
+      [file(path)]
+    ).errors,
+    []
+  );
+});
+
 const event = {
   repository: { full_name: 'JovieInc/Jovie' },
   pull_request: { number: 1, head: { sha: 'a'.repeat(40) } },
@@ -337,6 +357,20 @@ test('runner: reads current paginated PR evidence, rejects stale/incomplete read
   );
 });
 
+test('runner: a path whose type changed (symlink to file) appears twice but counts once', async () => {
+  const typeChanged = [
+    file('AGENTS.md', { status: 'removed' }),
+    file('AGENTS.md', { status: 'added' }),
+    file('CLAUDE.md', { status: 'removed' }),
+    file('CLAUDE.md', { status: 'added' }),
+  ];
+  const request = async path =>
+    path.includes('/files?')
+      ? typeChanged
+      : { ...pr(), number: 1, head: event.pull_request.head, changed_files: 2 };
+  assert.equal((await runFleetRules({ event, request })).errors.length, 0);
+});
+
 test('workflow: GITHUB_TOKEN read-only, non-blocking warning step, source required aggregate includes fleet', () => {
   const source = readFileSync(
     '.github/workflows/source-validation.yml',
@@ -349,7 +383,7 @@ test('workflow: GITHUB_TOKEN read-only, non-blocking warning step, source requir
   assert.match(readyJob, /name: Require fleet-rule evidence/);
   // Trust the evidence workflow's runs (only main's copy can produce them),
   // never a commit status any branch could post.
-  assert.match(readyJob, /fleet-rules-evidence\.yml\/runs\?head_sha=/);
+  assert.match(readyJob, /fleet-rules-evidence\.yml\/runs\?branch=/);
   assert.match(readyJob, /event=pull_request_target/);
   assert.doesNotMatch(readyJob, /\/statuses/);
   assert.match(
@@ -1189,6 +1223,7 @@ test('fleet policy regressions run before workspace dependencies are installed',
       'scripts/pr-fleet-rules.test.mjs',
       'scripts/pr-fleet-rules.mjs',
       'scripts/lib/workflow-token-budget.mjs',
+      'scripts/lib/wins-ledger.mjs',
       'packages/api-client',
       '.github/workflows/source-validation.yml',
       '.github/workflows/fleet-rules-evidence.yml',
