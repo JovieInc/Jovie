@@ -62,9 +62,14 @@ export function evidenceMatches(ev, { sha, tree }) {
  * local -> gem -> actions. Local when local load is fine; else Gem when its
  * load (1m / cores) is fine; else GitHub-hosted runners. gem null = unreadable.
  */
-export function chooseBackend({ load, cores, gem = null, env = {} }) {
+export function chooseBackend({
+  load,
+  cores,
+  gem = null,
+  env = /** @type {NodeJS.ProcessEnv} */ ({}),
+}) {
   const forced = env.JOVIE_PREPUSH_BACKEND;
-  if (['local', 'gem', 'actions'].includes(forced)) return forced;
+  if (forced && ['local', 'gem', 'actions'].includes(forced)) return forced;
   if (chooseMode({ load, cores, env }) === 'local') return 'local';
   if (gem && gem.cores && gem.load <= gem.cores * 1.5) return 'gem';
   return 'actions';

@@ -76,6 +76,7 @@ test('bundle mode fetches the shipped bundle and emits sha+tree evidence', () =>
     originUrl: 'git@github.com:JovieInc/Jovie.git',
     slots: 2,
     forward: ['--fast'],
+    bodyB64: '',
     bundle: true,
   });
   assert.match(s, /\.bundles\/b{40}\.bundle/);
