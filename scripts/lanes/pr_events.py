@@ -442,12 +442,17 @@ RED_CHECK_STATES = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR"
 NON_REQUIRED_CHECKS = frozenset({"tently"})
 
 
+def read_head_rollup(number: int, sh=run):
+    """One GraphQL read of the head check rollup. Callers own True, False, and None."""
+    owner, name = REPO.split("/", 1)
+    return sh(["gh", "api", "graphql", "-f", f"query={HEAD_CHECKS_QUERY}", "-F", f"owner={owner}",
+               "-F", f"name={name}", "-F", f"number={number}"])
+
+
 def head_red(number: int, sh=run) -> bool | None:
     """True only when the latest run of some check on the head failed. GitHub's rollup counts
     a CANCELLED (superseded) run as FAILURE even after its replacement passed. None: unreadable."""
-    owner, name = REPO.split("/", 1)
-    read = sh(["gh", "api", "graphql", "-f", f"query={HEAD_CHECKS_QUERY}", "-F", f"owner={owner}",
-               "-F", f"name={name}", "-F", f"number={number}"])
+    read = read_head_rollup(number, sh)
     try:
         commits = json.loads(read.stdout)["data"]["repository"]["pullRequest"]["commits"]["nodes"]
         nodes = ((commits[0]["commit"].get("statusCheckRollup") or {}).get("contexts") or {})["nodes"]
@@ -473,9 +478,7 @@ def head_settled_green(number: int, sh=run) -> bool:
     Pending, failed, cancelled, or unreadable is not green. The next check
     completion is the event that asks again; this does not sleep or poll.
     """
-    owner, name = REPO.split("/", 1)
-    read = sh(["gh", "api", "graphql", "-f", f"query={HEAD_CHECKS_QUERY}", "-F", f"owner={owner}",
-               "-F", f"name={name}", "-F", f"number={number}"])
+    read = read_head_rollup(number, sh)
     try:
         commits = json.loads(read.stdout)["data"]["repository"]["pullRequest"]["commits"]["nodes"]
         nodes = ((commits[0]["commit"].get("statusCheckRollup") or {}).get("contexts") or {})["nodes"]

@@ -188,6 +188,9 @@ test('a CI success clears a settled lane-fix-red without sleeping', () => {
     ).env.MODE,
     'relay'
   );
+  assert.equal(job['runs-on'], 'ubuntu-24.04');
+  const mint = job.steps.find(step => step.id === 'read-token');
+  assert.equal(mint['continue-on-error'], undefined);
 });
 
 test('a red check wakes the lane host immediately', () => {
