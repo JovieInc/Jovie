@@ -11,11 +11,10 @@ It covers lanes, Codex, Conductor, Claude-scratch and manual `jovie-wt-*` checko
 - A checkout retires when its branch's PR closed or merged (after a short grace), or when it
   has been idle for `idle_s`. Idle is the newest reflog entry or dirty-file mtime, never the
   directory mtime (git status and maintenance bump those).
-- Dirty or unpushed state is first committed off-index (`commit-tree`, no hooks, the
-  checkout is untouched) and pushed as `refs/jovie-preserved/sweep/<host>/<name>-<date>-<snapshot>`
-  (never a branch). A snapshot that is not proven secret-free is not published and the
-  checkout stays untouched. If the push fails, the checkout stays and loses only
-  regenerable build output.
+- Dirty or unpushed state is first committed off-index (`commit-tree`, the checkout
+  is untouched) and preserved only in the verified private archive, with full parent
+  history. Explicit archive credentials, private repository metadata and exact remote
+  readback are required. A clean secret scan alone never permits publication.
 - Preserved repairs (`.jovie-preserved-repair.json`) expire once their PR is closed or
   after `preserved_ttl_s`, through the same backup-then-remove path.
 - Standalone clones (own `.git` directory: ship workspaces, `bindings/*/worktrees/*`,
@@ -32,6 +31,7 @@ import fcntl
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -59,8 +59,8 @@ BUILD_DIRS = frozenset({"node_modules", ".next", ".turbo", "test-results", ".bui
                         ".pnpm-store", ".pnpm-store-private"})
 # Retired Elixir workspaces used this private store. Keep its cache bytes out of backups.
 LEGACY_PRIVATE_STORE = ".symphony/package-cache/pnpm-store"
-# Generated outputs and archive blobs never belong in a snapshot: JovieInc/Jovie is public and
-# refs/jovie-preserved/* is fetchable. On 2026-10-09 an `add -A` snapshot carried 1.3 GB of
+# Generated outputs and archive blobs never belong in a source snapshot.
+# On 2026-10-09 an `add -A` snapshot carried 1.3 GB of
 # outputs/ tarballs and builds (48 scanner hits, the weekly full scan red since 10-12).
 ARCHIVE_GLOBS = ("*.tar.gz", "*.tgz", "*.tar", "*.tar.bz2", "*.tar.xz", "*.zip", "*.7z")
 EXCLUDE = [f":(exclude,glob)**/{name}/**" for name in sorted(BUILD_DIRS)] + [f":(exclude){PRESERVED_REPAIR}",
@@ -76,7 +76,11 @@ def default_roots(home: Path, state: Path) -> list[Path]:
             home / "jovie-worktrees", home / "worktrees", home / "LogYourBody-wt",
             home / "jovie-wt-*", Path("/private/tmp/claude-501"), Path("/private/tmp/jovie-*"),
             home / "codex-worktrees", home / "grok-wt", home / "grok-ship-workspaces",
-            home / "codex-ship-workspaces", home / "wt-*", Path("/srv/worktrees/codex-worktrees")]
+            home / "codex-ship-workspaces", home / "wt-*", Path("/srv/worktrees/codex-worktrees"),
+            # ~/wt is where Gem agent sessions put worktrees (global charter: `git worktree add ... ~/wt/<name>`).
+            # It was out of scope: 75 checkouts at ~5.7 GiB each (pnpm copies, the store is on /srv/worktrees)
+            # and root at 89% on 2026-11-02 while the sweeper retired nothing there.
+            home / "wt"]
 
 
 def default_never(home: Path) -> list[Path]:
@@ -175,8 +179,7 @@ def sweep_prefix() -> str:
 
 
 class SnapshotHeld(RuntimeError):
-    """The snapshot must not be published (secret finding, or the scan could not prove it
-    clean). Callers keep the checkout exactly as it is: no strip, no removal."""
+    """Preservation is unverified. Callers keep the checkout: no strip, no removal."""
 
     def __init__(self, name: str, reason: str):
         super().__init__(f"{name}: {reason}")
@@ -231,13 +234,65 @@ def scan_snapshot(path: Path, run, remote: str, sha: str) -> str | None:
     return None
 
 
-def backup(path: Path, info: dict, run, prefix: str, date: str) -> str | None:
+ARCHIVE_REPO = "JovieInc/Ops"
+ARCHIVE_URL = f"https://github.com/{ARCHIVE_REPO}.git"
+
+
+def archive_context(name: str):
+    """Select existing saved gh auth explicitly, never the PATH App shim or token env.
+    This neither reads tokens into Python nor changes the credential store."""
+    gh = os.environ.get("LANES_SWEEP_ARCHIVE_GH", "")
+    if not gh or not Path(gh).is_absolute() or not Path(gh).is_file() or not os.access(gh, os.X_OK):
+        raise SnapshotHeld(name, "archive-credentials-unconfigured")
+    env = {k: v for k, v in os.environ.items() if k not in {
+        "GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN",
+        "GH_CONFIG_DIR", "GH_HOST", "GH_REPO"}}
+    env.update(GH_HOST="github.com", GH_PROMPT_DISABLED="1", GIT_TERMINAL_PROMPT="0",
+               GIT_ASKPASS="", SSH_ASKPASS="", GIT_NO_REPLACE_OBJECTS="1")
+    return gh, env
+
+
+def verify_archive(name: str, run, gh: str, env: dict) -> int:
+    """Metadata is authority for privacy; scanners cannot establish it."""
+    try:
+        result = run([gh, "api", "--hostname", "github.com", f"repos/{ARCHIVE_REPO}"],
+                     capture_output=True, text=True, timeout=30, env=env)
+        data = json.loads(result.stdout) if result.returncode == 0 else None
+        valid = (isinstance(data, dict) and data.get("full_name") == ARCHIVE_REPO
+                 and data.get("private") is True and data.get("visibility") == "private"
+                 and data.get("archived") is False and data.get("disabled") is False
+                 and isinstance(data.get("permissions"), dict) and data["permissions"].get("push") is True
+                 and type(data.get("id")) is int and data["id"] > 0)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        valid = False
+    if not valid:
+        raise SnapshotHeld(name, "archive-private-metadata-unverified")
+    return data["id"]
+
+
+def backup(path: Path, info: dict, run, prefix: str, date: str) -> str:
     """Snapshot the checkout (tracked + untracked, minus build output) to
     refs/jovie-preserved/<prefix>/<name>-<date>-<snapshot>; returns that full ref.
-    Raises SnapshotHeld when the snapshot is not proven secret-free (the ref is public)."""
-    head = git(path, run, "rev-parse", "HEAD").stdout.strip()
-    if not head or not info["remote"]:
-        return None
+    Never uses the source remote as a destination. Any unverified archive holds the
+    original checkout, including its build output. The snapshot retains HEAD as parent."""
+    name = path.name if path.name not in {"Jovie", "LogYourBody"} else f"{path.parent.name}-{path.name}"
+    gh, archive_env = archive_context(name)
+    identity = verify_archive(name, run, gh, archive_env)
+    # URL rewrites can silently redirect an explicit URL to another repository.
+    rewrites = git(path, run, "config", "--get-regexp", r"^url\..*\.(insteadof|pushinsteadof)$")
+    if rewrites.returncode != 1:
+        raise SnapshotHeld(name, "archive-url-rewrite-unverified")
+    shallow = git(path, run, "rev-parse", "--is-shallow-repository")
+    replacements = git(path, run, "replace", "--list")
+    grafts = git(path, run, "rev-parse", "--path-format=absolute", "--git-path", "info/grafts")
+    if (shallow.returncode != 0 or shallow.stdout.strip() != "false"
+            or replacements.returncode != 0 or replacements.stdout.strip()
+            or grafts.returncode != 0 or not grafts.stdout.strip() or Path(grafts.stdout.strip()).exists()):
+        raise SnapshotHeld(name, "archive-ancestry-incomplete")
+    head_result = git(path, run, "rev-parse", "HEAD")
+    head = head_result.stdout.strip()
+    if head_result.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40,64}", head) or not info["remote"]:
+        raise SnapshotHeld(name, "archive-source-unverified")
     sha = head
     if info["dirty"]:
         index = path.parent / f".{path.name}.sweep-index"
@@ -248,29 +303,70 @@ def backup(path: Path, info: dict, run, prefix: str, date: str) -> str | None:
             try:
                 shutil.copyfile(real, index)
             except OSError:
-                git(path, run, "read-tree", "HEAD", env=env)
+                if git(path, run, "read-tree", "HEAD", env=env).returncode != 0:
+                    raise SnapshotHeld(name, "archive-snapshot-failed")
             if git(path, run, "add", "-A", "--", ".", *EXCLUDE, env=env, timeout=900).returncode != 0:
-                return None
-            tree = git(path, run, "write-tree", env=env).stdout.strip()
+                raise SnapshotHeld(name, "archive-snapshot-failed")
+            written = git(path, run, "write-tree", env=env)
+            tree = written.stdout.strip()
+            if written.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40,64}", tree):
+                raise SnapshotHeld(name, "archive-snapshot-failed")
             commit = git(path, run, "commit-tree", tree, "-p", head, "-m",
                          f"backup: uncommitted state of {path} ({date}, worktree sweep)")
-            if commit.returncode != 0 or not tree:
-                return None
+            if commit.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40,64}", commit.stdout.strip()):
+                raise SnapshotHeld(name, "archive-snapshot-failed")
             sha = commit.stdout.strip()
         finally:
             index.unlink(missing_ok=True)
-    name = path.name if path.name not in {"Jovie", "LogYourBody"} else f"{path.parent.name}-{path.name}"
     if held := scan_snapshot(path, run, info["remote"], sha):
         raise SnapshotHeld(name, held)
+    objects = git(path, run, "rev-list", "--objects", "--missing=print", sha,
+                  env={"GIT_NO_REPLACE_OBJECTS": "1"}, timeout=900)
+    if objects.returncode != 0 or not objects.stdout.strip() or any(
+            line.startswith("?") for line in objects.stdout.splitlines()):
+        raise SnapshotHeld(name, "archive-ancestry-incomplete")
     # Leave room for the date, snapshot and Git's ref lock suffix on long checkout names.
     name = re.sub(r"[^A-Za-z0-9._-]", "-", name)[:160]
     ref = f"{PRESERVED_REF}{prefix}/{name}-{date}-{sha}"
-    # Same-named checkouts and repeated sweeps must never overwrite an earlier snapshot.
-    # The empty expected value permits only creation (or an already identical ref),
-    # including when another writer races this push. Normal pre-push hooks still run.
-    pushed = git(path, run, "push", "-q", f"--force-with-lease={ref}:", info["remote"],
-                 f"{sha}:{ref}", timeout=900)
-    return ref if pushed.returncode == 0 else None
+    helper = f"!{shlex.quote(gh)} auth git-credential"
+    config = [("credential.helper", ""), (f"credential.{ARCHIVE_URL}.helper", ""),
+              (f"credential.{ARCHIVE_URL}.helper", helper), ("core.askPass", ""),
+              ("http.extraHeader", ""), (f"http.{ARCHIVE_URL}.extraHeader", ""),
+              ("http.followRedirects", "false")]
+
+    def archive_git(*args):
+        # Command-line resets must come after inherited config, even when an empty
+        # helper was already present earlier in GIT_CONFIG_*.
+        options = [option for key, value in config for option in ("-c", f"{key}={value}")]
+        return run(["git", "-C", str(path), *options, *args], capture_output=True, text=True, timeout=900,
+                   env=git_housekeeping.apply_housekeeping_env(archive_env))
+
+    def readback():
+        result = archive_git("ls-remote", "--refs", ARCHIVE_URL, ref)
+        if result.returncode != 0:
+            raise SnapshotHeld(name, "archive-readback-failed")
+        rows = result.stdout.splitlines()
+        if not rows:
+            return None
+        if rows != [f"{sha}\t{ref}"]:
+            raise SnapshotHeld(name, "archive-ref-collision")
+        return sha
+
+    try:
+        if readback() is None:
+            # Empty expected value allows creation only. Normal pre-push hooks run.
+            if verify_archive(name, run, gh, archive_env) != identity:
+                raise SnapshotHeld(name, "archive-identity-changed")
+            pushed = archive_git("push", "-q", f"--force-with-lease={ref}:", ARCHIVE_URL, f"{sha}:{ref}")
+            if pushed.returncode != 0:
+                raise SnapshotHeld(name, "archive-push-failed")
+        if readback() != sha:
+            raise SnapshotHeld(name, "archive-readback-failed")
+        if verify_archive(name, run, gh, archive_env) != identity:
+            raise SnapshotHeld(name, "archive-identity-changed")
+    except (OSError, subprocess.SubprocessError):
+        raise SnapshotHeld(name, "archive-transport-failed") from None
+    return ref
 
 
 def strip_build_dirs(path: Path) -> None:
@@ -385,21 +481,29 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
     if live is None:
         report["errors"].append("process-state-unavailable")
         return report
+    # Fairness cursor: least recently visited checkout first, across every repository. Without it a
+    # spent budget restarted at the first repository each interval, so the second (~/Jovie, whose
+    # worktrees are ~/wt: 334 GiB on root, 2026-11-02) was never reached.
+    visits_path = None if state is None else state / VISITS_FILE
+    visits = _read_visits(visits_path)
+    queue = []
     for repo in repos:
-        if yield_to_drain():
-            return report
         try:
             entries = linked_worktrees(repo, run)
         except (OSError, subprocess.SubprocessError) as error:
             report["errors"].append(f"list:{repo}:{type(error).__name__}")
             continue
-        for path, branch in entries:
+        queue += [(repo, path, branch) for path, branch in entries]
+    queue.sort(key=lambda item: visits.get(str(item[1]), 0.0))
+    try:
+        for repo, path, branch in queue:
             # A retirement is one unit: finish its preservation/removal before
             # yielding, retaining the inherited lifecycle lease throughout.
             if yield_to_drain():
                 return report
             if not path.exists() or not in_scope(path, roots, never):
                 continue
+            visits[str(path)] = now
             try:
                 retire(repo, path, branch, live, report, run=run, now=now, closed=closed.get(repo, set()),
                        idle_s=idle_s, preserved_ttl_s=preserved_ttl_s, prefix=prefix, date=date)
@@ -408,6 +512,9 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
                 # the sweep; it stays in place and is retried next interval.
                 report["kept"] += 1
                 report["errors"].append(f"{path}:{type(error).__name__}"[:200])
+    finally:
+        _write_visits(visits_path, visits, {str(path) for _, path, _ in queue})
+    for repo in repos:
         if yield_to_drain():
             return report
         try:
@@ -415,6 +522,29 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
         except (OSError, subprocess.SubprocessError):
             pass
     return report
+
+
+VISITS_FILE = "worktree-sweep-visits.json"
+
+
+def _read_visits(path: Path | None) -> dict:
+    if path is None:
+        return {}
+    try:
+        data = json.loads(path.read_text())
+        return {k: float(v) for k, v in data.items()} if isinstance(data, dict) else {}
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def _write_visits(path: Path | None, visits: dict, live: set) -> None:
+    """Keep only checkouts that still exist in a repository listing; best effort."""
+    if path is None:
+        return
+    try:
+        atomic_write_text(path, json.dumps({k: v for k, v in visits.items() if k in live}, sort_keys=True))
+    except OSError:
+        pass
 
 
 def closed_branches(repo: Path, run) -> set[str]:
@@ -465,23 +595,35 @@ ARTIFACT_IDLE_S = 24 * 3600
 # Retired lane roots: nothing dispatches there any more, so build output is dead weight even
 # when the clone itself cannot be deleted yet (unpublished work awaiting archive).
 RETIRED_ROOT_GLOBS = ("grok-ship-workspaces/*/*", "codex-ship-workspaces/*/*", "grok-wt/*")
+# Kept clones under the agent-worktree roots on the root volume are node_modules-heavy too
+# (JOV-10348: gem root inodes forecast to the 90% limit in 2 days while kept clones under the
+# active roots held full pnpm copies forever). Their build output is regenerable and never
+# source, so the retired-root artifact prune extends to them at the same idle bar; the caller's
+# busy / keep-marker / state-referenced guards still decide. Clone-anchored globs: `wt/*` is a
+# checkout under ~/wt, `wt-*` a checkout named wt-* directly in home, `codex-worktrees/*` as listed.
+ARTIFACT_ROOT_GLOBS = RETIRED_ROOT_GLOBS + ("wt/*", "wt-*", "codex-worktrees/*")
 HEADROOM_WARN_PCT = 70
 HEADROOM_CRIT_PCT = 85
 REPORT_INTERVAL_S = 86400
 STATE_REF_MAX_BYTES = 8 * 1024 * 1024
+DEFAULT_MOUNTED_ROOTS = (Path("/srv/worktrees"),)
 
 
-def standalone_globs(home: Path, state: Path) -> list[tuple[Path, str]]:
+def standalone_globs(home: Path, state: Path, *,
+                     mounted_roots: tuple[Path, ...] = DEFAULT_MOUNTED_ROOTS) -> list[tuple[Path, str]]:
+    """Production mounted roots are explicit so cleanup fixtures can pass an empty set."""
     return [(home, "grok-ship-workspaces/*/*"), (home, "codex-ship-workspaces/*/*"), (home, "grok-wt/*"),
-            (home, "codex-worktrees/*"), (home, "wt-*"), (Path("/srv/worktrees"), "codex-worktrees/*"), (state, "bindings/*/worktrees/*"),
+            (home, "codex-worktrees/*"), (home, "wt-*"), (home, "wt/*"),
+            *((root, "codex-worktrees/*") for root in mounted_roots), (state, "bindings/*/worktrees/*"),
             (state, "runs/owner-*/checkout")]
 
 
-def standalone_candidates(home: Path, state: Path, repos: list[Path]) -> list[Path]:
+def standalone_candidates(home: Path, state: Path, repos: list[Path], *,
+                          mounted_roots: tuple[Path, ...] = DEFAULT_MOUNTED_ROOTS) -> list[Path]:
     """Directories matching a standalone glob that own a `.git` directory (linked worktrees have a file)."""
     skip = {repo.resolve() for repo in repos}
     found: list[Path] = []
-    for base, pattern in standalone_globs(home, state):
+    for base, pattern in standalone_globs(home, state, mounted_roots=mounted_roots):
         for path in sorted(base.glob(pattern)):
             try:
                 if (path / ".git").is_dir() and path.resolve() not in skip and path not in found:
@@ -587,8 +729,8 @@ def tree_kib(path: Path, run) -> int | None:
         return None
 
 
-def retired_root(home: Path, path: Path) -> bool:
-    return any(path in home.glob(pattern) for pattern in RETIRED_ROOT_GLOBS)
+def artifact_prunable_root(home: Path, path: Path) -> bool:
+    return any(path in home.glob(pattern) for pattern in ARTIFACT_ROOT_GLOBS)
 
 
 def prune_artifacts(path: Path) -> int:
@@ -612,7 +754,7 @@ def prune_artifacts(path: Path) -> int:
 
 def sweep_standalone(home: Path, state: Path, repos: list[Path], never: list[Path], *, run=lifecycle.run,
                      now: float | None = None, idle_s: float = STANDALONE_IDLE_S,
-                     remove=shutil.rmtree) -> dict:
+                     remove=shutil.rmtree, mounted_roots: tuple[Path, ...] = DEFAULT_MOUNTED_ROOTS) -> dict:
     """Delete clean, fully published, idle standalone clones; log each removal (with its size) first."""
     now = time.time() if now is None else now
     report = {"removed": [], "kept": {}, "errors": [], "freedKiB": 0}
@@ -621,7 +763,7 @@ def sweep_standalone(home: Path, state: Path, repos: list[Path], never: list[Pat
         report["errors"].append("process-state-unavailable")
         return report
     log = state / "disk-reclaim.jsonl"
-    for path in standalone_candidates(home, state, repos):
+    for path in standalone_candidates(home, state, repos, mounted_roots=mounted_roots):
         if lifecycle.draining(state):
             report["drained"] = True
             break
@@ -631,7 +773,7 @@ def sweep_standalone(home: Path, state: Path, repos: list[Path], never: list[Pat
             verdict = standalone_verdict(path, live, run, now, state, idle_s)
             if verdict:
                 report["kept"][verdict] = report["kept"].get(verdict, 0) + 1
-                if verdict not in {"busy", "keep-marker", "state-referenced"} and retired_root(home, path) \
+                if verdict not in {"busy", "keep-marker", "state-referenced"} and artifact_prunable_root(home, path) \
                         and now - newest_touch(path) >= ARTIFACT_IDLE_S:
                     freed = prune_artifacts(path)
                     if freed:

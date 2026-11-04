@@ -337,6 +337,20 @@ test('runner: reads current paginated PR evidence, rejects stale/incomplete read
   );
 });
 
+test('runner: a path whose type changed (symlink to file) appears twice but counts once', async () => {
+  const typeChanged = [
+    file('AGENTS.md', { status: 'removed' }),
+    file('AGENTS.md', { status: 'added' }),
+    file('CLAUDE.md', { status: 'removed' }),
+    file('CLAUDE.md', { status: 'added' }),
+  ];
+  const request = async path =>
+    path.includes('/files?')
+      ? typeChanged
+      : { ...pr(), number: 1, head: event.pull_request.head, changed_files: 2 };
+  assert.equal((await runFleetRules({ event, request })).errors.length, 0);
+});
+
 test('workflow: GITHUB_TOKEN read-only, non-blocking warning step, source required aggregate includes fleet', () => {
   const source = readFileSync(
     '.github/workflows/source-validation.yml',

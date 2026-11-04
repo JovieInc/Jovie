@@ -1480,6 +1480,45 @@ describe('production marker attempt state', () => {
       ).toMatchObject({ state: 'verified' });
     });
 
+    it('stays verified when only the customer-changelog staleness monitor failed (JOV-9998, run 41389538083)', () => {
+      // The exact live shape that froze production on b2a2d02 for 3.9h:
+      // promoted, Sentry-gated, rollback skipped, marker written, changelog
+      // published — then the newly added staleness monitor failed. It is a
+      // post-verification publication job; its failure un-verifies nothing.
+      const jobs: Array<[string, string]> = [
+        ...run37144574062.slice(0, -1),
+        ['Publish verified customer changelog', 'success'],
+        ['Customer changelog staleness', 'failure'],
+      ];
+      const marker = replayMarker(jobs, sha);
+      marker.attemptRun.conclusion = 'failure';
+      expect(
+        classifyProductionMarkerEvidence(
+          evidence({
+            markers: [marker],
+            latestRun: run(1, 'completed', 'failure'),
+          })
+        )
+      ).toMatchObject({ state: 'verified' });
+    });
+
+    it('stays verified when only the marker-heal dispatch step failed', () => {
+      const jobs: Array<[string, string]> = [
+        ...run37144574062,
+        ['Heal interrupted verified marker', 'failure'],
+      ];
+      const marker = replayMarker(jobs, sha);
+      marker.attemptRun.conclusion = 'failure';
+      expect(
+        classifyProductionMarkerEvidence(
+          evidence({
+            markers: [marker],
+            latestRun: run(1, 'completed', 'failure'),
+          })
+        )
+      ).toMatchObject({ state: 'verified' });
+    });
+
     it('keeps a cancelled run interrupted when a deploy job was cancelled', () => {
       const jobs = run37144574062.map(([n, c]): [string, string] =>
         n === 'Production Release / Promote to Production'

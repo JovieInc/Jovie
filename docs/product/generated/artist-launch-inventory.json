@@ -1681,6 +1681,30 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/admin/reference-review/intake/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/reference-review/intake",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/admin/reference-review/preview/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/reference-review/preview",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/admin/reference-review/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/reference-review",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/admin/releases/route.ts",
       "kind": "handler",
       "route": "/api/admin/releases",
@@ -3305,6 +3329,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/customer-voice/[id]/reply/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/customer-voice/[id]/reply",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/design-ci-judge-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/design-ci-judge-evidence",
@@ -4285,6 +4317,14 @@
       "kind": "handler",
       "route": "/api/profile/pac-event",
       "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/profile/search/route.ts",
+      "kind": "handler",
+      "route": "/api/profile/search",
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },

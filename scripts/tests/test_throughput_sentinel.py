@@ -63,6 +63,24 @@ class ThroughputSentinelTest(unittest.TestCase):
         self.assertEqual(ts.judge(base), {})
         base["mergeThroughput"] = {"observedAt": NOW - 7200, "queueDepth": 18, "mergedPerHour": 0}
         self.assertEqual(ts.judge(base), {})  # stale signal is not evidence
+
+    def test_a_fresh_queue_entry_beside_no_recent_merges_is_not_a_stall_jov_10345(self):
+        # 2026-11-02 08:47Z (JOV-10345): the queue held exactly 1 PR that had been enqueued
+        # 3.7 min earlier, mid-verification, and zero merges fell in the trailing hour only
+        # because the previous merge was 108 min old; the sole entry merged 2 min later.
+        # A young queue is the queue working, not a stalled one: alarm needs entries old
+        # enough that a healthy queue would have drained them (the 30 min enqueue->merge
+        # p50 SLO target), an unknown wait (fail loud), or ejections churning with no landing.
+        world = obs(pushes1h={"JovieInc/Jovie|codex": 1})
+        world["mergeThroughput"] = {"observedAt": NOW - 60, "queueDepth": 1, "mergedPerHour": 0,
+                                    "queueWaitP50Minutes": 3.7, "ejectionRate": None}
+        self.assertEqual(ts.judge(world), {})
+        stuck = dict(world, mergeThroughput=dict(world["mergeThroughput"], queueWaitP50Minutes=30.0))
+        self.assertIn("throughput-queue-no-merge", ts.judge(stuck))
+        churn = dict(world, mergeThroughput=dict(world["mergeThroughput"], queueWaitP50Minutes=4.0, ejectionRate=0.5))
+        self.assertIn("throughput-queue-no-merge", ts.judge(churn))
+        unknown = dict(world, mergeThroughput=dict(world["mergeThroughput"], queueWaitP50Minutes=None))
+        self.assertIn("throughput-queue-no-merge", ts.judge(unknown))
         slow = obs(pushes1h={"JovieInc/Jovie|codex": 1},
                    releaseFlow={"mergeGroupRuns": 3, "mergeGroupJobs": 6, "mergeGroupStartP50Min": 7.5, "mergeGroupStartMaxMin": 20,
                                 "leaseHeldMin": 46.0, "leaseRunIds": [101, 102]})

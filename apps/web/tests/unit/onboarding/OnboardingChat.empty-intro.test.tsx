@@ -5,6 +5,7 @@ import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat'
 import { ONBOARDING_ENTRY_TITLE } from '@/lib/onboarding/empty-state';
 
 const chatMocks = vi.hoisted(() => ({
+  messageRenderGate: null as Promise<void> | null,
   messages: [] as Array<{
     id: string;
     role: 'user' | 'assistant';
@@ -18,6 +19,13 @@ const chatMocks = vi.hoisted(() => ({
   errorMetadata: {} as Record<string, unknown>,
   options: null as null | { id?: string; messages?: UIMessage[] },
 }));
+
+// Exercise the App Router's actual Suspense behavior; next/dynamic's default
+// Node entry is the Pages Router implementation.
+vi.mock('next/dynamic', async () => {
+  const { default: dynamic } = await import('next/dist/shared/lib/app-dynamic');
+  return { default: dynamic };
+});
 
 vi.mock('ai', () => ({
   DefaultChatTransport: class DefaultChatTransport {
@@ -135,7 +143,10 @@ vi.mock('@/components/jovie/components', () => ({
     parts,
   }: {
     readonly parts: Array<{ type: 'text'; text: string }>;
-  }) => <div data-testid='chat-message'>{parts[0]?.text}</div>,
+  }) => {
+    if (chatMocks.messageRenderGate) throw chatMocks.messageRenderGate;
+    return <div data-testid='chat-message'>{parts[0]?.text}</div>;
+  },
 }));
 
 vi.mock('@/components/features/onboarding/ChatProposeNextStepCard', () => ({
@@ -319,6 +330,7 @@ describe('OnboardingChat empty intro', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     chatMocks.messages = [];
+    chatMocks.messageRenderGate = null;
     chatMocks.status = 'ready';
     chatMocks.onError = undefined;
     chatMocks.errorMetadata = {};
@@ -327,6 +339,44 @@ describe('OnboardingChat empty intro', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  it('reveals the first transcript together after its renderer loads while keeping the composer mounted', async () => {
+    let releaseRenderer!: () => void;
+    chatMocks.messageRenderGate = new Promise<void>(resolve => {
+      releaseRenderer = resolve;
+    });
+    chatMocks.status = 'submitted';
+    render(
+      <OnboardingChat
+        initialMessages={[
+          {
+            id: 'starter',
+            role: 'user',
+            parts: [{ type: 'text', text: 'I want to claim jov.ie/sam.' }],
+          },
+        ]}
+        turnstileToken='token'
+        turnstileStatus='verified'
+      />
+    );
+    const composer = screen.getByTestId('chat-input');
+    composer.focus();
+    // A visible speaker above a generic 40px slot moves when the user bubble
+    // and the much shorter thinking indicator replace their independent slots.
+    expect(screen.queryByTestId('onboarding-speaker-row')).toBeNull();
+    expect(screen.queryAllByTestId('chat-message')).toHaveLength(0);
+    await act(async () => {
+      chatMocks.messageRenderGate = null;
+      releaseRenderer();
+    });
+    await waitFor(() =>
+      expect(screen.getAllByTestId('chat-message')).toHaveLength(2)
+    );
+    expect(screen.getAllByTestId('onboarding-speaker-row')).toHaveLength(1);
+    expect(screen.getByText('I want to claim jov.ie/sam.')).toBeVisible();
+    expect(screen.getByTestId('chat-input')).toBe(composer);
+    expect(composer).toHaveFocus();
   });
 
   it('shows welcome intro on a blank /start visit', () => {

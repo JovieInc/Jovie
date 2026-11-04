@@ -38,6 +38,7 @@ import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { load as yamlLoad } from 'js-yaml';
+import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
 import {
   companionChecklist,
   explainShipGate,
@@ -45,6 +46,9 @@ import {
   PR_BODY_SKELETON,
   parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
+
+export { baseRefCandidates, resolveBaseRef };
+
 import { checkInstallMatchesLockfile } from './lib/preflight-install.mjs';
 import { remoteHint } from './lib/remote-hint.mjs';
 
@@ -71,6 +75,12 @@ export const NARROWED = {
 
 /** Generators whose output must be committed. `write` rewrites, `check` verifies. */
 export const GENERATORS = [
+  {
+    id: 'artist-launch-inventory',
+    when: /^apps\/web\/app\/|^scripts\/artist-launch-|^docs\/product\/generated\/artist-launch-inventory\.json$/,
+    write: 'node scripts/artist-launch-contract.mjs --write',
+    check: 'node scripts/artist-launch-contract.mjs --check',
+  },
   {
     id: 'workflow-topology',
     when: /^\.github\/workflows\/[^/]+\.ya?ml$|^scripts\/ci-workflow-topology\.mjs$/,
@@ -166,26 +176,129 @@ export function parseArgs(argv) {
   return a;
 }
 
-function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
+// Commands own separate POSIX groups so deadlines can terminate descendants.
+// Track those groups while they are live so an outer cancellation or normal
+// process exit cannot leave them behind.
+const activeCommandGroups = new Set();
+let commandHandlersInstalled = false;
+let cancelledCommandCode = 0;
+let cancellationTimer;
+
+function stopOwnedCommand(record) {
+  const { child } = record;
+  try {
+    if (process.platform === 'win32' || !child.pid) child.kill('SIGKILL');
+    else process.kill(-child.pid, 'SIGKILL');
+  } catch (error) {
+    if (error.code !== 'ESRCH') child.kill('SIGKILL');
+  }
+  child.stdout.destroy();
+  child.stderr.destroy();
+}
+
+function removeCommandHandlers() {
+  if (!commandHandlersInstalled) return;
+  process.removeListener('SIGTERM', onCommandTerm);
+  process.removeListener('SIGINT', onCommandInt);
+  process.removeListener('SIGHUP', onCommandHup);
+  process.removeListener('exit', onCommandExit);
+  commandHandlersInstalled = false;
+}
+
+/** @param {NodeJS.Signals} signal */
+function finishCommandCancellation(signal) {
+  clearTimeout(cancellationTimer);
+  removeCommandHandlers();
+  // Preserve another owner's signal handling if one exists. Otherwise retain
+  // Node's ordinary signal termination after our owned children have closed.
+  if (process.listenerCount(signal) === 0) process.kill(process.pid, signal);
+}
+
+/** @param {NodeJS.Signals} signal @param {number} code */
+function cancelCommands(signal, code) {
+  if (cancelledCommandCode) return;
+  cancelledCommandCode = code;
+  process.exitCode = code;
+  for (const record of activeCommandGroups) stopOwnedCommand(record);
+  if (activeCommandGroups.size === 0) finishCommandCancellation(signal);
+  else {
+    cancellationTimer = setTimeout(
+      () => finishCommandCancellation(signal),
+      1000
+    );
+  }
+}
+
+function onCommandTerm() {
+  cancelCommands('SIGTERM', 143);
+}
+function onCommandInt() {
+  cancelCommands('SIGINT', 130);
+}
+function onCommandHup() {
+  cancelCommands('SIGHUP', 129);
+}
+function onCommandExit() {
+  for (const record of activeCommandGroups) stopOwnedCommand(record);
+}
+
+function trackCommand(record) {
+  if (!commandHandlersInstalled) {
+    process.on('SIGTERM', onCommandTerm);
+    process.on('SIGINT', onCommandInt);
+    process.on('SIGHUP', onCommandHup);
+    process.on('exit', onCommandExit);
+    commandHandlersInstalled = true;
+  }
+  activeCommandGroups.add(record);
+}
+
+function untrackCommand(record) {
+  activeCommandGroups.delete(record);
+  if (activeCommandGroups.size === 0 && !cancelledCommandCode) {
+    removeCommandHandlers();
+  }
+}
+
+export function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
+  if (cancelledCommandCode)
+    return Promise.resolve({ code: cancelledCommandCode, out: '', ms: 0 });
   return new Promise(resolve => {
     const t0 = Date.now();
     const child = spawn('bash', ['-c', cmd], {
       cwd,
-      env,
+      env: {
+        ...(env ?? process.env),
+        ...(process.platform === 'win32'
+          ? {}
+          : { JOVIE_PREFLIGHT_MANAGED_GROUP: '1' }),
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
     });
+    const record = { child };
+    trackCommand(record);
     let out = '';
+    let timedOut = false;
     const take = d => {
       out += d.toString();
       if (out.length > 400_000) out = out.slice(-200_000);
     };
     child.stdout.on('data', take);
     child.stderr.on('data', take);
-    const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
+    const timer = setTimeout(() => {
+      timedOut = true;
+      // A shell can exit before its descendants close inherited output pipes.
+      // Kill its whole POSIX group, then close our pipe ends so timeout settles.
+      stopOwnedCommand(record);
+    }, timeoutMs);
     child.on('close', (code, signal) => {
       clearTimeout(timer);
+      untrackCommand(record);
       resolve({
-        code: code ?? (signal ? 137 : 1),
+        code: timedOut
+          ? 124
+          : cancelledCommandCode || (code ?? (signal ? 137 : 1)),
         out,
         ms: Date.now() - t0,
       });
@@ -198,11 +311,12 @@ const git = (cwd, args) => {
   return r.status === 0 ? r.stdout.trim() : '';
 };
 
-/** Changed files vs the merge-base, including uncommitted and untracked. */
+/** Changed files vs the merge-base, including uncommitted and untracked.
+ *  `base` must be a ref that resolves to a commit (see resolveBaseRef). */
 export function changedFiles(cwd, base) {
   const mb =
-    git(cwd, ['merge-base', `origin/${base}`, 'HEAD']) ||
-    git(cwd, ['rev-parse', `origin/${base}`]);
+    git(cwd, ['merge-base', base, 'HEAD']) || git(cwd, ['rev-parse', base]);
+  if (!mb) return { mergeBase: '', files: [] };
   /** @type {{filename:string, previous_filename:string|undefined, status:string, patch:string}[]} */
   const rows = git(cwd, ['diff', '--name-status', '-M', mb])
     .split('\n')
@@ -302,14 +416,18 @@ function loadBody(args, cwd) {
 }
 
 /** Run the shared Private Data Guard from the pinned JovieInc/ci workflow. */
-async function privateDataCheck(cwd, env, mergeBase) {
+export async function privateDataCheck(cwd, env, mergeBase) {
   const wfPath = path.join(cwd, '.github/workflows/private-data-guard.yml');
   if (!existsSync(wfPath)) return { skip: 'no private-data-guard workflow' };
   const wf = /** @type {any} */ (yamlLoad(readFileSync(wfPath, 'utf8')));
   const job = Object.values(wf.jobs ?? {})[0] ?? {};
   const m = String(job.uses ?? '').match(/^JovieInc\/ci\/(.+)@([0-9a-f]{40})$/);
   if (!m) return { skip: 'guard is not a pinned JovieInc/ci workflow' };
-  const cache = path.join(homedir(), '.cache', 'jovie-preflight');
+  const cacheRoot =
+    env.XDG_CACHE_HOME && path.isAbsolute(env.XDG_CACHE_HOME)
+      ? env.XDG_CACHE_HOME
+      : path.join(homedir(), '.cache');
+  const cache = path.join(cacheRoot, 'jovie-preflight');
   mkdirSync(cache, { recursive: true });
   const file = path.join(cache, `private-data-${m[2]}.py`);
   if (!existsSync(file)) {
@@ -379,8 +497,10 @@ export function typecheckTargets(files, cwd) {
     if (web) {
       out.add(isTest ? 'web-tests' : 'web');
       if (!isTest) {
-        // Source changes also affect test consumers and Ovie's TS graph.
+        // App, test and story projects have separate includes. Prop changes
+        // can break stories even when both the app and test projects compile.
         out.add('web-tests');
+        out.add('web-stories');
         out.add('pkg:@jovie/ovie');
       }
     } else if (/^scripts\//.test(f.filename)) out.add('scripts');
@@ -400,12 +520,25 @@ export function typecheckTargets(files, cwd) {
   return [...out];
 }
 
+/**
+ * Gem's host semaphore (scripts/typecheck-slot.mjs, GEM_TYPECHECK_SLOTS from environment.d) for
+ * preflight's heavy checks. Unset off Gem, so CI and laptops run the command untouched.
+ * 2026-11-02: every agent's pre-push preflight ran tsc and vitest outside the slot (only
+ * apps/web's own `typecheck` script used it), load reached 25-40 on 16 cores and autoscale
+ * halved the Codex lanes.
+ */
+export function hostSlotted(command) {
+  return `node scripts/typecheck-slot.mjs -- bash -c '${command.replace(/'/g, `'\\''`)}'`;
+}
+
 function typecheckCommand(target, cwd) {
   const cap = `NODE_OPTIONS=--max-old-space-size=${target.startsWith('web') ? WEB_HEAP_MB : HEAP_MB}`;
   if (target === 'web')
     return `cd apps/web && ${cap} pnpm exec node ../../scripts/typecheck-singleflight.mjs -- tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo`;
   if (target === 'web-tests')
     return `cd apps/web && ${cap} node ../../scripts/typecheck-singleflight.mjs -- node ../../scripts/typecheck-web-tests.mjs`;
+  if (target === 'web-stories')
+    return `cd apps/web && ${cap} node ../../scripts/typecheck-singleflight.mjs -- node ../../scripts/typecheck-web-stories.mjs`;
   if (target === 'scripts') return `${cap} pnpm typecheck:scripts`;
   return `${cap} pnpm --filter ${target.slice(4)} run typecheck`;
 }
@@ -441,21 +574,41 @@ export async function main({
   });
   if (pinned.status === 0 && pinned.stdout.trim())
     childEnv.PATH = `${pinned.stdout.trim()}:${childEnv.PATH}`;
+  // GitHub's environment contract is a logical branch name. Source guards
+  // prepend origin/ themselves; keep qualified refs only in CI_BASE_REF.
+  const branchBase = args.base.replace(
+    /^(?:refs\/remotes\/origin\/|refs\/heads\/|origin\/)/,
+    ''
+  );
+  // Fetch the remote branch under its unqualified name (JOV-10351).
+  spawnSync('git', ['fetch', '--no-tags', '-q', 'origin', branchBase], { cwd });
+  const baseRef = resolveBaseRef(cwd, args.base);
+  if (!baseRef) {
+    log(
+      `[preflight:changed] base ref '${args.base}' does not resolve to a commit (tried ${baseRefCandidates(args.base).join(', ')}); run 'git fetch origin' or pass an existing branch as --base`
+    );
+    return 1;
+  }
   Object.assign(childEnv, {
     NODE_OPTIONS: `--max-old-space-size=${HEAP_MB}`,
-    GITHUB_BASE_REF: args.base,
+    GITHUB_BASE_REF: branchBase,
     GITHUB_EVENT_NAME: 'pull_request',
-    CI_BASE_REF: `origin/${args.base}`,
+    CI_BASE_REF: baseRef,
     // Copied guards compare their module URL to argv[1]; macOS /var -> /private/var
     // aliases turn their real checks into silent no-ops or false reds.
     TMPDIR: realpathSync(env.TMPDIR || tmpdir()),
   });
-  spawnSync('git', ['fetch', '--no-tags', '-q', 'origin', args.base], { cwd });
-  const { mergeBase, files } = changedFiles(cwd, args.base);
+  const { mergeBase, files } = changedFiles(cwd, baseRef);
+  if (!mergeBase) {
+    log(
+      `[preflight:changed] git could not compute a diff base against ${baseRef}; failing instead of reporting 'no changes'`
+    );
+    return 1;
+  }
   childEnv.SHADCN_LINT_DIFF_BASE = mergeBase;
   const paths = files.map(f => f.filename);
   if (!paths.length) {
-    log('[preflight:changed] no changes vs origin/' + args.base);
+    log(`[preflight:changed] no changes vs ${baseRef}`);
     return 0;
   }
   const readFile = p => {
@@ -522,7 +675,7 @@ export async function main({
     pathToFileURL(path.join(cwd, 'scripts/lib/source-validation-manifest.mjs'))
       .href
   );
-  for (const g of manifest.selectManifestGuards(paths, args.base)) {
+  for (const g of manifest.selectManifestGuards(paths, branchBase)) {
     if (g.heavy && !args.thorough) {
       deferred.push(g.id);
       continue;
@@ -539,9 +692,9 @@ export async function main({
     );
 
   // Merge-with-base: Source Validation judges the merged tree. Warn-only.
-  add('merge-base', 'merges cleanly with origin/' + args.base, async () => {
+  add('merge-base', 'merges cleanly with ' + baseRef, async () => {
     const r = await sh(
-      `git merge-tree --write-tree --name-only origin/${args.base} HEAD`,
+      `git merge-tree --write-tree --name-only ${baseRef} HEAD`,
       { cwd, env: childEnv, timeoutMs: 60_000 }
     );
     if (r.code === 0) return r;
@@ -549,7 +702,7 @@ export async function main({
     return {
       ...r,
       code: 0,
-      warn: `does not merge cleanly with origin/${args.base}; resolve before pushing${conflicts.length ? `: ${conflicts.join(', ')}` : ''}`,
+      warn: `does not merge cleanly with ${baseRef}; resolve before pushing${conflicts.length ? `: ${conflicts.join(', ')}` : ''}`,
     };
   });
 
@@ -576,7 +729,7 @@ export async function main({
     cmd(
       'migration',
       'Migration Guard',
-      `cd apps/web && ./scripts/check-migrations.sh origin/${args.base} && ./scripts/validate-migrations.sh && pnpm exec tsx scripts/online-index-migrate.ts --validate-only`
+      `cd apps/web && ./scripts/check-migrations.sh ${baseRef} && ./scripts/validate-migrations.sh && pnpm exec tsx scripts/online-index-migrate.ts --validate-only`
     );
     add('migration-lint', 'migration SQL lint (squawk)', async () => {
       const r = await sh(
@@ -629,7 +782,9 @@ export async function main({
           JOVIE_COVERAGE_RELATED_TESTS: (parsed.relatedTests ?? []).join('\n'),
         };
         const run = await sh(
-          `pnpm --filter @jovie/web test:coverage --changed ${mergeBase} --bail 1 --testTimeout=60000 --retry=1 && node scripts/check-changed-test-coverage.mjs --base ${mergeBase} --head ${head} --coverage apps/web/coverage/coverage-final.json`,
+          hostSlotted(
+            `pnpm --filter @jovie/web test:coverage --changed ${mergeBase} --bail 1 --testTimeout=60000 --retry=1 && node scripts/check-changed-test-coverage.mjs --base ${mergeBase} --head ${head} --coverage apps/web/coverage/coverage-final.json`
+          ),
           { cwd, env: e, timeoutMs: 900_000 }
         );
         return {
@@ -649,7 +804,7 @@ export async function main({
         `tsc:${t}`,
         `typecheck ${t}`,
         async () => {
-          const r = await sh(typecheckCommand(t, cwd), {
+          const r = await sh(hostSlotted(typecheckCommand(t, cwd)), {
             cwd,
             env: childEnv,
             timeoutMs: 900_000,

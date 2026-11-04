@@ -43,6 +43,28 @@ export const Default: Story = {
   },
 };
 
+/** The real composer and reserved verification instruction before a starter sends. */
+export const StarterVerification: Story = {
+  args: {
+    starterHandoff: { kind: 'prompt', prompt: 'I want to claim jov.ie/sam.' },
+    turnstileToken: null,
+    turnstileStatus: 'loading',
+    turnstileHasSiteKey: true,
+    turnstilePanel: <span />,
+    headerOverlay: true,
+    // Keep the starter unsent in Storybook's development-mode auth bypass.
+    interactionDisabled: true,
+  },
+  parameters: { layout: 'fullscreen' },
+  decorators: [
+    Story => (
+      <div style={{ width: '100%', height: '100dvh', display: 'flex' }}>
+        <Story />
+      </div>
+    ),
+  ],
+};
+
 /** Taken handle with a starter prompt: the taken state wins, no prefilled claim (JOV-9624). */
 export const TakenHandleWithStarterPrompt: Story = {
   args: {

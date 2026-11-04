@@ -96,6 +96,18 @@ const LEDGER = {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
+  'ci-fast-structural-lanes/Start base-branch history fetch': {
+    kind: 'git-auth',
+    greenGroupCalls: 0,
+  },
+  'ci-fast-structural-lanes/Decide structural lane': {
+    kind: 'git-auth',
+    greenGroupCalls: 0,
+  },
+  'ci-fast-structural-lanes/Run lanes coverage pytest': {
+    kind: 'git-auth',
+    greenGroupCalls: 0,
+  },
   'neon-db/Verify shared Neon branch admission before publish': {
     kind: 'path-gated',
     greenGroupCalls: 0,
