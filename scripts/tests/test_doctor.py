@@ -2432,7 +2432,8 @@ class PublishTest(unittest.TestCase):
         patch = mock.patch.object(doctor.lifecycle, "run", run)
         patch.start()
         self.addCleanup(patch.stop)
-        env = mock.patch.dict(os.environ, {"LANES_STATE": str(self.state)})
+        env = mock.patch.dict(os.environ, {"LANES_STATE": str(self.state),
+                                          "JOVIE_API_STATE_DIR": str(self.state)})
         env.start()
         self.addCleanup(env.stop)
         return fixture
