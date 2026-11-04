@@ -82,11 +82,12 @@ describe('processJob social dispatch', () => {
       await processJob(db, makeJob(jobType));
 
       expect(mocks[mock]).toHaveBeenCalledTimes(1);
-      const [handle, payload] = mocks[mock].mock.calls[0];
+      const [payload, dbHandle] = mocks[mock].mock.calls[0];
       // Social processors take (payload) only — a second db-handle argument
       // would mean a transaction could span the external fetch.
-      expect(handle).toBeUndefined();
-      expect(handle).not.toBe(db);
+      expect(mocks[mock].mock.calls[0]).toHaveLength(1);
+      expect(dbHandle).toBeUndefined();
+      expect(payload).not.toBe(db);
       expect(payload).toMatchObject({ creatorProfileId: profileId });
     }
   );
