@@ -338,6 +338,15 @@ describe('ShippingMatrix rendering (JOV-6893)', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows 7d stage time above the matrix once the projection loads', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(projection([])));
+    renderMatrix();
+    const strip = await screen.findByRole('region', {
+      name: 'Stage time 7d (p50 / p95)',
+    });
+    expect(strip).toHaveTextContent('Stage events not published yet');
+  });
+
   it('keeps the table viewport reserved from loading to the empty live state', async () => {
     let resolveFetch: ((value: Response) => void) | undefined;
     fetchMock.mockReturnValueOnce(

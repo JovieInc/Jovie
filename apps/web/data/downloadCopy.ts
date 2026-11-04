@@ -1,7 +1,7 @@
 /**
  * Public /download copy. The Mac download is the desktop app. Do not call it
- * native: the Swift app is still only planned. The iPhone app is not a public
- * download on this page.
+ * native: the Swift app is still only planned. The page lists only what can
+ * be downloaded today; the iPhone app is added when it is public.
  */
 export const DOWNLOAD_COPY = {
   metadata: {
@@ -15,9 +15,7 @@ export const DOWNLOAD_COPY = {
   headline: 'Jovie, Installed Where You Work.',
   hero: 'Download the Mac app. It opens the same Jovie account you use on the web.',
   heroDownload: 'Download for Mac',
-  iphoneStatusLink: 'See iPhone status',
   proof: ['Developer ID signed', 'Apple notarized', 'Apple Silicon + Intel'],
-  phoneAlt: 'Jovie profile on a phone',
   platforms: {
     mac: {
       label: 'Mac',
@@ -25,12 +23,6 @@ export const DOWNLOAD_COPY = {
       body: 'Open Jovie from your Dock, keep your release workflow out of browser noise, and stay current with automatic updates.',
       action: 'Download for Mac',
       releasesAction: 'View releases',
-    },
-    iphone: {
-      label: 'iPhone',
-      title: 'iPhone App',
-      body: 'The Mac app is the public download. The iPhone app is not available on this page.',
-      status: 'Not a public download',
     },
   },
   workflowEyebrow: 'Release workflow',
@@ -103,10 +95,6 @@ export const DOWNLOAD_COPY = {
       question: 'Do I need a Jovie account?',
       answer:
         'Yes. The Mac app connects to your existing Jovie workspace. You can sign in with the same account you use on jov.ie.',
-    },
-    {
-      question: 'What about the iPhone app?',
-      answer: 'It is not a public download. Use this page for the Mac app.',
     },
     {
       question: 'Where does the download come from?',

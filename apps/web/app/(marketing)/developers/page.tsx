@@ -61,6 +61,12 @@ const RESOURCE_LINKS = [
       'Anonymous `jovie` commands for agents: read public profile data and create claimable profiles.',
   },
   {
+    href: APP_ROUTES.DEVELOPERS_AGENTS,
+    label: 'Agent Connector',
+    description:
+      'The connector for assistants: tools, authentication, limits and draft expiry.',
+  },
+  {
     href: '/api-versioning',
     // ui-casing-allow: sentence-case labels per marketing plan phase 1
     label: 'API versioning and deprecation policy',
@@ -68,11 +74,6 @@ const RESOURCE_LINKS = [
       // "Deprecation" and "Sunset" are the literal RFC 9745/8594 HTTP header
       // names (ui-casing-allow: literal HTTP header names)
       'Active v1 lifecycle boundary, additive versus breaking changes, and future Deprecation and Sunset signals.',
-  },
-  {
-    href: APP_ROUTES.INTEGRATIONS,
-    label: 'Integrations',
-    description: 'Account integrations and the capabilities each supports.',
   },
   {
     href: '/llms.txt',

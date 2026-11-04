@@ -40,7 +40,7 @@ describe('Artist Visibility offer contract', () => {
     ]);
     expect(getPublicPriceClaim('pro')).toMatchObject({
       priceUsd: 12,
-      ctaLabel: 'Claim your profile',
+      ctaLabel: 'Start Artist Presence, $12/mo',
       ctaHref: '/claim?plan=pro',
       selfService: true,
     });
@@ -145,7 +145,7 @@ describe('Artist Visibility offer contract', () => {
       selfService: true,
       badge: 'Self-serve',
       note: PRO_SELF_SERVE_TRUTH,
-      ctaLabel: 'Claim your profile',
+      ctaLabel: 'Start Artist Presence, $12/mo',
       ctaHref: '/claim?plan=pro',
     });
     expect(formatPublicPriceDisplay(pro)).toBe(`${pro.priceLabel}/mo`);

@@ -1,0 +1,248 @@
+{
+  "schema": "jovie.helpfulness-calibration/v1",
+  "note": "Reference grades: Opus judge plus manual review, 2026-10-28. Synthetic fixtures only.",
+  "examples": [
+    {
+      "id": "best-release",
+      "source": "opus-reference-2026-10-28-pre-fix",
+      "reply": {
+        "text": "I don't have per-release streaming data to crown a winner \u2014 the strongest signals in your account right now are audience and monetization, not track-by-track performance.\n\nWhat the data does show:\n- **Instagram is your engine:** 1,950 of your 3,200 profile views came from your Instagram bio link. That's 61%.\n- **Tip conversion is strong:** 8 tips from 42 tip-link clicks, a 19% conversion rate.\n\nIf you want a real answer on best release, check your Spotify for Artists stream counts across Night Swim, Neon Reef, Tidal Drift, and Coral EP \u2014 I can't pull that data. What I can say: whatever your listeners are finding, they're arriving through Instagram. Want to dig into that funnel?",
+        "toolCalls": [
+          {
+            "name": "showTopInsights",
+            "input": {},
+            "output": {
+              "insights": [
+                {
+                  "title": "Instagram drives 61% of profile visits",
+                  "evidence": "1,950 of 3,200 profile views came from the Instagram bio link."
+                },
+                {
+                  "title": "Tip conversion 19%",
+                  "evidence": "8 tips from 42 tip-link clicks."
+                }
+              ],
+              "relevant": true
+            }
+          }
+        ]
+      },
+      "reference": {
+        "grounded": 1,
+        "next_action": 1,
+        "time_aware": 0,
+        "no_dead_end": 1,
+        "specific": 1,
+        "concise": 1,
+        "truthful": 1
+      },
+      "referenceWhy": "It says it has no per-release data, though the context gives popularity scores (Tidal Drift 41, Neon Reef 38) that answer the question, and it lists the unreleased Night Swim as a release to check streams for.",
+      "ranAt": "2026-10-29T02:14:15.889Z"
+    },
+    {
+      "id": "whats-next-release",
+      "source": "opus-reference-2026-10-28-pre-fix",
+      "reply": {
+        "text": "Night Swim \u2014 your latest single \u2014 is dated October 30, 2026. I don't see anything scheduled beyond that in your catalog.\n\nIf you're planning the next one, say the word and I can help set it up: smart links, release plan, promo strategy, or a pitch when the details are locked.",
+        "toolCalls": []
+      },
+      "reference": {
+        "grounded": 2,
+        "next_action": 0,
+        "time_aware": 1,
+        "no_dead_end": 2,
+        "specific": 1,
+        "concise": 1,
+        "truthful": 2
+      },
+      "referenceWhy": "The reply gets the date right, but it calls Night Swim 'your latest single' and never says it comes out tomorrow (Friday). It also skips a prep step for Night Swim and ends with a generic menu of help options for some future release.",
+      "ranAt": "2026-10-29T02:14:15.889Z"
+    },
+    {
+      "id": "presave",
+      "source": "opus-reference-2026-10-28-pre-fix",
+      "reply": {
+        "text": "Yes \u2014 if you have a release dated at least two weeks out. Pre-saves turn fans into day-one saves, and saves in the first 48 hours are the strongest signal Spotify's algorithm reads for Release Radar and algorithmic push. The cost is near zero, but be realistic about scale: with 12,500 followers, expect modest numbers \u2014 the return depends on where you push the link. Your most engaged segment (42 tip-link clicks, 8 actual tips) is the core most likely to pre-save, so aim it there.\n\nWhich release is it for, and when does it drop?",
+        "toolCalls": []
+      },
+      "reference": {
+        "grounded": 1,
+        "next_action": 0,
+        "time_aware": 0,
+        "no_dead_end": 1,
+        "specific": 1,
+        "concise": 1,
+        "truthful": 1
+      },
+      "referenceWhy": "It misses that Night Swim drops tomorrow (2026-10-30) and asks which release and date when it already has both. Its 'two weeks out' rule would also push the artist away from a pre-save that should go up today.",
+      "ranAt": "2026-10-29T02:14:15.889Z"
+    },
+    {
+      "id": "greeting",
+      "source": "opus-reference-2026-10-28-pre-fix",
+      "reply": {
+        "text": "Hey. I'm Jovie \u2014 I've got your profile, releases, and stats on hand. What are we working on?",
+        "toolCalls": []
+      },
+      "reference": {
+        "grounded": 0,
+        "next_action": 0,
+        "time_aware": 0,
+        "no_dead_end": null,
+        "specific": 0,
+        "concise": 2,
+        "truthful": 2
+      },
+      "referenceWhy": "The reply says Jovie has the artist's data but never mentions that Night Swim drops tomorrow, and it ends with a generic 'What are we working on?' instead of a concrete next step for the release.",
+      "ranAt": "2026-10-29T02:14:15.889Z"
+    },
+    {
+      "id": "new-where-start",
+      "source": "opus-reference-2026-10-28-pre-fix",
+      "reply": {
+        "text": "Start with one finished song. Not a catalog, not a strategy \u2014 one track you'd defend in public.\n\nThe order that works: finish that single, get it on a distributor (DistroKid, TuneCore, CD Baby \u2014 pick one, they all get you onto Spotify), then use the 2\u20134 weeks before release day to set up your profile and a promo runway here. Your profile is a blank slate right now \u2014 no bio, no links, no releases \u2014 which is fine, but it means everything you build lands on empty ground unless we fill it before launch.\n\nDo you have a track already finished and mixed, or are you still writing? If one is done, tell me the title and I'll set up the release here so we can build a launch plan around it.",
+        "toolCalls": []
+      },
+      "reference": {
+        "grounded": 2,
+        "next_action": 1,
+        "time_aware": null,
+        "no_dead_end": 2,
+        "specific": 1,
+        "concise": 2,
+        "truthful": 2
+      },
+      "referenceWhy": "The reply notices the empty profile but puts off fixing it until a track is finished, so it misses the step she could take today in Jovie (add a bio or link, or connect Spotify, so jov.ie/maraquill goes live) and falls back on generic advice to finish a song and pick a distributor.",
+      "ranAt": "2026-10-29T02:14:15.889Z"
+    },
+    {
+      "id": "smartlink",
+      "source": "opus-reference-2026-10-28-post-fix",
+      "reply": {
+        "text": "Night Swim is already in your discography, so its smart link runs through your Jovie profile at https://jov.ie/lunawaves. With the single out tomorrow (Friday 2026-10-30), the one move that still pays: post the Night Swim pre-save link today and swap it into your social bios before release day.",
+        "toolCalls": []
+      },
+      "reference": {
+        "grounded": 2,
+        "next_action": 2,
+        "time_aware": 1,
+        "no_dead_end": 2,
+        "specific": 2,
+        "concise": 2,
+        "truthful": 1
+      },
+      "referenceWhy": "It says Night Swim is 'already in your discography' and points to a pre-save link it never checked or made. Its only link is the general profile, not a release-specific URL, so the setup step is assumed instead of done.",
+      "ranAt": "2026-10-29T02:29:10.944Z"
+    },
+    {
+      "id": "tips-earned",
+      "source": "opus-reference-2026-10-28-post-fix",
+      "reply": {
+        "text": "You've earned $150 total from 8 tips, and $25 of that came this month. Your tip link has 42 clicks, so roughly 1 in 5 people who click actually tip: that ratio is strong, the volume is the bottleneck.\n\nNight Swim drops tomorrow. Put the tip link next to the release link on your Jovie page (https://jov.ie/lunawaves) so release-day traffic hits it while listeners are most excited.",
+        "toolCalls": []
+      },
+      "reference": {
+        "grounded": 2,
+        "next_action": 2,
+        "time_aware": 2,
+        "no_dead_end": null,
+        "specific": 2,
+        "concise": 2,
+        "truthful": 2
+      },
+      "referenceWhy": "The biggest gap is that 'that ratio is strong' is an opinion with no benchmark in the context. Everything else matches the target: $150 total, $25 this month, 8 tips from 42 clicks, and one release-day step tied to Night Swim dropping tomorrow.",
+      "ranAt": "2026-10-29T02:29:10.944Z"
+    },
+    {
+      "id": "lapsed-flopped",
+      "source": "opus-reference-2026-10-28-post-fix",
+      "reply": {
+        "text": "Honest read: Low Tide Choir is sitting at 14 popularity, under the 19 your EP Signal Fires did, and it's been 128 days with nothing behind it. That's the real problem. Profile visits are down 38% month over month (41 in the last 30 vs 66 before), because there's nothing pulling people back to you.\n\nThe fix isn't promoting a 4-month-old single harder. It's a next release with actual runway: editorial pitches need 2 to 4 weeks of lead time, and a pre-save on your Jovie link can go up the day you have a title.\n\nOne move: what's the next single called and when is it landing? Give me that and I'll set up the release and its checklist today.",
+        "toolCalls": [
+          {
+            "name": "showTopInsights",
+            "input": {},
+            "output": {
+              "insights": [
+                {
+                  "title": "Profile visits down 38% over 30 days",
+                  "evidence": "610 lifetime views; 41 in the last 30 days vs 66 the 30 before."
+                }
+              ],
+              "relevant": true
+            }
+          }
+        ]
+      },
+      "reference": {
+        "grounded": 2,
+        "next_action": 1,
+        "time_aware": 2,
+        "no_dead_end": 2,
+        "specific": 2,
+        "concise": 2,
+        "truthful": 0
+      },
+      "referenceWhy": "It says Signal Fires had a popularity of 19, but that number appears nowhere in the context or tool results, and the next action is a question to the artist rather than a dated move Jovie proposes.",
+      "ranAt": "2026-10-29T02:29:10.944Z"
+    },
+    {
+      "id": "collab",
+      "source": "opus-reference-2026-10-28-post-fix",
+      "reply": {
+        "text": "Based on your ambient, electronic, downtempo profile, two strong collab candidates came up:\n\n1. **Fictional Artist A**: appears on shared ambient playlists, so your audiences already overlap on DSPs.\n2. **Fictional Artist B**: similar audience size, which makes a release swap or joint track mutually valuable rather than one-sided.\n\nWith Night Swim out tomorrow, timing works in your favor. A collab ask lands better when you have fresh music to trade attention around.\n\nNext step: I can draft a collaborator pitch for one of these two. Say the word and name your pick.",
+        "toolCalls": [
+          {
+            "name": "suggestRelatedArtists",
+            "input": {
+              "goal": "collaboration"
+            },
+            "output": {
+              "success": true,
+              "artists": [
+                {
+                  "name": "Fictional Artist A",
+                  "reason": "shared ambient playlists"
+                },
+                {
+                  "name": "Fictional Artist B",
+                  "reason": "similar audience size"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "reference": {
+        "grounded": 2,
+        "next_action": 1,
+        "time_aware": 2,
+        "no_dead_end": null,
+        "specific": 1,
+        "concise": 1,
+        "truthful": 1
+      },
+      "referenceWhy": "It offers a pitch and makes the artist pick, when it should have chosen one artist and drafted the outreach tied to tomorrow's Night Swim release; it also turns \"shared ambient playlists\" into an unverified claim that the audiences already overlap.",
+      "ranAt": "2026-10-29T02:29:10.944Z"
+    },
+    {
+      "id": "followup-do-it",
+      "source": "opus-reference-2026-10-28-post-fix",
+      "reply": {
+        "text": "Three things are missing before I can draft it: why Night Swim exists, a listen link, and the target playlist. One at a time.\n\nWhy does this release exist? Suggested line to confirm or rewrite: \"Night Swim is the follow-up to Neon Reef, a slow ambient electronic single about drifting through water after dark.\"\n\nConfirm, edit, or say UNKNOWN.",
+        "toolCalls": []
+      },
+      "reference": {
+        "grounded": 2,
+        "next_action": 1,
+        "time_aware": 1,
+        "no_dead_end": 1,
+        "specific": 1,
+        "concise": 1,
+        "truthful": 1
+      },
+      "referenceWhy": "After the artist said \"ok do it,\" Jovie still did not call generateReleasePitch; it started a three-question intake (why the release exists, a listen link, the target playlist) instead of drafting the pitch, asking only for the destination if needed, and it ignored that Night Swim comes out tomorrow.",
+      "ranAt": "2026-10-29T02:29:10.944Z"
+    }
+  ]
+}

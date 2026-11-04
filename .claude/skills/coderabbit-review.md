@@ -1,13 +1,13 @@
 ---
-description: Optional supplementary CodeRabbit review; use canonical internal review tooling
+description: Optional supplementary CodeRabbit review; preserve required qualification gates
 ---
 
 # CodeRabbit Review & Fix
 
 CodeRabbit is optional supplementary review. The canonical policy is
-`.claude/rules/code-style.md`; the existing JOV-7400 internal reviewer is the
-replacement. Record internal review receipts with verified reviewed-diff/head binding and resolve
-actionable findings.
+`.claude/rules/code-style.md`; the JOV-7400 internal reviewer and shadow review
+kernel are retired. Inspect the scoped diff, record review evidence with verified
+reviewed-diff/head binding, and resolve actionable findings.
 Required CI, security, qualification, and merge-queue gates remain unchanged.
 
 Run the steps below only when CodeRabbit is already available. Missing access,
@@ -21,7 +21,7 @@ not buy credits, configure credentials, or wait for a provider cooldown.
 3. Fix each issue one by one
 4. Re-run CodeRabbit to verify fixes
 5. Continue until no issues remain (maximum 3 iterations to avoid excessive API usage)
-6. If actionable issues remain after 3 iterations, resolve them through the normal internal review and qualification workflow
+6. If actionable issues remain after 3 iterations, resolve them through the normal independent review and qualification workflow
 
 ## Implementation
 
@@ -42,6 +42,6 @@ After receiving the review:
 - Use `--prompt-only` for token efficiency
 - Focus on uncommitted changes with `-t uncommitted`
 - Maximum 3 CodeRabbit runs to avoid excessive API usage
-- If CodeRabbit is unavailable or rate-limited, record that outcome and continue with existing internal tooling; do not wait or purchase capacity
+- If CodeRabbit is unavailable or rate-limited, record that outcome and continue with the required qualification workflow; do not wait or purchase capacity
 - Apply fixes methodically, one issue at a time
 - Verify fixes don't break existing functionality

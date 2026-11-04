@@ -80,7 +80,7 @@ jobs:
           branch_name: claim-dogfood-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production
+          protected_branches: main,production,prod,development,preview,br-main,br-production
           expires_in_hours: '2'
 
       - name: Resolve DATABASE_URL
@@ -152,7 +152,6 @@ jobs:
       - name: Build the app at the dogfooded SHA
         run: pnpm turbo build --filter=@jovie/web
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_APP_URL: http://localhost:3260
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3260
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
@@ -174,8 +173,6 @@ jobs:
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY: price_1USkjzASl9B9udHvEYkZLYZp
           STRIPE_TEST_ACCOUNT_ID: acct_1T1DV0ASl9B9udHv
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'

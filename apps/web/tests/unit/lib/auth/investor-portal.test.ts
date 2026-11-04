@@ -111,7 +111,7 @@ describe('investor portal proxy helper', () => {
     });
   });
 
-  it('lets response action links reach the page with token and action intact before DB validation', async () => {
+  it('lets response action links reach the page with token and action intact, behind the token limiter', async () => {
     const res = await handleInvestorRequest(
       createInvestorRequest(
         `/investor-portal/respond?t=${CLAIM_TOKEN}&action=interested`
@@ -121,10 +121,41 @@ describe('investor portal proxy helper', () => {
     expect(res?.status).toBe(200);
     expect(res?.headers.get('X-Robots-Tag')).toContain('noindex');
     expect(res?.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(mocks.investorPortalTokenLimit).toHaveBeenCalledTimes(1);
+    // The page owns the (read-only) DB validation; the middleware stays hot.
     expect(mocks.select).not.toHaveBeenCalled();
   });
 
-  it('lets token-only response links reach the page before DB validation', async () => {
+  it('answers a neutral 404 for a malformed token on the respond path without querying', async () => {
+    const res = await handleInvestorRequest(
+      createInvestorRequest('/investor-portal/respond?t=short&action=pass')
+    );
+
+    expectPrivateNotFoundish(res);
+    expect(mocks.investorPortalTokenLimit).not.toHaveBeenCalled();
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it('429s response action links when the limiter rejects, without touching the database', async () => {
+    mocks.investorPortalTokenLimit.mockResolvedValue({
+      success: false,
+      limit: 30,
+      remaining: 0,
+      reset: new Date(Date.now() + 9_000),
+    });
+
+    const res = await handleInvestorRequest(
+      createInvestorRequest(
+        `/investor-portal/respond?t=${CLAIM_TOKEN}&action=pass`
+      )
+    );
+
+    expect(res?.status).toBe(429);
+    expect(res?.headers.get('Retry-After')).not.toBeNull();
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it('lets token-only response links reach the page behind the limiter before DB validation', async () => {
     const res = await handleInvestorRequest(
       createInvestorRequest(`/investor-portal/respond?t=${CLAIM_TOKEN}`)
     );
@@ -132,6 +163,7 @@ describe('investor portal proxy helper', () => {
     expect(res?.status).toBe(200);
     expect(res?.headers.get('X-Robots-Tag')).toContain('noindex');
     expect(res?.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(mocks.investorPortalTokenLimit).toHaveBeenCalledTimes(1);
     expect(mocks.select).not.toHaveBeenCalled();
   });
 
@@ -278,6 +310,12 @@ describe('investor portal proxy helper', () => {
     expect(mocks.investorPortalTokenLimit).not.toHaveBeenCalled();
     expect(mocks.select).not.toHaveBeenCalled();
   });
+
+  function expectPrivateNotFoundish(res: Response | null | undefined) {
+    expect(res?.status).toBe(404);
+    expect(res?.headers.get('X-Robots-Tag')).toContain('noindex');
+    expect(res?.headers.get('Cache-Control')).toBe('private, no-store');
+  }
 
   function expectPrivateNotFound(res: Response | null | undefined) {
     expect(res?.status).toBe(404);

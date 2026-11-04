@@ -15,7 +15,9 @@ const {
   mockLte,
   mockIsNotNull,
   mockCountOpenCohortLearnings,
+  mockReadCachedAcquisitionEligibility,
 } = vi.hoisted(() => ({
+  mockReadCachedAcquisitionEligibility: vi.fn(),
   mockIsNotNull: vi.fn((column: unknown) => ({ op: 'isNotNull', column })),
   mockCountOpenCohortLearnings: vi.fn(),
   mockDbSelect: vi.fn(),
@@ -50,6 +52,10 @@ let lastCandidateLimit: number | null = null;
 
 const hashEmailForTest = (email: string) =>
   `hash:${email.trim().toLowerCase()}`;
+
+vi.mock('@/lib/acquisition/eligibility.server', () => ({
+  readCachedAcquisitionEligibility: mockReadCachedAcquisitionEligibility,
+}));
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -209,6 +215,11 @@ describe('runWaitlistAutoAccept', () => {
       autoAcceptedToday: 0,
     });
     mockCountOpenCohortLearnings.mockResolvedValue(0);
+    mockReadCachedAcquisitionEligibility.mockReset();
+    mockReadCachedAcquisitionEligibility.mockResolvedValue({
+      eligible: true,
+      verdict: 'ELIGIBLE',
+    });
     mockTryReserveAutoAcceptSlot.mockResolvedValue({
       shouldAutoAccept: true,
       reason: 'reserved',
@@ -241,6 +252,105 @@ describe('runWaitlistAutoAccept', () => {
       }
       return createCandidateQuery();
     });
+  });
+
+  it.each([
+    null,
+    { eligible: false, verdict: 'BLOCKED' },
+    { eligible: false, verdict: 'UNKNOWN' },
+    { eligible: false, verdict: 'ELIGIBLE' },
+    { eligible: true, verdict: 'UNKNOWN' },
+  ])(
+    'holds the queue without scanning or sending when readiness is %j',
+    async report => {
+      mockReadCachedAcquisitionEligibility.mockResolvedValue(report);
+      candidateRows = [
+        { id: 'artist', email: 'artist@example.com', status: 'waitlisted' },
+      ];
+      const { runWaitlistAutoAccept } = await import(
+        '@/lib/waitlist/auto-accept'
+      );
+      const result = await runWaitlistAutoAccept();
+      expect(result).toMatchObject({
+        scanned: 0,
+        approved: 0,
+        pausedReason: 'golden_path_not_green',
+      });
+      expect(mockDbSelect).not.toHaveBeenCalled();
+      expect(mockTryReserveAutoAcceptSlot).not.toHaveBeenCalled();
+      expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
+      expect(mockEnqueueWaitlistApprovalInviteEmail).not.toHaveBeenCalled();
+    }
+  );
+
+  it('holds admissions when the readiness dependency fails', async () => {
+    mockReadCachedAcquisitionEligibility.mockRejectedValue(
+      new Error('redis unavailable')
+    );
+    const { runWaitlistAutoAccept } = await import(
+      '@/lib/waitlist/auto-accept'
+    );
+    expect(await runWaitlistAutoAccept()).toMatchObject({
+      approved: 0,
+      pausedReason: 'golden_path_not_green',
+    });
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(mockEnqueueWaitlistApprovalInviteEmail).not.toHaveBeenCalled();
+  });
+
+  it('stops a running drain when readiness is revoked before the next candidate', async () => {
+    candidateRows = [
+      { id: 'first', email: 'first@example.com', status: 'waitlisted' },
+      { id: 'second', email: 'second@example.com', status: 'waitlisted' },
+    ];
+    mockReadCachedAcquisitionEligibility
+      .mockResolvedValueOnce({ eligible: true, verdict: 'ELIGIBLE' })
+      .mockResolvedValueOnce({ eligible: true, verdict: 'ELIGIBLE' })
+      .mockResolvedValue(null);
+    const { runWaitlistAutoAccept } = await import(
+      '@/lib/waitlist/auto-accept'
+    );
+    expect(await runWaitlistAutoAccept()).toMatchObject({
+      approved: 1,
+      pausedReason: 'golden_path_not_green',
+    });
+    expect(mockTryReserveAutoAcceptSlot).toHaveBeenCalledTimes(1);
+    expect(mockApproveWaitlistEntryInTx).toHaveBeenCalledTimes(1);
+    expect(mockEnqueueWaitlistApprovalInviteEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('rechecks readiness after a serialization conflict before retrying an admission', async () => {
+    candidateRows = [
+      { id: 'artist', email: 'artist@example.com', status: 'waitlisted' },
+    ];
+    mockReadCachedAcquisitionEligibility
+      .mockResolvedValueOnce({ eligible: true, verdict: 'ELIGIBLE' })
+      .mockResolvedValueOnce({ eligible: true, verdict: 'ELIGIBLE' })
+      .mockResolvedValue(null);
+    mockWithSystemIngestionSession.mockRejectedValueOnce(
+      Object.assign(new Error('serialization conflict'), { code: '40001' })
+    );
+    mockWithSerializableRetry.mockImplementation(
+      async (operation: () => Promise<unknown>) => {
+        try {
+          return await operation();
+        } catch {
+          return operation();
+        }
+      }
+    );
+    const { runWaitlistAutoAccept } = await import(
+      '@/lib/waitlist/auto-accept'
+    );
+    const result = await runWaitlistAutoAccept();
+    expect(result).toMatchObject({
+      approved: 0,
+      pausedReason: 'golden_path_not_green',
+    });
+    expect(mockWithSystemIngestionSession).toHaveBeenCalledTimes(1);
+    expect(mockTryReserveAutoAcceptSlot).not.toHaveBeenCalled();
+    expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
+    expect(mockEnqueueWaitlistApprovalInviteEmail).not.toHaveBeenCalled();
   });
 
   it.each([undefined, 'invalid+base@e2e.example.com'])(

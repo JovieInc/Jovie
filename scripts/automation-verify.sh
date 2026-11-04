@@ -18,10 +18,23 @@ case "$SCOPE" in
   affected)
     echo "[automation-verify] Running affected verify bundle"
     BASE_REF="${AUTOMATION_VERIFY_BASE:-origin/main}"
-    if ! git rev-parse --verify --quiet "${BASE_REF}^{commit}" >/dev/null; then
-      echo "[automation-verify] Cannot resolve affected-test base: ${BASE_REF}" >&2
+    # Resolve at the consumer boundary: pool-local main may be stale. Keep
+    # qualified refs intact and pin the commit for every downstream diff.
+    if ! BASE_REF="$(node --input-type=module - "$BASE_REF" <<'NODE'
+import { execFileSync } from 'node:child_process';
+import { baseRefCandidates, resolveBaseRef } from './scripts/lib/git-base-ref.mjs';
+const requested = process.argv[2];
+const base = resolveBaseRef(process.cwd(), requested);
+if (!base) {
+  console.error(`[automation-verify] Cannot resolve affected-test base: ${requested} (tried ${baseRefCandidates(requested).join(', ')})`);
+  process.exit(1);
+}
+console.log(execFileSync('git', ['rev-parse', '--verify', `${base}^{commit}`], { encoding: 'utf8' }).trim());
+NODE
+)"; then
       exit 1
     fi
+    export TURBO_SCM_BASE="$BASE_REF"
     node scripts/turbo-local.mjs typecheck --affected
     # Turbo packages do not cover the scripts/ tree; Source Validation checks it
     # separately. Run the same ratchet here when scripts/ changed so a new type
@@ -36,7 +49,13 @@ case "$SCOPE" in
       echo "[automation-verify] Cannot list scripts/ changes since ${SCRIPTS_DIFF_BASE}" >&2
       exit 1
     fi
-    if [[ -n "$SCRIPTS_CHANGED" ]]; then
+    # Include the index, working tree and untracked files for verification
+    # before commit, while retaining selection for every committed change.
+    if ! SCRIPTS_DIRTY="$(git status --porcelain --untracked-files=all -- scripts/)"; then
+      echo "[automation-verify] Cannot list scripts/ working tree changes" >&2
+      exit 1
+    fi
+    if [[ -n "$SCRIPTS_CHANGED" || -n "$SCRIPTS_DIRTY" ]]; then
       echo "[automation-verify] scripts/ changed: running the scripts typecheck ratchet"
       node scripts/typecheck-scripts.mjs
     else

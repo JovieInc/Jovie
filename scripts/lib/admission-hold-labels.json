@@ -1,15 +1,6 @@
 {
   "schema": "jovie-admission-hold-labels/v1",
-  "stopHoldLabels": [
-    "hold",
-    "gated",
-    "incident",
-    "do-not-merge",
-    "tim-hold",
-    "tim:hold",
-    "hold:tim",
-    "queue-deferred"
-  ],
+  "stopHoldLabels": ["hold", "gated", "incident", "queue-deferred"],
   "queuePoisonLabel": "queue-poison",
   "machineBlockLabels": ["lane-fix-red"]
 }

@@ -27,9 +27,6 @@ const NPM_DEPENDABOT = DEPENDABOT_CONFIG.match(
 
 const CODEQL_ACTION_USE =
   /^\s*uses:\s*github\/codeql-action\/([^@\s]+)@([^\s#]+)(?:\s+#\s+(\S+))?\s*$/gm;
-const EXPECTED_CODEQL_ACTION_REVISION =
-  '6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee';
-const EXPECTED_CODEQL_ACTION_VERSION = 'v4.39.0';
 
 function collectCodeqlActionUses() {
   return WORKFLOW_FILES.flatMap(({ content, file }) =>
@@ -43,23 +40,64 @@ function collectCodeqlActionUses() {
   );
 }
 
+function expectCoherentCodeqlRelease(pins) {
+  expect(pins.map(pin => pin.component)).toEqual(
+    expect.arrayContaining(['analyze', 'init', 'upload-sarif'])
+  );
+  expect(
+    pins.filter(pin => !/^[0-9a-f]{40}$/.test(pin.revision))
+  ).toStrictEqual([]);
+  expect(
+    pins.filter(pin => !/^v\d+\.\d+\.\d+$/.test(pin.version ?? ''))
+  ).toStrictEqual([]);
+  // Dependabot owns the release pin. Check coherence, so a grouped bump does
+  // not require updating a second copy of the release in this contract.
+  expect(new Set(pins.map(pin => pin.revision)).size).toBe(1);
+  expect(new Set(pins.map(pin => pin.version)).size).toBe(1);
+}
+
 describe('CodeQL workflow version coherence', () => {
   it('keeps every workflow CodeQL action use on one immutable release', () => {
+    expectCoherentCodeqlRelease(collectCodeqlActionUses());
+  });
+
+  it('accepts a coordinated future release without updating the contract', () => {
+    const pins = collectCodeqlActionUses().map(pin => ({
+      ...pin,
+      revision: '1'.repeat(40),
+      version: 'v99.0.0',
+    }));
+
+    expectCoherentCodeqlRelease(pins);
+  });
+
+  it.each([
+    ['a different immutable revision', { revision: '2'.repeat(40) }],
+    ['a different release comment', { version: 'v99.0.1' }],
+    ['a mutable tag', { revision: 'v99.0.0' }],
+    ['a short revision', { revision: '1234567' }],
+    ['a missing release comment', { version: null }],
+    ['a mutable release comment', { version: 'v99' }],
+  ])('rejects %s in any component', (_label, change) => {
     const pins = collectCodeqlActionUses();
 
-    expect(pins.map(pin => pin.component)).toEqual(
-      expect.arrayContaining(['analyze', 'init', 'upload-sarif'])
-    );
-    expect(
-      pins.filter(pin => !/^[0-9a-f]{40}$/.test(pin.revision))
-    ).toStrictEqual([]);
-    expect(
-      pins.filter(pin => pin.revision !== EXPECTED_CODEQL_ACTION_REVISION)
-    ).toStrictEqual([]);
-    expect(
-      pins.filter(pin => pin.version !== EXPECTED_CODEQL_ACTION_VERSION)
-    ).toStrictEqual([]);
+    for (const index of pins.keys()) {
+      const changed = pins.map((pin, i) =>
+        i === index ? { ...pin, ...change } : pin
+      );
+      expect(() => expectCoherentCodeqlRelease(changed)).toThrow();
+    }
   });
+
+  it.each(['analyze', 'init', 'upload-sarif'])(
+    'rejects a missing %s component',
+    component => {
+      const pins = collectCodeqlActionUses().filter(
+        pin => pin.component !== component
+      );
+      expect(() => expectCoherentCodeqlRelease(pins)).toThrow();
+    }
+  );
 
   it('groups CodeQL action updates so Dependabot moves every component together', () => {
     expect(GITHUB_ACTIONS_DEPENDABOT).toMatch(

@@ -33,18 +33,21 @@ vi.mock('@jovie/ui', () => ({
   ConfirmDialog: ({
     open,
     title,
+    body,
     confirmLabel,
     onConfirm,
     isLoading,
   }: {
     open: boolean;
     title: ReactNode;
+    body?: ReactNode;
     confirmLabel: ReactNode;
     onConfirm: () => void;
     isLoading: boolean;
   }) =>
     open ? (
       <div role='alertdialog' aria-label={String(title)}>
+        {body}
         <button type='button' disabled={isLoading} onClick={onConfirm}>
           {confirmLabel}
         </button>
@@ -114,5 +117,21 @@ describe('BillingActionsSection', () => {
       />
     );
     expect(document.body.textContent ?? '').not.toMatch(/branding/i);
+  });
+
+  it('states retention and contact limits from the entitlement registry', () => {
+    render(
+      <BillingActionsSection
+        cancelDialogOpen
+        setCancelDialogOpen={vi.fn()}
+        handleCancelSubscription={vi.fn()}
+        cancelMutationPending={false}
+      />
+    );
+    const text = (document.body.textContent ?? '').replace(/\s+/g, ' ');
+    // Pro 180 -> Free 30 days, saved contacts capped at 100 (registry).
+    expect(text).toContain('Retention drops from 180 days to 30 days');
+    expect(text).toContain('Saved contact limit drops to 100');
+    expect(text).not.toMatch(/90 days to 7 days/);
   });
 });

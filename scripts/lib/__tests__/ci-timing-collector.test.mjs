@@ -5,7 +5,10 @@ import {
   computeQueueDepth,
   jobAttemptRow,
   parseQueuePrNumber,
+  poolQueueWait,
   queueEventRow,
+  queueWaitSeconds,
+  runnerPool,
   SCHEMA_VERSION,
   toNdjson,
 } from '../ci-timing-collector.mjs';
@@ -273,5 +276,52 @@ describe('toNdjson', () => {
     expect(lines.length).toBe(2);
     expect(JSON.parse(lines[0]).a).toBe(1);
     expect(JSON.parse(lines[1]).b).toBe(2);
+  });
+});
+
+describe('runner pool queue wait', () => {
+  it('classifies the gem pool and measures created -> started', () => {
+    expect(runnerPool(['self-hosted', 'Linux', 'X64', 'jovie-fixed'])).toBe(
+      'self-hosted'
+    );
+    expect(runnerPool(['ubuntu-latest'])).toBe('hosted');
+    expect(runnerPool(undefined)).toBe('hosted');
+    expect(
+      queueWaitSeconds({
+        created_at: '2026-10-29T16:00:00Z',
+        started_at: '2026-10-29T16:02:00Z',
+      })
+    ).toBe(120);
+    expect(queueWaitSeconds({ created_at: '2026-10-29T16:00:00Z' })).toBeNull();
+    const row = jobAttemptRow({
+      run: BASE_RUN,
+      job: {
+        ...BASE_JOB,
+        labels: ['self-hosted', 'jovie-fixed'],
+        created_at: '2026-10-23T19:00:30Z',
+      },
+      collectedAt: '2026-10-23T20:00:00Z',
+    });
+    expect(row).toMatchObject({ runner_pool: 'self-hosted', queue_wait_s: 30 });
+  });
+
+  it('reports p50/p95 per pool from job_attempt rows only', () => {
+    const rows = [
+      ...[3, 3, 4, 5, 33].map(w => ({
+        row_type: 'job_attempt',
+        runner_pool: 'hosted',
+        queue_wait_s: w,
+      })),
+      ...[69, 120, 192, 451].map(w => ({
+        row_type: 'job_attempt',
+        runner_pool: 'self-hosted',
+        queue_wait_s: w,
+      })),
+      { row_type: 'queue_event', queue_wait_s: 999 },
+    ];
+    expect(poolQueueWait(rows)).toEqual({
+      hosted: { n: 5, p50S: 4, p95S: 33 },
+      'self-hosted': { n: 4, p50S: 120, p95S: 451 },
+    });
   });
 });

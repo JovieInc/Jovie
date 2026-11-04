@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   getInvestorPortalAccess: vi.fn(),
+  openInvestorPrivateFile: vi.fn(),
 }));
+
+const PDF_BYTES = new TextEncoder().encode('%PDF-1.7 test deck');
 
 vi.mock('@/lib/investors/portal-access', () => ({
   getInvestorPortalAccess: mocks.getInvestorPortalAccess,
@@ -10,6 +13,10 @@ vi.mock('@/lib/investors/portal-access', () => ({
     'X-Robots-Tag': 'noindex, nofollow, noarchive, nosnippet',
     'Cache-Control': 'private, no-store',
   },
+}));
+
+vi.mock('@/lib/investors/private-content', () => ({
+  openInvestorPrivateFile: mocks.openInvestorPrivateFile,
 }));
 
 import { GET } from './route';
@@ -31,6 +38,11 @@ describe('GET /investor-portal/deck/[...path]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getInvestorPortalAccess.mockResolvedValue(null);
+    mocks.openInvestorPrivateFile.mockImplementation(async () => ({
+      stream: new Response(PDF_BYTES).body,
+      contentType: 'application/pdf',
+      size: PDF_BYTES.byteLength,
+    }));
   });
 
   it.each(['Jovie-Pitch-Deck.pdf', 'index.html', 'assets/deck.png'])(
@@ -41,6 +53,7 @@ describe('GET /investor-portal/deck/[...path]', () => {
       expect(res.status).toBe(404);
       expectPrivate(res);
       expect(await res.text()).toBe('');
+      expect(mocks.openInvestorPrivateFile).not.toHaveBeenCalled();
     }
   );
 
@@ -88,4 +101,26 @@ describe('GET /investor-portal/deck/[...path]', () => {
       expectPrivate(res);
     }
   );
+
+  it('404s when the private store has no deck', async () => {
+    mocks.getInvestorPortalAccess.mockResolvedValue({ kind: 'admin' });
+    mocks.openInvestorPrivateFile.mockRejectedValue(new Error('missing'));
+
+    const res = await get('Jovie-Pitch-Deck.pdf');
+
+    expect(res.status).toBe(404);
+    expectPrivate(res);
+  });
+
+  it('reads the deck from the private store path', async () => {
+    mocks.getInvestorPortalAccess.mockResolvedValue({ kind: 'admin' });
+
+    const res = await get('Jovie-Pitch-Deck.pdf');
+    await res.body?.cancel();
+
+    expect(mocks.openInvestorPrivateFile).toHaveBeenCalledWith(
+      'assets/investor-deck/Jovie-Pitch-Deck.pdf',
+      'application/pdf'
+    );
+  });
 });

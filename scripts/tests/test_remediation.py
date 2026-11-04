@@ -51,6 +51,15 @@ def providers():
     }
 
 
+
+def ask_classify(*args, **kwargs):
+    """Detection view of classify_blocker. EVENT 2026-10-28: a reserved decision never changes the
+    class (nothing parks); it rides along as `decisionAsk`. These tests keep asserting what counts
+    as a reserved decision, so the ask is projected back onto the legacy class name."""
+    result = remediation.classify_blocker(*args, **kwargs)
+    return {**result, "cls": "needs-human-decision"} if result.get("decisionAsk") else result
+
+
 class ClassifierFixtureTest(unittest.TestCase):
     def test_unknown_merge_state_waits_without_spending_or_surfacing(self):
         for rollup in (checks(), checks(conclusion="FAILURE"),
@@ -60,7 +69,7 @@ class ClassifierFixtureTest(unittest.TestCase):
                     target = pr(mergeStateStatus="UNKNOWN", statusCheckRollup=rollup,
                                 reviewDecision=review)
                     record = {"sha": HEAD, "count": 2, "lane": "devin"}
-                    classified = remediation.classify_blocker(target, attempts=record)
+                    classified = ask_classify(target, attempts=record)
                     self.assertEqual((classified["cls"], classified["subtype"]),
                                      ("ready", "awaiting"))
                     self.assertIn("mergeStateStatus=UNKNOWN", classified["evidence"])
@@ -71,8 +80,8 @@ class ClassifierFixtureTest(unittest.TestCase):
 
     def test_stuck_pr_fixtures(self):
         ready = pr(number=20079, statusCheckRollup=checks(39))
-        self.assertEqual(remediation.classify_blocker(ready, {"sha": "ed4d35e", "reason": "fix-exhausted"})["cls"], "ready")
-        self.assertEqual(remediation.classify_blocker(ready)["next_action"], "arm")
+        self.assertEqual(ask_classify(ready, {"sha": "ed4d35e", "reason": "fix-exhausted"})["cls"], "ready")
+        self.assertEqual(ask_classify(ready)["next_action"], "arm")
 
         dirty = pr(number=20074, mergeStateStatus="DIRTY", labels=[{"name": "lane-fix-exhausted"}],
                    conflictFiles=["src/a.ts", "src/b.ts"],
@@ -80,34 +89,34 @@ class ClassifierFixtureTest(unittest.TestCase):
                                    "body": "PublicationStorySchema id required", "author": "sentry[bot]"},
                                   {"resolved": False, "bot": True, "severity": "HIGH",
                                    "body": "summary-vs-bullet removed"}])
-        classified = remediation.classify_blocker(dirty)
+        classified = ask_classify(dirty)
         self.assertEqual((classified["cls"], classified["subtype"]), ("needs-rebase", "semantic"))
         self.assertTrue(any("bot review" in line for line in classified["evidence"]))
 
         strategy = pr(number=20062, isDraft=True, labels=[{"name": "hold"}], files=["canon/strategy/theses.md"],
                       reviewThreads=[{"resolved": False, "bot": True, "body": "supersededBy cycle"}])
-        self.assertEqual(remediation.classify_blocker(strategy)["cls"], "needs-human-decision")
+        self.assertEqual(ask_classify(strategy)["cls"], "needs-human-decision")
 
         rebase = pr(number=20035, mergeStateStatus="DIRTY",
                     labels=[{"name": "lane-fix-conflict"}, {"name": "lane-fix-exhausted"}, {"name": "queue-poison"}])
-        self.assertEqual(remediation.classify_blocker(rebase)["cls"], "needs-rebase")
+        self.assertEqual(ask_classify(rebase)["cls"], "needs-rebase")
 
         failing = pr(number=20020, isDraft=True, labels=[{"name": "lane-fix-red"}, {"name": "lane-fix-exhausted"}],
                      statusCheckRollup=[{"name": "component-ship-gate", "status": "COMPLETED", "conclusion": "FAILURE",
                                          "excerpt": "missing LibraryFilesPanel.stories.tsx"}])
-        fixable = remediation.classify_blocker(failing, None, {"count": 2, "pushed": False, "sha": HEAD})
+        fixable = ask_classify(failing, None, {"count": 2, "pushed": False, "sha": HEAD})
         self.assertEqual(fixable["cls"], "fixable-by-model")
         self.assertTrue(any("did not move the head" in line for line in fixable["evidence"]))
 
         waiting = pr(number=19776, mergeStateStatus="BLOCKED",
                      labels=[{"name": "lane-fix-exhausted"}, {"name": "queue-poison"}],
                      statusCheckRollup=checks(2) + [{"name": "Exact-head Coverage", "status": "IN_PROGRESS", "conclusion": ""}])
-        self.assertEqual(remediation.classify_blocker(waiting)["subtype"], "awaiting")
+        self.assertEqual(ask_classify(waiting)["subtype"], "awaiting")
 
         held = pr(number=18985, labels=[{"name": "hold"}, {"name": "queue-poison"}],
                   holdNote={"author": "itstimwhite",
                             "body": "use computeRatePercent from @/lib/analytics/metrics and remove hold"})
-        human = remediation.classify_blocker(held)
+        human = ask_classify(held)
         self.assertEqual((human["cls"], human["subtype"]), ("fixable-by-model", "human-hold"))
 
     def test_changes_requested_routes_to_the_automated_review_fix_ladder(self):
@@ -116,7 +125,7 @@ class ClassifierFixtureTest(unittest.TestCase):
         (strategy/taste/credential content) keeps the needs-human-decision class."""
         # No bot review threads: an ordinary actionable CHANGES_REQUESTED review.
         ordinary = pr(number=21932, reviewDecision="CHANGES_REQUESTED")
-        classified = remediation.classify_blocker(ordinary)
+        classified = ask_classify(ordinary)
         self.assertEqual((classified["cls"], classified.get("subtype")),
                          ("fixable-by-model", "review"))
         self.assertEqual(classified["next_action"], "escalate")
@@ -124,7 +133,7 @@ class ClassifierFixtureTest(unittest.TestCase):
         prescribed = pr(number=21932, reviewDecision="CHANGES_REQUESTED",
                          held={"sha": HEAD, "evidence": ["replace `AUTHORIZATION: bearer` with the scoped Basic form"],
                                "reason": "fix-exhausted"})
-        fixable = remediation.classify_blocker(prescribed, prescribed["held"])
+        fixable = ask_classify(prescribed, prescribed["held"])
         self.assertEqual((fixable["cls"], fixable.get("subtype")),
                          ("fixable-by-model", "human-hold"))
         self.assertEqual(fixable["next_action"], "apply-prescribed-fix")
@@ -133,66 +142,64 @@ class ClassifierFixtureTest(unittest.TestCase):
         threaded = pr(number=21932, reviewDecision="CHANGES_REQUESTED",
                       reviewThreads=[{"resolved": False, "author": "itstimwhite",
                                       "body": "replace `bearer` with the documented Basic form"}])
-        threaded_cls = remediation.classify_blocker(threaded)
+        threaded_cls = ask_classify(threaded)
         self.assertEqual((threaded_cls["cls"], threaded_cls.get("subtype")),
                          ("fixable-by-model", "review"))
         self.assertTrue(any("unresolved human review thread" in line for line in threaded_cls["evidence"]))
         # A strategy/taste surface keeps the human gate (unchanged).
         strategy = pr(number=21932, reviewDecision="CHANGES_REQUESTED",
                       files=["canon/strategy/theses.md"])
-        self.assertEqual(remediation.classify_blocker(strategy)["cls"], "needs-human-decision")
+        self.assertEqual(ask_classify(strategy)["cls"], "needs-human-decision")
 
     def test_review_routing_preserves_explicit_stops_and_real_decisions(self):
         """Independent re-review counterexamples (#21932, 2026-10-16): an
         explicit stop label, a negated policy statement in an ordinary repair,
         and a real founder decision inside a review thread must all keep their
         gates; only ordinary actionable feedback rides the automated ladder."""
-        # An explicit stop label outranks the review-fix ladder: the early
-        # human_review return must not swallow a do-not-merge hold.
-        stopped = pr(number=21933, reviewDecision="CHANGES_REQUESTED",
-                     labels=[{"name": "do-not-merge"}],
-                     holdNote={"author": "itstimwhite",
-                               "body": "hold pending external review"})
-        stop_cls = remediation.classify_blocker(stopped)
-        self.assertEqual(stop_cls["cls"], "needs-human-decision")
-        self.assertEqual(stop_cls["next_action"], "tim-decides")
+        # EVENT 2026-10-28: do-not-merge / tim-hold are retired labels. They neither park the PR
+        # nor ask: requested changes ride the automated review-fix ladder.
+        for retired in ("do-not-merge", "tim-hold", "tim:hold", "hold:tim"):
+            stopped = pr(number=21933, reviewDecision="CHANGES_REQUESTED", labels=[{"name": retired}])
+            stop_cls = ask_classify(stopped)
+            self.assertEqual(stop_cls["cls"], "fixable-by-model", retired)
+            self.assertNotEqual(stop_cls["next_action"], "tim-decides", retired)
         # An ordinary repair that states what it did NOT touch ("No
         # credentials or permissions are changed") is assurance, not a
         # founder decision surface; a positive credential/pricing change
         # still keeps the gate.
         negative = pr(number=21934, reviewDecision="CHANGES_REQUESTED",
                       body="Fix the CI auth format. No credentials or permissions are changed.")
-        self.assertEqual(remediation.classify_blocker(negative)["cls"], "fixable-by-model")
+        self.assertEqual(ask_classify(negative)["cls"], "fixable-by-model")
         positive = pr(number=21935, reviewDecision="CHANGES_REQUESTED",
                       body="Rotate the production credential and update the pricing table")
-        self.assertEqual(remediation.classify_blocker(positive)["cls"], "needs-human-decision")
+        self.assertEqual(ask_classify(positive)["cls"], "needs-human-decision")
         # A current unresolved human thread carrying a real spend decision
         # surfaces the ask instead of routing it as prescribed implementation.
         spend = pr(number=21936, reviewDecision="CHANGES_REQUESTED",
                    reviewThreads=[{"resolved": False, "author": "itstimwhite",
                                    "body": "Should we purchase a paid plan before implementation?"}])
-        spend_cls = remediation.classify_blocker(spend)
+        spend_cls = ask_classify(spend)
         self.assertEqual(spend_cls["cls"], "needs-human-decision")
-        self.assertTrue(any("spend" in line for line in spend_cls["evidence"]))
+        self.assertTrue(any("spend" in line for line in remediation.classify_blocker(spend)["decisionAsk"]))
         # An ordinary engineering ask in the same position stays fixable.
         ordinary = pr(number=21937, reviewDecision="CHANGES_REQUESTED",
                       reviewThreads=[{"resolved": False, "author": "itstimwhite",
                                       "body": "replace `bearer` with the documented Basic form"}])
-        self.assertEqual(remediation.classify_blocker(ordinary)["cls"], "fixable-by-model")
+        self.assertEqual(ask_classify(ordinary)["cls"], "fixable-by-model")
 
     def test_lockfile_only_and_main_red_and_events(self):
         lock = pr(mergeStateStatus="DIRTY", conflictFiles=["pnpm-lock.yaml"])
-        self.assertEqual(remediation.classify_blocker(lock)["subtype"], "lockfile-only")
+        self.assertEqual(ask_classify(lock)["subtype"], "lockfile-only")
         generated = pr(mergeStateStatus="DIRTY", conflictFiles=[".github/workflow-topology.gen.yml"])
-        self.assertEqual(remediation.classify_blocker(generated)["subtype"], "generated-only")
-        self.assertEqual(remediation.plan_ladder(remediation.classify_blocker(generated), {}, providers(), 0, "h")["action"],
+        self.assertEqual(ask_classify(generated)["subtype"], "generated-only")
+        self.assertEqual(remediation.plan_ladder(ask_classify(generated), {}, providers(), 0, "h")["action"],
                          "resolve-lockfile")
         mixed = pr(mergeStateStatus="DIRTY",
                    conflictFiles=[".github/workflow-topology.gen.yml", "src/a.ts"])
-        self.assertEqual(remediation.classify_blocker(mixed)["subtype"], "semantic")
+        self.assertEqual(ask_classify(mixed)["subtype"], "semantic")
         overlap = pr(statusCheckRollup=[{"name": "CI", "status": "COMPLETED", "conclusion": "FAILURE"}])
         main = [{"name": "CI", "conclusion": "FAILURE"}]
-        self.assertEqual(remediation.classify_blocker(overlap, main_rollup=main)["subtype"], "main-red")
+        self.assertEqual(ask_classify(overlap, main_rollup=main)["subtype"], "main-red")
         event = remediation.classify_event({"source": "pr", "pr": overlap, "main_rollup": main})
         self.assertEqual(event["cls"], "main-red")
         self.assertEqual(remediation.classify_event({"source": "main-ci", "main_red": True, "evidence": {}})["cls"], "main-red")
@@ -212,7 +219,7 @@ class AggregateCheckTest(unittest.TestCase):
             {"name": "ci-fast", "status": "COMPLETED", "conclusion": "CANCELLED"},
             {"name": "unit (3)", "status": "COMPLETED", "conclusion": "STARTUP_FAILURE"},
             *checks(2)])
-        classified = remediation.classify_blocker(outage)
+        classified = ask_classify(outage)
         self.assertEqual((classified["cls"], classified["subtype"], classified["next_action"]),
                          ("flaky-infra", "infra", "rerun"))
         self.assertEqual(remediation.plan_ladder(classified, {}, providers(), NOW, HEAD)["action"], "rerun")
@@ -222,9 +229,9 @@ class AggregateCheckTest(unittest.TestCase):
             {"name": "PR Ready", "status": "COMPLETED", "conclusion": "FAILURE"},
             {"name": "ci-fast", "status": "COMPLETED", "conclusion": "CANCELLED"},
             {"name": "unit (1)", "status": "COMPLETED", "conclusion": "FAILURE"}])
-        self.assertEqual(remediation.classify_blocker(real)["cls"], "fixable-by-model")
+        self.assertEqual(ask_classify(real)["cls"], "fixable-by-model")
         alone = pr(statusCheckRollup=[{"name": "PR Ready", "status": "COMPLETED", "conclusion": "FAILURE"}])
-        self.assertEqual(remediation.classify_blocker(alone)["cls"], "fixable-by-model",
+        self.assertEqual(ask_classify(alone)["cls"], "fixable-by-model",
                          "a summary failing on its own carries its own cause")
 
 
@@ -303,7 +310,6 @@ class RouterLadderTest(unittest.TestCase):
             os.environ.pop(name, None)
         self.assertTrue(remediation.escalation_enabled())
         self.assertFalse(remediation.notify_tim())
-        self.assertFalse(remediation.lift_human_holds())
         os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
         self.assertTrue(remediation.stuck_pr_escalation_enabled(), "every exhausted head gets the ladder by default")
         os.environ["LANES_ESCALATION"] = "0"
@@ -314,22 +320,35 @@ class RouterLadderTest(unittest.TestCase):
         finally:
             os.environ.pop("LANES_ESCALATION", None)
 
-    def test_review_preserves_required_codeowner_gate(self):
+    def test_reserved_decisions_never_park_and_carry_a_default_and_deadline(self):
+        strategy = pr(number=1, title="pricing change", files=["canon/strategy/theses.md"],
+                      statusCheckRollup=checks(conclusion="FAILURE"))
+        result = remediation.classify_blocker(strategy)
+        self.assertEqual(result["cls"], "fixable-by-model")
+        self.assertTrue(result["decisionAsk"])
+        card = remediation.decision_card(strategy, result, now=1000.0)
+        self.assertFalse(card["blocking"])
+        self.assertEqual(card["decideBy"], 1000.0 + 48 * 3600)
+        self.assertIn(card["defaultDecision"], {"approve", "reject"})
+        self.assertTrue(card["defaultIfSilent"])
+
+    def test_codeowner_flag_is_not_a_human_gate(self):
+        # Review is a machine (LLM) gate, not a label: a codeowners flag never parks the PR.
         for extra in ({"codeownersBlocked": True}, {"labels": ["codeowners"]}):
             with self.subTest(extra=extra):
                 subject = pr(reviewDecision="CHANGES_REQUESTED", **extra)
                 result = remediation.classify_blocker(subject)
-                self.assertEqual(result["cls"], "needs-human-decision")
-                self.assertEqual(result["subtype"], "codeowners")
+                self.assertEqual(result["cls"], "fixable-by-model")
+                self.assertNotEqual(result["next_action"], "tim-decides")
 
     def test_review_permission_expansion_is_not_ordinary_implementation(self):
         subject = pr(
             reviewDecision="CHANGES_REQUESTED",
             reviewThreads=[{"author": "reviewer", "resolved": False,
                             "body": "Expand the GitHub token permissions to include workflow writes."}])
-        result = remediation.classify_blocker(subject)
+        result = ask_classify(subject)
         self.assertEqual(result["cls"], "needs-human-decision")
-        self.assertIn("decision", " ".join(result["evidence"]))
+        self.assertIn("decision", " ".join(remediation.classify_blocker(subject)["decisionAsk"]))
 
     def test_review_reusing_existing_auth_does_not_ask_for_permission(self):
         for text in (
@@ -341,7 +360,7 @@ class RouterLadderTest(unittest.TestCase):
             with self.subTest(text=text):
                 subject = pr(reviewDecision="CHANGES_REQUESTED",
                              reviewThreads=[{"author": "reviewer", "resolved": False, "body": text}])
-                result = remediation.classify_blocker(subject)
+                result = ask_classify(subject)
                 self.assertEqual(result["cls"], "fixable-by-model")
 
     def test_pricing_test_path_is_not_a_founder_gate(self):
@@ -361,13 +380,13 @@ class RouterLadderTest(unittest.TestCase):
             mergeStateStatus="BLOCKED",
             **red,
         )
-        classified = remediation.classify_blocker(copy_fix)
+        classified = ask_classify(copy_fix)
         self.assertEqual(classified["cls"], "fixable-by-model")
         self.assertNotIn(
             "strategy/pricing/credential/taste content", classified["evidence"])
         production = pr(files=["apps/web/app/(marketing)/pricing/page.tsx"], **red)
         self.assertEqual(
-            remediation.classify_blocker(production)["cls"], "needs-human-decision")
+            ask_classify(production)["cls"], "needs-human-decision")
 
     def test_negated_credentials_do_not_mask_positive_strategy_or_paths(self):
         for extra in (
@@ -377,7 +396,7 @@ class RouterLadderTest(unittest.TestCase):
              "files": ["canon/strategy/pricing.md"]},
         ):
             with self.subTest(extra=extra):
-                self.assertEqual(remediation.classify_blocker(pr(**extra))["cls"],
+                self.assertEqual(ask_classify(pr(**extra))["cls"],
                                  "needs-human-decision")
 
     def test_no_new_credential_list_is_assurance_not_a_human_gate(self):
@@ -391,7 +410,7 @@ class RouterLadderTest(unittest.TestCase):
         )
         red = {"statusCheckRollup": [
             {"name": "Source Validation", "status": "COMPLETED", "conclusion": "FAILURE"}]}
-        classified = remediation.classify_blocker(pr(
+        classified = ask_classify(pr(
             number=21810, body=assurance, mergeStateStatus="BLOCKED", **red))
         self.assertEqual(classified["cls"], "fixable-by-model")
         self.assertNotIn("strategy/pricing/credential/taste content", classified["evidence"])
@@ -404,7 +423,7 @@ class RouterLadderTest(unittest.TestCase):
         ):
             with self.subTest(body=body):
                 self.assertEqual(
-                    remediation.classify_blocker(pr(number=21810, body=body, **red))["cls"],
+                    ask_classify(pr(number=21810, body=body, **red))["cls"],
                     "needs-human-decision")
 
     def test_excluded_credentials_are_assurance_not_a_human_gate(self):
@@ -416,7 +435,7 @@ class RouterLadderTest(unittest.TestCase):
         )
         red = {"statusCheckRollup": [
             {"name": "Source Validation", "status": "COMPLETED", "conclusion": "FAILURE"}]}
-        classified = remediation.classify_blocker(pr(
+        classified = ask_classify(pr(
             number=21903, body=assurance, mergeStateStatus="BLOCKED", **red),
             {"sha": HEAD, "reason": "diff-too-large"})
         self.assertEqual((classified["cls"], classified["subtype"]),
@@ -425,7 +444,7 @@ class RouterLadderTest(unittest.TestCase):
                       {"files": ["canon/strategy/pricing.md"]},
                       {"files": ["scripts/credential-store.py"]}):
             with self.subTest(extra=extra):
-                self.assertEqual(remediation.classify_blocker(
+                self.assertEqual(ask_classify(
                     pr(body=assurance, **red, **extra))["cls"], "needs-human-decision")
 
     def test_assurance_removal_preserves_each_independent_credential_mention(self):
@@ -446,17 +465,17 @@ class RouterLadderTest(unittest.TestCase):
             "credentials need rotation",
         )
         for assurance in assurances:
-            self.assertEqual(remediation.classify_blocker(pr(body=assurance))["cls"], "ready")
+            self.assertEqual(ask_classify(pr(body=assurance))["cls"], "ready")
             for action in actions:
                 for body in (f"{assurance} and {action}", f"{action} and {assurance}"):
                     with self.subTest(body=body):
-                        self.assertEqual(remediation.classify_blocker(pr(body=body))["cls"],
+                        self.assertEqual(ask_classify(pr(body=body))["cls"],
                                          "needs-human-decision")
         for body in ("Copy credentials to the provider and logs are excluded",
                      "Credentials need rotation and headers are excluded",
                      "We cannot rotate the credential"):
             with self.subTest(body=body):
-                self.assertEqual(remediation.classify_blocker(pr(body=body))["cls"],
+                self.assertEqual(ask_classify(pr(body=body))["cls"],
                                  "needs-human-decision")
 
     def test_engineering_credential_removal_is_not_a_founder_gate(self):
@@ -475,12 +494,12 @@ class RouterLadderTest(unittest.TestCase):
         red = {"statusCheckRollup": [
             {"name": "Design gate", "status": "COMPLETED", "conclusion": "FAILURE",
              "excerpt": "API rate limit exceeded"}]}
-        classified = remediation.classify_blocker(pr(
+        classified = ask_classify(pr(
             number=22473, isDraft=True, mergeStateStatus="UNSTABLE", body=body,
             labels=[{"name": "lane-fix-green"}, {"name": "lane-fix-exhausted"}], **red))
         self.assertEqual(classified["cls"], "fixable-by-model")
         self.assertNotIn("strategy/pricing/credential/taste content", classified["evidence"])
-        green = remediation.classify_blocker(pr(
+        green = ask_classify(pr(
             number=22473, isDraft=True, mergeStateStatus="UNSTABLE", body=body))
         self.assertEqual((green["cls"], green["subtype"]), ("ready", "draft"))
         for extra in (
@@ -491,7 +510,7 @@ class RouterLadderTest(unittest.TestCase):
         ):
             with self.subTest(extra=extra):
                 self.assertEqual(
-                    remediation.classify_blocker(pr(number=22473, **red, **extra))["cls"],
+                    ask_classify(pr(number=22473, **red, **extra))["cls"],
                     "needs-human-decision")
 
     def test_direct_permission_asks_cover_github_token_and_app_scopes(self):
@@ -503,7 +522,7 @@ class RouterLadderTest(unittest.TestCase):
             with self.subTest(text=text):
                 subject = pr(reviewDecision="CHANGES_REQUESTED",
                              reviewThreads=[{"author": "reviewer", "resolved": False, "body": text}])
-                self.assertEqual(remediation.classify_blocker(subject)["cls"],
+                self.assertEqual(ask_classify(subject)["cls"],
                                  "needs-human-decision")
 
     def test_current_direct_credential_requests_keep_authority_gate(self):
@@ -516,15 +535,15 @@ class RouterLadderTest(unittest.TestCase):
             subject = pr(reviewDecision="CHANGES_REQUESTED", reviewSummaries=[
                 {"author": {"type": "User", "login": "reviewer"}, "body": body,
                  "state": "CHANGES_REQUESTED", "reviewedHead": HEAD}])
-            self.assertEqual(remediation.classify_blocker(subject)["cls"], "needs-human-decision", body)
+            self.assertEqual(ask_classify(subject)["cls"], "needs-human-decision", body)
 
     def test_url_rejection_evidence_does_not_block_engineering_repairs(self):
         assurance = ("Media uses the canonical image-host policy, rejecting unsupported hosts, "
                      "HTTP, credentials and nondefault ports before rendering.")
         red = {"statusCheckRollup": checks(conclusion="FAILURE")}
         subject = pr(number=23005, title="feat(inbox): use shared entity display", body=assurance, **red)
-        self.assertEqual(remediation.classify_blocker(subject)["cls"], "fixable-by-model")
-        self.assertEqual(remediation.classify_blocker({**subject, "mergeStateStatus": "DIRTY"})["cls"],
+        self.assertEqual(ask_classify(subject)["cls"], "fixable-by-model")
+        self.assertEqual(ask_classify({**subject, "mergeStateStatus": "DIRTY"})["cls"],
                          "needs-rebase")
         for body in (assurance + " Rotate the production credential.",
                      assurance + " Please update pricing.",
@@ -533,9 +552,9 @@ class RouterLadderTest(unittest.TestCase):
                      "Reject unsupported hosts and copy credentials to another provider.",
                      "Reject HTTP, credentials need rotation."):
             with self.subTest(body=body):
-                self.assertEqual(remediation.classify_blocker(pr(body=body, **red))["cls"],
+                self.assertEqual(ask_classify(pr(body=body, **red))["cls"],
                                  "needs-human-decision")
-        self.assertEqual(remediation.classify_blocker(
+        self.assertEqual(ask_classify(
             pr(body=assurance, files=["scripts/credential-store.py"], **red))["cls"],
             "needs-human-decision")
 
@@ -545,23 +564,22 @@ class RouterLadderTest(unittest.TestCase):
                 body = heading + newline + "Tile order and names ship. Default is cut, revert is one component."
                 subject = pr(number=23155, title="feat(ovie): make Home a company HUD", body=body,
                              statusCheckRollup=checks(conclusion="FAILURE"))
-                self.assertEqual(remediation.classify_blocker(subject)["cls"], "fixable-by-model")
+                self.assertEqual(ask_classify(subject)["cls"], "fixable-by-model")
                 for extra in ({"body": body + newline + "Tim must decide the taste direction."},
                               {"body": body + newline + "Please update pricing."},
-                              {"labels": ["tim-hold"]},
                               {"files": ["canon/strategy/theses.md"]}):
                     with self.subTest(heading=heading, newline=repr(newline), extra=extra):
-                        self.assertEqual(remediation.classify_blocker({**subject, **extra})["cls"],
+                        self.assertEqual(ask_classify({**subject, **extra})["cls"],
                                          "needs-human-decision")
-        self.assertEqual(remediation.classify_blocker(pr(body="## Taste approval needed"))["cls"],
+        self.assertEqual(ask_classify(pr(body="## Taste approval needed"))["cls"],
                          "needs-human-decision")
-        self.assertEqual(remediation.classify_blocker(
+        self.assertEqual(ask_classify(
             pr(body="## Taste (risk x confidence) Tim must approve the direction."))["cls"],
             "needs-human-decision")
         for body in ("## Taste approval needed\r\n",
                      "## Taste (risk x confidence) Tim must approve the direction.\r\n"):
             with self.subTest(body=body):
-                self.assertEqual(remediation.classify_blocker(pr(body=body))["cls"], "needs-human-decision")
+                self.assertEqual(ask_classify(pr(body=body))["cls"], "needs-human-decision")
 
     def test_review_assurances_and_examples_preserve_independent_positive_asks(self):
         ordinary = (
@@ -595,7 +613,7 @@ class RouterLadderTest(unittest.TestCase):
                 subject = pr(reviewDecision="CHANGES_REQUESTED", reviewSummaries=[
                     {"author": {"type": "User", "login": "reviewer"}, "body": body,
                      "state": "CHANGES_REQUESTED", "reviewedHead": HEAD}])
-                self.assertEqual(remediation.classify_blocker(subject)["cls"], expected, body)
+                self.assertEqual(ask_classify(subject)["cls"], expected, body)
 
     def test_surface_and_hold_nag_dedupe(self):
         body = remediation.surface_body(pr(number=9), {"cls": "needs-human-decision", "subtype": "hold",
