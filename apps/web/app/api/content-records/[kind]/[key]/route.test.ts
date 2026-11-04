@@ -60,8 +60,10 @@ async function validSpec() {
     '@/lib/content-records/marketing-page'
   );
   const spec = structuredClone(DEFAULT_HOME_SPEC);
-  const hero = spec.sections[0];
-  if (hero?.section === 'hero') hero.copy.subhead = 'A free profile for you.';
+  const close = spec.sections.at(-1);
+  if (close?.section === 'cta') {
+    close.copy.headline = 'Your online presence, in one place.';
+  }
   return spec;
 }
 
@@ -115,6 +117,16 @@ describe('/api/content-records/[kind]/[key]', () => {
       data: { sections: [] },
     });
     expect(bad.status).toBe(422);
+    const retired = await validSpec();
+    const hero = retired.sections[0];
+    if (hero?.section === 'hero') hero.copy.subhead = 'A free profile for you.';
+    const rejected = await call('POST', { action: 'validate', data: retired });
+    expect(rejected.status).toBe(422);
+    expect(rejected.json.errors).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('approved discovery subhead'),
+      ])
+    );
     expect(mocks.createContentVersion).not.toHaveBeenCalled();
   });
 
@@ -127,7 +139,7 @@ describe('/api/content-records/[kind]/[key]', () => {
     const result = await call('POST', {
       action: 'draft',
       data: await validSpec(),
-      note: 'subhead test',
+      note: 'close headline test',
     });
     expect(result.status).toBe(201);
     expect(result.json.version).toEqual({ id: VERSION_ID, version: 3 });
