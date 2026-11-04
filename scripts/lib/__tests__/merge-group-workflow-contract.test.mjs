@@ -877,6 +877,18 @@ describe('merge_group workflow contract', () => {
     }
   });
 
+  it('emits an explicit full_web_units merge suite scope after PR Ready (JOV-10687)', () => {
+    const scope = getJobBlock(CI_WORKFLOW, 'ci-merge-suite-scope');
+    expect(scope).toContain('name: Merge Suite Scope / full_web_units');
+    expect(scope).toContain('ci-merge-group-ready');
+    expect(scope).toContain("needs.ci-merge-group-ready.result == 'success'");
+    expect(scope).toContain('full_web_units');
+    expect(scope).toContain(
+      'Cannot claim full_web_units without successful Unit Tests'
+    );
+    expect(CI_WORKFLOW).toContain('ordinary_admission');
+  });
+
   it('fans real combined-head checks into PR Ready without PR metadata or deploy evidence', () => {
     const aggregate = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
     const sourceAggregate = getJobBlock(CI_WORKFLOW, 'ci-pr-ready');

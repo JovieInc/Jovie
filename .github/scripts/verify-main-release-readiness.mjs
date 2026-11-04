@@ -116,7 +116,62 @@ export function planGitHubRestHold({
   return { action: 'wait', waitMs: Math.max(0, retryAtMs - nowMs) };
 }
 
-export function hasExactSuccessfulMergeGroupProof({ sha, runs, jobsByRun }) {
+export const MERGE_SUITE_SCOPE_FULL = 'full_web_units';
+export const MERGE_SUITE_SCOPE_ORDINARY = 'ordinary_admission';
+export const MERGE_SUITE_SCOPE_JOB_PREFIX = 'Merge Suite Scope / ';
+export const MERGE_SUITE_SCOPE_LEGACY = 'legacy_unscoped';
+
+/**
+ * Job name that encodes the merge-group suite scope for main provenance.
+ * @param {string} scope
+ */
+export function mergeSuiteScopeJobName(scope) {
+  return `${MERGE_SUITE_SCOPE_JOB_PREFIX}${scope}`;
+}
+
+/**
+ * Resolve the suite scope claimed by successful merge-group jobs.
+ * Legacy runs with no scope job remain full-scope so current main skip stays valid.
+ * @param {Array<{ name?: string, status?: string, conclusion?: string }>} jobs
+ */
+export function resolveMergeSuiteScope(jobs) {
+  const successful = [];
+  let sawScopeJob = false;
+  for (const job of jobs ?? []) {
+    const name = String(job?.name ?? '');
+    if (!name.startsWith(MERGE_SUITE_SCOPE_JOB_PREFIX)) continue;
+    sawScopeJob = true;
+    if (job.status === 'completed' && job.conclusion === 'success') {
+      successful.push(name.slice(MERGE_SUITE_SCOPE_JOB_PREFIX.length));
+    }
+  }
+  if (successful.includes(MERGE_SUITE_SCOPE_FULL))
+    return MERGE_SUITE_SCOPE_FULL;
+  if (successful.includes(MERGE_SUITE_SCOPE_ORDINARY)) {
+    return MERGE_SUITE_SCOPE_ORDINARY;
+  }
+  if (sawScopeJob) return null;
+  return MERGE_SUITE_SCOPE_LEGACY;
+}
+
+/**
+ * Exact merge-group PR Ready proof that may authorize main to skip duplicate lanes.
+ * Only full_web_units (or legacy unscoped runs) authorize that skip. An
+ * ordinary_admission scope is intentional for a later shrink and must force main
+ * to re-run the full unit/build contract.
+ * @param {{
+ *   sha: string,
+ *   runs: Array<Record<string, unknown>>,
+ *   jobsByRun: Map<number, Array<Record<string, unknown>>>,
+ *   requiredScope?: string,
+ * }} input
+ */
+export function hasExactSuccessfulMergeGroupProof({
+  sha,
+  runs,
+  jobsByRun,
+  requiredScope = MERGE_SUITE_SCOPE_FULL,
+}) {
   if (!SHA_PATTERN.test(sha)) return false;
 
   return runs.some(run => {
@@ -129,12 +184,20 @@ export function hasExactSuccessfulMergeGroupProof({ sha, runs, jobsByRun }) {
       return false;
     }
 
-    return (jobsByRun.get(run.id) ?? []).some(
+    const jobs = jobsByRun.get(run.id) ?? [];
+    const prReady = jobs.some(
       job =>
         job.name === 'PR Ready' &&
         job.status === 'completed' &&
         job.conclusion === 'success'
     );
+    if (!prReady) return false;
+
+    const scope = resolveMergeSuiteScope(jobs);
+    if (scope === MERGE_SUITE_SCOPE_LEGACY) {
+      return requiredScope === MERGE_SUITE_SCOPE_FULL;
+    }
+    return scope === requiredScope;
   });
 }
 
@@ -437,7 +500,7 @@ export function describeProvenance(result, sha) {
   if (result.queueProven) {
     return {
       level: 'info',
-      line: `Exact merge-group provenance found for ${sha} (run ${result.proofRunId}).`,
+      line: `Exact merge-group provenance found for ${sha} (run ${result.proofRunId}; suite scope full_web_units or legacy).`,
     };
   }
   return {
