@@ -2108,7 +2108,7 @@ describe('iOS stage contract', () => {
     expect(iosWorkflow).not.toContain('mac-runner-heartbeat.yml');
     expect(ios).toContain('mac-first: true');
     expect(pathChanges).toContain(
-      "run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}"
+      "event_name == 'merge_group' && 'false' || steps.detect.outputs.run_ios"
     );
     expect(pathChanges).toContain(
       'git show "${CLASSIFICATION_POLICY_REF}:scripts/lib/product-lane-classifier.mjs"'
