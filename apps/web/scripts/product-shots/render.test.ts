@@ -11,7 +11,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { Page } from '@playwright/test';
-import sharp from 'sharp';
+import sharp, { type OutputInfo, type Sharp } from 'sharp';
 import { describe, expect, it, vi } from 'vitest';
 import type { ProductShotSpec } from '../../lib/screenshots/product-shots';
 import { PRODUCT_SHOT_MAX_BYTES } from './plan';
@@ -179,14 +179,11 @@ describe('product-shot renderer operational paths', () => {
           : failure === 'budget'
             ? vi
                 .spyOn(sharp.prototype, 'toFile')
-                .mockImplementation(async function (
-                  this: sharp.Sharp,
-                  file: string
-                ) {
+                .mockImplementation(async function (this: Sharp, file: string) {
                   const encode = original as (
-                    this: sharp.Sharp,
+                    this: Sharp,
                     file: string
-                  ) => Promise<sharp.OutputInfo>;
+                  ) => Promise<OutputInfo>;
                   const info = await encode.call(this, file);
                   appendFileSync(
                     file,
