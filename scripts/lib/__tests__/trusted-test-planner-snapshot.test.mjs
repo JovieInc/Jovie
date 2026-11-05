@@ -170,6 +170,42 @@ test('syntax-aware BASE closure follows commented imports and ignores inert type
   );
 });
 
+test('module-initialization data comes from BASE and cannot fall back to candidate JSON', t => {
+  const f = trustedPlannerFixture(t, false);
+  const data = 'scripts/invariants/latency-sensitive-execution-allowlist.json';
+  f.put(
+    'scripts/run-affected-tests.mjs',
+    "import './invariants/scanned-paths.mjs';\n"
+  );
+  f.put(
+    'scripts/invariants/scanned-paths.mjs',
+    "import {readFileSync} from 'node:fs';export const value=JSON.parse(readFileSync(new URL('./latency-sensitive-execution-allowlist.json',import.meta.url),'utf8'));\n"
+  );
+  f.put(data, '{"entries":{"trusted":{}}}');
+  f.put('LESSONS.guards.json', '{"lessons":[]}');
+  f.git('add', '.');
+  f.git('commit', '-qm', 'base module initialization data');
+  const base = f.git('rev-parse', 'HEAD');
+  f.put(data, '{"entries":{"candidate":{}}}');
+  const out = join(f.root, 'data-snapshot');
+  const manifest = snapshotTrustedTestPlanner({ repo: f.root, base, out });
+  assert.ok(manifest.files.some(file => file.path === data));
+  assert.ok(manifest.files.some(file => file.path === 'LESSONS.guards.json'));
+  assert.match(readFileSync(join(out, 'files', data), 'utf8'), /trusted/);
+  f.git('rm', '-f', data);
+  f.git('commit', '-qm', 'base missing required data');
+  f.put(data, '{}');
+  assert.throws(
+    () =>
+      snapshotTrustedTestPlanner({
+        repo: f.root,
+        base: f.git('rev-parse', 'HEAD'),
+        out: join(f.root, 'missing-data-snapshot'),
+      }),
+    /Required BASE dependency missing/
+  );
+});
+
 test('trusted snapshot verification rejects payload tampering', t => {
   const f = trustedPlannerFixture(t, true);
   const out = join(f.root, 'snapshot');

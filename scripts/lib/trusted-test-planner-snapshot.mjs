@@ -6,6 +6,13 @@ import { dirname, isAbsolute, join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ENTRY = 'scripts/run-affected-tests.mjs';
+// Existing sparse-checkout closure names this module-initialization JSON input.
+const MODULE_INIT_FILES = {
+  'scripts/invariants/scanned-paths.mjs': [
+    'scripts/invariants/latency-sensitive-execution-allowlist.json',
+  ],
+};
+
 const SHA = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;
 const PATH = /^[A-Za-z0-9_.\/-]+$/u;
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -71,6 +78,24 @@ export function snapshotTrustedTestPlanner({ repo, base, out }) {
     const bytes = readBlob(repo, base, file);
     const source = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     blobs.set(file, bytes);
+    pending.push(...(MODULE_INIT_FILES[file] ?? []));
+    if (
+      file === 'scripts/invariants/scanned-paths.mjs' &&
+      execFileSync(
+        'git',
+        [
+          '--no-replace-objects',
+          '--literal-pathspecs',
+          'ls-tree',
+          '-z',
+          base,
+          '--',
+          'LESSONS.guards.json',
+        ],
+        { cwd: repo }
+      ).length
+    )
+      pending.push('LESSONS.guards.json');
     if (file.endsWith('.json')) {
       JSON.parse(source);
       continue;
