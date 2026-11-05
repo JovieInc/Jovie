@@ -22,6 +22,13 @@ import { track } from '@/lib/analytics';
 import type { AskJovieQuestionIntent } from '@/lib/ask-jovie/answer';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 import { cn } from '@/lib/utils';
+import {
+  CATEGORY_LABELS,
+  type FollowIntent,
+  INTENT_LABELS,
+  type MessageCategory,
+  SUGGESTED_QUESTIONS,
+} from './ask-jovie-options';
 
 interface AskJovieWidgetProps {
   /** Profile handle the conversation is scoped to. */
@@ -29,8 +36,6 @@ interface AskJovieWidgetProps {
   /** Display name used in visitor-facing copy. */
   readonly artistName: string;
 }
-
-type FollowIntent = 'new_release_alerts' | 'local_show_alerts';
 
 type ChatMessage = {
   readonly id: number;
@@ -44,14 +49,6 @@ type ChatMessage = {
   readonly normalizedIntent?: AskJovieQuestionIntent;
   readonly sourceRevision?: string;
 };
-
-type MessageCategory =
-  | 'fan_mail'
-  | 'booking'
-  | 'press'
-  | 'collaboration'
-  | 'business'
-  | 'other';
 
 type Flow = 'escalate' | FollowIntent;
 
@@ -81,27 +78,6 @@ function outcomeForMessage(message: ChatMessage): CardOutcome | undefined {
   }
   return CARD_OUTCOMES[message.card.kind];
 }
-
-const CATEGORY_LABELS: ReadonlyArray<{ id: MessageCategory; label: string }> = [
-  { id: 'fan_mail', label: 'Fan Message' },
-  { id: 'booking', label: 'Booking' },
-  { id: 'press', label: 'Press / Media' },
-  { id: 'collaboration', label: 'Collab' },
-  { id: 'business', label: 'Business' },
-  { id: 'other', label: 'Other' },
-];
-
-const SUGGESTED_QUESTIONS = [
-  'Tell me about this artist',
-  'What song should I start with?',
-  'When are they playing in LA?',
-  'Where can I listen?',
-];
-
-const INTENT_LABELS: ReadonlyArray<{ id: FollowIntent; label: string }> = [
-  { id: 'new_release_alerts', label: 'New Music Alerts' },
-  { id: 'local_show_alerts', label: 'Local Show Alerts' },
-];
 
 const INPUT_CLASS =
   'w-full rounded-lg border border-subtle bg-transparent px-3 py-1.5 text-sm text-primary-token placeholder:text-tertiary-token';
