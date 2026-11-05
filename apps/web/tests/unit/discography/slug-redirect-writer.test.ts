@@ -31,7 +31,6 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 import {
-  contentSlugRedirects,
   discogRecordings,
   discogReleases,
   discogTracks,
@@ -136,7 +135,9 @@ describe('updateSlugWithRedirect', () => {
     creatorProfileId: 'p1',
     contentId: 'r1',
     currentSlug: 'take-me-over',
-    newSlug: 'Take Me Over',
+    // Sanitizes to 'take-me-over-2' — must differ from currentSlug or the
+    // writer short-circuits as a no-op before touching the database.
+    newSlug: 'take-me-over-2',
   } as const;
 
   it('returns the current slug and writes nothing when the slug is unchanged', async () => {
@@ -226,6 +227,5 @@ describe('updateSlugWithRedirect', () => {
 
     // The redirect rows target the right content type each time.
     expect(mocks.insert).toHaveBeenCalledTimes(2);
-    expect(contentSlugRedirects).toBeDefined();
   });
 });
