@@ -208,10 +208,10 @@ export const SOURCE_GUARDS = Object.freeze([
     command: [
       'capacity_python=python3',
       'if ! python3 -c "import coverage" 2>/dev/null; then capacity_env="$(mktemp -d "${RUNNER_TEMP:-/tmp}/jovie-capacity-python.XXXXXX")" && python3 -m venv "$capacity_env" && "$capacity_env/bin/python" -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt || exit 1; capacity_python="$capacity_env/bin/python"; fi',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-capacity-forecast.coverage" "$capacity_python" -m coverage run --branch -m unittest scripts.tests.test_capacity_forecast scripts.tests.test_neon_collector && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-capacity-forecast.coverage" "$capacity_python" -m coverage report --include="*/scripts/capacity/forecast.py" --show-missing --fail-under=60',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-capacity-forecast.coverage" "$capacity_python" -m coverage run --branch -m unittest scripts.tests.test_capacity_forecast scripts.tests.test_capacity_collectors scripts.tests.test_neon_collector && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-capacity-forecast.coverage" "$capacity_python" -m coverage report --include="*/scripts/capacity/forecast.py,*/scripts/capacity/collectors.py" --show-missing --fail-under=60',
     ].join('; '),
     inputs:
-      /^(?:scripts\/capacity\/forecast\.py|scripts\/tests\/test_(?:capacity_forecast|neon_collector)\.py|ops\/registry\/capacity-resources\.json|scripts\/ci-fast-lanes\.mjs)$/u,
+      /^(?:scripts\/capacity\/(?:forecast|collectors)\.py|scripts\/tests\/test_(?:capacity_forecast|capacity_collectors|neon_collector)\.py|ops\/registry\/capacity-resources\.json|scripts\/ci-fast-lanes\.mjs)$/u,
     prOnly: false,
   }),
   Object.freeze({
