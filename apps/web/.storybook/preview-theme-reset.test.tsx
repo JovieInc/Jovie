@@ -18,6 +18,15 @@ function decorate(): Decorate {
   return preview.decorators![0] as unknown as Decorate;
 }
 
+// The decorator runs React hooks (the QueryClient useState), so it can only
+// execute during a component render — exactly how Storybook invokes it.
+function renderDecorated(context: StoryInput): void {
+  function Decorated() {
+    return decorate()(() => <div>story</div>, context);
+  }
+  render(<Decorated />);
+}
+
 function beforeEachHook(): (context: StoryInput) => void {
   return preview.beforeEach as unknown as (context: StoryInput) => void;
 }
@@ -94,32 +103,26 @@ describe('preview theme reset', () => {
 
   describe('decorator forcedTheme', () => {
     it('renders a parameters light override as the light class', () => {
-      render(
-        decorate()(() => <div>story</div>, {
-          parameters: { themes: { themeOverride: 'light' } },
-          globals: {},
-        })
-      );
+      renderDecorated({
+        parameters: { themes: { themeOverride: 'light' } },
+        globals: {},
+      });
       expect(screen.getByText('story')).toBeInTheDocument();
       expect(document.documentElement.className).toMatch(/\blight\b/);
       expect(document.documentElement.className).not.toMatch(/\bdark\b/);
     });
 
     it('renders a themes global light request as the light class', () => {
-      render(
-        decorate()(() => <div>story</div>, {
-          parameters: {},
-          globals: { themes: { value: 'light' } },
-        })
-      );
+      renderDecorated({
+        parameters: {},
+        globals: { themes: { value: 'light' } },
+      });
       expect(document.documentElement.className).toMatch(/\blight\b/);
       expect(document.documentElement.className).not.toMatch(/\bdark\b/);
     });
 
     it('renders an unrequested story with the default theme', () => {
-      render(
-        decorate()(() => <div>story</div>, { parameters: {}, globals: {} })
-      );
+      renderDecorated({ parameters: {}, globals: {} });
       expect(document.documentElement.className).toMatch(/\bdark\b/);
     });
   });
