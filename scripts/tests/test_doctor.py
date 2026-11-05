@@ -1089,6 +1089,23 @@ class ConditionReceiptTest(unittest.TestCase):
         self.assertEqual(state["conditions"]["provider-idle:devin"]["generation"], 2)
         self.assertEqual(len(tracker.contradicted), 2)
 
+    def test_report_evidence_is_stamped_at_observation_completion_not_pass_start(self):
+        # JOV-10197/10198/10199 (2026-10-31): a heavy gem pass (7+ min observe, 12 min total)
+        # stamped every report with its start time, so the ops-report contract (JOV-8308,
+        # MAX_EVIDENCE_AGE_MS = 5 min) rejected every alert as stale-evidence and the issues
+        # landed as content-free "Root cause: UNKNOWN" stubs. Evidence must carry the moment
+        # the observation completed and the alerts were confirmed.
+        observed = obs(now=1_000_000.0, observationCompletedAt=1_000_420.0)
+        receipts = doctor.condition_receipts({"failed-runs": "12 harness-failed runs in 24h"},
+                                              {}, observed, "gem")
+        self.assertEqual(receipts["failed-runs"]["source"]["observedAt"], doctor.epoch_iso(1_000_420.0))
+        self.assertEqual(receipts["failed-runs"]["firstObservedAt"], doctor.epoch_iso(1_000_420.0))
+
+    def test_receipts_fall_back_to_the_pass_clock_without_a_completion_stamp(self):
+        observed = obs(now=1_000_000.0)
+        receipts = doctor.condition_receipts({"failed-runs": "x"}, {}, observed, "gem")
+        self.assertEqual(receipts["failed-runs"]["source"]["observedAt"], doctor.epoch_iso(observed["now"]))
+
 
 class ReconcileTest(unittest.TestCase):
     def test_dirty_checkout_cannot_be_claimed_as_exact_source_proof(self):
@@ -1577,6 +1594,27 @@ class OpsReportDeliveryTest(unittest.TestCase):
             self.assertEqual(result["review"]["reviewStatus"], "emergency-reviewer-unavailable")
         self.assertNotIn("4% free", json.dumps(prepared["review"]))
 
+    def test_slow_pass_evidence_stays_fresh_so_the_real_blocker_is_filed(self):
+        # Live incident 2026-10-31 (JOV-10197/10198/10199): evidence observed 23:39:33Z, issues
+        # filed 23:46:43Z. The pre-fix start-time stamp (420 s older than the observation's
+        # completion) failed the JOV-8308 five-minute contract, so the filed description was the
+        # review-queue stub ("Blocker: stale-evidence", "Root cause: UNKNOWN") and the real
+        # blocker text never reached Linear. Completion-stamped evidence must deliver it.
+        completed = doctor.time.time() - 30
+        blocker = "12 harness-failed runs in 24h; read runs/ledger.jsonl reasons"
+        fresh = {**self.condition, "source": {**self.condition["source"],
+                                              "observedAt": doctor.epoch_iso(completed)}}
+        prepared = doctor.prepare_ops_report("failed-runs", blocker, fresh, "test-host",
+                                             "Symphony doctor: failed-runs (test-host)")
+        self.assertIn(blocker, prepared["message"])
+        self.assertNotIn("stale-evidence", prepared["message"])
+        stale = {**self.condition, "source": {**self.condition["source"],
+                                              "observedAt": doctor.epoch_iso(completed - 420)}}
+        rejected = doctor.prepare_ops_report("failed-runs", blocker, stale, "test-host",
+                                             "Symphony doctor: failed-runs (test-host)")
+        self.assertIn("stale-evidence", rejected["message"])
+        self.assertNotIn(blocker, rejected["message"])
+
     def test_reviewer_outage_keeps_preapproved_emergency_notice_available(self):
         with mock.patch.object(doctor.subprocess, "run", side_effect=subprocess.TimeoutExpired("node", 20)) as run:
             prepared = doctor.prepare_ops_report("disk-low", "4% free", self.condition, "test-host", self.target)
@@ -2017,6 +2055,11 @@ class RunnablePoolTest(unittest.TestCase):
                     mock.patch.object(lane, "read_new_issue_budget", side_effect=lambda name, slots: lane.new_issue_budget(name, slots, [])), \
                     mock.patch.object(lane, "graphql_budget", return_value=None):
                 observed = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=10000)
+                # Observation completion stamp (evidence age for reports, JOV-8308 seam):
+                # under a fixed clock it equals the pass clock; live it is the moment the
+                # last evidence read finished, so report freshness is delivery lag, not runtime.
+                self.assertEqual(observed["observationCompletedAt"], 10000)
+                self.assertEqual(observed["observationSeconds"], 0)
                 self.assertEqual(observed["pool"], 2)
                 self.assertEqual(observed["candidatePool"], 6)
                 self.assertEqual(observed["qualifiedJobsByProvider"], {
@@ -2245,11 +2288,15 @@ class AccountAttributionTest(unittest.TestCase):
                 report = {"generatedAt": doctor.epoch_iso(generated), "count": 1,
                           "accounts": {"a": {"available": True, "leased": True}}}
                 with mock.patch.dict(os.environ, {"LANES_SELFTEST": "1"}), \
-                        mock.patch.object(doctor.time, "time", side_effect=[1000.9, 1001.2]):
+                        mock.patch.object(doctor.time, "time", side_effect=[1000.9, 1001.2, 1001.2]):
                     observation = doctor.observe(host, lane, SimpleNamespace(status=lambda: report))
                 self.assertEqual(observation["codexAttribution"]["state"], expected)
                 self.assertIsNone(observation["pool"])
                 self.assertIn("SystemExit: LINEAR_API_KEY missing", observation["linearError"])
+                # The completion stamp is the pass's final sample-clock read: report evidence
+                # age (JOV-8308 seam) is measured from here, not from the pass's first read.
+                self.assertEqual(observation["observationCompletedAt"], 1001.2)
+                self.assertEqual(observation["observationSeconds"], 0.3)
 
 
 class AdmissionBackpressureTest(unittest.TestCase):
@@ -2385,7 +2432,8 @@ class PublishTest(unittest.TestCase):
         patch = mock.patch.object(doctor.lifecycle, "run", run)
         patch.start()
         self.addCleanup(patch.stop)
-        env = mock.patch.dict(os.environ, {"LANES_STATE": str(self.state)})
+        env = mock.patch.dict(os.environ, {"LANES_STATE": str(self.state),
+                                          "JOVIE_API_STATE_DIR": str(self.state)})
         env.start()
         self.addCleanup(env.stop)
         return fixture
@@ -2742,7 +2790,59 @@ class PublishTest(unittest.TestCase):
         self.assertNotEqual(public["schema"], "symphony-lanes-status/v1")
         for key in ("running", "idle", "pool", "lanes", "alerts", "conditions"):
             self.assertNotIn(key, public, "refusal cannot manufacture a healthy empty fleet")
+        self.assertEqual(public["at"], feed["at"],
+                         "the registered gem:lanes-tick heartbeat path must survive the bounded view")
         self.assertEqual(json.loads(self.api.files["lanes-status-details.json"]), feed)
+
+    def test_essential_oversize_keeps_hosted_heartbeat_paths_readable(self):
+        # JOV-9115: during the 2026-10-25 13:50-17:41Z oversize window the refusal dropped every
+        # heartbeat path, and the hosted dead-man read "heartbeat-source-missing" for both
+        # gist-backed entries while the lanes tick kept publishing on schedule.
+        feed = self.feed(0)
+        feed["conditions"]["source-unknown"]["evidence"] = "x" * (256 * 1024)
+        feed["deployHealth"] = {"schema": "jovie-deploy-health/v1", "observedAt": "2026-10-25T17:45:48Z",
+                                "healthy": True, "limits": {}, "lag": {},
+                                "repos": {"JovieInc/Jovie": {"status": "ok", "failedStreak": 0}}}
+        doctor.publish_status(self.host, self.lane, feed)
+        public = json.loads(self.api.files["lanes-status.json"])
+        self.assertEqual(public["status"], "unavailable")
+        self.assertEqual(public["reason"], "essential-public-feed-exceeds-byte-limit")
+        self.assertEqual(public["at"], feed["at"], "gem:lanes-tick reads `at` from this gist")
+        self.assertEqual(public["deployHealth"], feed["deployHealth"],
+                         "gem:deploy-health reads deployHealth.observedAt/.healthy from this gist")
+        for key in ("running", "idle", "pool", "lanes", "alerts", "conditions"):
+            self.assertNotIn(key, public, "refusal cannot manufacture a healthy empty fleet")
+        self.assertLessEqual(len(self.api.files["lanes-status.json"].encode("utf-8")), 256 * 1024)
+        self.assertEqual(json.loads(self.api.files["lanes-status-details.json"]), feed)
+
+    def test_an_oversize_heartbeat_block_is_refused_whole_never_trimmed(self):
+        feed = self.feed(0)
+        feed["conditions"]["source-unknown"]["evidence"] = "x" * (256 * 1024)
+        feed["deployHealth"] = {"observedAt": "2026-10-25T17:45:48Z", "healthy": False,
+                                "repos": {"JovieInc/Jovie": {"status": "failing", "evidence": "z" * (256 * 1024)}}}
+        doctor.publish_status(self.host, self.lane, feed)
+        public = json.loads(self.api.files["lanes-status.json"])
+        self.assertEqual(public["status"], "unavailable")
+        self.assertLessEqual(len(self.api.files["lanes-status.json"].encode("utf-8")), 256 * 1024)
+        self.assertNotIn("deployHealth", public, "a block that cannot fit is refused whole")
+        self.assertEqual(public["at"], feed["at"], "a fitting heartbeat path survives an oversize sibling")
+
+    def test_unavailable_view_keeps_the_registered_lanes_tick_heartbeat(self):
+        """JOV-9006: canon/automation-registry.jsonl declares gem:lanes-tick with a
+        json-timestamp receipt reading the top-level `at` of lanes-status.json in
+        the public gist. When the essential feed exceeds PUBLIC_FEED_MAX_BYTES the
+        bounded view must still carry that `at` (fresh, written by this tick) so
+        automation-liveness.mjs reads a heartbeat instead of heartbeat-source-missing
+        while the fleet data stays explicitly unavailable."""
+        feed = self.feed(0)
+        feed["conditions"]["source-unknown"]["evidence"] = "x" * (256 * 1024)
+        doctor.publish_status(self.host, self.lane, feed)
+        public = json.loads(self.api.files["lanes-status.json"])
+        self.assertEqual(public["status"], "unavailable")
+        self.assertEqual(public["at"], feed["at"],
+                         "the dead-man must see the tick ran; only a stale `at` is silence")
+        self.assertEqual(public["fullEvidence"]["at"], feed["at"])
+        self.assertGreater(public["requiredBytes"], public["maxBytes"])
 
     def test_utf8_limit_counts_bytes_and_preserves_full_multibyte_evidence(self):
         feed = self.feed(0)
@@ -3139,11 +3239,11 @@ class SearchPopulationCoverageTest(unittest.TestCase):
             fetch_page=lambda lo, hi: {"issueCount": len(rows), "nodes": rows})
 
     def test_sparse_origin_emitter_does_not_import_the_merge_reader(self):
-        # Existing automation checkouts copy only these two files. Reporting's
-        # optional merge reader must not expand the origin emitter dependency set.
+        # The receipt writer is in the sparse emitter. The merge reader must stay out of that set.
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            for relative in ("scripts/shipping_origin.py", "scripts/lanes/shipping_attribution.py"):
+            for relative in ("scripts/shipping_origin.py", "scripts/lanes/shipping_attribution.py",
+                             "scripts/lanes/atomic_state.py"):
                 target = root / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes((ROOT / relative).read_bytes())

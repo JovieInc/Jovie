@@ -37,7 +37,9 @@ import {
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { stripVTControlCharacters } from 'node:util';
 import { load as yamlLoad } from 'js-yaml';
+import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
 import {
   companionChecklist,
   explainShipGate,
@@ -45,6 +47,10 @@ import {
   PR_BODY_SKELETON,
   parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
+import { guardNested, withPreflightDepth } from './lib/preflight-depth.mjs';
+
+export { baseRefCandidates, resolveBaseRef };
+
 import { checkInstallMatchesLockfile } from './lib/preflight-install.mjs';
 import { remoteHint } from './lib/remote-hint.mjs';
 
@@ -71,6 +77,12 @@ export const NARROWED = {
 
 /** Generators whose output must be committed. `write` rewrites, `check` verifies. */
 export const GENERATORS = [
+  {
+    id: 'artist-launch-inventory',
+    when: /^apps\/web\/app\/|^scripts\/artist-launch-|^docs\/product\/generated\/artist-launch-inventory\.json$/,
+    write: 'node scripts/artist-launch-contract.mjs --write',
+    check: 'node scripts/artist-launch-contract.mjs --check',
+  },
   {
     id: 'workflow-topology',
     when: /^\.github\/workflows\/[^/]+\.ya?ml$|^scripts\/ci-workflow-topology\.mjs$/,
@@ -132,6 +144,35 @@ export function downgradeHostRed(check, result, platform = process.platform) {
   return result;
 }
 
+/** Preserve a failure's name and nearby cause within the existing display bound. */
+export function failureSummaryLines(out) {
+  const lines = stripVTControlCharacters(String(out))
+    .split('\n')
+    .filter(line => line.trim());
+  const anchors = [
+    /^\s*test at .+:\d+(?::\d+)?$/,
+    /^\s*FAIL(?:\s|\|)/,
+    /^\s*not ok \d+\b/,
+    /^\s*[✖✗×]\s+(?!failing tests:)/,
+    /^\s*(?:\w*Error(?:\s*\[[^\]]+\])?:|(?:.+(?::\d+(?::\d+)?|\(\d+,\d+\)):\s*)?error TS\d+:)/,
+  ];
+  for (const anchor of anchors) {
+    const start = lines.findIndex(
+      line => !/^\s*(?:[✓✔]|ok \d+\b|PASS\b)/.test(line) && anchor.test(line)
+    );
+    if (start !== -1) {
+      return [
+        '[first recognized failure context; output is bounded]',
+        ...lines.slice(start, start + 13),
+      ].map(line => line.slice(0, 220));
+    }
+  }
+  return [
+    '[no explicit failure header in retained output; showing tail]',
+    ...lines.slice(-13),
+  ].map(line => line.slice(0, 220));
+}
+
 export function parseArgs(argv) {
   const a = {
     base: 'main',
@@ -166,27 +207,160 @@ export function parseArgs(argv) {
   return a;
 }
 
-function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
+// Commands own separate POSIX groups so deadlines can terminate descendants.
+// Track those groups while they are live so an outer cancellation or normal
+// process exit cannot leave them behind.
+const activeCommandGroups = new Set();
+let commandHandlersInstalled = false;
+let cancelledCommandCode = 0;
+let cancellationTimer;
+
+function stopOwnedCommand(record) {
+  const { child } = record;
+  try {
+    if (process.platform === 'win32' || !child.pid) child.kill('SIGKILL');
+    else process.kill(-child.pid, 'SIGKILL');
+  } catch (error) {
+    if (error.code !== 'ESRCH') child.kill('SIGKILL');
+  }
+  child.stdout.destroy();
+  child.stderr.destroy();
+}
+
+function removeCommandHandlers() {
+  if (!commandHandlersInstalled) return;
+  process.removeListener('SIGTERM', onCommandTerm);
+  process.removeListener('SIGINT', onCommandInt);
+  process.removeListener('SIGHUP', onCommandHup);
+  process.removeListener('exit', onCommandExit);
+  commandHandlersInstalled = false;
+}
+
+/** @param {NodeJS.Signals} signal */
+function finishCommandCancellation(signal) {
+  clearTimeout(cancellationTimer);
+  removeCommandHandlers();
+  // Preserve another owner's signal handling if one exists. Otherwise retain
+  // Node's ordinary signal termination after our owned children have closed.
+  if (process.listenerCount(signal) === 0) process.kill(process.pid, signal);
+}
+
+/** @param {NodeJS.Signals} signal @param {number} code */
+function cancelCommands(signal, code) {
+  if (cancelledCommandCode) return;
+  cancelledCommandCode = code;
+  process.exitCode = code;
+  for (const record of activeCommandGroups) stopOwnedCommand(record);
+  if (activeCommandGroups.size === 0) finishCommandCancellation(signal);
+  else {
+    cancellationTimer = setTimeout(
+      () => finishCommandCancellation(signal),
+      1000
+    );
+  }
+}
+
+function onCommandTerm() {
+  cancelCommands('SIGTERM', 143);
+}
+function onCommandInt() {
+  cancelCommands('SIGINT', 130);
+}
+function onCommandHup() {
+  cancelCommands('SIGHUP', 129);
+}
+function onCommandExit() {
+  for (const record of activeCommandGroups) stopOwnedCommand(record);
+}
+
+function trackCommand(record) {
+  if (!commandHandlersInstalled) {
+    process.on('SIGTERM', onCommandTerm);
+    process.on('SIGINT', onCommandInt);
+    process.on('SIGHUP', onCommandHup);
+    process.on('exit', onCommandExit);
+    commandHandlersInstalled = true;
+  }
+  activeCommandGroups.add(record);
+}
+
+function untrackCommand(record) {
+  activeCommandGroups.delete(record);
+  if (activeCommandGroups.size === 0 && !cancelledCommandCode) {
+    removeCommandHandlers();
+  }
+}
+
+const FAILURE_LINE = /(?:^|\b)(?:not ok\b|FAIL\b|location:|✖|×)/u;
+const TEST_PATH = /((?:[\w.@/-]+\/)?[\w.@-]+\.test\.[cm]?[jt]sx?)/u;
+
+/** Test files named by failure lines. The output tail is not a substitute:
+ * preflight keeps only the last 200KB, which dropped the names and left
+ * "8 failing tests" with nothing to fix. */
+export function failureTestPaths(text) {
+  const found = new Set();
+  for (const line of String(text).split('\n')) {
+    if (!FAILURE_LINE.test(line)) continue;
+    const match = TEST_PATH.exec(line);
+    if (!match) continue;
+    const raw = match[1];
+    const at = raw.lastIndexOf('scripts/');
+    const app = raw.lastIndexOf('apps/');
+    const rel = at >= 0 ? raw.slice(at) : app >= 0 ? raw.slice(app) : raw;
+    found.add(rel);
+  }
+  return [...found];
+}
+
+export function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
+  if (cancelledCommandCode)
+    return Promise.resolve({ code: cancelledCommandCode, out: '', ms: 0 });
   return new Promise(resolve => {
     const t0 = Date.now();
     const child = spawn('bash', ['-c', cmd], {
       cwd,
-      env,
+      env: {
+        ...(env ?? process.env),
+        ...(process.platform === 'win32'
+          ? {}
+          : { JOVIE_PREFLIGHT_MANAGED_GROUP: '1' }),
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
     });
+    const record = { child };
+    trackCommand(record);
     let out = '';
+    let carry = '';
+    const failedTests = new Set();
+    let timedOut = false;
     const take = d => {
+      const text = carry + d.toString();
+      const lines = text.split('\n');
+      carry = lines.pop() ?? '';
+      for (const path of failureTestPaths(lines.join('\n')))
+        failedTests.add(path);
       out += d.toString();
       if (out.length > 400_000) out = out.slice(-200_000);
     };
     child.stdout.on('data', take);
     child.stderr.on('data', take);
-    const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
+    const timer = setTimeout(() => {
+      timedOut = true;
+      // A shell can exit before its descendants close inherited output pipes.
+      // Kill its whole POSIX group, then close our pipe ends so timeout settles.
+      stopOwnedCommand(record);
+    }, timeoutMs);
     child.on('close', (code, signal) => {
       clearTimeout(timer);
+      untrackCommand(record);
+      for (const path of failureTestPaths(carry)) failedTests.add(path);
       resolve({
-        code: code ?? (signal ? 137 : 1),
+        code: timedOut
+          ? 124
+          : cancelledCommandCode || (code ?? (signal ? 137 : 1)),
         out,
+        failedTests: [...failedTests],
         ms: Date.now() - t0,
       });
     });
@@ -197,30 +371,6 @@ const git = (cwd, args) => {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
   return r.status === 0 ? r.stdout.trim() : '';
 };
-
-/**
- * Ref names to try for a diff base (JOV-10351). A bare branch name resolves
- * to its remote-tracking ref first, then the local branch; a name that is
- * already qualified (origin/main, refs/...) is never prefixed again.
- * @returns {string[]}
- */
-export function baseRefCandidates(base) {
-  const b = base.trim();
-  if (/^(?:origin\/|refs\/)/.test(b)) return [b];
-  return [`origin/${b}`, b];
-}
-
-/**
- * The first candidate that names a commit, or null when none does. Callers
- * must fail on null instead of treating it as 'no changes' (JOV-10351).
- * @returns {string|null}
- */
-export function resolveBaseRef(cwd, base) {
-  for (const candidate of baseRefCandidates(base))
-    if (git(cwd, ['rev-parse', '--verify', '--quiet', `${candidate}^{commit}`]))
-      return candidate;
-  return null;
-}
 
 /** Changed files vs the merge-base, including uncommitted and untracked.
  *  `base` must be a ref that resolves to a commit (see resolveBaseRef). */
@@ -327,14 +477,18 @@ function loadBody(args, cwd) {
 }
 
 /** Run the shared Private Data Guard from the pinned JovieInc/ci workflow. */
-async function privateDataCheck(cwd, env, mergeBase) {
+export async function privateDataCheck(cwd, env, mergeBase) {
   const wfPath = path.join(cwd, '.github/workflows/private-data-guard.yml');
   if (!existsSync(wfPath)) return { skip: 'no private-data-guard workflow' };
   const wf = /** @type {any} */ (yamlLoad(readFileSync(wfPath, 'utf8')));
   const job = Object.values(wf.jobs ?? {})[0] ?? {};
   const m = String(job.uses ?? '').match(/^JovieInc\/ci\/(.+)@([0-9a-f]{40})$/);
   if (!m) return { skip: 'guard is not a pinned JovieInc/ci workflow' };
-  const cache = path.join(homedir(), '.cache', 'jovie-preflight');
+  const cacheRoot =
+    env.XDG_CACHE_HOME && path.isAbsolute(env.XDG_CACHE_HOME)
+      ? env.XDG_CACHE_HOME
+      : path.join(homedir(), '.cache');
+  const cache = path.join(cacheRoot, 'jovie-preflight');
   mkdirSync(cache, { recursive: true });
   const file = path.join(cache, `private-data-${m[2]}.py`);
   if (!existsSync(file)) {
@@ -404,8 +558,10 @@ export function typecheckTargets(files, cwd) {
     if (web) {
       out.add(isTest ? 'web-tests' : 'web');
       if (!isTest) {
-        // Source changes also affect test consumers and Ovie's TS graph.
+        // App, test and story projects have separate includes. Prop changes
+        // can break stories even when both the app and test projects compile.
         out.add('web-tests');
+        out.add('web-stories');
         out.add('pkg:@jovie/ovie');
       }
     } else if (/^scripts\//.test(f.filename)) out.add('scripts');
@@ -442,6 +598,8 @@ function typecheckCommand(target, cwd) {
     return `cd apps/web && ${cap} pnpm exec node ../../scripts/typecheck-singleflight.mjs -- tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo`;
   if (target === 'web-tests')
     return `cd apps/web && ${cap} node ../../scripts/typecheck-singleflight.mjs -- node ../../scripts/typecheck-web-tests.mjs`;
+  if (target === 'web-stories')
+    return `cd apps/web && ${cap} node ../../scripts/typecheck-singleflight.mjs -- node ../../scripts/typecheck-web-stories.mjs`;
   if (target === 'scripts') return `${cap} pnpm typecheck:scripts`;
   return `${cap} pnpm --filter ${target.slice(4)} run typecheck`;
 }
@@ -466,7 +624,7 @@ export async function main({
     return 1;
   }
   const started = Date.now();
-  const childEnv = { ...env };
+  const childEnv = withPreflightDepth(env);
   for (const k of Object.keys(childEnv))
     if (/^GIT_/.test(k)) delete childEnv[k];
   // Gates refuse the ambient Node when it violates engines (same pin preflight.mjs uses).
@@ -477,13 +635,14 @@ export async function main({
   });
   if (pinned.status === 0 && pinned.stdout.trim())
     childEnv.PATH = `${pinned.stdout.trim()}:${childEnv.PATH}`;
-  // Fetch the remote branch under its unqualified name; a base that arrives
-  // already remote-qualified (origin/main) maps back to 'main' (JOV-10351).
-  spawnSync(
-    'git',
-    ['fetch', '--no-tags', '-q', 'origin', args.base.replace(/^origin\//, '')],
-    { cwd }
+  // GitHub's environment contract is a logical branch name. Source guards
+  // prepend origin/ themselves; keep qualified refs only in CI_BASE_REF.
+  const branchBase = args.base.replace(
+    /^(?:refs\/remotes\/origin\/|refs\/heads\/|origin\/)/,
+    ''
   );
+  // Fetch the remote branch under its unqualified name (JOV-10351).
+  spawnSync('git', ['fetch', '--no-tags', '-q', 'origin', branchBase], { cwd });
   const baseRef = resolveBaseRef(cwd, args.base);
   if (!baseRef) {
     log(
@@ -493,7 +652,7 @@ export async function main({
   }
   Object.assign(childEnv, {
     NODE_OPTIONS: `--max-old-space-size=${HEAP_MB}`,
-    GITHUB_BASE_REF: args.base,
+    GITHUB_BASE_REF: branchBase,
     GITHUB_EVENT_NAME: 'pull_request',
     CI_BASE_REF: baseRef,
     // Copied guards compare their module URL to argv[1]; macOS /var -> /private/var
@@ -577,7 +736,7 @@ export async function main({
     pathToFileURL(path.join(cwd, 'scripts/lib/source-validation-manifest.mjs'))
       .href
   );
-  for (const g of manifest.selectManifestGuards(paths, args.base)) {
+  for (const g of manifest.selectManifestGuards(paths, branchBase)) {
     if (g.heavy && !args.thorough) {
       deferred.push(g.id);
       continue;
@@ -797,12 +956,9 @@ export async function main({
   for (const w of results.filter(r => r.warn)) log(`\n[~] ${w.warn}`);
   for (const r of red) {
     log(`\n[ ] ${r.name}`);
-    const lines = r.out.split('\n').filter(Boolean);
-    const loud = lines.filter(l =>
-      /fail|error|violation|missing|✗|×|TS\d{4}|not registered/i.test(l)
-    );
-    for (const l of (loud.length ? loud : lines).slice(-14))
-      log(`      ${l.slice(0, 220)}`);
+    for (const testPath of r.failedTests ?? [])
+      log(`      failed-test: ${testPath}`);
+    for (const l of failureSummaryLines(r.out)) log(`      ${l}`);
   }
   for (const e of body.errors) log(`\n[ ] PR body: ${e.message}`);
   for (const w of body.warnings) log(`\n[~] PR body: ${w.message}`);
@@ -851,5 +1007,5 @@ if (
   existsSync(process.argv[1]) &&
   realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])
 )
-  process.exitCode = await main();
+  process.exitCode = guardNested('preflight:changed') ?? (await main());
 void SELF;
