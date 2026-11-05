@@ -162,7 +162,7 @@ export function HomepageNameSearch({
               {HOMEPAGE_SEARCH_COPY.waitlist}
             </a>
             {' · '}
-            <Link href='/signin' className='focus-ring-themed'>
+            <Link href='/signin' prefetch={false} className='focus-ring-themed'>
               {HOMEPAGE_SEARCH_COPY.invite}
             </Link>
           </p>

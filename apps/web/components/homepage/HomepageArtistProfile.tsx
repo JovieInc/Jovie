@@ -62,6 +62,7 @@ export function HomepageArtistHero({
             </Link>
             <Link
               href={HOMEPAGE_COPY.access.inviteHref}
+              prefetch={false}
               className='focus-ring-themed'
             >
               {HOMEPAGE_COPY.access.invite}
@@ -248,6 +249,7 @@ export function HomepageClose({
         </p>
         <Link
           href={HOMEPAGE_COPY.access.inviteHref}
+          prefetch={false}
           className='homepage-waitlist__invite focus-ring-themed'
         >
           {HOMEPAGE_COPY.access.invite}

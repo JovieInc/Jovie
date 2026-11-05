@@ -27,6 +27,23 @@ vi.mock('@/lib/flags/marketing-static', async importOriginal => {
   };
 });
 vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
+// Observe the Next Link contract; production scheduling is certified by the
+// hosted auth-entry boundary, not jsdom's development-mode renderer.
+vi.mock('next/link', async () => {
+  const { createElement, forwardRef } = await import('react');
+  return {
+    default: forwardRef<
+      HTMLAnchorElement,
+      import('react').ComponentProps<'a'> & { prefetch?: boolean }
+    >(function PrefetchObservedLink({ prefetch, ...props }, ref) {
+      return createElement('a', {
+        ...props,
+        ref,
+        'data-test-prefetch': String(prefetch),
+      });
+    }),
+  };
+});
 vi.mock('@/lib/content-records/store.server', async () => {
   const { MARKETING_PAGE_KIND } = await import(
     '@/lib/content-records/marketing-page'
@@ -194,11 +211,14 @@ describe('homepage contract', { timeout: 60_000 }, () => {
       ).toHaveAttribute('href', '#waitlist');
       expect(container.querySelector('form[action="/start"]')).toBeNull();
       expect(screen.getByText(HOMEPAGE_COPY.hero.supportNote)).toBeVisible();
-      expect(
-        screen
-          .getAllByRole('link', { name: HOMEPAGE_COPY.access.invite })
-          .every(link => link.getAttribute('href') === '/signin')
-      ).toBe(true);
+      const invitations = screen.getAllByRole('link', {
+        name: HOMEPAGE_COPY.access.invite,
+      });
+      expect(invitations).toHaveLength(2);
+      for (const invitation of invitations) {
+        expect(invitation).toHaveAttribute('href', '/signin');
+        expect(invitation).toHaveAttribute('data-test-prefetch', 'false');
+      }
     }
   );
 

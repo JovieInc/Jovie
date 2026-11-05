@@ -2,6 +2,23 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HomepageNameSearch } from './HomepageNameSearch';
 
+// Assert the Link prop independently of Next's production-only prefetch work.
+vi.mock('next/link', async () => {
+  const { createElement, forwardRef } = await import('react');
+  return {
+    default: forwardRef<
+      HTMLAnchorElement,
+      import('react').ComponentProps<'a'> & { prefetch?: boolean }
+    >(function PrefetchObservedLink({ prefetch, ...props }, ref) {
+      return createElement('a', {
+        ...props,
+        ref,
+        'data-test-prefetch': String(prefetch),
+      });
+    }),
+  };
+});
+
 afterEach(() => vi.unstubAllGlobals());
 
 function submit(name = 'Alex Example') {
@@ -35,6 +52,10 @@ describe('homepage read-only name discovery', () => {
     expect(
       await screen.findByRole('link', { name: /Alex Example/ })
     ).toHaveAttribute('href', '/alex');
+    expect(screen.getByRole('link', { name: /Alex Example/ })).toHaveAttribute(
+      'data-test-prefetch',
+      'undefined'
+    );
     expect(fetch).toHaveBeenCalledWith(
       '/api/profile/search?q=Alex%20Example',
       expect.objectContaining({ signal: expect.any(AbortSignal) })
@@ -45,6 +66,9 @@ describe('homepage read-only name discovery', () => {
     expect(
       screen.getByRole('link', { name: 'Have an invite? Sign in' })
     ).toHaveAttribute('href', '/signin');
+    expect(
+      screen.getByRole('link', { name: 'Have an invite? Sign in' })
+    ).toHaveAttribute('data-test-prefetch', 'false');
     expect(fetch.mock.calls[0]?.[1]).not.toHaveProperty('method', 'POST');
   });
 
