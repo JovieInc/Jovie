@@ -15,6 +15,7 @@ describe('ContentMetricCard', () => {
       />
     );
 
+    expect(container.firstElementChild).toHaveClass('p-4');
     expect(screen.getByText('128.4k')).toHaveClass('tabular-nums');
     expect(screen.getByText('Live')).toBeInTheDocument();
     expect(screen.getByText('Last 28 days')).toBeInTheDocument();

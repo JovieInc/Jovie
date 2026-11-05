@@ -5,12 +5,24 @@ const ROBOT_SKIP_MARKER = 'synthetic-robot-auth-unavailable';
 const ACKNOWLEDGED_SKIP_MARKERS = [OTP_SKIP_MARKER, ROBOT_SKIP_MARKER];
 const ROBOT_RESULT_NAME = 'onboarding-robot-full';
 /**
- * Suites whose skip is never acknowledged: a skip there means the canary did
- * not exercise its path, so it reports as a failure, not a pass. The waitlist
- * canary skipped its signup leg on every run (missing OTP mailbox secrets)
- * while the workflow read green (2026-10-29 waitlist audit).
+ * Suites whose unacknowledged skip means the canary did not exercise its
+ * path. In these sources a skip annotated `synthetic-otp-unavailable` is
+ * treated like the robot skip — an acknowledged missing-config state that
+ * reports as a warning and a skipped count — but ONLY when the resolver
+ * corroborates that the secrets were verified absent. A Doppler read
+ * failure, an OTP marker without that corroboration, or an unmarked skip
+ * still fails the run (JOV-7656; JOV-6813 keeps resolution failures loud).
  */
 const SKIP_IS_FAILURE_SOURCES = new Set(['synthetic-production-waitlist']);
+
+/**
+ * The resolver's verified-missing OTP reason always opens with this text
+ * (`resolve-synthetic-secrets.mjs`); a Doppler read failure instead emits a
+ * reason starting with the OTP marker itself. A waitlist skip counts as
+ * missing-config only when the resolver reason proves the former.
+ */
+const OTP_VERIFIED_MISSING_PREFIX =
+  'Skipping OTP-dependent synthetic steps: missing ';
 
 const DEFAULT_RESULT_FILES = (
   legacyCanaryEnabled,
@@ -71,11 +83,15 @@ function collectSpecs(suites = [], source, required = true) {
   return specs;
 }
 
-function acknowledgedSkipText(testCase) {
+function acknowledgedSkipText(testCase, marker = null) {
   const chunks = [];
   const push = value => {
     if (typeof value !== 'string') return;
-    if (!ACKNOWLEDGED_SKIP_MARKERS.some(marker => value.includes(marker))) {
+    if (
+      !(marker
+        ? value.includes(marker)
+        : ACKNOWLEDGED_SKIP_MARKERS.some(item => value.includes(item)))
+    ) {
       return;
     }
     chunks.push(value.replace(/\s+/g, ' ').trim());
@@ -94,7 +110,22 @@ function acknowledgedSkipText(testCase) {
   return chunks[0] ?? '';
 }
 
-function classifySyntheticTests(tests) {
+/**
+ * A skip in a skip-is-failure source is an acknowledged missing-config state
+ * (JOV-7656, same class as the robot skip) only when its annotation carries
+ * the OTP marker AND the resolver's skip reason proves the OTP secrets were
+ * verified absent. Every other acknowledged marker in these sources — a
+ * Doppler read failure, an uncorroborated marker, a robot marker — keeps the
+ * run red, as does a skip with no marker at all.
+ */
+function isVerifiedOtpMissingConfigSkip(reason, otpReason) {
+  return (
+    reason.includes(OTP_SKIP_MARKER) &&
+    trimReason(otpReason).startsWith(OTP_VERIFIED_MISSING_PREFIX)
+  );
+}
+
+function classifySyntheticTests(tests, otpSkipReason = '') {
   const skipped = tests.filter(
     ({ testCase }) =>
       testCase.status === 'skipped' ||
@@ -103,7 +134,12 @@ function classifySyntheticTests(tests) {
   const requiredSkipped = skipped.filter(
     ({ required, source, testCase }) =>
       required &&
-      (SKIP_IS_FAILURE_SOURCES.has(source) || !acknowledgedSkipText(testCase))
+      (SKIP_IS_FAILURE_SOURCES.has(source)
+        ? !isVerifiedOtpMissingConfigSkip(
+            acknowledgedSkipText(testCase),
+            otpSkipReason
+          )
+        : !acknowledgedSkipText(testCase))
   );
   const warnings = tests.flatMap(({ source, spec, testCase }) => {
     const logged = (testCase.results ?? []).flatMap(result =>
@@ -243,7 +279,7 @@ function parseSyntheticTestResults({
     }))
   );
   const { skipped, requiredSkipped, warnings, flaky, failed, passed } =
-    classifySyntheticTests(tests);
+    classifySyntheticTests(tests, otpReason);
   const testWarnings = appendUniqueWarning(
     appendUniqueWarning(warnings, otpReason),
     robotSkipAcknowledged ? robotReason : ''
@@ -263,8 +299,25 @@ function parseSyntheticTestResults({
     ...(skipped.length > 0
       ? [
           'Skipped tests:',
-          ...skipped.map(({ source, spec }) => `${source}: ${spec.title}`),
+          ...skipped.map(({ source, spec, testCase }) => {
+            // A skip that fails the run must name its cause inline: the
+            // Slack "Failed Tests" block and the Linear intake body are the
+            // only surfaces most readers see (JOV-6813 — a waitlist skip
+            // used to report as a bare "Skipped tests" line with no reason).
+            const reason = acknowledgedSkipText(testCase);
+            return reason
+              ? `${source}: ${spec.title} (skip reason: ${reason})`
+              : `${source}: ${spec.title}`;
+          }),
         ]
+      : []),
+    // The resolver's OTP_SKIP_REASON is the authoritative cause (it knows
+    // whether secrets were verified absent vs. a Doppler read failure) —
+    // attach it only when a required skip identifies OTP as its cause.
+    ...(requiredSkipped.some(({ testCase }) =>
+      acknowledgedSkipText(testCase, OTP_SKIP_MARKER)
+    ) && otpReason
+      ? [`Skip cause: ${otpReason}`]
       : []),
   ];
 

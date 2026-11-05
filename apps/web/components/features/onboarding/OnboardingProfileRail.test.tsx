@@ -94,6 +94,22 @@ describe('OnboardingProfileRail', () => {
               input: {},
               output,
             },
+            // The confirm-artist turn always ships the handle card next to
+            // the confirm output (JOV-10168), so the preview artist has a
+            // real handle and the rail renders (JOV-10169: no fabricated
+            // jov.ie/your-handle placeholder when it is still unknown).
+            {
+              type: 'dynamic-tool',
+              toolName: 'checkHandle',
+              toolCallId: 'handle',
+              state: 'output-available',
+              input: { handle: 'testartist' },
+              output: {
+                action: 'check_handle',
+                handle: 'testartist',
+                summary: 'Checking @testartist.',
+              },
+            },
           ],
         } as UIMessage,
       ],
@@ -273,6 +289,23 @@ describe('resolvePreviewArtist', () => {
       })
     ).toEqual({ id: 'handle-djnova', name: 'djnova', url: '' });
   });
+
+  it('hides the artist preview until a handle is known (JOV-10169: no jov.ie/your-handle flash)', () => {
+    const pickedArtist = {
+      artist: {
+        id: 'sp-1',
+        name: 'Greek',
+        url: 'https://open.spotify.com/artist/sp-1',
+      },
+      artistConfirmed: true,
+      handle: null,
+      socialLinks: [],
+    };
+    expect(resolvePreviewArtist(pickedArtist)).toBeNull();
+    expect(
+      resolvePreviewArtist({ ...pickedArtist, handle: 'greek' })
+    ).toMatchObject({ id: 'sp-1' });
+  });
 });
 
 // JOV-7973: the side rail is a focusable scroll region, so it must own its
@@ -316,11 +349,14 @@ describe('OnboardingProfileRail keyboard scrolling (JOV-7973)', () => {
       value: 720,
     });
 
-    await user.type(rail, '{End}');
+    await user.tab();
+    expect(rail).toHaveFocus();
+    await user.keyboard('{End}');
     expect(scrollTo).toHaveBeenLastCalledWith({
       top: 34,
       behavior: 'auto',
     });
+    expect(rail).toHaveFocus();
   });
 
   it('lets every other key scroll natively (no preventDefault)', async () => {
