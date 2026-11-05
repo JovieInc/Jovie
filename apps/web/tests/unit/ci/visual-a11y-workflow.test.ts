@@ -12,8 +12,11 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as parseYaml } from 'js-yaml';
-import ts from 'typescript';
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+  getPageScopedLocatorCalls,
+  getScreenshotArguments,
+} from './visual-workflow-ast';
 
 // JOV-7707: workflow contracts here read parsed YAML and execute the shipped
 // step shell with stubbed tools; PR/merge-group gate aggregation is covered by
@@ -118,87 +121,6 @@ function runStep(
     ? readFileSync(join(root, 'calls.log'), 'utf8')
     : '';
   return { ...result, calls, root };
-}
-
-function getPageScopedLocatorCalls(source: string): string[] {
-  const sourceFile = ts.createSourceFile(
-    'chat-visual.spec.ts',
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS
-  );
-  const calls: string[] = [];
-
-  function getPageMethod(expression: ts.LeftHandSideExpression): string | null {
-    if (
-      ts.isPropertyAccessExpression(expression) &&
-      ts.isIdentifier(expression.expression) &&
-      expression.expression.text === 'page'
-    ) {
-      return expression.name.text;
-    }
-
-    if (
-      ts.isElementAccessExpression(expression) &&
-      ts.isIdentifier(expression.expression) &&
-      expression.expression.text === 'page'
-    ) {
-      return expression.argumentExpression &&
-        ts.isStringLiteralLike(expression.argumentExpression)
-        ? expression.argumentExpression.text
-        : '<computed>';
-    }
-
-    return null;
-  }
-
-  function visit(node: ts.Node): void {
-    if (ts.isCallExpression(node)) {
-      const method = getPageMethod(node.expression);
-
-      if (
-        method === '<computed>' ||
-        method === 'locator' ||
-        method?.startsWith('getBy') ||
-        (method !== null && /^\$\$?$/.test(method))
-      ) {
-        const firstArgument = node.arguments[0]?.getText(sourceFile) ?? '';
-        calls.push(`${method}:${firstArgument}`);
-      }
-    }
-
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
-  return calls;
-}
-
-function getScreenshotArguments(source: string): string[] {
-  const sourceFile = ts.createSourceFile(
-    'visual-spec.ts',
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS
-  );
-  const argumentsFound: string[] = [];
-
-  function visit(node: ts.Node): void {
-    if (
-      ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
-      node.expression.name.text === 'toHaveScreenshot'
-    ) {
-      argumentsFound.push(node.arguments[0]?.getText(sourceFile) ?? '');
-    }
-
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
-  return argumentsFound;
 }
 
 describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
