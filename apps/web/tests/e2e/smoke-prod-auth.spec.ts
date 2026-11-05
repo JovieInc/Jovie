@@ -29,6 +29,7 @@ import {
 } from '../helpers/vercel-preview';
 import { deleteSyntheticChats } from './helpers/synthetic-chat-cleanup';
 import { primeOriginBoundVercelBypass } from './utils/prime-vercel-bypass';
+import { assertChatResponseOk } from './utils/prod-cert-chat-response';
 import {
   certStep,
   certStepBlocked,
@@ -1319,6 +1320,7 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           );
           await page.getByRole('button', { name: /send message/i }).click();
           const response = await chatResponse;
+          const responseDiagnostic = await assertChatResponseOk(response);
           // The weekly-AI-quota path returns HTTP 200 with the limit text
           // streamed as an assistant message, so a rendered reply element
           // alone is a false pass. A terminal failure names itself in a
@@ -1336,7 +1338,8 @@ test.describe('Production Auth Smoke @production-smoke', () => {
               .locator(
                 "[data-testid='chat-loading-indicator'], [data-testid='chat-message-reply']"
               )
-              .first()
+              .first(),
+            `Chat response: ${responseDiagnostic}`
           ).toBeVisible({ timeout: 30_000 });
           recordCertObservation({
             surface: 'chat',
@@ -1345,12 +1348,20 @@ test.describe('Production Auth Smoke @production-smoke', () => {
             value: Date.now() - sentAt,
             unit: 'ms',
           });
-          await expect(page.getByText(probe).first()).toBeVisible({
+          await expect(
+            page.getByText(probe).first(),
+            `Chat response: ${responseDiagnostic}`
+          ).toBeVisible({
             timeout: SMOKE_TIMEOUTS.VISIBILITY,
           });
           const echoMs = Date.now() - sentAt;
           const reply = replyLocator;
-          await expect(reply).toBeVisible({ timeout: 60_000 });
+          await expect(
+            reply,
+            `Chat response: ${responseDiagnostic}`
+          ).toBeVisible({
+            timeout: 60_000,
+          });
           const replyMs = Date.now() - sentAt;
           // A real assistant reply, not the quota/limit copy: the exhausted
           // weekly-AI-quota state streams its notice as an assistant message
