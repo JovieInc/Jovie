@@ -60,7 +60,6 @@ test('actual BASE bootstrap ignores malicious candidate engine and producer side
   );
   f.put(
     'scripts/lib/trusted-test-planner-snapshot.mjs',
-    'scripts/lib/test-planner-contract-tests.mjs',
     evil + 'process.exit(0);\n'
   );
   const temp = join(f.root, 'runner');
