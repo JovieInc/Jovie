@@ -6,11 +6,11 @@
   },
   "conservative": {
     "armed": true,
-    "count": 590,
+    "count": 589,
     "perFamily": {
       "marketing": 46,
       "web-shell": 243,
-      "web-other": 290,
+      "web-other": 289,
       "packages/ui": 11
     },
     "perUtility": {
@@ -20,7 +20,7 @@
       "mt-2.5": 14,
       "my-2.5": 1,
       "p-2.5": 28,
-      "p-3.5": 21,
+      "p-3.5": 20,
       "pb-2.5": 11,
       "pb-3.5": 1,
       "pl-2.5": 1,

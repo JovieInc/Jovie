@@ -169,7 +169,14 @@ const markdownAllowedJobs = new Set([
   'claim-checkout-dogfood.yml:dogfood',
 ]);
 // Workflow-level secrets a Playwright child may inherit (remote build cache).
-const inheritedSecretAllowlist = new Set(['TURBO_TOKEN', 'TURBO_TEAM']);
+const inheritedSecretAllowlist = new Set([
+  'TURBO_TOKEN',
+  'TURBO_TEAM',
+  'CF_TURBO_CACHE_URL',
+  'CF_TURBO_CACHE_RO_TOKEN',
+  'CF_TURBO_CACHE_RW_TOKEN',
+  'CF_TURBO_SIGNATURE_KEY',
+]);
 const policyWorkflow = (file: string) =>
   parseYaml(readFileSync(join(workflowsRoot, file), 'utf8')) as PolicyWorkflow;
 const policyJob = (source: string): PolicyJob =>
@@ -1266,6 +1273,14 @@ ${fixtureCheckout}
           ].map(name => `${file}:${id}:${name}`)
     );
     expect(violations).toEqual([]);
+    expect([...inheritedSecretAllowlist].sort()).toEqual([
+      'CF_TURBO_CACHE_RO_TOKEN',
+      'CF_TURBO_CACHE_RW_TOKEN',
+      'CF_TURBO_CACHE_URL',
+      'CF_TURBO_SIGNATURE_KEY',
+      'TURBO_TEAM',
+      'TURBO_TOKEN',
+    ]);
     expect(
       secretNames({ A: '${{ secrets.OPENAI_API_KEY }}', B: 'literal' })
     ).toEqual(['OPENAI_API_KEY']);
