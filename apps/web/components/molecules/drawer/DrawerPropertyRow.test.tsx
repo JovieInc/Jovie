@@ -35,6 +35,13 @@ describe('DrawerPropertyRow', () => {
     fireEvent.click(property);
     expect(onClick).toHaveBeenCalledOnce();
   });
+
+  it('adds no horizontal inset so rows share the drawer content edge', () => {
+    const { container } = render(
+      <DrawerPropertyRow label='Type' value='Single' />
+    );
+    expect(container.firstElementChild?.className).toContain('px-0');
+  });
 });
 
 describe('DrawerPropertyRow definition list semantics (JOV-8873)', () => {

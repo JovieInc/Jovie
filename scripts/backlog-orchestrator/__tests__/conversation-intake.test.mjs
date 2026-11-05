@@ -12,6 +12,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
@@ -345,8 +346,8 @@ describe('conversation issue reconciliation', () => {
 });
 
 function privateFixture(t) {
-  const directory = mkdtempSync(
-    join(realpathSync('/tmp'), 'jovie-private-intake-')
+  const directory = realpathSync(
+    mkdtempSync(join(tmpdir(), 'jovie-private-intake-'))
   );
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   return directory;

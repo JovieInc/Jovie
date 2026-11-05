@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   checkRepository,
   compareLiveFleet,
+  discoverAssets,
   IDENTITY_SCHEMA,
   OWNERSHIP_SCHEMA,
   parseMacLanes,
@@ -64,6 +65,39 @@ test('the committed registries own everything the repository runs', () => {
   assert.deepEqual(problems, []);
   assert.equal(coverage.discoveredUnowned, 0);
   assert.equal(coverage.owned, coverage.registered);
+});
+
+test('an install leftover worker directory is not a service', async () => {
+  const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import(
+    'node:fs'
+  );
+  const { tmpdir } = await import('node:os');
+  const path = await import('node:path');
+  const root = mkdtempSync(path.join(tmpdir(), 'ownership-workers-'));
+  try {
+    mkdirSync(path.join(root, '.github', 'ci-harness'), { recursive: true });
+    writeFileSync(
+      path.join(root, '.github', 'ci-harness', 'manifest.json'),
+      JSON.stringify({ jobs: [] })
+    );
+    const leftover = path.join(
+      root,
+      'workers',
+      'mesh-hub',
+      'node_modules',
+      'pkg'
+    );
+    mkdirSync(leftover, { recursive: true });
+    writeFileSync(path.join(leftover, 'index.js'), '');
+    const real = path.join(root, 'workers', 'real');
+    mkdirSync(path.join(real, 'node_modules'), { recursive: true });
+    writeFileSync(path.join(real, 'wrangler.toml'), 'name = "real"\n');
+    const ids = discoverAssets(root).map(item => item.id);
+    assert.equal(ids.includes('service:worker:mesh-hub'), false);
+    assert.equal(ids.includes('service:worker:real'), true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('the Mac lanes have a named agent repair owner (JOV-8657)', async () => {
