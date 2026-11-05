@@ -223,19 +223,21 @@ function chatState(overrides: Partial<HomeCanvasState> = {}): HomeCanvasState {
 describe('OvieHomeCanvas', () => {
   const fetchMock = vi.fn();
   let inbox: OvieInbox;
+  let companyResponses: Record<string, unknown>;
 
   beforeEach(() => {
     readyTiming.mockReset();
     panelAlert.mockReset();
     shipping.data = snapshot();
     inbox = INBOX;
+    companyResponses = COMPANY_RESPONSES;
     toastMock.mockClear();
     fetchMock.mockReset();
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
       if (url === '/api/ovie/inbox')
         return new Response(JSON.stringify(inbox), { status: 200 });
-      if (url in COMPANY_RESPONSES)
-        return new Response(JSON.stringify(COMPANY_RESPONSES[url]), {
+      if (url in companyResponses)
+        return new Response(JSON.stringify(companyResponses[url]), {
           status: 200,
         });
       if (init?.method === 'POST')
@@ -337,6 +339,12 @@ describe('OvieHomeCanvas', () => {
         },
       };
       renderCanvas();
+      // A failed read never claims the all-clear; the banner names the
+      // failure beside the sections that could not load (JOV-9019).
+      const banner = screen.getByTestId('home-loop-constraint');
+      expect(banner).toHaveTextContent('Shipping data could not load.');
+      expect(banner).not.toHaveTextContent('Shipping is on target');
+      expect(banner).toHaveAttribute('data-tone', 'unknown');
       expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
         'data-state',
         'error'
@@ -356,6 +364,36 @@ describe('OvieHomeCanvas', () => {
       );
     }
   );
+
+  it('preserves the named unknown shipping health when no metric is measured', async () => {
+    const base = snapshot();
+    companyResponses = {
+      '/api/hud/metrics': { overview: { financialDataAvailable: false } },
+      '/api/admin/hud/founder-funnel?range=7d': { stages: [] },
+      '/api/ovie/certifications': { rows: [] },
+    };
+    shipping.data = {
+      ...base,
+      view: { ...base.view, delivery: emptyDeliverySummary() },
+      operationalTasks: { ...base.operationalTasks, tasks: [] },
+    };
+    renderCanvas();
+    await screen.findByTestId('home-loop-tile-runway');
+    const banner = screen.getByTestId('home-loop-constraint');
+    expect(banner).toHaveTextContent(
+      'Shipping health unknown: merges, queue ejections, production, lanes not measured'
+    );
+    expect(banner).not.toHaveTextContent('Shipping is on target');
+    expect(banner).toHaveAttribute('data-tone', 'warn');
+    expect(
+      within(banner).getByRole('link', { name: 'Details' })
+    ).toHaveAttribute('href', APP_ROUTES.ADMIN_SHIPPING);
+    // Current main renders six shipping metrics and four company metrics.
+    expect(screen.getAllByTestId(/^home-loop-tile-/)).toHaveLength(10);
+    for (const tile of screen.getAllByTestId(/^home-loop-tile-/)) {
+      expect(tile).toHaveAttribute('data-measured', 'false');
+    }
+  });
 
   it('raises no panel alert when every section is ready', async () => {
     shipping.data = snapshot();
