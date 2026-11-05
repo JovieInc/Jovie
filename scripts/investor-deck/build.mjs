@@ -11,15 +11,10 @@
 // consistency issue; nothing renders from a failing ledger.
 
 import { createHash } from 'node:crypto';
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { load as loadYaml } from 'js-yaml';
 import { buildLedgerYcDeck } from '../../apps/web/lib/investors/yc-deck.ts';
@@ -53,10 +48,11 @@ export function loadLedger(dir) {
   const draftsDir = resolve(dir, '..', 'drafts');
   /** @type {Record<string, string>} */
   const drafts = {};
-  if (existsSync(draftsDir))
-    for (const name of readdirSync(draftsDir))
-      if (/^(?:YC|SPEEDRUN)-.*\.md$/u.test(name))
-        drafts[name] = readFileSync(join(draftsDir, name), 'utf8');
+  for (const name of readdirSync(draftsDir))
+    if (/^(?:YC|SPEEDRUN)-.*\.md$/u.test(name))
+      drafts[name] = readFileSync(join(draftsDir, name), 'utf8');
+  if (Object.keys(drafts).length === 0)
+    throw new Error('no YC or SPEEDRUN application drafts found');
   return {
     story,
     ledger: {
@@ -66,6 +62,21 @@ export function loadLedger(dir) {
     },
     drafts,
   };
+}
+
+/** Read only generated artifacts whose bytes still match the build receipt. */
+export function readBuiltDeck(dir) {
+  const build = JSON.parse(readFileSync(join(dir, 'build.json'), 'utf8'));
+  const deck = readFileSync(join(dir, 'deck.txt'), 'utf8');
+  const html = readFileSync(join(dir, 'deck.html'), 'utf8');
+  if (!Array.isArray(build?.issues) || build.issues.length)
+    throw new Error('missing or failing build receipt');
+  const digest = text => createHash('sha256').update(text).digest('hex');
+  if (digest(html) !== build.deckSha256)
+    throw new Error('rendered HTML does not match the build receipt');
+  if (digest(deck) !== build.deckTextSha256)
+    throw new Error('evaluation text does not match the build receipt');
+  return { build, deck };
 }
 
 /** Generator + consistency, no I/O beyond the inputs. */
@@ -81,14 +92,14 @@ export function buildDeck({ story, ledger, drafts }) {
   };
 }
 
-async function exportPdf(htmlPath, outDir, count) {
-  const { chromium } = await import('playwright');
+export async function exportPdf(htmlPath, outDir, count, chromium = undefined) {
+  chromium ??= (await import('playwright')).chromium;
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({
       viewport: { width: 1920, height: 1080 },
     });
-    await page.goto(`file://${htmlPath}`);
+    await page.goto(pathToFileURL(resolve(htmlPath)).href);
     await page.evaluate('document.fonts.ready');
     await page.pdf({
       path: join(outDir, 'deck.pdf'),
@@ -144,6 +155,7 @@ async function main() {
     generator: 'apps/web/lib/investors/yc-deck.ts#buildLedgerYcDeck',
     program: input.story.program,
     deckSha256: sha,
+    deckTextSha256: createHash('sha256').update(result.text).digest('hex'),
     slides: result.slides.map(slide => slide.id),
     issues,
     families: result.consistency.families,

@@ -1,5 +1,5 @@
-import type { FundraisingRegistry } from '@/lib/investors/fundraising-registry';
-import type { InvestorMetricsSnapshot } from '@/lib/investors/sourced-metrics';
+import type { FundraisingRegistry } from './fundraising-registry.ts';
+import type { InvestorMetricsSnapshot } from './sourced-metrics.ts';
 
 export const YC_DECK_SECTION_IDS = [
   'problem',

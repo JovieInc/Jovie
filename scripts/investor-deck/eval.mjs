@@ -7,14 +7,21 @@
 //
 //   node scripts/investor-deck/eval.mjs --deck <dir with deck.txt> [--samples 3] [--skip-calibration]
 //
-// api-budget: cloudflare-api 40/hr - one eval = (6 personas + 4 calibration decks) x 3 samples, run by hand per deck change
+// api-budget: cloudflare-api 144/hr - one manual full default eval/hour: 6 x 3 candidate + 6 x (3 x 2 holdout + 3 anchor) = 72 calls, up to two transport attempts each; additional runs/samples scale this budget
 // Writes <dir>/invest-eval.json (private). Exit 0 always; gate.mjs decides.
 
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { callRelay, parseAnswer, usdFor } from '../buyer-eval/judge.mjs';
+import {
+  callRelay,
+  parseAnswer,
+  ROUTING,
+  routeFor,
+  usdFor,
+} from '../output-quality/judge-core.mjs';
+import { readBuiltDeck } from './build.mjs';
 import { ANCHOR, HOLDOUTS } from './calibration.mjs';
 import { PERSONA_LABEL, PERSONAS } from './personas.mjs';
 import {
@@ -26,23 +33,9 @@ import {
 } from './rubric.mjs';
 
 export const ROUTE_ID = 'dev.investor-eval';
-const ROUTING = JSON.parse(
-  readFileSync(
-    new URL('../../apps/web/lib/ai/routing.json', import.meta.url),
-    'utf8'
-  )
-);
-
 export function investRoute(routing = ROUTING) {
-  const caller = routing.callers.find(row => row.id === ROUTE_ID);
-  if (!caller?.models?.[0])
-    throw new Error(`routing.json has no ${ROUTE_ID} caller`);
-  if (caller.route !== 'workers-ai-only')
-    throw new Error(`${ROUTE_ID} must be workers-ai-only, got ${caller.route}`);
-  return {
-    model: caller.models[0],
-    baseUrl: routing.providers['workers-ai'].relayBaseUrl,
-  };
+  const { model, baseUrl } = routeFor(ROUTE_ID, routing);
+  return { model, baseUrl };
 }
 
 /**
@@ -67,22 +60,8 @@ export function investContaminated(raw, prompt) {
 /** The relay caps output at 16,384; reasoning answers truncated at 12,000. */
 export const INVEST_MAX_TOKENS = 16_000;
 
-/** Max relay calls in flight: 84 at once opened the breaker on a secondary limit (2026-11-01). */
-export const MAX_IN_FLIGHT = 8;
-let inFlight = 0;
-const waiting = [];
-/** Bound concurrent relay calls across every persona and fixture in this process. */
-export async function pooled(fn) {
-  if (inFlight >= MAX_IN_FLIGHT)
-    await new Promise(resolve => waiting.push(resolve));
-  inFlight += 1;
-  try {
-    return await fn();
-  } finally {
-    inFlight -= 1;
-    waiting.shift()?.();
-  }
-}
+// Shared callRelay/api-client owns provider budgets, pacing and retries.
+// No call-site pool: its slot handoff raced and duplicated client policy.
 
 /** N independent samples for one persona over one deck. */
 export async function judgeDeck({
@@ -92,20 +71,20 @@ export async function judgeDeck({
   call = callRelay,
   route = investRoute(),
 }) {
+  if (!Number.isSafeInteger(samples) || samples < 1)
+    throw new Error('samples must be a positive integer');
   const prompt = buildInvestPrompt({ persona, deck });
   const schema = buildInvestSchema();
   const settled = await Promise.allSettled(
     Array.from({ length: samples }, () =>
-      pooled(() =>
-        call({
-          model: route.model,
-          baseUrl: route.baseUrl,
-          content: [{ type: 'text', text: prompt }],
-          schema,
-          timeoutMs: 300_000,
-          maxTokens: INVEST_MAX_TOKENS,
-        })
-      )
+      call({
+        model: route.model,
+        baseUrl: route.baseUrl,
+        content: [{ type: 'text', text: prompt }],
+        schema,
+        timeoutMs: 300_000,
+        maxTokens: INVEST_MAX_TOKENS,
+      })
     )
   );
   const parsed = [];
@@ -144,28 +123,53 @@ export async function judgeDeck({
  * persona's vote is not counted.
  */
 export function calibrationHolds(rows) {
-  const perPersona = {};
-  for (const row of rows) {
-    const entry = (perPersona[row.persona] ??= {
-      anchorP: null,
-      holdoutPs: [],
-    });
-    if (row.kind === 'anchor')
-      entry.anchorP = row.verdict === 'abstain' ? null : row.p;
-    else if (row.verdict !== 'abstain') entry.holdoutPs.push(row.p);
-  }
-  const personas = Object.entries(perPersona).map(([persona, e]) => ({
-    persona,
-    anchorP: e.anchorP,
-    maxHoldoutP: e.holdoutPs.length ? Math.max(...e.holdoutPs) : null,
-    separated:
-      e.anchorP !== null &&
-      e.holdoutPs.length >= 2 &&
-      Math.max(...e.holdoutPs) < e.anchorP,
-  }));
+  /** @type {Map<string, string>} */
+  const expected = new Map([[ANCHOR.id, 'anchor']]);
+  for (const holdout of HOLDOUTS) expected.set(holdout.id, 'holdout');
+  const validRows = Array.isArray(rows) ? rows : [];
+  const unknown = validRows.some(
+    row =>
+      !row ||
+      !PERSONAS.some(p => p.id === row.persona) ||
+      !expected.has(row.deck) ||
+      expected.get(row.deck) !== row.kind
+  );
+  const personas = PERSONAS.map(({ id: persona }) => {
+    const selected = validRows.filter(row => row?.persona === persona);
+    const complete =
+      selected.length === expected.size &&
+      new Set(selected.map(row => row.deck)).size === expected.size &&
+      selected.every(
+        row =>
+          expected.has(row.deck) &&
+          expected.get(row.deck) === row.kind &&
+          ['invest', 'pass'].includes(row.verdict) &&
+          Number.isFinite(row.p) &&
+          row.p >= 0 &&
+          row.p <= 1
+      );
+    const anchor = selected.find(row => row.deck === ANCHOR.id);
+    const holdouts = selected.filter(
+      row => expected.get(row.deck) === 'holdout'
+    );
+    const anchorP = complete ? anchor.p : null;
+    const maxHoldoutP = complete
+      ? Math.max(...holdouts.map(row => row.p))
+      : null;
+    return {
+      persona,
+      anchorP,
+      maxHoldoutP,
+      separated: complete && maxHoldoutP < anchorP,
+    };
+  });
   const unseparated = personas.filter(p => !p.separated).map(p => p.persona);
+  const complete =
+    validRows.length === PERSONAS.length * expected.size &&
+    new Set(validRows.map(row => `${row?.persona}:${row?.deck}`)).size ===
+      validRows.length;
   return {
-    ok: personas.length > 0 && unseparated.length <= 1,
+    ok: complete && !unknown && unseparated.length <= 1,
     unseparated,
     personas,
   };
@@ -195,10 +199,7 @@ async function main() {
     },
   });
   if (!values.deck) throw new Error('--deck <build output dir> is required');
-  const deck = readFileSync(join(values.deck, 'deck.txt'), 'utf8');
-  const build = JSON.parse(
-    readFileSync(join(values.deck, 'build.json'), 'utf8')
-  );
+  const { build, deck } = readBuiltDeck(values.deck);
   const samples = Number(values.samples);
   const started = Date.now();
   const personas = await Promise.all(

@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "agentsMap": {
-    "path": "CLAUDE.md",
+    "path": "AGENTS.md",
     "maxLines": 120
   },
   "crossLinkScopes": [
-    "CLAUDE.md",
+    "AGENTS.md",
     "CODEX.md",
     ".claude/rules/*.md",
     "canon/OPERATING_SYSTEM.md",
@@ -29,7 +29,7 @@
   "freshnessMarkers": [
     {
       "id": "scoped-rules-count",
-      "files": ["CLAUDE.md"],
+      "files": ["AGENTS.md"],
       "computer": "scoped-rules-count"
     },
     {
@@ -174,7 +174,7 @@
       "sources": [
         {
           "path": "scripts/investor-deck/gate.mjs",
-          "sha256": "ed714edf1f180b6fbc73ee1d50b2a0abb4bb9134f1a168ed24d8aa16c30149bf"
+          "sha256": "79a48e1fa299207a594243b4e26d420c0a9cd74514ee5607ca57ef36e40a54fd"
         }
       ]
     },
@@ -375,7 +375,7 @@
         }
       ]
     },
-    "CLAUDE.md": {
+    "AGENTS.md": {
       "owner": "@itstimwhite",
       "claim": "The top-level router inherits the constitution and routes personal/mixed requests to private intake before task tools.",
       "documentSha256": "375c8ef4d8ad65c06aef6bb63b2159fe44790ba5ee3499ebbccf8c76c8dd9e31",
@@ -430,10 +430,6 @@
         {
           "path": "scripts/invariants/capability-planning.mjs",
           "sha256": "7f72f2f4bc09235a61f3b22708775ce81f67418ff46affaba69afbce1c40adca"
-        },
-        {
-          "path": ".github/scripts/internal-pr-review.mjs",
-          "sha256": "dd0d20dfda2ed9724335435c45ae8e2dbc37d8292865e512aaaa4f9a2257890e"
         },
         {
           "path": "scripts/lanes/lane_runner.py",

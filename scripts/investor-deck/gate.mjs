@@ -15,6 +15,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
+import { readBuiltDeck } from './build.mjs';
+import { calibrationHolds, relativeVerdicts } from './eval.mjs';
+import { PERSONAS } from './personas.mjs';
 
 export const DEFAULT_THRESHOLD = 4; // of 6 personas
 export const MAX_AGE_DAYS = 3;
@@ -26,29 +29,73 @@ export function gateDecision({
   now = Date.now(),
 }) {
   const reasons = [];
+  if (
+    !Number.isInteger(threshold) ||
+    threshold < 1 ||
+    threshold > PERSONAS.length
+  )
+    reasons.push(`threshold must be an integer from 1 to ${PERSONAS.length}`);
   if (!build) reasons.push('no build receipt');
-  else if (build.issues?.length)
-    reasons.push(`build has ${build.issues.length} issue(s)`);
+  else {
+    if (typeof build.deckSha256 !== 'string' || !build.deckSha256.trim())
+      reasons.push('build has no deck sha');
+    if (!Array.isArray(build.issues)) reasons.push('build has no issue list');
+    else if (build.issues.length)
+      reasons.push(`build has ${build.issues.length} issue(s)`);
+  }
   if (!evalReport) reasons.push('no invest eval');
   else {
-    if (build && evalReport.deckSha256 !== build.deckSha256)
+    if (!build || evalReport.deckSha256 !== build.deckSha256)
       reasons.push('eval is for a different deck sha');
-    if (!evalReport.calibration) reasons.push('calibration was skipped');
-    else if (!evalReport.calibration.ok)
+    if (
+      typeof build?.deckTextSha256 !== 'string' ||
+      !build.deckTextSha256 ||
+      evalReport.deckTextSha256 !== build.deckTextSha256
+    )
+      reasons.push('eval is for different or unbound deck text');
+    const calibration = calibrationHolds(evalReport.calibrationRows);
+    if (evalReport.calibration?.ok !== true || !calibration.ok)
       reasons.push(
-        `calibration failed: holdouts not below the funded anchor for ${evalReport.calibration.unseparated.join(', ')}`
+        `calibration failed or incomplete: ${calibration.unseparated.join(', ')}`
       );
-    const abstain = evalReport.personas.filter(
-      p => p.verdict === 'abstain'
-    ).length;
-    if (abstain) reasons.push(`${abstain} persona(s) abstained`);
-    if (evalReport.yes < threshold)
+    const personas = evalReport.personas;
+    const validPersonas =
+      Array.isArray(personas) &&
+      personas.length === PERSONAS.length &&
+      new Set(personas.map(p => p?.persona)).size === PERSONAS.length &&
+      personas.every(
+        p =>
+          p &&
+          PERSONAS.some(expected => expected.id === p.persona) &&
+          ['invest', 'pass', 'abstain'].includes(p.verdict) &&
+          (p.verdict === 'abstain'
+            ? p.p === null
+            : Number.isFinite(p.p) && p.p >= 0 && p.p <= 1)
+      );
+    if (!validPersonas) reasons.push('missing or invalid persona results');
+    else {
+      const abstain = personas.filter(p => p.verdict === 'abstain').length;
+      if (abstain) reasons.push(`${abstain} persona(s) abstained`);
+      const scored = relativeVerdicts(personas, calibration);
+      const yes = scored.filter(p => p.relative === 'invest').length;
+      if (personas.some((p, i) => p.relative !== scored[i].relative))
+        reasons.push('persona votes disagree with calibration');
+      if (evalReport.yes !== yes)
+        reasons.push('vote count disagrees with persona results');
+    }
+    if (
+      !Number.isInteger(evalReport.yes) ||
+      evalReport.yes < 0 ||
+      evalReport.yes > PERSONAS.length
+    )
+      reasons.push('missing or invalid vote count');
+    else if (evalReport.yes < threshold)
       reasons.push(
-        `${evalReport.yes} of ${evalReport.personas.length} personas say invest; need ${threshold}`
+        `${evalReport.yes} of ${PERSONAS.length} personas say invest; need ${threshold}`
       );
     const ageDays = (now - Date.parse(evalReport.at)) / 86_400_000;
-    if (!(ageDays <= MAX_AGE_DAYS))
-      reasons.push(`eval is ${ageDays.toFixed(1)} days old`);
+    if (!(ageDays >= 0 && ageDays <= MAX_AGE_DAYS))
+      reasons.push(`eval age is invalid or exceeds ${MAX_AGE_DAYS} days`);
   }
   return { open: reasons.length === 0, reasons };
 }
@@ -65,8 +112,16 @@ async function main() {
       return null;
     }
   };
+  let build;
+  try {
+    ({ build } = readBuiltDeck(values.deck));
+  } catch (error) {
+    process.stdout.write(`CLOSED\n  - ${error.message}\n`);
+    process.exitCode = 1;
+    return;
+  }
   const decision = gateDecision({
-    build: read('build.json'),
+    build,
     evalReport: read('invest-eval.json'),
     threshold: values.threshold ? Number(values.threshold) : DEFAULT_THRESHOLD,
   });

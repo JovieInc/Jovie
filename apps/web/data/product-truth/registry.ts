@@ -751,7 +751,7 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   },
   CHATGPT_APP_DIRECTORY_MCP: {
     nonMarketing:
-      'ChatGPT directory MCP kill switch; anonymous public artist reads; default off',
+      'ChatGPT directory MCP kill switch; anonymous public creator reads; default off',
   },
   IN_HOUSE_RESOLVER: {
     nonMarketing:
@@ -781,6 +781,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   INVESTOR_PORTAL_YC_DECK: {
     nonMarketing:
       'investor brief section order; default off until founder design approval',
+  },
+  CLAIM_LEGACY_PROOF_SWEEP: {
+    nonMarketing:
+      'daily sweep over grandfathered claims; default off; no public capability claim',
   },
 } as const satisfies Readonly<Record<ProductFlagKey, FlagCapabilityBinding>>;
 

@@ -2007,6 +2007,7 @@ export const MERGE_GROUP_FAILURE_CONCLUSIONS = new Set([
 // runner, and aggregate failures remain unclassified and retain the bounded
 // retry policy below.
 export const DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS = new Set([
+  'Run lanes coverage pytest',
   'Run deterministic brand safety scan',
   'Run deterministic Promptfoo evals',
   'Run golden eval-set CI gate',

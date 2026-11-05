@@ -109,6 +109,7 @@ async function deliverSmsDraft(input: {
   }
 
   const providerMessageIds: string[] = [];
+  let acceptedRecipients = 0;
   let firstError: string | undefined;
   let retryable = false;
 
@@ -125,6 +126,7 @@ async function deliverSmsDraft(input: {
     });
 
     if (result.success) {
+      acceptedRecipients++;
       if (providerMessageIds.length < MAX_PERSISTED_PROVIDER_MESSAGE_IDS) {
         providerMessageIds.push(result.providerMessageId);
       }
@@ -164,7 +166,6 @@ async function deliverSmsDraft(input: {
     });
   }
 
-  const acceptedRecipients = providerMessageIds.length;
   const allAccepted = acceptedRecipients === sendable.length;
 
   return {

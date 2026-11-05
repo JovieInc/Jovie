@@ -26,6 +26,7 @@ export function JovieCardInterestCapture() {
       source={JOVIE_CARD_INTEREST_SOURCE}
       initialEmail={user?.primaryEmailAddress?.emailAddress ?? ''}
       copy={CARD_SIGNUP_COPY}
+      deferSecurityCheck
     />
   );
 }

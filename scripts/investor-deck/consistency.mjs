@@ -29,7 +29,7 @@ export const QUANTITY_FAMILIES = Object.freeze([
   {
     id: 'raise',
     pattern:
-      /\$(\d[\d,.]*K)\b(?=[^.\n]{0,40}\b(?:for 10%|funds|SAFE|investment)\b)/gu,
+      /\$(\d[\d,.]*K)\b(?=[^.\n]{0,40}\b(?:for 10%(?!\w)|(?:funds|SAFE|investment)\b))/gu,
   },
   {
     id: 'mrr',
@@ -91,6 +91,7 @@ export function checkConsistency({ deckText, drafts, ledger }) {
   const issues = [];
   const retired = retiredValues(ledger);
   const draftText = Object.values(drafts).map(draftProse).join('\n');
+  if (!draftText.trim()) issues.push('no application draft prose to check');
 
   for (const number of claimNumbers(deckText)) {
     const id = retired.get(number);
@@ -113,9 +114,9 @@ export function checkConsistency({ deckText, drafts, ledger }) {
     const draft = familyValues(draftText, family);
     families[family.id] = { deck: [...deck], drafts: [...draft] };
     for (const value of deck)
-      if (draft.size && !draft.has(value))
+      if (!draft.has(value))
         issues.push(
-          `${family.id}: deck says ${value}; drafts say ${[...draft].join(', ')}`
+          `${family.id}: deck says ${value}; drafts say ${[...draft].join(', ') || 'no supporting value'}`
         );
   }
   return { ok: issues.length === 0, issues, families };

@@ -1,12 +1,25 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { test } from 'node:test';
+import { pathToFileURL } from 'node:url';
 import {
   buildLedgerYcDeck,
   claimNumbers,
   isRetiredClaim,
   YC_DECK_SECTION_IDS,
 } from '../../apps/web/lib/investors/yc-deck.ts';
+import { callRelay } from '../output-quality/judge-core.mjs';
+import { exportPdf, loadLedger } from './build.mjs';
 import { ANCHOR, HOLDOUTS } from './calibration.mjs';
 import { checkConsistency, retiredValues } from './consistency.mjs';
 import {
@@ -238,47 +251,19 @@ test('a relay failure abstains, it never yields invest', async () => {
   assert.equal(result.failures.length, 3);
 });
 
-test('calibration needs holdouts below the funded anchor; verdicts are anchor-relative', () => {
-  const rows = [];
-  for (const persona of ['a', 'b', 'c']) {
-    rows.push({
-      kind: 'anchor',
-      deck: 'anc',
-      persona,
-      verdict: 'pass',
-      p: 0.3,
-    });
-    rows.push({
-      kind: 'holdout',
-      deck: 'h1',
-      persona,
-      verdict: 'pass',
-      p: 0.02,
-    });
-    rows.push({
-      kind: 'holdout',
-      deck: 'h2',
-      persona,
-      verdict: 'pass',
-      p: persona === 'c' ? 0.4 : 0.1,
-    });
-  }
+test('calibration needs all holdouts below the anchor for at least five personas', () => {
+  const { evalReport } = passingGateInput();
+  const rows = evalReport.calibrationRows;
+  rows.find(r => r.persona === PERSONAS[2].id && r.deck === HOLDOUTS[0].id).p =
+    0.4;
   const cal = calibrationHolds(rows);
   assert.equal(cal.ok, true);
-  assert.deepEqual(cal.unseparated, ['c']);
-  rows.push({
-    kind: 'anchor',
-    deck: 'anc',
-    persona: 'b',
-    verdict: 'abstain',
-    p: null,
-  });
-  assert.equal(calibrationHolds(rows).ok, false);
+  assert.deepEqual(cal.unseparated, [PERSONAS[2].id]);
   const scored = relativeVerdicts(
     [
-      { persona: 'a', p: 0.35 },
-      { persona: 'b', p: 0.2 },
-      { persona: 'c', p: 0.9 },
+      { persona: PERSONAS[0].id, p: 0.35 },
+      { persona: PERSONAS[1].id, p: 0.2 },
+      { persona: PERSONAS[2].id, p: 0.9 },
     ],
     cal
   );
@@ -286,20 +271,14 @@ test('calibration needs holdouts below the funded anchor; verdicts are anchor-re
     scored.map(s => s.relative),
     ['invest', 'pass', 'unscored']
   );
+  rows.find(r => r.persona === PERSONAS[1].id && r.deck === ANCHOR.id).verdict =
+    'abstain';
+  assert.equal(calibrationHolds(rows).ok, false);
 });
 
 test('gate fails closed', () => {
-  const build = { deckSha256: 'abc', issues: [] };
-  const evalReport = {
-    deckSha256: 'abc',
-    calibration: { ok: true, unseparated: [] },
-    personas: Array.from({ length: 6 }, (_, i) => ({
-      verdict: i < 4 ? 'invest' : 'pass',
-    })),
-    yes: 4,
-    at: new Date().toISOString(),
-  };
-  assert.deepEqual(gateDecision({ build, evalReport }), {
+  const { build, evalReport, now } = passingGateInput();
+  assert.deepEqual(gateDecision({ build, evalReport, now }), {
     open: true,
     reasons: [],
   });
@@ -324,7 +303,7 @@ test('gate fails closed', () => {
         calibration: { ok: false, unseparated: ['x', 'y'] },
       },
     }).reasons.join(),
-    /x, y/u
+    /calibration failed/u
   );
   assert.equal(gateDecision({ build, evalReport: null }).open, false);
 });
@@ -335,4 +314,393 @@ test('investor contamination ignores ordinary investor words', () => {
     []
   );
   assert.deepEqual(investContaminated({ t: 'like Ovie' }, 'prompt'), ['ovie']);
+});
+
+function passingGateInput() {
+  const calibrationRows = PERSONAS.flatMap(({ id: persona }) => [
+    { persona, deck: ANCHOR.id, kind: 'anchor', verdict: 'pass', p: 0.3 },
+    ...HOLDOUTS.map(({ id: deck }) => ({
+      persona,
+      deck,
+      kind: 'holdout',
+      verdict: 'pass',
+      p: 0.1,
+    })),
+  ]);
+  return {
+    now: Date.parse('2026-11-05T21:00:00Z'),
+    build: {
+      deckSha256: 'synthetic',
+      deckTextSha256: 'synthetic-text',
+      issues: [],
+    },
+    evalReport: {
+      deckSha256: 'synthetic',
+      deckTextSha256: 'synthetic-text',
+      calibrationRows,
+      calibration: calibrationHolds(calibrationRows),
+      personas: PERSONAS.map(({ id: persona }, i) => ({
+        persona,
+        verdict: 'pass',
+        p: i < 4 ? 0.4 : 0.2,
+        relative: i < 4 ? 'invest' : 'pass',
+      })),
+      yes: 4,
+      at: '2026-11-05T21:00:00Z',
+    },
+  };
+}
+
+test('consistency requires nonempty draft prose and support for every deck quantity', () => {
+  for (const drafts of [
+    {},
+    { a: '' },
+    { a: '> source only' },
+    { a: 'Synthetic narrative without runway.' },
+  ]) {
+    const result = checkConsistency({
+      deckText: '23 months',
+      drafts,
+      ledger: LEDGER,
+    });
+    assert.equal(result.ok, false, JSON.stringify(drafts));
+  }
+});
+
+test('percentage raise phrases are compared at punctuation and end of text', () => {
+  for (const suffix of ['', '.', ', with support', ' next year']) {
+    const result = checkConsistency({
+      deckText: `$750K for 10%${suffix}`,
+      drafts: { a: '$500K for 10%' },
+      ledger: LEDGER,
+    });
+    assert.equal(result.ok, false);
+    assert.deepEqual(result.families.raise, {
+      deck: ['750k'],
+      drafts: ['500k'],
+    });
+  }
+  assert.equal(
+    checkConsistency({
+      deckText: '$500K for 10%',
+      drafts: { a: '$500K for 10%' },
+      ledger: LEDGER,
+    }).ok,
+    true
+  );
+});
+
+test('ledger loading refuses a missing or empty application draft set', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'investor-ledger-test-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const registry = join(dir, 'registry');
+  mkdirSync(registry);
+  for (const name of ['claims.yaml', 'metrics.yaml', 'deck.yaml'])
+    writeFileSync(join(registry, name), '{}');
+  assert.throws(() => loadLedger(registry), /draft/iu);
+  mkdirSync(join(dir, 'drafts'));
+  assert.throws(() => loadLedger(registry), /draft/iu);
+  writeFileSync(
+    join(dir, 'drafts', 'YC-synthetic.md'),
+    'Synthetic company narrative.'
+  );
+  assert.equal(Object.keys(loadLedger(registry).drafts).length, 1);
+});
+
+test('gate rejects noninteger or out-of-range thresholds', () => {
+  const input = passingGateInput();
+  assert.equal(gateDecision(input).open, true);
+  for (const threshold of [NaN, Infinity, -1, 0, 1.5, 7, '4', null]) {
+    assert.equal(
+      gateDecision({ ...input, threshold: /** @type {number} */ (threshold) })
+        .open,
+      false,
+      String(threshold)
+    );
+  }
+});
+
+test('gate requires a valid vote count that agrees with the six persona results', () => {
+  const input = passingGateInput();
+  for (const yes of [undefined, NaN, Infinity, -1, 1.5, 7, '4', 6]) {
+    assert.equal(
+      gateDecision({ ...input, evalReport: { ...input.evalReport, yes } }).open,
+      false,
+      String(yes)
+    );
+  }
+  for (const personas of [
+    undefined,
+    [],
+    {},
+    Array(6).fill(input.evalReport.personas[0]),
+  ]) {
+    assert.equal(
+      gateDecision({ ...input, evalReport: { ...input.evalReport, personas } })
+        .open,
+      false
+    );
+  }
+});
+
+test('gate rejects malformed build/calibration receipts and future evaluations without throwing', () => {
+  const input = passingGateInput();
+  for (const build of [
+    {},
+    { deckSha256: 'synthetic' },
+    { issues: [], deckSha256: '' },
+  ]) {
+    assert.equal(gateDecision({ ...input, build }).open, false);
+  }
+  for (const calibration of [{ ok: 'yes' }, { ok: false }, {}]) {
+    assert.equal(
+      gateDecision({
+        ...input,
+        evalReport: { ...input.evalReport, calibration },
+      }).open,
+      false
+    );
+  }
+  for (const at of ['invalid', '2026-11-06T21:00:00Z']) {
+    assert.equal(
+      gateDecision({ ...input, evalReport: { ...input.evalReport, at } }).open,
+      false
+    );
+  }
+});
+
+test('calibration requires every expected persona and every distinct holdout', () => {
+  const { evalReport } = passingGateInput();
+  assert.equal(calibrationHolds(evalReport.calibrationRows).ok, true);
+  const onePersona = evalReport.calibrationRows.filter(
+    r => r.persona === PERSONAS[0].id
+  );
+  assert.equal(calibrationHolds(onePersona).ok, false);
+  const noThirdHoldout = evalReport.calibrationRows.filter(
+    r => r.deck !== HOLDOUTS[2].id
+  );
+  assert.equal(calibrationHolds(noThirdHoldout).ok, false);
+  const duplicated = noThirdHoldout.concat(
+    noThirdHoldout.filter(r => r.deck === HOLDOUTS[0].id)
+  );
+  assert.equal(calibrationHolds(duplicated).ok, false);
+});
+
+test('PDF export resolves and escapes relative output paths and closes the browser', async () => {
+  let url;
+  let closed = 0;
+  const page = {
+    goto: async value => {
+      url = value;
+    },
+    evaluate: async () => {},
+    pdf: async () => {},
+    $$: async () => [],
+    $$eval: async () => [],
+  };
+  const chromium = {
+    launch: async () => ({
+      newPage: async () => page,
+      close: async () => {
+        closed++;
+      },
+    }),
+  };
+  await exportPdf('synthetic out/#deck.html', 'synthetic out', 0, chromium);
+  assert.equal(url, pathToFileURL(resolve('synthetic out/#deck.html')).href);
+  assert.equal(closed, 1);
+  page.goto = async () => {
+    throw new Error('synthetic navigation error');
+  };
+  await assert.rejects(
+    exportPdf('out/deck.html', 'out', 0, chromium),
+    /synthetic navigation/u
+  );
+  assert.equal(closed, 2);
+});
+
+test('investor samples use maintained shared transport policy and investor-specific contamination', async () => {
+  const requests = [];
+  const options = [];
+  /** @type {typeof import('../../packages/api-client/client.ts').createApiClient} */
+  const createClient = option => {
+    options.push(option);
+    return {
+      provider: option.provider,
+      credential: option.credential,
+      state: async () => null,
+      request: async request => {
+        requests.push(request);
+        return {
+          status: 200,
+          headers: new Headers(),
+          text: '',
+          fromCache: null,
+          attempts: 1,
+          json: () =>
+            JSON.parse(
+              JSON.stringify({
+                choices: [
+                  {
+                    message: {
+                      content: JSON.stringify(
+                        sample(0.6, { for: ['ICP is clear this summer'] })
+                      ),
+                    },
+                  },
+                ],
+                usage: {},
+              })
+            ),
+        };
+      },
+    };
+  };
+  const result = await judgeDeck({
+    persona: PERSONAS[0],
+    deck: 'Synthetic company.',
+    samples: 3,
+    route: {
+      model: 'synthetic-model',
+      baseUrl: 'https://synthetic.invalid/v1',
+    },
+    call: args =>
+      callRelay({
+        ...args,
+        env: { WORKERS_AI_TOKEN: 'synthetic-test-credential' },
+        createClient,
+      }),
+  });
+  assert.equal(result.samples, 3);
+  assert.equal(result.verdict, 'invest');
+  assert.deepEqual(result.failures, []);
+  assert.equal(requests.length, 3);
+  assert.ok(options.every(option => option.provider === 'cloudflare'));
+  for (const request of requests) {
+    assert.equal(request.url, 'https://synthetic.invalid/v1/chat/completions');
+    assert.equal(request.body.model, 'synthetic-model');
+    assert.equal(request.body.max_tokens, 16000);
+    assert.equal(request.maxAttempts, 2);
+    assert.equal(request.priority, 'default');
+  }
+});
+
+test('invalid sample counts are rejected before the transport is called', async () => {
+  let calls = 0;
+  for (const samples of [NaN, Infinity, 0, -1, 1.5]) {
+    await assert.rejects(
+      judgeDeck({
+        persona: PERSONAS[0],
+        deck: 'Synthetic',
+        samples,
+        call: async () => {
+          calls++;
+          throw new Error('unexpected transport call');
+        },
+      }),
+      /positive integer/u
+    );
+  }
+  assert.equal(calls, 0);
+});
+
+test('calibration rejects unknown fixtures even when kind is absent', () => {
+  const { evalReport } = passingGateInput();
+  for (const replaced of [HOLDOUTS[2].id, ANCHOR.id]) {
+    const rows = evalReport.calibrationRows.map(row => {
+      if (row.deck !== replaced) return row;
+      const { kind, ...rest } = row;
+      return { ...rest, deck: 'unknown-fixture' };
+    });
+    assert.equal(calibrationHolds(rows).ok, false);
+  }
+});
+
+test('deck binding rejects changed rendered HTML or evaluation text at the gate CLI', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'investor-binding-test-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const { build, evalReport } = passingGateInput();
+  const html = '<p>Synthetic investor deck</p>';
+  const text = 'Synthetic investor deck';
+  const digest = value => createHash('sha256').update(value).digest('hex');
+  build.deckSha256 = evalReport.deckSha256 = digest(html);
+  build.deckTextSha256 = evalReport.deckTextSha256 = digest(text);
+  evalReport.at = new Date().toISOString();
+  writeFileSync(join(dir, 'build.json'), JSON.stringify(build));
+  writeFileSync(join(dir, 'invest-eval.json'), JSON.stringify(evalReport));
+  writeFileSync(join(dir, 'deck.html'), html);
+  writeFileSync(join(dir, 'deck.txt'), text);
+  const run = () =>
+    spawnSync(
+      process.execPath,
+      [new URL('./gate.mjs', import.meta.url).pathname, '--deck', dir],
+      { encoding: 'utf8' }
+    );
+  assert.equal(run().status, 0);
+  writeFileSync(join(dir, 'deck.txt'), 'Different synthetic evaluation text');
+  assert.equal(run().status, 1);
+  const evaluation = spawnSync(
+    process.execPath,
+    [new URL('./eval.mjs', import.meta.url).pathname, '--deck', dir],
+    { encoding: 'utf8', env: {} }
+  );
+  assert.equal(evaluation.status, 1);
+  assert.match(evaluation.stderr, /evaluation text does not match/u);
+  writeFileSync(join(dir, 'deck.txt'), text);
+  writeFileSync(
+    join(dir, 'deck.html'),
+    '<p>Different synthetic rendered deck</p>'
+  );
+  assert.equal(run().status, 1);
+});
+
+test('synthetic build CLI emits artifact hashes and rejects an empty draft directory', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'investor-build-test-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const registry = join(dir, 'registry');
+  const drafts = join(dir, 'drafts');
+  const out = join(dir, 'out');
+  mkdirSync(registry);
+  mkdirSync(drafts);
+  writeFileSync(join(registry, 'claims.yaml'), JSON.stringify({ claims: {} }));
+  writeFileSync(
+    join(registry, 'metrics.yaml'),
+    JSON.stringify({ metrics: {}, facts: {} })
+  );
+  writeFileSync(
+    join(registry, 'deck.yaml'),
+    JSON.stringify({
+      schema: 'synthetic',
+      program: 'synthetic',
+      title: 'Synthetic company',
+      slides: spine,
+    })
+  );
+  const run = () =>
+    spawnSync(
+      process.execPath,
+      [
+        new URL('./build.mjs', import.meta.url).pathname,
+        '--ledger',
+        registry,
+        '--out',
+        out,
+        '--no-pdf',
+        '--json',
+      ],
+      { encoding: 'utf8' }
+    );
+  assert.equal(run().status, 1);
+  writeFileSync(
+    join(drafts, 'YC-synthetic.md'),
+    'Synthetic company narrative.'
+  );
+  const built = run();
+  assert.equal(built.status, 0, built.stderr || built.stdout);
+  const receipt = JSON.parse(built.stdout);
+  const digest = path =>
+    createHash('sha256').update(readFileSync(path)).digest('hex');
+  assert.equal(receipt.deckSha256, digest(join(out, 'deck.html')));
+  assert.equal(receipt.deckTextSha256, digest(join(out, 'deck.txt')));
+  assert.deepEqual(receipt.issues, []);
 });
