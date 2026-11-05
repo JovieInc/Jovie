@@ -275,6 +275,150 @@ afterEach(() => {
 
 describe('OnboardingChat focused tool visibility', () => {
   it.each([false, true])(
+    'keeps a pressed disclosure still until its click (reduced motion=%s)',
+    async reduced => {
+      vi.spyOn(globalThis, 'matchMedia').mockImplementation(query => ({
+        matches: query.includes('prefers-reduced-motion') && reduced,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: () => true,
+      }));
+      const user = userEvent.setup();
+      const view = render(
+        <OnboardingChat
+          headerOverlay
+          initialMessages={chat.messages}
+          turnstileToken='token'
+          turnstileStatus='verified'
+        />
+      );
+      const change = await screen.findByRole('button', {
+        name: 'Change Handle',
+      });
+      const region = installCapturedGeometry(view.container);
+      const composer = screen.getByRole('textbox', {
+        name: 'Chat Message Input',
+      });
+      fireEvent.change(composer, { target: { value: 'Keep this draft' } });
+      const beforeScroll = region.scrollTop;
+      const beforeBounds = change.getBoundingClientRect();
+
+      // JSDOM does not hit-test a moved pointer target. Test the mechanical
+      // invariant instead: focusing on press must not move it before release.
+      // This boundary geometry is not an invented pointer trace from attempt 5.
+      await user.pointer({ target: change, keys: '[MouseLeft>]' });
+      expect(change).toHaveFocus();
+      flushResizeFrames();
+      expect(region.scrollTop).toBe(beforeScroll);
+      expect(change.getBoundingClientRect()).toEqual(beforeBounds);
+      expect(
+        screen.queryByRole('textbox', { name: 'Edit Proposed Handle' })
+      ).not.toBeInTheDocument();
+
+      await user.pointer({ target: change, keys: '[/MouseLeft]' });
+      const field = expectGroupVisible(region);
+      expect(field).toHaveFocus();
+      expect(screen.getByRole('textbox', { name: 'Chat Message Input' })).toBe(
+        composer
+      );
+      expect(composer).toHaveValue('Keep this draft');
+      expect(chat.sendMessage).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['outside release', 'pointer cancel', 'keyboard', 'window blur'])(
+    'restores immediate focus reveal after %s interrupts a press',
+    async ending => {
+      const user = userEvent.setup();
+      const view = render(
+        <OnboardingChat
+          headerOverlay
+          initialMessages={chat.messages}
+          turnstileToken='token'
+          turnstileStatus='verified'
+        />
+      );
+      const change = await screen.findByRole('button', {
+        name: 'Change Handle',
+      });
+      const region = installCapturedGeometry(view.container);
+      const originalScroll = region.scrollTop;
+      let pointerId: number | undefined;
+      change.addEventListener(
+        'pointerdown',
+        event => {
+          pointerId = event.pointerId;
+        },
+        { once: true }
+      );
+      await user.pointer({ target: change, keys: '[MouseLeft>]' });
+      expect(region.scrollTop).toBe(originalScroll);
+      if (ending === 'outside release') {
+        await user.pointer({ target: document.body, keys: '[/MouseLeft]' });
+      } else if (ending === 'pointer cancel') {
+        // JSDOM has no PointerEvent constructor. Keep the unit press's actual
+        // pointer id when dispatching cancellation, rather than inventing one.
+        const cancellation = new Event('pointercancel', { bubbles: true });
+        Object.defineProperty(cancellation, 'pointerId', { value: pointerId });
+        fireEvent(change, cancellation);
+      } else if (ending === 'keyboard') {
+        await user.keyboard('{Tab}');
+      } else {
+        act(() => {
+          globalThis.dispatchEvent(new Event('blur'));
+        });
+      }
+
+      act(() => {
+        change.blur();
+        change.focus();
+      });
+      expect(change).toHaveFocus();
+      expect(region.scrollTop).not.toBe(originalScroll);
+      expect(change.getBoundingClientRect().top - 4).toBeGreaterThanOrEqual(
+        region.getBoundingClientRect().top + 64
+      );
+      await user.keyboard('{Enter}');
+      expectGroupVisible(region);
+      expect(chat.sendMessage).not.toHaveBeenCalled();
+      if (ending !== 'outside release') {
+        await user.pointer({ target: document.body, keys: '[/MouseLeft]' });
+      }
+    }
+  );
+
+  it('reveals a pointer-focused input after click without moving it during press', async () => {
+    const user = userEvent.setup();
+    const view = render(
+      <OnboardingChat
+        headerOverlay
+        initialMessages={chat.messages}
+        turnstileToken='token'
+        turnstileStatus='verified'
+      />
+    );
+    const change = await screen.findByRole('button', { name: 'Change Handle' });
+    const region = installCapturedGeometry(view.container);
+    await user.click(change);
+    const field = expectGroupVisible(region);
+    act(() => field.blur());
+    region.scrollTop = 687;
+    const originalBounds = field.getBoundingClientRect();
+    await user.pointer({ target: field, keys: '[MouseLeft>]' });
+    expect(field).toHaveFocus();
+    expect(region.scrollTop).toBe(687);
+    expect(field.getBoundingClientRect()).toEqual(originalBounds);
+    await user.pointer({ target: field, keys: '[/MouseLeft]' });
+    expectGroupVisible(region);
+    expect(field).toHaveFocus();
+    expect(chat.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])(
     'reveals the real native handle editor and Confirm beyond the mask (reduced motion=%s)',
     async reduced => {
       vi.spyOn(globalThis, 'matchMedia').mockImplementation(query => ({

@@ -1033,10 +1033,9 @@ export function OnboardingChat({
     totalSizeRef,
     scrollContainerRef,
   } = useStickToBottom();
-  const handleTranscriptFocus = useCallback(
-    (event: FocusEvent<HTMLDivElement>) => {
-      const container = event.currentTarget;
-      const target = event.target;
+  const transcriptPointerIdRef = useRef<number | null>(null);
+  const revealTranscriptFocus = useCallback(
+    (container: HTMLDivElement, target: EventTarget | null) => {
       if (
         !(target instanceof HTMLElement) ||
         target === container ||
@@ -1049,6 +1048,10 @@ export function OnboardingChat({
       // An explicit tool interaction owns the viewport until the next user
       // turn. The existing resize controller must not re-pin over that edit.
       setStuckToBottom(false);
+      // Pointer focus happens before click. Moving its target here can make
+      // release hit a different element. Reveal after click has been delivered;
+      // keyboard and programmatic focus still reveal immediately.
+      if (transcriptPointerIdRef.current !== null) return;
       const viewport = container.getBoundingClientRect();
       const style = getComputedStyle(container);
       // The existing shared ring/forced-colors outline is 2px + 2px offset.
@@ -1084,6 +1087,49 @@ export function OnboardingChat({
     },
     [headerOverlay, setStuckToBottom]
   );
+  const handleTranscriptFocus = useCallback(
+    (event: FocusEvent<HTMLDivElement>) => {
+      revealTranscriptFocus(event.currentTarget, event.target);
+    },
+    [revealTranscriptFocus]
+  );
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const beginPointer = (event: PointerEvent) => {
+      if (event.isPrimary && event.button === 0) {
+        transcriptPointerIdRef.current = event.pointerId;
+      }
+    };
+    const endPointer = (event: PointerEvent) => {
+      if (transcriptPointerIdRef.current === event.pointerId) {
+        transcriptPointerIdRef.current = null;
+      }
+    };
+    const clearPointer = () => {
+      transcriptPointerIdRef.current = null;
+    };
+    const afterClick = () => {
+      revealTranscriptFocus(container, container.ownerDocument.activeElement);
+    };
+    // Observe native child controls; the transcript itself is not interactive.
+    // A click's target is already fixed before this bubble listener runs.
+    container.addEventListener('pointerdown', beginPointer, true);
+    container.addEventListener('click', afterClick);
+    // A press can end outside the transcript or be cancelled by touch scrolling.
+    globalThis.addEventListener('pointerup', endPointer, true);
+    globalThis.addEventListener('pointercancel', endPointer, true);
+    globalThis.addEventListener('keydown', clearPointer, true);
+    globalThis.addEventListener('blur', clearPointer);
+    return () => {
+      container.removeEventListener('pointerdown', beginPointer, true);
+      container.removeEventListener('click', afterClick);
+      globalThis.removeEventListener('pointerup', endPointer, true);
+      globalThis.removeEventListener('pointercancel', endPointer, true);
+      globalThis.removeEventListener('keydown', clearPointer, true);
+      globalThis.removeEventListener('blur', clearPointer);
+    };
+  }, [revealTranscriptFocus, scrollContainerRef]);
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
   const { onSend: notifyJankSend } = useChatJankMonitor({
     conversationId: 'onboarding',
