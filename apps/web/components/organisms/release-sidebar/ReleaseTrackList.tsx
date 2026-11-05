@@ -123,7 +123,7 @@ export function ReleaseTrackList({
 
   let liveAnnouncement = '';
   if (playbackState.playbackStatus === 'error') {
-    liveAnnouncement = 'Preview unavailable.';
+    liveAnnouncement = 'Preview did not load. Try again.';
   } else if (
     playbackState.playbackStatus === 'playing' &&
     playbackState.trackTitle
@@ -292,10 +292,6 @@ function TrackListRow({
   ]);
 
   function getControlLabel(): string {
-    if (!playableUrl && !isActiveTrack) {
-      return `No preview available for ${track.title}`;
-    }
-
     return isTrackPlaying ? `Pause ${track.title}` : `Play ${track.title}`;
   }
 
@@ -327,24 +323,31 @@ function TrackListRow({
       )}
       data-testid={`release-track-row-${track.id}`}
     >
-      <button
-        type='button'
-        onClick={handleTogglePlayback}
-        disabled={!playableUrl && !isActiveTrack}
-        className={cn(
-          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-caption tabular-nums transition-[background-color,color,border-color] duration-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-          isActiveTrack
-            ? 'border border-(--app-shell-frame-seam) bg-surface-0 text-primary-token hover:bg-surface-1'
-            : 'border border-transparent bg-transparent text-tertiary-token hover:bg-surface-0 hover:text-primary-token',
-          !playableUrl &&
-            !isActiveTrack &&
-            'cursor-not-allowed text-quaternary-token hover:bg-transparent hover:text-quaternary-token'
-        )}
-        aria-label={controlLabel}
-        data-testid={`release-track-control-${track.id}`}
-      >
-        {trackButtonContent}
-      </button>
+      {playableUrl || isActiveTrack ? (
+        <button
+          type='button'
+          onClick={handleTogglePlayback}
+          className={cn(
+            'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-caption tabular-nums transition-[background-color,color,border-color] duration-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+            isActiveTrack
+              ? 'border border-(--app-shell-frame-seam) bg-surface-0 text-primary-token hover:bg-surface-1'
+              : 'border border-transparent bg-transparent text-tertiary-token hover:bg-surface-0 hover:text-primary-token'
+          )}
+          aria-label={controlLabel}
+          data-testid={`release-track-control-${track.id}`}
+        >
+          {trackButtonContent}
+        </button>
+      ) : (
+        // No preview URL: the plain track number, not a control that cannot
+        // work (JOV-INV-046).
+        <span
+          className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-caption tabular-nums text-quaternary-token'
+          data-testid={`release-track-number-${track.id}`}
+        >
+          {trackLabel}
+        </span>
+      )}
 
       {onSelect ? (
         <button

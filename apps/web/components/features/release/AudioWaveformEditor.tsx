@@ -39,12 +39,12 @@ const PREVIEW_FAILURE_COPY: Record<
   { readonly title: string; readonly hint: string }
 > = {
   network: {
-    title: 'Audio preview unavailable',
+    title: 'Preview did not load',
     hint: 'The file is still attached — the preview could not be loaded. Check your connection and try again.',
   },
   unavailable: {
-    title: 'Audio preview unavailable',
-    hint: 'The file is still attached — the preview could not be loaded.',
+    title: 'Preview did not load',
+    hint: 'The file is still attached. Try loading the preview again.',
   },
   permission: {
     title: 'Preview not permitted',
@@ -55,8 +55,8 @@ const PREVIEW_FAILURE_COPY: Record<
     hint: 'The source file was removed. Upload a new file to restore the preview.',
   },
   unsupported: {
-    title: 'Preview not supported',
-    hint: 'This file cannot be previewed here.',
+    title: 'Cannot preview this file',
+    hint: 'This file format cannot be previewed here. Replace it with an audio file to trim a snippet.',
   },
 };
 
@@ -97,7 +97,8 @@ function msFromClientX(
 }
 
 export interface AudioWaveformEditorProps {
-  readonly audioUrl: string;
+  /** No audio attached: the editor renders nothing (JOV-INV-046). */
+  readonly audioUrl: string | null;
   readonly durationMs?: number | null;
   readonly initialSnippet?: AudioSnippet | null;
   readonly onSaveSnippet?: (snippet: AudioSnippet) => Promise<void>;
@@ -146,6 +147,7 @@ export function AudioWaveformEditor({
   }, [initialSnippet]);
 
   useEffect(() => {
+    if (!audioUrl) return;
     let cancelled = false;
     setIsLoading(true);
     setPreviewError(null);
@@ -179,6 +181,7 @@ export function AudioWaveformEditor({
   }, [audioUrl, durationMs, reloadKey]);
 
   useEffect(() => {
+    if (!audioUrl) return;
     const audio = new Audio(audioUrl);
     audio.preload = 'metadata';
     audioRef.current = audio;
@@ -360,6 +363,12 @@ export function AudioWaveformEditor({
     setIsLoading(true);
     setReloadKey(key => key + 1);
   }, []);
+
+  if (!audioUrl) {
+    // No preview URL: render nothing instead of controls that cannot work
+    // (JOV-INV-046).
+    return null;
+  }
 
   if (previewError) {
     const copy = PREVIEW_FAILURE_COPY[previewError];

@@ -99,6 +99,19 @@ describe('TrackSidebar', () => {
     expect(screen.getByText(/Canonical DSPs/i)).toBeInTheDocument();
   });
 
+  it('hides the play control when no preview or audio URL exists (JOV-INV-046)', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TrackSidebar track={buildTrack()} isOpen={true} onClose={vi.fn()} />
+    );
+
+    await user.click(screen.getByTestId('drawer-tab-assets'));
+
+    expect(screen.queryByRole('button', { name: 'Play preview' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Pause preview' })).toBeNull();
+  });
+
   it('renders empty platforms state when there are no provider links', async () => {
     const user = userEvent.setup();
 

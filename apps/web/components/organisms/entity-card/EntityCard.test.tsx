@@ -437,7 +437,11 @@ describe('ProfilePacCard landscape states', () => {
         />
       );
 
-      expect(screen.getByRole('link', { name: label })).toBeInTheDocument();
+      const link = screen.getByRole('link', { name: label });
+      expect(link).toBeInTheDocument();
+      // The upcoming label still resolves to the release page, which hosts
+      // the notify capture for the drop (JOV-INV-046).
+      expect(link).toHaveAttribute('href', '/tim/release');
     }
   );
 

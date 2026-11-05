@@ -45,7 +45,7 @@ export function SmartLinkAudioPreview({
   useEffect(() => {
     return onError(reason => {
       if (reason === 'missing_source') return;
-      toast.error('Preview unavailable');
+      toast.error('Preview did not load. Try again.');
     });
   }, [onError]);
 

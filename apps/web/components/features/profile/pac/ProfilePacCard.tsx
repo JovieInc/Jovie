@@ -686,7 +686,8 @@ export function ProfilePacCard({
         // unreleased subject links to its coming-soon page, so the label must
         // not promise listening that the destination cannot deliver.
         const listenLabel = isPacReleaseUpcoming(release)
-          ? 'Coming soon'
+          ? // dead-end-ok: upcoming release page hosts the notify capture
+            'Coming soon'
           : isFeatured
             ? 'Listen now'
             : 'Listen';
