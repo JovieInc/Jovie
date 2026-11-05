@@ -177,14 +177,33 @@ export function expandPackageScripts(seeds, packageScripts) {
  * @returns {Promise<CiCommand[]>}
  */
 export async function collectCiCommands(repoRoot, options = {}) {
+  const laneSource = 'scripts/ci-fast-lanes.mjs';
+  const laneText = readFileSync(join(repoRoot, laneSource), 'utf8');
+  const sources = [{ source: laneSource, text: laneText }];
+  // This literal group is executable only through this import and array spread.
+  const plannerImport =
+    /import\s*\{\s*TEST_PLANNER_CONTRACT_TESTS\s*\}\s*from\s*(['"])\.\/lib\/test-planner-contract-tests\.mjs\1/u;
+  const nodeArray =
+    /export const SCRIPT_CONTRACT_NODE_TESTS\s*=\s*Object\.freeze\(\[([\s\S]*?)\]\);/u.exec(
+      laneText
+    )?.[1];
+  if (
+    plannerImport.test(laneText) &&
+    nodeArray?.includes('...TEST_PLANNER_CONTRACT_TESTS')
+  ) {
+    const source = 'scripts/lib/test-planner-contract-tests.mjs';
+    sources.push({
+      source,
+      text: readFileSync(join(repoRoot, source), 'utf8'),
+    });
+  }
   /** @type {CiCommand[]} */
-  const seeds = readFileSync(
-    join(repoRoot, 'scripts/ci-fast-lanes.mjs'),
-    'utf8'
-  )
-    .split('\n')
-    .filter(line => !/^\s*(?:\/\/|\*)/u.test(line))
-    .map(text => ({ source: 'scripts/ci-fast-lanes.mjs', text }));
+  const seeds = sources.flatMap(({ source, text }) =>
+    text
+      .split('\n')
+      .filter(line => !/^\s*(?:\/\/|\*)/u.test(line))
+      .map(text => ({ source, text }))
+  );
   for (const file of [
     ...listYaml(join(repoRoot, '.github/workflows')),
     ...listYaml(join(repoRoot, '.github/actions')),
