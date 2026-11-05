@@ -28,6 +28,9 @@ printf 'common\n' >"$SEED/semantic.union-fixture"
 git -C "$SEED" add .gitattributes semantic.union-fixture
 git -C "$SEED" commit -q -m 'add built-in merge-driver fixture'
 BASE_SHA="$(git -C "$SEED" rev-parse HEAD)"
+BASE_EPOCH="$(git -C "$SEED" show -s --format='%ct' "$BASE_SHA")"
+# Equal dates expose scanners that stop at the base before visiting PR history.
+FEATURE_DATE="@${BASE_EPOCH} +0000"
 git -C "$SEED" push -q origin main
 PR_BASE_REF='refs/heads/pr-base'
 git -C "$SEED" push -q origin "$BASE_SHA:$PR_BASE_REF"
@@ -47,14 +50,17 @@ sed 's/ # trufflehog:ignore//g' \
   "$REPO_ROOT/scripts/security/gitleaks-backup-fixture.txt" \
   >"$SEED/settings.local.json.backup"
 git -C "$SEED" add settings.local.json.backup
-git -C "$SEED" commit -q -m 'introduce backup fixture'
+GIT_AUTHOR_DATE="$FEATURE_DATE" GIT_COMMITTER_DATE="$FEATURE_DATE" \
+  git -C "$SEED" commit -q -m 'introduce backup fixture'
 INTRODUCED_SHA="$(git -C "$SEED" rev-parse HEAD)"
 git -C "$SEED" rm -q settings.local.json.backup
-git -C "$SEED" commit -q -m 'remove backup fixture'
+GIT_AUTHOR_DATE="$FEATURE_DATE" GIT_COMMITTER_DATE="$FEATURE_DATE" \
+  git -C "$SEED" commit -q -m 'remove backup fixture'
 REMOVED_SHA="$(git -C "$SEED" rev-parse HEAD)"
 printf 'feature complete\n' >"$SEED/feature.txt"
 git -C "$SEED" add feature.txt
-git -C "$SEED" commit -q -m 'finish feature'
+GIT_AUTHOR_DATE="$FEATURE_DATE" GIT_COMMITTER_DATE="$FEATURE_DATE" \
+  git -C "$SEED" commit -q -m 'finish feature'
 SOURCE_HEAD="$(git -C "$SEED" rev-parse HEAD)"
 
 git -C "$SEED" switch -q -c pr-merge "$BASE_SHA"
@@ -181,7 +187,6 @@ git -C "$SEED" push -q origin "$QUEUE_HEAD:$SUPERSEDED_QUEUE_REF"
 # below the base into a shallow boundary and silently scans zero bytes. Keep a
 # real multi-commit side in the graph so the local scan-only anchor must retain
 # introduced-then-removed history, not merely the final tree.
-BASE_EPOCH="$(git -C "$SEED" show -s --format='%ct' "$BASE_SHA")"
 SKEWED_QUEUE_EPOCH=$(( BASE_EPOCH - 60 ))
 (( SKEWED_QUEUE_EPOCH > 0 )) \
   || { echo 'FAIL: skewed merge-group timestamp fixture underflowed' >&2; exit 1; }
