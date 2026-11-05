@@ -1,0 +1,11 @@
+{
+  "schema": "jovie.marketing-image/v1",
+  "kind": "mood-plate",
+  "accent": "ion",
+  "subject": "abstract",
+  "stage": "profile-depth",
+  "model": "@cf/black-forest-labs/flux-1-schnell",
+  "promptHash": "76e5cefe0ace29b82cef357f825c25e98f5811c0d3646e4d37a4d3435165971d",
+  "seed": 1994772222,
+  "modelSeed": null
+}
