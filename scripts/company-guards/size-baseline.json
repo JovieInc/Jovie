@@ -276,7 +276,7 @@
   "apps/web/components/shell/EntityPopover.tsx": 782,
   "apps/web/components/shell/HeaderSearchSurface.test.tsx": 568,
   "apps/web/components/shell/HeaderSearchSurface.tsx": 648,
-  "apps/web/components/shell/PillSearch.tsx": 561,
+  "apps/web/components/shell/PillSearch.tsx": 563,
   "apps/web/components/shell/ShellDropdown.tsx": 903,
   "apps/web/components/shell/SidebarThreadsSection.test.tsx": 704,
   "apps/web/components/shell/SidebarThreadsSection.tsx": 586,

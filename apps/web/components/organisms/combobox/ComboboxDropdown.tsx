@@ -46,6 +46,7 @@ export const ComboboxDropdown = forwardRef<
         {isLoading && query.length > 0 ? (
           <HeadlessComboboxOption
             disabled
+            aria-busy='true'
             value='__loading__'
             className='px-4 py-3 text-sm text-secondary-token'
           >
@@ -57,6 +58,7 @@ export const ComboboxDropdown = forwardRef<
             </div>
           </HeadlessComboboxOption>
         ) : showNoResults ? (
+          {/* dead-end-ok: no-results announcement row, not a user control */}
           <HeadlessComboboxOption
             disabled
             value='__no-results__'

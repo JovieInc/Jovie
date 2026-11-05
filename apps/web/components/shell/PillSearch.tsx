@@ -427,10 +427,12 @@ export function PillSearch({
           size='sm'
           onClick={onClose}
           className='system-b-pill-search-close h-auto shrink-0'
+          aria-label='Close search Esc'
         >
-          {/* Accessible name must contain the visible "Esc" text (WCAG 2.5.3
-              label-in-name): sr-only prefix instead of a shadowing aria-label. */}
-          <span className='sr-only'>Close search</span>
+          {/* Accessible name contains the visible "Esc" text (WCAG 2.5.3
+              label-in-name). The sr-only prefix concatenated without the
+              space ("Close searchEsc"), so the full name lives in the
+              aria-label. */}
           Esc
         </Button>
       </div>

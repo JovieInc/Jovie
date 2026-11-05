@@ -470,7 +470,8 @@ describe('FounderReviewRegistry', () => {
 
     const readyRow = screen.getByTestId('founder-review-row-feature.ready');
     const mark = await within(readyRow).findByText('Ready');
-    expect(mark.className).toContain('text-emerald-700');
-    expect(mark.className).toContain('dark:text-emerald-300');
+    // The AA success text token is mode-aware (darker on light, full success
+    // on dark), replacing the raw emerald palette classes.
+    expect(mark.className).toContain('text-success-text');
   });
 });

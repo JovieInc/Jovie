@@ -27,7 +27,13 @@ describe('PaySelector', () => {
   });
 
   it('keeps the custom-amount toggle wired to the heading it controls', () => {
-    render(<PaySelector amounts={[5, 10, 20]} onContinue={vi.fn()} />);
+    render(
+      <PaySelector
+        amounts={[5, 10, 20]}
+        onContinue={vi.fn()}
+        presentation='drawer'
+      />
+    );
 
     const toggle = screen.getByRole('button', { name: /custom amount/i });
     expect(toggle).toHaveAttribute('aria-controls', 'pay-selector-heading');
