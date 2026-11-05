@@ -79,9 +79,8 @@ export function snapshotTrustedTestPlanner({ repo, base, out }) {
     const source = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     blobs.set(file, bytes);
     pending.push(...(MODULE_INIT_FILES[file] ?? []));
-    if (
-      file === 'scripts/invariants/scanned-paths.mjs' &&
-      execFileSync(
+    if (file === 'scripts/invariants/scanned-paths.mjs') {
+      const optionalInput = execFileSync(
         'git',
         [
           '--no-replace-objects',
@@ -93,9 +92,13 @@ export function snapshotTrustedTestPlanner({ repo, base, out }) {
           'LESSONS.guards.json',
         ],
         { cwd: repo }
-      ).length
-    )
+      );
+      if (!optionalInput.length)
+        throw new Error(
+          'Optional BASE feedback-guard input absent; refusing candidate fallback: LESSONS.guards.json'
+        );
       pending.push('LESSONS.guards.json');
+    }
     if (file.endsWith('.json')) {
       JSON.parse(source);
       continue;

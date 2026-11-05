@@ -206,6 +206,66 @@ test('module-initialization data comes from BASE and cannot fall back to candida
   );
 });
 
+test('BASE-absent optional feedback data rejects candidate fallback before payload generation', t => {
+  const f = trustedPlannerFixture(t, false);
+  const actual = readFileSync(
+    join(ROOT, 'scripts/invariants/scanned-paths.mjs'),
+    'utf8'
+  );
+  const behavior = actual.slice(
+    actual.indexOf('export function readFeedbackGuardPaths'),
+    actual.indexOf('\nconst feedbackGuardPaths')
+  );
+  assert.ok(behavior.startsWith('export function readFeedbackGuardPaths'));
+  f.put(
+    'scripts/run-affected-tests.mjs',
+    "import './invariants/scanned-paths.mjs';\n"
+  );
+  f.put(
+    'scripts/invariants/scanned-paths.mjs',
+    "import {readFileSync} from 'node:fs';import {fileURLToPath} from 'node:url';\n" +
+      "const REPO_ROOT=fileURLToPath(new URL('../../',import.meta.url));\n" +
+      behavior
+  );
+  f.put(
+    'scripts/invariants/latency-sensitive-execution-allowlist.json',
+    '{"entries":{}}'
+  );
+  f.git('add', '.');
+  f.git('commit', '-qm', 'base has no optional feedback data');
+  const base = f.git('rev-parse', 'HEAD');
+  const entry = pathToFileURL(
+    join(f.root, 'scripts/invariants/scanned-paths.mjs')
+  ).href;
+  const evaluate = () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        'import(' +
+          JSON.stringify(entry) +
+          ').then(m=>console.log(JSON.stringify(m.readFeedbackGuardPaths())))',
+      ],
+      { cwd: f.root, env: f.env, encoding: 'utf8' }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    return JSON.parse(result.stdout);
+  };
+  assert.deepEqual(evaluate(), []);
+  f.put(
+    'LESSONS.guards.json',
+    JSON.stringify({ lessons: [{ guards: [{ path: 'candidate-only' }] }] })
+  );
+  assert.deepEqual(evaluate(), ['candidate-only']);
+  const out = join(f.root, 'absent-feedback-snapshot');
+  assert.throws(
+    () => snapshotTrustedTestPlanner({ repo: f.root, base, out }),
+    /Optional BASE feedback-guard input absent; refusing candidate fallback/
+  );
+  assert.equal(existsSync(out), false);
+});
+
 test('trusted snapshot verification rejects payload tampering', t => {
   const f = trustedPlannerFixture(t, true);
   const out = join(f.root, 'snapshot');
