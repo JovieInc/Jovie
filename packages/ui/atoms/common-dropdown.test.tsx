@@ -293,9 +293,11 @@ describe('CommonDropdown', () => {
         },
       ];
       render(<CommonDropdown items={items} open={true} />);
+      // subText rides the secondary token: tertiary measured below the AA
+      // contrast floor (the renderer and its sibling contract test agree).
       expect(screen.getByText('user@test.com')).toHaveClass(
         'text-2xs',
-        'text-(--linear-text-tertiary)'
+        'text-(--linear-text-secondary)'
       );
     });
 
