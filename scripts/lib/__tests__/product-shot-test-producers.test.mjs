@@ -104,7 +104,6 @@ test('all rolling sparse bootstraps carry the real selector helper closure', asy
     .filter(value => value.includes('scripts/run-affected-tests.mjs'));
   assert.equal(sparse.length, 4);
   const required = [
-    'scripts/lib/art-direction-source-guard.mjs',
     'scripts/lib/onboarding-test-producers.mjs',
     'scripts/lib/product-shot-test-producers.mjs',
   ];

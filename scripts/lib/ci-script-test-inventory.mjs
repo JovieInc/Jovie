@@ -24,11 +24,7 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
-import {
-  artDirectionGuardCommand,
-  artDirectionGuardIsWired,
-  plannerContractGroupIsWired,
-} from './trusted-test-planner-snapshot.mjs';
+import { plannerContractGroupIsWired } from './trusted-test-planner-snapshot.mjs';
 
 export const SCRIPT_TEST_PATTERN = /\.test\.(?:mjs|ts)$/;
 const SKIPPED_DIRS = new Set(['node_modules', 'fixtures', '.cache']);
@@ -190,15 +186,6 @@ export async function collectCiCommands(repoRoot, options = {}) {
     sources.push({
       source,
       text: readFileSync(join(repoRoot, source), 'utf8'),
-    });
-  }
-  if (artDirectionGuardIsWired(laneText)) {
-    const source = 'scripts/lib/art-direction-source-guard.mjs';
-    sources.push({
-      source,
-      text: artDirectionGuardCommand(
-        readFileSync(join(repoRoot, source), 'utf8')
-      ),
     });
   }
   /** @type {CiCommand[]} */

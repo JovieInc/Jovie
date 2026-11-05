@@ -31,11 +31,18 @@ const PARSER = [
   'process.stdout.write(JSON.stringify(dependencies));',
 ].join('\n');
 
-/** @param {string} source @param {string[]} statements */
-function parseCiAst(source, statements) {
+/** Parse actual executable wiring with the same pinned native parser as BASE imports. */
+export function plannerContractGroupIsWired(source) {
+  const program = [
+    ...AST_PARSER,
+    "const binding=ast.body.filter(n=>n.type==='ImportDeclaration'&&n.source.value==='./lib/test-planner-contract-tests.mjs').flatMap(n=>n.specifiers).find(n=>n.type==='ImportSpecifier'&&n.imported.name==='TEST_PLANNER_CONTRACT_TESTS')?.local.name;",
+    "const declaration=ast.body.filter(n=>n.type==='ExportNamedDeclaration'&&n.declaration?.type==='VariableDeclaration').flatMap(n=>n.declaration.declarations).find(n=>n.id.type==='Identifier'&&n.id.name==='SCRIPT_CONTRACT_NODE_TESTS')?.init;",
+    "const array=declaration?.type==='CallExpression'&&declaration.callee.type==='MemberExpression'&&!declaration.callee.computed&&declaration.callee.object.name==='Object'&&declaration.callee.property.name==='freeze'&&declaration.arguments.length===1?declaration.arguments[0]:null;",
+    "process.stdout.write(JSON.stringify(Boolean(binding&&array?.type==='ArrayExpression'&&array.elements.some(n=>n?.type==='SpreadElement'&&n.argument.type==='Identifier'&&n.argument.name===binding))));",
+  ].join('\n');
   const parsed = spawnSync(
     process.execPath,
-    ['--expose-internals', '-e', [...AST_PARSER, ...statements].join('\n')],
+    ['--expose-internals', '-e', program],
     {
       input: source,
       encoding: 'utf8',
@@ -44,36 +51,6 @@ function parseCiAst(source, statements) {
   if (parsed.status !== 0)
     throw new Error('Cannot parse CI planner wiring: ' + parsed.stderr);
   return JSON.parse(parsed.stdout);
-}
-
-/** Parse actual executable wiring with the same pinned native parser as BASE imports. */
-export function plannerContractGroupIsWired(source) {
-  return parseCiAst(source, [
-    "const binding=ast.body.filter(n=>n.type==='ImportDeclaration'&&n.source.value==='./lib/test-planner-contract-tests.mjs').flatMap(n=>n.specifiers).find(n=>n.type==='ImportSpecifier'&&n.imported.name==='TEST_PLANNER_CONTRACT_TESTS')?.local.name;",
-    "const declaration=ast.body.filter(n=>n.type==='ExportNamedDeclaration'&&n.declaration?.type==='VariableDeclaration').flatMap(n=>n.declaration.declarations).find(n=>n.id.type==='Identifier'&&n.id.name==='SCRIPT_CONTRACT_NODE_TESTS')?.init;",
-    "const array=declaration?.type==='CallExpression'&&declaration.callee.type==='MemberExpression'&&!declaration.callee.computed&&declaration.callee.object.name==='Object'&&declaration.callee.property.name==='freeze'&&declaration.arguments.length===1?declaration.arguments[0]:null;",
-    "process.stdout.write(JSON.stringify(Boolean(binding&&array?.type==='ArrayExpression'&&array.elements.some(n=>n?.type==='SpreadElement'&&n.argument.type==='Identifier'&&n.argument.name===binding))));",
-  ]);
-}
-
-/** Recognize only the existing imported art-direction record in the live guard array. */
-export function artDirectionGuardIsWired(source) {
-  return parseCiAst(source, [
-    "const binding=ast.body.filter(n=>n.type==='ImportDeclaration'&&n.source.value==='./lib/art-direction-source-guard.mjs').flatMap(n=>n.specifiers).find(n=>n.type==='ImportSpecifier'&&n.imported.name==='ART_DIRECTION_SOURCE_GUARD')?.local.name;",
-    "const declaration=ast.body.filter(n=>n.type==='ExportNamedDeclaration'&&n.declaration?.type==='VariableDeclaration').flatMap(n=>n.declaration.declarations).find(n=>n.id.type==='Identifier'&&n.id.name==='SOURCE_GUARDS')?.init;",
-    "const array=declaration?.type==='CallExpression'&&declaration.callee.type==='MemberExpression'&&!declaration.callee.computed&&declaration.callee.object.name==='Object'&&declaration.callee.property.name==='freeze'&&declaration.arguments.length===1?declaration.arguments[0]:null;",
-    "process.stdout.write(JSON.stringify(Boolean(binding&&array?.type==='ArrayExpression'&&array.elements.some(n=>n?.type==='Identifier'&&n.name===binding))));",
-  ]);
-}
-
-/** Read only the executable record's literal command; inert strings cannot wire tests. */
-export function artDirectionGuardCommand(source) {
-  return parseCiAst(source, [
-    "const value=ast.body.filter(n=>n.type==='ExportNamedDeclaration'&&n.declaration?.type==='VariableDeclaration').flatMap(n=>n.declaration.declarations).find(n=>n.id.type==='Identifier'&&n.id.name==='ART_DIRECTION_SOURCE_GUARD')?.init;",
-    "const object=value?.type==='CallExpression'&&value.callee.type==='MemberExpression'&&!value.callee.computed&&value.callee.object.name==='Object'&&value.callee.property.name==='freeze'&&value.arguments.length===1?value.arguments[0]:null;",
-    "const command=object?.type==='ObjectExpression'?object.properties.find(n=>n.type==='Property'&&!n.computed&&(n.key.name??n.key.value)==='command')?.value:null;",
-    "if(command?.type!=='Literal'||typeof command.value!=='string')throw Error('Unsupported art-direction command');process.stdout.write(JSON.stringify(command.value));",
-  ]);
 }
 
 function safePath(file) {

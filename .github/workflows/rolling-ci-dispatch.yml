@@ -66,7 +66,6 @@ jobs:
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
             scripts/lib/git-base-ref.mjs
-            scripts/lib/art-direction-source-guard.mjs
             scripts/lib/onboarding-test-producers.mjs
             scripts/lib/product-shot-test-producers.mjs
             scripts/lib/trusted-test-planner-snapshot.mjs
@@ -566,7 +565,6 @@ jobs:
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
             scripts/lib/git-base-ref.mjs
-            scripts/lib/art-direction-source-guard.mjs
             scripts/lib/onboarding-test-producers.mjs
             scripts/lib/product-shot-test-producers.mjs
             scripts/lib/trusted-test-planner-snapshot.mjs
@@ -872,7 +870,6 @@ jobs:
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
             scripts/lib/git-base-ref.mjs
-            scripts/lib/art-direction-source-guard.mjs
             scripts/lib/onboarding-test-producers.mjs
             scripts/lib/product-shot-test-producers.mjs
             scripts/lib/trusted-test-planner-snapshot.mjs
@@ -993,7 +990,6 @@ jobs:
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
             scripts/lib/git-base-ref.mjs
-            scripts/lib/art-direction-source-guard.mjs
             scripts/lib/onboarding-test-producers.mjs
             scripts/lib/product-shot-test-producers.mjs
             scripts/lib/trusted-test-planner-snapshot.mjs

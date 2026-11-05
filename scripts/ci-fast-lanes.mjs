@@ -42,7 +42,6 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
 import { isInvariantScannedPath } from './invariants/scanned-paths.mjs';
-import { ART_DIRECTION_SOURCE_GUARD } from './lib/art-direction-source-guard.mjs';
 import {
   affectsJovieTypecheck,
   affectsWebTestTypecheck,
@@ -356,7 +355,18 @@ export const SOURCE_GUARDS = Object.freeze([
       /^apps\/web\/(?:tests\/unit\/marketing\/static-revalidate-policy\.test\.ts|(?!tests\/)(?!.*\.(?:test|spec)\.[cm]?[jt]sx?$).+)$/u,
     prOnly: true,
   }),
-  ART_DIRECTION_SOURCE_GUARD,
+  Object.freeze({
+    // Art-direction ratchets (one accent, hue, plates, surface media, hero
+    // scroll, shadow vision judges). prOnly: merge groups run the same
+    // checks via web unit tests. Path-filtered so product-only diffs skip it.
+    // The glob wires every art-direction unit test, including ones added later.
+    id: 'art-direction',
+    command:
+      'node scripts/invariants/art-direction/run.mjs && node --test scripts/invariants/art-direction/*.test.mjs',
+    inputs:
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage)\/|apps\/web\/public\/assets\/generated\/|docs\/design-system\/taste-labels\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|docs\/design-system\/motion-effects\.json$|scripts\/invariants\/art-direction\/)/u,
+    prOnly: true,
+  }),
   Object.freeze({
     // Tim 2026-10-22 21:00 PT: no ICP-specific language on the homepage and
     // general pages. Audience routes are an explicit allowlist. The recorded

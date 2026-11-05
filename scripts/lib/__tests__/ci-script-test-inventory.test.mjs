@@ -171,62 +171,6 @@ describe('scripts test inventory guard', () => {
     }
   });
 
-  it('discovers only an executable imported art-direction command', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'art-direction-inventory-'));
-    const test = 'scripts/invariants/art-direction/fixture.test.mjs';
-    const orphan = 'scripts/lib/__tests__/new-orphan.test.mjs';
-    const helper = 'scripts/lib/art-direction-source-guard.mjs';
-    const importLine =
-      "import { ART_DIRECTION_SOURCE_GUARD as guard } from './lib/art-direction-source-guard.mjs';";
-    mkdirSync(join(root, 'scripts/lib'), { recursive: true });
-    writeFileSync(join(root, 'package.json'), '{"scripts":{}}');
-    writeFileSync(
-      join(root, helper),
-      "export const ART_DIRECTION_SOURCE_GUARD=Object.freeze({command:'node --test " +
-        test +
-        "'});const inert='" +
-        orphan +
-        "';"
-    );
-    const references = async source => {
-      writeFileSync(join(root, 'scripts/ci-fast-lanes.mjs'), source);
-      return mapTestReferences(await collectCiCommands(root), [test, orphan]);
-    };
-    const live =
-      importLine + '\nexport const SOURCE_GUARDS=Object.freeze([guard]);';
-    try {
-      const actual = await references(live);
-      expect(actual.get(test)?.has(helper)).toBe(true);
-      expect(actual.get(orphan)?.size).toBe(0);
-      for (const inert of [
-        importLine + '\nexport const SOURCE_GUARDS=Object.freeze([]);',
-        'export const SOURCE_GUARDS=Object.freeze([guard]);',
-        live
-          .split('\n')
-          .map(line => '// ' + line)
-          .join('\n'),
-        '/*' + live + '*/',
-        'const inert=' + JSON.stringify(live) + ';',
-      ])
-        expect((await references(inert)).get(test)?.size).toBe(0);
-      writeFileSync(
-        join(root, helper),
-        'export const ART_DIRECTION_SOURCE_GUARD=Object.freeze({command:makeCommand()});'
-      );
-      await expect(references(live)).rejects.toThrow(
-        /Unsupported art-direction command/
-      );
-      writeFileSync(join(root, helper), 'export const =;');
-      await expect(references(live)).rejects.toThrow(
-        /Cannot parse CI planner wiring/
-      );
-      rmSync(join(root, helper));
-      await expect(references(live)).rejects.toThrow(/ENOENT/);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-
   it('keeps every exception real, reasoned and still unwired', async () => {
     const { files, unrun } = await inventoryScriptTests(REPO_ROOT);
     const unrunSet = new Set(unrun);
