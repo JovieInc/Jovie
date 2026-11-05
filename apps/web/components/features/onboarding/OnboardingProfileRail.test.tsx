@@ -349,11 +349,14 @@ describe('OnboardingProfileRail keyboard scrolling (JOV-7973)', () => {
       value: 720,
     });
 
-    await user.type(rail, '{End}');
+    await user.tab();
+    expect(rail).toHaveFocus();
+    await user.keyboard('{End}');
     expect(scrollTo).toHaveBeenLastCalledWith({
       top: 34,
       behavior: 'auto',
     });
+    expect(rail).toHaveFocus();
   });
 
   it('lets every other key scroll natively (no preventDefault)', async () => {
