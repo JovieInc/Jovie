@@ -46,10 +46,16 @@ export function ThreadVideoCard({
           : {})}
         className='system-b-thread-media-preview system-b-thread-video-preview group'
       >
-        {/* No aria-label here: it would shadow the visible duration badge
-            (WCAG 2.5.3 label-in-name). The sr-only prefix plus the badge text
-            forms the accessible name ("Play <title> 3:07"). */}
-        {onPlay ? <span className='sr-only'>Play {title}</span> : null}
+        {/* No partial aria-label here: it would shadow or truncate the name.
+            The sr-only span carries the complete accessible name and the
+            visible duration badge is hidden from name computation to avoid
+            duplication (WCAG 2.5.3: the visible badge text "1:34" stays
+            contained in the name). */}
+        {onPlay ? (
+          <span className='sr-only'>
+            Play {title} — {formatDuration(durationSec)}
+          </span>
+        ) : null}
         <span aria-hidden='true' className='system-b-thread-video-backdrop' />
         <span className='system-b-thread-play-shell'>
           <Button
@@ -71,7 +77,7 @@ export function ThreadVideoCard({
             </span>
           </Button>
         </span>
-        <span className='system-b-thread-duration-badge'>
+        <span aria-hidden='true' className='system-b-thread-duration-badge'>
           {formatDuration(durationSec)}
         </span>
       </Thumb>

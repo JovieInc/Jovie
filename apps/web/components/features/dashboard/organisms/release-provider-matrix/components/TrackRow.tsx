@@ -197,9 +197,9 @@ export const TrackRow = memo(function TrackRow({
                 <button
                   type='button'
                   onClick={onClick}
+                  aria-label={`Open details for ${trackLabel}. ${track.title}`}
                   className='focus-ring-transparent-offset min-w-0 rounded-lg text-left'
                 >
-                  <span className='sr-only'>Open details for </span>
                   {titleRow}
                 </button>
               ) : (

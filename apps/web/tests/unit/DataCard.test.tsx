@@ -37,10 +37,10 @@ describe('DataCard', () => {
     expect(screen.getByRole('button', { name: 'Action' })).toBeInTheDocument();
   });
 
-  it('uses primary-token text on the error badge for contrast', () => {
+  it('uses the AA error text token on the error badge for contrast', () => {
     render(<DataCard title='Test Card' badge='Error' badgeVariant='error' />);
 
-    expect(screen.getByText('Error')).toHaveClass('text-primary-token');
+    expect(screen.getByText('Error')).toHaveClass('text-error-text');
   });
 
   it('applies custom className', () => {

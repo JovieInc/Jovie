@@ -358,7 +358,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.getByRole('button', { name: /^Switch Identity:/ })
+      screen.getByRole('button', { name: /^Switch identity:/ })
     ).toBeInTheDocument();
   });
 
@@ -369,7 +369,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.queryByRole('button', { name: /^Switch Identity:/ })
+      screen.queryByRole('button', { name: /^Switch identity:/ })
     ).not.toBeInTheDocument();
   });
 
