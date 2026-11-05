@@ -66,6 +66,9 @@ jobs:
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
             scripts/lib/git-base-ref.mjs
+            scripts/lib/art-direction-source-guard.mjs
+            scripts/lib/onboarding-test-producers.mjs
+            scripts/lib/product-shot-test-producers.mjs
             scripts/ci-fast-lanes.mjs
             scripts/design-conformance-paths.mjs
             scripts/lib/ci-repo-lanes.mjs
@@ -561,6 +564,9 @@ jobs:
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
             scripts/lib/git-base-ref.mjs
+            scripts/lib/art-direction-source-guard.mjs
+            scripts/lib/onboarding-test-producers.mjs
+            scripts/lib/product-shot-test-producers.mjs
             scripts/ci-fast-lanes.mjs
             scripts/design-conformance-paths.mjs
             scripts/lib/ci-repo-lanes.mjs
@@ -862,6 +868,9 @@ jobs:
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
             scripts/lib/git-base-ref.mjs
+            scripts/lib/art-direction-source-guard.mjs
+            scripts/lib/onboarding-test-producers.mjs
+            scripts/lib/product-shot-test-producers.mjs
             scripts/version-fanout-guard.mjs
           sparse-checkout-cone-mode: false
       - name: Setup Node.js for trusted policy
@@ -978,6 +987,9 @@ jobs:
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
             scripts/lib/git-base-ref.mjs
+            scripts/lib/art-direction-source-guard.mjs
+            scripts/lib/onboarding-test-producers.mjs
+            scripts/lib/product-shot-test-producers.mjs
             scripts/ci-fast-lanes.mjs
             scripts/design-conformance-paths.mjs
             scripts/lib/ci-repo-lanes.mjs
