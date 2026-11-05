@@ -6,6 +6,7 @@ import {
   type InputHTMLAttributes,
   type ReactNode,
   useCallback,
+  useEffect,
   useRef,
   useState,
 } from 'react';
@@ -158,6 +159,16 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
   const [email, setEmail] = useState('');
   const [city, setCity] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
+  const launcherRef = useRef<HTMLButtonElement>(null);
+  const composerRef = useRef<HTMLInputElement>(null);
+  const previousOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (previousOpenRef.current === open) return;
+    previousOpenRef.current = open;
+    const target = open ? composerRef.current : launcherRef.current;
+    target?.focus({ preventScroll: true });
+  }, [open]);
 
   const pushMessages = useCallback((...items: ChatMessage[]) => {
     setMessages(prev => [...prev, ...items]);
@@ -349,6 +360,7 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
     <>
       {!open && (
         <CircleIconButton
+          ref={launcherRef}
           type='button'
           variant='surface'
           size='lg'
@@ -532,6 +544,7 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
             }}
           >
             <input
+              ref={composerRef}
               value={input}
               onChange={e => setInput(e.target.value)}
               placeholder={
