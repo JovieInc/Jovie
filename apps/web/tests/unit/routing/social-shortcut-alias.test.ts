@@ -78,15 +78,7 @@ describe('social shortcut alias rewrite (JOV-5072)', () => {
     // those sources is also a concrete filesystem page, so the redirect must
     // win before the filesystem check or it would never fire. That contract
     // is pinned by ov-mode-routing.test.ts.
-    // /robots.txt is the other deliberate interceptor: app/robots.ts is a
-    // concrete filesystem route, and the rewrite swaps in a serializer of the
-    // same rules that adds the Content-Signal line (agent-ready).
-    const hudFamily = new Set([
-      '/hud',
-      '/hud/wiki',
-      '/hud/wiki/:path*',
-      '/robots.txt',
-    ]);
+    const hudFamily = new Set(['/hud', '/hud/wiki', '/hud/wiki/:path*']);
     const beforeFiles =
       (rewrites as { beforeFiles?: readonly RewriteRule[] }).beforeFiles ?? [];
     expect(

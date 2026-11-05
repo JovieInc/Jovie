@@ -3,6 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
 
 const listMock = vi.fn();
+const internalIdsMock = vi.fn(async () => new Set<string>());
+
+vi.mock('@/lib/accounts/internal-stripe-customers.server', () => ({
+  getInternalStripeCustomerIds: () => internalIdsMock(),
+}));
 
 vi.mock('@/lib/stripe/client', () => ({
   stripe: {
@@ -300,6 +305,37 @@ describe('getAdminStripeOverviewMetrics', () => {
         expand: expect.arrayContaining(['data.customer']),
       })
     );
+  });
+
+  it('excludes a customer whose user row is flagged internal, even with an external-looking Stripe email', async () => {
+    internalIdsMock.mockResolvedValueOnce(new Set(['cus_flagged']));
+    const items = {
+      data: [
+        {
+          price: {
+            currency: 'usd',
+            unit_amount: 4000,
+            recurring: { interval: 'month', interval_count: 1 },
+          },
+          quantity: 1,
+        },
+      ],
+    } as Stripe.ApiList<Stripe.SubscriptionItem>;
+    listMock.mockResolvedValue({
+      data: [
+        {
+          ...makeSubscription({ id: 'sub_flagged', status: 'active', items }),
+          customer: { id: 'cus_flagged', email: 'fan@gmail.com' },
+        } as unknown as Stripe.Subscription,
+      ],
+      has_more: false,
+    });
+
+    const metrics = await getAdminStripeOverviewMetrics();
+
+    expect(metrics.mrrUsd).toBe(0);
+    expect(metrics.excludedInternalSubscribers).toBe(1);
+    expect(metrics.excludedInternalMrrUsd).toBe(40);
   });
 
   it('subtracts fixed amount coupon discount from MRR (JOV-1089)', async () => {

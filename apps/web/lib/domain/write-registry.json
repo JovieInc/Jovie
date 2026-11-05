@@ -31,7 +31,8 @@
         "upsertRelease",
         "upsertTrack",
         "upsertRecording",
-        "upsertReleaseTrack"
+        "upsertReleaseTrack",
+        "purgeOrphanRecordings"
       ],
       "tables": ["discogReleases", "discogTracks", "discogRecordings"]
     },
@@ -46,14 +47,36 @@
       "tables": ["discogReleases"]
     },
     {
+      "id": "release.create",
+      "entity": "release",
+      "module": "apps/web/lib/domain/releases.ts",
+      "exports": ["createReleaseForProfile"],
+      "tables": ["discogReleases"]
+    },
+    {
       "id": "profile.fields",
       "entity": "profile",
       "module": "apps/web/lib/services/profile/mutations.ts",
       "exports": [
         "updateProfileById",
         "updateProfileByClerkId",
+        "holdLeadBuiltProfileInTx",
         "publishProfile"
       ],
+      "tables": ["creatorProfiles"]
+    },
+    {
+      "id": "profile.edit",
+      "entity": "profile",
+      "module": "apps/web/lib/domain/profile.ts",
+      "exports": ["applyProfileUpdate"],
+      "tables": ["creatorProfiles"]
+    },
+    {
+      "id": "profile.test-cleanup",
+      "entity": "profile",
+      "module": "apps/web/lib/services/profile/test-profile-unpublish.ts",
+      "exports": ["buildUnpublishTestProfilesQuery"],
       "tables": ["creatorProfiles"]
     },
     {
@@ -94,6 +117,13 @@
       "tables": ["waitlistEntries", "creatorProfiles"]
     },
     {
+      "id": "synthetic.admitted-canary",
+      "entity": "admitted production canary fixture",
+      "module": "apps/web/lib/synthetic/admitted-canary.server.ts",
+      "exports": ["reconcileAdmittedCanary", "verifyAdmittedCanaryOwnership"],
+      "tables": ["creatorProfiles", "userProfileClaims"]
+    },
+    {
       "id": "claim.finalize",
       "entity": "claim",
       "module": "apps/web/lib/claim/finalize.ts",
@@ -102,6 +132,13 @@
         "claimPrebuiltProfileForUser"
       ],
       "tables": ["creatorProfiles", "userProfileClaims"]
+    },
+    {
+      "id": "claim.legacy-verification",
+      "entity": "claim",
+      "module": "apps/web/lib/claim/legacy-verification.server.ts",
+      "exports": ["runLegacyClaimVerificationSweep"],
+      "tables": ["creatorProfiles"]
     },
     {
       "id": "billing.status",
@@ -139,6 +176,13 @@
       "tables": []
     },
     {
+      "id": "agent.draft-claim",
+      "entity": "agent draft claim",
+      "module": "apps/web/lib/agent-acquisition/draft-claim.server.ts",
+      "exports": ["claimAgentDraft"],
+      "tables": ["creatorProfiles"]
+    },
+    {
       "id": "agent.draft",
       "entity": "agent draft",
       "module": "apps/web/lib/agent-acquisition/draft-store.ts",
@@ -151,6 +195,13 @@
       "module": "apps/web/lib/youtube-library/thumbnail-review.ts",
       "exports": ["registerThumbnailCandidateReview"],
       "tables": []
+    },
+    {
+      "id": "leads.lead-claim-token",
+      "entity": "lead claim token",
+      "module": "apps/web/lib/leads/lead-claim-token.ts",
+      "exports": ["persistLeadClaimToken"],
+      "tables": ["creatorProfiles"]
     }
   ],
   "agentTools": {
@@ -183,8 +234,8 @@
       "kind": "read"
     },
     "chat:proposeProfileEdit": {
-      "kind": "debt",
-      "reason": "commit is /api/chat/confirm-edit (name and bio only); Ovie agent-first worker owns the fix"
+      "kind": "domain",
+      "domain": "profile.edit"
     },
     "chat:importBioFromUrl": {
       "kind": "read"
@@ -224,8 +275,8 @@
       "domain": "release.metadata"
     },
     "chat:createRelease": {
-      "kind": "debt",
-      "reason": "calls upsertRelease directly with its own slug rule and no status, reveal date, genres or explicit flag; Ovie agent-first worker owns the fix"
+      "kind": "domain",
+      "domain": "release.create"
     },
     "chat:generateReleasePitch": {
       "kind": "domain",

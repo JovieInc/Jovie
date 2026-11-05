@@ -6,8 +6,6 @@ import {
   buildApiCatalog,
   buildMcpServerCard,
   buildPoppyManifest,
-  CONTENT_SIGNAL,
-  serializeRobots,
   skillDigest,
 } from './discovery';
 
@@ -80,43 +78,5 @@ describe('agent discovery documents', () => {
       'web',
     ]);
     expect(manifest.web).toEqual({});
-  });
-});
-
-describe('serializeRobots', () => {
-  const body = serializeRobots({
-    rules: [
-      { userAgent: '*', allow: '/', disallow: ['/app/', '/api/'] },
-      { userAgent: 'GPTBot', allow: ['/', '/llms.txt'], disallow: ['/app/'] },
-    ],
-    sitemap: 'https://jov.ie/sitemap.xml',
-    host: 'https://jov.ie',
-  });
-
-  it('keeps Next ordering and puts Content-Signal in every group', () => {
-    expect(body).toBe(
-      [
-        'User-Agent: *',
-        'Allow: /',
-        'Disallow: /app/',
-        'Disallow: /api/',
-        `Content-Signal: ${CONTENT_SIGNAL}`,
-        '',
-        'User-Agent: GPTBot',
-        'Allow: /',
-        'Allow: /llms.txt',
-        'Disallow: /app/',
-        `Content-Signal: ${CONTENT_SIGNAL}`,
-        '',
-        'Host: https://jov.ie',
-        'Sitemap: https://jov.ie/sitemap.xml',
-        '',
-      ].join('\n')
-    );
-  });
-
-  it('declares all three signals', () => {
-    for (const key of ['ai-train', 'search', 'ai-input'])
-      expect(CONTENT_SIGNAL).toContain(`${key}=`);
   });
 });

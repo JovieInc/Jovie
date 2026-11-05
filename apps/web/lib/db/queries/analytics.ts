@@ -10,6 +10,7 @@ import {
   isNull,
   lte,
 } from 'drizzle-orm';
+import { externalAccountSql } from '@/lib/accounts/internal-account';
 import {
   buildEvidenceReceiptSet,
   buildMetricReceipt,
@@ -47,7 +48,6 @@ import {
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
-import { INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN } from '@/lib/utils/email';
 import type {
   AnalyticsRange,
   DashboardAnalyticsResponse,
@@ -780,7 +780,7 @@ export async function getCanonicalCustomerProfileExposure(
         drizzleSql`${dailyProfileViews.viewDate} >= current_date - ${windowDays}::int`,
         eq(creatorProfiles.isPublic, true),
         eq(creatorProfiles.isClaimed, true),
-        drizzleSql`(${users.email} is null or lower(${users.email}) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})`
+        externalAccountSql()
       )
     );
 
@@ -820,7 +820,7 @@ export async function getCanonicalCustomerLinkOutcome(
         eq(clickEvents.isBot, false),
         eq(creatorProfiles.isPublic, true),
         eq(creatorProfiles.isClaimed, true),
-        drizzleSql`(${users.email} is null or lower(${users.email}) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})`
+        externalAccountSql()
       )
     );
 
@@ -856,4 +856,42 @@ export async function hasUnownedAudienceRelationship(
     ))
   `);
   return result.rows[0]?.invalid !== '0';
+}
+
+export interface ReleaseClickCountRow {
+  readonly total: number;
+  readonly priorDay: number;
+}
+
+/**
+ * Human (non-bot) release click-outs per release, lifetime and for one UTC
+ * day. Feeds the per-song daily snapshot job.
+ */
+export async function getReleaseClickCounts(
+  creatorProfileId: string,
+  priorDay: string
+): Promise<ReadonlyMap<string, ReleaseClickCountRow>> {
+  const result = await db.execute<{
+    release_id: string;
+    total: string | number;
+    prior_day: string | number;
+  }>(drizzleSql`
+    select ${clickEvents.metadata} ->> 'contentId' as release_id,
+           count(*) as total,
+           count(*) filter (where ${clickEvents.createdAt}::date = ${priorDay}::date) as prior_day
+    from ${clickEvents}
+    where ${clickEvents.creatorProfileId} = ${creatorProfileId}
+      and ${clickEvents.isBot} = false
+      and ${clickEvents.metadata} ->> 'contentType' = 'release'
+      and ${clickEvents.metadata} ->> 'contentId' is not null
+    group by 1
+  `);
+  const map = new Map<string, ReleaseClickCountRow>();
+  for (const row of result.rows ?? []) {
+    map.set(row.release_id, {
+      total: Number(row.total),
+      priorDay: Number(row.prior_day),
+    });
+  }
+  return map;
 }

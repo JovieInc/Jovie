@@ -1,13 +1,18 @@
 import { APP_NAME } from '@/constants/app';
-import { env } from '@/lib/env-server';
+import { streamFromEmail, streamPolicy } from '@/lib/email/streams';
 
-export const FOUNDER_FROM_EMAIL = 'tim@send.jov.ie';
-export const SYSTEM_FROM_EMAIL =
-  env.RESEND_FROM_EMAIL ?? 'notifications@send.jov.ie';
+/**
+ * Sender addresses for display and copy. They derive from the stream
+ * registry (apps/web/lib/email/stream-registry.json); the send gateway sets
+ * the real From header, so nothing here is passed to a provider.
+ */
+export const FOUNDER_FROM_EMAIL = streamFromEmail('founder') ?? '';
+export const SYSTEM_FROM_EMAIL = streamFromEmail('transactional') ?? '';
 
-export const FOUNDER_REPLY_TO_EMAIL = 'tim@jov.ie';
+export const FOUNDER_REPLY_TO_EMAIL =
+  streamPolicy('founder').replyTo ?? FOUNDER_FROM_EMAIL;
 export const SYSTEM_REPLY_TO_EMAIL =
-  env.RESEND_REPLY_TO_EMAIL ?? SYSTEM_FROM_EMAIL;
+  streamPolicy('transactional').replyTo ?? SYSTEM_FROM_EMAIL;
 
 export type SenderClass = 'founder' | 'system';
 
@@ -34,6 +39,16 @@ export function getSenderPolicy(senderClass: SenderClass): SenderPolicy {
   };
 }
 
+/**
+ * Display name for mail sent on a creator's behalf ("Artist via Jovie").
+ * Undefined means the stream's default name.
+ */
+export function systemSenderName(displayName?: string): string | undefined {
+  if (!displayName) return undefined;
+  const sanitized = sanitizeDisplayName(displayName);
+  return sanitized ? `${sanitized} via ${APP_NAME}` : undefined;
+}
+
 export function formatFounderSender(name = 'Tim White'): string {
   const { fromEmail } = getSenderPolicy('founder');
   return `${sanitizeDisplayName(name)} <${fromEmail}>`;
@@ -41,15 +56,5 @@ export function formatFounderSender(name = 'Tim White'): string {
 
 export function formatSystemSender(displayName?: string): string {
   const { fromEmail } = getSenderPolicy('system');
-
-  if (!displayName) {
-    return `${APP_NAME} <${fromEmail}>`;
-  }
-
-  const sanitizedName = sanitizeDisplayName(displayName);
-  if (!sanitizedName) {
-    return `${APP_NAME} <${fromEmail}>`;
-  }
-
-  return `${sanitizedName} via ${APP_NAME} <${fromEmail}>`;
+  return `${systemSenderName(displayName) ?? APP_NAME} <${fromEmail}>`;
 }
