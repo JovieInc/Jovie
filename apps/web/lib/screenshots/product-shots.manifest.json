@@ -4,10 +4,12 @@
     "profile-hero-desktop": {
       "width": 1640,
       "height": 1172,
-      "sourceHash": "a677a1543ab0d390f0842d02d4551822286ed7d2b3b8ef0a0a3882d00b4bc61c",
+      "sourceHash": "46c710b30e3fd924481d76fad35b99dbc46116ff06be80180f2179bc67e744b0",
       "specHash": "431d2bbda1f7a334f405179ebdc85d1f63359bf2683879cf776aa248037d998c",
-      "renderedAt": "2026-11-05T21:28:49.116Z",
+      "renderedAt": "2026-11-05T21:47:18.256Z",
       "sources": [
+        "apps/web/lib/tim-white.ts",
+        "apps/web/components/features/home/home-surface-seed.ts",
         "apps/web/components/features/demo/DemoTimWhiteProfileSurface.tsx",
         "apps/web/components/features/demo/demo-profile-showcase-states.ts",
         "apps/web/components/features/home/homepage-profile-preview-fixture.ts",
@@ -23,10 +25,11 @@
     "setup-claim-handle": {
       "width": 696,
       "height": 372,
-      "sourceHash": "3b1d0e10ab3204d75614851ab31016ebf12afc1b9547cfc7eeef1efd2f4d7335",
+      "sourceHash": "44284c581a65d922376078f1a049e09dbe8d8a6b835793bdf4b030c887a32df8",
       "specHash": "8e8165321af2f58428e0d98ae5f458702ea14d0331883630a01c31630c875ffd",
       "renderedAt": "2026-11-02T12:28:39.725Z",
       "sources": [
+        "apps/web/lib/tim-white.ts",
         "apps/web/components/features/dashboard/organisms/onboarding/OnboardingHandleStep.tsx",
         "apps/web/components/features/dashboard/organisms/onboarding-v2/shared/types.ts",
         "apps/web/components/features/demo/DemoShowcaseSurface.tsx",
