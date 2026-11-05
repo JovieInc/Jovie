@@ -1681,6 +1681,30 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/admin/reference-review/intake/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/reference-review/intake",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/admin/reference-review/preview/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/reference-review/preview",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/admin/reference-review/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/reference-review",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/admin/releases/route.ts",
       "kind": "handler",
       "route": "/api/admin/releases",
@@ -2500,6 +2524,14 @@
       "source": "apps/web/app/api/cron/sync-ai-crawler-analytics/route.ts",
       "kind": "handler",
       "route": "/api/cron/sync-ai-crawler-analytics",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/cron/track-daily-snapshots/route.ts",
+      "kind": "handler",
+      "route": "/api/cron/track-daily-snapshots",
       "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
@@ -4293,6 +4325,14 @@
       "kind": "handler",
       "route": "/api/profile/pac-event",
       "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/profile/search/route.ts",
+      "kind": "handler",
+      "route": "/api/profile/search",
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },

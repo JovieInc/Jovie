@@ -1,0 +1,56 @@
+# Shared company guard suite from JovieInc/ci (canon/COMPANY.md).
+# Pin is bumped by a bot PR; a pin more than 72h behind the newest canon/guard
+# commit fails this check. The bot rewrites these two lines only:
+# company-guards.yml@e9a2c8a5f9dc7e2f83f051e67cb6edb02904eda7
+# ci-ref: e9a2c8a5f9dc7e2f83f051e67cb6edb02904eda7
+# Source Validation classifies with the trusted base, which has no
+# .company-guards/ rule. The baseline is committed under scripts/company-guards/
+# and this job copies it to the path guards/size.mjs reads.
+name: Company Guards
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  company-guards:
+    name: Company guards
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Read pin
+        id: pin
+        run: |
+          set -euo pipefail
+          sha=$(sed -n 's/^# ci-ref: \([0-9a-f]\{40\}\)$/\1/p' .github/workflows/company-guards.yml)
+          test -n "$sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - name: Fetch pinned guard suite
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: JovieInc/ci
+          ref: ${{ steps.pin.outputs.sha }}
+          path: .company-ci
+          persist-credentials: false
+      - name: Materialize size baseline
+        run: |
+          set -euo pipefail
+          mkdir -p .company-guards
+          cp scripts/company-guards/size-baseline.json .company-guards/size-baseline.json
+      - name: Run guards
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: node .company-ci/guards/run.mjs
+      # github-token-budget: 3 calls/run - pin drift lists commits on canon, guards, and this workflow
+      - name: Pin drift
+        env:
+          CI_PIN: ${{ steps.pin.outputs.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node .company-ci/guards/drift.mjs

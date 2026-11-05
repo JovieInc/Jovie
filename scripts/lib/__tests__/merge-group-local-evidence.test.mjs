@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -7,7 +8,8 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
+import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 import {
   parseLsTreeLong,
@@ -328,4 +330,184 @@ describe('local merge-group size evidence', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+});
+
+describe('merge-group workflow blob preparation', () => {
+  it.each(['complete', 'failed-backfill'])(
+    'fetches metadata before one full backfill and keeps final policy (%s)',
+    mode => {
+      const root = mkdtempSync(join(tmpdir(), 'mg-workflow-'));
+      const origin = join(root, 'origin.git');
+      const source = join(root, 'source');
+      const clone = join(root, 'clone');
+      const bin = join(root, 'bin');
+      const trace = join(root, 'fetches.jsonl');
+      const marker = join(root, 'initial-fetch');
+      const evidencePath = join(root, 'evidence.json');
+      const policyCalled = join(root, 'policy-called');
+      const realGit = execFileSync('/bin/sh', ['-c', 'command -v git'], {
+        encoding: 'utf8',
+      }).trim();
+      const repoRoot = resolve(import.meta.dirname, '../../..');
+      const helper = readFileSync(
+        join(repoRoot, 'scripts/lib/merge-group-local-evidence.mjs'),
+        'utf8'
+      );
+      const policy = `import { writeFileSync } from 'node:fs'; writeFileSync(process.env.POLICY_CALLED, process.argv.slice(2).join(' ')); process.exit(24);`;
+      const hidden = 'not included in the trusted-policy sparse checkout';
+      try {
+        for (const dir of [origin, source, bin])
+          mkdirSync(dir, { recursive: true });
+        git(origin, ['init', '--bare', '-b', 'main']);
+        git(origin, ['config', 'uploadpack.allowFilter', 'true']);
+        git(origin, ['config', 'uploadpack.allowAnySHA1InWant', 'true']);
+        git(source, ['init', '-b', 'main']);
+        git(source, ['config', 'user.name', 'GitHub']);
+        git(source, ['config', 'user.email', 'noreply@github.com']);
+        mkdirSync(join(source, 'scripts/lib'), { recursive: true });
+        mkdirSync(join(source, 'assets'), { recursive: true });
+        writeFileSync(
+          join(source, 'scripts/lib/merge-group-local-evidence.mjs'),
+          helper
+        );
+        writeFileSync(
+          join(source, 'scripts/lib/merge-group-member-policy.mjs'),
+          policy
+        );
+        writeFileSync(join(source, 'assets/hidden.txt'), hidden);
+        writeFileSync(join(source, 'kept.txt'), 'aaaa');
+        git(source, ['add', '.']);
+        git(source, ['commit', '-m', 'base']);
+        const base = git(source, ['rev-parse', 'HEAD']).trim();
+        writeFileSync(join(source, 'kept.txt'), 'aaaaX');
+        writeFileSync(join(source, 'added.txt'), 'group-only');
+        git(source, ['add', '.']);
+        git(source, ['commit', '-m', 'group (#1)']);
+        const head = git(source, ['rev-parse', 'HEAD']).trim();
+        git(source, [
+          'push',
+          origin,
+          `${base}:refs/heads/main`,
+          `${head}:refs/heads/group`,
+        ]);
+        git(root, [
+          'clone',
+          '--no-checkout',
+          '--filter=blob:none',
+          '--depth=1',
+          `file://${origin}`,
+          clone,
+        ]);
+        git(clone, ['sparse-checkout', 'init', '--no-cone']);
+        git(clone, [
+          'sparse-checkout',
+          'set',
+          'scripts/lib/merge-group-local-evidence.mjs',
+          'scripts/lib/merge-group-member-policy.mjs',
+        ]);
+        git(clone, ['checkout', 'main']);
+        // The initial fetch may leave commit/tree metadata available when its
+        // blob transfer times out. Exercise that actual recovery path without
+        // waiting for a network timeout or transmitting a real credential.
+        writeFileSync(
+          join(bin, 'git'),
+          `#!/usr/bin/env node
+const fs = require('node:fs');
+const { spawnSync } = require('node:child_process');
+let args = process.argv.slice(2);
+let first = false;
+if (args[0] === 'fetch') {
+  const authenticated = process.env.GIT_CONFIG_COUNT === '2' &&
+    process.env.GIT_CONFIG_KEY_0 === 'http.https://github.com/.extraheader' &&
+    process.env.GIT_CONFIG_VALUE_0 === 'AUTHORIZATION: basic ' + Buffer.from('x-access-token:' + process.env.GH_TOKEN).toString('base64');
+  fs.appendFileSync(process.env.FETCH_TRACE, JSON.stringify({ args, authenticated }) + String.fromCharCode(10));
+  if (!authenticated) process.exit(77);
+  first = !fs.existsSync(process.env.INITIAL_FETCH);
+  if (first) {
+    fs.writeFileSync(process.env.INITIAL_FETCH, 'started');
+    args = args.map(a => a === '--filter=blob:limit=1g' ? '--filter=blob:none' : a);
+  } else if (process.env.BACKFILL_MODE === 'failed-backfill') process.exit(124);
+}
+const result = spawnSync(process.env.REAL_GIT, args, { stdio: 'inherit', env: process.env });
+process.exit(first ? 124 : (result.status ?? 1));
+`
+        );
+        chmodSync(join(bin, 'git'), 0o755);
+        const workflow =
+          /** @type {{jobs: Record<string, {'timeout-minutes': number, steps: Array<{name: string, run: string}>}>}} */ (
+            load(
+              readFileSync(
+                join(repoRoot, '.github/workflows/pr-size-guard.yml'),
+                'utf8'
+              )
+            )
+          );
+        const job = workflow.jobs['merge-group-size'];
+        const step = job.steps.find(
+          s => s.name === 'Enforce combined-tree payload and member size policy'
+        );
+        expect(job['timeout-minutes']).toBe(5);
+        expect(step).toBeTruthy();
+        let status;
+        try {
+          execFileSync('bash', ['-c', step.run], {
+            cwd: clone,
+            encoding: 'utf8',
+            timeout: 30_000,
+            env: {
+              ...process.env,
+              PATH: `${bin}${delimiter}${process.env.PATH}`,
+              REAL_GIT: realGit,
+              FETCH_TRACE: trace,
+              INITIAL_FETCH: marker,
+              BACKFILL_MODE: mode,
+              GROUP_BASE: base,
+              GROUP_HEAD: head,
+              GH_TOKEN: 'fixture',
+              MERGE_GROUP_LOCAL_EVIDENCE: evidencePath,
+              MERGE_GROUP_POLICY_CACHE_DIR: join(root, 'policy-cache'),
+              POLICY_CALLED: policyCalled,
+              GIT_NO_LAZY_FETCH: '1',
+            },
+          });
+        } catch (error) {
+          status = error.status;
+        }
+        // A fixture policy intentionally rejects: prep must never skip or
+        // swallow the final trusted policy, including on missing byte data.
+        expect(status).toBe(24);
+        expect(readFileSync(policyCalled, 'utf8')).toBe(
+          '--policy=size --also=fork'
+        );
+        const requests = readFileSync(trace, 'utf8')
+          .trim()
+          .split(String.fromCharCode(10))
+          .map(line => JSON.parse(line));
+        expect(requests.every(request => request.authenticated)).toBe(true);
+        const fetches = requests.map(request => request.args);
+        expect(fetches[0]).toContain('--filter=blob:none');
+        expect(
+          fetches.filter(args => args.includes('--filter=blob:limit=1g'))
+        ).toHaveLength(1);
+        const evidence = JSON.parse(readFileSync(evidencePath, 'utf8'));
+        if (mode === 'complete') {
+          expect(evidence.tracked).toEqual({
+            bytes:
+              Buffer.byteLength(helper) +
+              Buffer.byteLength(policy) +
+              Buffer.byteLength(hidden) +
+              5 +
+              Buffer.byteLength('group-only'),
+            files: 5,
+          });
+        } else {
+          expect(evidence.tracked).toBeNull();
+        }
+        expect(git(clone, ['rev-parse', 'HEAD']).trim()).toBe(base);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+    40_000
+  );
 });
