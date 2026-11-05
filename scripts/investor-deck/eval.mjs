@@ -60,8 +60,26 @@ export function investContaminated(raw, prompt) {
 /** The relay caps output at 16,384; reasoning answers truncated at 12,000. */
 export const INVEST_MAX_TOKENS = 16_000;
 
-// Shared callRelay/api-client owns provider budgets, pacing and retries.
-// No call-site pool: its slot handoff raced and duplicated client policy.
+// Preserve the investor job's eight-call ceiling: 84 concurrent calls opened
+// the breaker on a secondary limit (2026-11-01). This is job orchestration;
+// the unchanged shared client still owns budgets, pacing, retries and breakers.
+export const MAX_IN_FLIGHT = 8;
+let inFlight = 0;
+/** @type {Array<() => void>} */
+const waiting = [];
+export async function pooled(fn) {
+  if (inFlight < MAX_IN_FLIGHT) inFlight += 1;
+  else await new Promise(resolve => waiting.push(() => resolve(undefined)));
+  try {
+    return await fn();
+  } finally {
+    const next = waiting.shift();
+    // Transfer the occupied slot before waking its waiter. A new arrival must
+    // never steal the slot between release and the waiter's continuation.
+    if (next) next();
+    else inFlight -= 1;
+  }
+}
 
 /** N independent samples for one persona over one deck. */
 export async function judgeDeck({
@@ -77,14 +95,16 @@ export async function judgeDeck({
   const schema = buildInvestSchema();
   const settled = await Promise.allSettled(
     Array.from({ length: samples }, () =>
-      call({
-        model: route.model,
-        baseUrl: route.baseUrl,
-        content: [{ type: 'text', text: prompt }],
-        schema,
-        timeoutMs: 300_000,
-        maxTokens: INVEST_MAX_TOKENS,
-      })
+      pooled(() =>
+        call({
+          model: route.model,
+          baseUrl: route.baseUrl,
+          content: [{ type: 'text', text: prompt }],
+          schema,
+          timeoutMs: 300_000,
+          maxTokens: INVEST_MAX_TOKENS,
+        })
+      )
     )
   );
   const parsed = [];

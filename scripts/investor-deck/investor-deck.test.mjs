@@ -704,3 +704,86 @@ test('synthetic build CLI emits artifact hashes and rejects an empty draft direc
   assert.equal(receipt.deckTextSha256, digest(join(out, 'deck.txt')));
   assert.deepEqual(receipt.issues, []);
 });
+
+test('investor orchestration caps concurrent personas and fixtures at eight', async () => {
+  let active = 0;
+  let peak = 0;
+  /** @type {() => void} */
+  let release = () => assert.fail('fixture barrier not initialized');
+  const barrier = new Promise(resolve => {
+    release = () => resolve(undefined);
+  });
+  const call = async () => {
+    active += 1;
+    peak = Math.max(peak, active);
+    try {
+      await barrier;
+      return { text: JSON.stringify(sample(0.8)), usage: {} };
+    } finally {
+      active -= 1;
+    }
+  };
+  const jobs = PERSONAS.slice(0, 2).map(persona =>
+    judgeDeck({
+      persona,
+      deck: 'synthetic concurrency fixture',
+      samples: 9,
+      call,
+      route: { model: 'fixture', baseUrl: 'https://fixture.invalid' },
+    })
+  );
+  try {
+    assert.equal(active, 8);
+  } finally {
+    release();
+    await Promise.all(jobs);
+  }
+  assert.equal(peak, 8);
+  assert.equal(active, 0);
+});
+
+test('pool hands a reserved slot to its waiter before a reentrant arrival', async () => {
+  const { pooled, MAX_IN_FLIGHT } = await import('./eval.mjs');
+  const releases = [];
+  let active = 0;
+  let peak = 0;
+  const enter = () =>
+    pooled(() => {
+      active += 1;
+      peak = Math.max(peak, active);
+      return new Promise(resolve =>
+        releases.push(() => {
+          active -= 1;
+          resolve();
+        })
+      );
+    });
+  const jobs = Array.from({ length: MAX_IN_FLIGHT + 1 }, enter);
+  releases.shift()();
+  await new Promise(resolve =>
+    queueMicrotask(() => {
+      jobs.push(enter());
+      resolve();
+    })
+  );
+  while (releases.length) {
+    releases.splice(0).forEach(release => release());
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  await Promise.all(jobs);
+  assert.equal(peak, MAX_IN_FLIGHT);
+  assert.equal(active, 0);
+  await assert.rejects(
+    pooled(() => {
+      throw new Error('sync fixture');
+    }),
+    /sync fixture/
+  );
+  await assert.rejects(
+    pooled(async () => {
+      throw new Error('async fixture');
+    }),
+    /async fixture/
+  );
+  assert.equal(await pooled(() => 42), 42);
+});
