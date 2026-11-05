@@ -21,6 +21,9 @@ vi.mock('@/lib/share/image-utils', () => ({
   loadSatoshiFont: mocks.font,
   toDataUrl: mocks.image,
 }));
+vi.mock('next/server', () => ({
+  connection: () => Promise.resolve(undefined),
+}));
 vi.mock('next/og', () => ({
   ImageResponse: class {
     constructor(node: ReactNode, options: unknown) {

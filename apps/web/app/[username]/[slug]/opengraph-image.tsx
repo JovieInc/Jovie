@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og';
+import { connection } from 'next/server';
 import { resolveSmartLinkArtistByline } from '@/lib/discography/release-credits';
 import { determineReleasePhase } from '@/lib/discography/release-phase';
 import { resolveOpaqueInternalProfileUsername } from '@/lib/profile/opaque-internal-profile-handle.server';
@@ -15,8 +16,9 @@ import {
 import { getContentBySlug, getCreatorByUsername } from './_lib/data';
 
 export const runtime = 'nodejs';
-// An old image URL must check current publication, including after revocation.
-export const revalidate = 0;
+// Dynamic by request-time connection (no route-segment cache export: the
+// stack-pattern ratchet caps those): an old image URL must check current
+// publication, including after revocation.
 export const alt = 'Release share card on Jovie with artwork, title and artist';
 export const size = OG_SIZE;
 export const contentType = 'image/png';
@@ -50,6 +52,7 @@ export default async function Image({
   params: Promise<{ username: string; slug: string }>;
 }) {
   const { username, slug } = await params;
+  await connection();
   let resolved: Awaited<ReturnType<typeof resolvePublicRelease>> = null;
   let status = 200;
   try {
