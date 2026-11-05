@@ -92,6 +92,7 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   agentWriteGlobal: mandatoryDenyFixed,
   general: mandatoryDenyFixed,
   changelogSubscribe: mandatoryDenyFixed,
+  waitlistJoin: mandatoryDenyFixed,
   musicBrainzLookup: mandatoryDeny,
 
   claimTokenAccess: advisoryAllow,

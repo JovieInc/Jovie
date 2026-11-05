@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   redirect: vi.fn(),
   rateLimit: vi.fn(),
   redeem: vi.fn(),
+  opened: vi.fn(),
+  redeemed: vi.fn(),
 }));
 vi.mock('next/headers', () => ({ headers: mocks.headers }));
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }));
@@ -25,6 +27,10 @@ vi.mock('@/lib/onboarding/rate-limit', () => ({
 vi.mock('@/lib/utils/ip-extraction', () => ({
   extractClientIP: vi.fn().mockReturnValue('127.0.0.1'),
 }));
+vi.mock('@/lib/waitlist/invite-funnel', () => ({
+  recordInviteOpened: mocks.opened,
+  recordInviteRedeemed: mocks.redeemed,
+}));
 vi.mock('@/lib/waitlist/redeem', () => ({
   redeemWaitlistInviteToken: mocks.redeem,
 }));
@@ -37,6 +43,8 @@ const page = (token?: string) =>
 describe('WaitlistInvitePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.opened.mockResolvedValue(undefined);
+    mocks.redeemed.mockResolvedValue(undefined);
     mocks.auth.mockResolvedValue({ userId: 'app-user-id' });
     mocks.currentUser.mockResolvedValue({
       emailVerified: true,
@@ -53,6 +61,8 @@ describe('WaitlistInvitePage', () => {
   it('rejects a missing token before reading identity or redeeming', async () => {
     expect(renderToStaticMarkup(await page())).toContain('Invite link missing');
     expect(mocks.auth).not.toHaveBeenCalled();
+    expect(mocks.opened).not.toHaveBeenCalled();
+    expect(mocks.redeemed).not.toHaveBeenCalled();
     expect(mocks.redeem).not.toHaveBeenCalled();
   });
 
@@ -61,7 +71,10 @@ describe('WaitlistInvitePage', () => {
     await expect(page('secure-token')).rejects.toThrow(
       'REDIRECT:/signin?redirect_url='
     );
+    expect(mocks.opened).toHaveBeenCalledExactlyOnceWith('secure-token');
+    expect(mocks.auth).toHaveBeenCalledWith({ session: 'fresh' });
     expect(mocks.redeem).not.toHaveBeenCalled();
+    expect(mocks.redeemed).not.toHaveBeenCalled();
   });
 
   it.each([false, undefined])(
@@ -81,6 +94,7 @@ describe('WaitlistInvitePage', () => {
       );
       expect(mocks.redeem).not.toHaveBeenCalled();
       expect(mocks.rateLimit).not.toHaveBeenCalled();
+      expect(mocks.redeemed).not.toHaveBeenCalled();
     }
   );
 
@@ -88,6 +102,11 @@ describe('WaitlistInvitePage', () => {
     await expect(page('secure-token')).rejects.toThrow(
       'REDIRECT:/start?fresh_signup=true'
     );
+    expect(mocks.opened).toHaveBeenCalledExactlyOnceWith('secure-token');
+    expect(mocks.redeemed).toHaveBeenCalledExactlyOnceWith({
+      entryId: 'entry-1',
+      appUserId: 'app-user-id',
+    });
     expect(mocks.auth).toHaveBeenCalledWith({ session: 'fresh' });
     expect(mocks.currentUser).toHaveBeenCalledWith({ session: 'fresh' });
     expect(mocks.redeem).toHaveBeenCalledWith({
@@ -115,5 +134,6 @@ describe('WaitlistInvitePage', () => {
     mocks.redeem.mockResolvedValue({ outcome });
     expect(renderToStaticMarkup(await page('secure-token'))).toContain(title);
     expect(mocks.redirect).not.toHaveBeenCalled();
+    expect(mocks.redeemed).not.toHaveBeenCalled();
   });
 });
