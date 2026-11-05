@@ -764,7 +764,6 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     expect(prefetchMock).not.toHaveBeenCalled();
 
     fireEvent.keyDown(input, { key: 'Enter' });
-
     expect(onAdditionalSelect).toHaveBeenCalledWith('upload-audio');
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(onSelectAudio).not.toHaveBeenCalled();
