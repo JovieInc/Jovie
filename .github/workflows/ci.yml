@@ -2305,6 +2305,7 @@ jobs:
             echo "tasks=false"
             echo "desktop_update=false"
             echo "dsp=false"
+            echo "smart_link=false"
             echo "run=false"
           } >> "$GITHUB_OUTPUT"
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
@@ -2316,6 +2317,7 @@ jobs:
           TASKS_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/tasks/(Task(DataTable|ListRow)(\.stories)?\.tsx|TasksPageClient\.tsx)|components/organisms/table/(atoms/TableCell\.tsx|table\.types\.ts|organisms/VirtualizedTableRow\.tsx|molecules/TaskProjectionListRow\.tsx)|tests/e2e/storybook-task-row-geometry\.spec\.ts)$'
           DESKTOP_UPDATE_STORYBOOK_PATTERN='^apps/web/(components/organisms/desktop-update/DesktopUpdateModal(\.stories)?\.tsx|tests/e2e/storybook-desktop-update-modal\.spec\.ts)$'
           DSP_STORYBOOK_PATTERN='^apps/web/(components/shell/DspAvatarStack(\.mobile-drawer)?(\.stories|\.test)?\.tsx|components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow(\.stories)?\.tsx|components/organisms/release-sidebar/ReleaseSidebarSections\.tsx|components/molecules/drawer/RightDrawer\.tsx|lib/a11y/modal-focus-boundary\.ts|tests/e2e/storybook-dsp-details\.spec\.ts)$'
+          SMART_LINK_STORYBOOK_PATTERN='^apps/web/(components/features/release/(SmartLinkShell|MusicServiceDial|ActionDial)(\.stories|\.test)?\.tsx|components/organisms/public-surface/PublicSurface(Shell|Stage)(\.stories|\.test)?\.tsx|components/organisms/ReleaseLandingPage\.stories\.tsx|app/r/\[slug\]/ReleaseLandingPage\.tsx|app/globals\.css|styles/design-system\.css|tests/e2e/storybook-smart-link-reachability\.spec\.ts)$'
           # Overlay primitives, their layer tokens, and the
           # collision harness re-prove stacking, focus, and viewport fit.
           OVERLAY_STORYBOOK_PATTERN='^(packages/ui/atoms/(dialog|alert-dialog|sheet|popover|dropdown-menu|context-menu|select|tooltip)\.tsx|packages/ui/lib/(overlay-styles|overlay-focus|dropdown-styles|utils)\.ts|apps/web/styles/tailwind-foundation\.css|apps/web/\.storybook/stories/overlay-collisions\.stories\.tsx|apps/web/tests/e2e/storybook-overlay-collisions\.spec\.ts)$'
@@ -2355,6 +2357,12 @@ jobs:
           if grep -qE "$DSP_STORYBOOK_PATTERN" "$changed_files"; then
             {
               echo "dsp=true"
+              echo "run=true"
+            } >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qE "$SMART_LINK_STORYBOOK_PATTERN" "$changed_files"; then
+            {
+              echo "smart_link=true"
               echo "run=true"
             } >> "$GITHUB_OUTPUT"
           fi
@@ -2450,6 +2458,7 @@ jobs:
           RUN_TASKS: ${{ steps.storybook-browser.outputs.tasks }}
           RUN_DESKTOP_UPDATE: ${{ steps.storybook-browser.outputs.desktop_update }}
           RUN_DSP: ${{ steps.storybook-browser.outputs.dsp }}
+          RUN_SMART_LINK: ${{ steps.storybook-browser.outputs.smart_link }}
           STORYBOOK_BASE_URL: http://localhost:6006
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
@@ -2481,6 +2490,9 @@ jobs:
           fi
           if [[ "$RUN_DSP" == 'true' ]]; then
             specs+=(tests/e2e/storybook-dsp-details.spec.ts)
+          fi
+          if [[ "${RUN_SMART_LINK:-false}" == 'true' ]]; then
+            specs+=(tests/e2e/storybook-smart-link-reachability.spec.ts)
           fi
           test "${#specs[@]}" -gt 0
           pnpm exec storybook dev -p 6006 --no-open &
@@ -3771,6 +3783,7 @@ jobs:
                   tests/e2e/storybook-task-row-geometry.spec.ts \
                   tests/e2e/storybook-desktop-update-modal.spec.ts \
                   tests/e2e/storybook-dsp-details.spec.ts \
+                  tests/e2e/storybook-smart-link-reachability.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
                   --workers=2 --shard="$STORYBOOK_SHARD"
               exit 0
@@ -6275,6 +6288,9 @@ jobs:
             exit 1
           fi
 
+          # The root-not-found axe fixture is guarded by the /dev layout/proxy.
+          # Match Mobile's explicit development runtime on this local-only server.
+          export VERCEL_ENV=development
           # Keep absolute URLs on loopback (GHA HOSTNAME is the runner machine name).
           export HOSTNAME=localhost
           export NEXT_PUBLIC_APP_URL=http://localhost:3220

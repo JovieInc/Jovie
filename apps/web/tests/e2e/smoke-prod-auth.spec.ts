@@ -41,6 +41,7 @@ import { resolveProductionAuthCredentials } from './utils/production-auth-creden
 import {
   prepareProductionAuthEmailForm,
   waitForProductionDashboardContent,
+  waitForProductionOnboardingLanding,
 } from './utils/production-auth-interaction';
 import {
   newProdcertUserEmail,
@@ -1429,23 +1430,8 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           startedAtMs: requestedAtMs,
         });
         await codeInput.fill(code);
-        await page.waitForURL(
-          url =>
-            url.origin === expectedOrigin &&
-            !url.pathname.startsWith(APP_ROUTES.SIGNIN),
-          { timeout: 30_000 }
-        );
+        await waitForProductionOnboardingLanding(page, expectedOrigin);
         assertExactNavigationUrl(page.url(), expectedOrigin, 'Signup landing');
-        // The post-signup redirect chain is still settling at this point: the
-        // OTP form lands the fresh user on /app, and the NEEDS_ONBOARDING
-        // state redirects to /start?fresh_signup=true. waitForURL unblocks at
-        // the first off-/signin commit, so the chain and the landing page's
-        // own load can still be in flight. Settle before this run navigates
-        // again — a goto issued mid-chain aborts the in-flight navigation
-        // (net::ERR_ABORTED, probes run 41152444713).
-        await page.waitForLoadState('domcontentloaded', {
-          timeout: SMOKE_TIMEOUTS.NAVIGATION,
-        });
         const text = (await page.locator('body').innerText()).toLowerCase();
         expect(text).not.toMatch(/application error|something went wrong/);
         return new URL(page.url()).pathname;
@@ -1500,10 +1486,6 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       'onboarding',
       'fresh-user-onboarding-first-value',
       async () => {
-        await page.goto(`${expectedOrigin}/start`, {
-          waitUntil: 'domcontentloaded',
-          timeout: SMOKE_TIMEOUTS.NAVIGATION,
-        });
         assertExactNavigationUrl(page.url(), expectedOrigin, 'Onboarding chat');
         const input = page.locator('[aria-label="Chat message input" i]');
         const sendButton = page.getByRole('button', { name: 'Send message' });
