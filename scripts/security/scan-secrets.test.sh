@@ -399,36 +399,8 @@ bash "$REPO_ROOT/scripts/security/prepare-ci-secret-scan-range.test.sh"
 DL_BIN="$TEST_ROOT/dl-bin"
 DL_TMP="$TEST_ROOT/dl-tmp"
 mkdir -p "$DL_BIN" "$DL_TMP"
-cat >"$DL_BIN/curl" <<'EOF'
-#!/usr/bin/env bash
-count=0
-[[ -f "$CURL_COUNT" ]] && count="$(cat "$CURL_COUNT")"
-count=$((count + 1))
-printf '%s\n' "$count" >"$CURL_COUNT"
-if [[ "${CURL_ALWAYS_FAIL:-}" == "1" || $count -eq 1 ]]; then
-  echo "curl: (35) Recv failure: Connection reset by peer" >&2
-  exit 35
-fi
-out=''
-prev=''
-for arg in "$@"; do
-  [[ "$prev" == '-o' ]] && out="$arg"
-  prev="$arg"
-done
-printf 'fake-tarball' >"$out"
-EOF
-cat >"$DL_BIN/tar" <<'EOF'
-#!/usr/bin/env bash
-dest=''
-prev=''
-for arg in "$@"; do
-  [[ "$prev" == '-C' ]] && dest="$arg"
-  prev="$arg"
-done
-member="${!#}"
-printf '#!/usr/bin/env bash\nexit 0\n' >"$dest/$member"
-EOF
-chmod +x "$DL_BIN/curl" "$DL_BIN/tar"
+source "$REPO_ROOT/scripts/security/test-fixtures/scanner-download-runtime.sh"
+setup_scanner_download_fixture "$DL_BIN"
 
 export CURL_COUNT="$TEST_ROOT/download.curl-count"
 : >"$CURL_COUNT"
@@ -439,8 +411,10 @@ PATH="$DL_BIN:/usr/bin:/bin" TMPDIR="$DL_TMP" SCAN_SECRETS_RETRY_DELAY=0 \
   GITLEAKS_BIN= TRUFFLEHOG_BIN= \
   bash "$SCAN_SCRIPT" pre-commit >"$TEST_ROOT/download.output" 2>&1 \
   || status=$?
-[[ $status -eq 0 ]] \
-  || fail "transient download failure must be retried to success: $status"
+if [[ $status -ne 0 ]]; then
+  cat "$TEST_ROOT/download.output" >&2
+  fail "transient download failure must be retried to success: $status"
+fi
 [[ "$(cat "$CURL_COUNT")" -eq 3 ]] \
   || fail 'expected 1 failed attempt + 2 successful downloads (gitleaks, trufflehog)'
 grep -q 'download attempt 1 failed; retrying' "$TEST_ROOT/download.output" \
