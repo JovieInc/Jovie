@@ -6274,6 +6274,9 @@ jobs:
             exit 1
           fi
 
+          # The root-not-found axe fixture is guarded by the /dev layout/proxy.
+          # Match Mobile's explicit development runtime on this local-only server.
+          export VERCEL_ENV=development
           # Keep absolute URLs on loopback (GHA HOSTNAME is the runner machine name).
           export HOSTNAME=localhost
           export NEXT_PUBLIC_APP_URL=http://localhost:3220

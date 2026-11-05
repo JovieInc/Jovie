@@ -494,6 +494,52 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(runs).not.toContain('playwright-report');
   });
 
+  it('serves development-only axe fixtures on the isolated local server', () => {
+    const audit = step(
+      job('ci-a11y'),
+      'Run axe a11y audit (public routes)'
+    ).step;
+    const stubs = {
+      node: `if [ "$1" = .next/standalone/apps/web/server.js ]; then
+        echo "server PORT=$PORT HOSTNAME=$HOSTNAME VERCEL_ENV=$VERCEL_ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL" >> calls.log
+        touch server-started
+        exec /bin/sleep 30
+      fi
+      exit "\${AUDIT_EXIT_CODE:-0}"`,
+      curl: 'for _ in $(seq 1 200); do [ -f server-started ] && exit "${READINESS_EXIT_CODE:-0}"; /bin/sleep 0.01; done; exit 7',
+      sleep: 'exit 0',
+    };
+    const prepared = (env: Record<string, string> = {}) =>
+      runStep(
+        `mkdir -p apps/web/.next/standalone/apps/web/.next && touch apps/web/.next/standalone/apps/web/server.js apps/web/.next/standalone/apps/web/.next/BUILD_ID\n${audit.run}`,
+        stubs,
+        { NODE_ENV: 'production', VERCEL_ENV: 'production', ...env }
+      );
+
+    const served = prepared();
+    expect(served.status, served.stderr).toBe(0);
+    expect(
+      readFileSync(join(served.root, 'apps/web/calls.log'), 'utf8')
+    ).toContain(
+      'server PORT=3220 HOSTNAME=localhost VERCEL_ENV=development NEXT_PUBLIC_APP_URL=http://localhost:3220'
+    );
+    expect(served.calls).toContain('curl -sf http://localhost:3220');
+    expect(served.calls).toContain(
+      'guard-playwright-artifacts.mjs --run -- pnpm exec playwright test tests/e2e/axe-audit.spec.ts --config=playwright.config.ts --project=chromium --reporter=line,json'
+    );
+
+    const failed = prepared({ AUDIT_EXIT_CODE: '43' });
+    expect(failed.status, failed.stderr).toBe(43);
+
+    const unready = prepared({ READINESS_EXIT_CODE: '7' });
+    expect(unready.status, unready.stderr).toBe(1);
+    expect(unready.calls).not.toContain('playwright test');
+
+    const missing = runStep(String(audit.run), stubs);
+    expect(missing.status, missing.stderr).toBe(1);
+    expect(missing.calls).not.toContain('playwright test');
+  });
+
   it('stages only structured public axe JSON without masking failures', () => {
     const publicA11y = job('ci-a11y');
     expect(publicA11y.env).toMatchObject({
