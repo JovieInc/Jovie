@@ -14,7 +14,7 @@ import {
 } from './fixtures';
 import { HomeLoopAnswerPanel } from './HomeLoopAnswerPanel';
 import { HomeLoopAsks } from './HomeLoopAsks';
-import { HomeLoopCanvas } from './HomeLoopCanvas';
+import { HomeLoopCanvas, type HomeLoopCanvasProps } from './HomeLoopCanvas';
 import { props } from './HomeLoopCanvas.test-fixtures';
 import {
   HOME_LOOP_UNDO_WINDOW_MS,
