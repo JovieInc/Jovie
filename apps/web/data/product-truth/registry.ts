@@ -7,6 +7,7 @@ import type {
 import type { CodeFlagName } from '@/lib/flags/code-flags';
 import type { AppFlagName } from '@/lib/flags/contracts';
 import type { MarketingStaticFlagName } from '@/lib/flags/marketing-static';
+import { PUBLIC_ACCESS_FLAG_CAPABILITIES } from './public-access-flags';
 
 /**
  * Product-truth capability + claim registry (JOV-6223 / JOV-7247).
@@ -746,13 +747,7 @@ export const PRODUCT_FLAG_CAPABILITIES = {
     nonMarketing:
       'marketing copy presentation; default on, env kill switch; does not change smart-link certification (JOV-7580)',
   },
-  OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: {
-    nonMarketing: 'OAuth dynamic client registration kill switch',
-  },
-  CHATGPT_APP_DIRECTORY_MCP: {
-    nonMarketing:
-      'ChatGPT directory MCP kill switch; anonymous public artist reads; default off',
-  },
+  ...PUBLIC_ACCESS_FLAG_CAPABILITIES,
   IN_HOUSE_RESOLVER: {
     nonMarketing:
       'legacy JOV-7323 umbrella rollback override for resolver families',
@@ -770,7 +765,6 @@ export const PRODUCT_FLAG_CAPABILITIES = {
     nonMarketing:
       'auth offer recap; default off; no price, trial, or entitlement change',
   },
-  PUBLIC_SIGNUP_CLOSED: { nonMarketing: 'closed signup gate; default on' },
   SOCIAL_HTML_ISOLATED_PROVIDER: {
     nonMarketing:
       'internal ingestion routing kill switch; reserved for future isolated provider rollout',
