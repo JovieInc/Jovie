@@ -5,7 +5,7 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import dynamic from 'next/dynamic';
-import type { ReactNode } from 'react';
+import type { FocusEvent, ReactNode } from 'react';
 import {
   Suspense,
   useCallback,
@@ -1033,6 +1033,57 @@ export function OnboardingChat({
     totalSizeRef,
     scrollContainerRef,
   } = useStickToBottom();
+  const handleTranscriptFocus = useCallback(
+    (event: FocusEvent<HTMLDivElement>) => {
+      const container = event.currentTarget;
+      const target = event.target;
+      if (
+        !(target instanceof HTMLElement) ||
+        target === container ||
+        !container.contains(target) ||
+        container.clientHeight === 0
+      ) {
+        return;
+      }
+
+      // An explicit tool interaction owns the viewport until the next user
+      // turn. The existing resize controller must not re-pin over that edit.
+      setStuckToBottom(false);
+      const viewport = container.getBoundingClientRect();
+      const style = getComputedStyle(container);
+      // The existing shared ring/forced-colors outline is 2px + 2px offset.
+      const focusClearance = 4;
+      const top =
+        viewport.top +
+        (headerOverlay ? Number.parseFloat(style.paddingTop) || 0 : 0) +
+        focusClearance;
+      const bottom =
+        viewport.bottom -
+        (Number.parseFloat(style.paddingBottom) || 0) -
+        focusClearance;
+      const owner =
+        target.closest<HTMLElement>('[data-component="composite-field"]') ??
+        target;
+      const ownerBounds = owner.getBoundingClientRect();
+      const groupBounds = owner.parentElement?.getBoundingClientRect();
+      // Keep the small tool's status, field and next action together when they
+      // fit. For a tall tool, reveal just the focused control instead.
+      const bounds =
+        groupBounds &&
+        groupBounds.height > 0 &&
+        groupBounds.height <= bottom - top
+          ? groupBounds
+          : ownerBounds;
+      const delta =
+        bounds.top < top
+          ? bounds.top - top
+          : bounds.bottom > bottom
+            ? bounds.bottom - bottom
+            : 0;
+      if (delta !== 0) container.scrollTop += delta;
+    },
+    [headerOverlay, setStuckToBottom]
+  );
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
   const { onSend: notifyJankSend } = useChatJankMonitor({
     conversationId: 'onboarding',
@@ -1439,6 +1490,7 @@ export function OnboardingChat({
       <div
         ref={scrollContainerRef}
         onScroll={onScroll}
+        onFocusCapture={handleTranscriptFocus}
         className={cn(
           'relative min-h-0 flex-1 overflow-y-auto px-4 pb-5 sm:px-6 lg:px-8',
           // Under the floating sign-in row, scrolled-away messages fade out

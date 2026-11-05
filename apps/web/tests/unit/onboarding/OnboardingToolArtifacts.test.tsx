@@ -1,4 +1,5 @@
 import { fireEvent, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   formatGenreLabel,
@@ -508,7 +509,8 @@ describe('onboarding tool artifacts', () => {
     ).toHaveProperty('value', 'Un');
   });
 
-  it('routes picker, handle, and social fields through one focus owner', () => {
+  it('routes picker, handle, and social fields through one native label focus owner', async () => {
+    const user = userEvent.setup();
     mocks.handleAvailability.data = { available: true };
 
     fastRender(
@@ -540,15 +542,29 @@ describe('onboarding tool artifacts', () => {
       .filter((field): field is HTMLElement => field instanceof HTMLElement);
     expect(fields).toHaveLength(3);
     for (const field of fields) {
+      const input = field.querySelector('input');
+      expect(input).not.toBeNull();
+      expect(field.tagName).toBe('LABEL');
+      expect(field).toHaveAttribute('data-component', 'composite-field');
+      expect(field).toHaveAttribute('for', input?.id);
+      expect(input?.parentElement).toBe(field);
+      await user.click(field);
+      expect(input).toHaveFocus();
+      expect(field.className).not.toMatch(/focus-within:(?:ring|shadow)-/);
       expect(field).toHaveClass(
         'border-subtle',
         'bg-surface-0',
         'focus-within:border-focus',
-        'focus-within:ring-focus/16'
+        'composite-field',
+        'rounded-lg'
       );
       expect(field.className).not.toContain(
         'focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.035)]'
       );
+    }
+    expect(fields[0]).toHaveClass('h-auto', 'min-h-0', 'gap-2', 'px-3', 'py-2');
+    for (const field of fields.slice(1)) {
+      expect(field).toHaveClass('h-9', 'min-h-0', 'gap-0', 'px-2.5', 'py-0');
     }
     expect(fields[0]).toHaveAttribute('data-density', 'picker');
     expect(fields[1]).toHaveAttribute('data-density', 'compact');
