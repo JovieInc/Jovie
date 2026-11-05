@@ -1,8 +1,7 @@
 /**
  * Daily per-song signals (Spotify popularity, YouTube views, Jovie release
- * click-outs) for allowlisted profiles. Default allowlist: tim. Kill switch:
- * TRACK_DAILY_SNAPSHOTS=false. Idempotent per song, source and UTC day.
- * Schedule: 25 9 * * * UTC.
+ * click-outs) for explicitly allowlisted profiles. Disabled by default.
+ * Idempotent per song, source and UTC day. No schedule is installed.
  */
 import { NextResponse } from 'next/server';
 import { verifyCronRequest } from '@/lib/cron/auth';
@@ -36,7 +35,7 @@ export async function GET(request: Request) {
     const report = await runLiveTrackDailySnapshots();
     return NextResponse.json(
       { ok: report.failures.length === 0, ...report },
-      { headers: NO_STORE_HEADERS }
+      { status: report.failures.length ? 500 : 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
     await captureError('Track daily snapshots failed', error, {

@@ -1,9 +1,11 @@
 import 'server-only';
-import { and, sql as drizzleSql, eq, inArray, isNull } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, inArray, isNull, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { getReleaseClickCounts } from '@/lib/db/queries/analytics';
 import {
+  discogRecordings,
   discogReleases,
+  discogReleaseTracks,
   discogTracks,
   providerLinks,
 } from '@/lib/db/schema/content';
@@ -45,24 +47,51 @@ export const drizzleTrackSnapshotStore: TrackSnapshotStore = {
     const [tracks, links] = await Promise.all([
       db
         .select({
-          releaseId: discogTracks.releaseId,
-          trackId: discogTracks.id,
+          releaseId: discogReleaseTracks.releaseId,
+          trackId: discogReleaseTracks.id,
           spotifyTrackId: drizzleSql<
             string | null
-          >`${discogTracks.metadata} ->> 'spotify_track_id'`,
+          >`coalesce(${discogReleaseTracks.metadata} ->> 'spotifyId', ${discogRecordings.metadata} ->> 'spotifyId')`,
         })
-        .from(discogTracks)
-        .where(inArray(discogTracks.releaseId, releaseIds)),
+        .from(discogReleaseTracks)
+        .innerJoin(
+          discogRecordings,
+          eq(discogRecordings.id, discogReleaseTracks.recordingId)
+        )
+        .where(
+          and(
+            inArray(discogReleaseTracks.releaseId, releaseIds),
+            eq(discogRecordings.creatorProfileId, creatorProfileId)
+          )
+        ),
       db
         .select({
           releaseId: providerLinks.releaseId,
-          trackId: providerLinks.trackId,
-          trackReleaseId: discogTracks.releaseId,
+          trackId: discogReleaseTracks.id,
+          trackReleaseId: discogReleaseTracks.releaseId,
           url: providerLinks.url,
         })
         .from(providerLinks)
         .leftJoin(discogTracks, eq(discogTracks.id, providerLinks.trackId))
-        .where(inArray(providerLinks.providerId, YOUTUBE_PROVIDERS)),
+        .leftJoin(
+          discogReleaseTracks,
+          or(
+            eq(discogReleaseTracks.id, providerLinks.releaseTrackId),
+            and(
+              eq(discogReleaseTracks.releaseId, discogTracks.releaseId),
+              eq(discogReleaseTracks.slug, discogTracks.slug)
+            )
+          )
+        )
+        .where(
+          and(
+            inArray(providerLinks.providerId, YOUTUBE_PROVIDERS),
+            or(
+              inArray(providerLinks.releaseId, releaseIds),
+              inArray(discogReleaseTracks.releaseId, releaseIds)
+            )
+          )
+        ),
     ]);
     const owned = new Set(releaseIds);
     const videos: SnapshotVideoRef[] = [];

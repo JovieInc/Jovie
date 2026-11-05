@@ -12,8 +12,11 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as parseYaml } from 'js-yaml';
-import ts from 'typescript';
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+  getPageScopedLocatorCalls,
+  getScreenshotArguments,
+} from './visual-workflow-ast';
 
 // JOV-7707: workflow contracts here read parsed YAML and execute the shipped
 // step shell with stubbed tools; PR/merge-group gate aggregation is covered by
@@ -118,87 +121,6 @@ function runStep(
     ? readFileSync(join(root, 'calls.log'), 'utf8')
     : '';
   return { ...result, calls, root };
-}
-
-function getPageScopedLocatorCalls(source: string): string[] {
-  const sourceFile = ts.createSourceFile(
-    'chat-visual.spec.ts',
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS
-  );
-  const calls: string[] = [];
-
-  function getPageMethod(expression: ts.LeftHandSideExpression): string | null {
-    if (
-      ts.isPropertyAccessExpression(expression) &&
-      ts.isIdentifier(expression.expression) &&
-      expression.expression.text === 'page'
-    ) {
-      return expression.name.text;
-    }
-
-    if (
-      ts.isElementAccessExpression(expression) &&
-      ts.isIdentifier(expression.expression) &&
-      expression.expression.text === 'page'
-    ) {
-      return expression.argumentExpression &&
-        ts.isStringLiteralLike(expression.argumentExpression)
-        ? expression.argumentExpression.text
-        : '<computed>';
-    }
-
-    return null;
-  }
-
-  function visit(node: ts.Node): void {
-    if (ts.isCallExpression(node)) {
-      const method = getPageMethod(node.expression);
-
-      if (
-        method === '<computed>' ||
-        method === 'locator' ||
-        method?.startsWith('getBy') ||
-        (method !== null && /^\$\$?$/.test(method))
-      ) {
-        const firstArgument = node.arguments[0]?.getText(sourceFile) ?? '';
-        calls.push(`${method}:${firstArgument}`);
-      }
-    }
-
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
-  return calls;
-}
-
-function getScreenshotArguments(source: string): string[] {
-  const sourceFile = ts.createSourceFile(
-    'visual-spec.ts',
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS
-  );
-  const argumentsFound: string[] = [];
-
-  function visit(node: ts.Node): void {
-    if (
-      ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
-      node.expression.name.text === 'toHaveScreenshot'
-    ) {
-      argumentsFound.push(node.arguments[0]?.getText(sourceFile) ?? '');
-    }
-
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
-  return argumentsFound;
 }
 
 describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
@@ -492,6 +414,52 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     const runs = authed.steps.map(entry => entry.run ?? '').join('\n');
     expect(runs).not.toContain('--reporter=line ');
     expect(runs).not.toContain('playwright-report');
+  });
+
+  it('serves development-only axe fixtures on the isolated local server', () => {
+    const audit = step(
+      job('ci-a11y'),
+      'Run axe a11y audit (public routes)'
+    ).step;
+    const stubs = {
+      node: `if [ "$1" = .next/standalone/apps/web/server.js ]; then
+        echo "server PORT=$PORT HOSTNAME=$HOSTNAME VERCEL_ENV=$VERCEL_ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL" >> calls.log
+        touch server-started
+        exec /bin/sleep 30
+      fi
+      exit "\${AUDIT_EXIT_CODE:-0}"`,
+      curl: 'for _ in $(seq 1 200); do [ -f server-started ] && exit "${READINESS_EXIT_CODE:-0}"; /bin/sleep 0.01; done; exit 7',
+      sleep: 'exit 0',
+    };
+    const prepared = (env: Record<string, string> = {}) =>
+      runStep(
+        `mkdir -p apps/web/.next/standalone/apps/web/.next && touch apps/web/.next/standalone/apps/web/server.js apps/web/.next/standalone/apps/web/.next/BUILD_ID\n${audit.run}`,
+        stubs,
+        { NODE_ENV: 'production', VERCEL_ENV: 'production', ...env }
+      );
+
+    const served = prepared();
+    expect(served.status, served.stderr).toBe(0);
+    expect(
+      readFileSync(join(served.root, 'apps/web/calls.log'), 'utf8')
+    ).toContain(
+      'server PORT=3220 HOSTNAME=localhost VERCEL_ENV=development NEXT_PUBLIC_APP_URL=http://localhost:3220'
+    );
+    expect(served.calls).toContain('curl -sf http://localhost:3220');
+    expect(served.calls).toContain(
+      'guard-playwright-artifacts.mjs --run -- pnpm exec playwright test tests/e2e/axe-audit.spec.ts --config=playwright.config.ts --project=chromium --reporter=line,json'
+    );
+
+    const failed = prepared({ AUDIT_EXIT_CODE: '43' });
+    expect(failed.status, failed.stderr).toBe(43);
+
+    const unready = prepared({ READINESS_EXIT_CODE: '7' });
+    expect(unready.status, unready.stderr).toBe(1);
+    expect(unready.calls).not.toContain('playwright test');
+
+    const missing = runStep(String(audit.run), stubs);
+    expect(missing.status, missing.stderr).toBe(1);
+    expect(missing.calls).not.toContain('playwright test');
   });
 
   it('stages only structured public axe JSON without masking failures', () => {

@@ -1,24 +1,22 @@
 /**
  * Per-song daily snapshots for the catalog-reactivation proof.
- * Runs only for allowlisted usernames (default: tim). Kill switch:
- * TRACK_DAILY_SNAPSHOTS=false. Failures use one fingerprint.
+ * Disabled until explicitly enabled with TRACK_DAILY_SNAPSHOTS=true and
+ * TRACK_DAILY_SNAPSHOT_USERNAMES. Failures use one fingerprint.
  */
 export const TRACK_SNAPSHOT_ROUTE = '/api/cron/track-daily-snapshots' as const;
 export const TRACK_SNAPSHOT_REMEDIATION_FINGERPRINT =
   'remediation:track-snapshots' as const;
-export const TRACK_SNAPSHOT_DEFAULT_USERNAMES = ['tim'] as const;
 export const TRACK_SNAPSHOT_MAX_PROFILES = 10;
 
-const OFF_VALUES = new Set(['0', 'false', 'off', 'no']);
+const ON_VALUES = new Set(['1', 'true', 'on', 'yes']);
 
 export function isTrackDailySnapshotsEnabled(
   raw: string | undefined = process.env.TRACK_DAILY_SNAPSHOTS
 ): boolean {
-  if (!raw?.trim()) return true;
-  return !OFF_VALUES.has(raw.trim().toLowerCase());
+  return ON_VALUES.has(raw?.trim().toLowerCase() ?? '');
 }
 
-/** Comma-separated usernames; unset means the default allowlist. */
+/** Comma-separated usernames; an empty allowlist never selects a customer. */
 export function resolveTrackSnapshotUsernames(
   raw: string | undefined = process.env.TRACK_DAILY_SNAPSHOT_USERNAMES
 ): string[] {
@@ -26,8 +24,7 @@ export function resolveTrackSnapshotUsernames(
     .split(',')
     .map(name => name.trim().toLowerCase())
     .filter(Boolean);
-  const names = parsed.length ? parsed : [...TRACK_SNAPSHOT_DEFAULT_USERNAMES];
-  return [...new Set(names)].slice(0, TRACK_SNAPSHOT_MAX_PROFILES);
+  return [...new Set(parsed)].slice(0, TRACK_SNAPSHOT_MAX_PROFILES);
 }
 
 export function utcDay(now: Date): string {

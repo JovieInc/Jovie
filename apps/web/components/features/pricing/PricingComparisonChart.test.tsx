@@ -80,6 +80,14 @@ describe('PricingComparisonChart', () => {
         expect(header).toHaveClass('whitespace-nowrap');
         expect(header).not.toHaveAttribute('data-wrap', 'feature-label');
       }
+      const longFeature = within(table).getByRole('rowheader', {
+        name: 'Release notifications (email to your audience)',
+      });
+      expect(longFeature).toHaveAttribute('scope', 'row');
+      expect(longFeature).toHaveAttribute('data-wrap', 'feature-label');
+      expect(longFeature.className).not.toMatch(
+        /line-clamp|truncate|whitespace-nowrap/
+      );
     }
 
     const feature = within(mobileTable).getByRole('rowheader', {

@@ -194,9 +194,7 @@ export default async function middleware(
   // deletion, rename or a storage failure (JOV-8629 §6.2).
   // ========================================================================
   if (req.method !== 'OPTIONS') {
-    const profilePublicationResponse = await gateProfilePublicationAtEdge(
-      req.nextUrl.pathname
-    );
+    const profilePublicationResponse = await gateProfilePublicationAtEdge(req);
     if (profilePublicationResponse) return profilePublicationResponse;
   }
 

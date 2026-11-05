@@ -16,7 +16,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { discogReleases, discogTracks } from './content';
+import { discogReleases, discogReleaseTracks } from './content';
 import { creatorProfiles } from './profiles';
 
 export const TRACK_DAILY_SNAPSHOT_SOURCES = [
@@ -38,7 +38,7 @@ export const trackDailySnapshots = pgTable(
       .notNull()
       .references(() => discogReleases.id, { onDelete: 'cascade' }),
     /** Null for release-level signals (release click-outs, release videos). */
-    trackId: uuid('track_id').references(() => discogTracks.id, {
+    trackId: uuid('track_id').references(() => discogReleaseTracks.id, {
       onDelete: 'cascade',
     }),
     source: text('source').notNull(),

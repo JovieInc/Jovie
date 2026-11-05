@@ -31,6 +31,25 @@ describe('GET /api/cron/track-daily-snapshots', () => {
     expect(runLiveMock).not.toHaveBeenCalled();
   });
 
+  it('does not run without explicit activation', async () => {
+    vi.stubEnv('TRACK_DAILY_SNAPSHOTS', '');
+    const { GET } = await import('@/app/api/cron/track-daily-snapshots/route');
+    const response = await GET(new Request(URL_));
+    expect(await response.json()).toMatchObject({ enabled: false });
+    expect(runLiveMock).not.toHaveBeenCalled();
+  });
+
+  it('returns a failure status for partial source failures', async () => {
+    vi.stubEnv('TRACK_DAILY_SNAPSHOTS', 'true');
+    runLiveMock.mockResolvedValue({
+      failures: [{ source: 'spotify_popularity', reason: 'unavailable' }],
+    });
+    const { GET } = await import('@/app/api/cron/track-daily-snapshots/route');
+    const response = await GET(new Request(URL_));
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ ok: false });
+  });
+
   it('honours the kill switch', async () => {
     vi.stubEnv('TRACK_DAILY_SNAPSHOTS', 'false');
     const { GET } = await import('@/app/api/cron/track-daily-snapshots/route');
@@ -43,7 +62,8 @@ describe('GET /api/cron/track-daily-snapshots', () => {
     expect(runLiveMock).not.toHaveBeenCalled();
   });
 
-  it('runs by default and returns the report', async () => {
+  it('runs only when enabled and returns the report', async () => {
+    vi.stubEnv('TRACK_DAILY_SNAPSHOTS', 'true');
     runLiveMock.mockResolvedValue({
       day: '2026-11-02',
       rowsInserted: 3,
@@ -59,6 +79,7 @@ describe('GET /api/cron/track-daily-snapshots', () => {
   });
 
   it('fingerprints a thrown failure', async () => {
+    vi.stubEnv('TRACK_DAILY_SNAPSHOTS', 'true');
     runLiveMock.mockRejectedValue(new Error('db down'));
     const { GET } = await import('@/app/api/cron/track-daily-snapshots/route');
     const response = await GET(new Request(URL_));

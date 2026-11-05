@@ -19,6 +19,10 @@ import {
   readPendingClaimContext,
 } from '@/lib/claim/context';
 import { claimPrebuiltProfileForUser } from '@/lib/claim/finalize';
+import {
+  prepareSelfServeClaimProof,
+  requireFunnelDelivery,
+} from '@/lib/claim/self-serve-claim-proof.server';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
 import { users } from '@/lib/db/schema/auth';
@@ -51,11 +55,7 @@ import {
   isUnclaimedStructuredCreditProfile,
   markStructuredCreditProfileClaimed,
 } from '@/lib/profile/unclaimed-artist-profile';
-import {
-  type ServerAnalyticsDelivery,
-  trackServerEvent,
-  trackServerEventTx,
-} from '@/lib/server-analytics';
+import { trackServerEvent, trackServerEventTx } from '@/lib/server-analytics';
 import { ACQUISITION_COOKIE_NAME } from '@/lib/tracking/consent';
 import { finalizePostOnboarding } from './post-onboarding';
 
@@ -68,22 +68,6 @@ const DSP_DISCOVERY_PROVIDERS = [
   'deezer',
   'musicbrainz',
 ] as const;
-
-async function requireFunnelDelivery(
-  event: string,
-  delivery: ServerAnalyticsDelivery
-): Promise<void> {
-  if (delivery.ok) return;
-
-  const error = new Error(
-    `Onboarding Spotify funnel event rejected: ${event} (${delivery.error})`
-  );
-  await captureError('onboarding Spotify funnel event rejected', error, {
-    action: 'connectOnboardingSpotifyArtist',
-    event,
-  });
-  throw error;
-}
 
 export interface ConnectOnboardingSpotifyArtistParams {
   artistName: string;
@@ -105,6 +89,8 @@ export interface ConnectOnboardingSpotifyArtistResult {
    * was not linked and a verification request was stored instead.
    */
   verificationPending?: boolean;
+  /** Identity linked and catalog imported; page private until proof. */
+  proofPending?: boolean;
 }
 
 function isSpotifyIdUniqueViolation(error: unknown): boolean {
@@ -215,6 +201,7 @@ async function getOwnedProfile(profileId: string, appUserId: string) {
       dbUserId: users.id,
       handle: creatorProfiles.usernameNormalized,
       id: creatorProfiles.id,
+      isAdmin: users.isAdmin,
       isClaimed: creatorProfiles.isClaimed,
       settings: creatorProfiles.settings,
       spotifyId: creatorProfiles.spotifyId,
@@ -346,6 +333,14 @@ export async function connectOnboardingSpotifyArtist(
     };
   }
 
+  const claimProof = prepareSelfServeClaimProof({
+    profile,
+    settings: currentSettings,
+    spotifyArtistId: params.spotifyArtistId,
+    artistName: params.artistName || null,
+    directClaim: isDirectClaimAwaitingMatch,
+  });
+
   try {
     if (isDirectClaimAwaitingMatch) {
       const claimedSettings = markStructuredCreditProfileClaimed(
@@ -375,6 +370,7 @@ export async function connectOnboardingSpotifyArtist(
               profile.handle,
             source: 'direct_profile_spotify_match',
             finalizeOnboarding: true,
+            ...(claimProof.record ? { publish: false } : {}),
           });
 
           // Durable funnel events commit atomically with the claim inside
@@ -397,13 +393,14 @@ export async function connectOnboardingSpotifyArtist(
               { eventIdentity: `activation_achieved:${profile.id}` }
             )
           );
+          await claimProof.recordCreated(tx);
 
           await tx
             .update(creatorProfiles)
             .set({
               spotifyId: params.spotifyArtistId,
               spotifyUrl: params.spotifyArtistUrl,
-              settings: claimedSettings,
+              settings: claimProof.apply(claimedSettings),
               updatedAt: new Date(),
             })
             .where(eq(creatorProfiles.id, profile.id));
@@ -423,15 +420,16 @@ export async function connectOnboardingSpotifyArtist(
             .set({
               spotifyId: params.spotifyArtistId,
               spotifyUrl: params.spotifyArtistUrl,
-              settings: {
+              settings: claimProof.apply({
                 ...currentSettings,
                 spotifyArtistName: params.artistName,
                 spotifyImportStatus: 'importing',
                 spotifyImportTotal: 0,
-              },
+              }),
               updatedAt: new Date(),
             })
             .where(eq(creatorProfiles.id, profile.id));
+          await claimProof.recordCreated(tx);
         },
         { clerkUserId: userId }
       );
@@ -452,6 +450,8 @@ export async function connectOnboardingSpotifyArtist(
 
     throw error;
   }
+
+  claimProof.scheduleReview();
 
   // The direct claim is now persisted. Also reconcile on retry when the
   // profile is already claimed but the attribution cookie survived a failure.
@@ -631,6 +631,7 @@ export async function connectOnboardingSpotifyArtist(
         : 'Spotify import finished with errors.',
       imported: result.imported,
       artistName: params.artistName,
+      ...(claimProof.proofPending ? { proofPending: true } : {}),
     };
   } catch (error) {
     await markSpotifyImportFailed(profile.id);
@@ -650,6 +651,7 @@ export async function connectOnboardingSpotifyArtist(
       message: 'Spotify import failed.',
       imported: 0,
       artistName: params.artistName,
+      ...(claimProof.proofPending ? { proofPending: true } : {}),
     };
   }
 }

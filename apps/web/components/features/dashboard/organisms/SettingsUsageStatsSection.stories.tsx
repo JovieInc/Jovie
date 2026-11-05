@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { useLayoutEffect, useState } from 'react';
+import SettingsUsagePage from '@/app/app/(shell)/settings/usage/page';
 import { queryKeys } from '@/lib/queries/keys';
 import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
 import { SettingsUsageStatsSection } from './SettingsUsageStatsSection';
@@ -167,4 +168,17 @@ export const FailedRetry: Story = {
       <SettingsUsageStatsSection />
     </UsageStoryProvider>
   ),
+};
+
+export const UsagePage: Story = {
+  render: () => (
+    <UsageStoryProvider usage={baseUsage}>
+      <SettingsUsagePage />
+    </UsageStoryProvider>
+  ),
+};
+
+export const UsagePageLight: Story = {
+  ...UsagePage,
+  parameters: { themes: { themeOverride: 'light' } },
 };

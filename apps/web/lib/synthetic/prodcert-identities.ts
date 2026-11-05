@@ -1,5 +1,6 @@
 import { DEFAULT_DEV_TEST_AUTH_EMAILS } from '@/lib/auth/dev-test-auth-identity';
 import { normalizeEmail } from '@/lib/utils/email';
+import { isAdmittedCanaryEmail } from './admitted-canary-fixture';
 
 /**
  * Production certification canary identities (JOV-9625).
@@ -19,6 +20,8 @@ import { normalizeEmail } from '@/lib/utils/email';
  *     only for the admin certifications-inventory readback (JOV-9625
  *     outcome rework). It never acts as a creator: no passage-token mint
  *     scopes target it, and the readback refuses to write.
+ *   - the admitted canary (`admitted-canary-fixture.ts`), the one permanent
+ *     admitted identity with a live profile (exact address only).
  *
  * The OTP reader and the passage token both refuse every other address.
  */
@@ -57,7 +60,8 @@ export function isProdcertCanaryEmail(
     normalized === PRODCERT_RETURNING_CANARY_EMAIL ||
     normalized === PRODCERT_ADMIN_READBACK_EMAIL ||
     normalized === PRODCERT_CHAT_HEALTH_CANARY_EMAIL ||
-    PRODCERT_NEW_USER_EMAIL_PATTERN.test(normalized)
+    PRODCERT_NEW_USER_EMAIL_PATTERN.test(normalized) ||
+    isAdmittedCanaryEmail(normalized)
   );
 }
 

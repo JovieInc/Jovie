@@ -132,15 +132,17 @@ describe('runTrackDailySnapshots', () => {
 });
 
 describe('contract helpers', () => {
-  it('defaults the allowlist to tim and honours overrides', () => {
-    expect(resolveTrackSnapshotUsernames(undefined)).toEqual(['tim']);
+  it('requires an explicit allowlist and honours overrides', () => {
+    expect(resolveTrackSnapshotUsernames('')).toEqual([]);
     expect(resolveTrackSnapshotUsernames(' Tim, ,Other ')).toEqual([
       'tim',
       'other',
     ]);
   });
-  it('is on unless explicitly switched off', () => {
-    expect(isTrackDailySnapshotsEnabled(undefined)).toBe(true);
+  it('requires explicit activation', () => {
+    expect(isTrackDailySnapshotsEnabled('')).toBe(false);
+    expect(isTrackDailySnapshotsEnabled('true')).toBe(true);
+    expect(isTrackDailySnapshotsEnabled('typo')).toBe(false);
     expect(isTrackDailySnapshotsEnabled('false')).toBe(false);
   });
   it('parses YouTube ids from the common URL shapes', () => {
