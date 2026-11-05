@@ -80,7 +80,7 @@ describe('release share image disclosure', () => {
     mocks.content.mockResolvedValue(null);
     await render();
     const [node, options] = mocks.response.mock.calls[0];
-    expect(renderedText(node)).toContain('Release unavailable');
+    expect(renderedText(node)).toContain('Release not found');
     expect(renderedText(node)).not.toMatch(/maya-vale|Midnight Signal/i);
     expect(options).toMatchObject({
       status: 404,
@@ -93,7 +93,7 @@ describe('release share image disclosure', () => {
     mocks.creator.mockResolvedValue(null);
     await render();
     const [node, options] = mocks.response.mock.calls[0];
-    expect(renderedText(node)).toContain('Release unavailable');
+    expect(renderedText(node)).toContain('Release not found');
     expect(options).toMatchObject({ status: 404 });
   });
 

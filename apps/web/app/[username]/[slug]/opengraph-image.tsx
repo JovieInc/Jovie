@@ -72,7 +72,7 @@ export default async function Image({
   try {
     font = await loadSatoshiFont();
   } catch {
-    return new Response('Preview unavailable', {
+    return new Response('Preview not ready — try again', {
       status: 503,
       headers: HEADERS,
     });
@@ -99,7 +99,7 @@ export default async function Image({
     ? isMystery
       ? `New music from ${artistName}`
       : resolved.content.title
-    : 'Release unavailable';
+    : 'Release not found';
   const urlText = resolved
     ? buildDisplayUrl(
         `/${resolved.creator.usernameNormalized}/${resolved.content.slug}`
