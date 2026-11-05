@@ -102,7 +102,6 @@ vi.mock('sonner', () => ({
     dismiss: vi.fn(),
   }),
 }));
-
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/hooks/useImportPolling',
   () => ({
@@ -579,6 +578,7 @@ describe('ShellReleasesView', () => {
 
     renderShell([fakeRelease({ id: 'release-2', title: 'Already linked' })], {
       spotifyConnected: true,
+      appleMusicConnected: true,
     });
 
     expect(
