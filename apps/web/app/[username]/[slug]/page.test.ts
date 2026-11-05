@@ -351,7 +351,9 @@ describe('release share metadata (JOV-9626)', () => {
     // and twitter:image.
     expect(metadata.openGraph?.images).toBeUndefined();
     expect(metadata.twitter?.images).toBeUndefined();
-    expect(metadata.twitter?.card).toBe('summary_large_image');
+    expect(metadata.twitter).toMatchObject({
+      card: 'summary_large_image',
+    });
     expect(metadata.openGraph?.title).toContain('Midnight Signal');
     expect(metadata.openGraph?.title).toContain('Tim White');
   });
