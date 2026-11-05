@@ -12,8 +12,7 @@
  * biome/typecheck red does not pay for structural Playwright. Cheap lanes
  * always run so one CI cycle reports every cheap failure instead of hiding
  * later lanes behind the first red one. Skipped lanes still emit a receipt.
- * Set CI_FAST_FAIL_FAST=false to run structural even after a failure. Local callers may omit the selector to
- * retain the all-lanes default.
+ * CI_FAST_FAIL_FAST=false retains structural after failures; no selector runs all lanes.
  *
  * Usage:
  *   node scripts/ci-fast-lanes.mjs [with CI_FAST_LANE_GROUP=<group>]
@@ -1003,6 +1002,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/evals/summer-ops-card-copy.test.mjs',
   'scripts/buyer-eval/buyer-eval.test.mjs',
   'scripts/buyer-eval/gate.test.mjs',
+  'scripts/queue-dequeue.test.mjs',
   'scripts/fleet-audit/import-github-audit.test.mjs',
   'scripts/golden-path-walk/latency-gate.test.mjs',
   'scripts/positioning/positioning.test.mjs',
