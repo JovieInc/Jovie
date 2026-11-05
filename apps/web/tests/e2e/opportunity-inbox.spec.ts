@@ -14,7 +14,7 @@ test.use({ storageState: { cookies: [], origins: [] } });
 test.describe('Opportunity Inbox', () => {
   test('authenticated home renders the opportunity queue', async ({ page }) => {
     await setTestAuthBypassSession(page, 'creator-ready');
-    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD, {
+    await smokeNavigateWithRetry(page, APP_ROUTES.INBOX, {
       waitUntil: 'domcontentloaded',
     });
 
@@ -40,7 +40,7 @@ test.describe('Opportunity Inbox', () => {
       page,
     }) => {
       await setTestAuthBypassSession(page, persona);
-      await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD, {
+      await smokeNavigateWithRetry(page, APP_ROUTES.INBOX, {
         waitUntil: 'domcontentloaded',
       });
       await expect(page.getByTestId('opportunity-inbox-page')).toBeVisible({

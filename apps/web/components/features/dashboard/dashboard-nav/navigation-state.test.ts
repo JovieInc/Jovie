@@ -13,9 +13,12 @@ describe('isNavigationItemActive', () => {
   it('keeps Home scoped to the shell root', () => {
     const params = new URLSearchParams();
 
+    expect(isNavigationItemActive(homeNavItem, APP_ROUTES.INBOX, params)).toBe(
+      true
+    );
     expect(
       isNavigationItemActive(homeNavItem, APP_ROUTES.DASHBOARD, params)
-    ).toBe(true);
+    ).toBe(false);
     expect(isNavigationItemActive(homeNavItem, APP_ROUTES.CHAT, params)).toBe(
       false
     );

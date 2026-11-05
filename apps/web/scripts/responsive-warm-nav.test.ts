@@ -32,7 +32,7 @@ describe('resolveResponsiveWarmNavMeasurement', () => {
       'audience',
     ]);
     expect(canonicalSidebarNavigation.map(item => item.href)).toEqual([
-      APP_ROUTES.DASHBOARD,
+      APP_ROUTES.INBOX,
       APP_ROUTES.PRESENCE,
       APP_ROUTES.LIBRARY,
       APP_ROUTES.CONTACTS_AUDIENCE,

@@ -80,7 +80,7 @@ export const APP_SCREEN_CANVAS_EXCEPTIONS: Readonly<
 > = {
   // Source-bound legacy state on current main. The Inbox convergence slice
   // removes this allowance together with the nested PageShell occurrence.
-  'apps/web/app/app/(shell)/page.tsx': screenOwned({
+  'apps/web/app/app/(shell)/inbox/page.tsx': screenOwned({
     source:
       'apps/web/components/features/opportunity-inbox/OpportunityInboxPageClient.tsx',
     component: 'PageShell',

@@ -2,16 +2,16 @@ import type { Metadata } from 'next';
 import { OnboardingInterviewModal } from '@/components/onboarding/OnboardingInterviewModal';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState } from '@/lib/queries/server';
-import { OpportunityInboxRoute } from './OpportunityInboxRoute';
+import { DeferredChatPageClient } from './chat/DeferredChatPageClient';
 
-const DASHBOARD_DESCRIPTION =
-  'Review Jovie suggestions, approve actions, and send feedback from your inbox.';
-const DASHBOARD_TITLE = 'Home';
+const HOME_DESCRIPTION =
+  'Ask Jovie anything. Your composer and live canvas are one tap away.';
+const HOME_TITLE = 'Home';
 
 export function generateMetadata(): Metadata {
   return {
-    title: DASHBOARD_TITLE,
-    description: DASHBOARD_DESCRIPTION,
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
   };
 }
 
@@ -27,18 +27,21 @@ function readFirstParam(
   return Array.isArray(value) ? value[0] : value;
 }
 
+/**
+ * Home is agent-first: the chat composer with the live canvas above it, the
+ * same primitive as /app/chat. The opportunity inbox lives at /app/inbox;
+ * legacy /app?view=… links are redirected there in next.config.js.
+ */
 export default async function AppRootPage({
   searchParams,
 }: AppRootPageProps = {}) {
   const params = (await searchParams) ?? {};
-  const interviewRequested = readFirstParam(params.interview) === '1';
-
   return (
     <HydrateClient state={getDehydratedState()}>
-      <OpportunityInboxRoute
-        initialView={readFirstParam(params.view) === 'done' ? 'done' : 'needs'}
+      <DeferredChatPageClient />
+      <OnboardingInterviewModal
+        initialRequested={readFirstParam(params.interview) === '1'}
       />
-      <OnboardingInterviewModal initialRequested={interviewRequested} />
     </HydrateClient>
   );
 }

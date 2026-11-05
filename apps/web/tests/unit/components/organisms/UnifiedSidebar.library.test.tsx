@@ -335,7 +335,7 @@ describe('UnifiedSidebar library route', () => {
     );
     expect(screen.getByRole('link', { name: 'Inbox' })).toHaveAttribute(
       'href',
-      '/app'
+      '/app/inbox'
     );
   });
 

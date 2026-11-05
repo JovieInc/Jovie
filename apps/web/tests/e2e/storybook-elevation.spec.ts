@@ -616,7 +616,7 @@ test.describe('central runtime notifications', () => {
     ).toBeDisabled();
     await expect(
       page.getByRole('link', { name: 'Inbox — App Update Available' })
-    ).toHaveAttribute('href', '/app');
+    ).toHaveAttribute('href', '/app/inbox');
     await page.evaluate(() =>
       (window as unknown as { downloaded: () => void }).downloaded()
     );
@@ -647,7 +647,7 @@ test.describe('sidebar attention and Settings header', () => {
         name: 'Inbox',
         exact: true,
       })
-    ).toHaveAttribute('href', '/app');
+    ).toHaveAttribute('href', '/app/inbox');
     await expect(page.locator('[data-sidebar-search-divider]')).toHaveCount(0);
   });
 
@@ -775,7 +775,7 @@ test.describe('sidebar attention and Settings header', () => {
       const row = page.locator('[data-sidebar-brand-row]');
       const inbox = page.getByRole('link', { name: /Inbox —/ });
       const search = page.getByRole('button', { name: 'Search Jovie' });
-      await expect(inbox).toHaveAttribute('href', '/app');
+      await expect(inbox).toHaveAttribute('href', '/app/inbox');
       await expect(search).toHaveCount(1);
       await expect(row).toContainText('Jovie');
       const bellBox = (await inbox.boundingBox())!;
@@ -788,7 +788,7 @@ test.describe('sidebar attention and Settings header', () => {
       // Current navigation groups Calendar within Work. Preserve every
       // canonical destination exposed by this default-flags story.
       for (const [name, href] of [
-        ['Inbox', '/app'],
+        ['Inbox', '/app/inbox'],
         ['Work', '/app/library'],
         ['Audience', '/app/contacts?tab=audience'],
         // JOV-7733 retired the Identity rollout gate, so it is part of the

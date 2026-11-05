@@ -112,7 +112,7 @@ describe('performance route manifest', () => {
       expect(route?.warmupStrategy).toBe('authenticated-shell');
       expect(route?.warmNavigationStartPath).not.toBe(item.href);
       if (item.id === 'home') {
-        // /app is shared with the header inbox bell. The warm probe must
+        // /app/inbox is shared with the header inbox bell. The warm probe must
         // click the rail item, which carries navigation id `home`.
         expect(route?.readySelectors.navTrigger).toEqual([
           '[data-navigation-item-id="home"]',
@@ -146,7 +146,7 @@ describe('performance route manifest', () => {
       route => route.id === 'creator-release-tasks'
     );
 
-    expect(appHome?.path).toBe(APP_ROUTES.DASHBOARD);
+    expect(appHome?.path).toBe(APP_ROUTES.INBOX);
     expect(appHome?.readySelectors.content).toEqual([
       '[data-testid="opportunity-inbox-page"]',
     ]);

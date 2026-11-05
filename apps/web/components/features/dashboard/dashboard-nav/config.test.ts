@@ -15,7 +15,7 @@ import {
 } from './config';
 
 const CANONICAL_NAVIGATION = [
-  ['home', 'Inbox', APP_ROUTES.DASHBOARD],
+  ['home', 'Inbox', APP_ROUTES.INBOX],
   ['presence', 'Identity', APP_ROUTES.PRESENCE],
   ['library', 'Work', APP_ROUTES.LIBRARY],
   ['audience', 'Audience', APP_ROUTES.CONTACTS_AUDIENCE],

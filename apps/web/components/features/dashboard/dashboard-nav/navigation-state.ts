@@ -44,7 +44,7 @@ export function isNavigationItemActive(
   const normalizedPathname = normalizePathname(pathname);
 
   if (item.id === 'home') {
-    return normalizedPathname === APP_ROUTES.DASHBOARD;
+    return normalizedPathname === APP_ROUTES.INBOX;
   }
 
   if (item.id === 'library' && isLibraryNavigationRoute(pathname)) {

@@ -18,7 +18,7 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
 }));
 
 const CANONICAL_NAV = [
-  ['Inbox', APP_ROUTES.DASHBOARD],
+  ['Inbox', APP_ROUTES.INBOX],
   ['Identity', APP_ROUTES.PRESENCE],
   ['Work', APP_ROUTES.LIBRARY],
   ['Audience', APP_ROUTES.CONTACTS_AUDIENCE],
@@ -152,7 +152,7 @@ describe('DashboardNav', () => {
   });
 
   it('gives Home sole current-page ownership at the shell root', () => {
-    mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+    mockUsePathname.mockReturnValue(APP_ROUTES.INBOX);
     renderDashboardNav({
       renderFn: fastRender,
       overrides: {

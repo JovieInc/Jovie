@@ -13,26 +13,23 @@ vi.mock('@/lib/queries/HydrateClient', () => ({
   HydrateClient: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 vi.mock('@/lib/queries/server', () => ({ getDehydratedState: () => ({}) }));
-vi.mock('./OpportunityInboxRoute', () => ({
-  OpportunityInboxRoute: ({ initialView }: { initialView: string }) => (
-    <span data-testid='inbox-view'>{initialView}</span>
-  ),
+vi.mock('./chat/DeferredChatPageClient', () => ({
+  DeferredChatPageClient: () => <span data-testid='chat-home' />,
 }));
 
 import AppRootPage from './page';
 
-describe('Inbox direct route', () => {
-  it('opens Done for you from its permanent history destination while preserving the interview entry', async () => {
-    render(
-      await AppRootPage({
-        searchParams: Promise.resolve({ view: 'done', interview: '1' }),
-      })
-    );
-    expect(screen.getByTestId('inbox-view')).toHaveTextContent('done');
-    expect(screen.getByTestId('interview')).toHaveTextContent('true');
-  });
-  it('defaults the signed-in home to Needs you', async () => {
+describe('App Home', () => {
+  it('opens on the chat composer, not the inbox empty state', async () => {
     render(await AppRootPage());
-    expect(screen.getByTestId('inbox-view')).toHaveTextContent('needs');
+    expect(screen.getByTestId('chat-home')).toBeInTheDocument();
+    expect(screen.getByTestId('interview')).toHaveTextContent('false');
+  });
+
+  it('keeps the interview entry on Home', async () => {
+    render(
+      await AppRootPage({ searchParams: Promise.resolve({ interview: '1' }) })
+    );
+    expect(screen.getByTestId('interview')).toHaveTextContent('true');
   });
 });

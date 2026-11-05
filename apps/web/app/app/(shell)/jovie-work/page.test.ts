@@ -14,7 +14,7 @@ describe('legacy work history destination', () => {
     }
     expect(redirectError).toHaveProperty(
       'digest',
-      'NEXT_REDIRECT;replace;/app?view=done;308;'
+      'NEXT_REDIRECT;replace;/app/inbox?view=done;308;'
     );
   });
 });

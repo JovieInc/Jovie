@@ -128,7 +128,7 @@ describe('DashboardMobileTabs', () => {
       EXPANDED_LABELS
     );
     expect(links.slice(0, 4).map(link => link.getAttribute('href'))).toEqual([
-      APP_ROUTES.DASHBOARD,
+      APP_ROUTES.INBOX,
       APP_ROUTES.PRESENCE,
       APP_ROUTES.LIBRARY,
       APP_ROUTES.CONTACTS_AUDIENCE,
@@ -250,7 +250,7 @@ describe('DashboardMobileTabs', () => {
     ).not.toHaveAttribute('aria-current');
     chat.unmount();
 
-    mockPathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+    mockPathname.mockReturnValue(APP_ROUTES.INBOX);
     render(<DashboardMobileTabs />);
     const homeTabs = screen.getByRole('navigation', {
       name: 'Dashboard Tabs',
