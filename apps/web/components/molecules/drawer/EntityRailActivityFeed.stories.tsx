@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { ActivityFeed } from './ActivityFeed';
 import { drawerStoryFrame, ACTIVITY_ITEMS as ITEMS } from './drawer.fixtures';
+import { EntityRailActivityFeed } from './EntityRailActivityFeed';
 
 const meta = {
-  title: 'Molecules/Drawer/ActivityFeed',
-  component: ActivityFeed,
+  title: 'Molecules/Drawer/EntityRailActivityFeed',
+  component: EntityRailActivityFeed,
   parameters: {
     layout: 'centered',
   },
@@ -12,7 +12,7 @@ const meta = {
   args: {
     items: ITEMS,
   },
-} satisfies Meta<typeof ActivityFeed>;
+} satisfies Meta<typeof EntityRailActivityFeed>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

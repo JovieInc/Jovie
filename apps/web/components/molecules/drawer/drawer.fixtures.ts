@@ -1,6 +1,6 @@
 import type { Decorator } from '@storybook/nextjs-vite';
 import { createElement, type KeyboardEvent } from 'react';
-import type { EntityRailActivityItem } from './ActivityFeed';
+import type { EntityRailActivityItem } from './EntityRailActivityFeed';
 import type { RightDrawerProps } from './RightDrawer';
 
 export function drawerStoryFrame(className: string, dir?: 'rtl'): Decorator {
@@ -24,7 +24,7 @@ export const MockRightDrawer = (
     props.children
   );
 
-// A fixed clock in ActivityFeed.test.tsx keeps calendar groups deterministic.
+// A fixed clock in EntityRailActivityFeed.test.tsx keeps calendar groups deterministic.
 export const ACTIVITY_ITEMS: readonly EntityRailActivityItem[] = [
   ['Tim White', 'edited', 'Midnight Drive', '2026-01-15T01:05:00Z'],
   ['Jovie', 'linked', 'Spotify', '2026-01-15T09:00:00Z'],

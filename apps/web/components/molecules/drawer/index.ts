@@ -1,9 +1,4 @@
 export {
-  ActivityFeed,
-  type ActivityFeedProps,
-  type EntityRailActivityItem,
-} from './ActivityFeed';
-export {
   CollapsibleSectionHeading,
   type CollapsibleSectionHeadingProps,
 } from './CollapsibleSectionHeading';
@@ -146,6 +141,11 @@ export {
   type EntityRailProperty,
   type EntityRailProps,
 } from './EntityRail';
+export {
+  EntityRailActivityFeed,
+  type EntityRailActivityFeedProps,
+  type EntityRailActivityItem,
+} from './EntityRailActivityFeed';
 export {
   EntitySidebarShell,
   type EntitySidebarShellProps,

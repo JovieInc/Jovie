@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
-import { ActivityFeed } from './ActivityFeed';
 import { ACTIVITY_ITEMS as ITEMS } from './drawer.fixtures';
+import { EntityRailActivityFeed } from './EntityRailActivityFeed';
 
-describe('ActivityFeed', () => {
+describe('EntityRailActivityFeed', () => {
   beforeEach(() => {
     vi.stubEnv('TZ', 'America/Los_Angeles');
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -15,7 +15,7 @@ describe('ActivityFeed', () => {
     vi.unstubAllEnvs();
   });
   it('time-groups items into Today, Yesterday, and dated groups', async () => {
-    const { container } = render(<ActivityFeed items={ITEMS} />);
+    const { container } = render(<EntityRailActivityFeed items={ITEMS} />);
     const today = screen
       .getByTestId('entity-rail-activity-feed')
       .querySelector('[data-activity-group="Today"]');
@@ -37,7 +37,7 @@ describe('ActivityFeed', () => {
   });
 
   it('renders one quiet line per item: actor, verb, object', () => {
-    render(<ActivityFeed items={[ITEMS[0]]} />);
+    render(<EntityRailActivityFeed items={[ITEMS[0]]} />);
     expect(screen.getByText('Tim White')).toBeInTheDocument();
     expect(screen.getByText('Midnight Drive')).toBeInTheDocument();
     expect(screen.getByTestId('entity-rail-activity-item')).toHaveTextContent(
@@ -46,7 +46,7 @@ describe('ActivityFeed', () => {
   });
 
   it('keeps tabular time labels on the quiet tertiary scale', () => {
-    render(<ActivityFeed items={[ITEMS[0]]} />);
+    render(<EntityRailActivityFeed items={[ITEMS[0]]} />);
     const time = screen
       .getByTestId('entity-rail-activity-item')
       ?.querySelector('span');
@@ -55,7 +55,7 @@ describe('ActivityFeed', () => {
   });
 
   it('shows the quiet empty state when there is no activity', async () => {
-    const { container } = render(<ActivityFeed items={[]} />);
+    const { container } = render(<EntityRailActivityFeed items={[]} />);
     expect(screen.getByTestId('entity-rail-activity-feed')).toHaveTextContent(
       'No activity yet.'
     );

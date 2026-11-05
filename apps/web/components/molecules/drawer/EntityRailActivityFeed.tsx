@@ -12,7 +12,7 @@ export interface EntityRailActivityItem {
   readonly at: string | Date;
 }
 
-export interface ActivityFeedProps {
+export interface EntityRailActivityFeedProps {
   readonly items: readonly EntityRailActivityItem[];
   readonly className?: string;
   readonly 'data-testid'?: string;
@@ -69,11 +69,11 @@ function groupByDay(items: readonly EntityRailActivityItem[]): ActivityGroup[] {
 }
 
 /** Time-grouped activity shared by entity rails. */
-export function ActivityFeed({
+export function EntityRailActivityFeed({
   items,
   className,
   'data-testid': testId,
-}: ActivityFeedProps) {
+}: EntityRailActivityFeedProps) {
   if (items.length === 0) {
     return (
       <DrawerInlineNote

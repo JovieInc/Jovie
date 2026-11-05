@@ -8,10 +8,13 @@ import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
-import { ActivityFeed, type EntityRailActivityItem } from './ActivityFeed';
 import { DrawerPropertyRow } from './DrawerPropertyRow';
 import { DrawerTabs } from './DrawerTabs';
 import { EntityHeader } from './EntityHeader';
+import {
+  EntityRailActivityFeed,
+  type EntityRailActivityItem,
+} from './EntityRailActivityFeed';
 import { EntitySidebarShell } from './EntitySidebarShell';
 import {
   ENTITY_RAIL_OVERVIEW_TAB_ID,
@@ -172,7 +175,7 @@ export function EntityRail({
       ) : null}
       {activityItems && activityItems.length > 0 ? (
         <div className='space-y-1'>
-          <ActivityFeed
+          <EntityRailActivityFeed
             items={activityItems.slice(0, ACTIVITY_PREVIEW_LIMIT)}
           />
           {hasActivityTab ? (

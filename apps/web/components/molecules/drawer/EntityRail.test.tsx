@@ -76,7 +76,11 @@ describe('EntityRail entity table', () => {
   it('fixes one rail width with wide as the only variant, never a numeric literal in the template', () => {
     expect(RAIL_WIDTH).toBe(360);
     expect(RAIL_WIDTH_WIDE).toBe(480);
-    for (const file of ['EntityRail.tsx', 'StatRow.tsx', 'ActivityFeed.tsx']) {
+    for (const file of [
+      'EntityRail.tsx',
+      'StatRow.tsx',
+      'EntityRailActivityFeed.tsx',
+    ]) {
       const source = readSource(file);
       expect(source, `${file} must not hardcode rail widths`).not.toMatch(
         /width=\{\d+\}/
