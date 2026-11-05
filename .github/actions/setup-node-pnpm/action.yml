@@ -266,6 +266,10 @@ runs:
           -o -name '@anthropic-ai+claude-agent-sdk-linux-*' \) \
           -exec find {}/node_modules -type f ! -name package.json -delete \;
 
+    - name: Prepare browser contracts for remote preflight
+      if: github.workflow == 'Preflight Remote'
+      uses: ./.github/actions/setup-playwright
+
     - name: Stamp installed workspace receipt
       if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && runner.environment == 'github-hosted' && inputs.package_cache == 'true' && !(github.event_name == 'merge_group' && inputs.reuse_merge_group_workspace == 'true')
       shell: bash
