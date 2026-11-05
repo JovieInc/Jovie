@@ -2,14 +2,13 @@
 import { getArtworkRadiusPx } from '@/components/atoms/ArtworkFrame';
 import palette from '@/design/oklch-palette.json';
 
-import type { ProfileShareImage } from './profile-card';
-
 /** Display-only composition; source imagery is never cropped, masked or overlaid. */
 export function renderReleaseShareCard(params: {
   readonly title: string;
   readonly artistName: string;
   readonly urlText: string;
-  readonly image?: ProfileShareImage | null;
+  /** Artwork as a satori-decodable data URL (see `toDataUrl`), null renders a quiet placeholder tile. */
+  readonly image?: string | null;
 }) {
   // Long titles keep the full column before reducing type size. The page
   // metadata retains the complete title when a host omits or crops the bitmap.
@@ -42,10 +41,10 @@ export function renderReleaseShareCard(params: {
           }}
         >
           <img
-            src={params.image.dataUrl}
+            src={params.image}
             alt={params.title}
-            width={params.image.width}
-            height={params.image.height}
+            width={518}
+            height={518}
             style={{ objectFit: 'cover' }}
           />
         </div>

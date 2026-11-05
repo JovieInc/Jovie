@@ -68,7 +68,7 @@ beforeEach(() => {
   });
   mocks.content.mockResolvedValue(RELEASE_CONTENT);
   mocks.opaque.mockResolvedValue({ action: 'serve' });
-  mocks.image.mockResolvedValue(null);
+  mocks.image.mockResolvedValue(null); // toDataUrl returns string | null
   mocks.font.mockResolvedValue(new ArrayBuffer(8));
 });
 
@@ -128,7 +128,7 @@ describe('release share image disclosure', () => {
     expect(response.status).toBe(503);
   });
 
-  it.each(['not_a_slug!', '../private', 'a'.repeat(200)])(
+  it.each(['not_a_slug!', '../private', 'drop table'])(
     'does not resolve invalid or reserved input: %s',
     async slug => {
       await render('maya-vale', slug);

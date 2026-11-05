@@ -688,18 +688,6 @@ export async function generateMetadata({
   );
 
   const ogType = content.type === 'release' ? 'music.album' : 'music.song';
-  // Branded share card served by the collocated opengraph-image route.
-  // Mystery releases keep the artwork/title suppression via `ogImage: null`;
-  // the file-based route still renders a mystery-safe card for those pages.
-  const ogImage = isMystery
-    ? null
-    : {
-        url: `/${creator.usernameNormalized}/${content.slug}/opengraph-image`,
-        width: 1200,
-        height: 630,
-        type: 'image/png',
-      };
-  const artworkAlt = `${content.title} ${contentType} artwork`;
   const ogTitle = isMystery
     ? `New music from ${artistName}`
     : `${content.title} by ${artistName}`;
@@ -725,32 +713,16 @@ export async function generateMetadata({
       url: canonicalUrl,
       siteName: 'Jovie',
       locale: 'en_US',
-      ...(ogImage && {
-        images: [
-          {
-            url: ogImage.url,
-            width: ogImage.width,
-            height: ogImage.height,
-            alt: artworkAlt,
-            type: ogImage.type,
-          },
-        ],
-      }),
+      // No `images` here: the collocated opengraph-image route serves the
+      // branded 1200x630 share card and file-based metadata wins whenever the
+      // object omits its images.
     },
     twitter: {
-      card: ogImage ? 'summary_large_image' : 'summary',
+      card: 'summary_large_image',
       title: ogTitle,
       description,
       creator: COMPANY_IDENTITY.xHandle,
       site: COMPANY_IDENTITY.xHandle,
-      ...(ogImage && {
-        images: [
-          {
-            url: ogImage.url,
-            alt: artworkAlt,
-          },
-        ],
-      }),
     },
     other: {
       'music:musician': `${BASE_URL}/${creator.usernameNormalized}`,
