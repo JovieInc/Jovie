@@ -1,9 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import {
   appendFileSync,
+  existsSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
+  renameSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -15,6 +17,11 @@ import type { ProductShotSpec } from '../../lib/screenshots/product-shots';
 import { PRODUCT_SHOT_MAX_BYTES } from './plan';
 import { cropBox, renderShot } from './render';
 import { hashShotSources } from './source-hash.mjs';
+
+vi.mock('node:fs', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return { ...actual, renameSync: vi.fn(actual.renameSync) };
+});
 
 function fakePage(png: Buffer, size = 8) {
   const locator = {
@@ -122,15 +129,24 @@ describe('product-shot renderer operational paths', () => {
     ).rejects.toThrow();
   });
 
-  it.each(['second encoder', 'budget', 'missing source'])(
-    'preserves the prior image pair and metadata after %s failure',
+  it.each([
+    'second encoder',
+    'budget',
+    'missing source',
+    'second rename',
+    'second rename without prior pair',
+    'rollback failure',
+  ])(
+    'keeps prior image data recoverable and metadata unchanged after %s failure',
     async failure => {
       const root = mkdtempSync(join(tmpdir(), 'shot-transaction-'));
       writeFileSync(join(root, 'source.ts'), 'fixture source\n');
       const oldAvif = Buffer.from('previous avif');
       const oldWebp = Buffer.from('previous webp');
-      writeFileSync(join(root, spec.id + '.avif'), oldAvif);
-      writeFileSync(join(root, spec.id + '.webp'), oldWebp);
+      if (failure !== 'second rename without prior pair') {
+        writeFileSync(join(root, spec.id + '.avif'), oldAvif);
+        writeFileSync(join(root, spec.id + '.webp'), oldWebp);
+      }
       const metadata = resolve('lib/screenshots/product-shots.manifest.json');
       const beforeMetadata = readFileSync(metadata);
       const png = await sharp({
@@ -139,7 +155,22 @@ describe('product-shot renderer operational paths', () => {
         .png()
         .toBuffer();
       const { page } = fakePage(png);
+      const realFs = await vi.importActual<typeof import('node:fs')>('node:fs');
       const original = sharp.prototype.toFile;
+      if (
+        failure.startsWith('second rename') ||
+        failure === 'rollback failure'
+      ) {
+        vi.mocked(renameSync)
+          .mockImplementationOnce(realFs.renameSync)
+          .mockImplementationOnce(() => {
+            throw new Error('second rename failed');
+          });
+        if (failure === 'rollback failure')
+          vi.mocked(renameSync).mockImplementationOnce(() => {
+            throw new Error('rollback rename failed');
+          });
+      }
       const mock =
         failure === 'second encoder'
           ? vi.spyOn(sharp.prototype, 'webp').mockImplementationOnce(() => {
@@ -177,14 +208,27 @@ describe('product-shot renderer operational paths', () => {
             { outDir: root, repoRoot: root }
           )
         ).rejects.toThrow();
-        expect(readFileSync(join(root, spec.id + '.avif'))).toEqual(oldAvif);
-        expect(readFileSync(join(root, spec.id + '.webp'))).toEqual(oldWebp);
+        const staging = readdirSync(root).filter(name =>
+          name.startsWith('.product-shot-')
+        );
+        if (failure === 'second rename without prior pair') {
+          expect(existsSync(join(root, spec.id + '.avif'))).toBe(false);
+          expect(existsSync(join(root, spec.id + '.webp'))).toBe(false);
+        } else if (failure === 'rollback failure') {
+          expect(staging).toHaveLength(1);
+          expect(
+            readFileSync(join(root, staging[0], spec.id + '.avif.previous'))
+          ).toEqual(oldAvif);
+          expect(readFileSync(join(root, spec.id + '.webp'))).toEqual(oldWebp);
+        } else {
+          expect(readFileSync(join(root, spec.id + '.avif'))).toEqual(oldAvif);
+          expect(readFileSync(join(root, spec.id + '.webp'))).toEqual(oldWebp);
+        }
         expect(readFileSync(metadata)).toEqual(beforeMetadata);
-        expect(
-          readdirSync(root).filter(name => name.startsWith('.product-shot-'))
-        ).toEqual([]);
+        if (failure !== 'rollback failure') expect(staging).toEqual([]);
       } finally {
         mock?.mockRestore();
+        vi.mocked(renameSync).mockReset().mockImplementation(realFs.renameSync);
       }
     }
   );
