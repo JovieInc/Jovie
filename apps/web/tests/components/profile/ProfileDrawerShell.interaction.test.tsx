@@ -223,7 +223,8 @@ describe('ProfileDrawerShell keyboard modal contract', () => {
       const first = screen.getByRole('button', { name: 'Share Profile' });
       const last = screen.getByRole('button', { name: 'Pay' });
       expect(first).toHaveFocus();
-      last.focus();
+      await user.tab();
+      expect(last).toHaveFocus();
       fireEvent.keyDown(document, { key: 'Tab' });
       expect(first).toHaveFocus();
       first.focus();

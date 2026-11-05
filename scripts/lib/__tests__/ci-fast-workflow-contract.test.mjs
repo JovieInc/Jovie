@@ -58,9 +58,9 @@ import {
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
 import { buildWebVitestFastArgs } from '../ci-web-vitest-fast-args.mjs';
 import { defineStorybookBrowserSelectionTests } from './ci-storybook-browser-selection.cases.mjs';
+import { assertProfileClaimProof } from './profile-claim-proof.support.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
-
 // JOV-6837: the structural control paths are data, one ERE alternative per line.
 const STRUCTURAL_CONTROL_PATHS = readFileSync(
   resolve(REPO_ROOT, '.github/ci-harness/structural-control-paths.ere'),
@@ -83,7 +83,6 @@ const CI_FAST_SOURCE = readFileSync(
 const PACKAGE_JSON = JSON.parse(
   readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8')
 );
-
 const HOSTED_GROUP_JOBS = [
   {
     jobId: 'ci-fast-typecheck',
@@ -881,6 +880,8 @@ describe('ci-fast bounded parallel workflow', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('registers mobile claim proof in web CI', assertProfileClaimProof);
 
   it('selects real Ovie privacy browser proof for its boundary and keeps combined coverage', () => {
     const remaining = jobBlock(
