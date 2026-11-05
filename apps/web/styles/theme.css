@@ -14,6 +14,7 @@
    collapses the top inset so the email field stays on screen. */
 [data-auth-shell] {
   padding: var(--space-6);
+  scroll-padding-block: var(--space-6);
   padding-left: max(var(--space-6), env(safe-area-inset-left));
   padding-right: max(var(--space-6), env(safe-area-inset-right));
   padding-bottom: max(var(--space-6), env(safe-area-inset-bottom));
