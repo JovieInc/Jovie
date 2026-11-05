@@ -4,6 +4,9 @@ Each collector returns {"value", "limit", "burnPerHour"?, "observedAt"?} or None
 (ops/registry/capacity-resources.json) picks one by `collector.type`. Split out of forecast.py
 (2026-11, size-500 guard): forecast.py owns the store/forecast/delivery loop and re-exports the
 names its CLI and tests use; collector tests patch THIS module's bindings.
+
+api-budget: github-user-core 4/hr - gh rate_limit and env secret counts via run_gh, a few reads per 15-30 min collector pass
+api-budget: neon-api 4/hr - month-to-date Neon usage reads, at most two calls per collector pass
 """
 from __future__ import annotations
 
