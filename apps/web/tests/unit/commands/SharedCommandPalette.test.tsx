@@ -156,7 +156,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       />
     );
 
-    expect(screen.getByText('No matches')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'No matches' })).toBeInTheDocument();
     expect(fuzzyMatch('SharedCommandPalette', 'palette')).toBe(true);
     expect(fuzzyMatch('SharedCommandPalette', 'missing')).toBe(false);
   });
