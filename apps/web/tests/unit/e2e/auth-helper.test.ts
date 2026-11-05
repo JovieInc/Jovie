@@ -1,13 +1,13 @@
 import type { Locator, Page } from '@playwright/test';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  describeShellReadyStall,
   fillControlledInputUntilEnabled,
   resolveBypassFallbackUserId,
   setTestAuthBypassSession,
   signInUser,
   waitForAuthenticatedHealth,
 } from '../../helpers/auth';
+import { describeShellReadyStall } from '../../helpers/shell-ready';
 
 describe('fillControlledInputUntilEnabled', () => {
   it('refills when hydration resets the first controlled value', async () => {
