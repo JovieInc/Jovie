@@ -245,33 +245,30 @@ export function ChatMerchOptionsCard({
                     className='object-cover'
                     unoptimized
                   />
+                ) : mockupFailed ? (
+                  // JOV-INV-046 hide treatment: a failed mockup renders a quiet
+                  // placeholder. The real reason rides the sellability line
+                  // under the card, so the tile never explains its own absence.
+                  <div
+                    data-testid='chat-merch-mockup-failed'
+                    aria-hidden='true'
+                    className='flex h-full w-full items-center justify-center text-tertiary-token'
+                  >
+                    <AlertTriangle className='h-6 w-6' strokeWidth={1.8} />
+                  </div>
                 ) : (
                   <div
-                    data-testid={
-                      mockupFailed
-                        ? 'chat-merch-mockup-failed'
-                        : 'chat-merch-mockup-fallback'
-                    }
+                    data-testid='chat-merch-mockup-fallback'
                     className='flex h-full w-full flex-col items-center justify-center gap-2 px-3 text-center text-tertiary-token'
                     role='status'
                   >
-                    {mockupFailed ? (
-                      <AlertTriangle
-                        className='h-6 w-6'
-                        strokeWidth={1.8}
-                        aria-hidden
-                      />
-                    ) : (
-                      <Loader2
-                        className='h-6 w-6 animate-spin'
-                        strokeWidth={1.8}
-                        aria-hidden
-                      />
-                    )}
+                    <Loader2
+                      className='h-6 w-6 animate-spin'
+                      strokeWidth={1.8}
+                      aria-hidden
+                    />
                     <span className='text-3xs font-medium'>
-                      {mockupFailed
-                        ? 'Preview unavailable'
-                        : 'Rendering mockup'}
+                      Rendering mockup
                     </span>
                   </div>
                 )}

@@ -69,20 +69,28 @@ function DesignArt({ design }: { readonly design: MerchDesignPreview }) {
   }
 
   const failed = design.mockup_status === 'mockup_failed';
+  if (failed) {
+    // JOV-INV-046 hide treatment: the tile keeps its footprint and the
+    // design name below carries the real content, so a failed mockup never
+    // explains its own absence.
+    return (
+      <div
+        data-testid='chat-merch-mockup-failed'
+        aria-hidden='true'
+        className='flex h-full items-center justify-center bg-surface-0 text-tertiary-token'
+      >
+        <AlertTriangle className='h-3.5 w-3.5' aria-hidden />
+      </div>
+    );
+  }
   return (
     <div
       className='flex h-full items-center justify-center bg-surface-0 px-3 text-center text-2xs text-tertiary-token'
       role='status'
-      data-testid={
-        failed ? 'chat-merch-mockup-failed' : 'chat-merch-mockup-fallback'
-      }
+      data-testid='chat-merch-mockup-fallback'
     >
-      {failed ? (
-        <AlertTriangle className='mr-2 h-3.5 w-3.5' aria-hidden />
-      ) : (
-        <Loader2 className='mr-2 h-3.5 w-3.5 animate-spin' aria-hidden />
-      )}
-      {failed ? 'Preview unavailable' : 'Rendering'}
+      <Loader2 className='mr-2 h-3.5 w-3.5 animate-spin' aria-hidden />
+      Rendering
     </div>
   );
 }

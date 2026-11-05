@@ -432,11 +432,28 @@ describe('SidebarThreadsSection', () => {
     );
 
     const errorRow = screen.getByText(
-      'Conversations unavailable'
+      "Conversations didn't load"
     ).parentElement;
     expect(errorRow).toHaveClass('h-(--app-shell-sidebar-row-height)');
     fireEvent.click(screen.getByRole('button', { name: 'Retry Chats' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the error row when no retry control is available', () => {
+    render(
+      <SidebarThreadsSection
+        threads={[]}
+        activeThreadId={null}
+        state='error'
+        collapsed={false}
+      />
+    );
+
+    // JOV-9672: without onRetry there is no working path, so the row hides
+    // instead of announcing an unavailable list.
+    expect(screen.queryByText("Conversations didn't load")).toBeNull();
+    expect(screen.queryByText('Conversations unavailable')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Retry Chats' })).toBeNull();
   });
 
   it('maps conversation status, unread state, and fallback titles deterministically', () => {

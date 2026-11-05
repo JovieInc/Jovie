@@ -58,4 +58,16 @@ describe('ChatOpsDataCard', () => {
     expect(screen.getByText(/Observed/)).toBeInTheDocument();
     expect(screen.getByText(/ubuntu-operational-truth/)).toBeInTheDocument();
   });
+
+  it('hides the observation footer when the payload has no timestamp or source', () => {
+    render(
+      <ChatOpsDataCard
+        card={{ ...card, observedAt: null, source: undefined }}
+      />
+    );
+
+    // JOV-9672: missing observation metadata never announces itself.
+    expect(screen.queryByText(/Observed/)).toBeNull();
+    expect(screen.queryByText('Observation time unavailable')).toBeNull();
+  });
 });
