@@ -36,10 +36,10 @@ import {
   livenessDecisions,
   livenessFingerprint,
   loadRegistry,
-  readPath,
   runStageEvents,
   validateRegistry,
 } from './lib/automation-registry.mjs';
+import { projectJsonHeartbeat } from './lib/json-heartbeat-receipt.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TIMEOUT_MS = 10_000;
@@ -181,27 +181,7 @@ export async function observeGithubWorkflow(
 
 /** A timestamp inside a JSON document (status feeds, health routes). */
 export async function observeJsonTimestamp(receipt, { fetchImpl }) {
-  const read = await readJson(fetchImpl, receipt.url);
-  if (!read.ok) return { ok: false, reason: `json-${read.reason}` };
-  const value = readPath(read.body, receipt.path);
-  if (value === undefined || value === null) {
-    return {
-      ok: true,
-      lastProofAt: null,
-      reason: `heartbeat-source-missing:${receipt.path}`,
-    };
-  }
-  if (receipt.okPath) {
-    const okValue = readPath(read.body, receipt.okPath);
-    if (!(receipt.okValues ?? ['verified', 'ok', true]).includes(okValue)) {
-      return {
-        ok: true,
-        lastProofAt: null,
-        reason: `heartbeat-not-ok:${receipt.okPath}=${String(okValue)}`,
-      };
-    }
-  }
-  return { ok: true, lastProofAt: value, url: receipt.url };
+  return projectJsonHeartbeat(receipt, await readJson(fetchImpl, receipt.url));
 }
 
 const PUSH_RUNS_PAGE = 100;
