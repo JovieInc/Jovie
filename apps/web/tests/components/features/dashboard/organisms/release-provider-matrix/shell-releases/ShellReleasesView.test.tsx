@@ -573,7 +573,7 @@ describe('ShellReleasesView', () => {
 
   it('keeps the settled no-banner release list mounted', () => {
     mockUseDspMatchesQuery.mockReturnValue({
-      data: [{ status: 'confirmed' }],
+      data: [],
       isLoading: false,
     });
 

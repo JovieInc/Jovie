@@ -413,8 +413,8 @@ export function SlashCommandMenu({
   attachmentActions,
   onQueryChange,
 }: SlashCommandMenuProps) {
-  const generatedListId = useId(),
-    listId = listIdProp ?? generatedListId;
+  const generatedListId = useId();
+  const listId = listIdProp ?? generatedListId;
   const filterInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (onQueryChange) filterInputRef.current?.focus();
@@ -446,7 +446,6 @@ export function SlashCommandMenu({
         },
       }));
   }, [hideAlbumArtSuggestions, promptActions, query, state.status]);
-
   // Map legacy SlashMenuItem sections → PickerItem sections for the shared
   // shell. The shape is structurally equivalent; the indirection just gates
   // the optionality.
