@@ -138,8 +138,12 @@ export function SmartLinkAudioPreview({
             />
           </div>
           <div className='flex h-3.5 items-center justify-between text-3xs tabular-nums text-secondary-token'>
-            <span className='min-w-8'>{currentTimeFormatted}</span>
-            <span className='min-w-12 text-right'>{durationSlot}</span>
+            <span className='min-w-8 text-secondary-token'>
+              {currentTimeFormatted}
+            </span>
+            <span className='min-w-12 text-right text-secondary-token'>
+              {durationSlot}
+            </span>
           </div>
         </div>
       </div>

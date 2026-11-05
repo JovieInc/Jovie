@@ -18,15 +18,18 @@ describe('ShippingVelocityChart', () => {
     );
   });
 
-  it('raises the closed-series toggle from 0.8 to full opacity when pressed', () => {
+  it('dims only the swatch while the closed series is hidden', () => {
     render(<ShippingVelocityChart initialData={[]} initialRange='7d' />);
     const toggle = screen.getByRole('button', {
       name: 'Toggle Closed Series Visibility',
     });
+    // The swatch dims, never the label text: 80% label opacity failed WCAG AA.
+    const swatch = toggle.querySelector('span');
+    expect(swatch).not.toBeNull();
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
-    expect(toggle).toHaveStyle({ opacity: '0.8' });
+    expect(swatch).toHaveStyle({ opacity: '0.4' });
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
-    expect(toggle).toHaveStyle({ opacity: '1' });
+    expect(swatch).toHaveStyle({ opacity: '1' });
   });
 });

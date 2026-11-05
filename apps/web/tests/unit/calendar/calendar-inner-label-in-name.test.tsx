@@ -4,7 +4,9 @@ import CalendarInner from '@/components/atoms/CalendarInner';
 
 describe('CalendarInner label-in-name (JOV-8873)', () => {
   it('names day buttons with the visible day number as a whole word', () => {
-    render(<CalendarInner month={new Date(2026, 0, 1)} />);
+    // mode='single' is required: react-day-picker v10 renders day cells as
+    // plain content (no buttons) without a selection mode.
+    render(<CalendarInner mode='single' month={new Date(2026, 0, 1)} />);
 
     const january15 = screen
       .getAllByRole('button')

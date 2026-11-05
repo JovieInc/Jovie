@@ -1,3 +1,4 @@
+import type { StoryContext } from '@storybook/nextjs-vite';
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { default as preview, resolveStoryTheme } from './preview';
@@ -15,7 +16,11 @@ type Decorate = (
 ) => React.ReactElement;
 
 function decorate(): Decorate {
-  return preview.decorators![0] as unknown as Decorate;
+  const exported = preview.decorators;
+  const list = Array.isArray(exported) ? exported : exported ? [exported] : [];
+  const first = list[0];
+  if (!first) throw new Error('preview decorator missing');
+  return first as unknown as Decorate;
 }
 
 // The decorator runs React hooks (the QueryClient useState), so it can only
@@ -25,6 +30,17 @@ function renderDecorated(context: StoryInput): void {
     return decorate()(() => <div>story</div>, context);
   }
   render(<Decorated />);
+}
+
+type ThemeContext = Pick<StoryContext, 'globals' | 'parameters'>;
+
+// resolveStoryTheme takes a Pick over the real StoryContext, so a fixture
+// must carry both keys — build it here instead of hand-writing partials.
+function themeContext(input: StoryInput = {}): ThemeContext {
+  return {
+    parameters: input.parameters ?? {},
+    globals: input.globals ?? {},
+  } as ThemeContext;
 }
 
 function beforeEachHook(): (context: StoryInput) => void {
@@ -45,31 +61,41 @@ describe('preview theme reset', () => {
   describe('resolveStoryTheme', () => {
     it('honors parameters.themes.themeOverride over globals', () => {
       expect(
-        resolveStoryTheme({
-          parameters: { themes: { themeOverride: 'light' } },
-          globals: { themes: { value: 'dark' } },
-        })
+        resolveStoryTheme(
+          themeContext({
+            parameters: { themes: { themeOverride: 'light' } },
+            globals: { themes: { value: 'dark' } },
+          })
+        )
       ).toBe('light');
     });
 
     it('reads the themes global value', () => {
       expect(
-        resolveStoryTheme({ globals: { themes: { value: 'light' } } })
+        resolveStoryTheme(
+          themeContext({ globals: { themes: { value: 'light' } } })
+        )
       ).toBe('light');
       expect(
-        resolveStoryTheme({ globals: { themes: { value: 'dark' } } })
+        resolveStoryTheme(
+          themeContext({ globals: { themes: { value: 'dark' } } })
+        )
       ).toBe('dark');
     });
 
     it('reads a bare theme global', () => {
-      expect(resolveStoryTheme({ globals: { theme: 'light' } })).toBe('light');
+      expect(
+        resolveStoryTheme(themeContext({ globals: { theme: 'light' } }))
+      ).toBe('light');
     });
 
     it('returns undefined when the story requests nothing', () => {
-      expect(resolveStoryTheme({})).toBeUndefined();
+      expect(resolveStoryTheme(themeContext({}))).toBeUndefined();
       expect(resolveStoryTheme(undefined)).toBeUndefined();
       expect(
-        resolveStoryTheme({ globals: { themes: { value: 'system' } } })
+        resolveStoryTheme(
+          themeContext({ globals: { themes: { value: 'system' } } })
+        )
       ).toBeUndefined();
     });
   });
