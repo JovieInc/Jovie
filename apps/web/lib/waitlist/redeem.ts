@@ -117,7 +117,12 @@ export async function redeemWaitlistInviteToken(input: {
             inviteTokenRedeemedAt: waitlistEntries.inviteTokenRedeemedAt,
           })
           .from(waitlistEntries)
-          .where(eq(waitlistEntries.inviteTokenHash, tokenHash))
+          .where(
+            and(
+              eq(waitlistEntries.inviteTokenHash, tokenHash),
+              eq(waitlistEntries.canonical, true)
+            )
+          )
           .for('update')
           .limit(1);
 
