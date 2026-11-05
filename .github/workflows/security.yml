@@ -236,7 +236,7 @@ jobs:
           set -euo pipefail
           trufflehog_bin="$(command -v trufflehog || true)"
           if [[ -z "$trufflehog_bin" ]]; then
-            version="${TRUFFLEHOG_VERSION:-3.95.5}"
+            version="${TRUFFLEHOG_VERSION:-3.99.8}"
             trufflehog_bin="${TMPDIR:-/tmp}/trufflehog-${version}/trufflehog"
           fi
           if [[ ! -x "$trufflehog_bin" ]]; then

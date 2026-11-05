@@ -42,8 +42,10 @@ git -C "$SEED" push -q origin "$BASE_SHA:$HOSTILE_BASE_REF"
 # A multi-commit PR introduces and later removes a leak-shaped backup file. The
 # range preparation must retain that historical commit even though HEAD is clean.
 git -C "$SEED" switch -q -c feature "$BASE_SHA"
-cp "$REPO_ROOT/scripts/security/gitleaks-backup-fixture.txt" \
-  "$SEED/settings.local.json.backup"
+# Historical scans must detect this bait rather than depend on inline ignores.
+sed 's/ # trufflehog:ignore//g' \
+  "$REPO_ROOT/scripts/security/gitleaks-backup-fixture.txt" \
+  >"$SEED/settings.local.json.backup"
 git -C "$SEED" add settings.local.json.backup
 git -C "$SEED" commit -q -m 'introduce backup fixture'
 INTRODUCED_SHA="$(git -C "$SEED" rev-parse HEAD)"
@@ -226,34 +228,8 @@ fail() {
   exit 1
 }
 
-# TruffleHog 3.99.4 no longer prints "scanning repo" at the default log
-# level. Require completed, nonempty work beyond that progress message;
-# an aborted traversal can exit zero after scanning no data.
-trufflehog_scanned_data() {
-  awk '
-    /finished scanning/ &&
-      /"chunks":[[:space:]]*[1-9][0-9]*[[:space:]]*[,}]/ &&
-      /"bytes":[[:space:]]*[1-9][0-9]*[[:space:]]*[,}]/ { scanned = 1 }
-    /encountered errors during scan/ { incomplete = 1 }
-    END { exit !(scanned && !incomplete) }
-  '
-}
-
-completion_log='info-0 trufflehog finished scanning {"chunks": 7, "bytes": 1068}'
-trufflehog_scanned_data <<<"$completion_log" \
-  || fail 'a completed nonempty scan must pass without a progress message'
-for scan_log in \
-  '' \
-  'scanning repo' \
-  'finished scanning {}' \
-  'finished scanning {"chunks": 0, "bytes": 0}' \
-  'finished scanning {"chunks": 7, "bytes": 0}' \
-  'finished scanning {"chunks": 0, "bytes": 1068}' \
-  "$completion_log"$'\nencountered errors during scan'; do
-  if trufflehog_scanned_data <<<"$scan_log"; then
-    fail 'missing, empty, or aborted scan evidence must fail closed'
-  fi
-done
+# shellcheck source=scripts/security/test-fixtures/range-scanner-evidence.sh
+source "$REPO_ROOT/scripts/security/test-fixtures/range-scanner-evidence.sh"
 
 assert_complete_range() {
   local checkout="$1"
@@ -443,13 +419,8 @@ fi
 
 if TRUFFLEHOG_BIN="${TRUFFLEHOG_BIN:-$(command -v trufflehog || true)}" \
   && [[ -n "$TRUFFLEHOG_BIN" ]]; then
-  "$TRUFFLEHOG_BIN" git "file://$PR_DIR" \
-    --since-commit "$BASE_SHA" \
-    --branch HEAD \
-    --no-verification \
-    --fail >"$TEST_ROOT/trufflehog.output" 2>&1 \
-    || fail 'trufflehog could not clone and scan the local-only pull request scan head'
-  echo 'PASS: trufflehog cloned and scanned the local-only pull request scan head'
+  assert_historical_postgres_scan \
+    "$PR_DIR" "$TEST_ROOT/trufflehog" 'local-only pull request scan-head'
 else
   echo 'SKIP: trufflehog binary unavailable for local-only scan-head assertion'
 fi
@@ -509,25 +480,8 @@ fi
 
 if TRUFFLEHOG_BIN="${TRUFFLEHOG_BIN:-$(command -v trufflehog || true)}" \
   && [[ -n "$TRUFFLEHOG_BIN" ]]; then
-  # TruffleHog 3.99.4 (runner image ubuntu24/20261018.339, released
-  # 2026-10-22) moved the repository-scan receipt from default info to
-  # verbosity 2: logger.V(2).Info("scanning repo", base, head, ...).
-  # info-0 still prints "finished scanning", which does not name the repo
-  # or the resolved base. 3.95.5 emits the same receipt at info-0, so
-  # verbosity 2 keeps it visible on both. Require this fixture's base on
-  # that line so an empty or unresolved scan cannot pass.
-  "$TRUFFLEHOG_BIN" git "file://$SKEWED_QUEUE_DIR" \
-    --log-level=2 \
-    --since-commit "$BASE_SHA" \
-    --branch HEAD \
-    --no-verification \
-    --fail >"$TEST_ROOT/skewed-trufflehog.output" 2>&1 \
-    || fail 'trufflehog could not scan the older-dated anchored merge group'
-  grep 'scanning repo' "$TEST_ROOT/skewed-trufflehog.output" | grep -q "$BASE_SHA" \
-    || fail 'trufflehog did not emit a positive repository-scan receipt'
-  trufflehog_scanned_data <"$TEST_ROOT/skewed-trufflehog.output" \
-    || fail 'trufflehog did not complete a nonempty older-dated merge-group scan'
-  echo 'PASS: trufflehog scanned the older-dated anchored merge group'
+  assert_historical_postgres_scan \
+    "$SKEWED_QUEUE_DIR" "$TEST_ROOT/skewed-trufflehog" 'older-dated merge-group'
 else
   echo 'SKIP: trufflehog binary unavailable for older-dated merge-group assertion'
 fi

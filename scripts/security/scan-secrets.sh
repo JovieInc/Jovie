@@ -13,7 +13,7 @@ cd "$REPO_ROOT"
 MODE="${1:-pre-commit}"
 BASE_REF="${2:-origin/main}"
 GITLEAKS_VERSION="${GITLEAKS_VERSION:-8.21.2}"
-TRUFFLEHOG_VERSION="${TRUFFLEHOG_VERSION:-3.95.5}"
+TRUFFLEHOG_VERSION="${TRUFFLEHOG_VERSION:-3.99.8}"
 EXCLUDE_PATHS="$REPO_ROOT/.trufflehog-exclude.txt"
 
 # Release downloads hit transient network resets (curl 35 connection resets on
