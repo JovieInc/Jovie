@@ -290,3 +290,7 @@ runs:
           packages/*/node_modules
           workers/*/node_modules
         key: ${{ steps.node-modules-cache.outputs.cache-primary-key }}
+
+    - name: Prepare browser contracts for remote preflight
+      if: github.workflow == 'Preflight Remote'
+      uses: ./.github/actions/setup-playwright
