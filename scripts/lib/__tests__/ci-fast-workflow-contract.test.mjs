@@ -117,9 +117,10 @@ function jobBlock(jobId, nextJobId) {
 }
 
 /**
- * @typedef {{run?: string, uses?: string, if?: string | boolean,
+ * @typedef {{name?: string, run?: string, uses?: string, if?: string | boolean,
  *   with?: {'go-version'?: string, cache?: boolean}}} ActionlintWorkflowStep
- * @typedef {{jobs: Record<string, {steps?: ActionlintWorkflowStep[]}>}} ActionlintWorkflow
+ * @typedef {{jobs: Record<string, {if?: string | boolean,
+ *   steps?: ActionlintWorkflowStep[]}>}} ActionlintWorkflow
  */
 function assertActionlintCompiler(steps) {
   const lintIndex = steps.findIndex(step =>
@@ -988,7 +989,8 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('runs the mobile profile claim proof in the existing combined web lane', () => {
     const spec = 'tests/e2e/storybook-profile-claim-name.spec.ts';
-    const surfaces = loadYaml(WORKFLOW).jobs['ci-storybook-surfaces'];
+    const workflow = /** @type {ActionlintWorkflow} */ (loadYaml(WORKFLOW));
+    const surfaces = workflow.jobs['ci-storybook-surfaces'];
     const runner = surfaces.steps.find(
       step => step.name === 'Run surface elevation matrix (Storybook)'
     );
