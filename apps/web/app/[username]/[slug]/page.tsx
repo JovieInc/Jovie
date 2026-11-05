@@ -549,49 +549,6 @@ function ContentPageBody({
   );
 }
 
-/** Resolve the best OG image URL, size, height, and MIME type from content artwork data. */
-function resolveOgImage(
-  artworkSizes: Record<string, string> | null | undefined,
-  artworkUrl: string | null
-): { url: string; width: number; height: number; type: string } {
-  const defaultImage = `${BASE_URL}/og/default.png`;
-  const url =
-    artworkSizes?.['1000'] ??
-    artworkSizes?.original ??
-    artworkUrl ??
-    defaultImage;
-  const isDefault = url === defaultImage;
-
-  let width = 1200;
-  if (artworkSizes?.['1000']) {
-    width = 1000;
-  } else if (!artworkSizes?.original && artworkUrl) {
-    width = 640;
-  }
-
-  const height = isDefault ? 630 : width;
-
-  const EXT_TO_MIME: Record<string, string> = {
-    '.png': 'image/png',
-    '.webp': 'image/webp',
-    '.avif': 'image/avif',
-  };
-
-  let type = 'image/jpeg';
-  if (isDefault) {
-    type = 'image/png';
-  } else {
-    for (const [ext, mime] of Object.entries(EXT_TO_MIME)) {
-      if (url.includes(ext)) {
-        type = mime;
-        break;
-      }
-    }
-  }
-
-  return { url, width, height, type };
-}
-
 /** Build the SEO description for a content page. */
 function buildContentDescription(
   content: {
@@ -731,9 +688,17 @@ export async function generateMetadata({
   );
 
   const ogType = content.type === 'release' ? 'music.album' : 'music.song';
+  // Branded share card served by the collocated opengraph-image route.
+  // Mystery releases keep the artwork/title suppression via `ogImage: null`;
+  // the file-based route still renders a mystery-safe card for those pages.
   const ogImage = isMystery
     ? null
-    : resolveOgImage(content.artworkSizes, content.artworkUrl);
+    : {
+        url: `/${creator.usernameNormalized}/${content.slug}/opengraph-image`,
+        width: 1200,
+        height: 630,
+        type: 'image/png',
+      };
   const artworkAlt = `${content.title} ${contentType} artwork`;
   const ogTitle = isMystery
     ? `New music from ${artistName}`
