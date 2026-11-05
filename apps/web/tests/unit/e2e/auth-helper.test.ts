@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  describeShellReadyStall,
   fillControlledInputUntilEnabled,
   resolveBypassFallbackUserId,
   setTestAuthBypassSession,
@@ -227,5 +228,54 @@ describe('waitForAuthenticatedHealth', () => {
     await expect(
       waitForAuthenticatedHealth(page, 'expected-user', { timeout: 3_000 })
     ).rejects.toThrow();
+  });
+});
+
+describe('describeShellReadyStall', () => {
+  function buildStalledPage(restoreState: string | null) {
+    const visibleLocator = { isVisible: () => Promise.resolve(false) };
+    const boundary = { getAttribute: vi.fn(async () => restoreState) };
+    const page = {
+      url: () => 'http://localhost:3100/start',
+      locator: vi.fn((selector: string) => ({
+        first: () =>
+          selector.includes('onboarding-session-boundary')
+            ? boundary
+            : visibleLocator,
+        innerText: () => Promise.reject(new Error('no body')),
+      })),
+    } as unknown as Page;
+    return { page, boundary };
+  }
+
+  it('names the stuck restore boundary state for the nightly annotation', async () => {
+    const { page, boundary } = buildStalledPage('failed');
+    const main = {
+      isVisible: () => Promise.resolve(false),
+    } as unknown as Locator;
+    const composer = {
+      isVisible: () => Promise.resolve(false),
+    } as unknown as Locator;
+
+    const detail = await describeShellReadyStall(page, main, composer);
+
+    expect(detail).toContain('url=http://localhost:3100/start');
+    expect(detail).toContain('main=false');
+    expect(detail).toContain('composer=false');
+    expect(detail).toContain('boundary-restore-state=failed');
+    expect(boundary.getAttribute).toHaveBeenCalledWith('data-restore-state');
+  });
+
+  it('reports an absent boundary instead of throwing when the landing never mounted it', async () => {
+    const { page } = buildStalledPage(null);
+
+    const detail = await describeShellReadyStall(
+      page,
+      { isVisible: () => Promise.resolve(true) } as unknown as Locator,
+      { isVisible: () => Promise.resolve(false) } as unknown as Locator
+    );
+
+    expect(detail).toContain('main=true');
+    expect(detail).toContain('boundary-restore-state=absent');
   });
 });
