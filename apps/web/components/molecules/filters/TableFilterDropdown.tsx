@@ -251,7 +251,7 @@ export function TableFilterDropdown<T extends string = string>({
         onCloseAutoFocus={event => event.preventDefault()}
       >
         {categories.length === 0 ? (
-          {/* dead-end-ok: empty-state announcement row, not a user control */}
+          // dead-end-ok: empty-state announcement row, not a user control
           <DropdownMenuItem disabled>
             <DropdownEmptyRow message={emptyMessage} />
           </DropdownMenuItem>

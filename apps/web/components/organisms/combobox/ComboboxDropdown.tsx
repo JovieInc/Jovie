@@ -58,7 +58,7 @@ export const ComboboxDropdown = forwardRef<
             </div>
           </HeadlessComboboxOption>
         ) : showNoResults ? (
-          {/* dead-end-ok: no-results announcement row, not a user control */}
+          // dead-end-ok: no-results announcement row, not a user control
           <HeadlessComboboxOption
             disabled
             value='__no-results__'
