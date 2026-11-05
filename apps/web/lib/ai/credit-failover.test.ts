@@ -212,6 +212,32 @@ describe('credit failover before stream output', () => {
     }
   );
 
+  it('cancels an open primary error stream once before starting fallback', async () => {
+    const error = gatewayCreditsExhausted();
+    const cancel = vi.fn();
+    const primary = streamingModel('gateway', {
+      start(controller) {
+        controller.enqueue({ type: 'error', error });
+      },
+      cancel,
+    });
+    const secondary = healthyStream();
+    secondary.doStream.mockImplementationOnce(async () => {
+      expect(cancel).toHaveBeenCalledExactlyOnceWith(error);
+      return healthyStream().doStream({} as never);
+    });
+    const result = await failoverModel(primary, secondary).doStream(
+      {} as never
+    );
+    expect(await readParts(result.stream)).toContainEqual({
+      type: 'text-delta',
+      id: '1',
+      delta: 'recovered',
+    });
+    expect(cancel).toHaveBeenCalledExactlyOnceWith(error);
+    expect(secondary.doStream).toHaveBeenCalledTimes(1);
+  });
+
   it('recovers a first-chunk stall after the stream opens', async () => {
     const primary = withStreamStallGuard(
       streamingModel('gateway', { start() {} }),
@@ -344,7 +370,7 @@ describe('credit failover before stream output', () => {
     expect(secondary.doStream).not.toHaveBeenCalled();
   });
 
-  it.each(['text-delta', 'tool-call', 'reasoning-delta'])(
+  it.each(['text-delta', 'tool-call', 'tool-input-start', 'reasoning-delta'])(
     'never replays an error part after %s',
     async type => {
       const error = gatewayCreditsExhausted();
