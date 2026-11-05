@@ -24,6 +24,11 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import {
+  artDirectionGuardCommand,
+  artDirectionGuardIsWired,
+  plannerContractGroupIsWired,
+} from './trusted-test-planner-snapshot.mjs';
 
 export const SCRIPT_TEST_PATTERN = /\.test\.(?:mjs|ts)$/;
 const SKIPPED_DIRS = new Set(['node_modules', 'fixtures', '.cache']);
@@ -177,14 +182,32 @@ export function expandPackageScripts(seeds, packageScripts) {
  * @returns {Promise<CiCommand[]>}
  */
 export async function collectCiCommands(repoRoot, options = {}) {
+  const laneSource = 'scripts/ci-fast-lanes.mjs';
+  const laneText = readFileSync(join(repoRoot, laneSource), 'utf8');
+  const sources = [{ source: laneSource, text: laneText }];
+  if (plannerContractGroupIsWired(laneText)) {
+    const source = 'scripts/lib/test-planner-contract-tests.mjs';
+    sources.push({
+      source,
+      text: readFileSync(join(repoRoot, source), 'utf8'),
+    });
+  }
+  if (artDirectionGuardIsWired(laneText)) {
+    const source = 'scripts/lib/art-direction-source-guard.mjs';
+    sources.push({
+      source,
+      text: artDirectionGuardCommand(
+        readFileSync(join(repoRoot, source), 'utf8')
+      ),
+    });
+  }
   /** @type {CiCommand[]} */
-  const seeds = readFileSync(
-    join(repoRoot, 'scripts/ci-fast-lanes.mjs'),
-    'utf8'
-  )
-    .split('\n')
-    .filter(line => !/^\s*(?:\/\/|\*)/u.test(line))
-    .map(text => ({ source: 'scripts/ci-fast-lanes.mjs', text }));
+  const seeds = sources.flatMap(({ source, text }) =>
+    text
+      .split('\n')
+      .filter(line => !/^\s*(?:\/\/|\*)/u.test(line))
+      .map(text => ({ source, text }))
+  );
   for (const file of [
     ...listYaml(join(repoRoot, '.github/workflows')),
     ...listYaml(join(repoRoot, '.github/actions')),

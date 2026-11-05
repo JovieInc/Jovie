@@ -76,20 +76,32 @@ test('core onboarding extraction preserves existing producer and actual dependen
 });
 
 test('all rolling sparse bootstraps carry the real selector helper closure', async t => {
-  const workflow = yamlLoad(
+  const document = yamlLoad(
     readFileSync(
       join(ROOT, '.github/workflows/rolling-ci-dispatch.yml'),
       'utf8'
     )
   );
+  assert.ok(
+    document !== null &&
+      typeof document === 'object' &&
+      !Array.isArray(document)
+  );
+  assert.ok(
+    'jobs' in document &&
+      document.jobs !== null &&
+      typeof document.jobs === 'object' &&
+      !Array.isArray(document.jobs)
+  );
+  const workflow =
+    /** @type {{jobs:Record<string,{steps?:Array<{with?:Record<string,unknown>}>}>}} */ (
+      document
+    );
   const sparse = Object.values(workflow.jobs)
     .flatMap(job => job.steps ?? [])
     .map(step => step.with?.['sparse-checkout'])
-    .filter(
-      value =>
-        typeof value === 'string' &&
-        value.includes('scripts/run-affected-tests.mjs')
-    );
+    .filter(value => typeof value === 'string')
+    .filter(value => value.includes('scripts/run-affected-tests.mjs'));
   assert.equal(sparse.length, 4);
   const required = [
     'scripts/lib/art-direction-source-guard.mjs',
