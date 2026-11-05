@@ -1,5 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-const allDisabled = rows => rows.every(x => x.getAttribute('aria-disabled'));
+
+const allDisabled = (rows: HTMLElement[]) =>
+  rows.every(x => x.getAttribute('aria-disabled') === 'true');
+
 import userEvent from '@testing-library/user-event';
 import { FileAudio2, Paperclip } from 'lucide-react';
 import {
@@ -20,10 +23,10 @@ import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 import { CmdKPalette } from './CmdKPalette';
+
 const pushMock = vi.fn();
 const prefetchMock = vi.fn();
 const onOpenChangeMock = vi.fn();
-
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: pushMock,
