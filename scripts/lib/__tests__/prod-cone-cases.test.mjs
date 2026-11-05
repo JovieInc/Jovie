@@ -22,7 +22,8 @@ async function anonymousCheckIds() {
     headers: new Map(),
     url: 'https://jov.ie/',
   };
-  const fakeFetch = async () => fakeResponse;
+  /** @type {typeof fetch} */
+  const fakeFetch = async () => /** @type {any} */ (fakeResponse);
   const probes = anonymousChecks({
     origin: 'https://jov.ie',
     fetchImpl: fakeFetch,

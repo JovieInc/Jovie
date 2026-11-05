@@ -1,8 +1,4 @@
 {
-  "apps/desktop/SIGNING.md": {
-    "recurring_price": 1,
-    "billing_claim": 1
-  },
   "apps/docs/app/docs/build-your-presence/audience/understand-audience-data/page.mdx": {
     "trial_claim": 1,
     "refund_guarantee_claim": 1
