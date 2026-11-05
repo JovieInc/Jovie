@@ -65,6 +65,13 @@ export const CODE_FLAGS = {
   // registration limited to the shared MCP redirect allowlist. The founder
   // Ovie issuer advertises /api/ovie/oauth/register on its own.
   OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: false,
+  // Closed public signup (Tim, 2026-11-02). Closed by default. With
+  // FEATURE_PUBLIC_SIGNUP_CLOSED=true, /signup and anonymous /start send
+  // visitors to the closed /waitlist entry. Existing sign-in and issued
+  // invitation continuations stay available. Role capture ships separately.
+  // Reopen criteria: the golden path is certified AND the first paying
+  // artists are live. Decision: canon/PRODUCT.md (2026-11-02).
+  PUBLIC_SIGNUP_CLOSED: true,
   // Social-network HTML must not be fetched from Jovie server IPs. Default
   // off. FEATURE_SOCIAL_HTML_ISOLATED_PROVIDER=true is reserved for a future
   // isolated provider and still fails closed until that provider exists.
