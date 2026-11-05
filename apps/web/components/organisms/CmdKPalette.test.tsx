@@ -1,8 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-const allDisabled = (rows: HTMLElement[]) =>
-  rows.every(x => x.getAttribute('aria-disabled') === 'true');
-
 import userEvent from '@testing-library/user-event';
 import { FileAudio2, Paperclip } from 'lucide-react';
 import {
@@ -24,6 +21,9 @@ import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 import { CmdKPalette } from './CmdKPalette';
 
+const allDim = (r: HTMLElement[]) =>
+  r.every(x => x.getAttribute('aria-disabled'));
+
 const pushMock = vi.fn();
 const prefetchMock = vi.fn();
 const onOpenChangeMock = vi.fn();
@@ -40,11 +40,9 @@ vi.mock('next/image', () => ({
     <span data-testid='img' data-src={src} data-alt={alt} />
   ),
 }));
-
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
   useReleasesQuery: () => ({ data: [], isLoading: false }),
 }));
-
 vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
   useArtistSearchQuery: () => {
     const [query, setQuery] = useState('');
@@ -61,7 +59,6 @@ vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
     };
   },
 }));
-
 vi.mock('@/lib/queries/useChatCapabilitiesQuery', () => ({
   useChatCapabilitiesQuery: () => ({
     data: {
@@ -193,7 +190,7 @@ describe('CmdKPalette', () => {
     expect(screen.getAllByRole('option')).toHaveLength(1);
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'Contacts' } });
-    expect(allDisabled(screen.queryAllByRole('option'))).toBe(true);
+    expect(allDim(screen.queryAllByRole('option'))).toBe(true);
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(pushMock).not.toHaveBeenCalled();
     expect(onAdditionalSelect).not.toHaveBeenCalled();
@@ -399,7 +396,7 @@ describe('CmdKPalette', () => {
       name: 'Command Palette Search',
     });
     fireEvent.change(input, { target: { value: 'totally-absent-command' } });
-    expect(allDisabled(screen.queryAllByRole('option'))).toBe(true);
+    expect(allDim(screen.queryAllByRole('option'))).toBe(true);
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     fireEvent.keyDown(input, { key: 'ArrowUp' });
     fireEvent.keyDown(input, { key: 'Enter' });
