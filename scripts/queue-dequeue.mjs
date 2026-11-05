@@ -24,7 +24,7 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 export const CODES = [
   'poison',
@@ -257,7 +257,7 @@ function defaultLog() {
   );
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (import.meta.main) {
   try {
     process.exitCode = run(process.argv.slice(2));
   } catch (error) {
