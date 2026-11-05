@@ -4,12 +4,13 @@
     "profile-hero-desktop": {
       "width": 1640,
       "height": 1172,
-      "sourceHash": "2717906f6526d616f949e6b04c94bb14927725d78b0c4ff09a61db970934749c",
+      "sourceHash": "a677a1543ab0d390f0842d02d4551822286ed7d2b3b8ef0a0a3882d00b4bc61c",
       "specHash": "431d2bbda1f7a334f405179ebdc85d1f63359bf2683879cf776aa248037d998c",
-      "renderedAt": "2026-11-05T19:27:13.424Z",
+      "renderedAt": "2026-11-05T21:28:49.116Z",
       "sources": [
         "apps/web/components/features/demo/DemoTimWhiteProfileSurface.tsx",
         "apps/web/components/features/demo/demo-profile-showcase-states.ts",
+        "apps/web/components/features/home/homepage-profile-preview-fixture.ts",
         "apps/web/components/features/profile/templates/ProfileCompactTemplate.tsx",
         "apps/web/components/features/profile/ProfileIdentityHeader.tsx",
         "apps/web/components/features/profile/pac/ProfilePacCard.tsx"

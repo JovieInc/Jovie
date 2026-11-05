@@ -1,11 +1,18 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { Page } from '@playwright/test';
 import sharp from 'sharp';
 import { describe, expect, it, vi } from 'vitest';
 import type { ProductShotSpec } from '../../lib/screenshots/product-shots';
+import { PRODUCT_SHOT_MAX_BYTES } from './plan';
 import { cropBox, renderShot } from './render';
 import { hashShotSources } from './source-hash.mjs';
 
@@ -114,6 +121,73 @@ describe('product-shot renderer operational paths', () => {
       })
     ).rejects.toThrow();
   });
+
+  it.each(['second encoder', 'budget', 'missing source'])(
+    'preserves the prior image pair and metadata after %s failure',
+    async failure => {
+      const root = mkdtempSync(join(tmpdir(), 'shot-transaction-'));
+      writeFileSync(join(root, 'source.ts'), 'fixture source\n');
+      const oldAvif = Buffer.from('previous avif');
+      const oldWebp = Buffer.from('previous webp');
+      writeFileSync(join(root, spec.id + '.avif'), oldAvif);
+      writeFileSync(join(root, spec.id + '.webp'), oldWebp);
+      const metadata = resolve('lib/screenshots/product-shots.manifest.json');
+      const beforeMetadata = readFileSync(metadata);
+      const png = await sharp({
+        create: { width: 8, height: 8, channels: 3, background: '#334455' },
+      })
+        .png()
+        .toBuffer();
+      const { page } = fakePage(png);
+      const original = sharp.prototype.toFile;
+      const mock =
+        failure === 'second encoder'
+          ? vi.spyOn(sharp.prototype, 'webp').mockImplementationOnce(() => {
+              throw new Error('second encoder failed');
+            })
+          : failure === 'budget'
+            ? vi
+                .spyOn(sharp.prototype, 'toFile')
+                .mockImplementation(async function (
+                  this: sharp.Sharp,
+                  file: string
+                ) {
+                  const encode = original as (
+                    this: sharp.Sharp,
+                    file: string
+                  ) => Promise<sharp.OutputInfo>;
+                  const info = await encode.call(this, file);
+                  appendFileSync(
+                    file,
+                    Buffer.alloc(PRODUCT_SHOT_MAX_BYTES + 1)
+                  );
+                  return info;
+                } as never)
+            : null;
+      try {
+        await expect(
+          renderShot(
+            page as unknown as Page,
+            'http://localhost:3000',
+            {
+              ...spec,
+              sources:
+                failure === 'missing source' ? ['missing.ts'] : spec.sources,
+            },
+            { outDir: root, repoRoot: root }
+          )
+        ).rejects.toThrow();
+        expect(readFileSync(join(root, spec.id + '.avif'))).toEqual(oldAvif);
+        expect(readFileSync(join(root, spec.id + '.webp'))).toEqual(oldWebp);
+        expect(readFileSync(metadata)).toEqual(beforeMetadata);
+        expect(
+          readdirSync(root).filter(name => name.startsWith('.product-shot-'))
+        ).toEqual([]);
+      } finally {
+        mock?.mockRestore();
+      }
+    }
+  );
 
   it('rejects invalid CLI selection without mutating committed metadata', () => {
     const renderer = resolve('scripts/product-shots/render.ts');

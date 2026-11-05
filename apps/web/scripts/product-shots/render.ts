@@ -11,7 +11,17 @@
  * in `product-shots.manifest.json`. `--stale` renders only shots whose source
  * or spec hash no longer matches the manifest.
  */
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium, type Page } from '@playwright/test';
@@ -131,29 +141,76 @@ export async function renderShot(
     withoutEnlargement: true,
   });
   mkdirSync(outDir, { recursive: true });
-  const avifPath = path.join(outDir, `${spec.id}.avif`);
-  const webpPath = path.join(outDir, `${spec.id}.webp`);
-  const info = await resized
-    .clone()
-    .avif({ quality: 58, effort: 7, chromaSubsampling: '4:4:4' })
-    .toFile(avifPath);
-  await resized.clone().webp({ quality: 82, effort: 6 }).toFile(webpPath);
-
-  const bytes = {
-    avif: statSync(avifPath).size,
-    webp: statSync(webpPath).size,
-  };
-  const oversized = oversizedFormats(spec.id, bytes);
-  if (oversized.length > 0) throw new Error(oversized.join('; '));
-  return {
-    width: info.width,
-    height: info.height,
-    sourceHash: hashShotSources(repoRoot, spec.sources),
-    specHash: hashShotSpec(spec),
-    renderedAt: new Date().toISOString(),
-    sources: [...spec.sources],
-    bytes,
-  } satisfies ManifestEntry;
+  // Match the existing screenshot export's same-directory temporary + rename
+  // pattern. Validate the complete pair before publishing either final path.
+  const stage = mkdtempSync(path.join(outDir, '.product-shot-'));
+  const published: string[] = [];
+  const prior = new Set<string>();
+  let retainRecovery = false;
+  try {
+    const avifPath = path.join(stage, `${spec.id}.avif`);
+    const webpPath = path.join(stage, `${spec.id}.webp`);
+    const info = await resized
+      .clone()
+      .avif({ quality: 58, effort: 7, chromaSubsampling: '4:4:4' })
+      .toFile(avifPath);
+    await resized.clone().webp({ quality: 82, effort: 6 }).toFile(webpPath);
+    const bytes = {
+      avif: statSync(avifPath).size,
+      webp: statSync(webpPath).size,
+    };
+    const oversized = oversizedFormats(spec.id, bytes);
+    if (oversized.length > 0) throw new Error(oversized.join('; '));
+    const entry = {
+      width: info.width,
+      height: info.height,
+      sourceHash: hashShotSources(repoRoot, spec.sources),
+      specHash: hashShotSpec(spec),
+      renderedAt: new Date().toISOString(),
+      sources: [...spec.sources],
+      bytes,
+    } satisfies ManifestEntry;
+    for (const format of ['avif', 'webp']) {
+      const file = `${spec.id}.${format}`;
+      if (existsSync(path.join(outDir, file))) {
+        copyFileSync(
+          path.join(outDir, file),
+          path.join(stage, file + '.previous')
+        );
+        prior.add(file);
+      }
+    }
+    for (const format of ['avif', 'webp']) {
+      const file = `${spec.id}.${format}`;
+      renameSync(path.join(stage, file), path.join(outDir, file));
+      published.push(file);
+    }
+    return entry;
+  } catch (error) {
+    const recoveryErrors: unknown[] = [];
+    for (const file of published.reverse()) {
+      try {
+        if (prior.has(file))
+          renameSync(
+            path.join(stage, file + '.previous'),
+            path.join(outDir, file)
+          );
+        else rmSync(path.join(outDir, file));
+      } catch (recoveryError) {
+        recoveryErrors.push(recoveryError);
+      }
+    }
+    if (recoveryErrors.length) {
+      retainRecovery = true;
+      throw new AggregateError(
+        [error, ...recoveryErrors],
+        'Shot publication failed; recovery files retained at ' + stage
+      );
+    }
+    throw error;
+  } finally {
+    if (!retainRecovery) rmSync(stage, { recursive: true, force: true });
+  }
 }
 
 async function main() {

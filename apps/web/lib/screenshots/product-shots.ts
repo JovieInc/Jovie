@@ -178,6 +178,7 @@ export const PRODUCT_SHOTS = [
     sources: [
       `${DEMO}/DemoTimWhiteProfileSurface.tsx`,
       `${DEMO}/demo-profile-showcase-states.ts`,
+      'apps/web/components/features/home/homepage-profile-preview-fixture.ts',
       `${PROFILE}/templates/ProfileCompactTemplate.tsx`,
       `${PROFILE}/ProfileIdentityHeader.tsx`,
       `${PROFILE}/pac/ProfilePacCard.tsx`,
