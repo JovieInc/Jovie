@@ -189,7 +189,7 @@ function ScreenShell({
               {title}
             </h2>
             {body ? (
-              <p className='max-w-96 text-sm leading-5 text-white/58'>{body}</p>
+              <p className='max-w-96 text-sm leading-5 text-white/60'>{body}</p>
             ) : null}
           </div>
           <div>{children}</div>
@@ -206,7 +206,7 @@ function ScreenShell({
           {title}
         </h2>
         {body ? (
-          <p className='max-w-96 text-sm leading-5 text-white/58'>{body}</p>
+          <p className='max-w-96 text-sm leading-5 text-white/60'>{body}</p>
         ) : null}
       </div>
       <div className='flex-1'>{children}</div>
@@ -270,7 +270,7 @@ function SecondaryTextButton({
       type='button'
       onClick={onClick}
       disabled={disabled}
-      className='inline-flex h-10 w-full items-center justify-center rounded-3xl px-5 text-app font-medium tracking-[-0.005em] text-white/58 transition-colors duration-subtle hover:text-white/76 disabled:cursor-not-allowed disabled:opacity-60'
+      className='inline-flex h-10 w-full items-center justify-center rounded-3xl px-5 text-app font-medium tracking-[-0.005em] text-white/60 transition-colors duration-subtle hover:text-white/76 disabled:cursor-not-allowed disabled:opacity-60'
     >
       {children}
     </button>
@@ -356,7 +356,7 @@ function InlineCaptureField({
               onSelect={onCountrySelect}
             />
           ) : (
-            <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/46'>
+            <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/60'>
               <Mail className='size-4.5' />
             </span>
           )}
@@ -585,7 +585,7 @@ export function ProfileMobileNotificationsFlow({
                     type='button'
                     onClick={onDismissCapture}
                     disabled={isSubmitting}
-                    className='inline-flex h-11 items-center rounded-full text-xs font-semibold text-white/48 transition-colors duration-subtle hover:text-white/70 disabled:cursor-not-allowed disabled:opacity-50'
+                    className='inline-flex h-11 items-center rounded-full text-xs font-semibold text-white/60 transition-colors duration-subtle hover:text-white/70 disabled:cursor-not-allowed disabled:opacity-50'
                   >
                     Not Now
                   </button>
@@ -621,7 +621,7 @@ export function ProfileMobileNotificationsFlow({
               : `${artistName} updates are on.`
           }
           footer={
-            <p className='min-h-10 text-sm text-white/46'>
+            <p className='min-h-10 text-sm text-white/60'>
               Setting up your preferences...
             </p>
           }
@@ -726,7 +726,7 @@ export function ProfileMobileNotificationsFlow({
           footer={
             <div className='space-y-3'>
               {birthdayHintShown ? (
-                <p className='text-sm text-white/52'>
+                <p className='text-sm text-white/60'>
                   Enter a full date to save it.
                 </p>
               ) : null}
