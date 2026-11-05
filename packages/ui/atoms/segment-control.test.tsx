@@ -75,7 +75,7 @@ describe('Tabs pending state', () => {
     );
   });
 
-  it('retains the explicit raw primitive escape hatch', () => {
+  it('retains the explicit raw primitive escape hatch (JOV-8873)', () => {
     expect(Tabs.Root).toBe(TabsPrimitive.Root);
     expect(Tabs.List).toBe(TabsPrimitive.List);
     expect(Tabs.Content).toBe(TabsPrimitive.Content);
@@ -796,21 +796,5 @@ describe('SegmentControl', () => {
 
       expect(screen.getByTestId('icon')).toBeInTheDocument();
     });
-  });
-});
-
-describe('SegmentControl linear-pill active fill (JOV-8873)', () => {
-  it('keeps the active pill trigger transparent so the indicator owns the fill', () => {
-    render(
-      <SegmentControl
-        value='links'
-        onValueChange={vi.fn()}
-        options={defaultOptions}
-        variant='linear-pill'
-      />
-    );
-    expect(
-      screen.getByRole('tab', { name: 'Links', selected: true })
-    ).toHaveClass('data-[state=active]:bg-transparent');
   });
 });

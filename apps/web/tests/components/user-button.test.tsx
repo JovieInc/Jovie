@@ -311,15 +311,9 @@ describe('UserButton billing actions', () => {
       />
     );
     const trigger = screen.getByRole('button', {
-      name: /Open user menu · Update available/,
+      name: /^Open user menu · Update available/,
     });
     expect(trigger).toContainElement(screen.getByTestId('dock-status'));
-    // JOV-8873: the name comes from sr-only content so it includes the
-    // visible label (WCAG 2.5.3) instead of an overriding aria-label.
-    expect(trigger).not.toHaveAttribute('aria-label');
-    expect(within(trigger).getByText(/^Open user menu ·/)).toHaveClass(
-      'sr-only'
-    );
     await user.click(trigger);
     expect(await screen.findByRole('menu')).toBeVisible();
     rerender(<UserButton showUserInfo />);

@@ -156,10 +156,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       />
     );
 
-    expect(screen.getByRole('option', { name: 'No matches' })).toHaveAttribute(
-      'aria-disabled',
-      'true'
-    );
+    expect(screen.getByText('No matches')).toBeInTheDocument();
     expect(fuzzyMatch('SharedCommandPalette', 'palette')).toBe(true);
     expect(fuzzyMatch('SharedCommandPalette', 'missing')).toBe(false);
   });

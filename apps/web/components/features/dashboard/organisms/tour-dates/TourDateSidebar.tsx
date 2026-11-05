@@ -243,7 +243,6 @@ export function TourDateSidebar({
       </Button>
     </div>
   ) : undefined;
-
   return (
     <>
       <EntitySidebarShell

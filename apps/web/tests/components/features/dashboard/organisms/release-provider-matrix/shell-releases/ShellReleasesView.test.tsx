@@ -602,8 +602,7 @@ describe('ShellReleasesView', () => {
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
     expect(screen.getByText('Bahamas')).toBeInTheDocument();
     expect(screen.getByText('Other')).toBeInTheDocument();
-    // List rows own real per-cell controls and keep their list owner
-    // through the context-menu host wrappers.
+    // List rows own real per-cell controls and keep their list owner.
     const list = screen.getByRole('list', { name: 'Releases' });
     expect(
       screen.getByRole('listitem', { name: 'Lost in the Light' }).closest('ul')

@@ -286,12 +286,10 @@ function ShellDropdownRoot({
   );
 
   const isEmpty = searchable && query.trim().length > 0 && visibleCount === 0;
-
   const widthStyle =
     width === 'trigger'
       ? { ['--w' as string]: 'var(--radix-dropdown-menu-trigger-width)' }
       : { ['--w' as string]: `${width}px` };
-
   return (
     <DropdownMenuPrimitive.Root
       open={open}
@@ -305,7 +303,6 @@ function ShellDropdownRoot({
       <DropdownMenuPrimitive.Portal>
         <DropdownMenuPrimitive.Content
           role={searchable ? 'dialog' : 'menu'}
-          aria-orientation={searchable ? undefined : 'vertical'}
           aria-label={searchable ? 'Filter Menu' : undefined}
           align={align}
           side={side}
@@ -352,7 +349,6 @@ function ShellDropdownRoot({
     </DropdownMenuPrimitive.Root>
   );
 }
-
 // ---------------------------------------------------------------------------
 // Filter input — sticky at top, ESC clears, hairline below.
 // ---------------------------------------------------------------------------

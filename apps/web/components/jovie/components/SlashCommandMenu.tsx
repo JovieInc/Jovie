@@ -392,7 +392,6 @@ function SlashHeader({ state }: SlashHeaderProps) {
     </div>
   );
 }
-
 /**
  * Inline picker rendered INSIDE the same surface as the chat input. Two
  * modes: `inline` (root state, list above the input row) and `rail` (entity
@@ -414,11 +413,8 @@ export function SlashCommandMenu({
   attachmentActions,
   onQueryChange,
 }: SlashCommandMenuProps) {
-  // aria-controls on the combobox must always reference a real listbox id
-  // (axe aria-required-attr); fall back to a generated id when the caller
-  // does not pass one.
-  const generatedListId = useId();
-  const listId = listIdProp ?? generatedListId;
+  const generatedListId = useId(),
+    listId = listIdProp ?? generatedListId;
   const filterInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (onQueryChange) filterInputRef.current?.focus();
@@ -600,7 +596,6 @@ export function SlashCommandMenu({
     </div>
   );
 }
-
 /** Resolve the currently-active EntityRef from the picker state + items. */
 export function activeEntityFor(
   state: PickerState,

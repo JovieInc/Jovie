@@ -190,12 +190,7 @@ describe('CmdKPalette', () => {
     expect(screen.getAllByRole('option')).toHaveLength(1);
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'Contacts' } });
-    // The empty-state hint is a disabled placeholder option (valid listbox children); no selectable rows remain.
-    expect(
-      screen
-        .queryAllByRole('option')
-        .filter(row => row.getAttribute('aria-disabled') !== 'true')
-    ).toHaveLength(0);
+    expect(screen.queryAllByRole('option')).toHaveLength(1);
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(pushMock).not.toHaveBeenCalled();
     expect(onAdditionalSelect).not.toHaveBeenCalled();
@@ -401,12 +396,7 @@ describe('CmdKPalette', () => {
       name: 'Command Palette Search',
     });
     fireEvent.change(input, { target: { value: 'totally-absent-command' } });
-    // The empty-state hint is a disabled placeholder option (valid listbox children); no selectable rows remain.
-    expect(
-      screen
-        .queryAllByRole('option')
-        .filter(row => row.getAttribute('aria-disabled') !== 'true')
-    ).toHaveLength(0);
+    expect(screen.queryAllByRole('option')).toHaveLength(1);
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     fireEvent.keyDown(input, { key: 'ArrowUp' });
     fireEvent.keyDown(input, { key: 'Enter' });

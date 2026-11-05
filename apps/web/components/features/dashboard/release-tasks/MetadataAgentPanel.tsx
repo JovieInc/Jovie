@@ -436,7 +436,6 @@ export function MetadataAgentPanel({
           ) : null}
         </div>
       ) : null}
-
       {error ? (
         <div
           className={`mt-4 rounded-lg border px-3 py-2 text-sm ${
@@ -448,7 +447,6 @@ export function MetadataAgentPanel({
           {error}
         </div>
       ) : null}
-
       {hasBlockingFields ? (
         <div className='mt-4 rounded-lg border border-warning/20 bg-warning-subtle p-3'>
           <p className='text-sm font-medium text-warning-text'>

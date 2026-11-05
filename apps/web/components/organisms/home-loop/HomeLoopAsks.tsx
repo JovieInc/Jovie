@@ -44,8 +44,6 @@ function DefaultLine({ ask }: Readonly<{ readonly ask: HomeLoopAsk }>) {
   const countdown = formatCountdown(fallback.deadline, now);
   const verb = fallback.decision === 'approve' ? 'Approves' : 'Rejects';
   return (
-    // text-secondary-token: the answered card dims to opacity-80, where the
-    // tertiary token falls below WCAG AA contrast (axe color-contrast).
     <p
       className='flex flex-wrap items-baseline gap-x-1.5 text-xs text-secondary-token'
       data-testid='home-loop-ask-default'
@@ -293,8 +291,6 @@ function AskCard({
           <Check aria-hidden='true' className='size-3.5 text-success' />
           <span className='truncate'>{answer.label}</span>
           {answer.state === 'pending' ? (
-            // Secondary, not tertiary: stays above WCAG AA inside the dimmed
-            // (opacity-80) answered card (axe color-contrast).
             <span className='text-secondary-token'>Sending</span>
           ) : null}
           {answer.state === 'sent' && ask.canFeedback && onFeedback ? (

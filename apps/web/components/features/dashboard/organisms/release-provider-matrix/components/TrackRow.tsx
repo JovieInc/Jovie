@@ -47,9 +47,7 @@ interface TrackRowProps {
  * - Indented layout with track number prefix
  * - Lighter background to distinguish from release rows
  * - Shows: track number, title, duration, ISRC
- * - Provider availability dots (compact)
  * - Explicit badge if applicable
- *
  * @coverage-via tests/components/release-provider-matrix/TrackRow.test.tsx
  */
 export const TrackRow = memo(function TrackRow({

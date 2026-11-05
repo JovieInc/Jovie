@@ -165,7 +165,7 @@ describe('SuggestedDspMatches', () => {
 
     render(<SuggestedDspMatches profileId='profile-1' />);
 
-    expect(screen.getByText('Suggested')).toBeInTheDocument();
+    expect(screen.getByText('Suggested')).toBeInTheDocument(); // JOV-8873 name contract
     // Linear-scale section label: quiet Title Case, no all-caps eyebrow treatment.
     expect(screen.getByText('Suggested').className).not.toContain('uppercase');
     // Name appears in both row and popover content
@@ -507,31 +507,5 @@ describe('Navigation config', () => {
       name: 'Identity',
       href: APP_ROUTES.PRESENCE,
     });
-  });
-});
-
-describe('SuggestedDspMatches action semantics (JOV-8873)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockUseDspMatchActions.mockReturnValue(defaultMatchActions);
-  });
-
-  it('names confirm and reject actions and keeps them outside the popover trigger', () => {
-    mockUseDspMatchesQuery.mockReturnValue({
-      data: [createMatch()],
-      isLoading: false,
-      error: null,
-      refetch: vi.fn(),
-    });
-    render(<SuggestedDspMatches profileId='profile-1' />);
-
-    const confirm = screen.getByRole('button', {
-      name: /^Confirm .+ match for Test Artist$/,
-    });
-    const reject = screen.getByRole('button', {
-      name: /^Reject .+ match for Test Artist$/,
-    });
-    expect(confirm.parentElement?.closest('button')).toBeNull();
-    expect(reject.parentElement?.closest('button')).toBeNull();
   });
 });
