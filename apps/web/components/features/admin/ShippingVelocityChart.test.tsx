@@ -24,7 +24,7 @@ describe('ShippingVelocityChart', () => {
       name: 'Toggle Closed Series Visibility',
     });
     // The swatch dims, never the label text: 80% label opacity failed WCAG AA.
-    const swatch = toggle.querySelector('span');
+    const swatch = toggle.querySelector('span[style]');
     expect(swatch).not.toBeNull();
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
     expect(swatch).toHaveStyle({ opacity: '0.4' });
