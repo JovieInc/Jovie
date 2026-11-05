@@ -7,6 +7,7 @@ import {
   readFileSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -368,12 +369,19 @@ test('the standalone command uses the budgeted client from any cwd and propagate
       else process.exit(99);
     `
     );
+    const linkedCommand = join(dir, 'queue-dequeue-link.mjs');
+    symlinkSync(command, linkedCommand);
     const logPath = join(dir, 'state', 'history.jsonl');
-    for (const quota of ['0', '1']) {
+    for (const [entry, quota] of [
+      [command, '0'],
+      [command, '1'],
+      [linkedCommand, '0'],
+      [linkedCommand, '1'],
+    ]) {
       const result = spawnSync(
         process.execPath,
         [
-          command,
+          entry,
           '--pr',
           '5',
           '--reason',
