@@ -57,9 +57,9 @@ import {
 } from '../../ci-fast-lanes.mjs';
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
 import { buildWebVitestFastArgs } from '../ci-web-vitest-fast-args.mjs';
+import { assertProfileClaimProof } from './profile-claim-proof.support.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
-
 // JOV-6837: the structural control paths are data, one ERE alternative per line.
 const STRUCTURAL_CONTROL_PATHS = readFileSync(
   resolve(REPO_ROOT, '.github/ci-harness/structural-control-paths.ere'),
@@ -82,7 +82,6 @@ const CI_FAST_SOURCE = readFileSync(
 const PACKAGE_JSON = JSON.parse(
   readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8')
 );
-
 const HOSTED_GROUP_JOBS = [
   {
     jobId: 'ci-fast-typecheck',
@@ -985,6 +984,7 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
+  it('registers mobile claim proof in web CI', assertProfileClaimProof);
   it('selects the Tasks row geometry proof for its shared cell and feature surfaces', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',

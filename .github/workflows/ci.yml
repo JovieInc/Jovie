@@ -3763,6 +3763,7 @@ jobs:
                   tests/e2e/storybook-separator.spec.ts \
                   tests/e2e/storybook-sheet.spec.ts \
                   tests/e2e/storybook-overlay-collisions.spec.ts \
+                  tests/e2e/storybook-profile-claim-name.spec.ts \
                   tests/e2e/storybook-spotify-connect.spec.ts \
                   tests/e2e/storybook-ovie-privacy-boundary.spec.ts \
                   tests/e2e/storybook-onboarding-dsp-strip-clearance.spec.ts \
