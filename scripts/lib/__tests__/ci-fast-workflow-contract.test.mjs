@@ -57,10 +57,9 @@ import {
 } from '../../ci-fast-lanes.mjs';
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
 import { buildWebVitestFastArgs } from '../ci-web-vitest-fast-args.mjs';
-import { classifyProductLanes } from '../product-lane-classifier.mjs';
+import { assertProfileClaimProof } from './profile-claim-proof.support.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
-
 // JOV-6837: the structural control paths are data, one ERE alternative per line.
 const STRUCTURAL_CONTROL_PATHS = readFileSync(
   resolve(REPO_ROOT, '.github/ci-harness/structural-control-paths.ere'),
@@ -83,7 +82,6 @@ const CI_FAST_SOURCE = readFileSync(
 const PACKAGE_JSON = JSON.parse(
   readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8')
 );
-
 const HOSTED_GROUP_JOBS = [
   {
     jobId: 'ci-fast-typecheck',
@@ -117,10 +115,9 @@ function jobBlock(jobId, nextJobId) {
 }
 
 /**
- * @typedef {{name?: string, run?: string, uses?: string, if?: string | boolean,
+ * @typedef {{run?: string, uses?: string, if?: string | boolean,
  *   with?: {'go-version'?: string, cache?: boolean}}} ActionlintWorkflowStep
- * @typedef {{jobs: Record<string, {if?: string | boolean,
- *   steps?: ActionlintWorkflowStep[]}>}} ActionlintWorkflow
+ * @typedef {{jobs: Record<string, {steps?: ActionlintWorkflowStep[]}>}} ActionlintWorkflow
  */
 function assertActionlintCompiler(steps) {
   const lintIndex = steps.findIndex(step =>
@@ -987,33 +984,7 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('runs the mobile profile claim proof in the existing combined web lane', () => {
-    const spec = 'tests/e2e/storybook-profile-claim-name.spec.ts';
-    const workflow = /** @type {ActionlintWorkflow} */ (loadYaml(WORKFLOW));
-    const surfaces = workflow.jobs['ci-storybook-surfaces'];
-    const runner = surfaces.steps.find(
-      step => step.name === 'Run surface elevation matrix (Storybook)'
-    );
-    const invocation = runner.run.match(
-      /pnpm exec playwright test ([\s\S]*?)--config=playwright\.config\.storybook\.ts/
-    );
-    expect(invocation).not.toBeNull();
-    expect(
-      invocation[1].split(/\s+/).filter(path => path === spec)
-    ).toHaveLength(1);
-    expect(existsSync(resolve(REPO_ROOT, 'apps/web', spec))).toBe(true);
-    for (const path of [
-      'apps/web/components/features/profile/templates/ProfileCompactSurface.tsx',
-      `apps/web/${spec}`,
-    ]) {
-      expect(classifyProductLanes([path]).selectedLanes, path).toEqual(['web']);
-    }
-    expect(surfaces.if).toContain("outputs.run_web == 'true'");
-    expect(surfaces.if).toContain("github.event_name == 'merge_group'");
-    expect(surfaces.if).toContain("github.event_name == 'push'");
-    expect(surfaces.if).not.toContain('pull_request');
-  });
-
+  it('registers mobile claim proof in web CI', assertProfileClaimProof);
   it('selects the Tasks row geometry proof for its shared cell and feature surfaces', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',

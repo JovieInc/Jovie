@@ -319,21 +319,13 @@ describe('ProfileCompactSurface', () => {
       renderSurface({ proofClaimCta: { href: '/start', label } });
 
       const bar = screen.getByTestId('profile-proof-claim-bar');
+      const cta = screen.getByTestId('profile-proof-claim-bar-cta');
       expect(bar).toHaveClass('md:hidden');
-      expect(screen.getByTestId('profile-proof-claim-bar-cta')).toHaveAttribute(
-        'href',
-        '/start'
-      );
+      expect(cta).toHaveAttribute('href', '/start');
       // WCAG 2.5.3 / axe label-content-name-mismatch: the accessible name
       // starts with the visible "jov.ie/you" text.
-      expect(
-        screen
-          .getByTestId('profile-proof-claim-bar-cta')
-          .getAttribute('aria-label')
-      ).toBe(`jov.ie/you ${label}`);
-      expect(
-        screen.getByTestId('profile-proof-claim-bar-cta').textContent
-      ).toBe(`jov.ie/you ${label}`);
+      expect(cta.getAttribute('aria-label')).toBe(`jov.ie/you ${label}`);
+      expect(cta.textContent).toBe(`jov.ie/you ${label}`);
       // Rides inside the dock, directly above the nav, so it moves with it.
       expect(bar.nextElementSibling).toBe(
         screen.getByTestId('profile-bottom-nav')
