@@ -80,10 +80,14 @@ describe('canonical robots.txt Content-Signal output', () => {
     const { default: config } = await import('../../next.config.js');
     const rewrites = await config.rewrites();
     expect(
-      rewrites.beforeFiles.some(rule => rule.source === '/robots.txt')
+      rewrites.beforeFiles.some(
+        (rule: { readonly source: string }) => rule.source === '/robots.txt'
+      )
     ).toBe(false);
     expect(
-      rewrites.beforeFiles.some(rule => rule.source.startsWith('/hud'))
+      rewrites.beforeFiles.some((rule: { readonly source: string }) =>
+        rule.source.startsWith('/hud')
+      )
     ).toBe(true);
   });
 });
