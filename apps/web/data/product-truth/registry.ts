@@ -749,7 +749,7 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   ...PUBLIC_ACCESS_FLAG_CAPABILITIES,
   CHATGPT_APP_DIRECTORY_MCP: {
     nonMarketing:
-      'ChatGPT directory MCP kill switch; anonymous public artist reads; default off',
+      'ChatGPT directory MCP kill switch; anonymous public creator reads; default off',
   },
   IN_HOUSE_RESOLVER: {
     nonMarketing:
