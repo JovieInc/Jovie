@@ -29,11 +29,9 @@ import {
 } from '@/lib/commands/registry';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
-
 const pushMock = vi.fn();
 const prefetchMock = vi.fn();
 const CMD_LABEL = String.fromCodePoint(0x2318);
-
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: pushMock,
@@ -156,7 +154,9 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       />
     );
 
-    expect(screen.getByRole('option', { name: 'No matches' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('option', { name: 'No matches' })
+    ).toBeInTheDocument();
     expect(fuzzyMatch('SharedCommandPalette', 'palette')).toBe(true);
     expect(fuzzyMatch('SharedCommandPalette', 'missing')).toBe(false);
   });

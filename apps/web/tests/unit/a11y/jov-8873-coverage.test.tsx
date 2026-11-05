@@ -27,6 +27,7 @@ describe('JOV-8873 shrunk-coverage restore', () => {
     render(
       <SegmentControl
         value='links'
+        variant='linear-pill'
         onValueChange={vi.fn()}
         options={[...options]}
       />
