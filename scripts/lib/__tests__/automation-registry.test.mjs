@@ -410,22 +410,12 @@ describe('post-handoff Summer receiver detection', () => {
   });
 
   it.each([
-    [
-      'failed',
-      null,
-      'mesh-undelivered-over-10m:49+',
-      '=failed; mesh-undelivered-over-10m:49+',
-    ],
-    [
-      'unknown',
-      null,
-      'mesh-pending-unreadable',
-      '=unknown; mesh-pending-unreadable',
-    ],
-    ['partial', at, 'mesh-pending-partial', '=partial; mesh-pending-partial'],
+    ['failed', null, 'mesh-undelivered-over-10m:49+'],
+    ['unknown', null, 'mesh-pending-unreadable'],
+    ['partial', at, 'mesh-pending-partial'],
   ])(
     'retains %s producer evidence while the process heartbeat is healthy',
-    async (status, observedAt, code, detail) => {
+    async (status, observedAt, code) => {
       const { report } = await observe({
         status,
         observedAt,
@@ -437,7 +427,7 @@ describe('post-handoff Summer receiver detection', () => {
         report.results.find(row => row.id === 'summer:heartbeat').status
       ).toBe('fresh');
       expect(receiver(report).status).not.toBe('fresh');
-      expect(receiver(report).reason).toContain(detail);
+      expect(receiver(report).reason).toContain(`=${status}; ${code}`);
       expect(report.status).toBe('degraded');
       expect(livenessDecisions(report, {})).toEqual([]);
     }
