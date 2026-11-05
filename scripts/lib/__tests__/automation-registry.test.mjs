@@ -406,6 +406,7 @@ describe('post-handoff Summer receiver detection', () => {
     expect(
       registry.entries.some(row => row.id === 'summer:mesh-delivery-dwell')
     ).toBe(false);
+    expect(selected.entries.find(row => row.id === id).critical).toBe(false);
   });
 
   it.each([
@@ -437,10 +438,8 @@ describe('post-handoff Summer receiver detection', () => {
       ).toBe('fresh');
       expect(receiver(report).status).not.toBe('fresh');
       expect(receiver(report).reason).toContain(detail);
-      expect(report.status).toBe('critical');
-      expect(livenessDecisions(report, {})).toMatchObject([
-        { action: 'red', id },
-      ]);
+      expect(report.status).toBe('degraded');
+      expect(livenessDecisions(report, {})).toEqual([]);
     }
   );
 
@@ -469,7 +468,7 @@ describe('post-handoff Summer receiver detection', () => {
     expect(receiver(report)).toMatchObject({ status: 'stale', ageMinutes: 31 });
   });
 
-  it('accepts fresh verified receiver evidence and clears the same detector identity', async () => {
+  it('accepts fresh verified receiver evidence without an outbound decision', async () => {
     const { report } = await observe({
       status: 'verified',
       observedAt: at,
@@ -482,7 +481,7 @@ describe('post-handoff Summer receiver detection', () => {
       livenessDecisions(report, {
         'automation-liveness-summer-receiver-outcomes': 'red',
       })
-    ).toMatchObject([{ action: 'green', id }]);
+    ).toEqual([]);
   });
 
   it('keeps an unreadable source unknown without a retry', async () => {
