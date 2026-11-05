@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CODE_FLAGS } from '@/lib/flags/code-flags';
+import { APP_FLAG_KEYS } from '@/lib/flags/contracts';
 import { PUBLIC_ACCESS_FLAG_CAPABILITIES } from './public-access-flags';
 import { PRODUCT_FLAG_CAPABILITIES } from './registry';
 
@@ -11,7 +12,7 @@ describe('public access flag classifications', () => {
   )(
     'retains %s as an explicit access policy instead of a marketing capability',
     flag => {
-      expect(CODE_FLAGS).toHaveProperty(flag);
+      expect({ ...APP_FLAG_KEYS, ...CODE_FLAGS }).toHaveProperty(flag);
       expect(PRODUCT_FLAG_CAPABILITIES[flag]).toBe(
         PUBLIC_ACCESS_FLAG_CAPABILITIES[flag]
       );

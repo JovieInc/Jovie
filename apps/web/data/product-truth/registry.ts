@@ -709,7 +709,6 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   BILLING_UPGRADE_DIRECT: { nonMarketing: 'billing checkout routing' },
   SMARTLINK_PRE_SAVE: { capabilityId: 'smart-links' },
   IOS_APPLE_MUSIC_PRIORITY: { nonMarketing: 'platform ordering heuristic' },
-  SPOTIFY_OAUTH: { nonMarketing: 'account connection plumbing' },
   STRIPE_CONNECT_ENABLED: { capabilityId: 'pay' },
   PLAYLIST_ENGINE: { nonMarketing: 'internal playlist generation job' },
   ALBUM_ART_GENERATION: { capabilityId: 'album-art-generation' },
@@ -764,6 +763,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   },
   MUSIC_RESOLVER_RELEASE_FACTS: {
     nonMarketing: 'JOV-7323 release-facts resolver family cutover',
+  },
+  AUTH_OFFER_SUMMARY: {
+    nonMarketing:
+      'auth offer recap; default off; no price, trial, or entitlement change',
   },
   SOCIAL_HTML_ISOLATED_PROVIDER: {
     nonMarketing:
