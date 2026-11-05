@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { fn } from 'storybook/test';
+import { expect, fn } from 'storybook/test';
 import { PageErrorState } from './PageErrorState';
 
 const meta: Meta<typeof PageErrorState> = {
@@ -50,6 +50,37 @@ export const LongErrorDetails: Story = {
       ),
       { digest: 'dashboard-long-error' }
     ),
+    onRetry: fn(),
+  },
+};
+
+export const ContactsReadTimeout: Story = {
+  args: {
+    message: 'Failed to load contacts. Please refresh the page.',
+    onRetry: fn(),
+  },
+  play: async ({ canvas, userEvent, args }) => {
+    await expect(canvas.getByRole('alert')).toHaveTextContent(args.message!);
+    await userEvent.click(canvas.getByRole('button', { name: 'Try again' }));
+    await expect(args.onRetry).toHaveBeenCalledOnce();
+  },
+};
+
+export const AudienceReadTimeoutMobile: Story = {
+  ...ContactsReadTimeout,
+  args: {
+    message: 'Failed to load audience data. Please refresh the page.',
+    onRetry: fn(),
+  },
+  parameters: {
+    viewport: { defaultViewport: 'mobile1' },
+  },
+};
+
+export const WorkspaceReadTimeout: Story = {
+  ...ContactsReadTimeout,
+  args: {
+    message: 'Failed to load your workspace. Please refresh the page.',
     onRetry: fn(),
   },
 };

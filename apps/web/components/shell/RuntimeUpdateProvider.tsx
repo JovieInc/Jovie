@@ -38,10 +38,10 @@ export function RuntimeUpdateProvider({
   const title = applying
     ? 'Updating Jovie…'
     : downloading
-      ? 'Downloading Jovie Update…'
+      ? 'Downloading Jovie update…'
       : isDesktop
-        ? 'Restart Jovie To Update'
-        : 'Reload Jovie To Update';
+        ? 'Restart Jovie to update'
+        : 'Reload Jovie to update';
   const description = applying
     ? 'Installing the update and restarting Jovie…'
     : downloading

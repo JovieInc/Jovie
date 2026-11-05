@@ -14,7 +14,8 @@ time-to-limit is shorter than the resource's lead time to fix (minutes for a cle
 hardware, hours for cloud containers, same day for a budget). Alarms are change-only events on the
 host-alarms feed plus an escalation card (recommendation, default, deadline). Nothing is bought:
 cards are decisions for Tim. Auto-remediation runs only allowlisted registry commands, only with
---remediate, only on the resource's own host. No secrets are read or printed (Doppler: names only).
+--remediate, only on the resource's own host. No secrets are printed (Doppler: names only, plus
+named token lookups read in memory, never logged).
 """
 from __future__ import annotations
 
@@ -37,6 +38,12 @@ BAD = ("ALARM", "AT-LIMIT", "BLIND", "STALE")
 MIN_SPAN_S = 6 * 3600
 HEADROOM_WARN = 0.85
 INF = float("inf")
+
+# Why a collector last returned no reading, keyed "<collector-type>:<metric>": surfaces the
+# exact cause (missing variable, HTTP status) into GAP rows so the doctor card names the fix
+# instead of a bare "collector is blind".
+COLLECTOR_ERRORS: dict[str, str] = {}
+LAST_HTTP_ERROR = ""
 
 
 def iso(t: float) -> str:
@@ -124,19 +131,31 @@ def c_spend(spec: dict, now: float) -> dict | None:
 
 
 def _http_json(url: str, token: str, method: str = "GET") -> dict | None:
+    global LAST_HTTP_ERROR
+    import urllib.error
     import urllib.request
+    LAST_HTTP_ERROR = ""
     try:
         req = urllib.request.Request(url, method=method, headers={"Authorization": f"Bearer {token}"})
         with urllib.request.urlopen(req, timeout=20) as r:
             return json.load(r)
+    except urllib.error.HTTPError as e:
+        LAST_HTTP_ERROR = f"HTTP {e.code}"
+        return None
     except (OSError, ValueError):
+        LAST_HTTP_ERROR = "unreachable"
         return None
 
 
 def neon_token() -> str | None:
-    """NEON_API_KEY, else the neonctl OAuth token on this host (read in memory, never printed)."""
+    """NEON_API_KEY from the environment, then the Doppler lanes store (agent-mesh/prd, the same
+    store c_resend reads RESEND_READ_KEY from), then the neonctl OAuth token on this host
+    (read in memory, never printed)."""
     if os.environ.get("NEON_API_KEY"):
-        return os.environ["NEON_API_KEY"]
+        return os.environ["NEON_API_KEY"].strip()
+    token = run(["doppler", "secrets", "get", "NEON_API_KEY", "-p", "agent-mesh", "-c", "prd", "--plain"])
+    if token and token.strip():
+        return token.strip()
     try:
         return json.loads((Path.home() / ".config/neonctl/credentials.json").read_text())["access_token"]
     except (OSError, ValueError, KeyError):
@@ -151,18 +170,25 @@ def c_neon(spec: dict, now: float) -> dict | None:
     """
     token = neon_token()
     if not token:
+        COLLECTOR_ERRORS[f"neon:{spec.get('metric', '')}"] = (
+            "no NEON_API_KEY on this host — add it to Doppler agent-mesh/prd (the lanes store the "
+            "collector already reads) or the collector's environment; provisioning is Tim-only")
         return None
     base = "https://console.neon.tech/api/v2"
     org = spec["orgId"]
     if spec["metric"] == "branches":
         proj = _http_json(f"{base}/projects/{spec['projectId']}/branches?limit=500", token)
-        return {"value": len(proj["branches"]), "limit": spec["limit"]} if proj else None
+        if not proj:
+            COLLECTOR_ERRORS[f"neon:{spec.get('metric', '')}"] = f"Neon API {LAST_HTTP_ERROR or 'unreachable'}"
+            return None
+        return {"value": len(proj["branches"]), "limit": spec["limit"]}
     start = datetime.fromtimestamp(now, timezone.utc).replace(day=1, hour=0, minute=0, second=0)
     stamp = lambda d: d.strftime("%Y-%m-%dT%H:%M:%SZ")
     url = (f"{base}/consumption_history/v2/projects?org_id={org}&granularity=daily&from={stamp(start)}"
            f"&to={iso(now)}&limit=100&metrics=compute_unit_seconds,public_network_transfer_bytes,extra_branches_month")
     data = _http_json(url, token)
     if not data:
+        COLLECTOR_ERRORS[f"neon:{spec.get('metric', '')}"] = f"Neon API {LAST_HTTP_ERROR or 'unreachable'}"
         return None
     totals: dict[str, float] = {}
     for proj in data.get("projects", []):
@@ -187,27 +213,54 @@ def c_neon(spec: dict, now: float) -> dict | None:
     return None
 
 
+def _resend_count(value: object) -> bool:
+    # Counts cross a JSON/float-based forecast boundary; booleans are not counts.
+    return type(value) is int and 0 <= value <= 2 ** 53 - 1
+
+
+def _resend_reset_at(value: object, now: float) -> float | None:
+    if not isinstance(value, str) or "T" not in value:
+        return None
+    try:
+        reset = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if reset.tzinfo is None:
+            return None
+        timestamp = reset.timestamp()
+    except (ValueError, OverflowError, OSError):
+        return None
+    return timestamp if timestamp > now else None
+
+
 def c_resend(spec: dict, now: float) -> dict | None:
-    """Emails sent today (UTC) or this month vs the plan quota. Needs a full-access key: the production
-    key is send-only (401 on list), so this reads RESEND_READ_KEY and is a GAP until Tim mints one."""
+    """Read authoritative account quota, including sent AND received email.
+
+    Adopt Resend GET /usage through the shared HTTP wrapper. Sent listings
+    cannot establish total quota. Keep GAP for unavailable evidence, unlimited
+    or changed limits the current registry cannot represent, and expired resets.
+    Reset boundaries come from the provider, never a locally derived calendar.
+    RESEND_READ_KEY is existing read authority; absence does not create a key.
+    """
+    window_name = spec.get("window")
+    window = {"day": "daily", "month": "monthly"}.get(window_name) if isinstance(window_name, str) else None
+    configured_limit = spec.get("limit")
+    if not window or not _resend_count(configured_limit) or configured_limit == 0:
+        return None
     token = os.environ.get("RESEND_READ_KEY") or run(
         ["doppler", "secrets", "get", "RESEND_READ_KEY", "-p", "agent-mesh", "-c", "prd", "--plain"])
-    if not token:
+    if not token or not token.strip():
         return None
-    day = datetime.fromtimestamp(now, timezone.utc)
-    floor = day.replace(hour=0, minute=0, second=0).strftime("%Y-%m-%d") if spec["window"] == "day" \
-        else day.strftime("%Y-%m-01")
-    count, after = 0, ""
-    for _ in range(100):
-        page = _http_json(f"https://api.resend.com/emails?limit=100{after}", token.strip())
-        rows = (page or {}).get("data")
-        if not rows:
-            break
-        count += sum(1 for r in rows if r["created_at"][:10] >= floor)
-        if rows[-1]["created_at"][:10] < floor or not page.get("has_more"):
-            break
-        after = f"&after={rows[-1]['id']}"
-    return {"value": count, "limit": spec["limit"]}
+    payload = _http_json("https://api.resend.com/usage", token.strip())
+    if not isinstance(payload, dict) or payload.get("object") != "usage" \
+            or not isinstance(payload.get("emails"), dict):
+        return None
+    usage = payload["emails"].get(window)
+    if not isinstance(usage, dict) or any(not _resend_count(usage.get(key))
+                                          for key in ("used", "limit", "sent", "received")):
+        return None
+    if usage["limit"] != configured_limit or usage["used"] != usage["sent"] + usage["received"] \
+            or _resend_reset_at(usage.get("resets_at"), now) is None:
+        return None
+    return {"value": usage["used"], "limit": usage["limit"], "resetsAt": usage["resets_at"]}
 
 
 def c_manual(spec: dict, now: float) -> dict | None:
@@ -319,12 +372,30 @@ def c_access_gaps(spec: dict, now: float) -> dict | None:
     agent that hits the same 401/403/Doppler denial twice becomes an access-gap card for its owner
     instead of a shrug. Snippets are normalized (ids, numbers and long tokens removed) and capped.
     """
-    import glob, hashlib, re
+    import glob, hashlib, math, re
     pattern = re.compile("|".join(ACCESS_DENIED))
     hint = re.compile(rb"Doppler Error|HTTP 40[13]|40[13] (?:Unauth|Forbid)|not accessible by|ermission denied|"
                       rb"scope|not authori|n't read|not read|t access", re.I)
     offsets_path = state_dir() / "access-gap-offsets.json"
     seen_path = state_dir() / "access-gap-seen.jsonl"
+    COLLECTOR_ERRORS.pop("access-gaps:", None)
+    # Recovery requires complete history. The generic sample reader tolerates
+    # corrupt/unreadable rows; using that result here would falsely clear issues
+    # after transcript offsets have advanced. Preserve both files on failure.
+    try:
+        try:
+            history = [json.loads(line) for line in seen_path.read_text().splitlines()]
+        except FileNotFoundError:
+            if offsets_path.exists():
+                raise ValueError("history missing after scan")
+            history = []
+        if any(not isinstance(row, dict) or not isinstance(row.get("sig"), str)
+               or not isinstance(row.get("src"), str) or type(row.get("t")) not in (int, float)
+               or not math.isfinite(row["t"]) for row in history):
+            raise ValueError("invalid history")
+    except (OSError, ValueError):
+        COLLECTOR_ERRORS["access-gaps:"] = "access-gap history unavailable or invalid"
+        return None
     try:
         offsets = json.loads(offsets_path.read_text())
     except (OSError, ValueError):
@@ -338,7 +409,8 @@ def c_access_gaps(spec: dict, now: float) -> dict | None:
             try:
                 st = os.stat(path)
             except OSError:
-                continue
+                COLLECTOR_ERRORS["access-gaps:"] = "access-gap transcript metadata unavailable"
+                return None
             if st.st_mtime < now - window:
                 continue
             start = offsets.get(path, max(0, st.st_size - spec.get("firstReadBytes", 2_000_000)))
@@ -356,7 +428,7 @@ def c_access_gaps(spec: dict, now: float) -> dict | None:
                 offsets[path] = fh.tell()
     state_dir().mkdir(parents=True, exist_ok=True)
     offsets_path.write_text(json.dumps(offsets))
-    rows = load_samples(seen_path, now - window) + hits
+    rows = [row for row in history if row["t"] >= now - window] + hits
     with open(seen_path, "w") as fh:
         for row in rows:
             fh.write(json.dumps(row) + "\n")
@@ -366,10 +438,11 @@ def c_access_gaps(spec: dict, now: float) -> dict | None:
         counts.setdefault(row["sig"], set()).add(row["src"])
         total[row["sig"]] = total.get(row["sig"], 0) + 1
     repeated = sorted((s for s, n in total.items() if n >= spec.get("minRepeats", 2)), key=lambda s: -total[s])
-    repeated = repeated[:spec.get("maxCards", 8)]  # the long tail stays in the parent row's count
+    active_keys = [hashlib.sha256(s.encode()).hexdigest()[:12] for s in repeated]
+    repeated = repeated[:spec.get("maxCards", 8)]  # limit cards, not evidence of still-active gaps
     gaps = [{"sig": s, "count": total[s], "sources": len(counts[s]),
              "key": hashlib.sha256(s.encode()).hexdigest()[:12]} for s in repeated]
-    return {"value": len(gaps), "limit": spec.get("limit", 1000), "gaps": gaps,
+    return {"value": len(gaps), "limit": spec.get("limit", 1000), "gaps": gaps, "activeGapKeys": active_keys,
             "detail": "; ".join(f"{g['sig']} x{g['count']} in {g['sources']} sessions" for g in gaps[:5])}
 
 
@@ -413,6 +486,11 @@ def evaluate(res: dict, reading: dict | None, history: list[tuple[float, float]]
     quiet GAP: a broken collector hid the 100/100 secret cap and stale spend for days (2026-10-31)."""
     row = {"id": res["id"], "group": res["group"], "label": res["label"], "unit": res.get("unit", ""),
            "leadTimeHours": res["leadTimeHours"], "atLimit": res["atLimit"]["effect"]}
+    if reading is not None and res["collector"]["type"] == "resend":
+        if not _resend_count(reading.get("value")) or not _resend_count(reading.get("limit")) \
+                or reading["limit"] == 0 or reading["limit"] != res["collector"].get("limit") \
+                or _resend_reset_at(reading.get("resetsAt"), now) is None:
+            reading = None
     if reading is None and blind:
         return {**row, "status": "BLIND", "why": f"{res['collector']['type']} collector returned no reading"}
     if reading is None:
@@ -420,6 +498,8 @@ def evaluate(res: dict, reading: dict | None, history: list[tuple[float, float]]
                 else res["collector"].get("note", "collector not wired")}
     if reading.get("detail"):
         row["detail"] = reading["detail"]
+    if res["collector"]["type"] == "access-gaps" and "activeGapKeys" in reading:
+        row["activeGapKeys"] = reading["activeGapKeys"]
     value, limit = reading["value"], reading["limit"]
     burn = reading.get("burnPerHour")
     if burn is None and res.get("mode", "trend") == "trend":
@@ -427,6 +507,8 @@ def evaluate(res: dict, reading: dict | None, history: list[tuple[float, float]]
     ttl = INF if not burn or burn <= 0 else max(0.0, (limit - value) / burn)
     frac = value / limit if limit else 0.0
     row.update(value=value, limit=limit, frac=round(frac, 3), burnPerHour=burn, ttlHours=ttl, observedAt=reading.get("observedAt"))
+    if res["collector"]["type"] == "resend":
+        row["resetsAt"] = reading["resetsAt"]
     max_age = res.get("maxAgeDays")
     stale = bool(reading.get("observedAt") and max_age and (now - parse_iso(reading["observedAt"])) > max_age * 86400)
     projected = reading.get("burnPerHour") is not None and reading.get("observedAt")
@@ -445,6 +527,15 @@ def evaluate(res: dict, reading: dict | None, history: list[tuple[float, float]]
         row.update(status="STALE", why=f"reading older than {max_age}d")
     else:
         row.update(status="OK", why="" if burn is not None else "no trend yet")
+    return row
+
+
+def apply_collector_error(row: dict, res: dict) -> dict:
+    """Surface a recorded collector failure reason into a GAP row's why (no-op when it read fine)."""
+    if "value" not in row:
+        reason = COLLECTOR_ERRORS.get(f"{res['collector']['type']}:{res['collector'].get('metric', '')}")
+        if reason:
+            row["why"] = reason
     return row
 
 
@@ -485,6 +576,25 @@ def publish(rows: list[dict], registry: dict, now: float, state: Path, feed: Pat
             cards.append(card(by_id.get(row["id"]) or row["res"], row, now))
         elif row["status"] == "OK" and prior.get(row["id"]) in BAD:
             cards.append({"kind": "capacity-clear", "id": row["id"], "at": iso(now), "clear": True})
+    # Dynamic denial rows can disappear instead of becoming OK. Only a successful,
+    # complete parent scan proves recovery; BLIND/missing/legacy evidence and the
+    # maxCards display cap must preserve the outstanding alarm for a later scan.
+    parents = {r["id"]: r for r in rows}
+    for res in registry["resources"]:
+        if res["collector"]["type"] != "access-gaps":
+            continue
+        parent = parents.get(res["id"], {})
+        active = parent.get("activeGapKeys")
+        complete = (parent.get("status") in ("OK", "ALARM", "AT-LIMIT")
+                    and isinstance(active, list) and all(isinstance(key, str) for key in active))
+        prefix = res["id"] + ":"
+        for ident, status in prior.items():
+            if not ident.startswith(prefix) or ident in current or status not in BAD:
+                continue
+            if complete and ident[len(prefix):] not in active:
+                cards.append({"kind": "capacity-clear", "id": ident, "at": iso(now), "clear": True})
+            else:
+                current[ident] = status
     state.mkdir(parents=True, exist_ok=True)
     if cards:
         feed.parent.mkdir(parents=True, exist_ok=True)
@@ -522,7 +632,11 @@ def tracker_transport(cards: list[dict]) -> list[tuple[str | None, str | None]]:
     for c in cards:
         try:
             if c.get("clear"):  # the condition cleared: close its issue so Triage reflects reality
+                tracker.existing_error = None
                 found = tracker.existing(f"capacity:{c['id']}")
+                if tracker.existing_error:
+                    out.append((None, "tracker-lookup-failed"))
+                    continue
                 ok = tracker.close(found, f"capacity:{c['id']}") if found else True
                 out.append((found or "none-open", None) if ok else (None, "tracker-close-failed"))
                 continue
@@ -552,7 +666,9 @@ def deliver(cards: list[dict], state: Path, local: str, now: float, transport=No
     """Deliver new cards plus any still pending; returns the delivery block for forecast.json."""
     pending_path, log_path = state / "pending-delivery.jsonl", state / "deliveries.jsonl"
     pending = load_samples(pending_path, 0) if pending_path.exists() else []
-    queue = {(c["id"], c["at"]): c for c in pending + [dict(c, host=c.get("host", local), t=now) for c in cards]}
+    # New observations supersede undelivered actions for the same resource. In
+    # particular, a successful clear must never leave an older open queued behind it.
+    queue = {c["id"]: c for c in pending + [dict(c, host=c.get("host", local), t=now) for c in cards]}
     todo = list(queue.values())
     if transport is None:
         target = os.environ.get("CAPACITY_DELIVERY_HOST", "gem")
@@ -640,11 +756,22 @@ def main(argv: list[str] | None = None) -> int:
         if own and kind in COLLECTORS:
             reading = COLLECTORS[kind](res["collector"], now)
             if reading and args.cmd == "collect" and kind != "manual":
-                fresh.append({"t": now, "id": res["id"], "host": local, "value": reading["value"], "limit": reading["limit"]})
+                sample = {"t": now, "id": res["id"], "host": local, "value": reading["value"], "limit": reading["limit"]}
+                if kind == "resend":
+                    sample["resetsAt"] = reading["resetsAt"]
+                fresh.append(sample)
         elif not own and hist:
             last = next(r for r in reversed(merged) if r.get("id") == res["id"])
             reading, hist = {"value": last["value"], "limit": last["limit"]}, hist[:-1]
+            if "resetsAt" in last:
+                reading["resetsAt"] = last["resetsAt"]
+        if kind == "resend" and reading:
+            reset = _resend_reset_at(reading.get("resetsAt"), now)
+            same_window = {(r["t"], r["value"]) for r in merged if r.get("id") == res["id"]
+                           and reset is not None and _resend_reset_at(r.get("resetsAt"), now) == reset}
+            hist = [point for point in hist if point in same_window]
         row = evaluate(res, reading, hist, now, blind=own and kind in COLLECTORS and args.cmd == "collect")
+        row = apply_collector_error(row, res)
         if reading is None and not own and kind != "none":
             row["why"] = f"no samples from {res['host']} (install collector, then --remote {res['host']})"
         rows.append(row)
@@ -656,6 +783,12 @@ def main(argv: list[str] | None = None) -> int:
                 f.write(json.dumps(s) + "\n")
         cards = publish(rows, registry, now, state, alarm_feed())
         delivery = deliver(cards, state, local, now)
+        if local == cloud_owner and os.environ.get("WASTE_LOOP") != "off":
+            try:  # unit-metric waste detectors ride the same pass (ops/registry/waste.json)
+                import waste
+                waste.run_pass()
+            except Exception as error:  # a waste-loop fault never blocks capacity alarms
+                print(f"waste-loop: {type(error).__name__}: {error}", file=sys.stderr)
         if args.remediate:
             by_id = {r["id"]: r for r in registry["resources"]}
             for row in rows:

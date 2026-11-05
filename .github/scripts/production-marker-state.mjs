@@ -32,6 +32,15 @@ const CONTROLLER_ROLLBACK_SUFFIX = 'Centralized production rollback';
 const POST_VERIFICATION_JOBS = new Set([
   'Publish verified customer changelog',
   'File customer changelog remediation',
+  // Post-verification publication monitor (checks for unpublished
+  // release-worthy changes after the marker write). Its failure un-verifies
+  // nothing: run 41389538083 (b2a2d02) verified, published, then failed only
+  // here — and classified interrupted, freezing every later release for
+  // 3.9h (JOV-9998).
+  'Customer changelog staleness',
+  // Dispatch-only heal step; its failure never mutates or un-verifies the
+  // generation.
+  'Heal interrupted verified marker',
 ]);
 const INTERRUPTED_CONCLUSIONS = new Set([
   'cancelled',

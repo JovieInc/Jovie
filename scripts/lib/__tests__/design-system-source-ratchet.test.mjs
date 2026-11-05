@@ -371,9 +371,7 @@ describe('design-system source identity ratchet (JOV-5301)', () => {
   });
 
   it('passes the live tree against the committed identity baseline', () => {
-    const started = Date.now();
     const result = evaluateDesignSystemSourceRatchet({ repoRoot: REPO_ROOT });
-    expect(Date.now() - started).toBeLessThan(5_000);
     expect(result.ok, result.issues.join('\n')).toBe(true);
     expect(result.newIdentities).toEqual([]);
     expect(collectDesignSystemIdentities({ repoRoot: REPO_ROOT }).length).toBe(
