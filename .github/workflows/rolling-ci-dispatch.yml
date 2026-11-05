@@ -65,6 +65,7 @@ jobs:
             scripts/lib/changed-test-coverage.mjs
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
+            scripts/lib/onboarding-test-producers.mjs
             scripts/lib/git-base-ref.mjs
             scripts/ci-fast-lanes.mjs
             scripts/design-conformance-paths.mjs
@@ -560,6 +561,7 @@ jobs:
             scripts/lib/changed-test-coverage.mjs
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
+            scripts/lib/onboarding-test-producers.mjs
             scripts/lib/git-base-ref.mjs
             scripts/ci-fast-lanes.mjs
             scripts/design-conformance-paths.mjs
@@ -861,6 +863,7 @@ jobs:
             scripts/design-conformance-paths.mjs
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
+            scripts/lib/onboarding-test-producers.mjs
             scripts/lib/git-base-ref.mjs
             scripts/version-fanout-guard.mjs
           sparse-checkout-cone-mode: false
@@ -977,6 +980,7 @@ jobs:
             scripts/lib/changed-test-coverage.mjs
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
+            scripts/lib/onboarding-test-producers.mjs
             scripts/lib/git-base-ref.mjs
             scripts/ci-fast-lanes.mjs
             scripts/design-conformance-paths.mjs

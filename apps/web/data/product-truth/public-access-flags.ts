@@ -1,13 +1,13 @@
 import type { ProductFlagKey } from './registry';
 
-/** Access-control switches do not announce customer-facing capabilities. */
+/** Auth-entry and access switches do not announce customer-facing capabilities. */
 export const PUBLIC_ACCESS_FLAG_CAPABILITIES = {
   OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: {
     nonMarketing: 'OAuth dynamic client registration kill switch',
   },
-  CHATGPT_APP_DIRECTORY_MCP: {
+  AUTH_OFFER_SUMMARY: {
     nonMarketing:
-      'ChatGPT directory MCP kill switch; anonymous public artist reads; default off',
+      'auth offer recap; default off; no price, trial, or entitlement change',
   },
   PUBLIC_SIGNUP_CLOSED: { nonMarketing: 'closed signup gate; default on' },
 } as const satisfies Readonly<

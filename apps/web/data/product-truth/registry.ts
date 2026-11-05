@@ -748,6 +748,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
       'marketing copy presentation; default on, env kill switch; does not change smart-link certification (JOV-7580)',
   },
   ...PUBLIC_ACCESS_FLAG_CAPABILITIES,
+  CHATGPT_APP_DIRECTORY_MCP: {
+    nonMarketing:
+      'ChatGPT directory MCP kill switch; anonymous public artist reads; default off',
+  },
   IN_HOUSE_RESOLVER: {
     nonMarketing:
       'legacy JOV-7323 umbrella rollback override for resolver families',
@@ -760,10 +764,6 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   },
   MUSIC_RESOLVER_RELEASE_FACTS: {
     nonMarketing: 'JOV-7323 release-facts resolver family cutover',
-  },
-  AUTH_OFFER_SUMMARY: {
-    nonMarketing:
-      'auth offer recap; default off; no price, trial, or entitlement change',
   },
   SOCIAL_HTML_ISOLATED_PROVIDER: {
     nonMarketing:
