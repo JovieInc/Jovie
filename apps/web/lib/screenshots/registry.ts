@@ -7,12 +7,6 @@ import type {
   ScreenshotScenario,
 } from './types';
 
-/**
- * Exact-prod recertification path (JOV-7713): this registry is a Product
- * Screenshots trigger path, so a change here re-runs Generate + Certify on
- * the current main tip, binding the AM-020/021/023 web-desktop and web-mobile
- * screen-audit obligations to the live deployed generation.
- */
 export const SCREENSHOT_VIEWPORTS = {
   desktop: { width: 1440, height: 900 },
   mobile: { width: 390, height: 844 },
