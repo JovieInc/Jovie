@@ -24,6 +24,7 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { plannerContractGroupIsWired } from './trusted-test-planner-snapshot.mjs';
 
 export const SCRIPT_TEST_PATTERN = /\.test\.(?:mjs|ts)$/;
 const SKIPPED_DIRS = new Set(['node_modules', 'fixtures', '.cache']);
@@ -180,17 +181,7 @@ export async function collectCiCommands(repoRoot, options = {}) {
   const laneSource = 'scripts/ci-fast-lanes.mjs';
   const laneText = readFileSync(join(repoRoot, laneSource), 'utf8');
   const sources = [{ source: laneSource, text: laneText }];
-  // This literal group is executable only through this import and array spread.
-  const plannerImport =
-    /import\s*\{\s*TEST_PLANNER_CONTRACT_TESTS\s*\}\s*from\s*(['"])\.\/lib\/test-planner-contract-tests\.mjs\1/u;
-  const nodeArray =
-    /export const SCRIPT_CONTRACT_NODE_TESTS\s*=\s*Object\.freeze\(\[([\s\S]*?)\]\);/u.exec(
-      laneText
-    )?.[1];
-  if (
-    plannerImport.test(laneText) &&
-    nodeArray?.includes('...TEST_PLANNER_CONTRACT_TESTS')
-  ) {
+  if (plannerContractGroupIsWired(laneText)) {
     const source = 'scripts/lib/test-planner-contract-tests.mjs';
     sources.push({
       source,

@@ -62,6 +62,13 @@ test('actual BASE bootstrap ignores malicious candidate engine and producer side
     'scripts/lib/trusted-test-planner-snapshot.mjs',
     evil + 'process.exit(0);\n'
   );
+  assert.equal(
+    readFileSync(
+      join(f.root, 'scripts/lib/trusted-test-planner-snapshot.mjs'),
+      'utf8'
+    ),
+    evil + 'process.exit(0);\n'
+  );
   const temp = join(f.root, 'runner');
   mkdirSync(temp);
   const { workflow, bootstrap } = workflowBootstrap();
@@ -263,6 +270,16 @@ test('BASE-absent optional feedback data rejects candidate fallback before paylo
     /Optional BASE feedback-guard input absent; refusing candidate fallback/
   );
   assert.equal(existsSync(out), false);
+});
+
+test('fixture rejects surplus arguments before writing a misleading payload', t => {
+  const f = trustedPlannerFixture(t, false);
+  assert.throws(
+    () =>
+      Reflect.apply(f.put, null, ['scripts/ignored.mjs', 'harmless', 'evil']),
+    /fixture put requires exactly two arguments/
+  );
+  assert.equal(existsSync(join(f.root, 'scripts/ignored.mjs')), false);
 });
 
 test('trusted snapshot verification rejects payload tampering', t => {

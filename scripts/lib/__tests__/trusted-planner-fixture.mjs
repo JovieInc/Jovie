@@ -25,10 +25,15 @@ export function trustedPlannerFixture(t, withProducer) {
   git('init', '-q');
   git('config', 'user.name', 'Trusted planner fixture');
   git('config', 'user.email', 'fixture@example.invalid');
-  const put = (file, text) => {
+  function put(file, text) {
+    assert.equal(
+      arguments.length,
+      2,
+      'fixture put requires exactly two arguments'
+    );
     mkdirSync(dirname(join(root, file)), { recursive: true });
     writeFileSync(join(root, file), text);
-  };
+  }
   put(
     'scripts/lib/blog-content-ci.mjs',
     "export const blogMarker='trusted-blog';\n"

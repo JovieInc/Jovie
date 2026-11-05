@@ -16,17 +16,42 @@ const MODULE_INIT_FILES = {
 const SHA = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;
 const PATH = /^[A-Za-z0-9_.\/-]+$/u;
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
-const PARSER = [
+const AST_PARSER = [
   "const {parse}=require('node:internal/deps/acorn/acorn/dist/acorn');",
   "const {readFileSync}=require('node:fs');",
   "const ast=parse(readFileSync(0,'utf8'),{ecmaVersion:'latest',sourceType:'module'});",
-  "const aliases=new Set(['require']);const dependencies=[];",
   "function walk(node,visit){if(!node||typeof node!=='object')return;visit(node);for(const value of Object.values(node)){if(Array.isArray(value))for(const child of value)walk(child,visit);else if(value&&typeof value==='object')walk(value,visit);}}",
+];
+const PARSER = [
+  ...AST_PARSER,
+  "const aliases=new Set(['require']);const dependencies=[];",
   "walk(ast,node=>{if(node.type==='VariableDeclarator'&&node.id.type==='Identifier'&&node.init?.type==='CallExpression'&&node.init.callee.type==='Identifier'&&node.init.callee.name==='createRequire')aliases.add(node.id.name);});",
   "function literal(node){if(node?.type!=='Literal'||typeof node.value!=='string')throw Error('Unsupported computed BASE dependency');return node.value;}",
   "walk(ast,node=>{if(['ImportDeclaration','ExportNamedDeclaration','ExportAllDeclaration'].includes(node.type)&&node.source)dependencies.push(literal(node.source));else if(node.type==='ImportExpression')dependencies.push(literal(node.source));else if(node.type==='CallExpression'&&node.callee.type==='Identifier'&&aliases.has(node.callee.name)){if(node.arguments.length!==1)throw Error('Unsupported BASE require arguments');const value=literal(node.arguments[0]);if(value.startsWith('.'))dependencies.push(value);}});",
   'process.stdout.write(JSON.stringify(dependencies));',
 ].join('\n');
+
+/** Parse actual executable wiring with the same pinned native parser as BASE imports. */
+export function plannerContractGroupIsWired(source) {
+  const program = [
+    ...AST_PARSER,
+    "const binding=ast.body.filter(n=>n.type==='ImportDeclaration'&&n.source.value==='./lib/test-planner-contract-tests.mjs').flatMap(n=>n.specifiers).find(n=>n.type==='ImportSpecifier'&&n.imported.name==='TEST_PLANNER_CONTRACT_TESTS')?.local.name;",
+    "const declaration=ast.body.filter(n=>n.type==='ExportNamedDeclaration'&&n.declaration?.type==='VariableDeclaration').flatMap(n=>n.declaration.declarations).find(n=>n.id.type==='Identifier'&&n.id.name==='SCRIPT_CONTRACT_NODE_TESTS')?.init;",
+    "const array=declaration?.type==='CallExpression'&&declaration.callee.type==='MemberExpression'&&!declaration.callee.computed&&declaration.callee.object.name==='Object'&&declaration.callee.property.name==='freeze'&&declaration.arguments.length===1?declaration.arguments[0]:null;",
+    "process.stdout.write(JSON.stringify(Boolean(binding&&array?.type==='ArrayExpression'&&array.elements.some(n=>n?.type==='SpreadElement'&&n.argument.type==='Identifier'&&n.argument.name===binding))));",
+  ].join('\n');
+  const parsed = spawnSync(
+    process.execPath,
+    ['--expose-internals', '-e', program],
+    {
+      input: source,
+      encoding: 'utf8',
+    }
+  );
+  if (parsed.status !== 0)
+    throw new Error('Cannot parse CI planner wiring: ' + parsed.stderr);
+  return JSON.parse(parsed.stdout);
+}
 
 function safePath(file) {
   if (

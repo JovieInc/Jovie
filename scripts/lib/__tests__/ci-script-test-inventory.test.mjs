@@ -141,6 +141,29 @@ describe('scripts test inventory guard', () => {
       expect((await referenced(true, true)).get(orphan)?.size).toBe(0);
       expect((await referenced(false, true)).get(test)?.size).toBe(0);
       expect((await referenced(true, false)).get(test)?.size).toBe(0);
+      const actualLane =
+        importLine +
+        '\nexport const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([\n...TEST_PLANNER_CONTRACT_TESTS,\n]);';
+      for (const inert of [
+        actualLane
+          .split('\n')
+          .map(line => '// ' + line)
+          .join('\n'),
+        '/*\n' + actualLane + '\n*/',
+        'const inert = ' + JSON.stringify(actualLane) + ';',
+      ]) {
+        writeFileSync(join(root, 'scripts/ci-fast-lanes.mjs'), inert);
+        const refs = mapTestReferences(await collectCiCommands(root), [
+          test,
+          orphan,
+        ]);
+        expect(refs.get(test)?.size).toBe(0);
+        expect(refs.get(orphan)?.size).toBe(0);
+      }
+      writeFileSync(join(root, 'scripts/ci-fast-lanes.mjs'), 'export const =;');
+      await expect(collectCiCommands(root)).rejects.toThrow(
+        /Cannot parse CI planner wiring/
+      );
       rmSync(join(root, helper));
       await expect(referenced(true, true)).rejects.toThrow(/ENOENT/);
     } finally {
