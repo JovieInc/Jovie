@@ -2512,10 +2512,10 @@ describe('source-read guard selection', () => {
         const modules = [
           ...guard.command.matchAll(/scripts\.tests\.test_[a-z_]+/gu),
         ].map(match => match[0]);
-        expect(modules).toEqual([
-          'scripts.tests.test_capacity_forecast',
-          'scripts.tests.test_neon_collector',
-        ]);
+        expect(modules.join(' ')).toBe(
+          'scripts.tests.test_capacity_forecast scripts.tests.test_capacity_collectors ' +
+            'scripts.tests.test_neon_collector'
+        );
         for (const module of modules) {
           expect(
             readFileSync(
