@@ -2030,7 +2030,7 @@ describe('merge_group workflow contract', () => {
       "run_web: ${{ steps.detect.outputs.run_web || 'false' }}"
     );
     expect(pathChanges).toMatch(
-      /run_ios: \$\{\{ github\.event_name == 'merge_group' && 'false' \|\| steps\.detect\.outputs\.run_ios \|\| 'false' \}\}[\s\S]*run_macos: \$\{\{ github\.event_name == 'merge_group' && 'false' \|\| steps\.detect\.outputs\.run_macos \|\| 'false' \}\}/
+      /run_ios: \$\{\{ github\.event_name == 'merge_group' && 'false' \|\| steps\.detect\.outputs\.run_ios \|\| 'false' \}\}[\s\S]*run_macos: \$\{\{ github\.event_name == 'merge_group' && 'false' \|\| steps\.detect\.outputs\.run_macos \|\| 'false' \}\}[\s\S]*Drop hosted macOS lanes from the merge-queue receipt[\s\S]*del\(\.ios, \.mac\)/
     );
     expect(pathChanges).toContain(
       "run_cross_product: ${{ steps.detect.outputs.run_cross_product || 'false' }}"

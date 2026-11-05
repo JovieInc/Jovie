@@ -1079,6 +1079,29 @@ jobs:
           printf '\n### Blog content qualification\n\n- Profile: `%s`\n- Receipt: `blog-content-receipt.json`\n' \
             "$profile" >> "$GITHUB_STEP_SUMMARY"
 
+      # The trusted classifier can still select mac or ios. The queue must
+      # not wait on the hosted macOS pool for that selection. Push to main
+      # still runs both lanes. Run 41946653614 failed the receipt because
+      # mac stayed selected while the lane was skipped.
+      - name: Drop hosted macOS lanes from the merge-queue receipt
+        if: ${{ github.event_name == 'merge_group' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/product-lane-classification"
+          jq '
+            .selectedLanes |= map(select(. != "ios" and . != "mac"))
+            | .skippedLanes = (
+                [.skippedLanes[] | select(.lane != "ios" and .lane != "mac")]
+                + [
+                  {"lane":"ios","reason":"merge queue does not wait on the hosted macOS pool"},
+                  {"lane":"mac","reason":"merge queue does not wait on the hosted macOS pool"}
+                ]
+              )
+            | .requiredGates |= del(.ios, .mac)
+          ' "$root/receipt.json" > "$root/receipt.queue.json"
+          mv "$root/receipt.queue.json" "$root/receipt.json"
+
       - name: Detect web coverage applicability
         id: coverage-detect
         shell: bash
