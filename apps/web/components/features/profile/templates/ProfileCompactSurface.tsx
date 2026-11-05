@@ -925,7 +925,7 @@ export function ProfileCompactSurface({
                   >
                     <span>
                       <span className='text-white/55'>jov.ie/</span>you
-                    </span>
+                    </span>{' '}
                     <span className='inline-flex items-center gap-1.5'>
                       {proofClaimCta.label}
                       <ArrowRight className='size-4' aria-hidden='true' />
