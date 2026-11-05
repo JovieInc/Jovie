@@ -304,6 +304,40 @@ describe('fresh production signup landing', () => {
     ).rejects.toThrow('Fresh onboarding is not ready');
   });
 
+  it.each(['missing', 'disabled'])(
+    'ignores a writable input outside onboarding when its own input is %s',
+    async state => {
+      const { shell, input } = onboardingFixture();
+      const decoy = document.createElement('textarea');
+      decoy.setAttribute('aria-label', 'Chat message input');
+      document.body.prepend(decoy);
+      vi.spyOn(decoy, 'getClientRects').mockReturnValue([
+        new DOMRect(0, 0, 100, 40),
+      ] as unknown as DOMRectList);
+      if (state === 'missing') input.remove();
+      else input.disabled = true;
+
+      const dispose = vi.fn();
+      const page = {
+        waitForFunction: vi.fn(
+          async (
+            predicate: (options: LandingOptions) => boolean,
+            options: LandingOptions
+          ) => {
+            expect(predicate(options)).toBe(false);
+            if (state === 'missing') shell.append(input);
+            else input.disabled = false;
+            expect(predicate(options)).toBe(true);
+            return { dispose };
+          }
+        ),
+      };
+
+      await waitForProductionOnboardingLanding(page as never, 'https://jov.ie');
+      expect(dispose).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it('keeps the fresh signup and first reply on the same naturally reached page', () => {
     const source = readFileSync(
       resolve(__dirname, '../../e2e/smoke-prod-auth.spec.ts'),
