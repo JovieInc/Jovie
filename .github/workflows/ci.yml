@@ -574,8 +574,12 @@ jobs:
       run_marketing_dom: ${{ steps.homepage-visual.outputs.run_marketing_dom || 'false' }}
       run_drizzle: ${{ steps.detect.outputs.run_drizzle || 'false' }}
       run_neon: ${{ steps.detect.outputs.run_neon || 'false' }}
-      run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
-      run_macos: ${{ steps.detect.outputs.run_macos || 'false' }}
+      # Merge queue must not wait on the hosted macOS pool. A macos-26
+      # runner sat pending from 23:56Z to 00:24Z on 2026-11-05 and the
+      # 30-minute queue budget ejected #23881 before the lane could finish.
+      # These lanes still run on push to main and on workflow_dispatch.
+      run_ios: ${{ github.event_name == 'merge_group' && 'false' || steps.detect.outputs.run_ios || 'false' }}
+      run_macos: ${{ github.event_name == 'merge_group' && 'false' || steps.detect.outputs.run_macos || 'false' }}
       # 'false' only when the Mac lane is selected solely by node-only inputs
       # (MAC_NODE_ONLY_RULES): the lane then runs on ubuntu. Absent from an older
       # trusted classifier, so it defaults to the macOS lane.
@@ -3782,9 +3786,9 @@ jobs:
           allow-images: 'true'
           retention-days: 7
 
-  # The coverage-bearing iOS unit gate belongs on the synthetic combined head,
-  # never the source PR. Full simulator UI/screenshot regression is preserved
-  # as a release-blocking TestFlight predecessor instead of delaying merges.
+  # iOS unit coverage runs on push to main and on workflow_dispatch.
+  # It does not run in the merge queue: the hosted macOS pool cannot hold
+  # check_response_timeout. Full simulator regression stays a TestFlight gate.
   ci-ios:
     name: iOS Fast Unit + Coverage (combined)
     needs: [ci-path-changes, ci-merge-group-admission]
