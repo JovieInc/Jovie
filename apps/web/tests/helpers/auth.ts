@@ -232,6 +232,38 @@ async function enableTestAuthBypass(
   }
 }
 
+/**
+ * Diagnostic-only: describe the exact stuck state when the post-auth shell
+ * never becomes ready, so the nightly annotation distinguishes a failed
+ * restore (Try Again), an eternally-restoring boundary, and a landing that
+ * never reached /start or /app. Reads only; changes nothing.
+ */
+export async function describeShellReadyStall(
+  page: Page,
+  main: Locator,
+  chatComposer: Locator
+): Promise<string> {
+  const bits: string[] = [`url=${page.url()}`];
+  const restoreState = await page
+    .locator('[data-testid="onboarding-session-boundary"]')
+    .first()
+    .getAttribute('data-restore-state')
+    .catch(() => null);
+  bits.push(
+    `main=${await main.isVisible().catch(() => 'unknown')}`,
+    `composer=${await chatComposer.isVisible().catch(() => 'unknown')}`,
+    `boundary-restore-state=${restoreState ?? 'absent'}`
+  );
+  const bodyText = await page
+    .locator('body')
+    .innerText({ timeout: 5_000 })
+    .catch(() => '');
+  if (bodyText) {
+    bits.push(`body=${bodyText.replace(/\s+/g, ' ').slice(0, 240)}`);
+  }
+  return bits.join(' | ');
+}
+
 async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
   const main = page.locator('main').first();
   const chatComposer = page
@@ -251,24 +283,36 @@ async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
   // reload can only fire on a stuck /start boundary.
   const reloaded = { value: false };
 
-  await expect
-    .poll(
-      async () => {
-        if (await isShellReady()) return true;
-        if (!reloaded.value) {
-          const url = new URL(page.url());
-          if (url.pathname.startsWith('/start')) {
-            reloaded.value = true;
-            await page
-              .reload({ waitUntil: 'domcontentloaded', timeout: 45_000 })
-              .catch(() => undefined);
+  // Diagnostic-only: on a poll timeout, name the exact stuck state so the
+  // nightly annotation distinguishes a failed restore (Try Again), an
+  // eternally-restoring boundary, and a landing that never reached /start or
+  // /app. The pass conditions and budgets are unchanged.
+  const describeStall = () => describeShellReadyStall(page, main, chatComposer);
+
+  try {
+    await expect
+      .poll(
+        async () => {
+          if (await isShellReady()) return true;
+          if (!reloaded.value) {
+            const url = new URL(page.url());
+            if (url.pathname.startsWith('/start')) {
+              reloaded.value = true;
+              await page
+                .reload({ waitUntil: 'domcontentloaded', timeout: 45_000 })
+                .catch(() => undefined);
+            }
           }
-        }
-        return false;
-      },
-      { timeout: 90_000, intervals: [2_000, 5_000, 10_000] }
-    )
-    .toBe(true);
+          return false;
+        },
+        { timeout: 90_000, intervals: [2_000, 5_000, 10_000] }
+      )
+      .toBe(true);
+  } catch (error) {
+    throw new Error(
+      `${error instanceof Error ? error.message : String(error)} | ${await describeStall()}`
+    );
+  }
 }
 
 export async function setTestAuthBypassSession(
