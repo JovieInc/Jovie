@@ -16,6 +16,7 @@ import {
 } from './lib/blog-content-ci.mjs';
 
 import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
+import { ONBOARDING_TEST_PRODUCERS } from './lib/onboarding-test-producers.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -101,30 +102,7 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
     'apps/web/lib/notifications/campaign-scheduling.ts',
     ['apps/web/lib/notifications/campaign-scheduling.test.ts'],
   ],
-  // Exact waitlist producers: global flags and unknown neighbors stay fail-closed.
-  [
-    'apps/web/lib/waitlist/role-entry.ts',
-    ['apps/web/lib/waitlist/role-entry.test.ts'],
-  ],
-  [
-    'apps/web/lib/waitlist/roles.ts',
-    [
-      'apps/web/components/features/waitlist/WaitlistRoleForm.test.tsx',
-      'apps/web/lib/waitlist/role-entry.test.ts',
-      'apps/web/tests/unit/api/waitlist/join.test.ts',
-    ],
-  ],
-  [
-    'apps/web/lib/admin/waitlist-gate-funnel.ts',
-    ['apps/web/lib/admin/waitlist-gate-funnel.test.ts'],
-  ],
-  [
-    'apps/web/components/features/onboarding/onboardingChatHelpers.ts',
-    [
-      'apps/web/tests/unit/onboarding/OnboardingChat.completed-steps.test.tsx',
-      'apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx',
-    ],
-  ],
+  ...ONBOARDING_TEST_PRODUCERS,
   [
     'apps/web/tests/e2e/utils/start-entry-layout.ts',
     [
