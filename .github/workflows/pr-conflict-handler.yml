@@ -592,14 +592,13 @@ jobs:
               if [[ "$conflict_count" -eq 0 ]]; then
                 detail='git failed before producing a typed conflict set'
               elif jq -e 'any(
-                (if type == "object" then .file else . end) |
-                if type != "string" then true else
                 . == ".github/workflows" or startswith(".github/workflows/") or
                 . == "scripts/pr-conflict-handler.mjs" or
                 . == "scripts/lib/pr-conflict-handler.mjs" or
                 . == "scripts/run-affected-tests.mjs" or
                 . == "scripts/ci-fast-lanes.mjs" or
                 . == "scripts/lib/trusted-test-planner-snapshot.mjs" or
+                . == "scripts/lib/test-planner-contract-tests.mjs" or
                 . == "scripts/lib/git-base-ref.mjs" or
                 . == "scripts/lib/onboarding-test-producers.mjs" or
                 . == "scripts/lib/product-shot-test-producers.mjs" or
@@ -611,7 +610,6 @@ jobs:
                 test("(^|/)\\.git(/|$)") or
                 contains("*") or contains("?") or contains("[") or
                 contains("]") or contains("{") or contains("}") or contains("\\")
-                end
               )' <<<"$conflict_files" >/dev/null || \
                 git ls-files -u | awk '$1 != "100644" && $1 != "100755" { unsafe=1 } END { exit(unsafe ? 0 : 1) }'; then
                 outcome='protected_conflict'
