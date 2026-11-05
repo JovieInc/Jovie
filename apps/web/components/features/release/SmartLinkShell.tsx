@@ -156,8 +156,12 @@ export function SmartLinkShell({
   );
 
   return (
-    <PublicSurfaceShell ambientMediaUrl={artworkUrl}>
-      <PublicSurfaceStage>
+    <PublicSurfaceShell
+      ambientMediaUrl={artworkUrl}
+      className='overflow-y-auto'
+    >
+      {/* Short screens scroll the full card so the hero cannot collapse the service reel. */}
+      <PublicSurfaceStage panelClassName='md:max-h-none'>
         {/* Hero: clean square art, then title and artist in flow. No text,
             gradient or scrim ever sits on the art (DETAILS.md, no text on text). */}
         <header className='relative w-full shrink-0 pb-1'>
