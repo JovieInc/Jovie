@@ -231,6 +231,8 @@ jobs:
           fi
 
       - name: Test secret scan regressions with installed TruffleHog
+        # Keep regression evidence available when the repository scan finds a leak.
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -euo pipefail
