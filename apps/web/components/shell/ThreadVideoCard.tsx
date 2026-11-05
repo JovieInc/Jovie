@@ -77,7 +77,7 @@ export function ThreadVideoCard({
             </span>
           </Button>
         </span>
-        <span aria-hidden='true' className='system-b-thread-duration-badge'>
+        <span aria-hidden='true' className='system-b-thread-duration-badge tabular-nums'>
           {formatDuration(durationSec)}
         </span>
       </Thumb>
