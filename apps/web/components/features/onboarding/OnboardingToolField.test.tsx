@@ -63,7 +63,7 @@ describe('OnboardingToolField', () => {
       ONBOARDING_TOOL_FIELD_MOTION
     );
     expect(ONBOARDING_TOOL_FIELD_FOCUS).toContain('focus-within:border-focus');
-    expect(ONBOARDING_TOOL_FIELD_FOCUS).toContain('focus-within:ring-focus/16');
+    expect(ONBOARDING_TOOL_FIELD_FOCUS).not.toMatch(/(?:ring|shadow)-/);
     expect(ONBOARDING_TOOL_FIELD_MOTION).toContain(
       'motion-reduce:transition-none'
     );
@@ -81,7 +81,10 @@ describe('OnboardingToolField', () => {
     expect(picker).toHaveClass(
       ...ONBOARDING_TOOL_FIELD_DENSITY.picker.split(' ')
     );
-    expect(picker).not.toHaveClass('h-9');
+    expect(picker).toHaveClass('h-auto');
+    expect(picker?.className).not.toMatch(
+      /(?:^| )(?:h-9|h-app-control-sm|min-h-12)(?: |$)/
+    );
 
     rerender(<FieldExample density='compact' label='Edit Proposed Handle' />);
     const compact = screen
@@ -92,7 +95,10 @@ describe('OnboardingToolField', () => {
     expect(compact).toHaveClass(
       ...ONBOARDING_TOOL_FIELD_DENSITY.compact.split(' ')
     );
-    expect(compact).not.toHaveClass('mt-3');
+    expect(compact).toHaveClass('gap-0');
+    expect(compact?.className).not.toMatch(
+      /(?:^| )(?:mt-3|h-app-control-sm|min-h-12|py-2)(?: |$)/
+    );
   });
 
   it('keeps keyboard focus on the inner input while the owner carries the ring', async () => {
@@ -106,14 +112,38 @@ describe('OnboardingToolField', () => {
     expect(input.matches(':focus-visible')).toBe(true);
 
     const owner = input.closest('[data-slot="onboarding-tool-field"]');
-    expect(owner).toHaveClass(
-      'focus-within:border-focus',
-      'focus-within:ring-2',
-      'focus-within:ring-focus/16'
-    );
+    expect(owner).toHaveAttribute('data-component', 'composite-field');
+    expect(owner).toHaveClass('composite-field', 'rounded-lg');
+    expect(owner?.className).not.toMatch(/focus-within:(?:ring|shadow)-/);
     expect(owner).not.toHaveClass(
       'focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.035)]'
     );
+  });
+
+  it('retains the same native label, label activation, typing, and inner-button focus', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <OnboardingToolField density='compact' htmlFor='native-handle'>
+        <span id='native-handle-label'>Account handle</span>
+        <input id='native-handle' aria-labelledby='native-handle-label' />
+        <button type='button'>Check handle</button>
+      </OnboardingToolField>
+    );
+    const input = screen.getByRole('textbox', { name: 'Account handle' });
+    const label = container.firstElementChild;
+    expect(label?.tagName).toBe('LABEL');
+    expect(label).toHaveAttribute('for', 'native-handle');
+    expect(label).toHaveAttribute('data-component', 'composite-field');
+    expect(input.parentElement).toBe(label);
+    expect(
+      container.querySelectorAll('[data-component="composite-field"]')
+    ).toHaveLength(1);
+    await user.click(screen.getByText('Account handle'));
+    expect(input).toHaveFocus();
+    await user.keyboard('artist');
+    expect(input).toHaveValue('artist');
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Check handle' })).toHaveFocus();
   });
 
   it('renders unfocused and focused owners without changing geometry', () => {

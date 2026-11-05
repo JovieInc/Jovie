@@ -1,5 +1,6 @@
 'use client';
 
+import { Slot } from '@radix-ui/react-slot';
 import * as React from 'react';
 
 import { cn } from '../lib/utils';
@@ -10,6 +11,8 @@ export type CompositeFieldSurface = 'none' | 'page' | 'shell' | 'field';
 
 export interface CompositeFieldProps
   extends React.ComponentPropsWithoutRef<'div'> {
+  /** Use the single child as the native field owner without adding a wrapper. */
+  readonly asChild?: boolean;
   /**
    * Container radius. The focus ring follows it, so the ring and the field
    * always share one silhouette.
@@ -55,12 +58,13 @@ const sizeClasses = {
  * ```
  */
 export const CompositeField = React.forwardRef<
-  HTMLDivElement,
+  React.ComponentRef<typeof Slot>,
   CompositeFieldProps
 >(function CompositeField(
   {
     children,
     className,
+    asChild = false,
     shape = 'pill',
     size = 'md',
     surface = 'none',
@@ -69,7 +73,7 @@ export const CompositeField = React.forwardRef<
   ref
 ) {
   return (
-    <div
+    <Slot
       ref={ref}
       data-component='composite-field'
       data-shape={shape}
@@ -87,7 +91,7 @@ export const CompositeField = React.forwardRef<
       )}
       {...props}
     >
-      {children}
-    </div>
+      {asChild ? children : <div>{children}</div>}
+    </Slot>
   );
 });

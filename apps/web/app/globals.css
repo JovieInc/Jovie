@@ -2158,6 +2158,13 @@ body {
     outline: none;
     box-shadow: none;
   }
+  /* Forced colors removes box shadows; retain the same outer focus owner. */
+  @media (forced-colors: active) {
+    .composite-field:has(:is(input, textarea, select):focus-visible) {
+      outline: 2px solid Highlight;
+      outline-offset: 2px;
+    }
+  }
 }
 
 /* Menu animations */

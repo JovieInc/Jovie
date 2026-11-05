@@ -116,7 +116,10 @@ export const Focused: Story = {
     await expect(input.matches(':focus-visible')).toBe(true);
     const owner = input.closest('[data-slot="onboarding-tool-field"]');
     await expect(owner).toHaveClass('focus-within:border-focus');
-    await expect(owner).toHaveClass('focus-within:ring-focus/16');
+    await expect(owner).toHaveAttribute('data-component', 'composite-field');
+    await expect(owner?.tagName).toBe('LABEL');
+    await expect(input.parentElement).toBe(owner);
+    await expect(owner).toHaveClass('rounded-lg', 'h-9', 'gap-0');
   },
 };
 

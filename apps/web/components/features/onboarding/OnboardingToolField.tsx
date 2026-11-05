@@ -1,18 +1,19 @@
+import { CompositeField } from '@jovie/ui/atoms/composite-field';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export const ONBOARDING_TOOL_FIELD_SURFACE =
   'flex items-center rounded-lg border border-subtle bg-surface-0';
 
-export const ONBOARDING_TOOL_FIELD_FOCUS =
-  'focus-within:border-focus focus-within:ring-2 focus-within:ring-focus/16';
+// CompositeField owns the ring; this only preserves the field's focus border.
+export const ONBOARDING_TOOL_FIELD_FOCUS = 'focus-within:border-focus';
 
 export const ONBOARDING_TOOL_FIELD_MOTION =
   'transition-[border-color,box-shadow] duration-subtle ease-subtle motion-reduce:transition-none';
 
 export const ONBOARDING_TOOL_FIELD_DENSITY = {
-  picker: 'mt-3 gap-2 px-3 py-2',
-  compact: 'mt-2 h-9 px-2.5',
+  picker: 'mt-3 h-auto min-h-0 gap-2 px-3 py-2',
+  compact: 'mt-2 h-9 min-h-0 gap-0 px-2.5 py-0',
 } as const;
 
 export type OnboardingToolFieldDensity =
@@ -43,13 +44,19 @@ export function OnboardingToolField({
   className,
 }: OnboardingToolFieldProps) {
   return (
-    <label
-      htmlFor={htmlFor}
-      data-slot='onboarding-tool-field'
-      data-density={density}
+    <CompositeField
+      asChild
+      shape='md'
+      size='md'
       className={cn(onboardingToolFieldClassName(density), className)}
     >
-      {children}
-    </label>
+      <label
+        htmlFor={htmlFor}
+        data-slot='onboarding-tool-field'
+        data-density={density}
+      >
+        {children}
+      </label>
+    </CompositeField>
   );
 }
