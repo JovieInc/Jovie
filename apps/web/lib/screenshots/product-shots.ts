@@ -113,6 +113,7 @@ export const PRODUCT_SHOTS = [
     frame: 'bare',
     displayWidth: 358,
     sources: [
+      'apps/web/lib/tim-white.ts',
       `${ONBOARDING}/OnboardingHandleStep.tsx`,
       ONBOARDING_COPY,
       `${DEMO}/DemoShowcaseSurface.tsx`,
@@ -176,6 +177,8 @@ export const PRODUCT_SHOTS = [
     frame: 'bare',
     displayWidth: 820,
     sources: [
+      'apps/web/lib/tim-white.ts',
+      'apps/web/components/features/home/home-surface-seed.ts',
       `${DEMO}/DemoTimWhiteProfileSurface.tsx`,
       `${DEMO}/demo-profile-showcase-states.ts`,
       'apps/web/components/features/home/homepage-profile-preview-fixture.ts',

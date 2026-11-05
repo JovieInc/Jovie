@@ -59,6 +59,50 @@ describe('committed product-shot provenance', () => {
     expect(isShotStale(root, spec, shots)).toBe(true);
   });
 
+  it.each([
+    [
+      'profile-hero-desktop',
+      'apps/web/lib/tim-white.ts',
+      "name: 'Tim White'",
+      "name: 'Changed artist'",
+    ],
+    [
+      'profile-hero-desktop',
+      'apps/web/components/features/home/home-surface-seed.ts',
+      "title: 'Take Me Over'",
+      "title: 'Changed release'",
+    ],
+    [
+      'setup-claim-handle',
+      'apps/web/lib/tim-white.ts',
+      "publicProfileHandle: 'tim'",
+      "publicProfileHandle: 'changed-handle'",
+    ],
+  ] as const)(
+    'invalidates %s when live data %s changes',
+    (id, input, before, after) => {
+      const spec = PRODUCT_SHOTS.find(shot => shot.id === id)!;
+      expect(spec.sources).toContain(input);
+      const root = mkdtempSync(join(tmpdir(), 'shot-live-data-'));
+      for (const source of spec.sources) {
+        mkdirSync(dirname(join(root, source)), { recursive: true });
+        writeFileSync(join(root, source), readFileSync(join(repoRoot, source)));
+      }
+      const shots = {
+        [id]: {
+          ...manifest.shots[id],
+          sourceHash: hashShotSources(root, spec.sources),
+          specHash: hashShotSpec(spec),
+        },
+      };
+      expect(isShotStale(root, spec, shots)).toBe(false);
+      const original = readFileSync(join(root, input), 'utf8');
+      expect(original).toContain(before);
+      writeFileSync(join(root, input), original.replaceAll(before, after));
+      expect(isShotStale(root, spec, shots)).toBe(true);
+    }
+  );
+
   it.each(PRODUCT_SHOTS)(
     'keeps $id fresh against this checkout and actual image files',
     spec => {
