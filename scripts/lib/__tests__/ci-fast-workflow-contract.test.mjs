@@ -57,6 +57,7 @@ import {
 } from '../../ci-fast-lanes.mjs';
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
 import { buildWebVitestFastArgs } from '../ci-web-vitest-fast-args.mjs';
+import { classifyProductLanes } from '../product-lane-classifier.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 
@@ -983,6 +984,32 @@ describe('ci-fast bounded parallel workflow', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('runs the mobile profile claim proof in the existing combined web lane', () => {
+    const spec = 'tests/e2e/storybook-profile-claim-name.spec.ts';
+    const surfaces = loadYaml(WORKFLOW).jobs['ci-storybook-surfaces'];
+    const runner = surfaces.steps.find(
+      step => step.name === 'Run surface elevation matrix (Storybook)'
+    );
+    const invocation = runner.run.match(
+      /pnpm exec playwright test ([\s\S]*?)--config=playwright\.config\.storybook\.ts/
+    );
+    expect(invocation).not.toBeNull();
+    expect(
+      invocation[1].split(/\s+/).filter(path => path === spec)
+    ).toHaveLength(1);
+    expect(existsSync(resolve(REPO_ROOT, 'apps/web', spec))).toBe(true);
+    for (const path of [
+      'apps/web/components/features/profile/templates/ProfileCompactSurface.tsx',
+      `apps/web/${spec}`,
+    ]) {
+      expect(classifyProductLanes([path]).selectedLanes, path).toEqual(['web']);
+    }
+    expect(surfaces.if).toContain("outputs.run_web == 'true'");
+    expect(surfaces.if).toContain("github.event_name == 'merge_group'");
+    expect(surfaces.if).toContain("github.event_name == 'push'");
+    expect(surfaces.if).not.toContain('pull_request');
   });
 
   it('selects the Tasks row geometry proof for its shared cell and feature surfaces', () => {
