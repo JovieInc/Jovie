@@ -10,6 +10,7 @@ import { INTERACTION_CASE_CONTRACT } from '@/lib/ovie/interaction-case';
 import { SUMMER_OPS_CARD_SCHEMA } from '@/lib/ovie/ops-card';
 import { emptyDeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import { OvieHomeCanvas } from './OvieHomeCanvas';
+import { snapshot } from './OvieHomeCanvas.test-fixtures';
 
 const toastMock = vi.hoisted(() =>
   Object.assign(vi.fn(), {
@@ -69,49 +70,6 @@ const INBOX: OvieInbox = {
     },
   ],
 };
-
-function snapshot() {
-  const delivery = emptyDeliverySummary();
-  return {
-    operationalRequestState: 'idle',
-    view: {
-      connection: 'connected',
-      delivery: {
-        ...delivery,
-        merges: {
-          ...delivery.merges,
-          since: '2026-10-20T07:00:00.000Z',
-          today: { state: 'measured-nonzero', value: 3 },
-        },
-      },
-    },
-    operationalTasks: {
-      canonicalSource: 'linear',
-      cacheMode: 'local-reconciled',
-      syncState: 'fresh',
-      sourceId: 'lane-pull-requests',
-      observedAt: null,
-      lastSyncedAt: null,
-      freshnessDeadline: null,
-      deltas: [],
-      tasks: [
-        {
-          id: 'linear:JOV-1',
-          linearIdentifier: 'JOV-1',
-          linearUrl: null,
-          title: 'Blocked task',
-          workflowState: 'blocked',
-          priority: 'high',
-          attempt: null,
-          retryAt: null,
-          sourceRevision: null,
-          updatedAt: '2026-10-20T18:00:00.000Z',
-          pullRequest: null,
-        },
-      ],
-    },
-  };
-}
 
 function renderCanvas(chat?: HomeCanvasState) {
   const client = new QueryClient({
