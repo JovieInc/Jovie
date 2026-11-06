@@ -1,7 +1,3 @@
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { CANONICAL_PEN } from './pen-bridge.mjs';
 
 export function fixPrompt(frame, issue, brief) {
@@ -30,33 +26,4 @@ export function fixerModel(issue, env = process.env) {
   return taste
     ? env.PEN_REVIEW_TASTE_FIXER_MODEL || 'opus'
     : env.PEN_REVIEW_FIXER_MODEL || 'sonnet';
-}
-
-/** @param {string} prompt @param {{timeoutMs?: number, model?: string}} [opts] */
-export function runFixerAgent(
-  prompt,
-  { timeoutMs = 12 * 60_000, model = fixerModel(null) } = {}
-) {
-  const cwd = mkdtempSync(join(tmpdir(), 'pen-fixer-'));
-  const res = spawnSync(
-    'claude',
-    [
-      '-p',
-      prompt,
-      '--model',
-      model,
-      '--allowedTools',
-      'mcp__pencil__execute,mcp__pencil__get_app_state,mcp__pencil__read_skill',
-    ],
-    { cwd, encoding: 'utf8', timeout: timeoutMs }
-  );
-  return {
-    status: res.status,
-    out: String(res.stdout ?? '')
-      .trim()
-      .slice(-600),
-    err: String(res.stderr ?? '')
-      .trim()
-      .slice(-300),
-  };
 }

@@ -21,6 +21,7 @@
  * Kill switch: touch ~/.local/state/jovie-pen-review/disabled.
  */
 
+import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   appendFileSync,
@@ -42,7 +43,7 @@ import {
 } from '../../packages/copy/rules.ts';
 import { PATTERNS as CLAIM_PATTERNS } from '../invariants/stat-claims/check.mjs';
 import { brandChecks } from './brand-checks.mjs';
-import { fixerModel, fixPrompt, runFixerAgent } from './fixer.mjs';
+import { fixerModel, fixPrompt } from './fixer.mjs';
 import { runPanel } from './judges.mjs';
 import { runChecks } from './lib.mjs';
 import {
@@ -71,7 +72,7 @@ import {
 
 import { renderTrusted } from './render-trusted.mjs';
 
-export { fixerModel, fixPrompt, runFixerAgent } from './fixer.mjs';
+export { fixerModel, fixPrompt } from './fixer.mjs';
 export { renderTrusted } from './render-trusted.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -102,6 +103,34 @@ const CHECK_CTX = {
   claimPatterns: CLAIM_PATTERNS,
 };
 
+/** @param {string} prompt @param {{timeoutMs?: number, model?: string}} [opts] */
+export function runFixerAgent(
+  prompt,
+  { timeoutMs = 12 * 60_000, model = fixerModel(null) } = {}
+) {
+  const cwd = mkdtempSync(join(tmpdir(), 'pen-fixer-'));
+  const res = spawnSync(
+    'claude',
+    [
+      '-p',
+      prompt,
+      '--model',
+      model,
+      '--allowedTools',
+      'mcp__pencil__execute,mcp__pencil__get_app_state,mcp__pencil__read_skill',
+    ],
+    { cwd, encoding: 'utf8', timeout: timeoutMs }
+  );
+  return {
+    status: res.status,
+    out: String(res.stdout ?? '')
+      .trim()
+      .slice(-600),
+    err: String(res.stderr ?? '')
+      .trim()
+      .slice(-300),
+  };
+}
 export async function reviewFrame(
   id,
   {
