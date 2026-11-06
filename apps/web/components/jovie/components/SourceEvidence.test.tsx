@@ -17,8 +17,10 @@ import {
 } from './source-evidence.fixtures';
 
 const SOURCE_CHIP = 'entity-chip-popover-trigger';
+const findSourceChip = () => screen.findByTestId(SOURCE_CHIP);
 const SOURCE_CARD = 'source-fact-card';
 const sourceCard = () => screen.getByTestId(SOURCE_CARD);
+const findSourceCard = () => screen.findByTestId(SOURCE_CARD);
 
 async function settleSourceEvidence() {
   await waitFor(() => {
@@ -52,9 +54,7 @@ describe('inline typed source evidence', () => {
         />
       </TooltipProvider>
     );
-    expect(await screen.findByTestId(SOURCE_CHIP)).toHaveTextContent(
-      '9.9K followers'
-    );
+    expect(await findSourceChip()).toHaveTextContent('9.9K followers');
   });
   it('keeps inline markdown fragments inline with inspectable evidence', async () => {
     fastRender(
@@ -62,7 +62,7 @@ describe('inline typed source evidence', () => {
         <ChatMarkdown content='9.9K followers' inline />
       </SourceEvidenceProvider>
     );
-    expect((await screen.findByTestId(SOURCE_CHIP)).closest('p')).toBeNull();
+    expect((await findSourceChip()).closest('p')).toBeNull();
   });
   it.each([
     ['book.title', 'Book'],
@@ -99,9 +99,7 @@ describe('inline typed source evidence', () => {
     });
     expect(screen.queryByText('Invented identity')).toBeNull();
     await user.click(screen.getAllByTestId(SOURCE_CHIP)[0]);
-    expect(await screen.findByTestId(SOURCE_CARD)).toHaveTextContent(
-      '9.9K followers'
-    );
+    expect(await findSourceCard()).toHaveTextContent('9.9K followers');
   });
 
   it.each(['unknown', 'contradicted', 'inaccessible'] as const)(
@@ -121,9 +119,7 @@ describe('inline typed source evidence', () => {
     await user.tab();
     const trigger = screen.getByTestId(SOURCE_CHIP);
     expect(trigger).toHaveFocus();
-    expect(await screen.findByTestId(SOURCE_CARD)).toHaveTextContent(
-      'Direct source'
-    );
+    expect(await findSourceCard()).toHaveTextContent('Direct source');
     expect(sourceCard()).toHaveTextContent('Collected');
     const link = screen.getByRole('link', { name: 'Open Source' });
     expect(link).toHaveAttribute(
@@ -152,8 +148,8 @@ describe('inline typed source evidence', () => {
         ],
       }),
     ]);
-    await user.click(await screen.findByTestId(SOURCE_CHIP));
-    expect(await screen.findByTestId(SOURCE_CARD)).toHaveTextContent(
+    await user.click(await findSourceChip());
+    expect(await findSourceCard()).toHaveTextContent(
       'Indirect enrichment · catalog'
     );
     expect(sourceCard()).toHaveTextContent('stale · unverified');
@@ -196,12 +192,10 @@ describe('inline typed source evidence', () => {
       [sourceFixture({ value: null, status: 'unknown' })],
       content
     );
-    const trigger = await screen.findByTestId(SOURCE_CHIP);
+    const trigger = await findSourceChip();
     expect(trigger).not.toHaveTextContent('9.9K followers');
     await user.click(trigger);
-    expect(await screen.findByTestId(SOURCE_CARD)).not.toHaveTextContent(
-      '9.9K followers'
-    );
+    expect(await findSourceCard()).not.toHaveTextContent('9.9K followers');
     expect(screen.getByRole('link', { name: 'Open Source' })).toHaveAttribute(
       'href',
       'https://open.spotify.com/artist/fixture'
@@ -227,7 +221,7 @@ describe('inline typed source evidence', () => {
     });
     const triggers = screen.getAllByTestId(SOURCE_CHIP);
     await user.hover(triggers[0]);
-    await screen.findByTestId(SOURCE_CARD);
+    await findSourceCard();
     await user.hover(triggers[1]);
     expect(await screen.findAllByTestId(SOURCE_CARD)).toHaveLength(1);
   });
@@ -242,7 +236,7 @@ describe('inline typed source evidence', () => {
     try {
       const user = userEvent.setup();
       renderEvidence([sourceFixture()]);
-      await user.click(await screen.findByTestId(SOURCE_CHIP));
+      await user.click(await findSourceChip());
       const sheet = await screen.findByTestId('entity-chip-source-sheet');
       expect(sheet).toHaveAttribute('data-side', 'bottom');
       expect(sheet).toHaveTextContent('Direct source');
@@ -283,7 +277,5 @@ it('forwards public tool evidence through the app transcript', async () => {
       />
     </TooltipProvider>
   );
-  expect(await screen.findByTestId(SOURCE_CHIP)).toHaveTextContent(
-    '9.9K followers'
-  );
+  expect(await findSourceChip()).toHaveTextContent('9.9K followers');
 });
