@@ -6,10 +6,10 @@ import { describe, expect, it, vi } from 'vitest';
 import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { fastRender } from '@/tests/utils/fast-render';
 import { ChatThreadMessages } from '../JovieChatSections';
+import { SourceEvidenceProvider } from '../source-evidence-context';
 import { AssistantMessageText } from './AssistantMessageText';
 import { ChatMarkdown } from './ChatMarkdown';
 import { ChatMessage } from './ChatMessage';
-import { SourceEvidenceProvider } from './SourceEvidence';
 import { SourceFactCard } from './SourceFactCard';
 import {
   sourceFixture,
@@ -18,6 +18,7 @@ import {
 
 const SOURCE_CHIP = 'entity-chip-popover-trigger';
 const SOURCE_CARD = 'source-fact-card';
+const sourceCard = () => screen.getByTestId(SOURCE_CARD);
 
 async function settleSourceEvidence() {
   await waitFor(() => {
@@ -82,8 +83,8 @@ describe('inline typed source evidence', () => {
       value: { type: 'text', value: 'Public title' },
     });
     fastRender(<SourceFactCard fact={fact} />);
-    expect(screen.getByTestId(SOURCE_CARD)).toHaveTextContent(category);
-    expect(screen.getByTestId(SOURCE_CARD)).toHaveTextContent('Public title');
+    expect(sourceCard()).toHaveTextContent(category);
+    expect(sourceCard()).toHaveTextContent('Public title');
     expect(screen.queryByRole('img')).toBeNull();
   });
 
@@ -123,7 +124,7 @@ describe('inline typed source evidence', () => {
     expect(await screen.findByTestId(SOURCE_CARD)).toHaveTextContent(
       'Direct source'
     );
-    expect(screen.getByTestId(SOURCE_CARD)).toHaveTextContent('Collected');
+    expect(sourceCard()).toHaveTextContent('Collected');
     const link = screen.getByRole('link', { name: 'Open Source' });
     expect(link).toHaveAttribute(
       'href',
@@ -155,9 +156,7 @@ describe('inline typed source evidence', () => {
     expect(await screen.findByTestId(SOURCE_CARD)).toHaveTextContent(
       'Indirect enrichment · catalog'
     );
-    expect(screen.getByTestId(SOURCE_CARD)).toHaveTextContent(
-      'stale · unverified'
-    );
+    expect(sourceCard()).toHaveTextContent('stale · unverified');
   });
 
   it('does not create false sources from restricted, unavailable or ambiguous numbers', async () => {
@@ -213,9 +212,7 @@ describe('inline typed source evidence', () => {
       </SourceEvidenceProvider>
     );
     await waitFor(() => {
-      expect(screen.getByTestId(SOURCE_CARD)).toHaveTextContent(
-        '9.9K followers'
-      );
+      expect(sourceCard()).toHaveTextContent('9.9K followers');
     });
   });
 

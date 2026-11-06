@@ -20,7 +20,6 @@ import { EntityMentionSpan } from './EntityMentionSpan';
 
 export { SourceEvidenceProvider } from '../source-evidence-context';
 
-// Streamdown accepts both intrinsic HTML props and custom-element records.
 type SourceMarkdownProps =
   | { readonly children?: unknown; readonly href?: unknown }
   | Record<string, unknown>;
