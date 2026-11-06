@@ -26,8 +26,7 @@ they do not establish authentication, distribution or installed performance.
 The scaffold is a bounded extraction from Tim White's #18958 (`3dde45bbe4d5`,
 co-authored with Claude Opus 5.5). JOV-7528 owns this source slice; JOV-6750,
 JOV-6754, JOV-6748 and JOV-6759 retain shared-client, parity and release acceptance.
-The deprecated standalone Swift Ovie implementation
-stays read-only by policy. Do not grow MenuMonitor into a second product shell.
+There is no native Ovie (founder decision 2026-10-28): Ovie is web at `/app/ov`, and the standalone Swift repo is archived. Do not grow MenuMonitor into a second product shell.
 
 ### Local editor boundary (JOV-7571)
 
