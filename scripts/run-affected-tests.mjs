@@ -17,6 +17,7 @@ import {
 
 import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
 import { ONBOARDING_TEST_PRODUCERS } from './lib/onboarding-test-producers.mjs';
+import { PRODUCT_SHOT_TEST_PRODUCERS } from './lib/product-shot-test-producers.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -103,6 +104,7 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
     ['apps/web/lib/notifications/campaign-scheduling.test.ts'],
   ],
   ...ONBOARDING_TEST_PRODUCERS,
+  ...PRODUCT_SHOT_TEST_PRODUCERS,
   [
     'apps/web/tests/e2e/utils/start-entry-layout.ts',
     [
