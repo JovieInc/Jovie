@@ -1839,6 +1839,112 @@ describe('origin-bound Vercel protection bypass', () => {
     ).rejects.toThrow('Public profile returned error or not-found content.');
   });
 
+  describe('closed-signup public-surface redirects', () => {
+    const html = '<html><body>' + 'healthy'.repeat(200) + '</body></html>';
+    const waitlistHtml = html.replace(
+      '</body>',
+      '<form data-testid="waitlist-role-form"></form></body>'
+    );
+
+    function redirectFixture(
+      entry: string,
+      location = '/waitlist',
+      status = 307,
+      landing: Partial<ResponseFixture> = {}
+    ) {
+      return vi.fn(async (rawUrl: URL, _options: unknown) => {
+        const url = new URL(rawUrl);
+        if (url.pathname === entry) {
+          return responseFixture({ status, url: url.href, location });
+        }
+        return responseFixture({
+          status: 200,
+          url: url.href,
+          contentType:
+            url.pathname === DEPLOY_HEALTH_PATH
+              ? 'application/json'
+              : 'text/html',
+          body:
+            url.pathname === DEPLOY_HEALTH_PATH
+              ? HEALTHY_DEPLOY_PAYLOAD
+              : url.pathname === '/waitlist'
+                ? waitlistHtml
+                : html,
+          ...(url.pathname === '/waitlist' ? landing : {}),
+        });
+      });
+    }
+
+    const verify = (fetchImpl: ReturnType<typeof redirectFixture>) =>
+      verifyPublicDeploymentSurfaces(DEPLOYMENT_URL, {
+        cookieHeader: '__vercel_live_token=opaque-cookie',
+        fetchImpl,
+        attempts: 1,
+      });
+
+    it.each(['/start', '/signup'])(
+      'verifies the role form after the intentional %s redirect',
+      async entry => {
+        const fetchImpl = redirectFixture(entry);
+        await expect(verify(fetchImpl)).resolves.toBeUndefined();
+        const calls = fetchImpl.mock.calls as unknown as [
+          URL,
+          { headers: Record<string, string>; redirect: string },
+        ][];
+        const entryIndex = calls.findIndex(([url]) => url.pathname === entry);
+        expect(calls[entryIndex + 1][0].href).toBe(`${DEPLOYMENT_URL}waitlist`);
+        for (const [, options] of calls) {
+          expect(options.headers.Cookie).toBe(
+            '__vercel_live_token=opaque-cookie'
+          );
+          expect(options.headers).not.toHaveProperty(BYPASS_HEADER);
+          expect(options.redirect).toBe('manual');
+        }
+      }
+    );
+
+    it.each<[string, string, number]>([
+      ['/start', '/signin', 307],
+      ['/start', '/waitlist?next=/start', 307],
+      ['/start', '/waitlist#form', 307],
+      ['/start', 'https://example.com/waitlist', 307],
+      ['/start', '/waitlist', 308],
+      ['/signin', '/waitlist', 307],
+    ])(
+      'rejects %s → %s (%s) before another request',
+      async (entry, location, status) => {
+        const fetchImpl = redirectFixture(entry, location, status);
+        await expect(verify(fetchImpl)).rejects.toThrow();
+        expect(fetchImpl.mock.calls.at(-1)?.[0].pathname).toBe(entry);
+      }
+    );
+
+    it.each([
+      { status: 401 },
+      { status: 307, location: '/waitlist' },
+      { status: 200, body: html },
+      {
+        status: 200,
+        body: html + '<!-- <form data-testid="waitlist-role-form"></form> -->',
+      },
+      {
+        status: 200,
+        body:
+          html +
+          '<script>"<form data-testid=\"waitlist-role-form\"></form>"</script>',
+      },
+      {
+        status: 200,
+        body: waitlistHtml.replace('healthy', 'Internal server error'),
+      },
+      { status: 200, url: `${DEPLOYMENT_URL}signin` },
+    ])('fails closed on an unhealthy waitlist response %j', async landing => {
+      await expect(
+        verify(redirectFixture('/start', '/waitlist', 307, landing))
+      ).rejects.toThrow();
+    });
+  });
+
   it('checks the complete public-surface set with cookie-only exact-route requests', async () => {
     const html = '<html><body>' + 'healthy'.repeat(200) + '</body></html>';
     const fetchImpl = vi.fn(async (rawUrl: URL, _options: unknown) => {

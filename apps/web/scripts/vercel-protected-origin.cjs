@@ -442,11 +442,7 @@ function getResponseRedirect(response, requestedUrl) {
   return assertOriginBoundRedirect(requestedUrl, location);
 }
 
-function assertExactProbeResponse(
-  response,
-  requestedUrl,
-  { allowSameOriginRedirect = false } = {}
-) {
+function assertExactResponseUrl(response, requestedUrl) {
   const expected = parseProbeUrl(requestedUrl);
   if (typeof response.url !== 'string' || response.url.length === 0) {
     throw new Error(
@@ -464,6 +460,15 @@ function assertExactProbeResponse(
     );
   }
 
+  return expected;
+}
+
+function assertExactProbeResponse(
+  response,
+  requestedUrl,
+  { allowSameOriginRedirect = false } = {}
+) {
+  const expected = assertExactResponseUrl(response, requestedUrl);
   const redirect = getResponseRedirect(response, expected);
   if (redirect) {
     if (allowSameOriginRedirect) return { redirect };
@@ -1015,13 +1020,48 @@ async function verifyPublicSurfaceOnce(
       'User-Agent': 'Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)',
     },
   });
-  const response = await fetchWithinDeadline(
+  let response = await fetchWithinDeadline(
     deadline,
     fetchImpl,
     request.url,
     request.options
   );
-  assertExactProbeResponse(response, request.url);
+  let responseUrl = request.url;
+  let closedSignupRedirect = false;
+  assertExactResponseUrl(response, responseUrl);
+  // Anonymous /start and /signup intentionally redirect to the role form
+  // while public signup is closed. This is one explicit 307 transition,
+  // not permission for bootstrap, health, or other surface redirects.
+  if (
+    (surface.path === '/start' || surface.path === '/signup') &&
+    response.status === 307 &&
+    response.headers.get('location')
+  ) {
+    const destination = parseProbeUrl(
+      new URL(response.headers.get('location'), request.url),
+      'Closed signup redirect'
+    );
+    if (
+      destination.origin === request.url.origin &&
+      destination.pathname === '/waitlist' &&
+      destination.search === ''
+    ) {
+      await deadline.run(() => discardResponseBody(response));
+      const waitlistRequest = buildOriginBoundCookieRequest(destination, {
+        cookieHeader,
+        headers: request.options.headers,
+      });
+      responseUrl = waitlistRequest.url;
+      response = await fetchWithinDeadline(
+        deadline,
+        fetchImpl,
+        responseUrl,
+        waitlistRequest.options
+      );
+      closedSignupRedirect = true;
+    }
+  }
+  assertExactProbeResponse(response, responseUrl);
   if (response.status !== 200) {
     await deadline.run(() => discardResponseBody(response));
     throw new Error(`${surface.label} returned HTTP ${response.status}.`);
@@ -1097,6 +1137,14 @@ async function verifyPublicSurfaceOnce(
   // <script> tags and is still caught.
   if (PUBLIC_ERROR_CONTENT.test(stripInlineScriptContent(body))) {
     throw new Error(`${surface.label} returned error or not-found content.`);
+  }
+  if (
+    closedSignupRedirect &&
+    !/<form\b[^>]*\bdata-testid=["']waitlist-role-form["']/i.test(
+      stripInlineScriptContent(body).replace(/<!--[\s\S]*?(?:-->|$)/g, ' ')
+    )
+  ) {
+    throw new Error(`${surface.label} did not reach the waitlist role form.`);
   }
   if (surface.release === true) assertLiveReleaseDocument(surface, body);
   return body;
