@@ -128,7 +128,7 @@ export function planCanaryReset(input: {
 }): CanaryResetPlan {
   if (!isClaimWalkCanaryEmail(input.user.email)) {
     throw new Error(
-      '[CANARY_RESET_REFUSED] Reset may only act on the fixed claim-walk canary identity'
+      'CANARY_RESET_REFUSED: Reset may only act on the fixed claim-walk canary identity'
     );
   }
   const profileUpdates = input.profileRows

@@ -70,7 +70,9 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
     const tag = runTag();
 
     // The walk cannot even start without the reset secrets: record the
-    // blocked steps so the cert shows the exact unblock, never a silent skip.
+    // blocked steps so the cert shows the exact unblock, then fail — the
+    // producer must never be silently absent (a skipped walk is exactly the
+    // false-green the scoreboard exists to prevent).
     if (!canaryResetConfigured()) {
       for (const id of [
         'cone-checkout-success-truthful',
@@ -96,8 +98,9 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
           'CRON_SECRET/SYNTHETIC_PASSAGE_KEY are not provided to this run (canary reset unconfigured)'
         );
       }
-      test.skip(true, 'Canary reset secrets are not configured for this run');
-      return;
+      throw new Error(
+        'Canary reset secrets (CRON_SECRET/SYNTHETIC_PASSAGE_KEY) are not provided to this run; the JOV-9826 checkout walk cannot run'
+      );
     }
 
     await resetClaimCanary({ request: page.request, origin, runTag: tag });

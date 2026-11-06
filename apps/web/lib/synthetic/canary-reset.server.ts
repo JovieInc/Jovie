@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { and, eq, inArray } from 'drizzle-orm';
-import { db } from '@/lib/db';
+import { runAtomicDbOperation } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
 import { chatConversations } from '@/lib/db/schema/chat';
 import { suggestedActions } from '@/lib/db/schema/connectors';
@@ -62,7 +62,8 @@ export async function executeCanaryReset(): Promise<CanaryResetOutcome> {
   const account = await resolveCanaryAccount();
   if (!account) return { ok: false, reason: 'unknown_canary_account' };
 
-  const plan = await db.transaction(async tx => {
+  const plan = await runAtomicDbOperation(
+    async tx => {
     const claimRows = await tx
       .select({ id: userProfileClaims.id, userId: userProfileClaims.userId })
       .from(userProfileClaims)
@@ -109,7 +110,7 @@ export async function executeCanaryReset(): Promise<CanaryResetOutcome> {
         .returning({ id: creatorProfiles.id });
       if (!claimed) {
         throw new Error(
-          `[CANARY_RESET_CONFLICT] profile ${update.id} left canary ownership mid-reset`
+          `CANARY_RESET_CONFLICT: profile ${update.id} left canary ownership mid-reset`
         );
       }
       await tx.insert(profileOwnershipLog).values({
@@ -133,7 +134,9 @@ export async function executeCanaryReset(): Promise<CanaryResetOutcome> {
     }
 
     return plan;
-  });
+  },
+    { actorId: 'system_canary_reset', system: true, retry: 'serialization' }
+  );
 
   const summary = summarizeCanaryResetPlan(plan);
   logger.info('[canary-reset] completed', {

@@ -79,7 +79,6 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   anonymousOnboardingChatUnverifiedIp: mandatoryDenyFixed,
   anonymousOnboardingChatUnverifiedGlobal: mandatoryDenyFixed,
   syntheticPassageToken: mandatoryDenyFixed,
-  canaryReset: mandatoryDenyFixed,
   anonymousOnboardingChatSession: mandatoryDenyFixed,
   // Fresh-session allowance only (Turnstile-gated); memory-degrades on Redis
   // outage so a new visitor's first message never hard-fails (JOV-6114).

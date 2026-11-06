@@ -207,21 +207,6 @@ export const RATE_LIMITERS = {
     trafficClass: 'internal',
   } satisfies RateLimitConfig,
 
-  /**
-   * Canary account reset (JOV-9826): production-mutation endpoint,
-   * 6/hour, Redis-only, fail closed without Redis.
-   */
-  canaryReset: {
-    name: 'Canary Reset',
-    limit: 6,
-    window: '1 h',
-    prefix: 'canary_reset',
-    requireRedis: true,
-    analytics: false,
-    algorithm: 'fixed-window',
-    trafficClass: 'internal',
-  } satisfies RateLimitConfig,
-
   anonymousOnboardingChatFirstTouch: {
     name: 'Anonymous Onboarding Chat (First Touch)',
     limit: 20,

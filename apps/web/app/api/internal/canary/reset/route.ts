@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { env } from '@/lib/env-server';
-import { canaryResetLimiter } from '@/lib/rate-limit/limiters';
+import { createRateLimiter } from '@/lib/rate-limit';
 import { executeCanaryReset } from '@/lib/synthetic/canary-reset.server';
 import { PASSAGE_TOKEN_SCOPE_CANARY_RESET } from '@/lib/synthetic/passage-token';
 import { resolveSyntheticPassageToken } from '@/lib/synthetic/passage-token.server';
@@ -16,7 +16,8 @@ import { resolveSyntheticPassageToken } from '@/lib/synthetic/passage-token.serv
  * public profile per run.
  *
  * Authorization, in order, all fail closed:
- *   1. production kill switch (`CANARY_RESET_DISABLED=1`) → 503;
+ *   1. production kill switch (`SYNTHETIC_PASSAGE_TOKENS_DISABLED=1`,
+ *      the same switch that stops every canary passage token) → 503;
  *   2. `CRON_SECRET` bearer (timing-safe) → 401;
  *   3. a single-use `jsp1` passage token with the `canary_reset` scope,
  *      minted in CI from a key derived from CRON_SECRET, consumed in Redis
@@ -34,6 +35,26 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
+/**
+ * Route-local limiter (the sms-intents route pattern): 6/hour across all
+ * runs, Redis-backed. Fail closed without Redis: requireRedis at both the
+ * config and the limiter level means an unavailable store denies, never
+ * degrades to memory, because this endpoint mutates accounts.
+ */
+const canaryResetLimiter = createRateLimiter(
+  {
+    name: 'Canary Reset',
+    limit: 6,
+    window: '1 h',
+    prefix: 'canary_reset',
+    requireRedis: true,
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'internal',
+  },
+  { requireRedis: true }
+);
+
 function json(body: unknown, status: number) {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
 }
@@ -41,7 +62,7 @@ function json(body: unknown, status: number) {
 export async function POST(request: NextRequest) {
   // 1. Production kill switch: a one-way off switch, checked first so a
   // misbehaving run cannot spend any further authorization work.
-  if (env.CANARY_RESET_DISABLED === '1') {
+  if (env.SYNTHETIC_PASSAGE_TOKENS_DISABLED === '1') {
     return json({ error: 'Canary reset is disabled' }, 503);
   }
 
@@ -53,7 +74,7 @@ export async function POST(request: NextRequest) {
   if (cronFailure) return cronFailure;
 
   // 3. Single-use scoped passage token (signature, TTL, scope, canary
-  // binding, jti replay guard, and its own kill switch + limiter inside).
+  // binding, jti replay guard, and its own limiter inside).
   const grant = await resolveSyntheticPassageToken(
     request.headers,
     PASSAGE_TOKEN_SCOPE_CANARY_RESET,
