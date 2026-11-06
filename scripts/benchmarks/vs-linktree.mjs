@@ -15,6 +15,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { loadavg, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   allowsPinchZoom,
   COMPARATIVE_BENCHMARK,
@@ -34,43 +35,84 @@ function arg(name, fallback) {
   return index > 0 ? process.argv[index + 1] : fallback;
 }
 
-function lighthouseOnce(url, dir, index) {
+/**
+ * @param {string} url
+ * @param {string} dir
+ * @param {string} index
+ * @param {(command: string, args: string[], options: { encoding: 'utf8', timeout: number, cwd: string }) => { status: number | null, stderr?: string | null }} [run]
+ */
+export function lighthouseOnce(url, dir, index, run = spawnSync) {
   const out = join(dir, `lh-${index}.json`);
-  const result = spawnSync(
-    'npm',
-    [
-      'exec',
-      '--yes',
-      `--package=${LIGHTHOUSE}`,
-      '--',
-      'lighthouse',
-      url,
-      '--quiet',
-      '--output=json',
-      `--output-path=${out}`,
-      '--only-categories=performance',
-      '--form-factor=mobile',
-      '--chrome-flags=--headless=new --no-sandbox --disable-gpu',
-    ],
-    { encoding: 'utf8', timeout: 180_000, cwd: dir }
-  );
+  const args = [
+    'exec',
+    '--yes',
+    `--package=${LIGHTHOUSE}`,
+    '--',
+    'lighthouse',
+    url,
+    '--quiet',
+    '--output=json',
+    `--output-path=${out}`,
+    '--only-categories=performance',
+    '--form-factor=mobile',
+    '--chrome-flags=--headless=new --no-sandbox --disable-gpu',
+  ];
+  // Retry a failed measurement once; never retry a measured claim regression.
+  let result;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    rmSync(out, { force: true });
+    result = run('npm', args, { encoding: 'utf8', timeout: 180_000, cwd: dir });
+    if (result.status === 0) break;
+  }
   if (result.status !== 0) {
     throw new Error(
       `lighthouse failed for ${url}: ${(result.stderr || '').slice(0, 300)}`
     );
   }
   const lhr = JSON.parse(readFileSync(out, 'utf8'));
-  const audits = lhr.audits;
-  const requests = audits['network-requests'].details.items;
+  const invalid = () => new Error(`invalid Lighthouse report for ${url}`);
+  const nonnegative = value =>
+    typeof value === 'number' && Number.isFinite(value) && value >= 0;
+  const audits = lhr?.audits;
+  const lcp = audits?.['largest-contentful-paint']?.numericValue;
+  const fcp = audits?.['first-contentful-paint']?.numericValue;
+  const tbt = audits?.['total-blocking-time']?.numericValue;
+  const bytes = audits?.['total-byte-weight']?.numericValue;
+  const score = lhr?.categories?.performance?.score;
+  const requests = audits?.['network-requests']?.details?.items;
+  if (
+    lhr?.runtimeError != null ||
+    ![lcp, fcp, tbt, bytes, score].every(nonnegative) ||
+    score > 1 ||
+    !Array.isArray(requests)
+  )
+    throw invalid();
+  for (const item of requests) {
+    if (
+      !item ||
+      typeof item.resourceType !== 'string' ||
+      !item.resourceType.trim() ||
+      typeof item.url !== 'string' ||
+      (item.resourceType === 'Script' && !nonnegative(item.transferSize))
+    )
+      throw invalid();
+    try {
+      new URL(item.url);
+    } catch {
+      throw invalid();
+    }
+  }
+  const js = requests
+    .filter(item => item.resourceType === 'Script')
+    .reduce((sum, item) => sum + item.transferSize, 0);
+  if (!Number.isFinite(js)) throw invalid();
   return {
-    lcp: audits['largest-contentful-paint'].numericValue,
-    fcp: audits['first-contentful-paint'].numericValue,
-    tbt: audits['total-blocking-time'].numericValue,
-    bytes: audits['total-byte-weight'].numericValue,
-    js: requests
-      .filter(item => item.resourceType === 'Script')
-      .reduce((sum, item) => sum + item.transferSize, 0),
-    score: Math.round(lhr.categories.performance.score * 100),
+    lcp,
+    fcp,
+    tbt,
+    bytes,
+    js,
+    score: Math.round(score * 100),
     thirdParty: thirdPartyHosts(
       url,
       requests.map(item => item.url)
@@ -78,11 +120,13 @@ function lighthouseOnce(url, dir, index) {
   };
 }
 
-async function pageFacts(url) {
-  const response = await fetch(url, {
+export async function pageFacts(url, request = fetch) {
+  const response = await request(url, {
     headers: { 'user-agent': MOBILE_UA },
     redirect: 'follow',
   });
+  if (!response.ok)
+    throw new Error(`page facts failed with HTTP ${response.status}`);
   const html = await response.text();
   const viewport =
     /<meta[^>]+name=["']viewport["'][^>]*>/iu.exec(html)?.[0] ?? '';
@@ -98,24 +142,25 @@ async function pageFacts(url) {
   };
 }
 
-async function main() {
-  const runs = Number(arg('runs', '3'));
-  const outPath = arg('out', null);
+export async function main({
+  runs = Number(arg('runs', '3')),
+  outPath = arg('out', null),
+  measure = lighthouseOnce,
+  factsForPage = pageFacts,
+} = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'vs-linktree-'));
   const samples = { jovie: [], competitor: [] };
   try {
     for (let i = 0; i < runs; i++) {
       // Alternate so any host or network drift hits both pages equally.
-      samples.jovie.push(
-        lighthouseOnce(COMPARATIVE_BENCHMARK.jovieUrl, dir, `j${i}`)
-      );
+      samples.jovie.push(measure(COMPARATIVE_BENCHMARK.jovieUrl, dir, `j${i}`));
       samples.competitor.push(
-        lighthouseOnce(COMPARATIVE_BENCHMARK.competitorUrl, dir, `c${i}`)
+        measure(COMPARATIVE_BENCHMARK.competitorUrl, dir, `c${i}`)
       );
     }
     const facts = {
-      jovie: await pageFacts(COMPARATIVE_BENCHMARK.jovieUrl),
-      competitor: await pageFacts(COMPARATIVE_BENCHMARK.competitorUrl),
+      jovie: await factsForPage(COMPARATIVE_BENCHMARK.jovieUrl),
+      competitor: await factsForPage(COMPARATIVE_BENCHMARK.competitorUrl),
     };
     const pick = (side, key) =>
       median(samples[side].map(sample => sample[key]));
@@ -175,13 +220,22 @@ async function main() {
       const line = `${evaluation.holds ? 'ok  ' : 'CLAIM-FLAG'} ${evaluation.claimId} jovie=${evaluation.live.jovie} linktree=${evaluation.live.competitor} ${evaluation.reason}`;
       console.log(line);
     }
-    process.exitCode = evaluations.every(item => item.holds) ? 0 : 1;
+    return evaluations.every(item => item.holds) ? 0 : 1;
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 }
 
-main().catch(error => {
-  console.error(`measurement-failed: ${error.message}`);
-  process.exitCode = 2;
-});
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  main()
+    .then(status => {
+      process.exitCode = status;
+    })
+    .catch(error => {
+      console.error(`measurement-failed: ${error.message}`);
+      process.exitCode = 2;
+    });
+}

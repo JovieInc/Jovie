@@ -116,6 +116,12 @@ describe('comparative claims registry', () => {
       evaluateComparativeClaim(thirdParty as never, { jovie: 1, competitor: 5 })
         .holds
     ).toBe(false);
+    for (const competitor of [0, 1, 4, 6]) {
+      expect(
+        evaluateComparativeClaim(thirdParty as never, { jovie: 0, competitor })
+          .holds
+      ).toBe(false);
+    }
   });
 
   it('is a current publish-safe receipt set with the method beside the figures', () => {

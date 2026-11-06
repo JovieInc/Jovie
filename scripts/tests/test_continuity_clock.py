@@ -151,6 +151,24 @@ class ClockTest(unittest.TestCase):
             with self.assertRaises((RuntimeError, ValueError)):
                 clock.observe(lambda *a, **kw: response, NOW)
 
+    def test_weekly_observation_failure_retries_without_waiting_another_week(self):
+        weekly = next(c for c in clock.CLOCKS if c.name == "vsLinktreeClaims")
+        self.get_error = subprocess.TimeoutExpired("gh", 10)
+        result = self.tick(clocks=(weekly,))["clocks"][weekly.name]
+        self.assertEqual(result["status"], "failed")
+        state = json.loads((self.path / weekly.state_file).read_text())
+        self.assertEqual(state["nextAttemptAt"], NOW + clock.UNCERTAIN_S)
+        self.get_error = None
+        self.rows = [run_row(age=8 * 86400, event="repository_dispatch")]
+        result = clock.tick(self.path, "gem", self.api, NOW + clock.UNCERTAIN_S,
+                            clocks=(weekly,))["clocks"][weekly.name]
+        self.assertEqual(result["status"], "dispatch-requested")
+
+    def test_observation_retry_never_slows_a_short_clock(self):
+        self.get_error = subprocess.TimeoutExpired("gh", 10)
+        self.tick()
+        self.assertEqual(self.saved()["nextAttemptAt"], NOW + clock.CONTINUITY.interval_s)
+
     def test_uncertain_post_is_rate_limited_and_not_replayed_by_a_new_process(self):
         self.post_error = subprocess.TimeoutExpired("gh", 10)
         self.assertEqual(self.tick()["status"], "dispatch-uncertain")

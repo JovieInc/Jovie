@@ -61,6 +61,8 @@ export interface ComparativeClaim {
   readonly minMargin: number;
   /** When set, the Jovie side must equal this exactly (wording says "no"/"zero"). */
   readonly jovieExact?: number;
+  /** When wording publishes an exact competitor count, a changed count flags it. */
+  readonly competitorExact?: number;
   readonly robustness: 'robust' | 'fragile';
 }
 
@@ -125,6 +127,7 @@ export const COMPARATIVE_CLAIMS = [
     spread: { jovie: [0, 0], competitor: [5, 5] },
     minMargin: 2,
     jovieExact: 0,
+    competitorExact: 5,
     robustness: 'robust',
   },
   {
@@ -188,6 +191,7 @@ export function comparativeRatio(
 export function evaluateComparativeClaim(
   claim: Pick<ComparativeClaim, 'id' | 'direction' | 'minMargin'> & {
     readonly jovieExact?: number;
+    readonly competitorExact?: number;
   },
   live: ComparativeMeasurement
 ): ComparativeEvaluation {
@@ -201,6 +205,17 @@ export function evaluateComparativeClaim(
     };
   }
   const ratio = comparativeRatio(claim.direction, live);
+  if (
+    claim.competitorExact !== undefined &&
+    live.competitor !== claim.competitorExact
+  ) {
+    return {
+      claimId: claim.id,
+      holds: false,
+      ratio,
+      reason: `Competitor measured ${live.competitor} where the wording requires exactly ${claim.competitorExact}`,
+    };
+  }
   if (claim.jovieExact !== undefined && live.jovie !== claim.jovieExact) {
     return {
       claimId: claim.id,

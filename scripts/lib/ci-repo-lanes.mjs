@@ -10,6 +10,14 @@
 import { appendFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+/** Product lanes admitted by the existing CI runner environment. */
+export const selectedProductLanes = () =>
+  new Set(
+    (process.env.CI_PRODUCT_LANES || 'ios,mac,web,operations,cross-product')
+      .split(',')
+      .filter(Boolean)
+  );
+
 export const CI_REPO_LANES_SCHEMA = 'jovie-ci-repo-lanes/v1';
 
 export const CI_LANES = Object.freeze({
