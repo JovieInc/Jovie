@@ -42,7 +42,7 @@ const UNCONFIRMED_RETURN_COPY = [
 const PAID_ACTIVE_MARKER = `${PRO_OFFER.displayName} is active`;
 /**
  * JOV-6920 cone: landing-surface checks — the canonical claim handoff.
- * @param { origin: string, fetchImpl?: typeof fetch, run: Function } options
+ * @param {{ origin: string, fetchImpl?: typeof fetch, run: (id: any, fn: any) => Promise<any> }} options
  */
 export function coneLandingChecks({ origin, fetchImpl, run }) {
   return [
@@ -65,7 +65,7 @@ export function coneLandingChecks({ origin, fetchImpl, run }) {
 /**
  * JOV-6920 cone: claim-surface checks — dead routes, handle-preserving
  * redirects and safe failure for junk claim input.
- * @param { origin: string, fetchImpl?: typeof fetch, run: Function } options
+ * @param {{ origin: string, fetchImpl?: typeof fetch, run: (id: any, fn: any) => Promise<any> }} options
  */
 export function coneClaimChecks({ origin, fetchImpl, run }) {
   return [
