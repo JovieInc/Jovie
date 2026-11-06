@@ -55,10 +55,7 @@ export function OverflowMenu({
           disabled={disabled || visibleItems.length === 0}
           data-testid={testId}
           data-disclosure-level='l4'
-          className={cn(
-            'text-tertiary-token hover:text-primary-token',
-            className
-          )}
+          className={cn(className)}
         >
           <MoreHorizontal className='h-3.5 w-3.5' aria-hidden='true' />
         </IconButton>
