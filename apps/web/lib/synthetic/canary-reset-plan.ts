@@ -56,7 +56,7 @@ export interface CanaryResetProfileRow {
   readonly claimToken: string | null;
   readonly claimTokenExpiresAt: Date | null;
   readonly onboardingCompletedAt: Date | null;
-  readonly settings: unknown;
+  readonly settings: Record<string, unknown> | null;
 }
 
 /** Column writes that return one profile row to its pre-claim state. */
@@ -68,7 +68,7 @@ export interface CanaryResetProfileSet {
   readonly claimToken: null;
   readonly claimTokenExpiresAt: null;
   readonly onboardingCompletedAt: null;
-  readonly settings: unknown;
+  readonly settings: Record<string, unknown> | null;
 }
 
 export interface CanaryResetProfileUpdate {
@@ -91,30 +91,27 @@ export interface CanaryResetPlan {
 /** The pre-claim marker state, mirroring the claim finalize's claimed flip. */
 const STRUCTURED_CREDIT_SOURCE = 'structured_spotify_release_credit';
 
-function resetSettingsMarker(settings: unknown): unknown {
-  if (
-    typeof settings !== 'object' ||
-    settings === null ||
-    Array.isArray(settings)
-  ) {
-    return settings;
-  }
-  const record = settings as Record<string, unknown>;
-  const marker = record.unclaimedArtistProfile;
+function resetSettingsMarker(
+  settings: Record<string, unknown> | null
+): Record<string, unknown> | null {
+  if (settings === null) return null;
+  const marker = settings.unclaimedArtistProfile as Record<
+    string,
+    unknown
+  > | null;
   if (typeof marker !== 'object' || marker === null || Array.isArray(marker)) {
     return settings;
   }
-  const m = marker as Record<string, unknown>;
   if (
-    m.source !== STRUCTURED_CREDIT_SOURCE ||
-    (m.state !== 'claimed' && m.state !== 'unclaimed')
+    marker.source !== STRUCTURED_CREDIT_SOURCE ||
+    (marker.state !== 'claimed' && marker.state !== 'unclaimed')
   ) {
     return settings;
   }
-  if (m.state === 'unclaimed') return settings;
-  const { claimedAt: _drop, ...rest } = m;
+  if (marker.state === 'unclaimed') return settings;
+  const { claimedAt: _drop, ...rest } = marker;
   return {
-    ...record,
+    ...settings,
     unclaimedArtistProfile: { ...rest, state: 'unclaimed' },
   };
 }
@@ -145,20 +142,22 @@ export function planCanaryReset(input: {
           p.claimTokenExpiresAt !== null ||
           p.onboardingCompletedAt !== null)
     )
-    .map(p => ({
-      id: p.id,
-      usernameNormalized: p.usernameNormalized,
-      set: {
-        userId: null,
-        isClaimed: false,
-        isPublic: false,
-        claimedAt: null,
-        claimToken: null,
-        claimTokenExpiresAt: null,
-        onboardingCompletedAt: null,
-        settings: resetSettingsMarker(p.settings),
-      },
-    }));
+    .map(
+      (p): CanaryResetProfileUpdate => ({
+        id: p.id,
+        usernameNormalized: p.usernameNormalized,
+        set: {
+          userId: null,
+          isClaimed: false,
+          isPublic: false,
+          claimedAt: null,
+          claimToken: null,
+          claimTokenExpiresAt: null,
+          onboardingCompletedAt: null,
+          settings: resetSettingsMarker(p.settings),
+        },
+      })
+    );
   return {
     canaryUserId: input.user.id,
     claimRowIds: input.claimRows

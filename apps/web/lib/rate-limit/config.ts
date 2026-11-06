@@ -208,11 +208,8 @@ export const RATE_LIMITERS = {
   } satisfies RateLimitConfig,
 
   /**
-   * Canary account reset (JOV-9826): a production-mutation endpoint that
-   * returns the claim-walk canary to its pre-claim state. Six resets per
-   * hour across all runs; the canary walk needs at most one per run.
-   * Fail closed without Redis — an unavailable store never opens a window
-   * on an endpoint that mutates accounts.
+   * Canary account reset (JOV-9826): production-mutation endpoint,
+   * 6/hour, Redis-only, fail closed without Redis.
    */
   canaryReset: {
     name: 'Canary Reset',
