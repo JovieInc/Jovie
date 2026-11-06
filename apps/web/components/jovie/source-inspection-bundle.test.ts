@@ -29,7 +29,7 @@ describe('source inspection first-load split', () => {
     expect(valueImports('JovieChatSections.tsx')).not.toContain(
       './source-facts'
     );
-    expect(source('JovieChatSections.tsx')).toContain(
+    expect(source('source-evidence-context.tsx')).toContain(
       "import('./source-facts')"
     );
     const forbidden = [
@@ -37,7 +37,13 @@ describe('source inspection first-load split', () => {
       ['components/EntityChipPopover.tsx', '@/lib/profile-facts/enrichment'],
       ['components/EntityChipPopover.tsx', './SourceFactCard'],
       ['source-fact-labels.ts', '@/lib/profile-facts/enrichment'],
-      ['source-evidence-context.ts', '@/lib/profile-facts/enrichment'],
+      ['source-evidence-context.tsx', '@/lib/profile-facts/enrichment'],
+      ['source-evidence-context.tsx', './source-facts'],
+      [
+        '../features/onboarding/OnboardingChat.tsx',
+        '@/components/jovie/source-facts',
+      ],
+      ['components/ChatMarkdown.tsx', '../source-facts'],
       ['components/SourceEvidence.tsx', '@/lib/profile-facts/enrichment'],
       ['components/SourceEvidence.tsx', '../source-facts'],
     ] as const;

@@ -8,11 +8,7 @@ type SourceFactCardComponent = ComponentType<{ readonly fact: EnrichedFact }>;
 export function useProjectedSourceFact(
   candidate: EnrichedFact | undefined,
   id: string
-): {
-  readonly sourceFact: EnrichedFact | undefined;
-  readonly pending: boolean;
-  readonly SourceFactCardView: SourceFactCardComponent | null;
-} {
+) {
   const matches = candidate?.id === id;
   const [sourceFact, setSourceFact] = useState<EnrichedFact | undefined>();
   const [pending, setPending] = useState(Boolean(candidate && matches));
@@ -27,28 +23,18 @@ export function useProjectedSourceFact(
     }
     let cancelled = false;
     setPending(true);
-    void import('@/lib/profile-facts/enrichment').then(module => {
+    void import('../source-facts').then(module => {
       if (cancelled) return;
       setSourceFact(
         module.projectPublicEnrichedFacts([candidate], candidate.subject.id)[0]
       );
+      setSourceFactCardView(() => module.SourceFactCard);
       setPending(false);
     });
     return () => {
       cancelled = true;
     };
   }, [candidate, id]);
-
-  useEffect(() => {
-    if (!sourceFact) return;
-    let cancelled = false;
-    void import('./SourceFactCard').then(module => {
-      if (!cancelled) setSourceFactCardView(() => module.SourceFactCard);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [sourceFact]);
 
   return { sourceFact, pending, SourceFactCardView };
 }

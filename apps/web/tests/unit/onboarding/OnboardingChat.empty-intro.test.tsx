@@ -7,11 +7,7 @@ import { ONBOARDING_ENTRY_TITLE } from '@/lib/onboarding/empty-state';
 
 const chatMocks = vi.hoisted(() => ({
   messageRenderGate: null as Promise<void> | null,
-  messages: [] as Array<{
-    id: string;
-    role: 'user' | 'assistant';
-    parts: Array<{ type: 'text'; text: string }>;
-  }>,
+  messages: [] as UIMessage[],
   sendMessage: vi.fn(),
   setMessages: vi.fn(),
   status: 'ready' as 'ready' | 'submitted' | 'streaming',
@@ -140,6 +136,9 @@ vi.mock('@/components/jovie/components', () => ({
       placeholder={placeholder}
     />
   ),
+}));
+
+vi.mock('@/components/jovie/components/ChatMessage', () => ({
   ChatMessage: ({
     parts,
     sourceFacts,

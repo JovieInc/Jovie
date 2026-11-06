@@ -3,6 +3,7 @@
 import {
   Children,
   cloneElement,
+  createElement,
   isValidElement,
   type ReactElement,
   type ReactNode,
@@ -93,25 +94,12 @@ function enrichChildren(
   });
 }
 
-function SourceParagraph({ children }: SourceMarkdownProps) {
+function SourceText({
+  children,
+  tag,
+}: SourceMarkdownProps & { tag: 'p' | 'span' | 'li' | 'strong' | 'em' }) {
   const facts = useContext(SourceEvidenceContext);
-  return <p>{enrichChildren(children as ReactNode, facts)}</p>;
-}
-function InlineSourceParagraph({ children }: SourceMarkdownProps) {
-  const facts = useContext(SourceEvidenceContext);
-  return <span>{enrichChildren(children as ReactNode, facts)}</span>;
-}
-function SourceListItem({ children }: SourceMarkdownProps) {
-  const facts = useContext(SourceEvidenceContext);
-  return <li>{enrichChildren(children as ReactNode, facts)}</li>;
-}
-function SourceStrong({ children }: SourceMarkdownProps) {
-  const facts = useContext(SourceEvidenceContext);
-  return <strong>{enrichChildren(children as ReactNode, facts)}</strong>;
-}
-function SourceEmphasis({ children }: SourceMarkdownProps) {
-  const facts = useContext(SourceEvidenceContext);
-  return <em>{enrichChildren(children as ReactNode, facts)}</em>;
+  return createElement(tag, null, enrichChildren(children as ReactNode, facts));
 }
 function SourceAnchor({
   href: rawHref,
@@ -122,7 +110,7 @@ function SourceAnchor({
   const [safe, setSafe] = useState<string | null | undefined>(undefined);
   useEffect(() => {
     let cancelled = false;
-    void import('@/lib/profile-facts/enrichment').then(module => {
+    void import('../source-facts').then(module => {
       if (!cancelled) setSafe(module.publicSourceUrl(href ?? null));
     });
     return () => {
@@ -141,13 +129,11 @@ function SourceAnchor({
   if (fact)
     return (
       <SourceMention fact={fact}>
-        {fact.value
-          ? fact.value.type === 'text'
-            ? fact.value.value
-            : children === sourceFactLabel(fact)
-              ? sourceFactLabel(fact)
-              : (fact.subject.displayName ?? 'Source details')
-          : (fact.subject.displayName ?? 'Source details')}
+        {fact.value?.type === 'text'
+          ? fact.value.value
+          : fact.value && children === sourceFactLabel(fact)
+            ? sourceFactLabel(fact)
+            : (fact.subject.displayName ?? 'Source details')}
       </SourceMention>
     );
   return (
@@ -159,12 +145,12 @@ function SourceAnchor({
 
 export const SOURCE_MARKDOWN_COMPONENTS: Components = {
   a: SourceAnchor,
-  p: SourceParagraph,
-  li: SourceListItem,
-  strong: SourceStrong,
-  em: SourceEmphasis,
+  p: props => <SourceText {...props} tag='p' />,
+  li: props => <SourceText {...props} tag='li' />,
+  strong: props => <SourceText {...props} tag='strong' />,
+  em: props => <SourceText {...props} tag='em' />,
 };
 export const INLINE_SOURCE_MARKDOWN_COMPONENTS: Components = {
   ...SOURCE_MARKDOWN_COMPONENTS,
-  p: InlineSourceParagraph,
+  p: props => <SourceText {...props} tag='span' />,
 };

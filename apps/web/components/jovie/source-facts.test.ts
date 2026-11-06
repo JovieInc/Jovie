@@ -1,5 +1,7 @@
+import { renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { sourceFixture } from './components/source-evidence.fixtures';
+import { useSourceFactsByMessage } from './source-evidence-context';
 import { sourceFactsByMessage } from './source-facts';
 
 const receipt = (enrichedFacts: unknown, state = 'output-available') => ({
@@ -67,4 +69,16 @@ describe('chat source receipt scope', () => {
     expect(unsafe).toMatchObject({ value: null, status: 'unknown' });
     expect(unsafe?.sourceRefs[0].url).toBeNull();
   });
+});
+
+it('revokes a replaced same-ID receipt before its deferred projection resolves', async () => {
+  const { result, rerender } = renderHook(useSourceFactsByMessage, {
+    initialProps: [
+      { id: 'same', role: 'assistant', parts: [receipt([sourceFixture()])] },
+    ],
+  });
+  await waitFor(() => expect(result.current.get('same')).toHaveLength(1));
+  rerender([{ id: 'same', role: 'assistant', parts: [receipt([])] }]);
+  expect(result.current.size).toBe(0);
+  await waitFor(() => expect(result.current.get('same')).toEqual([]));
 });

@@ -17,16 +17,11 @@ export function sourceMetricLabels(fact: EnrichedFact): readonly string[] {
   const compact = sourceFactLabel(fact);
   if (!compact || fact.value?.type !== 'number' || !fact.unit) return [];
   const full = `${new Intl.NumberFormat('en-US').format(fact.value.value)} ${fact.unit}`;
-  return [
-    ...new Set([
-      compact,
-      full,
-      ...(fact.predicate === 'spotify.followers'
-        ? [
-            compact.replace(' followers', ' Spotify followers'),
-            full.replace(' followers', ' Spotify followers'),
-          ]
-        : []),
-    ]),
-  ];
+  const values = [compact, full];
+  if (fact.predicate === 'spotify.followers') {
+    values.push(
+      ...values.map(value => value.replace(' followers', ' Spotify followers'))
+    );
+  }
+  return [...new Set(values)];
 }

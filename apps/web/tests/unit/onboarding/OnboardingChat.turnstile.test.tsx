@@ -145,6 +145,9 @@ vi.mock('@/components/jovie/components', () => ({
       </form>
     );
   }),
+}));
+
+vi.mock('@/components/jovie/components/ChatMessage', () => ({
   ChatMessage: ({ id }: { readonly id: string }) => (
     <div data-testid='chat-message'>{id}</div>
   ),

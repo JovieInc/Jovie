@@ -16,6 +16,9 @@ import {
   sourceMessageFixture,
 } from './source-evidence.fixtures';
 
+const SOURCE_CHIP = 'entity-chip-popover-trigger';
+const SOURCE_CARD = 'source-fact-card';
+
 async function settleSourceEvidence() {
   await waitFor(() => {
     expect(
@@ -48,9 +51,9 @@ describe('inline typed source evidence', () => {
         />
       </TooltipProvider>
     );
-    expect(
-      await screen.findByTestId('entity-chip-popover-trigger')
-    ).toHaveTextContent('9.9K followers');
+    expect(await screen.findByTestId(SOURCE_CHIP)).toHaveTextContent(
+      '9.9K followers'
+    );
   });
   it('keeps inline markdown fragments inline with inspectable evidence', async () => {
     fastRender(
@@ -58,9 +61,7 @@ describe('inline typed source evidence', () => {
         <ChatMarkdown content='9.9K followers' inline />
       </SourceEvidenceProvider>
     );
-    expect(
-      (await screen.findByTestId('entity-chip-popover-trigger')).closest('p')
-    ).toBeNull();
+    expect((await screen.findByTestId(SOURCE_CHIP)).closest('p')).toBeNull();
   });
   it.each([
     ['book.title', 'Book'],
@@ -75,19 +76,14 @@ describe('inline typed source evidence', () => {
     ['website.url', 'Website'],
     ['social.account', 'Social Account'],
   ])('presents %s in the canonical card', (predicate, category) => {
-    fastRender(
-      <SourceFactCard
-        fact={sourceFixture({
-          predicate,
-          unit: null,
-          value: { type: 'text', value: 'Public title' },
-        })}
-      />
-    );
-    expect(screen.getByTestId('source-fact-card')).toHaveTextContent(category);
-    expect(screen.getByTestId('source-fact-card')).toHaveTextContent(
-      'Public title'
-    );
+    const fact = sourceFixture({
+      predicate,
+      unit: null,
+      value: { type: 'text', value: 'Public title' },
+    });
+    fastRender(<SourceFactCard fact={fact} />);
+    expect(screen.getByTestId(SOURCE_CARD)).toHaveTextContent(category);
+    expect(screen.getByTestId(SOURCE_CARD)).toHaveTextContent('Public title');
     expect(screen.queryByRole('img')).toBeNull();
   });
 
@@ -98,13 +94,11 @@ describe('inline typed source evidence', () => {
       '**9.9K followers** and [Invented identity](https://open.spotify.com/artist/fixture).'
     );
     await waitFor(() => {
-      expect(screen.getAllByTestId('entity-chip-popover-trigger')).toHaveLength(
-        2
-      );
+      expect(screen.getAllByTestId(SOURCE_CHIP)).toHaveLength(2);
     });
     expect(screen.queryByText('Invented identity')).toBeNull();
-    await user.click(screen.getAllByTestId('entity-chip-popover-trigger')[0]);
-    expect(await screen.findByTestId('source-fact-card')).toHaveTextContent(
+    await user.click(screen.getAllByTestId(SOURCE_CHIP)[0]);
+    expect(await screen.findByTestId(SOURCE_CARD)).toHaveTextContent(
       '9.9K followers'
     );
   });
@@ -114,7 +108,7 @@ describe('inline typed source evidence', () => {
     async status => {
       renderEvidence([sourceFixture({ status })]);
       await settleSourceEvidence();
-      expect(screen.queryByTestId('entity-chip-popover-trigger')).toBeNull();
+      expect(screen.queryByTestId(SOURCE_CHIP)).toBeNull();
     }
   );
 
@@ -124,14 +118,12 @@ describe('inline typed source evidence', () => {
     await settleSourceEvidence();
     expect(screen.queryByText(/source: enrichment/)).toBeNull();
     await user.tab();
-    const trigger = screen.getByTestId('entity-chip-popover-trigger');
+    const trigger = screen.getByTestId(SOURCE_CHIP);
     expect(trigger).toHaveFocus();
-    expect(await screen.findByTestId('source-fact-card')).toHaveTextContent(
+    expect(await screen.findByTestId(SOURCE_CARD)).toHaveTextContent(
       'Direct source'
     );
-    expect(screen.getByTestId('source-fact-card')).toHaveTextContent(
-      'Collected'
-    );
+    expect(screen.getByTestId(SOURCE_CARD)).toHaveTextContent('Collected');
     const link = screen.getByRole('link', { name: 'Open Source' });
     expect(link).toHaveAttribute(
       'href',
@@ -159,11 +151,11 @@ describe('inline typed source evidence', () => {
         ],
       }),
     ]);
-    await user.click(await screen.findByTestId('entity-chip-popover-trigger'));
-    expect(await screen.findByTestId('source-fact-card')).toHaveTextContent(
+    await user.click(await screen.findByTestId(SOURCE_CHIP));
+    expect(await screen.findByTestId(SOURCE_CARD)).toHaveTextContent(
       'Indirect enrichment · catalog'
     );
-    expect(screen.getByTestId('source-fact-card')).toHaveTextContent(
+    expect(screen.getByTestId(SOURCE_CARD)).toHaveTextContent(
       'stale · unverified'
     );
   });
@@ -171,7 +163,7 @@ describe('inline typed source evidence', () => {
   it('does not create false sources from restricted, unavailable or ambiguous numbers', async () => {
     renderEvidence([sourceFixture({ permission: 'private' })]);
     await settleSourceEvidence();
-    expect(screen.queryByTestId('entity-chip-popover-trigger')).toBeNull();
+    expect(screen.queryByTestId(SOURCE_CHIP)).toBeNull();
     expect(screen.queryByText('Fixture Artist')).toBeNull();
   });
 
@@ -181,7 +173,7 @@ describe('inline typed source evidence', () => {
       '42 guesses, `9.9K followers`, and [ordinary website](https://example.com).'
     );
     await settleSourceEvidence();
-    expect(screen.queryByTestId('entity-chip-popover-trigger')).toBeNull();
+    expect(screen.queryByTestId(SOURCE_CHIP)).toBeNull();
     expect(
       screen.getByRole('link', { name: 'ordinary website' })
     ).toHaveAttribute('rel', 'noopener noreferrer');
@@ -193,9 +185,7 @@ describe('inline typed source evidence', () => {
       '9.9K Spotify followers, 9,900 followers, and 9,900 Spotify followers. 19.9K followers stay plain.'
     );
     await waitFor(() => {
-      expect(screen.getAllByTestId('entity-chip-popover-trigger')).toHaveLength(
-        3
-      );
+      expect(screen.getAllByTestId(SOURCE_CHIP)).toHaveLength(3);
     });
   });
 
@@ -207,10 +197,10 @@ describe('inline typed source evidence', () => {
       [sourceFixture({ value: null, status: 'unknown' })],
       content
     );
-    const trigger = await screen.findByTestId('entity-chip-popover-trigger');
+    const trigger = await screen.findByTestId(SOURCE_CHIP);
     expect(trigger).not.toHaveTextContent('9.9K followers');
     await user.click(trigger);
-    expect(await screen.findByTestId('source-fact-card')).not.toHaveTextContent(
+    expect(await screen.findByTestId(SOURCE_CARD)).not.toHaveTextContent(
       '9.9K followers'
     );
     expect(screen.getByRole('link', { name: 'Open Source' })).toHaveAttribute(
@@ -223,7 +213,7 @@ describe('inline typed source evidence', () => {
       </SourceEvidenceProvider>
     );
     await waitFor(() => {
-      expect(screen.getByTestId('source-fact-card')).toHaveTextContent(
+      expect(screen.getByTestId(SOURCE_CARD)).toHaveTextContent(
         '9.9K followers'
       );
     });
@@ -236,15 +226,13 @@ describe('inline typed source evidence', () => {
       '[Artist](https://open.spotify.com/artist/fixture) has 9.9K followers.'
     );
     await waitFor(() => {
-      expect(screen.getAllByTestId('entity-chip-popover-trigger')).toHaveLength(
-        2
-      );
+      expect(screen.getAllByTestId(SOURCE_CHIP)).toHaveLength(2);
     });
-    const triggers = screen.getAllByTestId('entity-chip-popover-trigger');
+    const triggers = screen.getAllByTestId(SOURCE_CHIP);
     await user.hover(triggers[0]);
-    await screen.findByTestId('source-fact-card');
+    await screen.findByTestId(SOURCE_CARD);
     await user.hover(triggers[1]);
-    expect(await screen.findAllByTestId('source-fact-card')).toHaveLength(1);
+    expect(await screen.findAllByTestId(SOURCE_CARD)).toHaveLength(1);
   });
 
   it('opens a narrow viewport in the bottom sheet', async () => {
@@ -257,9 +245,7 @@ describe('inline typed source evidence', () => {
     try {
       const user = userEvent.setup();
       renderEvidence([sourceFixture()]);
-      await user.click(
-        await screen.findByTestId('entity-chip-popover-trigger')
-      );
+      await user.click(await screen.findByTestId(SOURCE_CHIP));
       const sheet = await screen.findByTestId('entity-chip-source-sheet');
       expect(sheet).toHaveAttribute('data-side', 'bottom');
       expect(sheet).toHaveTextContent('Direct source');
@@ -300,7 +286,7 @@ it('forwards public tool evidence through the app transcript', async () => {
       />
     </TooltipProvider>
   );
-  expect(
-    await screen.findByTestId('entity-chip-popover-trigger')
-  ).toHaveTextContent('9.9K followers');
+  expect(await screen.findByTestId(SOURCE_CHIP)).toHaveTextContent(
+    '9.9K followers'
+  );
 });

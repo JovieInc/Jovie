@@ -2,36 +2,32 @@
 // @coverage-via apps/web/components/jovie/components/SourceEvidence.test.tsx
 
 import { EntityCard } from '@/components/organisms/entity-card/EntityCard';
-import type { EntityCardModel } from '@/components/organisms/entity-card/types';
 import {
   type EnrichedFact,
   publicSourceUrl,
 } from '@/lib/profile-facts/enrichment';
 import { sourceFactLabel } from '../source-fact-labels';
 
-function sourceKind(fact: EnrichedFact): {
-  label: string;
-  kind: EntityCardModel['kind'];
-} {
-  const predicate = fact.predicate;
-  if (/track|release/.test(predicate)) return { label: 'Music', kind: 'music' };
-  if (/event/.test(predicate)) return { label: 'Event', kind: 'show' };
-  if (/book/.test(predicate)) return { label: 'Book', kind: 'merch' };
-  if (/publication/.test(predicate))
-    return { label: 'Publication', kind: 'alerts' };
-  if (/product/.test(predicate)) return { label: 'Product', kind: 'merch' };
-  if (/project/.test(predicate)) return { label: 'Project', kind: 'merch' };
-  if (/credential/.test(predicate))
-    return { label: 'Credential', kind: 'alerts' };
-  if (/social/.test(predicate))
-    return { label: 'Social Account', kind: 'person' };
-  if (/website/.test(predicate)) return { label: 'Website', kind: 'alerts' };
-  if (fact.value?.type === 'number') return { label: 'Metric', kind: 'person' };
-  return { label: 'Person', kind: 'person' };
-}
+const SOURCE_KINDS = [
+  [/track|release/, 'Music', 'music'],
+  [/event/, 'Event', 'show'],
+  [/book/, 'Book', 'merch'],
+  [/publication/, 'Publication', 'alerts'],
+  [/product/, 'Product', 'merch'],
+  [/project/, 'Project', 'merch'],
+  [/credential/, 'Credential', 'alerts'],
+  [/social/, 'Social Account', 'person'],
+  [/website/, 'Website', 'alerts'],
+] as const;
 
 export function SourceFactCard({ fact }: { readonly fact: EnrichedFact }) {
-  const category = sourceKind(fact);
+  const [, label, kind] =
+    SOURCE_KINDS.find(([pattern]) => pattern.test(fact.predicate)) ??
+    ([
+      null,
+      fact.value?.type === 'number' ? 'Metric' : 'Person',
+      'person',
+    ] as const);
   const source = fact.sourceRefs.find(ref => ref.status === 'available');
   const href = source ? publicSourceUrl(source.url) : null;
   return (
@@ -42,10 +38,10 @@ export function SourceFactCard({ fact }: { readonly fact: EnrichedFact }) {
         className='rounded-none border-0 shadow-none'
         model={{
           id: fact.id,
-          kind: category.kind,
+          kind: kind,
           imageAlt: '',
-          title: fact.subject.displayName ?? category.label,
-          eyebrow: category.label,
+          title: fact.subject.displayName ?? label,
+          eyebrow: label,
           meta: sourceFactLabel(fact),
           secondaryMeta: `${fact.status} · ${fact.verification}`,
           interactive: true,

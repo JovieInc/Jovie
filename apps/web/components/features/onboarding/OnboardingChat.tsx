@@ -1,6 +1,6 @@
 'use client';
 
-import { sourceFactsByMessage } from '@/components/jovie/source-facts';
+import { useSourceFactsByMessage } from '@/components/jovie/source-evidence-context';
 
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx
 
@@ -103,7 +103,9 @@ import {
  * Guard: tests/unit/onboarding/OnboardingChat.entry-bundle.test.ts
  */
 const loadChatMessage = () =>
-  import('@/components/jovie/components').then(mod => mod.ChatMessage);
+  import('@/components/jovie/components/ChatMessage').then(
+    mod => mod.ChatMessage
+  );
 const loadToolPartsRenderer = () =>
   import('@/components/jovie/tool-ui').then(mod => mod.ToolPartsRenderer);
 const loadChatProposeCheckoutCard = () =>
@@ -120,7 +122,9 @@ function ReservedChatSlot({ minHeightClass }: { minHeightClass: string }) {
 }
 
 const ChatMessage = dynamic(() =>
-  import('@/components/jovie/components').then(mod => mod.ChatMessage)
+  import('@/components/jovie/components/ChatMessage').then(
+    mod => mod.ChatMessage
+  )
 );
 const ToolPartsRenderer = dynamic(
   () => import('@/components/jovie/tool-ui').then(mod => mod.ToolPartsRenderer),
@@ -561,7 +565,7 @@ function OnboardingMessageList({
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
 }) {
-  const sourceFacts = sourceFactsByMessage(displayMessages);
+  const sourceFacts = useSourceFactsByMessage(displayMessages);
   const handleStepDone =
     hasToolOutputAction(
       displayMessages,
