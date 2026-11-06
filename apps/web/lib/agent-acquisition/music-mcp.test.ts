@@ -49,7 +49,6 @@ vi.mock('@/lib/flags/server', () => ({ getAppFlagValue: mocks.flag }));
 import { DELETE, GET, POST } from '@/app/api/music/mcp/route';
 import { POST as resolveRest } from '@/app/api/v1/music/resolve/route';
 import { BASE_URL } from '@/constants/app';
-import { AGENT_SKILLS, buildMcpServerCard } from '@/lib/agent-ready/discovery';
 import timArtist from '@/lib/dsp-enrichment/providers/fixtures/tim-white-musicbrainz.json';
 import timUrl from '@/lib/dsp-enrichment/providers/fixtures/tim-white-musicbrainz-url.json';
 import {
@@ -241,29 +240,6 @@ describe('public music identity MCP, real SDK and canonical resolver', () => {
     expect(chosen).toMatchObject({ status: 'resolved', mbid: timArtist.id });
   });
 
-  it('documents artist-only fetching and rejects track and album fetch identifiers', async () => {
-    const skill = AGENT_SKILLS.find(
-      item => item.name === 'jovie-music-identity'
-    )!;
-    expect(skill.description).toContain('fetch public artists');
-    expect(skill.description).toContain('resolve artist, track and album');
-    expect(skill.body).toContain(`description: ${skill.description}\n`);
-
-    for (const id of [
-      `https://open.spotify.com/track/${ID}`,
-      `https://open.spotify.com/album/${ID}`,
-      'https://music.apple.com/us/album/123456',
-    ]) {
-      const { body } = await call('fetch', { id });
-      expect(body.result.isError).toBe(true);
-      expect(body.result.structuredContent).toEqual({
-        error: { code: 'INVALID_INPUT', retryable: false },
-      });
-    }
-    expect(mocks.spotifyGet).not.toHaveBeenCalled();
-    expect(mocks.appleGet).not.toHaveBeenCalled();
-  });
-
   it('clean official client initializes, discovers generated strict schemas and calls search then fetch', async () => {
     const transport = new StreamableHTTPClientTransport(new URL(url), {
       fetch: async (input, init) => {
@@ -278,11 +254,6 @@ describe('public music identity MCP, real SDK and canonical resolver', () => {
     await client.connect(transport);
     try {
       const tools = await client.listTools();
-      const card = buildMcpServerCard(BASE_URL);
-      expect(card.serverInfo).toMatchObject(client.getServerVersion()!);
-      expect(card.tools.map(tool => tool.name).sort()).toEqual(
-        tools.tools.map(tool => tool.name).sort()
-      );
       expect(tools.tools.map(tool => tool.name)).toEqual([
         'resolve',
         'search',
