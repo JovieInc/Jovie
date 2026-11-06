@@ -46,8 +46,11 @@ export const Empty: Story = { render: () => <ListDemo empty /> };
 
 export const NestedMenu: Story = {
   render: () => (
-    <DropdownMenuPrimitive.Root defaultOpen>
-      <DropdownMenuPrimitive.Trigger className='rounded-full border border-subtle bg-surface-1 px-3 py-2 text-sm text-primary-token'>
+    <DropdownMenuPrimitive.Root open>
+      <DropdownMenuPrimitive.Trigger
+        inert
+        className='rounded-full border border-subtle bg-surface-1 px-3 py-2 text-sm text-primary-token'
+      >
         Add platform
       </DropdownMenuPrimitive.Trigger>
       <DropdownMenuPrimitive.Portal>
@@ -68,8 +71,11 @@ export const NestedMenu: Story = {
 
 export const LoadingNestedMenu: Story = {
   render: () => (
-    <DropdownMenuPrimitive.Root defaultOpen>
-      <DropdownMenuPrimitive.Trigger className='rounded-full border border-subtle bg-surface-1 px-3 py-2 text-sm text-primary-token'>
+    <DropdownMenuPrimitive.Root open>
+      <DropdownMenuPrimitive.Trigger
+        inert
+        className='rounded-full border border-subtle bg-surface-1 px-3 py-2 text-sm text-primary-token'
+      >
         Add platform
       </DropdownMenuPrimitive.Trigger>
       <DropdownMenuPrimitive.Portal>

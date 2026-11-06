@@ -96,6 +96,18 @@
       "rule": "arbitrary-value",
       "value": "max-w-[45%]",
       "reason": "PR #22736: caps the inline artist line at 45% of the release row so the 32px dense row keeps title room. Percentage max-width has repo precedent (max-w-[66%]/[70%]/[78%] grandfathered) and no canonical token exists for fractional row caps."
+    },
+    {
+      "file": "packages/ui/atoms/common-dropdown-item-renderers.tsx",
+      "rule": "linear-namespace",
+      "value": "--linear-text-secondary",
+      "reason": "A11y contrast repair (2026-10-23): dropdown subText moved off --linear-text-tertiary, which fails WCAG AA at text-2xs on the menu surface; --linear-text-secondary is the in-namespace canonical secondary already used by badge.tsx and siblings."
+    },
+    {
+      "file": "apps/web/components/molecules/page-toolbar-classes.ts",
+      "rule": "arbitrary-value",
+      "value": "font-[540]",
+      "reason": "JOV-8873: page-toolbar action classes extracted into the shared page-toolbar-classes module; value-identical to PageToolbar.tsx's grandfathered string (ACTION_BAR_BUTTON_CLASS === APP_CONTROL_BUTTON_CLASS). File-move registration only."
     }
   ],
   "notes": "Documented escapes only. Each identity is file<TAB>rule<TAB>value (or {file, rule, value}). Prefer deleting the debt over adding an escape. The JOV-[1-9] entry is a zod issue-key validation regex in that route (identifier: /^JOV-[1-9][0-9]*$/u), not a style token; no canonical design token applies."
