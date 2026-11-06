@@ -1124,8 +1124,7 @@ const PREFLIGHT_COVERAGE_ARGS = [
 ];
 
 /** Keep unrelated scanners outside V8 instrumentation; run every selection once.
- * @param {readonly string[]} tests
- * @returns {string[][]}
+ * @param {readonly string[]} tests @returns {string[][]}
  */
 export function scriptContractNodeArgs(tests) {
   const focused = tests.filter(test => PREFLIGHT_COVERAGE_TESTS.includes(test));
@@ -1145,6 +1144,7 @@ export const SCRIPT_CONTRACT_NODE_COMMAND = `${PR_OPEN_COVERAGE_COMMAND} && ${DE
   .join(' && ')}`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
+  'scripts/lib/__tests__/merge-group-sibling-burn-contract.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
   'scripts/lib/__tests__/gh-api-hold-retry.test.mjs',
   'scripts/lib/__tests__/prod-cert.test.mjs',
