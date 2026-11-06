@@ -19,6 +19,10 @@ import type { MarketingPenContractId } from '@/data/marketing/penContracts';
 import type { BrandMarkSize } from '@/lib/brand/tokens';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { cn } from '@/lib/utils';
+import {
+  getNavGroupVariantClass,
+  getNavLinkVariantClass,
+} from './header-nav-variants';
 
 // Linear header structure: full-width header with centered ~1000px content
 // Linear uses ~224px margins on 1440px viewport = ~984px content width
@@ -324,42 +328,6 @@ function MarketingGlassFlyout({
       </div>
     </div>
   );
-}
-
-function getNavLinkVariantClass({
-  isHomepagePresentation,
-  isMarketingGlass,
-}: Readonly<{
-  isHomepagePresentation: boolean;
-  isMarketingGlass: boolean;
-}>) {
-  if (isMarketingGlass) {
-    return 'marketing-glass-header__nav-link';
-  }
-
-  if (isHomepagePresentation) {
-    return 'homepage-header-nav-link';
-  }
-
-  return 'nav-link-linear';
-}
-
-function getNavGroupVariantClass({
-  isHomepagePresentation,
-  isMarketingGlass,
-}: Readonly<{
-  isHomepagePresentation: boolean;
-  isMarketingGlass: boolean;
-}>) {
-  if (isMarketingGlass) {
-    return 'marketing-glass-header__nav';
-  }
-
-  if (isHomepagePresentation) {
-    return 'homepage-header-nav-group';
-  }
-
-  return 'gap-1 lg:gap-1.5';
 }
 
 function getNavContainerVariantClass({
