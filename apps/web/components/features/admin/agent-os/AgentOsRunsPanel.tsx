@@ -298,7 +298,7 @@ function AgentOsBoard({
                   onStatusFilterChange(statusFilter === status ? null : status)
                 }
                 aria-pressed={statusFilter === status}
-                aria-label={`Filter by ${RUN_STATUS_LABEL[status]} (${laneRows.length})`}
+                aria-label={`Filter by ${RUN_STATUS_LABEL[status]}: ${laneRows.length}`}
                 className={cn(
                   'h-auto rounded px-1 text-2xs tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
                   statusFilter === status

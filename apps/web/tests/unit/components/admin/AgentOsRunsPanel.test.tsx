@@ -99,6 +99,11 @@ describe('AgentOsRunsPanel', () => {
     });
     expect(queuedFilterBtn).toHaveAttribute('aria-pressed', 'false');
 
+    // The visible lane count must be a clean token inside the accessible
+    // name (label-content-name-mismatch): "Filter by Queued: 1", not parens.
+    expect(queuedFilterBtn).toHaveAccessibleName(/Filter by Queued: \d+/);
+    expect(queuedFilterBtn).not.toHaveAccessibleName(/\(\d+\)/);
+
     await userEvent.click(queuedFilterBtn);
     expect(queuedFilterBtn).toHaveAttribute('aria-pressed', 'true');
 
