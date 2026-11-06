@@ -487,6 +487,10 @@ export const ServerEnvSchema = z.object({
   E2E_PROD_SIGNUP_EMAIL_BASE: z.string().email().optional(),
   // Kill switch for canary passage tokens on the /start bot check (JOV-9625).
   SYNTHETIC_PASSAGE_TOKENS_DISABLED: z.enum(['0', '1']).optional(),
+  // Kill switch for the canary account-reset endpoint (JOV-9826). '1' makes
+  // /api/internal/canary/reset refuse every request (503) without touching
+  // the canary account.
+  CANARY_RESET_DISABLED: z.enum(['0', '1']).optional(),
   PRODUCTION_WAITLIST_CANARY_READ_TOKEN: z.string().min(32).optional(),
   E2E_PROD_SIGNUP_PASSWORD: z.string().optional(),
   E2E_PROD_MAILBOX_PROVIDER: z
@@ -688,6 +692,7 @@ export const ENV_KEYS = [
   'ONBOARDING_SYSTEM1_ENGINE',
   'E2E_PROD_SIGNUP_EMAIL_BASE',
   'SYNTHETIC_PASSAGE_TOKENS_DISABLED',
+  'CANARY_RESET_DISABLED',
   'PRODUCTION_WAITLIST_CANARY_READ_TOKEN',
   'E2E_PROD_SIGNUP_PASSWORD',
   'E2E_PROD_MAILBOX_PROVIDER',

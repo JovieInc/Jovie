@@ -165,6 +165,11 @@ export const syntheticPassageTokenLimiter = createRateLimiter(
   { requireRedis: true }
 );
 
+/** Canary account reset (JOV-9826). Redis only, fail closed. */
+export const canaryResetLimiter = createRateLimiter(RATE_LIMITERS.canaryReset, {
+  requireRedis: true,
+});
+
 export interface AnonymousChatLimitInput {
   readonly ip: string;
   readonly sessionId: string;

@@ -207,6 +207,24 @@ export const RATE_LIMITERS = {
     trafficClass: 'internal',
   } satisfies RateLimitConfig,
 
+  /**
+   * Canary account reset (JOV-9826): a production-mutation endpoint that
+   * returns the claim-walk canary to its pre-claim state. Six resets per
+   * hour across all runs; the canary walk needs at most one per run.
+   * Fail closed without Redis — an unavailable store never opens a window
+   * on an endpoint that mutates accounts.
+   */
+  canaryReset: {
+    name: 'Canary Reset',
+    limit: 6,
+    window: '1 h',
+    prefix: 'canary_reset',
+    requireRedis: true,
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'internal',
+  } satisfies RateLimitConfig,
+
   anonymousOnboardingChatFirstTouch: {
     name: 'Anonymous Onboarding Chat (First Touch)',
     limit: 20,
