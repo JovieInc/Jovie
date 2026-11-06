@@ -9,9 +9,8 @@ export function useProjectedSourceFact(
   candidate: EnrichedFact | undefined,
   id: string
 ) {
-  const matches = candidate?.id === id;
   const [sourceFact, setSourceFact] = useState<EnrichedFact | undefined>();
-  const [pending, setPending] = useState(Boolean(candidate && matches));
+  const [pending, setPending] = useState(candidate?.id === id);
   const [SourceFactCardView, setSourceFactCardView] =
     useState<SourceFactCardComponent | null>(null);
 

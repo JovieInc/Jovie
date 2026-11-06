@@ -47,8 +47,7 @@ export function SourceEvidenceProvider({
   );
 }
 
-const EMPTY_SOURCE_FACTS: ReadonlyMap<string, readonly EnrichedFact[]> =
-  new Map();
+const EMPTY_FACTS: ReadonlyMap<string, readonly EnrichedFact[]> = new Map();
 
 export function useSourceFactsByMessage(
   messages: Parameters<typeof import('./source-facts').sourceFactsByMessage>[0]
@@ -68,5 +67,5 @@ export function useSourceFactsByMessage(
       cancelled = true;
     };
   }, [messages]);
-  return result?.messages === messages ? result.facts : EMPTY_SOURCE_FACTS;
+  return result?.messages === messages ? result.facts : EMPTY_FACTS;
 }
