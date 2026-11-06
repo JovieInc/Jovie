@@ -37,6 +37,7 @@ describe('LibraryAssetSharePanel', () => {
         profileId='profile-1'
         artistHandle='tim'
         disabled
+        onShareChange={vi.fn()}
         initialShare={{
           assetId: 'release-1',
           visibility: 'private',
