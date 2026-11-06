@@ -73,10 +73,12 @@ export function getAudienceDisplayName(
     return name;
   }
 
-  return isAudienceMemberAnonymous(member) ? 'Anonymous Fan' : 'Fan';
+  return isAudienceMemberAnonymous(member)
+    ? 'Anonymous visitor'
+    : 'Audience member';
 }
 
-/** Whether the artist can message this fan through a known channel. */
+/** Whether the artist can message this audience member through a known channel. */
 export function canMessageAudienceMember(
   member: Pick<
     AudienceMember,

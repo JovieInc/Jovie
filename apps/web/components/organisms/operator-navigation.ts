@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import {
   ADMIN_NAV_REGISTRY,
+  ADMIN_WORKSPACE_TABS,
   type AdminNavigationSection,
   type AdminWorkspaceId,
 } from '@/constants/admin-navigation';
@@ -138,6 +139,15 @@ export function isOperatorNavigationHrefActive(
 
   if (href === APP_ROUTES.OV) {
     return pathname === href || pathname === APP_ROUTES.ADMIN_CHAT;
+  }
+
+  const views = Object.values(ADMIN_WORKSPACE_TABS).find(tabs =>
+    tabs.some(tab => tab.href === href)
+  );
+  if (views) {
+    return views.some(
+      tab => pathname === tab.href || pathname.startsWith(`${tab.href}/`)
+    );
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);

@@ -1,4 +1,5 @@
 import { sql as drizzleSql } from 'drizzle-orm';
+import { internalEmailSql } from '@/lib/accounts/internal-account';
 import { users } from '@/lib/db/schema/auth';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 
@@ -17,9 +18,9 @@ export const BACKFILL_MIN_USER_AGE_BEFORE_ENTRY = '1 day';
  * Derived from provenance already stored, so it applies to past batches too.
  */
 export function organicWaitlistEntrySql() {
-  return drizzleSql`NOT EXISTS (
+  return drizzleSql`(NOT ${internalEmailSql(waitlistEntries.emailNormalized)} AND NOT EXISTS (
     SELECT 1 FROM ${users}
     WHERE ${users.waitlistEntryId} = ${waitlistEntries.id}
       AND ${users.createdAt} < ${waitlistEntries.createdAt} - interval '${drizzleSql.raw(BACKFILL_MIN_USER_AGE_BEFORE_ENTRY)}'
-  )`;
+  ))`;
 }

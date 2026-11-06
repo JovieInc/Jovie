@@ -134,6 +134,7 @@ export const leads = pgTable(
     // Outreach pipeline
     outreachRoute: leadOutreachRouteEnum('outreach_route'),
     outreachStatus: leadOutreachStatusEnum('outreach_status'),
+    /** @deprecated Plaintext is never written; 0160 nulls existing values. Read claimTokenHash. */
     claimToken: text('claim_token'),
     claimTokenHash: text('claim_token_hash'),
     claimTokenExpiresAt: timestamp('claim_token_expires_at'),

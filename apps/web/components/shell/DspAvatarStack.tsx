@@ -217,7 +217,6 @@ export function DspAvatarStack({
             aria-controls={open ? popoverId : undefined}
             aria-expanded={open}
             aria-haspopup='dialog'
-            aria-label='View DSP Distribution Details'
             className='inline-flex items-center gap-1.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--system-b-bg-page)'
             onClick={event => {
               event.stopPropagation();
@@ -236,7 +235,10 @@ export function DspAvatarStack({
             onPointerLeave={handlePointerLeave}
             type='button'
           >
-            <span className='inline-flex items-center'>
+            {/* Include the visible overflow count in the name (WCAG 2.5.3,
+                JOV-8781). Explicit whitespace separates inline text nodes. */}
+            <span className='sr-only'>View DSP Distribution Details</span>{' '}
+            <span aria-hidden='true' className='inline-flex items-center'>
               {visible.map((dsp, index) => (
                 <span
                   key={dsp.id}

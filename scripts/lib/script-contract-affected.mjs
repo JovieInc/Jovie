@@ -7,11 +7,13 @@
  * after a Biome bump (8), deprecation-clearance, backlog and pr-size-guard
  * contracts. This runs the affected ones at PR time.
  *
- * Selection: a diff under scripts/, .github/, the root package.json, the
- * lockfile or biome.json can change any contract's inputs or toolchain, so it
- * runs both full lists. Any other diff runs the contracts whose derived
- * imports or reads it touches (testsAffectedBy). The node and vitest lists run
- * concurrently.
+ * Selection: a diff under .github/, or of the root package.json, the lockfile,
+ * biome.json, or a non-test JS/TS file under scripts/, can change any
+ * contract's inputs or toolchain, so it runs both full lists. That is the
+ * 2026-10-12 rule (37 merge-group failures after a green PR). Python, data,
+ * and other non-JS paths under scripts/ cannot change those inputs, so they
+ * use the derived selector (testsAffectedBy), same as any other diff. The
+ * node and vitest lists run concurrently.
  *
  * Usage: node scripts/lib/script-contract-affected.mjs [--list] [changed paths...]
  * With no paths it reads the PR diff via ci-fast-lanes.mjs.
@@ -25,14 +27,18 @@ import {
   listAllChangedFiles,
   SCRIPT_CONTRACT_NODE_TESTS,
   SCRIPT_CONTRACT_VITEST_TESTS,
+  scriptContractNodeArgs,
 } from '../ci-fast-lanes.mjs';
 import { testsAffectedBy } from './test-file-dependencies.mjs';
 
 // The CLI runs from the checkout root; Source Validation may load this file
 // from a trusted base archive elsewhere on disk.
 const REPO_ROOT = process.cwd();
+// JS/TS under scripts/ stays on the full list. A .py or other non-JS path
+// there does not: it cannot change a contract's toolchain or inputs, and
+// treating it as one is what made a four-file lane fix run every contract.
 const FULL_RUN_INPUT =
-  /^(?:scripts\/|\.github\/|package\.json$|pnpm-lock\.yaml$|biome\.json$)/u;
+  /^(?:\.github\/.+|package\.json|pnpm-lock\.yaml|biome\.json|scripts\/.+\.(?:mjs|cjs|js|ts|mts|tsx))$/u;
 
 /**
  * @param {readonly string[] | null} changed null = unreadable diff
@@ -82,7 +88,8 @@ async function main(args) {
     return 0;
   }
   const runs = [];
-  if (node.length > 0) runs.push(run(process.execPath, ['--test', ...node]));
+  for (const args of scriptContractNodeArgs(node))
+    runs.push(run(process.execPath, args));
   if (vitest.length > 0)
     runs.push(
       run('pnpm', [

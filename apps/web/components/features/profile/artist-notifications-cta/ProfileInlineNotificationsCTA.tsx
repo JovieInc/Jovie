@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/profile/inline-notifications-cta.test.tsx
 'use client';
 
 import { Bell, CheckCircle2 } from 'lucide-react';
@@ -564,13 +565,17 @@ export function ProfileInlineNotificationsCTA({
       if (captureSuccessTimerRef.current) {
         clearTimeout(captureSuccessTimerRef.current);
       }
+      // No mailbox proof on this path (returning verified email, or SMS), so
+      // no signup-session cookie exists and the name/birthday save would be
+      // refused. Only the OTP-verified path continues to those steps.
       captureSuccessTimerRef.current = setTimeout(() => {
-        setStep('name');
+        handleClose();
       }, CAPTURE_SUCCESS_HOLD_MS);
     }
   }, [
     channel,
     emailInput,
+    handleClose,
     handleSubscribe,
     markSubscriptionActivated,
     phoneInput,

@@ -152,14 +152,7 @@ export const MARKETING_SHELL_REGISTRY = [
     'MarketingFooterCta',
     'Marketing/Shells/MarketingFooterCta',
     [MARKETING_PEN_CONTRACT_IDS.shell.footerCta],
-    'penContractId={MARKETING_PEN_CONTRACT_IDS.shell.footerCta}',
-    [
-      {
-        source: 'apps/web/components/site/MarketingTerminalCta.tsx',
-        binding: 'data-pen-contract={penContractId}',
-        occurrences: 1,
-      },
-    ]
+    'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.shell.footerCta}'
   ),
   shell(
     'shell.final-cta',
@@ -582,6 +575,12 @@ const SECTION_RESOLUTIONS = {
         variantId: 'release-rail',
         componentPath:
           'apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx',
+        rootBinding: "sectionVariant='release-rail'",
+      },
+      {
+        variantId: 'release-rail',
+        componentPath:
+          'apps/web/components/marketing/ConnectedComponentsGallery.tsx',
         rootBinding: "sectionVariant='release-rail'",
       },
     ],

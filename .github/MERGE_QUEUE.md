@@ -7,6 +7,9 @@ also the supported stack-construction path: dependent PRs may temporarily target
 their immediate parent, then are retargeted and rebased onto `main` after that
 parent lands. There is no second landing transport.
 
+Steward decisions (proven-culprit dequeue, flake handling, failure class to guard) live in
+[`canon/MERGE_QUEUE_STEWARD.md`](../canon/MERGE_QUEUE_STEWARD.md).
+
 ## How a PR lands
 
 1. Open a root PR against `main`. A dependent child may instead target its
@@ -34,7 +37,7 @@ Branch protection pins aggregate contexts only—never individual CI jobs.
 
 | Context           | Source PR                                                                                                                | Native `merge_group`                                                                                                                                                                 |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `PR Ready`        | Path selection, risk classification, `ci-fast` (including the portable iOS contract), diff secret scan, Golden Path Lock | Path selection, risk classification, `ci-fast`, ten affected unit shards, one hosted build + layout workspace, path-selected iOS unit + coverage, diff secret scan, Golden Path Lock |
+| `PR Ready`        | Path selection, risk classification, `ci-fast` (including the portable iOS contract), diff secret scan, Golden Path Lock | Path selection, risk classification, `ci-fast`, 14 web unit shards + `packages/ui`, one hosted build + layout workspace, path-selected iOS unit + coverage, diff secret scan, Golden Path Lock; emits `Merge Suite Scope / full_web_units` so main may skip duplicate lanes (JOV-10687). An `ordinary_admission` scope must not authorize that skip. |
 | `Migration Guard` | Path-gated migration policy                                                                                              | Re-emitted and evaluated on the combined head                                                                                                                                        |
 | `Fork PR Gate`    | Human approval policy for external forks                                                                                 | Revalidates every exact group member before emitting the combined-head context                                                                                                       |
 | `PR Size Guard`   | Source-diff size policy                                                                                                  | Revalidates every exact group member before emitting the combined-head context                                                                                                       |
@@ -84,18 +87,21 @@ Checked-in source: `.github/rulesets/branch-protection.yml`.
 - Required status checks are non-strict on source PRs; the combined head owns
   latest-`main` validation.
 - Merge method: `SQUASH`
-- Grouping strategy: `ALLGREEN`
+- Grouping strategy: `HEADGREEN` (live 2026-10-29, Tim-approved): only the group
+  head's build gates the merge, so a one-off failure in an intermediate build
+  no longer ejects the entries behind it.
 - Minimum entries to merge: `1`.
 - Minimum entries wait: `0` minutes. A source-green PR forms a group
   immediately instead of waiting for a cohort.
 - Maximum entries per merge: `10`. Each entry still builds its own synthetic
   head layered on the entry ahead (one member per group), so per-member lanes
   and member policy are unchanged; up to ten green entries land in one push.
-- Maximum entries building concurrently: checked-in ceiling `10`. Lower live
-  values remain supported as a reversible runner-capacity brake. Raise the
-  file and the live ruleset together.
-- Check response timeout: `20` minutes (Tim-approved tuning and live readback
-  verified 2026-10-21). Required checks and ALLGREEN remain unchanged.
+- Maximum entries building concurrently: `8` (live 2026-10-29, Tim-approved;
+  the 2026-10-13 quota storm happened at 8 hosted-runner builds, so watch the
+  quota numbers in the tuning log). Lower live values remain supported as a
+  reversible capacity brake. Raise the file and the live ruleset together.
+- Check response timeout: `30` minutes (live readback 2026-10-29; the checked-in
+  value had stayed at 20 after a live change). Required checks remain unchanged.
 - Production health governs deployment and promotion through the existing
   production controls. Native source admission uses the required checks above;
   the retired Auto-Enroll fleet gate does not create a second admission gate.
@@ -132,15 +138,22 @@ only the selected Web, Mac, iOS, operations/tooling, and shared-contract lanes,
 so a fast-only change does not inherit an unrelated PR's slow product lane.
 
 **Ship now:** immediate groups (`min=1`, `wait=0`), up to ten green entries
-per merge push, ten building concurrently, ALLGREEN, 20-minute check response
-budget (2026-10-21, Tim-approved; 3 of 287 group runs exceeded 20 minutes in
-the first 12 hours, with no timeout removals). HEADGREEN is unsafe here:
-member policy validates only the newest member and lanes are path-selected per
-member, so an earlier member could land without its own lanes passing.
+per merge push, eight building concurrently, HEADGREEN, 30-minute check response
+budget (2026-10-29, Tim-approved: one-off failures in intermediate merge_group
+builds were ejecting green PRs, and a size-budget overflow plus a self-hosted
+sparse-checkout fault had jammed the queue). Known HEADGREEN risk, accepted by
+Tim: lanes are path-selected per member and member policy validates the newest
+member, so an earlier member can land on a head build that did not run its own
+lanes. Mitigations in code: `merge-group-failure-hold` still holds
+deterministic-source failures at any position and any failure of the last queued
+entry, and only leaves a non-deterministic failure of an intermediate entry
+queued; the queue breaker ignores failed builds of an entry still queued on that
+same synthetic commit. A poison PR ahead of others now ejects the entries
+behind it one head at a time until it is last, so watch queue breaker trips.
 **Re-evaluate when:** the group failure rate stays under 10% and the repo
-GITHUB_TOKEN bucket stays healthy for a day. **Then:** keep 10/10; if
+GITHUB_TOKEN bucket stays healthy for a day. **Then:** keep 8/10; if
 merge-group runs selecting the 30/40-minute iOS or Mac lanes start timing out
-at the 20-minute response budget (the 2026-09-23 failure mode), raise the
+at the 30-minute response budget (the 2026-09-23 failure mode), raise the
 budget in this file and the live ruleset together, watching hosted macOS pickup
 (the org shares five hosted macOS slots).
 
@@ -155,6 +168,10 @@ budget in this file and the live ruleset together, watching hosted macOS pickup
 | 2026-10-13 | source synced to live (build 6, merge 5) | keep the daily verify green |
 | 2026-10-21 04:47 | live `max_entries_to_build` 6 → 10, `max_entries_to_merge` 5 → 10, `check_response_timeout_minutes` 60 → 20 (Tim-approved) | queue 40 deep at ~5 merges/h; stuck checks held the head for an hour |
 | 2026-10-21 | source synced to live (build 10, merge 10, timeout 20) | keep the daily verify green (JOV-8205) |
+| 2026-10-29 16:3x | live `grouping_strategy` ALLGREEN → HEADGREEN, `max_entries_to_build` 10 → 8, `max_entries_to_merge` stays 10, check timeout stays 30 (Tim-approved) | one-off failures in intermediate merge_group builds ejected green PRs; size-budget overflow and a self-hosted sparse-checkout fault jammed the queue |
+| 2026-10-29 | source synced to live (HEADGREEN, build 8, merge 10, timeout 30; the checked-in 20 had drifted from live 30); failure-hold, queue breaker and native-queue-eval made HEADGREEN-aware | keep the daily verify green; stop attributing intermediate failures to their entry |
+| 2026-10-31 08:48 | live `max_entries_to_build` 8 → 4; merge 10, HEADGREEN and timeout 30 unchanged (Tim-approved 2026-10-31) | hosted runner cap (about 60 concurrent jobs) was binding: 8 HEADGREEN groups of about 49 jobs each, 183 runs queued, head group 22 min wall for 10 min of CI; only the head group gates the merge (JOV-10096) |
+| 2026-10-31 | source synced to live (build 4); live was lowered first because a lock below live fails preflight, while live below lock is a supported brake | keep the daily verify green |
 
 ## Reconciliation and loop prevention
 
@@ -162,6 +179,11 @@ The finishing agent requests GitHub Merge when ready against the exact PR head.
 GitHub owns queue membership, combined-head checks, and merge ordering. A
 one-shot `gh pr merge --auto --match-head-commit` request is not a queue receipt;
 read `mergeQueueEntry` before claiming admission.
+
+Never dequeue to re-prioritize; label `compounding` and let green-enroll re-route.
+A queued `compounding` PR with a non-compounding entry ahead of it is dequeued and
+re-enqueued with `jump` by Merge Queue Green Enroll (receipt `relabel-jump`), under
+the same caps as a fresh enqueue: `MAX_JUMPED`, `JUMP_MAX_BUILD_S`, `JUMP_BATCH_S`.
 
 `drain-pr-queue.sh` remains a guarded manual maintenance tool. Its legacy
 source-admission and rebase path has no automatic caller. Hard-gate labels block
@@ -323,7 +345,7 @@ runtime behavior, or Summer commissioning.
   introduced it; a group stacked on an already broken base passes. The failure
   hold then records `jovie-queue-failure-hold/v1` on the exact source head and
   reports `PR Ready` failed on the synthetic group head, so the queue ejects it
-  at once. The ruleset's 20-minute check response timeout remains the backstop
+  at once. The ruleset's 30-minute check response timeout remains the backstop
   for any other cause.
 
 ## Queue freeze (queue-watch runbook)
@@ -383,3 +405,53 @@ Commit signing remains an audit signal, but live ruleset `10512119` does not
 currently require signatures. Keep agent signing enabled where supported and
 use `commit-signature-check` on `main`; do not claim this as an admission gate
 until an explicit ruleset cutover is verified against native squash commits.
+
+## Auto-merge only on main-based PRs
+
+Auto-merge and enqueue belong only on a PR whose base is `main`. A stacked
+child armed against its parent branch merges into that branch, and the work
+never ships. Two layers enforce it: `assertEnrollCandidate` in
+`scripts/merge-queue-backend.mjs` refuses a non-main base (this covers green
+enroll and `drain-pr-queue.sh`), and the `Auto-Merge Base Guard` workflow
+disables auto-merge the moment it is enabled on a non-main base (covers a
+person or agent arming auto-merge by hand). When a parent merges,
+`Unstack Merged Parent` retargets its children to `main`, rebases them without
+the parent's squash-merged commits, then dispatches green enroll's per-PR path
+for it, so admission (green head, holds, draft) stays in the single queue
+writer. `QUEUE_FREEZE=1` stops that dispatch; the retarget and rebase still run.
+
+## Runner pool variables
+
+Control-plane and the cheap required `PR Ready` job read their pool from repo
+variables so a saturated hosted pool can be relieved without a PR. Unset means
+`ubuntu-latest`. Values are JSON:
+
+- `RUNNER_CONTROL_PLANE`: Green Enroll, Lane Fix Relay, PR Fleet Rules (fork PRs stay hosted) and PR targets main (non-merge-group events). Gem: `["self-hosted","Linux","X64","jovie-fixed"]`.
+- `RUNNER_READY`: the `PR Ready` job in Source Validation.
+
+- `RUNNER_SOURCE_VALIDATION`: the six Source Validation jobs except `PR Ready`. Fork PRs always stay on their hosted label. Gem has 5 slots (one job each) against Source Validation's ~26 average concurrent hosted jobs, so only flip this for a measured subset; compare per-job time before and after.
+
+Auto-Ready Drafts fleet controllers stay hosted to preserve their verified `gh` CLI contract.
+
+Fork PR Gate stays hosted: it handles untrusted fork events and must not run on persistent runners.
+Flip: `gh variable set RUNNER_CONTROL_PLANE --body '["self-hosted","Linux","X64","jovie-fixed"]'`; revert: `gh variable delete RUNNER_CONTROL_PLANE`.
+
+### Marketing priority
+
+Apply `priority:marketing` to a marketing-page PR and its ready Linear issue.
+Green Enroll considers labeled PRs first in reconciliation and uses the existing
+bounded jump and relabel-jump path. Marketing and `compounding` entries share
+`MAX_JUMPED`, `JUMP_MAX_BUILD_S` and `JUMP_BATCH_S`; an active build or cap can
+defer a jump. The label never clears a hold or substitutes for current-head checks.
+
+Symphony admits ready labeled Backlog issues through the existing bounded
+priority replacement and protects them from low-priority displacement. Signed
+Summer portfolio ranks and explicit Linear Urgent remain ahead; marketing
+precedes other eligible work. Removing the label restores ordinary ordering.
+The mesh board still orders stuck-PR repairs before detector issues and goals;
+it does not interpret arbitrary task text as a priority grant. Existing admission
+timestamps and Green Enroll decision receipts measure the effect.
+
+Ship now: reuse the existing priority paths. Re-evaluate when marketing is
+cleared or jump-reset receipts show lost throughput. Then remove the label or
+adjust the existing bounded policy with measured evidence, retaining every gate.
