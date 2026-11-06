@@ -22,6 +22,7 @@ export function PublicSurfaceShell({
   className,
 }: Readonly<PublicSurfaceShellProps>) {
   return (
+    {/* biome-ignore lint/a11y/noNoninteractiveTabindex: the scroll viewport is the keyboard entry point for native scrolling (scrollable-region-focusable) */}
     <div
       tabIndex={0}
       className={cn(
