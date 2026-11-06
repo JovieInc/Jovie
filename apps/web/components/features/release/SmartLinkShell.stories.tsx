@@ -13,7 +13,10 @@ const meta = {
   args: {
     artworkUrl: 'https://placehold.co/640x640/111827/E5E7EB?text=Artwork',
     artworkAlt: 'Never Say A Word artwork',
-    showMenuButton: false,
+    // Production shells always carry the brand/menu row; keeping it gives
+    // the scrollable viewport focusable content (scrollable-region-focusable).
+    showMenuButton: true,
+    onMenuOpen: () => undefined,
     children: <p>Listen</p>,
   },
 } satisfies Meta<typeof SmartLinkShell>;

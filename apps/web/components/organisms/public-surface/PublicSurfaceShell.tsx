@@ -1,7 +1,5 @@
 'use client';
 
-// @coverage-via apps/web/components/features/release/SmartLinkShell.test.tsx
-
 import Image from 'next/image';
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
 import { cn } from '@/lib/utils';
@@ -21,10 +19,8 @@ export function PublicSurfaceShell({
   children,
   className,
 }: Readonly<PublicSurfaceShellProps>) {
-  // biome-ignore lint/a11y/noNoninteractiveTabindex: the scroll viewport is the keyboard entry point for native scrolling (scrollable-region-focusable)
   return (
     <div
-      tabIndex={0}
       className={cn(
         'profile-viewport relative h-dvh overflow-clip bg-base text-primary-token md:h-auto md:min-h-dvh md:overflow-x-hidden',
         className
