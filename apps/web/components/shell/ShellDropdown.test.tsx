@@ -14,6 +14,11 @@ describe('ShellDropdown', () => {
       </ShellDropdown>
     );
     expect(screen.getByRole('menu')).toBeInTheDocument();
+    // Menu-role content keeps Radix's vertical orientation (valid on menu).
+    expect(screen.getByRole('menu')).toHaveAttribute(
+      'aria-orientation',
+      'vertical'
+    );
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(
       screen.queryByRole('textbox', { name: 'Filter Dropdown Items' })
@@ -36,6 +41,8 @@ describe('ShellDropdown', () => {
       'aria-label',
       'Filter Menu'
     );
+    // role="dialog" must not carry aria-orientation (aria-allowed-attr).
+    expect(screen.getByRole('dialog')).not.toHaveAttribute('aria-orientation');
     expect(screen.getByRole('menu')).toBeInTheDocument();
     const filter = screen.getByLabelText('Filter Dropdown Items');
     fireEvent.change(filter, { target: { value: 'spot' } });
