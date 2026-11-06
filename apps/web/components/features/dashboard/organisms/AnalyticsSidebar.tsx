@@ -367,12 +367,14 @@ export function AnalyticsSidebarView({
               <div className='rounded-lg px-2 py-2'>
                 <StatTile
                   label='Link Clicks'
+                  state={loading ? 'loading' : undefined}
                   value={formatMetricValue(loading, data?.total_clicks)}
                 />
               </div>
               <div className='rounded-lg px-2 py-2'>
                 <StatTile
                   label='Listen Clicks'
+                  state={loading ? 'loading' : undefined}
                   value={formatMetricValue(loading, data?.listen_clicks)}
                 />
               </div>
@@ -380,6 +382,7 @@ export function AnalyticsSidebarView({
                 <div className='rounded-lg px-2 py-2'>
                   <StatTile
                     label='Tip Link Visits'
+                    state={loading ? 'loading' : undefined}
                     value={formatMetricValue(loading, data?.tip_link_visits)}
                   />
                 </div>

@@ -7,6 +7,7 @@
 
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-server';
+import { PUBLIC_SUBMISSION_RATE_LIMITERS } from './public-submission-config';
 import type { RateLimitConfig } from './types';
 
 // ============================================================================
@@ -678,17 +679,7 @@ export const RATE_LIMITERS = {
     requireRedis: true,
   } satisfies RateLimitConfig,
 
-  /** Changelog subscribe: 1 request per 10 seconds per IP */
-  changelogSubscribe: {
-    name: 'Changelog Subscribe',
-    limit: 1,
-    window: '10 s',
-    prefix: 'changelog:subscribe',
-    analytics: false,
-    algorithm: 'fixed-window',
-    trafficClass: 'anonymous',
-    requireRedis: true,
-  } satisfies RateLimitConfig,
+  ...PUBLIC_SUBMISSION_RATE_LIMITERS,
 
   // ---------------------------------------------------------------------------
   // Spotify Ingest Operations

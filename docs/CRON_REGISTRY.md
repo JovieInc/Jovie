@@ -196,6 +196,7 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | `/api/cron/public-profile-canary` | 30s | Lightweight HTTP health check: GET /tim, /tim/alerts, /tim/pay, POST /api/audience/visit; emits Sentry breadcrumb + writes Redis key for admin ops panel (JOV-1872) | — |
 | `/api/cron/auth-signup-onboarding-canary` | 30s | Lightweight HTTP golden-path check: GET /signup, /signin, /start, POST /api/chat onboarding probe; emits Sentry breadcrumb + writes Redis key for admin ops panel (JOV-1871) | — |
 | `/api/cron/artist-daily-snapshots` | 300s | Append-only official-API snapshots for a capped batch of known artists. Default-off (`ARTIST_DAILY_SNAPSHOTS`). Social HTML is not fetched from core. Failures fingerprint as `remediation:artist-snapshots`. | — |
+| `/api/cron/track-daily-snapshots` | 300s | Unscheduled, disabled by default. Requires explicit TRACK_DAILY_SNAPSHOTS=true and TRACK_DAILY_SNAPSHOT_USERNAMES; append-only per-song daily signals; idempotent per song, source and UTC day. Failures fingerprint as `remediation:track-snapshots`. | — |
 
 ## LLM Model Usage in Web App Crons
 

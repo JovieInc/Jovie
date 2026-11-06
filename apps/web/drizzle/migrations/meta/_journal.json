@@ -1093,6 +1093,13 @@
       "when": 1793594984160,
       "tag": "0164_grandfather_claimed_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 156,
+      "version": "7",
+      "when": 1793913518877,
+      "tag": "0177_track_daily_snapshots",
+      "breakpoints": true
     }
   ]
 }

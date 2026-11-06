@@ -2529,6 +2529,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/cron/track-daily-snapshots/route.ts",
+      "kind": "handler",
+      "route": "/api/cron/track-daily-snapshots",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/cron/voice-pipeline/route.ts",
       "kind": "handler",
       "route": "/api/cron/voice-pipeline",
@@ -4821,6 +4829,14 @@
       "kind": "handler",
       "route": "/api/visibility-audit/offer",
       "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/waitlist/join/route.ts",
+      "kind": "handler",
+      "route": "/api/waitlist/join",
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
