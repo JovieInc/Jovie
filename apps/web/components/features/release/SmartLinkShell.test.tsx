@@ -1,6 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import {
+  PublicSurfaceShell,
+  PublicSurfaceStage,
+} from '@/components/organisms/public-surface';
 import { SmartLinkShell } from './SmartLinkShell';
 
 vi.mock('next/image', () => ({
@@ -10,6 +14,32 @@ vi.mock('next/image', () => ({
 }));
 
 describe('SmartLinkShell', () => {
+  it('scopes full-card scrolling to smart links while shared public panels retain their height cap', () => {
+    render(
+      <>
+        <SmartLinkShell artworkUrl={null} showMenuButton={false}>
+          Smart-link service
+        </SmartLinkShell>
+        <PublicSurfaceShell>
+          <PublicSurfaceStage>Other public content</PublicSurfaceStage>
+        </PublicSurfaceShell>
+      </>
+    );
+
+    const service = screen.getByText('Smart-link service');
+    const otherContent = screen.getByText('Other public content');
+    expect(service.closest('.profile-viewport')).toHaveClass('overflow-y-auto');
+    expect(service.closest('main')?.firstElementChild).toHaveClass(
+      'md:max-h-none'
+    );
+    expect(otherContent.closest('.profile-viewport')).not.toHaveClass(
+      'overflow-y-auto'
+    );
+    expect(otherContent.closest('main')?.firstElementChild).toHaveClass(
+      'md:max-h-[min(920px,calc(100dvh-64px))]'
+    );
+  });
+
   it('expands the back and menu hit areas while preserving navigation and menu activation', async () => {
     const user = userEvent.setup();
     const onMenuOpen = vi.fn();
@@ -58,6 +88,28 @@ describe('SmartLinkShell', () => {
     const image = screen.getByRole('img', { name: 'Never Say A Word artwork' });
     expect(image).toHaveClass('object-contain');
     expect(image).not.toHaveClass('object-cover');
+  });
+
+  it('never renders text inside the art bounds in the below treatment (no text on text)', () => {
+    const { container } = render(
+      <SmartLinkShell
+        artworkUrl='/art.jpg'
+        artworkAlt='Never Say A Word artwork'
+        showMenuButton={false}
+        heroMeta={<h1>Never Say A Word</h1>}
+      >
+        Listen
+      </SmartLinkShell>
+    );
+    const art = screen.getByTestId('smart-link-artwork');
+    expect(art.textContent).toBe('');
+    expect(art).not.toContainElement(
+      screen.getByRole('heading', { level: 1, name: 'Never Say A Word' })
+    );
+    // No gradient or scrim may sit over square art either.
+    expect(
+      container.querySelector('[class*="bg-[linear-gradient"]')
+    ).toBeNull();
   });
 
   it('uses the banned-icon-safe AudioLines glyph without artwork', () => {

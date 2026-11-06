@@ -1,8 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
-import { OperatorRouteTabs } from '@/components/features/admin/layout/OperatorRouteTabs';
-import { ADMIN_WORKSPACE_TABS } from '@/constants/admin-navigation';
 import { ActivityTableUnified } from '@/features/admin/ActivityTableUnified';
 import { filterAdminActivityItems } from '@/lib/admin/activity-search';
 import { getAdminActivityFeed } from '@/lib/admin/overview';
@@ -26,8 +24,6 @@ async function ActivityContent({ query }: { readonly query: string }) {
   );
 }
 
-const activityTabs = [{ value: 'activity', label: 'Activity' }] as const;
-
 export default async function AdminActivityPage({
   searchParams,
 }: Readonly<AdminActivityPageProps>) {
@@ -37,24 +33,16 @@ export default async function AdminActivityPage({
 
   return (
     <AdminPage
+      views='shipping'
       title='Timeline'
       description={
         query
           ? 'Search covers the 200 most recent company events from the last 7 days.'
           : 'The 50 most recent company events from the last 7 days, with source evidence and observed outcomes.'
       }
-      tabs={{
-        param: 'view',
-        value: 'activity',
-        options: activityTabs,
-      }}
       testId='admin-activity-page'
       viewTestId='admin-activity-view'
     >
-      <OperatorRouteTabs
-        tabs={ADMIN_WORKSPACE_TABS.shipping}
-        label='Shipping Views'
-      />
       <Suspense fallback={<AdminActivitySkeleton />}>
         <ActivityContent query={query} />
       </Suspense>

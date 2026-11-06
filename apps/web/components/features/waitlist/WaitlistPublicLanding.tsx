@@ -10,6 +10,7 @@ import {
 } from '@/data/homepageFrontDoorCta';
 import { AuthRoutePrefetch, AuthShell } from '@/features/auth';
 import { page, track } from '@/lib/analytics';
+import { WaitlistRoleForm } from './WaitlistRoleForm';
 
 /**
  * Unauthenticated /waitlist handoff (JOV-5334 / JOV-5376).
@@ -17,8 +18,14 @@ import { page, track } from '@/lib/analytics';
  * Shared auth shell: chrome-20 mark, Continue to Jovie, email + providers.
  * Get started on marketing pages lands here instead of unfinished /start chat.
  * Auth completion continues into /start.
+ *
+ * With public signup closed (`PUBLIC_SIGNUP_CLOSED`, canon/PRODUCT.md
+ * 2026-11-02) the same shell shows the role-qualifying waitlist form instead
+ * of sign-up; returning users still reach sign-in.
  */
-export function WaitlistPublicLanding() {
+export function WaitlistPublicLanding({
+  signupClosed = false,
+}: Readonly<{ signupClosed?: boolean }> = {}) {
   useEffect(() => {
     page('waitlist', WAITLIST_FRONT_DOOR_CONTEXT);
     track(WAITLIST_FRONT_DOOR_EVENTS.PAGE_VIEW, WAITLIST_FRONT_DOOR_CONTEXT);
@@ -30,18 +37,25 @@ export function WaitlistPublicLanding() {
       <AuthLayout
         formTitle='Continue to Jovie'
         showFormTitle={false}
-        showFooterPrompt={false}
+        showFooterPrompt={signupClosed}
+        footerPrompt='Already have an account?'
+        footerLinkText='Log In'
+        footerLinkHref={APP_ROUTES.SIGNIN}
         layoutVariant='stack'
       >
         <AuthRoutePrefetch href={APP_ROUTES.SIGNIN} />
-        <AuthShell
-          mode='sign-up'
-          forceOppositeModeHardNavigation
-          oppositeModeUrl={APP_ROUTES.SIGNIN}
-          fallbackRedirectUrl={APP_ROUTES.START}
-          suppressOneTap
-          marketingCapture
-        />
+        {signupClosed ? (
+          <WaitlistRoleForm />
+        ) : (
+          <AuthShell
+            mode='sign-up'
+            forceOppositeModeHardNavigation
+            oppositeModeUrl={APP_ROUTES.SIGNIN}
+            fallbackRedirectUrl={APP_ROUTES.START}
+            suppressOneTap
+            marketingCapture
+          />
+        )}
       </AuthLayout>
     </AuthenticatedAuthEntryGuard>
   );

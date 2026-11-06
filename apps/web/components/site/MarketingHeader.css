@@ -1,7 +1,7 @@
 /* Locked Pen header GTcgO → master eoUUU, re-seated as a docked bar
    (Tim direction 2026-09-26; supersedes the Floating Bar capsule).
    Overrides live on MarketingHeader only so HeaderNav.css (#17511) stays put.
-   Optical grid: outer 64 / row 44 / CTA 28 / chrome mark 20. Noir-ion atoms.
+   Optical grid: outer 64 / row 44 / CTA 28 / marketing mark 28. Noir-ion atoms.
    Selector stays more specific than HeaderNav.css so tokens win the cascade.
 
    Docked contract:

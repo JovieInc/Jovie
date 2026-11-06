@@ -41,6 +41,7 @@ import {
   ownerHoldReleaseIntent,
   PR_SIZE_GUARD_WORKFLOW_ID,
   parseMergeQueueBranch,
+  peerContainsPr,
   REVISION_FAILED_AT_HEAD,
   recordDequeueReason,
   reenrollmentDisposition,
@@ -78,7 +79,9 @@ it('imports the real failure policy from both workflow sparse checkouts', () => 
         cwd: dir,
         encoding: 'utf8',
         input,
-        timeout: 10_000,
+        // Sparse fixture git under full script-contracts load regularly
+        // exceeds 10s on contended hosts; keep the assertion, widen the wait.
+        timeout: 60_000,
       });
       expect(result.error, result.stderr).toBeUndefined();
       expect(result.status, result.stderr).toBe(0);
@@ -119,7 +122,7 @@ it('imports the real failure policy from both workflow sparse checkouts', () => 
         const missing = spawnSync(process.execPath, importArgs, {
           cwd: dir,
           encoding: 'utf8',
-          timeout: 10_000,
+          timeout: 60_000,
         });
         expect(missing.error).toBeUndefined();
         expect(missing.status).not.toBe(0);
@@ -1382,6 +1385,9 @@ describe('merge-group source revision mapping', () => {
 
 describe('failure classification and revision-scoped suppression', () => {
   it('classifies deterministic source checks separately from infrastructure', () => {
+    expect(classify('failure', ['Run lanes coverage pytest'])).toBe(
+      'deterministic-source'
+    );
     expect(classify('failure', ['Run structural ci-fast lane'])).toBe(
       'deterministic-source'
     );
@@ -3000,5 +3006,37 @@ describe('base-branch fetch timeout (merge-group infrastructure)', () => {
       );
       expect(replay(annotations(), other)).toBe('unclassified');
     });
+  });
+});
+
+describe('peerContainsPr (shadow peer recurrence membership)', () => {
+  // 2026-10-31: #24072 rode in the base chain of #24075's groups, so the
+  // queue entries ahead of main, not only base...head, decide membership.
+  const subject = message => ({ commit: { message } });
+  it('counts the peer head PR and every queue entry ahead of main', () => {
+    expect(peerContainsPr([], 24072, 24072)).toBe(true);
+    expect(
+      peerContainsPr(
+        [
+          subject('fix(changelog): newest-first archive (#24072)\n\nbody'),
+          subject('docs: x (#24075)'),
+        ],
+        24075,
+        24072
+      )
+    ).toBe(true);
+  });
+  it('excludes groups without the PR and stays unknown without evidence', () => {
+    expect(peerContainsPr([subject('docs: x (#24075)')], 24075, 24072)).toBe(
+      false
+    );
+    expect(
+      peerContainsPr(
+        [subject('mentions (#24072) mid-title only (#24075)')],
+        24075,
+        24072
+      )
+    ).toBe(false);
+    expect(peerContainsPr(undefined, 24075, 24072)).toBeNull();
   });
 });

@@ -94,9 +94,13 @@ vi.mock('@/components/organisms/user-button', () => ({
 vi.mock('@/components/organisms/SidebarDockBridge', () => ({
   SidebarDockBridge: (props: {
     readonly collapsed: boolean;
+    readonly userState?: { readonly hasClaimedHandle: boolean };
     readonly children: (status: undefined) => React.ReactNode;
   }) => {
-    nowPlayingBridgePropsMock({ collapsed: props.collapsed });
+    nowPlayingBridgePropsMock({
+      collapsed: props.collapsed,
+      userState: props.userState,
+    });
     return (
       <>
         <div data-sidebar-dock='true' className='shrink-0'>
@@ -320,16 +324,16 @@ describe('UnifiedSidebar library route', () => {
     expect(dock).toContainElement(
       screen.getByTestId('sidebar-now-playing-bridge')
     );
-    expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith({
-      collapsed: false,
-    });
+    expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ collapsed: false })
+    );
     const row = screen
-      .getByRole('link', { name: /Inbox —/ })
+      .getByRole('link', { name: 'Inbox' })
       .closest('[data-sidebar-brand-row]');
     expect(row).toContainElement(
       screen.getByRole('button', { name: 'Search Sidebar' })
     );
-    expect(screen.getByRole('link', { name: /Inbox —/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Inbox' })).toHaveAttribute(
       'href',
       '/app'
     );
@@ -388,6 +392,16 @@ describe('UnifiedSidebar library route', () => {
     );
     expect(whatsNew.compareDocumentPosition(nowPlaying)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
+    );
+  });
+
+  it('tells the dock whether the viewer already claimed a handle', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+    });
+    expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ userState: { hasClaimedHandle: true } })
     );
   });
 

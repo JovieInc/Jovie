@@ -52,6 +52,56 @@ describe('MarketingHeader', () => {
     });
   });
 
+  it.each([
+    '/',
+    '/product',
+    '/pricing',
+    '/about',
+    '/instant-merch',
+    '/cli',
+    '/blog',
+    '/download',
+    '/artist-profiles',
+  ])('renders the canonical 28px marketing mark on %s', pathname => {
+    mockUsePathname.mockReturnValue(pathname);
+    render(<MarketingHeader />);
+
+    const logoLink = screen.getByTestId('site-logo-link');
+    expect(logoLink).toHaveAttribute('href', '/');
+    expect(logoLink.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '28'
+    );
+    expect(logoLink.querySelector('svg')).toHaveAttribute('width', '28');
+    expect(logoLink.querySelector('svg')).toHaveAttribute('height', '28');
+  });
+
+  it('keeps the ordinary header mark at its existing 20px size', () => {
+    render(<HeaderNav logoVariant='icon' authMode='public-static' />);
+
+    const logoLink = screen.getByTestId('site-logo-link');
+    expect(logoLink.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '20'
+    );
+    expect(logoLink.querySelector('svg')).toHaveAttribute('width', '20');
+    expect(logoLink.querySelector('svg')).toHaveAttribute('height', '20');
+  });
+
+  it.each(['homepage', 'minimal'] as const)(
+    'keeps the 28px mark in the %s marketing presentation',
+    variant => {
+      render(<MarketingHeader variant={variant} logoVariant='icon' />);
+
+      const mark = screen
+        .getByTestId('site-logo-link')
+        .querySelector('[data-brand-mark-size]');
+      expect(mark).toHaveAttribute('data-brand-mark-size', '28');
+      expect(mark?.querySelector('svg')).toHaveAttribute('width', '28');
+      expect(mark?.querySelector('svg')).toHaveAttribute('height', '28');
+    }
+  );
+
   it('reserves only enlarged row growth and releases its observer on unmount', () => {
     const observations: {
       element: Element;

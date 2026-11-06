@@ -1065,6 +1065,41 @@
       "when": 1793245772337,
       "tag": "0160_hash_lead_claim_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 152,
+      "version": "7",
+      "when": 1793394813634,
+      "tag": "0161_investor_portal_content",
+      "breakpoints": true
+    },
+    {
+      "idx": 153,
+      "version": "7",
+      "when": 1793514205708,
+      "tag": "0162_lead_build_hold",
+      "breakpoints": true
+    },
+    {
+      "idx": 154,
+      "version": "7",
+      "when": 1793587853964,
+      "tag": "0163_taken_down_never_public",
+      "breakpoints": true
+    },
+    {
+      "idx": 155,
+      "version": "7",
+      "when": 1793594984160,
+      "tag": "0164_grandfather_claimed_profiles",
+      "breakpoints": true
+    },
+    {
+      "idx": 156,
+      "version": "7",
+      "when": 1793913518877,
+      "tag": "0177_track_daily_snapshots",
+      "breakpoints": true
     }
   ]
 }

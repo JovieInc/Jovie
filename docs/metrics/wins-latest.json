@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-10-30T20:52:32.989Z",
-  "winsTotal": 25,
+  "at": "2026-11-04T20:41:04.781Z",
+  "winsTotal": 35,
   "winsVerified": 1,
-  "winsClaimed": 12,
+  "winsClaimed": 15,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 4,
-  "winsPendingMeasure": 4,
-  "winsLast7d": 25,
+  "winsPendingMeasure": 11,
+  "winsLast7d": 35,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -18,7 +18,7 @@
     },
     {
       "theme": "merge-throughput",
-      "total": 15,
+      "total": 16,
       "verified": 0,
       "ready": false
     },
@@ -48,6 +48,48 @@
     },
     {
       "theme": "golden-path-reliability",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "runner-pin",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "golden-path",
+      "total": 3,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "hydration-correctness",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "neon-egress",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "false-green",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "ovie-home",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "cost",
       "total": 1,
       "verified": 0,
       "ready": false
@@ -153,6 +195,46 @@
     {
       "id": "win-2026-10-30-eliminate-the-false-failing-publication-transport",
       "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-coherent-grouped-codeql-releases-pass-the",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-the-runner-pin-gate-is-green",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-31-typed-handles-are-honored-and-freed",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-removes-the-client-side-hydration-re",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-certification-ingest-reads-the-6-5",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-the-shared-outcome-verifier-rejects-all",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-31-sign-up-in-the-claim-chat",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-ovie-home-in-flight-done-today",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-30-golden-path-model-review-makes-about",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-removes-placeholder-stale-and-duplicated-surfaces",
+      "status": "pending-measure"
     }
   ]
 }

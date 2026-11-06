@@ -29,6 +29,8 @@ const env = {
   JOVIE_MESH_TOKEN: TOKEN,
   JOVIE_MESH_SENDER_ID: SENDER_ID,
   JOVIE_MESH_SENDER_KIND: 'claude',
+  // These cases cover the legacy Summer transport; the hub has its own suite.
+  JOVIE_MESH_HUB: '0',
 };
 
 type Call = { url: string; init: RequestInit };
@@ -132,7 +134,9 @@ describe('jovie mesh', () => {
     await expect(meshSend('x'.repeat(4001), {}, deps)).rejects.toThrow(
       '1–4000'
     );
-    await expect(meshSend('x', { to: 'nobody' }, deps)).rejects.toThrow('--to');
+    await expect(meshSend('x', { to: 'No Body!' }, deps)).rejects.toThrow(
+      '--to'
+    );
     await expect(
       meshSend('x', { refs: Array(9).fill('r').join(',') }, deps)
     ).rejects.toThrow('--refs');
@@ -369,7 +373,7 @@ describe('jovie mesh', () => {
           env: {
             JOVIE_MESH_TOKEN: TOKEN,
             JOVIE_MESH_SENDER_ID: SENDER_ID,
-            JOVIE_MESH_SENDER_KIND: 'nobody',
+            JOVIE_MESH_SENDER_KIND: 'No Body!',
           },
         }
       )
