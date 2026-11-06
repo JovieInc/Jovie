@@ -29,6 +29,8 @@ describe('SmartLinkShell', () => {
     const service = screen.getByText('Smart-link service');
     const otherContent = screen.getByText('Other public content');
     expect(service.closest('.profile-viewport')).toHaveClass('overflow-y-auto');
+    // Scrollable regions are keyboard-reachable (scrollable-region-focusable).
+    expect(service.closest('.profile-viewport')).toHaveAttribute('tabindex', '0');
     expect(service.closest('main')?.firstElementChild).toHaveClass(
       'md:max-h-none'
     );

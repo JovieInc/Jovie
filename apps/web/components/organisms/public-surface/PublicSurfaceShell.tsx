@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/components/features/release/SmartLinkShell.test.tsx
+
 import Image from 'next/image';
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
 import { cn } from '@/lib/utils';
