@@ -115,35 +115,38 @@ describe('executeCanaryReset', () => {
     hoisted.accountRow = [
       { id: CANARY_USER_ID, email: PRODCERT_CLAIM_CANARY_EMAIL },
     ];
+    // One queue entry per QUERY: each entry is the full result array.
     hoisted.txSelectQueue.set(CLAIMS_TABLE, [
-      { id: 'claim-1', userId: CANARY_USER_ID },
+      [{ id: 'claim-1', userId: CANARY_USER_ID }],
     ]);
     hoisted.txSelectQueue.set(PROFILES_TABLE, [
-      {
-        id: 'profile-1',
-        userId: CANARY_USER_ID,
-        usernameNormalized: 'jovie-prodcert-claim',
-        isClaimed: true,
-        isPublic: true,
-        claimedAt: new Date(),
-        claimToken: 'tok',
-        claimTokenExpiresAt: new Date(),
-        onboardingCompletedAt: new Date(),
-        settings: null,
-      },
-      {
-        // A foreign-owned claimed profile must never be touched.
-        id: 'profile-other',
-        userId: OTHER_USER_ID,
-        usernameNormalized: 'someone-else',
-        isClaimed: true,
-        isPublic: true,
-        claimedAt: new Date(),
-        claimToken: null,
-        claimTokenExpiresAt: null,
-        onboardingCompletedAt: new Date(),
-        settings: null,
-      },
+      [
+        {
+          id: 'profile-1',
+          userId: CANARY_USER_ID,
+          usernameNormalized: 'jovie-prodcert-claim',
+          isClaimed: true,
+          isPublic: true,
+          claimedAt: new Date(),
+          claimToken: 'tok',
+          claimTokenExpiresAt: new Date(),
+          onboardingCompletedAt: new Date(),
+          settings: null,
+        },
+        {
+          // A foreign-owned claimed profile must never be touched.
+          id: 'profile-other',
+          userId: OTHER_USER_ID,
+          usernameNormalized: 'someone-else',
+          isClaimed: true,
+          isPublic: true,
+          claimedAt: new Date(),
+          claimToken: null,
+          claimTokenExpiresAt: null,
+          onboardingCompletedAt: new Date(),
+          settings: null,
+        },
+      ],
     ]);
 
     const outcome = await executeCanaryReset();
@@ -168,8 +171,13 @@ describe('executeCanaryReset', () => {
     expect(hoisted.inserted[0]?.table).toBe('profile_ownership_log');
     expect(String(hoisted.inserted[0]?.row?.reason)).toContain('JOV-9826');
 
-    // Walk-owned rows purged: chat conversations + suggested actions.
+    // Walk-owned rows purged: claim rows + chat conversations + suggested
+    // actions.
     const deletedTables = hoisted.deleted.map(d => d.table).sort();
-    expect(deletedTables).toEqual(['chat_conversations', 'suggested_actions']);
+    expect(deletedTables).toEqual([
+      'chat_conversations',
+      'suggested_actions',
+      'user_profile_claims',
+    ]);
   });
 });

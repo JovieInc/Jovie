@@ -33,7 +33,7 @@ export interface CanaryResetEnv {
  * Callers record a blocked step (never a silent skip) when false.
  */
 export function canaryResetConfigured(
-  environment: CanaryResetEnv = process.env
+  environment: CanaryResetEnv = process.env as CanaryResetEnv
 ): boolean {
   return !!(environment.CRON_SECRET && environment.SYNTHETIC_PASSAGE_KEY);
 }
