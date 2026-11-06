@@ -44,27 +44,22 @@ success response, or an opaque backup alone is insufficient.
 
 ## Writer lease and guarded save
 
-One writer at a time is enforced, not assumed. Before any mutation batch, take
-the lease: `node scripts/pen-review/run.mjs lease acquire --holder <you> --scope <what>`
-(exit 3 and the holder's name when another agent holds it; an expired lease can
-be taken over). Save only through `node scripts/pen-review/run.mjs save --holder <you>
---touched <top-level ids you changed>`: it refuses unless you hold the lease, and
-refuses when a top-level node differs between the live canvas and disk but is
-not in your touched set. Saving would publish another agent's unsaved work
-(2026-11-01: a golden-path save wrote `T1E2z` and `BVsfD`). Release with
-`lease release`.
+- Acquire before mutations: `node scripts/pen-review/run.mjs lease acquire --holder <you> --scope <what>`. Another owner receives exit 3; expired leases can be acquired again.
+- Keep the returned token; renew with `lease acquire --holder <you> --token <token>`.
+- Save with `node scripts/pen-review/run.mjs save --holder <you> --token <token> --touched <top-level ids>`. It refuses foreign unsaved changes outside your touched set, preventing accidental publication of another writer's work.
+- Release with `lease release --holder <you> --token <token>`.
 
 ## PROPOSAL review loop
 
 Frames named `PROPOSAL / …` (or with a `· PROPOSAL` segment) are reviewed
 by `scripts/pen-review/` when explicitly invoked or after opting into the
-installer `scripts/hostops/install-pen-review.sh` (launchd on every canonical
+installer `scripts/hostops/install-pen-review.sh` (requires `PEN_REVIEW_PLAYWRIGHT` and installed Chromium; launchd on every canonical
 save plus a 10-minute sweep). Render,
 render guard, deterministic checks, System-1 panel, fix, re-render; only frames
 renamed `· ready for Tim r<receipt>` may be shown to Tim. Receipts:
 `~/.local/state/jovie-pen-review/receipts/<run>/<frame>/`; each invocation
-retains its own attempts. Review and sweep use unique writer identities, renew
-at operation boundaries, and release their lease on completion or failure.
+retains its own attempts. Workers renew exclusive leases and release them on success or failure.
+Automatic retries stop after three attempts per unchanged digest; edit the frame or invoke review explicitly to retry.
 
 Every panel includes an artist-dignity reader, and three checks always block:
 `artist-dignity` (copy that implies a small audience, empty rooms, failure or

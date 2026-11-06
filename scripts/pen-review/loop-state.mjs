@@ -13,16 +13,9 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname } from 'node:path';
+import { ownsLease } from './writer-identity.mjs';
 
-export {
-  frameDigest,
-  isProposalFrame,
-  markReady,
-  PROPOSAL_RE,
-  READY_SUFFIX,
-  stableJson,
-  stripReady,
-} from './frame-identity.mjs';
+export * from './frame-identity.mjs';
 
 export const RECEIPT_SCHEMA = 'pen-review-receipt/v1';
 export const LEASE_SCHEMA = 'pen-writer-lease/v1';
@@ -173,17 +166,24 @@ function withLeaseLock(path, busy, operation) {
 
 /**
  * @param {string} path
- * @param {{holder?: string, scope?: string|null, ttlMs?: number, now?: () => number, renewOnly?: boolean}} [opts]
+ * @param {{holder?: string, scope?: string|null, ttlMs?: number, now?: () => number, renewOnly?: boolean, token?: string}} [opts]
  */
 export function acquireLease(
   path,
-  { holder, scope, ttlMs = 15 * 60_000, now = Date.now, renewOnly = false } = {}
+  {
+    holder,
+    scope,
+    ttlMs = 15 * 60_000,
+    now = Date.now,
+    renewOnly = false,
+    token,
+  } = {}
 ) {
   if (!holder) throw new Error('lease holder is required');
   return withLeaseLock(path, { ok: false, heldBy: readLease(path) }, () => {
     const cur = readLease(path);
     const active = cur && Date.parse(cur.expiresAt) > now();
-    const ours = cur?.holder === holder && cur?.pid === process.pid;
+    const ours = ownsLease(cur, holder, token);
     // Never reclaim an empty/partially written/corrupt lease, including one
     // created by an older client. Expired takeovers are serialized too.
     if (
@@ -198,6 +198,7 @@ export function acquireLease(
       holder,
       scope: scope ?? null,
       pid: process.pid,
+      token: token ?? null,
       acquiredAt:
         active && ours ? cur.acquiredAt : new Date(now()).toISOString(),
       expiresAt: new Date(now() + ttlMs).toISOString(),
@@ -219,7 +220,7 @@ export async function withWriterLease(path, options, operation) {
   try {
     return await operation(assertLease);
   } finally {
-    releaseLease(path, options.holder);
+    releaseLease(path, options.holder, options.token);
   }
 }
 
@@ -232,11 +233,11 @@ export function readLease(path) {
   }
 }
 
-export function releaseLease(path, holder) {
+export function releaseLease(path, holder, token = undefined) {
   return withLeaseLock(path, false, () => {
     if (!existsSync(path)) return true;
     const cur = readLease(path);
-    if (!cur || cur.holder !== holder) return false;
+    if (!ownsLease(cur, holder, token)) return false;
     unlinkSync(path);
     return true;
   });
@@ -244,7 +245,7 @@ export function releaseLease(path, holder) {
 
 function writeAtomic(path, value) {
   const tmp = `${path}.${process.pid}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify(value)}\n`);
+  writeFileSync(tmp, `${JSON.stringify(value)}\n`, { mode: 0o600 });
   renameSync(tmp, path);
 }
 

@@ -193,3 +193,16 @@ test('competing processes cannot share a holder or race an expired takeover', as
   );
   assert.equal(results.filter(r => r.ok).length, 1);
 });
+
+test('manual lease renewal and release require the token while process leases retain PID checks', t => {
+  const path = join(scratch(t), 'manual.json');
+  const options = { holder: 'manual', token: 'test-session' };
+  assert.equal(acquireLease(path, options).ok, true);
+  const lease = readLease(path);
+  writeFileSync(path, JSON.stringify({ ...lease, pid: process.pid + 1 }));
+  assert.equal(acquireLease(path, { holder: 'manual' }).ok, false);
+  assert.equal(acquireLease(path, { ...options, token: 'wrong' }).ok, false);
+  assert.equal(releaseLease(path, 'manual'), false);
+  assert.equal(acquireLease(path, options).renewed, true);
+  assert.equal(releaseLease(path, 'manual', options.token), true);
+});

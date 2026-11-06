@@ -29,6 +29,26 @@ if [[ "${1:-}" == "--uninstall" ]]; then
   exit 0
 fi
 
+# The detached checkout has no node_modules. Carry a validated installed module
+# and browser into launchd rather than relying on the interactive shell.
+: "${PEN_REVIEW_PLAYWRIGHT:?Set PEN_REVIEW_PLAYWRIGHT to an installed Playwright package.json or module directory}"
+DEFAULT_CHROMIUM="$(node - "$PEN_REVIEW_PLAYWRIGHT" <<'JS'
+const { createRequire } = require('node:module');
+const { join, resolve } = require('node:path');
+const p = process.argv[2];
+const req = createRequire(resolve(p.endsWith('.json') ? p : join(p, 'package.json')));
+let api;
+for (const name of ['playwright-core', 'playwright', '@playwright/test']) {
+  try { api = req(name); break; } catch {}
+}
+if (!api?.chromium) throw new Error('Playwright Chromium is unavailable');
+process.stdout.write(api.chromium.executablePath());
+JS
+)"
+PEN_REVIEW_CHROMIUM="${PEN_REVIEW_CHROMIUM:-$DEFAULT_CHROMIUM}"
+[[ -x "$PEN_REVIEW_CHROMIUM" ]] || { echo 'Chromium executable is unavailable' >&2; exit 1; }
+printf -v BROWSER_ENV 'export PEN_REVIEW_PLAYWRIGHT=%q\nexport PEN_REVIEW_CHROMIUM=%q' "$PEN_REVIEW_PLAYWRIGHT" "$PEN_REVIEW_CHROMIUM"
+
 mkdir -p "$SHARE" "$STATE" "$HOME/Library/LaunchAgents"
 if [[ ! -d "$CHECKOUT/.git" && ! -f "$CHECKOUT/.git" ]]; then
   git --git-dir="$REPO" fetch -q origin main
@@ -49,6 +69,7 @@ cat >"$RUNNER" <<RUN
 #!/usr/bin/env bash
 set -uo pipefail
 [[ -e "$STATE/disabled" ]] && exit 0
+$BROWSER_ENV
 git -C "$CHECKOUT" fetch -q origin main && git -C "$CHECKOUT" checkout -q --detach origin/main
 date -u +"%Y-%m-%dT%H:%M:%SZ sweep start" >>"$STATE/launchd.log"
 node "$CHECKOUT/scripts/pen-review/run.mjs" sweep --holder pen-review-loop

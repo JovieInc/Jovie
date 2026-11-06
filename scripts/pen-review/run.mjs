@@ -6,7 +6,7 @@
  *   node scripts/pen-review/run.mjs review --frames rRwHL,TtXhW [--receipts DIR] [--fixer agent|none] [--max-rounds 8]
  *   node scripts/pen-review/run.mjs sweep [--receipts DIR]          # what launchd runs
  *   node scripts/pen-review/run.mjs save --holder NAME [--touched a,b]  # guarded save()
- *   node scripts/pen-review/run.mjs lease acquire|release|status --holder NAME
+ *   node scripts/pen-review/run.mjs lease acquire|release|status --holder NAME [--token TOKEN]
  *
  * Per frame and round: render (live Pen, font-race retry) -> render guard ->
  * deterministic checks -> System-1 panel -> decide. A material finding sends
@@ -71,6 +71,8 @@ import {
 } from './pen-bridge.mjs';
 
 import { renderTrusted } from './render-trusted.mjs';
+import { MAX_SWEEP_ATTEMPTS, recordSweepAttempt } from './sweep-state.mjs';
+import { ownsLease } from './writer-identity.mjs';
 
 export { fixerModel, fixPrompt } from './fixer.mjs';
 export { renderTrusted } from './render-trusted.mjs';
@@ -326,12 +328,12 @@ export function sweepTargets({
   };
 }
 
-/** Transient infrastructure failures remain eligible even without a design edit. */
+/** A changed frame starts fresh; unchanged infrastructure failures get bounded retries. */
 export function shouldReview(tree, previous) {
   return (
-    previous?.verdict === 'render-untrusted' ||
-    previous?.verdict === 'error' ||
-    previous?.digest !== frameDigest(tree)
+    previous?.digest !== frameDigest(tree) ||
+    (['render-untrusted', 'error'].includes(previous?.verdict) &&
+      (previous.attempts ?? 0) < MAX_SWEEP_ATTEMPTS)
   );
 }
 
@@ -357,19 +359,22 @@ async function main(argv) {
         acquireLease(LEASE_PATH, {
           holder,
           scope: arg(argv, 'scope', 'proposal-frames'),
+          token: arg(argv, 'token', randomUUID()),
         }),
         r => (r.ok ? 0 : 3)
       );
     if (sub === 'release')
-      return report({ released: releaseLease(LEASE_PATH, holder) }, () => 0);
+      return report(
+        { released: releaseLease(LEASE_PATH, holder, arg(argv, 'token')) },
+        r => (r.released ? 0 : 3)
+      );
     return report(readLease(LEASE_PATH), () => 0);
   }
   if (cmd === 'save') {
     const lease = readLease(LEASE_PATH);
     if (
-      !lease ||
-      lease.holder !== holder ||
-      Date.parse(lease.expiresAt) < Date.now()
+      !ownsLease(lease, holder, arg(argv, 'token')) ||
+      !(Date.parse(lease.expiresAt) > Date.now())
     )
       return report(
         {
@@ -447,6 +452,7 @@ async function main(argv) {
             verdict: 'error',
             error: String(error.message).slice(0, 200),
           });
+          recordSweepAttempt(sweep, id, { verdict: 'error' });
           continue;
         }
         results.push({
@@ -456,17 +462,7 @@ async function main(argv) {
           rounds: rec.rounds.length,
           nextFix: rec.nextFix?.message,
         });
-        if (sweep) {
-          sweep.state[id] = {
-            digest: rec.digestAfter,
-            verdict: rec.verdict,
-            at: now(),
-          };
-          writeFileSync(
-            sweep.statePath,
-            `${JSON.stringify(sweep.state, null, 2)}\n`
-          );
-        }
+        recordSweepAttempt(sweep, id, rec);
       }
       return { results };
     }
