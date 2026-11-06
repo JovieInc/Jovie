@@ -37,6 +37,15 @@ function git(cwd, args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 }
 
+/** @param {string} cwd */
+function keepFixtureMaintenanceSynchronous(cwd) {
+  // --refetch can repack promisor objects after fetch returns. Keep real
+  // maintenance, but finish it before no-lazy-fetch assertions read the
+  // snapshot packs or afterEach removes this isolated repository.
+  git(cwd, ['config', 'maintenance.autoDetach', 'false']);
+  git(cwd, ['config', 'gc.autoDetach', 'false']);
+}
+
 /** @param {string} cwd @param {string} message */
 function commit(cwd, message) {
   writeFileSync(join(cwd, `${message}.txt`), `${message}\n`);
@@ -173,6 +182,7 @@ function shallowFixture(mainCommits = 80) {
     'refs/tags/unrelated-tag',
   ]);
   execFileSync('git', ['init', '-q', clone]);
+  keepFixtureMaintenanceSynchronous(clone);
   git(clone, ['remote', 'add', 'origin', `file://${remote}`]);
   git(clone, [
     'fetch',
@@ -402,6 +412,7 @@ function makeCommit(cwd, tree, parents, message) {
 function cloneDepth(root, remote, head, depth = 1) {
   const clone = join(root, `clone-${head.slice(0, 8)}`);
   execFileSync('git', ['init', '-q', clone]);
+  keepFixtureMaintenanceSynchronous(clone);
   git(clone, ['remote', 'add', 'origin', `file://${remote}`]);
   git(clone, ['fetch', '-q', '--no-tags', `--depth=${depth}`, 'origin', head]);
   git(clone, ['checkout', '-q', '--detach', head]);
