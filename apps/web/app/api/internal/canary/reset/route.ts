@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { env } from '@/lib/env-server';
 import { createRateLimiter } from '@/lib/rate-limit';
@@ -59,7 +59,7 @@ function json(body: unknown, status: number) {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request): Promise<NextResponse> {
   // 1. Production kill switch: a one-way off switch, checked first so a
   // misbehaving run cannot spend any further authorization work.
   if (env.SYNTHETIC_PASSAGE_TOKENS_DISABLED === '1') {

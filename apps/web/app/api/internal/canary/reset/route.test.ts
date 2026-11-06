@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   env: { SYNTHETIC_PASSAGE_TOKENS_DISABLED: undefined as string | undefined },
-  cronAuth: vi.fn<[], null>(),
+  cronAuth: vi.fn(),
   passageGrant: vi.fn(),
   limiter: vi.fn(),
   execute: vi.fn(),
