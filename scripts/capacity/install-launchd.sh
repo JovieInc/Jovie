@@ -18,6 +18,7 @@ fi
 HOST="${CAPACITY_HOST:?set CAPACITY_HOST=mac or air}"
 mkdir -p "$SHARE/scripts/capacity" "$SHARE/ops/registry" "$STATE" "$HOME/Library/LaunchAgents"
 install -m 0755 "$HERE/forecast.py" "$SHARE/scripts/capacity/forecast.py"
+install -m 0644 "$HERE/collectors.py" "$SHARE/scripts/capacity/collectors.py"
 install -m 0644 "$HERE/../../ops/registry/capacity-resources.json" "$SHARE/ops/registry/capacity-resources.json"
 install -m 0644 "$HERE/../../ops/registry/spend.json" "$SHARE/ops/registry/spend.json"
 # The client layer (budgeted gh) the gh-rate and gh-env-secrets collectors import; without it they go BLIND.

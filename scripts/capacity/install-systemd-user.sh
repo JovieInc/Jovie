@@ -11,6 +11,7 @@ if [[ "${1:-}" == "--uninstall" ]]; then
 fi
 mkdir -p "$U" "$SHARE/scripts/capacity" "$SHARE/ops/registry" "$HOME/.local/state/capacity"
 install -m 0755 "$HERE/forecast.py" "$SHARE/scripts/capacity/forecast.py"
+install -m 0644 "$HERE/collectors.py" "$SHARE/scripts/capacity/collectors.py"
 install -m 0644 "$HERE/../../ops/registry/capacity-resources.json" "$SHARE/ops/registry/capacity-resources.json"
 install -m 0644 "$HERE/../../ops/registry/spend.json" "$SHARE/ops/registry/spend.json"
 # The client layer (budgeted gh) the gh-rate and gh-env-secrets collectors import; without it they go BLIND.

@@ -11,6 +11,7 @@ import {
   scriptContractNodeArgs,
   selectSourceGuards,
 } from '../../ci-fast-lanes.mjs';
+import { buildAffectedTestPlan } from '../../run-affected-tests.mjs';
 import { selectScriptContracts } from '../script-contract-affected.mjs';
 import { testsAffectedBy } from '../test-file-dependencies.mjs';
 
@@ -202,4 +203,69 @@ test('Node contract coverage isolates the original behavior suites and preserves
     );
     assert.equal(SCRIPT_CONTRACT_NODE_COMMAND.split(file).length, 2);
   }
+});
+
+/** @type {Array<[string, string[]]>} */
+const waitlistBindings = [
+  [
+    'apps/web/lib/waitlist/role-entry.ts',
+    ['apps/web/lib/waitlist/role-entry.test.ts'],
+  ],
+  [
+    'apps/web/lib/waitlist/roles.ts',
+    [
+      'apps/web/components/features/waitlist/WaitlistRoleForm.test.tsx',
+      'apps/web/lib/waitlist/role-entry.test.ts',
+      'apps/web/tests/unit/api/waitlist/join.test.ts',
+    ],
+  ],
+  [
+    'apps/web/lib/admin/waitlist-gate-funnel.ts',
+    ['apps/web/lib/admin/waitlist-gate-funnel.test.ts'],
+  ],
+];
+for (const [source, producers] of waitlistBindings) {
+  test(`binds ${source} to its real behavior producers`, () => {
+    const plan = buildAffectedTestPlan([source]);
+    assert.equal(plan.mode, 'selected');
+    for (const producer of producers)
+      assert.ok(plan.selectedTests.includes(producer));
+    assert.equal(plan.fallbackReason, undefined);
+  });
+  test(`fails closed when a producer for ${source} is absent`, () => {
+    const plan = buildAffectedTestPlan([source], {
+      isFileAvailable: file => file !== producers[0],
+    });
+    assert.equal(plan.mode, 'full');
+    assert.ok(plan.fallbackReason?.includes(source));
+  });
+}
+test('waitlist producer selection keeps global flags on the broad lane', () => {
+  const plan = buildAffectedTestPlan([
+    waitlistBindings[0][0],
+    'apps/web/lib/flags/code-flags.ts',
+  ]);
+  assert.equal(plan.mode, 'full');
+  assert.ok(plan.fallbackReason?.includes('apps/web/lib/flags/code-flags.ts'));
+});
+test('waitlist producer selection keeps unknown neighbors fail-closed', () => {
+  assert.equal(
+    buildAffectedTestPlan([
+      waitlistBindings[0][0],
+      'apps/web/lib/waitlist/unmapped.ts',
+    ]).mode,
+    'full'
+  );
+});
+test('waitlist producer mapping edits require the complete selector regression pair', () => {
+  const selector = [
+    'scripts/run-affected-tests.mjs',
+    'scripts/lib/__tests__/automation-verify.test.mjs',
+  ];
+  const files = waitlistBindings.map(([source]) => source);
+  const complete = buildAffectedTestPlan([...files, ...selector]);
+  assert.equal(complete.mode, 'selected');
+  assert.ok(complete.scriptVitestTests.includes(selector[1]));
+  assert.equal(buildAffectedTestPlan([...files, selector[0]]).mode, 'full');
+  assert.equal(buildAffectedTestPlan([...files, selector[1]]).mode, 'full');
 });

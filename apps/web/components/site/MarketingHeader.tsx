@@ -251,6 +251,7 @@ export function MarketingHeader({
         presentation === 'marketing-glass' || isArtistProfiles ? 'sm' : logoSize
       }
       logoVariant={resolvedLogoVariant}
+      logoMarkSize='marketing'
       logoReveal={resolvedLogoVariant === 'icon'}
       authMode='public-static'
       hideNav={isMinimal}
