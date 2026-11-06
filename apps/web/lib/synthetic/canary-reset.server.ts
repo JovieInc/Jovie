@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { and, eq, inArray } from 'drizzle-orm';
+import { db } from '@/lib/db';
 import { runAtomicDbOperation } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
 import { chatConversations } from '@/lib/db/schema/chat';
