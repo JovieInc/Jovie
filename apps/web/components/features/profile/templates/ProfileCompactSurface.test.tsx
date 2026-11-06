@@ -39,18 +39,18 @@ const lazyOverlays = vi.hoisted(() => ({
 
 // Execute the App Router's actual lazy/Suspense implementation. Only module
 // arrival is controlled; preserve each source call's loading/SSR options.
-// Only the notifications overlay still lazy-loads: the unified drawer is a
-// static import (same-commit render, JOV-7973), so the only next/dynamic
-// call left in the surface is ProfileInlineNotificationsCTA.
 vi.mock('next/dynamic', async () => {
   const { default: appDynamic } = await vi.importActual<
     typeof import('next/dist/shared/lib/app-dynamic')
   >('next/dist/shared/lib/app-dynamic');
   return {
     default: (loader: () => Promise<unknown>, options?: DynamicOptions) => {
+      const kind = String(loader).includes('ProfileUnifiedDrawer')
+        ? 'drawer'
+        : 'notifications';
       return appDynamic(
         () =>
-          lazyOverlays.pending.get('notifications')?.promise ??
+          lazyOverlays.pending.get(kind)?.promise ??
           Promise.resolve({ default: () => null }),
         options
       );
@@ -235,124 +235,79 @@ describe('ProfileCompactSurface', () => {
     mockUseIsAuthenticated.mockReturnValue(false);
   });
 
-  it('keeps the mounted profile and focused claim available while the notifications module loads', async () => {
-    let releaseModule!: (value: { default: React.ComponentType }) => void;
-    const promise = new Promise<{ default: React.ComponentType }>(resolve => {
-      releaseModule = resolve;
-    });
-    lazyOverlays.pending.set('notifications', {
-      promise,
-      resolve: releaseModule,
-    });
-    const Overlay = () => <button type='button'>notifications ready</button>;
-    const profile = (ready: boolean) => (
-      <React.Suspense fallback={<div role='status'>Loading profile</div>}>
-        <PublicProfileLayoutShell
-          artistName={artist.name}
-          heroImageUrl={null}
-          heroImageError={false}
-          isDesktopLayout={false}
-          shouldRenderHeading={false}
-          profileAccentStyle={{}}
-          compactSurface={
-            <ProfileCompactSurface
-              artist={artist}
-              socialLinks={[]}
-              contacts={[]}
-              drawerOpen={false}
-              drawerView='menu'
-              activeMode='profile'
-              onDrawerOpenChange={vi.fn()}
-              onDrawerViewChange={vi.fn()}
-              onBack={vi.fn()}
-              onOpenMenu={vi.fn()}
-              onPlayClick={vi.fn()}
-              onShare={vi.fn()}
-              profileHref='/timwhite'
-              proofClaimCta={{ href: '/start', label: 'Claim yours' }}
-              renderInteractiveOverlays
-              visitorAssignmentResolved={ready}
-            />
-          }
-        />
-      </React.Suspense>
-    );
-    const view = render(profile(false));
-    await act(async () => {});
-    const heading = screen.getByRole('heading', { name: artist.name });
-    const claim = screen.getByRole('link', { name: /Claim yours/ });
-    const dock = screen.getByTestId('profile-tab-bar');
-    claim.focus();
-    expect(claim).toHaveFocus();
-    view.rerender(profile(true));
-    try {
-      expect(heading).toBeVisible();
-      expect(claim).toBeVisible();
-      expect(dock).toBeVisible();
+  // Drawer no longer lazy-loads (JOV-7973): its same-commit render contract
+  // lives in ProfileCompactSurface.drawer-import.test.tsx.
+  it.each(['notifications'])(
+    'keeps the mounted profile and focused claim available while the %s module loads',
+    async kind => {
+      let releaseModule!: (value: { default: React.ComponentType }) => void;
+      const promise = new Promise<{ default: React.ComponentType }>(resolve => {
+        releaseModule = resolve;
+      });
+      lazyOverlays.pending.set(kind, { promise, resolve: releaseModule });
+      const Overlay = () => <button type='button'>{kind} ready</button>;
+      const profile = (ready: boolean) => (
+        <React.Suspense fallback={<div role='status'>Loading profile</div>}>
+          <PublicProfileLayoutShell
+            artistName={artist.name}
+            heroImageUrl={null}
+            heroImageError={false}
+            isDesktopLayout={false}
+            shouldRenderHeading={false}
+            profileAccentStyle={{}}
+            compactSurface={
+              <ProfileCompactSurface
+                artist={artist}
+                socialLinks={[]}
+                contacts={[]}
+                drawerOpen={false}
+                drawerView='menu'
+                activeMode='profile'
+                onDrawerOpenChange={vi.fn()}
+                onDrawerViewChange={vi.fn()}
+                onBack={vi.fn()}
+                onOpenMenu={vi.fn()}
+                onPlayClick={vi.fn()}
+                onShare={vi.fn()}
+                profileHref='/timwhite'
+                proofClaimCta={{ href: '/start', label: 'Claim yours' }}
+                renderInteractiveOverlays={kind === 'drawer' ? ready : true}
+                visitorAssignmentResolved={
+                  kind === 'notifications' ? ready : false
+                }
+              />
+            }
+          />
+        </React.Suspense>
+      );
+      const view = render(profile(false));
+      // The already-present closed drawer may resolve before the per-visitor
+      // assignment enables the separate notifications module.
+      await act(async () => {});
+      const heading = screen.getByRole('heading', { name: artist.name });
+      const claim = screen.getByRole('link', { name: /Claim yours/ });
+      const dock = screen.getByTestId('profile-tab-bar');
+      claim.focus();
       expect(claim).toHaveFocus();
-      expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    } finally {
-      await act(async () => releaseModule({ default: Overlay }));
-      lazyOverlays.pending.delete('notifications');
+      view.rerender(profile(true));
+      try {
+        expect(heading).toBeVisible();
+        expect(claim).toBeVisible();
+        expect(dock).toBeVisible();
+        expect(claim).toHaveFocus();
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      } finally {
+        await act(async () => releaseModule({ default: Overlay }));
+        lazyOverlays.pending.delete(kind);
+      }
+      expect(
+        screen.getByRole('button', { name: `${kind} ready` })
+      ).toBeVisible();
+      expect(screen.getByRole('heading', { name: artist.name })).toBe(heading);
+      expect(screen.getByRole('link', { name: /Claim yours/ })).toBe(claim);
+      expect(claim).toHaveFocus();
     }
-    expect(
-      screen.getByRole('button', { name: 'notifications ready' })
-    ).toBeVisible();
-    expect(screen.getByRole('heading', { name: artist.name })).toBe(heading);
-    expect(screen.getByRole('link', { name: /Claim yours/ })).toBe(claim);
-    expect(claim).toHaveFocus();
-  });
-
-  it('renders the pay drawer in the same commit the drawer opens (no lazy boundary, JOV-7973)', () => {
-    render(
-      <React.Suspense fallback={<div role='status'>Loading profile</div>}>
-        <PublicProfileLayoutShell
-          artistName={artist.name}
-          heroImageUrl={null}
-          heroImageError={false}
-          isDesktopLayout={false}
-          shouldRenderHeading={false}
-          profileAccentStyle={{}}
-          compactSurface={
-            <ProfileCompactSurface
-              artist={artist}
-              socialLinks={[]}
-              contacts={[]}
-              drawerOpen
-              drawerView='pay'
-              activeMode='pay'
-              onDrawerOpenChange={vi.fn()}
-              onDrawerViewChange={vi.fn()}
-              onBack={vi.fn()}
-              onOpenMenu={vi.fn()}
-              onPlayClick={vi.fn()}
-              onShare={vi.fn()}
-              profileHref='/timwhite'
-              renderInteractiveOverlays
-            />
-          }
-        />
-      </React.Suspense>
-    );
-    // Synchronous render: no suspended lazy module may sit between the
-    // open drawer and the committed DOM. The deep-link pay arrival records
-    // its usable result when this element becomes visible, so any lazy
-    // boundary here re-adds the suspend/retry delay the budgets gate on.
-    expect(
-      document.querySelector('[data-testid="profile-mode-drawer-pay"]')
-    ).not.toBeNull();
-  });
-
-  it('statically imports the unified drawer (regression guard for the JOV-7973 budget fix)', () => {
-    const source = readFileSync(
-      resolve(__dirname, './ProfileCompactSurface.tsx'),
-      'utf8'
-    );
-    expect(source).toContain(
-      "import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';"
-    );
-    expect(source).not.toContain('ProfileUnifiedDrawer = dynamic');
-  });
+  );
 
   it('renders the floating bottom tab bar on the interactive profile', () => {
     renderSurface();

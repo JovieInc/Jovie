@@ -40,6 +40,7 @@ const {
   mockProfileInlineNotificationsCTA,
   mockProfileDesktopSurface,
   mockProfileUnifiedDrawer,
+  mockDrawerSlot,
   mockProfilePrimaryTabPanel,
   MockProfileDesktopSurface,
   mockClientNavigation,
@@ -74,20 +75,19 @@ const {
     mockProfileInlineNotificationsCTA: vi.fn(),
     mockProfileDesktopSurface,
     mockProfileUnifiedDrawer: vi.fn(),
+    mockDrawerSlot: (props: unknown) => mockProfileUnifiedDrawer(props),
     mockProfilePrimaryTabPanel: vi.fn(),
     MockProfileDesktopSurface,
     mockClientNavigation: vi.fn((_href: string) => false),
   };
 });
 
-vi.mock('@/features/profile/ProfileUnifiedDrawer', () => ({
-  ProfileUnifiedDrawer: (props: unknown) => mockProfileUnifiedDrawer(props),
-}));
-
+vi.mock(
+  '../../../components/features/profile/templates/useProfileUnifiedDrawerModule',
+  () => ({ ProfileUnifiedDrawerSlot: mockDrawerSlot }));
 vi.mock('next/dynamic', () => ({
   default: (loader: unknown) => {
     const source = String(loader);
-
     if (source.includes('ProfileInlineNotificationsCTA')) {
       return (props: unknown) => mockProfileInlineNotificationsCTA(props);
     }
