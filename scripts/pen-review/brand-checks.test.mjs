@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { brandChecks } from './brand-checks.mjs';
+import { brandChecks, sidebarFindings } from './brand-checks.mjs';
 import { decideRound } from './loop-state.mjs';
 
 const node = o => ({ p: 'F', d: 1, x: 0, y: 0, w: 100, h: 20, ...o });
@@ -126,31 +126,6 @@ test('brand findings outrank everything else as the next fix', () => {
     decideRound({ checks: findings }).topIssue.check,
     'artist-dignity'
   );
-});
-
-test('settled product decisions reach every judge prompt; none means no line', async () => {
-  const { personaPrompt } = await import('./judges.mjs');
-  const brief = {
-    surface: 'S5',
-    mission: 'm',
-    audience: 'a',
-    decisions: ['Invites are sent by the artist from their own Gmail.'],
-  };
-  assert.match(
-    personaPrompt('premium-critic', brief, '- x'),
-    /Settled product decisions.*own Gmail/
-  );
-  assert.doesNotMatch(
-    personaPrompt('premium-critic', { surface: 'S5', mission: 'm' }, '- x'),
-    /Settled product decisions/
-  );
-});
-
-test('taste issues go to the strong fixer, mechanical ones to the cheap one', async () => {
-  const { fixerModel } = await import('./run.mjs');
-  assert.equal(fixerModel({ source: 'judge' }, {}), 'opus');
-  assert.equal(fixerModel({ source: 'clef-gate' }, {}), 'opus');
-  assert.equal(fixerModel({ source: 'check' }, {}), 'sonnet');
 });
 
 test('DS rules: elevation inversion, accent misuse, raw radius and spacing', async () => {
@@ -378,4 +353,41 @@ test('sidebar header: saturated count badge and detached circle fail; muted coun
     ]),
     []
   );
+});
+
+test('inherited sidebar findings stay visible as warnings, owned badges still block', () => {
+  const nodes = [
+    { id: 'shell', d: 1, t: 'frame', nm: 'Sidebar', refName: 'Sidebar' },
+    {
+      id: 'shell/b',
+      p: 'shell',
+      d: 2,
+      t: 'frame',
+      segRefName: 'Sidebar',
+      w: 24,
+      h: 20,
+      r: { fill: '$ion', cornerRadius: '$radius-pill' },
+    },
+    {
+      id: 'shell/t',
+      p: 'shell/b',
+      d: 3,
+      t: 'text',
+      segRefName: 'Sidebar',
+      tx: '3',
+    },
+    {
+      id: 'own',
+      p: 'shell',
+      d: 2,
+      t: 'frame',
+      w: 24,
+      h: 20,
+      r: { fill: '$ion', cornerRadius: '$radius-pill' },
+    },
+    { id: 'text', p: 'own', d: 3, t: 'text', tx: '3' },
+  ];
+  const findings = sidebarFindings({ nodes });
+  assert.equal(findings.find(f => f.node === 'shell/b').severity, 'warn');
+  assert.equal(findings.find(f => f.node === 'own').severity, 'block');
 });

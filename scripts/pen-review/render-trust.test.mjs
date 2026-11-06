@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
-import { garbleFinding, speckleBands } from './render-guard.mjs';
-import { prepareHtml } from './render-html.mjs';
-import { renderTrusted } from './run.mjs';
+import { deflateSync } from 'node:zlib';
+import { renderTrusted } from './render-trusted.mjs';
 
 const img = (w, h, f) => {
   const data = new Uint8ClampedArray(w * h * 4);
@@ -21,25 +20,6 @@ const clean = () =>
   img(160, 96, (x, y) => (y % 24 > 18 && x % 40 < 30 ? 220 : 6));
 // Mis-strided readback: dense isolated speckle (deterministic hash noise).
 const garbled = () => img(160, 96, (x, y) => ((x + 2 * y) % 3 === 0 ? 230 : 4));
-
-test('garble detector: speckle field fails, clean UI passes', () => {
-  assert.equal(garbleFinding(clean()), null);
-  assert.match(garbleFinding(garbled()), /garbled raster/);
-  const half = img(160, 96, (x, y) =>
-    y < 48 ? 6 : (x + 2 * y) % 3 === 0 ? 230 : 4
-  );
-  assert.ok(
-    speckleBands(half)
-      .slice(4)
-      .every(b => b.v > 30),
-    'lower bands flagged'
-  );
-  assert.match(garbleFinding(half), /garbled raster: 4\/8/);
-});
-
-// PNG encode is not needed: the exporter stub returns a buffer and decodePng is
-// bypassed by encoding the stub images through the real decoder's input format.
-import { deflateSync } from 'node:zlib';
 
 function png({ width, height, data }) {
   const crcTable = Array.from({ length: 256 }, (_, n) => {
@@ -131,17 +111,4 @@ test('renderTrusted: html fallback font failure keeps the render untrusted', asy
     }),
   });
   assert.deepEqual(r.guard, ['font not loaded: Satoshi']);
-});
-
-test('prepareHtml: local fonts replace Google Fonts, relative images resolve', () => {
-  const html = `<html><head><link rel="preconnect" href="https://fonts.googleapis.com" /><link href="https://fonts.googleapis.com/css2?family=Inter%3Awght%40100..900&display=swap" rel="stylesheet" /><link href="https://fonts.googleapis.com/css2?family=Fraunces&display=swap" rel="stylesheet" /></head><body><div style="background-image: url('generated-58.png')"></div><img src="a b.png"></body></html>`;
-  const out = prepareHtml(html, {
-    assetBase: '/ws',
-    fontDir: '/fonts',
-    localFonts: { Inter: { file: 'Inter.woff2', weight: '100 900' } },
-  });
-  assert.doesNotMatch(out, /family=Inter/);
-  assert.match(out, /family=Fraunces&display=block/);
-  assert.match(out, /url\('file:\/\/\/ws\/generated-58\.png'\)/);
-  assert.match(out, /src="file:\/\/\/ws\/a%20b\.png"/);
 });

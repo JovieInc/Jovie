@@ -3,7 +3,6 @@
  * digests and the ready marker, the single-writer lease and the save guard.
  */
 
-import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -15,11 +14,18 @@ import {
 } from 'node:fs';
 import { dirname } from 'node:path';
 
+export {
+  frameDigest,
+  isProposalFrame,
+  markReady,
+  PROPOSAL_RE,
+  READY_SUFFIX,
+  stableJson,
+  stripReady,
+} from './frame-identity.mjs';
+
 export const RECEIPT_SCHEMA = 'pen-review-receipt/v1';
 export const LEASE_SCHEMA = 'pen-writer-lease/v1';
-export const READY_SUFFIX = ' · ready for Tim';
-/** "PROPOSAL / …" at the start or "· PROPOSAL" as a segment; never the big "PROPOSAL AREA" boards. */
-export const PROPOSAL_RE = /^PROPOSAL\s*[/·]|·\s*PROPOSAL\s*(?:·|$)/;
 /** Two consecutive judge rounds with nothing material (Tim, 2026-11-01). */
 export const QUIET_ROUNDS_TO_PASS = 2;
 export const DEFAULT_MAX_ROUNDS = 8;
@@ -145,34 +151,6 @@ const rank = c => {
 };
 
 // ── Digest, receipts ─────────────────────────────────────────────────────
-
-/** Content digest of a frame, ignoring its own name (the ready marker). */
-export function frameDigest(tree) {
-  const { name: _name, ...rest } = tree ?? {};
-  return createHash('sha256').update(stableJson(rest)).digest('hex');
-}
-
-export function stableJson(v) {
-  if (Array.isArray(v)) return `[${v.map(stableJson).join(',')}]`;
-  if (v && typeof v === 'object')
-    return `{${Object.keys(v)
-      .sort()
-      .map(k => `${JSON.stringify(k)}:${stableJson(v[k])}`)
-      .join(',')}}`;
-  return JSON.stringify(v);
-}
-
-export function stripReady(name) {
-  return String(name ?? '').replace(/ · ready for Tim(?: r[0-9a-f]{8})?$/, '');
-}
-
-export function markReady(name, receiptHash) {
-  return `${stripReady(name)}${READY_SUFFIX} r${String(receiptHash).slice(0, 8)}`;
-}
-
-export function isProposalFrame(node) {
-  return Boolean(node?.name) && PROPOSAL_RE.test(stripReady(node.name).trim());
-}
 
 // ── Single-writer lease (shared by every agent that writes the canvas) ──
 
