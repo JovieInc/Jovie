@@ -27,6 +27,7 @@ vi.mock('@/lib/env-server', () => ({
 
 import { isProviderCreditError } from '@/lib/ai/credit-failover';
 import { gateway, routeCallProvider } from '@/lib/ai/sdk';
+import { STREAM_FIRST_CHUNK_TIMEOUT_MS } from '@/lib/ai/stream-stall-guard';
 
 const gatewayModel = (id: string) => mockGatewayModel(id);
 const modelOf = (args: readonly [unknown, ...unknown[]]) =>
@@ -159,5 +160,30 @@ describe('Workers AI routing in the shared AI layer', () => {
     );
     expect(result.content[0]?.text).toBe('from-workers-ai');
     fetchSpy.mockRestore();
+  });
+
+  it('bounds a Gateway stream that never answers, even with no Workers AI twin', async () => {
+    envState.WORKERS_AI_TOKEN = undefined;
+    vi.useFakeTimers();
+    try {
+      mockGatewayModel.mockReturnValueOnce({
+        provider: 'gateway',
+        modelId: 'zai/glm-5.3-flash',
+        doGenerate: vi.fn(),
+        doStream: vi.fn(() => new Promise(() => undefined)),
+      });
+      const model = gateway('zai/glm-5.3-flash') as unknown as {
+        doStream: (options: unknown) => Promise<unknown>;
+      };
+      const pending = model.doStream({});
+      const settled = expect(pending).rejects.toMatchObject({
+        name: 'StreamStallError',
+        phase: 'first-chunk',
+      });
+      await vi.advanceTimersByTimeAsync(STREAM_FIRST_CHUNK_TIMEOUT_MS + 1);
+      await settled;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

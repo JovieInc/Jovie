@@ -328,9 +328,42 @@ export function resolvePreviewArtist(
       tagline: draft.outcome,
     };
   }
-  if (state.artist) return state.artist;
-  if (!state.handle || state.socialLinks.length === 0) return null;
+  if (state.artist) {
+    // JOV-10169: the artist preview must never render a fabricated
+    // jov.ie/your-handle identity. Between the artist pick and a known
+    // handle, the rail stays empty (the shell falls back to the entry
+    // preview) instead of flashing the placeholder URL and /your-handle
+    // links.
+    if (!state.handle) return null;
+    return state.artist;
+  }
+  // Pen R6As7U: the draft profile is present as soon as a handle is known,
+  // before any artist or link is attached.
+  if (!state.handle) return null;
   return { id: `handle-${state.handle}`, name: state.handle, url: '' };
+}
+
+/**
+ * Pen R6As7U `SDt0M`: names the panel so the phone reads as the visitor's own
+ * draft. Pen sets the eyebrow in its canonical uppercase eyebrow style.
+ */
+function OnboardingDraftProfileHeader() {
+  return (
+    <header
+      className='system-b-onboarding-draft-header'
+      data-testid='onboarding-draft-profile-header'
+    >
+      <p className='system-b-onboarding-draft-eyebrow'>
+        Your profile, taking shape
+      </p>
+      <h2 className='system-b-onboarding-draft-title text-balance'>
+        Your Draft Profile
+      </h2>
+      <p className='system-b-onboarding-draft-lead'>
+        A first version from your link. Shape it as we talk.
+      </p>
+    </header>
+  );
 }
 
 export function OnboardingProfileRail({
@@ -415,10 +448,11 @@ export function OnboardingProfileRail({
       <div
         className={cn(
           'flex min-h-0 items-center justify-center',
-          isInline ? 'h-full px-0 py-2' : 'min-h-full lg:w-95 lg:px-4 lg:py-4'
+          isInline ? 'h-full px-0 py-2' : 'min-h-full lg:w-95 lg:px-4 lg:pb-4'
         )}
       >
         <div className='flex min-h-0 w-full flex-col items-center'>
+          {isInline ? null : <OnboardingDraftProfileHeader />}
           <ProfilePreviewBento
             phoneContent={
               draft?.activeRole && draft.activeRole !== 'artist' && source ? (
@@ -465,7 +499,7 @@ export function OnboardingProfileRail({
             className={cn('w-full', isInline ? 'max-w-86' : 'h-full max-w-87')}
             heroClassName={cn(
               'w-full rounded-3xl',
-              isInline ? 'min-h-114 p-4' : 'min-h-0 max-h-170 p-5'
+              isInline ? 'min-h-114 p-4' : 'min-h-0 max-h-170 px-5'
             )}
             // Width only: the screen keeps its 402:874 aspect, so a fixed frame
             // height let it overflow the frame (JOV-7192).
@@ -480,7 +514,7 @@ export function OnboardingProfileRail({
             }
             // One caption for every path: internal draft state ("Draft · artist ·
             // Review") is not visitor-facing (2026-10-31 golden-path walk).
-            caption='Preview — not claimed yet'
+            caption='Preview · not claimed yet'
             overlay={<DspMatchStrip matches={dspMatches} />}
           />
           {previewArtist.tagline ? (

@@ -117,17 +117,15 @@ describe('buildStageStrip', () => {
 });
 
 describe('flow pulse tiles', () => {
-  it('reads merges per hour, queue ejections, red PRs, eligible and ownerless', () => {
+  it('reads queue ejections and ownerless PRs from the flow block', () => {
     const byKey = Object.fromEntries(
       buildPulse(withLanes({ flow: FLOW })).map(tile => [tile.key, tile])
     );
-    expect(byKey['merges-hour']).toMatchObject({ value: '3.6', tone: 'good' });
-    expect(byKey.queue).toMatchObject({
-      label: 'Queue · 72% ejected',
+    expect(byKey.ejections).toMatchObject({
+      label: 'Queue ejections',
+      value: '72%',
       tone: 'bad',
     });
-    expect(byKey['red-prs']).toMatchObject({ value: '22/98', tone: 'warn' });
-    expect(byKey.eligible).toMatchObject({ value: '3/31', tone: 'good' });
-    expect(byKey.ownerless).toMatchObject({ value: '2', tone: 'bad' });
+    expect(byKey.ownerless).toMatchObject({ value: '2', tone: 'warn' });
   });
 });

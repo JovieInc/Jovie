@@ -1,75 +1,105 @@
-// Strong tier: independent `claude -p` samples (subscription lane, no raw
-// API keys, same transport family as scripts/funnel-judge). Each sample runs
-// from the walk's frame directory with Read as its only tool, no settings,
-// no MCP and no session persistence, so it sees the frames and nothing else.
+// Strong tier: independent samples from a vision model on the sanctioned
+// Workers AI route (JOV-10091). The route and model come from
+// apps/web/lib/ai/routing.json caller `dev.buyer-eval`; calls go through
+// Jovie's Workers AI relay with the shared API client (budget, breaker,
+// retries). Frames are sent inline as base64 images, so the model sees the
+// prompt and the frames and nothing else: no tools, no files, no memory.
+// It replaced `claude -p` on a consumer subscription, which is forbidden for
+// automation (ops/registry/fleet.json lane-claude; scripts/subscription-cli-guard.mjs).
 
-import { spawn } from 'node:child_process';
-import { buildClaudeArgs } from '../funnel-judge/judge.mjs';
+import {
+  CONTAMINATION_MARKERS,
+  callRelay,
+  contaminated,
+  contentFor,
+  encodeImages,
+  MAX_IMAGES_PER_REQUEST,
+  parseAnswer,
+  routeFor,
+  sampleJudge,
+  USD_PER_K_NEURONS,
+  usdFor,
+} from '../output-quality/judge-core.mjs';
 import {
   buildBuyerPrompt,
   buildBuyerSchema,
   parseBuyerSample,
 } from './rubric.mjs';
 
-export const STRONG_MODEL = 'claude-opus-5-5';
+// Transport, encoding, contamination and cost live in the shared audience
+// judge (scripts/output-quality/judge-core.mjs); buyer-eval owns only the walk
+// image plan and the pay-forecast rubric.
+export {
+  CONTAMINATION_MARKERS,
+  callRelay,
+  contaminated,
+  MAX_IMAGES_PER_REQUEST,
+  parseAnswer,
+  USD_PER_K_NEURONS,
+  usdFor,
+};
+
+export const ROUTE_ID = 'dev.buyer-eval';
 export const DEFAULT_SAMPLES = 3;
 
-/**
- * Words that exist only in company memory/docs, never in a walk or prompt.
- * Seeing one in a judge's output means context leaked in (review #7).
- */
-export const CONTAMINATION_MARKERS = Object.freeze([
-  '$300',
-  '300/mo',
-  'ovie',
-  'summer',
-  'gbrain',
-  'premium pricing',
-  'icp',
-]);
-
-export function contaminated(raw, prompt) {
-  const out = JSON.stringify(raw ?? '').toLowerCase();
-  const inPrompt = prompt.toLowerCase();
-  const has = (text, word) =>
-    new RegExp(
-      `(?:^|[^a-z0-9])${word.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}(?:$|[^a-z0-9])`,
-      'u'
-    ).test(text);
-  return CONTAMINATION_MARKERS.filter(
-    word => has(out, word) && !has(inPrompt, word)
-  );
+/** The strong tier's route from routing.json; fail closed when it is not Workers AI. */
+export function strongRoute(routing) {
+  const { model, baseUrl } = routeFor(ROUTE_ID, routing);
+  return { model, baseUrl };
 }
 
-function runClaude(args, cwd, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    const child = spawn('claude', args, {
-      cwd,
-      stdio: ['ignore', 'pipe', 'pipe'],
+export const STRONG_MODEL = strongRoute().model;
+const FRAME_WIDTH = 1280;
+const SHEET_WIDTH = 1024;
+
+/** Encode one frame (at most 1280 wide) or a sheet of frames stacked at 1024 wide. */
+export function encodeFrames(paths) {
+  return encodeImages(paths, { width: FRAME_WIDTH, sheetWidth: SHEET_WIDTH });
+}
+
+/**
+ * Pick what to attach within the per-request image cap: every frame when
+ * they fit; else each step's first frame (the step screenshot); else
+ * consecutive steps stacked into at most MAX_IMAGES_PER_REQUEST sheets.
+ */
+export function planImages(steps, max = MAX_IMAGES_PER_REQUEST) {
+  const all = steps.flatMap(step =>
+    step.images.map((path, index) => ({
+      label: `STEP ${step.stepId}${step.images.length > 1 ? ` (frame ${index + 1} of ${step.images.length})` : ''}`,
+      paths: [path],
+    }))
+  );
+  if (all.length <= max) return all;
+  const firsts = steps
+    .filter(step => step.images.length)
+    .map(step => ({ stepId: step.stepId, path: step.images[0] }));
+  if (firsts.length <= max)
+    return firsts.map(row => ({
+      label: `STEP ${row.stepId}`,
+      paths: [row.path],
+    }));
+  const per = Math.ceil(firsts.length / max);
+  const sheets = [];
+  for (let i = 0; i < firsts.length; i += per) {
+    const group = firsts.slice(i, i + per);
+    sheets.push({
+      label: `STEPS ${group.map(row => row.stepId).join(', ')} (stacked top to bottom)`,
+      paths: group.map(row => row.path),
     });
-    let stdout = '';
-    let stderr = '';
-    const timer = setTimeout(() => {
-      child.kill('SIGTERM');
-      reject(new Error(`judge timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-    child.stdout.on('data', chunk => {
-      stdout += chunk;
-    });
-    child.stderr.on('data', chunk => {
-      stderr += chunk;
-    });
-    child.on('error', error => {
-      clearTimeout(timer);
-      reject(error);
-    });
-    child.on('close', code => {
-      clearTimeout(timer);
-      if (code !== 0)
-        reject(new Error(`claude exited ${code}: ${stderr.slice(0, 300)}`));
-      else resolve(stdout);
-    });
-  });
+  }
+  return sheets;
+}
+
+/**
+ * OpenAI-style content: the prompt, then each attached image after its label.
+ * Over the relay body budget, throw (an unjudged walk is an abstain, never a pass).
+ */
+export function buildContent(prompt, steps, encode = encodeFrames) {
+  const images = planImages(steps).map(unit => ({
+    label: unit.label,
+    ...encode(unit.paths),
+  }));
+  return contentFor(prompt, images);
 }
 
 /**
@@ -82,8 +112,9 @@ export async function judgeBuyer({
   walk,
   samples = DEFAULT_SAMPLES,
   model = STRONG_MODEL,
-  timeoutMs = 900_000,
-  run = runClaude,
+  timeoutMs = 600_000,
+  call = undefined,
+  encode = encodeFrames,
 }) {
   // Tier A archetypes (and Tier B on a walk that is not their own) watch a
   // stand-in account; v1 counted the stand-in's small numbers as an objection.
@@ -93,37 +124,16 @@ export async function judgeBuyer({
     steps: walk.steps,
     standIn: walk.subjectId !== persona.id,
   });
-  const schema = buildBuyerSchema(walk.steps.map(step => step.stepId));
-  const args = buildClaudeArgs({
+  const result = await sampleJudge({
     model,
     prompt,
-    schema,
-    imageDir: walk.frameDir,
+    content: buildContent(prompt, walk.steps, encode),
+    schema: buildBuyerSchema(walk.steps.map(step => step.stepId)),
+    schemaName: 'buyer_forecast',
+    samples,
+    timeoutMs,
+    parse: answer => parseBuyerSample(answer, walk.steps),
+    ...(call ? { call } : {}),
   });
-  const settled = await Promise.allSettled(
-    Array.from({ length: samples }, () => run(args, walk.frameDir, timeoutMs))
-  );
-  const parsed = [];
-  const failures = [];
-  let costUsd = 0;
-  for (const result of settled) {
-    if (result.status === 'rejected') {
-      failures.push(
-        String(result.reason?.message ?? result.reason).slice(0, 200)
-      );
-      continue;
-    }
-    try {
-      const envelope = JSON.parse(result.value);
-      costUsd += Number(envelope.total_cost_usd) || 0;
-      if (envelope.is_error)
-        throw new Error(String(envelope.result ?? 'judge error'));
-      const leaks = contaminated(envelope.structured_output, prompt);
-      if (leaks.length) throw new Error(`contaminated: ${leaks.join(',')}`);
-      parsed.push(parseBuyerSample(envelope.structured_output, walk.steps));
-    } catch (error) {
-      failures.push(String(error?.message ?? error).slice(0, 200));
-    }
-  }
-  return { model, samples: parsed, failures, costUsd };
+  return { ...result, route: ROUTE_ID };
 }

@@ -66,6 +66,14 @@ export const ARCHETYPES = Object.freeze([
       'Artist with 15k monthly listeners who has paid for two link-in-bio and pre-save tools and saw no measurable lift. Distrusts AI hype and fake urgency. Converts only on concrete proof about their own career, shown before paying.',
   },
   {
+    // Tim 2026-11-02: "im not gonna be able to get the bands to do this til
+    // the product is pretty". Certification needs this buyer too (gate.mjs
+    // REQUIRED_PERSONAS, ratcheted).
+    id: 'heritage-rock-manager',
+    brief:
+      'Tour and artist manager for a multi-platinum heritage rock band (catalog from the 1970s to now, millions of monthly listeners, arena tours, a label and a business manager). Answers to the band members, who are protective of their brand. Budget is not the constraint: any tool shown to the band must look premium and polished, be trustworthy with their catalog and fans, and never look cheap, broken, generic or unfinished. One rough edge means it never gets shown to the band.',
+  },
+  {
     id: 'control-link-in-bio',
     control: true,
     brief:
@@ -136,11 +144,10 @@ export function buildBuyerPrompt({
         `STEP ${step.stepId} at ${step.tSec.toFixed(1)}s: ${step.title}`,
       ];
       if (step.text) lines.push(`Visible text:\n"""\n${step.text}\n"""`);
-      for (const image of step.images) lines.push(`Frame: ${image}`);
       return lines.join('\n');
     })
     .join('\n\n');
-  return `You are a conversion forecaster. You are shown a screen recording (as frames plus visible text) of one person's session on Jovie, in order. Predict that person's real behavior.
+  return `You are a conversion forecaster. You are shown a screen recording (as attached frames plus visible text) of one person's session on Jovie, in order. Predict that person's real behavior.
 
 The person: ${persona.brief}
 ${
@@ -156,7 +163,7 @@ Calibration facts you must respect:
 - Only what is literally on screen counts. Do not credit features that are promised, implied or "probably there". A payment ask before the person has seen value about themselves counts against it.
 - Placeholder text, internal jargon, errors, a price that changes, or a paid ask while the person is told they are waitlisted are trust breakers.
 - Unverifiable marketing claims (guaranteed growth, "10x streams") lower trust; they do not raise p.
-- Read every frame (use the Read tool on each path) before answering.
+- Look at every attached image before answering. Each image is labelled with the step(s) it shows; a sheet stacks consecutive steps top to bottom.
 
 Work in this order:
 1. objections: the 3 strongest reasons this person would NOT pay, each tied to the stepId where it happens (the step where the person would feel it), with a category.

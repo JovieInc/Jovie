@@ -80,6 +80,8 @@ describe('support route header contract', () => {
     expect(headerSource).toContain(
       "logoReveal={resolvedLogoVariant === 'icon'}"
     );
+    // Every shared marketing shell selects the named 28px mark, including support.
+    expect(headerSource).toContain("logoMarkSize='marketing'");
     expect(headerSource).not.toMatch(
       /textContent|innerText|querySelector\('h1/
     );
@@ -137,5 +139,18 @@ describe('support route header contract', () => {
     expect(headerSource).toContain('export interface MarketingHeaderChromeNav');
     expect(headerSource).toContain('navLinks ?? chromeNav?.primary');
     expect(headerSource).toContain('links: plainLinks(chromeNav.customers)');
+  });
+});
+
+describe('prerendered homepage pathname', () => {
+  it('MarketingHeader.tsx reads "/index" as "/" via usePublicPathname', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/site/MarketingHeader.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('usePublicPathname');
+    expect(source).not.toMatch(/\busePathname\b/);
   });
 });

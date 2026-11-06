@@ -28,6 +28,8 @@ const chatMocks = vi.hoisted(() => ({
   setMessages: vi.fn(),
   status: 'ready' as 'ready' | 'submitted' | 'streaming',
   stop: vi.fn(),
+  scrollContainerRef: { current: null as HTMLDivElement | null },
+  setStuckToBottom: vi.fn(),
 }));
 
 vi.mock('ai', () => ({
@@ -95,7 +97,8 @@ vi.mock('@/components/jovie/hooks', () => ({
   useStickToBottom: () => ({
     isStuckToBottom: true,
     onScroll: vi.fn(),
-    scrollContainerRef: { current: null },
+    scrollContainerRef: chatMocks.scrollContainerRef,
+    setStuckToBottom: chatMocks.setStuckToBottom,
     totalSizeRef: { current: null },
   }),
 }));
@@ -360,5 +363,117 @@ describe('OnboardingChat completed guarded steps (JOV-7078)', () => {
     expect(socialCards).toHaveLength(1);
     expect(socialCards[0]?.textContent).toBe('social_attached');
     expect(screen.getAllByTestId('handle-card')).toHaveLength(1);
+  });
+});
+
+describe('OnboardingChat Pen transcript anatomy (R6As7U)', () => {
+  beforeEach(() => {
+    chatMocks.messages = [];
+    chatMocks.status = 'ready';
+  });
+
+  it('opens each agent turn with one Jovie speaker row and aligns widgets to the text edge', () => {
+    chatMocks.messages = [
+      {
+        id: 'u1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'I want to claim jov.ie/validartist' }],
+      },
+      {
+        id: 'a1',
+        role: 'assistant',
+        parts: [
+          { type: 'text', text: 'That name is open.' },
+          {
+            type: 'tool-checkHandle',
+            toolCallId: 't-check',
+            state: 'output-available',
+            output: { action: 'check_handle', handle: 'validartist' },
+          },
+        ],
+      },
+      {
+        id: 'a2',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'One more thing.' }],
+      },
+      {
+        id: 'u2',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Sounds good' }],
+      },
+      {
+        id: 'a3',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'Great.' }],
+      },
+    ];
+
+    renderChat();
+
+    const chat = screen.getByTestId('onboarding-chat');
+    expect(chat).toHaveClass('system-b-onboarding-chat');
+    // Two agent turns (a1+a2 run, a3) → two speaker rows, none for users.
+    const speakerRows = screen.getAllByTestId('onboarding-speaker-row');
+    expect(speakerRows).toHaveLength(2);
+    expect(speakerRows[0]).toHaveTextContent('Jovie');
+    // Widget column starts at the agent text edge (no avatar-gutter indent).
+    const widgetColumn = screen.getByTestId('handle-card').parentElement;
+    expect(widgetColumn?.className).not.toMatch(/\bpl-\d/);
+  });
+});
+
+describe('OnboardingChat docked composer scroll (JOV-10131)', () => {
+  beforeEach(() => {
+    chatMocks.messages = [];
+    chatMocks.status = 'ready';
+    chatMocks.setStuckToBottom.mockClear();
+  });
+
+  it('re-pins the transcript to the bottom when the composer docks and on each user turn', () => {
+    const writes: number[] = [];
+    const scrollHeight = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockReturnValue(900);
+    const scrollTop = vi
+      .spyOn(HTMLElement.prototype, 'scrollTop', 'set')
+      .mockImplementation(value => {
+        writes.push(value);
+      });
+    const userTurn = (id: string, text: string) => ({
+      id,
+      role: 'user' as const,
+      parts: [{ type: 'text', text }],
+    });
+    chatMocks.messages = [
+      userTurn('u1', 'I want to claim jov.ie/gpwoaiyp.'),
+      {
+        id: 'a1',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'Tell me your name.' }],
+      },
+      userTurn('u2', 'unmarkedpavement'),
+      handleMessage('a2', 'check_handle', 'unmarkedpavement'),
+    ];
+
+    const { rerender } = renderChat();
+
+    // Docked (two user turns): the thread was pinned to the top while
+    // centered, so the dock must move it to the bottom and re-arm sticking.
+    expect(writes.at(-1)).toBe(900);
+    expect(chatMocks.setStuckToBottom).toHaveBeenLastCalledWith(true);
+
+    chatMocks.setStuckToBottom.mockClear();
+    chatMocks.messages = [
+      ...chatMocks.messages,
+      userTurn('u3', 'unmarkedpave'),
+    ];
+    rerender(
+      <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
+    );
+    expect(chatMocks.setStuckToBottom).toHaveBeenCalledExactlyOnceWith(true);
+
+    scrollHeight.mockRestore();
+    scrollTop.mockRestore();
   });
 });

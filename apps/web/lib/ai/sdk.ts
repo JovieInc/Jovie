@@ -12,6 +12,7 @@ import {
   emitAiReceipt,
 } from '@/lib/ai/receipt';
 import { isChatCall, routeForCall } from '@/lib/ai/routing';
+import { withStreamStallGuard } from '@/lib/ai/stream-stall-guard';
 import {
   isWorkersAiConfigured,
   workersAiLanguageModel,
@@ -193,8 +194,11 @@ export function routeCallProvider<
   if (!workers) return args;
   const model = createCreditFailoverModel({
     label: identity.functionId || 'untagged',
-    primary: { name: 'workers-ai', model: workers },
-    secondary: { name: 'gateway', model: getGatewayProvider()(gatewayId) },
+    primary: { name: 'workers-ai', model: withStreamStallGuard(workers) },
+    secondary: {
+      name: 'gateway',
+      model: withStreamStallGuard(getGatewayProvider()(gatewayId)),
+    },
     shouldFailover: error => !isAbortError(error),
     served,
   });
@@ -338,11 +342,14 @@ const gatewaySelector = ((modelId: string) => {
   // OpenAI/Anthropic are banned outright and anything off
   // GATEWAY_ALLOWED_MODELS throws before it can bill per-token.
   assertGatewayModelAllowed(modelId);
-  const gatewayModel = getGatewayProvider()(modelId);
+  // Bounded first-chunk/idle time: a provider that accepts the call and then
+  // goes silent must fail (and fail over) instead of leaving the turn open.
+  const gatewayModel = withStreamStallGuard(getGatewayProvider()(modelId));
   // Credits can never be a single point of failure: if the Gateway reports
   // insufficient funds or a spent key budget, replay the call on the Workers AI
   // twin of the same model (routing.json). No token or no twin: unchanged.
-  const workers = workersAiLanguageModel(modelId);
+  const workersTwin = workersAiLanguageModel(modelId);
+  const workers = workersTwin ? withStreamStallGuard(workersTwin) : undefined;
   if (!workers) return gatewayModel;
   return createCreditFailoverModel({
     label: 'gateway',

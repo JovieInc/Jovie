@@ -24,7 +24,7 @@ function runGate(args = [], env = {}) {
   return spawnSync('bash', [gateScript, ...args], {
     cwd: repoRoot,
     encoding: 'utf8',
-    env: { ...process.env, ...env },
+    env: { ...process.env, JOVIE_PREFLIGHT_DEPTH: undefined, ...env },
   });
 }
 
@@ -90,6 +90,7 @@ for (const linkedWorktree of [false, true]) {
     assert.equal(localNames.status, 0, localNames.stderr);
     for (const name of localNames.stdout.trim().split('\n')) delete env[name];
     delete env.JOVIE_SKIP_PRE_PUSH_GATE;
+    delete env.JOVIE_PREFLIGHT_DEPTH;
     env.GIT_CONFIG_GLOBAL = '/dev/null';
     env.GIT_CONFIG_NOSYSTEM = '1';
 
@@ -199,6 +200,7 @@ test('publication rejects committed formatter drift and accepts the formatted re
   assert.equal(localNames.status, 0, localNames.stderr);
   for (const name of localNames.stdout.trim().split('\n')) delete env[name];
   delete env.JOVIE_SKIP_PRE_PUSH_GATE;
+  delete env.JOVIE_PREFLIGHT_DEPTH;
   env.GIT_CONFIG_GLOBAL = '/dev/null';
   env.GIT_CONFIG_NOSYSTEM = '1';
   const run = (command, args) =>
@@ -231,6 +233,8 @@ test('publication rejects committed formatter drift and accepts the formatted re
     write('scripts/ci-branching-guard.mjs', 'export {};\n');
     write('scripts/component-ship-gate.mjs', 'export {};\n');
     write('scripts/lib/policy-gate-liveness.mjs', 'export {};\n');
+    write('scripts/preflight-changed.mjs', 'export {};\n');
+    write('scripts/hooks/prepush-preflight.mjs', 'export {};\n');
     write('scripts/security/scan-secrets.sh', 'exit 0\n');
     write('scripts/hooks/pre-push-gate.test.mjs', 'export {};\n');
     write('.gitignore', 'node_modules/\n');
@@ -311,6 +315,8 @@ test('publication blocks missing component stories and tests before publishing',
       `import { writeFileSync } from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'done');\n`
     );
     write('scripts/hooks/pre-push-gate.test.mjs', 'export {};\n');
+    write('scripts/preflight-changed.mjs', 'export {};\n');
+    write('scripts/hooks/prepush-preflight.mjs', 'export {};\n');
     const checker = pathToFileURL(
       path.join(repoRoot, 'scripts/component-ship-gate.mjs')
     ).href;
@@ -342,6 +348,8 @@ process.exit(report.ok ? 0 : 1);
             ...process.env,
             PATH: `${path.join(root, 'bin')}:${process.env.PATH}`,
             JOVIE_SKIP_PRE_PUSH_GATE: '',
+            // This spawn is the subject. An inherited hook depth refuses before the checker prints.
+            JOVIE_PREFLIGHT_DEPTH: '',
           },
         }
       );
@@ -375,4 +383,10 @@ process.exit(report.ok ? 0 : 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('pre-push-gate.sh refuses when nested inside a preflight', () => {
+  const result = runGate([], { JOVIE_PREFLIGHT_DEPTH: '1' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /nested inside a preflight/);
 });

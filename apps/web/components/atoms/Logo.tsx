@@ -1,5 +1,6 @@
 import { BrandLogo, type BrandLogoTone } from '@/components/atoms/BrandLogo';
 import { wordmarkGeometry } from '@/lib/brand/primitives';
+import type { BrandMarkSize } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
 
 export type LogoVariant = 'word' | 'wordAlt' | 'icon' | 'full' | 'fullAlt';
@@ -8,6 +9,7 @@ interface LogoProps
   extends Readonly<{
     readonly className?: string;
     readonly size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+    readonly markSize?: BrandMarkSize;
     readonly variant?: LogoVariant;
     readonly tone?: BrandLogoTone;
     /** @deprecated The wordmark is inline SVG now; nothing to prioritise. */
@@ -27,6 +29,7 @@ const TONE_TEXT: Record<BrandLogoTone, string | undefined> = {
 export function Logo({
   className,
   size = 'md',
+  markSize,
   variant = 'word',
   tone = 'auto',
   'aria-hidden': ariaHidden,
@@ -95,7 +98,7 @@ export function Logo({
   if (variant === 'icon') {
     return (
       <BrandLogo
-        size={iconSizePx[size]}
+        size={markSize ?? iconSizePx[size]}
         tone={tone}
         alt={ariaHidden ? '' : 'Jovie'}
         aria-hidden={ariaHidden}
