@@ -14,6 +14,8 @@ const meta = {
       },
     },
     backgrounds: { default: 'dark' },
+    // The receipt body hardcodes white-on-noir text tokens.
+    themes: { themeOverride: 'dark' },
     viewport: { defaultViewport: 'desktop' },
     pen: {
       registryId: 'web-214-waitlist',

@@ -1,10 +1,17 @@
-import base, { Default } from './components/SourceEvidence.stories';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { ChatMarkdown } from './components/ChatMarkdown';
+import { sourceFixture } from './components/source-evidence.fixtures';
 import { SourceEvidenceProvider } from './source-evidence-context';
 
 const meta = {
-  ...base,
   title: 'Jovie/SourceEvidenceContext',
   component: SourceEvidenceProvider,
-};
+  args: {
+    facts: [sourceFixture()],
+    children: <ChatMarkdown content='9.9K followers' />,
+  },
+} satisfies Meta<typeof SourceEvidenceProvider>;
+
 export default meta;
-export { Default };
+
+export const Default: StoryObj<typeof meta> = {};
