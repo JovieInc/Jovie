@@ -33,7 +33,7 @@ export const KIND = /^[a-z][a-z0-9-]{1,31}$/;
 export const CORRELATION = /^[A-Za-z0-9][A-Za-z0-9_.:-]{7,127}$/;
 export const SHA256 = /^[a-f0-9]{64}$/;
 /** Hub-internal senders; never registrable as agents. */
-export const SYSTEM_KINDS = new Set(['mesh-hub', 'mesh-probe']);
+export const SYSTEM_KINDS = new Set(['mesh-hub', 'mesh-probe', 'board']);
 
 /** Shallow RPC-serializable record (Durable Object stub types reject deep/unknown). */
 export type Detail = Record<
@@ -334,6 +334,34 @@ export class MailboxStore {
     );
   }
 
+  /**
+   * Hub executor: unhandled peer messages older than `graceMs` whose lease has
+   * lapsed, leased for `leaseMs` so two alarms never run one task twice.
+   */
+  claimForExecutor(
+    now: number,
+    graceMs: number,
+    leaseMs: number,
+    limit: number
+  ): Delivered[] {
+    const rows = this.sql
+      .exec(
+        `SELECT * FROM messages WHERE acked_at IS NULL AND kind = 'message' AND body IS NOT NULL
+           AND accepted_at <= ? AND lease_until <= ? ORDER BY seq LIMIT ?`,
+        now - graceMs,
+        now,
+        limit
+      )
+      .toArray();
+    for (const row of rows)
+      this.sql.exec(
+        'UPDATE messages SET lease_until = ? WHERE seq = ?',
+        now + leaseMs,
+        Number(row.seq)
+      );
+    return rows.map(row => toDelivered(row));
+  }
+
   /** Relay stream: everything not yet received (probes included), in seq order. */
   unreceived(now: number, limit: number = LIMITS.pageSize): Delivered[] {
     const rows = this.sql
@@ -453,6 +481,16 @@ export class MailboxStore {
         now - LIMITS.retentionAfterAckMs
       )
       .toArray().length;
+  }
+
+  /** Oldest unhandled peer message (not events/wrappers: alarms must not alarm on themselves). */
+  oldestUnackedMessage(): Delivered | null {
+    const row = this.sql
+      .exec(
+        "SELECT * FROM messages WHERE acked_at IS NULL AND kind = 'message' ORDER BY seq LIMIT 1"
+      )
+      .toArray()[0];
+    return row ? toDelivered(row) : null;
   }
 
   oldestUnacked(): Delivered | null {

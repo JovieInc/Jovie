@@ -67,6 +67,15 @@ describe('CookieBannerSection consent sync', () => {
     vi.unstubAllEnvs();
   });
 
+  it('renders consent on the banner layer below modal profile sheets', async () => {
+    const mod = await import('@/components/organisms/CookieBannerSection');
+    setCookie('jv_cc_required=1');
+    render(<mod.CookieBannerSection />);
+
+    expect(screen.getByTestId('cookie-banner')).toHaveClass('z-banner');
+    expect(screen.getByRole('button', { name: 'Accept all' })).toBeVisible();
+  });
+
   it('uses the E2E-only pathname override to clear the public profile dock', async () => {
     vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
     const mod = await import('@/components/organisms/CookieBannerSection');

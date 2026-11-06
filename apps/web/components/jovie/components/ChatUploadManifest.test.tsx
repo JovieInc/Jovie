@@ -161,4 +161,35 @@ describe('ChatUploadManifest', () => {
       'system-b-chat-upload-manifest-mini-bar-fill'
     );
   });
+
+  it('keeps status copy on the WCAG AA status-text tokens', () => {
+    const failedFile: PendingFile = {
+      ...uploadingFile,
+      id: 'failed-file',
+      status: 'failed',
+      error: 'Upload failed',
+    };
+    renderManifest({
+      files: [failedFile],
+      isUploading: false,
+      aggregate: {
+        total: 1,
+        done: 0,
+        overallPct: 0,
+        speed: '0 B/s',
+        eta: '—',
+      },
+    });
+
+    expect(screen.getByText('Upload failed')).toHaveClass('text-error-text');
+
+    const manifestSource = readFileSync(
+      resolve(__dirname, './ChatUploadManifest.tsx'),
+      'utf8'
+    );
+    expect(manifestSource).toContain("return 'text-warning-text';");
+    expect(manifestSource).toContain("return 'text-success-text';");
+    expect(manifestSource).not.toContain("return 'text-error';");
+    expect(manifestSource).not.toContain("return 'text-warning';");
+  });
 });

@@ -158,8 +158,8 @@ Profile is historical ledger drift, not a reason to change the current code.
 ## macOS screen and state registry
 
 `apps/macos` contains one macOS **Swift** target: `MenuMonitor`, a
-menu-bar-only operator tool. The shipped Mac product / Ovie shell is Electron
-in `apps/desktop`. The [native Mac direction](../macos/ADR-swift-native-mac.md)
+menu-bar-only operator tool. The shipped Mac product is Electron
+in `apps/desktop`; Ovie is web at `/app/ov`, never native. The [native Mac direction](../macos/ADR-swift-native-mac.md)
 plans a separate `apps/ios/JovieMac` product target on shared iOS foundations;
 this registry does not certify that planned target or its parity. MenuMonitor
 is not a public artist
@@ -210,7 +210,7 @@ the source contract to verify, not a claim that each viewport has passed.
 | Medium iPhone / large portrait | Same shell composition with wider drawer; grids remain readable; long labels use minimum scale/truncation where source provides it | Preserve semantic hierarchy; do not add a second navigation rail or duplicate tab bar. |
 | iPad / wide iOS | No dedicated size-class branch is present in the inspected native surfaces; SwiftUI flexible stacks/grids are the source behavior | Treat any tablet-specific layout as `proposal` until source owner and test evidence exist. Do not infer a Pen tablet frame from iPhone code. |
 | Web compact | Shell body reserves safe-area top and mobile bottom surface; mobile nav is capacity-derived, `AppShellFrame.tsx:L60-L80,L156-L163`; nav partition in `dashboard-nav/config.ts:L226-L260` | Verify compact nav, safe area, keyboard/composer, and route loading geometry. |
-| Web desktop | Sidebar mount and raised main plane share coordinated shell motion; `AppShellFrame.tsx:L71-L143` | Main content remains one raised plane; right rail is in-flow and may narrow the route. |
+| Web desktop | Sidebar mount and raised main plane share coordinated shell motion; `AppShellFrame.tsx:L71-L143` | Main content remains one raised plane; right rail renders as an overlay (`AppShellRightRail`) that never narrows the route — verify last-column reachability under it. |
 | macOS menu bar | Accessory menu only; no window or adaptive product shell | Verify menu readability and action feedback, not iOS/web visual parity. |
 | Text scaling / reduce motion | iOS uses SwiftUI environment in drawer, audience, chat, Talk; web uses `motion-reduce`; examples `AppShellLeftDrawer.swift:L59-L64,L132-L146`, `JovieTheme.swift:L95-L122` | Preserve reserved layout; remove movement under reduce motion while keeping accessible opacity/state changes. |
 

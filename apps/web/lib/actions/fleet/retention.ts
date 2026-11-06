@@ -27,6 +27,15 @@ export type ArchiveKind =
   | 'summerEvents';
 const ARCHIVE_SCHEMA = 'jovie.summer.fleet.archive/v1';
 const MAX_ARCHIVE_BATCH = 250;
+/**
+ * The hot fleet document is a single ovie_operating_kv row read whole on
+ * every dispatcher access; the row budget is 256 KB (see
+ * OVIE_OPERATING_KV_ROW_BUDGET_BYTES in lib/ovie/mcp/postgres-backend.ts).
+ * Count caps alone cannot respect a byte budget — at the 3000-invocation
+ * compaction threshold the hashes alone exceed the budget — so once the
+ * serialized document is over, compaction is size-driven (JOV-10280).
+ */
+export const FLEET_HOT_ROW_BUDGET_BYTES = 256 * 1024;
 export function fleetArchiveKey(
   profileId: string,
   kind: ArchiveKind,
@@ -81,6 +90,8 @@ export function compactFleetState(
   const pendingInvocations = new Set(
     Object.values(s.pendingDefects).map(p => p.invocationId)
   );
+  const overBudget =
+    Buffer.byteLength(JSON.stringify(s)) > FLEET_HOT_ROW_BUDGET_BYTES;
   const pinnedRequests = new Set(
     Object.values(s.summer?.events ?? {})
       .filter(event => event.state === 'pending')
@@ -122,7 +133,7 @@ export function compactFleetState(
     }
     return true;
   };
-  if (Object.keys(s.invocations).length >= 3000) {
+  if (Object.keys(s.invocations).length >= 3000 || overBudget) {
     let archived = 0;
     for (const [id, invocation] of Object.entries(s.invocations)) {
       if (pendingInvocations.has(id)) continue;
@@ -161,6 +172,7 @@ export function compactFleetState(
     s.receiptHistoryRecorded[receipt.receiptId] = true;
   }
   const workPressure =
+    overBudget ||
     Object.keys(s.leases).length >= 750 ||
     Object.keys(s.receipts).length >= 750;
   {
@@ -281,6 +293,11 @@ export function compactFleetState(
       delete s.leases[id];
       delete s.leaseCredentials[id];
     }
+  }
+  // Publish-once markers only dedupe history rows for hot receipts; entries
+  // for receipts no longer hot are dead weight in the bounded document.
+  for (const receiptId of Object.keys(s.receiptHistoryRecorded)) {
+    if (!(receiptId in s.receipts)) delete s.receiptHistoryRecorded[receiptId];
   }
   if (Object.keys(s.defects).length >= 150) {
     for (const [fingerprint, issue] of Object.entries(s.defects)) {

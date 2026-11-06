@@ -31,6 +31,19 @@ def resolve(repository, pr, head):
     return repository, {"number": pr, "head": {"sha": head}}
 
 
+@pytest.mark.parametrize("event", ["repository_dispatch", "workflow_dispatch"])
+def test_daily_coverage_audit_preserves_verified_publication(event, tmp_path):
+    candidate = payload(initiator="workflow:test-coverage-audit.yml")
+    trusted = run("test-coverage-audit.yml", event=event)
+    ledger = tmp_path / "ledger"
+    origin.ingest(candidate, trusted, "JovieInc/Jovie", ledger, resolve)
+    assert json.loads(ledger.read_text())["initiator"] == candidate["initiator"]
+    with pytest.raises(ValueError, match="untrusted-origin-run"):
+        origin.ingest(candidate, {**trusted, "head_branch": "untrusted"},
+                      "JovieInc/Jovie", tmp_path / "rejected", resolve)
+    assert not (tmp_path / "rejected").exists()
+
+
 def archive(rows):
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w") as zipped:

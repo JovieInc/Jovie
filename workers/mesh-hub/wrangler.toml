@@ -14,9 +14,22 @@ class_name = "Mailbox"
 name = "REGISTRY"
 class_name = "Registry"
 
+[[durable_objects.bindings]]
+name = "BOARD"
+class_name = "Board"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Mailbox", "Registry"]
+
+# Fleet task board (canon MESH-SWARM.md).
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Board"]
+
+# Hub model executor (failover for kinds with no live reader). Workers AI binding: no secret.
+[ai]
+binding = "AI"
 
 [observability]
 enabled = true
@@ -26,6 +39,12 @@ enabled = true
 #   SUMMER_HUB_WEBHOOK_SECRET  HMAC for pushes to Summer (optional until Summer consumes the hub)
 
 [vars]
+# Stand-ins are disabled: registered agent mail must wait for its real runtime.
+# A hub-generated reply is never evidence that the addressed agent is available.
+EXECUTOR_KINDS = ""
+EXECUTOR_GRACE_MS = "20000"
+# Alarm once when peer mail sits unhandled this long (ms).
+MAIL_STALE_MS = "600000"
 # summer-config #387: Summer consumes hub pushes here (HMAC with SUMMER_HUB_WEBHOOK_SECRET).
 SUMMER_HUB_WEBHOOK_URL = "https://summer.jov.ie/summer/v1/mesh/hub"
 

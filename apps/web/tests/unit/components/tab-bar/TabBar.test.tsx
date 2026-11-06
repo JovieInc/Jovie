@@ -169,7 +169,7 @@ describe('TabBar distribution', () => {
 
     expect(activeTab).toHaveClass(
       'rounded-full',
-      'bg-(--surface-2)',
+      'bg-surface-3',
       'shadow-none'
     );
     expect(activeTab.className).not.toContain('ring-(--color-accent)');

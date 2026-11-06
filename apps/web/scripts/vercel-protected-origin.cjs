@@ -996,6 +996,13 @@ function assertLiveReleaseDocument(surface, body) {
   }
 }
 
+// JOV-7973: the surface verifier lives in ./vercel-surface-verifier.cjs so
+// the closed-entry reconciliation can evolve without growing this
+// size-baselined script. Platform primitives are injected; no state moves.
+const {
+  verifyPublicSurfaceOnce: verifyPublicSurfaceWithClosedEntry,
+} = require('./vercel-surface-verifier.cjs');
+
 async function verifyPublicSurfaceOnce(
   surface,
   targetUrl,
@@ -1004,102 +1011,25 @@ async function verifyPublicSurfaceOnce(
   deadline,
   cacheBust
 ) {
-  const url = new URL(surface.path, targetUrl.origin);
-  url.searchParams.set('_cb', cacheBust);
-  const request = buildOriginBoundCookieRequest(url, {
+  return verifyPublicSurfaceWithClosedEntry(
+    surface,
+    targetUrl,
     cookieHeader,
-    headers: {
-      Accept: surface.json ? 'application/json' : 'text/html',
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      Pragma: 'no-cache',
-      'User-Agent': 'Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)',
-    },
-  });
-  const response = await fetchWithinDeadline(
-    deadline,
     fetchImpl,
-    request.url,
-    request.options
+    deadline,
+    cacheBust,
+    {
+      buildOriginBoundCookieRequest,
+      fetchWithinDeadline,
+      discardResponseBody,
+      readResponseText,
+      assertExactProbeResponse,
+      parseProbeUrl,
+      publicErrorContent: PUBLIC_ERROR_CONTENT,
+      stripInlineScriptContent,
+      assertLiveReleaseDocument,
+    }
   );
-  assertExactProbeResponse(response, request.url);
-  if (response.status !== 200) {
-    await deadline.run(() => discardResponseBody(response));
-    throw new Error(`${surface.label} returned HTTP ${response.status}.`);
-  }
-
-  const contentType = (
-    response.headers.get('content-type') ?? ''
-  ).toLowerCase();
-  const body = await readResponseText(response, deadline);
-  if (surface.json) {
-    if (!contentType.includes('application/json')) {
-      throw new Error(`${surface.label} did not return JSON.`);
-    }
-    let payload;
-    try {
-      payload = JSON.parse(body);
-    } catch {
-      throw new Error(`${surface.label} returned invalid JSON.`);
-    }
-    const reportsAnonymousLiveness =
-      surface.acceptsAnonymousLiveness === true &&
-      payload &&
-      typeof payload === 'object' &&
-      payload.healthy === true &&
-      typeof payload.timestamp === 'string' &&
-      Object.keys(payload).every(
-        key => key === 'healthy' || key === 'timestamp'
-      );
-    if (reportsAnonymousLiveness) return;
-    if (
-      !payload ||
-      typeof payload !== 'object' ||
-      payload.status !== surface.expectedStatus
-    ) {
-      throw new Error(`${surface.label} did not report healthy status.`);
-    }
-    for (const check of surface.requiredChecks ?? []) {
-      if (payload.checks?.[check]?.ok !== true) {
-        throw new Error(
-          `${surface.label} did not report healthy ${check} state.`
-        );
-      }
-    }
-    if (
-      Object.hasOwn(payload, 'database') &&
-      payload.database !== 'ok' &&
-      !(
-        payload.database &&
-        typeof payload.database === 'object' &&
-        payload.database.ok === true
-      )
-    ) {
-      throw new Error(
-        `${surface.label} did not report healthy database state.`
-      );
-    }
-    return;
-  }
-
-  if (!contentType.includes('text/html')) {
-    throw new Error(`${surface.label} did not return HTML.`);
-  }
-  if (
-    Buffer.byteLength(body) < surface.minimumBytes ||
-    !/<html(?:\s|>)/i.test(body) ||
-    !/<body(?:\s|>)/i.test(body)
-  ) {
-    throw new Error(`${surface.label} returned an incomplete document.`);
-  }
-  // Scan the rendered markup only. Inline <script> RSC flight payloads echo
-  // component copy (including error-branch strings), so testing the raw body
-  // here false-fails healthy deploys. Visible error/not-found copy lives outside
-  // <script> tags and is still caught.
-  if (PUBLIC_ERROR_CONTENT.test(stripInlineScriptContent(body))) {
-    throw new Error(`${surface.label} returned error or not-found content.`);
-  }
-  if (surface.release === true) assertLiveReleaseDocument(surface, body);
-  return body;
 }
 
 async function verifySurfaceWithRetries(

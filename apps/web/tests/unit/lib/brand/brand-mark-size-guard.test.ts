@@ -50,6 +50,7 @@ describe('brand mark size ladder', () => {
       compact: 16,
       chrome: 20,
       control: 24,
+      marketing: 28,
       splash: 32,
     });
     expect(BRAND_MARK_CREAM).toBe('#F5F4F0');
@@ -58,6 +59,7 @@ describe('brand mark size ladder', () => {
     );
     expect(resolveBrandMarkSize('splash')).toBe(32);
     expect(resolveBrandMarkSize('chrome')).toBe(20);
+    expect(resolveBrandMarkSize('marketing')).toBe(28);
   });
 
   it('keeps splash-B BrandLogo call sites on the 32px token', () => {

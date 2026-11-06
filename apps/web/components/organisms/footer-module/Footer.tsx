@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
  * negative y-margin returns the extra height to layout.
  */
 const PROFILE_LEGAL_LINK_CLASS =
-  'min-h-11 min-w-11 items-center justify-center -my-3 mx-0 text-3xs leading-4 opacity-60 hover:opacity-100';
+  'min-h-11 min-w-11 items-center justify-center -my-3 mx-0 text-3xs leading-4 opacity-80 hover:opacity-100';
 
 const FOOTER_COLUMNS = [
   {

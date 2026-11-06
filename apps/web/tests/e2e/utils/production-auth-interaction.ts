@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
 
 const EMAIL_FORM_SELECTOR = 'form[data-auth-email-code-step="email"]';
 const IDENTIFIER_INPUT_SELECTOR = [
@@ -108,4 +109,51 @@ export async function waitForCheckoutEntryContent(
 ): Promise<string> {
   const text = await waitForProductionDashboardContent(page, timeoutMs, 5);
   return text.toLowerCase();
+}
+
+/** Wait through the fresh-user redirect chain without starting another navigation. */
+export async function waitForProductionOnboardingLanding(
+  page: Page,
+  expectedOrigin: string,
+  timeoutMs = 30_000
+): Promise<void> {
+  const landing = await page.waitForFunction(
+    ({ origin, pathname, shellSelector, inputSelector }) => {
+      if (location.origin !== origin || location.pathname !== pathname)
+        return false;
+      const shell = document.querySelector(shellSelector);
+      const input = shell?.querySelector(inputSelector);
+      if (
+        !(shell instanceof HTMLElement) ||
+        !(
+          input instanceof HTMLTextAreaElement ||
+          input instanceof HTMLInputElement
+        )
+      )
+        return false;
+      const visible = (element: HTMLElement) => {
+        const style = getComputedStyle(element);
+        return (
+          element.getClientRects().length > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          style.visibility !== 'collapse'
+        );
+      };
+      return (
+        visible(shell) &&
+        visible(input) &&
+        !input.matches(':disabled') &&
+        !input.readOnly
+      );
+    },
+    {
+      origin: expectedOrigin,
+      pathname: APP_ROUTES.START,
+      shellSelector: '[data-testid="onboarding-chat"]',
+      inputSelector: '[aria-label="Chat message input" i]',
+    },
+    { timeout: timeoutMs }
+  );
+  await landing.dispose();
 }
