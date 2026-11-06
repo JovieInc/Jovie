@@ -48,6 +48,22 @@ export const PRODCERT_ADMIN_READBACK_EMAIL = DEFAULT_DEV_TEST_AUTH_EMAILS.admin;
 export const PRODCERT_CHAT_HEALTH_CANARY_EMAIL =
   'browse-ready+chat-health@jov.ie';
 
+/**
+ * Fixed claim-walk canary (JOV-9826). The ONLY identity allowed to walk the
+ * real claim submission + onboarding + test-mode checkout on production:
+ * a real claim per run would otherwise publish a public profile, so the
+ * walk claims this identity's one reserved handle and the canary-reset
+ * endpoint (`/api/internal/canary/reset`) returns it to its pre-claim state
+ * after every run. Exact match only — the reset endpoint refuses any other
+ * address, and the handle (`PRODCERT_CLAIM_CANARY_HANDLE`) is in the
+ * reserved-identity registry, so it stays noindex whether claimed or not.
+ */
+export const PRODCERT_CLAIM_CANARY_EMAIL =
+  'browse-ready+synthetic-prodcert-claim@jov.ie';
+
+/** The claim-walk canary's one reserved, noindex handle (JOV-9826). */
+export const PRODCERT_CLAIM_CANARY_HANDLE = 'jovie-prodcert-claim';
+
 export const PRODCERT_NEW_USER_EMAIL_PATTERN =
   /^browse-ready\+synthetic-prodcert-(?:[a-z\d]){6,24}@jov\.ie$/u;
 
@@ -60,6 +76,7 @@ export function isProdcertCanaryEmail(
     normalized === PRODCERT_RETURNING_CANARY_EMAIL ||
     normalized === PRODCERT_ADMIN_READBACK_EMAIL ||
     normalized === PRODCERT_CHAT_HEALTH_CANARY_EMAIL ||
+    normalized === PRODCERT_CLAIM_CANARY_EMAIL ||
     PRODCERT_NEW_USER_EMAIL_PATTERN.test(normalized) ||
     isAdmittedCanaryEmail(normalized)
   );

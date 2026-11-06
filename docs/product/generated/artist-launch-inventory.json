@@ -3329,6 +3329,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/canary/reset/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/canary/reset",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/certification-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/certification-evidence",
