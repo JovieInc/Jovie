@@ -4,14 +4,12 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@jovie/ui/atoms/popover';
-import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetTitle,
   SheetTrigger,
-} from '@jovie/ui/atoms/sheet';
+} from '@jovie/ui';
 import {
   type CSSProperties,
   type KeyboardEvent,

@@ -204,12 +204,14 @@ describe('inline typed source evidence', () => {
   it('keeps the source actionable without inventing unknown values and recovers on a new receipt', async () => {
     const user = userEvent.setup();
     const fact = sourceFixture();
-    const content = '[Artist](https://open.spotify.com/artist/fixture)';
+    const content = '[9.9K followers](https://open.spotify.com/artist/fixture)';
     const view = renderEvidence(
       [sourceFixture({ value: null, status: 'unknown' })],
       content
     );
-    await user.click(await screen.findByTestId('entity-chip-popover-trigger'));
+    const trigger = await screen.findByTestId('entity-chip-popover-trigger');
+    expect(trigger).not.toHaveTextContent('9.9K followers');
+    await user.click(trigger);
     expect(await screen.findByTestId('source-fact-card')).not.toHaveTextContent(
       '9.9K followers'
     );

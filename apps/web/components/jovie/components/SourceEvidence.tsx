@@ -147,7 +147,7 @@ function SourceAnchor({
             : children === sourceFactLabel(fact)
               ? sourceFactLabel(fact)
               : (fact.subject.displayName ?? 'Source details')
-          : (children as ReactNode)}
+          : (fact.subject.displayName ?? 'Source details')}
       </SourceMention>
     );
   return (
