@@ -12,6 +12,8 @@ is historical; its rewrite prohibition is superseded.
 
 ## Mac app platform
 
+One Ovie (founder decision 2026-10-28, `canon/PRODUCT.md`): web, at `/app/ov` on the shared Jovie/Ovie shell. There is no native Ovie. Do not add a Swift, SwiftUI, AppKit or Electron-only Ovie; the Electron door and the office wall only load that URL (`pnpm run surfaces:check`).
+
 All Mac app work defaults to SwiftUI. Do not add new Electron, AppKit-only, or other non-SwiftUI Mac surfaces unless Tim explicitly overrides this for that task. The long-term goal is a fully SwiftUI Mac app.
 
 - New native Mac surfaces go in `apps/macos` (for example `apps/macos/MenuMonitor`). MenuMonitor stays an operator accessory: do not fold product UI into it.
