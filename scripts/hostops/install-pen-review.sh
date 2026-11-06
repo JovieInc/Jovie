@@ -32,6 +32,7 @@ fi
 # The detached checkout has no node_modules. Carry a validated installed module
 # and browser into launchd rather than relying on the interactive shell.
 : "${PEN_REVIEW_PLAYWRIGHT:?Set PEN_REVIEW_PLAYWRIGHT to an installed Playwright package.json or module directory}"
+PEN_REVIEW_PLAYWRIGHT="$(node -p 'require("node:path").resolve(process.argv[1])' "$PEN_REVIEW_PLAYWRIGHT")"
 DEFAULT_CHROMIUM="$(node - "$PEN_REVIEW_PLAYWRIGHT" <<'JS'
 const { createRequire } = require('node:module');
 const { join, resolve } = require('node:path');
@@ -45,7 +46,7 @@ if (!api?.chromium) throw new Error('Playwright Chromium is unavailable');
 process.stdout.write(api.chromium.executablePath());
 JS
 )"
-PEN_REVIEW_CHROMIUM="${PEN_REVIEW_CHROMIUM:-$DEFAULT_CHROMIUM}"
+PEN_REVIEW_CHROMIUM="$(node -p 'require("node:path").resolve(process.argv[1])' "${PEN_REVIEW_CHROMIUM:-$DEFAULT_CHROMIUM}")"
 [[ -x "$PEN_REVIEW_CHROMIUM" ]] || { echo 'Chromium executable is unavailable' >&2; exit 1; }
 printf -v BROWSER_ENV 'export PEN_REVIEW_PLAYWRIGHT=%q\nexport PEN_REVIEW_CHROMIUM=%q' "$PEN_REVIEW_PLAYWRIGHT" "$PEN_REVIEW_CHROMIUM"
 
