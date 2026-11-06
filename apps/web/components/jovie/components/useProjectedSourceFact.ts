@@ -23,12 +23,15 @@ export function useProjectedSourceFact(
     }
     let cancelled = false;
     setPending(true);
-    void import('../source-facts').then(module => {
+    void Promise.all([
+      import('../source-facts'),
+      import('./SourceFactCard'),
+    ]).then(([module, card]) => {
       if (cancelled) return;
       setSourceFact(
         module.projectPublicEnrichedFacts([candidate], candidate.subject.id)[0]
       );
-      setSourceFactCardView(() => module.SourceFactCard);
+      setSourceFactCardView(() => card.SourceFactCard);
       setPending(false);
     });
     return () => {

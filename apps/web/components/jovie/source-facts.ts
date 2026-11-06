@@ -7,7 +7,6 @@ export {
   projectPublicEnrichedFacts,
   publicSourceUrl,
 } from '@/lib/profile-facts/enrichment';
-export { SourceFactCard } from './components/SourceFactCard';
 
 /** Only successful assistant tool receipts supply evidence; user prose never does. */
 export function sourceFactsByMessage(
