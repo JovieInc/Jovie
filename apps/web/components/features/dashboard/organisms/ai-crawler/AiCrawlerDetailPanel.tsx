@@ -196,6 +196,7 @@ export function AiCrawlerDetailPanel({
                 <div className='grid grid-cols-2 gap-2 p-2'>
                   <StatTile
                     label='Reads (30 Days)'
+                    state={isLoading ? 'loading' : undefined}
                     value={
                       isLoading
                         ? ''
@@ -206,6 +207,7 @@ export function AiCrawlerDetailPanel({
                   />
                   <StatTile
                     label='This Week'
+                    state={isLoading ? 'loading' : undefined}
                     value={
                       isLoading
                         ? ''
