@@ -4,7 +4,10 @@ import {
   type ReporterDescription,
 } from '@playwright/test';
 import { worktreeMetadata } from './scripts/playwright-worktree';
-import { vercelAutomationHeaders } from './tests/e2e/utils/vercel-automation-headers';
+import {
+  E2E_DEFAULT_GEO_HEADERS,
+  vercelAutomationHeaders,
+} from './tests/e2e/utils/vercel-automation-headers';
 import { resolveWebServerWarmupProfile } from './tests/e2e/utils/warmup-profile';
 
 const vercelAutomation = vercelAutomationHeaders();
@@ -148,9 +151,10 @@ export default defineConfig({
     // Turbopack compilation needs longer timeouts even for smoke tests
     navigationTimeout: isSmokeOnly ? 60_000 : 120_000, // 60s for smoke, 120s for full (Turbopack)
     actionTimeout: isSmokeOnly ? 20_000 : 30_000, // Increased for slow page loads
-    ...(vercelAutomation.active && {
-      extraHTTPHeaders: vercelAutomation.headers,
-    }),
+    extraHTTPHeaders: {
+      ...vercelAutomation.headers,
+      ...E2E_DEFAULT_GEO_HEADERS,
+    },
     // Reuse authenticated session from global setup
     // Tests can override this by not using the storage state fixture
     storageState: 'tests/.auth/user.json',
