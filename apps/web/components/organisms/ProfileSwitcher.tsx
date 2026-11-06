@@ -69,7 +69,11 @@ export function IdentitySwitcher() {
         <DropdownMenuTrigger asChild>
           <button
             type='button'
-            aria-label='Switch Identity'
+            aria-label={`Switch identity: ${
+              activeIdentity?.displayName ||
+              activeIdentity?.username ||
+              'Select identity'
+            }`}
             className={cn(
               'flex h-7 w-full items-center gap-1.5 rounded-full px-2 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:bg-sidebar-accent/60',
               'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
