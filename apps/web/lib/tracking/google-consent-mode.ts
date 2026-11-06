@@ -160,9 +160,15 @@ gtag('consent', 'default', {
     gtag('consent', 'update', denied);
     return;
   }
-  var bannerRequired = !document.cookie.split(';').some(function (cookie) {
-    return cookie.trim() === '${COOKIE_BANNER_REQUIRED_COOKIE}=0';
+  // Match the shared reader: every matching flag must have the full value 0.
+  // Conflicting path/domain cookies and jv_cc_required=0=1 fail closed.
+  var requirementCookies = document.cookie.split(';').filter(function (cookie) {
+    return cookie.trim().indexOf('${COOKIE_BANNER_REQUIRED_COOKIE}=') === 0;
   });
+  var bannerRequired = requirementCookies.length === 0 ||
+    !requirementCookies.every(function (cookie) {
+      return cookie.trim().slice(${COOKIE_BANNER_REQUIRED_COOKIE.length + 1}).trim() === '0';
+    });
   var storedConsent = null;
   try {
     var raw = localStorage.getItem('jv_cc');

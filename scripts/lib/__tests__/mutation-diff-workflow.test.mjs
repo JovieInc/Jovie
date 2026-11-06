@@ -8,16 +8,30 @@ const workflow = readFileSync(
   'utf8'
 );
 
-describe('Mutation Diff spare-compute contract', () => {
-  it('runs every job on the gem pool with no hosted fallback', () => {
+describe('Mutation Diff Gem contract', () => {
+  // Policy 2026-10-29 (supersedes 2026-10-26 hosted-by-default): hosted CI is saturated, so every
+  // job runs on the Gem jovie-fixed pool. The sweep preflight skips when Gem is short on capacity.
+  it('runs every job on the Gem jovie-fixed pool and keeps the sweep state in an Actions cache', () => {
     const runsOn = [...workflow.matchAll(/^\s+runs-on:\s*(.+)$/gmu)].map(
       match => match[1].trim()
     );
     expect(runsOn).toHaveLength(2);
-    for (const value of runsOn) {
+    for (const value of runsOn)
       expect(value).toBe('[self-hosted, Linux, X64, jovie-fixed]');
-    }
-    expect(workflow).not.toMatch(/ubuntu-/u);
+    expect(workflow).not.toMatch(/runs-on:\s*ubuntu/u);
+    expect(workflow).toMatch(/actions\/cache\/restore@/u);
+    expect(workflow).toMatch(/actions\/cache\/save@/u);
+  });
+
+  it('is gated on 5-minute load below 8 with Stryker concurrency 1', () => {
+    expect(workflow).toMatch(/MUTATION_MAX_LOAD: '8'/u);
+    expect(workflow).toMatch(/STRYKER_CONCURRENCY: '1'/u);
+    expect(workflow).not.toMatch(/MUTATION_MAX_LOAD: '(?!8')/u);
+  });
+
+  it('ranks the sweep by touch (tier weight plus churn)', () => {
+    expect(workflow).toMatch(/test-quality-loop\.mjs rank/u);
+    expect(workflow).toMatch(/--touch-file/u);
   });
 
   it('confines its one secret to the issue-filing step and never runs on pull requests', () => {

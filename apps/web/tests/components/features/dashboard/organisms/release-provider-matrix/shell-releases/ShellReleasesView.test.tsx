@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   act,
@@ -100,7 +102,6 @@ vi.mock('sonner', () => ({
     dismiss: vi.fn(),
   }),
 }));
-
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/hooks/useImportPolling',
   () => ({
@@ -137,9 +138,21 @@ vi.mock(
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog',
   () => ({
-    SpotifyConnectDialog: ({ open }: { open: boolean }) =>
+    SpotifyConnectDialog: ({
+      open,
+      connected,
+      connectedArtistName,
+    }: {
+      open: boolean;
+      connected?: boolean;
+      connectedArtistName?: string | null;
+    }) =>
       open ? (
-        <div data-testid='spotify-connect-dialog'>
+        <div
+          data-testid='spotify-connect-dialog'
+          data-connected={String(connected)}
+          data-artist={connectedArtistName ?? ''}
+        >
           <h2>Connect Spotify</h2>
           <label htmlFor='spotify-search'>
             Search Spotify artists or paste a link
@@ -375,10 +388,7 @@ function RightPanelProbe() {
 function HeaderActionsProbe() {
   const state = useOptionalHeaderActions();
   return (
-    <div
-      data-testid='header-actions-probe'
-      data-search-total={state?.headerSearchAdapter?.totalCount}
-    >
+    <div data-testid='header-actions-probe'>
       <HeaderSearchSurfaceFromContext />
       {state?.headerActions}
     </div>
@@ -562,12 +572,13 @@ describe('ShellReleasesView', () => {
 
   it('keeps the settled no-banner release list mounted', () => {
     mockUseDspMatchesQuery.mockReturnValue({
-      data: [{ status: 'confirmed' }],
+      data: [],
       isLoading: false,
     });
 
     renderShell([fakeRelease({ id: 'release-2', title: 'Already linked' })], {
       spotifyConnected: true,
+      appleMusicConnected: true,
     });
 
     expect(
@@ -591,11 +602,11 @@ describe('ShellReleasesView', () => {
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
     expect(screen.getByText('Bahamas')).toBeInTheDocument();
     expect(screen.getByText('Other')).toBeInTheDocument();
-    // The catalog is a native list (not an ARIA listbox): rows own real
-    // per-cell controls, which an ARIA `option` cannot contain (axe
-    // nested-interactive).
+    // List rows own real per-cell controls and keep their list owner.
     const list = screen.getByRole('list', { name: 'Releases' });
-    expect(list.tagName).toBe('UL');
+    expect(
+      screen.getByRole('listitem', { name: 'Lost in the Light' }).closest('ul')
+    ).toBe(list);
     expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(2);
   });
 
@@ -650,6 +661,7 @@ describe('ShellReleasesView', () => {
     renderShell([]);
 
     const dialog = screen.getByTestId('spotify-connect-dialog');
+    expect(dialog).toHaveAttribute('data-connected', 'false');
     expect(
       within(dialog).getByRole('heading', { name: 'Connect Spotify' })
     ).toBeInTheDocument();
@@ -746,18 +758,30 @@ describe('ShellReleasesView', () => {
     });
   });
 
-  it('registers release filtering behind the shared global search trigger', async () => {
+  it('keeps the global search trigger inside the header actions probe', async () => {
     renderShell([
       fakeRelease({ id: '1', title: 'Alpha' }),
       fakeRelease({ id: '2', title: 'Beta' }),
     ]);
     const probe = await screen.findByTestId('header-actions-probe');
     expect(probe).toBeInTheDocument();
-    expect(probe).toHaveAttribute('data-search-total', '2');
     const searchTrigger = await screen.findByRole('button', {
-      name: 'Search Jovie',
+      name: /^Search Jovie/,
     });
     expect(searchTrigger).toHaveAttribute('data-app-search-trigger', 'true');
+  });
+
+  it('does not register a retired header search adapter (JOV-8792)', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../../../../../components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toContain('useRegisterHeaderSearch');
+    expect(source).not.toContain('headerSearchAdapter');
   });
 
   it('does not open a second route-filter popup from the shell trigger', async () => {
@@ -768,7 +792,7 @@ describe('ShellReleasesView', () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Search Jovie' })
+      await screen.findByRole('button', { name: /^Search Jovie/ })
     );
 
     expect(

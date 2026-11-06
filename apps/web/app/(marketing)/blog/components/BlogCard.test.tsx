@@ -60,7 +60,7 @@ describe('BlogCard editorial navigation', () => {
 
       expect(
         screen.getByRole('link', { name: name => name.includes(post.title) })
-      ).toHaveAccessibleName(`${headline} ${post.title}`);
+      ).toHaveAccessibleName(`${post.imageAlt}${headline} ${post.title}`);
     }
   );
 
@@ -78,19 +78,18 @@ describe('BlogCard editorial navigation', () => {
       />
     );
     expect(screen.getAllByRole('link')).toHaveLength(1);
-    expect(screen.getByRole('link', { name: post.title })).toHaveAttribute(
-      'href',
-      '/blog/new-article'
-    );
+    expect(
+      screen.getByRole('link', { name: `${post.title} ${post.title}` })
+    ).toHaveAttribute('href', '/blog/new-article');
     expect(container.querySelector('img')).toBeNull();
     expect(screen.getByText('By Tim White')).toBeInTheDocument();
   });
 
-  it('uses the title alone when an editorial article has no artwork', () => {
+  it('includes the visible fallback and heading when an editorial article has no artwork', () => {
     render(<BlogCard post={{ ...post, image: undefined }} author={author} />);
-    expect(screen.getByRole('link', { name: post.title })).toHaveAccessibleName(
-      post.title
-    );
+    expect(
+      screen.getByRole('link', { name: `${post.title} ${post.title}` })
+    ).toHaveAccessibleName(`${post.title} ${post.title}`);
   });
 
   it('omits related entries without resolved authors and handles an empty feed', () => {

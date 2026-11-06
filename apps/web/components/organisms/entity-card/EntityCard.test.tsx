@@ -33,18 +33,24 @@ vi.mock('@/components/atoms/ImageWithFallback', () => ({
   ImageWithFallback: ({
     alt,
     className,
+    fetchPriority,
     priority,
+    sizes,
     src,
   }: {
     readonly alt: string;
     readonly className?: string;
+    readonly fetchPriority?: 'high' | 'low' | 'auto';
     readonly priority?: boolean;
+    readonly sizes?: string;
     readonly src: string;
   }) =>
     React.createElement('img', {
       alt,
       className,
+      fetchPriority,
       'data-priority': priority ? 'true' : 'false',
+      'data-sizes': sizes,
       src,
     }),
 }));
@@ -109,16 +115,15 @@ describe('EntityCard', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('$45.00')).toBeInTheDocument();
     expect(screen.getByText('Shop')).toBeInTheDocument();
-  });
-
-  it('keeps editorial helper lines outside paragraph anatomy', () => {
-    render(<EntityCard model={merchModel} treatment='detailed' />);
     expect(screen.getByText('Premium tee').tagName).toBe('SPAN');
     expect(screen.getByText('Profit $11.87').tagName).toBe('SPAN');
   });
 
   it('hides the status pill in the compact treatment (progressive disclosure)', () => {
-    render(<EntityCard model={merchModel} treatment='compact' />);
+    const view = render(
+      <EntityCard model={merchModel} treatment='compact' media='none' />
+    );
+    expect(view.container.querySelector('img, .aspect-square')).toBeNull();
     expect(screen.queryByText('Live')).not.toBeInTheDocument();
     render(<EntityCard model={merchModel} treatment='detailed' />);
     expect(screen.getByText('Live')).toBeInTheDocument();
@@ -747,6 +752,48 @@ describe('ProfilePacCard landscape states', () => {
       })
     );
   });
+
+  it.each(['interactive', 'preview'] as const)(
+    'keeps responsive artwork sizes and hints only interactive featured art in %s mode',
+    renderMode => {
+      render(
+        <ProfilePacCard
+          artist={pacArtist}
+          release={{
+            title: 'Release',
+            slug: 'release',
+            artworkUrl: '/release.jpg',
+            previewUrl: null,
+            releaseDate: '2020-01-01',
+          }}
+          assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+          layout='profile-landscape'
+          presentation='featured'
+          renderMode={renderMode}
+          artPriority={false}
+          captureEnabled={false}
+        />
+      );
+
+      const art = screen.getByTestId('profile-pac-featured-art');
+      expect(art.querySelector('img')).toHaveAttribute(
+        'data-sizes',
+        '(min-width: 1024px) 400px, 104px'
+      );
+      expect(art.querySelector('img')).toHaveAttribute(
+        'data-priority',
+        'false'
+      );
+      if (renderMode === 'interactive') {
+        expect(art.querySelector('img')).toHaveAttribute(
+          'fetchpriority',
+          'high'
+        );
+      } else {
+        expect(art.querySelector('img')).not.toHaveAttribute('fetchpriority');
+      }
+    }
+  );
 
   it('renders the featured mode card with the rotating accent and a neutral Listen now CTA', () => {
     mockUseTrackAudioPlayer.mockReturnValue({

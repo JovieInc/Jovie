@@ -109,6 +109,30 @@ async function assertTargets(page: Page) {
   return targets;
 }
 
+test('marketing mark stays 28px on desktop and mobile through scroll and focus', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  for (const width of [1440, 390]) {
+    await openHeader(page, width);
+    const logoLink = page.getByTestId('site-logo-link');
+    const mark = logoLink.locator('[data-brand-mark-size]');
+    const svg = mark.locator('svg');
+    await expect(mark).toHaveAttribute('data-brand-mark-size', '28');
+    await expect(svg).toHaveAttribute('width', '28');
+    await expect(svg).toHaveAttribute('height', '28');
+    for (const scrollY of [0, 240]) {
+      await page.evaluate(y => window.scrollTo(0, y), scrollY);
+      await logoLink.focus();
+      for (const element of [mark, svg]) {
+        const bounds = await element.boundingBox();
+        expect(bounds?.width).toBe(28);
+        expect(bounds?.height).toBe(28);
+      }
+    }
+  }
+});
+
 test('marketing header targets activate their own action and feedback follows rapid reversal', async ({
   page,
 }) => {

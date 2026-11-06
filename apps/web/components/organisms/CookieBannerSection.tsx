@@ -2,7 +2,6 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CookieActions } from '@/components/molecules/CookieActions';
 import { CookieModal } from '@/components/organisms/CookieModal';
@@ -13,6 +12,8 @@ import {
 } from '@/lib/cookies/banner-visibility';
 import { saveConsent } from '@/lib/cookies/consent';
 import { isCookieBannerRequiredFromCookieString } from '@/lib/cookies/consent-regions';
+import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
+import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 import { setConsentState } from '@/lib/tracking/consent';
 
 const CONSENT_SAVE_ERROR =
@@ -30,8 +31,16 @@ function isBannerRequiredFromCookie(): boolean {
 
 export function CookieBannerSection({
   testOnlyPathname,
-}: Readonly<{ testOnlyPathname?: string }>) {
-  const pathname = usePathname();
+  initialVisible = false,
+}: Readonly<{
+  testOnlyPathname?: string;
+  /**
+   * Server-resolved visibility so the card paints with the HTML (LCP). The
+   * layout effect below still reconciles against localStorage and the cookie.
+   */
+  initialVisible?: boolean;
+}>) {
+  const pathname = usePublicPathname();
   const effectivePathname =
     process.env.NEXT_PUBLIC_E2E_MODE === '1' && testOnlyPathname
       ? testOnlyPathname
@@ -45,7 +54,7 @@ export function CookieBannerSection({
   const lastPageFocus = useRef<HTMLElement | null>(null);
   const savingFocus = useRef<HTMLElement | null>(null);
 
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(initialVisible);
   const [customize, setCustomize] = useState(false);
   const [_isMobileExpanded, setIsMobileExpanded] = useState(false);
   const [isSavingConsent, setIsSavingConsent] = useState(false);
@@ -190,7 +199,31 @@ export function CookieBannerSection({
 
     if (shouldClearProfileDock) {
       root.style.removeProperty('--cookie-banner-h');
-      return;
+
+      // Tablet/narrow-desktop profiles are a centered card whose avatar sits
+      // under any top-anchored consent card. Anchor the card just above the
+      // dock instead, like phones, so identity stays uncovered. The dock top
+      // is not derivable in CSS (card height and viewport clamp vary).
+      const publishDockClearance = () => {
+        const dock = document.querySelector<HTMLElement>(
+          '[data-testid="profile-tab-bar"]'
+        );
+        if (!dock) {
+          root.style.removeProperty('--cookie-banner-dock-clearance');
+          return;
+        }
+        const gap = 8;
+        root.style.setProperty(
+          '--cookie-banner-dock-clearance',
+          `${Math.max(gap, globalThis.innerHeight - dock.getBoundingClientRect().top + gap)}px`
+        );
+      };
+      publishDockClearance();
+      globalThis.addEventListener('resize', publishDockClearance);
+      return () => {
+        globalThis.removeEventListener('resize', publishDockClearance);
+        root.style.removeProperty('--cookie-banner-dock-clearance');
+      };
     }
 
     const banner = document.querySelector<HTMLElement>(
@@ -316,7 +349,7 @@ export function CookieBannerSection({
           ref={bannerRef}
           aria-label='Cookie Consent'
           data-testid='cookie-banner'
-          className={`cookie-banner-card fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-85 ${
+          className={`cookie-banner-card fixed bottom-4 right-4 ${PROFILE_Z.COOKIE_BANNER} w-[calc(100vw-2rem)] max-w-85 ${
             shouldClearProfileDock
               ? 'cookie-banner-card--above-public-profile-dock'
               : 'max-sm:inset-x-0 max-sm:bottom-0 max-sm:right-auto max-sm:w-full max-sm:max-w-none sm:max-w-95'
@@ -326,7 +359,7 @@ export function CookieBannerSection({
             className={`border border-(--app-shell-frame-seam) bg-surface-1 px-4 py-3 shadow-card ${
               shouldClearProfileDock
                 ? 'rounded-2xl'
-                : 'max-sm:rounded-b-none max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] rounded-2xl'
+                : 'max-sm:rounded-b-none max-sm:pb-safe-3 rounded-2xl'
             }`}
           >
             <div className='min-w-0'>

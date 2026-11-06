@@ -1,11 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import {
-  MarketingContainer,
-  MarketingEditorialHeroPhoto,
-} from '@/components/marketing';
+import { MarketingContainer } from '@/components/marketing';
 import { ChangelogSubscribeColumn } from '@/components/marketing/changelog/ChangelogSubscribeColumn';
 import { CustomerChangelogArchive } from '@/components/marketing/changelog/CustomerChangelogArchive';
+import { NoOrphanText } from '@/components/marketing/NoOrphanText';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -29,6 +27,7 @@ export const metadata: Metadata = {
     canonical: `${BASE_URL}${APP_ROUTES.CHANGELOG}`,
     types: {
       'application/atom+xml': `${BASE_URL}${APP_ROUTES.CHANGELOG}/feed.xml`,
+      'application/rss+xml': `${BASE_URL}${APP_ROUTES.CHANGELOG}/rss.xml`,
       'application/feed+json': `${BASE_URL}${APP_ROUTES.CHANGELOG}/feed.json`,
     },
   },
@@ -58,11 +57,6 @@ function ReleaseJournalHero({
 }) {
   return (
     <div className='marketing-hero-dock relative overflow-hidden'>
-      <MarketingEditorialHeroPhoto
-        src='/images/hero/changelog-index.webp'
-        opacity={0.4}
-        testId='changelog-hero-photo'
-      />
       <section
         className='changelog-hero relative z-10'
         aria-labelledby='changelog-hero-title'
@@ -99,7 +93,7 @@ function ReleaseJournalHero({
                         {formatTimelineDate(entry.date)}
                       </span>
                       <span className='changelog-hero__timeline-title'>
-                        {entry.title}
+                        <NoOrphanText>{entry.title}</NoOrphanText>
                       </span>
                     </Link>
                   </li>
@@ -185,9 +179,8 @@ export default async function ChangelogPage() {
       </MarketingContainer>
 
       <MarketingFooterCta
-        title='Take control of your presence.'
         ctaLabel='Find your profile'
-        ctaHref='/#handle-input'
+        ctaHref='/#homepage-claim-handle'
       />
     </div>
   );

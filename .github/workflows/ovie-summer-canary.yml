@@ -49,6 +49,15 @@ jobs:
             -H "authorization: Bearer ${CRON_SECRET}" https://jov.ie/api/cron/summer-canary)
           cat "$RUNNER_TEMP/summer-canary.json"; echo
           test "$status" = "200"
+          # First-token targets (Tim): p50 < 1.5 s, p95 < 3 s. A miss is a warning, not an outage.
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync(process.env.RUNNER_TEMP + "/summer-canary.json", "utf8"));
+            const bad = (r.ttftSummary || []).filter(s => s.withinTarget === false);
+            const line = "first token " + r.ttftMs + " ms (headers " + r.headersMs + " ms); server percentiles: " +
+              JSON.stringify(r.ttftSummary || []);
+            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, line + "\n");
+            if (r.withinTarget && r.withinTarget.p50 === false || bad.length) console.log("::warning title=Summer first token over target::" + line);
+          '
 
       - name: Send Slack Alert on Failure
         if: ${{ failure() }}

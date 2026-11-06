@@ -59,16 +59,48 @@ run_gh() {
   set -e
 }
 
+# Transient GitHub gateway failures (5xx, 408, network timeouts) can be
+# retried with a bounded backoff when the caller opts in through
+# GH_API_RETRY_ATTEMPTS (total attempts including the first). The default of
+# 1 keeps the long-standing single-attempt behavior: callers that already
+# loop around this script (desktop-release.yml, release-lineage-gate.sh)
+# keep their own attempt budgets and call counts. Auth, permission,
+# not-found and other non-transient 4xx responses are never retried here,
+# and rate-limit responses fall through to the hold below, unchanged.
+retry_attempts="${GH_API_RETRY_ATTEMPTS:-1}"
+case "$retry_attempts" in
+  *[!0-9]* | '') retry_attempts=1 ;;
+esac
+retry_base="${GH_API_RETRY_SECONDS:-2}"
+case "$retry_base" in
+  *[!0-9]* | '') retry_base=2 ;;
+esac
+
+attempt=1
 run_gh "$@"
+while [ "$status" -ne 0 ]; do
+  message="$(cat "$err" "$out" 2>/dev/null || true)"
+  if printf '%s\n' "$message" | grep -qiE 'API rate limit (already )?exceeded|x-ratelimit-remaining:[[:space:]]*0|secondary rate limit|HTTP 429'; then
+    break
+  fi
+  if [ "$attempt" -ge "$retry_attempts" ] ||
+    ! printf '%s\n' "$message" | grep -Eqi 'HTTP (408|5[0-9][0-9])|timed? out|timeout|error connecting|connection reset'; then
+    cat "$err" >&2
+    exit "$status"
+  fi
+  attempt=$((attempt + 1))
+  retry_wait="$retry_base"
+  if [ "$retry_wait" -gt 30 ]; then
+    retry_wait=30
+  fi
+  echo "::warning::gh api attempt $attempt of $retry_attempts hit a transient failure; retrying in ${retry_wait}s." >&2
+  sleep "$retry_wait"
+  run_gh "$@"
+done
+
 if [ "$status" -eq 0 ]; then
   cat "$out"
   exit 0
-fi
-
-message="$(cat "$err" "$out" 2>/dev/null || true)"
-if ! printf '%s\n' "$message" | grep -qiE 'API rate limit (already )?exceeded|x-ratelimit-remaining:[[:space:]]*0|secondary rate limit|HTTP 429'; then
-  cat "$err" >&2
-  exit "$status"
 fi
 
 # GET /rate_limit does not spend the bucket it reports, including while that
@@ -83,12 +115,27 @@ if [ "$reset_status" -ne 0 ] || ! [[ "$reset" =~ ^[0-9]+$ ]]; then
   cat "$err" >&2
   exit "$status"
 fi
+# Which resource ran dry, from the failing response's own x-ratelimit-resource
+# header (core when the response carried none and rate_limit says core).
+bucket="$(printf '%s\n' "$message" | grep -ioE 'x-ratelimit-resource:[[:space:]]*[A-Za-z_]+' | head -n1 | sed -E 's/^[^:]*:[[:space:]]*//' || true)"
+bucket_src="x-ratelimit-resource"
+if [ -z "$bucket" ]; then
+  bucket="core"
+  bucket_src="rate_limit.resources.core"
+fi
+# Unit tests drive this script with a fake gh (GH_API_HOLD_BIN) and mocked
+# resets. Their lines carry [fixture] so nobody mistakes them for a live quota
+# refusal (2026-10-25: two workers chased a mocked "resets at 1792938043").
+tag=""
+if [ -n "${GH_API_HOLD_BIN:-}" ] || [ "${GH_API_HOLD_FIXTURE:-}" = 1 ]; then
+  tag="[fixture] "
+fi
 wait=$((reset - now + 1))
 if [ "$wait" -lt 0 ]; then
   wait=0
 fi
 if [ "$wait" -gt "$budget" ]; then
-  echo "::error::GitHub rate limit resets at ${reset}, outside the ${budget}s budget. Not passing." >&2
+  echo "::error::${tag}GitHub rate limit resets at ${reset} (resource=${bucket}), outside the ${budget}s budget. Not passing." >&2
   cat "$err" >&2
   exit "$status"
 fi
@@ -97,12 +144,6 @@ echo "::warning::Holding ${wait}s for the GitHub rate limit reset." >&2
 # stderr and re-print the ::notice line, so it is kept to sanitized metadata
 # (never tokens, headers or URLs). The summary is a plain file append.
 trigger_http="$(printf '%s\n' "$message" | grep -oE 'HTTP [0-9]{3}' | head -n1 | cut -d' ' -f2 || true)"
-bucket="$(printf '%s\n' "$message" | grep -ioE 'x-ratelimit-resource:[[:space:]]*[A-Za-z_]+' | head -n1 | sed -E 's/^[^:]*:[[:space:]]*//' || true)"
-bucket_src="x-ratelimit-resource"
-if [ -z "$bucket" ]; then
-  bucket="core"
-  bucket_src="rate_limit.resources.core"
-fi
 label="${GH_API_HOLD_LABEL:-gh ${1:-} ${2:-}}"
 label="${label%%\?*}"
 label="$(printf '%s' "$label" | tr -c 'A-Za-z0-9 ._/@-' '_' | cut -c1-120)"

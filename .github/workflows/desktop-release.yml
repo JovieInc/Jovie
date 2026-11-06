@@ -13,11 +13,7 @@ run-name: Desktop release ${{ github.event.workflow_run.head_sha || github.sha }
 #   starved desktop while the merge queue outran the controller). A checked-in
 #   VERSION change publishes immediately; production-impacting desktop source
 #   opens one deterministic post-land stamp PR before publication.
-# - Manual dispatch publishes a signed staging prerelease from exact green
-#   current main, or rebuilds production after the same Production Verified
-#   proof.
-# - Daily staging reconciliation publishes only when desktop source changed
-#   since the last signed staging release and current main has exact green CI.
+# - Manual dispatch rebuilds production after the same Production Verified proof.
 #
 # Signing & notarization:
 # - Requires GH secrets: MAC_CERTIFICATE_BASE64, MAC_CERTIFICATE_PASSWORD,
@@ -30,22 +26,19 @@ run-name: Desktop release ${{ github.event.workflow_run.head_sha || github.sha }
 #   are absent. Staging publication fails closed unless signing and
 #   notarization credentials are both available.
 # - See apps/desktop/SIGNING.md for one-time setup.
-# - Canonical prod/staging/local shell matrix: apps/desktop/SIGNING.md (GH-12900).
+# - Canonical production/local shell matrix: apps/desktop/SIGNING.md.
 
 on:
   workflow_run:
     workflows: [Production Controller]
     types: [completed]
     branches: [main]
-  schedule:
-    - cron: '17 10 * * *'
   workflow_dispatch:
     inputs:
       environment:
         description: "Target environment"
         type: choice
         options:
-          - staging
           - production
         default: production
       force_rebuild:
@@ -83,7 +76,6 @@ jobs:
       release_sha: ${{ steps.authorize.outputs.release_sha }}
       environment: ${{ steps.authorize.outputs.environment }}
       baseline_sha: ${{ steps.authorize.outputs.baseline_sha }}
-      staging_auto: ${{ steps.authorize.outputs.staging_auto }}
       should_release: ${{ steps.select.outputs.should_release }}
       should_stamp: ${{ steps.select.outputs.should_stamp }}
     steps:
@@ -138,7 +130,6 @@ jobs:
             echo "baseline_sha="
             echo "authorized=false"
             echo "manual=false"
-            echo "staging_auto=false"
             echo "already_released=false"
           } >> "$GITHUB_OUTPUT"
 
@@ -236,8 +227,7 @@ jobs:
               echo "baseline_sha="
               echo "authorized=false"
               echo "manual=false"
-              echo "staging_auto=false"
-              echo "already_released=false"
+                echo "already_released=false"
             } >> "$GITHUB_OUTPUT"
             announce_desktop_quota_defer
           }
@@ -272,24 +262,16 @@ jobs:
               exit 1
             }
             case "$MANUAL_ENVIRONMENT" in
-              staging | production) environment="$MANUAL_ENVIRONMENT" ;;
+              production) environment="production" ;;
               *)
                 echo "::error::Unsupported desktop environment: $MANUAL_ENVIRONMENT"
                 exit 1
                 ;;
             esac
             release_sha="$MANUAL_SHA"
-            if [ "$environment" = "staging" ] || [ "$MANUAL_FORCE_REBUILD" = "true" ]; then
+            if [ "$MANUAL_FORCE_REBUILD" = "true" ]; then
               echo "manual=true" >> "$GITHUB_OUTPUT"
             fi
-          elif [ "$EVENT_NAME" = "schedule" ]; then
-            [[ "$MANUAL_SHA" =~ ^[0-9a-f]{40}$ ]] || {
-              echo "::error::Scheduled staging dispatch did not resolve a full commit SHA."
-              exit 1
-            }
-            release_sha="$MANUAL_SHA"
-            environment="staging"
-            echo "staging_auto=true" >> "$GITHUB_OUTPUT"
           else
             echo "::error::Unsupported desktop release event: $EVENT_NAME"
             exit 1
@@ -365,10 +347,7 @@ jobs:
             echo "::error::Could not resolve exact current main for desktop authorization."
             exit 1
           }
-          if [ "$EVENT_NAME" = "schedule" ] && [ "$current_main_sha" != "$release_sha" ]; then
-            echo "::notice::Scheduled staging generation $release_sha was superseded by $current_main_sha."
-            exit 0
-          elif [ "$current_main_sha" != "$release_sha" ]; then
+          if [ "$current_main_sha" != "$release_sha" ]; then
             # Forward-only lineage: a verified generation that main has since
             # advanced past still publishes. Exact-SHA supersession starved
             # production desktop from 26.9.14 onward (2026-09-21..26) because
@@ -388,79 +367,6 @@ jobs:
               exit 1
             }
             echo "::notice::Desktop generation $release_sha is a trusted ancestor of current main $current_main_sha; continuing forward-only."
-          fi
-
-          # Staging publishes an immutable mainline generation whose exact push
-          # CI run is already green. Later main advancement does not invalidate
-          # that certified source; ancestry and monotonic feed versioning do.
-          if [ "$environment" = "staging" ]; then
-            ci_workflow="$(gh api \
-              "repos/$REPOSITORY/actions/workflows/ci.yml")"
-            jq -e '
-              type == "object" and
-              (.id | type == "number" and . >= 1) and
-              .name == "CI" and
-              .path == ".github/workflows/ci.yml"
-            ' >/dev/null <<<"$ci_workflow" || {
-              echo "::error::CI workflow identity is malformed."
-              exit 1
-            }
-            ci_workflow_id="$(jq -r '.id' <<<"$ci_workflow")"
-            # Scheduled reconciliation can fire before GitHub creates the exact
-            # push CI run, or while it is still running. Neither authorizes a
-            # release: defer until the next reconciliation. Completed failed CI
-            # and manual requests without proof still fail closed.
-            ci_runs="$(gh api \
-              "repos/$REPOSITORY/actions/workflows/$ci_workflow_id/runs?branch=main&head_sha=$release_sha&per_page=100")"
-            if [ "$EVENT_NAME" = "schedule" ] &&
-              jq -e --arg repo "$REPOSITORY" --arg sha "$release_sha" '
-                type == "object" and
-                (.workflow_runs | type == "array") and
-                ([.workflow_runs[]? | select(
-                  .head_sha == $sha and
-                  .head_branch == "main" and
-                  .head_repository.full_name == $repo and
-                  .event == "push" and
-                  .path == ".github/workflows/ci.yml"
-                )] | length) == 0
-              ' >/dev/null <<<"$ci_runs"; then
-              echo "::notice::No exact push CI run exists yet for staging generation $release_sha; deferring staging publication to the next reconciliation. No release was authorized."
-              exit 0
-            fi
-            if jq -e --arg repo "$REPOSITORY" --arg sha "$release_sha" '
-              type == "object" and
-              (.workflow_runs | type == "array") and
-              ([.workflow_runs[]? | select(
-                .head_sha == $sha and
-                .head_branch == "main" and
-                .head_repository.full_name == $repo and
-                .event == "push" and
-                .path == ".github/workflows/ci.yml" and
-                .status != "completed"
-              )] | length) >= 1
-            ' >/dev/null <<<"$ci_runs"; then
-              echo "::notice::Exact push CI for staging generation $release_sha is still running; deferring staging publication to the next reconciliation."
-              exit 0
-            fi
-            jq -e --arg repo "$REPOSITORY" --arg sha "$release_sha" '
-              type == "object" and
-              (.workflow_runs | type == "array") and
-              ([.workflow_runs[]? | select(
-                .head_sha == $sha and
-                .head_branch == "main" and
-                .head_repository.full_name == $repo and
-                .event == "push" and
-                .path == ".github/workflows/ci.yml" and
-                .status == "completed" and
-                .conclusion == "success"
-              )] | length) >= 1
-            ' >/dev/null <<<"$ci_runs" || {
-              echo "::error::Current main lacks an exact successful CI run for staging publication."
-              exit 1
-            }
-            echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
-            echo "authorized=true" >> "$GITHUB_OUTPUT"
-            exit 0
           fi
 
           prove_existing_production_marker() {
@@ -719,10 +625,10 @@ jobs:
           echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
           echo "authorized=true" >> "$GITHUB_OUTPUT"
 
-          # Explicit staging/force rebuilds may skip deduplication, but a
-          # production reconciliation must load the last proven publication.
+          # Explicit force rebuilds may skip deduplication, but a production
+          # reconciliation must load the last proven publication.
           if [ "$EVENT_NAME" = "workflow_dispatch" ] &&
-            { [ "$environment" = "staging" ] || [ "$MANUAL_FORCE_REBUILD" = "true" ]; }; then
+            [ "$MANUAL_FORCE_REBUILD" = "true" ]; then
             exit 0
           fi
 
@@ -1115,7 +1021,6 @@ jobs:
           AUTHORIZED: ${{ steps.authorize.outputs.authorized }}
           ALREADY_RELEASED: ${{ steps.authorize.outputs.already_released }}
           MANUAL: ${{ steps.authorize.outputs.manual }}
-          STAGING_AUTO: ${{ steps.authorize.outputs.staging_auto }}
           RELEASE_SHA: ${{ steps.authorize.outputs.release_sha }}
           BASELINE_SHA: ${{ steps.authorize.outputs.baseline_sha }}
           GH_TOKEN: ${{ github.token }}
@@ -1126,45 +1031,6 @@ jobs:
           echo "should_release=false" >> "$GITHUB_OUTPUT"
           echo "should_stamp=false" >> "$GITHUB_OUTPUT"
           if [ "$AUTHORIZED" != "true" ] || [ "$ALREADY_RELEASED" = "true" ]; then
-            exit 0
-          fi
-          if [ "${STAGING_AUTO:-false}" = "true" ]; then
-            staging_release="$(gh api "repos/$REPOSITORY/releases/tags/desktop-staging")" || {
-              echo "::error::Signed staging baseline is unavailable; use the explicit manual bootstrap path."
-              exit 1
-            }
-            staging_baseline="$(jq -er '
-              select(type == "object" and .tag_name == "desktop-staging")
-              | .target_commitish
-              | select(type == "string" and test("^[0-9a-f]{40}$"))
-            ' <<<"$staging_release")" || {
-              echo "::error::Signed staging baseline has no exact source revision."
-              exit 1
-            }
-            [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
-              echo "::error::Scheduled staging source revision is malformed."
-              exit 1
-            }
-            git cat-file -e "${staging_baseline}^{commit}"
-            git cat-file -e "${RELEASE_SHA}^{commit}"
-            git merge-base --is-ancestor "$staging_baseline" "$RELEASE_SHA" || {
-              echo "::error::Signed staging baseline is not an ancestor of current main."
-              exit 1
-            }
-            desktop_changes="$(git diff --name-status --find-renames \
-              "$staging_baseline" "$RELEASE_SHA" -- \
-              .github/workflows/desktop-release.yml \
-              apps/desktop/build apps/desktop/electron-builder.yml \
-              apps/desktop/electron-builder.staging.yml apps/desktop/package.json \
-              apps/desktop/scripts apps/desktop/src pnpm-lock.yaml \
-              scripts/desktop-release-assets.mjs)"
-            if [ -n "$desktop_changes" ]; then
-              printf '%s\n' "$desktop_changes"
-              echo "should_release=true" >> "$GITHUB_OUTPUT"
-              echo "Verified main contains unpublished staging desktop changes."
-            else
-              echo "Signed staging already contains the current desktop source."
-            fi
             exit 0
           fi
           if [ "$MANUAL" = "true" ]; then
@@ -1392,7 +1258,7 @@ jobs:
           retention-days: 30
 
   build:
-    name: ${{ needs.authorize-release.outputs.environment == 'staging' && 'Publish staging desktop prerelease' || 'Publish production desktop release' }}
+    name: Publish production desktop release
     needs: [authorize-release]
     if: ${{ needs.authorize-release.result == 'success' && needs.authorize-release.outputs.should_release == 'true' }}
     timeout-minutes: 45
@@ -1405,9 +1271,8 @@ jobs:
     outputs:
       published_sha: ${{ steps.publisher-identity.outputs.published_sha }}
       publisher_attempt: ${{ steps.publisher-identity.outputs.publisher_attempt }}
-      staging_version: ${{ steps.staging-version.outputs.version }}
-      quota_deferred: ${{ steps.prepare-production.outputs.quota_deferred || steps.prepare-staging.outputs.quota_deferred || steps.publish-production.outputs.quota_deferred || steps.publish-staging.outputs.quota_deferred }}
-      quota_reset_epoch: ${{ steps.prepare-production.outputs.quota_reset_epoch || steps.prepare-staging.outputs.quota_reset_epoch || steps.publish-production.outputs.quota_reset_epoch || steps.publish-staging.outputs.quota_reset_epoch }}
+      quota_deferred: ${{ steps.prepare-production.outputs.quota_deferred || steps.publish-production.outputs.quota_deferred }}
+      quota_reset_epoch: ${{ steps.prepare-production.outputs.quota_reset_epoch || steps.publish-production.outputs.quota_reset_epoch }}
     env:
       ENVIRONMENT: ${{ needs.authorize-release.outputs.environment }}
       RELEASE_SHA: ${{ needs.authorize-release.outputs.release_sha }}
@@ -1497,56 +1362,12 @@ jobs:
           set -e
           bash .github/scripts/desktop-quota-defer-exit.sh "$status"
 
-      - name: Compute monotonic staging release version
-        id: staging-version
-        if: env.ENVIRONMENT == 'staging'
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="$(node apps/desktop/scripts/sync-version.mjs \
-            --staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT")"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "DESKTOP_VERSION=$version" >> "$GITHUB_ENV"
-
-      - name: Require staging signing and notarization credentials
-        if: env.ENVIRONMENT == 'staging'
-        shell: bash
-        run: |
-          set -euo pipefail
-          [ "$HAS_MAC_SIGNING_CREDENTIALS" = "true" ] &&
-            [ "$HAS_APPLE_API_CREDENTIALS" = "true" ] &&
-            [ "$HAS_APPLE_TEAM_ID" = "true" ] || {
-            echo "::error::Staging publication requires the existing macOS signing certificate, App Store Connect API key, and Apple team ID secrets."
-            exit 1
-          }
-
-      - name: Validate rolling staging prerelease
-        id: prepare-staging
-        if: env.ENVIRONMENT == 'staging'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          set +e
-          node scripts/desktop-release-assets.mjs prepare \
-            --environment staging \
-            --sha "$RELEASE_SHA" \
-            --version "${{ steps.staging-version.outputs.version }}"
-          status=$?
-          set -e
-          bash .github/scripts/desktop-quota-defer-exit.sh "$status"
-
-      - name: Generate staging icon
-        if: ${{ env.ENVIRONMENT == 'staging' && steps.prepare-staging.outputs.quota_deferred != 'true' }}
-        run: node apps/desktop/scripts/gen-staging-icon.mjs
-
       # macOS code signing: import the Developer ID Application cert into a
       # temporary keychain so electron-builder + codesign can find it.
       # If MAC_CERTIFICATE_BASE64 is absent, this step no-ops and the build
       # continues unsigned (electron-builder will warn, not fail).
       - name: Import Apple Developer cert (macOS)
-        if: env.HAS_MAC_SIGNING_CREDENTIALS == 'true' && steps.prepare-production.outputs.quota_deferred != 'true' && steps.prepare-staging.outputs.quota_deferred != 'true' && (env.ENVIRONMENT == 'staging' || steps.prepare-production.outputs.prepared == 'true')
+        if: env.HAS_MAC_SIGNING_CREDENTIALS == 'true' && steps.prepare-production.outputs.quota_deferred != 'true' && steps.prepare-production.outputs.prepared == 'true'
         env:
           MAC_CERTIFICATE_BASE64: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
           MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
@@ -1605,7 +1426,7 @@ jobs:
       # Accepts the secret either as raw PEM (-----BEGIN PRIVATE KEY-----) or
       # base64-encoded; whichever Tim pasted works.
       - name: Stage Apple API key (macOS)
-        if: env.HAS_APPLE_API_CREDENTIALS == 'true' && steps.prepare-production.outputs.quota_deferred != 'true' && steps.prepare-staging.outputs.quota_deferred != 'true' && (env.ENVIRONMENT == 'staging' || steps.prepare-production.outputs.prepared == 'true')
+        if: env.HAS_APPLE_API_CREDENTIALS == 'true' && steps.prepare-production.outputs.quota_deferred != 'true' && steps.prepare-production.outputs.prepared == 'true'
         env:
           APPLE_API_KEY_CONTENTS: ${{ secrets.APPLE_API_KEY }}
         run: |
@@ -1623,152 +1444,6 @@ jobs:
             exit 1
           }
           echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
-
-      - name: Package staging desktop app
-        if: ${{ env.ENVIRONMENT == 'staging' && steps.prepare-staging.outputs.quota_deferred != 'true' }}
-        env:
-          JOVIE_DESKTOP_SOURCE_REVISION: ${{ env.RELEASE_SHA }}
-          JOVIE_RELEASE_DMG: 'true'
-          ELECTRON_ENV: ${{ env.ENVIRONMENT }}
-          # Apple notarization via App Store Connect API key. All three are
-          # required by @electron/notarize when notarize: true is set; if any
-          # are missing, electron-builder skips notarization with a warning.
-          # APPLE_API_KEY is the path written by "Stage Apple API key" above.
-          APPLE_API_KEY: ${{ env.APPLE_API_KEY }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # CSC_LINK is the alternative to MAC_CERTIFICATE_BASE64 when not
-          # using a pre-imported keychain. Left unset; we use the keychain
-          # set up above instead.
-          CSC_KEYCHAIN: ${{ env.KEYCHAIN_PATH }}
-        run: pnpm --filter @jovie/desktop package:staging
-
-      - name: Verify staging desktop artifact set
-        if: ${{ env.ENVIRONMENT == 'staging' && steps.prepare-staging.outputs.quota_deferred != 'true' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          release_version="${{ steps.staging-version.outputs.version }}"
-          [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-staging\.[1-9][0-9]*\.[1-9][0-9]*$ ]] || {
-            echo "::error::Staging version is not valid prerelease semver."
-            exit 1
-          }
-          staging_files=(
-            "apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg"
-            "apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg.blockmap"
-            "apps/desktop/dist/Jovie-Staging-${release_version}-universal.zip"
-            "apps/desktop/dist/Jovie-Staging-${release_version}-universal.zip.blockmap"
-            "apps/desktop/dist/staging-mac.yml"
-          )
-          for staging_file in "${staging_files[@]}"; do
-            [ -f "$staging_file" ] || {
-              echo "::error::Expected staging desktop artifact is missing: $staging_file"
-              exit 1
-            }
-          done
-
-          staging_app="apps/desktop/dist/mac-universal/Jovie Staging.app"
-          [ -d "$staging_app" ] || {
-            echo "::error::Packaged staging app bundle is missing."
-            exit 1
-          }
-          codesign --verify --deep --strict "$staging_app"
-          spctl --assess --type execute --verbose=2 "$staging_app"
-          xcrun stapler validate "$staging_app"
-
-          identity_file="$staging_app/Contents/Resources/build-identity.json"
-          cmp apps/desktop/build/build-identity.json "$identity_file"
-          node -e '
-            const fs = require("fs");
-            const [file, version, sha] = process.argv.slice(1);
-            const record = JSON.parse(fs.readFileSync(file, "utf8"));
-            const exact = Object.keys(record).sort().join(",") === "builtAt,channel,sourceRevision,version" &&
-              record.channel === "staging" && record.version === version &&
-              record.sourceRevision === sha &&
-              new Date(record.builtAt).toISOString() === record.builtAt;
-            if (!exact) throw new Error("Packaged staging build identity is not exact.");
-          ' "$identity_file" "$release_version" "$RELEASE_SHA"
-          runtime_identity="$("$staging_app/Contents/MacOS/Jovie Staging" --print-build-identity | tail -n 1)"
-          node -e '
-            const fs = require("fs");
-            const expected = {...JSON.parse(fs.readFileSync(process.argv[1], "utf8")), provenance: "verified"};
-            if (JSON.stringify(JSON.parse(process.argv[2])) !== JSON.stringify(expected))
-              throw new Error("Runtime staging build identity is not exact.");
-          ' "$identity_file" "$runtime_identity"
-          embedded_version="$(/usr/libexec/PlistBuddy \
-            -c 'Print :CFBundleShortVersionString' \
-            "$staging_app/Contents/Info.plist")"
-          [ "$embedded_version" = "$release_version" ] || {
-            echo "::error::Staging app embedded version is not exact."
-            exit 1
-          }
-          update_config="$staging_app/Contents/Resources/app-update.yml"
-          grep -Eq '^provider:[[:space:]]*generic[[:space:]]*$' "$update_config"
-          grep -Eq '^url:[[:space:]]*https://github.com/JovieInc/Jovie/releases/download/desktop-staging[[:space:]]*$' "$update_config"
-          grep -Eq '^channel:[[:space:]]*staging[[:space:]]*$' "$update_config"
-          grep -Eq "^updaterCacheDirName:[[:space:]]*'?jovie-desktop-staging-updater'?[[:space:]]*$" "$update_config"
-
-          staging_dmg="apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg"
-          xcrun stapler validate "$staging_dmg"
-          spctl --assess --type open --context context:primary-signature \
-            --verbose=2 "$staging_dmg"
-
-      - name: Upload staging desktop package
-        if: ${{ env.ENVIRONMENT == 'staging' && steps.prepare-staging.outputs.quota_deferred != 'true' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: desktop-staging-${{ steps.staging-version.outputs.version }}-attempt-${{ github.run_attempt }}
-          path: |
-            apps/desktop/dist/Jovie-Staging-*-universal.dmg
-            apps/desktop/dist/Jovie-Staging-*-universal.dmg.blockmap
-            apps/desktop/dist/Jovie-Staging-*-universal.zip
-            apps/desktop/dist/Jovie-Staging-*-universal.zip.blockmap
-            apps/desktop/dist/staging-mac.yml
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 7
-
-      - name: Publish staging desktop prerelease
-        id: publish-staging
-        if: ${{ env.ENVIRONMENT == 'staging' && steps.prepare-staging.outputs.quota_deferred != 'true' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_API_HOLD_BUDGET_SECONDS: '600'
-          REPOSITORY: ${{ github.repository }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          current_main_sha="$(bash .github/scripts/resolve-main-sha.sh "$REPOSITORY")"
-          [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::Could not resolve exact current main before staging publication."
-            exit 1
-          }
-          if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
-            mainline_compare="$(bash .github/scripts/gh-api-hold.sh api \
-              "repos/$REPOSITORY/compare/$RELEASE_SHA...$current_main_sha")"
-            jq -e --arg release "$RELEASE_SHA" --arg current "$current_main_sha" '
-              type == "object" and
-              .status == "ahead" and
-              .base_commit.sha == $release and
-              .merge_base_commit.sha == $release and
-              (.ahead_by | type == "number" and . > 0 and floor == .) and
-              (.commits | type == "array" and length > 0 and .[-1].sha == $current) and
-              .behind_by == 0
-            ' >/dev/null <<<"$mainline_compare" || {
-              echo "::error::Desktop generation $RELEASE_SHA is not a trusted ancestor of current main before staging publication."
-              exit 1
-            }
-          fi
-          set +e
-          node scripts/desktop-release-assets.mjs upload-and-publish \
-            --environment staging \
-            --sha "$RELEASE_SHA" \
-            --version="${{ steps.staging-version.outputs.version }}" \
-            --dist "apps/desktop/dist"
-          status=$?
-          set -e
-          bash .github/scripts/desktop-quota-defer-exit.sh "$status"
 
       - name: Package production desktop app
         if: env.ENVIRONMENT == 'production' && steps.prepare-production.outputs.prepared == 'true' && steps.prepare-production.outputs.quota_deferred != 'true'
@@ -1876,9 +1551,9 @@ jobs:
 
       - name: Capture production publisher identity
         id: publisher-identity
-        if: ((env.ENVIRONMENT == 'production' && steps.prepare-production.outputs.prepared == 'true') || env.ENVIRONMENT == 'staging') && steps.prepare-production.outputs.quota_deferred != 'true' && steps.prepare-staging.outputs.quota_deferred != 'true' && steps.publish-production.outputs.quota_deferred != 'true' && steps.publish-staging.outputs.quota_deferred != 'true'
+        if: env.ENVIRONMENT == 'production' && steps.prepare-production.outputs.prepared == 'true' && steps.prepare-production.outputs.quota_deferred != 'true' && steps.publish-production.outputs.quota_deferred != 'true'
         env:
-          PUBLISHED_SHA: ${{ steps.publish-staging.outputs.release_sha || steps.publish-production.outputs.release_sha }}
+          PUBLISHED_SHA: ${{ steps.publish-production.outputs.release_sha }}
         run: |
           [ "$PUBLISHED_SHA" = "$RELEASE_SHA" ] || {
             echo "::error::Published release proof does not match the authorized commit."
@@ -1941,7 +1616,7 @@ jobs:
           sleep "$wait_for"
 
   rebuild-deferred-desktop:
-    name: ${{ needs.authorize-release.outputs.environment == 'staging' && 'Publish staging desktop prerelease' || 'Publish production desktop release' }}
+    name: Publish production desktop release
     needs: [authorize-release, wait-for-deferred-desktop-quota]
     if: needs.wait-for-deferred-desktop-quota.result == 'success'
     timeout-minutes: 45
@@ -1953,9 +1628,8 @@ jobs:
     outputs:
       published_sha: ${{ steps.publisher-identity.outputs.published_sha }}
       publisher_attempt: ${{ steps.publisher-identity.outputs.publisher_attempt }}
-      staging_version: ${{ steps.staging-version.outputs.version }}
-      quota_deferred: ${{ steps.prepare-production.outputs.quota_deferred || steps.prepare-staging.outputs.quota_deferred || steps.publish-production.outputs.quota_deferred || steps.publish-staging.outputs.quota_deferred }}
-      quota_reset_epoch: ${{ steps.prepare-production.outputs.quota_reset_epoch || steps.prepare-staging.outputs.quota_reset_epoch || steps.publish-production.outputs.quota_reset_epoch || steps.publish-staging.outputs.quota_reset_epoch }}
+      quota_deferred: ${{ steps.prepare-production.outputs.quota_deferred || steps.publish-production.outputs.quota_deferred }}
+      quota_reset_epoch: ${{ steps.prepare-production.outputs.quota_reset_epoch || steps.publish-production.outputs.quota_reset_epoch }}
     env:
       DESKTOP_QUOTA_RETRY: '1'
       ENVIRONMENT: ${{ needs.authorize-release.outputs.environment }}
@@ -2046,56 +1720,12 @@ jobs:
           set -e
           bash .github/scripts/desktop-quota-defer-exit.sh "$status"
 
-      - name: Compute monotonic staging release version
-        id: staging-version
-        if: env.ENVIRONMENT == 'staging'
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="$(node apps/desktop/scripts/sync-version.mjs \
-            --staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT")"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "DESKTOP_VERSION=$version" >> "$GITHUB_ENV"
-
-      - name: Require staging signing and notarization credentials
-        if: env.ENVIRONMENT == 'staging'
-        shell: bash
-        run: |
-          set -euo pipefail
-          [ "$HAS_MAC_SIGNING_CREDENTIALS" = "true" ] &&
-            [ "$HAS_APPLE_API_CREDENTIALS" = "true" ] &&
-            [ "$HAS_APPLE_TEAM_ID" = "true" ] || {
-            echo "::error::Staging publication requires the existing macOS signing certificate, App Store Connect API key, and Apple team ID secrets."
-            exit 1
-          }
-
-      - name: Validate rolling staging prerelease
-        id: prepare-staging
-        if: env.ENVIRONMENT == 'staging'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          set +e
-          node scripts/desktop-release-assets.mjs prepare \
-            --environment staging \
-            --sha "$RELEASE_SHA" \
-            --version "${{ steps.staging-version.outputs.version }}"
-          status=$?
-          set -e
-          bash .github/scripts/desktop-quota-defer-exit.sh "$status"
-
-      - name: Generate staging icon
-        if: ${{ env.ENVIRONMENT == 'staging' && steps.prepare-staging.outputs.quota_deferred != 'true' }}
-        run: node apps/desktop/scripts/gen-staging-icon.mjs
-
       # macOS code signing: import the Developer ID Application cert into a
       # temporary keychain so electron-builder + codesign can find it.
       # If MAC_CERTIFICATE_BASE64 is absent, this step no-ops and the build
       # continues unsigned (electron-builder will warn, not fail).
       - name: Import Apple Developer cert (macOS)
-        if: env.HAS_MAC_SIGNING_CREDENTIALS == 'true' && steps.prepare-production.outputs.quota_deferred != 'true' && steps.prepare-staging.outputs.quota_deferred != 'true' && (env.ENVIRONMENT == 'staging' || steps.prepare-production.outputs.prepared == 'true')
+        if: env.HAS_MAC_SIGNING_CREDENTIALS == 'true' && steps.prepare-production.outputs.quota_deferred != 'true' && steps.prepare-production.outputs.prepared == 'true'
         env:
           MAC_CERTIFICATE_BASE64: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
           MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
@@ -2154,7 +1784,7 @@ jobs:
       # Accepts the secret either as raw PEM (-----BEGIN PRIVATE KEY-----) or
       # base64-encoded; whichever Tim pasted works.
       - name: Stage Apple API key (macOS)
-        if: env.HAS_APPLE_API_CREDENTIALS == 'true' && steps.prepare-production.outputs.quota_deferred != 'true' && steps.prepare-staging.outputs.quota_deferred != 'true' && (env.ENVIRONMENT == 'staging' || steps.prepare-production.outputs.prepared == 'true')
+        if: env.HAS_APPLE_API_CREDENTIALS == 'true' && steps.prepare-production.outputs.quota_deferred != 'true' && steps.prepare-production.outputs.prepared == 'true'
         env:
           APPLE_API_KEY_CONTENTS: ${{ secrets.APPLE_API_KEY }}
         run: |
@@ -2172,152 +1802,6 @@ jobs:
             exit 1
           }
           echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
-
-      - name: Package staging desktop app
-        if: ${{ env.ENVIRONMENT == 'staging' && steps.prepare-staging.outputs.quota_deferred != 'true' }}
-        env:
-          JOVIE_DESKTOP_SOURCE_REVISION: ${{ env.RELEASE_SHA }}
-          JOVIE_RELEASE_DMG: 'true'
-          ELECTRON_ENV: ${{ env.ENVIRONMENT }}
-          # Apple notarization via App Store Connect API key. All three are
-          # required by @electron/notarize when notarize: true is set; if any
-          # are missing, electron-builder skips notarization with a warning.
-          # APPLE_API_KEY is the path written by "Stage Apple API key" above.
-          APPLE_API_KEY: ${{ env.APPLE_API_KEY }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # CSC_LINK is the alternative to MAC_CERTIFICATE_BASE64 when not
-          # using a pre-imported keychain. Left unset; we use the keychain
-          # set up above instead.
-          CSC_KEYCHAIN: ${{ env.KEYCHAIN_PATH }}
-        run: pnpm --filter @jovie/desktop package:staging
-
-      - name: Verify staging desktop artifact set
-        if: ${{ env.ENVIRONMENT == 'staging' && steps.prepare-staging.outputs.quota_deferred != 'true' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          release_version="${{ steps.staging-version.outputs.version }}"
-          [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-staging\.[1-9][0-9]*\.[1-9][0-9]*$ ]] || {
-            echo "::error::Staging version is not valid prerelease semver."
-            exit 1
-          }
-          staging_files=(
-            "apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg"
-            "apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg.blockmap"
-            "apps/desktop/dist/Jovie-Staging-${release_version}-universal.zip"
-            "apps/desktop/dist/Jovie-Staging-${release_version}-universal.zip.blockmap"
-            "apps/desktop/dist/staging-mac.yml"
-          )
-          for staging_file in "${staging_files[@]}"; do
-            [ -f "$staging_file" ] || {
-              echo "::error::Expected staging desktop artifact is missing: $staging_file"
-              exit 1
-            }
-          done
-
-          staging_app="apps/desktop/dist/mac-universal/Jovie Staging.app"
-          [ -d "$staging_app" ] || {
-            echo "::error::Packaged staging app bundle is missing."
-            exit 1
-          }
-          codesign --verify --deep --strict "$staging_app"
-          spctl --assess --type execute --verbose=2 "$staging_app"
-          xcrun stapler validate "$staging_app"
-
-          identity_file="$staging_app/Contents/Resources/build-identity.json"
-          cmp apps/desktop/build/build-identity.json "$identity_file"
-          node -e '
-            const fs = require("fs");
-            const [file, version, sha] = process.argv.slice(1);
-            const record = JSON.parse(fs.readFileSync(file, "utf8"));
-            const exact = Object.keys(record).sort().join(",") === "builtAt,channel,sourceRevision,version" &&
-              record.channel === "staging" && record.version === version &&
-              record.sourceRevision === sha &&
-              new Date(record.builtAt).toISOString() === record.builtAt;
-            if (!exact) throw new Error("Packaged staging build identity is not exact.");
-          ' "$identity_file" "$release_version" "$RELEASE_SHA"
-          runtime_identity="$("$staging_app/Contents/MacOS/Jovie Staging" --print-build-identity | tail -n 1)"
-          node -e '
-            const fs = require("fs");
-            const expected = {...JSON.parse(fs.readFileSync(process.argv[1], "utf8")), provenance: "verified"};
-            if (JSON.stringify(JSON.parse(process.argv[2])) !== JSON.stringify(expected))
-              throw new Error("Runtime staging build identity is not exact.");
-          ' "$identity_file" "$runtime_identity"
-          embedded_version="$(/usr/libexec/PlistBuddy \
-            -c 'Print :CFBundleShortVersionString' \
-            "$staging_app/Contents/Info.plist")"
-          [ "$embedded_version" = "$release_version" ] || {
-            echo "::error::Staging app embedded version is not exact."
-            exit 1
-          }
-          update_config="$staging_app/Contents/Resources/app-update.yml"
-          grep -Eq '^provider:[[:space:]]*generic[[:space:]]*$' "$update_config"
-          grep -Eq '^url:[[:space:]]*https://github.com/JovieInc/Jovie/releases/download/desktop-staging[[:space:]]*$' "$update_config"
-          grep -Eq '^channel:[[:space:]]*staging[[:space:]]*$' "$update_config"
-          grep -Eq "^updaterCacheDirName:[[:space:]]*'?jovie-desktop-staging-updater'?[[:space:]]*$" "$update_config"
-
-          staging_dmg="apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg"
-          xcrun stapler validate "$staging_dmg"
-          spctl --assess --type open --context context:primary-signature \
-            --verbose=2 "$staging_dmg"
-
-      - name: Upload staging desktop package
-        if: ${{ env.ENVIRONMENT == 'staging' && steps.prepare-staging.outputs.quota_deferred != 'true' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: desktop-staging-${{ steps.staging-version.outputs.version }}-attempt-${{ github.run_attempt }}
-          path: |
-            apps/desktop/dist/Jovie-Staging-*-universal.dmg
-            apps/desktop/dist/Jovie-Staging-*-universal.dmg.blockmap
-            apps/desktop/dist/Jovie-Staging-*-universal.zip
-            apps/desktop/dist/Jovie-Staging-*-universal.zip.blockmap
-            apps/desktop/dist/staging-mac.yml
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 7
-
-      - name: Publish staging desktop prerelease
-        id: publish-staging
-        if: ${{ env.ENVIRONMENT == 'staging' && steps.prepare-staging.outputs.quota_deferred != 'true' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_API_HOLD_BUDGET_SECONDS: '600'
-          REPOSITORY: ${{ github.repository }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          current_main_sha="$(bash .github/scripts/resolve-main-sha.sh "$REPOSITORY")"
-          [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::Could not resolve exact current main before staging publication."
-            exit 1
-          }
-          if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
-            mainline_compare="$(bash .github/scripts/gh-api-hold.sh api \
-              "repos/$REPOSITORY/compare/$RELEASE_SHA...$current_main_sha")"
-            jq -e --arg release "$RELEASE_SHA" --arg current "$current_main_sha" '
-              type == "object" and
-              .status == "ahead" and
-              .base_commit.sha == $release and
-              .merge_base_commit.sha == $release and
-              (.ahead_by | type == "number" and . > 0 and floor == .) and
-              (.commits | type == "array" and length > 0 and .[-1].sha == $current) and
-              .behind_by == 0
-            ' >/dev/null <<<"$mainline_compare" || {
-              echo "::error::Desktop generation $RELEASE_SHA is not a trusted ancestor of current main before staging publication."
-              exit 1
-            }
-          fi
-          set +e
-          node scripts/desktop-release-assets.mjs upload-and-publish \
-            --environment staging \
-            --sha "$RELEASE_SHA" \
-            --version="${{ steps.staging-version.outputs.version }}" \
-            --dist "apps/desktop/dist"
-          status=$?
-          set -e
-          bash .github/scripts/desktop-quota-defer-exit.sh "$status"
 
       - name: Package production desktop app
         if: env.ENVIRONMENT == 'production' && steps.prepare-production.outputs.prepared == 'true' && steps.prepare-production.outputs.quota_deferred != 'true'
@@ -2425,9 +1909,9 @@ jobs:
 
       - name: Capture production publisher identity
         id: publisher-identity
-        if: ((env.ENVIRONMENT == 'production' && steps.prepare-production.outputs.prepared == 'true') || env.ENVIRONMENT == 'staging') && steps.prepare-production.outputs.quota_deferred != 'true' && steps.prepare-staging.outputs.quota_deferred != 'true' && steps.publish-production.outputs.quota_deferred != 'true' && steps.publish-staging.outputs.quota_deferred != 'true'
+        if: env.ENVIRONMENT == 'production' && steps.prepare-production.outputs.prepared == 'true' && steps.prepare-production.outputs.quota_deferred != 'true' && steps.publish-production.outputs.quota_deferred != 'true'
         env:
-          PUBLISHED_SHA: ${{ steps.publish-staging.outputs.release_sha || steps.publish-production.outputs.release_sha }}
+          PUBLISHED_SHA: ${{ steps.publish-production.outputs.release_sha }}
         run: |
           [ "$PUBLISHED_SHA" = "$RELEASE_SHA" ] || {
             echo "::error::Published release proof does not match the authorized commit."

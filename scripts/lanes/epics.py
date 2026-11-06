@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
-from atomic_state import atomic_write_text  # noqa: E402
+from atomic_state import append_json_object, atomic_write_text  # noqa: E402
 
 EPIC_LABEL = "type:epic"
 HOLD_LABEL = "hold"
@@ -91,6 +91,9 @@ def render_prompt(issue, children: list[dict]) -> str:
         "issues in dependency order, each one PR-sized (<= 1500 changed lines) and shippable",
         "on its own by an unattended coding agent. Skip anything main already does or an",
         "existing child covers.",
+        "- Build the machine, not the thing: if this epic is one more instance of a class of work that keeps",
+        "  recurring (the 3rd time in 14 days) or would cost more than 10 USD to do by hand, make the first child",
+        "  the loop, generator, template or guard that does it every time, and label it `machine-gap`.",
         "- Do not edit files, commit, push, open PRs or call Linear: the harness files the issues.",
         "- You are unattended: never ask a question or wait for approval.",
         "- End your reply with exactly one fenced json block of this shape:",
@@ -201,8 +204,7 @@ def run_epic(lane, host, name: str, spec: dict, linear, issue, repo: Path) -> di
         if worktree.exists():
             lane.sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=repo)
     receipt["endedAt"] = lane.now_iso()
-    with open(runs / "ledger.jsonl", "a") as ledger:
-        ledger.write(json.dumps(receipt) + "\n")
+    append_json_object(runs / "ledger.jsonl", receipt)
     return receipt
 
 

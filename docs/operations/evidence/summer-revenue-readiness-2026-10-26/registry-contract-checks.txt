@@ -1,0 +1,17 @@
+✔ canonical registry validates and keeps COMM-006 fail-closed (3.616419ms)
+✔ direct commissioning rejects a noncanonical false-green registry (4.8148ms)
+✔ canonical-shaped registry substitutions cannot replace probe definitions (77.404661ms)
+✔ completed empty heartbeat turns fail the canonical recurrence probe (11.684677ms)
+✔ production provenance ignores hostile Git repository overrides (53.437613ms)
+✔ canonical registry.json satisfies validateRegistry (3.536342ms)
+✔ rejects duplicate probe IDs before evaluation (1.027345ms)
+✔ validates every registry boundary before reading source (2.870517ms)
+✔ report validation rejects official-looking malformed artifacts (4.22425ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 215.431999

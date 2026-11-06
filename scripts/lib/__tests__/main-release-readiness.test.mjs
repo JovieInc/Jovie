@@ -8,21 +8,42 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   checkMainQueueProvenance,
   describeProvenance,
   findExactQueueProof,
   hasExactSuccessfulMergeGroupProof,
   MAX_REST_HOLD_MS,
+  MERGE_SUITE_SCOPE_FULL,
+  MERGE_SUITE_SCOPE_ORDINARY,
+  mergeSuiteScopeJobName,
   PROVENANCE_JOB_TIMEOUT_MINUTES,
   planGitHubRestHold,
   resolveMainSha,
+  resolveMergeSuiteScope,
   restHoldBudgetMs,
 } from '../../../.github/scripts/verify-main-release-readiness.mjs';
 
 const SHA = 'a'.repeat(40);
 const SUPERSEDING_SHA = 'b'.repeat(40);
+
+// The fake reset and the child shell must share a clock. A loaded host can
+// otherwise consume the entire four-second fixture window before bash runs.
+const HOLD_FIXTURE_EPOCH = 1_800_000_000;
+function installHoldClock(root) {
+  writeFileSync(
+    join(root, 'date'),
+    `#!/bin/sh
+if [ "$*" = "+%s" ]; then
+  printf '%s\\n' '${HOLD_FIXTURE_EPOCH}'
+else
+  exec /bin/date "$@"
+fi
+`
+  );
+  chmodSync(join(root, 'date'), 0o755);
+}
 
 function jsonResponse(body, { ok = true, status = 200 } = {}) {
   return {
@@ -45,6 +66,20 @@ function exactSuccessfulRun(id = 41) {
 }
 
 describe('main release readiness', () => {
+  // In-process holds write `::warning::Holding ...` to stderr. Capture it so the
+  // runner never parses a mocked rate-limit hold as a workflow annotation.
+  /** @type {import('vitest').MockInstance[]} */
+  let spies = [];
+  beforeEach(() => {
+    spies = [
+      vi.spyOn(console, 'error').mockImplementation(() => {}),
+      vi.spyOn(process.stderr, 'write').mockImplementation(() => true),
+    ];
+  });
+  afterEach(() => {
+    for (const spy of spies) spy.mockRestore();
+  });
+
   it('accepts only an exact successful merge-group PR Ready proof', () => {
     const run = exactSuccessfulRun();
     const successJobs = new Map([
@@ -83,6 +118,98 @@ describe('main release readiness', () => {
           [
             run.id,
             [{ name: 'PR Ready', status: 'completed', conclusion: 'failure' }],
+          ],
+        ]),
+      })
+    ).toBe(false);
+  });
+
+  it('keeps legacy unscoped PR Ready as full-suite proof', () => {
+    const run = exactSuccessfulRun();
+    expect(
+      resolveMergeSuiteScope([
+        { name: 'PR Ready', status: 'completed', conclusion: 'success' },
+      ])
+    ).toBe('legacy_unscoped');
+    expect(
+      hasExactSuccessfulMergeGroupProof({
+        sha: SHA,
+        runs: [run],
+        jobsByRun: new Map([
+          [
+            run.id,
+            [{ name: 'PR Ready', status: 'completed', conclusion: 'success' }],
+          ],
+        ]),
+      })
+    ).toBe(true);
+  });
+
+  it('accepts explicit full_web_units scope with PR Ready', () => {
+    const run = exactSuccessfulRun();
+    const jobs = [
+      { name: 'PR Ready', status: 'completed', conclusion: 'success' },
+      {
+        name: mergeSuiteScopeJobName(MERGE_SUITE_SCOPE_FULL),
+        status: 'completed',
+        conclusion: 'success',
+      },
+    ];
+    expect(resolveMergeSuiteScope(jobs)).toBe(MERGE_SUITE_SCOPE_FULL);
+    expect(
+      hasExactSuccessfulMergeGroupProof({
+        sha: SHA,
+        runs: [run],
+        jobsByRun: new Map([[run.id, jobs]]),
+      })
+    ).toBe(true);
+  });
+
+  it('rejects ordinary_admission scope for full-suite main skip', () => {
+    const run = exactSuccessfulRun();
+    const jobs = [
+      { name: 'PR Ready', status: 'completed', conclusion: 'success' },
+      {
+        name: mergeSuiteScopeJobName(MERGE_SUITE_SCOPE_ORDINARY),
+        status: 'completed',
+        conclusion: 'success',
+      },
+    ];
+    expect(resolveMergeSuiteScope(jobs)).toBe(MERGE_SUITE_SCOPE_ORDINARY);
+    expect(
+      hasExactSuccessfulMergeGroupProof({
+        sha: SHA,
+        runs: [run],
+        jobsByRun: new Map([[run.id, jobs]]),
+      })
+    ).toBe(false);
+    expect(
+      hasExactSuccessfulMergeGroupProof({
+        sha: SHA,
+        runs: [run],
+        jobsByRun: new Map([[run.id, jobs]]),
+        requiredScope: MERGE_SUITE_SCOPE_ORDINARY,
+      })
+    ).toBe(true);
+  });
+
+  it('rejects a failed or missing successful scope claim when a scope job exists', () => {
+    const run = exactSuccessfulRun();
+    expect(
+      hasExactSuccessfulMergeGroupProof({
+        sha: SHA,
+        runs: [run],
+        jobsByRun: new Map([
+          [
+            run.id,
+            [
+              { name: 'PR Ready', status: 'completed', conclusion: 'success' },
+              {
+                name: mergeSuiteScopeJobName(MERGE_SUITE_SCOPE_FULL),
+                status: 'completed',
+                conclusion: 'failure',
+              },
+            ],
           ],
         ]),
       })
@@ -624,7 +751,7 @@ esac
     const described = describeProvenance(result, tipSha);
     expect(described.level).toBe('info');
     expect(described.line).toContain(
-      `Exact merge-group provenance found for ${tipSha} (run ${proofRunId}).`
+      `Exact merge-group provenance found for ${tipSha} (run ${proofRunId}; suite scope full_web_units or legacy).`
     );
     expect(described.line).not.toContain('rate-limit-hold');
   });
@@ -704,11 +831,11 @@ esac
     const runHold = (resetOffset, budget) => {
       const root = mkdtempSync(join(tmpdir(), 'gh-api-hold-'));
       try {
+        installHoldClock(root);
         const calls = join(root, 'calls');
         writeFileSync(calls, '0');
         const slept = join(root, 'slept');
         writeFileSync(slept, '');
-        const reset = Math.floor(Date.now() / 1000) + resetOffset;
         writeFileSync(
           join(root, 'sleep'),
           `#!/bin/sh
@@ -724,7 +851,7 @@ n="$(cat "${calls}")"
 n=$((n + 1))
 printf '%s' "$n" > "${calls}"
 case "$*" in
-  *rate_limit*) printf '%s\\n' "${reset}"; exit 0 ;;
+  *rate_limit*) printf '%s\\n' "$(( $(date +%s) + ${resetOffset} ))"; exit 0 ;;
 esac
 if [ "$n" -eq 1 ]; then
   echo "API rate limit exceeded for installation" >&2
@@ -762,14 +889,14 @@ exit 0
     expect(held.status, held.stderr).toBe(0);
     expect(held.stdout).toContain('PR Ready');
     expect(held.stderr).toContain('Holding');
+    expect(held.slept).toBe('0');
     expect(held.calls).toBeGreaterThan(1);
 
     const fullWindow = runHold(60 * 60, null);
     expect(fullWindow.status, fullWindow.stderr).toBe(0);
     expect(fullWindow.stdout).toContain('PR Ready');
     expect(fullWindow.stderr).toContain('Holding');
-    expect(Number(fullWindow.slept)).toBeGreaterThanOrEqual(60 * 60);
-    expect(Number(fullWindow.slept)).toBeLessThanOrEqual(3900);
+    expect(Number(fullWindow.slept)).toBe(60 * 60 + 1);
     expect(fullWindow.calls).toBeGreaterThan(1);
 
     const refused = runHold(100_000, null);
@@ -792,6 +919,7 @@ exit 0
     const runVisible = ({ resetOffset, firstError, label }) => {
       const root = mkdtempSync(join(tmpdir(), 'gh-api-hold-vis-'));
       try {
+        installHoldClock(root);
         const calls = join(root, 'calls');
         writeFileSync(calls, '0');
         const slept = join(root, 'slept');
@@ -804,9 +932,7 @@ exit 0
         );
         chmodSync(join(root, 'sleep'), 0o755);
         const reset =
-          resetOffset === null
-            ? ''
-            : String(Math.floor(Date.now() / 1000) + resetOffset);
+          resetOffset === null ? '' : String(HOLD_FIXTURE_EPOCH + resetOffset);
         writeFileSync(
           join(root, 'gh'),
           `#!/bin/sh
@@ -862,12 +988,12 @@ exit 0
     });
     expect(held.status).toBe(0);
     expect(held.calls).toBeGreaterThan(1);
-    expect(Number(held.slept)).toBeGreaterThanOrEqual(4);
+    expect(Number(held.slept)).toBe(5);
     for (const channel of [held.stderr, held.summary]) {
       expect(channel).toContain('GitHub API hold');
       expect(channel).toContain('label=cross-prove_ step_1');
       expect(channel).toContain('http=403');
-      expect(channel).toMatch(/wait_s=[4-6] /);
+      expect(channel).toContain('wait_s=5 ');
       expect(channel).toMatch(/reset_epoch=\d{10}/);
       expect(channel).toMatch(/reset_iso=\d{4}-\d{2}-\d{2}T[\d:]{8}Z/);
       expect(channel).toContain(

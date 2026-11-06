@@ -27,6 +27,7 @@ type TxState = { poisoned: boolean; closed: boolean; rolledBack: boolean };
 const {
   captureExceptionMock,
   cleanupGates,
+  commitFailures,
   loggerErrorMock,
   loggerWarnMock,
   outcomes,
@@ -35,6 +36,7 @@ const {
   withDbSessionTxMock,
 } = vi.hoisted(() => {
   const cleanupGates = new Map<number, () => Promise<void>>();
+  const commitFailures = new Map<number, QueryOutcome>();
   const outcomes: QueryOutcome[] = [];
   const setupFailures = new Map<number, QueryOutcome>();
   const txStates: TxState[] = [];
@@ -110,7 +112,16 @@ const {
           state.poisoned = true;
           throw setupError;
         }
-        return await handler(createTx(state), 'user_123');
+        const result = await handler(createTx(state), 'user_123');
+        const commitError = commitFailures.get(transactionIndex)?.().error;
+        if (commitError) {
+          // The callback already finished; Drizzle's post-callback COMMIT
+          // failed on the wire and the wrapper discarded the client (JOV-8641
+          // preserves this original error instead of letting ROLLBACK mask
+          // it). Nothing the callback wrote can be acknowledged.
+          throw commitError;
+        }
+        return result;
       } catch (error) {
         state.rolledBack = true;
         throw error;
@@ -125,6 +136,7 @@ const {
   return {
     captureExceptionMock: vi.fn(),
     cleanupGates,
+    commitFailures,
     loggerErrorMock: vi.fn(),
     loggerWarnMock: vi.fn(),
     outcomes,
@@ -412,6 +424,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     const { doesTableExist } = await import('@/lib/db');
     vi.mocked(doesTableExist).mockReset().mockResolvedValue(false);
     cleanupGates.clear();
+    commitFailures.clear();
     outcomes.length = 0;
     setupFailures.clear();
     txStates.length = 0;
@@ -798,6 +811,73 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     );
     expect(capturedCascadeErrors()).toEqual([]);
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+  });
+
+  it('JOV-8864: an idle-terminated avatar set_config is log-only noise, never a Sentry fingerprint', async () => {
+    // Production shape (Sentry 7808112661, staging GET /app/ov): the avatar
+    // read's own transaction dies on a Neon idle-in-transaction termination
+    // before its first query — Drizzle surfaces `Failed query: SELECT
+    // set_config('statement_timeout', $1, true)` chaining the termination,
+    // and both the read and its one retry hit it. The read is fail-soft
+    // (UNKNOWN fallback) and the class is an infrastructure condition
+    // (JOV-5754), so it must degrade log-only instead of paging Sentry with
+    // the set_config fingerprint that auto-filed this issue.
+    const idleSetConfigFingerprint = () =>
+      new Error(
+        "Failed query: SELECT set_config('statement_timeout', $1, true)",
+        {
+          cause: Object.assign(
+            new Error(
+              'terminating connection due to idle-in-transaction timeout'
+            ),
+            { code: '25P03' }
+          ),
+        }
+      );
+    const { setStatementTimeout } = await import('@/lib/db/query-timeout');
+    vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
+      if (ms === 5000) throw idleSetConfigFingerprint();
+    });
+    queueReadsBeforeDistribution();
+    // Neither avatar attempt reaches its SELECT (set_config dies first), so
+    // the queued avatar outcome is removed to keep sibling reads aligned.
+    outcomes.splice(6, 1);
+
+    const result = await getDashboardData();
+
+    // Fail-soft fallback semantics are preserved for the user.
+    expect(result.avatarQuality).toEqual({
+      status: 'unknown',
+      width: null,
+      height: null,
+    });
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(result.hasSocialLinks).toBe(true);
+    expect(result.hasMusicLinks).toBe(true);
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(result.tippingStats.tipClicks).toBe(3);
+
+    // The read was attempted once and retried once after cleanup.
+    expect(
+      vi.mocked(setStatementTimeout).mock.calls.filter(([, ms]) => ms === 5000)
+    ).toHaveLength(2);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+    expect(txStates[3]).toMatchObject({ closed: true, rolledBack: true });
+    expect(txStates.every(state => state.closed)).toBe(true);
+
+    // No Sentry event: the fingerprint is log-only degradation, and no
+    // statement_timeout cascade error is reported anywhere.
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      '[avatar-quality] avatar read timed out; degrading to unknown quality',
+      expect.objectContaining({
+        error: expect.stringContaining(
+          "SELECT set_config('statement_timeout', $1, true)"
+        ),
+      })
+    );
+    expect(capturedCascadeErrors()).toEqual([]);
   });
 
   it('degrades a tipping click-count timeout without emitting a Sentry issue (JOV-4458)', async () => {
@@ -1262,10 +1342,55 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       totalReceivedCents: 250,
       monthReceivedCents: 125,
     });
+    expect(result.legacyNudge).toBeNull();
     expect(result.dashboardLoadError).toBeUndefined();
     expect(captureExceptionMock).not.toHaveBeenCalled();
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
   });
+  it('exposes the grandfathered-claim nudge for a legacy-verified profile', async () => {
+    outcomes.push(
+      ok([userRow]),
+      ok([
+        {
+          ...dashboardProfile,
+          settings: {
+            claimVerification: {
+              schema: 'jovie-claim-verification/v1',
+              status: 'verified',
+              proofMethod: 'legacy',
+              spotifyArtistId: 'sp-1',
+              artistName: 'Artist',
+              reach: {
+                signal: 'spotify_followers',
+                value: 1_200,
+                threshold: 50_000,
+              },
+              requestedAt: '2026-11-02T00:00:00.000Z',
+              paidAt: null,
+              decidedBy: 'grandfather-2026-11',
+              legacyNudgeDueAt: '2999-01-01T00:00:00.000Z',
+            },
+          },
+        },
+      ]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]),
+      ok([{ count: 0 }]),
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      ok([{ width: 256, height: 256 }]),
+      ok([{ totalReceived: 0, monthReceived: 0, tipsSubmitted: 0 }]),
+      ok([{ total: 0, qr: 0, link: 0 }])
+    );
+
+    const result = await getDashboardData();
+
+    expect(result.legacyNudge).toEqual({
+      state: 'nudge',
+      dueAt: '2999-01-01T00:00:00.000Z',
+      nudgeSentAt: null,
+    });
+  });
+
   it('JOV-8580-recovery: recovers avatar metadata on a fresh transaction after idle setup cleanup', async () => {
     const idle = new Error('Failed query: SELECT set_config', {
       cause: Object.assign(
@@ -1328,6 +1453,9 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       }
     });
     let avatarOrTippingStarted = false;
+    const loggerClosedProbe = vi.fn((_message: string, _data?: unknown) => {
+      expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+    });
     outcomes.push(
       ok([userRow]),
       ok([dashboardProfile]),
@@ -1344,10 +1472,10 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       },
       ok([{ total: 3, qr: 1, link: 2 }])
     );
-    captureExceptionMock.mockImplementation(error => {
-      if (error === timeout) {
-        expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
-      }
+    // JOV-8864: the timeout class is log-only — the fallback reporter is
+    // logger.warn, which must only fire after the failed transaction closed.
+    loggerWarnMock.mockImplementation((message: string, _data?: unknown) => {
+      if (message.includes('avatar read timed out')) loggerClosedProbe(message);
     });
     const resultPromise = getDashboardData();
     await setupStarted;
@@ -1368,10 +1496,16 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       vi.mocked(setStatementTimeout).mock.calls.filter(([, ms]) => ms === 5000)
     ).toHaveLength(1);
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
-    expect(captureExceptionMock).toHaveBeenCalledWith(
-      timeout,
+    // JOV-8864: a statement-timeout avatar failure is log-only degradation —
+    // no Sentry event pages the set_config('statement_timeout') fingerprint.
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerClosedProbe).toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      '[avatar-quality] avatar read timed out; degrading to unknown quality',
       expect.objectContaining({
-        tags: expect.objectContaining({ query: 'avatar_quality' }),
+        error: expect.stringContaining(
+          'canceling statement due to statement timeout'
+        ),
       })
     );
     expect(txStates.every(state => state.closed)).toBe(true);
@@ -1384,8 +1518,10 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     );
     setupFailures.set(2, fail(idle));
     setupFailures.set(3, fail(idle));
-    captureExceptionMock.mockImplementation(error => {
-      if (error === idle) {
+    loggerWarnMock.mockImplementation((message: string, _data?: unknown) => {
+      // The tolerated failure is logged only after both failed transactions
+      // fully closed and were discarded (JOV-8864 log-only degradation).
+      if (message.includes('avatar read timed out')) {
         expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
         expect(txStates[3]).toMatchObject({ closed: true, rolledBack: true });
       }
@@ -1405,10 +1541,15 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     expect(result.tippingStats.totalReceivedCents).toBe(100);
     expect(result.dashboardLoadError).toBeUndefined();
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
-    expect(captureExceptionMock).toHaveBeenCalledWith(
-      idle,
+    // JOV-8864: idle-terminated avatar attempts are log-only degradation —
+    // the fingerprint never pages Sentry; the warn fires only after cleanup.
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      '[avatar-quality] avatar read timed out; degrading to unknown quality',
       expect.objectContaining({
-        tags: expect.objectContaining({ query: 'avatar_quality' }),
+        error: expect.stringContaining(
+          'terminating connection due to idle-in-transaction timeout'
+        ),
       })
     );
     expect(capturedCascadeErrors()).toEqual([]);
@@ -1513,5 +1654,80 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     } finally {
       clock.mockRestore();
     }
+  });
+
+  it('JOV-8837: recovers an avatar read whose read-only commit died on a dropped connection', async () => {
+    // Neon idle-in-transaction terminations can arrive as a bare transport
+    // failure: Drizzle's post-callback COMMIT rejects with `Failed query:
+    // commit` wrapping a lost connection — no 25P03 SQLSTATE, no idle text.
+    // The idle-only predicate (pre-JOV-8837) let that escape as a warning.
+    const droppedCommit = () =>
+      new Error('Failed query: commit', {
+        cause: new Error('Connection terminated unexpectedly'),
+      });
+    commitFailures.set(2, fail(droppedCommit()));
+    queueReadsBeforeDistribution();
+    // Both avatar attempts consume one profilePhotos outcome each: the first
+    // attempt's rows are discarded by its failed commit, so the retry needs
+    // its own queued read inserted after the first avatar outcome.
+    outcomes.splice(7, 0, () => {
+      // Recovery starts only after the failed transaction fully closed and
+      // was discarded — never on the poisoned, still-open connection.
+      expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+      return { rows: [{ width: 2048, height: 2048 }] };
+    });
+
+    const result = await getDashboardData();
+
+    expect(result.avatarQuality).toEqual({
+      status: 'ok',
+      width: 2048,
+      height: 2048,
+    });
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+    expect(txStates[3]).toMatchObject({ closed: true, rolledBack: false });
+    expect(txStates.every(state => state.closed)).toBe(true);
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(capturedCascadeErrors()).toEqual([]);
+  });
+
+  it('JOV-8837: falls back after two commit failures have closed their transactions', async () => {
+    const droppedCommit = () =>
+      new Error('Failed query: commit', {
+        cause: new Error('Connection terminated unexpectedly'),
+      });
+    const firstCommit = droppedCommit();
+    const secondCommit = droppedCommit();
+    commitFailures.set(2, fail(firstCommit));
+    commitFailures.set(3, fail(secondCommit));
+    captureExceptionMock.mockImplementation(error => {
+      // The tolerated failure is reported only after both failed
+      // transactions fully closed and were discarded.
+      expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+      expect(txStates[3]).toMatchObject({ closed: true, rolledBack: true });
+      expect(error).toBe(secondCommit);
+    });
+    queueReadsBeforeDistribution();
+    // Both avatar attempts consume one profilePhotos outcome each before
+    // their commits die; the retry needs its own queued read.
+    outcomes.splice(7, 0, ok([{ width: 1024, height: 1024 }]));
+
+    const result = await getDashboardData();
+
+    expect(result.avatarQuality?.status).toBe('unknown');
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      secondCommit,
+      expect.objectContaining({
+        tags: expect.objectContaining({ query: 'avatar_quality' }),
+      })
+    );
+    expect(capturedCascadeErrors()).toEqual([]);
+    expect(txStates.every(state => state.closed)).toBe(true);
   });
 });

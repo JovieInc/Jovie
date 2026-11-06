@@ -60,6 +60,7 @@ const link = {
 
 describe('admin investor pipeline page', () => {
   beforeEach(() => {
+    mocks.auth.mockReset();
     mocks.auth.mockResolvedValue(undefined);
     mocks.load.mockReset();
   });
@@ -86,12 +87,40 @@ describe('admin investor pipeline page', () => {
 
   it('loads on the same two-line row mode the loaded rows use', async () => {
     const page = (await InvestorPipelinePage()) as ReactElement<{
-      children: ReactElement<{ fallback: ReactNode }>;
+      children: ReactNode;
     }>;
-    const { container } = render(page.props.children.props.fallback);
+    const tableBoundary = Children.toArray(page.props.children).find(
+      child =>
+        isValidElement<{ fallback?: ReactNode }>(child) && child.props.fallback
+    ) as ReactElement<{ fallback: ReactNode }> | undefined;
+    expect(tableBoundary).toBeDefined();
+    const { container } = render(tableBoundary?.props.fallback);
 
     expect(
       container.querySelector('[data-table-row-mode="two-line"]')
     ).not.toBeNull();
+  });
+
+  it('mounts the empty hypothetical preview independently of investor records', async () => {
+    mocks.load.mockResolvedValue([]);
+    const page = await InvestorPipelinePage();
+    expect(mocks.auth).toHaveBeenCalledExactlyOnceWith();
+    render(await resolveServerNodes(page));
+    const preview = screen.getByRole('region', {
+      name: 'Hypothetical Dilution Preview',
+    });
+    expect(preview.querySelector('details')).not.toHaveAttribute('open');
+    expect(preview.querySelector('input')).toHaveValue('');
+    expect(screen.getByText('No investor links yet.')).toBeVisible();
+  });
+
+  it('does not return page content or load investor records when the existing access gate refuses', async () => {
+    const refusal = new Error('Synthetic admin access refusal');
+    mocks.auth.mockRejectedValue(refusal);
+    await expect(InvestorPipelinePage()).rejects.toBe(refusal);
+    expect(mocks.load).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole('region', { name: 'Hypothetical Dilution Preview' })
+    ).toBeNull();
   });
 });

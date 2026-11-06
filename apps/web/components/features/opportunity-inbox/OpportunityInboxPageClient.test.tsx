@@ -46,7 +46,6 @@ vi.mock('@/components/shell/RuntimeUpdateProvider', () => ({
 const mutateMock = vi.fn();
 const refreshMock = vi.fn();
 const mutateAsyncMock = vi.fn().mockResolvedValue({ ok: true });
-let inboxHomeEnabled = false;
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/app',
@@ -56,10 +55,6 @@ vi.mock('next/navigation', () => ({
     prefetch: vi.fn(),
     refresh: refreshMock,
   }),
-}));
-
-vi.mock('@/lib/flags/client', () => ({
-  useAppFlag: () => inboxHomeEnabled,
 }));
 
 vi.mock('@/lib/founder-review/client', () => ({
@@ -197,7 +192,7 @@ const pendingTourDate = {
 describe('OpportunityInboxPageClient', () => {
   afterEach(() => {
     runtimeState.update = null;
-    inboxHomeEnabled = false;
+
     mutateMock.mockReset();
     mutateAsyncMock.mockReset();
     mutateAsyncMock.mockResolvedValue({ ok: true });
@@ -366,7 +361,6 @@ describe('OpportunityInboxPageClient', () => {
   });
 
   it('keeps unavailable creator inboxes distinct from a healthy empty state', () => {
-    inboxHomeEnabled = true;
     render(
       <OpportunityInboxPageClient
         inbox={{
@@ -455,6 +449,10 @@ describe('OpportunityInboxPageClient', () => {
       'aria-expanded',
       'false'
     );
+    // Aligned with the centered tab toolbar, not floating left.
+    expect(
+      screen.getByRole('button', { name: 'Add Notes' }).parentElement
+    ).toHaveClass('justify-center');
   });
 
   it('discloses empty notes by keyboard and restores focus on Escape', async () => {
@@ -513,7 +511,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.queryByRole('textbox', { name: 'Notes' })).toBeNull();
   });
 
-  it('renders the inbox feed when cards are present', () => {
+  it('renders the inbox feed when cards are present (JOV-8873)', () => {
     render(
       <OpportunityInboxPageClient
         inbox={{
@@ -537,7 +535,7 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
 
-    expect(screen.getByTestId('opportunity-inbox-feed')).toBeInTheDocument();
+    expect(screen.getByTestId('opportunity-card-stack')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Inbox' })).toBeNull();
     expect(
       screen.queryByText('Pending opportunities, ready to accept or dismiss.')
@@ -595,7 +593,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.queryByText('New single detected')).not.toBeInTheDocument();
   });
 
-  it('renders the empty state when there are no cards', () => {
+  it('renders the calm empty state without setup steps when there are no cards', () => {
     render(
       <OpportunityInboxPageClient
         inbox={{
@@ -617,11 +615,17 @@ describe('OpportunityInboxPageClient', () => {
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Inbox' })).toBeNull();
     expect(screen.getByText('Your Inbox Is Clear')).toBeInTheDocument();
+    // JOV-8967: setup steps belong on Home only; the Inbox empty state never
+    // renders an action card or its CTA, even when the mapper supplies one.
     expect(
-      screen.getByRole('link', { name: 'Connect Spotify' })
-    ).toHaveAttribute('href', '/app/dashboard/releases?connect=spotify');
+      screen.queryByRole('link', { name: 'Connect Spotify' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Connect Spotify')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveAttribute(
+      'href',
+      '/app/chat'
+    );
   });
 
   it('filters cards by signal type and restores them on All', () => {
@@ -862,7 +866,7 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Plan Opportunity/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review pitch' }));
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
@@ -870,7 +874,6 @@ describe('OpportunityInboxPageClient', () => {
 
   it('returns focus to the active filter after clearing its stack', async () => {
     const user = userEvent.setup();
-    inboxHomeEnabled = true;
 
     render(
       <OpportunityInboxPageClient
@@ -929,7 +932,6 @@ describe('OpportunityInboxPageClient', () => {
           apply: vi.fn(),
         };
       const user = userEvent.setup();
-      inboxHomeEnabled = true;
 
       render(
         <OpportunityInboxPageClient
@@ -972,7 +974,7 @@ describe('OpportunityInboxPageClient', () => {
 
   it('returns focus to recovery after completing the last report next step', async () => {
     const user = userEvent.setup();
-    inboxHomeEnabled = true;
+
     mutateMock.mockImplementation((_id, options) => {
       options?.onSuccess?.();
     });
@@ -1025,7 +1027,7 @@ describe('OpportunityInboxPageClient', () => {
 
   it('does not restore stack focus after a failed report next step', async () => {
     const user = userEvent.setup();
-    inboxHomeEnabled = true;
+
     mutateMock.mockImplementation((_id, options) => {
       options?.onError?.();
     });
@@ -1081,7 +1083,7 @@ describe('OpportunityInboxPageClient', () => {
     'does not restore stack focus after a failed %s action',
     async key => {
       const user = userEvent.setup();
-      inboxHomeEnabled = true;
+
       mutateMock.mockImplementation((_id, options) => {
         options?.onError?.();
       });
@@ -1129,7 +1131,7 @@ describe('OpportunityInboxPageClient', () => {
 
   it('returns focus to a queue item restored after an asynchronous failure', async () => {
     const user = userEvent.setup();
-    inboxHomeEnabled = true;
+
     let rejectAction: (() => void) | undefined;
     mutateMock.mockImplementationOnce((_id, options) => {
       rejectAction = () => options?.onError?.(new Error('decision failed'));
@@ -1282,8 +1284,7 @@ describe('OpportunityInboxPageClient', () => {
 });
 
 describe('creator-only empty home', () => {
-  it('never offers founder capture when Inbox Home is enabled', () => {
-    inboxHomeEnabled = true;
+  it('never offers founder capture in the supported creator inbox', () => {
     render(
       <OpportunityInboxPageClient
         inbox={{

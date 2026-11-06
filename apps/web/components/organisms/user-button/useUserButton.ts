@@ -10,6 +10,7 @@ import { useBillingStatusQuery } from '@/lib/queries';
 import { upgradeOAuthAvatarUrl } from '@/lib/utils/avatar-url';
 import type { Artist } from '@/types/db';
 import { useUserMenuActions } from '../useUserMenuActions';
+import { resolveAccountLabel } from './resolve-account-label';
 import type { UserDisplayInfo } from './types';
 
 const BILLING_STATUS_ERROR_TOAST_SESSION_KEY =
@@ -168,20 +169,14 @@ export function useUserButton({
     user?.primaryEmailAddress?.emailAddress ||
     user?.emailAddresses?.[0]?.emailAddress;
 
-  const emailDerivedName = contactEmail
-    ?.split('@')[0]
-    ?.replaceAll(/[._-]+/g, ' ');
-
-  const displayName =
-    artist?.name ||
-    user?.fullName ||
-    (user?.firstName && user?.lastName
-      ? `${user.firstName} ${user.lastName}`
-      : user?.firstName) ||
-    user?.username ||
-    artist?.handle ||
-    emailDerivedName ||
-    'Artist';
+  const displayName = resolveAccountLabel({
+    artistName: artist?.name,
+    artistHandle: artist?.handle,
+    fullName: user?.fullName,
+    firstName: user?.firstName,
+    lastName: user?.lastName,
+    username: user?.username,
+  });
 
   const userInitials = displayName
     ? displayName
@@ -206,8 +201,7 @@ export function useUserButton({
   const settingsUrl = settingsHref ?? APP_ROUTES.SETTINGS;
   const usageStatsUrl = APP_ROUTES.SETTINGS_USAGE;
 
-  const jovieUsername =
-    user?.username || artist?.handle || contactEmail?.split('@')[0] || null;
+  const jovieUsername = user?.username || artist?.handle || null;
   const formattedUsername = jovieUsername ? `@${jovieUsername}` : null;
 
   const menuActions = useUserMenuActions({

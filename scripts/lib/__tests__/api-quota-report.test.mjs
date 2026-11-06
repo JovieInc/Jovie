@@ -6,6 +6,7 @@ import {
   jobSeconds,
   parseQuotaNotice,
   percentile,
+  projectDrain,
   summarizeHeadroom,
   summarizeQuota,
 } from '../api-quota-report.mjs';
@@ -15,7 +16,7 @@ describe('api quota report', () => {
     const hour = 1792551600; // hour aligned
     const sample = (bucket, remaining, offset) =>
       parseQuotaNotice(
-        `bucket=${bucket} remaining=${remaining} limit=1000 used=1 reset=1 at=${hour + offset}`
+        `bucket=${bucket} remaining=${remaining} limit=1000 used=1 reset=${hour + 3600 * (offset >= 3600 ? 2 : 1)} at=${hour + offset}`
       );
     expect(
       summarizeHeadroom([
@@ -148,5 +149,127 @@ describe('api quota report', () => {
     expect(names.indexOf('Sample API quota')).toBeLessThan(
       names.indexOf('Enqueue green PRs')
     );
+  });
+});
+
+describe('projectDrain', () => {
+  const hour = 1_800_000_000 - (1_800_000_000 % 3600);
+  const sample = (minute, remaining, bucket = 'github-token') => ({
+    at: hour + minute * 60,
+    bucket,
+    remaining,
+    limit: 5000,
+  });
+
+  it('alerts when the bucket is projected empty before the window resets', () => {
+    const alerts = projectDrain(
+      [sample(0, 5000), sample(5, 4000), sample(10, 3000)],
+      hour + 10 * 60
+    );
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({
+      bucket: 'github-token',
+      remaining: 3000,
+      ratePerMinute: 200,
+    });
+    // 3000 left at 200/min is empty 15 min from now, 35 min before the reset.
+    expect(alerts[0].minutesEarly).toBe(35);
+  });
+
+  it('stays quiet when the bucket outlasts the window, is flat, or has too little data', () => {
+    expect(
+      projectDrain(
+        [sample(0, 5000), sample(5, 4900), sample(10, 4800)],
+        hour + 600
+      )
+    ).toEqual([]);
+    expect(
+      projectDrain(
+        [sample(0, 3000), sample(5, 3000), sample(10, 3000)],
+        hour + 600
+      )
+    ).toEqual([]);
+    expect(
+      projectDrain([sample(0, 5000), sample(10, 100)], hour + 600)
+    ).toEqual([]);
+    expect(
+      projectDrain(
+        [sample(0, 5000), sample(0.5, 4000), sample(1, 3000)],
+        hour + 60
+      )
+    ).toEqual([]);
+  });
+
+  it('ignores samples from earlier windows and judges each bucket on its own', () => {
+    const alerts = projectDrain(
+      [
+        { at: hour - 60, bucket: 'github-token', remaining: 1, limit: 5000 },
+        sample(0, 5000, 'jovie-bot'),
+        sample(5, 4990, 'jovie-bot'),
+        sample(10, 4980, 'jovie-bot'),
+        sample(0, 5000),
+        sample(5, 2500),
+        sample(10, 0),
+      ],
+      hour + 600
+    );
+    expect(alerts.map(alert => alert.bucket)).toEqual(['github-token']);
+  });
+});
+
+describe('quota windows follow the reset epoch, not the clock hour', () => {
+  // The installation's windows run :23 to :23 (reset 03:23:23 on 2026-10-26).
+  const reset = 1_800_000_000 - (1_800_000_000 % 3600) + 23 * 60 + 23;
+  const sample = (secondsBeforeReset, remaining, bucket = 'github-token') => ({
+    at: reset - secondsBeforeReset,
+    bucket,
+    remaining,
+    limit: 5000,
+    used: 5000 - remaining,
+    reset,
+  });
+
+  it('summarizeHeadroom groups by reset so a :23 window is not split at the hour', () => {
+    const rows = summarizeHeadroom([
+      sample(3000, 4800),
+      sample(2000, 3000), // after the top of the hour, same window
+      sample(100, 250),
+      { ...sample(100, 4900), reset: reset + 3600, at: reset + 3500 }, // next window
+    ]);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ samples: 3, minRemaining: 250 });
+    expect(new Date(rows[0].windowStart).getTime() / 1000).toBe(reset - 3600);
+  });
+
+  it('projectDrain uses the newest sample reset as the window end', () => {
+    // 1800 left falling 1000 per 5 min => empty in 9 min; reset is 20 min away.
+    const alerts = projectDrain(
+      [
+        sample(1800, 4800),
+        sample(1500, 3800),
+        sample(1200, 2800),
+        sample(900, 1800),
+      ],
+      reset - 900
+    );
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].resetAt).toBe(new Date(reset * 1000).toISOString());
+    expect(alerts[0].minutesEarly).toBe(6);
+  });
+
+  it('projectDrain ignores samples from the previous window and a window that already reset', () => {
+    const old = { ...sample(0, 10), reset: reset - 3600, at: reset - 3700 };
+    expect(
+      projectDrain(
+        [old, sample(600, 4000), sample(400, 3990), sample(200, 3980)],
+        reset - 100
+      )
+    ).toEqual([]);
+    expect(
+      projectDrain(
+        [sample(600, 100), sample(400, 50), sample(200, 0)],
+        reset + 10
+      )
+    ).toEqual([]);
   });
 });

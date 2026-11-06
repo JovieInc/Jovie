@@ -95,13 +95,9 @@ export function resolveCookieBannerRequirement(params: {
   readonly countryCode: string | null;
   readonly regionCode?: string | null;
 }): boolean {
-  const cookieValue = params.cookieHeader
-    ?.split(';')
-    .find(cookie =>
-      cookie.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`)
-    )
-    ?.split('=')[1]
-    ?.trim();
+  const cookieValue = readCookieBannerRequirementValue(
+    params.cookieHeader ?? ''
+  );
 
   if (cookieValue === '0') return false;
   if (cookieValue === '1') return true;
@@ -119,10 +115,22 @@ export function resolveCookieBannerRequirement(params: {
 export function isCookieBannerRequiredFromCookieString(
   cookieString: string
 ): boolean {
-  const entry = cookieString
+  return readCookieBannerRequirementValue(cookieString) !== '0';
+}
+
+/** Conflicting path/domain cookies cannot override a required-region flag. */
+function readCookieBannerRequirementValue(
+  cookieString: string
+): string | undefined {
+  const values = cookieString
     .split(';')
-    .find(cookie =>
-      cookie.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`)
+    .map(cookie => cookie.trim())
+    .filter(cookie => cookie.startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`))
+    .map(cookie =>
+      cookie.slice(COOKIE_BANNER_REQUIRED_COOKIE.length + 1).trim()
     );
-  return entry?.split('=')[1]?.trim() !== '0';
+  if (values.length > 1) {
+    return values.every(value => value === '0') ? '0' : '1';
+  }
+  return values[0];
 }

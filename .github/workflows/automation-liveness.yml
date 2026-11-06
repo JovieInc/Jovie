@@ -10,7 +10,7 @@ name: Automation Liveness
 # lanes tick fires every 5 minutes and GitHub's cron backstops when Gem is down.
 # Runner Health Monitor is a telemetry node, and the workflow topology contract
 # forbids workflow_run edges out of telemetry (observer recursion). The job runs
-# on every fifth guard run (about 25 minutes) to keep its ~40 GitHub API reads
+# when no check ran in the current 20-minute bucket (a time gate, see the gate job) to keep its ~40 GitHub API reads
 # per run inside the shared GITHUB_TOKEN budget; the lanes doctor alerts when no
 # run lands for 60 minutes.
 
@@ -35,12 +35,98 @@ permissions:
   actions: read
 
 jobs:
+  # 2026-10-26: the old gate ran the check on guard run numbers ending in 0 or 5, which assumed the lanes tick
+  # fires the guard every 5 minutes. With the tick slow, guard runs arrived every 10-20 minutes and the check
+  # ran once in 70 minutes, so a stale lanes status went unreported. The gate is now time based: the check is
+  # due when none has run in the current 20-minute bucket (at most 40 minutes between checks, inside the lanes
+  # doctor's 60-minute alert). It reads an Actions-cache marker, not the GitHub API: the first version listed
+  # runs and jobs with github.token (two API calls and an unprimed setup-node per guard run) and put this file
+  # over its workflow-token-budget, which turned PR Fleet Rules red for every PR.
+  gate:
+    name: Liveness check due
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      due: ${{ steps.due.outputs.due }}
+      bucket: ${{ steps.bucket.outputs.bucket }}
+    steps:
+      - id: bucket
+        run: echo "bucket=$(( $(date -u +%s) / 1200 ))" >> "$GITHUB_OUTPUT"
+      - id: seen
+        if: github.event_name != 'workflow_dispatch'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .liveness-marker
+          key: automation-liveness-ran-${{ steps.bucket.outputs.bucket }}
+          lookup-only: true
+          fail-on-cache-miss: false
+      - id: due
+        env:
+          EVENT: ${{ github.event_name }}
+          SEEN: ${{ steps.seen.outputs.cache-hit }}
+        run: |
+          if [ "$EVENT" != workflow_dispatch ] && [ "$SEEN" = true ]; then echo "due=false" >> "$GITHUB_OUTPUT"; else echo "due=true" >> "$GITHUB_OUTPUT"; fi
+
+  # Budget diagnostics share the existing due gate. A failed token mint must
+  # not fail Check automation heartbeats or defeat its 20-minute throttle.
+  installation-budget:
+    name: Sample installation REST budgets
+    needs: gate
+    if: needs.gate.outputs.due == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      # 2026-10-24: the shared installation REST budget ran dry and a dozen PRs
+      # went red until a manual rerun. GET /rate_limit is free; each sample is a
+      # point in the consumption series and alarms below 15% remaining. Reuses
+      # this sanctioned ~25m backstop (JOV-INV-042: no new clock).
+      - name: Mint CI App read token for budget sample
+        id: ci-app-token
+        if: ${{ always() && vars.CI_APP_ID != '' }}
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+          permission-contents: read
+
+      - name: Sample GitHub installation budgets
+        id: installation-budget
+        if: ${{ always() }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CI_APP_TOKEN: ${{ steps.ci-app-token.outputs.token }}
+        run: node scripts/installation-budget-sentinel.mjs
+
+      - name: Send Slack Alert on Low Installation Budget
+        if: ${{ always() && (steps.installation-budget.outputs.shared_github_token_low == 'true' || steps.installation-budget.outputs.ci_app_low == 'true') }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: "#alerts-production"
+          author_name: "CI Budget Sentinel"
+          custom_payload: |
+            {
+              "text": "GitHub REST budget below 15% (shared GITHUB_TOKEN: ${{ steps.installation-budget.outputs.shared_github_token_remaining }}/${{ steps.installation-budget.outputs.shared_github_token_limit }}, CI App: ${{ steps.installation-budget.outputs.ci_app_remaining }}/${{ steps.installation-budget.outputs.ci_app_limit }}). Fleet-rule gates defer (exit 75) until the reset.",
+              "attachments": [{ "color": "warning", "fields": [{ "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>", "short": false }] }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
   liveness:
     name: Check automation heartbeats
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      endsWith(format('{0}', github.event.workflow_run.run_number), '0') ||
-      endsWith(format('{0}', github.event.workflow_run.run_number), '5')
+    needs: gate
+    if: needs.gate.outputs.due == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -70,8 +156,8 @@ jobs:
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
-          channel: '#alerts-production'
-          author_name: 'Synthetic Monitoring'
+          channel: "#alerts-production"
+          author_name: "Synthetic Monitoring"
           custom_payload: |
             {
               "text": "Production Synthetic Monitoring Failed - jov.ie",
@@ -127,6 +213,16 @@ jobs:
           if [ "$FILE_ISSUES" = "true" ]; then args+=(--file); fi
           node scripts/automation-liveness.mjs "${args[@]}"
 
+      # Release-lag dead-man: a green Production Controller run proves nothing because Coalesce can
+      # skip the release as superseded. Alerts, naming the blocking step, when production has not
+      # advanced in 3h while main has.
+      # github-token-budget: 3 calls/run - names the blocking controller step, only when production lags
+      - name: Production release lag
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release-lag-check.mjs
+
       - name: Save alert state
         if: ${{ always() && hashFiles('liveness/state.json') != '' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -153,3 +249,15 @@ jobs:
             liveness/decisions.json
           if-no-files-found: ignore
           retention-days: 90
+
+      # Marks this 20-minute bucket as checked (the gate reads it). Runs even when the check failed:
+      # a failing check must not be retried by every guard run in the bucket.
+      - name: Mark this liveness bucket as checked
+        if: ${{ always() }}
+        run: mkdir -p .liveness-marker && date -u +%FT%TZ > .liveness-marker/ran
+      - name: Save the liveness bucket marker
+        if: ${{ always() }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .liveness-marker
+          key: automation-liveness-ran-${{ needs.gate.outputs.bucket }}

@@ -18,6 +18,63 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    # Cloudflare R2 Turbo cache with automatic fallback. Runs only when the
+    # caller exported CF_TURBO_* (ci.yml); a failed probe leaves the legacy
+    # TURBO_* values untouched. Roles: rw (push, dispatch, merge group) or ro
+    # (pull_request). TURBO_CACHE_READ is the read-only form for steps that must
+    # never write (they set TURBO_CACHE to it instead of hard-coding local:r,
+    # which would also switch remote reads off). The "turbo-cache:" log line is
+    # parsed by scripts/lib/turbo-cache-stats.mjs; keep its format.
+    - name: Select Turbo remote cache
+      shell: bash
+      env:
+        CF_TURBO_URL: ${{ env.CF_TURBO_URL }}
+        CF_TURBO_TOKEN: ${{ env.CF_TURBO_TOKEN }}
+        CF_TURBO_ROLE: ${{ env.CF_TURBO_ROLE }}
+        CF_TURBO_SIGNATURE_KEY: ${{ env.CF_TURBO_SIGNATURE_KEY }}
+      run: |
+        if [ -z "${CF_TURBO_URL:-}" ] || [ -z "${CF_TURBO_TOKEN:-}" ]; then
+          echo "TURBO_CACHE_READ=local:r" >> "$GITHUB_ENV"
+          echo "turbo-cache: backend=legacy (no Cloudflare credentials)"
+          exit 0
+        fi
+        code=$(curl -s -o /dev/null -m 5 -w '%{http_code}' \
+          -H "Authorization: Bearer ${CF_TURBO_TOKEN}" \
+          "${CF_TURBO_URL%/}/v8/artifacts/status" || true)
+        if [ "$code" != "200" ]; then
+          echo "::warning::Cloudflare Turbo cache probe returned ${code:-none}; using legacy cache."
+          echo "TURBO_CACHE_READ=local:r" >> "$GITHUB_ENV"
+          echo "turbo-cache: backend=legacy (probe ${code:-none})"
+          exit 0
+        fi
+        # Signing: artifacts are HMAC-signed with a key every reader and writer
+        # holds; unsigned or wrongly-signed artifacts are rejected. Without a
+        # key nothing may write (unsigned writes could be forged).
+        role="$CF_TURBO_ROLE"
+        signed_json=""
+        if [ -n "${CF_TURBO_SIGNATURE_KEY:-}" ]; then
+          signed_json="${RUNNER_TEMP}/turbo.signed.json"
+          perl -0pe 's/\{/{\n  "remoteCache": { "signature": true },/' turbo.json > "$signed_json"
+        else
+          role="ro"
+        fi
+        {
+          echo "TURBO_API=${CF_TURBO_URL%/}"
+          echo "TURBO_TOKEN=${CF_TURBO_TOKEN}"
+          echo "TURBO_TEAM=jovie"
+          echo "TURBO_CACHE_READ=local:r,remote:r"
+          if [ -n "$signed_json" ]; then
+            echo "TURBO_ROOT_TURBO_JSON=${signed_json}"
+            echo "TURBO_REMOTE_CACHE_SIGNATURE_KEY=${CF_TURBO_SIGNATURE_KEY}"
+          fi
+          if [ "$role" = "rw" ]; then
+            echo "TURBO_CACHE=local:rw,remote:rw"
+          else
+            echo "TURBO_CACHE=local:rw,remote:r"
+          fi
+        } >> "$GITHUB_ENV"
+        echo "turbo-cache: backend=cloudflare-r2 role=${role} signed=$([ -n "$signed_json" ] && echo yes || echo no)"
+
     # Self-hosted runners reuse a workspace whose owner can differ from the job
     # user, tripping git's dubious-ownership guard. That makes turbo's SCM probe
     # report the checkout as "not part of a Git repository" and breaks
@@ -60,7 +117,7 @@ runs:
     # re-download costs seconds. The package store stays shared and safe.
     - name: Setup pnpm
       if: steps.runner-prereqs.outputs.dependencies_warm != 'true'
-      uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      uses: ./.github/actions/vendor/pnpm-action-setup # pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 v6.1.0 (vendored, JOV-8754)
       with:
         dest: ${{ runner.temp }}/setup-pnpm
 
@@ -83,7 +140,7 @@ runs:
     - name: Restore installed node_modules (GitHub-hosted)
       id: node-modules-cache
       if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && runner.environment == 'github-hosted' && inputs.package_cache == 'true'
-      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      uses: ./.github/actions/vendor/actions-cache/restore # actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 v6.1.0 (vendored, JOV-8754)
       with:
         path: |
           node_modules
@@ -141,6 +198,16 @@ runs:
             "${{ steps.runner-prereqs.outputs.installed_tree_archive_sha256 }}"
         else
           pnpm install --frozen-lockfile
+          # A restored tree can survive the frozen install still linking an
+          # unpatched copy of a patchedDependencies entry (run 40345264860:
+          # prebuild-install, DEP0176). Rebuild from scratch instead of
+          # running on, or saving, that tree.
+          if ! node scripts/lib/verify-patched-dependencies.mjs; then
+            echo "::warning::Restored node_modules held stale patched dependencies; reinstalling from scratch."
+            rm -rf node_modules apps/*/node_modules packages/*/node_modules workers/*/node_modules
+            pnpm install --frozen-lockfile
+            node scripts/lib/verify-patched-dependencies.mjs
+          fi
         fi
 
     # The repo's Actions cache runs over its 10 GB cap on dependabot days (12.3 GB
@@ -199,6 +266,10 @@ runs:
           -o -name '@anthropic-ai+claude-agent-sdk-linux-*' \) \
           -exec find {}/node_modules -type f ! -name package.json -delete \;
 
+    - name: Prepare browser contracts for remote preflight
+      if: github.workflow == 'Preflight Remote'
+      uses: ./.github/actions/setup-playwright
+
     - name: Stamp installed workspace receipt
       if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && runner.environment == 'github-hosted' && inputs.package_cache == 'true' && !(github.event_name == 'merge_group' && inputs.reuse_merge_group_workspace == 'true')
       shell: bash
@@ -215,7 +286,7 @@ runs:
         (github.event_name == 'merge_group' && inputs.save_merge_group_workspace == 'true') ||
         (github.event_name == 'pull_request' &&
         github.event.pull_request.head.repo.full_name == github.repository))
-      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      uses: ./.github/actions/vendor/actions-cache/save # actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 v6.1.0 (vendored, JOV-8754)
       with:
         path: |
           node_modules

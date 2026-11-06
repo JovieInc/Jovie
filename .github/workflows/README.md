@@ -218,7 +218,7 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `Ovie Typecheck (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/ovie typecheck` |
 | `Storybook Surface Matrix (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/web exec playwright test tests/e2e/storybook-elevation.spec.ts tests/e2e/storybook-input.spec.ts --config=playwright.config.storybook.ts --project=chromium` |
 | `iOS Fast Unit + Coverage (combined)` | merge-group | combined-integration | `pnpm run ios:lint && bash apps/ios/scripts/run-unit-tests.sh && bash apps/ios/scripts/check_coverage.sh` |
-| `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm run macos:test && pnpm run macos:build && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging` |
+| `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm run macos:test && pnpm run macos:build && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test` |
 | `Cross-Product Integration (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test && pnpm --filter @jovie/release-channel-contracts test` |
 | `Promptfoo Evals (deterministic)` | merge-group | combined-integration | `pnpm run evals` |
 | `Golden Eval Set (deterministic)` | merge-group | combined-integration | `pnpm run evals:golden` |
@@ -242,21 +242,3 @@ Sensitive changes are classified deterministically on source PRs. Smoke and prev
 | Environment and runtime config | high | yes | yes | no |
 | Public UI and profile surfaces | medium | no | yes | no |
 <!-- ci-harness:end -->
-
-## Internal PR Review (advisory)
-
-`internal-review.yml` (JOV-7400) is the internal, advisory-only replacement for
-CodeRabbit. On each non-draft PR open, reopen and push it posts one upserted comment covering correctness risks, test gaps, migration
-hazards and violations of the scoped `.claude/rules` conventions for the
-changed paths (with capped base-branch call sites of changed exports, enclosing
-functions, scripts and flags), via the Vercel AI Gateway (`zai/glm-5.3-flash`, existing
-`AI_GATEWAY_API_KEY` secret — no new vendors). Drafts, Dependabot, `bot/*`
-report branches and docs-only diffs are skipped; `gh workflow run
-internal-review.yml -f pr_number=<n>` reviews one PR on demand.
-
-Non-blocking by construction: it is not a required check, never requests
-changes, and the script always exits 0 — a missing key, rate limit, or
-oversized diff degrades to an annotated comment, never merge delay. Merge
-correctness remains owned by the required gates above. It runs on
-`pull_request_target` against the trusted base ref; the PR diff is read through
-the GitHub API as data only, so no PR-controlled code executes.

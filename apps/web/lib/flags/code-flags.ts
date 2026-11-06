@@ -24,6 +24,11 @@ export const CODE_FLAGS = {
   // enables the anonymous public-artist tools. Does not enable DCR.
   CHATGPT_APP_DIRECTORY_MCP: false,
   CHAT_COMPOSER_V2: true,
+  // Claim-verify spec Q2: daily sweep over grandfathered (legacy) claims.
+  // Default off so the first run that takes 50k+ pages private is a
+  // deliberate, observable flip. FEATURE_CLAIM_LEGACY_PROOF_SWEEP=true stamps
+  // the 30-day nudge and reopens 50k+ claims past it as proof-only requests.
+  CLAIM_LEGACY_PROOF_SWEEP: false,
   CYAN_FOCUS_GLOW: true,
   // Fundraising YC section order. Default off until Tim approves the
   // narrative in Pen. FEATURE_INVESTOR_PORTAL_YC_DECK=true reorders the
@@ -49,12 +54,24 @@ export const CODE_FLAGS = {
   MUSIC_RESOLVER_PROVIDER_LINKS: false,
   MUSIC_RESOLVER_RELEASE_FACTS: false,
   NEW_RELEASE_PAGE: true,
+  // JOV-9758: value before paywall. On: the onboarding preview shows the
+  // matched artist's real Spotify catalog, the materialized profile imports
+  // that catalog, and the upgrade page leads with it before the price.
+  // FEATURE_ONBOARDING_VALUE_BEFORE_PAYWALL=false is the kill switch.
+  ONBOARDING_VALUE_BEFORE_PAYWALL: true,
   // Better Auth dynamic client registration. Default off: Better Auth
   // discovery omits registration_endpoint and /oauth2/register stays closed.
   // FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION=true opens unauthenticated
   // registration limited to the shared MCP redirect allowlist. The founder
   // Ovie issuer advertises /api/ovie/oauth/register on its own.
   OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: false,
+  // Closed public signup (Tim, 2026-11-02). Closed by default. With
+  // FEATURE_PUBLIC_SIGNUP_CLOSED=true, /signup and anonymous /start send
+  // visitors to the /waitlist role form (Turnstile-gated, no account). Sign-in
+  // and waitlist invite links still create accounts and enter /start.
+  // Reopen criteria: the golden path is certified AND the first paying
+  // artists are live. Decision: canon/PRODUCT.md (2026-11-02).
+  PUBLIC_SIGNUP_CLOSED: true,
   // Social-network HTML must not be fetched from Jovie server IPs. Default
   // off. FEATURE_SOCIAL_HTML_ISOLATED_PROVIDER=true is reserved for a future
   // isolated provider and still fails closed until that provider exists.

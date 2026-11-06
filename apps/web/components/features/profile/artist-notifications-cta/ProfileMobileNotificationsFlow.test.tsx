@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { COUNTRY_OPTIONS } from '@/features/profile/notifications';
@@ -93,7 +94,7 @@ describe('ProfileMobileNotificationsFlow', () => {
   });
 
   it('labels the event preference with the generalized Events copy', () => {
-    renderFlow();
+    renderFlow({ availableContent: ['newMusic', 'tourDates', 'merch'] });
 
     expect(screen.getAllByText('Events').length).toBeGreaterThan(0);
     expect(screen.queryByText('Shows')).toBeNull();
@@ -110,5 +111,41 @@ describe('ProfileMobileNotificationsFlow', () => {
 
     expect(source).not.toMatch(/\bred-\d/);
     expect(source).toContain('text-error');
+  });
+
+  it('shows only the preference toggles for content the artist has', () => {
+    renderFlow();
+
+    expect(screen.getAllByText('New Music').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Events')).toBeNull();
+    expect(screen.queryByText('Merch')).toBeNull();
+  });
+
+  it('shows a save error on the preferences step instead of looking saved', () => {
+    renderFlow({ error: 'We could not save your choices. Try again.' });
+    expect(screen.getByRole('alert').textContent).toMatch(/could not save/);
+  });
+
+  it('describes what the artist toggle really shares', () => {
+    renderFlow({ showArtistEmailSection: true });
+    expect(screen.getByText(/including ads/)).toBeTruthy();
+    expect(screen.getByText(/Off unless you turn it on/)).toBeTruthy();
+  });
+});
+
+describe('contrast floor (WCAG 1.4.3)', () => {
+  it('renders no label or body text below text-white/60 on the dark hero', () => {
+    const source = readFileSync(
+      resolve(
+        dirname(fileURLToPath(import.meta.url)),
+        'ProfileMobileNotificationsFlow.tsx'
+      ),
+      'utf8'
+    );
+
+    // text-white/42 measured below 4.5:1 on the hero backdrop (axe
+    // color-contrast); 60% white is the floor for label/body text here.
+    expect(source).not.toMatch(/text-white\/(?:[0-4]\d|5[0-9])\b/);
+    expect(source).toMatch(/text-white\/60/);
   });
 });

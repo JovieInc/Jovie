@@ -9,11 +9,17 @@ vi.mock('@/app/(marketing)/changelog/ChangelogEmailSignup', () => ({
   ChangelogEmailSignup: ({
     source,
     marketingSection,
+    deferSecurityCheck,
   }: {
     source: string;
     marketingSection?: boolean;
+    deferSecurityCheck?: boolean;
   }) => (
-    <div data-testid='signup' data-marketing-section={marketingSection}>
+    <div
+      data-testid='signup'
+      data-marketing-section={marketingSection}
+      data-defer-security-check={deferSecurityCheck}
+    >
       {source}
     </div>
   ),
@@ -42,6 +48,11 @@ describe('MarketingEmailSignup placement', () => {
     );
     expect(screen.getByTestId('signup')).toHaveAttribute(
       'data-marketing-section',
+      'true'
+    );
+    // Footer signups never load the Cloudflare iframe on page view.
+    expect(screen.getByTestId('signup')).toHaveAttribute(
+      'data-defer-security-check',
       'true'
     );
   });

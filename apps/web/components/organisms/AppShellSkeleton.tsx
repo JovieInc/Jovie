@@ -139,6 +139,7 @@ export function AppShellSkeleton({
         Loading your workspace…
       </p>
       <AppShellFrame
+        brandVariant={brandVariant}
         placeholder
         sidebar={resolvedSidebar}
         header={

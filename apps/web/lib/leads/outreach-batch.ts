@@ -20,10 +20,12 @@ import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
 import { recordLeadFunnelEvent } from '@/lib/leads/funnel-events';
 import { pushLeadToInstantly } from '@/lib/leads/instantly';
+import { resolveLeadClaimToken } from '@/lib/leads/lead-claim-token';
 import {
   isInstantlyOutboundEnabled,
   isOutreachQuietHours,
 } from '@/lib/leads/outbound-gates';
+import { outreachApprovedWhere } from '@/lib/leads/outreach-eligible-status';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import {
   evaluateOutboundSend,
@@ -68,10 +70,10 @@ function getPendingEmailWhereClause(now = new Date()) {
   return and(
     or(eq(leads.outreachRoute, 'email'), eq(leads.outreachRoute, 'both')),
     eq(leads.outreachStatus, 'pending'),
-    eq(leads.status, 'approved'),
+    outreachApprovedWhere(),
     eq(leads.emailInvalid, false),
     isNotNull(leads.contactEmail),
-    isNotNull(leads.claimToken),
+    isNotNull(leads.claimTokenHash),
     // Consent gate: only leads with recorded outbound consent may be sent.
     // Until a consent-capture path writes this column, the batch sends nothing.
     isNotNull(leads.outreachConsentAt),
@@ -160,7 +162,9 @@ interface ClaimedLead {
   contactEmail: string | null;
   instagramHandle: string | null;
   creatorProfileId: string | null;
+  /** Derived in memory from the stored hash inputs; never persisted. */
   claimToken: string | null;
+  claimTokenHash: string | null;
   priorityScore: number | null;
   claimedAt: Date;
 }
@@ -251,7 +255,8 @@ async function claimOutreachLeads(
         contactEmail: leads.contactEmail,
         instagramHandle: leads.instagramHandle,
         creatorProfileId: leads.creatorProfileId,
-        claimToken: leads.claimToken,
+        claimTokenHash: leads.claimTokenHash,
+        claimTokenExpiresAt: leads.claimTokenExpiresAt,
         priorityScore: leads.priorityScore,
       })
       .from(leads)
@@ -278,7 +283,16 @@ async function claimOutreachLeads(
         .returning({ id: leads.id });
 
       if (claimedLead) {
-        claimed.push({ ...lead, claimedAt });
+        const { claimTokenExpiresAt, ...rest } = lead;
+        claimed.push({
+          ...rest,
+          claimToken: await resolveLeadClaimToken({
+            id: lead.id,
+            claimTokenHash: lead.claimTokenHash,
+            claimTokenExpiresAt,
+          }),
+          claimedAt,
+        });
       }
     }
 
@@ -378,6 +392,9 @@ export async function processOutreachBatch(
     attempted++;
 
     if (!lead.contactEmail || !lead.claimToken) {
+      // A legacy random token cannot be re-derived: release so the lead is
+      // routed again (which mints a derivable one) instead of holding the claim.
+      await releaseClaim(lead.id);
       continue;
     }
 
@@ -461,7 +478,7 @@ export async function processOutreachBatch(
             campaignKey: 'claim_invite',
             metadata: {
               instantlyLeadId,
-              claimToken: lead.claimToken,
+              claimTokenHash: lead.claimTokenHash,
               approvedCopyRevision: permission.copy.revision,
             },
           },

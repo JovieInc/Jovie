@@ -12,7 +12,7 @@ vi.mock('@/lib/queries/useAiCrawlerAnalyticsQuery', () => ({
   useAiCrawlerAnalyticsQuery: hoisted.useAiCrawlerAnalyticsQueryMock,
 }));
 
-vi.mock('@/components/molecules/drawer', () => ({
+vi.mock('@/components/molecules/drawer', async () => ({
   DrawerSurfaceCard: ({ children }: { readonly children: ReactNode }) => (
     <div>{children}</div>
   ),
@@ -20,29 +20,20 @@ vi.mock('@/components/molecules/drawer', () => ({
     entityHeader,
     children,
     isOpen,
+    scrollStrategy = 'child',
   }: {
     readonly entityHeader?: ReactNode;
     readonly children: ReactNode;
     readonly isOpen: boolean;
+    readonly scrollStrategy?: 'child' | 'shell';
   }) =>
     isOpen ? (
-      <aside>
+      <aside data-scroll-strategy={scrollStrategy}>
         {entityHeader}
         {children}
       </aside>
     ) : null,
-  StatTile: ({
-    label,
-    value,
-  }: {
-    readonly label: string;
-    readonly value: string;
-  }) => (
-    <div>
-      <span>{label}</span>
-      <span>{value}</span>
-    </div>
-  ),
+  ...(await import('@/components/molecules/drawer/StatTile')),
 }));
 
 vi.mock('@/components/molecules/drawer-header/DrawerHeaderActions', () => ({
@@ -88,6 +79,7 @@ describe('AiCrawlerDetailPanel', () => {
       screen.getByTestId('ai-crawler-measurement-disclosure')
     ).toHaveTextContent('They do not show an AI answer mention');
     expect(screen.getByText('420')).toBeInTheDocument();
+    expect(screen.getByText('420')).toHaveAttribute('data-state', 'value');
     expect(screen.getByText('GPTBot')).toBeInTheDocument();
   });
 
@@ -100,6 +92,7 @@ describe('AiCrawlerDetailPanel', () => {
     render(<AiCrawlerDetailPanel isOpen onClose={() => undefined} />);
 
     expect(screen.getAllByText('Unknown')).toHaveLength(2);
+    expect(screen.queryByText('Loading')).not.toBeInTheDocument();
     expect(
       screen.getByText(
         'AI crawler reads are Unknown until telemetry is available.'
@@ -122,10 +115,22 @@ describe('AiCrawlerDetailPanel', () => {
     render(<AiCrawlerDetailPanel isOpen onClose={() => undefined} />);
 
     expect(screen.getAllByText('0')).toHaveLength(2);
+    expect(screen.getAllByTestId('stat-tile-value')).toHaveLength(2);
+    expect(screen.queryByText('Loading')).not.toBeInTheDocument();
     expect(
       screen.getByText('No AI crawler visits recorded yet.')
     ).toBeInTheDocument();
     expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
+  });
+
+  it('gives the long crawler list an explicit shell-owned scroll region', () => {
+    render(<AiCrawlerDetailPanel isOpen onClose={() => undefined} />);
+
+    // P1.3/P3.1: pinned stats plus one shell-owned scroller keeps long crawler
+    // lists scrollable without a second nested scroll owner.
+    expect(
+      document.querySelector('aside[data-scroll-strategy="shell"]')
+    ).not.toBeNull();
   });
 
   it('gates the teaser behind the canonical Artist Presence upsell', () => {
@@ -155,6 +160,11 @@ describe('AiCrawlerDetailPanel', () => {
     render(<AiCrawlerDetailPanel isOpen onClose={() => undefined} />);
 
     expect(screen.getByText('Reads (30 Days)')).toBeInTheDocument();
+    expect(screen.getAllByTestId('stat-tile-value')).toHaveLength(2);
+    for (const value of screen.getAllByTestId('stat-tile-value')) {
+      expect(value).toHaveAttribute('aria-busy', 'true');
+    }
+    expect(screen.queryByText('Not measured')).not.toBeInTheDocument();
     expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
     expect(
       screen.queryByText(

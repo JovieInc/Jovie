@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -177,6 +178,10 @@ describe('pre-push gate Node and fanout wiring (JOV-4329)', () => {
     expect(huskyPrePush).toContain(
       'export AUTOMATION_VERIFY_SHARD_CONCURRENCY="${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-1}"'
     );
+    expect(huskyPrePush).toContain(
+      'export JOVIE_PREFLIGHT_JOBS="${JOVIE_PREFLIGHT_JOBS:-1}"'
+    );
+    expect(huskyPrePush).not.toMatch(/^JOVIE_PREFLIGHT_JOBS=1$/m);
   });
 
   it('keeps the documented max-workers knob in the verify bundle', () => {
@@ -223,6 +228,10 @@ describe('publication range failures', () => {
     const env = {
       PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`,
       HOME: root,
+      // HOME is the fixture so scanners cannot write into the user home.
+      // The node pin still has to resolve from the host nvm, or a machine
+      // whose ambient Node is behind .nvmrc exits before the scan.
+      NVM_DIR: process.env.NVM_DIR ?? resolve(process.env.HOME ?? '', '.nvm'),
       GIT_CONFIG_COUNT: '3',
       GIT_CONFIG_KEY_0: 'maintenance.auto',
       GIT_CONFIG_VALUE_0: 'false',
@@ -254,7 +263,9 @@ describe('publication range failures', () => {
     for (const file of [
       'scripts/hooks/pre-push-gate.sh',
       'scripts/hooks/resolve-repo-node.sh',
+      'scripts/hooks/biome-pre-push.sh',
       'scripts/security/scan-secrets.sh',
+      'biome.json',
       '.nvmrc',
     ]) {
       mkdirSync(dirname(resolve(root, file)), { recursive: true });
@@ -262,12 +273,20 @@ describe('publication range failures', () => {
     }
     for (const file of [
       'scripts/ci-branching-guard.mjs',
+      'scripts/component-ship-gate.mjs',
       'scripts/lib/policy-gate-liveness.mjs',
       'scripts/hooks/pre-push-gate.test.mjs',
+      'scripts/preflight-changed.mjs',
+      'scripts/hooks/prepush-preflight.mjs',
     ]) {
       mkdirSync(dirname(resolve(root, file)), { recursive: true });
       writeFileSync(resolve(root, file), '');
     }
+    symlinkSync(
+      resolve(repoRoot, 'node_modules'),
+      resolve(root, 'node_modules'),
+      'dir'
+    );
     git('init', '-q');
     git('config', 'user.name', 'Fixture');
     git('config', 'user.email', 'fixture@example.invalid');

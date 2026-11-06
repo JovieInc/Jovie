@@ -177,7 +177,7 @@ describe('ArtistNotificationsCTA SMS manage flow', () => {
   it('removes the retired inline phone composer from the auto-open flow', async () => {
     await renderCTA();
 
-    expect(await screen.findByText('Get Updates')).toBeInTheDocument();
+    expect(await screen.findByText('Get New Music')).toBeInTheDocument();
     expect(screen.queryByTestId('country-selector')).not.toBeInTheDocument();
     expect(screen.queryByText('Stay in the Loop')).not.toBeInTheDocument();
   });
@@ -203,7 +203,7 @@ describe('ArtistNotificationsCTA SMS manage flow', () => {
     await renderCTA();
 
     expect(await screen.findByText('Sent from Jovie')).toBeInTheDocument();
-    expect(screen.queryByText('Sent by Test Artist')).not.toBeInTheDocument();
+    expect(screen.queryByText('Optional')).not.toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Save & Finish' }));

@@ -155,6 +155,7 @@ const markdownAllowedJobs = new Set([
   'ci.yml:ci-e2e-smoke',
   'ci.yml:ci-e2e-tests',
   'ci.yml:ci-fast-remaining',
+  'ci.yml:ci-golden-path',
   'ci.yml:ci-smoke-required',
   'ci.yml:ci-storybook-surfaces',
   'ci.yml:ci-visual-snapshot-compare',
@@ -168,7 +169,14 @@ const markdownAllowedJobs = new Set([
   'claim-checkout-dogfood.yml:dogfood',
 ]);
 // Workflow-level secrets a Playwright child may inherit (remote build cache).
-const inheritedSecretAllowlist = new Set(['TURBO_TOKEN', 'TURBO_TEAM']);
+const inheritedSecretAllowlist = new Set([
+  'TURBO_TOKEN',
+  'TURBO_TEAM',
+  'CF_TURBO_CACHE_URL',
+  'CF_TURBO_CACHE_RO_TOKEN',
+  'CF_TURBO_CACHE_RW_TOKEN',
+  'CF_TURBO_SIGNATURE_KEY',
+]);
 const policyWorkflow = (file: string) =>
   parseYaml(readFileSync(join(workflowsRoot, file), 'utf8')) as PolicyWorkflow;
 const policyJob = (source: string): PolicyJob =>
@@ -1265,6 +1273,14 @@ ${fixtureCheckout}
           ].map(name => `${file}:${id}:${name}`)
     );
     expect(violations).toEqual([]);
+    expect([...inheritedSecretAllowlist].sort()).toEqual([
+      'CF_TURBO_CACHE_RO_TOKEN',
+      'CF_TURBO_CACHE_RW_TOKEN',
+      'CF_TURBO_CACHE_URL',
+      'CF_TURBO_SIGNATURE_KEY',
+      'TURBO_TEAM',
+      'TURBO_TOKEN',
+    ]);
     expect(
       secretNames({ A: '${{ secrets.OPENAI_API_KEY }}', B: 'literal' })
     ).toEqual(['OPENAI_API_KEY']);
@@ -1307,20 +1323,18 @@ ${fixtureCheckout}
     expect(violations).toEqual([]);
     const reportJob = policyWorkflow('nightly-testing-agent.yml').jobs?.report;
     expect(reportJob?.permissions).toEqual({ contents: 'read' });
-    const reportToken = reportJob?.steps?.find(
-      step => step.id === 'report-token'
-    );
-    expect(reportToken?.with).toMatchObject({
-      'permission-contents': 'write',
-      'permission-pull-requests': 'write',
-    });
-    const commitReport = reportJob?.steps?.find(
-      step => step.name === 'Open nightly evidence PR'
-    );
-    expect(commitReport?.env?.GH_TOKEN).toBe(
-      '${{ steps.report-token.outputs.token }}'
-    );
-    expect(String(commitReport?.run)).not.toMatch(/\bgit\s+(?:pull|push)\b/);
+    // Evidence is data: the nightly report ships as a run artifact, never as
+    // a PR (#23906). The report job must not mint a publication token at all,
+    // so no bot credentials can reach it in any order.
+    expect(
+      reportJob?.steps?.some(step =>
+        /create-github-app-token@/.test(step.uses ?? '')
+      )
+    ).toBe(false);
+    expect(
+      reportJob?.steps?.some(step => step.name === 'Open nightly evidence PR')
+    ).toBe(false);
+    expect(JSON.stringify(reportJob)).not.toContain('JOVIE_BOT_PRIVATE_KEY');
     expect(reportJob?.env?.GH_TOKEN).toBeUndefined();
     for (const [file, jobId, stepName] of [
       ['screenshots.yml', 'publish', 'Create or update screenshot PR'],
@@ -1348,10 +1362,7 @@ ${fixtureCheckout}
       Object.entries(generate?.env ?? {})
         .filter(([name]) => isCredentialBearingName(name))
         .map(([name, value]) => `${name}: ${value}`)
-    ).toEqual([
-      'DATABASE_URL: postgresql://localhost/noop',
-      'CLERK_SECRET_KEY: sk_test_mock',
-    ]);
+    ).toEqual(['DATABASE_URL: postgresql://localhost/noop']);
     const publishSteps = publish?.steps ?? [];
     const tokenIndex = publishSteps.findIndex(step =>
       /create-github-app-token@/.test(step.uses ?? '')

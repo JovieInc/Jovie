@@ -9,7 +9,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Exact missing-token presentation for web-213-waitlist--invite. The /waitlist/invite server route keeps token parsing, authentication, rate limiting, redemption, and redirects; this deterministic story supplies only copy already shipped by the route.',
+          'Recovery presentations for web-213-waitlist--invite. The /waitlist/invite server route keeps token parsing, authentication, verification, rate limiting, redemption, and redirects; these deterministic stories supply only copy already shipped by the route.',
       },
     },
     backgrounds: { default: 'dark' },
@@ -35,5 +35,19 @@ export const Web213MissingToken: Story = {
   args: {
     title: 'Invite link missing',
     body: 'This invite link is missing its secure token. Open the latest invite email and try again.',
+  },
+};
+
+export const Web213UnverifiedEmail: Story = {
+  name: 'web-213 /waitlist/invite — unverified email',
+  parameters: {
+    pen: {
+      storyExport: 'Web213UnverifiedEmail',
+      fixture: 'unverified email',
+    },
+  },
+  args: {
+    title: 'Verify your email',
+    body: 'Sign in with the same verified email address that received this invite, then open the link again.',
   },
 };

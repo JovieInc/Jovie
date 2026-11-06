@@ -433,31 +433,53 @@ function simulatorUdid(name) {
 
 const sleep = ms => new Promise(done => setTimeout(done, ms));
 
+/** Waiting-budget multiple for one screen's settle loop. */
+export const SETTLE_BUDGET = 18;
+
+/**
+ * Wall-clock deadline for one screen's settle loop (JOV-7952). The budget is
+ * `settleMs * SETTLE_BUDGET` of *waiting* for the fixture to seed and go
+ * still; time spent inside `simctl io screenshot` is capture latency, not
+ * settling — a cold hosted runner can spend 30s+ per frame — so `shotMs` is
+ * credited back. Without that credit a healthy-but-slow screen fails as
+ * "never settled" purely from screenshot latency.
+ */
+export function settleDeadline({ settleMs, startedAt, shotMs = 0 }) {
+  return startedAt + settleMs * SETTLE_BUDGET + shotMs;
+}
+
 /**
  * Screenshot until two consecutive frames match and the screen body has
  * content. Fixtures seed asynchronously, and a cold CI simulator is much
  * slower than a warm local one, so a fixed delay captured empty screens.
  */
 async function captureSettled({ udid, file, spec, screen, settleMs }) {
-  // A cold hosted simulator can spend 30s+ on one screenshot, so the budget
-  // is generous and a capture always gets at least three frames to compare.
-  const deadline = Date.now() + settleMs * 18;
+  // A cold hosted simulator can spend 30s+ on one screenshot, so the waiting
+  // budget is generous, screenshot latency is credited back into it, and a
+  // capture always gets at least three frames to compare.
+  const startedAt = Date.now();
+  let shotMs = 0;
   let frames = 0;
   await sleep(settleMs);
   let previous;
   let density = 0;
   let difference = 1;
   while (true) {
+    const shotStart = Date.now();
     run('xcrun', ['simctl', 'io', udid, 'screenshot', '--type=png', file], {
       stdio: 'ignore',
     });
+    shotMs += Date.now() - shotStart;
     const buffer = readFileSync(file);
     frames++;
     density = contentDensity(buffer, spec.contentCheck);
     difference = previous ? frameDifference(previous, buffer) : 1;
     const settled = difference < 0.001;
     if (settled && density >= spec.contentCheck.minDensity) return buffer;
-    if (Date.now() > deadline && frames >= 3) {
+    if (
+      Date.now() > settleDeadline({ settleMs, startedAt, shotMs }) &&
+      frames >= 3
+    ) {
       throw new Error(
         `${screen.id}: ${settled ? 'screen body is empty' : 'screen never settled'} (content density ${(density * 100).toFixed(2)}%, last frame change ${(difference * 100).toFixed(2)}%)`
       );
@@ -465,6 +487,43 @@ async function captureSettled({ udid, file, spec, screen, settleMs }) {
     previous = buffer;
     await sleep(2000);
   }
+}
+
+/** Launch one fixture on the simulator and settle its capture. */
+async function launchAndSettle({ udid, file, spec, screen, settleMs }) {
+  runQuietly('xcrun', ['simctl', 'terminate', udid, BUNDLE_ID]);
+  run('xcrun', [
+    'simctl',
+    'launch',
+    udid,
+    BUNDLE_ID,
+    screen.launchArgument,
+    'UITest',
+  ]);
+  return captureSettled({ udid, file, spec, screen, settleMs });
+}
+
+export const CAPTURE_ATTEMPTS = 2;
+
+/**
+ * Capture one fixture screen with one bounded relaunch (JOV-7952). A first
+ * launch on a cold simulator races system services and can stall before the
+ * fixture seeds; the relaunch retries that window without loosening the
+ * settle or content checks. The dimension contract stays with the caller.
+ */
+export async function captureScreen(
+  { udid, file, spec, screen, settleMs },
+  { attempt = launchAndSettle, attempts = CAPTURE_ATTEMPTS } = {}
+) {
+  let failure;
+  for (let tryIndex = 1; tryIndex <= attempts; tryIndex++) {
+    try {
+      return await attempt({ udid, file, spec, screen, settleMs });
+    } catch (error) {
+      failure = error;
+    }
+  }
+  throw failure;
 }
 
 async function capture({ appPath, out, settleMs }) {
@@ -503,17 +562,8 @@ async function capture({ appPath, out, settleMs }) {
   runQuietly('xcrun', ['simctl', 'uninstall', udid, BUNDLE_ID]);
   run('xcrun', ['simctl', 'install', udid, appPath]);
   for (const screen of spec.screens) {
-    runQuietly('xcrun', ['simctl', 'terminate', udid, BUNDLE_ID]);
-    run('xcrun', [
-      'simctl',
-      'launch',
-      udid,
-      BUNDLE_ID,
-      screen.launchArgument,
-      'UITest',
-    ]);
     const file = join(rawDir, `${screen.id}.png`);
-    const buffer = await captureSettled({ udid, file, spec, screen, settleMs });
+    const buffer = await captureScreen({ udid, file, spec, screen, settleMs });
     const info = pngInfo(buffer);
     if (
       info.width !== spec.device.width ||

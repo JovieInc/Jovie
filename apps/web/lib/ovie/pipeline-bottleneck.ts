@@ -38,20 +38,18 @@ export const pipelineBottleneckSchema = z
     sourceDigest: z.string().regex(/^[a-f0-9]{64}$/),
   })
   .superRefine((data, ctx) => {
-    if ((data.status === 'clear') !== (data.rank1 === null)) {
+    if (
+      (data.status === 'clear' && data.rank1 !== null) ||
+      (data.status === 'agentic' && data.rank1 === null)
+    ) {
       ctx.addIssue({
         code: 'custom',
         path: ['rank1'],
-        message: 'Active status requires rank1; clear requires null',
+        message: 'Agentic requires rank1; clear requires null',
       });
     }
-    if (data.status === 'needs-you' && (!data.cost || !data.impact)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['cost'],
-        message: 'Needs-you requires cost and impact',
-      });
-    }
+    // Needs-you also represents held evidence. Unknown rank, cost, and impact
+    // remain null rather than claiming a clear pipeline or an actionable repair.
   });
 
 export const pipelineBottleneckContributionSchema = z.object({

@@ -295,7 +295,8 @@ export function EntitySidebarShell({
                   {!isMinimalHeader && tabs ? (
                     <div
                       className={cn(
-                        'overflow-visible border-t border-(--app-shell-frame-seam) px-3 py-2.5 [&>*]:w-full',
+                        // Preserve the 1px geometry; the card owns the seam.
+                        'overflow-visible border-t border-transparent px-3 py-2.5 [&>*]:w-full',
                         tabsContainerClassName
                       )}
                     >
@@ -306,8 +307,7 @@ export function EntitySidebarShell({
                   {renderMinimalTabsInHeader && tabs ? (
                     <div
                       className={cn(
-                        showMinimalHeaderBar &&
-                          'border-t border-(--app-shell-frame-seam)',
+                        showMinimalHeaderBar && 'border-t border-transparent',
                         'overflow-visible px-3 py-2.5 [&>*]:w-full',
                         tabsContainerClassName
                       )}

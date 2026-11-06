@@ -1,11 +1,16 @@
-import { dirname, resolve } from 'node:path';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { load } from 'js-yaml';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../../packages/api-client/client.ts';
 import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
 import {
   lsRemoteMain,
+  observeWorkflowFailureStreak,
   runLiveness as runLivenessImpl,
+  main as runMain,
 } from '../../automation-liveness.mjs';
 import { ADMISSION_BLOCKING_LABELS } from '../admission-hold-labels.mjs';
 import {
@@ -13,9 +18,16 @@ import {
   livenessFingerprint,
   loadRegistry,
 } from '../automation-registry.mjs';
+import { applyRemediationDecisionWithRetry } from '../remediation-signal.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const registry = loadRegistry(repoRoot);
+
+// JOV-8843: the filing branch's intake is mocked so state-preservation tests
+// never reach Linear. Restore the mock per test that counts calls.
+vi.mock('../remediation-signal.mjs', () => ({
+  applyRemediationDecisionWithRetry: vi.fn(async () => ({ ok: true })),
+}));
 const NOW = Date.parse('2026-10-20T19:35:00Z');
 const iso = minutesAgo => new Date(NOW - minutesAgo * 60_000).toISOString();
 const MAIN = 'a'.repeat(40);
@@ -1101,6 +1113,44 @@ describe('dead-man liveness', () => {
     expect(rowFor(report, 'gem:lanes-tick').status).toBe('unknown');
   });
 
+  // JOV-9006: when the essential public feed exceeds its byte cap, doctor.py
+  // publishes the bounded `symphony-lanes-status-unavailable/v1` view. That
+  // view still carries the tick heartbeat at the receipt path (`at`), so the
+  // dead-man stays green while the feed is explicitly degraded — only a host
+  // that stops ticking goes silent.
+  it('(b) the doctor unavailable view still carries the tick heartbeat', async () => {
+    const { report } = await runLiveness({
+      registry: only('gem:lanes-tick'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'lanes-status.json': {
+          schema: 'symphony-lanes-status-unavailable/v1',
+          status: 'unavailable',
+          reason: 'essential-public-feed-exceeds-byte-limit',
+          at: iso(4),
+          requiredBytes: 290185,
+          maxBytes: 262144,
+          fullEvidence: {
+            fileName: 'lanes-status-details.json',
+            sha256: '0'.repeat(64),
+            bytes: 580808,
+            at: iso(4),
+            host: 'gem',
+            release: '9cf0916',
+            binding: 'declared-feed-identity',
+          },
+        },
+      }),
+    });
+    expect(rowFor(report, 'gem:lanes-tick')).toMatchObject({
+      status: 'fresh',
+      lastProofAt: iso(4),
+      ageMinutes: 4,
+      budgetMinutes: 30,
+    });
+    expect(livenessDecisions(report)).toEqual([]);
+  });
+
   // JOV-8799: Summer's observeReceipt reports a succeeded read as `stale`
   // once it is older than the 10-minute provider TTL. This dead-man keeps
   // its own 60-minute silence budget and still rejects unknown or failed reads.
@@ -1641,5 +1691,198 @@ describe('liveness run receipts', () => {
       ['started', 'advanced'],
       ['finished', 'failed'],
     ]);
+  });
+});
+
+describe('alert state preservation (JOV-8843)', () => {
+  const FINGERPRINT = livenessFingerprint('summer:model-turns');
+  const failFetch = async () => new Response('{}', { status: 404 });
+  // The JOV-8803 critical loop back fresh: its heartbeat returned while an
+  // alert for it was already filed (persisted red state).
+  const recoveredFetch = fakeFetch({
+    'summer.jov.ie/runtime/v1/health': {
+      receiptFreshness: {
+        modelTurn: {
+          // main() judges against real wall-clock time; a fixed fixture
+          // timestamp would age past the 120-minute silence budget.
+          observedAt: new Date(Date.now() - 10 * 60_000).toISOString(),
+          status: 'verified',
+        },
+      },
+    },
+  });
+  const summerStatus = report =>
+    report.results.find(row => row.id === 'summer:model-turns')?.status;
+
+  function persistState(at) {
+    const dir = mkdtempSync(join(tmpdir(), 'automation-liveness-'));
+    const path = join(dir, 'state.json');
+    writeFileSync(path, `${JSON.stringify(at, null, 2)}\n`);
+    return path;
+  }
+
+  beforeEach(() => {
+    vi.mocked(applyRemediationDecisionWithRetry).mockClear();
+  });
+
+  it('keeps filed alert state on a diagnostic run without --file', async () => {
+    const path = persistState({ [FINGERPRINT]: 'red' });
+    const result = await runMain({
+      argv: ['--previous', path],
+      env: {},
+      fetchImpl: recoveredFetch,
+    });
+    expect(summerStatus(result)).toBe('fresh');
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({
+      [FINGERPRINT]: 'red',
+    });
+    expect(applyRemediationDecisionWithRetry).not.toHaveBeenCalled();
+  });
+
+  it('keeps filed alert state when remediation intake is disabled', async () => {
+    const path = persistState({ [FINGERPRINT]: 'red' });
+    const result = await runMain({
+      argv: ['--file', '--previous', path],
+      env: { REMEDIATION_INTAKE_DISABLED: '1' },
+      fetchImpl: recoveredFetch,
+    });
+    expect(summerStatus(result)).toBe('fresh');
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({
+      [FINGERPRINT]: 'red',
+    });
+    expect(applyRemediationDecisionWithRetry).not.toHaveBeenCalled();
+  });
+
+  it('still advances state and files decisions when intake is active', async () => {
+    const path = persistState({ [FINGERPRINT]: 'red' });
+    const result = await runMain({
+      argv: ['--file', '--previous', path],
+      env: {},
+      fetchImpl: recoveredFetch,
+    });
+    expect(summerStatus(result)).toBe('fresh');
+    expect(JSON.parse(readFileSync(path, 'utf8'))[FINGERPRINT]).toBe('green');
+    const decisions = vi
+      .mocked(applyRemediationDecisionWithRetry)
+      .mock.calls.map(([decision]) => decision);
+    expect(decisions.find(row => row.fingerprint === FINGERPRINT)?.action).toBe(
+      'green'
+    );
+    // main() also returns the export-automations payload, which has no decisions.
+    if (!('decisions' in result)) {
+      throw new Error('expected a liveness report with decisions');
+    }
+    expect(applyRemediationDecisionWithRetry).toHaveBeenCalledTimes(
+      result.decisions.length
+    );
+  });
+
+  it('keeps the prior state for a fingerprint whose filing failed', async () => {
+    // checkJs accepts only a real applyRemediationDecision return. The intake reads ok.
+    vi.mocked(applyRemediationDecisionWithRetry).mockResolvedValue({
+      ok: false,
+      action: 'green',
+      results: [],
+    });
+    const path = persistState({ [FINGERPRINT]: 'red' });
+    try {
+      const result = await runMain({
+        argv: ['--file', '--previous', path],
+        env: {},
+        fetchImpl: failFetch,
+      });
+      expect(summerStatus(result)).toBe('unknown');
+      expect(JSON.parse(readFileSync(path, 'utf8'))[FINGERPRINT]).toBe('red');
+    } finally {
+      vi.mocked(applyRemediationDecisionWithRetry).mockResolvedValue({
+        ok: true,
+        action: 'skip',
+      });
+    }
+  });
+});
+
+describe('budget diagnostics failure isolation', () => {
+  /** @typedef {{id?: string, name?: string, if?: string, run?: string}} BudgetStep */
+  /** @typedef {{needs: string, if: string, steps: BudgetStep[]}} BudgetJob */
+  it('uses the same due gate without becoming a heartbeat dependency', () => {
+    const workflow = /** @type {{jobs: Record<string, BudgetJob>}} */ (
+      load(
+        readFileSync(
+          join(repoRoot, '.github/workflows/automation-liveness.yml'),
+          'utf8'
+        )
+      )
+    );
+    const budget = workflow.jobs['installation-budget'];
+    const heartbeat = workflow.jobs.liveness;
+    expect(budget.needs).toBe('gate');
+    expect(heartbeat.needs).toBe('gate');
+    expect(budget.if).toBe(heartbeat.if);
+    expect(heartbeat.steps.some(step => step.id === 'ci-app-token')).toBe(
+      false
+    );
+    expect(
+      heartbeat.steps.some(
+        step => step.name === 'Preserve synthetic dead-man failure'
+      )
+    ).toBe(true);
+    const sample = budget.steps.find(step => step.id === 'installation-budget');
+    expect(sample.if).toBe('${{ always() }}');
+    expect(sample.run).toBe('node scripts/installation-budget-sentinel.mjs');
+    const alert = budget.steps.find(
+      step => step.name === 'Send Slack Alert on Low Installation Budget'
+    );
+    expect(alert.if).toContain(
+      "steps.installation-budget.outputs.shared_github_token_low == 'true'"
+    );
+    expect(alert.if).toContain(
+      "steps.installation-budget.outputs.ci_app_low == 'true'"
+    );
+  });
+});
+
+describe('workflow failure streak (production controller alarm)', () => {
+  const nowMs = Date.parse('2026-10-29T23:00:00Z');
+  const receipt = {
+    repo: 'JovieInc/Jovie',
+    workflow: 'production-controller.yml',
+    streak: 3,
+  };
+  const runsFetch = conclusions => async () => ({
+    status: 200,
+    json: async () => ({
+      workflow_runs: conclusions.map((conclusion, index) => ({
+        id: 100 - index,
+        conclusion,
+        created_at: new Date(nowMs - index * 60_000).toISOString(),
+        updated_at: new Date(nowMs - index * 60_000).toISOString(),
+      })),
+    }),
+  });
+
+  it('goes silent after 3 consecutive failures, ignoring skipped runs', async () => {
+    const observed = await observeWorkflowFailureStreak(receipt, {
+      fetchImpl: runsFetch([
+        'failure',
+        'skipped',
+        'failure',
+        'failure',
+        'cancelled',
+      ]),
+      token: 'test-token',
+      nowMs,
+    });
+    expect(observed.reason).toContain('3-consecutive-failures');
+    expect(Date.parse(observed.lastProofAt)).toBeLessThan(nowMs - 60 * 60_000);
+  });
+
+  it('stays healthy when a success interrupts the failures', async () => {
+    const observed = await observeWorkflowFailureStreak(receipt, {
+      fetchImpl: runsFetch(['failure', 'failure', 'success', 'failure']),
+      token: 'test-token',
+      nowMs,
+    });
+    expect(observed.lastProofAt).toBe(new Date(nowMs).toISOString());
   });
 });

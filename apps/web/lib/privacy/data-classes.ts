@@ -545,6 +545,7 @@ export const DATA_CLASSES: DataClass[] = [
       'investor_links',
       'investor_views',
       'investor_settings',
+      'investor_portal_content',
       'investor_update_drafts',
       'investor_update_candidates',
       'investor_update_candidate_decisions',

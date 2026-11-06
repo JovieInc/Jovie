@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // can exercise the orchestration logic of `submitWaitlistAccessRequest`
 // without touching a real database.
 
+const readCachedAcquisitionEligibility = vi.fn();
+const withSystemIngestionSession = vi.fn();
 const findLatestEntryByEmail = vi.fn();
 const getWaitlistSettings = vi.fn();
 const tryReserveAutoAcceptSlot = vi.fn();
@@ -21,6 +23,11 @@ const updatedRows: Array<Record<string, unknown>> = [];
 let waitlistInsertReturnRows: Array<{ id: string }> = [{ id: 'entry-new' }];
 let executeRows: Array<Record<string, unknown>> = [];
 const executedSql: string[] = [];
+
+vi.mock('@/lib/acquisition/eligibility.server', () => ({
+  readCachedAcquisitionEligibility: (...args: unknown[]) =>
+    readCachedAcquisitionEligibility(...args),
+}));
 
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: (...args: unknown[]) =>
@@ -63,12 +70,8 @@ vi.mock('@/lib/utils/email', async importOriginal => {
 // Mock the ingestion session wrapper to invoke the operation with a tx
 // stub that the test can shape.
 vi.mock('@/lib/ingestion/session', () => ({
-  withSystemIngestionSession: async (
-    operation: (tx: unknown) => Promise<unknown>
-  ) => {
-    const tx = createTxMock();
-    return operation(tx);
-  },
+  withSystemIngestionSession: (...args: unknown[]) =>
+    withSystemIngestionSession(...args),
 }));
 
 function createTxMock() {
@@ -192,6 +195,16 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     waitlistInsertReturnRows = [{ id: 'entry-new' }];
     executeRows = [];
     executedSql.length = 0;
+    readCachedAcquisitionEligibility.mockReset();
+    readCachedAcquisitionEligibility.mockResolvedValue({
+      eligible: true,
+      verdict: 'ELIGIBLE',
+    });
+    withSystemIngestionSession.mockReset();
+    withSystemIngestionSession.mockImplementation(
+      async (operation: (tx: unknown) => Promise<unknown>) =>
+        operation(createTxMock())
+    );
     findLatestEntryByEmail.mockReset();
     findLatestEntryByEmail.mockReturnValue([]);
     getWaitlistSettings.mockReset();
@@ -220,7 +233,11 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     const { submitWaitlistAccessRequest } = await import(
       '@/lib/waitlist/access-request'
     );
-    const result = await submitWaitlistAccessRequest(baseInput);
+    readCachedAcquisitionEligibility.mockResolvedValue(null);
+    const result = await submitWaitlistAccessRequest({
+      ...baseInput,
+      goldenPathAdmission: { admit: true, reason: 'admit_resolved_artist' },
+    });
 
     expect(result.outcome).toBe('already_accepted');
     // userStatus must still be 'active' — not 'waitlist_approved'
@@ -253,6 +270,132 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
 
   describe('golden-path admission', () => {
     const admit = { admit: true, reason: 'admit_resolved_artist' } as const;
+
+    it.each([
+      undefined,
+      { admit: false, reason: 'hold_golden_path_not_green' } as const,
+    ])(
+      'holds a strong interview without reserving or approving when readiness is %j',
+      async goldenPathAdmission => {
+        const { submitWaitlistAccessRequest } = await import(
+          '@/lib/waitlist/access-request'
+        );
+        const result = await submitWaitlistAccessRequest({
+          ...baseInput,
+          data: {
+            primaryGoal: 'streams',
+            primarySocialUrl: 'https://instagram.com/x',
+            spotifyUrl: 'https://open.spotify.com/artist/test',
+            spotifyArtistName: 'Test Artist',
+            heardAbout: undefined,
+            selectedPlan: undefined,
+          },
+          goldenPathAdmission,
+          interviewResponses: {
+            currentWorkflow: 'I am an artist releasing an album',
+            biggestBlocker: 'I cannot get my release links out to my fans',
+          },
+        });
+        expect(result.status).toBe('waitlisted');
+        expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
+        expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
+        expect(finalizeWaitlistApproval).not.toHaveBeenCalled();
+      }
+    );
+
+    it('holds a previously positive decision when the readiness read fails', async () => {
+      readCachedAcquisitionEligibility.mockRejectedValue(
+        new Error('redis unavailable')
+      );
+      const { submitWaitlistAccessRequest } = await import(
+        '@/lib/waitlist/access-request'
+      );
+      const result = await submitWaitlistAccessRequest({
+        ...baseInput,
+        goldenPathAdmission: admit,
+      });
+      expect(result.status).toBe('waitlisted');
+      expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
+      expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
+    });
+
+    it('rechecks a positive decision when a serialization retry follows readiness revocation', async () => {
+      readCachedAcquisitionEligibility
+        .mockResolvedValueOnce({ eligible: true, verdict: 'ELIGIBLE' })
+        .mockResolvedValue(null);
+      withSystemIngestionSession.mockRejectedValueOnce(
+        Object.assign(new Error('serialization conflict'), { code: '40001' })
+      );
+      tryReserveAutoAcceptSlot.mockResolvedValue({
+        shouldAutoAccept: true,
+        reason: 'reserved',
+      });
+      approveWaitlistEntryInTx.mockResolvedValue({
+        outcome: 'approved',
+        entryId: 'entry-new',
+        profileId: null,
+        email: 'creator@example.com',
+        fullName: 'Test Creator',
+        clerkId: null,
+      });
+      const { submitWaitlistAccessRequest } = await import(
+        '@/lib/waitlist/access-request'
+      );
+      const result = await submitWaitlistAccessRequest({
+        ...baseInput,
+        goldenPathAdmission: admit,
+      });
+      expect(result.status).toBe('waitlisted');
+      expect(withSystemIngestionSession).toHaveBeenCalledTimes(2);
+      expect(readCachedAcquisitionEligibility).toHaveBeenCalledTimes(2);
+      expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
+      expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
+      expect(finalizeWaitlistApproval).not.toHaveBeenCalled();
+    });
+
+    it.each(['reserved', 'capacity_full'] as const)(
+      'reserves the same bounded capacity for a high-scoring interview: %s',
+      async reservationReason => {
+        tryReserveAutoAcceptSlot.mockResolvedValue({
+          shouldAutoAccept: reservationReason === 'reserved',
+          reason: reservationReason,
+        });
+        approveWaitlistEntryInTx.mockResolvedValue({
+          outcome: 'approved',
+          entryId: 'entry-new',
+          profileId: null,
+          email: 'creator@example.com',
+          fullName: 'Test Creator',
+          clerkId: null,
+        });
+        const { submitWaitlistAccessRequest } = await import(
+          '@/lib/waitlist/access-request'
+        );
+        const result = await submitWaitlistAccessRequest({
+          ...baseInput,
+          data: {
+            primaryGoal: 'streams',
+            primarySocialUrl: 'https://instagram.com/x',
+            spotifyUrl: 'https://open.spotify.com/artist/test',
+            spotifyArtistName: 'Test Artist',
+            heardAbout: undefined,
+            selectedPlan: undefined,
+          },
+          goldenPathAdmission: admit,
+          interviewResponses: {
+            currentWorkflow: 'I am an artist releasing an album',
+            biggestBlocker: 'I cannot get my release links out to my fans',
+          },
+        });
+        expect(tryReserveAutoAcceptSlot).toHaveBeenCalledTimes(1);
+        expect(result.status).toBe(
+          reservationReason === 'reserved' ? 'approved' : 'waitlisted'
+        );
+        if (reservationReason === 'capacity_full') {
+          expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
+        }
+      }
+    );
 
     it('admits a resolved artist when capacity reserves, recording the reason and sending nothing', async () => {
       tryReserveAutoAcceptSlot.mockResolvedValue({

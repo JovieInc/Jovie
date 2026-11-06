@@ -30,10 +30,12 @@ const MODES = new Set([
   'credentials',
   'domains',
   'drafts',
+  'drift',
   'exhausted',
   'holds',
   'summer',
   'summer-config',
+  'swift-arch',
   'vercel',
 ]);
 
@@ -258,6 +260,20 @@ export function planExhaustedConflicts(pulls, nowMs) {
   for (const pull of pulls ?? []) {
     if (!labelNames(pull).some(name => name.toLowerCase() === EXHAUSTED_LABEL))
       continue;
+    // A hold parks the PR: no lane may repair or sync it while the hold
+    // stands, so its exhausted marker is not actionable at any age and
+    // planIdleHolds owns the disposition. PR #22809 carried lane-fix-exhausted
+    // under tim-hold and the sweep kept filing conflict cards no lane could
+    // discharge (JOV-9100).
+    const holds = labelNames(pull).filter(name =>
+      HOLD_LABELS.has(name.toLowerCase())
+    );
+    if (holds.length > 0) {
+      warnings.push(
+        `#${pull.number} carries ${EXHAUSTED_LABEL} but is held (${holds.join(', ')}); the hold nag owns its disposition; not filing`
+      );
+      continue;
+    }
     const age = ageMs(pull.exhaustedSince, nowMs);
     if (age == null) {
       warnings.push(
@@ -426,6 +442,46 @@ export function planVercelFailure(project, deployment) {
   });
 }
 
+/**
+ * Swift architecture debt (docs/architecture/swift-architecture-adr-2026-10-29.md).
+ * One rolling issue per guard rule with remaining baselined debt, so the
+ * ratchet's backlog is owned work instead of a number nobody reads. The title
+ * stays stable (fingerprint lookup); counts and the worst files live in the
+ * description and refresh on every run. A rule at zero files nothing.
+ */
+export function planSwiftArchDebt(metrics) {
+  if (!metrics || typeof metrics !== 'object') return [];
+  const plans = [];
+  for (const [rule, count] of Object.entries(metrics.byRule ?? {})) {
+    if (!(count > 0)) continue;
+    const fingerprint = `remediation:swift-arch-debt:${rule}`;
+    const files = (metrics.topFiles ?? [])
+      .filter(entry => entry.rule === rule)
+      .slice(0, 10)
+      .map(entry => `- \`${entry.file}\`: ${entry.count}`)
+      .join('\n');
+    plans.push(
+      issue({
+        fingerprint,
+        summary: `Swift architecture debt: ${rule}`,
+        priority: rule.startsWith('main-actor') ? 2 : 3,
+        reason: `${count} baselined violation(s)`,
+        description: note(
+          fingerprint,
+          [
+            `${count} baselined \`${rule}\` violation(s) remain (${metrics.total} across all Swift rules, measured ${metrics.generatedAt}).`,
+            files,
+            'Fix a file, then run `node scripts/swift-arch/guard.mjs --write-baseline` in the same PR to lock the lower count in. ADR: docs/architecture/swift-architecture-adr-2026-10-29.md.',
+          ]
+            .filter(Boolean)
+            .join('\n')
+        ),
+      })
+    );
+  }
+  return plans;
+}
+
 export function readVercelReadonlyToken(env = process.env) {
   for (const name of VERCEL_READONLY_TOKEN_ENVS) {
     const token = env[name]?.trim();
@@ -475,6 +531,8 @@ export async function fileRemediationPlans(plans, { dryRun, upsert, apiKey }) {
  * @param {() => Promise<any>} [options.loadDeployments]
  * @param {() => Promise<any[]>} [options.loadDomains]
  * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadCredentials]
+ * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadDrift]
+ * @param {() => { generatedAt: string, total: number, byRule: Record<string, number>, topFiles: { rule: string, file: string, count: number }[] } | Promise<{ generatedAt: string, total: number, byRule: Record<string, number>, topFiles: { rule: string, file: string, count: number }[] }>} [options.loadSwiftArch]
  * @param {boolean} [options.vercelTokenPresent]
  * @param {(args: any) => Promise<any>} [options.upsert]
  * @param {string} [options.apiKey]
@@ -489,6 +547,8 @@ export async function runRemediationSweep({
   loadDeployments,
   loadDomains,
   loadCredentials,
+  loadDrift,
+  loadSwiftArch,
   vercelTokenPresent = false,
   upsert,
   apiKey,
@@ -565,6 +625,24 @@ export async function runRemediationSweep({
       const credentials = await loadCredentials();
       warnings.push(...(credentials.warnings ?? []));
       plans.push(...credentials.plans);
+    }
+  }
+  if (includesMode(mode, 'drift')) {
+    // Source-of-truth drift (canon/sources-of-truth.json liveChecks): Stripe
+    // prices, email DNS, production build against their owners.
+    if (!loadDrift) {
+      warnings.push('Source drift loader not wired; not judged');
+    } else {
+      const drift = await loadDrift();
+      warnings.push(...(drift.warnings ?? []));
+      plans.push(...drift.plans);
+    }
+  }
+  if (includesMode(mode, 'swift-arch')) {
+    if (!loadSwiftArch) {
+      warnings.push('Swift architecture guard loader not wired; not judged');
+    } else {
+      plans.push(...planSwiftArchDebt(await loadSwiftArch()));
     }
   }
   const issues = await fileRemediationPlans(plans, { dryRun, upsert, apiKey });
