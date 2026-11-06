@@ -41,6 +41,9 @@ describe('LibraryAssetSharePanel', () => {
           assetId: 'release-1',
           visibility: 'private',
           shareSlug: 'take-me-over',
+          accessToken: 'token-1',
+          shareUrl: 'https://jov.ie/p/token-1',
+          tokenRevokedAt: null,
         }}
       />
     );
