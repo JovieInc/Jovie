@@ -251,6 +251,14 @@ describe('OnboardingProfileRail', () => {
     ).toHaveFocus();
   });
 
+  it('keeps the side-rail badge readable over light imagery (AA)', () => {
+    render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
+
+    const badge = document.querySelector('[class*="bg-black/60"]');
+    expect(badge).not.toBeNull();
+    expect(badge?.className).not.toContain('bg-black/50');
+  });
+
   it('does not add a container tab stop to the inline preview', async () => {
     const user = userEvent.setup();
     render(
