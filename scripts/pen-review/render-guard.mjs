@@ -143,7 +143,11 @@ export function cropStats(img, box) {
  * one batch; `facts` (optional) gives node bounds for glyph checks.
  * Returns [{id, reason}] — empty means every render is trustworthy.
  */
-export function renderGuard(renders, factsById = {}, { dark = true } = {}) {
+export function renderGuard(
+  renders,
+  factsById = {},
+  { dark = true, scale = 1 } = {}
+) {
   const bad = [];
   const hashes = new Map();
   for (const r of renders)
@@ -179,14 +183,21 @@ export function renderGuard(renders, factsById = {}, { dark = true } = {}) {
     const facts = factsById[r.id];
     if (facts)
       bad.push(
-        ...glyphFindings(r, facts).map(reason => ({ id: r.id, reason }))
+        ...glyphFindings(r, facts, scale).map(reason => ({ id: r.id, reason }))
       );
   }
   return bad;
 }
 
 /** Missing icon glyphs, blank text and unloaded image fills inside one render. */
-export function glyphFindings(render, facts) {
+export function glyphFindings(render, facts, scale = 1) {
+  const crop = n =>
+    cropStats(render.img, {
+      x: n.x * scale,
+      y: n.y * scale,
+      w: n.w * scale,
+      h: n.h * scale,
+    });
   const reasons = [];
   const nodes = facts.nodes.filter(n => n.d > 0);
   const icons = nodes.filter(n => n.t === 'icon_font' && n.w >= 8 && n.h >= 8);
@@ -194,7 +205,7 @@ export function glyphFindings(render, facts) {
     const names = new Set(icons.map(n => n.ic));
     const sigs = new Map();
     for (const n of icons) {
-      const s = cropStats(render.img, n).sig;
+      const s = crop(n).sig;
       sigs.set(s, (sigs.get(s) ?? 0) + 1);
     }
     const [topSig, topCount] = [...sigs.entries()].sort(
@@ -213,7 +224,7 @@ export function glyphFindings(render, facts) {
       n.h >= 6
   );
   if (texts.length) {
-    const blank = texts.filter(n => cropStats(render.img, n).std < 0.02);
+    const blank = texts.filter(n => crop(n).std < 0.02);
     if (blank.length / texts.length > 0.3)
       reasons.push(
         `missing text: ${blank.length}/${texts.length} text nodes rendered without ink (fonts not loaded)`
@@ -222,7 +233,7 @@ export function glyphFindings(render, facts) {
   for (const n of nodes.filter(
     x => hasImageFill(x.fill) && x.w >= 32 && x.h >= 32
   )) {
-    const s = cropStats(render.img, n);
+    const s = crop(n);
     if (s.colors <= 4 && s.top2Share > 0.9 && s.std > 0.02)
       reasons.push(`image fill not loaded (checkerboard) on ${n.id}`);
   }

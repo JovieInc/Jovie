@@ -12,6 +12,8 @@
  *   may only appear on a frame that declares a fictional catalog.
  */
 
+import { indexFacts } from './lib.mjs';
+
 export const LOGO_SIZE_DEFAULT = 28;
 export const LOGO_SIZE_MAX = 32;
 /** Pen component ids of the Jovie brand mark and wordmark masters. */
@@ -113,7 +115,7 @@ const isScreen = n => n.w >= 360 && n.h >= 480;
 
 export function dsFindings(facts) {
   const out = [];
-  const byId = new Map(facts.nodes.map(n => [n.id, n]));
+  const byId = indexFacts(facts);
   const light = facts.theme?.['mode-2'] === 'light';
   const owned = facts.nodes.filter(n => n.d > 0 && !n.inherited);
   const brand = new Set();
@@ -201,7 +203,7 @@ const isPill = n =>
 /** Saturated count badges and detached circular buttons inside a sidebar. */
 export function sidebarFindings(facts) {
   const out = [];
-  const byId = new Map(facts.nodes.map(n => [n.id, n]));
+  const byId = indexFacts(facts);
   const inSidebar = n => {
     for (let p = byId.get(n.p); p; p = byId.get(p.p))
       if (/sidebar/i.test(p.nm ?? '')) return true;
@@ -223,7 +225,7 @@ export function sidebarFindings(facts) {
     )
       out.push({
         check: 'sidebar-badge',
-        severity: 'block',
+        severity: n.inherited ? 'warn' : 'block',
         node: n.id,
         name: n.nm,
         message: `count badge uses saturated ${fill}; use a muted numeral or a neutral $atom-surface-elevated badge`,
@@ -240,7 +242,7 @@ export function sidebarFindings(facts) {
     if (detached)
       out.push({
         check: 'sidebar-detached-button',
-        severity: 'block',
+        severity: n.inherited ? 'warn' : 'block',
         node: n.id,
         name: n.nm,
         message:

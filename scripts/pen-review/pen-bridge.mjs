@@ -246,15 +246,23 @@ export function exportFrames(ids, dir, { scale = 1, ...opts } = {}) {
 /**
  * @param {string[]} ids
  * @param {string} dir
- * @param {{scale?: number, snapshot?: string, live?: object, run?: typeof runPen}} [opts]
+ * @param {{scale?: number, snapshot?: string, live?: object, run?: typeof runPen, treesReader?: typeof frameTrees}} [opts]
  */
 export function exportFramesHeadless(
   ids,
   dir,
-  { scale = 1, snapshot, live = {}, run = runPen } = {}
+  {
+    scale = 1,
+    snapshot,
+    live = {},
+    run = runPen,
+    treesReader = frameTrees,
+  } = {}
 ) {
   mkdirSync(dir, { recursive: true });
-  const trees = frameTrees(ids, live).filter(t => !t.missing);
+  const trees = treesReader(ids, live);
+  const missing = ids.filter(id => !trees.some(t => t.id === id && !t.missing));
+  if (missing.length) throw new Error(`missing frames: ${missing.join(', ')}`);
   const source = snapshot ?? CANONICAL_PEN;
   // A hidden sibling of the workspace folder, at the same depth, so asset
   // paths that climb out of the workspace ("../../Codex/…/x.glsl") resolve.
@@ -267,6 +275,7 @@ export function exportFramesHeadless(
     if (!entry.endsWith('.pen') && !entry.startsWith('.'))
       symlinkSync(join(dirname(source), entry), join(work, entry));
   const warm = join(work, 'warm');
+  const rendered = join(work, 'rendered');
   // One execute per step: each execute has a ~55 s budget in headless mode,
   // and a 1348x900 graft plus two exports can exceed it in one call.
   const snippets = trees.flatMap((tree, i) => {
@@ -277,7 +286,7 @@ export function exportFramesHeadless(
     return [
       `const has=Get((n,c)=>{if(c.depth>0){c.skipChildren();return}return n.id===${JSON.stringify(id)}||undefined}).length>0;const b=${JSON.stringify(body, (k, v) => (k === 'id' ? undefined : v))};${v}=has?Replace(${JSON.stringify(id)},b):Insert(document,{...b,x:0,y:-200000});Print("MAP"+JSON.stringify([${JSON.stringify(id)},${v}]))`,
       `Export([${v}],"png",${JSON.stringify(warm)},{scale:${Number(scale)}})`,
-      `Export([${v}],"png",${JSON.stringify(dir)},{scale:${Number(scale)}})`,
+      `Export([${v}],"png",${JSON.stringify(rendered)},{scale:${Number(scale)}})`,
     ];
   });
   try {
@@ -288,9 +297,10 @@ export function exportFramesHeadless(
     });
     const map = Object.fromEntries(res.flatMap(r => tagged(r.lines, 'MAP')));
     return ids.map(id => {
-      const src = join(dir, `${map[id]}.png`);
+      if (!map[id]) throw new Error(`missing export mapping for ${id}`);
+      const src = join(rendered, `${map[id]}.png`);
       const path = join(dir, `${id}.png`);
-      if (map[id] && map[id] !== id) renameSync(src, path);
+      renameSync(src, path);
       const buf = readFileSync(path);
       return {
         id,

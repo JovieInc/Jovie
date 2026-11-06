@@ -5,12 +5,11 @@
 
 import { createHash } from 'node:crypto';
 import {
-  closeSync,
   existsSync,
   mkdirSync,
-  openSync,
   readFileSync,
   renameSync,
+  rmdirSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -62,6 +61,7 @@ export function decideRound({
   gates = null,
   judges = [],
   quietRounds = 0,
+  complete = true,
   round = 0,
   maxRounds = DEFAULT_MAX_ROUNDS,
 }) {
@@ -70,6 +70,13 @@ export function decideRound({
   const confirmed = judges.filter(j => j.material && j.confirmed);
   const material = blocks.length + gateFails.length + confirmed.length;
   const issue = topIssue({ blocks, gateFails, gates, confirmed });
+  if (material === 0 && !complete)
+    return {
+      action: round + 1 >= maxRounds ? 'fail' : 'rejudge',
+      quietRounds: 0,
+      topIssue: null,
+      incomplete: true,
+    };
   if (material === 0) {
     const quiet = quietRounds + 1;
     if (quiet >= QUIET_ROUNDS_TO_PASS)
@@ -169,58 +176,73 @@ export function isProposalFrame(node) {
 
 // ── Single-writer lease (shared by every agent that writes the canvas) ──
 
-/**
- * The Pen canvas has one writer at a time (Jovie .claude/rules/pen.md). A
- * lease is a JSON file created with O_EXCL; an expired lease may be taken
- * over, a live foreign lease never. `scope` names what the holder may write
- * (for example "proposal-frames"); saves must also pass foreignUnsaved().
- */
+/** Serialize lease read/replace/release. A crashed or unreadable lock fails closed. */
+function withLeaseLock(path, busy, operation) {
+  mkdirSync(dirname(path), { recursive: true });
+  const lock = `${path}.lock`;
+  try {
+    mkdirSync(lock);
+  } catch (error) {
+    if (error.code === 'EEXIST') return busy;
+    throw error;
+  }
+  try {
+    return operation();
+  } finally {
+    rmdirSync(lock);
+  }
+}
+
 /**
  * @param {string} path
- * @param {{holder?: string, scope?: string|null, ttlMs?: number, now?: () => number}} [opts]
+ * @param {{holder?: string, scope?: string|null, ttlMs?: number, now?: () => number, renewOnly?: boolean}} [opts]
  */
 export function acquireLease(
   path,
-  { holder, scope, ttlMs = 15 * 60_000, now = Date.now } = {}
+  { holder, scope, ttlMs = 15 * 60_000, now = Date.now, renewOnly = false } = {}
 ) {
   if (!holder) throw new Error('lease holder is required');
-  mkdirSync(dirname(path), { recursive: true });
-  const body = {
-    schema: LEASE_SCHEMA,
-    holder,
-    scope: scope ?? null,
-    pid: process.pid,
-    acquiredAt: new Date(now()).toISOString(),
-    expiresAt: new Date(now() + ttlMs).toISOString(),
+  return withLeaseLock(path, { ok: false, heldBy: readLease(path) }, () => {
+    const cur = readLease(path);
+    const active = cur && Date.parse(cur.expiresAt) > now();
+    const ours = cur?.holder === holder && cur?.pid === process.pid;
+    // Never reclaim an empty/partially written/corrupt lease, including one
+    // created by an older client. Expired takeovers are serialized too.
+    if (
+      (existsSync(path) &&
+        (!cur || !Number.isFinite(Date.parse(cur.expiresAt)))) ||
+      (active && !ours) ||
+      (renewOnly && (!active || !ours))
+    )
+      return { ok: false, heldBy: cur };
+    const body = {
+      schema: LEASE_SCHEMA,
+      holder,
+      scope: scope ?? null,
+      pid: process.pid,
+      acquiredAt:
+        active && ours ? cur.acquiredAt : new Date(now()).toISOString(),
+      expiresAt: new Date(now() + ttlMs).toISOString(),
+    };
+    writeAtomic(path, body);
+    return { ok: true, lease: body, renewed: Boolean(active && ours) };
+  });
+}
+
+/** Renew at operation boundaries, including after awaits; always release on failure. */
+export async function withWriterLease(path, options, operation) {
+  const lease = acquireLease(path, options);
+  if (!lease.ok)
+    return { ...lease, skipped: true, reason: 'writer lease held' };
+  const assertLease = () => {
+    const renewed = acquireLease(path, { ...options, renewOnly: true });
+    if (!renewed.ok) throw new Error('writer lease lost');
   };
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const fd = openSync(path, 'wx');
-      writeFileSync(fd, `${JSON.stringify(body)}\n`);
-      closeSync(fd);
-      return { ok: true, lease: body };
-    } catch (error) {
-      if (error.code !== 'EEXIST') throw error;
-      const cur = readLease(path);
-      if (cur && cur.holder === holder) {
-        writeAtomic(path, { ...body, acquiredAt: cur.acquiredAt });
-        return {
-          ok: true,
-          lease: { ...body, acquiredAt: cur.acquiredAt },
-          renewed: true,
-        };
-      }
-      if (cur && Date.parse(cur.expiresAt) > now())
-        return { ok: false, heldBy: cur };
-      try {
-        unlinkSync(path); // expired or unreadable: take over once
-      } catch {
-        // Another taker won the race; the retry sees its lease.
-      }
-    }
+  try {
+    return await operation(assertLease);
+  } finally {
+    releaseLease(path, options.holder);
   }
-  const cur = readLease(path);
-  return { ok: false, heldBy: cur };
 }
 
 export function readLease(path) {
@@ -233,14 +255,13 @@ export function readLease(path) {
 }
 
 export function releaseLease(path, holder) {
-  const cur = readLease(path);
-  if (cur && cur.holder !== holder) return false;
-  try {
+  return withLeaseLock(path, false, () => {
+    if (!existsSync(path)) return true;
+    const cur = readLease(path);
+    if (!cur || cur.holder !== holder) return false;
     unlinkSync(path);
-  } catch {
-    // Already gone.
-  }
-  return true;
+    return true;
+  });
 }
 
 function writeAtomic(path, value) {

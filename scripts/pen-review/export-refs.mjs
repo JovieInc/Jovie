@@ -16,8 +16,9 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { decodePng } from '../invariants/pen-still-diff-lib.mjs';
-import { exportFramesHeadless, runPen } from './pen-bridge.mjs';
+import { exportFramesHeadless, readFacts, runPen } from './pen-bridge.mjs';
 import { renderGuard } from './render-guard.mjs';
 
 export const CANONICAL_SURFACES = Object.freeze({
@@ -41,10 +42,15 @@ const parsePairs = s => Object.fromEntries(s.split(',').map(p => p.split('=')));
 export function exportRefs(
   surfaces,
   out,
-  { exporter = exportFramesHeadless, pen = runPen } = {}
+  {
+    exporter = exportFramesHeadless,
+    pen = runPen,
+    factsReader = readFacts,
+  } = {}
 ) {
   const ids = Object.values(surfaces);
   const pngDir = join(out, 'png');
+  const facts = Object.fromEntries(ids.map(id => [id, factsReader(id)]));
   const renders = exporter(ids, pngDir);
   const manifest = {
     schema: 'pen-parity-refs/v1',
@@ -53,10 +59,11 @@ export function exportRefs(
   };
   for (const [surface, id] of Object.entries(surfaces)) {
     const r = renders.find(x => x.id === id);
+    if (!r) throw new Error(`missing render for ${id}`);
     const img = decodePng(r.buf);
     const guard = renderGuard(
       [{ id, md5: r.md5, img }],
-      {},
+      facts,
       // Canonical frames mix light and dark themes; the garble and glyph
       // checks hold for both, the dark-only white-noise heuristic does not.
       { dark: false }
@@ -120,7 +127,7 @@ async function main(argv) {
 
 if (
   process.argv[1] &&
-  resolve(process.argv[1]) === resolve(new URL(import.meta.url).pathname)
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   main(process.argv.slice(2)).then(
     c => process.exit(c),

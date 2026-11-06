@@ -22,7 +22,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   appendFileSync,
   copyFileSync,
@@ -58,6 +58,7 @@ import {
   readLease,
   releaseLease,
   stripReady,
+  withWriterLease,
 } from './loop-state.mjs';
 import {
   CANONICAL_PEN,
@@ -125,7 +126,7 @@ export async function renderTrusted(
     const bad = renderGuard(
       [{ id, md5: r.md5, img }],
       { [id]: facts },
-      { dark: !/light/i.test(facts.name) }
+      { dark: !/light/i.test(facts.name), scale: scales[attempt] ?? 1 }
     );
     last = {
       ...r,
@@ -266,12 +267,33 @@ export function runFixerAgent(
 
 export async function reviewFrame(
   id,
-  { receiptsDir, fixer = 'agent', maxRounds = DEFAULT_MAX_ROUNDS, holder }
+  {
+    receiptsDir,
+    fixer = 'agent',
+    maxRounds = DEFAULT_MAX_ROUNDS,
+    holder,
+    assertLease = () => {},
+  },
+  {
+    getTrees = frameTrees,
+    getFacts = readFacts,
+    renderFrame = renderTrusted,
+    panelFor = runPanel,
+    rename = renameFrame,
+    fix = runFixerAgent,
+    record = ledger,
+  } = {}
 ) {
   const dir = join(receiptsDir, id);
   mkdirSync(dir, { recursive: true });
-  const [tree] = frameTrees([id]);
+  assertLease();
+  const [tree] = getTrees([id]);
   if (!tree || tree.missing) throw new Error(`frame ${id} not found`);
+  // Invalidate prior certification before any fallible review work.
+  if (tree.name !== stripReady(tree.name)) {
+    assertLease();
+    rename(id, stripReady(tree.name));
+  }
   const brief = loadBrief(tree.name);
   const receipt = {
     schema: RECEIPT_SCHEMA,
@@ -285,9 +307,11 @@ export async function reviewFrame(
   };
   let quietRounds = 0;
   for (let round = 0; round < maxRounds; round++) {
+    assertLease();
     const r = { round, startedAt: now() };
-    const facts = readFacts(id);
-    const render = await renderTrusted(id, join(dir, `r${round}`), facts);
+    const facts = getFacts(id);
+    const render = await renderFrame(id, join(dir, `r${round}`), facts);
+    assertLease();
     r.render = {
       path: render.path,
       md5: render.md5,
@@ -319,7 +343,7 @@ export async function reviewFrame(
       warns: findings.filter(f => f.severity === 'warn').length,
       findings,
     };
-    const panel = await runPanel({
+    const panel = await panelFor({
       png: render.buf,
       facts,
       brief,
@@ -337,21 +361,16 @@ export async function reviewFrame(
     };
     r.judges = panel.judges;
     // Missing evidence is never quiet: an incomplete panel cannot count toward a pass.
-    const decision = panel.complete
-      ? decideRound({
-          checks: findings,
-          gates: gate,
-          judges: panel.judges,
-          quietRounds,
-          round,
-          maxRounds,
-        })
-      : {
-          action: round + 1 >= maxRounds ? 'fail' : 'rejudge',
-          quietRounds: 0,
-          topIssue: null,
-          incomplete: true,
-        };
+    const decision = decideRound({
+      checks: findings,
+      gates: gate,
+      judges: panel.judges,
+      complete: panel.complete,
+      quietRounds,
+      round,
+      maxRounds,
+    });
+    assertLease();
     quietRounds = decision.quietRounds;
     r.decision = decision;
     if (decision.action === 'fix') {
@@ -361,13 +380,13 @@ export async function reviewFrame(
         receipt.nextFix = decision.topIssue;
         break;
       }
-      r.fix = runFixerAgent(
+      r.fix = fix(
         fixPrompt({ id, name: tree.name }, decision.topIssue, brief),
         { model: fixerModel(decision.topIssue) }
       );
     }
     receipt.rounds.push({ ...r, finishedAt: now() });
-    ledger({
+    record({
       stage: 'pen-review-round',
       frame: id,
       round,
@@ -385,21 +404,22 @@ export async function reviewFrame(
   const last = receipt.rounds.at(-1);
   if (last?.render?.path && existsSync(last.render.path))
     copyFileSync(last.render.path, join(dir, 'after.png'));
-  const [after] = frameTrees([id]);
+  const [after] = getTrees([id]);
   receipt.digestAfter = frameDigest(after);
   const body = JSON.stringify(receipt, null, 2);
   receipt.receiptHash = sha(body);
+  assertLease();
   if (receipt.verdict === 'pass') {
-    renameFrame(id, markReady(after.name, receipt.receiptHash));
+    rename(id, markReady(after.name, receipt.receiptHash));
     receipt.readyMarked = true;
   } else if (after.name !== stripReady(after.name)) {
-    renameFrame(id, stripReady(after.name)); // a stale marker never survives a failed review
+    rename(id, stripReady(after.name)); // a stale marker never survives a failed review
   }
   writeFileSync(
     join(dir, 'receipt.json'),
     `${JSON.stringify(receipt, null, 2)}\n`
   );
-  ledger({
+  record({
     stage: 'pen-review-frame',
     frame: id,
     verdict: receipt.verdict,
@@ -429,11 +449,18 @@ export function sweepTargets({
   return {
     state,
     statePath,
-    targets: trees
-      .filter(t => state[t.id]?.digest !== frameDigest(t))
-      .map(t => t.id),
+    targets: trees.filter(t => shouldReview(t, state[t.id])).map(t => t.id),
     trees,
   };
+}
+
+/** Transient infrastructure failures remain eligible even without a design edit. */
+export function shouldReview(tree, previous) {
+  return (
+    previous?.verdict === 'render-untrusted' ||
+    previous?.verdict === 'error' ||
+    previous?.digest !== frameDigest(tree)
+  );
 }
 
 function arg(argv, name, fallback) {
@@ -443,7 +470,7 @@ function arg(argv, name, fallback) {
 
 async function main(argv) {
   const [cmd, sub] = argv;
-  const holder = arg(
+  let holder = arg(
     argv,
     'holder',
     process.env.PEN_REVIEW_HOLDER || 'pen-review-loop'
@@ -504,69 +531,76 @@ async function main(argv) {
   const receiptsDir = resolve(
     arg(argv, 'receipts', join(STATE_DIR, 'receipts'))
   );
-  const lease = acquireLease(LEASE_PATH, {
-    holder,
-    scope: 'proposal-frames',
-    ttlMs: 60 * 60_000,
-  });
-  if (!lease.ok)
-    return report(
-      { skipped: true, reason: 'writer lease held', heldBy: lease.heldBy },
-      () => 3
-    );
-  const opts = {
-    receiptsDir,
-    fixer: arg(argv, 'fixer', 'agent'),
-    maxRounds: Number(arg(argv, 'max-rounds', DEFAULT_MAX_ROUNDS)),
-    holder,
-  };
-  let ids = (arg(argv, 'frames', '') || '').split(',').filter(Boolean);
-  let sweep;
-  if (cmd === 'sweep') {
-    sweep = sweepTargets();
-    ids = sweep.targets;
-  }
-  const results = [];
-  for (const id of ids) {
-    let rec;
-    try {
-      rec = await reviewFrame(id, opts);
-    } catch (error) {
-      // One frame's infrastructure failure never stops the batch.
-      ledger({
-        stage: 'pen-review-frame',
-        frame: id,
-        verdict: 'error',
-        error: String(error.message).slice(0, 200),
-        finishedAt: now(),
-      });
-      results.push({
-        id,
-        verdict: 'error',
-        error: String(error.message).slice(0, 200),
-      });
-      continue;
-    }
-    results.push({
-      id,
-      name: rec.frame.name,
-      verdict: rec.verdict,
-      rounds: rec.rounds.length,
-      nextFix: rec.nextFix?.message,
-    });
-    if (sweep) {
-      sweep.state[id] = {
-        digest: rec.digestAfter,
-        verdict: rec.verdict,
-        at: now(),
+  if (cmd !== 'review' && cmd !== 'sweep')
+    throw new Error('expected review, sweep, save or lease');
+  // A holder label is not a process identity: concurrent invocations get distinct leases.
+  holder = `${holder}:${randomUUID()}`;
+  const result = await withWriterLease(
+    LEASE_PATH,
+    {
+      holder,
+      scope: 'proposal-frames',
+      ttlMs: 60 * 60_000,
+    },
+    async assertLease => {
+      const opts = {
+        receiptsDir: join(receiptsDir, randomUUID()),
+        assertLease,
+        fixer: arg(argv, 'fixer', 'agent'),
+        maxRounds: Number(arg(argv, 'max-rounds', DEFAULT_MAX_ROUNDS)),
+        holder,
       };
-      writeFileSync(
-        sweep.statePath,
-        `${JSON.stringify(sweep.state, null, 2)}\n`
-      );
+      let ids = (arg(argv, 'frames', '') || '').split(',').filter(Boolean);
+      let sweep;
+      if (cmd === 'sweep') {
+        sweep = sweepTargets();
+        ids = sweep.targets;
+      }
+      const results = [];
+      for (const id of ids) {
+        let rec;
+        try {
+          rec = await reviewFrame(id, opts);
+        } catch (error) {
+          // One frame's infrastructure failure never stops the batch.
+          ledger({
+            stage: 'pen-review-frame',
+            frame: id,
+            verdict: 'error',
+            error: String(error.message).slice(0, 200),
+            finishedAt: now(),
+          });
+          results.push({
+            id,
+            verdict: 'error',
+            error: String(error.message).slice(0, 200),
+          });
+          continue;
+        }
+        results.push({
+          id,
+          name: rec.frame.name,
+          verdict: rec.verdict,
+          rounds: rec.rounds.length,
+          nextFix: rec.nextFix?.message,
+        });
+        if (sweep) {
+          sweep.state[id] = {
+            digest: rec.digestAfter,
+            verdict: rec.verdict,
+            at: now(),
+          };
+          writeFileSync(
+            sweep.statePath,
+            `${JSON.stringify(sweep.state, null, 2)}\n`
+          );
+        }
+      }
+      return { results };
     }
-  }
-  return report({ results }, r =>
+  );
+  if (result.skipped) return report(result, () => 3);
+  return report(result, r =>
     r.results.some(x => x.verdict === 'render-untrusted')
       ? 3
       : r.results.every(x => x.verdict === 'pass')

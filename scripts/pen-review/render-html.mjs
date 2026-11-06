@@ -98,7 +98,7 @@ export function prepareHtml(
   );
   if (assetBase) {
     const abs = p =>
-      /^(data:|https?:|file:)/.test(p) || isAbsolute(p)
+      /^(#|data:|https?:|file:)/.test(p) || isAbsolute(p)
         ? p
         : pathToFileURL(join(assetBase, p)).href;
     out = out.replace(
