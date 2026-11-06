@@ -36,6 +36,15 @@ describe('FooterBranding', () => {
     expect(screen.getByRole('link', { name: 'Made with Jovie' })).toHaveFocus();
   });
 
+  it('gives the brand link a real 44px hit box', () => {
+    render(<FooterBranding mark='brand' showCTA={false} />);
+
+    const link = screen.getByRole('link', { name: 'Made with Jovie' });
+    // Real box (axe's target-size cannot see before: pseudo hit areas).
+    expect(link).toHaveClass('min-h-11');
+    expect(link.className).not.toContain('before:h-11');
+  });
+
   it('uses untracked destinations when there is no artist', () => {
     render(<FooterBranding mark='brand' />);
 
