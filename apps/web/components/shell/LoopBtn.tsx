@@ -34,7 +34,7 @@ export function LoopBtn({
       type='button'
       onClick={onClick}
       className={className}
-      aria-label={`Loop: ${mode}${mode === 'track' ? ' 1x' : mode === 'section' ? ' section-repeat' : ''}`}
+      aria-label={`Loop: ${mode === 'track' ? 'track 1' : mode === 'section' ? 'section ⤴' : mode}`}
       title={`Loop: ${mode}`}
     >
       <Repeat className='h-3.5 w-3.5' strokeWidth={2.25} />
