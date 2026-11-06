@@ -57,11 +57,14 @@ not in your touched set. Saving would publish another agent's unsaved work
 ## PROPOSAL review loop
 
 Frames named `PROPOSAL / …` (or with a `· PROPOSAL` segment) are reviewed
-automatically by `scripts/pen-review/` (launchd on every canonical save plus a
-10-minute sweep; installer `scripts/hostops/install-pen-review.sh`). Render,
+by `scripts/pen-review/` when explicitly invoked or after opting into the
+installer `scripts/hostops/install-pen-review.sh` (launchd on every canonical
+save plus a 10-minute sweep). Render,
 render guard, deterministic checks, System-1 panel, fix, re-render; only frames
 renamed `· ready for Tim r<receipt>` may be shown to Tim. Receipts:
-`~/.local/state/jovie-pen-review/receipts/<frame>/`.
+`~/.local/state/jovie-pen-review/receipts/<run>/<frame>/`; each invocation
+retains its own attempts. Review and sweep use unique writer identities, renew
+at operation boundaries, and release their lease on completion or failure.
 
 Every panel includes an artist-dignity reader, and three checks always block:
 `artist-dignity` (copy that implies a small audience, empty rooms, failure or
