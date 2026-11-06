@@ -34,7 +34,6 @@ export function SourceFactCard({ fact }: { readonly fact: EnrichedFact }) {
   const category = sourceKind(fact);
   const source = fact.sourceRefs.find(ref => ref.status === 'available');
   const href = source ? publicSourceUrl(source.url) : null;
-  const label = sourceFactLabel(fact);
   return (
     <div data-testid='source-fact-card'>
       <EntityCard
@@ -47,7 +46,7 @@ export function SourceFactCard({ fact }: { readonly fact: EnrichedFact }) {
           imageAlt: '',
           title: fact.subject.displayName ?? category.label,
           eyebrow: category.label,
-          meta: label,
+          meta: sourceFactLabel(fact),
           secondaryMeta: `${fact.status} · ${fact.verification}`,
           interactive: true,
           cta: href ? { label: 'Open Source', href, external: true } : null,

@@ -40,12 +40,10 @@ function renderEvidence(
 
 describe('inline typed source evidence', () => {
   it('mounts receipt-backed sources through the canonical chat message', async () => {
-    const messageProps = { id: 'receipt', role: 'assistant' as const };
     fastRender(
       <TooltipProvider>
         <ChatMessage
-          {...messageProps}
-          parts={[{ type: 'text', text: '9.9K followers' }]}
+          {...sourceMessageFixture('receipt', '9.9K followers')}
           sourceFacts={[sourceFixture()]}
         />
       </TooltipProvider>

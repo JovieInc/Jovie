@@ -428,14 +428,13 @@ describe('ChatComposerSurface one-chrome-layer wiring', () => {
 });
 
 describe('ChatThreadMessages virtualized window', () => {
-  it('renders the rows the virtualizer reports on every render, not the first window', () => {
+  it('renders the rows the virtualizer reports on every render, not the first window', async () => {
     const messages = Array.from({ length: 6 }, (_, index) => ({
       id: `m${index}`,
       role: index % 2 ? ('assistant' as const) : ('user' as const),
       parts: [],
     }));
     let window = [0, 1];
-    // One stable object whose state changes between renders, like TanStack Virtual.
     const virtualizer = {
       getVirtualItems: () =>
         window.map(index => ({ index, start: index * 80, key: index })),
@@ -458,6 +457,7 @@ describe('ChatThreadMessages virtualized window', () => {
       onScrollToBottom: () => undefined,
     };
     const view = render(<ChatThreadMessages {...props} />);
+    await act(() => Promise.resolve());
     expect(
       screen.getAllByTestId('thread-row').map(row => row.textContent)
     ).toEqual(['m0', 'm1']);
