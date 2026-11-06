@@ -2,6 +2,8 @@
 
 /**
  * Release DSP list: quiet name+↗ rows, Find when not found, no helper prose.
+ *
+ * @coverage-via apps/web/tests/components/organisms/release-sidebar/ReleaseDspLinks.interaction.test.tsx
  */
 
 import {
