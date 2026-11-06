@@ -43,13 +43,15 @@ vi.mock('@/lib/db/legacy-transaction', async () => {
         }),
         update: (table: unknown) => ({
           set: (set: unknown) => ({
-            where: async () => {
-              hoisted.profileUpdates.push({
-                table: getTableName(table as never),
-                set,
-              });
-              return [{ id: 'profile-1' }];
-            },
+            where: () => ({
+              returning: async () => {
+                hoisted.profileUpdates.push({
+                  table: getTableName(table as never),
+                  set,
+                });
+                return [{ id: 'profile-1' }];
+              },
+            }),
           }),
         }),
         insert: (table: unknown) => ({
