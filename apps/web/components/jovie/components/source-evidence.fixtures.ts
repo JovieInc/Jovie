@@ -1,3 +1,4 @@
+import type { UIMessage } from 'ai';
 import {
   type EnrichedFact,
   enrichedFactId,
@@ -42,4 +43,22 @@ export function sourceFixture(
     ],
     ...overrides,
   };
+}
+
+export function sourceMessageFixture(id: string, text: string) {
+  return {
+    id,
+    role: 'assistant',
+    parts: [
+      { type: 'text', text },
+      {
+        type: 'dynamic-tool',
+        toolName: 'fixtureEvidence',
+        toolCallId: 'evidence',
+        state: 'output-available',
+        input: {},
+        output: { enrichedFacts: [sourceFixture()] },
+      },
+    ],
+  } satisfies UIMessage;
 }

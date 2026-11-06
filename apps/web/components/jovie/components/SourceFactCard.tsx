@@ -49,7 +49,7 @@ export function SourceFactCard({ fact }: { readonly fact: EnrichedFact }) {
           imageAlt: '',
           title: fact.subject.displayName ?? category.label,
           eyebrow: category.label,
-          meta: label ?? 'Source unavailable',
+          meta: label,
           secondaryMeta: `${fact.status} · ${fact.verification}`,
           interactive: true,
           cta: href ? { label: 'Open Source', href, external: true } : null,

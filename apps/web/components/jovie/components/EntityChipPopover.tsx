@@ -410,9 +410,7 @@ function toMentionInput(
     thumbnail: entity?.thumbnail ?? null,
   };
 
-  if (!meta) {
-    return base;
-  }
+  if (!meta) return base;
 
   if (meta.kind === 'release') {
     return {
@@ -466,16 +464,12 @@ function EntityChipPopoverBody({
     const cta = canOpenProfilePreview
       ? {
           label: 'Open Live Profile Preview',
-          onClick: () => {
-            onOpenProfilePreview();
-          },
+          onClick: onOpenProfilePreview,
         }
       : canOpen
         ? {
             label: `Open ${KIND_PREFIX[kind]}`,
-            onClick: () => {
-              onOpenEntity();
-            },
+            onClick: onOpenEntity,
           }
         : null;
 

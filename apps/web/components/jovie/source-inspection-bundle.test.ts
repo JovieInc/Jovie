@@ -29,10 +29,14 @@ describe('source inspection first-load split', () => {
     expect(valueImports('JovieChatSections.tsx')).not.toContain(
       './source-facts'
     );
-    expect(source('JovieChatSections.tsx')).toContain(
+    expect(source('source-evidence-context.ts')).toContain(
       "import('./source-facts')"
     );
     const forbidden = [
+      [
+        '../features/onboarding/OnboardingChat.tsx',
+        '@/components/jovie/source-facts',
+      ],
       ['components/ChatMessage.tsx', './SourceEvidence'],
       ['components/EntityChipPopover.tsx', '@/lib/profile-facts/enrichment'],
       ['components/EntityChipPopover.tsx', './SourceFactCard'],

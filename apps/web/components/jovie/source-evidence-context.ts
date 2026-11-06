@@ -8,6 +8,25 @@ import {
   useState,
 } from 'react';
 import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
+import type { sourceFactsByMessage } from './source-facts';
+
+export function useSourceFacts(
+  messages: Parameters<typeof sourceFactsByMessage>[0]
+) {
+  const [facts, setFacts] = useState<ReturnType<typeof sourceFactsByMessage>>(
+    () => new Map()
+  );
+  useEffect(() => {
+    let cancelled = false;
+    void import('./source-facts').then(module => {
+      if (!cancelled) setFacts(module.sourceFactsByMessage(messages));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [messages]);
+  return facts;
+}
 
 export const SourceEvidenceContext = createContext<readonly EnrichedFact[]>([]);
 

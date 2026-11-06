@@ -1,6 +1,6 @@
 'use client';
 
-import { sourceFactsByMessage } from '@/components/jovie/source-facts';
+import { useSourceFacts } from '@/components/jovie/source-evidence-context';
 
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx
 
@@ -88,6 +88,7 @@ import {
   isHandleCheckOutput,
   isNextStepPayload,
   isSocialLinkOutput,
+  rollbackFailedUserTurn,
   THINKING_PLACEHOLDER_ID,
   type ToolPart,
 } from './onboardingChatHelpers';
@@ -560,7 +561,7 @@ function OnboardingMessageList({
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
 }) {
-  const sourceFacts = sourceFactsByMessage(displayMessages);
+  const sourceFacts = useSourceFacts(displayMessages);
   const handleStepDone =
     hasToolOutputAction(
       displayMessages,
@@ -651,25 +652,6 @@ function isTurnstileTokenUsable(
 ): boolean {
   if (!token) return false;
   return !BLOCKED_TURNSTILE_TOKEN_STATUSES.has(status);
-}
-
-function rollbackFailedUserTurn(
-  messages: readonly UIMessage[],
-  failedText: string | null | undefined
-): readonly UIMessage[] {
-  const trimmedFailed = failedText?.trim();
-  if (!trimmedFailed) return messages;
-
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message.role !== 'user') continue;
-    if (getMessageText(message).trim() === trimmedFailed) {
-      return messages.slice(0, index);
-    }
-    break;
-  }
-
-  return messages;
 }
 
 function getDisplayMessages(

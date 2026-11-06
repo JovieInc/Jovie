@@ -2,7 +2,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import type { UIMessage } from 'ai';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
-import { sourceFixture } from '@/components/jovie/components/source-evidence.fixtures';
+import { sourceMessageFixture } from '@/components/jovie/components/source-evidence.fixtures';
 import { ONBOARDING_ENTRY_TITLE } from '@/lib/onboarding/empty-state';
 
 const chatMocks = vi.hoisted(() => ({
@@ -166,14 +166,13 @@ vi.mock('@/components/features/onboarding/ChatProposeNextStepCard', () => ({
   ),
 }));
 
+const text = (id: string, role: 'user' | 'assistant', value: string) =>
+  ({ id, role, parts: [{ type: 'text', text: value }] }) as UIMessage;
+
 describe('OnboardingChat empty intro', () => {
   it('gives the sign-up card the handle locked in chat, not the homepage one (JOV-10127)', async () => {
     const initialMessages: UIMessage[] = [
-      {
-        id: 'u1',
-        role: 'user',
-        parts: [{ type: 'text', text: 'I want to claim jov.ie/gpwo879d.' }],
-      },
+      text('u1', 'user', 'I want to claim jov.ie/gpwo879d.'),
       {
         id: 'confirmation',
         role: 'assistant',
@@ -273,8 +272,6 @@ describe('OnboardingChat empty intro', () => {
   });
 
   it('opens each restored agent turn with one Jovie speaker row (Pen R6As7U)', () => {
-    const text = (id: string, role: 'user' | 'assistant', value: string) =>
-      ({ id, role, parts: [{ type: 'text', text: value }] }) as UIMessage;
     render(
       <OnboardingChat
         conversationId='saved-conversation'
@@ -299,26 +296,8 @@ describe('OnboardingChat empty intro', () => {
 
   it('renders persisted progress without auto-submitting a starter or re-triggering claim activity', async () => {
     const initialMessages: UIMessage[] = [
-      {
-        id: 'saved-user',
-        role: 'user',
-        parts: [{ type: 'text', text: 'I already selected my artist' }],
-      },
-      {
-        id: 'saved-assistant',
-        role: 'assistant',
-        parts: [
-          { type: 'text', text: 'Your artist is saved' },
-          {
-            type: 'dynamic-tool',
-            toolName: 'fixtureEvidence',
-            toolCallId: 'evidence',
-            state: 'output-available',
-            input: {},
-            output: { enrichedFacts: [sourceFixture()] },
-          },
-        ],
-      },
+      text('saved-user', 'user', 'I already selected my artist'),
+      sourceMessageFixture('saved-assistant', 'Your artist is saved'),
     ];
     const activity = vi.fn();
     render(

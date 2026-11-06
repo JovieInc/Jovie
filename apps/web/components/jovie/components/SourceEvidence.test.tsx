@@ -1,15 +1,20 @@
 import { TooltipProvider } from '@jovie/ui';
+import type { Virtualizer } from '@tanstack/react-virtual';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { fastRender } from '@/tests/utils/fast-render';
+import { ChatThreadMessages } from '../JovieChatSections';
 import { AssistantMessageText } from './AssistantMessageText';
 import { ChatMarkdown } from './ChatMarkdown';
 import { ChatMessage } from './ChatMessage';
 import { SourceEvidenceProvider } from './SourceEvidence';
 import { SourceFactCard } from './SourceFactCard';
-import { sourceFixture } from './source-evidence.fixtures';
+import {
+  sourceFixture,
+  sourceMessageFixture,
+} from './source-evidence.fixtures';
 
 async function settleSourceEvidence() {
   await waitFor(() => {
@@ -196,7 +201,7 @@ describe('inline typed source evidence', () => {
     });
   });
 
-  it('uses an unavailable fallback for unknown evidence and recovers on a new receipt', async () => {
+  it('keeps the source actionable without inventing unknown values and recovers on a new receipt', async () => {
     const user = userEvent.setup();
     const fact = sourceFixture();
     const content = '[Artist](https://open.spotify.com/artist/fixture)';
@@ -205,8 +210,12 @@ describe('inline typed source evidence', () => {
       content
     );
     await user.click(await screen.findByTestId('entity-chip-popover-trigger'));
-    expect(await screen.findByTestId('source-fact-card')).toHaveTextContent(
-      'Source unavailable'
+    expect(await screen.findByTestId('source-fact-card')).not.toHaveTextContent(
+      '9.9K followers'
+    );
+    expect(screen.getByRole('link', { name: 'Open Source' })).toHaveAttribute(
+      'href',
+      'https://open.spotify.com/artist/fixture'
     );
     view.rerender(
       <SourceEvidenceProvider facts={[fact]}>
@@ -258,4 +267,40 @@ describe('inline typed source evidence', () => {
       vi.unstubAllGlobals();
     }
   });
+});
+
+it('renders text-only evidence without an invented image or artwork placeholder', () => {
+  const { container } = fastRender(<SourceFactCard fact={sourceFixture()} />);
+  expect(screen.getByRole('heading', { name: 'Fixture Artist' })).toBeVisible();
+  expect(screen.getByRole('link', { name: 'Open Source' })).toHaveAttribute(
+    'rel',
+    'noopener noreferrer'
+  );
+  expect(container.querySelector('img, .aspect-square')).toBeNull();
+});
+
+it('forwards public tool evidence through the app transcript', async () => {
+  fastRender(
+    <TooltipProvider>
+      <ChatThreadMessages
+        messages={[sourceMessageFixture('sourced', '9.9K followers')]}
+        shouldVirtualizeMessages={false}
+        virtualizer={{} as Virtualizer<HTMLDivElement, Element>}
+        virtualizedMessageViewportHeight={0}
+        virtualizedMinHeight={0}
+        messageViewportPaddingBottom={undefined}
+        totalSizeRef={() => undefined}
+        bottomSentinelRef={() => undefined}
+        isStreaming={false}
+        lastAssistantIndex={-1}
+        knownMessageIds={new Set()}
+        inlineChatError={null}
+        isStuckToBottom
+        onScrollToBottom={() => undefined}
+      />
+    </TooltipProvider>
+  );
+  expect(
+    await screen.findByTestId('entity-chip-popover-trigger')
+  ).toHaveTextContent('9.9K followers');
 });

@@ -24,7 +24,6 @@ import type {
 
 interface EntityCardProps {
   readonly model: EntityCardModel;
-  /** Evidence without artwork can use the same compact text/CTA anatomy. */
   readonly media?: 'auto' | 'none';
   /** Feature Hero / Compact / Detailed — auto-selected by the carousel. */
   readonly treatment?: EntityTreatment;
@@ -273,11 +272,6 @@ export function EntityCard({
               treatment === 'big' ? 'rounded-2xl' : 'rounded-xl'
             )
           : size.artClass;
-  const titleClampClassName = isUnified
-    ? 'line-clamp-1'
-    : shape && treatment !== 'big'
-      ? 'line-clamp-1'
-      : 'line-clamp-2';
   const preset = KIND_PRESETS[model.kind];
   const accent = model.accent ?? preset.accent;
   const Icon = preset.icon;
@@ -452,7 +446,9 @@ export function EntityCard({
           <h3
             className={cn(
               'min-w-0 font-[590] leading-tight tracking-tighter text-primary-token',
-              titleClampClassName,
+              isUnified || (shape && treatment !== 'big')
+                ? 'line-clamp-1'
+                : 'line-clamp-2',
               // Unified: match the featured card's title size — one design.
               isUnified ? 'text-sm' : size.titleClass
             )}
