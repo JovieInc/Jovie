@@ -40,7 +40,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "3dbed7e15801a9c4e7591606fb8402bf57d040e1b2afff3996ece2ccf18e9633"
+    "bodySha256": "ef991019ec62499714178175681e240c3d7da523e236b57e4e09c5b66386086f"
   },
   {
     "file": ".claude/rules/event-driven.md",
@@ -72,12 +72,12 @@
       ".claude/skills/**",
       "docs/agent-context/**"
     ],
-    "bodySha256": "4591abc2c1aa6e310d88ec278463142cfcdd413441bd1bd04998482b22793d01"
+    "bodySha256": "81ffe4da6cf4f869dd5d627f2beeb5188a982b8088b3df6b63b429c5fb29fe66"
   },
   {
     "file": ".claude/rules/hermes-air.md",
     "paths": ["docs/HERMES_AIR.md"],
-    "bodySha256": "1146534132d4a342e1ed2d00e9594d10e4e3fcf347054041bfe91323c5de98e7"
+    "bodySha256": "d94d5030bb335baed8ad4417af4c7ca0acf8d8aa0c026177af52882508ec01ea"
   },
   {
     "file": ".claude/rules/infra.md",

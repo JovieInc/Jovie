@@ -93,7 +93,7 @@ If `--sources` includes `appstore`:
 
 Save the brief to `.context/market-research/<target>-<date>.md` for future reference.
 
-If run from a Hermes context (no interactive session), emit JSON:
+If there is no interactive session, emit JSON:
 
 ```json
 {

@@ -8,11 +8,12 @@ Acceptance harness: `scripts/summer-commissioning/commissioning.mjs`
 Access audit: `scripts/summer-commissioning/capability-access-registry.json`
 Architecture freshness: `scripts/summer-commissioning/architecture-freshness-registry.json`
 
-Summer is **not commissioned**. Founder direction on 2026-09-02 retired Hermes
-and Trigger.dev. The local Summer profile is archived and offline, the desktop
-bridge fails closed, the Eve Summer identity remains read-only and unproven in
-a live deployment, and Photon/iMessage still binds Ovie. This page records the
-commissioning boundary for the Eve target; retired tooling is not a fallback.
+This page is the 2026-09-02 commissioning boundary, and its freshness deadline
+has passed. It does not say whether live Eve is up. Live Summer is
+`JovieInc/summer-config` `apps/summer` on Vercel project `jovie-eve-shadow`.
+Health is `https://summer.jov.ie/runtime/v1/health`. Founder direction on 2026-09-02 retired Hermes
+and Trigger.dev. Do not use either as a fallback.
+Summer is **not commissioned** by this page.
 
 The registry consumes the pending `jovie.certification/v1` contract from
 JOV-5753. It does not define another lifecycle, event bus, scheduler, or
@@ -122,7 +123,9 @@ node --test scripts/summer-commissioning/architecture-freshness.test.mjs
 
 The validator deliberately fails if a current context reactivates Hermes or
 Trigger.dev, if a historical page lacks its retirement notice, or if current
-records are expired or conflicting. Historical evidence remains intact.
+records are expired or conflicting. Historical pages are stubs. The old bodies
+are git history, not instructions. `retired-notes-stub.test.mjs` fails if a
+procedure is pasted back.
 
 ## Direct capability access audit
 
