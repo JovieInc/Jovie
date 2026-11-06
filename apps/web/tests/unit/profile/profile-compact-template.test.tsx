@@ -84,16 +84,13 @@ const {
 
 vi.mock(
   '../../../components/features/profile/templates/useProfileUnifiedDrawerModule',
-  () => ({ ProfileUnifiedDrawerSlot: mockDrawerSlot }));
+  () => ({ ProfileUnifiedDrawerSlot: mockDrawerSlot })
+);
 vi.mock('next/dynamic', () => ({
   default: (loader: unknown) => {
     const source = String(loader);
     if (source.includes('ProfileInlineNotificationsCTA')) {
       return (props: unknown) => mockProfileInlineNotificationsCTA(props);
-    }
-
-    if (source.includes('ProfileDesktopSurface')) {
-      return MockProfileDesktopSurface;
     }
 
     return () => null;
