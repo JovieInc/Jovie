@@ -437,7 +437,17 @@ test('review workflow repairs deterministic defects during incomplete panel and 
       }),
       panelFor: async () => ({
         complete: panels++ >= 2,
-        gates: { status: 'ok', pass: true, failed: [] },
+        gates: {
+          status: 'evaluated',
+          pass: true,
+          failed: [],
+          schema: 'test',
+          model: 'test',
+          profile: 'app',
+          surface: 'test',
+          advisory: false,
+          certified: false,
+        },
         judges: [],
       }),
       fix: prompt => {
