@@ -20,9 +20,9 @@ The architecture registry's `refreshBy` is `2026-09-09`. A caller that requires 
 The macOS Summer runtime was retired recoverably:
 
 - Disabled launch labels: `ai.hermes.gateway-summer`, `ai.hermes.summer-auto-update`, and `ai.jovie.summer-idle-kick`.
-- Archived profile and durable context: `/Users/timwhite/.hermes/retired/summer-hermes-20260902T043256Z`.
+- Archived profile and durable context: Hermes config snapshot `summer-hermes-20260902T043256Z`.
 - The unrelated `co.jovie.hermes.gbrain-worker` service was not stopped. Leaving it running did not keep Hermes as a runtime.
-- `~/.hermes` may still hold credentials. That directory is not a runtime to start.
+- The Hermes config directory may still hold credentials. That directory is not a runtime to start.
 - Restoring a retired launcher is prohibited unless a new architecture decision explicitly recommissions it.
 
 ## Supersession

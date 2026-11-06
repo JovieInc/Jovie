@@ -77,7 +77,7 @@
   {
     "file": ".claude/rules/hermes-air.md",
     "paths": ["docs/HERMES_AIR.md"],
-    "bodySha256": "d94d5030bb335baed8ad4417af4c7ca0acf8d8aa0c026177af52882508ec01ea"
+    "bodySha256": "8f3fe75a0a77dd812481cbea13e7e2fabf83b95d48af9f5646b2fc9a2fc725f0"
   },
   {
     "file": ".claude/rules/infra.md",

@@ -18,4 +18,4 @@ The MacBook Air (`tims-macbook-air`) is the fleet's Mac lane. Hermes was retired
 - It does not dispatch GitHub issues. The GitHub AI dispatcher and the Pro Codex issue shipper are retired.
 - It does not orchestrate JOV work. Symphony lanes claim that work (`scripts/lanes/README.md`).
 - It does not start the retired Hermes gateway, voice watcher, or learning sweep. Those steps are git history. Do not restore them.
-- `~/.hermes` may still hold credentials and a gbrain worker that was left running on 2026-09-02. That directory is not a runtime to start.
+- The Hermes config directory may still hold credentials and a gbrain worker that was left running on 2026-09-02. That directory is not a runtime to start.
