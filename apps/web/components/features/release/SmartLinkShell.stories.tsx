@@ -4,7 +4,12 @@ import { SmartLinkShell } from './SmartLinkShell';
 const meta = {
   title: 'Release/SmartLinkShell',
   component: SmartLinkShell,
-  parameters: { layout: 'centered' },
+  parameters: {
+    layout: 'centered',
+    // Smart link pages render the Noir stage; white text tokens assume it.
+    themes: { themeOverride: 'dark' },
+    backgrounds: { default: 'dark' },
+  },
   args: {
     artworkUrl: 'https://placehold.co/640x640/111827/E5E7EB?text=Artwork',
     artworkAlt: 'Never Say A Word artwork',

@@ -21,6 +21,7 @@ export function PublicSurfaceShell({
 }: Readonly<PublicSurfaceShellProps>) {
   return (
     <div
+      tabIndex={0}
       className={cn(
         'profile-viewport relative h-dvh overflow-clip bg-base text-primary-token md:h-auto md:min-h-dvh md:overflow-x-hidden',
         className
