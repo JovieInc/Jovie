@@ -1,10 +1,8 @@
 'use client';
 // @coverage-via apps/web/components/jovie/components/SourceEvidence.test.tsx
 
-import {
-  EntityCard,
-  type EntityCardModel,
-} from '@/components/organisms/entity-card';
+import { EntityCard } from '@/components/organisms/entity-card/EntityCard';
+import type { EntityCardModel } from '@/components/organisms/entity-card/types';
 import {
   type EnrichedFact,
   publicSourceUrl,

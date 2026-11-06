@@ -1,6 +1,6 @@
 'use client';
 
-import { useSourceFacts } from '@/components/jovie/source-evidence-context';
+import { sourceFactsByMessage } from '@/components/jovie/source-facts';
 
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx
 
@@ -561,7 +561,7 @@ function OnboardingMessageList({
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
 }) {
-  const sourceFacts = useSourceFacts(displayMessages);
+  const sourceFacts = sourceFactsByMessage(displayMessages);
   const handleStepDone =
     hasToolOutputAction(
       displayMessages,
