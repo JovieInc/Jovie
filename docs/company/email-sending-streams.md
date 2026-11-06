@@ -111,9 +111,10 @@ Cheapest ingestion: add a free Postmark DMARC digest address as a second
 `rua` (no code, $0, weekly readable digest), then later parse reports in-house
 through the existing Resend inbound webhook if the digest is not enough.
 After 7 consecutive days of clean reports, move `_dmarc.send.jov.ie` from
-`p=none` to `p=quarantine` (Summer task, earliest 2026-11-05). Note: PR #23153
-found three `v=DMARC1` records at `_dmarc.jov.ie`; receivers discard all of
-them, so the apex has no effective policy until two are removed.
+`p=none` to `p=quarantine` (Summer task JOV-9918, earliest 2026-11-05). DNS on 2026-10-29: `_dmarc.jov.ie`,
+`_dmarc.send`, `_dmarc.notify` and `_dmarc.payments` each publish exactly one
+`v=DMARC1; p=none` record with `rua=mailto:dmarc-reports@jov.ie` (the apex used
+to carry three conflicting records and a placeholder; see JOV-6595).
 
 ### Google Postmaster Tools
 

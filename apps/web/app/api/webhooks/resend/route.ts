@@ -26,6 +26,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { webhookEvents } from '@/lib/db/schema/suppression';
 import { stopEnrollmentsForEmail } from '@/lib/email/campaigns/enrollment';
+import { evaluateStreamFromEvent } from '@/lib/email/deliverability/loop.server';
+import { senderDomainOf } from '@/lib/email/streams';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import {
@@ -70,6 +72,8 @@ interface ResendWebhookPayload {
     to: string[];
     subject: string;
     created_at: string;
+    /** Tags set at send time by the gateway (`stream`, `purpose`). */
+    tags?: Record<string, string> | Array<{ name: string; value: string }>;
     // Bounce-specific fields
     bounce?: {
       message: string;
@@ -302,6 +306,27 @@ async function updateCreatorReputation(
   }
 }
 
+/** The gateway's `stream` tag, whichever shape Resend delivers tags in. */
+function streamTag(data: ResendWebhookPayload['data']): string | undefined {
+  const tags = data.tags;
+  if (!tags) return undefined;
+  if (Array.isArray(tags)) return tags.find(t => t.name === 'stream')?.value;
+  return tags.stream;
+}
+
+/** Stream and sending domain on every outcome, for per-stream deliverability. */
+function outcomeMetadata(data: ResendWebhookPayload['data']): {
+  stream?: string;
+  senderDomain?: string;
+} {
+  const stream = streamTag(data);
+  const senderDomain = senderDomainOf(data.from);
+  return {
+    ...(stream && { stream }),
+    ...(senderDomain && { senderDomain }),
+  };
+}
+
 /**
  * Process a bounce or complaint event
  */
@@ -383,6 +408,7 @@ async function processBounceOrComplaint(
           bounceCode: data.bounce?.diagnostic_code,
           complaintType,
           ...(creatorProfileId && { creatorProfileId }),
+          ...outcomeMetadata(data),
         },
       })
     )
@@ -395,6 +421,9 @@ async function processBounceOrComplaint(
       });
     }
   }
+
+  // Closed loop: re-judge the stream; over the line it pauses and files a card.
+  await evaluateStreamFromEvent(streamTag(data));
 }
 
 /**
@@ -456,9 +485,11 @@ async function processDelivered(event: ResendWebhookPayload): Promise<void> {
         recipientEmail: email,
         status: 'delivered',
         providerMessageId: data.email_id,
-        ...(creatorProfileId && {
-          metadata: { creatorProfileId },
-        }),
+        metadata: {
+          eventType: 'email.delivered',
+          ...(creatorProfileId && { creatorProfileId }),
+          ...outcomeMetadata(data),
+        },
       })
     )
   );

@@ -112,6 +112,10 @@ export interface DeliveryLogMetadata {
   releaseId?: string;
   releaseName?: string;
   suppressionReason?: string;
+  /** Gateway stream tag from the provider event, for per-stream deliverability. */
+  stream?: string;
+  /** Sending domain from the provider event, for per-domain deliverability. */
+  senderDomain?: string;
 }
 
 /**
