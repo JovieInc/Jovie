@@ -65,77 +65,77 @@ export async function executeCanaryReset(): Promise<CanaryResetOutcome> {
 
   const plan = await runAtomicDbOperation(
     async tx => {
-    const claimRows = await tx
-      .select({ id: userProfileClaims.id, userId: userProfileClaims.userId })
-      .from(userProfileClaims)
-      .where(eq(userProfileClaims.userId, account.id));
+      const claimRows = await tx
+        .select({ id: userProfileClaims.id, userId: userProfileClaims.userId })
+        .from(userProfileClaims)
+        .where(eq(userProfileClaims.userId, account.id));
 
-    const profileRows: CanaryResetProfileRow[] = await tx
-      .select({
-        id: creatorProfiles.id,
-        userId: creatorProfiles.userId,
-        usernameNormalized: creatorProfiles.usernameNormalized,
-        isClaimed: creatorProfiles.isClaimed,
-        isPublic: creatorProfiles.isPublic,
-        claimedAt: creatorProfiles.claimedAt,
-        claimToken: creatorProfiles.claimToken,
-        claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
-        onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
-        settings: creatorProfiles.settings,
-      })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.userId, account.id));
+      const profileRows: CanaryResetProfileRow[] = await tx
+        .select({
+          id: creatorProfiles.id,
+          userId: creatorProfiles.userId,
+          usernameNormalized: creatorProfiles.usernameNormalized,
+          isClaimed: creatorProfiles.isClaimed,
+          isPublic: creatorProfiles.isPublic,
+          claimedAt: creatorProfiles.claimedAt,
+          claimToken: creatorProfiles.claimToken,
+          claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
+          onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+          settings: creatorProfiles.settings,
+        })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.userId, account.id));
 
-    const plan = planCanaryReset({
-      user: account,
-      claimRows,
-      profileRows,
-    });
-
-    if (plan.claimRowIds.length > 0) {
-      await tx
-        .delete(userProfileClaims)
-        .where(inArray(userProfileClaims.id, [...plan.claimRowIds]));
-    }
-
-    for (const update of plan.profileUpdates) {
-      const [claimed] = await tx
-        .update(creatorProfiles)
-        .set({ ...update.set, updatedAt: new Date() })
-        .where(
-          and(
-            eq(creatorProfiles.id, update.id),
-            eq(creatorProfiles.userId, account.id)
-          )
-        )
-        .returning({ id: creatorProfiles.id });
-      if (!claimed) {
-        throw new Error(
-          `CANARY_RESET_CONFLICT: profile ${update.id} left canary ownership mid-reset`
-        );
-      }
-      await tx.insert(profileOwnershipLog).values({
-        creatorProfileId: update.id,
-        userId: account.id,
-        action: 'unlinked',
-        performedBy: account.id,
-        reason: 'internal: canary reset to pre-claim state (JOV-9826)',
+      const plan = planCanaryReset({
+        user: account,
+        claimRows,
+        profileRows,
       });
-    }
 
-    if (plan.deleteChatConversations) {
-      await tx
-        .delete(chatConversations)
-        .where(eq(chatConversations.userId, account.id));
-    }
-    if (plan.deleteSuggestedActions) {
-      await tx
-        .delete(suggestedActions)
-        .where(eq(suggestedActions.userId, account.id));
-    }
+      if (plan.claimRowIds.length > 0) {
+        await tx
+          .delete(userProfileClaims)
+          .where(inArray(userProfileClaims.id, [...plan.claimRowIds]));
+      }
 
-    return plan;
-  },
+      for (const update of plan.profileUpdates) {
+        const [claimed] = await tx
+          .update(creatorProfiles)
+          .set({ ...update.set, updatedAt: new Date() })
+          .where(
+            and(
+              eq(creatorProfiles.id, update.id),
+              eq(creatorProfiles.userId, account.id)
+            )
+          )
+          .returning({ id: creatorProfiles.id });
+        if (!claimed) {
+          throw new Error(
+            `CANARY_RESET_CONFLICT: profile ${update.id} left canary ownership mid-reset`
+          );
+        }
+        await tx.insert(profileOwnershipLog).values({
+          creatorProfileId: update.id,
+          userId: account.id,
+          action: 'unlinked',
+          performedBy: account.id,
+          reason: 'internal: canary reset to pre-claim state (JOV-9826)',
+        });
+      }
+
+      if (plan.deleteChatConversations) {
+        await tx
+          .delete(chatConversations)
+          .where(eq(chatConversations.userId, account.id));
+      }
+      if (plan.deleteSuggestedActions) {
+        await tx
+          .delete(suggestedActions)
+          .where(eq(suggestedActions.userId, account.id));
+      }
+
+      return plan;
+    },
     { actorId: 'system_canary_reset', system: true, retry: 'serialization' }
   );
 
