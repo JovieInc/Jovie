@@ -48,7 +48,10 @@ function renderLogoMark(
   if (mark === 'text') {
     return (
       <>
-        <span>Powered by</span>
+        {/* Explicit trailing space: the two spans concatenate in the
+            accessible text, and the label-in-name contract needs the
+            visible text verbatim inside the link's name. */}
+        <span>{'Powered by '}</span>
         <span className='font-semibold'>Jovie</span>
       </>
     );
@@ -124,7 +127,7 @@ export function FooterBranding({
       <Link
         href={logoHref}
         prefetch={false}
-        aria-label={mark === 'brand' ? undefined : 'Jovie Home'}
+        aria-label={mark === 'brand' ? undefined : 'Powered by Jovie Home'}
         className={logoLinkClass}
       >
         {renderLogoMark(mark, size, isLinear, logoClass)}
