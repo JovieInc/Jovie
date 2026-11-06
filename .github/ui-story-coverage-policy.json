@@ -114,10 +114,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/admin/waitlist-table/WaitlistKanbanCard.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/admin/WeeklyTrendChart.tsx",
       "linearIssue": "JOV-8847"
     },

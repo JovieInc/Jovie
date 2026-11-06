@@ -61,10 +61,11 @@ describe('AiCrawlerIntelligenceCard', () => {
   it('renders the readiness disclosure in the populated compact row', () => {
     render(<AiCrawlerIntelligenceCard onOpenDetail={() => undefined} />);
 
-    expect(screen.getByTestId('ai-crawler-intelligence-card')).toHaveAttribute(
-      'aria-label',
-      'View AI Crawler Read Details'
-    );
+    const trigger = screen.getByRole('button', {
+      name: /^View AI Crawler Reads/,
+    });
+    expect(trigger).toHaveAccessibleName(/420 reads · 2 services tracked/);
+    expect(trigger).toHaveAccessibleName(/Active$/);
     expect(screen.getByText('AI Crawler Reads')).toBeInTheDocument();
     expect(
       screen.getByText('420 reads · 2 services tracked')

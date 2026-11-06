@@ -22,7 +22,11 @@
 }
 
 .m-spec-bento__title--purple {
-  color: var(--color-accent-purple);
+  color: color-mix(
+    in oklab,
+    var(--color-accent-purple-text) 85%,
+    var(--color-text-primary-token)
+  );
 }
 
 .m-spec-bento__stage {

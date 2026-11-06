@@ -286,12 +286,10 @@ function ShellDropdownRoot({
   );
 
   const isEmpty = searchable && query.trim().length > 0 && visibleCount === 0;
-
   const widthStyle =
     width === 'trigger'
       ? { ['--w' as string]: 'var(--radix-dropdown-menu-trigger-width)' }
       : { ['--w' as string]: `${width}px` };
-
   return (
     <DropdownMenuPrimitive.Root
       open={open}
@@ -304,6 +302,8 @@ function ShellDropdownRoot({
       </DropdownMenuPrimitive.Trigger>
       <DropdownMenuPrimitive.Portal>
         <DropdownMenuPrimitive.Content
+          role={searchable ? 'dialog' : 'menu'}
+          aria-label={searchable ? 'Filter Menu' : undefined}
           align={align}
           side={side}
           sideOffset={sideOffset}
@@ -328,6 +328,7 @@ function ShellDropdownRoot({
                 />
               ) : null}
               <div
+                role={searchable ? 'menu' : undefined}
                 className={cn(
                   'system-b-shell-dropdown-scroll',
                   searchable && 'pt-0'
@@ -348,7 +349,6 @@ function ShellDropdownRoot({
     </DropdownMenuPrimitive.Root>
   );
 }
-
 // ---------------------------------------------------------------------------
 // Filter input — sticky at top, ESC clears, hairline below.
 // ---------------------------------------------------------------------------
@@ -386,14 +386,14 @@ function FilterInput({
             }
           }}
           placeholder={placeholder}
-          aria-label='Filter dropdown items'
+          aria-label='Filter Dropdown Items'
           className='system-b-shell-dropdown-filter-input'
         />
         {value ? (
           <button
             type='button'
             onClick={() => onChange('')}
-            aria-label='Clear filter'
+            aria-label='Clear Filter'
             className='system-b-shell-dropdown-filter-clear'
           >
             <X className='h-3 w-3' strokeWidth={2.25} />
