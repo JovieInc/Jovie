@@ -232,9 +232,6 @@ function ExpandCollapseIcon({ open }: Readonly<{ open: boolean }>) {
 }
 
 function getSwButtonProps(enabled: boolean) {
-  // The accessible name must contain the button's visible text ("SW"):
-  // axe label-content-name-mismatch (WCAG 2.5.3) fails the public-screens
-  // proof captures otherwise (JOV-7973 fleet-gate blocker).
   return {
     title: enabled
       ? 'Service worker active — click to disable'
@@ -244,9 +241,7 @@ function getSwButtonProps(enabled: boolean) {
         ? 'text-accent bg-accent/10'
         : 'text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2'
     }`,
-    'aria-label': enabled
-      ? 'Disable SW (service worker)'
-      : 'Enable SW (service worker)',
+    'aria-label': enabled ? 'Disable SW' : 'Enable SW',
   };
 }
 
