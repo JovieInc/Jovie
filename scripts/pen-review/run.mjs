@@ -21,7 +21,6 @@
  * Kill switch: touch ~/.local/state/jovie-pen-review/disabled.
  */
 
-import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   appendFileSync,
@@ -41,9 +40,9 @@ import {
   DEAD_END_RULES,
   DEAD_END_TRANSIENT,
 } from '../../packages/copy/rules.ts';
-import { decodePng } from '../invariants/pen-still-diff-lib.mjs';
 import { PATTERNS as CLAIM_PATTERNS } from '../invariants/stat-claims/check.mjs';
 import { brandChecks } from './brand-checks.mjs';
+import { fixerModel, fixPrompt, runFixerAgent } from './fixer.mjs';
 import { runPanel } from './judges.mjs';
 import { runChecks } from './lib.mjs';
 import {
@@ -62,17 +61,18 @@ import {
 } from './loop-state.mjs';
 import {
   CANONICAL_PEN,
-  exportFramesHeadless,
   frameTrees,
   listFrames,
   readFacts,
   renameFrame,
-  runPen,
   saveLive,
   signatures,
 } from './pen-bridge.mjs';
-import { renderGuard } from './render-guard.mjs';
-import { renderHtmlFiles } from './render-html.mjs';
+
+import { renderTrusted } from './render-trusted.mjs';
+
+export { fixerModel, fixPrompt, runFixerAgent } from './fixer.mjs';
+export { renderTrusted } from './render-trusted.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const STATE_DIR =
@@ -80,10 +80,7 @@ export const STATE_DIR =
   join(homedir(), '.local/state/jovie-pen-review');
 export const LEASE_PATH = join(STATE_DIR, 'writer.lease.json');
 const LEDGER = join(STATE_DIR, 'ledger.jsonl');
-const RENDER_RETRIES = 3;
-const RENDER_RETRY_WAIT_MS = 4_000;
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => new Date().toISOString();
 const sha = v => createHash('sha256').update(v).digest('hex');
 
@@ -98,172 +95,12 @@ function ledger(event) {
   appendFileSync(LEDGER, `${JSON.stringify({ at: now(), ...event })}\n`);
 }
 
-/**
- * Exports and guards one frame. Cold exports race font and image loading;
- * re-export after a wait until the guard is clean, else fail the render.
- */
-export async function renderTrusted(
-  id,
-  dir,
-  facts,
-  {
-    exporter = exportFramesHeadless,
-    wait = sleep,
-    htmlFallback = renderViaHtml,
-    requireStable = exporter !== exportFramesHeadless,
-  } = {}
-) {
-  // Root fix for the font race: Pen's first export after a load can draw before
-  // web fonts (Material Symbols, Inter) arrive. An export is trusted only when
-  // two consecutive exports are byte-identical AND the guard is clean, so a
-  // half-loaded font can never be the render a judge sees.
-  let last;
-  let prevMd5 = null;
-  const scales = [1, 1, 1, 0.5];
-  for (let attempt = 0; attempt < RENDER_RETRIES + 1; attempt++) {
-    const [r] = exporter([id], dir, { scale: scales[attempt] ?? 1 });
-    const img = decodePng(r.buf);
-    const bad = renderGuard(
-      [{ id, md5: r.md5, img }],
-      { [id]: facts },
-      { dark: !/light/i.test(facts.name), scale: scales[attempt] ?? 1 }
-    );
-    last = {
-      ...r,
-      attempt,
-      guard: bad,
-      renderer:
-        exporter === exportFramesHeadless ? 'pen-headless' : 'pen-raster',
-      stable: !requireStable || prevMd5 === r.md5,
-    };
-    if (bad.length === 0 && last.stable) return last;
-    prevMd5 = bad.length === 0 ? r.md5 : null;
-    if (bad.length) await wait(RENDER_RETRY_WAIT_MS * (attempt + 1));
-  }
-  if (last.guard.length === 0)
-    return {
-      ...last,
-      stable: false,
-      guard: [
-        'render did not stabilise across exports (fonts or images still loading)',
-      ],
-    };
-  // Raster still untrusted (garbled readback): Chromium render of the html-css export.
-  const html = await htmlFallback(id, dir);
-  if (!html?.buf)
-    return { ...last, guard: [...last.guard, ...(html?.problems ?? [])] };
-  const img = decodePng(html.buf);
-  const bad = [
-    ...html.problems,
-    ...renderGuard(
-      [{ id, md5: html.md5, img }],
-      {},
-      { dark: !/light/i.test(facts.name) }
-    ).map(b => b.reason),
-  ];
-  return {
-    ...html,
-    attempt: last.attempt + 1,
-    guard: bad,
-    renderer: 'chromium-html',
-    rasterGuard: last.guard,
-  };
-}
-
-async function renderViaHtml(id, dir) {
-  try {
-    const htmlPath = join(dir, `${id}.html`);
-    runPen([
-      `Export(${JSON.stringify([id])},"html-css",${JSON.stringify(htmlPath)})`,
-    ]);
-    const outPath = join(dir, `${id}.chromium.png`);
-    const [res] = await renderHtmlFiles([{ htmlPath, outPath }], {
-      assetBase: dirname(CANONICAL_PEN),
-    });
-    const buf = readFileSync(outPath);
-    return {
-      id,
-      path: outPath,
-      buf,
-      md5: createHash('md5').update(buf).digest('hex'),
-      problems: res.problems,
-    };
-  } catch (error) {
-    return {
-      id,
-      path: null,
-      buf: null,
-      md5: null,
-      problems: [
-        `html fallback failed: ${String(error.message).slice(0, 160)}`,
-      ],
-    };
-  }
-}
-
 const CHECK_CTX = {
   lintCopy,
   deadEndRules: DEAD_END_RULES,
   deadEndTransient: DEAD_END_TRANSIENT,
   claimPatterns: CLAIM_PATTERNS,
 };
-
-export function fixPrompt(frame, issue, brief) {
-  return [
-    `You are the Pen fixer in Jovie's PROPOSAL review loop. Fix exactly one issue in one frame of the live Pen canvas "${CANONICAL_PEN}" using the pencil MCP execute tool.`,
-    `Frame: ${frame.id} "${frame.name}". Mission of the screen: ${brief.mission}. Audience: ${brief.audience}.`,
-    `Top issue (${issue.source}/${issue.check}): ${issue.message}${issue.fix ? `\nSuggested fix: ${issue.fix}` : ''}${issue.element ? `\nElement: ${issue.element}` : ''}`,
-    issue.nodes?.length
-      ? `Nodes: ${issue.nodes.join(', ')}\nDetail: ${JSON.stringify(issue.detail ?? []).slice(0, 2500)}`
-      : '',
-    'Rules: edit only nodes inside this frame (never a reusable component master, never another frame, never variables). Use the existing $tokens for colour, type size and radius; spacing on the 4px grid; whole-pixel geometry; one content axis; one filled primary action per screen; sentence-case, plain copy with no em dashes. Keep the design language; do not redesign the screen.',
-    'Read the frame first (Get with depth or a visitor), make the smallest change that fixes the issue everywhere it applies, then confirm it with a Get visitor (ctx.bounds, ctx.problems). Do not use TakeScreenshot: the app raster output is unreliable and the loop re-renders out of process. Never add a second filled button, never remove the only actions of a state (that makes a dead end), never hide or edit the shared app shell (sidebar, header), and never add numbers that are not already on the frame. Do not save, do not open or switch documents. Reply with one line saying what you changed.',
-  ]
-    .filter(Boolean)
-    .join('\n');
-}
-
-/**
- * Model per issue (2026-11-02): mechanical findings (grid, contrast, tokens,
- * copy lint) go to the cheap fixer; judge and Clef-gate issues are taste calls
- * where a wrong fix is expensive (a Sonnet fixer added a second primary and
- * dropped the only actions from a held-state card), so they go to Opus.
- */
-export function fixerModel(issue, env = process.env) {
-  const taste = issue?.source === 'judge' || issue?.source === 'clef-gate';
-  return taste
-    ? env.PEN_REVIEW_TASTE_FIXER_MODEL || 'opus'
-    : env.PEN_REVIEW_FIXER_MODEL || 'sonnet';
-}
-
-/** @param {string} prompt @param {{timeoutMs?: number, model?: string}} [opts] */
-export function runFixerAgent(
-  prompt,
-  { timeoutMs = 12 * 60_000, model = fixerModel(null) } = {}
-) {
-  const cwd = mkdtempSync(join(tmpdir(), 'pen-fixer-'));
-  const res = spawnSync(
-    'claude',
-    [
-      '-p',
-      prompt,
-      '--model',
-      model,
-      '--allowedTools',
-      'mcp__pencil__execute,mcp__pencil__get_app_state,mcp__pencil__read_skill',
-    ],
-    { cwd, encoding: 'utf8', timeout: timeoutMs }
-  );
-  return {
-    status: res.status,
-    out: String(res.stdout ?? '')
-      .trim()
-      .slice(-600),
-    err: String(res.stderr ?? '')
-      .trim()
-      .slice(-300),
-  };
-}
 
 export async function reviewFrame(
   id,
@@ -308,7 +145,9 @@ export async function reviewFrame(
   let quietRounds = 0;
   for (let round = 0; round < maxRounds; round++) {
     assertLease();
-    const r = { round, startedAt: now() };
+    const digest = frameDigest(getTrees([id])[0]);
+    if (receipt.rounds.at(-1)?.digest !== digest) quietRounds = 0;
+    const r = { round, startedAt: now(), digest };
     const facts = getFacts(id);
     const render = await renderFrame(id, join(dir, `r${round}`), facts);
     assertLease();
@@ -406,6 +245,10 @@ export async function reviewFrame(
     copyFileSync(last.render.path, join(dir, 'after.png'));
   const [after] = getTrees([id]);
   receipt.digestAfter = frameDigest(after);
+  if (receipt.verdict === 'pass' && receipt.digestAfter !== last?.digest) {
+    receipt.verdict = 'fail';
+    receipt.failure = 'frame changed after its evaluated render; review again';
+  }
   const body = JSON.stringify(receipt, null, 2);
   receipt.receiptHash = sha(body);
   assertLease();
@@ -477,7 +320,7 @@ async function main(argv) {
   );
   if (existsSync(join(STATE_DIR, 'disabled')) && cmd !== 'lease') {
     console.log('pen-review disabled (kill switch)');
-    return 0;
+    return cmd === 'save' ? 3 : 0;
   }
   if (cmd === 'lease') {
     if (sub === 'acquire')
