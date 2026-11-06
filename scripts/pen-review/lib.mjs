@@ -1,23 +1,10 @@
 /**
- * Pen PROPOSAL review loop: the pure half (no Pen, no network).
+ * Pure checks over resolved Pen node facts: colour, contrast, design-system
+ * tokens, type, geometry, actions, copy and numeric claims.
  *
- * Every Pen frame marked PROPOSAL is rendered, checked deterministically,
- * judged by a cheap System-1 panel, fixed one top issue at a time and
- * re-rendered until all checks pass and two consecutive judge rounds raise
- * nothing material. Only then is it marked "ready for Tim". This module holds
- * the parts that must be exact and testable:
- *
- * - render guard: renderer noise, identical renders, missing glyphs, blank
- *   text and unloaded image fills fail the render, never reach a judge;
- * - deterministic checks over a frame's resolved node facts: DS tokens only,
- *   type scale, font families, contrast, touch targets, grid and optical
- *   alignment, one primary action, dead ends, copy lint, numeric claims;
- * - the loop decision (fix / quiet / pass / fail) and top-issue selection;
- * - the single-writer lease for the shared Pen canvas.
- *
- * Siblings: render-guard.mjs (render trust), loop-state.mjs (decision,
- * digest, lease). Wiring lives in run.mjs (CLI, sweep, receipts), pen-bridge.mjs (live
- * canvas) and judges.mjs (Clef + Workers AI panel).
+ * Shared shell descendants remain advisory because a proposal fixer cannot
+ * change their component masters. Rendering, review decisions and writer
+ * leases live in their own modules; this module has no Pen or network calls.
  */
 
 // ── Colour ───────────────────────────────────────────────────────────────
