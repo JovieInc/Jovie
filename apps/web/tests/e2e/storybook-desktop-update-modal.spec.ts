@@ -1,6 +1,25 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('Desktop update release notes geometry', () => {
+  test('does not persist a light override into the next default story', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto(
+      '/iframe.html?id=organisms-desktopupdatemodal--available-light&viewMode=story'
+    );
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.locator('html')).toHaveClass(/light/);
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+    // Navigate in the same browser context without resetting theme storage.
+    await page.goto(
+      '/iframe.html?id=organisms-desktopupdatemodal--downloading-slow&viewMode=story'
+    );
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await expect(page.locator('html')).not.toHaveClass(/light/);
+  });
+
   for (const [width, height] of [
     [390, 844],
     [768, 1024],
@@ -26,9 +45,8 @@ test.describe('Desktop update release notes geometry', () => {
           .getByRole('dialog')
           .evaluate(el => el.contains(document.activeElement))
       ).toBe(true);
-      // The preview persists a story's requested theme now (the Surface
-      // Matrix seeding contract), so the light story above would bleed into
-      // this unrequested one. Reset storage; the provider default is dark.
+      // Isolate the download-speed fixture from saved theme preferences.
+      // The dedicated transition test above verifies navigation without a reset.
       await page.evaluate(() =>
         localStorage.removeItem('jovie-theme-storybook')
       );
