@@ -207,7 +207,10 @@ export function ReleaseDspLinks({
                 }
               }}
             >
-              <SelectTrigger className='h-8 w-full rounded-md border-subtle bg-surface-0 text-xs'>
+              <SelectTrigger
+                aria-label='Provider'
+                className='h-8 w-full rounded-md border-subtle bg-surface-0 text-xs'
+              >
                 <SelectValue placeholder='Select provider' />
               </SelectTrigger>
               <SelectContent>
