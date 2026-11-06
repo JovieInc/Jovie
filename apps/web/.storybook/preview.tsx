@@ -227,22 +227,8 @@ export function resolveStoryTheme(
 }
 
 const preview: Preview = {
-  // Restore each story's requested theme instead of wiping storage: the
-  // Surface Matrix harness seeds `jovie-theme-storybook` per variant, and a
-  // blanket removal here erased that seed before the ThemeProvider mounted,
-  // so every unrequested story fell back to `defaultTheme` (light variants
-  // rendered dark). A story that explicitly requests a theme gets it written
-  // back; a story that requests nothing keeps the seeded value it was given.
-  beforeEach: context => {
-    try {
-      const requested = resolveStoryTheme(context);
-      if (requested) {
-        globalThis.localStorage?.setItem('jovie-theme-storybook', requested);
-      }
-    } catch {
-      // Storage is optional in isolated browser tests.
-    }
-  },
+  // Explicit story themes are applied through forcedTheme below. Keep them
+  // out of storage so later stories retain their harness seed or default.
   parameters: {
     controls: {
       matchers: {

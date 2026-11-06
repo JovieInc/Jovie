@@ -25,11 +25,12 @@ function decorate(): Decorate {
 
 // The decorator runs React hooks (the QueryClient useState), so it can only
 // execute during a component render — exactly how Storybook invokes it.
-function renderDecorated(context: StoryInput): void {
+function renderDecorated(context: StoryInput) {
+  beforeEachHook()?.(context);
   function Decorated() {
     return decorate()(() => <div>story</div>, context);
   }
-  render(<Decorated />);
+  return render(<Decorated />);
 }
 
 type ThemeContext = Pick<StoryContext, 'globals' | 'parameters'>;
@@ -43,8 +44,10 @@ function themeContext(input: StoryInput = {}): ThemeContext {
   } as ThemeContext;
 }
 
-function beforeEachHook(): (context: StoryInput) => void {
-  return preview.beforeEach as unknown as (context: StoryInput) => void;
+function beforeEachHook(): ((context: StoryInput) => void) | undefined {
+  return preview.beforeEach as unknown as
+    | ((context: StoryInput) => void)
+    | undefined;
 }
 
 describe('preview theme reset', () => {
@@ -100,30 +103,37 @@ describe('preview theme reset', () => {
     });
   });
 
-  describe('preview.beforeEach', () => {
-    it('restores a requested theme into storage', () => {
-      beforeEachHook()({
+  describe('story theme isolation', () => {
+    it('does not persist an explicit story theme into the next default story', () => {
+      const lightStory = renderDecorated({
         parameters: { themes: { themeOverride: 'light' } },
         globals: {},
       });
-      expect(window.localStorage.getItem(STORAGE_KEY)).toBe('light');
+      expect(document.documentElement.className).toMatch(/\blight\b/);
+      lightStory.unmount();
+      renderDecorated({ parameters: {}, globals: {} });
+      expect(document.documentElement.className).toMatch(/\bdark\b/);
+      expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
     });
 
-    it('keeps a harness-seeded theme when the story requests nothing', () => {
+    it('renders and retains a harness-seeded theme without a story request', () => {
       seedStorage('light');
-      beforeEachHook()({ parameters: {}, globals: {} });
-      // Removing the seed here is what turned every Surface Matrix light
-      // variant dark: the ThemeProvider fell back to defaultTheme.
+      renderDecorated({ parameters: {}, globals: {} });
+      expect(document.documentElement.className).toMatch(/\blight\b/);
       expect(window.localStorage.getItem(STORAGE_KEY)).toBe('light');
     });
 
-    it('overwrites a stale story-toggle choice for a themed story', () => {
+    it('applies an explicit override without replacing the harness seed', () => {
       seedStorage('dark');
-      beforeEachHook()({
+      const lightStory = renderDecorated({
         parameters: { themes: { themeOverride: 'light' } },
         globals: {},
       });
-      expect(window.localStorage.getItem(STORAGE_KEY)).toBe('light');
+      expect(document.documentElement.className).toMatch(/\blight\b/);
+      expect(window.localStorage.getItem(STORAGE_KEY)).toBe('dark');
+      lightStory.unmount();
+      renderDecorated({ parameters: {}, globals: {} });
+      expect(document.documentElement.className).toMatch(/\bdark\b/);
     });
   });
 
