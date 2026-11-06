@@ -138,6 +138,13 @@
       "tables": ["creatorProfiles", "userProfileClaims"]
     },
     {
+      "id": "synthetic.canary-reset",
+      "entity": "claim-walk canary reset (JOV-9826)",
+      "module": "apps/web/lib/synthetic/canary-reset.server.ts",
+      "exports": ["executeCanaryReset"],
+      "tables": ["creatorProfiles", "userProfileClaims"]
+    },
+    {
       "id": "claim.finalize",
       "entity": "claim",
       "module": "apps/web/lib/claim/finalize.ts",

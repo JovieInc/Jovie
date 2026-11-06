@@ -25,7 +25,14 @@ import { derivePassageKeyBase64Url } from './synthetic-passage-key.mjs';
 export const PASSAGE_TOKEN_HEADER = 'x-jovie-synthetic-passage';
 /** The chat-health canary (apps/web/lib/synthetic/prodcert-identities.ts). */
 export const DEFAULT_PASSAGE_SUBJECT = 'browse-ready+chat-health@jov.ie';
-const SCOPES = new Set(['onboarding_chat', 'smartlink_click']);
+// canary_reset / canary_checkout (JOV-9826): the internal canary-reset
+// endpoint and the Stripe test-mode canary checkout walk.
+const SCOPES = new Set([
+  'onboarding_chat',
+  'smartlink_click',
+  'canary_reset',
+  'canary_checkout',
+]);
 
 export function mintPassageTokenFromSecret(
   rootSecret,
