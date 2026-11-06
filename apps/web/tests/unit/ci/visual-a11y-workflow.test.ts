@@ -1,4 +1,5 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { once } from 'node:events';
 import {
   existsSync,
   mkdirSync,
@@ -123,6 +124,20 @@ function runStep(
   return { ...result, calls, root };
 }
 
+async function withLiveServer(
+  run: (pid: string, exited: Promise<unknown[]>) => Promise<void>
+) {
+  const child = spawn('sleep', ['30'], { stdio: 'ignore' });
+  const exited = once(child, 'exit');
+  try {
+    await once(child, 'spawn');
+    await run(String(child.pid), exited);
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) child.kill();
+    await exited;
+  }
+}
+
 describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
   it('runs build + layout on hosted capacity for combined heads and main only', () => {
     const buildLayout = job('ci-build-layout');
@@ -160,7 +175,7 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(config).toContain('workers: isCI ? 1 : undefined');
   });
 
-  it('boots Storybook ahead of setup, then gates the matrix on a live server', () => {
+  it('boots Storybook ahead of setup, then gates the matrix on a live server', async () => {
     const storybook = job('ci-storybook-surfaces');
     const start = step(storybook, 'Start Storybook dev server');
     const checks = step(storybook, 'Check extension and observability ingest');
@@ -177,7 +192,8 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(matrix.step.env?.JOVIE_STORYBOOK_MANUAL_AXE).toBe('1');
 
     // Start: the server is detached, logged to a file, and its pid exported.
-    const started = runStep(String(start.step.run), {
+    // Reap the short-lived stub after running the shipped start step verbatim.
+    const started = runStep(`${start.step.run}\nwait`, {
       pnpm: 'echo storybook-output; sleep 0',
     });
     expect(started.status, started.stderr).toBe(0);
@@ -200,40 +216,33 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(dead.stdout).toContain('::error::Storybook dev server died');
     expect(dead.calls).not.toContain('node ');
 
-    const live = spawnSync(
-      'bash',
-      ['-c', 'sleep 30 >/dev/null 2>&1 & echo $!'],
-      {
-        encoding: 'utf8',
-      }
-    );
-    const pid = live.stdout.trim();
-    const ready = runStep(matrixRun, stubs, {
-      STORYBOOK_PID: pid,
-      STORYBOOK_SHARD: '2/2',
+    await withLiveServer(async (pid, exited) => {
+      const ready = runStep(matrixRun, stubs, {
+        STORYBOOK_PID: pid,
+        STORYBOOK_SHARD: '2/2',
+      });
+      expect(ready.status, ready.stderr).toBe(0);
+      expect(ready.calls).toMatch(
+        /node .*guard-playwright-artifacts\.mjs --run -- pnpm exec playwright test/
+      );
+      expect(ready.calls).toContain('--shard=2/2');
+      // The EXIT trap terminates the owned child; await reaping before kill -0.
+      expect((await exited)[1]).toBe('SIGTERM');
+      expect(spawnSync('kill', ['-0', pid]).status).not.toBe(0);
+      expect(ready.stdout).toContain('Storybook dev server log');
     });
-    expect(ready.status, ready.stderr).toBe(0);
-    expect(ready.calls).toMatch(
-      /node .*guard-playwright-artifacts\.mjs --run -- pnpm exec playwright test/
-    );
-    expect(ready.calls).toContain('--shard=2/2');
-    // The EXIT trap stops the server and prints its log.
-    expect(spawnSync('kill', ['-0', pid]).status).not.toBe(0);
-    expect(ready.stdout).toContain('Storybook dev server log');
 
-    const neverReady = runStep(
-      matrixRun,
-      { ...stubs, curl: 'exit 7' },
-      {
-        STORYBOOK_PID: spawnSync(
-          'bash',
-          ['-c', 'sleep 30 >/dev/null 2>&1 & echo $!'],
-          { encoding: 'utf8' }
-        ).stdout.trim(),
-      }
-    );
-    expect(neverReady.status).toBe(1);
-    expect(neverReady.stdout).toContain('failed to start within 300s');
+    await withLiveServer(async (pid, exited) => {
+      const neverReady = runStep(
+        matrixRun,
+        { ...stubs, curl: 'exit 7' },
+        { STORYBOOK_PID: pid }
+      );
+      expect(neverReady.status).toBe(1);
+      expect(neverReady.stdout).toContain('failed to start within 300s');
+      expect((await exited)[1]).toBe('SIGTERM');
+      expect(spawnSync('kill', ['-0', pid]).status).not.toBe(0);
+    });
     // Spawns the shipped shell with stub tools several times.
   }, 60_000);
 
