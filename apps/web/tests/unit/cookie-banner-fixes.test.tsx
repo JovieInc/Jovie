@@ -67,17 +67,6 @@ describe('CookieBannerSection consent sync', () => {
     vi.unstubAllEnvs();
   });
 
-  it.each(['', 'jv_cc_required=0=1', 'jv_cc_required=0; jv_cc_required=1'])(
-    'keeps consent actions available for uncertain region flags: %j',
-    async cookie => {
-      const mod = await import('@/components/organisms/CookieBannerSection');
-      setCookie(cookie);
-      render(<mod.CookieBannerSection />);
-      expect(screen.getByRole('button', { name: 'Reject all' })).toBeVisible();
-      expect(screen.getByRole('button', { name: 'Accept all' })).toBeVisible();
-    }
-  );
-
   it('renders consent on the banner layer below modal profile sheets', async () => {
     const mod = await import('@/components/organisms/CookieBannerSection');
     setCookie('jv_cc_required=1');

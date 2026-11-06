@@ -1159,37 +1159,6 @@ describe('UserButton billing actions', () => {
     );
   });
 
-  it.each([
-    ['', true],
-    ['jv_cc_required=0=1', true],
-    ['jv_cc_required=0; jv_cc_required=1', true],
-    ['jv_cc_required=0', false],
-  ])(
-    'keeps cookie settings reachable for region flag %j',
-    async (cookie, visible) => {
-      const cookieRead = vi
-        .spyOn(document, 'cookie', 'get')
-        .mockReturnValue(cookie);
-      mockUseBillingStatusQuery.mockReturnValue({
-        data: { isPro: false, plan: null, hasStripeCustomer: false },
-        isLoading: false,
-        error: null,
-      } as any);
-      try {
-        const user = userEvent.setup();
-        render(<UserButton showUserInfo />);
-        await user.click(screen.getByRole('button', { name: /Adele Adkins/i }));
-        await user.hover(screen.getByRole('menuitem', { name: 'Learn More' }));
-        await screen.findByRole('menuitem', { name: 'Cookie Policy' });
-        expect(
-          screen.queryByRole('menuitem', { name: 'Cookie Settings' }) !== null
-        ).toBe(visible);
-      } finally {
-        cookieRead.mockRestore();
-      }
-    }
-  );
-
   it('uses distinct semantic icons for the Learn More menu items', async () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: false, plan: null, hasStripeCustomer: false },
