@@ -80,13 +80,13 @@ const {
   };
 });
 
+vi.mock('@/features/profile/ProfileUnifiedDrawer', () => ({
+  ProfileUnifiedDrawer: (props: unknown) => mockProfileUnifiedDrawer(props),
+}));
+
 vi.mock('next/dynamic', () => ({
   default: (loader: unknown) => {
     const source = String(loader);
-
-    if (source.includes('ProfileUnifiedDrawer')) {
-      return (props: unknown) => mockProfileUnifiedDrawer(props);
-    }
 
     if (source.includes('ProfileInlineNotificationsCTA')) {
       return (props: unknown) => mockProfileInlineNotificationsCTA(props);

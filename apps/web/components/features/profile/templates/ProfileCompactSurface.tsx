@@ -30,6 +30,7 @@ import { ProfileIdentityHeader } from '@/features/profile/ProfileIdentityHeader'
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import { ProfilePrimaryTabPanel } from '@/features/profile/ProfilePrimaryTabPanel';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
+import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
 import { ProofClaimCtaLink } from '@/features/profile/ProofClaimCtaLink';
 import {
   getPublicProfileHistoryServerSnapshot,
@@ -76,16 +77,16 @@ import type { PressPhoto } from '@/types/press-photos';
 import type { NotificationSourceContext } from '../artist-notifications-cta/types';
 import { useProfileMobileOverflow } from './useProfileMobileOverflow';
 
-// Optional overlays must suspend locally. A late visitor assignment can mount
-// their lazy modules after the profile is visible; without a local fallback,
-// the page-level loading boundary hides the artist and navigation together.
-const ProfileUnifiedDrawer = dynamic(
-  () =>
-    import('@/features/profile/ProfileUnifiedDrawer').then(mod => ({
-      default: mod.ProfileUnifiedDrawer,
-    })),
-  { loading: () => null }
-);
+// The drawer renders through a direct static import, not next/dynamic. Its
+// module is already in the entry chunk graph (ProfileDesktopSurface imports
+// it statically), so the lazy boundary bought no chunk separation — it only
+// added a Suspense suspend/retry cycle that delayed the first drawer paint
+// by ~60ms+ after hydration (JOV-7973: the deep-link pay arrival's
+// usable-alias-result budget). Optional overlays that genuinely lazy-load
+// (notifications, below) still suspend locally: a late visitor assignment
+// can mount their lazy modules after the profile is visible; without a
+// local fallback, the page-level loading boundary hides the artist and
+// navigation together.
 
 const ProfileInlineNotificationsCTA = dynamic(
   () =>
