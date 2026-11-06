@@ -37,8 +37,8 @@ vi.mock('@/lib/auth/session', () => ({
     run({ select: f.select }),
 }));
 vi.mock('@/lib/db', () => ({ db: { select: f.select } }));
-vi.mock('@/lib/notifications/providers/resend', () => ({
-  ResendEmailProvider: class {
+vi.mock('@/lib/notifications/providers/gateway', () => ({
+  GatewayEmailProvider: class {
     sendEmail = f.send;
   },
 }));

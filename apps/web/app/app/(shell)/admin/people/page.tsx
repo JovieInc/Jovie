@@ -4,6 +4,7 @@ import { AdminPeopleRightPanelProvider } from '@/components/features/admin/Admin
 import { AdminContactsTable } from '@/components/features/admin/contacts-table/AdminContactsTable';
 import { CustomerRecoveryPanel } from '@/components/features/admin/customer-recovery/CustomerRecoveryPanel';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { WaitlistGateFunnel } from '@/components/features/admin/WaitlistGateFunnel';
 import { WaitlistMetrics } from '@/components/features/admin/WaitlistMetrics';
 import {
   type AdminPeopleView,
@@ -28,6 +29,7 @@ import {
   getWaitlistIntegritySummary,
   getWaitlistMetrics,
 } from '@/lib/admin/waitlist';
+import { getWaitlistGateFunnel } from '@/lib/admin/waitlist-gate-funnel';
 import { getAdminFeedbackItemsResult } from '@/lib/feedback';
 import {
   type AdminCreatorsSort,
@@ -144,15 +146,18 @@ async function renderPeopleView(
         { entries, pageSize: resolvedPageSize, total },
         metrics,
         integrity,
+        gateFunnel,
       ] = await Promise.all([
         getAdminWaitlistEntries({ page: 1, pageSize }),
         getWaitlistMetrics(),
         getWaitlistIntegritySummary(),
+        getWaitlistGateFunnel(),
       ]);
 
       return (
         <div className='space-y-4'>
           <WaitlistMetrics metrics={metrics} />
+          <WaitlistGateFunnel funnel={gateFunnel} />
           <WaitlistSettingsPanel />
           <AdminWaitlistTableWithViews
             entries={entries}

@@ -3,9 +3,9 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { MarketingContainer } from '@/components/marketing/MarketingContainer';
 import { MarketingContentProse } from '@/components/marketing/MarketingContentProse';
-import { MarketingEditorialHeroPhoto } from '@/components/marketing/MarketingEditorialHeroPhoto';
 import { MarketingHero } from '@/components/marketing/MarketingHero';
 import { APP_ROUTES } from '@/constants/routes';
+import { ENGINEERING_COPY } from '@/data/engineeringCopy';
 import type { EngineeringStoryRecord } from '@/lib/engineering-publication';
 
 function formatDate(iso: string): string {
@@ -67,20 +67,19 @@ function PageFrame({
   title,
   description,
   children,
-  /** Only the /engineering index carries the editorial hero photo (route
-   * table: hero image 37). Article and founder-preview pages stay text-only. */
-  showHeroPhoto = false,
+  /** Preserve the public index header offset; article and preview spacing stays unchanged. */
+  dockedHero = false,
 }: {
   readonly kicker: ReactNode;
   readonly title: string;
   readonly description: string;
   readonly children: ReactNode;
-  readonly showHeroPhoto?: boolean;
+  readonly dockedHero?: boolean;
 }) {
   const hero = (
     <MarketingHero
       variant='left'
-      className={showHeroPhoto ? 'relative z-10' : undefined}
+      className={dockedHero ? 'relative z-10' : undefined}
     >
       <div className='text-sm font-medium text-tertiary-token'>{kicker}</div>
       <h1 className='system-b-marketing-route-title mb-4 mt-6 max-w-2xl text-primary-token line-clamp-2'>
@@ -94,13 +93,8 @@ function PageFrame({
 
   return (
     <section className='min-h-screen bg-page text-primary-token'>
-      {showHeroPhoto ? (
+      {dockedHero ? (
         <div className='marketing-hero-dock relative overflow-hidden'>
-          <MarketingEditorialHeroPhoto
-            src='/images/hero/engineering-index.webp'
-            opacity={0.4}
-            testId='engineering-hero-photo'
-          />
           {hero}
         </div>
       ) : (
@@ -133,15 +127,22 @@ export function EngineeringIndex({
           ? 'Draft and provenance status for founder review. This gallery stays out of public indexes.'
           : 'Proof-led notes on what Jovie has shipped and made public.'
       }
-      showHeroPhoto={!preview}
+      dockedHero={!preview}
     >
       <div data-testid='engineering-index'>
         {stories.length === 0 ? (
-          <p className='text-secondary-token'>
-            {preview
-              ? 'No draft stories in the local founder gallery yet.'
-              : 'No founder-approved engineering stories are public yet.'}
-          </p>
+          <div className='space-y-3'>
+            <p className='text-secondary-token'>
+              {preview
+                ? 'No draft stories in the local founder gallery yet.'
+                : 'No founder-approved engineering stories are public yet.'}
+            </p>
+            {preview ? null : (
+              <p className='max-w-2xl text-secondary-token'>
+                {ENGINEERING_COPY.emptyIndexExplainer}
+              </p>
+            )}
+          </div>
         ) : (
           <ul className='space-y-8'>
             {stories.map(story => (

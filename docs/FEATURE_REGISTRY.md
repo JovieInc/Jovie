@@ -170,6 +170,7 @@ The source defaults below are preserved in this slice.
 |---|---|---|
 | `AUTH_OFFER_SUMMARY` | `false` | Remove copy/layout gate after selecting the supported offer recap; no pricing, auth or entitlement change. |
 | `CANVAS_GRAIN` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
+| `CLAIM_LEGACY_PROOF_SWEEP` | `false` | Keep rollout stop for the grandfathered-claim sweep that takes 50k+ pages private after the 30-day nudge; remove once the first flip is observed. |
 | `CHATGPT_APP_DIRECTORY_MCP` | `false` | Keep public API exposure security control; no dynamic client registration grant. |
 | `CHAT_COMPOSER_V2` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
 | `CYAN_FOCUS_GLOW` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
@@ -181,7 +182,9 @@ The source defaults below are preserved in this slice.
 | `MUSIC_RESOLVER_PROVIDER_LINKS` | `false` | Keep provider-family routing/rollback control (JOV-7323). |
 | `MUSIC_RESOLVER_RELEASE_FACTS` | `false` | Keep provider-family routing/rollback control (JOV-7323). |
 | `NEW_RELEASE_PAGE` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
+| `ONBOARDING_VALUE_BEFORE_PAYWALL` | `true` | Keep funnel-order kill switch (JOV-9758) until the catalog-before-pricing read-out; then remove in favor of the enabled behavior. |
 | `OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION` | `false` | Keep unauthenticated client-registration security boundary and redirect allowlist. |
+| `PUBLIC_SIGNUP_CLOSED` | `true` | Keep access-control switch: on sends `/signup` and anonymous `/start` to the `/waitlist` role form; sign-in and invite links still create accounts. Reopen criteria: golden path certified and first paying artists live (canon/PRODUCT.md). |
 | `SOCIAL_HTML_ISOLATED_PROVIDER` | `false` | Keep off: isolation provider is absent; server-IP scraping remains prohibited. |
 | `YOUTUBE_THUMBNAILS_PASTE_GENERATE` | `false` | Keep model-spend/output-certification control (JOV-5862); provider publication restrictions remain. |
 

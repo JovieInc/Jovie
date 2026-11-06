@@ -357,9 +357,14 @@ describe('release lineage gate', () => {
     expect(held.decision).toBe(plain.decision);
     expect(held.outputs).toMatchObject({ gate_decision: 'proceed' });
     expect(held.compareAttempts).toBe(2);
-    expect(Number(held.holdSleep.trim())).toBeGreaterThanOrEqual(4);
+    // gh-api-hold sleeps reset-now+1. The reset epoch is captured before the
+    // gate runs, so a loaded host records less than the original 4s offset.
+    // The +1s is the script's cushion, and the notice must name that sleep.
+    const slept = Number(held.holdSleep.trim());
+    expect(slept).toBeGreaterThanOrEqual(1);
+    expect(slept).toBeLessThanOrEqual(5);
     expect(held.result.stderr).toContain('::notice title=GitHub API hold::');
-    expect(held.result.stderr).toMatch(/wait_s=[4-6] /);
+    expect(held.result.stderr).toMatch(new RegExp(`wait_s=${slept} `));
     expect(held.result.stderr).toMatch(/reset_epoch=\d{10}/);
     expect(held.result.stderr).toContain('http=403');
     expect(held.result.stderr).toContain('bucket=core');

@@ -138,6 +138,7 @@ export async function getArtistOfferFunnelReport(input?: {
     'claim-rejected': toDate(row.stages?.['claim-rejected']),
     'claim-link-open': toDate(row.stages?.['claim-link-open']),
     start: toDate(row.stages?.start),
+    'catalog-preview': toDate(row.stages?.['catalog-preview']),
     claimed: toDate(row.stages?.claimed),
     'upgrade-viewed': toDate(row.stages?.['upgrade-viewed']),
   }));

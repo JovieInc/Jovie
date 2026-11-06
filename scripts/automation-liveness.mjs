@@ -36,10 +36,10 @@ import {
   livenessDecisions,
   livenessFingerprint,
   loadRegistry,
-  readPath,
   runStageEvents,
   validateRegistry,
 } from './lib/automation-registry.mjs';
+import { projectJsonHeartbeat } from './lib/json-heartbeat-receipt.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TIMEOUT_MS = 10_000;
@@ -76,6 +76,51 @@ function githubHeaders(token) {
   return token
     ? { Authorization: `Bearer ${token}`, 'X-GitHub-Api-Version': '2022-11-28' }
     : {};
+}
+
+/**
+ * Controller failure streak: healthy unless the newest `receipt.streak` (default 3) conclusive runs (success or
+ * failure; skipped and cancelled runs carry no verdict) all failed. A streak reports the newest success time (or
+ * epoch when none), which is always older than the entry's silence budget, so it goes silent with the run ids named.
+ */
+export async function observeWorkflowFailureStreak(
+  receipt,
+  { fetchImpl, token, nowMs, apiUrl = GITHUB_API }
+) {
+  const streak = receipt.streak ?? 3;
+  const branch = receipt.branch
+    ? `&branch=${encodeURIComponent(receipt.branch)}`
+    : '';
+  const url = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs?status=completed&per_page=50${branch}`;
+  const read = await readJson(fetchImpl, url, githubHeaders(token));
+  if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
+  if (!Array.isArray(read.body?.workflow_runs))
+    return { ok: false, reason: 'github-runs-unreadable' };
+  const conclusive = read.body.workflow_runs
+    .filter(
+      row => row?.conclusion === 'success' || row?.conclusion === 'failure'
+    )
+    .sort((a, b) =>
+      String(b?.created_at ?? '').localeCompare(String(a?.created_at ?? ''))
+    );
+  const newest = conclusive.slice(0, streak);
+  if (
+    newest.length === streak &&
+    newest.every(row => row.conclusion === 'failure')
+  ) {
+    const lastSuccess = conclusive.find(row => row.conclusion === 'success');
+    return {
+      ok: true,
+      lastProofAt: lastSuccess?.updated_at ?? new Date(0).toISOString(),
+      detailOnStale: true,
+      reason: `${streak}-consecutive-failures[${newest.map(row => row.id).join(',')}]`,
+    };
+  }
+  return {
+    ok: true,
+    lastProofAt: new Date(nowMs).toISOString(),
+    reason: 'no-failure-streak',
+  };
 }
 
 /** Last run of a workflow whose conclusion is one of `receipt.conclusions`. */
@@ -136,27 +181,7 @@ export async function observeGithubWorkflow(
 
 /** A timestamp inside a JSON document (status feeds, health routes). */
 export async function observeJsonTimestamp(receipt, { fetchImpl }) {
-  const read = await readJson(fetchImpl, receipt.url);
-  if (!read.ok) return { ok: false, reason: `json-${read.reason}` };
-  const value = readPath(read.body, receipt.path);
-  if (value === undefined || value === null) {
-    return {
-      ok: true,
-      lastProofAt: null,
-      reason: `heartbeat-source-missing:${receipt.path}`,
-    };
-  }
-  if (receipt.okPath) {
-    const okValue = readPath(read.body, receipt.okPath);
-    if (!(receipt.okValues ?? ['verified', 'ok', true]).includes(okValue)) {
-      return {
-        ok: true,
-        lastProofAt: null,
-        reason: `heartbeat-not-ok:${receipt.okPath}=${String(okValue)}`,
-      };
-    }
-  }
-  return { ok: true, lastProofAt: value, url: receipt.url };
+  return projectJsonHeartbeat(receipt, await readJson(fetchImpl, receipt.url));
 }
 
 const PUSH_RUNS_PAGE = 100;
@@ -824,6 +849,8 @@ export async function observeEntry(entry, context) {
   const receipt = entry.receipt ?? {};
   if (receipt.kind === 'github-workflow')
     return observeGithubWorkflow(receipt, context);
+  if (receipt.kind === 'workflow-failure-streak')
+    return observeWorkflowFailureStreak(receipt, context);
   if (receipt.kind === 'json-timestamp')
     return observeJsonTimestamp(receipt, context);
   if (receipt.kind === 'production-freshness')

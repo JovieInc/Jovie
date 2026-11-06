@@ -31,6 +31,12 @@ describe('merge-group size trusted bootstrap contract', () => {
     expect(validateSizeGuardBootstrapWorkflow(workflow)).toEqual([]);
   });
 
+  it('fails closed when the exclusion dependency is omitted', () => {
+    expect(
+      errorsAfter('            scripts/lib/pr-size-exclusions.mjs\n', '')
+    ).not.toEqual([]);
+  });
+
   it('fails closed on a wrong or broadened bootstrap base', () => {
     expect(
       errorsAfter(TRUSTED_SIZE_BOOTSTRAP_BASE, 'f'.repeat(40))
@@ -94,6 +100,25 @@ describe('merge-group size trusted bootstrap contract', () => {
       errorsAfter("trap 'unset AUTH_HEADER GH_TOKEN' EXIT", '')
     ).not.toEqual([]);
   });
+
+  it.each([
+    ['export GIT_CONFIG_COUNT=2', 'GIT_CONFIG_COUNT=2'],
+    ['node scripts/lib/merge-group-local-evidence.mjs || true', ''],
+    [
+      '--filter=blob:none --no-tags --depth=2',
+      '--filter=blob:limit=1g --no-tags --depth=2',
+    ],
+    [
+      'node scripts/lib/merge-group-member-policy.mjs --policy=size --also=fork',
+      'node scripts/lib/merge-group-member-policy.mjs --policy=size',
+    ],
+    ['timeout --kill-after=5s 70s', 'timeout --kill-after=5s 71s'],
+  ])(
+    'fails closed on a changed normal policy boundary: %s',
+    (before, after) => {
+      expect(errorsAfter(before, after)).not.toEqual([]);
+    }
+  );
 
   it('fails closed when normal policy can double-run on the bootstrap base', () => {
     expect(
@@ -297,15 +322,15 @@ exit 0
     }
   }
 
-  it('fetches blob bytes at depth 2 even when the commit object is already local', () => {
+  it('fetches metadata at depth 2 before the evidence helper backfills blob bytes', () => {
     const landed = runFetch();
     expect(landed.result.status, landed.result.stderr).toBe(0);
     expect(landed.calls).toContain(
-      'fetch --refetch --filter=blob:limit=1g --no-tags --depth=2 origin ' +
+      'fetch --refetch --filter=blob:none --no-tags --depth=2 origin ' +
         'a'.repeat(40)
     );
     expect(landed.calls).not.toContain('--depth=64');
-    expect(landed.calls).not.toContain('blob:none');
+    expect(landed.calls).not.toContain('blob:limit=1g');
     expect(landed.calls).toContain(
       'node scripts/lib/merge-group-local-evidence.mjs'
     );

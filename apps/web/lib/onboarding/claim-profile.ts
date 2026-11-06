@@ -27,6 +27,7 @@ import { captureError } from '@/lib/error-tracking';
 import { isHandleUniqueViolation } from '@/lib/errors/onboarding';
 import { isMusicfetchVendorUnavailable } from '@/lib/musicfetch/errors';
 import { captureRevenueSpineFailure } from '@/lib/observability/revenue-spine';
+import { scheduleOnboardingCatalogImport } from '@/lib/onboarding/catalog-import.server';
 import {
   type ClaimedOnboardingState,
   deriveClaimedOnboardingStateFromMessageRows,
@@ -61,9 +62,12 @@ export interface MaterializeClaimedOnboardingProfileInput {
   readonly ipAddress: string | null;
   readonly userAgent: string | null;
   /**
-   * 'public' (default) publishes a claimed, live profile. 'reserved' holds the
-   * handle on a hidden, unclaimed profile so a pending waitlist decision still
-   * protects jov.ie/<handle> until approval flips it public.
+   * 'unproven' (default) claims the profile but keeps it private until the
+   * claimant proves they control the artist identity (Tim, 2026-11-02); with
+   * no artist identity there is nothing to prove and the page is ordinary.
+   * 'public' is only for claims an operator already vouched for. 'reserved'
+   * holds the handle on a hidden, unclaimed profile so a pending waitlist
+   * decision still protects jov.ie/<handle> until approval flips it public.
    */
   readonly visibility?: 'public' | 'reserved' | 'unproven';
   /** Durable waitlist receipt this reservation belongs to (reserved mode). */
@@ -516,7 +520,7 @@ async function materializeProfile({
   conversationId,
   ipAddress,
   userAgent,
-  visibility = 'public',
+  visibility = 'unproven',
   waitlistEntryId = null,
 }: MaterializeClaimedOnboardingProfileInput): Promise<MaterializeClaimedOnboardingProfileResult> {
   const reserved = visibility === 'reserved';
@@ -573,6 +577,19 @@ async function materializeProfile({
       unproven,
       waitlistEntryId,
     });
+
+  // JOV-9758: import the matched artist's real catalog (releases, artwork,
+  // release smartlinks, DSP links) for every materialized identity,
+  // including reserved waitlist holds, so the page is never an empty shell.
+  // A held high-reach identity has no artist here and imports on approval.
+  if (state.artist?.id && profileId) {
+    scheduleOnboardingCatalogImport({
+      profileId,
+      spotifyArtistId: state.artist.id,
+      spotifyArtistUrl: state.artist.url,
+      userId: verifiedUserId,
+    });
+  }
 
   if (verification) {
     await requestClaimVerification({

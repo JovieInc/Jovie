@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { UIMessage } from 'ai';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -17,12 +18,19 @@ vi.mock('@/features/profile/templates/ProfileCompactSurface', () => ({
   ProfileCompactSurface: ({
     dataTestId,
     artist,
+    releases = [],
   }: {
     dataTestId?: string;
     artist: { tagline?: string };
+    releases?: readonly { id: string; title: string }[];
   }) => (
     <div data-testid={dataTestId ?? 'profile-compact-surface'}>
       {artist.tagline}
+      {releases.map(release => (
+        <span key={release.id} data-testid='preview-release'>
+          {release.title}
+        </span>
+      ))}
     </div>
   ),
 }));
@@ -50,6 +58,75 @@ const CONFIRMED_STATE: OnboardingProfileBuilderState = {
 };
 
 describe('OnboardingProfileRail', () => {
+  it('renders the confirmed artist real catalog on the preview (JOV-9758)', () => {
+    const output = {
+      action: 'spotify_artist_confirmed',
+      spotifyArtistId: 'artist-1',
+      artist: {
+        id: 'artist-1',
+        name: 'Test Artist',
+        url: 'https://open.spotify.com/artist/artist-1',
+      },
+      catalog: {
+        total: 22,
+        releases: [
+          {
+            id: 'album-new',
+            title: 'Newest single',
+            releaseType: 'single',
+            releaseDate: '2026-08-14',
+            artworkUrl: 'https://i.scdn.co/image/new',
+            spotifyUrl: 'https://open.spotify.com/album/albumnew',
+          },
+        ],
+      },
+    };
+    const state = deriveProfileBuilderState({
+      handleDraft: null,
+      selectedArtist: null,
+      messages: [
+        {
+          id: 'assistant-confirm',
+          role: 'assistant',
+          parts: [
+            {
+              type: 'dynamic-tool',
+              toolName: 'confirmSpotifyArtist',
+              toolCallId: 'confirm',
+              state: 'output-available',
+              input: {},
+              output,
+            },
+            // The confirm-artist turn always ships the handle card next to
+            // the confirm output (JOV-10168), so the preview artist has a
+            // real handle and the rail renders (JOV-10169: no fabricated
+            // jov.ie/your-handle placeholder when it is still unknown).
+            {
+              type: 'dynamic-tool',
+              toolName: 'checkHandle',
+              toolCallId: 'handle',
+              state: 'output-available',
+              input: { handle: 'testartist' },
+              output: {
+                action: 'check_handle',
+                handle: 'testartist',
+                summary: 'Checking @testartist.',
+              },
+            },
+          ],
+        } as UIMessage,
+      ],
+    });
+    render(<OnboardingProfileRail state={state} />);
+    expect(screen.getByTestId('onboarding-profile-rail')).toHaveAttribute(
+      'data-catalog-releases',
+      '1'
+    );
+    expect(screen.getByTestId('preview-release')).toHaveTextContent(
+      'Newest single'
+    );
+  });
+
   it.each(
     onboardingRoleSchema.options.flatMap(role =>
       ['tool', 'metadata'].map(transport => ({ role, transport }))
@@ -113,7 +190,8 @@ describe('OnboardingProfileRail', () => {
     expect(
       screen.queryByTestId('onboarding-dsp-match-strip')
     ).not.toBeInTheDocument();
-    expect(screen.getByText('Draft · founder · Review')).toBeInTheDocument();
+    expect(screen.getByText('Preview · not claimed yet')).toBeInTheDocument();
+    expect(screen.queryByText(/Draft · /)).toBeNull();
     expect(screen.queryByText('Test Artist')).not.toBeInTheDocument();
   });
   it('renders nothing when there is no preview artist', () => {
@@ -148,6 +226,8 @@ describe('OnboardingProfileRail', () => {
     expect(
       screen.getByText(/12\.3K Spotify followers/, { selector: 'p' })
     ).toBeVisible();
+    // No pipeline words in the preview (2026-10-31 golden-path walk).
+    expect(screen.queryByText(/enrichment|\(source:/i)).toBeNull();
   });
 
   it('renders the inline rail variant at mobile widths', () => {
@@ -159,9 +239,55 @@ describe('OnboardingProfileRail', () => {
       screen.getByTestId('onboarding-profile-rail-inline')
     ).toBeInTheDocument();
   });
+
+  it('lets keyboard users enter the side preview scroll region', async () => {
+    const user = userEvent.setup();
+    render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
+
+    await user.tab();
+
+    expect(
+      screen.getByRole('complementary', { name: 'Profile Preview' })
+    ).toHaveFocus();
+  });
+
+  it('does not add a container tab stop to the inline preview', async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <OnboardingProfileRail placement='inline' state={CONFIRMED_STATE} />
+        <button type='button'>Continue conversation</button>
+      </>
+    );
+
+    await user.tab();
+
+    expect(
+      screen.getByRole('button', { name: 'Continue conversation' })
+    ).toHaveFocus();
+  });
 });
 
 describe('resolvePreviewArtist', () => {
+  it('previews a claimed handle before any link is shared (Pen R6As7U)', () => {
+    expect(
+      resolvePreviewArtist({
+        artist: null,
+        artistConfirmed: false,
+        handle: 'timwhite',
+        socialLinks: [],
+      })
+    ).toEqual({ id: 'handle-timwhite', name: 'timwhite', url: '' });
+    expect(
+      resolvePreviewArtist({
+        artist: null,
+        artistConfirmed: false,
+        handle: null,
+        socialLinks: [],
+      })
+    ).toBeNull();
+  });
+
   it('previews a handle-only profile once social links exist', () => {
     expect(
       resolvePreviewArtist({
@@ -171,5 +297,88 @@ describe('resolvePreviewArtist', () => {
         socialLinks: ['https://instagram.com/djnova'],
       })
     ).toEqual({ id: 'handle-djnova', name: 'djnova', url: '' });
+  });
+
+  it('hides the artist preview until a handle is known (JOV-10169: no jov.ie/your-handle flash)', () => {
+    const pickedArtist = {
+      artist: {
+        id: 'sp-1',
+        name: 'Greek',
+        url: 'https://open.spotify.com/artist/sp-1',
+      },
+      artistConfirmed: true,
+      handle: null,
+      socialLinks: [],
+    };
+    expect(resolvePreviewArtist(pickedArtist)).toBeNull();
+    expect(
+      resolvePreviewArtist({ ...pickedArtist, handle: 'greek' })
+    ).toMatchObject({ id: 'sp-1' });
+  });
+});
+
+// JOV-7973: the side rail is a focusable scroll region, so it must own its
+// Home/End keyboard scrolling (JOV-8844 reachability) instead of relying on
+// the browser default, which the live chat's focus/keyboard layers can shadow
+// mid-journey — leaving the rail at its bottom edge with the preview badge
+// clipped at the scrollport top (golden-path toBeInViewport ratio 0.8125).
+describe('OnboardingProfileRail keyboard scrolling (JOV-7973)', () => {
+  it('scrolls itself to the top edge on Home', async () => {
+    const user = userEvent.setup();
+    render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
+    const rail = screen.getByTestId('onboarding-profile-rail');
+    const scrollTo = vi.fn();
+    Object.defineProperty(rail, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    });
+
+    await user.type(rail, '{Home}');
+    expect(scrollTo).toHaveBeenLastCalledWith({
+      top: 0,
+      behavior: 'auto',
+    });
+  });
+
+  it('scrolls itself to the bottom edge on End', async () => {
+    const user = userEvent.setup();
+    render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
+    const rail = screen.getByTestId('onboarding-profile-rail');
+    const scrollTo = vi.fn();
+    Object.defineProperty(rail, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    });
+    Object.defineProperty(rail, 'scrollHeight', {
+      configurable: true,
+      value: 754,
+    });
+    Object.defineProperty(rail, 'clientHeight', {
+      configurable: true,
+      value: 720,
+    });
+
+    await user.tab();
+    expect(rail).toHaveFocus();
+    await user.keyboard('{End}');
+    expect(scrollTo).toHaveBeenLastCalledWith({
+      top: 34,
+      behavior: 'auto',
+    });
+    expect(rail).toHaveFocus();
+  });
+
+  it('lets every other key scroll natively (no preventDefault)', async () => {
+    const user = userEvent.setup();
+    render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
+    const rail = screen.getByTestId('onboarding-profile-rail');
+    const scrollTo = vi.fn();
+    Object.defineProperty(rail, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    });
+
+    await user.type(rail, '{ArrowDown}');
+    expect(scrollTo).not.toHaveBeenCalled();
   });
 });

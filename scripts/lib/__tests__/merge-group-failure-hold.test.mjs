@@ -26,6 +26,7 @@ import {
   autoMergeWasNotArmed,
   classifyDequeueDenial,
   classifyMergeGroupFailure,
+  coveredByLaterEntry,
   enqueueWasRejected,
   FAILURE_HOLD_CONTEXT,
   FAILURE_RETRY_CONTEXT,
@@ -40,6 +41,7 @@ import {
   ownerHoldReleaseIntent,
   PR_SIZE_GUARD_WORKFLOW_ID,
   parseMergeQueueBranch,
+  peerContainsPr,
   REVISION_FAILED_AT_HEAD,
   recordDequeueReason,
   reenrollmentDisposition,
@@ -77,7 +79,9 @@ it('imports the real failure policy from both workflow sparse checkouts', () => 
         cwd: dir,
         encoding: 'utf8',
         input,
-        timeout: 10_000,
+        // Sparse fixture git under full script-contracts load regularly
+        // exceeds 10s on contended hosts; keep the assertion, widen the wait.
+        timeout: 60_000,
       });
       expect(result.error, result.stderr).toBeUndefined();
       expect(result.status, result.stderr).toBe(0);
@@ -118,7 +122,7 @@ it('imports the real failure policy from both workflow sparse checkouts', () => 
         const missing = spawnSync(process.execPath, importArgs, {
           cwd: dir,
           encoding: 'utf8',
-          timeout: 10_000,
+          timeout: 60_000,
         });
         expect(missing.error).toBeUndefined();
         expect(missing.status).not.toBe(0);
@@ -1381,6 +1385,9 @@ describe('merge-group source revision mapping', () => {
 
 describe('failure classification and revision-scoped suppression', () => {
   it('classifies deterministic source checks separately from infrastructure', () => {
+    expect(classify('failure', ['Run lanes coverage pytest'])).toBe(
+      'deterministic-source'
+    );
     expect(classify('failure', ['Run structural ci-fast lane'])).toBe(
       'deterministic-source'
     );
@@ -2210,6 +2217,57 @@ describe('terminal failure hold application', () => {
     ).toBe(true);
   });
 
+  it('HEADGREEN: leaves an intermediate entry queued after a non-deterministic failure', async () => {
+    const queuedAt = (position, totalCount) => ({
+      id: 'PR_42',
+      state: 'OPEN',
+      headRefOid: SOURCE,
+      isInMergeQueue: true,
+      mergeQueueEntry: {
+        id: 'MQE_42',
+        position,
+        headCommit: { oid: GROUP },
+        mergeQueue: { entries: { totalCount } },
+      },
+      autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
+    });
+    expect(coveredByLaterEntry(queuedAt(2, 5), SOURCE, GROUP)).toBe(true);
+    // The last entry has nothing behind it; missing queue data fails closed.
+    expect(coveredByLaterEntry(queuedAt(5, 5), SOURCE, GROUP)).toBe(false);
+    expect(
+      coveredByLaterEntry(
+        {
+          ...queuedAt(2, 5),
+          mergeQueueEntry: { id: 'x', headCommit: { oid: GROUP } },
+        },
+        SOURCE,
+        GROUP
+      )
+    ).toBe(false);
+    const writeStatus = vi.fn();
+    const dequeuePullRequest = vi.fn();
+    const disableAutoMerge = vi.fn();
+    const result = await applyMergeGroupFailure(
+      { ...failureInput, failedSteps: ['Set up job'] },
+      {
+        writeStatus,
+        readPullRequest: vi.fn(async () => queuedAt(2, 5)),
+        dequeuePullRequest,
+        disableAutoMerge,
+      }
+    );
+    expect(result).toMatchObject({
+      coveredByLaterEntry: true,
+      skipped: true,
+      statusWritten: false,
+      dequeued: false,
+      autoMergeDisabled: false,
+    });
+    expect(writeStatus).not.toHaveBeenCalled();
+    expect(dequeuePullRequest).not.toHaveBeenCalled();
+    expect(disableAutoMerge).not.toHaveBeenCalled();
+  });
+
   it('only treats a live queued exact source as superseded', () => {
     const queued = {
       state: 'OPEN',
@@ -2948,5 +3006,37 @@ describe('base-branch fetch timeout (merge-group infrastructure)', () => {
       );
       expect(replay(annotations(), other)).toBe('unclassified');
     });
+  });
+});
+
+describe('peerContainsPr (shadow peer recurrence membership)', () => {
+  // 2026-10-31: #24072 rode in the base chain of #24075's groups, so the
+  // queue entries ahead of main, not only base...head, decide membership.
+  const subject = message => ({ commit: { message } });
+  it('counts the peer head PR and every queue entry ahead of main', () => {
+    expect(peerContainsPr([], 24072, 24072)).toBe(true);
+    expect(
+      peerContainsPr(
+        [
+          subject('fix(changelog): newest-first archive (#24072)\n\nbody'),
+          subject('docs: x (#24075)'),
+        ],
+        24075,
+        24072
+      )
+    ).toBe(true);
+  });
+  it('excludes groups without the PR and stays unknown without evidence', () => {
+    expect(peerContainsPr([subject('docs: x (#24075)')], 24075, 24072)).toBe(
+      false
+    );
+    expect(
+      peerContainsPr(
+        [subject('mentions (#24072) mid-title only (#24075)')],
+        24075,
+        24072
+      )
+    ).toBe(false);
+    expect(peerContainsPr(undefined, 24075, 24072)).toBeNull();
   });
 });

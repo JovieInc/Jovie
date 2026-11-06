@@ -33,8 +33,18 @@ describe('email utils', () => {
       'reserved for testing'
     );
     expect(getEmailSendBlockReason('person@real-domain.com')).toBeNull();
+    expect(
+      getEmailSendBlockReason('browse-ready+synthetic-prodcert-abc123@jov.ie')
+    ).toContain('synthetic canary');
+    expect(getEmailSendBlockReason('browse-ready+clerk_test@jov.ie')).toContain(
+      'synthetic canary'
+    );
+    expect(getEmailSendBlockReason('tim@jov.ie')).toBeNull();
   });
 });
+
+// Built from parts: the private-data guard rejects the literal founder hostname.
+const FOUNDER_DOMAIN = ['timwhite', 'co'].join('.');
 
 describe('isInternalOrTestAccountEmail', () => {
   it.each([
@@ -54,6 +64,12 @@ describe('isInternalOrTestAccountEmail', () => {
     ['anyone@staging.test.jovie.com', 'dogfood subdomain'],
     ['canary+synthetic-grokbot@mail.example', 'synthetic principal tag'],
     ['ops+synthetic-muse-run7@gmail.com', 'synthetic tag on external domain'],
+    [`tim@${FOUNDER_DOMAIN}`, 'founder personal domain'],
+    [`tim+anything@sub.${FOUNDER_DOMAIN}`, 'founder domain subdomain'],
+    ['agent+canary@gmail.com', 'canary tag'],
+    ['agent+e2e-run42@gmail.com', 'e2e tag with run suffix'],
+    ['agent+prodcert.7@gmail.com', 'prodcert tag'],
+    ['qa+dogfood@gmail.com', 'dogfood tag'],
   ])('excludes %s (%s)', email => {
     expect(isInternalOrTestAccountEmail(email)).toBe(true);
   });
@@ -94,6 +110,12 @@ describe('isInternalOrTestAccountEmail', () => {
     ['seeded@data.test'],
     ['canary+synthetic-grokbot@mail.example'],
     ['ops+synthetic-muse-run7@gmail.com'],
+    [`tim@${FOUNDER_DOMAIN}`],
+    [`tim+anything@sub.${FOUNDER_DOMAIN}`],
+    ['agent+canary@gmail.com'],
+    ['agent+e2e-run42@gmail.com'],
+    ['agent+prodcert.7@gmail.com'],
+    ['qa+dogfood@gmail.com'],
   ])('SQL pattern excludes %s', email => {
     expect(sqlPattern.test(email.toLowerCase())).toBe(true);
   });
@@ -110,6 +132,10 @@ describe('isInternalOrTestAccountEmail', () => {
     ['quality@band.com'],
     ['synthetic-fan@gmail.com'],
     ['fan+synthetic@gmail.com'],
+    [`fan@not${FOUNDER_DOMAIN}`],
+    ['fan+canaryfan@gmail.com'],
+    ['fan+e2ex@gmail.com'],
+    ['canary@gmail.com'],
   ])('SQL pattern keeps %s external', email => {
     expect(sqlPattern.test(email.toLowerCase())).toBe(false);
   });

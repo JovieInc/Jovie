@@ -596,6 +596,13 @@ jobs:
                 . == "scripts/pr-conflict-handler.mjs" or
                 . == "scripts/lib/pr-conflict-handler.mjs" or
                 . == "scripts/run-affected-tests.mjs" or
+                . == "scripts/ci-fast-lanes.mjs" or
+                . == "scripts/lib/trusted-test-planner-snapshot.mjs" or
+                . == "scripts/lib/test-planner-contract-tests.mjs" or
+                . == "scripts/lib/git-base-ref.mjs" or
+                . == "scripts/lib/onboarding-test-producers.mjs" or
+                . == "scripts/lib/product-shot-test-producers.mjs" or
+                . == "scripts/lib/art-direction-source-guard.mjs" or
                 . == "canon/invariants.jsonl" or
                 startswith("/") or . == ".." or startswith("../") or
                 contains("/../") or endswith("/..") or
@@ -642,6 +649,7 @@ jobs:
                   "Attempt: $ATTEMPT/$MAX_ATTEMPTS" \
                   "Conflicting files: $(jq -r 'join(", ")' <<<"$conflict_files")" \
                   'Preserve the objective behavior of both sides and add only directly required tests.' \
+                  "For navigation registries, retain base-added destinations, preserve the PR's explicit retirements, and keep current base labels unless the PR intentionally changes them. Reconcile desktop and mobile navigation and their tests against the combined registry, including active routes and deep links." \
                   'Do not commit, push, edit controller policy, weaken tests, add a hold, change PR state, or access credentials.' \
                   'Terminal, network, MCP, deletion, rename, and non-conflict edits are denied by trusted profile policy.' \
                   'Subjective taste is not a shipping gate; leave optional taste changes for a separate follow-up.' \
@@ -985,12 +993,16 @@ jobs:
             git fetch --no-tags origin "$BASE_HEAD"
           fi
           test "$(git rev-parse "$BASE_HEAD^{commit}")" = "$BASE_HEAD"
-          git show "$BASE_HEAD:scripts/run-affected-tests.mjs" \
-            > "$RUNNER_TEMP/trusted-run-affected-tests.mjs"
-          git show "$BASE_HEAD:scripts/lib/blog-content-ci.mjs" \
-            > "$RUNNER_TEMP/trusted-blog-content-ci.mjs"
-          chmod 0444 "$RUNNER_TEMP/trusted-run-affected-tests.mjs"
-          chmod 0444 "$RUNNER_TEMP/trusted-blog-content-ci.mjs"
+          # Bootstrap and every planner import come only from the immutable BASE.
+          if ! git --no-replace-objects cat-file -e "$BASE_HEAD:scripts/lib/trusted-test-planner-snapshot.mjs"; then
+            write_binding false 'BASE predates the trusted snapshot bootstrap; integrate current main before retry' "$expected_patch_sha" "$resolved_tree"
+            echo 'candidate=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git --no-replace-objects show "$BASE_HEAD:scripts/lib/trusted-test-planner-snapshot.mjs" \
+            > "$RUNNER_TEMP/snapshot-trusted-planner.mjs"
+          node "$RUNNER_TEMP/snapshot-trusted-planner.mjs" \
+            --base "$BASE_HEAD" --out "$RUNNER_TEMP/trusted-planner"
           {
             echo 'candidate=true'
             echo "candidate_receipt_sha=$receipt_sha"
@@ -1013,6 +1025,12 @@ jobs:
           RESOLVED_TREE: ${{ steps.candidate.outputs.resolved_tree }}
         run: |
           set -euo pipefail
+          node "$RUNNER_TEMP/snapshot-trusted-planner.mjs" \
+            --verify --base "$BASE_HEAD" --out "$RUNNER_TEMP/trusted-planner"
+          trusted_mounts=()
+          while IFS= read -r path; do
+            trusted_mounts+=(--volume "$RUNNER_TEMP/trusted-planner/files/$path:/workspace/$path:ro")
+          done < <(jq -r '.files[].path' "$RUNNER_TEMP/trusted-planner/manifest.json")
           set +e
           docker run --rm \
             --cap-drop ALL \
@@ -1022,8 +1040,7 @@ jobs:
             --env SOURCE_HEAD="$SOURCE_HEAD" \
             --env HOME=/tmp/jovie-container-home \
             --volume "$GITHUB_WORKSPACE:/workspace:rw" \
-            --volume "$RUNNER_TEMP/trusted-run-affected-tests.mjs:/workspace/scripts/run-affected-tests.mjs:ro" \
-            --volume "$RUNNER_TEMP/trusted-blog-content-ci.mjs:/workspace/scripts/lib/blog-content-ci.mjs:ro" \
+            "${trusted_mounts[@]}" \
             --workdir /workspace \
             'node:24.22.1-bookworm@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a' \
             bash -lc 'corepack enable && corepack prepare pnpm@9.15.9 --activate && pnpm install --frozen-lockfile && node scripts/run-affected-tests.mjs --base "$SOURCE_HEAD" --max-workers 2'

@@ -6,8 +6,10 @@ import { sourceFactsByMessage } from '@/components/jovie/source-facts';
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
+import dynamic from 'next/dynamic';
 import type { ReactNode } from 'react';
 import {
+  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -15,6 +17,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import {
   consumeHomepageIntent,
   readHomepageIntent,
@@ -23,14 +26,12 @@ import {
 import {
   ChatEmptyStateComposerRegion,
   ChatInput,
-  ChatMessage,
 } from '@/components/jovie/components';
 import { useChatJankMonitor, useStickToBottom } from '@/components/jovie/hooks';
 import {
   composeMessage,
   useChipTray,
 } from '@/components/jovie/hooks/useChipTray';
-import { ToolPartsRenderer } from '@/components/jovie/tool-ui';
 import type { ChatError, MessagePart } from '@/components/jovie/types';
 import {
   extractErrorMetadata,
@@ -52,8 +53,6 @@ import {
   type StartEntryProfile,
 } from '@/lib/onboarding/start-entry-profile';
 import { cn } from '@/lib/utils';
-import { ChatProposeCheckoutCard } from './ChatProposeCheckoutCard';
-import { ChatProposeNextStepCard } from './ChatProposeNextStepCard';
 import {
   OnboardingChatEmptyIntro,
   OnboardingComposerAmbientMark,
@@ -92,6 +91,78 @@ import {
   THINKING_PLACEHOLDER_ID,
   type ToolPart,
 } from './onboardingChatHelpers';
+
+/**
+ * /start LCP (JOV-9611): the empty state paints only the intro heading and the
+ * composer. Everything that renders a conversation (markdown/streamdown message
+ * bodies, tool UI, proposal cards) is split out of the entry bundle so the
+ * first paint is not starved behind its evaluation on slow mobile CPUs.
+ * `preloadOnboardingConversationChunks` warms them once the page is idle, so
+ * the first assistant reply never waits on a network fetch.
+ * Guard: tests/unit/onboarding/OnboardingChat.entry-bundle.test.ts
+ */
+const loadChatMessage = () =>
+  import('@/components/jovie/components').then(mod => mod.ChatMessage);
+const loadToolPartsRenderer = () =>
+  import('@/components/jovie/tool-ui').then(mod => mod.ToolPartsRenderer);
+const loadChatProposeCheckoutCard = () =>
+  import('./ChatProposeCheckoutCard').then(mod => mod.ChatProposeCheckoutCard);
+const loadChatProposeNextStepCard = () =>
+  import('./ChatProposeNextStepCard').then(mod => mod.ChatProposeNextStepCard);
+
+// Inline import() inside dynamic() keeps Next's loadable preload metadata; the
+// loaders above resolve to the same chunks for idle preloading. Message rows
+// reveal together inside OnboardingMessageList; tool cards reserve their slots
+// locally so a pending chunk never suspends up to the route-level fallback.
+function ReservedChatSlot({ minHeightClass }: { minHeightClass: string }) {
+  return <div aria-hidden='true' className={`w-full ${minHeightClass}`} />;
+}
+
+const ChatMessage = dynamic(() =>
+  import('@/components/jovie/components').then(mod => mod.ChatMessage)
+);
+const ToolPartsRenderer = dynamic(
+  () => import('@/components/jovie/tool-ui').then(mod => mod.ToolPartsRenderer),
+  { loading: () => null }
+);
+const ChatProposeCheckoutCard = dynamic(
+  () =>
+    import('./ChatProposeCheckoutCard').then(
+      mod => mod.ChatProposeCheckoutCard
+    ),
+  { loading: () => <ReservedChatSlot minHeightClass='min-h-32' /> }
+);
+const ChatProposeNextStepCard = dynamic(
+  () =>
+    import('./ChatProposeNextStepCard').then(
+      mod => mod.ChatProposeNextStepCard
+    ),
+  { loading: () => <ReservedChatSlot minHeightClass='min-h-24' /> }
+);
+
+function preloadOnboardingConversationChunks() {
+  void Promise.all([
+    loadChatMessage(),
+    loadToolPartsRenderer(),
+    loadChatProposeCheckoutCard(),
+    loadChatProposeNextStepCard(),
+  ]).catch(() => undefined);
+}
+
+function scheduleOnboardingConversationPreload(): () => void {
+  if (typeof globalThis.requestIdleCallback === 'function') {
+    const handle = globalThis.requestIdleCallback(
+      preloadOnboardingConversationChunks,
+      { timeout: 4000 }
+    );
+    return () => globalThis.cancelIdleCallback?.(handle);
+  }
+  const handle = globalThis.setTimeout(
+    preloadOnboardingConversationChunks,
+    1500
+  );
+  return () => globalThis.clearTimeout(handle);
+}
 
 const STARTER_VERIFICATION_INSTRUCTION = 'One quick check before we send';
 
@@ -215,6 +286,8 @@ type OnboardingToolRendererArgs = {
   readonly selectedArtistId: string | null;
   readonly handleStepDone: boolean;
   readonly socialStepDone: boolean;
+  /** Handle the conversation settled on; the sign-up card claims this one. */
+  readonly claimHandle: string | null;
 };
 
 type OnboardingToolRenderer = (
@@ -323,14 +396,21 @@ const renderProposeSocialLink: OnboardingToolRenderer = ({
   );
 };
 
-const renderProposeNextStep: OnboardingToolRenderer = ({ part, key }) => {
+const renderProposeNextStep: OnboardingToolRenderer = ({
+  part,
+  key,
+  claimHandle,
+}) => {
   if (!isNextStepPayload(part.output)) {
     return null;
   }
 
   return (
     <div key={key} className='w-full max-w-110'>
-      <ChatProposeNextStepCard payload={part.output} />
+      <ChatProposeNextStepCard
+        payload={part.output}
+        claimHandle={claimHandle}
+      />
     </div>
   );
 };
@@ -371,6 +451,7 @@ function renderOnboardingTools({
   selectedArtistId,
   handleStepDone,
   socialStepDone,
+  claimHandle,
 }: {
   readonly messageId: string;
   readonly toolParts: readonly ToolPart[];
@@ -384,6 +465,7 @@ function renderOnboardingTools({
   readonly selectedArtistId: string | null;
   readonly handleStepDone: boolean;
   readonly socialStepDone: boolean;
+  readonly claimHandle: string | null;
 }) {
   const genericParts: ToolPart[] = [];
   const cards: ReactNode[] = [];
@@ -414,6 +496,7 @@ function renderOnboardingTools({
         selectedArtistId,
         handleStepDone,
         socialStepDone,
+        claimHandle,
       });
       if (card) {
         cards.push(card);
@@ -429,7 +512,7 @@ function renderOnboardingTools({
   }
 
   return (
-    <div className={cn('space-y-3 pl-9', hasMessageText && 'mt-3')}>
+    <div className={cn('space-y-3', hasMessageText && 'mt-3')}>
       {cards}
       {genericParts.length > 0 ? (
         <ToolPartsRenderer
@@ -438,6 +521,18 @@ function renderOnboardingTools({
           hasMessageText={false}
         />
       ) : null}
+    </div>
+  );
+}
+
+function OnboardingSpeakerRow() {
+  return (
+    <div
+      className='system-b-onboarding-speaker-row'
+      data-testid='onboarding-speaker-row'
+    >
+      <BrandLogo size='chrome' aria-hidden />
+      <span>Jovie</span>
     </div>
   );
 }
@@ -478,54 +573,75 @@ function OnboardingMessageList({
       WIDGET_COMPLETION_ACTIONS.SOCIAL_ATTACHED
     ) ||
     hasWidgetEvent(displayMessages, ONBOARDING_WIDGET_EVENTS.SOCIAL_ATTACHED);
+  // The sign-up card must claim the handle the chat settled on, not the
+  // homepage `?handle=` the visitor later changed (golden-path cert
+  // 2026-10-31 pm: card said "Claim @gpwo879d" after @unmarkedpave locked).
+  const claimHandle = deriveProfileBuilderState({
+    handleDraft: null,
+    messages: displayMessages,
+    selectedArtist: null,
+  }).handle;
 
+  // A generic per-message placeholder cannot match both a wrapped user
+  // bubble and the thinking dots. Reveal the first transcript as one unit,
+  // including its speaker rows, while the surrounding composer stays mounted.
   return (
-    <div className='flex flex-col pb-4'>
-      {displayMessages.map(message => {
-        const text = getMessageText(message);
-        const toolParts = getToolParts(message);
-        const isThinking = message.id === THINKING_PLACEHOLDER_ID;
-        const shouldRenderMessage =
-          isThinking || Boolean(text) || toolParts.length === 0;
+    <Suspense fallback={null}>
+      <div className='flex flex-col pb-4'>
+        {displayMessages.map((message, index) => {
+          const text = getMessageText(message);
+          const toolParts = getToolParts(message);
+          const isThinking = message.id === THINKING_PLACEHOLDER_ID;
+          const shouldRenderMessage =
+            isThinking || Boolean(text) || toolParts.length === 0;
+          // Pen R6As7U: one Jovie speaker row opens each agent turn; a run of
+          // assistant messages is one turn and keeps a single row.
+          const startsAgentTurn =
+            message.role === 'assistant' &&
+            displayMessages[index - 1]?.role !== 'assistant';
 
-        return (
-          <div
-            key={message.id}
-            className='pb-5 transition-opacity duration-fast'
-          >
-            {shouldRenderMessage ? (
-              <ChatMessage
-                id={message.id}
-                role={message.role}
-                parts={(message.parts ?? []) as MessagePart[]}
-                sourceFacts={sourceFacts.get(message.id)}
-                isThinking={isThinking}
-                isStreaming={
-                  isStreaming && message.id === lastAssistantMessageId
-                }
-                renderTools={false}
-              />
-            ) : null}
-            {!isThinking
-              ? renderOnboardingTools({
-                  messageId: message.id,
-                  toolParts,
-                  hasMessageText: Boolean(text),
-                  isBusy,
-                  onHandleCandidateChange,
-                  onConfirmHandle,
-                  onAttachAccount,
-                  onNoneOfTheseArtists,
-                  onSelectArtist,
-                  selectedArtistId,
-                  handleStepDone,
-                  socialStepDone,
-                })
-              : null}
-          </div>
-        );
-      })}
-    </div>
+          return (
+            <div
+              key={message.id}
+              className='pb-5 transition-opacity duration-fast'
+            >
+              {startsAgentTurn ? <OnboardingSpeakerRow /> : null}
+              {shouldRenderMessage ? (
+                <ChatMessage
+                  id={message.id}
+                  role={message.role}
+                  parts={(message.parts ?? []) as MessagePart[]}
+                  sourceFacts={sourceFacts.get(message.id)}
+                  isThinking={isThinking}
+                  isStreaming={
+                    isStreaming && message.id === lastAssistantMessageId
+                  }
+                  renderTools={false}
+                  showAssistantActions={false}
+                />
+              ) : null}
+              {!isThinking
+                ? renderOnboardingTools({
+                    messageId: message.id,
+                    toolParts,
+                    hasMessageText: Boolean(text),
+                    isBusy,
+                    onHandleCandidateChange,
+                    onConfirmHandle,
+                    onAttachAccount,
+                    onNoneOfTheseArtists,
+                    onSelectArtist,
+                    selectedArtistId,
+                    handleStepDone,
+                    socialStepDone,
+                    claimHandle,
+                  })
+                : null}
+            </div>
+          );
+        })}
+      </div>
+    </Suspense>
   );
 }
 
@@ -785,6 +901,8 @@ export function OnboardingChat({
   const latestInputRef = useRef(initialDraft);
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [hasSentFirst, setHasSentFirst] = useState(initialMessages.length > 0);
+
+  useEffect(() => scheduleOnboardingConversationPreload(), []);
   const [verificationRequested, setVerificationRequested] = useState(false);
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
@@ -912,8 +1030,13 @@ export function OnboardingChat({
   const shouldShowThinking = isBusy && lastMessage?.role === 'user';
   const displayMessages = getDisplayMessages(messages, shouldShowThinking);
   const lastAssistantMessageId = findLastAssistantMessageId(displayMessages);
-  const { isStuckToBottom, onScroll, totalSizeRef, scrollContainerRef } =
-    useStickToBottom();
+  const {
+    isStuckToBottom,
+    onScroll,
+    setStuckToBottom,
+    totalSizeRef,
+    scrollContainerRef,
+  } = useStickToBottom();
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
   const { onSend: notifyJankSend } = useChatJankMonitor({
     conversationId: 'onboarding',
@@ -1230,6 +1353,16 @@ export function OnboardingChat({
     }
     scrollContainer.scrollTop = 0;
   }, [displayMessages.length, scrollContainerRef, shouldDockComposer, status]);
+  // Docking hands the transcript to stick-to-bottom while it is still at the
+  // top (the undocked thread is pinned up). Re-pin on dock and on every user
+  // turn so the active tool card scrolls above the composer (JOV-10131).
+  useLayoutEffect(() => {
+    if (!shouldDockComposer || userTurnCount === 0) return;
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    setStuckToBottom(true);
+  }, [scrollContainerRef, setStuckToBottom, shouldDockComposer, userTurnCount]);
 
   // Card drafts and user confirmation taps are provisional. A persisted tool
   // confirmation keeps later questions from inheriting the old handle prompt.
@@ -1294,14 +1427,16 @@ export function OnboardingChat({
         {...onboardingChatInputProps}
         pickerPlacement={sendLocalError ? 'flow' : 'overlay'}
       />
+      <span hidden aria-hidden='true' data-onboarding-composer-complete />
     </div>
   );
 
   return (
     <section
-      className='relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)'
+      className='system-b-onboarding-chat relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)'
       aria-label='Jovie Onboarding Chat'
       data-testid='onboarding-chat'
+      data-starter-handoff={hasInitialStarterPrompt ? 'true' : undefined}
       data-picker-open={composerPickerOpen ? 'true' : undefined}
     >
       {/* Scroll area (flex-1) — upper content morphs on first message */}
