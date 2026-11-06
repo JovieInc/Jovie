@@ -26,6 +26,12 @@ test.describe('Desktop update release notes geometry', () => {
           .getByRole('dialog')
           .evaluate(el => el.contains(document.activeElement))
       ).toBe(true);
+      // The preview persists a story's requested theme now (the Surface
+      // Matrix seeding contract), so the light story above would bleed into
+      // this unrequested one. Reset storage; the provider default is dark.
+      await page.evaluate(() =>
+        localStorage.removeItem('jovie-theme-storybook')
+      );
       await page.goto(
         '/iframe.html?id=organisms-desktopupdatemodal--downloading-slow&viewMode=story'
       );
