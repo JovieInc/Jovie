@@ -70,10 +70,9 @@ describe('FooterBranding', () => {
   it('retains the default icon link and optional waitlist action', () => {
     render(<FooterBranding />);
 
-    expect(screen.getByRole('link', { name: 'Jovie Home' })).toHaveAttribute(
-      'href',
-      '/'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Powered by Jovie Home' })
+    ).toHaveAttribute('href', '/');
     expect(screen.queryByText('Made with Jovie')).not.toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Join the waitlist' })
@@ -85,10 +84,9 @@ describe('FooterBranding', () => {
     mark => {
       render(<FooterBranding mark={mark} size='sm' showCTA={false} />);
 
-      expect(screen.getByRole('link', { name: 'Jovie Home' })).toHaveAttribute(
-        'href',
-        '/'
-      );
+      expect(
+        screen.getByRole('link', { name: 'Powered by Jovie Home' })
+      ).toHaveAttribute('href', '/');
       expect(screen.queryByText('Made with Jovie')).not.toBeInTheDocument();
       expect(screen.getAllByRole('link')).toHaveLength(1);
       if (mark === 'text') {
