@@ -408,7 +408,6 @@ function seatNote(
           : 'no pace';
   return `${account}: ${copy}`;
 }
-
 function PathsCard({ view }: Readonly<{ view: CapacityView }>) {
   if (view.paths.length === 0) return null;
   const models = [...new Set(view.paths.map(p => p.model))];
@@ -502,8 +501,6 @@ function AlertBanner({
             alert.severity === 'alarm' ? 'text-error' : 'text-secondary-token'
           )}
         >
-          {/* role=alert on the li would override its listitem role and break
-              the ul's list semantics (axe list); it lives on an inner wrapper. */}
           <div role={alert.severity === 'alarm' ? 'alert' : undefined}>
             <span className='mr-2 text-2xs font-semibold uppercase'>
               {alert.severity === 'alarm' ? 'Alarm' : 'Note'}
