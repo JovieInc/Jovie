@@ -44,7 +44,7 @@
         "packages/ui/atoms/button.test.tsx"
       ],
       "penRootId": "g3IC1",
-      "sourceDigest": "e07f389a47372d636600c1e03ec4e663169271b367fe6c07e68f04b05f3f4396"
+      "sourceDigest": "97fe25a918d0e924f57d182079b609d82930b3e16fc03d396bd3c9e55677c5b2"
     },
     {
       "id": "atom.input",
@@ -123,7 +123,7 @@
       "storySources": ["packages/ui/atoms/icon-button.stories.tsx"],
       "testSources": ["packages/ui/atoms/icon-button.test.tsx"],
       "penRootId": "XYhft",
-      "sourceDigest": "bd0bc5250e812ef8501e8ca0481007172548da0b1e48ca02aaee5bc946515e3b"
+      "sourceDigest": "0ef6aa1b5ca6a3dd9cfc3c948410a3e5beaadf2ddae29ecc4dc45160df668bd2"
     }
   ],
   "legacy": {

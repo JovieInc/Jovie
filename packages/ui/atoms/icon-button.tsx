@@ -54,7 +54,7 @@ const CIRCLE_CHROME_CLASSNAME =
 // Applied after variant chrome so quiet/ghost token colors cannot override
 // the shared Button destructive state.
 const ICON_BUTTON_DESTRUCTIVE_CLASSNAME =
-  'text-error hover:bg-error-subtle hover:text-error focus-visible:bg-error-subtle focus-visible:text-error active:bg-error-subtle';
+  'text-error-text hover:bg-error-subtle hover:text-error-text focus-visible:bg-error-subtle focus-visible:text-error-text active:bg-error-subtle';
 
 const iconButtonVariants = cva(
   // Shared base: uniform reduced-motion + touch behavior. Focus ring and
