@@ -55,7 +55,8 @@ class DispatchBudgetTest(unittest.TestCase):
 
     def test_claim_without_a_reservation_keeps_its_behaviour(self):
         self.spend_mutations(100, 6)
-        self.assertTrue(self.claim(200)["admitted"])  # other callers are unchanged
+        refused = self.claim(200)  # other callers keep the used >= cap rule
+        self.assertEqual(refused["reason"], "mutations_budget_exhausted")
 
     def test_fix_red_claims_with_the_dispatch_reservation(self):
         source = inspect.getsource(lane._fix_red_pr)
