@@ -1,8 +1,7 @@
 import { lintCopy } from '@jovie/copy';
 import { z } from 'zod';
 import surfaceCensus from '@/data/designSystem/surfaceCensus.json';
-import { HOMEPAGE_COPY } from '@/data/homepageCopy';
-import { HOMEPAGE_FAN_STATES_COPY } from '@/data/homepageFanStatesCopy';
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import { MARKETING_SECTIONS } from '@/data/marketing/sections';
 import icpLanguage from '../../../../scripts/invariants/icp-language/config.json';
 import { experimentSchema } from './experiment';
@@ -20,10 +19,14 @@ import type { ContentKindDefinition } from './kind';
  * - Prices, plan names, and included features. Those come from offer truth
  *   and the entitlement registry (same price everywhere); copy slots reject
  *   currency and price-period text.
- * - Locked lines. The homepage headline is the company identity line
- *   (Tim, 2026-10-22) and has no slot.
+ * - Locked lines. The homepage headline ("Jovie helps you move your music
+ *   forward.", Tim 2026-11-03) has no slot.
  */
 
+// 2026-11-07: the editorial invite-only homepage replaced the artist-profile
+// claim sections. A record stored with the old section variants no longer
+// validates, so `getLiveContent` serves the code default below (source
+// 'incompatible') until a valid version is published.
 const MARKETING_PAGE_SPEC_SCHEMA_VERSION = 1;
 
 const line = (max: number) =>
@@ -37,25 +40,30 @@ const line = (max: number) =>
 const HeroSection = z
   .object({
     section: z.literal('hero'),
-    variant: z.literal('split-claim-card'),
+    variant: z.literal('centered-none'),
     copy: z
       .object({
         subhead: line(220),
-        claimAction: line(24),
+        primaryAction: line(24),
+        secondaryAction: line(24),
       })
       .strict(),
+  })
+  .strict();
+
+const FeatureSplitSection = z
+  .object({
+    section: z.literal('feature-split'),
+    variant: z.literal('phone-right'),
+    copy: z.object({ headline: line(90), body: line(240) }).strict(),
   })
   .strict();
 
 const ProductGallerySection = z
   .object({
     section: z.literal('product-gallery'),
-    variant: z.literal('profile-grid'),
-    copy: z
-      .object({
-        headline: line(90),
-      })
-      .strict(),
+    variant: z.literal('release-rail'),
+    copy: z.object({ headline: line(90), body: line(240) }).strict(),
   })
   .strict();
 
@@ -63,13 +71,7 @@ const CtaSection = z
   .object({
     section: z.literal('cta'),
     variant: z.literal('final-single-claim'),
-    copy: z
-      .object({
-        headline: line(90),
-        subhead: line(220),
-        plansLinkLabel: line(32),
-      })
-      .strict(),
+    copy: z.object({ headline: line(90), subhead: line(220) }).strict(),
   })
   .strict();
 
@@ -100,37 +102,33 @@ function censusStatus(groupId: string): SpecSectionDsStatus {
 }
 
 const HOMEPAGE_SECTION_SOURCE =
-  'apps/web/components/homepage/HomepageArtistProfile.tsx';
+  'apps/web/components/homepage/HomepageEditorial.tsx';
+
+function homeEntry(
+  section: string,
+  variant: string,
+  component: string
+): SpecSectionRegistryEntry {
+  return {
+    section,
+    variant,
+    component,
+    source: HOMEPAGE_SECTION_SOURCE,
+    censusGroup: 'home',
+    dsStatus: censusStatus('home'),
+  };
+}
 
 export const SPEC_SECTION_REGISTRY: readonly SpecSectionRegistryEntry[] = [
-  {
-    section: 'hero',
-    variant: 'split-claim-card',
-    component: 'HomepageArtistHero',
-    source: HOMEPAGE_SECTION_SOURCE,
-    censusGroup: 'home',
-    dsStatus: censusStatus('home'),
-  },
-  {
-    section: 'product-gallery',
-    variant: 'profile-grid',
-    component: 'HomepageFanStates',
-    source: HOMEPAGE_SECTION_SOURCE,
-    censusGroup: 'home',
-    dsStatus: censusStatus('home'),
-  },
-  {
-    section: 'cta',
-    variant: 'final-single-claim',
-    component: 'HomepageOfferClose',
-    source: HOMEPAGE_SECTION_SOURCE,
-    censusGroup: 'home',
-    dsStatus: censusStatus('home'),
-  },
+  homeEntry('hero', 'centered-none', 'HomepageStoryHero'),
+  homeEntry('feature-split', 'phone-right', 'HomepageProfileChapter'),
+  homeEntry('product-gallery', 'release-rail', 'HomepageReleasesChapter'),
+  homeEntry('cta', 'final-single-claim', 'HomepageInviteClose'),
 ];
 
 export const MarketingPageSectionSchema = z.discriminatedUnion('section', [
   HeroSection,
+  FeatureSplitSection,
   ProductGallerySection,
   CtaSection,
 ]);
@@ -152,30 +150,34 @@ export type MarketingPageSections = MarketingPageSpec['sections'];
 export const MARKETING_PAGE_KEYS = ['home'] as const;
 export type MarketingPageKey = (typeof MARKETING_PAGE_KEYS)[number];
 
-/** The code default: exactly what the homepage rendered before specs. */
+const COPY = HOMEPAGE_EDITORIAL_COPY;
+
+/** The code default: the editorial story, ending in the invitation form. */
 export const DEFAULT_HOME_SPEC: MarketingPageSpec = {
   sections: [
     {
       section: 'hero',
-      variant: 'split-claim-card',
+      variant: 'centered-none',
       copy: {
-        subhead: HOMEPAGE_COPY.hero.subhead,
-        claimAction: HOMEPAGE_COPY.hero.claim.action,
+        subhead: COPY.hero.subhead,
+        primaryAction: COPY.hero.primaryAction,
+        secondaryAction: COPY.hero.secondaryAction,
       },
     },
     {
+      section: 'feature-split',
+      variant: 'phone-right',
+      copy: { headline: COPY.profile.headline, body: COPY.profile.body },
+    },
+    {
       section: 'product-gallery',
-      variant: 'profile-grid',
-      copy: { headline: HOMEPAGE_FAN_STATES_COPY.headline },
+      variant: 'release-rail',
+      copy: { headline: COPY.releases.headline, body: COPY.releases.body },
     },
     {
       section: 'cta',
       variant: 'final-single-claim',
-      copy: {
-        headline: HOMEPAGE_COPY.offer.headline,
-        subhead: HOMEPAGE_COPY.close.subhead,
-        plansLinkLabel: HOMEPAGE_COPY.offer.plansLink.label,
-      },
+      copy: { headline: COPY.invite.headline, subhead: COPY.invite.subhead },
     },
   ],
 };
@@ -185,11 +187,13 @@ const PRICE_PATTERN =
   /[$€£¥]|\b\d+(?:\.\d+)?\s*(?:usd|eur|gbp)\b|\/\s*(?:mo|month|yr|year)\b|\bper\s+(?:month|year)\b|\bfree\s+trial\b/i;
 
 // General pages stay generic (MKT-D16): the same terms the blocking
-// `scripts/invariants/icp-language/check.mjs` source guard enforces.
+// `scripts/invariants/icp-language/check.mjs` source guard enforces. `home`
+// is not a general page: Tim's 2026-11-03 decision ("Music line wins")
+// scopes music language to `/` only. A future general page key goes here.
 const ICP_TERM_PATTERNS = icpLanguage.terms.map(
   term => new RegExp(`\\b${term.replace(/\s+/g, '\\s+')}s?\\b`, 'i')
 );
-const GENERAL_PAGE_KEYS: ReadonlySet<string> = new Set(['home']);
+const GENERAL_PAGE_KEYS: ReadonlySet<string> = new Set<string>([]);
 
 function icpTermIn(text: string): string | null {
   let scrubbed = text;

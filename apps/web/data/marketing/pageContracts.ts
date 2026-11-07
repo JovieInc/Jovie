@@ -38,6 +38,13 @@ const START_CTA = {
   label: 'Find yourself',
 } as const;
 
+// Invite-only homepage (PUBLIC_SIGNUP_CLOSED): the one action is the
+// on-page role waitlist form.
+const HOME_INVITE_CTA = {
+  href: '/#request-invite',
+  label: 'Request an Invite',
+} as const;
+
 const CLAIM_PROFILE_CTA = {
   href: APP_ROUTES.SIGNUP,
   label: 'Claim your profile',
@@ -48,10 +55,10 @@ export const MARKETING_PAGE_CONTRACTS = {
     routeGlob: '(home)/page.tsx',
     copyScope: 'shared',
     url: APP_ROUTES.HOME,
-    job: 'help visitors understand their public presence and start with their profile',
-    proof: 'published profile and relationship examples',
-    successEvent: 'visitor starts the onboarding handoff',
-    primaryCta: START_CTA,
+    job: 'tell the Jovie story and take an invitation request',
+    proof: 'the template profile and the real releases workspace',
+    successEvent: 'visitor requests an invitation',
+    primaryCta: HOME_INVITE_CTA,
   },
   '(marketing)/new/page.tsx': {
     routeGlob: '(marketing)/new/page.tsx',

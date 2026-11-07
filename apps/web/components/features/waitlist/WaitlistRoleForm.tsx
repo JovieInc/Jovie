@@ -45,7 +45,19 @@ export const WAITLIST_ROLE_FORM_ENDPOINT = '/api/waitlist/join';
 export function WaitlistRoleForm({
   variant = 'artist',
   headingLevel = 1,
-}: Readonly<{ variant?: 'artist' | 'general'; headingLevel?: 1 | 2 | 3 }>) {
+  title = 'Request access',
+  description,
+  headingClassName,
+}: Readonly<{
+  variant?: 'artist' | 'general';
+  headingLevel?: 1 | 2 | 3;
+  /** Form heading; a host page may name the action in its own words. */
+  title?: string;
+  /** Optional single support line under the heading. */
+  description?: string;
+  /** Host type role for the heading (e.g. the marketing section title). */
+  headingClassName?: string;
+}>) {
   const formId = useId();
   const Heading = headingLevel === 1 ? 'h1' : headingLevel === 2 ? 'h2' : 'h3';
   const roles = variant === 'general' ? GENERAL_WAITLIST_ROLES : WAITLIST_ROLES;
@@ -187,10 +199,18 @@ export function WaitlistRoleForm({
       >
         <Heading
           id={`${formId}-heading`}
-          className='text-balance text-xl font-medium tracking-tight text-primary-token'
+          className={cn(
+            'text-balance text-primary-token',
+            headingClassName ?? 'text-xl font-medium tracking-tight'
+          )}
         >
-          Request access
+          {title}
         </Heading>
+        {description ? (
+          <p className='max-w-md text-balance text-center text-sm text-secondary-token'>
+            {description}
+          </p>
+        ) : null}
         {variant === 'general' ? (
           <label
             className='grid w-full gap-2 text-sm text-primary-token'

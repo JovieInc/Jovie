@@ -4,10 +4,11 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
 import {
-  HomepageArtistHero,
-  HomepageFanStates,
-  HomepageOfferClose,
-} from '@/components/homepage/HomepageArtistProfile';
+  HomepageInviteClose,
+  HomepageProfileChapter,
+  HomepageReleasesChapter,
+  HomepageStoryHero,
+} from '@/components/homepage/HomepageEditorial';
 import {
   FaqSection,
   MarketingContainer,
@@ -79,16 +80,17 @@ export const homepage: Story = {
     docs: {
       description: {
         story:
-          'Proven recipe `homepage` — reference route `/`: the artist-profile hero, three real profile states, then the free offer with the same claim.',
+          'Proven recipe `homepage` — reference route `/`: the music-line hero, the profile and releases chapters, then the invitation form.',
       },
     },
   },
   render: () => (
     <RecipeChrome recipeId='homepage'>
       <PublicPageShell>
-        <HomepageArtistHero />
-        <HomepageFanStates />
-        <HomepageOfferClose />
+        <HomepageStoryHero />
+        <HomepageProfileChapter />
+        <HomepageReleasesChapter />
+        <HomepageInviteClose />
       </PublicPageShell>
     </RecipeChrome>
   ),
