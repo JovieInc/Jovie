@@ -34,10 +34,9 @@ import {
   readFileSync,
   realpathSync,
 } from 'node:fs';
-import { cpus, homedir, loadavg, tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { stripVTControlCharacters } from 'node:util';
 import { load as yamlLoad } from 'js-yaml';
 import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
 import {
@@ -47,11 +46,21 @@ import {
   PR_BODY_SKELETON,
   parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
+import {
+  failureSummaryLines,
+  failureTestPaths,
+} from './lib/preflight-failure-summary.mjs';
+
+export { failureSummaryLines, failureTestPaths };
+
 import { guardNested, withPreflightDepth } from './lib/preflight-depth.mjs';
-import { acquireSlot, defaultLockDir } from './lib/preflight-lock.mjs';
-import { NARROWED_LOCAL, unrelatedFailure } from './lib/preflight-scope.mjs';
-import { recordTimings } from './lib/preflight-timing.mjs';
-import { isInfraTimeout } from './lib/prepush-offload.mjs';
+import {
+  failingItemLines,
+  NARROWED_LOCAL,
+  recordRun,
+  settleResult,
+  takeSlot,
+} from './lib/preflight-scope.mjs';
 
 export { baseRefCandidates, resolveBaseRef };
 
@@ -146,59 +155,6 @@ export function downgradeHostRed(check, result, platform = process.platform) {
       skip: `host-only reds (${[...new Set(failed)].join(', ')}); CI runs Linux`,
     };
   return result;
-}
-
-/** Preserve a failure's name and nearby cause within the existing display bound. */
-export function failureSummaryLines(out) {
-  const lines = stripVTControlCharacters(String(out))
-    .split('\n')
-    .filter(line => line.trim());
-  const anchors = [
-    /^\s*test at .+:\d+(?::\d+)?$/,
-    /^\s*FAIL(?:\s|\|)/,
-    /^\s*not ok \d+\b/,
-    /^\s*[✖✗×]\s+(?!failing tests:)/,
-    /^\s*(?:\w*Error(?:\s*\[[^\]]+\])?:|(?:.+(?::\d+(?::\d+)?|\(\d+,\d+\)):\s*)?error TS\d+:)/,
-  ];
-  for (const anchor of anchors) {
-    const start = lines.findIndex(
-      line => !/^\s*(?:[✓✔]|ok \d+\b|PASS\b)/.test(line) && anchor.test(line)
-    );
-    if (start !== -1) {
-      return [
-        '[first recognized failure context; output is bounded]',
-        ...lines.slice(start, start + 13),
-      ].map(line => line.slice(0, 220));
-    }
-  }
-  return [
-    '[no explicit failure header in retained output; showing tail]',
-    ...lines.slice(-13),
-  ].map(line => line.slice(0, 220));
-}
-
-/** Every failing item, numbered; never a count with the items cut off. */
-export function failingItemLines({ red, body, companion }) {
-  const items = [
-    ...red.map(r => `${r.name} [${r.id}]`),
-    ...body.errors.map(e => `PR body: ${e.message}`),
-    ...companion.map(c => `companion edit (${c.trigger}): ${c.item}`),
-  ];
-  if (!items.length) return [];
-  return [
-    `\nFailing items (${items.length}):`,
-    ...items.map((item, i) => `  ${i + 1}. ${item}`),
-  ];
-}
-
-/** Load high enough that a local red may be noise (override JOVIE_PREFLIGHT_OVERLOAD_FACTOR). */
-export function hostOverloaded(
-  env = process.env,
-  load = loadavg()[0],
-  cores = cpus().length
-) {
-  if (env.CI || env.GEM_TYPECHECK_SLOTS) return false;
-  return load > cores * (Number(env.JOVIE_PREFLIGHT_OVERLOAD_FACTOR) || 2);
 }
 
 export function parseArgs(argv) {
@@ -320,27 +276,6 @@ function untrackCommand(record) {
   if (activeCommandGroups.size === 0 && !cancelledCommandCode) {
     removeCommandHandlers();
   }
-}
-
-const FAILURE_LINE = /(?:^|\b)(?:not ok\b|FAIL\b|location:|✖|×)/u;
-const TEST_PATH = /((?:[\w.@/-]+\/)?[\w.@-]+\.test\.[cm]?[jt]sx?)/u;
-
-/** Test files named by failure lines. The output tail is not a substitute:
- * preflight keeps only the last 200KB, which dropped the names and left
- * "8 failing tests" with nothing to fix. */
-export function failureTestPaths(text) {
-  const found = new Set();
-  for (const line of String(text).split('\n')) {
-    if (!FAILURE_LINE.test(line)) continue;
-    const match = TEST_PATH.exec(line);
-    if (!match) continue;
-    const raw = match[1];
-    const at = raw.lastIndexOf('scripts/');
-    const app = raw.lastIndexOf('apps/');
-    const rel = at >= 0 ? raw.slice(at) : app >= 0 ? raw.slice(app) : raw;
-    found.add(rel);
-  }
-  return [...found];
 }
 
 export function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
@@ -923,62 +858,24 @@ export async function main({
 
   // Run phases in order; within a phase, a bounded pool.
   const results = [];
-  // One heavy preflight per host (Gem has its own semaphore). Waiting is
-  // announced; a timeout proceeds rather than deadlocking the push.
-  const lockDir = defaultLockDir(env);
-  const slot =
-    args.lock &&
-    !env.GEM_TYPECHECK_SLOTS &&
-    !env.CI &&
-    env.JOVIE_PREFLIGHT_LEDGER !== 'off'
-      ? await acquireSlot({
-          dir: lockDir,
-          slots: Number(env.JOVIE_PREFLIGHT_LOCAL_SLOTS || 1),
-          label: `${path.basename(cwd)}@${git(cwd, ['rev-parse', '--short', 'HEAD'])}`,
-          log,
-        })
-      : { release() {}, waitedMs: 0 };
+  const slot = await takeSlot({
+    args,
+    env,
+    cwd,
+    log,
+    sha: git(cwd, ['rev-parse', '--short', 'HEAD']),
+  });
   const runStarted = Date.now();
   for (const phase of [0, 1, 2]) {
     const queue = checks.filter(c => c.phase === phase);
     const worker = async () => {
       while (queue.length) {
         const c = queue.shift();
-        let r = downgradeHostRed(c, await c.run());
-        // Under host overload a red is not a verdict (2026-11-07: every guard
-        // that failed on a load-50 Mac passed on a clean runner). A timeout or
-        // kill is inconclusive; any other red is retried once, and only a
-        // repeat counts as an item to fix.
-        if (r.code && hostOverloaded(env)) {
-          const load = loadavg()[0].toFixed(0);
-          if (isInfraTimeout(r))
-            r = {
-              ...r,
-              code: 0,
-              warn: `${c.name} timed out or was killed under host load ${load}; inconclusive, not an item to fix. Run \`pnpm preflight:remote\` or let CI decide`,
-            };
-          else {
-            const again = await c.run();
-            r = again.code
-              ? again
-              : {
-                  ...again,
-                  warn: `${c.name} failed once under host load ${load} and passed on rerun; treat as load noise`,
-                };
-          }
-        }
-        // A failure only in tests this change cannot reach is not this PR's
-        // red; CI stays the authority for it.
-        if (
-          r.code &&
-          /^guard:/.test(c.id) &&
-          unrelatedFailure(r.failedTests, paths, cwd)
-        )
-          r = {
-            ...r,
-            code: 0,
-            warn: `${c.name} failed only in tests this change does not touch (${r.failedTests.join(', ')}); not blocking the push, CI decides`,
-          };
+        const r = await settleResult(c, downgradeHostRed(c, await c.run()), {
+          env,
+          paths,
+          cwd,
+        });
         const status = r.skip
           ? 'skip'
           : r.warn
@@ -1064,23 +961,18 @@ export async function main({
         env.JOVIE_PREFLIGHT_LEDGER_DIR ||
         path.join(homedir(), '.local', 'state', 'jovie-lanes');
       mkdirSync(dir, { recursive: true });
-      recordTimings({
+      recordRun({
         dir,
-        file: args.timingsFile,
-        run: {
-          head: git(cwd, ['rev-parse', 'HEAD']),
-          host: env.HOSTNAME || path.basename(homedir()),
-          files: paths.length,
-          totalMs: Date.now() - runStarted,
-          waitedMs: slot.waitedMs,
-          outcome: total ? 'failed' : 'completed',
-          guards: results.map(r => ({
-            id: r.id,
-            ms: r.ms ?? 0,
-            status: r.status,
-          })),
-          deferred,
-        },
+        args,
+        cwd,
+        env,
+        head: git(cwd, ['rev-parse', 'HEAD']),
+        paths,
+        runStarted,
+        slot,
+        total,
+        results,
+        deferred,
       });
       appendFileSync(
         path.join(dir, 'preflight-changed.jsonl'),
