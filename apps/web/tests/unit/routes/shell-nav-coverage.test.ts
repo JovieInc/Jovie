@@ -197,6 +197,62 @@ describe('shell route coverage', () => {
     expect(missingRoutes).toEqual([]);
   });
 
+  it('canonical rail destinations own a warm-navigation loading boundary', () => {
+    // The shell segment intentionally has no loading.tsx, so a warm
+    // navigation keeps the previous page mounted until the destination
+    // resolves its server data — the Mac dogfood caught Home rendered
+    // under the new active Identity state for the whole slow Profiles
+    // fetch, and a Work title under a Profiles heading (JOV-9024). A
+    // route-owned loading.tsx lets the router commit the navigation
+    // immediately and hold a route-shaped skeleton instead. Rail
+    // destinations without one need a documented exception below.
+    const RAIL_LOADING_BOUNDARY_EXCEPTIONS: Record<string, string> = {
+      [APP_ROUTES.DASHBOARD]:
+        'Inbox is the shell root page; the shell segment stays loading-free so warm navigation keeps the previous route visible (shell layout lock)',
+      '/app/contacts':
+        'Audience rail destination is a dual-tab workspace (contacts + audience tabs); a tab-shaped loading skeleton is a separate design decision',
+    };
+
+    const segmentLoadingPath = (pathname: string) =>
+      path.join(
+        SHELL_ROOT,
+        ...pathname
+          .replace(/^\/app\/?/, '')
+          .split('/')
+          .filter(Boolean),
+        'loading.tsx'
+      );
+
+    const missingBoundaries = primaryNavigation
+      .map(item => ({
+        item,
+        pathname: new URL(item.href, 'https://jovie.local').pathname,
+      }))
+      .filter(({ pathname }) => !(pathname in RAIL_LOADING_BOUNDARY_EXCEPTIONS))
+      .filter(({ pathname }) => !fs.existsSync(segmentLoadingPath(pathname)))
+      .map(
+        ({ item, pathname }) =>
+          `${item.name} (${pathname}) owns no loading.tsx at its shell segment: ${segmentLoadingPath(pathname)}`
+      );
+
+    expect(missingBoundaries).toEqual([]);
+
+    // The boundaries must reuse the canonical skeleton family, not custom
+    // chrome, so the loaded surface replaces reserved geometry.
+    const presenceLoading = fs.readFileSync(
+      segmentLoadingPath(APP_ROUTES.PRESENCE),
+      'utf8'
+    );
+    expect(presenceLoading).toContain('DashboardSegmentSkeleton');
+    expect(presenceLoading).toContain("variant='profile'");
+
+    const libraryLoading = fs.readFileSync(
+      segmentLoadingPath(APP_ROUTES.LIBRARY),
+      'utf8'
+    );
+    expect(libraryLoading).toContain('LibraryLoadingState');
+  });
+
   it('keeps the canonical Contacts destination as a real workspace', () => {
     const contactsPage = pageByRoute.get(APP_ROUTES.CONTACTS);
     const contactsClient = fs.readFileSync(CONTACTS_CLIENT_PATH, 'utf8');
