@@ -135,6 +135,10 @@ class LaneBudget(unittest.TestCase):
         self.assertTrue(lane.new_issue_budget("codex", 3, None)["allowed"], "unknown inventory admits")
         self.assertEqual(lane.new_issue_budget("codex", 0, at)["reason"], "provider-disabled")
 
+    def test_exhausted_escalated_and_poisoned_prs_do_not_count_toward_the_cap(self):
+        parked = [pr(n, "codex/x", labels=(label,)) for n, label in enumerate(("lane-fix-exhausted", "lane-fix-escalating", "queue-poison"), 1)]
+        self.assertEqual(pr_wip.admit(parked + [pr(9, "codex/y")], "codex", POLICY)["used"], 1)
+
     def test_an_unreadable_inventory_admits(self):
         import lane_runner as lane  # noqa: PLC0415
         with patch.object(lane, "open_prs_summary", side_effect=RuntimeError("github down")):

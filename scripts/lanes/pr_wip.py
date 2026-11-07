@@ -24,14 +24,16 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 POLICY_PATH = Path(os.environ.get("LANES_PR_WIP_POLICY", HERE / "pr-wip-policy.json"))
-HOLD_LABELS = frozenset({"hold", "gated", "incident", "queue-deferred"})
+# Parked, not the producer's to land: human holds plus repair-exhausted, escalated and queue-poisoned PRs.
+HOLD_LABELS = frozenset({"hold", "gated", "incident", "queue-deferred", "lane-fix-exhausted", "lane-fix-escalating", "queue-poison"})
 REPO_SLUG = "JovieInc/Jovie"
 
 
 def load_policy(path: Path | None = None) -> dict:
     try:
         return json.loads(Path(path or POLICY_PATH).read_text())
-    except (OSError, ValueError):
+    except (OSError, ValueError) as exc:  # fails open (every producer exempt), but never silently
+        print(f"pr_wip: policy unreadable ({exc}); WIP caps are not enforced", file=sys.stderr)
         return {}
 
 
