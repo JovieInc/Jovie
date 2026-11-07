@@ -68,15 +68,25 @@ type Target = {
   readonly mode: 'loopback' | 'certification';
 };
 
-function fixtureClient(target: Target, schema: string) {
-  // postgres.js applies URL query settings after `connection`. Keep provider
-  // routing/TLS options, but bind every pool session to this fixture schema.
+function fixtureUrl(target: Target, schema: string) {
+  // Neon documents options=-c search_path=... for direct connections; a
+  // standalone startup search_path did not survive the hosted boundary.
+  // https://neon.com/docs/guides/prisma#setting-the-search-path-for-raw-sql-queries
   const url = new URL(target.url);
-  url.searchParams.set('search_path', schema);
-  return postgres(url.toString(), {
+  const options = url.searchParams.get('options')?.trim();
+  url.searchParams.delete('search_path');
+  url.searchParams.set(
+    'options',
+    [options, `-c search_path=${schema}`].filter(Boolean).join(' ')
+  );
+  return url;
+}
+
+function fixtureClient(target: Target, schema: string) {
+  return postgres(fixtureUrl(target, schema).toString(), {
     max: 2,
     connect_timeout: 10,
-    connection: { search_path: schema, statement_timeout: 10_000 },
+    connection: { statement_timeout: 10_000 },
     ...(target.mode === 'certification' ? { ssl: 'require' as const } : {}),
   });
 }
@@ -308,6 +318,35 @@ export function registerContentPublicationCertification(
       const probe = fixtureClient({ ...target, url: url.toString() }, schema);
       try {
         await assertFixtureSessions(probe, schema);
+      } finally {
+        await probe.end({ timeout: 3 });
+      }
+    });
+
+    it('binds the schema through supported startup options and preserves other settings', async () => {
+      const target = getTarget();
+      if (!target)
+        throw new Error('Isolated certification database is required');
+      const url = new URL(target.url);
+      url.searchParams.set(
+        'options',
+        '-c work_mem=2048kB -c search_path=public'
+      );
+      const forwarded = fixtureUrl({ ...target, url: url.toString() }, schema);
+      // Model the hosted boundary that ignored standalone search_path: only
+      // the documented direct-connection options may carry schema scope.
+      forwarded.searchParams.delete('search_path');
+      const probe = postgres(forwarded.toString(), {
+        max: 2,
+        connect_timeout: 10,
+        connection: { statement_timeout: 10_000 },
+        ...(target.mode === 'certification' ? { ssl: 'require' as const } : {}),
+      });
+      try {
+        await assertFixtureSessions(probe, schema);
+        const [row] = await probe`
+          SELECT current_setting('work_mem') AS work_mem`;
+        expect(row.work_mem).toBe('2MB');
       } finally {
         await probe.end({ timeout: 3 });
       }
