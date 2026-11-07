@@ -58,7 +58,7 @@ export interface MarketingHeroShellProps extends MarketingHeroBaseProps {
  */
 export interface MarketingHeroContentProps extends MarketingHeroBaseProps {
   readonly sectionVariant?: string;
-  readonly headlineMaxLines?: 2 | 3 | 'none';
+  readonly headlineMaxLines?: 2 | 3;
   /** One-line value prop. 56px Inter at `--font-weight-bold` (680). */
   readonly headline: string;
   /** 1-2 line supporting copy. 18px Inter at 400. */

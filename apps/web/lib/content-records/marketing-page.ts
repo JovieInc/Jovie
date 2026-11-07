@@ -150,8 +150,6 @@ export type MarketingPageSections = MarketingPageSpec['sections'];
 export const MARKETING_PAGE_KEYS = ['home'] as const;
 export type MarketingPageKey = (typeof MARKETING_PAGE_KEYS)[number];
 
-const COPY = HOMEPAGE_EDITORIAL_COPY;
-
 /** The code default: the editorial story, ending in the invitation form. */
 export const DEFAULT_HOME_SPEC: MarketingPageSpec = {
   sections: [
@@ -159,25 +157,34 @@ export const DEFAULT_HOME_SPEC: MarketingPageSpec = {
       section: 'hero',
       variant: 'centered-none',
       copy: {
-        subhead: COPY.hero.subhead,
-        primaryAction: COPY.hero.primaryAction,
-        secondaryAction: COPY.hero.secondaryAction,
+        subhead: HOMEPAGE_EDITORIAL_COPY.hero.subhead,
+        primaryAction: HOMEPAGE_EDITORIAL_COPY.hero.primaryAction,
+        secondaryAction: HOMEPAGE_EDITORIAL_COPY.hero.secondaryAction,
       },
     },
     {
       section: 'feature-split',
       variant: 'phone-right',
-      copy: { headline: COPY.profile.headline, body: COPY.profile.body },
+      copy: {
+        headline: HOMEPAGE_EDITORIAL_COPY.profile.headline,
+        body: HOMEPAGE_EDITORIAL_COPY.profile.body,
+      },
     },
     {
       section: 'product-gallery',
       variant: 'release-rail',
-      copy: { headline: COPY.releases.headline, body: COPY.releases.body },
+      copy: {
+        headline: HOMEPAGE_EDITORIAL_COPY.releases.headline,
+        body: HOMEPAGE_EDITORIAL_COPY.releases.body,
+      },
     },
     {
       section: 'cta',
       variant: 'final-single-claim',
-      copy: { headline: COPY.invite.headline, subhead: COPY.invite.subhead },
+      copy: {
+        headline: HOMEPAGE_EDITORIAL_COPY.invite.headline,
+        subhead: HOMEPAGE_EDITORIAL_COPY.invite.subhead,
+      },
     },
   ],
 };

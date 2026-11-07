@@ -33,7 +33,9 @@
   font-size: var(--ds-marketing-title-size);
   font-weight: var(--font-weight-medium);
   letter-spacing: -0.03em;
-  line-height: var(--ds-marketing-title-leading);
+  /* The shared three-line clamp hides overflow; leading on the 4px grid
+     keeps descenders inside each line box at every width. */
+  line-height: 1.16;
   text-wrap: balance;
 }
 

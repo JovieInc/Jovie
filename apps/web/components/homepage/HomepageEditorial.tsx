@@ -35,7 +35,7 @@ export function HomepageStoryHero({
       sectionVariant='centered-none'
       sectionOwner={OWNER}
       align='center'
-      headlineMaxLines='none'
+      headlineMaxLines={3}
       className='homepage-editorial-hero'
       primaryCta={{
         label: copy.primaryAction,
