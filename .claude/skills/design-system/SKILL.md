@@ -26,6 +26,7 @@ One skill for design-system work across Pen and code. Read this page, pick the r
 | New or changed look, layout, motion, copy on any surface; design review; variants; "make it feel better" | [guides/art-direction.md](guides/art-direction.md) |
 | Add, rename, change or retire a token; color, type, radius, spacing, motion, shadow | [guides/tokens.md](guides/tokens.md) |
 | Build or change a shared component; ownership; variants; right rail, status, menu, table | [guides/components.md](guides/components.md) |
+| Column layout, subgrid bands, baseline rhythm, ink-aligned display type, grid overlay and how to measure them | [guides/grid.md](guides/grid.md) |
 | Anything that touches a `.pen` file, the `pen` CLI or `mcp__pencil__*` | [guides/pen-operations.md](guides/pen-operations.md) |
 | Make code match Pen, or Pen match code; drift ledger; conformance gate; Storybook evidence | [guides/code-parity.md](guides/code-parity.md) |
 | Component certificate, benchmark judgment, alignment and a11y rules, what "done" means | [guides/certification.md](guides/certification.md) |
