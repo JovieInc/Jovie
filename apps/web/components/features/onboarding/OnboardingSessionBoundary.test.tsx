@@ -291,6 +291,54 @@ describe('onboarding identity boundary', () => {
     expect(await screen.findByRole('alert')).toBe(boundary);
     expect(boundary).toHaveAttribute('data-restore-state', 'failed');
   });
+
+  it('exposes the restore-failure code and auth state for the nightly stall annotation (JOV-7653)', async () => {
+    let mounted: ReturnType<typeof render> | null = null;
+    const renderStalled = async (
+      rejection: () => Promise<unknown>,
+      auth: Partial<typeof mocks.auth>
+    ) => {
+      mounted?.unmount();
+      mocks.fetch.mockReset();
+      mocks.fetch.mockImplementationOnce(rejection);
+      Object.assign(mocks.auth, auth);
+      mounted = render(<OnboardingSessionBoundary sessionLabel='pending' />);
+      return await screen.findByRole('alert');
+    };
+
+    // HTTP failure surfaces the status.
+    let boundary = await renderStalled(
+      () => Promise.resolve(Response.json({ error: 'no' }, { status: 503 })),
+      { userId: 'account-a' }
+    );
+    expect(boundary).toHaveAttribute('data-restore-error', 'status:503');
+
+    // Identity mismatch (client anonymous vs server session) is distinct.
+    boundary = await renderStalled(
+      () =>
+        Promise.resolve(
+          Response.json({
+            identityId: 'account-a',
+            conversationId: null,
+            owned: false,
+            messages: [],
+          })
+        ),
+      { userId: null }
+    );
+    expect(boundary).toHaveAttribute('data-restore-error', 'invalid-restore');
+    expect(boundary).toHaveAttribute('data-auth-state', 'anonymous');
+
+    // Network failure is distinct from a parsed error response.
+    boundary = await renderStalled(
+      () => Promise.reject(new TypeError('fetch failed')),
+      { userId: 'account-a' }
+    );
+    expect(boundary).toHaveAttribute('data-restore-error', 'restore-network');
+    expect(boundary).toHaveAttribute('data-auth-state', 'signed-in');
+
+    mounted?.unmount();
+  });
   it('offers restoration retry without fabricating a fresh onboarding flow', async () => {
     mocks.fetch
       .mockRejectedValueOnce(new Error('offline'))
