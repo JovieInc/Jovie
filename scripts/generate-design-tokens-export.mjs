@@ -79,24 +79,56 @@ const TOKEN_MAP = {
   'feature.pro': '--noir-ion-gold',
 };
 
-/** Parse `--noir-ion-*` anchors from the `:root.dark` block of the CSS. */
+/** Parse custom-property anchors from the `:root.dark` block of the CSS.
+ *  Light/global `:root` blocks are merged underneath (dark wins) so tokens
+ *  the dark ladder references but does not override (e.g.
+ *  --color-border-default) still resolve — JOV-8976 elevation export. */
 export function loadAnchors(css = readFileSync(SOURCE_PATH, 'utf8')) {
   /** @type {string[]} */
   const blocks = [
-    ...(css.match(/:root\.dark(?:\s*,[^{]+)?\s*\{[\s\S]*?\n\}/g) ?? []),
+    ...(css.match(/:root(?:\.dark)?(?:\s*,[^{]+)?\s*\{[\s\S]*?\n\}/g) ?? []),
   ];
-  const block = blocks.find(b => b.includes('--noir-ion-canvas'));
-  if (!block) {
+  const darkBlock = blocks
+    .filter(b => b.startsWith(':root.dark'))
+    .find(b => b.includes('--noir-ion-canvas'));
+  if (!darkBlock) {
     throw new Error(
       `No :root.dark block with --noir-ion-canvas found in ${SOURCE_PATH}`
     );
   }
   const anchors = {};
-  for (const match of block.matchAll(/(--noir-ion-[\w-]+):\s*([^;]+);/g)) {
+  for (const block of blocks) {
+    if (block === darkBlock || block.startsWith(':root.dark')) continue;
+    for (const match of block.matchAll(/(--[\w-]+):\s*([^;]+);/g)) {
+      anchors[match[1]] = match[2].trim();
+    }
+  }
+  for (const match of darkBlock.matchAll(/(--[\w-]+):\s*([^;]+);/g)) {
     anchors[match[1]] = match[2].trim();
   }
   return anchors;
 }
+
+/** Resolve `var(--x)` chains against the merged anchors (depth-guarded). */
+export function resolveVars(value, anchors, depth = 0) {
+  if (depth > 6 || !value.includes('var(')) return value;
+  return resolveVars(
+    value.replace(/var\((--[\w-]+)\)/g, (ref, name) => anchors[name] ?? ref),
+    anchors,
+    depth + 1
+  );
+}
+
+/** Elevation ladder (JOV-8976): level -> exported parts. L5 = modal + scrim. */
+const ELEVATION_LEVELS = {
+  0: ['surface', 'border', 'shadow'],
+  1: ['surface', 'border', 'shadow'],
+  2: ['surface', 'border', 'shadow'],
+  3: ['surface', 'border', 'shadow'],
+  4: ['surface', 'border', 'shadow'],
+  5: ['surface', 'border', 'shadow', 'scrim'],
+};
+const ELEVATION_COLOR_PARTS = new Set(['surface', 'border', 'scrim']);
 
 /** @returns {string} serialized design.tokens.json */
 export function generate(anchors = loadAnchors()) {
@@ -108,13 +140,31 @@ export function generate(anchors = loadAnchors()) {
     }
     color[tokenName] = { $value: value, $type: 'color' };
   }
+  const elevation = {};
+  for (const [level, parts] of Object.entries(ELEVATION_LEVELS)) {
+    elevation[level] = {};
+    for (const part of parts) {
+      const cssVar = `--elev-${level}-${part}`;
+      const raw = anchors[cssVar];
+      if (!raw) {
+        throw new Error(
+          `Anchor ${cssVar} not found for elevation.${level}.${part}`
+        );
+      }
+      elevation[level][part] = {
+        $value: resolveVars(raw, anchors),
+        $type: ELEVATION_COLOR_PARTS.has(part) ? 'color' : 'shadow',
+      };
+    }
+  }
   const doc = {
     $schema: 'https://design-tokens.github.io/community-group/format/',
     $version: 1,
     name: 'Jovie System B (Noir Ion)',
     $description:
-      'Canonical Jovie design tokens, dark-first. Generated from the Noir Ion anchors (--noir-ion-*) in apps/web/styles/design-system.css by scripts/generate-design-tokens-export.mjs — do not edit by hand. Rebuild: pnpm design:tokens:export. Used by importers (e.g. Magic Patterns) instead of scraping raw repo colors.',
+      'Canonical Jovie design tokens, dark-first. Generated from the Noir Ion anchors and the JOV-8976 elevation ladder (--elev-0..5, L5 = modal + scrim) in apps/web/styles/design-system.css by scripts/generate-design-tokens-export.mjs — do not edit by hand. Rebuild: pnpm design:tokens:export. Used by importers (e.g. Magic Patterns) instead of scraping raw repo colors.',
     color,
+    elevation,
   };
   return `${JSON.stringify(doc, null, 2)}\n`;
 }

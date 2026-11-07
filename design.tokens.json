@@ -2,7 +2,7 @@
   "$schema": "https://design-tokens.github.io/community-group/format/",
   "$version": 1,
   "name": "Jovie System B (Noir Ion)",
-  "$description": "Canonical Jovie design tokens, dark-first. Generated from the Noir Ion anchors (--noir-ion-*) in apps/web/styles/design-system.css by scripts/generate-design-tokens-export.mjs — do not edit by hand. Rebuild: pnpm design:tokens:export. Used by importers (e.g. Magic Patterns) instead of scraping raw repo colors.",
+  "$description": "Canonical Jovie design tokens, dark-first. Generated from the Noir Ion anchors and the JOV-8976 elevation ladder (--elev-0..5, L5 = modal + scrim) in apps/web/styles/design-system.css by scripts/generate-design-tokens-export.mjs — do not edit by hand. Rebuild: pnpm design:tokens:export. Used by importers (e.g. Magic Patterns) instead of scraping raw repo colors.",
   "color": {
     "surface.canvas": {
       "$value": "#030406",
@@ -167,6 +167,96 @@
     "feature.pro": {
       "$value": "#ff7800",
       "$type": "color"
+    }
+  },
+  "elevation": {
+    "0": {
+      "surface": {
+        "$value": "#07080a",
+        "$type": "color"
+      },
+      "border": {
+        "$value": "transparent",
+        "$type": "color"
+      },
+      "shadow": {
+        "$value": "none",
+        "$type": "shadow"
+      }
+    },
+    "1": {
+      "surface": {
+        "$value": "rgb(7 8 10)",
+        "$type": "color"
+      },
+      "border": {
+        "$value": "rgba(168, 176, 195, 0.12)",
+        "$type": "color"
+      },
+      "shadow": {
+        "$value": "0 0 0 1px rgba(168, 176, 195, 0.12), 0 12px 28px rgba(0, 0, 0, 0.18)",
+        "$type": "shadow"
+      }
+    },
+    "2": {
+      "surface": {
+        "$value": "#131417",
+        "$type": "color"
+      },
+      "border": {
+        "$value": "rgba(168, 176, 195, 0.12)",
+        "$type": "color"
+      },
+      "shadow": {
+        "$value": "0 0 0 1px rgba(168, 176, 195, 0.12), 0 14px 36px rgba(0, 0, 0, 0.22)",
+        "$type": "shadow"
+      }
+    },
+    "3": {
+      "surface": {
+        "$value": "#131417",
+        "$type": "color"
+      },
+      "border": {
+        "$value": "rgba(168, 176, 195, 0.1)",
+        "$type": "color"
+      },
+      "shadow": {
+        "$value": "0 0 0 1px rgba(168, 176, 195, 0.1), 0 18px 42px rgba(0, 0, 0, 0.32)",
+        "$type": "shadow"
+      }
+    },
+    "4": {
+      "surface": {
+        "$value": "#1a1b1e",
+        "$type": "color"
+      },
+      "border": {
+        "$value": "rgba(168, 176, 195, 0.16)",
+        "$type": "color"
+      },
+      "shadow": {
+        "$value": "0 0 0 1px rgba(255, 255, 255, 0.12), 0 10px 28px rgba(0, 0, 0, 0.45)",
+        "$type": "shadow"
+      }
+    },
+    "5": {
+      "surface": {
+        "$value": "#1a1b1e",
+        "$type": "color"
+      },
+      "border": {
+        "$value": "rgba(168, 176, 195, 0.16)",
+        "$type": "color"
+      },
+      "shadow": {
+        "$value": "0 0 0 1px rgba(255, 255, 255, 0.12), 0 10px 28px rgba(0, 0, 0, 0.45)",
+        "$type": "shadow"
+      },
+      "scrim": {
+        "$value": "rgba(0, 0, 0, 0.52)",
+        "$type": "color"
+      }
     }
   }
 }

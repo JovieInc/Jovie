@@ -20,7 +20,9 @@ describe('overlay-styles', () => {
       expect(overlayStyles.base).toContain('fixed');
       expect(overlayStyles.base).toContain('inset-0');
       expect(overlayStyles.base).toContain('z-modal');
-      expect(overlayStyles.base).toContain('bg-black/52');
+      // JOV-8976: the modal scrim is the --elev-5-scrim token (rgba(0,0,0,0.52)),
+      // same rendered value as the retired bg-black/52 literal.
+      expect(overlayStyles.base).toContain('bg-(--elev-5-scrim)');
     });
 
     it('keeps the sheet scrim on the sheet layer, below modal dialogs', () => {

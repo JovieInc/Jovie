@@ -42,7 +42,7 @@ describe('System B concentric radius contract', () => {
     expect(css).toMatch(
       /--system-b-radius-card-inner:\s*calc\(\s*var\(--system-b-radius-card\)\s*-\s*var\(--space-1\)\s*\)/
     );
-    expect(css).toContain('--system-b-radius-overlay: var(--radius-xl);');
+    expect(css).toContain('--system-b-radius-overlay: var(--radius-sm);');
     expect(css).toMatch(
       /--system-b-radius-overlay-inner:\s*calc\(\s*var\(--system-b-radius-overlay\)\s*-\s*var\(--space-1\)\s*\)/
     );
