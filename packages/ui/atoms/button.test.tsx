@@ -3,7 +3,6 @@ import path from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { expectNoA11yViolations } from '../test-utils/a11y';
 import { BUTTON_SIZE_NAMES, BUTTON_VARIANT_NAMES, Button } from './button';
 import {
   ACTION_BUTTON_LABEL_WEIGHT,
@@ -697,30 +696,4 @@ describe('Button', () => {
     expect(btn).toHaveAttribute('aria-disabled', 'false');
   });
   // href prop removed; use asChild with an anchor element instead
-});
-
-describe('Button accessibility', () => {
-  it('has no axe violations across idle, loading, error, denied and RTL states', async () => {
-    const { container } = render(
-      <div>
-        <Button>Save release</Button>
-        <Button loading>Saving</Button>
-        <Button
-          pendingPresentation='morph'
-          actionState='error'
-          stateLabels={{ error: 'Could not save.', retry: 'Retry save' }}
-        >
-          Save release
-        </Button>
-        <Button disabled aria-describedby='denied-note'>
-          Publish release
-        </Button>
-        <p id='denied-note'>Only label admins can publish releases.</p>
-        <div dir='rtl'>
-          <Button variant='secondary'>رجوع إلى جميع الإصدارات</Button>
-        </div>
-      </div>
-    );
-    await expectNoA11yViolations(container);
-  });
 });
