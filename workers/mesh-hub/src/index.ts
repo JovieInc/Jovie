@@ -13,11 +13,14 @@ import {
   validateSend,
 } from './core.ts';
 import type { Env } from './env.ts';
+import { MCP_IDENTITY } from './mcp.ts';
+import { type Api, handleMcpHttp } from './mcp-http.ts';
 import { type AgentEntry } from './registry.ts';
 import { scanBody } from './scan.ts';
 
 export { Board } from './board-do.ts';
 export { Mailbox } from './mailbox.ts';
+export { McpAuth } from './mcp-oauth-do.ts';
 export { Registry } from './registry.ts';
 
 const AUTH_CACHE_MS = 60_000;
@@ -41,6 +44,10 @@ function registry(env: Env) {
 }
 function board(env: Env) {
   return env.BOARD.get(env.BOARD.idFromName('board'));
+}
+function mcpApi(env: Env): Api {
+  const stub = env.MCP_AUTH.get(env.MCP_AUTH.idFromName('mcp-auth'));
+  return ((method, ...args) => stub.call(method, args)) as Api;
 }
 function mailbox(env: Env, kind: string) {
   return env.MAILBOX.get(env.MAILBOX.idFromName(kind));
@@ -274,11 +281,76 @@ async function route(request: Request, env: Env): Promise<Response> {
         return failure(422, 'invalid_registration');
       }
     }
+    if (path === '/v1/admin/mcp/grants' && request.method === 'GET') {
+      const out = await mcpApi(env)('grants' as never);
+      return json(200, { ok: true, grants: out.ok ? out.value : [] });
+    }
+    if (path === '/v1/admin/mcp/revoke' && request.method === 'POST') {
+      const body = (await readJson(request)) as {
+        grantId?: string;
+        all?: boolean;
+      };
+      const api = mcpApi(env) as unknown as (
+        m: string,
+        ...a: unknown[]
+      ) => Promise<{ ok: boolean; value?: unknown }>;
+      if (body?.all === true)
+        return json(200, { ok: true, revoked: (await api('revokeAll')).value });
+      if (typeof body?.grantId === 'string')
+        return json(200, {
+          ok: true,
+          revoked: (await api('revokeGrant', body.grantId)).value,
+        });
+      return failure(422, 'invalid_revoke');
+    }
     if (path === '/v1/admin/sweep' && request.method === 'POST')
       return json(200, { ok: true, ...(await registry(env).sweep()) });
     return failure(404, 'not_found');
   }
-  const kind = await authenticate(request, env);
+  const mcp = await handleMcpHttp(request, url, {
+    api: mcpApi(env),
+    backend: (method, apiPath, body) =>
+      asTim(env, url.origin, method, apiPath, body),
+    newCorrelationId: () => `tim-mcp-${crypto.randomUUID()}`,
+  });
+  if (mcp) return mcp;
+  return authed(request, env, await authenticate(request, env), url);
+}
+
+/** One hub call made as the founder identity, through the same routes agents use. */
+async function asTim(
+  env: Env,
+  origin: string,
+  method: 'GET' | 'POST',
+  apiPath: string,
+  body?: unknown
+): Promise<{ status: number; json: unknown }> {
+  const target = new URL(apiPath, origin);
+  const request = new Request(target, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  let response: Response;
+  try {
+    response = await authed(request, env, MCP_IDENTITY, target);
+  } catch (error) {
+    response =
+      error instanceof HubError
+        ? failure(error.status, error.code, error.retryable)
+        : failure(503, 'hub_unavailable', true);
+  }
+  return { status: response.status, json: await response.json() };
+}
+
+/** Routes that need an authenticated agent kind. */
+async function authed(
+  request: Request,
+  env: Env,
+  kind: string,
+  url: URL
+): Promise<Response> {
+  const path = url.pathname;
   if (path === '/v1/send' && request.method === 'POST')
     return send(request, env, kind);
   if (path === '/v1/mailbox' && request.method === 'GET') {
