@@ -201,6 +201,19 @@ export const AUTO_SCROLL_DEFAULT_WPM = 130;
 export const AUTO_SCROLL_MIN_WPM = 60;
 export const AUTO_SCROLL_MAX_WPM = 220;
 
+const AUTO_SCROLL_SPEED_STEPS = [100, 130, 160, 190] as const;
+
+/** The dock's Speed button steps through a few comfortable reading speeds. */
+export function nextAutoScrollSpeed(wordsPerMinute: number): number {
+  const position = AUTO_SCROLL_SPEED_STEPS.findIndex(
+    step => step === wordsPerMinute
+  );
+  return (
+    AUTO_SCROLL_SPEED_STEPS[(position + 1) % AUTO_SCROLL_SPEED_STEPS.length] ??
+    AUTO_SCROLL_DEFAULT_WPM
+  );
+}
+
 export function clampWordsPerMinute(wpm: number): number {
   if (!Number.isFinite(wpm)) return AUTO_SCROLL_DEFAULT_WPM;
   return Math.min(

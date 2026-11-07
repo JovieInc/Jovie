@@ -87,7 +87,9 @@ export function ringLightStyle(
   return {
     '--studio-ring-rgb': ringLightRgb(settings.warmth),
     '--studio-ring-level': settings.brightness.toFixed(2),
-    '--studio-ring-width': `${settings.width}px`,
+    // Full white turns the whole frame into light, edge to edge.
+    '--studio-ring-width':
+      settings.mode === 'full' ? 'max(18vmin, 96px)' : `${settings.width}px`,
   };
 }
 

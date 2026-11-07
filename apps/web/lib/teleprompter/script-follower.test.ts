@@ -3,6 +3,7 @@ import {
   AUTO_SCROLL_DEFAULT_WPM,
   autoScrollWordIndex,
   clampWordsPerMinute,
+  nextAutoScrollSpeed,
   ScriptFollower,
 } from './script-follower';
 
@@ -140,5 +141,13 @@ describe('auto scroll', () => {
     expect(clampWordsPerMinute(10)).toBe(60);
     expect(clampWordsPerMinute(400)).toBe(220);
     expect(clampWordsPerMinute(Number.NaN)).toBe(AUTO_SCROLL_DEFAULT_WPM);
+  });
+});
+
+describe('nextAutoScrollSpeed', () => {
+  it('steps through reading speeds and wraps around', () => {
+    expect(nextAutoScrollSpeed(130)).toBe(160);
+    expect(nextAutoScrollSpeed(190)).toBe(100);
+    expect(nextAutoScrollSpeed(147)).toBe(100);
   });
 });

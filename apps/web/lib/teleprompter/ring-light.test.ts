@@ -48,6 +48,11 @@ describe('ring light', () => {
       '--studio-ring-level': '0.90',
       '--studio-ring-width': '28px',
     });
+    expect(
+      ringLightStyle({ ...DEFAULT_RING_LIGHT, mode: 'full' })[
+        '--studio-ring-width'
+      ]
+    ).toBe('max(18vmin, 96px)');
   });
 
   it('remembers the creator settings', () => {
