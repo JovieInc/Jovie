@@ -1100,6 +1100,13 @@
       "when": 1793913518877,
       "tag": "0177_track_daily_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 157,
+      "version": "7",
+      "when": 1794065487308,
+      "tag": "0178_signup_replays",
+      "breakpoints": true
     }
   ]
 }
