@@ -299,6 +299,7 @@
     "design:shared-ui-visual-arbitrary:check": "node scripts/shared-ui-visual-arbitrary-audit.mjs",
     "design:shared-ui-visual-arbitrary:update": "node scripts/shared-ui-visual-arbitrary-audit.mjs --update-baseline",
     "design:no-dead-ends:check": "tsx packages/copy/dead-ends.ts check",
+    "pen:review": "node scripts/pen-review/run.mjs",
     "design:no-dead-ends:update": "tsx packages/copy/dead-ends.ts update",
     "design:shell-ia:check": "node scripts/invariants/shell-ia.mjs",
     "design:shell-ia:update": "node scripts/invariants/shell-ia.mjs --update",
