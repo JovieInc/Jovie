@@ -154,3 +154,15 @@ describe('prerendered homepage pathname', () => {
     expect(source).not.toMatch(/\busePathname\b/);
   });
 });
+
+describe('homepage header CTA', () => {
+  it('MarketingHeader.tsx can hide the primary CTA for the invite-only homepage', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/site/MarketingHeader.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('hidePrimaryCta');
+  });
+});
