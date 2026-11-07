@@ -1496,13 +1496,14 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       vi.mocked(setStatementTimeout).mock.calls.filter(([, ms]) => ms === 5000)
     ).toHaveLength(1);
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
-    // JOV-8864: a statement-timeout avatar failure is log-only degradation —
-    // no Sentry event pages the set_config('statement_timeout') fingerprint.
+    // JOV-8864 / JOV-8900: a statement-timeout avatar failure is log-only.
+    // No Sentry event pages the set_config fingerprint.
     expect(captureExceptionMock).not.toHaveBeenCalled();
     expect(loggerClosedProbe).toHaveBeenCalled();
     expect(loggerWarnMock).toHaveBeenCalledWith(
       '[avatar-quality] avatar read timed out; degrading to unknown quality',
       expect.objectContaining({
+        profileId: 'profile_1',
         error: expect.stringContaining(
           'canceling statement due to statement timeout'
         ),
@@ -1511,7 +1512,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     expect(txStates.every(state => state.closed)).toBe(true);
   });
 
-  it('JOV-8580: stops after two idle setup failures and reports fallback only after cleanup', async () => {
+  it('JOV-8580/JOV-8900: stops after two idle setup failures and degrades log-only after cleanup', async () => {
     const idle = Object.assign(
       new Error('terminating connection due to idle-in-transaction timeout'),
       { code: '25P03' }
@@ -1520,8 +1521,8 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     setupFailures.set(3, fail(idle));
     loggerWarnMock.mockImplementation((message: string, _data?: unknown) => {
       // The tolerated failure is logged only after both failed transactions
-      // fully closed and were discarded (JOV-8864 log-only degradation).
-      if (message.includes('avatar read timed out')) {
+      // fully closed and were discarded (JOV-8864 / JOV-8900).
+      if (message.includes('[avatar-quality]')) {
         expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
         expect(txStates[3]).toMatchObject({ closed: true, rolledBack: true });
       }
@@ -1541,12 +1542,13 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     expect(result.tippingStats.totalReceivedCents).toBe(100);
     expect(result.dashboardLoadError).toBeUndefined();
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
-    // JOV-8864: idle-terminated avatar attempts are log-only degradation —
-    // the fingerprint never pages Sentry; the warn fires only after cleanup.
+    // JOV-8864 / JOV-8900: idle-terminated avatar attempts are log-only.
+    // The fingerprint never pages Sentry; the warn fires only after cleanup.
     expect(captureExceptionMock).not.toHaveBeenCalled();
     expect(loggerWarnMock).toHaveBeenCalledWith(
       '[avatar-quality] avatar read timed out; degrading to unknown quality',
       expect.objectContaining({
+        profileId: 'profile_1',
         error: expect.stringContaining(
           'terminating connection due to idle-in-transaction timeout'
         ),
@@ -1554,6 +1556,97 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     );
     expect(capturedCascadeErrors()).toEqual([]);
     expect(txStates.every(state => state.closed)).toBe(true);
+  });
+
+  it('JOV-8900: avatar-quality select idle terminations on both attempts stay log-only', async () => {
+    // Prod fingerprint of Sentry issue JOVIE-WEB-YK (Linear JOV-8900): the
+    // avatar_quality profile_photos read itself fails with a Neon
+    // idle-in-transaction termination (25P03) — the drizzle wrapper names the
+    // select in the outer message and the PG termination text lives on the
+    // cause. The page still rendered (200); the handled-warning Sentry event
+    // was the entire harm. Both wrapper attempts fail here, so the retry in
+    // fetchAvatarQualityWithSession is exhausted and the caller catch must
+    // degrade log-only instead of filing another Sentry issue.
+    const idleSelectError = () =>
+      new Error(
+        'Failed query: select "width", "height" from "profile_photos"',
+        {
+          cause: Object.assign(
+            new Error(
+              'terminating connection due to idle-in-transaction timeout'
+            ),
+            { code: '25P03' }
+          ),
+        }
+      );
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]),
+      ok([{ count: 0 }]),
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      fail(idleSelectError()), // avatar attempt 1: the select itself fails
+      fail(idleSelectError()), // avatar retry on a fresh transaction
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }])
+    );
+
+    const result = await getDashboardData();
+
+    expect(result.avatarQuality).toEqual({
+      status: 'unknown',
+      width: null,
+      height: null,
+    });
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+    expect(txStates[3]).toMatchObject({ closed: true, rolledBack: true });
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('[avatar-quality]'),
+      expect.objectContaining({ profileId: 'profile_1' })
+    );
+    expect(capturedCascadeErrors()).toEqual([]);
+    expect(txStates.every(state => state.closed)).toBe(true);
+  });
+
+  it('JOV-8900: avatar-quality connection-class failures degrade log-only', async () => {
+    // Transient transport failures (pool/WebSocket resets) on the fail-soft
+    // avatar read are infrastructure conditions (isRetryableError surface):
+    // log-only, no Sentry issue (JOV-5754 doctrine, JOV-8900).
+    const resetError = () =>
+      new Error(
+        'Failed query: select "width", "height" from "profile_photos"',
+        {
+          cause: new Error('read ECONNRESET'),
+        }
+      );
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]),
+      ok([{ count: 0 }]),
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      // fetchAvatarQualityWithSession retries a connection-class failure
+      // once. One queued failure lets that retry consume the tipping row.
+      fail(resetError()),
+      fail(resetError()),
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }])
+    );
+
+    const result = await getDashboardData();
+
+    expect(result.avatarQuality?.status).toBe('unknown');
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('[avatar-quality]'),
+      expect.objectContaining({ profileId: 'profile_1' })
+    );
   });
 
   it('JOV-8580: recovers code-less wrapped idle setup errors without losing query results', async () => {
@@ -1703,12 +1796,14 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     const secondCommit = droppedCommit();
     commitFailures.set(2, fail(firstCommit));
     commitFailures.set(3, fail(secondCommit));
-    captureExceptionMock.mockImplementation(error => {
-      // The tolerated failure is reported only after both failed
-      // transactions fully closed and were discarded.
-      expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
-      expect(txStates[3]).toMatchObject({ closed: true, rolledBack: true });
-      expect(error).toBe(secondCommit);
+    loggerWarnMock.mockImplementation((message: string) => {
+      // JOV-8900: a residual connection-class commit failure is log-only,
+      // and only after both failed transactions have closed.
+      if (message.includes('[avatar-quality]')) {
+        expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+        expect(txStates[3]).toMatchObject({ closed: true, rolledBack: true });
+        expect(message).toContain('transient DB condition');
+      }
     });
     queueReadsBeforeDistribution();
     // Both avatar attempts consume one profilePhotos outcome each before
@@ -1721,10 +1816,12 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     expect(result.tippingStats.totalReceivedCents).toBe(100);
     expect(result.dashboardLoadError).toBeUndefined();
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
-    expect(captureExceptionMock).toHaveBeenCalledWith(
-      secondCommit,
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      '[avatar-quality] transient DB condition after retry; degrading to unknown quality',
       expect.objectContaining({
-        tags: expect.objectContaining({ query: 'avatar_quality' }),
+        profileId: 'profile_1',
+        error: expect.stringContaining('Connection terminated unexpectedly'),
       })
     );
     expect(capturedCascadeErrors()).toEqual([]);
