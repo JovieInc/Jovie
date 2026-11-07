@@ -22,7 +22,6 @@ import { logger } from '@/lib/utils/logger';
  */
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 const ROUTE = '/api/internal/ovie/dogfood-judge-evidence';
 const MAX_BODY_BYTES = 64 * 1024;
