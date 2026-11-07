@@ -8,8 +8,8 @@
  *   --mutation-state sweep-state.json  --a11y a11y.json  --visual visual.json  --journeys journeys.json
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
   COVERAGE_ROOTS,
@@ -67,6 +67,29 @@ const readJson = (p, fallback) => {
 const read = rel => {
   const abs = join(root, rel);
   return existsSync(abs) ? readFileSync(abs, 'utf8') : null;
+};
+// Evidence for one component may span companion files (button.test.tsx plus
+// button.certificate.test.tsx, button.stories.tsx plus button.states.stories.tsx)
+// so each file stays under the repo's 500-line cap; the certificate reads them as one.
+const readWithCompanions = (rel, suffix) => {
+  const dir = dirname(rel);
+  const base = basename(rel, suffix);
+  let names = [];
+  try {
+    names = readdirSync(join(root, dir));
+  } catch {}
+  const companions = names
+    .filter(
+      n =>
+        n !== `${base}${suffix}` &&
+        n.startsWith(`${base}.`) &&
+        n.endsWith(suffix)
+    )
+    .sort();
+  const parts = [rel, ...companions.map(n => join(dir, n))]
+    .map(read)
+    .filter(text => typeof text === 'string');
+  return parts.length ? parts.join('\n') : null;
 };
 
 if (values.guards) {
@@ -135,8 +158,12 @@ if (!values.all && values.component)
 
 const certificates = list.map(c => {
   const source = read(c.sourceRel) ?? '';
-  const testSource = c.testRel ? read(c.testRel) : null;
-  const storySource = c.storyRel ? read(c.storyRel) : null;
+  const testSource = c.testRel
+    ? readWithCompanions(c.testRel, '.test.tsx')
+    : null;
+  const storySource = c.storyRel
+    ? readWithCompanions(c.storyRel, '.stories.tsx')
+    : null;
   const mutationTests = mutationInventory?.tracked.has(c.sourceRel)
     ? (mutationInventory.tests.get(
         c.sourceRel
