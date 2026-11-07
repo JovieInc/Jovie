@@ -553,13 +553,14 @@ export function convert(parsed, { section, rules, tokens }) {
 
   // vertical flow
   items.sort((a, b) => a.rect.y - b.rect.y || a.rect.x - b.rect.x);
+  /** @type {number | null} */
   let prevBottom = null;
   items.forEach((it, i) => {
     it.row = i + 1;
     if (it.h == null) return;
     if (i === 0) it.gap = null;
     else {
-      const gap = it.rect.y - prevBottom;
+      const gap = it.rect.y - (prevBottom ?? it.rect.y);
       if (gap < 0)
         problems.push({
           kind: 'layout',
@@ -573,8 +574,7 @@ export function convert(parsed, { section, rules, tokens }) {
   });
   const first = items[0];
   const pt = first ? first.rect.y : 0;
-  const pb =
-    items.length && prevBottom != null ? Math.max(0, H - prevBottom) : 0;
+  const pb = prevBottom == null ? 0 : Math.max(0, H - prevBottom);
   if (pt % 4) warnings.push(`section top offset ${pt}px is off the 4px grid`);
 
   return {

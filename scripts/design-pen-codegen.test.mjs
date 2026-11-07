@@ -101,12 +101,16 @@ test('off-scale type fails, a missing link fails', () => {
   const noType = merge(base, { ...extra, typeOverrides: {} });
   assert.throws(
     () => generate(noType),
-    err => err.problems.some(p => p.kind === 'type' && /22px/.test(p.message))
+    err =>
+      err instanceof CodegenError &&
+      err.problems.some(p => p.kind === 'type' && /22px/.test(p.message))
   );
   const noLink = merge(base, { ...extra, links: {} });
   assert.throws(
     () => generate(noLink),
-    err => err.problems.some(p => p.kind === 'component')
+    err =>
+      err instanceof CodegenError &&
+      err.problems.some(p => p.kind === 'component')
   );
 });
 
@@ -119,7 +123,9 @@ test('nested layout without a rule is reported as unresolved, not guessed', () =
     );
   assert.throws(
     () => generate(merge(base, extra), src),
-    err => err.problems.some(p => p.kind === 'unresolved')
+    err =>
+      err instanceof CodegenError &&
+      err.problems.some(p => p.kind === 'unresolved')
   );
 });
 
