@@ -329,6 +329,43 @@ html[data-desktop-runtime="electron"]
   padding-left: var(--app-shell-gap);
 }
 
+/* JOV-8942: a desktop window never adopts the mobile shell. In the Electron
+   runtime the compact range keeps the desktop frame — inline rail, shell
+   gutter, and raised content panel — and the mobile bottom surface stays
+   hidden before paint so no tab bar flashes while hydration catches up. */
+html[data-desktop-runtime="electron"]
+[data-testid="app-shell-mobile-bottom-surface"] {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  /* The compact range mirrors the shell gutter and panel chrome the lg:
+     utilities apply at full desktop widths. */
+  html[data-desktop-runtime="electron"] [data-app-shell-body="true"] {
+    gap: var(--app-shell-gap);
+    padding: var(--app-shell-gap);
+  }
+
+  /* Keep the inline desktop rail mounted; the mobile sheet stays closed. */
+  html[data-desktop-runtime="electron"]
+    [data-app-shell-sidebar-mount="true"]
+    > div {
+    display: flex;
+  }
+
+  html[data-desktop-runtime="electron"]
+    [data-app-shell-sidebar-mount="true"]
+    [data-sidebar="sidebar"]:not([data-mobile="true"]) {
+    border-radius: var(--app-shell-radius);
+    box-shadow: var(--app-shell-sidebar-shadow);
+  }
+
+  html[data-desktop-runtime="electron"] #main-content {
+    border-radius: var(--app-shell-radius);
+    box-shadow: var(--app-shell-shadow);
+  }
+}
+
 /* Public pages use document scrolling rather than app-shell scroll panes.
    Only override html — setting overflow-y:auto on body promotes overflow-x:clip
    to overflow-x:hidden, which creates a scroll container that breaks sticky. */

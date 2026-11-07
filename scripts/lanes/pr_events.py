@@ -1101,13 +1101,14 @@ def with_red_section(body: str, block: str) -> str:
 
 def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
                          locking_pr: int | None = None, win_section: str | None = None,
-                         premise: dict | None = None) -> str:
+                         premise: dict | None = None, machine_path: str | None = None) -> str:
     """Complete repair metadata without replacing existing evidence or customer decisions.
 
     The caller chooses the customer outcome and supplies any locking PR provenance;
     never infer either from a failed check. Existing locked-area decisions are preserved.
     Measured wins must be supplied by the caller, never inferred from a red check.
     Premise evidence must describe the caller's actual falsifying test and observation.
+    Machine paths are caller-supplied evidence, never inferred from a repair fingerprint.
     The canonical Fleet/changelog guards still validate the resulting body.
     """
     updated = body
@@ -1144,6 +1145,18 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Premise check\s*$", re.I)) is None:
             block = "## Premise check\n\n" + "\n".join(f"- {field}: {premise[field]}" for field in fields)
             updated = updated.rstrip("\n") + "\n\n" + block + "\n"
+    if machine_path is not None:
+        if (not isinstance(machine_path, str)
+                or not re.fullmatch(r"[\w.-]+(?:/[\w.-]+)+", machine_path)
+                or any(part in (".", "..") for part in machine_path.split("/"))):
+            raise ValueError("machine path requires an explicit repository-relative path")
+        visible = re.sub(r"<!--[\s\S]*?-->", "", updated)
+        visible = re.sub(r"^```[^\n]*\n[\s\S]*?^```[^\n]*$", "", visible, flags=re.M)
+        receipts = re.findall(r"^(?:Machine:|Machine-gap:)[^\n]*$", visible, re.M)
+        if len(receipts) > 1:
+            raise ValueError("multiple machine decisions require reconciliation")
+        if not receipts:
+            updated = updated.rstrip("\n") + f"\n\nMachine: built {machine_path}\n"
     return updated
 
 
@@ -1159,10 +1172,11 @@ def api_gh(args, **_):
 
 def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None,
                             locking_pr: int | None = None, win_section: str | None = None,
-                            premise: dict | None = None) -> bool:
+                            premise: dict | None = None, machine_path: str | None = None) -> bool:
     """Complete repair evidence and an optional caller-selected customer decision."""
     if not isinstance(pr.get("number"), int) or (
             customer_decision is None and locking_pr is None and win_section is None and premise is None
+            and machine_path is None
             and red_before_green_block(pr, excerpt) is None):
         return False
     viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
@@ -1170,7 +1184,7 @@ def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_
         return False
     body = viewed.stdout or ""
     updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision, locking_pr=locking_pr,
-                                   win_section=win_section, premise=premise)
+                                   win_section=win_section, premise=premise, machine_path=machine_path)
     if updated == body:
         return False
     with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:

@@ -77,7 +77,9 @@ function AuthShellInner({
   const hideTopHeader = isInSettings || isLyricsRoute;
   const showCustomerMobileTabs =
     showMobileTabs && section !== 'ov' && section !== 'admin';
-  const hasMobileBottomNav = section === 'ov' || showCustomerMobileTabs;
+  // JOV-8942: a desktop window never renders a mobile bottom tab bar.
+  const hasMobileBottomNav =
+    !isElectron && (section === 'ov' || showCustomerMobileTabs);
 
   // Memoize the sidebar so it doesn't re-render on breadcrumb/header changes.
   // The sidebar only depends on `section` — it shouldn't remount when
@@ -96,12 +98,12 @@ function AuthShellInner({
   // Memoize mobile bottom nav — stable across route changes
   const mobileBottomNav = useMemo(
     () =>
-      section === 'ov' ? (
+      isElectron ? null : section === 'ov' ? (
         <OperatorMobileNavigation />
       ) : showCustomerMobileTabs ? (
         <DashboardMobileTabs />
       ) : null,
-    [section, showCustomerMobileTabs]
+    [section, showCustomerMobileTabs, isElectron]
   );
   const audioPlayer = useMemo(() => <PersistentAudioBar />, []);
 

@@ -3122,6 +3122,41 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         "Result": "Main: 2; head: 3; head without hold block: 2.",
     }
 
+    def test_explicit_machine_receipt_is_idempotent_and_preserves_prior_decisions(self):
+        path = "scripts/lanes/pr_events.py"
+        body = events.red_before_green_block(self.PR)
+        self.assertNotIn("Machine:", events.repair_evidence_body(self.PR, body))
+        updated = events.repair_evidence_body(self.PR, body, machine_path=path)
+        self.assertEqual(updated.count(f"Machine: built {path}"), 1)
+        self.assertIn(body, updated)
+        self.assertEqual(events.repair_evidence_body(self.PR, updated, machine_path=path), updated)
+        for receipt in ("Machine: built scripts/lanes/fix_red_classes.py", "Machine-gap: JOV-123"):
+            original = body + "\n" + receipt + "\n"
+            self.assertEqual(events.repair_evidence_body(self.PR, original, machine_path=path), original)
+        for invalid in ("", "/tmp/machine.py", "../machine.py", "scripts/../machine.py",
+                        "scripts/machine.py\nMachine-gap: JOV-123", 1):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                events.repair_evidence_body(self.PR, body, machine_path=invalid)
+        with self.assertRaises(ValueError):
+            events.repair_evidence_body(self.PR, body + "\nMachine-gap: JOV-1\nMachine-gap: JOV-2\n",
+                                        machine_path=path)
+
+    def test_ensure_machine_receipt_without_a_red_check_preserves_other_evidence(self):
+        body = self.WIN + '<!-- customer-changelog/v1 {"releaseWorthy":false} -->\n'
+        written = []
+
+        def shell(args):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout=body)
+            written.append(Path(args[args.index("--body-file") + 1]).read_text())
+            return SimpleNamespace(returncode=0, stdout="")
+
+        self.assertTrue(events.ensure_red_before_green({"number": 7}, sh=shell,
+                                                       machine_path="scripts/lanes/pr_events.py"))
+        self.assertEqual(len(written), 1)
+        self.assertIn(body, written[0])
+        self.assertEqual(written[0].count("Machine: built scripts/lanes/pr_events.py"), 1)
+
     def test_explicit_premise_repairs_body_and_passes_canonical_policy(self):
         body = events.red_before_green_block(self.PR)
         updated = events.repair_evidence_body(self.PR, body, premise=self.PREMISE)
