@@ -1,8 +1,8 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import { and, desc, eq, gte, inArray, max } from 'drizzle-orm';
-import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
-import { db, doesTableExist } from '@/lib/db';
+import { and, desc, eq, gte, inArray } from 'drizzle-orm';
+import { revalidatePath, revalidateTag } from 'next/cache';
+import { db } from '@/lib/db';
 import { runAtomicDbOperation } from '@/lib/db/legacy-transaction';
 import {
   contentRecordEvents,
@@ -12,248 +12,55 @@ import {
 import { captureWarning } from '@/lib/error-tracking';
 import { getDeployedBuildInfo } from '@/lib/observability/build-info';
 import { authorizeFounderSummerUser } from '@/lib/ovie/summer-founder-auth';
-import { resolveContentApprover } from './access.server';
 import {
   type ContentKindDefinition,
   contentRecordCacheTag,
   gateContentRecord,
-  validateContentRecord,
 } from './kind';
+import { contentApprovalProof, contentReviewIdentity } from './publication';
 import {
-  type ContentReviewIdentity,
-  contentApprovalProof,
-  contentReviewIdentity,
-} from './publication';
+  ContentConflictError,
+  ContentPublicationUncertainError,
+  ContentValidationError,
+} from './store-errors';
+import {
+  type ContentPublicationEvent as Event,
+  readEvent,
+  runPublicationSmoke,
+  targetVersion,
+} from './store-review.server';
+import {
+  type ContentSource,
+  type ContentVersion,
+  type ContentVersionSummary,
+  getContentVersion,
+  getLiveContent,
+  toVersion,
+} from './store-versions.server';
 
-/**
- * The versioned content record store (`.claude/rules/data-vs-code.md`).
- *
- * Reads: `getLiveContent` serves the published version through Next's data
- * cache, tagged per record, so steady-state page renders issue zero database
- * reads. Missing tables, an empty pointer, a store error, or a stored value
- * that no longer validates all fall back to the kind's repo-seeded default.
- *
- * Writes: drafts are immutable versions; publish and rollback move one live
- * pointer and append one audit event in the same atomic operation, then
- * expire the record's cache tag so the next request renders the new version.
- */
+export {
+  ContentAuthorizationError,
+  ContentConflictError,
+  ContentPublicationUncertainError,
+  ContentValidationError,
+} from './store-errors';
+export {
+  approveContentVersion,
+  getContentReviewIdentity,
+} from './store-review.server';
+export type {
+  ContentSource,
+  ContentVersion,
+  ContentVersionSummary,
+  LiveContent,
+} from './store-versions.server';
+export {
+  createContentVersion,
+  getContentVersion,
+  getLiveContent,
+} from './store-versions.server';
 
-const TABLE = 'content_record_live';
-
-export type ContentSource = 'live' | 'default';
-
-export interface LiveContent<T> {
-  readonly data: T;
-  readonly source: ContentSource;
-  readonly versionId: string | null;
-  readonly version: number | null;
-  readonly publishedAt: string | null;
-  readonly fallbackReason?: 'unavailable' | 'unpublished' | 'incompatible';
-}
-
-interface StoredLive {
-  readonly versionId: string;
-  readonly version: number;
-  readonly data: unknown;
-  readonly publishedAt: string;
-  readonly schemaVersion: number;
-}
-
-async function readStoredLive(
-  kind: string,
-  key: string
-): Promise<StoredLive | null> {
-  if (!(await doesTableExist(TABLE))) return null;
-  const [row] = await db
-    .select({
-      versionId: contentRecordLive.versionId,
-      publishedAt: contentRecordLive.publishedAt,
-      version: contentRecordVersions.version,
-      data: contentRecordVersions.data,
-      schemaVersion: contentRecordVersions.schemaVersion,
-    })
-    .from(contentRecordLive)
-    .innerJoin(
-      contentRecordVersions,
-      eq(contentRecordVersions.id, contentRecordLive.versionId)
-    )
-    .where(
-      and(
-        eq(contentRecordLive.kind, kind),
-        eq(contentRecordLive.recordKey, key)
-      )
-    )
-    .limit(1);
-  return row
-    ? {
-        versionId: row.versionId,
-        version: row.version,
-        data: row.data,
-        schemaVersion: row.schemaVersion,
-        publishedAt: row.publishedAt.toISOString(),
-      }
-    : null;
-}
-
-function defaultContent<T>(
-  definition: ContentKindDefinition<T>,
-  key: string,
-  fallbackReason: NonNullable<LiveContent<T>['fallbackReason']> = 'unpublished'
-): LiveContent<T> {
-  return {
-    data: definition.defaultRecord(key),
-    source: 'default',
-    versionId: null,
-    version: null,
-    publishedAt: null,
-    fallbackReason,
-  };
-}
-
-/** Published record for `key`, or the repo default. Never throws. */
-export async function getLiveContent<T>(
-  definition: ContentKindDefinition<T>,
-  key: string
-): Promise<LiveContent<T>> {
-  let stored: StoredLive | null;
-  try {
-    stored = await unstable_cache(
-      () => readStoredLive(definition.kind, key),
-      ['content-record-live', definition.kind, key],
-      { tags: [contentRecordCacheTag(definition.kind, key)] }
-    )();
-  } catch (error) {
-    await captureWarning('Content record read failed', error, {
-      kind: definition.kind,
-      key,
-    });
-    return defaultContent(definition, key, 'unavailable');
-  }
-  if (!stored) return defaultContent(definition, key);
-
-  const validated = validateContentRecord(definition, key, stored.data);
-  if (!validated.ok || stored.schemaVersion !== definition.schemaVersion) {
-    await captureWarning(
-      'Live content record no longer validates',
-      new Error(
-        validated.ok
-          ? 'Stored content schema revision changed'
-          : validated.errors.join('; ')
-      ),
-      { kind: definition.kind, key, versionId: stored.versionId }
-    );
-    return defaultContent(definition, key, 'incompatible');
-  }
-  return {
-    data: validated.data,
-    source: 'live',
-    versionId: stored.versionId,
-    version: stored.version,
-    publishedAt: stored.publishedAt,
-  };
-}
-
-export interface ContentVersionSummary {
-  readonly id: string;
-  readonly kind: string;
-  readonly key: string;
-  readonly version: number;
-  readonly schemaVersion: number;
-  readonly author: string;
-  readonly note: string | null;
-  readonly createdAt: string;
-}
-
-export interface ContentVersion extends ContentVersionSummary {
-  readonly data: unknown;
-}
-
-function toVersion(
-  row: typeof contentRecordVersions.$inferSelect
-): ContentVersion {
-  return {
-    id: row.id,
-    kind: row.kind,
-    key: row.recordKey,
-    version: row.version,
-    schemaVersion: row.schemaVersion,
-    author: row.author,
-    note: row.note,
-    createdAt: row.createdAt.toISOString(),
-    data: row.data,
-  };
-}
-
-/** One stored version by id (uncached: preview and publish read this). */
-export async function getContentVersion(
-  versionId: string
-): Promise<ContentVersion | null> {
-  const [row] = await db
-    .select()
-    .from(contentRecordVersions)
-    .where(eq(contentRecordVersions.id, versionId))
-    .limit(1);
-  return row ? toVersion(row) : null;
-}
-
-export class ContentValidationError extends Error {
-  constructor(readonly errors: readonly string[]) {
-    super(`Content record failed validation: ${errors.join('; ')}`);
-    this.name = 'ContentValidationError';
-  }
-}
-
-export class ContentConflictError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ContentConflictError';
-  }
-}
-
-/** Validates and stores a new immutable version. Does not publish it. */
-export async function createContentVersion<T>(
-  definition: ContentKindDefinition<T>,
-  input: {
-    readonly key: string;
-    readonly data: unknown;
-    readonly author: string;
-    readonly note?: string | null;
-  }
-): Promise<ContentVersion> {
-  const validated = gateContentRecord(definition, input.key, input.data);
-  if (!validated.ok) throw new ContentValidationError(validated.errors);
-
-  const row = await runAtomicDbOperation(
-    async tx => {
-      const [current] = await tx
-        .select({ latest: max(contentRecordVersions.version) })
-        .from(contentRecordVersions)
-        .where(
-          and(
-            eq(contentRecordVersions.kind, definition.kind),
-            eq(contentRecordVersions.recordKey, input.key)
-          )
-        );
-      const [inserted] = await tx
-        .insert(contentRecordVersions)
-        .values({
-          kind: definition.kind,
-          recordKey: input.key,
-          version: (current?.latest ?? 0) + 1,
-          schemaVersion: definition.schemaVersion,
-          data: validated.data,
-          author: input.author,
-          note: input.note ?? null,
-        })
-        .returning();
-      return inserted;
-    },
-    { actorId: input.author, system: true, retry: 'serialization' }
-  );
-  if (!row) throw new Error('Content version insert returned no row');
-  return toVersion(row);
-}
-
+/** Public content store: conditional pointer writes, audit, and history. */
 export type ContentPointerAction = 'publish' | 'rollback';
 
 export interface ContentPointerMove {
@@ -274,26 +81,6 @@ export interface ContentPointerMove {
   readonly delivery: 'unverified';
 }
 
-export class ContentAuthorizationError extends Error {
-  constructor(
-    readonly status: 401 | 403 | 503,
-    message: string
-  ) {
-    super(message);
-    this.name = 'ContentAuthorizationError';
-  }
-}
-
-export class ContentPublicationUncertainError extends Error {
-  constructor(readonly operationId: string) {
-    super(
-      'Publication outcome is uncertain; reconcile this operation before retrying'
-    );
-    this.name = 'ContentPublicationUncertainError';
-  }
-}
-
-type Event = typeof contentRecordEvents.$inferSelect;
 type MoveInput = {
   readonly key: string;
   readonly versionId: string;
@@ -303,201 +90,6 @@ type MoveInput = {
   readonly approvalId?: string;
   readonly operationId?: string;
 };
-
-async function readLiveVersionId(
-  kind: string,
-  key: string
-): Promise<string | null> {
-  const [row] = await db
-    .select({ versionId: contentRecordLive.versionId })
-    .from(contentRecordLive)
-    .where(
-      and(
-        eq(contentRecordLive.kind, kind),
-        eq(contentRecordLive.recordKey, key)
-      )
-    )
-    .limit(1);
-  return row?.versionId ?? null;
-}
-
-async function readEvent(id: string): Promise<Event | null> {
-  const [row] = await db
-    .select()
-    .from(contentRecordEvents)
-    .where(eq(contentRecordEvents.id, id))
-    .limit(1);
-  return row ?? null;
-}
-
-async function targetVersion<T>(
-  definition: ContentKindDefinition<T>,
-  key: string,
-  id: string
-) {
-  const target = await getContentVersion(id);
-  if (!target || target.kind !== definition.kind || target.key !== key) {
-    throw new ContentConflictError(
-      `Version ${id} is not a ${definition.kind}/${key} version`
-    );
-  }
-  if (target.schemaVersion !== definition.schemaVersion) {
-    throw new ContentConflictError(
-      'Stored content schema revision changed; create a compatible version'
-    );
-  }
-  return target;
-}
-
-const RENDER_SMOKE_TIMEOUT_MS = 5_000;
-
-async function runPublicationSmoke<T>(
-  definition: ContentKindDefinition<T>,
-  data: T,
-  key: string,
-  identity: ContentReviewIdentity
-) {
-  if (!definition.renderSmoke) {
-    throw new ContentConflictError(
-      'No same-version renderer evidence hook is registered; publication remains closed'
-    );
-  }
-  const controller = new AbortController();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    const observed = await Promise.race([
-      definition.renderSmoke({
-        data,
-        key,
-        identity,
-        signal: controller.signal,
-      }),
-      new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => {
-          controller.abort();
-          reject(new Error('Render smoke deadline exceeded'));
-        }, RENDER_SMOKE_TIMEOUT_MS);
-      }),
-    ]);
-    if (
-      !observed ||
-      observed.reviewDigest !== identity.reviewDigest ||
-      observed.versionId !== identity.versionId ||
-      observed.renderBuildId !== identity.renderBuildId ||
-      !Array.isArray(observed.errors) ||
-      observed.errors.length !== 0
-    ) {
-      throw new Error(
-        'Missing, failed or mismatched same-version render evidence'
-      );
-    }
-  } catch (error) {
-    throw new ContentValidationError([
-      error instanceof Error ? error.message : 'Render smoke failed',
-    ]);
-  } finally {
-    clearTimeout(timer);
-    controller.abort();
-  }
-}
-
-/** Used by draft responses and the preview; never accepts a caller's renderer identity. */
-export async function getContentReviewIdentity<T>(
-  definition: ContentKindDefinition<T>,
-  key: string,
-  versionId: string
-): Promise<ContentReviewIdentity | null> {
-  const target = await targetVersion(definition, key, versionId);
-  return contentReviewIdentity(
-    target,
-    await getDeployedBuildInfo(),
-    await readLiveVersionId(definition.kind, key)
-  );
-}
-
-/** Append a founder-authenticated decision to the existing immutable audit log. */
-export async function approveContentVersion<T>(
-  definition: ContentKindDefinition<T>,
-  input: {
-    readonly key: string;
-    readonly versionId: string;
-    readonly decisionId: string;
-    readonly reviewDigest: string;
-    readonly expectedLiveVersionId: string | null;
-  },
-  request: Request
-): Promise<{ readonly id: string; readonly identity: ContentReviewIdentity }> {
-  const founder = await resolveContentApprover(request);
-  if (!founder.ok)
-    throw new ContentAuthorizationError(founder.status, founder.error);
-  const target = await targetVersion(definition, input.key, input.versionId);
-  const checked = gateContentRecord(definition, input.key, target.data);
-  if (!checked.ok) throw new ContentValidationError(checked.errors);
-  const identity = contentReviewIdentity(
-    target,
-    await getDeployedBuildInfo(),
-    input.expectedLiveVersionId
-  );
-  if (!identity || identity.reviewDigest !== input.reviewDigest) {
-    throw new ContentConflictError(
-      'Preview payload or renderer changed; review the exact version again'
-    );
-  }
-  // The existing experiment workflow has no complete-arm decision receipt.
-  if (
-    target.data &&
-    typeof target.data === 'object' &&
-    'experiment' in target.data
-  ) {
-    throw new ContentConflictError(
-      'A complete experiment-arm approval receipt is required'
-    );
-  }
-  if (
-    (await readLiveVersionId(definition.kind, input.key)) !==
-    input.expectedLiveVersionId
-  ) {
-    throw new ContentConflictError('Live version changed after preview');
-  }
-  await runPublicationSmoke(definition, checked.data, input.key, identity);
-  const reason = contentApprovalProof(identity);
-  const matches = (event: Event) =>
-    event.action === 'approve' &&
-    event.kind === definition.kind &&
-    event.recordKey === input.key &&
-    event.toVersionId === target.id &&
-    event.fromVersionId === input.expectedLiveVersionId &&
-    event.actor === founder.actor &&
-    event.reason === reason;
-  const previous = await readEvent(input.decisionId);
-  if (previous) {
-    if (!matches(previous))
-      throw new ContentConflictError('Decision id belongs to another approval');
-    return { id: previous.id, identity };
-  }
-  try {
-    await db
-      .insert(contentRecordEvents)
-      .values({
-        id: input.decisionId,
-        kind: definition.kind,
-        recordKey: input.key,
-        action: 'approve',
-        fromVersionId: input.expectedLiveVersionId,
-        toVersionId: target.id,
-        actor: founder.actor,
-        reason,
-      })
-      .onConflictDoNothing();
-  } catch {
-    // A transport failure does not establish that the insert failed.
-  }
-  const stored = await readEvent(input.decisionId);
-  if (!stored) throw new ContentPublicationUncertainError(input.decisionId);
-  if (!matches(stored))
-    throw new ContentConflictError('Decision id belongs to another approval');
-  return { id: stored.id, identity };
-}
 
 function expireLiveCaches<T>(
   definition: ContentKindDefinition<T>,
