@@ -670,12 +670,9 @@ const DEPLOY_WORKFLOW_CI_TEST = 'tests/unit/ci/deploy-workflow.test.ts';
 const PLAYWRIGHT_RECEIPT_INPUTS =
   /^(\.github\/|scripts\/lib\/playwright-png\.mjs$|apps\/web\/(playwright[^/]*\.config[^/]*\.ts|tests\/unit\/ci\/playwright-artifact-secrets\.test\.ts)$)/u;
 export function selectPlaywrightReceipt(event, selected, changed) {
-  if (event === 'pull_request') {
-    return (
-      !changed?.length || changed.some(f => PLAYWRIGHT_RECEIPT_INPUTS.test(f))
-    );
-  }
-  return event !== 'workflow_dispatch' && !selected.has('web');
+  return event === 'pull_request'
+    ? !changed?.length || changed.some(f => PLAYWRIGHT_RECEIPT_INPUTS.test(f))
+    : event !== 'workflow_dispatch' && !selected.has('web');
 }
 export function webCiContractTestsCommand(
   ledgerPath = resolve(process.cwd(), 'apps/web/tests/quarantine.json'),
@@ -957,6 +954,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/offer-claims/offer-claims.test.mjs',
   'scripts/copy-inventory/extract.test.mjs',
   'scripts/invariants/stat-claims/stat-claims.test.mjs',
+  'scripts/lib/__tests__/proof-loop.test.mjs',
   'scripts/public-benchmark/proof-observations.test.mjs',
   ...TEST_PLANNER_CONTRACT_TESTS,
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',
