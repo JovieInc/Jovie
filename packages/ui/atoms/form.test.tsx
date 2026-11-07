@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import {
   Form,
@@ -541,5 +542,23 @@ describe('Form', () => {
       expect(onSubmit).not.toHaveBeenCalled();
       expect(await screen.findByText('Email is required')).toBeInTheDocument();
     });
+  });
+});
+
+describe('Form certificate evidence', () => {
+  it('has no axe violations before and after a validation error', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<TestFormWithValidation />);
+    await expectNoA11yViolations(container);
+
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Email is required'
+    );
+    expect(screen.getByPlaceholderText('Enter email')).toHaveAttribute(
+      'aria-invalid',
+      'true'
+    );
+    await expectNoA11yViolations(container);
   });
 });
