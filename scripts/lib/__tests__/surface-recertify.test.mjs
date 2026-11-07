@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { load as yamlLoad } from 'js-yaml';
 import { test } from 'vitest';
-import { sourceDigest } from '../../design-surface-census.mjs';
+import { CENSUS_PATH, sourceDigest } from '../../design-surface-census.mjs';
+import { evaluateFleetRules } from '../../pr-fleet-rules.mjs';
 import {
   renewGroup,
   requiresAuth,
@@ -11,6 +15,7 @@ import {
   staleGroups,
   validateCapture,
 } from '../surface-recertify.mjs';
+import { parseWinSection } from '../wins-ledger.mjs';
 
 const PAGE = 'apps/web/app/(marketing)/pricing/page.tsx';
 const OWNER = 'apps/web/components/site/MarketingFooter.tsx';
@@ -199,4 +204,93 @@ test('renewal writes the real digest, evidence pointers and keeps prior history'
     twice.groups[0].evidence.ref.match(/Automatic recertification/g).length,
     1
   );
+});
+
+test('renewal CLI and bot PR body report the measured win required by Fleet', () => {
+  const { root, census } = repo();
+  writeFileSync(join(root, OWNER), 'edited');
+  const censusFile = join(root, CENSUS_PATH);
+  mkdirSync(dirname(censusFile), { recursive: true });
+  writeFileSync(censusFile, JSON.stringify(census));
+  const evidence = join(root, 'evidence');
+  mkdirSync(join(evidence, 'pricing'), { recursive: true });
+  writeFileSync(
+    join(evidence, 'pricing/capture.json'),
+    JSON.stringify(capture)
+  );
+  const cli = fileURLToPath(
+    new URL('../../surface-recertify.mjs', import.meta.url)
+  );
+  const invoke = args =>
+    JSON.parse(
+      execFileSync(process.execPath, [cli, ...args, '--root', root], {
+        encoding: 'utf8',
+      })
+    );
+  const before = invoke(['list']);
+  const runUrl = 'https://github.com/JovieInc/Jovie/actions/runs/123';
+  const applied = invoke([
+    'apply',
+    '--evidence',
+    evidence,
+    '--run-url',
+    runUrl,
+    '--artifact',
+    'surface-recert-123',
+    '--sha',
+    'a'.repeat(40),
+  ]);
+  const after = invoke(['list']);
+  assert.equal(before.length, 1);
+  assert.deepEqual(applied, { renewed: ['pricing'], failed: [], skipped: [] });
+  assert.deepEqual(after, []);
+
+  const workflow = yamlLoad(
+    readFileSync(
+      new URL(
+        '../../../.github/workflows/surface-recertify.yml',
+        import.meta.url
+      ),
+      'utf8'
+    )
+  );
+  const step = workflow.jobs.recertify.steps.find(
+    item => item.name === 'Open or update the renewal PR'
+  );
+  const heredoc = step.run.match(
+    /cat > "\$RUNNER_TEMP\/body.md" <<BODY\n([\s\S]*?)\nBODY/
+  );
+  assert(heredoc, 'the bot publishes a reviewable PR body');
+  execFileSync(
+    'bash',
+    ['-eu', '-c', `cat > "$RUNNER_TEMP/body.md" <<BODY\n${heredoc[1]}\nBODY\n`],
+    {
+      env: {
+        ...process.env,
+        RUNNER_TEMP: root,
+        GITHUB_SHA: 'a'.repeat(40),
+        GITHUB_RUN_ID: '123',
+        renewed: applied.renewed.join(', '),
+        renewed_count: String(applied.renewed.length),
+        remaining_count: String(after.length),
+        run_url: runUrl,
+      },
+    }
+  );
+  const body = readFileSync(join(root, 'body.md'), 'utf8');
+  assert.deepEqual(
+    evaluateFleetRules({
+      pr: {
+        title: 'chore(design): renew certification evidence',
+        labels: ['compounding'],
+        body,
+      },
+      files: [{ filename: CENSUS_PATH }],
+    }),
+    { errors: [], warnings: [] }
+  );
+  const win = parseWinSection(body);
+  assert.equal(win.metrics[0].before, 1);
+  assert.equal(win.metrics[0].after, 0);
+  assert.equal(win.verifyLink, runUrl);
 });

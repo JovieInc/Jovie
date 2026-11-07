@@ -27,6 +27,11 @@ describe('OverflowMenu', () => {
       screen.queryByRole('menuitem', { name: 'Revoke private link' })
     ).not.toBeInTheDocument();
 
+    // IconButton owns the trigger color: no unapproved override classes.
+    const trigger = screen.getByRole('button', { name: 'Share link actions' });
+    expect(trigger).not.toHaveClass('text-tertiary-token');
+    expect(trigger).toHaveClass('text-secondary-token');
+
     await user.click(
       screen.getByRole('button', { name: 'Share link actions' })
     );

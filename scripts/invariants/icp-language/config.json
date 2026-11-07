@@ -12,6 +12,8 @@
     {"phrase": "Artist Presence", "reason": "Plan name from offer truth (plan-prices, offer-truth). A product noun, not audience targeting; the rest of the line is still checked."}
   ],
   "audienceAllowlist": [
+    {"path": "apps/web/components/homepage/HomepageEditorial.tsx", "reason": "Homepage `/` only: Tim 2026-11-03 'Music line wins' (gbrain decisions/homepage-music-line-scope-2026-11-03-0420). Other general routes keep MKT-D16."},
+    {"path": "apps/web/data/homepageEditorialCopy.ts", "reason": "Copy rendered only by the homepage `/` (same 2026-11-03 decision)."},
     {"path": "apps/web/app/(marketing)/solutions/", "reason": "solutions/[audience] landing pages"},
     {"path": "apps/web/content/pages/solutions/", "reason": "Factory records rendered only by solutions/[audience]"},
     {"path": "apps/web/app/(marketing)/artist-profile/", "reason": "Dedicated artist-profile audience route"},
@@ -21,7 +23,6 @@
     {"path": "apps/web/data/artistNotificationsCopy.ts", "reason": "Copy rendered by the artist-notifications route"},
     {"path": "apps/web/data/youtubeThumbnailsCopy.ts", "reason": "Copy rendered by the YouTube-thumbnails route"},
     {"path": "apps/web/app/investor-portal/", "reason": "Dedicated investor audience portal"},
-    {"path": "apps/web/content/investors/", "reason": "Investor-portal documents"},
     {"path": "apps/web/data/investorAnswerReuseCopy.ts", "reason": "Investor-audience answers"}
   ],
   "editorialOutOfScope": [

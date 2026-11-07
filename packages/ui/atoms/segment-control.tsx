@@ -68,7 +68,7 @@ const segmentTriggerVariants = cva(
         'linear-pill': cn(
           linearPillLabelClassName,
           linearPillFocusClassName,
-          'text-(--linear-text-tertiary) hover:text-(--linear-text-primary) data-[state=active]:text-(--linear-btn-primary-fg)'
+          'text-(--linear-text-tertiary) hover:text-(--linear-text-primary) data-[state=active]:bg-transparent data-[state=active]:text-(--linear-btn-primary-fg)'
         ),
       },
       layout: {

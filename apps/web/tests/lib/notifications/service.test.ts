@@ -19,9 +19,9 @@ vi.mock('@/lib/notifications/push', () => ({
   sendPushNotification: vi.fn(),
 }));
 
-vi.mock('@/lib/notifications/providers/resend', () => ({
-  ResendEmailProvider: vi.fn().mockImplementation(function (this: any) {
-    this.provider = 'resend';
+vi.mock('@/lib/notifications/providers/gateway', () => ({
+  GatewayEmailProvider: vi.fn().mockImplementation(function (this: any) {
+    this.provider = 'gateway';
     this.sendEmail = vi.fn().mockResolvedValue({
       channel: 'email',
       status: 'sent',
@@ -38,10 +38,8 @@ vi.mock('@/lib/notifications/config', () => ({
 }));
 
 vi.mock('@/lib/notifications/sender-policy', () => ({
-  formatSystemSender: vi.fn((displayName?: string) =>
-    displayName
-      ? `${displayName} via Jovie <notifications@send.jov.ie>`
-      : 'Jovie <notifications@send.jov.ie>'
+  systemSenderName: vi.fn((displayName?: string) =>
+    displayName ? `${displayName} via Jovie` : undefined
   ),
 }));
 
@@ -80,7 +78,7 @@ import { sendOutboundSms } from '@/lib/notifications/providers/sms/outbound-sms'
 import { sendPushNotification } from '@/lib/notifications/push';
 import { checkQuota, reserveTrialFanEmail } from '@/lib/notifications/quota';
 import { checkReputation } from '@/lib/notifications/reputation';
-import { formatSystemSender } from '@/lib/notifications/sender-policy';
+import { systemSenderName } from '@/lib/notifications/sender-policy';
 import {
   dismissNotification,
   sendNotification,
@@ -99,6 +97,12 @@ import type {
   NotificationMessage,
   NotificationTarget,
 } from '@/types/notifications';
+
+const TEST_ROUTE = {
+  stream: 'transactional',
+  purpose: 'test',
+  consent: 'account-transaction',
+} as const;
 
 describe('Notification Service', () => {
   beforeEach(() => {
@@ -171,6 +175,7 @@ describe('Notification Service', () => {
       text: 'Test content',
       html: '<p>Test content</p>',
       category: 'transactional',
+      emailRoute: TEST_ROUTE,
     };
 
     const baseTarget: NotificationTarget = {
@@ -276,6 +281,7 @@ describe('Notification Service', () => {
       const marketingMessage: NotificationMessage = {
         ...baseMessage,
         category: 'marketing',
+        emailRoute: TEST_ROUTE,
       };
 
       const result = await sendNotification(marketingMessage, baseTarget);
@@ -304,6 +310,7 @@ describe('Notification Service', () => {
         subject: 'Test',
         text: 'Content',
         category: 'transactional',
+        emailRoute: TEST_ROUTE,
       };
 
       const result = await sendNotification(messageWithoutChannels, baseTarget);
@@ -382,6 +389,7 @@ describe('Notification Service', () => {
       const forceMarketingMessage: NotificationMessage = {
         ...baseMessage,
         category: 'marketing',
+        emailRoute: TEST_ROUTE,
         respectUserPreferences: false,
       };
 
@@ -454,6 +462,7 @@ describe('Notification Service', () => {
       text: 'New from Tim: "Never Say a Word" — https://jov.ie/tim/never-say-a-word',
       channels: ['sms'],
       category: 'marketing',
+      emailRoute: TEST_ROUTE,
     };
     const smsTarget: NotificationTarget = {
       phone: '+15551112222',
@@ -630,6 +639,7 @@ describe('Notification Service', () => {
         subject: 'Test',
         text: 'Content',
         category: 'transactional',
+        emailRoute: TEST_ROUTE,
       };
 
       const target: NotificationTarget = {
@@ -661,6 +671,7 @@ describe('Notification Service', () => {
           subject: 'Your code',
           text: 'Use code 123456',
           category: 'transactional',
+          emailRoute: TEST_ROUTE,
         },
         { email: 'user@example.com' }
       );
@@ -693,6 +704,7 @@ describe('Notification Service', () => {
           subject: 'Invite',
           text: 'Use this invite',
           category: 'transactional',
+          emailRoute: TEST_ROUTE,
         },
         { email: 'user@example.com' }
       );
@@ -722,6 +734,7 @@ describe('Notification Service', () => {
         subject: 'New release',
         text: 'Listen now',
         category: 'marketing',
+        emailRoute: TEST_ROUTE,
         senderContext: {
           creatorProfileId: 'creator-1',
           displayName: 'Artist Name',
@@ -731,13 +744,37 @@ describe('Notification Service', () => {
 
       await sendNotification(message, { email: 'fan@example.com' });
 
-      expect(formatSystemSender).toHaveBeenCalledWith('Artist Name');
+      expect(systemSenderName).toHaveBeenCalledWith('Artist Name');
       expect(customProvider.sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({
-          from: 'Artist Name via Jovie <notifications@send.jov.ie>',
-          replyTo: 'reply@example.com',
+          ...TEST_ROUTE,
+          fromName: 'Artist Name via Jovie',
         })
       );
+      expect(customProvider.sendEmail).toHaveBeenCalledWith(
+        expect.not.objectContaining({ from: expect.anything() })
+      );
+    });
+
+    it('refuses an email without a gateway route before any side effect', async () => {
+      const customProvider = {
+        provider: 'debug' as const,
+        sendEmail: vi.fn(),
+      };
+      setEmailProvider(customProvider);
+
+      const result = await sendNotification(
+        {
+          id: 'no-route',
+          subject: 'Hi',
+          text: 'Hi',
+          category: 'transactional',
+        },
+        { email: 'user@example.com' }
+      );
+
+      expect(customProvider.sendEmail).not.toHaveBeenCalled();
+      expect(result.errors[0]?.error).toMatch(/emailRoute missing/);
     });
   });
   describe('fan sends preserve trial allowance and legacy contracts', () => {
@@ -745,6 +782,7 @@ describe('Notification Service', () => {
       subject: 'Release',
       text: 'Listen now',
       category: 'marketing',
+      emailRoute: TEST_ROUTE,
       senderContext: {
         creatorProfileId: 'artist-1',
         displayName: 'Artist',
@@ -759,7 +797,7 @@ describe('Notification Service', () => {
         status: 'sent',
         detail: 'msg-1',
       });
-      setEmailProvider({ provider: 'resend', sendEmail });
+      setEmailProvider({ provider: 'gateway', sendEmail });
     });
 
     it.each(['free', 'pro', 'max'] as const)(

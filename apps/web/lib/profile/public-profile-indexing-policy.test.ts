@@ -17,6 +17,7 @@ describe('public profile indexing policy', () => {
     ['testartist', 'legacy_claim_fixture'],
     ['authqaprod', 'production_canary'],
     ['e2e-test-user', 'qa_auth_fixture'],
+    ['unfazed', 'capture_profile_fixture'],
     ['e2eclaimartist', 'claim_flow_fixture'],
   ] as const)('excludes verified synthetic handle %s', (handle, reason) => {
     expect(getPublicProfileIndexingExclusionReason(handle)).toBe(reason);

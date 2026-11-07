@@ -25,7 +25,7 @@ export const CodeDefault: Story = {};
 export const HeroAndClose: Story = {
   args: {
     sections: DEFAULT_HOME_SPEC.sections.filter(
-      section => section.section !== 'product-gallery'
+      section => section.section === 'hero' || section.section === 'cta'
     ),
   },
 };

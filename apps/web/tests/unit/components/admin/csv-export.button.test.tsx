@@ -120,7 +120,7 @@ describe('ExportCSVButton', () => {
 
       expect(screen.getByRole('button')).toHaveAttribute(
         'aria-label',
-        'Export user data'
+        'Export CSV — Export user data'
       );
     });
   });

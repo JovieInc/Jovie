@@ -37,7 +37,7 @@ concurrency:
 jobs:
   detect:
     name: Find stale certified surfaces
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       stale: ${{ steps.list.outputs.stale }}
@@ -180,6 +180,9 @@ jobs:
           git config user.name "jovie-bot[bot]"
           git config user.email "jovie-bot[bot]@users.noreply.github.com"
           renewed="$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).renewed.join(", ")' "$RUNNER_TEMP/apply.json")"
+          renewed_count="$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).renewed.length' "$RUNNER_TEMP/apply.json")"
+          node scripts/surface-recertify.mjs list > "$RUNNER_TEMP/remaining.json"
+          remaining_count="$(node -e 'const fs = require("fs"); const renewed = JSON.parse(fs.readFileSync(process.argv[1],"utf8")).renewed; console.log(JSON.parse(fs.readFileSync(process.argv[2],"utf8")).filter(row => renewed.includes(row.id)).length)' "$RUNNER_TEMP/apply.json" "$RUNNER_TEMP/remaining.json")"
           git checkout -B "$BRANCH"
           git add apps/web/data/designSystem/surfaceCensus.json
           git commit -q -m "chore(design): renew certification evidence for ${renewed}" -m "Automatic recertification after ${GITHUB_SHA:0:9}; evidence in workflow artifact surface-recert-${GITHUB_RUN_ID}."
@@ -194,9 +197,18 @@ jobs:
 
           <!-- customer-changelog/v1 {"releaseWorthy":false} -->
 
+          ## Win
+
+          - Claim: Renewed surfaces have current certification digests after validated browser capture.
+          - Area: design
+          - Theme: certification-reliability
+          - Metric: stale groups among renewed surfaces | groups | lower | ${renewed_count} | ${remaining_count} | apply.json and remaining.json in the workflow log | Read the apply output and run node scripts/surface-recertify.mjs list on this PR head, filtering to renewed IDs.
+          - Verify: ${run_url}
+
           ## Blast radius
 
           - What could break: nothing at runtime. One data file, \`apps/web/data/designSystem/surfaceCensus.json\`, evidence record(s) only.
+          - Proof: validated 1440 and 390 captures in ${run_url}; the apply log names every renewed, failed and skipped row.
           - Rows that could not be captured stay red on purpose (see run log); Main Health pages Summer for them.
 
           ## Locked areas

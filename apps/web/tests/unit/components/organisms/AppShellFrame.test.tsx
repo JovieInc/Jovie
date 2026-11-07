@@ -545,4 +545,29 @@ describe('AppShellFrame', () => {
     );
     expect(surface).not.toHaveClass('fixed', 'absolute');
   });
+
+  // JOV-7973: the shell frame planes clip, but must never own a programmatically
+  // scrollable box. overflow:hidden stays scrollable, so a route journey's
+  // scrollIntoView can leave the whole pane shifted under the clip (the /start
+  // onboarding preview badge measured a stable viewport ratio 0.8125 in CI from
+  // a 34.5px drift that keyboard End/Home on the rail could never undo).
+  it('clips shell planes without owning a vertical scroll box (JOV-7973)', () => {
+    const { container } = render(
+      <AppShellFrame sidebar={null} main={<div>Main Content</div>} />
+    );
+
+    const planes = [
+      container.querySelector('[data-app-shell-frame]'),
+      container.querySelector('[data-app-shell-body]'),
+      screen.getByRole('main'),
+      container.querySelector('[data-app-shell-main-content]'),
+      container.querySelector('[data-app-shell-content-inset]'),
+    ];
+
+    for (const plane of planes) {
+      expect(plane).not.toBeNull();
+      expect(plane).not.toHaveClass('overflow-hidden');
+      expect(plane).toHaveClass('overflow-clip');
+    }
+  });
 });

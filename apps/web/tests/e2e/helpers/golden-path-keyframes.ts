@@ -32,7 +32,82 @@ export interface KeyframeRecord {
   readonly expectedArtistName?: string;
   readonly audit: LayoutAudit;
   readonly pageErrors: readonly string[];
+  /** Public homepage proof, sampled on both sides of the screenshot bytes. */
+  readonly homePreview?: {
+    readonly before: HomePreviewAudit;
+    readonly after: HomePreviewAudit;
+  };
 }
+
+export interface HomePreviewAudit {
+  /** Endpoint state; neither occlusion nor the exact PNG instant is inferred. */
+  readonly status: 'ready' | 'loading' | 'error' | 'missing' | 'hidden';
+  readonly scenario: 'template-profile-live-mobile';
+  readonly selectedCopy: {
+    readonly headline: string;
+    readonly subhead: string;
+  };
+  readonly frameStatus: string | null;
+  readonly image: {
+    readonly resource: 'expected' | 'unexpected' | 'missing';
+    readonly complete: boolean;
+    readonly naturalWidth: number;
+    readonly naturalHeight: number;
+  };
+  readonly geometry: {
+    readonly viewport: { readonly width: number; readonly height: number };
+    readonly scroll: { readonly x: number; readonly y: number };
+    readonly ancestors: readonly {
+      readonly tag: string;
+      readonly box: {
+        readonly x: number;
+        readonly y: number;
+        readonly width: number;
+        readonly height: number;
+      };
+      readonly display: string;
+      readonly visibility: string;
+      readonly opacity: string;
+      readonly contentVisibility: string;
+      readonly transform: string;
+    }[];
+  };
+}
+
+/** Plain JS: no transpiler helpers, URLs, or account data enter this public proof. */
+export const HOME_PREVIEW_AUDIT_SOURCE = `(() => {
+  const proof = document.querySelector('[data-testid="homepage-hero-proof"]');
+  const frame = proof && proof.querySelector('[data-testid="product-screenshot-frame-template-profile-live-mobile"]');
+  const image = frame && frame.querySelector('img');
+  const frameStatus = frame ? frame.getAttribute('data-status') : null;
+  let resource = 'missing';
+  if (image) {
+    resource = 'unexpected';
+    try {
+      const url = new URL(image.currentSrc || image.src, location.href);
+      if (url.origin === location.origin && !url.username && !url.password && url.pathname === '/product-screenshots/template-profile-live-phone.png') resource = 'expected';
+    } catch {}
+  }
+  const ancestors = [];
+  let hidden = false;
+  for (let el = image || frame || proof; el && ancestors.length < 12; el = el.parentElement) {
+    const rect = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    hidden ||= style.display === 'none' || style.visibility !== 'visible' || Number(style.opacity) === 0 || style.contentVisibility === 'hidden' || rect.width <= 0 || rect.height <= 0;
+    ancestors.push({ tag: el.tagName, box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, display: style.display, visibility: style.visibility, opacity: style.opacity, contentVisibility: style.contentVisibility, transform: style.transform });
+    if (el === document.body) break;
+  }
+  const complete = image instanceof HTMLImageElement && image.complete;
+  const naturalWidth = image instanceof HTMLImageElement ? image.naturalWidth : 0;
+  const naturalHeight = image instanceof HTMLImageElement ? image.naturalHeight : 0;
+  const status = !proof || !frame ? 'missing' : frameStatus === 'error' ? 'error' : !image ? 'missing' : complete && naturalWidth === 0 ? 'error' : hidden ? 'hidden' : frameStatus !== 'loaded' || !complete || !naturalWidth || !naturalHeight ? 'loading' : 'ready';
+  return {
+    status, scenario: 'template-profile-live-mobile', frameStatus,
+    selectedCopy: { headline: (document.querySelector('[data-hero-canvas] h1')?.textContent || '').slice(0, 500), subhead: (document.querySelector('.homepage-hero-canvas__subhead')?.textContent || '').slice(0, 500) },
+    image: { resource, complete, naturalWidth, naturalHeight },
+    geometry: { viewport: { width: innerWidth, height: innerHeight }, scroll: { x: scrollX, y: scrollY }, ancestors },
+  };
+})()`;
 
 export interface EssentialViewportAudit {
   readonly supported: boolean;
@@ -355,6 +430,10 @@ export async function captureKeyframe(
     // A long-poll or analytics beacon must not block evidence capture.
   });
   await page.evaluate(SETTLE_SCROLL_SOURCE);
+  const homeBefore =
+    id === 'home'
+      ? ((await page.evaluate(HOME_PREVIEW_AUDIT_SOURCE)) as HomePreviewAudit)
+      : undefined;
   sequence += 1;
   const file = `${String(sequence).padStart(2, '0')}-${id}.png`;
   const image = await page.screenshot({
@@ -365,6 +444,10 @@ export async function captureKeyframe(
     // The dev toolbar is CI chrome, not product; reviewers must not judge it.
     style: '[data-testid="dev-toolbar"]{display:none!important}',
   });
+  const homeAfter =
+    id === 'home'
+      ? ((await page.evaluate(HOME_PREVIEW_AUDIT_SOURCE)) as HomePreviewAudit)
+      : undefined;
   const record: KeyframeRecord = {
     schema: GOLDEN_PATH_KEYFRAME_SCHEMA,
     id,
@@ -375,6 +458,10 @@ export async function captureKeyframe(
     expectedArtistName: context.expectedArtistName,
     audit: (await page.evaluate(LAYOUT_AUDIT_SOURCE)) as LayoutAudit,
     pageErrors: errors.splice(0),
+    homePreview:
+      homeBefore && homeAfter
+        ? { before: homeBefore, after: homeAfter }
+        : undefined,
   };
   appendFileSync(join(dir, 'manifest.jsonl'), `${JSON.stringify(record)}\n`);
 }

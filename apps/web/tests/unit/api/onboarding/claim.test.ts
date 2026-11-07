@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Hoisted mocks (must be before imports of SUT)
 const {
   mockGetCachedAuth,
+  mockLinkOnboardingSessionReplaysToUser,
   mockGetCachedCurrentUser,
   mockGetDbUser,
   mockGetCurrentOnboardingSessionId,
@@ -20,6 +21,7 @@ const {
   mockIsWaitlistGateEnabled,
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
+  mockLinkOnboardingSessionReplaysToUser: vi.fn(),
   mockGetCachedCurrentUser: vi.fn(),
   mockGetDbUser: vi.fn(),
   mockGetCurrentOnboardingSessionId: vi.fn(),
@@ -48,6 +50,10 @@ const mockDecideGoldenPathAdmission = vi.hoisted(() =>
 vi.mock('@/lib/waitlist/golden-path-admission.server', () => ({
   decideGoldenPathAdmissionForArtist: mockDecideGoldenPathAdmission,
   requiresProofBeforePublic: mockRequiresProofBeforePublic,
+}));
+
+vi.mock('@/lib/analytics/signup-replay.server', () => ({
+  linkOnboardingSessionReplaysToUser: mockLinkOnboardingSessionReplaysToUser,
 }));
 
 vi.mock('@/lib/auth/cached', () => ({
@@ -380,21 +386,10 @@ function setupInsertAudit(success = true) {
   }
 }
 
-// Pure helper extracted for property testing the recency ordering + idempotency invariants
-// (mirrors the [primary, ...others] + desc createdAt logic in the route without duplicating prod code).
-function pickPrimaryAndOthers<T extends { createdAt: Date }>(
-  cands: T[]
-): { primary: T | undefined; others: T[] } {
-  if (!cands.length) return { primary: undefined, others: [] };
-  const sorted = [...cands].sort(
-    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-  );
-  return { primary: sorted[0], others: sorted.slice(1) };
-}
-
 describe('POST /api/onboarding/claim — race, idempotency, failure paths', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLinkOnboardingSessionReplaysToUser.mockResolvedValue(undefined);
     mockGetCachedAuth.mockResolvedValue({
       userId: '3a53ba3e-150c-4ab5-8e73-2d2499764e2c',
       sessionId: 'ba_session_123',
@@ -435,6 +430,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     const json = await res.json();
     expect(json.errorCode).toBe('UNAUTHORIZED');
     expect(mockGetCurrentOnboardingSessionId).not.toHaveBeenCalled();
+    expect(mockLinkOnboardingSessionReplaysToUser).not.toHaveBeenCalled();
   });
 
   it('returns 401 when a Better Auth session has no provisioned app user', async () => {
@@ -458,6 +454,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ claimed: 0 });
     expect(mockClearOnboardingSessionCookie).not.toHaveBeenCalled();
+    expect(mockLinkOnboardingSessionReplaysToUser).not.toHaveBeenCalled();
   });
 
   it('clears cookie and returns {claimed:0} when no unclaimed conversations for session', async () => {
@@ -544,6 +541,9 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
       readyForCheckout: true,
     });
     expect(mockClearOnboardingSessionCookie).toHaveBeenCalledTimes(1);
+    expect(
+      mockLinkOnboardingSessionReplaysToUser
+    ).toHaveBeenCalledExactlyOnceWith('sess_abc123', appUserId);
     expect(mockDbUpdate).toHaveBeenCalled();
     expect(mockDbInsert).toHaveBeenCalled();
     expect(mockDbUpdate.mock.results[0]?.value.set).toHaveBeenCalledWith(
@@ -557,6 +557,31 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     );
     // ip/ua passed via extract
     expect(mockExtractClientIP).toHaveBeenCalled();
+  });
+
+  it('completes the claim when best-effort replay linking fails', async () => {
+    const replayError = new Error('Replay storage unavailable');
+    mockLinkOnboardingSessionReplaysToUser.mockRejectedValueOnce(replayError);
+    setupDbSelectForCandidates(
+      [{ id: 'conv_1', createdAt: new Date('2026-05-01') }],
+      instantAccessDecisionMessageRows()
+    );
+    setupUpdateForPrimary(1);
+    setupInsertAudit(true);
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      claimed: 1,
+      conversationId: 'conv_1',
+    });
+    expect(mockClearOnboardingSessionCookie).toHaveBeenCalledTimes(1);
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Onboarding replay link failed',
+      replayError,
+      { route: '/api/onboarding/claim', method: 'POST' }
+    );
   });
 
   it('persists a waitlist decision, returns its durable receipt, and reserves the handle on a hidden profile', async () => {
@@ -1050,81 +1075,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
   });
 });
 
-describe('claim route invariants (property tests for recency, idempotency, data races, 409)', () => {
-  const timestampArb = fc.integer({
-    min: Date.UTC(2020, 0, 1),
-    max: Date.UTC(2026, 5, 1),
-  });
-  const candidateArb = fc.record({
-    id: fc.uuid(),
-    createdAt: timestampArb.map(t => new Date(t)),
-  });
-
-  it('recency ordering: primary is always the most recently created (or undefined)', () => {
-    fc.assert(
-      fc.property(fc.array(candidateArb, { maxLength: 12 }), cands => {
-        const { primary, others } = pickPrimaryAndOthers(cands);
-        if (primary) {
-          for (const o of others) {
-            expect(primary.createdAt.getTime()).toBeGreaterThanOrEqual(
-              o.createdAt.getTime()
-            );
-          }
-        }
-        // ordering property holds
-        expect(others.length).toBe(Math.max(0, cands.length - 1));
-      })
-    );
-  });
-
-  it('idempotent pick: pick(pick(xs)) shape equals pick(xs) for the primary/others split', () => {
-    fc.assert(
-      fc.property(fc.array(candidateArb, { maxLength: 8 }), cands => {
-        const once = pickPrimaryAndOthers(cands);
-        const twice = pickPrimaryAndOthers(
-          once.primary ? [once.primary, ...once.others] : []
-        );
-        if (once.primary) {
-          expect(twice.primary?.createdAt.getTime()).toBe(
-            once.primary.createdAt.getTime()
-          );
-        } else {
-          expect(twice.primary).toBeUndefined();
-        }
-        expect(twice.others.length).toBe(once.others.length);
-      })
-    );
-  });
-
-  it('failure path safety: empty candidates always yields zero others, never throws on pick', () => {
-    fc.assert(
-      fc.property(fc.constant([]), () => {
-        const { primary, others } = pickPrimaryAndOthers([]);
-        expect(primary).toBeUndefined();
-        expect(others).toEqual([]);
-      })
-    );
-  });
-
-  it('recency with timestamp ties: primary time is a maximum (covers sort in recency ordering)', () => {
-    fc.assert(
-      fc.property(
-        fc.array(candidateArb, { minLength: 2, maxLength: 6 }),
-        cands => {
-          if (cands.length >= 2) {
-            cands[1] = { ...cands[1], createdAt: cands[0].createdAt };
-          }
-          const { primary, others } = pickPrimaryAndOthers(cands);
-          if (primary) {
-            const maxT = Math.max(...cands.map(c => c.createdAt.getTime()));
-            expect(primary.createdAt.getTime()).toBe(maxT);
-            expect(others.length).toBe(cands.length - 1);
-          }
-        }
-      )
-    );
-  });
-
+describe('claim route invariants (property test for 409 data races)', () => {
   it('409 error classification (data race to different user): messages with "unique" or idx string yield 409 SESSION_ALREADY_CLAIMED (property over varied error strings)', async () => {
     await fc.assert(
       fc.asyncProperty(

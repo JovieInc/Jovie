@@ -21,6 +21,11 @@ import {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+const PUBLIC_PROFILE_RECOVERY =
+  "If the creator has an existing public Jovie profile, run `jovie artist get` followed by that profile's exact Jovie username. A social handle may belong to someone else on Jovie.";
+
+const UNSUPPORTED_URL_MESSAGE = `This URL is not supported for creator lookup. ${PUBLIC_PROFILE_RECOVERY}`;
+
 const querySchema = z.object({
   url: z
     .string()
@@ -66,26 +71,26 @@ function extractionFailure(error: ExtractionError) {
       return fail(
         502,
         'SOURCE_LOGIN_WALL',
-        "The platform showed a login page instead of this profile. Try the creator's YouTube channel URL."
+        `The platform showed a login page instead of this profile. ${PUBLIC_PROFILE_RECOVERY}`
       );
     case 'SOCIAL_HTML_DISABLED':
       return fail(
         422,
         'SOURCE_UNSUPPORTED',
-        "Jovie does not read this platform's pages from its servers. Try the creator's YouTube channel URL."
+        `Fresh profile extraction is unavailable for this source because Jovie does not read this platform's pages from its servers. ${PUBLIC_PROFILE_RECOVERY}`
       );
     case 'EMPTY_RESPONSE':
       return fail(
         502,
         'SOURCE_EMPTY',
-        "The platform returned no public profile data. Try the creator's YouTube channel URL."
+        `The platform returned no public profile data. ${PUBLIC_PROFILE_RECOVERY}`
       );
     default:
       return fail(502, 'LOOKUP_FAILED', 'Creator data could not be extracted.');
   }
 }
 
-/** Public, read-only extraction for supported creator profile URLs. */
+/** Read an existing linked profile before attempting available extraction. */
 export async function GET(request: Request) {
   const rateLimit = await agentCreatorLookupLimiter.limit(getClientIP(request));
   if (!rateLimit.success) {
@@ -114,7 +119,7 @@ export async function GET(request: Request) {
 
   const validated = validateCreatorUrl(parsed.data.url);
   if (!validated) {
-    return fail(422, 'UNSUPPORTED_URL', 'Use a YouTube channel URL.');
+    return fail(422, 'UNSUPPORTED_URL', UNSUPPORTED_URL_MESSAGE);
   }
 
   try {
@@ -141,7 +146,7 @@ export async function GET(request: Request) {
   try {
     const creator = await lookupCreator(parsed.data.url);
     if (!creator) {
-      return fail(422, 'UNSUPPORTED_URL', 'Use a YouTube channel URL.');
+      return fail(422, 'UNSUPPORTED_URL', UNSUPPORTED_URL_MESSAGE);
     }
 
     return NextResponse.json(

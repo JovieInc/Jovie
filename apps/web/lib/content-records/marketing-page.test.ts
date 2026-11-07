@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { MARKETING_SECTIONS } from '@/data/marketing/sections';
+import icpLanguage from '../../../../scripts/invariants/icp-language/config.json';
 import { assignExperimentArm, experimentArmBody } from './experiment';
 import { validateContentRecord } from './kind';
 import {
@@ -19,7 +20,7 @@ function cleanSpec(): MarketingPageSpec {
   const hero = spec.sections[0];
   if (hero?.section !== 'hero') throw new Error('hero first');
   hero.copy.subhead =
-    'A free profile for your work, bio, and links. Your latest release leads, with tour dates and updates one tap away.';
+    'Your profile, every release, and the people who follow your work, in one quiet workspace.';
   return spec;
 }
 
@@ -39,17 +40,28 @@ describe('marketing-page content kind', () => {
   it('keeps the code default in sync with the rendered homepage order', () => {
     expect(DEFAULT_HOME_SPEC.sections.map(s => s.section)).toEqual([
       'hero',
+      'feature-split',
       'product-gallery',
       'cta',
     ]);
   });
 
-  it('flags audience language on the general homepage (MKT-D16)', () => {
-    // The shipped default subhead still says "music"; the first publish
-    // has to clear it, and no spec can reintroduce it.
-    expect(errorsOf(DEFAULT_HOME_SPEC)).toEqual([
-      expect.stringContaining('"music" is audience language'),
-    ]);
+  it('accepts the code default: the music line is permitted on / only', () => {
+    // Tim 2026-11-03: music language is scoped to the root route, so the
+    // default validates, and so does a slot that uses the audience terms.
+    expect(errorsOf(DEFAULT_HOME_SPEC)).toEqual([]);
+    const spec = cleanSpec();
+    const hero = spec.sections[0];
+    if (hero?.section !== 'hero') throw new Error('hero first');
+    hero.copy.subhead = 'Move your music forward, one release at a time.';
+    expect(errorsOf(spec)).toEqual([]);
+  });
+
+  it('keeps the ICP term list the source guard enforces for general pages', () => {
+    // No general page key is registered yet (GENERAL_PAGE_KEYS is empty), so
+    // the rule has no reachable key. The shared term list must still carry
+    // "music", so the next general key inherits MKT-D16 rather than losing it.
+    expect(icpLanguage.terms).toContain('music');
   });
 
   it('rejects unknown records', () => {
@@ -66,6 +78,9 @@ describe('marketing-page content kind', () => {
     };
     spec.sections[0]!.copy.headline = 'A new headline';
     expect(errorsOf(spec).join(' ')).toMatch(/headline/);
+    expect(JSON.stringify(DEFAULT_HOME_SPEC.sections[0])).not.toMatch(
+      /move your music forward/
+    );
   });
 
   it('rejects variants and sections outside the renderer registry', () => {
@@ -83,7 +98,7 @@ describe('marketing-page content kind', () => {
   it('rejects prices typed into copy (same price everywhere)', () => {
     for (const text of ['Only $12 to start', 'Pro is 12 USD', 'Pay 9/mo']) {
       const spec = cleanSpec();
-      const cta = spec.sections[2];
+      const cta = spec.sections[3];
       if (cta?.section !== 'cta') throw new Error('cta last');
       cta.copy.subhead = text;
       expect(errorsOf(spec).join(' ')).toMatch(/offer truth/);
@@ -96,18 +111,18 @@ describe('marketing-page content kind', () => {
     expect(errorsOf(swapped).join(' ')).toMatch(/hero section must come first/);
 
     const ctaMiddle = cleanSpec();
-    const [hero, gallery, cta] = ctaMiddle.sections;
-    ctaMiddle.sections = [hero!, cta!, gallery!];
+    const [hero, split, gallery, cta] = ctaMiddle.sections;
+    ctaMiddle.sections = [hero!, split!, cta!, gallery!];
     expect(errorsOf(ctaMiddle).join(' ')).toMatch(/closing cta must be last/);
 
     const duplicate = cleanSpec();
-    duplicate.sections.splice(1, 0, clone(duplicate.sections[1]!));
+    duplicate.sections.splice(2, 0, clone(duplicate.sections[2]!));
     expect(errorsOf(duplicate).join(' ')).toMatch(/appears twice/);
   });
 
   it('rejects markup and multi-line copy', () => {
     const spec = cleanSpec();
-    const gallery = spec.sections[1];
+    const gallery = spec.sections[2];
     if (gallery?.section !== 'product-gallery') throw new Error('gallery');
     gallery.copy.headline = 'Bold <b>claim</b>';
     expect(errorsOf(spec).join(' ')).toMatch(/Single line/);
@@ -116,23 +131,23 @@ describe('marketing-page content kind', () => {
   it('validates experiment variants with the same rules as the control', () => {
     const spec = cleanSpec();
     const variantBody = clone(spec.sections);
-    const gallery = variantBody[1];
+    const gallery = variantBody[2];
     if (gallery?.section !== 'product-gallery') throw new Error('gallery');
-    gallery.copy.headline = 'Every fan sees one clear thing.';
+    gallery.copy.headline = 'Every release, only $12 a month.';
     spec.experiment = {
       id: 'home-gallery-headline',
-      hypothesis: 'A sharper gallery headline lifts profile claims.',
+      hypothesis: 'A sharper gallery headline lifts invite requests.',
       metric: { funnel: 'artist_signup', step: 'cta_click' },
       status: 'running',
       variants: [{ id: 'sharper', weight: 50, body: variantBody }],
     };
     expect(errorsOf(spec)).toEqual([
       expect.stringContaining(
-        'experiment.variants[0].body[1].copy.headline: "fan"'
+        'experiment.variants[0].body[2].copy.headline: prices and plan terms'
       ),
     ]);
 
-    gallery.copy.headline = 'Your profile leads with the one thing that fits.';
+    gallery.copy.headline = 'Every release, found in one place.';
     expect(errorsOf(spec)).toEqual([]);
   });
 

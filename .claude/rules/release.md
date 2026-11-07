@@ -191,6 +191,13 @@ When evidence is incomplete, keep remediation running until the relevant machine
    A PR the queue ejected for failed checks must not be re-enqueued at the same
    head: push a repair first. Re-enqueuing a rejected head poisons and rebuilds
    every merge group behind it (JOV-6620).
+   Never pass `jump: true` to `enqueuePullRequest`, and never dequeue and
+   re-enqueue to change a PR's position. A jump restarts every merge group
+   already building, so its CI starts over. On 2026-10-31, agents jumped 8
+   `compounding` PRs in 24 minutes and no group finished in that window. Only
+   `merge-queue-green-enroll.yml` jumps, under its `MAX_JUMPED` and
+   `JUMP_BATCH_S` limits. If a fix has to land first, ask the queue owner;
+   do not jump it yourself.
    Do not wait for the retired Auto-Enroll controller. GitHub owns required
    checks, native queue groups, and final merge; do not bypass them.
    Do not add, read, or retain the retired `merge-queue` label; authoritative
@@ -255,10 +262,7 @@ For each **root** comment (where `in_reply_to_id` is null) from the bots above:
 A reply, from a human or an agent, is not evidence of a fix. Close a finding only
 with evidence on the current head: `fixed-and-reverified` (a regression test or
 re-review on the new head) or `dismissed-with-evidence` (code or test shows the
-claim is false). The Jovie review kernel uses the same states
-(`candidate | verified | fixed-and-reverified | dismissed-with-evidence | stale |
-not-assessed`); see [pr-review-kernel](../../docs/evaluations/pr-review-kernel.md).
-The author fixes verified findings on the same PR before requesting merge; none of
+claim is false). The author fixes verified findings on the same PR before requesting merge; none of
 these states is a merge gate.
 
 ### When flagged

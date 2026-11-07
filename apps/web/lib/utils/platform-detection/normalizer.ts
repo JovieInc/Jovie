@@ -4,6 +4,9 @@
  */
 
 import { DOMAIN_MISSPELLINGS } from './registry';
+import { isUnsafeUrl } from './url-safety';
+
+export { isUnsafeUrl } from './url-safety';
 
 /**
  * URL dot-fix patterns for common typos
@@ -69,22 +72,6 @@ const TRACKING_PARAMS = [
 const MAX_URL_LENGTH = 2048;
 
 /**
- * Dangerous URL schemes that should be rejected
- */
-const DANGEROUS_SCHEMES = [
-  'javascript:', // NOSONAR (S5334) - Security blocklist: explicitly blocks javascript: URIs to prevent XSS
-  'data:',
-  'vbscript:',
-  'file:',
-  'mailto:',
-];
-
-/**
- * Pattern to detect encoded control characters
- */
-const ENCODED_CONTROL_PATTERN = /%(0a|0d|09|00)/i;
-
-/**
  * Reserved TikTok paths that shouldn't be prefixed with @
  */
 const TIKTOK_RESERVED_PATHS = new Set([
@@ -96,23 +83,6 @@ const TIKTOK_RESERVED_PATHS = new Set([
   'discover',
   'trending',
 ]);
-
-/**
- * Check if a URL contains dangerous schemes or encoded control characters
- */
-export function isUnsafeUrl(url: string): boolean {
-  const lowered = url.trim().toLowerCase();
-
-  if (DANGEROUS_SCHEMES.some(scheme => lowered.startsWith(scheme))) {
-    return true;
-  }
-
-  if (ENCODED_CONTROL_PATTERN.test(lowered)) {
-    return true;
-  }
-
-  return false;
-}
 
 /**
  * Fix common domain misspellings in a URL

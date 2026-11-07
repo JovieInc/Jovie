@@ -27,6 +27,25 @@ function getStepBlock(workflow: string, stepName: string): string {
 }
 
 describe('test coverage audit workflow', () => {
+  it('runs daily and manually while retaining the report publication opt-out', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const triggers = workflow.split('\non:\n')[1]!.split('\npermissions:')[0]!;
+
+    expect(triggers).toContain(
+      '  repository_dispatch:\n    types: [clock_test_coverage_audit]'
+    );
+    expect(triggers).toContain('  workflow_dispatch:');
+    expect(triggers).not.toMatch(/^  (push|schedule):/m);
+    for (const name of [
+      'Generate report publication token',
+      'Open coverage report PR',
+    ]) {
+      expect(getStepBlock(workflow, name)).toContain(
+        "if: ${{ github.event_name == 'repository_dispatch' || inputs.commit }}"
+      );
+    }
+  });
+
   it('leaves measured time for full coverage plus baseline publication', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const timeout = Number(

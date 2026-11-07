@@ -1,3 +1,5 @@
+import { DISCOVERABILITY_FLAGS } from './discoverability-defaults';
+
 export const LEGACY_STATSIG_GATE_KEYS = {
   BILLING_UPGRADE_DIRECT: 'billing.upgradeDirect',
   SMARTLINK_PRE_SAVE: 'smartlink_pre_save_campaigns',
@@ -29,8 +31,7 @@ export interface StatsigFeatureFlagsBootstrap {
 }
 
 export const APP_FLAG_DEFAULTS = {
-  YOUTUBE_WORKSPACE_NAV: false,
-  JOVIE_WORK_NAV: false,
+  ...DISCOVERABILITY_FLAGS,
   BILLING_UPGRADE_DIRECT: true,
   SMARTLINK_PRE_SAVE: true,
   IOS_APPLE_MUSIC_PRIORITY: true,
