@@ -39,6 +39,14 @@ const VALID_STATUSES = new Set([
   'retired',
   'unused',
 ]);
+/**
+ * Spend expiry statuses that no longer alert. A dated expiry whose deadline
+ * passed (lapsed) or was consumed (redeemed, superseded) is registry history:
+ * the data marks it resolved and the check skips it, mirroring retired
+ * credential statuses, so a lapsed deadline never pages forever.
+ */
+const RESOLVED_EXPIRY_STATUSES = new Set(['lapsed', 'redeemed', 'superseded']);
+const VALID_EXPIRY_STATUSES = new Set(['active', ...RESOLVED_EXPIRY_STATUSES]);
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low', 'info'];
 const PRIORITY_BY_SEVERITY = { critical: 1, high: 2, medium: 3, low: 4 };
 
@@ -147,6 +155,15 @@ export function validateSpendLedger(ledger) {
     ids.add(entry.id);
     if (entry.cap && !(entry.cap.amountUsd > 0))
       errors.push(`${entry.id}: cap.amountUsd must be positive`);
+    for (const dated of entry.expiries ?? []) {
+      if (
+        dated.status !== undefined &&
+        !VALID_EXPIRY_STATUSES.has(dated.status)
+      )
+        errors.push(
+          `${entry.id}: ${dated.id}: unknown expiry status ${dated.status}`
+        );
+    }
   }
   // funding says who pays: `cash`, or `credits` drawn from another entry (the credit pool).
   // Summer reads it to report net cash spend; an entry without it is reported as unknown.
@@ -460,6 +477,7 @@ export function evaluateSpend(ledger, nowMs, live = {}, thresholds = {}) {
       }
     }
     for (const dated of entry.expiries ?? []) {
+      if (RESOLVED_EXPIRY_STATUSES.has(dated.status)) continue;
       const expiry = expiryFinding({
         kind: 'spend',
         id: `${entry.id}:${dated.id}`,
