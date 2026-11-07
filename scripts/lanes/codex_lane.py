@@ -50,6 +50,9 @@ LEDGER_CADENCE_S = 3600
 SUBSCRIPTION_REFRESH_LEAD_S = 900
 SUBSCRIPTION_RETRY_S = 240
 EVIDENCE_MAX_AGE_S = 2 * 3600
+MODEL_CAPACITY = re.compile(r"(?:model|gpt-[\w.-]+).{0,60}(?:at capacity|temporarily unavailable|overloaded)|(?:at capacity|overloaded).{0,60}(?:model|gpt-[\w.-]+)", re.I)
+MODEL_FALLBACK_FAMILIES = ("openai:astra@latest", "openai:sol@latest", "openai:luna@latest")
+HEADROOM_ALARM_PERCENT = 20
 AUTH = re.compile(r"not logged in|login required|unauthori[sz]ed|invalid.*(token|credential)|\b401\b", re.I)
 # "Try again at 3:15 PM", "try again in 2 hours 5 minutes", "resets at 2026-09-27T01:00:00Z"
 RESET_AT = re.compile(r"(?:try again|resets?|available)\s+(?:at|on)\s+([0-9T:\-\. ]+(?:AM|PM|Z)?)", re.I)
@@ -851,6 +854,7 @@ def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> di
                     entry.update(subscriptionBinding=binding, subscriptionIdentityVerifiedAt=now)
                 previous = entry.get("capacityLease") or {}
                 entry["capacityLease"] = value
+                observe_headroom(state, name, value, now)
                 closed = closed_windows(previous, value, now)
                 if closed:
                     entry["windowHistory"] = ((entry.get("windowHistory") or []) + closed)[-WINDOW_HISTORY_MAX:]
@@ -886,6 +890,34 @@ def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> di
         return {"reconciled": value is not None, "accounts": [name] if value else [], "errors": errors}
     finally:
         handle.close()
+
+def observe_headroom(state: dict, name: str, capacity: dict, now: float) -> None:
+    """Publish one low-headroom alarm per crossing under the existing state lock.
+
+    Reading the alarm never changes admission: the 1% floor still owns that decision.
+    Reset-time drift cannot repeatedly alarm; recovery above 20% rearms the crossing.
+    """
+    windows = list((capacity.get("usableCapacityRemaining") or {}).values())
+    if not windows or any(not isinstance(w, dict) or type(w.get("remainingPercent")) not in (int, float)
+                          or not math.isfinite(w["remainingPercent"])
+                          or not 0 <= w["remainingPercent"] <= 100 for w in windows):
+        return
+    remaining = min(w["remainingPercent"] for w in windows)
+    row = state.setdefault(name, {})
+    if remaining > HEADROOM_ALARM_PERCENT:
+        row.pop("headroomAlarm", None)
+        return
+    if row.get("headroomAlarm"):
+        return
+    alarm = {"schema": "jovie.codex-headroom-alarm/v1", "at": iso(now), "account": name,
+             "remainingPercent": remaining, "thresholdPercent": HEADROOM_ALARM_PERCENT,
+             "dispatchFloorPercent": floor_percent(), "owner": "symphony",
+             "action": "continue above floor; fail over at floor; no automatic reset or paid fallback"}
+    with (STATE.parent / "capacity-events.jsonl").open("a") as stream:
+        stream.write(json.dumps(alarm, sort_keys=True) + "\n")
+    row["headroomAlarm"] = alarm
+    print("codex-lane: quota-headroom-alarm " + json.dumps(alarm, sort_keys=True), file=sys.stderr, flush=True)
+
 
 def _lease_digest(value: dict) -> str:
     stable = json.loads(json.dumps(value))
@@ -1026,7 +1058,7 @@ def maybe_redeem(name: str, handle, now: float) -> bool:
 
 
 def classify(output: str, code: int, now: float) -> tuple[str, float | None]:
-    """(kind, exhausted_until): kind is ok | rate | limit | auth | error."""
+    """(kind, exhausted_until): kind is ok | rate | limit | auth | capacity | error."""
     tail = output[-20000:]
     # Only a failed run can be an exhausted account. A successful run's transcript often
     # mentions "429", "quota" or "rate limit" (Jovie has a rate limiter), and matching that
@@ -1041,6 +1073,8 @@ def classify(output: str, code: int, now: float) -> tuple[str, float | None]:
     # benched Gem's only login for 24h on a plain 429 (2026-10-12, 96% capacity left).
     if code != 0 and AUTH.search(closing):
         return "auth", now + 24 * 3600
+    if code != 0 and MODEL_CAPACITY.search(closing):
+        return "capacity", None
     return ("ok" if code == 0 else "error"), None
 
 
@@ -1172,6 +1206,22 @@ def pick(state: dict, now: float, names: list[str] | None = None, deltas: dict |
     return None, None
 
 
+def model_fallbacks(requested: str | None) -> tuple:
+    if not subscription_pool_mode():
+        return (requested,)
+    # Read the maintained registry; providers and installed releases share these aliases.
+    directory = str(Path(__file__).resolve().parent)
+    if directory not in sys.path:
+        sys.path.insert(0, directory)
+    import model_families
+    capacity = json.loads(model_families.CAPACITY_PATH.read_text())
+    chain = tuple(model_families.resolve(capacity, alias) for alias in MODEL_FALLBACK_FAMILIES)
+    first = requested or chain[0]
+    if first.startswith("openai:"):
+        first = model_families.resolve(capacity, first)
+    return chain[chain.index(first):] if first in chain else (first,)
+
+
 def run(args) -> int:
     """One lane run. When an account hits a limit or auth failure mid-run, bank it and rotate to
     the next available account on the same worktree, so the work finishes instead of stalling.
@@ -1194,21 +1244,25 @@ def run(args) -> int:
         base += ["--sandbox", "workspace-write", "-c", 'approval_policy="on-request"',
                  "-c", 'approvals_reviewer="auto_review"', "-c", 'model_provider="openai"',
                  "-c", 'forced_login_method="chatgpt"']
-    if args.model:
-        base += ["-m", args.model]
+    models = model_fallbacks(args.model)
     if args.reasoning_effort:
         base += ["-c", f'model_reasoning_effort="{args.reasoning_effort}"']
     if args.cwd:
         base += ["-C", args.cwd]
     base.append("-")
     tried: list[str] = []
+    model_indexes: dict[str, int] = {}
+    preferred = None
     attempted = False
     wait_until, waiting = time.time() + LEASE_WAIT_S, False
     while True:
         now = time.time()
         candidates = [n for n in accounts() if n not in tried]
         state = read_state()
-        name, handle = pick(state, now, candidates)
+        name, handle = pick(state, now, [preferred]) if preferred in candidates else (None, None)
+        if name is None:
+            name, handle = pick(state, now, candidates)
+        preferred = None
         if name is None:
             busy = [n for n in candidates if available(n, state, now)]
             if busy and now < wait_until:
@@ -1228,7 +1282,9 @@ def run(args) -> int:
             "A previous attempt on this worktree stopped when its account hit a limit. Continue from the "
             "current state of the worktree (check `git status` and `git diff`); do not start over.\n\n" + prompt)
         prior_attempt, attempted = attempted, True
-        code, kind, until = run_account(name, handle, base, text, args.cwd, now,
+        model = models[model_indexes.get(name, 0)]
+        command = base[:-1] + (["-m", model] if model else []) + [base[-1]]
+        code, kind, until = run_account(name, handle, command, text, args.cwd, now,
                                         getattr(args, "receipt_file", None))
         if kind == "held":
             # Verified metadata put this alias at or below the floor before anything launched:
@@ -1237,7 +1293,15 @@ def run(args) -> int:
             print(f"codex-lane: account {name} at or below the {floor_percent():g}% floor until {iso(until)}; "
                   "failing over", file=sys.stderr)
             continue
-        if current_login_mode():
+        if kind == "capacity" and subscription_pool_mode():
+            index = model_indexes.get(name, 0) + 1
+            if index < len(models):
+                model_indexes[name] = index
+                tried.remove(name)
+                preferred = name
+                print(f"codex-lane: model {model} unavailable on {name}; trying {models[index]}", file=sys.stderr)
+            continue
+        if current_login_mode() and not subscription_pool_mode():
             # Preserve the worktree for the harness's existing retry/handoff policy;
             # never rotate accounts or consume reset credits after an exhausted run.
             return NO_ACCOUNT_EXIT if kind in ("rate", "limit", "auth") else code
@@ -1269,6 +1333,8 @@ def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float,
                                   or type(row.get("resetsAt")) is not int or row["resetsAt"] <= observed_at
                                   for row in windows.values()):
                 raise ValueError("subscription capacity metadata unavailable")
+            capacity = build_capacity_lease(name, snapshot, now=observed_at)
+            update_state(lambda st: observe_headroom(st, name, capacity, observed_at))
             # At or below the floor is held like a spent window, before anything launches: the
             # last 1% is not worth a run that dies mid-change, and nothing ran, so run() fails
             # over to the next signed-in alias ("held") instead of handing the job off.
@@ -1283,6 +1349,13 @@ def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float,
                                    lastRunAt=observed_at, lastError=METADATA_HOLD)
                 update_state(bank)
                 return NO_ACCOUNT_EXIT, "held", depleted
+            # Model names are never a new quota pool. Only advertised models may execute;
+            # an unavailable model advances the bounded ladder without banking this account.
+            requested = cmd[cmd.index("-m") + 1] if "-m" in cmd else None
+            advertised = {row.get("model") or row.get("id") for row in (snapshot.get("models") or {}).get("data", [])
+                          if isinstance(row, dict) and not row.get("hidden")}
+            if requested and requested not in advertised:
+                return NO_ACCOUNT_EXIT, "capacity", None
         update_state(lambda st: st.setdefault(name, {}).update(
             lastUsed=now, runs=int(st.get(name, {}).get("runs") or 0) + 1))
         record_lease(receipt_file, name, cwd, now)
@@ -1535,6 +1608,7 @@ def status(now: float | None = None, names: list[str] | None = None, state: dict
             "naturalResetInS": max(0, int(reset_at - now)) if isinstance(reset_at, (int, float)) else None,
             "bankedResetCount": credit_count,
             "capacityLease": capacity_lease or None,
+            "headroomAlarm": entry.get("headroomAlarm"),
         }
         rank = burn_rank(entry, now)
         rows[name].update(atFloor=bool(rank and rank["atFloor"]),
