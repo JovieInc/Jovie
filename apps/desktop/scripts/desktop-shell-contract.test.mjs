@@ -277,10 +277,10 @@ test('desktop window enters the authenticated chat shell instead of the web root
     mainSource,
     /await shell\.openExternal\(parsed\.toString\(\)\);/
   );
-  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_X = 20;/);
-  // JOV-8974: 17px native + one app-shell gap (8px) — the lights ride the
-  // titlebar band down below the window's top gutter.
-  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_Y = 25;/);
+  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_X = 12;/);
+  // JOV-8940: locked 44pt title row — 15px in-band + the JOV-8974 top
+  // gutter, so the light centers sit on the row's icon centerline.
+  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_Y = 23;/);
   assert.match(
     mainSource,
     /const MACOS_TRAFFIC_LIGHT_POSITION = \{\s*x: MACOS_TRAFFIC_LIGHT_X,\s*y: MACOS_TRAFFIC_LIGHT_Y,\s*\} as const;/
@@ -1766,16 +1766,32 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   assert.match(runtimeInit, /JovieDesktop\\\//);
   assert.match(runtimeInit, /root\.dataset\.desktopRuntime = 'electron'/);
   assert.match(runtimeInit, /root\.dataset\.devChromeDisabled = '1'/);
-  assert.match(globalsCss, /--electron-titlebar-height: 40px;/);
+  assert.match(
+    globalsCss,
+    /--electron-titlebar-height: var\(--chrome-title-row-height\);/
+  );
+  assert.match(globalsCss, /--chrome-title-row-height: 44px;/);
+  assert.match(globalsCss, /--chrome-traffic-lights-leading: 12px;/);
+  assert.match(globalsCss, /--chrome-traffic-lights-reserve: 76px;/);
   assert.match(globalsCss, /--electron-traffic-light-control-size: 14px;/);
-  assert.match(globalsCss, /--electron-traffic-light-clearance: 8px;/);
+  assert.match(globalsCss, /--electron-traffic-light-clearance: 6px;/);
+  assert.match(globalsCss, /--electron-traffic-light-toggle-gap: 12px;/);
   assert.match(globalsCss, /--electron-traffic-light-safe-width:\s*calc\(/);
   assert.doesNotMatch(
     globalsCss,
     /--electron-traffic-light-safe-width:\s*\d+px;/
   );
-  assert.match(globalsCss, /--electron-traffic-light-x: 20px;/);
-  assert.match(globalsCss, /--electron-traffic-light-y: 25px;/);
+  assert.match(
+    globalsCss,
+    /--electron-traffic-light-x: var\(--chrome-traffic-lights-leading\);/
+  );
+  assert.match(globalsCss, /--electron-traffic-light-y: 23px;/);
+  // JOV-8940: full screen hides the native lights — the reserve collapses
+  // to zero while the 44pt title row keeps its height above sidebar content.
+  assert.match(
+    globalsCss,
+    /html\[data-desktop-runtime="electron"\]\[data-electron-fullscreen="true"\] \{[\s\S]*?--electron-traffic-light-safe-width: calc\(\s*var\(--chrome-traffic-lights-reserve\)\s\*\s*0\s*\);/
+  );
   // JOV-8974: the shell keeps one gutter on every edge. The body's top
   // padding and the titlebar band's top offset both use the shell gap.
   assert.match(
@@ -1840,7 +1856,7 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
     mainSource.match(/const MACOS_TRAFFIC_LIGHT_Y = (\d+);/)?.[1]
   );
   const titlebarHeight = Number(
-    globalsCss.match(/--electron-titlebar-height: (\d+)px;/)?.[1]
+    globalsCss.match(/--chrome-title-row-height: (\d+)px;/)?.[1]
   );
   const controlDiameter = Number(
     globalsCss.match(/--electron-traffic-light-control-size: (\d+)px;/)?.[1]
@@ -1851,33 +1867,36 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
   const shellGap = Number(
     designSystem.match(/--app-shell-gap:\s*(\d+)px;/)?.[1]
   );
-  const space2Rem = Number(
-    designSystem.match(/--space-2:\s*([\d.]+)rem;/)?.[1]
+  const toggleGap = Number(
+    globalsCss.match(/--electron-traffic-light-toggle-gap:\s*(\d+)px;/)?.[1]
   );
-  const iconGap = space2Rem * 16;
   // Safe width is a calc of those tokens. The titlebar's padding-left is the
-  // shell gap, so the reserve is measured from the content origin:
-  // x - gap + 3 controls + 2 inter-light gaps + trailing clearance - icon gap.
-  const safeWidth =
-    x -
-    shellGap +
-    3 * controlDiameter +
-    2 * trailingClearance +
-    trailingClearance -
-    iconGap;
+  // shell gap, so the reserve is measured from the content origin: the
+  // spacer reaches from there to the native lights' trailing edge
+  // (leading + 3 controls + 2 inter-light clearances - gap).
+  const safeWidth = x + 3 * controlDiameter + 2 * trailingClearance - shellGap;
 
   assert.ok(Number.isFinite(x) && Number.isFinite(y));
   assert.ok(Number.isFinite(titlebarHeight) && Number.isFinite(safeWidth));
-  assert.equal(safeWidth, 70);
+  assert.equal(safeWidth, 58);
+  assert.equal(titlebarHeight, 44);
 
-  // The first interactive control starts at window x = shell gap + reserve +
-  // the shared icon gap. That must clear the third traffic light plus the
-  // trailing buffer at every supported window size.
+  // JOV-8940: the light centers must sit on the 44pt row's icon centerline:
+  // in-band y (15px) + half the control (7px) == half the row (22px).
+  assert.equal(
+    y - shellGap + controlDiameter / 2,
+    titlebarHeight / 2,
+    `native light center (${y - shellGap + controlDiameter / 2}px in-band) must match the row center (${titlebarHeight / 2}px)`
+  );
+
+  // The first interactive control starts at window x = shell gap + reserve
+  // + the locked toggle gap. That must clear the third traffic light plus
+  // the locked gap at every supported window size.
   const lightsEnd = x + 3 * controlDiameter + 2 * trailingClearance;
-  const toggleStart = shellGap + safeWidth + iconGap;
+  const toggleStart = shellGap + safeWidth + toggleGap;
   assert.ok(
-    toggleStart >= lightsEnd + trailingClearance,
-    `toggle window x (${toggleStart}px) must clear lights ending at ${lightsEnd}px plus ${trailingClearance}px`
+    toggleStart >= lightsEnd + toggleGap,
+    `toggle window x (${toggleStart}px) must clear lights ending at ${lightsEnd}px plus ${toggleGap}px`
   );
   assert.ok(
     titlebarHeight >= y + controlDiameter,
@@ -2334,4 +2353,64 @@ test('Cmd+B reaches the renderer policy without consuming editor input or other 
   beforeInput(event, { ...input, alt: true });
   beforeInput(event, { ...input, meta: false });
   assert.deepEqual(ignored, [true, true, false, false, false, false]);
+});
+
+test('Electron shell learns native full-screen transitions to collapse the traffic-light reserve', async () => {
+  const main = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const preload = await readFile(join(desktopRoot, 'src/preload.ts'), 'utf8');
+  const css = await readFile(
+    join(desktopRoot, '../web/app/globals.css'),
+    'utf8'
+  );
+  const titlebarSource = await readFile(
+    join(desktopRoot, '../web/components/organisms/DesktopTitlebar.tsx'),
+    'utf8'
+  );
+
+  // The main process broadcasts every native full-screen transition.
+  assert.match(
+    main,
+    /const FULL_SCREEN_STATE_CHANNEL = 'desktop-full-screen-changed';/
+  );
+  assert.match(
+    main,
+    /const GET_FULL_SCREEN_STATE_CHANNEL = 'desktop-get-full-screen-state';/
+  );
+  assert.match(
+    main,
+    /win\.webContents\.send\(FULL_SCREEN_STATE_CHANNEL, win\.isFullScreen\(\)\)/
+  );
+  assert.match(main, /win\.on\('enter-full-screen', sendFullScreenState\)/);
+  assert.match(main, /win\.on\('leave-full-screen', sendFullScreenState\)/);
+  assert.match(main, /ipcMain\.handle\(GET_FULL_SCREEN_STATE_CHANNEL/);
+
+  // The preload bridge exposes the state and the transition subscription.
+  assert.match(
+    preload,
+    /getFullScreenState: \(\) =>\s*ipcRenderer\.invoke\(GET_FULL_SCREEN_STATE_CHANNEL\) as Promise<boolean>/
+  );
+  assert.match(
+    preload,
+    /onFullScreenChanged: \(callback: \(isFullScreen: boolean\) => void\)/
+  );
+
+  // The renderer mirrors the native state onto the document root.
+  assert.match(titlebarSource, /observeDesktopFullScreen/);
+  assert.match(
+    titlebarSource,
+    /root\.dataset\.electronFullscreen = isFullScreen \? 'true' : 'false';/
+  );
+
+  // Full screen collapses the reserve to zero while the 44pt row keeps its
+  // height above sidebar content — no top gap appears when the lights hide.
+  const fullScreen =
+    css.match(
+      /html\[data-desktop-runtime="electron"\]\[data-electron-fullscreen="true"\] \{([^}]+)\}/
+    )?.[1] ?? '';
+  assert.match(
+    fullScreen,
+    /--electron-traffic-light-safe-width: calc\(\s*var\(--chrome-traffic-lights-reserve\)\s*\*\s*0\s*\)/
+  );
+  assert.doesNotMatch(fullScreen, /--electron-titlebar-height: 0/);
+  assert.doesNotMatch(fullScreen, /--chrome-title-row-height: 0/);
 });

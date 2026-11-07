@@ -111,27 +111,45 @@ body {
 }
 
 html[data-desktop-runtime="electron"] {
-  --electron-titlebar-height: 40px;
+  /* JOV-8940: the locked 44pt title-row chrome. The row matches the page
+     header's unified toolbar height; the native lights lead at 12px and
+     their centers sit on the row's icon centerline (15px in-band). */
+  --chrome-title-row-height: 44px;
+  --chrome-traffic-lights-leading: 12px;
+  --chrome-traffic-lights-reserve: 76px;
+  --electron-titlebar-height: var(--chrome-title-row-height);
   --electron-controls-width: 200px;
-  --electron-traffic-light-x: 20px;
+  --electron-traffic-light-x: var(--chrome-traffic-lights-leading);
   /* JOV-8974: the titlebar band sits one shell gap below the window top, so
-     the native lights ride down with it (MACOS_TRAFFIC_LIGHT_Y + gap). */
-  --electron-traffic-light-y: 25px;
+     the native lights ride down with it (15px in-band + the top gutter). */
+  --electron-traffic-light-y: 23px;
   --electron-traffic-light-control-size: 14px;
-  --electron-traffic-light-clearance: 8px;
-  /* Content origin is the shell gap (titlebar padding-left). The reserve
-     places the first control at the native lights' trailing clearance.
-     20 - 8 + 42 + 16 + 8 - 8 = 70. Toggle window x = 8 + 70 + 8 = 86. */
+  --electron-traffic-light-clearance: 6px;
+  /* The first interactive control clears the hidden native lights by the
+     locked toggle gap instead of hugging them. */
+  --electron-traffic-light-toggle-gap: 12px;
+  /* The spacer spans from the content origin (the shell gap) to the native
+     lights' trailing edge: leading + 3 controls + 2 clearances - gap
+     (12 + 42 + 12 - 8 = 58). Toggle window x = 8 + 58 + 12 = 78. */
   --electron-traffic-light-safe-width: calc(
-    var(--electron-traffic-light-x) -
-    var(--app-shell-gap) +
+    var(--chrome-traffic-lights-leading) +
     (3 * var(--electron-traffic-light-control-size)) +
-    (2 * var(--electron-traffic-light-clearance)) +
-    var(--electron-traffic-light-clearance) -
-    var(--app-shell-sidebar-icon-gap)
+    (2 * var(--electron-traffic-light-clearance)) -
+    var(--app-shell-gap)
   );
   --electron-sidebar-width: var(--app-shell-sidebar-width);
   --electron-sidebar-collapsed-width: 52px;
+}
+
+/* Full screen hides the native lights: the reserve collapses so content
+   owns the window's top-left with no dead gap, while the 44pt title row
+   above the sidebar keeps its height. */
+html[data-desktop-runtime="electron"][data-electron-fullscreen="true"] {
+  --electron-traffic-light-safe-width: calc(
+    var(--chrome-traffic-lights-reserve) *
+    0
+  );
+  --electron-controls-width: 140px;
 }
 
 html[data-desktop-runtime="electron"] body {
