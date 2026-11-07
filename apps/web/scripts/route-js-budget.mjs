@@ -137,7 +137,7 @@ export function measureRouteJs(
 }
 
 /**
- * Code that must never reach initial /app JS, identified by a string literal
+ * Code that must never reach initial browser JS, identified by a string literal
  * that survives minification. zod's translated error tables (~39 KB gzip)
  * ride in through `export * as locales` unless patches/zod@<version>.patch
  * applies; a zod bump that drops the patch would bring them back silently.
@@ -147,6 +147,11 @@ export const FORBIDDEN_CLIENT_CODE = [
     id: 'zod-locales',
     markers: ['Ungültige Eingabe', 'Μη έγκυρη είσοδος'],
     fix: 'Re-key patches/zod@<version>.patch to the resolved zod version.',
+  },
+  {
+    id: 'api-provider-registry',
+    markers: ['jovie-api-providers/v1'],
+    fix: 'Keep the API provider registry in server modules; shared image helpers must not import it.',
   },
 ];
 
@@ -160,10 +165,13 @@ export function findForbiddenClientCode(
   rules = FORBIDDEN_CLIENT_CODE
 ) {
   const routesByFile = new Map();
-  for (const { route, files } of collectRouteFiles(nextDir)) {
+  for (const { route, files } of [
+    ...collectRouteFiles(nextDir),
+    ...collectFirstLoadFiles(nextDir),
+  ]) {
     for (const file of files) {
-      if (!routesByFile.has(file)) routesByFile.set(file, []);
-      routesByFile.get(file).push(route);
+      if (!routesByFile.has(file)) routesByFile.set(file, new Set());
+      routesByFile.get(file).add(route);
     }
   }
   const hits = [];
@@ -171,7 +179,12 @@ export function findForbiddenClientCode(
     const source = readFileSync(join(nextDir, file), 'utf8');
     for (const rule of rules) {
       if (rule.markers.some(marker => source.includes(marker))) {
-        hits.push({ id: rule.id, fix: rule.fix, file, routes: routes.sort() });
+        hits.push({
+          id: rule.id,
+          fix: rule.fix,
+          file,
+          routes: [...routes].sort(),
+        });
       }
     }
   }
@@ -518,7 +531,7 @@ function main() {
   const forbidden = findForbiddenClientCode(options.nextDir);
   for (const hit of forbidden) {
     console.error(
-      `::error::${hit.file} ships forbidden client code (${hit.id}) in ${hit.routes.length} /app routes, e.g. ${hit.routes[0]}. ${hit.fix}`
+      `::error::${hit.file} ships forbidden client code (${hit.id}) in ${hit.routes.length} routes, e.g. ${hit.routes[0]}. ${hit.fix}`
     );
   }
   process.exit(result.ok && forbidden.length === 0 ? 0 : 1);

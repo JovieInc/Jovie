@@ -1,3 +1,4 @@
+import apiProviders from '@jovie/api-client/providers.json';
 import {
   getCspConnectSrcDomains,
   getCspImgSrcDomains,
@@ -122,6 +123,7 @@ const STATIC_CSP_PARTS = {
   connectSrcBase: [
     "connect-src 'self'",
     ...getCspConnectSrcDomains(),
+    ...apiProviders.providers.elevenlabs.hosts.map(host => `wss://${host}`),
     'https://api.stripe.com',
     'https://*.ingest.sentry.io',
     'https://*.ingest.us.sentry.io',

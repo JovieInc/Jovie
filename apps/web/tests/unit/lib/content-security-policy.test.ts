@@ -1,3 +1,4 @@
+import apiProviders from '@jovie/api-client/providers.json';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildContentSecurityPolicy,
@@ -109,6 +110,18 @@ describe('buildContentSecurityPolicy', () => {
     const connectSrc = findDirective(csp, 'connect-src');
 
     expect(connectSrc).toContain('https://api.qrserver.com');
+  });
+
+  it('includes registry realtime sockets in connect-src', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const connectSrc = findDirective(csp, 'connect-src');
+
+    for (const host of apiProviders.providers.elevenlabs.hosts) {
+      expect(connectSrc).toContain(`wss://${host}`);
+    }
   });
 
   it('includes Sentry regional ingest wildcard in connect-src', () => {

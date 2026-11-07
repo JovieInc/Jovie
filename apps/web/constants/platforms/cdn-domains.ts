@@ -11,8 +11,6 @@
  * The sync test ensures all consumers stay in sync.
  */
 
-import { ALL_PLATFORMS } from './data';
-
 /**
  * CDN domains for each supported platform.
  *
@@ -21,6 +19,8 @@ import { ALL_PLATFORMS } from './data';
  *
  * Platforms with no known image CDN use an empty array.
  */
+import { ALL_PLATFORMS } from './data';
+
 export const PLATFORM_CDN_DOMAINS: Record<string, readonly string[]> = {
   // ── Music DSPs ──────────────────────────────────────────────
   spotify: ['i.scdn.co', '*.scdn.co', '*.spotifycdn.com'],
@@ -195,8 +195,9 @@ export function getCspMediaSrcDomains(): string[] {
 }
 
 /**
- * Returns all connect domains prefixed with `https://` for CSP connect-src.
- * Used by content-security-policy.ts.
+ * Returns fetch hosts prefixed with `https://` for CSP connect-src.
+ * Realtime websocket hosts stay in content-security-policy.ts. This module
+ * is imported by client image helpers, so it must not load the provider registry.
  */
 export function getCspConnectSrcDomains(): string[] {
   return [...new Set(INFRASTRUCTURE_CONNECT_DOMAINS)].map(d => `https://${d}`);
