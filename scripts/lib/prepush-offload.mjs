@@ -74,3 +74,23 @@ export function chooseBackend({
   if (gem && gem.cores && gem.load <= gem.cores * 1.5) return 'gem';
   return 'actions';
 }
+
+/** Gem's exit code (EX_TEMPFAIL) when every remote slot stayed busy past the queue limit: infra, not a verdict. */
+export const SLOTS_BUSY_EXIT = 75;
+/** Default seconds the hook waits for a Gem slot before handing off to hosted runners. */
+export const DEFAULT_GEM_QUEUE_MAX_SEC = 90;
+
+/**
+ * A backend that could not run the gate: command missing (127), ssh/transport
+ * failure (255) or every Gem slot busy past the limit (75). The hook moves on to
+ * the next backend; the gate itself is never skipped.
+ */
+export function isBackendUnavailable(code) {
+  return code === 127 || code === 255 || code === SLOTS_BUSY_EXIT;
+}
+
+/** Seconds to queue for a Gem slot; JOVIE_PREPUSH_GEM_QUEUE_MAX_SEC=0 waits forever. */
+export function gemQueueMaxSec(env = process.env) {
+  const v = Number.parseInt(env.JOVIE_PREPUSH_GEM_QUEUE_MAX_SEC ?? '', 10);
+  return Number.isFinite(v) && v >= 0 ? v : DEFAULT_GEM_QUEUE_MAX_SEC;
+}
