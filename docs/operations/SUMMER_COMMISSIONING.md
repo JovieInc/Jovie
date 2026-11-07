@@ -124,8 +124,9 @@ node --test scripts/summer-commissioning/architecture-freshness.test.mjs
 The validator deliberately fails if a current context reactivates Hermes or
 Trigger.dev, if a historical page lacks its retirement notice, or if current
 records are expired or conflicting. Historical pages are stubs. The old bodies
-are git history, not instructions. `retired-notes-stub.test.mjs` fails if a
-procedure is pasted back.
+are git history, not instructions.
+`scripts/summer-commissioning/company-registry.test.mjs` fails if a procedure
+is pasted back.
 
 ## Direct capability access audit
 
