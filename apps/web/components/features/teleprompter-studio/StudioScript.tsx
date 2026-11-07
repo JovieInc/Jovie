@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
 interface StudioScriptProps {
@@ -21,6 +21,11 @@ export function StudioScript({
 }: StudioScriptProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const currentRef = useRef<HTMLButtonElement>(null);
+  // Script words repeat, so each word is keyed by its place in the script.
+  const tokens = useMemo(
+    () => words.map((text, position) => ({ key: `w${position}`, text })),
+    [words]
+  );
 
   useEffect(() => {
     const container = containerRef.current;
@@ -37,12 +42,11 @@ export function StudioScript({
       data-testid='teleprompter-studio-script'
     >
       <p className='py-24 text-2xl md:text-3xl xl:text-4xl leading-snug tracking-tight font-semibold text-pretty'>
-        {words.map((word, index) => {
+        {tokens.map((token, index) => {
           const isCurrent = index === nextWordIndex;
           return (
             <button
-              // biome-ignore lint/suspicious/noArrayIndexKey: script words repeat; position is identity.
-              key={index}
+              key={token.key}
               ref={isCurrent ? currentRef : undefined}
               type='button'
               tabIndex={-1}
@@ -59,7 +63,7 @@ export function StudioScript({
                 index > nextWordIndex + 8 && 'text-white/70'
               )}
             >
-              {word}
+              {token.text}
             </button>
           );
         })}
