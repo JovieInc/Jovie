@@ -131,3 +131,32 @@ test('emails once per incident (down and recovery, not re-pages) and pages Summe
     '1000'
   );
 });
+
+test('a page that reaches no channel does not start the re-page quiet window', async () => {
+  const store = new Map();
+  const STATE = {
+    get: async k => store.get(k) ?? null,
+    put: async (k, v) => {
+      store.set(k, v);
+    },
+  };
+  const failing = async (u, init) =>
+    init?.method === 'POST' ? res(500) : res(503);
+  const env = {
+    STATE,
+    TARGETS: 'https://jov.ie/',
+    FAILURES_TO_PAGE: '1',
+    PAGE_URLS: 'https://a.example/h',
+  };
+  const first = await run(env, 1000, failing);
+  assert.equal(first.page, 'down');
+  assert.equal(first.delivered, 0);
+  const second = await run(env, 61_000, failing);
+  assert.equal(second.page, 'down', 'the next minute tries to page again');
+  const ok = async (u, init) => (init?.method === 'POST' ? res(200) : res(503));
+  const third = await run(env, 121_000, ok);
+  assert.equal(third.page, 'down');
+  assert.equal(third.delivered, 1);
+  const fourth = await run(env, 181_000, ok);
+  assert.equal(fourth.page, null, 'a delivered page starts the quiet window');
+});

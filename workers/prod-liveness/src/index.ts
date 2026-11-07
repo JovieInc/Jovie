@@ -224,6 +224,14 @@ export async function run(
         : []),
     ]);
     delivered = sent.filter(s => s.status === 'fulfilled' && s.value.ok).length;
+    if (delivered === 0 && page !== 'recovered' && env.STATE) {
+      // Nothing reached anyone: do not start the re-page quiet window, so the
+      // next minute tries again instead of staying silent for 30 minutes.
+      await env.STATE.put(
+        'state',
+        JSON.stringify({ ...state, pagedAt: prev.pagedAt })
+      );
+    }
     if (delivered === 0)
       console.error(
         JSON.stringify({
