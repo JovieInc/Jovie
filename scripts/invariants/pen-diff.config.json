@@ -1,0 +1,45 @@
+{
+  "$comment": "Single source of thresholds and scope for design:pen-diff (Pen-to-code merge gate). Tightening is free; loosening needs a taste call.",
+  "viewports": [1440, 390],
+  "thresholds": {
+    "ssimMin": 0.82,
+    "boxAspectTolerance": 0.1
+  },
+  "scopeRoutes": {
+    "/": [
+      "apps/web/app/(home)/**",
+      "apps/web/components/homepage/**",
+      "apps/web/components/features/home/**",
+      "apps/web/components/marketing/home/**"
+    ],
+    "/pricing": [
+      "apps/web/app/(marketing)/pricing/**",
+      "apps/web/components/marketing/pricing/**"
+    ],
+    "/onboarding": [
+      "apps/web/app/onboarding/**",
+      "apps/web/components/features/onboarding/**"
+    ],
+    "/app/dashboard": [
+      "apps/web/app/app/(shell)/dashboard/**",
+      "apps/web/components/features/dashboard/**"
+    ],
+    "/[username]": [
+      "apps/web/app/[username]/**",
+      "apps/web/components/features/profile/**"
+    ],
+    "/checkout": [
+      "apps/web/app/(marketing)/checkout/**",
+      "apps/web/components/features/checkout/**"
+    ]
+  },
+  "baselinePrefixes": {
+    "/": ["homepage"],
+    "/pricing": ["pricing"],
+    "/onboarding": ["onboarding"],
+    "/app/dashboard": ["dashboard"],
+    "/[username]": ["profile"],
+    "/checkout": ["checkout"]
+  },
+  "ignoreSourceGlobs": ["**/*.test.*", "**/*.stories.*", "**/__tests__/**"]
+}

@@ -15,14 +15,17 @@
 import { spawnSync } from 'node:child_process';
 import {
   copyFileSync,
+  existsSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   rmSync,
   statSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { protectedBaselineReason } from './invariants/pen-diff-lib.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const SNAPSHOT_ROOT = join(
@@ -46,7 +49,20 @@ function walk(dir) {
  * Map each `<name>-actual.png` to the one committed baseline named
  * `<name>.png`. Ambiguous or unknown names are reported, never guessed.
  */
-export function planAdoption(actualPaths, baselinePaths) {
+export function loadPenGuard(root = REPO_ROOT) {
+  const read = p => (existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : {});
+  return {
+    bindings: read(join(root, 'docs/design-system/pen-bindings.json')),
+    config: read(join(root, 'scripts/invariants/pen-diff.config.json')),
+  };
+}
+
+export function planAdoption(
+  actualPaths,
+  baselinePaths,
+  guard = loadPenGuard()
+) {
+  const { bindings, config } = guard;
   const byName = new Map();
   for (const path of baselinePaths) {
     const name = basename(path);
@@ -62,7 +78,13 @@ export function planAdoption(actualPaths, baselinePaths) {
     if (seen.has(name)) continue; // retries write the same shot more than once
     seen.add(name);
     const matches = byName.get(name) ?? [];
-    if (matches.length === 1) copies.push({ from: actual, to: matches[0] });
+    const refused =
+      matches.length === 1
+        ? protectedBaselineReason(matches[0], bindings, config)
+        : null;
+    if (refused) problems.push(`refusing to adopt ${name}: ${refused}`);
+    else if (matches.length === 1)
+      copies.push({ from: actual, to: matches[0] });
     else
       problems.push(
         matches.length === 0

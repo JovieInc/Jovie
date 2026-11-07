@@ -47,3 +47,24 @@ test('reports unknown and ambiguous names instead of guessing', () => {
     'ambiguous baseline dup.png: 2 matches',
   ]);
 });
+
+test('refuses to adopt a baseline for a route bound to an approved Pen design', () => {
+  const guard = {
+    bindings: {
+      routes: {
+        '/': {
+          sources: [],
+          approved: { by: 'tim', at: '2026-11-07T00:00:00Z', receipt: 'r' },
+        },
+      },
+    },
+    config: { baselinePrefixes: { '/': ['homepage'] } },
+  };
+  const { copies, problems } = planAdoption(
+    ['/tmp/a/homepage-375-actual.png', '/tmp/a/other-actual.png'],
+    ['/repo/snap/homepage-375.png', '/repo/snap/other.png'],
+    guard
+  );
+  assert.equal(copies.length, 1);
+  assert.match(problems.join('\n'), /refusing to adopt homepage-375\.png/);
+});
