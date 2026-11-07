@@ -57,6 +57,7 @@ import {
   getWorktreeSentryOptions,
   type WorktreeSentryOptions,
 } from '@/lib/observability/worktree-runtime';
+import { scrubDisplayBreadcrumb } from '@/lib/ovie/display/scrub';
 import {
   isNonActionableLoopbackBetterAuthHostEvent,
   isNonActionableSpotifyReleaseCreditBoundEvent,
@@ -591,6 +592,9 @@ export interface BaseSentryClientConfig extends WorktreeSentryOptions {
     event: SentryEvent,
     hint?: SentryEventHint
   ) => SentryEvent | null;
+  beforeBreadcrumb?: (
+    breadcrumb: Sentry.Breadcrumb
+  ) => Sentry.Breadcrumb | null;
   ignoreErrors?: Array<string | RegExp>;
 }
 
@@ -654,6 +658,8 @@ export function getBaseClientConfig(): BaseSentryClientConfig {
       graphQL: { document: false, variables: false },
     },
     beforeSend: scrubPii,
+    // Display proofs ride a URL fragment that navigation breadcrumbs record.
+    beforeBreadcrumb: scrubDisplayBreadcrumb,
     ignoreErrors: [
       ...UPSTASH_QUOTA_IGNORE_ERRORS,
       // React hooks mismatch: known bug in onboarding/settings — tracked separately.

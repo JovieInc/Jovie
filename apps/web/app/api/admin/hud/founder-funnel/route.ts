@@ -7,6 +7,7 @@ import {
   getFounderFunnelData,
 } from '@/lib/admin/founder-funnel';
 import { captureError } from '@/lib/error-tracking';
+import { isDisplayReadRequest } from '@/lib/ovie/display/server';
 import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 export const runtime = 'nodejs';
@@ -45,7 +46,9 @@ async function authorizeAdmin(): Promise<Response | null> {
  */
 export async function GET(request: Request): Promise<Response> {
   try {
-    const authResponse = await authorizeAdmin();
+    const authResponse = (await isDisplayReadRequest(request))
+      ? null
+      : await authorizeAdmin();
     if (authResponse) return authResponse;
 
     const funnel = await getFounderFunnelData(parseRange(request));
