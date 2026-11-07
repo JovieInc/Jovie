@@ -360,7 +360,7 @@ def _expired_row(rows: list[dict], ident: dict, active: dict, now: float) -> dic
     expired["diagnosis"] = _diagnosis([*rows, expired], "failed_unknown")
     return expired
 def _number(value) -> bool: return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
-def claim(path: Path, ident: dict, owner: dict, policy: dict, trigger: dict, now: float | None = None, coordination: dict | None = None) -> dict:
+def claim(path: Path, ident: dict, owner: dict, policy: dict, trigger: dict, now: float | None = None, coordination: dict | None = None, min_reservation: dict | None = None) -> dict:
     now = time.time() if now is None else now
     required = ("attempts", "concurrency", "wallSeconds", "spend", "mutations", "leaseSeconds")
     if any(not _number(policy.get(key)) or policy[key] < 0 for key in required) or any(policy[key] <= 0 for key in required[:3] + ("leaseSeconds",)): raise ValueError("execution-policy-malformed")
@@ -382,8 +382,8 @@ def claim(path: Path, ident: dict, owner: dict, policy: dict, trigger: dict, now
         # positive boundary still fails closed; positive exhausted caps retain
         # their existing stop semantics. This never grants a provider route.
         exhausted = next((key for key in ("attempts", "concurrency", "wallSeconds", "spend", "mutations")
-                          if used[key] >= policy[key] and not
-                          (key in {"spend", "mutations"} and used[key] == policy[key] == 0)), None)
+                          if (used[key] >= policy[key] and not (key in {"spend", "mutations"} and used[key] == policy[key] == 0))
+                          or used[key] + (min_reservation or {}).get(key, 0) > policy[key]), None)  # JOV-11407: room for the dispatch
         if exhausted:
             row = {**ident, "schema": SCHEMA, "event": "decision", "at": now, "terminalState": "budget_exhausted", "retryDecision": "stop",
                    "reason": f"{exhausted}_budget_exhausted", "diagnosis": _diagnosis(rows, "budget_exhausted")}
