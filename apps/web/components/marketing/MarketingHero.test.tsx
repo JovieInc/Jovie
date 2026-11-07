@@ -14,6 +14,25 @@ vi.mock('@/components/features/home/HomeTrustSection', () => ({
   HomeTrustSection: () => <div data-testid='home-trust-section' />,
 }));
 
+describe('MarketingHero content headline clamp', () => {
+  it('lets a locked content-mode headline paint unclamped', () => {
+    render(
+      <MarketingHero
+        headline='Jovie helps you move your music forward.'
+        subtitle='One quiet workspace.'
+        primaryCta={{ label: 'Request an Invite', href: '#request-invite' }}
+        headingId='unclamped-hero'
+        headlineMaxLines='none'
+      />
+    );
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading).not.toHaveClass('line-clamp-2');
+    expect(heading).not.toHaveClass('line-clamp-3');
+    expect(heading).not.toHaveClass('marketing-h1-max-two-lines');
+    expect(heading.style.maxBlockSize).toBe('none');
+  });
+});
+
 describe('MarketingHero source-backed default story', () => {
   it('puts an explicit delegated owner on the semantic root in both shell and content modes', () => {
     const owner = 'apps/web/components/homepage/HomepageArtistProfile.tsx';
