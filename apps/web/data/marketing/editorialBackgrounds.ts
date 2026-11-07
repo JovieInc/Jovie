@@ -224,11 +224,7 @@ export const EDITORIAL_BACKGROUND_FLOW: MarketingEditorialBackgroundVariant = {
     approvedTargets: ['#24 material/light quality, unified field'],
     specIssueId: 'JOV-6246',
   },
-  accent: sceneAccent(
-    'ion',
-    '--system-b-accent-cyan',
-    '--color-accent-blue-subtle'
-  ),
+  accent: sceneAccent('ion', '--noir-ion-ion', '--color-accent-blue-subtle'),
   composition: {
     focal: {
       desktop: { x: 78, y: 30 },

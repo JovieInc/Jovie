@@ -326,6 +326,7 @@ export type {
 export {
   auditMarketingMediaRecipeDecision,
   COMPACT_GLASS_MEDIA_RECIPE,
+  createMarketingMediaRecipeInput,
   DARK_GLASS_MEDIA_RECIPE,
   FLOWING_ACCENT_MEDIA_RECIPE,
   formatMarketingMediaRecipesForPrompt,
@@ -333,6 +334,7 @@ export {
   isApprovedMarketingMediaRecipeId,
   JOVIE_MARKETING_MEDIA_RECIPE_SCHEMA,
   JOVIE_MARKETING_MEDIA_RECIPE_VERSION,
+  MARKETING_MEDIA_PRESENTATIONS,
   MARKETING_MEDIA_RECIPE_ACCENTS,
   MARKETING_MEDIA_RECIPE_FOUNDER_LOCK,
   MARKETING_MEDIA_RECIPE_IDS,
@@ -342,7 +344,9 @@ export {
   MARKETING_MEDIA_RECIPE_SOURCE_MATRIX,
   MARKETING_MEDIA_RECIPES,
   MARKETING_MEDIA_SAFE_AREA_POLICIES,
+  MarketingMediaRecipeInputSchema,
   resolveMarketingMediaRecipeForExport,
+  resolveMarketingMediaRequest,
   SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE,
   validateMarketingMediaRecipeInput,
 } from './mediaRecipes';
