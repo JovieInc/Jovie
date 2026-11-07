@@ -8092,7 +8092,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                            "leaseSeconds": host.agent_timeout + 900, "version": "lanes-v1"},
                                           {"triggerId": run_id, "correlationId": f"pr-{pr['number']}",
                                            "causationId": pr["headRefOid"]}, coordination=coordination,
-                                          min_reservation={"spend": 1, "mutations": 1})
+                                          min_reservation={"spend": 1, "mutations": 1 + (len(conflict_resolvers()) if pr.get("mergeStateStatus") == "DIRTY" else 0)})
     except Exception as error:
         # Same contract as run_issue (JOV-7191): a claim failure must leave a ledger
         # receipt instead of a worker exit the doctor can only see as spawn-exit.
