@@ -21,4 +21,14 @@ describe('ProviderIcon', () => {
 
     expect(screen.getByLabelText('Unsupported provider')).toBeInTheDocument();
   });
+
+  it('renders a brand glyph for newly supported VK Music and Traxsource', () => {
+    for (const provider of ['vk_music', 'traxsource'] as ProviderKey[]) {
+      const { container, unmount } = render(
+        <ProviderIcon provider={provider} aria-label={provider} />
+      );
+      expect(container.querySelector('svg path')).not.toBeNull();
+      unmount();
+    }
+  });
 });
