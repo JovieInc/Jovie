@@ -92,7 +92,7 @@ import capacity_registry  # noqa: E402  (caps and policies come from ops/registr
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
 import qualification_guard  # noqa: E402
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
-import binding_turns, bindings, ledger_read  # noqa: E401,E402  (extra Linear team -> repo bindings, e.g. LYB)
+import binding_turns, bindings, issue_turns, ledger_read  # noqa: E401,E402  (extra Linear team -> repo bindings, e.g. LYB)
 import binding_refill  # noqa: E402  (Backlog -> Todo refill per extra binding)
 import priority_admission  # noqa: E402  (Urgent/Summer-ranked admission, Todo WIP sanity, claim rank; JOV-7073)
 import macos_pool  # noqa: E402  (shared hosted-macOS pool: measure, record, gate LYB iOS intake)
@@ -144,7 +144,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_migration_renumber.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_migration_renumber.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -7167,38 +7167,6 @@ def snap_spacing_fix(host: Host, pr: dict, route: dict, worktree: Path, log, rec
     return types.SimpleNamespace(returncode=0)
 
 
-def repair_launch_cache_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
-    """Regenerate the artist-launch manifest and drop legacy cache exports from files this PR adds."""
-    listed = sh(["git", "diff", "--name-only", "--diff-filter=A", "origin/main...HEAD"],
-                cwd=worktree, log=log, timeout=120)
-    if listed.returncode:
-        return None
-    edited = fix_red_classes.strip_added_legacy_cache_exports(
-        worktree, [line for line in (listed.stdout or "").splitlines() if line.strip()])
-    if sh(["node", "scripts/artist-launch-contract.mjs", "--write"], cwd=worktree, log=log, timeout=180).returncode:
-        return None
-    if sh(["node", "scripts/artist-launch-contract.mjs", "--check"], cwd=worktree, log=log, timeout=180).returncode:
-        return None
-    paths = [*edited, "docs/product/generated/artist-launch-inventory.json"]
-    dirty = sh(["git", "diff", "--quiet", "--", *paths], cwd=worktree, log=log, timeout=120)
-    staged = sh(["git", "diff", "--cached", "--quiet", "--", *paths], cwd=worktree, log=log, timeout=120)
-    if dirty.returncode == 0 and staged.returncode == 0:
-        return None
-    if sh(["git", "add", "--", *paths], cwd=worktree, log=log, timeout=120).returncode:
-        return None
-    committed = sh(["git", "commit", "-q", "-m",
-                    "fix(ci): refresh launch inventory and drop new legacy cache exports"],
-                   cwd=worktree, log=log, timeout=900)
-    if committed.returncode:
-        return None
-    require_fix_target(pr, "before-launch-cache-push", worktree=worktree, repair=True)
-    if sh(["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"],
-          cwd=worktree, log=log, timeout=900).returncode:
-        return None
-    receipt.update(resolution="repaired-launch-cache", launchCacheFiles=edited)
-    return types.SimpleNamespace(returncode=0)
-
-
 def claim_route(host: Host, pr: dict, action: str) -> bool:
     """True once per (PR, head, action): a deterministic route is tried once, then the model gets the head."""
     taken = []
@@ -8231,8 +8199,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                          fix_red_classes.RENUMBER: renumber_migrations_fix,
                          fix_red_classes.SNAP_SPACING: snap_spacing_fix,
                          fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix,
-                         fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix,
-                         fix_red_classes.REPAIR_LAUNCH_CACHE: repair_launch_cache_fix}.get((route or {}).get("action"))
+                         fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix}.get((route or {}).get("action"))
                 agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
                 agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
@@ -9691,15 +9658,15 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             if local and rung_inventory_valid else []
         # A fixed share of turns gates green drafts first: red repairs otherwise took 94-99% of
         # lane turns and green drafts waited hours for a gate (2026-10-21, Gem ledger).
-        if local and provider_may_run(name, "adopt") and adoption_turn_due(host):
+        if local and not issue_turns.due(host.state, name, skip=maintenance_only) and provider_may_run(name, "adopt") and adoption_turn_due(host):
             adopt = claim_adoptable_pr(host, name, prs, candidates)
-        red = None if adopt else local and (pr_events.claim_event_pr(host, THIS, name, events)
+        red = None if adopt or issue_turns.due(host.state, name, skip=maintenance_only) else local and (pr_events.claim_event_pr(host, THIS, name, events)
                          or claim_escalation_pr(host, name, list({pr["number"]: pr
                                                                for pr in candidates + rung_candidates}.values()),
                                                 routing_context=routing_context)
                          or claim_red_pr(host, name, candidates)) or None
         if adopt is None:
-            adopt = None if red or not local or not provider_may_run(name, "adopt") \
+            adopt = None if red or not local or issue_turns.due(host.state, name, skip=maintenance_only) or not provider_may_run(name, "adopt") \
                 else claim_adoptable_pr(host, name, prs, candidates)
         if local:
             selected = {red["number"]} if red else {adopt.pr["number"]} if adopt else set()
@@ -9795,7 +9762,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         issue = None
         rate_limited = red is None and adopt is None
     finally:
-        claim.release()
+        claim.release(); issue_turns.record(host.state, name, served_repair=bool(red or adopt), found_issue=issue is not None, skip=maintenance_only)
     if repair_inventory_held:
         held_summary = repair_inventory.get("summary") if isinstance(repair_inventory, dict) else None
         held_summary = held_summary if isinstance(held_summary, dict) else {}

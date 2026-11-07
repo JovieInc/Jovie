@@ -26,52 +26,12 @@ class ClassifyTest(unittest.TestCase):
             "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.": ("spacing-scale", "snap-spacing"),
             "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence": ("census-certification", "sync-main"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "atomic-write"),
-            "launch inventory drift: classify/review new routes and regenerate the manifest": ("launch-cache", "repair-launch-cache"),
-            "Error: legacy Cache Components surface grew to 246 (maximum 245):": ("launch-cache", "repair-launch-cache"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
             "AssertionError: expected 1": ("other", "agent"),
         }
         for log, (cls, action) in cases.items():
             got = classes.classify(pr("Source Validation"), {"Source Validation": log})
             self.assertEqual((got["cls"], got["action"]), (cls, action), log)
-
-    def test_launch_cache_outranks_rate_limit_noise_and_unexplained_companions(self):
-        log = (
-            "launch inventory drift: classify/review new routes and regenerate the manifest\n"
-            "Error: legacy Cache Components surface grew to 246 (maximum 245):\n"
-            "run 900 attempt 1 failed on GitHub primary-rate-limit: re-ran failed jobs\n"
-            "HttpError: API rate limit exceeded for installation\n"
-        )
-        got = classes.classify(pr("Source Validation"), {"Source Validation": log})
-        self.assertEqual((got["cls"], got["action"]), ("launch-cache", "repair-launch-cache"))
-        companion = classes.classify(pr("Source Validation", "Tently"), {
-            "Source Validation": log, "Tently": "provider timeout"})
-        self.assertEqual((companion["cls"], companion["action"]), ("launch-cache", "repair-launch-cache"))
-        blocked = classes.classify(pr("Source Validation", "Migration Guard"), {
-            "Source Validation": log, "Migration Guard": "API rate limit exceeded"})
-        self.assertEqual(blocked["cls"], "mixed")
-
-    def test_strip_added_legacy_cache_exports_leaves_grandfathered_files(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            added = root / "apps/web/app/api/x/route.ts"
-            added.parent.mkdir(parents=True)
-            added.write_text(
-                "export const runtime = 'nodejs';\n"
-                "export const dynamic = 'force-dynamic';\n"
-                "export async function POST() {}\n")
-            old = root / "apps/web/app/old/route.ts"
-            old.parent.mkdir(parents=True)
-            old.write_text("export const dynamic = 'force-dynamic';\n")
-            changed = classes.strip_added_legacy_cache_exports(
-                root, ["apps/web/app/api/x/route.ts"])
-            self.assertEqual(changed, ["apps/web/app/api/x/route.ts"])
-            text = added.read_text()
-            self.assertIn("export const runtime", text)
-            self.assertNotIn("dynamic", text)
-            self.assertIn("dynamic", old.read_text())
-            again = classes.strip_added_legacy_cache_exports(root, ["apps/web/app/api/x/route.ts"])
-            self.assertEqual(again, [])
 
     def test_unwired_files_are_extracted_and_aggregates_ignored(self):
         got = classes.classify(pr("Source Validation"), {"Source Validation":
