@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  classifyRoutes,
-  compareSection,
-  globToRegExp,
-  matchesAny,
+  isEnforced,
+  loadBindings,
   validateBindings,
-} from './pen-diff-lib.mjs';
+} from '../design/pen-bindings-lib.mjs';
+import { classifyRoutes, compareSection } from './pen-diff-lib.mjs';
 import { encodePng, fillRect, solidImage } from './pen-still-diff-lib.mjs';
 
 const T = { ssimMin: 0.82, boxAspectTolerance: 0.1 };
@@ -33,42 +32,15 @@ const pricing = {
   viewports: {},
 };
 
-test('globs: ** crosses dirs, * does not, brackets and parens are literal', () => {
-  assert.ok(
-    globToRegExp('apps/web/app/(home)/**').test('apps/web/app/(home)/a/b.tsx')
+test('the real manifest validates and, with nothing enforced, never fails a PR', () => {
+  const bindings = loadBindings();
+  assert.deepEqual(validateBindings(bindings), []);
+  const files = Object.values(bindings.routes).flatMap(r =>
+    r.sources.map(s => s.replace(/\*+.*$/, 'x.tsx'))
   );
-  assert.ok(!globToRegExp('apps/*/x.ts').test('apps/a/b/x.ts'));
-  assert.ok(
-    globToRegExp('apps/web/app/[username]/**').test(
-      'apps/web/app/[username]/page.tsx'
-    )
-  );
-  assert.ok(matchesAny('a/b.test.ts', ['**/*.test.*']));
-});
-
-test('bindings validation rejects bad shape and accepts good shape', () => {
-  assert.equal(validateBindings({ schema: 'nope', routes: {} }).ok, false);
-  assert.equal(validateBindings(null).ok, false);
-  const bad = validateBindings({
-    schema: 'jovie.pen-binding/v1',
-    routes: { '/': { sources: 'x' } },
-  });
-  assert.equal(bad.ok, false);
-  assert.equal(
-    validateBindings({
-      schema: 'jovie.pen-binding/v1',
-      routes: { '/': entry() },
-    }).ok,
-    true
-  );
-  const noViewport = entry({ viewports: { 1440: [{ section: 'hero' }] } });
-  assert.equal(
-    validateBindings({
-      schema: 'jovie.pen-binding/v1',
-      routes: { '/': noViewport },
-    }).ok,
-    false
-  );
+  const r = classifyRoutes({ bindings, config: cfg, changedFiles: files });
+  const anyEnforced = Object.values(bindings.routes).some(isEnforced);
+  if (!anyEnforced) assert.equal(r.failures.length, 0);
 });
 
 test('bound route with matching changed source is checked', () => {

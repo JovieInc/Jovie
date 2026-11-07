@@ -3,76 +3,15 @@
  * Binding shape: jovie.pen-binding/v1 (docs/design-system/pen-bindings.json).
  * Thresholds and scope live in pen-diff.config.json only.
  */
+import {
+  isEnforced,
+  matchesAny,
+  routesForFiles,
+} from '../design/pen-bindings-lib.mjs';
 import { diffImage, resizeImage, ssim } from './pen-still-diff-lib.mjs';
 
-export const BINDING_SCHEMA = 'jovie.pen-binding/v1';
-
-/** `**` crosses directories, `*` does not; brackets and parens are literal. */
-export function globToRegExp(glob) {
-  let out = '';
-  for (let i = 0; i < glob.length; i++) {
-    const c = glob[i];
-    if (c === '*' && glob[i + 1] === '*') {
-      i += 1;
-      if (glob[i + 1] === '/') {
-        i += 1;
-        out += '(?:.*/)?';
-      } else out += '.*';
-    } else if (c === '*') out += '[^/]*';
-    else if (c === '?') out += '[^/]';
-    else out += c.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-  }
-  return new RegExp(`^${out}$`);
-}
-
-export function matchesAny(file, globs) {
-  return globs.some(g => globToRegExp(g).test(file));
-}
-
-/** Defensive shape validation (W1 owns the writer). Returns every problem. */
-export function validateBindings(value) {
-  const errors = [];
-  if (!value || typeof value !== 'object')
-    return { ok: false, errors: ['bindings must be an object'] };
-  if (value.schema !== BINDING_SCHEMA)
-    errors.push(`schema must be ${BINDING_SCHEMA}`);
-  if (!value.routes || typeof value.routes !== 'object') {
-    errors.push('routes must be an object');
-    return { ok: false, errors };
-  }
-  for (const [route, entry] of Object.entries(value.routes)) {
-    const at = `routes[${route}]`;
-    if (!entry || typeof entry !== 'object') {
-      errors.push(`${at} must be an object`);
-      continue;
-    }
-    if (
-      !Array.isArray(entry.sources) ||
-      entry.sources.some(s => typeof s !== 'string')
-    )
-      errors.push(`${at}.sources must be a string array`);
-    if (entry.approved !== undefined) {
-      const a = entry.approved;
-      if (
-        !a ||
-        typeof a.by !== 'string' ||
-        Number.isNaN(Date.parse(a.at)) ||
-        !a.receipt
-      )
-        errors.push(`${at}.approved needs by, ISO at, receipt`);
-    }
-    for (const [vp, frames] of Object.entries(entry.viewports ?? {})) {
-      if (!Array.isArray(frames)) {
-        errors.push(`${at}.viewports[${vp}] must be an array`);
-        continue;
-      }
-      for (const f of frames)
-        if (typeof f?.section !== 'string' || typeof f?.still !== 'string')
-          errors.push(`${at}.viewports[${vp}] frame needs section and still`);
-    }
-  }
-  return errors.length ? { ok: false, errors } : { ok: true, errors };
-}
+// One reader: binding shape, globs, enforce and route selection come from
+// scripts/design/pen-bindings-lib.mjs (W1).
 
 export function stillPathsOf(entry) {
   return Object.values(entry.viewports ?? {}).flatMap(frames =>
@@ -94,14 +33,17 @@ export function classifyRoutes({
 }) {
   const ignore = config.ignoreSourceGlobs ?? [];
   const live = changedFiles.filter(f => !matchesAny(f, ignore));
+  const sourceRoutes = new Set(
+    routesForFiles(bindings, live).map(r => r.route)
+  );
   const toCheck = [];
   const failures = [];
   const warnings = [];
   // Scope routes are the manifest's routes. `enforce: true` makes a route's
   // verdict blocking; otherwise it is reported and never fails the PR.
   for (const [route, entry] of Object.entries(bindings?.routes ?? {})) {
-    const enforced = entry.enforce === true;
-    const sourcesChanged = live.some(f => matchesAny(f, entry.sources ?? []));
+    const enforced = isEnforced(entry);
+    const sourcesChanged = sourceRoutes.has(route);
     const stills = stillPathsOf(entry);
     const stillsChanged = changedFiles.filter(f => stills.includes(f));
     if (!sourcesChanged && stillsChanged.length === 0) continue;

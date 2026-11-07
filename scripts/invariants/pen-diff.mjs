@@ -18,11 +18,11 @@ import {
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadBindings, validateBindings } from '../design/pen-bindings-lib.mjs';
 import {
   classifyRoutes,
   compareSection,
   formatReport,
-  validateBindings,
 } from './pen-diff-lib.mjs';
 import { decodePng, encodePng } from './pen-still-diff-lib.mjs';
 
@@ -92,13 +92,10 @@ async function main() {
   const baseUrl = arg('base-url', process.env.PEN_DIFF_BASE_URL);
   const only = arg('route');
 
-  const bindingsPath = join(REPO, BINDINGS);
-  const bindings = existsSync(bindingsPath)
-    ? JSON.parse(readFileSync(bindingsPath, 'utf8'))
-    : { schema: 'jovie.pen-binding/v1', routes: {} };
-  const valid = validateBindings(bindings);
-  if (!valid.ok) {
-    console.error(`FAIL ${BINDINGS} invalid:\n${valid.errors.join('\n')}`);
+  const bindings = loadBindings(REPO);
+  const problems = validateBindings(bindings);
+  if (problems.length) {
+    console.error(`FAIL ${BINDINGS} invalid:\n${problems.join('\n')}`);
     process.exit(1);
   }
 
