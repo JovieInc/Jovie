@@ -9537,6 +9537,28 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
         temporary.unlink(missing_ok=True)
 
 
+def _binding_turn_marker(host: Host, name: str) -> Path:
+    return host.state / "binding-turns" / name
+
+
+def binding_turn_yields(host: Host, name: str, jovie_pending: bool) -> bool:
+    """True when this provider's last turn served a binding and Jovie work is waiting."""
+    return jovie_pending and _binding_turn_marker(host, name).exists()
+
+
+def record_binding_turn(host: Host, name: str, served_binding: bool) -> None:
+    """Remember whether this turn served a binding; best-effort, never blocks a turn."""
+    marker = _binding_turn_marker(host, name)
+    try:
+        if served_binding:
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            marker.touch()
+        else:
+            marker.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def jovie_repair_pending(host: Host, now: float | None = None) -> bool:
     """True unless a fresh maintenance-demand record from any local lane proves Jovie has no
     repairable PR. Unknown or stale counts as pending so the Jovie path gets a turn and
@@ -9571,12 +9593,17 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         return 1
     # Extra repository bindings (LYB) share this seat. Jovie-only holds below never block them,
     # and a binding fault never blocks the Jovie path. No configured binding = no reads at all.
-    try:
-        bound = bindings.work(THIS, host, name, spec, maintenance_only=maintenance_only,
-                              jovie_repair_pending=jovie_repair_pending(host))
-    except Exception as error:
-        bound = None
-        print(f"binding pass failed: {type(error).__name__}: {error}"[:300], file=sys.stderr)
+    # While Jovie work is pending, the seat alternates: a turn that served the binding is
+    # followed by a Jovie turn (2026-11-07: one codex seat ran 28 LYB repairs and 0 Jovie runs).
+    pending = jovie_repair_pending(host)
+    bound = None
+    if not binding_turn_yields(host, name, pending):
+        try:
+            bound = bindings.work(THIS, host, name, spec, maintenance_only=maintenance_only,
+                                  jovie_repair_pending=pending)
+        except Exception as error:
+            print(f"binding pass failed: {type(error).__name__}: {error}"[:300], file=sys.stderr)
+    record_binding_turn(host, name, bound is not None)
     if bound is not None:
         slot.release()
         return 1 if bound == "disk-held" else reexec(host, name)

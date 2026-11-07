@@ -4219,6 +4219,26 @@ class WorkerTest(unittest.TestCase):
         jovie.assert_not_called()
         self.assertEqual(len(self.execs), 1)  # re-exec for the next unit, like any finished run
 
+    def test_pending_jovie_work_gets_the_seat_after_a_binding_turn(self):
+        with patch.object(lane, "jovie_repair_pending", return_value=True), \
+                patch.object(lane.bindings, "work", return_value="pr-opened") as bound, \
+                patch.object(lane, "run_issue", return_value={"verdict": "landing"}) as jovie:
+            lane.worker(self.host, "devin")
+            self.assertEqual(bound.call_count, 1)
+            jovie.assert_not_called()
+            lane.worker(self.host, "devin")  # last turn served the binding: Jovie goes next
+            self.assertEqual(bound.call_count, 1)
+            self.assertEqual(jovie.call_args.args[4].identifier, "JOV-3")
+            lane.worker(self.host, "devin")  # and the binding gets the turn after that
+            self.assertEqual(bound.call_count, 2)
+
+    def test_binding_keeps_the_seat_when_no_jovie_work_is_pending(self):
+        with patch.object(lane, "jovie_repair_pending", return_value=False), \
+                patch.object(lane.bindings, "work", return_value="pr-opened") as bound:
+            lane.worker(self.host, "devin")
+            lane.worker(self.host, "devin")
+        self.assertEqual(bound.call_count, 2)
+
     def test_binding_fault_never_blocks_the_jovie_path(self):
         with patch.object(lane.bindings, "work", side_effect=RuntimeError("lyb unreadable")), \
                 patch.object(lane, "run_issue", return_value={"verdict": "landing"}) as jovie, \
