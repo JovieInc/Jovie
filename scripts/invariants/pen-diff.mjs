@@ -120,6 +120,7 @@ async function main() {
   if (process.argv.includes('--scope-only')) {
     // Cheap path selector for ci-path-changes: is any bound or scope route touched?
     const r = classifyRoutes({ bindings, config, changedFiles: touched });
+    r.failures.push(...r.warnings);
     const infra = changedFiles.some(f =>
       /^(scripts\/invariants\/pen-diff|docs\/pen-stills\/|docs\/design-system\/pen-bindings\.json)/.test(
         f
@@ -138,7 +139,7 @@ async function main() {
     const t = git(['log', '-1', '--format=%cI', `${base}..HEAD`, '--', f]);
     if (t) stillChangedAt[f] = t;
   }
-  let { toCheck, failures } = classifyRoutes({
+  let { toCheck, failures, warnings } = classifyRoutes({
     bindings,
     config,
     changedFiles: touched,
@@ -150,6 +151,7 @@ async function main() {
   // Emits needs_render for the CI job that decides whether to build.
   if (process.argv.includes('--policy-only')) {
     for (const f of failures) console.log(`FAIL ${f.message}`);
+    for (const w of warnings) console.log(`ADVISORY ${w.message}`);
     if (process.env.GITHUB_OUTPUT)
       appendFileSync(
         process.env.GITHUB_OUTPUT,
@@ -162,13 +164,14 @@ async function main() {
   }
 
   const results = [];
-  for (const { route, entry } of toCheck) {
+  for (const { route, entry, enforced } of toCheck) {
     for (const viewport of config.viewports) {
       const frames = entry.viewports?.[String(viewport)] ?? [];
       if (!frames.length) continue;
       for (const f of frames) {
         const p = join(REPO, f.still);
         const res = {
+          enforced,
           route,
           viewport,
           section: f.section,
@@ -201,8 +204,9 @@ async function main() {
       )
         continue;
       if (!baseUrl) {
-        failures.push({
+        (enforced ? failures : warnings).push({
           route,
+          enforced,
           message: `${route}: --base-url (or PEN_DIFF_BASE_URL) required to render`,
         });
         continue;
@@ -216,6 +220,7 @@ async function main() {
       });
       for (const f of frames) {
         const res = {
+          enforced,
           route,
           viewport,
           section: f.section,
@@ -255,13 +260,14 @@ async function main() {
       }
     }
   }
-  const ok = failures.length === 0 && results.every(r => r.pass);
+  const ok =
+    failures.length === 0 && results.every(r => r.pass || r.enforced === false);
   mkdirSync(outDir, { recursive: true });
   writeFileSync(
     join(outDir, 'receipt.json'),
-    `${JSON.stringify({ ok, failures, results: results.map(({ diff, ...r }) => r) }, null, 2)}\n`
+    `${JSON.stringify({ ok, failures, warnings, results: results.map(({ diff, ...r }) => r) }, null, 2)}\n`
   );
-  const text = formatReport(results, failures);
+  const text = formatReport(results, failures, warnings);
   console.log(
     text ||
       `pen-diff: no bound or scope route touched (${changedFiles.length} files)`

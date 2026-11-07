@@ -18,6 +18,7 @@ const card = (w, h, x) => {
 };
 const approved = { by: 'tim', at: '2026-11-07T12:00:00Z', receipt: 'r1' };
 const entry = (over = {}) => ({
+  enforce: true,
   sources: ['apps/web/app/(home)/**'],
   approved,
   viewports: {
@@ -26,12 +27,10 @@ const entry = (over = {}) => ({
   },
   ...over,
 });
-const cfg = {
-  scopeRoutes: {
-    '/': ['apps/web/app/(home)/**'],
-    '/pricing': ['apps/web/app/(marketing)/pricing/**'],
-  },
-  ignoreSourceGlobs: ['**/*.test.*'],
+const cfg = { ignoreSourceGlobs: ['**/*.test.*'] };
+const pricing = {
+  sources: ['apps/web/app/(marketing)/pricing/**'],
+  viewports: {},
 };
 
 test('globs: ** crosses dirs, * does not, brackets and parens are literal', () => {
@@ -97,9 +96,9 @@ test('unrelated and test-only changes do not trigger the gate', () => {
   assert.equal(r.failures.length, 0);
 });
 
-test('unbound scope route with changed sources fails with the exact message', () => {
+test('enforced route without approval fails with the exact message', () => {
   const r = classifyRoutes({
-    bindings: { routes: { '/': entry() } },
+    bindings: { routes: { '/pricing': { ...pricing, enforce: true } } },
     config: cfg,
     changedFiles: ['apps/web/app/(marketing)/pricing/page.tsx'],
     stillChangedAt: {},
@@ -108,6 +107,34 @@ test('unbound scope route with changed sources fails with the exact message', ()
     r.failures.map(f => f.message),
     ['no approved Pen design for /pricing']
   );
+});
+
+test('non-enforced route without approval only warns', () => {
+  for (const enforce of [false, undefined]) {
+    const r = classifyRoutes({
+      bindings: { routes: { '/pricing': { ...pricing, enforce } } },
+      config: cfg,
+      changedFiles: ['apps/web/app/(marketing)/pricing/page.tsx'],
+      stillChangedAt: {},
+    });
+    assert.equal(r.failures.length, 0);
+    assert.match(
+      r.warnings[0].message,
+      /no approved Pen design for \/pricing \(not enforced\)/
+    );
+  }
+});
+
+test('non-enforced approved route is still rendered but flagged advisory; stale approval only warns', () => {
+  const r = classifyRoutes({
+    bindings: { routes: { '/': entry({ enforce: false }) } },
+    config: cfg,
+    changedFiles: ['apps/web/app/(home)/page.tsx', 's.png'],
+    stillChangedAt: { 's.png': '2026-11-07T13:00:00Z' },
+  });
+  assert.equal(r.failures.length, 0);
+  assert.equal(r.warnings.length, 1);
+  assert.equal(r.toCheck[0].enforced, false);
 });
 
 test('binding present but without approved is unbound', () => {
@@ -177,7 +204,7 @@ import { protectedBaselineReason } from './pen-diff-lib.mjs';
 
 test('adoption guard protects Pen stills and bound-route baselines only', () => {
   const bindings = {
-    routes: { '/': entry(), '/pricing': entry({ approved: undefined }) },
+    routes: { '/': entry(), '/pricing': { ...pricing } },
   };
   const config = {
     baselinePrefixes: { '/': ['homepage'], '/pricing': ['pricing'] },
@@ -196,7 +223,7 @@ test('adoption guard protects Pen stills and bound-route baselines only', () => 
       bindings,
       config
     ),
-    /bound to an approved Pen design/
+    /has Pen stills/
   );
   assert.equal(
     protectedBaselineReason(

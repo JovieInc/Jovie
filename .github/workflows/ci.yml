@@ -1686,9 +1686,10 @@ jobs:
 
   ci-pen-diff:
     name: Pen Diff
-    # Pen-to-code merge gate: bound routes must render like their committed,
-    # approved Pen stills (SSIM + layout box); scope routes with no approved
-    # binding fail. Renders only the affected routes. Thresholds:
+    # Pen-to-code merge gate: routes with enforce:true in pen-bindings.json must
+    # render like their committed, approved Pen stills (SSIM + layout box) and
+    # need an approved binding; enforce:false routes are diffed and reported
+    # (artifact + job log) without failing. Renders only the affected routes. Thresholds:
     # scripts/invariants/pen-diff.config.json. The consent banner stays ON
     # (no NEXT_DISABLE_TOOLBAR), unlike Visual Snapshot Compare.
     needs: [ci-path-changes]

@@ -48,12 +48,13 @@ test('reports unknown and ambiguous names instead of guessing', () => {
   ]);
 });
 
-test('refuses to adopt a baseline for a route bound to an approved Pen design', () => {
+test('refuses to adopt a baseline for a route that has Pen stills', () => {
   const guard = {
     bindings: {
       routes: {
         '/': {
           sources: [],
+          viewports: { 1440: [{ section: 'hero', still: 's.png' }] },
           approved: { by: 'tim', at: '2026-11-07T00:00:00Z', receipt: 'r' },
         },
       },

@@ -96,21 +96,22 @@ export function classifyRoutes({
   const live = changedFiles.filter(f => !matchesAny(f, ignore));
   const toCheck = [];
   const failures = [];
-  const routes = bindings?.routes ?? {};
-  const seen = new Set();
-
-  for (const [route, entry] of Object.entries(routes)) {
-    seen.add(route);
+  const warnings = [];
+  // Scope routes are the manifest's routes. `enforce: true` makes a route's
+  // verdict blocking; otherwise it is reported and never fails the PR.
+  for (const [route, entry] of Object.entries(bindings?.routes ?? {})) {
+    const enforced = entry.enforce === true;
     const sourcesChanged = live.some(f => matchesAny(f, entry.sources ?? []));
     const stills = stillPathsOf(entry);
     const stillsChanged = changedFiles.filter(f => stills.includes(f));
     if (!sourcesChanged && stillsChanged.length === 0) continue;
+    const report = message =>
+      (enforced ? failures : warnings).push({ route, message, enforced });
     if (!entry.approved) {
       if (sourcesChanged)
-        failures.push({
-          route,
-          message: `no approved Pen design for ${route}`,
-        });
+        report(
+          `no approved Pen design for ${route}${enforced ? '' : ' (not enforced)'}`
+        );
       continue;
     }
     if (sourcesChanged && stillsChanged.length) {
@@ -118,21 +119,14 @@ export function classifyRoutes({
       for (const still of stillsChanged) {
         const changed = Date.parse(stillChangedAt[still] ?? '');
         if (!Number.isNaN(changed) && approvedAt <= changed)
-          failures.push({
-            route,
-            message: `${route}: approved.at ${entry.approved.at} is older than the still change to ${still} (${stillChangedAt[still]}); re-approve the design`,
-          });
+          report(
+            `${route}: approved.at ${entry.approved.at} is older than the still change to ${still} (${stillChangedAt[still]}); re-approve the design`
+          );
       }
     }
-    toCheck.push({ route, entry });
+    toCheck.push({ route, entry, enforced });
   }
-
-  for (const [route, globs] of Object.entries(config.scopeRoutes ?? {})) {
-    if (seen.has(route)) continue;
-    if (live.some(f => matchesAny(f, globs)))
-      failures.push({ route, message: `no approved Pen design for ${route}` });
-  }
-  return { toCheck, failures };
+  return { toCheck, failures, warnings };
 }
 
 /** Layout-box check: rendered aspect (h/w) within tolerance of the still's. */
@@ -170,16 +164,17 @@ export function compareSection({ still, render, box }, thresholds) {
   };
 }
 
-export function formatReport(results, failures) {
+export function formatReport(results, failures, warnings = []) {
   const lines = [];
   for (const f of failures) lines.push(`FAIL ${f.message}`);
+  for (const w of warnings) lines.push(`ADVISORY ${w.message}`);
   for (const r of results) {
     const box = r.box
       ? `aspect error ${r.box.aspectError.toFixed(3)} (max ${r.boxMax})`
       : 'box n/a';
     const score = r.ssim === undefined ? 'n/a' : r.ssim.toFixed(3);
     lines.push(
-      `${r.pass ? 'PASS' : 'FAIL'} ${r.route} @${r.viewport} [${r.section}] ssim ${score} (min ${r.ssimMin}), ${box}${r.reason ? `, ${r.reason}` : ''}${r.diffPath ? `, diff ${r.diffPath}` : ''}`
+      `${r.pass ? 'PASS' : r.enforced === false ? 'ADVISORY-FAIL' : 'FAIL'} ${r.route} @${r.viewport} [${r.section}] ssim ${score} (min ${r.ssimMin}), ${box}${r.reason ? `, ${r.reason}` : ''}${r.diffPath ? `, diff ${r.diffPath}` : ''}`
     );
   }
   return lines.join('\n');
@@ -187,7 +182,7 @@ export function formatReport(results, failures) {
 
 /**
  * Baseline self-adoption guard: Pen stills are never an adoption target, and
- * neither is a visual baseline for a route with an approved binding. Returns a
+ * neither is a visual baseline for a route that has Pen stills. Returns a
  * reason string when `target` (repo-relative or absolute path) is protected.
  */
 export function protectedBaselineReason(target, bindings, config) {
@@ -196,10 +191,10 @@ export function protectedBaselineReason(target, bindings, config) {
     return 'Pen stills are only changed by the approved Pen export, never by adoption';
   const name = norm.split('/').pop() ?? '';
   for (const [route, entry] of Object.entries(bindings?.routes ?? {})) {
-    if (!entry?.approved) continue;
+    if (!entry || stillPathsOf(entry).length === 0) continue;
     const prefixes = config.baselinePrefixes?.[route] ?? [];
     if (prefixes.some(p => name === `${p}.png` || name.startsWith(`${p}-`)))
-      return `route ${route} is bound to an approved Pen design; its render must match the Pen still, not a new baseline`;
+      return `route ${route} has Pen stills; its render must match the Pen still, not a new baseline`;
   }
   return null;
 }
