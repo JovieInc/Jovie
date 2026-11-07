@@ -106,12 +106,17 @@ describe('summer card store', () => {
     );
   });
 
-  it('replays when the stored digest matches', async () => {
+  it('replays filed facts when the stored digest matches', async () => {
     hoisted.insertReturning.mockResolvedValue([]);
-    hoisted.selectLimit.mockResolvedValue([{ value: stored() }]);
+    hoisted.selectLimit.mockResolvedValue([
+      { value: stored({ facts: ['Recorded fact'] }) },
+    ]);
     await expect(submitSummerCard(input, NOW)).resolves.toMatchObject({
       outcome: 'replayed',
-      card: { id: summerCardId(input.idempotencyKey) },
+      card: {
+        id: summerCardId(input.idempotencyKey),
+        facts: ['Recorded fact'],
+      },
     });
   });
 
