@@ -1,6 +1,5 @@
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { linkOnboardingSessionReplaysToUser } from '@/lib/analytics/signup-replay.server';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { isWaitlistApprovedUserStatus } from '@/lib/auth/canonical-user-state';
 import { getDbUser } from '@/lib/auth/session';
@@ -13,6 +12,10 @@ import {
 } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
 import { materializeClaimedOnboardingProfile } from '@/lib/onboarding/claim-profile';
+import {
+  isClaimAccessControlled,
+  linkClaimReplaysBestEffort,
+} from '@/lib/onboarding/claim-side-effects';
 import { deriveClaimedOnboardingStateFromMessageRows } from '@/lib/onboarding/claimed-state';
 import { isOnboardingOwnershipError } from '@/lib/onboarding/ownership-gate';
 import {
@@ -33,7 +36,6 @@ import {
   decideGoldenPathAdmissionForArtist,
   requiresProofBeforePublic,
 } from '@/lib/waitlist/golden-path-admission.server';
-import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import {
   isWaitlistApprovedStatus,
   isWaitlistPendingStatus,
@@ -396,23 +398,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ claimed: 0 });
     }
 
-    // Best effort: tie this visitor's session replays to the new account.
-    await linkOnboardingSessionReplaysToUser(sessionId, userId).catch(error =>
-      captureError('Onboarding replay link failed', error, {
-        route: '/api/onboarding/claim',
-        method: 'POST',
-      })
-    );
+    await linkClaimReplaysBestEffort(sessionId, userId);
 
-    const accessControlled = await isWaitlistGateEnabled().catch(
-      async error => {
-        await captureError('Onboarding claim gate lookup failed', error, {
-          route: '/api/onboarding/claim',
-          method: 'POST',
-        });
-        return true;
-      }
-    );
+    const accessControlled = await isClaimAccessControlled();
     const currentDbUser = await getDbUser(userId);
     const alreadyApproved = isWaitlistApprovedUserStatus(
       currentDbUser?.userStatus
