@@ -36,6 +36,11 @@ export type BoundedFetchOptions = RequestInit & {
   timeoutMs?: number;
   context?: string;
   retry?: BoundedFetchRetryOptions;
+  /**
+   * Consume the body within the attempt deadline. The returned Response is
+   * already consumed; callers should retain the parsed value in this callback.
+   */
+  consumeResponseBody?: (response: Response) => Promise<void>;
 };
 
 function isRetryableStatus(status: number): boolean {
@@ -86,6 +91,7 @@ export async function boundedFetch(
     timeoutMs = 5000,
     context = 'External request',
     retry,
+    consumeResponseBody,
     signal: externalSignal,
     ...fetchOptions
   } = options;
@@ -110,6 +116,10 @@ export async function boundedFetch(
         ...fetchOptions,
         signal: controller.signal,
       });
+
+      if (consumeResponseBody) {
+        await consumeResponseBody(response);
+      }
 
       const shouldRetry =
         retry &&
@@ -161,7 +171,7 @@ export async function boundedFetch(
     maxDelayMs: retry.maxDelayMs,
     backoffMultiplier: retry.backoffMultiplier,
     isRetryable: error => {
-      if (!(error instanceof Error)) {
+      if (externalSignal?.aborted || !(error instanceof Error)) {
         return false;
       }
 

@@ -303,6 +303,7 @@ export const getCachedCurrentUser = cache(
       const currentUser = toJovieUser({
         id: session.user.id,
         email: session.user.email,
+        emailVerified: session.user.emailVerified,
         name: session.user.name,
         image: session.user.image,
         username:

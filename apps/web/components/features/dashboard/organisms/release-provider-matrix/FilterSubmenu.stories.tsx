@@ -28,7 +28,9 @@ const meta = {
     Story => (
       <DropdownMenu open>
         <DropdownMenuTrigger asChild>
-          <button type='button'>Open filters</button>
+          <button type='button' inert>
+            Open filters
+          </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           <Story />

@@ -2,14 +2,12 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import type { UIMessage } from 'ai';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
+import { sourceMessageFixture } from '@/components/jovie/components/source-evidence.fixtures';
 import { ONBOARDING_ENTRY_TITLE } from '@/lib/onboarding/empty-state';
 
 const chatMocks = vi.hoisted(() => ({
-  messages: [] as Array<{
-    id: string;
-    role: 'user' | 'assistant';
-    parts: Array<{ type: 'text'; text: string }>;
-  }>,
+  messageRenderGate: null as Promise<void> | null,
+  messages: [] as UIMessage[],
   sendMessage: vi.fn(),
   setMessages: vi.fn(),
   status: 'ready' as 'ready' | 'submitted' | 'streaming',
@@ -18,6 +16,13 @@ const chatMocks = vi.hoisted(() => ({
   errorMetadata: {} as Record<string, unknown>,
   options: null as null | { id?: string; messages?: UIMessage[] },
 }));
+
+// Exercise the App Router's actual Suspense behavior; next/dynamic's default
+// Node entry is the Pages Router implementation.
+vi.mock('next/dynamic', async () => {
+  const { default: dynamic } = await import('next/dist/shared/lib/app-dynamic');
+  return { default: dynamic };
+});
 
 vi.mock('ai', () => ({
   DefaultChatTransport: class DefaultChatTransport {
@@ -59,6 +64,7 @@ vi.mock('@/components/jovie/hooks', () => ({
     isStuckToBottom: true,
     onScroll: vi.fn(),
     scrollContainerRef: { current: null },
+    setStuckToBottom: vi.fn(),
     totalSizeRef: { current: null },
   }),
 }));
@@ -130,11 +136,23 @@ vi.mock('@/components/jovie/components', () => ({
       placeholder={placeholder}
     />
   ),
+}));
+
+vi.mock('@/components/jovie/components/ChatMessage', () => ({
   ChatMessage: ({
     parts,
+    sourceFacts,
   }: {
+    readonly sourceFacts?: readonly unknown[];
     readonly parts: Array<{ type: 'text'; text: string }>;
-  }) => <div data-testid='chat-message'>{parts[0]?.text}</div>,
+  }) => {
+    if (chatMocks.messageRenderGate) throw chatMocks.messageRenderGate;
+    return (
+      <div data-testid='chat-message' data-source-count={sourceFacts?.length}>
+        {parts[0]?.text}
+      </div>
+    );
+  },
 }));
 
 vi.mock('@/components/features/onboarding/ChatProposeNextStepCard', () => ({
@@ -147,14 +165,13 @@ vi.mock('@/components/features/onboarding/ChatProposeNextStepCard', () => ({
   ),
 }));
 
+const text = (id: string, role: 'user' | 'assistant', value: string) =>
+  ({ id, role, parts: [{ type: 'text', text: value }] }) as UIMessage;
+
 describe('OnboardingChat empty intro', () => {
-  it('gives the sign-up card the handle locked in chat, not the homepage one (JOV-10127)', () => {
+  it('gives the sign-up card the handle locked in chat, not the homepage one (JOV-10127)', async () => {
     const initialMessages: UIMessage[] = [
-      {
-        id: 'u1',
-        role: 'user',
-        parts: [{ type: 'text', text: 'I want to claim jov.ie/gpwo879d.' }],
-      },
+      text('u1', 'user', 'I want to claim jov.ie/gpwo879d.'),
       {
         id: 'confirmation',
         role: 'assistant',
@@ -195,7 +212,8 @@ describe('OnboardingChat empty intro', () => {
         turnstileStatus='verified'
       />
     );
-    expect(screen.getByTestId('next-step-card')).toHaveAttribute(
+    // The proposal card is code-split out of the /start entry bundle.
+    expect(await screen.findByTestId('next-step-card')).toHaveAttribute(
       'data-claim-handle',
       'unmarkedpave'
     );
@@ -253,8 +271,6 @@ describe('OnboardingChat empty intro', () => {
   });
 
   it('opens each restored agent turn with one Jovie speaker row (Pen R6As7U)', () => {
-    const text = (id: string, role: 'user' | 'assistant', value: string) =>
-      ({ id, role, parts: [{ type: 'text', text: value }] }) as UIMessage;
     render(
       <OnboardingChat
         conversationId='saved-conversation'
@@ -279,16 +295,8 @@ describe('OnboardingChat empty intro', () => {
 
   it('renders persisted progress without auto-submitting a starter or re-triggering claim activity', async () => {
     const initialMessages: UIMessage[] = [
-      {
-        id: 'saved-user',
-        role: 'user',
-        parts: [{ type: 'text', text: 'I already selected my artist' }],
-      },
-      {
-        id: 'saved-assistant',
-        role: 'assistant',
-        parts: [{ type: 'text', text: 'Your artist is saved' }],
-      },
+      text('saved-user', 'user', 'I already selected my artist'),
+      sourceMessageFixture('saved-assistant', 'Your artist is saved'),
     ];
     const activity = vi.fn();
     render(
@@ -307,6 +315,10 @@ describe('OnboardingChat empty intro', () => {
       id: 'saved-conversation',
       messages: initialMessages,
     });
+    expect(screen.getByText('Your artist is saved')).toHaveAttribute(
+      'data-source-count',
+      '1'
+    );
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
     expect(activity).not.toHaveBeenCalled();
     expect(
@@ -317,6 +329,7 @@ describe('OnboardingChat empty intro', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     chatMocks.messages = [];
+    chatMocks.messageRenderGate = null;
     chatMocks.status = 'ready';
     chatMocks.onError = undefined;
     chatMocks.errorMetadata = {};
@@ -325,6 +338,44 @@ describe('OnboardingChat empty intro', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  it('reveals the first transcript together after its renderer loads while keeping the composer mounted', async () => {
+    let releaseRenderer!: () => void;
+    chatMocks.messageRenderGate = new Promise<void>(resolve => {
+      releaseRenderer = resolve;
+    });
+    chatMocks.status = 'submitted';
+    render(
+      <OnboardingChat
+        initialMessages={[
+          {
+            id: 'starter',
+            role: 'user',
+            parts: [{ type: 'text', text: 'I want to claim jov.ie/sam.' }],
+          },
+        ]}
+        turnstileToken='token'
+        turnstileStatus='verified'
+      />
+    );
+    const composer = screen.getByTestId('chat-input');
+    composer.focus();
+    // A visible speaker above a generic 40px slot moves when the user bubble
+    // and the much shorter thinking indicator replace their independent slots.
+    expect(screen.queryByTestId('onboarding-speaker-row')).toBeNull();
+    expect(screen.queryAllByTestId('chat-message')).toHaveLength(0);
+    await act(async () => {
+      chatMocks.messageRenderGate = null;
+      releaseRenderer();
+    });
+    await waitFor(() =>
+      expect(screen.getAllByTestId('chat-message')).toHaveLength(2)
+    );
+    expect(screen.getAllByTestId('onboarding-speaker-row')).toHaveLength(1);
+    expect(screen.getByText('I want to claim jov.ie/sam.')).toBeVisible();
+    expect(screen.getByTestId('chat-input')).toBe(composer);
+    expect(composer).toHaveFocus();
   });
 
   it('shows welcome intro on a blank /start visit', () => {

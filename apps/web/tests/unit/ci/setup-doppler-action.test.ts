@@ -52,6 +52,8 @@ function runInstaller(options: {
   runnerTemp: string;
   binDir: string;
 }) {
+  const verificationHome = resolve(options.runnerTemp, 'verification-gnupg');
+  mkdirSync(verificationHome, { recursive: true, mode: 0o700 });
   return spawnSync(
     'bash',
     [
@@ -65,6 +67,7 @@ function runInstaller(options: {
       encoding: 'utf8',
       env: {
         ...process.env,
+        GNUPGHOME: verificationHome,
         FAKE_CURL_SOURCE: options.source,
         PATH: `${options.binDir}:${process.env.PATH ?? ''}`,
         PS4: '+${LINENO}: ',
@@ -216,7 +219,14 @@ describe('Doppler keyring installer', () => {
 
       const installedFingerprint = spawnSync(
         'gpg',
-        ['--batch', '--show-keys', '--with-colons', target],
+        [
+          '--batch',
+          '--homedir',
+          resolve(root, 'verification-gnupg'),
+          '--show-keys',
+          '--with-colons',
+          target,
+        ],
         { encoding: 'utf8' }
       )
         .stdout.split('\n')

@@ -287,6 +287,7 @@ extension View {
 
 struct JoviePillButtonStyle: ButtonStyle {
   static let visibleHeight: CGFloat = 28
+  /// 44pt hit target on the padded control. The frame is applied after the pill is painted, so it adds no paint.
   static let minimumHitHeight: CGFloat = 44
   static let hitInset = JovieSpacing.small
   static let pressedOpacity: Double = 0.8
@@ -318,6 +319,10 @@ struct JoviePillButtonStyle: ButtonStyle {
       .scaleEffect(configuration.isPressed ? JovieMotion.pressScale : 1)
       .animation(JovieMotion.subtle, value: configuration.isPressed)
       .padding(.vertical, JoviePillButtonStyle.hitInset)
+      .frame(
+        minWidth: JoviePillButtonStyle.minimumHitHeight,
+        minHeight: JoviePillButtonStyle.minimumHitHeight
+      )
       .contentShape(Rectangle())
   }
 }

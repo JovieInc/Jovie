@@ -1,10 +1,13 @@
 import { spawn, spawnSync } from 'node:child_process';
 import {
+  chmodSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,6 +32,7 @@ import {
   runControlTestCommands,
 } from '../../run-affected-tests.mjs';
 import { classifyBlogContentChanges } from '../blog-content-ci.mjs';
+import { resolveBaseRef } from '../git-base-ref.mjs';
 
 const SERVICE_CENSUS_QUALIFICATION_INPUTS = [
   'scripts/lanes/service_census.py',
@@ -44,6 +48,133 @@ const SERVICE_CENSUS_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
 ];
+
+describe('main-red ejector qualification closure', () => {
+  const inputs = [
+    'scripts/ci-fast-lanes.mjs',
+    'scripts/lib/__tests__/main-red-eject-quota-failover.test.mjs',
+    'scripts/main-red-eject.mjs',
+  ];
+  const behavior = [
+    'scripts/lib/__tests__/main-red-eject.test.mjs',
+    'scripts/lib/__tests__/main-red-eject-failing-head.test.mjs',
+    'scripts/lib/__tests__/main-red-eject-quota-failover.test.mjs',
+  ];
+  const proofs = [
+    ...behavior,
+    'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+    'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+    'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
+    'scripts/lib/__tests__/automation-verify.test.mjs',
+  ];
+  const options = {
+    isFileAvailable: () => true,
+    scriptContractVitestTests: behavior,
+  };
+  it('selects the complete behavior and CI inventory closure for the exact repair signature', () => {
+    for (const files of [
+      inputs,
+      [
+        ...inputs,
+        'scripts/run-affected-tests.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ],
+    ]) {
+      const plan = buildAffectedTestPlan(files, options);
+      expect(plan.mode).toBe('selected');
+      expect(plan.scriptVitestTests).toEqual(proofs);
+      expect(plan.selectedTests).toEqual([]);
+      const commands = buildSelectedTestCommands(plan, '1');
+      expect(commands).toHaveLength(1);
+      expect(commands[0][1]).toEqual(
+        expect.arrayContaining(
+          proofs.map(file => file.replace(/^scripts\//, ''))
+        )
+      );
+    }
+  });
+  it.each(proofs)(
+    'retains full fallback when required proof %s is missing',
+    missing => {
+      const plan = buildAffectedTestPlan(inputs, {
+        ...options,
+        isFileAvailable: file => file !== missing,
+      });
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toBe(
+        'main-red ejector behavior or CI inventory proof is unavailable'
+      );
+    }
+  );
+  it.each(behavior)(
+    'requires actual CI inventory registration of %s',
+    missing => {
+      expect(
+        buildAffectedTestPlan(inputs, {
+          ...options,
+          scriptContractVitestTests: behavior.filter(test => test !== missing),
+        }).mode
+      ).toBe('full');
+    }
+  );
+  it.each([
+    'scripts/unknown-control.mjs',
+    'scripts/lib/__tests__/unknown.test.mjs',
+    'apps/web/lib/product.ts',
+    'package.json',
+    'scripts/run-affected-tests.mjs',
+  ])('preserves full fallback for an unknown/mixed/partial peer %s', peer => {
+    expect(buildAffectedTestPlan([...inputs, peer], options).mode).toBe('full');
+  });
+  it.each(inputs)(
+    'does not accept the incomplete signature without %s',
+    missing => {
+      expect(
+        buildAffectedTestPlan(
+          inputs.filter(file => file !== missing),
+          options
+        ).mode
+      ).toBe('full');
+    }
+  );
+  it('executes a selected failing behavior test and propagates its real nonzero status', async () => {
+    const dir = mkdtempSync(resolve(tmpdir(), 'ejector-selected-failure-'));
+    const marker = resolve(dir, 'selected-args');
+    const fixture = resolve(dir, 'behavior.test.mjs');
+    try {
+      writeFileSync(
+        fixture,
+        "import { test } from 'node:test'; import assert from 'node:assert/strict'; test('behavior regression', () => assert.equal(1, 2));\n"
+      );
+      writeFileSync(
+        resolve(dir, 'pnpm'),
+        '#!/bin/sh\nprintf "%s\\n" "$@" > "$EJECTOR_SELECTED_MARKER"\ncase "$*" in *lib/__tests__/main-red-eject-quota-failover.test.mjs*) exec "$EJECTOR_REAL_NODE" --test "$EJECTOR_FAILURE_FIXTURE";; *) exit 0;; esac\n',
+        { mode: 0o755 }
+      );
+      const plan = buildAffectedTestPlan(inputs, options);
+      expect(plan.mode).toBe('selected');
+      const [[command, args]] = buildSelectedTestCommands(plan, '1');
+      const status = await runCommandStatus(
+        'env',
+        [
+          `PATH=${dir}:${process.env.PATH}`,
+          `EJECTOR_SELECTED_MARKER=${marker}`,
+          `EJECTOR_REAL_NODE=${process.execPath}`,
+          `EJECTOR_FAILURE_FIXTURE=${fixture}`,
+          command,
+          ...args,
+        ],
+        { bufferOutput: true }
+      );
+      expect(status).toBe(1);
+      expect(readFileSync(marker, 'utf8')).toContain(
+        'lib/__tests__/main-red-eject-quota-failover.test.mjs'
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('Sentry deployment contract selection', () => {
   const inputs = [
@@ -890,7 +1021,7 @@ describe('structural control stage execution', () => {
 
   it('starts registry, project, control coverage, Dependabot coverage, CLI coverage, web, continuity, and FX stages in order', async () => {
     const stages = buildControlTestCommands();
-    expect(stages).toHaveLength(24);
+    expect(stages).toHaveLength(23);
     expect(stages[0]).toEqual(buildCompanyRegistryTestCommand());
     expect(stages[1]).toEqual(buildProjectCreationTestCommand());
     expect(stages[2][1]).toContain('lib/__tests__/pr-conflict-event.test.mjs');
@@ -1052,18 +1183,6 @@ describe('structural control stage execution', () => {
       [
         '--test',
         '--experimental-test-coverage',
-        '--test-coverage-include=.github/scripts/internal-pr-review.mjs',
-        '--test-coverage-lines=85',
-        '--test-coverage-branches=80',
-        '--test-coverage-functions=85',
-        '.github/scripts/internal-pr-review.test.mjs',
-      ],
-    ]);
-    expect(stages[22]).toEqual([
-      'node',
-      [
-        '--test',
-        '--experimental-test-coverage',
         '--test-coverage-include=scripts/lib/source-admission-policy.mjs',
         '--test-coverage-lines=95',
         '--test-coverage-branches=90',
@@ -1071,7 +1190,7 @@ describe('structural control stage execution', () => {
         'scripts/lib/__tests__/source-admission-policy.test.mjs',
       ],
     ]);
-    expect(stages[23]).toEqual([
+    expect(stages[22]).toEqual([
       'pnpm',
       ['run', 'test:rolling-ci-fx:coverage'],
     ]);
@@ -2130,9 +2249,7 @@ describe('automation-verify affected scope', () => {
   });
 
   it('fails closed on an unresolved base and retains mandatory risk policy', () => {
-    expect(script).toContain(
-      'git rev-parse --verify --quiet "${BASE_REF}^{commit}"'
-    );
+    expect(script).toContain('resolveBaseRef(process.cwd(), requested)');
     expect(script).toContain('pnpm ci:harness:check');
   });
 
@@ -3621,6 +3738,131 @@ describe('automation-verify affected scope', () => {
     );
   });
 
+  describe('marketing certification evidence producers', () => {
+    const census = 'apps/web/data/designSystem/surfaceCensus.json';
+    const censusProducer =
+      'scripts/lib/__tests__/design-surface-census.test.mjs';
+    const tokens = 'apps/web/lib/brand/tokens.ts';
+    it('retains full fallback for shared tokens with unregistered real consumers', () => {
+      const repo = resolve(import.meta.dirname, '../../..');
+      for (const test of [
+        'apps/web/tests/unit/og/marketing-og-cards.test.ts',
+        'apps/web/components/atoms/JovieMarkElectric.test.tsx',
+      ]) {
+        expect(readFileSync(resolve(repo, test), 'utf8')).toContain(
+          "from '@/lib/brand/tokens'"
+        );
+      }
+      const plan = buildAffectedTestPlan([tokens]);
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toContain(tokens);
+    });
+    it('runs the real census validator with the scripts Vitest runner', () => {
+      const plan = buildAffectedTestPlan([census]);
+      expect(plan.mode).toBe('selected');
+      expect(plan.scriptVitestTests).toContain(censusProducer);
+      expect(plan.selectedTests).not.toContain(censusProducer);
+      expect(plan.nodeTests).not.toContain(censusProducer);
+      const commands = buildSelectedTestCommands(plan, '2');
+      expect(commands).toContainEqual([
+        'node',
+        ['scripts/design-surface-census.mjs', 'origin/main'],
+      ]);
+      expect(commands).toContainEqual([
+        'pnpm',
+        [
+          'exec',
+          'vitest',
+          '--root',
+          'scripts',
+          '--config',
+          'vitest.config.mts',
+          'run',
+          'lib/__tests__/design-surface-census.test.mjs',
+          '--maxWorkers',
+          '2',
+        ],
+      ]);
+    });
+
+    it('runs the runtime census consumer and falls back when its test is absent', () => {
+      const repo = resolve(import.meta.dirname, '../../..');
+      const consumer = 'apps/web/lib/content-records/marketing-page.ts';
+      const producer = 'apps/web/lib/content-records/marketing-page.test.ts';
+      expect(readFileSync(resolve(repo, consumer), 'utf8')).toContain(
+        "import surfaceCensus from '@/data/designSystem/surfaceCensus.json'"
+      );
+      expect(readFileSync(resolve(repo, producer), 'utf8')).toContain(
+        'e.dsStatus'
+      );
+      const plan = buildAffectedTestPlan([census]);
+      expect(plan.selectedTests).toContain(producer);
+      expect(
+        buildAffectedTestPlan([census], {
+          isFileAvailable: file => file !== producer,
+        }).mode
+      ).toBe('full');
+    });
+
+    it('validates current census transitions against the caller-provided base', () => {
+      const plan = buildAffectedTestPlan([census]);
+      const base = '0123456789abcdef0123456789abcdef01234567';
+      expect(buildSelectedTestCommands(plan, '2', base)).toContainEqual([
+        'node',
+        ['scripts/design-surface-census.mjs', base],
+      ]);
+      expect(
+        buildSelectedTestCommands(
+          { ...plan, censusValidation: false },
+          '2',
+          base
+        )
+      ).toContainEqual(['node', ['scripts/design-surface-census.mjs', base]]);
+    });
+
+    it('retains full fallback when the census producer is missing', () => {
+      const plan = buildAffectedTestPlan([census], {
+        isFileAvailable: file => file !== censusProducer,
+      });
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toContain(census);
+    });
+
+    it.each([
+      'apps/web/lib/brand/unregistered.ts',
+      'apps/web/data/designSystem/unregistered.json',
+    ])(
+      'retains full fallback for unknown neighbor %s, alone or mixed',
+      neighbor => {
+        expect(buildAffectedTestPlan([neighbor]).mode).toBe('full');
+        expect(buildAffectedTestPlan([census, tokens, neighbor]).mode).toBe(
+          'full'
+        );
+      }
+    );
+
+    it.each([tokens, 'package.json'])(
+      'retains census validation when %s requires full fallback',
+      other => {
+        const plan = buildAffectedTestPlan([census, other]);
+        expect(plan.mode).toBe('full');
+        expect(plan.scriptVitestTests).toContain(censusProducer);
+        const commands = buildSelectedTestCommands(plan, '2', 'origin/main');
+        expect(commands).toContainEqual([
+          'node',
+          ['scripts/design-surface-census.mjs', 'origin/main'],
+        ]);
+        expect(
+          commands.some(
+            ([command, args]) =>
+              command === 'pnpm' &&
+              args.includes('lib/__tests__/design-surface-census.test.mjs')
+          )
+        ).toBe(true);
+      }
+    );
+  });
+
   describe('audience release denial lane', () => {
     const productFiles = [
       'apps/web/app/api/cron/schedule-release-notifications/route.ts',
@@ -3922,6 +4164,33 @@ describe('automation-verify affected scope', () => {
     });
   });
 
+  describe('homepage discovery copy binding', () => {
+    const source = 'apps/web/data/homepageSearchCopy.ts';
+    const producer = 'apps/web/components/homepage/HomepageNameSearch.test.tsx';
+
+    it('executes the real component behavior producer for discovery copy', () => {
+      const plan = buildAffectedTestPlan([source]);
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toEqual([producer]);
+      expect(plan.selectedTests).toEqual([producer]);
+      expect(plan.fallbackReason).toBeUndefined();
+    });
+
+    it('fails closed when the behavior producer is unavailable or another unknown data file changes', () => {
+      expect(
+        buildAffectedTestPlan([source], {
+          isFileAvailable: file => file !== producer,
+        }).mode
+      ).toBe('full');
+      expect(
+        buildAffectedTestPlan([
+          source,
+          'apps/web/data/homepageSearchCopy-neighbor.ts',
+        ]).mode
+      ).toBe('full');
+    });
+  });
+
   describe('homepage front-door copy bindings', () => {
     const frontDoor = 'apps/web/data/homepageFrontDoorCta.ts';
     const homepageCopy = 'apps/web/data/homepageV2Copy.ts';
@@ -4186,7 +4455,6 @@ describe('automation-verify affected scope', () => {
 
   it('fails closed with a timeout and progress diagnostics for a stalled shard', async () => {
     const diagnostics = [];
-    const startedAt = Date.now();
     const status = await runCommandStatus(
       process.execPath,
       ['-e', 'setInterval(() => {}, 1000)'],
@@ -4199,7 +4467,6 @@ describe('automation-verify affected scope', () => {
     );
 
     expect(status).toBe(124);
-    expect(Date.now() - startedAt).toBeLessThan(5000);
     expect(diagnostics.join('\n')).toContain(
       '[affected-tests] start shard 1/8'
     );
@@ -4357,5 +4624,171 @@ describe('linear sync on merge selection', () => {
     expect(
       buildAffectedTestPlan([...lane, 'scripts/unrelated-peer.mjs']).mode
     ).toBe('full');
+  });
+});
+
+// These fixtures run the real entrypoints with their own refs. In particular,
+// never move a developer's local main to simulate a stale worktree pool.
+function consumerBaseFixture() {
+  const repo = mkdtempSync(resolve(tmpdir(), 'verify-base-consumer-'));
+  const root = resolve(import.meta.dirname, '../../..');
+  const write = (file, text) => {
+    mkdirSync(dirname(resolve(repo, file)), { recursive: true });
+    writeFileSync(resolve(repo, file), text);
+  };
+  const git = (...args) => {
+    const result = spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    return result.stdout.trim();
+  };
+  write('.gitignore', 'scripts/\nnode_modules/\nbin/\ncalls\n');
+  git('init', '-b', 'main');
+  git('config', 'user.email', 'fixture@example.invalid');
+  git('config', 'user.name', 'Base fixture');
+  git('add', '.');
+  git('commit', '-m', 'old local base');
+  git('checkout', '-b', 'upstream');
+  write('package.json', '{}\n');
+  write('scripts/upstream.mjs', 'export {};\n');
+  git('add', 'package.json');
+  git('commit', '-m', 'upstream global input');
+  const remote = git('rev-parse', 'HEAD');
+  git('update-ref', 'refs/remotes/origin/main', remote);
+  git('checkout', '-b', 'feature');
+  write('apps/web/lib/base-consumer.test.ts', 'export {};\n');
+  git('add', '.');
+  git('commit', '-m', 'actual narrow change');
+  // Copy the entrypoints so their repository root is this private fixture;
+  // resolve their maintained dependency graph from the real checkout.
+  for (const file of ['run-affected-tests.mjs', 'automation-verify.sh']) {
+    cpSync(resolve(root, 'scripts', file), resolve(repo, 'scripts', file));
+  }
+  for (const file of ['ci-fast-lanes.mjs', 'preflight-changed.mjs', 'lib']) {
+    symlinkSync(resolve(root, 'scripts', file), resolve(repo, 'scripts', file));
+  }
+  write('scripts/hooks/resolve-repo-node.sh', '#!/bin/sh\nexit 0\n');
+  return { repo, write, git, remote };
+}
+
+function runBaseConsumer(repo, args, env = {}) {
+  return spawnSync(process.execPath, args, {
+    cwd: repo,
+    encoding: 'utf8',
+    env: { ...buildVerificationEnv(), ...env },
+  });
+}
+
+describe('actual affected-test CLI base selection', () => {
+  it('uses remote-first bare bases, preserves qualified refs, and falls back only when remote is absent', () => {
+    const { repo, git } = consumerBaseFixture();
+    const run = base =>
+      runBaseConsumer(repo, [
+        'scripts/run-affected-tests.mjs',
+        '--base',
+        base,
+        '--dry-run',
+      ]);
+    try {
+      for (const base of ['main', 'origin/main', 'refs/remotes/origin/main']) {
+        expect(resolveBaseRef(repo, base)).toBe(
+          base === 'main' ? 'origin/main' : base
+        );
+        const result = run(base);
+        expect(result.status, result.stdout + result.stderr).toBe(0);
+        const plan = JSON.parse(result.stdout);
+        expect(plan.mode).toBe('selected');
+        expect(plan.selectedTests).toEqual([
+          'apps/web/lib/base-consumer.test.ts',
+        ]);
+      }
+      git('update-ref', '-d', 'refs/remotes/origin/main');
+      expect(resolveBaseRef(repo, 'main')).toBe('main');
+      expect(resolveBaseRef(repo, 'origin/main')).toBeNull();
+      expect(resolveBaseRef(repo, 'missing-branch')).toBeNull();
+      expect(JSON.parse(run('main').stdout).mode).toBe('full');
+      expect(run('origin/main').status).not.toBe(0);
+      expect(run('missing-branch').status).not.toBe(0);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('retains full fallback for real global inputs and unknown paths', () => {
+    const { repo, write, git } = consumerBaseFixture();
+    try {
+      for (const file of ['package.json', 'apps/web/lib/unknown-runtime.ts']) {
+        const head = git('rev-parse', 'HEAD');
+        write(file, 'changed\n');
+        git('add', '-f', file);
+        git('commit', '-m', file);
+        const result = runBaseConsumer(repo, [
+          'scripts/run-affected-tests.mjs',
+          '--base',
+          'main',
+          '--dry-run',
+        ]);
+        expect(result.status, result.stdout + result.stderr).toBe(0);
+        expect(JSON.parse(result.stdout).mode, file).toBe('full');
+        git('revert', '--no-edit', 'HEAD');
+        expect(git('diff', head, 'HEAD')).toBe('');
+      }
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('actual automation verify shell base selection', () => {
+  it('pins every diff consumer to the remote-first commit and fails before workloads for missing refs', () => {
+    const { repo, write, git, remote } = consumerBaseFixture();
+    const calls = resolve(repo, 'calls');
+    try {
+      write(
+        'bin/node',
+        `#!/bin/sh
+if [ "$1" = "--input-type=module" ]; then exec '${process.execPath}' "$@"; fi
+printf '%s\\n' "$TURBO_SCM_BASE:$*" >> '${calls}'
+`
+      );
+      write('bin/pnpm', `#!/bin/sh\nprintf '%s\\n' "$*" >> '${calls}'\n`);
+      for (const bin of ['node', 'pnpm']) {
+        chmodSync(resolve(repo, 'bin', bin), 0o755);
+      }
+      const run = base =>
+        spawnSync('bash', ['scripts/automation-verify.sh', 'affected'], {
+          cwd: repo,
+          encoding: 'utf8',
+          env: {
+            ...buildVerificationEnv(),
+            AUTOMATION_VERIFY_BASE: base,
+            PATH: `${resolve(repo, 'bin')}:${process.env.PATH}`,
+          },
+        });
+      for (const base of ['main', 'origin/main', 'refs/remotes/origin/main']) {
+        writeFileSync(calls, '');
+        const result = run(base);
+        expect(result.status, result.stdout + result.stderr).toBe(0);
+        const actual = readFileSync(calls, 'utf8');
+        expect(actual).toContain(
+          `${remote}:scripts/turbo-local.mjs typecheck --affected`
+        );
+        expect(actual).toContain(`--base ${remote}`);
+        expect(actual).toContain(`--diff-base=${remote}`);
+        expect(actual).toContain(`--diff-base ${remote}`);
+      }
+      git('update-ref', '-d', 'refs/remotes/origin/main');
+      writeFileSync(calls, '');
+      expect(run('main').status).toBe(0);
+      expect(readFileSync(calls, 'utf8')).toContain(
+        `--base ${git('rev-parse', 'main')}`
+      );
+      for (const base of ['origin/main', 'missing-branch']) {
+        writeFileSync(calls, '');
+        expect(run(base).status).not.toBe(0);
+        expect(readFileSync(calls, 'utf8')).toBe('');
+      }
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 });

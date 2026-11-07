@@ -45,8 +45,7 @@ describe('CalendarInner System B style guard', () => {
     );
     expect(source).toContain('[&>button]:font-medium');
     expect(source).toContain('[&>button]:text-primary-token');
-    expect(source).toContain('[&>button]:text-tertiary-token');
-    expect(source).toContain('[&>button]:opacity-50');
+    expect(source).toContain('[&>button]:text-secondary-token');
     expect(source).toContain('[&>button]:opacity-40');
   });
 });

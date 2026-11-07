@@ -89,16 +89,102 @@ fi`
   };
 }
 
+function installFixture(mode = 'success') {
+  const dir = mkdtempSync(join(tmpdir(), 'actionlint-build-'));
+  temporary.push(dir);
+  const executable = (name, text) =>
+    writeFileSync(join(dir, name), `#!/bin/bash\nset -eu\n${text}\n`, {
+      mode: 0o755,
+    });
+  executable('uname', 'case "$1" in -s) echo Darwin;; -m) echo arm64;; esac');
+  executable(
+    'curl',
+    `while [ "$#" -gt 0 ]; do
+    if [ "$1" = --output ]; then printf fixture > "$2"; shift 2; else shift; fi
+  done`
+  );
+  executable('shasum', 'cat >> "$TEST_CHECKSUMS"');
+  executable(
+    'tar',
+    `case "$*" in
+    *actionlint-source.tar.gz*)
+      target=$(find "$RUNNER_TEMP" -name actionlint-source -type d)
+      printf '%s\\n' 'cmd.Stdin = strings.NewReader(e.stdin)' > "$target/process.go" ;;
+    *shellcheck.tar.xz*)
+      target=$(find "$RUNNER_TEMP" -name actionlint-source -type d)
+      printf '#!/bin/bash\\necho "version: 0.11.0"\\n' > "$(dirname "$target")/shellcheck" ;;
+  esac`
+  );
+  executable(
+    'go',
+    `printf '%s\\n' "$@" >> "$TEST_GO_ARGS"
+  [ "$GOTOOLCHAIN" = local ] && [ "$GOWORK" = off ] && [ -z "$GOFLAGS" ]
+  [ "$CGO_ENABLED" = 0 ] && [ "$GOOS" = darwin ] && [ "$GOARCH" = arm64 ]
+  if [ "$1" = test ]; then
+    [ "$TEST_MODE" != regression-failure ] || exit 7
+    for arg in "$@"; do case "$arg" in
+      -coverprofile=*) printf 'mode: set\\ngithub.com/rhysd/actionlint/process.go:1.1,2.1 1 %s\\n' \\
+        "$([ "$TEST_MODE" = uncovered ] && echo 0 || echo 5)" > "$(printf '%s' "$arg" | cut -d= -f2-)" ;;
+    esac; done
+    [ "$TEST_MODE" != regression-failure-covered ] || exit 7
+    exit 0
+  fi
+  [ "$TEST_MODE" != build-failure ] || exit 8
+  out=''
+  while [ "$#" -gt 0 ]; do
+    if [ "$1" = -o ]; then out="$2"; shift 2; else shift; fi
+  done
+  cat > "$out" <<'BIN'
+#!/bin/bash
+if [ "$1" = -version ]; then
+  if [ "$TEST_MODE" = wrong-version ]; then echo wrong; else echo 1.7.12+fd33e9f582a0; fi
+else
+  printf '%s\\n' "$@" > "$TEST_LINT_ARGS"
+  echo 'lint ran'
+  [ "$TEST_MODE" != lint-failure ] || exit 2
+fi
+BIN`
+  );
+  executable('python3', 'echo 3.4.0');
+  const goArgs = join(dir, 'go-args');
+  const lintArgs = join(dir, 'lint-args');
+  const checksums = join(dir, 'checksums');
+  const result = spawnSync(
+    '/bin/bash',
+    [wrapper, '-oneline', 'workflow with spaces.yml'],
+    {
+      encoding: 'utf8',
+      timeout: 15_000,
+      env: {
+        ...process.env,
+        PATH: `${dir}:${process.env.PATH}`,
+        RUNNER_TEMP: dir,
+        TEST_MODE: mode,
+        TEST_GO_ARGS: goArgs,
+        TEST_LINT_ARGS: lintArgs,
+        TEST_CHECKSUMS: checksums,
+      },
+    }
+  );
+  return {
+    status: result.status,
+    output: `${result.stdout}${result.stderr}`,
+    goArgs: existsSync(goArgs) ? readFileSync(goArgs, 'utf8') : '',
+    lintArgs: existsSync(lintArgs) ? readFileSync(lintArgs, 'utf8') : '',
+    checksums: existsSync(checksums) ? readFileSync(checksums, 'utf8') : '',
+  };
+}
+
 describe('checksum-pinned actionlint platform execution', () => {
   it.each([
-    ['Linux', 'x86_64', 'linux_amd64'],
-    ['Darwin', 'arm64', 'darwin_arm64'],
-    ['Darwin', 'x86_64', 'darwin_amd64'],
-  ])('selects the official artifact on %s/%s', (os, architecture, platform) => {
+    ['Linux', 'x86_64'],
+    ['Darwin', 'arm64'],
+    ['Darwin', 'x86_64'],
+  ])('verifies the upstream fix on %s/%s', (os, architecture) => {
     const result = run(os, architecture);
     expect(result.status).toBe(1);
     expect(result.urls).toEqual([
-      `https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_${platform}.tar.gz`,
+      'https://codeload.github.com/rhysd/actionlint/tar.gz/fd33e9f582a01a02885c93ae3775e1190cf63653',
     ]);
     expect(result.output).toContain('download failed:');
     expect(result.extracted).toBe(false);
@@ -126,5 +212,40 @@ describe('checksum-pinned actionlint platform execution', () => {
     expect(result.output).toContain('sha256 mismatch:');
     expect(result.urls).toHaveLength(1);
     expect(result.extracted).toBe(false);
+  });
+
+  it('runs the upstream pipe regression and builds only verified source with fixed flags', () => {
+    const result = installFixture();
+    expect(result.status, result.output).toBe(0);
+    expect(result.goArgs).toContain(
+      '^TestProcessConcurrentStdinDoesNotDeadlock$'
+    );
+    expect(result.goArgs).toContain('-timeout=20s');
+    expect(result.goArgs).toContain('-mod=readonly');
+    expect(result.goArgs).toContain('-trimpath');
+    expect(result.checksums).toContain(
+      '475da14da4ed169c493d4f988f2cd6e4f15434752635ad809e5613cc3cde6fcc'
+    );
+    expect(result.lintArgs).toMatch(/-shellcheck=.*\/shellcheck/);
+    expect(result.lintArgs).toMatch(/-pyflakes=.*\/pyflakes/);
+    expect(result.lintArgs).toContain('-oneline\nworkflow with spaces.yml');
+  });
+
+  it.each([
+    'regression-failure',
+    'regression-failure-covered',
+    'uncovered',
+    'build-failure',
+    'wrong-version',
+  ])('fails closed before linting on %s', mode => {
+    const result = installFixture(mode);
+    expect(result.status).toBe(1);
+    expect(result.lintArgs).toBe('');
+  });
+
+  it('propagates actual lint failure rather than accepting a successful build', () => {
+    const result = installFixture('lint-failure');
+    expect(result.status, result.output).toBe(2);
+    expect(result.output).toContain('lint ran');
   });
 });

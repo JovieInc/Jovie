@@ -435,60 +435,83 @@ describe('scripts-typecheck: fail closed before baseline write (JOV-5450)', () =
     );
   });
 
-  it('diagnoses mixed table rows and accepts a tuple annotation with the real compiler', () => {
-    const { directory, baselineFile } = makeBaselineDir();
-    const baseline = JSON.stringify({
-      schemaVersion: BASELINE_SCHEMA_VERSION,
-      totalErrors: 0,
-      files: {},
-    });
-    writeFileSync(baselineFile, baseline);
-    writeFileSync(
-      resolve(directory, 'tsconfig.json'),
-      JSON.stringify({
-        compilerOptions: {
-          allowJs: true,
-          checkJs: true,
-          noEmit: true,
-          skipLibCheck: true,
-          target: 'es2022',
-          types: [],
-        },
-        files: ['table.mjs'],
-      })
-    );
-    const fixture = resolve(directory, 'table.mjs');
-    const rows = `const event = { reason: 'manual' };
+  it.each([
+    {
+      name: 'object/count',
+      rows: `const event = { reason: 'manual' };
 const cases = [[event, 1], [event, 3]];
 for (const [event, count] of cases) {
   Array.from({ length: count }, () => ({ ...event }));
 }
-`;
-    writeFileSync(fixture, rows);
-    const red = captureEvaluate({ directory, baselineFile, updateMode: false });
-    expect(red.exits).toEqual([1]);
-    expect(red.errors).toContain('TS2769');
-    expect(red.errors).toContain('TS2698');
-    expect(red.errors).toContain('JSDoc tuple');
-    expect(readFileSync(baselineFile, 'utf8')).toBe(baseline);
-    vi.restoreAllMocks();
+`,
+      annotation: 'Array<[typeof event, number]>',
+      diagnostics: ['TS2769', 'TS2698'],
+    },
+    {
+      name: 'pattern/reason',
+      rows: `const cases = [[/typecheck/, 'hosted CI']];
+for (const [pattern, reason] of cases) {
+  if (pattern.test('pnpm typecheck')) reason.toUpperCase();
+}
+`,
+      annotation: 'ReadonlyArray<readonly [RegExp, string]>',
+      diagnostics: ['TS2339'],
+    },
+  ])(
+    'diagnoses $name rows and accepts a tuple annotation with the real compiler',
+    ({ rows, annotation, diagnostics }) => {
+      const { directory, baselineFile } = makeBaselineDir();
+      const baseline = JSON.stringify({
+        schemaVersion: BASELINE_SCHEMA_VERSION,
+        totalErrors: 0,
+        files: {},
+      });
+      writeFileSync(baselineFile, baseline);
+      writeFileSync(
+        resolve(directory, 'tsconfig.json'),
+        JSON.stringify({
+          compilerOptions: {
+            allowJs: true,
+            checkJs: true,
+            noEmit: true,
+            skipLibCheck: true,
+            target: 'es2022',
+            types: [],
+          },
+          files: ['table.mjs'],
+        })
+      );
+      const fixture = resolve(directory, 'table.mjs');
+      writeFileSync(fixture, rows);
+      const red = captureEvaluate({
+        directory,
+        baselineFile,
+        updateMode: false,
+      });
+      expect(red.exits).toEqual([1]);
+      for (const diagnostic of diagnostics)
+        expect(red.errors).toContain(diagnostic);
+      expect(red.errors).toContain('JSDoc tuple');
+      expect(readFileSync(baselineFile, 'utf8')).toBe(baseline);
+      vi.restoreAllMocks();
 
-    writeFileSync(
-      fixture,
-      rows.replace(
-        'const cases =',
-        '/** @type {Array<[typeof event, number]>} */\nconst cases ='
-      )
-    );
-    const green = captureEvaluate({
-      directory,
-      baselineFile,
-      updateMode: false,
-    });
-    expect(green.exits).toEqual([0]);
-    expect(green.errors).toBe('');
-    expect(readFileSync(baselineFile, 'utf8')).toBe(baseline);
-  });
+      writeFileSync(
+        fixture,
+        rows.replace(
+          'const cases =',
+          `/** @type {${annotation}} */\nconst cases =`
+        )
+      );
+      const green = captureEvaluate({
+        directory,
+        baselineFile,
+        updateMode: false,
+      });
+      expect(green.exits).toEqual([0]);
+      expect(green.errors).toBe('');
+      expect(readFileSync(baselineFile, 'utf8')).toBe(baseline);
+    }
+  );
 
   it.each([
     [

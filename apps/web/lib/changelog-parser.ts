@@ -508,7 +508,8 @@ const PublicationReceiptSchema = z.object({
       z.object({
         passed: z.boolean(),
         // Failed or unreachable checks carry no status or hash; they must not
-        // invalidate the receipt's passing evidence.
+        // invalidate the receipt's passing evidence (at least one pass is still
+        // required below).
         status: z.number().optional(),
         sha256: z.string().optional(),
       })

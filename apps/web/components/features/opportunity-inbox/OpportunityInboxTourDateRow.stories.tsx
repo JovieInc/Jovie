@@ -7,6 +7,15 @@ const meta: Meta<typeof OpportunityInboxTourDateRow> = {
   parameters: {
     layout: 'centered',
   },
+  // The row renders an <li>; give the standalone story canvas the list
+  // parent it has in the app feed so axe's listitem rule sees real context.
+  decorators: [
+    Story => (
+      <ul className='list-none p-0 m-0'>
+        <Story />
+      </ul>
+    ),
+  ],
   args: {
     item: {
       id: 'tour-date-troubadour',

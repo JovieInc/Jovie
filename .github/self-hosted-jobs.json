@@ -53,6 +53,16 @@
       "reason": "runs the Hermes CLI installed on the gem host"
     },
     {
+      "workflow": "lane-fix-relay.yml",
+      "job": "wake-red",
+      "reason": "a red check writes the lane host wake file so fix-now starts without waiting for the lanes timer"
+    },
+    {
+      "workflow": "mutation-diff.yml",
+      "job": "*",
+      "reason": "Hosted CI is saturated; Stryker mutation runs on the Gem pool and the preflight skips when the 5-minute load is 8 or more so shipping lanes stay ahead."
+    },
+    {
       "workflow": "pr-size-guard.yml",
       "job": "merge-group-fork",
       "reason": "light merge_group gate job; hosted by default, routed to the fixed pool only while repo variable MERGE_GATE_POOL=fixed (hosted saturation fallback, #23586)"

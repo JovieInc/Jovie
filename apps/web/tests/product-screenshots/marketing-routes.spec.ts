@@ -62,6 +62,9 @@ test.describe('Exact marketing route screenshots', () => {
         });
         const documentStatus = response?.status() ?? 0;
         const finalPath = new URL(page.url()).pathname;
+        expect(new URL(page.url()).origin, target.url).toBe(
+          new URL(testInfo.project.use.baseURL as string).origin
+        );
         expect(documentStatus, target.url).toBeLessThan(400);
         expect(finalPath, `${target.url} redirected`).toBe(target.expectedPath);
         await expect(
