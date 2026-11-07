@@ -7,8 +7,13 @@
 # .company-guards/ rule. The baseline is committed under scripts/company-guards/
 # and this job copies it to the path guards/size.mjs reads.
 name: Company Guards
+# Required check: it must also report on merge_group, or queue entries wait
+# forever. The size guard compares the checked-out tree with the committed
+# baseline (no base ref), so the merge-group checkout needs no base_sha.
 on:
   pull_request:
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
 permissions:
