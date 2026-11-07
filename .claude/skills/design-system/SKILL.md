@@ -23,7 +23,7 @@ One skill for design-system work across Pen and code. Read this page, pick the r
 
 | Task | Guide |
 |---|---|
-| New or changed look, layout, motion, copy on any surface; design review; variants; "make it feel better" | [guides/art-direction.md](guides/art-direction.md) |
+| New or changed look, layout, motion, copy on any surface; design review; variants; "make it feel better"; Pen page proposal (art-direction loop) | [guides/art-direction.md](guides/art-direction.md) |
 | Add, rename, change or retire a token; color, type, radius, spacing, motion, shadow | [guides/tokens.md](guides/tokens.md) |
 | Build or change a shared component; ownership; variants; right rail, status, menu, table | [guides/components.md](guides/components.md) |
 | Anything that touches a `.pen` file, the `pen` CLI or `mcp__pencil__*` | [guides/pen-operations.md](guides/pen-operations.md) |
