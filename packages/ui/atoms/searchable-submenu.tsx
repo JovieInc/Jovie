@@ -145,6 +145,14 @@ function nextEnabledIndex(
 const MENU_TOUCH_TARGET_BASE =
   'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
 
+/** Focus an element on the next tick, after portalled content mounts. */
+function focusOnNextTick(ref: React.RefObject<HTMLElement | null>): () => void {
+  const timer = setTimeout(() => {
+    ref.current?.focus();
+  }, 0);
+  return () => clearTimeout(timer);
+}
+
 // ============================================================================
 // COMPONENT
 // ============================================================================
@@ -190,17 +198,19 @@ export function SearchableSubmenu({
 
   const hasResults = flatItems.length > 0;
 
-  // Reset state when submenu opens/closes
-  useEffect(() => {
-    if (isOpen) {
+  // Start each open with a fresh search. The reset runs in the open-change
+  // handler, not an effect on isOpen, so a re-render never wipes typed text.
+  const handleOpenChange = useCallback((nextOpen: boolean) => {
+    if (nextOpen) {
       setSearchQuery('');
       setHighlightedIndex(0);
-      // Focus search input after a brief delay to ensure it's mounted
-      const timer = setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 0);
-      return () => clearTimeout(timer);
     }
+    setIsOpen(nextOpen);
+  }, []);
+
+  // Focus search input once the submenu content has mounted
+  useEffect(() => {
+    if (isOpen) return focusOnNextTick(searchInputRef);
   }, [isOpen]);
 
   // Reset highlighted index when search results change
@@ -318,9 +328,12 @@ export function SearchableSubmenu({
   let globalIndex = 0;
 
   return (
-    <DropdownMenuPrimitive.Sub open={isOpen} onOpenChange={setIsOpen}>
+    <DropdownMenuPrimitive.Sub open={isOpen} onOpenChange={handleOpenChange}>
       <DropdownMenuPrimitive.SubTrigger
         disabled={disabled}
+        // The panel is a search dialog (combobox + listbox), not a menu of
+        // menuitems, so announce the popup type it actually opens.
+        aria-haspopup='dialog'
         data-slot='searchable-submenu-trigger'
         className={cn(MENU_ITEM_BASE, MENU_TOUCH_TARGET_BASE)}
       >
@@ -332,6 +345,10 @@ export function SearchableSubmenu({
       <DropdownMenuPrimitive.Portal>
         <DropdownMenuPrimitive.SubContent
           ref={contentRef}
+          // Radix labels the panel by its trigger; drop the menu-only
+          // orientation so the dialog role carries only allowed attributes.
+          role='dialog'
+          aria-orientation={undefined}
           data-slot='searchable-submenu-content'
           className={contentClasses}
           sideOffset={2}

@@ -8,6 +8,7 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import type {
   SearchableSubmenuItem,
@@ -589,5 +590,139 @@ describe('SearchableSubmenu', () => {
     const clear = screen.getByRole('button', { name: 'Clear search' });
     expect(clear.className).toContain('before:h-11');
     expect(clear.className).toContain('before:min-w-11');
+  });
+
+  it('keeps typed search text when the parent re-renders while open', async () => {
+    const user = userEvent.setup({ delay: null });
+    function Host({ tick }: { readonly tick: number }) {
+      return (
+        <DropdownMenuPrimitive.Root defaultOpen>
+          <DropdownMenuPrimitive.Trigger>
+            Actions {tick}
+          </DropdownMenuPrimitive.Trigger>
+          <DropdownMenuPrimitive.Portal>
+            <DropdownMenuPrimitive.Content>
+              <SearchableSubmenu
+                triggerLabel='Choose platform'
+                sections={[...sections]}
+                onSelect={vi.fn()}
+              />
+            </DropdownMenuPrimitive.Content>
+          </DropdownMenuPrimitive.Portal>
+        </DropdownMenuPrimitive.Root>
+      );
+    }
+    const { rerender } = render(<Host tick={0} />);
+
+    await user.hover(screen.getByText('Choose platform'));
+    const input = await screen.findByRole('combobox', { name: 'Search...' });
+    await user.type(input, 'apple', { skipClick: true });
+    expect(input).toHaveValue('apple');
+
+    rerender(<Host tick={1} />);
+    rerender(<Host tick={2} />);
+
+    const after = screen.getByRole('combobox', { name: 'Search...' });
+    expect(after).toBe(input);
+    expect(after).toHaveValue('apple');
+    expect(after).toHaveFocus();
+  });
+
+  it('starts each reopen with an empty search', async () => {
+    const user = userEvent.setup({ delay: null });
+    renderSubmenu();
+
+    await user.hover(screen.getByText('Choose platform'));
+    const input = await screen.findByRole('combobox', { name: 'Search...' });
+    await user.type(input, 'apple', { skipClick: true });
+    expect(input).toHaveValue('apple');
+
+    // Escape clears the query; selecting a result closes the submenu.
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(input).toHaveValue('');
+    await user.type(input, 'spot', { skipClick: true });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('combobox', { name: 'Search...' })
+      ).not.toBeInTheDocument()
+    );
+
+    const trigger = document.querySelector<HTMLElement>(
+      '[data-slot="searchable-submenu-trigger"]'
+    );
+    expect(trigger).toBeInTheDocument();
+    trigger?.focus();
+    fireEvent.keyDown(trigger as HTMLElement, { key: 'ArrowRight' });
+    const reopened = await screen.findByRole('combobox', { name: 'Search...' });
+    expect(reopened).toHaveValue('');
+  });
+
+  it('has no axe violations when the submenu is open', async () => {
+    const user = userEvent.setup({ delay: null });
+    renderSubmenu();
+
+    await user.hover(screen.getByText('Choose platform'));
+    await screen.findByRole('combobox', { name: 'Search...' });
+    const content = document.querySelector(
+      '[data-slot="searchable-submenu-content"]'
+    );
+    expect(content).toBeInTheDocument();
+    await expectNoA11yViolations(content as Element);
+  });
+});
+
+describe('SearchableList input retention and accessibility', () => {
+  it('keeps typed text when the parent re-renders', async () => {
+    const user = userEvent.setup({ delay: null });
+    function Host({ tick }: { readonly tick: number }) {
+      return (
+        <div data-tick={tick}>
+          <SearchableList items={[...sampleItems]} onSelect={vi.fn()} />
+        </div>
+      );
+    }
+    const { rerender } = render(<Host tick={0} />);
+    const input = screen.getByPlaceholderText('Search...');
+
+    await user.type(input, 'ban');
+    rerender(<Host tick={1} />);
+
+    expect(screen.getByPlaceholderText('Search...')).toBe(input);
+    expect(input).toHaveValue('ban');
+    expect(input).toHaveFocus();
+  });
+
+  it('has no axe violations with results, no results and right-to-left items', async () => {
+    const { container, rerender } = render(
+      <SearchableList items={sampleItems} onSelect={vi.fn()} />
+    );
+    await expectNoA11yViolations(container);
+
+    rerender(
+      <SearchableList
+        items={[]}
+        onSelect={vi.fn()}
+        emptyMessage='No platforms match'
+      />
+    );
+    await expectNoA11yViolations(container);
+
+    rerender(
+      <div dir='rtl'>
+        <SearchableList
+          items={[
+            {
+              id: 'rtl-1',
+              label: 'آبل ميوزك للفنانين مع الكتالوج الكامل للإصدارات',
+              description: 'متصل عبر حساب التوزيع',
+            },
+          ]}
+          onSelect={vi.fn()}
+          placeholder='ابحث عن منصة'
+        />
+      </div>
+    );
+    await expectNoA11yViolations(container);
   });
 });
