@@ -74,6 +74,8 @@ interface MarketingFooterProps {
   readonly columns?: readonly MarketingFooterColumn[];
   /** Published legal row (Privacy and Terms are required by the record). */
   readonly legalLinks?: readonly MarketingFooterLink[];
+  /** Section id for the Pen design-diff gate (`data-pen-section`). */
+  readonly penSection?: string;
 }
 
 type ResolvedVariant = 'expanded' | 'minimal';
@@ -201,6 +203,7 @@ export function MarketingFooter({
   showCta = true,
   columns,
   legalLinks,
+  penSection,
 }: Readonly<MarketingFooterProps>) {
   const pathname = usePublicPathname();
   const resolvedVariant = resolveFooterVariant(variant, pathname);
@@ -223,6 +226,7 @@ export function MarketingFooter({
         className
       )}
       data-testid='marketing-footer'
+      data-pen-section={penSection}
       data-footer-variant={resolvedVariant}
     >
       <div

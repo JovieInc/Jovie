@@ -47,11 +47,19 @@ const registry = JSON.parse(
     ),
     'utf8'
   )
-) as { images: { path: string; routes: string[] }[] };
+) as {
+  images: { path: string; routes: string[]; homeApproval?: string }[];
+};
+
+// Tim approved the canonical v1 design, which shows his own profile photo, on
+// 2026-11-07 (receipt home-canonical-v1). Only images carrying that receipt
+// may render on `/`; every other registered person stays off it.
+const HOME_RECEIPT = 'home-canonical-v1';
 
 describe('homepage shows no real person', () => {
   it('lists / on no approved-people image', () => {
     for (const image of registry.images) {
+      if (image.homeApproval === HOME_RECEIPT) continue;
       expect(image.routes, image.path).not.toContain('/');
     }
   });
@@ -63,12 +71,18 @@ describe('homepage shows no real person', () => {
       node => [node.getAttribute('src'), node.getAttribute('srcset')]
     );
     const html = `${sources.join(' ')} ${container.innerHTML}`;
-    const basenames = registry.images.map(image =>
-      decodeURIComponent(image.path.slice(image.path.lastIndexOf('/') + 1))
-    );
-    for (const name of basenames) {
+    const nameOf = (image: { path: string }) =>
+      decodeURIComponent(image.path.slice(image.path.lastIndexOf('/') + 1));
+    const approved = registry.images
+      .filter(image => image.homeApproval === HOME_RECEIPT)
+      .map(nameOf);
+    for (const image of registry.images) {
+      const name = nameOf(image);
+      if (approved.includes(name)) continue;
       expect(html, name).not.toContain(name);
     }
-    expect(html).not.toMatch(/tim-white|tim-profile/iu);
+    let rest = html;
+    for (const name of approved) rest = rest.split(name).join('');
+    expect(rest).not.toMatch(/tim-white|tim-profile/iu);
   });
 });

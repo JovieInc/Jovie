@@ -37,10 +37,13 @@ export default async function HomeLayout({
       <PublicPageShell
         chrome={chrome}
         className='home-viewport home-viewport--hero-canvas min-h-svh overflow-x-clip bg-base text-primary-token'
+        footerClassName='home-footer-v1'
+        footerPenSection='footer'
         footerShowCta={false}
         footerVariant='expanded'
         headerBrand={HOME_HEADER_BRAND}
         headerCta={HOME_HEADER_CTA}
+        headerHidePrimaryCta
         logoSize='sm'
         pageContract={HOME_PAGE_CONTRACT}
       >

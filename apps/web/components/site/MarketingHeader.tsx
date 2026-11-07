@@ -104,6 +104,8 @@ export interface MarketingHeaderProps
      */
     readonly chromeNav?: MarketingHeaderChromeNav;
     readonly primaryCta?: MarketingHeaderCta;
+    /** Show Log in only (the invite-only homepage has one CTA, in the hero). */
+    readonly hidePrimaryCta?: boolean;
     readonly showHomepageCenterNav?: boolean;
     readonly variant?: MarketingHeaderVariant;
   }> {}
@@ -178,6 +180,7 @@ export function MarketingHeader({
   navLinks,
   chromeNav,
   primaryCta,
+  hidePrimaryCta = false,
   showHomepageCenterNav = true,
   variant = 'landing',
 }: MarketingHeaderProps) {
@@ -264,6 +267,7 @@ export function MarketingHeader({
       presentation={presentation}
       flyoutMenus={navConfig.flyoutMenus}
       publicCta={resolvedPrimaryCta}
+      hidePublicCta={hidePrimaryCta}
       mobileNavLinks={navConfig.mobileNavLinks}
       navLinks={navConfig.desktopNavLinks}
       showContactLink={false}

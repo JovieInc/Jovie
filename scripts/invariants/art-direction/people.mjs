@@ -70,6 +70,14 @@ function walk(absolute, out) {
   }
 }
 
+/**
+ * Tim approved the "Homepage canonical v1" design, which shows his own profile
+ * and release art, on 2026-11-07 (Design Approvals receipt home-canonical-v1).
+ * That is the only receipt that lifts the 2026-10-26 "keep my face off the
+ * homepage" rule, and only for the images that carry it.
+ */
+export const HOME_APPROVAL = 'home-canonical-v1';
+
 export function validateRegistry(registry, exists) {
   const errors = [];
   const people = new Map();
@@ -98,7 +106,7 @@ export function validateRegistry(registry, exists) {
       errors.push(
         `image ${image.path}: routes is required (the routes it may render on)`
       );
-    else if (image.routes.includes('/'))
+    else if (image.routes.includes('/') && image.homeApproval !== HOME_APPROVAL)
       errors.push(
         `image ${image.path}: / is never allowed; no real person on the homepage`
       );

@@ -126,10 +126,8 @@ describe('homepage contract', { timeout: 60_000 }, () => {
 
     const h1s = screen.getAllByRole('heading', { level: 1 });
     expect(h1s).toHaveLength(1);
-    expect(h1s[0]).toHaveTextContent(
-      'Jovie helps you move your music forward.'
-    );
-    expect(copy.hero.headline).toBe('Jovie helps you move your music forward.');
+    expect(h1s[0]).toHaveTextContent('Move your music forward.');
+    expect(copy.hero.headline).toBe('Move your music forward.');
     expect(
       screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)
     ).toEqual([
@@ -154,7 +152,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
       const close = container.querySelector(`#${HOMEPAGE_INVITE_ANCHOR}`);
       expect(close).toHaveAttribute('data-testid', 'marketing-section-cta');
       expect(close?.contains(forms[0] ?? null)).toBe(true);
-      expect(within(forms[0]!).getByRole('radiogroup')).toBeVisible();
+      expect(within(forms[0]!).getAllByRole('radio')).toHaveLength(6);
 
       // The hero's primary action scrolls to that form; no public signup.
       const primary = screen.getByTestId('homepage-primary-cta');
@@ -198,15 +196,19 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     const sources = [...container.querySelectorAll('section img')].map(image =>
       (image.getAttribute('src') ?? '').replace(/\?v=\w+$/, '')
     );
-    // The template profile (jov.ie/you, monogram avatar, abstract art), then
-    // the releases workspace and the featured release from Tim White's own
-    // catalog. Every capture comes from the screenshot registry.
+    // Canonical v1 (receipt home-canonical-v1): the matte signal field, Tim
+    // White's own profile photo and the featured release in the phone, then
+    // his four real release covers. No stock or generated person.
     expect(sources).toEqual([
-      '/product-screenshots/template-profile-live-phone.png',
-      '/product-screenshots/releases-dashboard-full.png',
-      '/product-screenshots/profile-state-release.png',
+      '/assets/generated/homepage-hero-signal-grain-v1.webp',
+      '/images/avatars/tim-white-profile.jpg',
+      '/img/releases/never-say-a-word.jpg',
+      '/img/releases/never-say-a-word.jpg',
+      '/img/releases/take-me-over-remix.jpg',
+      '/img/releases/the-deep-end-art.jpg',
+      '/img/releases/tomorrow-sounds.jpg',
     ]);
-    expect(copy.profile.scenarioId).toBe('template-profile-live-mobile');
+    expect(copy.profile.alt).toBeTruthy();
   });
 
   it('keeps copy in data and free of em dashes and stock promotion', async () => {

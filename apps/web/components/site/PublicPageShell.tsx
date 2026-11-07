@@ -24,6 +24,8 @@ export interface PublicPageShellProps {
   readonly chrome?: ResolvedSiteChrome;
   readonly className?: string;
   readonly footerClassName?: string;
+  /** Pen design-diff section id for the footer. */
+  readonly footerPenSection?: string;
   /** Set false when the route owns its final CTA (the homepage). */
   readonly footerShowCta?: boolean;
   readonly footerVariant?: 'auto' | 'expanded' | 'minimal';
@@ -31,6 +33,8 @@ export interface PublicPageShellProps {
   /** Overrides the per-page header brand config (icon-only vs lockup). */
   readonly headerBrand?: MarketingHeaderBrand;
   readonly headerCta?: MarketingHeaderCta;
+  /** Header shows Log in only, no primary CTA. */
+  readonly headerHidePrimaryCta?: boolean;
   readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   readonly logoVariant?: LogoVariant;
   readonly mainClassName?: string;
@@ -56,10 +60,12 @@ export function PublicPageShell({
   chrome,
   className,
   footerClassName,
+  footerPenSection,
   footerShowCta,
   footerVariant,
   headerBrand,
   headerCta,
+  headerHidePrimaryCta = false,
   headerVariant = 'landing',
   logoSize = 'xs',
   logoVariant,
@@ -85,6 +91,7 @@ export function PublicPageShell({
         logoVariant={logoVariant}
         navLinks={navLinks}
         primaryCta={headerCta}
+        hidePrimaryCta={headerHidePrimaryCta}
         showHomepageCenterNav={showHomepageCenterNav}
         variant={headerVariant}
       />
@@ -104,6 +111,7 @@ export function PublicPageShell({
       <MarketingFooter
         className={footerClassName}
         columns={chrome?.footerColumns}
+        penSection={footerPenSection}
         showCta={footerShowCta}
         legalLinks={chrome?.legalLinks}
         variant={footerVariant}
