@@ -164,5 +164,6 @@ describe('homepage header CTA', () => {
       'utf8'
     );
     expect(source).toContain('hidePrimaryCta');
+    expect(source).toContain('leftWordmark');
   });
 });

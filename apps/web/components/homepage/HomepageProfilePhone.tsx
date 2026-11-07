@@ -6,9 +6,9 @@ import {
   Music2,
   User,
 } from 'lucide-react';
-import Image from 'next/image';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { ImageryStage } from '@/components/marketing/ImageryStage';
 import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
@@ -34,7 +34,7 @@ export function HomepageProfilePhone({
         <Ellipsis className='size-4' />
       </div>
       <div className='hpv1-phone__identity' aria-hidden>
-        <Image
+        <ImageryStage
           src='/images/avatars/tim-white-profile.jpg'
           alt=''
           width={80}
@@ -57,7 +57,7 @@ export function HomepageProfilePhone({
       </div>
       <div className='hpv1-phone__card' aria-hidden>
         <span className='hpv1-phone__card-label'>{PHONE_COPY.listen}</span>
-        <Image
+        <ImageryStage
           src={release.src}
           alt=''
           width={104}

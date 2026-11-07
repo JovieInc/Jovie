@@ -35,6 +35,8 @@ export interface PublicPageShellProps {
   readonly headerCta?: MarketingHeaderCta;
   /** Header shows Log in only, no primary CTA. */
   readonly headerHidePrimaryCta?: boolean;
+  /** Wordmark at the left of the header (the homepage). */
+  readonly headerLeftWordmark?: boolean;
   readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   readonly logoVariant?: LogoVariant;
   readonly mainClassName?: string;
@@ -66,6 +68,7 @@ export function PublicPageShell({
   headerBrand,
   headerCta,
   headerHidePrimaryCta = false,
+  headerLeftWordmark = false,
   headerVariant = 'landing',
   logoSize = 'xs',
   logoVariant,
@@ -92,6 +95,7 @@ export function PublicPageShell({
         navLinks={navLinks}
         primaryCta={headerCta}
         hidePrimaryCta={headerHidePrimaryCta}
+        leftWordmark={headerLeftWordmark}
         showHomepageCenterNav={showHomepageCenterNav}
         variant={headerVariant}
       />

@@ -26,7 +26,16 @@ export default async function HomeLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const chrome = await getSiteChrome();
+  const siteChrome = await getSiteChrome();
+  // The design's legal row also names Cookies and DMCA (both are live pages).
+  const chrome = {
+    ...siteChrome,
+    legalLinks: [
+      ...siteChrome.legalLinks,
+      { href: APP_ROUTES.LEGAL_COOKIES, label: 'Cookies' },
+      { href: APP_ROUTES.LEGAL_DMCA, label: 'DMCA' },
+    ],
+  };
   // The homepage uses the one canonical marketing shell: the docked
   // landing header (with the Customers flyout) and the full footer. The
   // hero opts into `marketing-hero-dock`, so its cinematic field bleeds
@@ -44,6 +53,7 @@ export default async function HomeLayout({
         headerBrand={HOME_HEADER_BRAND}
         headerCta={HOME_HEADER_CTA}
         headerHidePrimaryCta
+        headerLeftWordmark
         logoSize='sm'
         pageContract={HOME_PAGE_CONTRACT}
       >

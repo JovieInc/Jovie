@@ -29,13 +29,6 @@
   }
 }
 
-.hpv1-wrap {
-  width: 100%;
-  max-width: 90rem;
-  margin-inline: auto;
-  padding-inline: var(--hpv1-margin);
-}
-
 /* ── Type ──────────────────────────────────────────────────────────── */
 
 .hpv1-display {
@@ -66,6 +59,10 @@
   color: var(--color-text-secondary-token);
   font-size: 1rem;
   line-height: 1.5rem;
+}
+
+.public-container.hpv1-wrap {
+  inline-size: min(100% - 2 * var(--hpv1-margin), 78rem);
 }
 
 .hpv1-eyebrow {
@@ -216,10 +213,7 @@
   }
 
   .hpv1-hero__copy {
-    max-width: 50.25rem;
-    margin-inline: 0 auto;
     padding-top: 16rem;
-    margin-left: max(0px, calc((100% - 90rem) / 2));
   }
 
   .hpv1-hero .hpv1-lede {
@@ -417,7 +411,7 @@
     margin-top: 0;
     overflow: hidden;
     border: 1px solid var(--color-border-subtle);
-    border-radius: var(--space-4);
+    border-radius: var(--radius-xl);
     background:
       radial-gradient(
         120% 90% at 50% 100%,
@@ -442,7 +436,7 @@
   width: 19.375rem;
   height: 33.8125rem;
   overflow: hidden;
-  border-radius: var(--space-6);
+  border-radius: calc(var(--radius-xl) * 1.5);
   background: var(--hpv1-canvas);
   color: var(--color-text-primary-token);
 }
@@ -516,7 +510,7 @@
   display: grid;
   margin: var(--space-5) 0.6875rem 0;
   padding: var(--space-4);
-  border-radius: var(--space-5);
+  border-radius: calc(var(--radius-xl) * 1.25);
   background: linear-gradient(
     200deg,
     color-mix(in oklab, var(--color-accent-purple) 40%, transparent) 0%,
@@ -535,7 +529,7 @@
   height: 6.5rem;
   margin: var(--space-1) auto 0;
   border: 2px solid var(--color-text-primary-token);
-  border-radius: 0.375rem;
+  border-radius: calc(var(--radius-sm) * 0.75);
   object-fit: cover;
 }
 
@@ -617,7 +611,7 @@
   aspect-ratio: 163 / 164;
   overflow: hidden;
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--space-2);
+  border-radius: var(--radius-sm);
 }
 
 .hpv1-release__art img {
@@ -674,7 +668,7 @@
 
   .hpv1-release__art {
     aspect-ratio: 1;
-    border-radius: var(--space-3);
+    border-radius: var(--radius-lg);
   }
 
   .hpv1-release__title {
@@ -851,11 +845,24 @@
 /* ── Footer geometry (production link data, Pen spacing) ─────────────── */
 
 .home-footer-v1 .public-container {
-  width: 100%;
-  max-width: 90rem;
-  padding-inline: var(--space-6);
-  padding-top: 2.5625rem;
-  padding-bottom: 3.25rem;
+  inline-size: min(100% - 2 * var(--hpv1-margin), 78rem);
+  padding-block: 2.5625rem 3.25rem;
+}
+
+.home-footer-v1 {
+  --hpv1-margin: var(--space-6);
+}
+
+@media (min-width: 48rem) {
+  .home-footer-v1 {
+    --hpv1-margin: var(--space-12);
+  }
+}
+
+@media (min-width: 75rem) {
+  .home-footer-v1 {
+    --hpv1-margin: var(--space-24);
+  }
 }
 
 .home-footer-v1 .mf-eyebrow {
@@ -887,17 +894,7 @@
   color: var(--mf-text);
 }
 
-@media (min-width: 48rem) {
-  .home-footer-v1 .public-container {
-    padding-inline: var(--space-12);
-  }
-}
-
 @media (min-width: 75rem) {
-  .home-footer-v1 .public-container {
-    padding-inline: var(--space-24);
-  }
-
   /* Brand on column 1; link columns on the grid: 3 spans of 3 columns from
      column 2 (96 + 108k), so every column start sits on a column line. */
   .home-footer-v1 .public-container > div:first-child {
@@ -954,7 +951,7 @@
     height: var(--space-12);
     padding-inline: var(--space-4);
     border: 1px solid var(--color-border-strong);
-    border-radius: var(--space-3);
+    border-radius: var(--radius-lg);
     background: var(--color-bg-surface-1);
   }
 
@@ -975,7 +972,6 @@
   }
 
   .hpv1-lede,
-  .hpv1-body,
   .hpv1-note {
     letter-spacing: -0.011em;
   }

@@ -4,10 +4,10 @@ import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 /**
- * Tim (2026-10-26): "keep my face off the homepage. Product page is fine."
- * Renders the real `/` page module and fails if any image on it is a person
- * from the approved-people registry (or a Tim capture). The registry's
- * per-route allowlist never lists `/`; people.mjs enforces that half.
+ * Approved people only (today: Tim White, his own photos). Renders the real
+ * `/` page module and fails if any person image on it is not an approved
+ * person registered for `/`. An unapproved person, or an unregistered image
+ * of an approved one, stays off the page. people.mjs enforces the registry.
  */
 vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
 vi.mock('@/lib/content-records/store.server', async () => {
@@ -48,41 +48,37 @@ const registry = JSON.parse(
     'utf8'
   )
 ) as {
-  images: { path: string; routes: string[]; homeApproval?: string }[];
+  people: { id: string }[];
+  images: { path: string; routes: string[]; person: string }[];
 };
 
-// Tim approved the canonical v1 design, which shows his own profile photo, on
-// 2026-11-07 (receipt home-canonical-v1). Only images carrying that receipt
-// may render on `/`; every other registered person stays off it.
-const HOME_RECEIPT = 'home-canonical-v1';
+const nameOf = (path: string) =>
+  decodeURIComponent(path.slice(path.lastIndexOf('/') + 1));
 
-describe('homepage shows no real person', () => {
-  it('lists / on no approved-people image', () => {
-    for (const image of registry.images) {
-      if (image.homeApproval === HOME_RECEIPT) continue;
-      expect(image.routes, image.path).not.toContain('/');
+describe('homepage people are approved people only', () => {
+  it('registers every person image on / to an approved person', () => {
+    const approved = new Set(registry.people.map(person => person.id));
+    for (const image of registry.images.filter(i => i.routes.includes('/'))) {
+      expect(approved.has(image.person), image.path).toBe(true);
     }
   });
 
-  it('renders no registered person image or Tim capture', async () => {
+  it('renders no person image that is not registered for /', async () => {
     const { default: HomePage } = await import('@/app/(home)/page');
     const { container } = render(await HomePage());
     const sources = [...container.querySelectorAll('img, source')].flatMap(
       node => [node.getAttribute('src'), node.getAttribute('srcset')]
     );
     const html = `${sources.join(' ')} ${container.innerHTML}`;
-    const nameOf = (image: { path: string }) =>
-      decodeURIComponent(image.path.slice(image.path.lastIndexOf('/') + 1));
-    const approved = registry.images
-      .filter(image => image.homeApproval === HOME_RECEIPT)
-      .map(nameOf);
-    for (const image of registry.images) {
-      const name = nameOf(image);
-      if (approved.includes(name)) continue;
-      expect(html, name).not.toContain(name);
+    // Registered for another route only: must not appear here.
+    for (const image of registry.images.filter(i => !i.routes.includes('/'))) {
+      expect(html, image.path).not.toContain(nameOf(image.path));
     }
+    // Anything Tim-named that renders must be a registered `/` image.
     let rest = html;
-    for (const name of approved) rest = rest.split(name).join('');
+    for (const image of registry.images.filter(i => i.routes.includes('/'))) {
+      rest = rest.split(nameOf(image.path)).join('');
+    }
     expect(rest).not.toMatch(/tim-white|tim-profile/iu);
   });
 });

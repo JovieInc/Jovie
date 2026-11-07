@@ -1,15 +1,16 @@
 // @coverage-via apps/web/tests/unit/home/homepage-contract.test.tsx
 import { Button } from '@jovie/ui/atoms/button';
 import { ArrowRight } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { Fragment, type ReactNode } from 'react';
 import { DisplayText } from '@/components/atoms/DisplayText';
 import { WaitlistRoleForm } from '@/components/features/waitlist/WaitlistRoleForm';
 import { HomepageProfilePhone } from '@/components/homepage/HomepageProfilePhone';
+import { ImageryStage } from '@/components/marketing/ImageryStage';
 import {
   HOMEPAGE_EDITORIAL_COPY,
   HOMEPAGE_HEADLINE_BREAKS,
+  HOMEPAGE_HERO_PLATE,
   HOMEPAGE_INVITE_ANCHOR,
   HOMEPAGE_RELEASES,
 } from '@/data/homepageEditorialCopy';
@@ -67,8 +68,8 @@ export function HomepageStoryHero({
       className='hpv1-hero marketing-hero-dock'
     >
       <div className='hpv1-hero__art' aria-hidden>
-        <Image
-          src='/assets/generated/homepage-hero-signal-grain-v1.webp'
+        <ImageryStage
+          src={HOMEPAGE_HERO_PLATE}
           alt=''
           fill
           priority
@@ -77,7 +78,7 @@ export function HomepageStoryHero({
         />
         <div className='hpv1-hero__veil' />
       </div>
-      <div className='hpv1-wrap hpv1-hero__copy'>
+      <div className='public-container hpv1-wrap hpv1-hero__copy'>
         <DisplayText as='h1' id={headingId} className='hpv1-display'>
           {lines(HOMEPAGE_EDITORIAL_COPY.hero.headline)}
         </DisplayText>
@@ -114,7 +115,7 @@ export function HomepageStoryHero({
         </p>
       </div>
       <nav
-        className='hpv1-wrap hpv1-index'
+        className='public-container hpv1-wrap hpv1-index'
         aria-label={HOMEPAGE_EDITORIAL_COPY.chaptersLabel}
       >
         <ol>
@@ -152,7 +153,7 @@ export function HomepageProfileChapter({
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.featureSplit}
       className='hpv1-chapter hpv1-profile'
     >
-      <div className='hpv1-wrap hpv1-profile__grid'>
+      <div className='public-container hpv1-wrap hpv1-profile__grid'>
         <div className='hpv1-profile__copy'>
           <Eyebrow index='01' label={HOMEPAGE_EDITORIAL_COPY.chapters[0]} />
           <DisplayText as='h2' className='hpv1-display hpv1-display--section'>
@@ -196,7 +197,7 @@ export function HomepageReleasesChapter({
       }
       className='hpv1-chapter hpv1-releases'
     >
-      <div className='hpv1-wrap'>
+      <div className='public-container hpv1-wrap'>
         <div className='hpv1-releases__head'>
           <div>
             <Eyebrow index='02' label={HOMEPAGE_EDITORIAL_COPY.chapters[1]} />
@@ -210,7 +211,7 @@ export function HomepageReleasesChapter({
           {HOMEPAGE_RELEASES.map(release => (
             <li key={release.title} className='hpv1-release'>
               <div className='hpv1-release__art'>
-                <Image
+                <ImageryStage
                   src={release.src}
                   alt={`${release.title} cover art`}
                   fill
@@ -261,7 +262,7 @@ export function HomepageInviteClose({
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.cta}
       className='hpv1-chapter hpv1-invite'
     >
-      <div className='hpv1-wrap hpv1-invite__grid'>
+      <div className='public-container hpv1-wrap hpv1-invite__grid'>
         <div className='hpv1-invite__form'>
           <Eyebrow index='03' label={HOMEPAGE_EDITORIAL_COPY.chapters[2]} />
           <DisplayText as='h2' className='hpv1-display hpv1-display--section'>

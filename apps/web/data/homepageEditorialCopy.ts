@@ -124,3 +124,7 @@ export const HOMEPAGE_HEADLINE_BREAKS: Readonly<
   ],
   [HOMEPAGE_EDITORIAL_COPY.invite.headline]: ['Jovie opens', 'by invitation.'],
 };
+
+/** The approved hero field (Pen library A14, blue signal grain). Sidecar declares its accent. */
+export const HOMEPAGE_HERO_PLATE =
+  '/assets/generated/homepage-hero-signal-grain-v1.webp';
