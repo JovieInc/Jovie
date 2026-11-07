@@ -338,10 +338,10 @@ def _locked(path: Path, ident: dict, coordination: dict | None, fn, *, now=None)
 def _for(rows: list[dict], ident: dict) -> list[dict]: return [row for row in rows if row["identityDigest"] == ident["identityDigest"]]
 def _usage(rows: list[dict], now: float) -> dict:
     starts = [row for row in rows if row["event"] == "attempt_started"]
-    finishes = {row["fencingToken"] for row in rows if row["event"] == "attempt_finished"}
+    finishes = {row["fencingToken"]: row["at"] for row in rows if row["event"] == "attempt_finished"}  # token -> finish time
     boundaries = [row for row in rows if row["event"] == "boundary_admitted"]
     return {"attempts": len(starts), "concurrency": sum(row["fencingToken"] not in finishes for row in starts),
-            "wallSeconds": max(0, now - min((row["at"] for row in starts), default=now)),
+            "wallSeconds": sum(max(0, finishes.get(row["fencingToken"], now) - row["at"]) for row in starts),  # spent, not since first start
             "spend": sum(row["reservation"]["spend"] for row in boundaries),
             "mutations": sum(row["reservation"]["mutations"] for row in boundaries)}
 def _remaining(policy: dict, used: dict) -> dict: return {name: max(0, policy[name] - used[name]) for name in ("attempts", "concurrency", "wallSeconds", "spend", "mutations")}
