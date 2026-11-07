@@ -5,6 +5,7 @@ import {
   closeButtonClassName as rootCloseButtonClassName,
   closeButtonStyles as rootCloseButtonStyles,
 } from '../index';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 import {
   CloseButtonIcon,
   closeButtonClassName,
@@ -131,5 +132,27 @@ describe('closeButtonClassName', () => {
     expect(closeButtonClassName).not.toContain(
       'rounded-(--app-shell-radius-item)'
     );
+  });
+});
+
+describe('CloseButton accessibility', () => {
+  it('has no axe violations for enabled, disabled and RTL close buttons', async () => {
+    const { container } = render(
+      <div>
+        <button type='button' className={closeButtonClassName}>
+          <CloseButtonIcon />
+        </button>
+        <button type='button' className={closeButtonClassName} disabled>
+          <CloseButtonIcon />
+        </button>
+        <div dir='rtl'>
+          <button type='button' className={closeButtonClassName}>
+            <CloseButtonIcon size={5} />
+          </button>
+        </div>
+      </div>
+    );
+    expect(screen.getAllByRole('button', { name: 'Close' })).toHaveLength(3);
+    await expectNoA11yViolations(container);
   });
 });

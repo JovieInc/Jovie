@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 import { SimpleTooltip } from './simple-tooltip';
 import { TooltipProvider } from './tooltip';
 
@@ -265,5 +266,36 @@ describe('SimpleTooltip', () => {
 
       expect(screen.getByText('Trigger')).toHaveAttribute('tabindex', '-1');
     });
+  });
+});
+
+describe('SimpleTooltip accessibility', () => {
+  it('has no axe violations with LTR and RTL tooltips open', async () => {
+    const { container } = render(
+      <TestWrapper>
+        <SimpleTooltip content='Copy link' contentVariant='compact' defaultOpen>
+          <button type='button'>Copy</button>
+        </SimpleTooltip>
+        <div dir='rtl'>
+          <SimpleTooltip
+            content={<span dir='rtl'>انسخ رابط الملف الشخصي العام</span>}
+            defaultOpen
+            showArrow
+          >
+            <span>نسخ الرابط</span>
+          </SimpleTooltip>
+        </div>
+      </TestWrapper>
+    );
+    // A non-focusable trigger is made keyboard-reachable by the wrapper.
+    expect(screen.getByText('نسخ الرابط')).toHaveAttribute('tabindex', '0');
+    // Audit the triggers and each portalled tooltip layer in document.body.
+    const layers = document.body.querySelectorAll(
+      '[data-radix-popper-content-wrapper]'
+    );
+    expect(layers).toHaveLength(2);
+    for (const node of [container, ...layers]) {
+      await expectNoA11yViolations(node);
+    }
   });
 });
