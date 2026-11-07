@@ -159,7 +159,8 @@ export function HomepageInviteClose({
           headingLevel={2}
           title={copy.headline}
           description={copy.subhead}
-          headingClassName='marketing-type-section text-center'
+          headingClassName='marketing-type-section'
+          align='start'
         />
       </div>
     </ArtistProfileSectionShell>

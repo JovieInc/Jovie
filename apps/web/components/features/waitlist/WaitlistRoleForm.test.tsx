@@ -49,8 +49,10 @@ describe('WaitlistRoleForm', () => {
         title='Request an invitation.'
         description='We open to a small group at a time.'
         headingClassName='marketing-type-section'
+        align='start'
       />
     );
+    expect(screen.getByTestId('waitlist-role-form')).toHaveClass('items-start');
     const heading = screen.getByRole('heading', {
       level: 2,
       name: 'Request an invitation.',
