@@ -73,7 +73,7 @@ export function testsNearChange(tests, changed, root) {
 
 /**
  * @param {readonly string[] | null} changed null = unreadable diff
- * @param {{ root?: string, node?: readonly string[], vitest?: readonly string[] }} [options]
+ * @param {{ root?: string, node?: readonly string[], vitest?: readonly string[], derivedOnly?: boolean }} [options]
  * @returns {{ full: boolean, node: string[], vitest: string[] }}
  */
 export function selectScriptContracts(changed, options = {}) {
