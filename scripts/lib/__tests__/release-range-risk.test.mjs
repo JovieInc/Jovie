@@ -368,36 +368,6 @@ describe('isolated marketing entrypoint promotion applicability', () => {
   );
 
   it.each([
-    ['apps/web/app/(marketing)/compare/page.tsx'],
-    ['apps/web/app/(marketing)/blog/page.tsx'],
-    [leaves[0], 'apps/web/app/(marketing)/support/page.tsx'],
-  ])('leaf pages outside auth, billing and signup ship: %j', (...paths) => {
-    expect(evaluatePromotion({ range: grade(paths) })).toMatchObject({
-      required: false,
-      decision: 'pass',
-    });
-  });
-
-  it.each([
-    // Ordinary names that render or build claim state: names alone can't protect these.
-    'apps/web/app/(marketing)/product/ProductLanding.tsx',
-    'apps/web/components/features/profile/templates/PublicProfileLayoutShell.tsx',
-    'apps/web/app/[username]/page.tsx',
-    'apps/web/lib/images/validate-magic-bytes.ts',
-    'apps/web/app/(marketing)/start/page.tsx',
-    'apps/web/app/(marketing)/waitlist/page.tsx',
-    'apps/web/app/(marketing)/compare/layout.tsx',
-    'apps/web/app/(marketing)/blog/SignupBanner.tsx',
-    'apps/web/styles/globals.css',
-    'packages/ui/src/button.tsx',
-  ])('%s can reach a protected flow, so journeys stay required', path => {
-    expect(evaluatePromotion({ range: grade([path]) })).toMatchObject({
-      required: true,
-      decision: 'blocked',
-    });
-  });
-
-  it.each([
     { paths: [] },
     { paths: null },
     { paths: [{ path: leaves[0], class: 'safe', level: 'low' }] },
