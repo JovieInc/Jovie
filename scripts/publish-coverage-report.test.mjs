@@ -25,7 +25,7 @@ import {
  *   jobs: Record<string, {
  *     permissions?: Record<string, string>,
  *     if?: string,
- *     steps?: { id?: string, run?: string, with?: Record<string, string | number> }[]
+ *     steps?: { id?: string, run?: string, if?: string, with?: Record<string, string | number> }[]
  *   }>
  * }} Workflow
  */
@@ -41,7 +41,6 @@ test('every integrated workflow retains origin data and the handoff grants only 
     'desktop-release',
     'production-controller',
     'screenshots',
-    'sentry-autofix',
     'shipping-slo',
     'test-coverage-audit',
   ]) {
@@ -86,6 +85,32 @@ test('every integrated workflow retains origin data and the handoff grants only 
   );
   assert.equal(token.with['permission-contents'], 'read');
   assert.equal(token.with['permission-pull-requests'], 'read');
+});
+
+test('held Sentry intake retains hold evidence without claiming a published source origin', () => {
+  const workflow = /** @type {Workflow} */ (
+    load(
+      readFileSync(
+        new URL('../.github/workflows/sentry-autofix.yml', import.meta.url),
+        'utf8'
+      )
+    )
+  );
+  assert.deepEqual(workflow.permissions, {});
+  assert.deepEqual(workflow.jobs.autofix.permissions, { contents: 'read' });
+  const steps = workflow.jobs.autofix.steps;
+  assert.deepEqual(
+    steps.filter(step => step.run).map(step => step.run.trim()),
+    ['node scripts/sentry-autofix-intake.mjs']
+  );
+  assert.ok(steps.every(step => step.with?.name !== 'shipping-origin-v1'));
+  const retention = steps.find(
+    step => step.with?.path === '${{ runner.temp }}/sentry-autofix-hold.json'
+  );
+  assert.ok(retention, 'a held event must retain its bounded failure receipt');
+  assert.equal(retention.with['retention-days'], 14);
+  assert.equal(retention.with['if-no-files-found'], 'error');
+  assert.equal(retention.if, '${{ always() }}');
 });
 
 function fixture(t, nightly = false) {

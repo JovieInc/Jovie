@@ -342,6 +342,10 @@ const SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS = new Set([
   '.github/workflows/sentry-autofix-recurrence.yml',
   '.github/workflows/sentry-autofix.yml',
   'scripts/sentry-autofix-recurrence.mjs',
+  'scripts/sentry-autofix-intake.mjs',
+  'scripts/lib/__tests__/sentry-autofix-intake.test.mjs',
+  'docs/ops/SENTRY_AUTOFIX_COMMISSIONING.md',
+  'scripts/publish-coverage-report.test.mjs',
   'scripts/lib/sentry-validation-observation.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
@@ -350,9 +354,13 @@ const SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS = new Set([
 const SENTRY_AUTOFIX_RECURRENCE_LANE = new Set([
   ...SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  'scripts/ci-fast-lanes.mjs',
+  '.github/workflows/source-validation.yml',
   'scripts/tests/test_agent_workflow_hygiene.py',
+  'scripts/lib/external-api-guard.ratchet.gen.json',
 ]);
 const SENTRY_AUTOFIX_RECURRENCE_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/sentry-autofix-intake.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
@@ -361,7 +369,10 @@ const SENTRY_AUTOFIX_RECURRENCE_SCRIPT_TESTS = [
 const SENTRY_AUTOFIX_RECURRENCE_PYTHON_TESTS = [
   'scripts/tests/test_agent_workflow_hygiene.py',
 ];
-const SENTRY_AUTOFIX_RECURRENCE_NODE_TESTS = ['scripts/typecheck-scripts.mjs'];
+const SENTRY_AUTOFIX_RECURRENCE_NODE_TESTS = [
+  'scripts/typecheck-scripts.mjs',
+  'scripts/publish-coverage-report.test.mjs',
+];
 const SAFE_PR_REMEDIATION_PRIMARY_INPUTS = new Set([
   '.github/workflows/safe-pr-remediation.yml',
   'scripts/lib/safe-pr-remediation.mjs',
@@ -1833,6 +1844,10 @@ function planAffectedTests(
       scriptVitestCoverageArgs: [
         '--coverage',
         '--coverage.include=sentry-autofix-recurrence.mjs',
+        '--coverage.include=sentry-autofix-intake.mjs',
+        '--coverage.thresholds.**/sentry-autofix-intake*.lines=90',
+        '--coverage.thresholds.**/sentry-autofix-intake*.branches=90',
+        '--coverage.thresholds.**/sentry-autofix-intake*.functions=95',
         '--coverage.include=lib/sentry-validation-observation.mjs',
         '--coverage.reporter=text',
         '--coverage.reporter=json-summary',

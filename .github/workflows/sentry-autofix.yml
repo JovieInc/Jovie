@@ -1,7 +1,7 @@
 # controller-hop-exception: jovie-controller-hop/v1
-# accountable-writer: Ops
-# capability-gap: Sentry repository events start deduplicated repair work from main; the Jovie App publishes the verified repair branch and PR so source CI runs.
-# removal-trigger: Remove when the primary Sentry intake writer directly produces the same deduplicated verified repair PRs with release and fingerprint evidence.
+# accountable-writer: Gem
+# capability-gap: Sentry intake has no commissioned authenticated source-to-board adapter for the approved fx/WorkersAI and subscription Codex repair ladder. Preserve a red, bounded hold receipt until that boundary is qualified.
+# removal-trigger: Replace the held intake only after source validation, durable task, approved route and lease readback pass through the existing Lane Fix Relay and board.
 name: Sentry Autofix
 
 on:
@@ -11,267 +11,44 @@ on:
 permissions: {}
 
 concurrency:
-  group: sentry-autofix-${{ github.event.client_payload.dedupe_key || github.event.client_payload.issue_id }}
+  # Never let untrusted payload text control workflow identity or cancel evidence.
+  group: sentry-autofix-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:
   autofix:
-    # Model repair work is event-driven and must not occupy fixed CI capacity.
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 3
     permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-      id-token: write
+      contents: read
     steps:
-      - name: Generate Jovie Bot token
-        id: app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          app-id: ${{ vars.AGENTS_APP_ID }}
-          private-key: ${{ secrets.AGENTS_APP_PRIVATE_KEY }}
-
-      - name: Check for existing branch (dedup)
-        id: dedup
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          DEDUPE_KEY: ${{ github.event.client_payload.dedupe_key || github.event.client_payload.issue_id }}
-        run: |
-          BRANCH="sentry-fix/${DEDUPE_KEY}"
-          if git ls-remote --heads "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "$BRANCH" | grep -q "$BRANCH"; then
-            echo "Branch $BRANCH already exists — skipping"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Checkout main
-        if: steps.dedup.outputs.skip != 'true'
+      - name: Checkout trusted intake policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
-          fetch-depth: 0
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            .github/actions/prime-node-toolcache
+            scripts/sentry-autofix-intake.mjs
+          sparse-checkout-cone-mode: false
 
-      - name: Create fix branch
-        if: steps.dedup.outputs.skip != 'true'
-        env:
-          DEDUPE_KEY: ${{ github.event.client_payload.dedupe_key || github.event.client_payload.issue_id }}
-        run: |
-          git checkout -b "sentry-fix/${DEDUPE_KEY}"
+      - name: Prime Node toolcache
+        uses: ./.github/actions/prime-node-toolcache
 
-      - name: Setup Node.js and pnpm
-        if: steps.dedup.outputs.skip != 'true'
-        uses: ./.github/actions/setup-node-pnpm
-
-      - name: Resolve automation contract
-        if: steps.dedup.outputs.skip != 'true'
-        id: contract
-        env:
-          PAYLOAD_VERIFY_REQUIRED: ${{ github.event.client_payload.verify_required }}
-          PAYLOAD_SIMPLIFY_BOUNDED: ${{ github.event.client_payload.simplify_bounded }}
-          PAYLOAD_MODEL_TIER: ${{ github.event.client_payload.model_tier }}
-        run: |
-          VERIFY_REQUIRED="${PAYLOAD_VERIFY_REQUIRED,,}"
-          if [[ "$VERIFY_REQUIRED" != "false" ]]; then
-            VERIFY_REQUIRED="true"
-          fi
-
-          SIMPLIFY_BOUNDED="${PAYLOAD_SIMPLIFY_BOUNDED,,}"
-          if [[ "$SIMPLIFY_BOUNDED" != "false" ]]; then
-            SIMPLIFY_BOUNDED="true"
-          fi
-
-          MODEL_TIER="${PAYLOAD_MODEL_TIER,,}"
-          if [[ "$MODEL_TIER" != "economy" ]]; then
-            MODEL_TIER="premium"
-          fi
-
-          echo "verify_required=$VERIFY_REQUIRED" >> "$GITHUB_OUTPUT"
-          echo "simplify_bounded=$SIMPLIFY_BOUNDED" >> "$GITHUB_OUTPUT"
-          echo "model_tier=$MODEL_TIER" >> "$GITHUB_OUTPUT"
-
-      - name: Run Claude Code to fix the bug
-        if: steps.dedup.outputs.skip != 'true'
-        id: claude
-        uses: anthropics/claude-code-action@925afb53776cf1a2b738c6bdbed37b4d4000ef13 # v1
+      - name: Setup pinned Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: |
-            A Sentry error needs to be fixed. Here are the details:
+          node-version-file: .nvmrc
 
-            **Error:** ${{ github.event.client_payload.title }}
-            **Culprit:** ${{ github.event.client_payload.culprit }}
-            **Message:** ${{ github.event.client_payload.message }}
-            **Sentry URL:** ${{ github.event.client_payload.url }}
-            **Root-cause fingerprint:** ${{ github.event.client_payload.context.root_cause_fingerprint }}
-            **Environment:** ${{ github.event.client_payload.context.environment }}
-            **Release:** ${{ github.event.client_payload.context.release }}
-            **Project:** ${{ github.event.client_payload.context.project }}
-            **Route / transaction:** ${{ github.event.client_payload.context.route }}
-            **Level:** ${{ github.event.client_payload.context.level }}
-            **Event ID:** ${{ github.event.client_payload.context.event_id }}
-            **First seen:** ${{ github.event.client_payload.context.first_seen }}
-            **Last seen:** ${{ github.event.client_payload.context.last_seen }}
-            **Event count:** ${{ github.event.client_payload.context.event_count }}
-            **Affected users:** ${{ github.event.client_payload.context.user_count }}
+      - name: Record uncommissioned Sentry intake
+        run: node scripts/sentry-autofix-intake.mjs
 
-            **Automation Contract:**
-            - verify_required: ${{ steps.contract.outputs.verify_required }}
-            - simplify_bounded: ${{ steps.contract.outputs.simplify_bounded }}
-            - model_tier: ${{ steps.contract.outputs.model_tier }}
-
-            **Stack Trace:**
-            ```
-            ${{ github.event.client_payload.stacktrace }}
-            ```
-
-            Work in these gated stages. Do not advance when the prior stage lacks evidence:
-            1. Inventory the supplied release, environment, route, recurrence, and stack evidence. If customer impact or the current release is ambiguous, make no code change and report the missing evidence.
-            2. Diagnose one root cause and state a narrow objective. Do not treat the title as proof.
-            3. Select one minimal, non-overlapping fix plan and define its regression proof.
-            4. Implement only that fix and add or update the regression test.
-            5. Run the repository formatter, the Jovie web typecheck, and the focused regression test; fix any failures before continuing.
-            6. If simplify_bounded=true, run a small simplification pass on touched files only:
-               - remove dead imports/locals
-               - flatten obvious nested conditionals
-               - improve unclear local variable names
-               - do not change behavior/API contracts
-               - skip sensitive paths (.github/, drizzle/migrations/, auth/billing/security-critical)
-            7. Record the source-blind verification result and leave production resolution pending until post-deploy recurrence evidence is available.
-            8. Use model_tier as guidance for depth/cost profile:
-               - premium: thorough and comprehensive
-               - economy: concise and targeted
-
-            Keep changes minimal — fix only the bug, do not refactor surrounding code.
-
-      - name: Run automation verify bundle
-        if: steps.dedup.outputs.skip != 'true' && steps.contract.outputs.verify_required == 'true'
-        run: |
-          bash scripts/automation-verify.sh affected
-
-      - name: Push branch and create PR
-        if: steps.dedup.outputs.skip != 'true'
-        id: create-pr
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          DEDUPE_KEY: ${{ github.event.client_payload.dedupe_key || github.event.client_payload.issue_id }}
-          ISSUE_ID: ${{ github.event.client_payload.issue_id }}
-          SENTRY_SHORT_ID: ${{ github.event.client_payload.short_id }}
-          LINEAR_IDENTIFIER: ${{ github.event.client_payload.linear_identifier }}
-          ERROR_TITLE: ${{ github.event.client_payload.title }}
-          SENTRY_URL: ${{ github.event.client_payload.url }}
-          SENTRY_ENVIRONMENT: ${{ github.event.client_payload.context.environment }}
-          SENTRY_RELEASE: ${{ github.event.client_payload.context.release }}
-          SENTRY_ROUTE: ${{ github.event.client_payload.context.route }}
-          SENTRY_FINGERPRINT: ${{ github.event.client_payload.context.root_cause_fingerprint }}
-          SENTRY_LAST_SEEN: ${{ github.event.client_payload.context.last_seen }}
-          SENTRY_EVENT_COUNT: ${{ github.event.client_payload.context.event_count }}
-        run: |
-          BRANCH="sentry-fix/${DEDUPE_KEY}"
-
-          # Check if there are changes to commit (tracked + untracked)
-          if git diff --quiet && git diff --staged --quiet && [ -z "$(git status --porcelain)" ]; then
-            echo "No changes were made — Claude could not fix the issue"
-            echo "has_changes=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "has_changes=true" >> "$GITHUB_OUTPUT"
-
-          # Configure git
-          git config user.name "jovie-bot[bot]"
-          git config user.email "jovie-bot[bot]@users.noreply.github.com"
-
-          # Stage and commit
-          git add -A
-          git commit -m "$(cat <<EOF
-          fix: resolve Sentry error — ${ERROR_TITLE}
-
-          Automated fix for Sentry issue ${ISSUE_ID}.
-          See: ${SENTRY_URL}
-
-          Co-authored-by: Claude <claude@anthropic.com>
-          EOF
-          )"
-
-          # Push branch
-          git push origin "HEAD:${BRANCH}"
-
-          # Create PR
-          PR_URL=$(gh pr create \
-            --base main \
-            --head "$BRANCH" \
-            --title "fix: Sentry autofix — ${ERROR_TITLE}" \
-            --body "$(cat <<EOF
-          ## Summary
-
-          Automated fix for a Sentry production error.
-
-          - **Error:** ${ERROR_TITLE}
-          - **Sentry:** ${SENTRY_URL}
-          - **Issue ID:** ${ISSUE_ID}
-          - **Sentry short ID:** ${SENTRY_SHORT_ID}
-          - **Linear:** ${LINEAR_IDENTIFIER}
-          - **Root-cause fingerprint:** ${SENTRY_FINGERPRINT}
-          - **Environment:** ${SENTRY_ENVIRONMENT}
-          - **Release:** ${SENTRY_RELEASE}
-          - **Route:** ${SENTRY_ROUTE}
-          - **Last seen:** ${SENTRY_LAST_SEEN}
-          - **Event count:** ${SENTRY_EVENT_COUNT}
-
-          ## Test plan
-
-          - [ ] CI passes (Biome + TypeScript + tests)
-          - [ ] Error no longer reproduces in production after deploy
-
-          This PR does not close the incident. Resolution requires post-deploy recurrence evidence for the affected release and environment.
-
-          🤖 Generated with [Claude Code](https://claude.com/claude-code) via Sentry Autofix
-          EOF
-          )")
-
-          python3 scripts/shipping_origin.py emit-automation \
-            --pr "$PR_URL" --head-sha "$(git rev-parse HEAD)" \
-            --provider claude ${LINEAR_IDENTIFIER:+--linear-issue "$LINEAR_IDENTIFIER"}
-          echo "pr_url=${PR_URL}" >> "$GITHUB_OUTPUT"
-
-      - name: Leave native autoenroll as the queue writer
-        if: steps.create-pr.outputs.has_changes == 'true'
-        env:
-          PR_URL: ${{ steps.create-pr.outputs.pr_url }}
-        run: |
-          echo "Opened $PR_URL. Native autoenroll owns queue mutation; the merge-queue label is retired."
-
-      - name: Fallback — convert to draft if validation failed
-        if: failure() && steps.dedup.outputs.skip != 'true'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          DEDUPE_KEY: ${{ github.event.client_payload.dedupe_key || github.event.client_payload.issue_id }}
-        run: |
-          BRANCH="sentry-fix/${DEDUPE_KEY}"
-
-          # Check if branch was pushed
-          if ! git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
-            echo "Branch was never pushed — nothing to clean up"
-            exit 0
-          fi
-
-          # Check if PR exists
-          PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
-
-          if [ -n "$PR_NUMBER" ]; then
-            gh pr comment "$PR_NUMBER" --body "## ⚠️ Sentry Autofix Failed
-
-          The automated fix workflow was unable to fully resolve this Sentry error.
-          The failing machine gate remains authoritative and the PR stays available for the next automated remediation lease." 2>/dev/null || true
-          fi
-
-      - name: Retain immutable origin payload
+      - name: Preserve bounded hold receipt
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: shipping-origin-v1
-          path: ${{ runner.temp }}/shipping-origin/*.json
-          if-no-files-found: ignore
-          retention-days: 30
+          name: sentry-autofix-hold-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/sentry-autofix-hold.json
+          if-no-files-found: error
+          retention-days: 14

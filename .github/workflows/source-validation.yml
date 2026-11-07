@@ -759,6 +759,15 @@ jobs:
           # Same command and quarantine as the merge group's structural web lane.
           command="$(node -e "import('./scripts/ci-fast-lanes.mjs').then(m => process.stdout.write(m.webCiContractTestsCommand()))")"
           bash -c "$command"
+      - name: Enforce Sentry intake behavior coverage
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ci == 'true' && matrix.shard == '3/4'
+        run: >-
+          pnpm exec vitest --root scripts --config vitest.config.mts run
+          lib/__tests__/sentry-autofix-intake.test.mjs --maxWorkers=1
+          --coverage --coverage.include=sentry-autofix-intake.mjs
+          --coverage.thresholds.lines=90 --coverage.thresholds.branches=90 --coverage.thresholds.functions=95
+          --coverage.reporter=text --coverage.reporter=json-summary
+          --coverage.reportsDirectory="${RUNNER_TEMP}/sentry-autofix-coverage"
       - name: Run packages/ui unit tests
         if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ui == 'true' && matrix.shard == '1/4'
         run: pnpm turbo test --filter=@jovie/ui

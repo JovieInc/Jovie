@@ -28,46 +28,91 @@ const RECURRENCE = readFileSync(
 );
 
 describe('Sentry autofix workflow contract', () => {
-  it('deduplicates automation by root signature with issue ID fallback', () => {
-    const keyExpression =
-      '${{ github.event.client_payload.dedupe_key || github.event.client_payload.issue_id }}';
-
-    expect(WORKFLOW).toContain(`group: sentry-autofix-${keyExpression}`);
-    expect(WORKFLOW).toContain(`DEDUPE_KEY: ${keyExpression}`);
-    expect(WORKFLOW).toContain('BRANCH="sentry-fix/${DEDUPE_KEY}"');
-  });
-
-  it('carries release, environment, route, and recurrence evidence into repair', () => {
-    for (const field of [
-      'root_cause_fingerprint',
-      'environment',
-      'release',
-      'project',
-      'route',
-      'level',
-      'event_id',
-      'first_seen',
-      'last_seen',
-      'event_count',
-      'user_count',
-    ]) {
-      expect(WORKFLOW, `missing client payload field ${field}`).toContain(
-        `github.event.client_payload.context.${field}`
+  it('enforces actual behavior coverage in the required source CI unit job', () => {
+    const source =
+      /** @type {{jobs: Record<string, {name?: string, steps?: {name?: string, if?: string, run?: string}[]}>}} */ (
+        parseYaml(
+          readFileSync(
+            resolve(REPO_ROOT, '.github/workflows/source-validation.yml'),
+            'utf8'
+          )
+        )
       );
-    }
+    const job = Object.values(source.jobs).find(
+      job => job.name === 'Affected Unit Tests (${{ matrix.shard }})'
+    );
+    const step = job.steps.find(
+      step => step.name === 'Enforce Sentry intake behavior coverage'
+    );
+    expect(step.if).toBe(
+      "steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ci == 'true' && matrix.shard == '3/4'"
+    );
+    expect(step).not.toHaveProperty('continue-on-error');
+    expect(step.run).toContain('lib/__tests__/sentry-autofix-intake.test.mjs');
+    for (const flag of [
+      '--coverage.include=sentry-autofix-intake.mjs',
+      '--coverage.thresholds.lines=90',
+      '--coverage.thresholds.branches=90',
+      '--coverage.thresholds.functions=95',
+    ])
+      expect(step.run).toContain(flag);
   });
-
-  it('requires staged diagnosis and post-deploy recurrence proof', () => {
-    expect(WORKFLOW).toContain(
-      'Work in these gated stages. Do not advance when the prior stage lacks evidence'
+  it('holds Sentry intake without running an unapproved code executor', () => {
+    for (const test of [
+      'scripts/lib/__tests__/sentry-autofix-intake.test.mjs',
+      'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
+    ])
+      expect(SCRIPT_CONTRACT_VITEST_TESTS).toContain(test);
+    const workflow =
+      /** @type {{on: object, permissions: object, concurrency: {group: string, 'cancel-in-progress': boolean}, jobs: {autofix: {permissions: object, steps: {run?: string, uses?: string, if?: string, with?: Record<string, unknown>}[]}}}} */ (
+        parseYaml(WORKFLOW)
+      );
+    expect(workflow.on).toEqual({
+      repository_dispatch: { types: ['sentry-issue'] },
+    });
+    expect(workflow.permissions).toEqual({});
+    expect(Object.keys(workflow.jobs)).toEqual(['autofix']);
+    expect(Object.keys(workflow.jobs.autofix).sort()).toEqual([
+      'permissions',
+      'runs-on',
+      'steps',
+      'timeout-minutes',
+    ]);
+    expect(workflow.jobs.autofix.permissions).toEqual({ contents: 'read' });
+    expect(WORKFLOW).not.toMatch(
+      /claude-code-action|CLAUDE_CODE|anthropics\//i
     );
-    expect(WORKFLOW).toContain(
-      'If customer impact or the current release is ambiguous, make no code change'
+    expect(WORKFLOW).not.toMatch(
+      /secrets\.|id-token:|pull-requests:|contents: write|git push|gh pr create/
     );
-    expect(WORKFLOW).toContain(
-      'This PR does not close the incident. Resolution requires post-deploy recurrence evidence'
+    expect(WORKFLOW).not.toContain('github.event.client_payload');
+    const steps = workflow.jobs.autofix.steps;
+    expect(steps).toHaveLength(5);
+    for (const step of steps) {
+      expect(step).not.toHaveProperty('env');
+      expect(step).not.toHaveProperty('shell');
+      expect(step).not.toHaveProperty('continue-on-error');
+    }
+    expect(steps.find(step => step.run)).not.toHaveProperty('if');
+    expect(steps.filter(step => step.run).map(step => step.run.trim())).toEqual(
+      ['node scripts/sentry-autofix-intake.mjs']
     );
-    expect(WORKFLOW).not.toMatch(/close[sd]?\s+(the\s+)?(Sentry\s+)?issue/i);
+    expect(steps.filter(step => step.uses).map(step => step.uses)).toEqual([
+      'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
+      './.github/actions/prime-node-toolcache',
+      'actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1',
+      'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9',
+    ]);
+    expect(steps[0].with).toMatchObject({
+      ref: 'main',
+      'persist-credentials': false,
+    });
+    expect(steps.at(-1).if).toBe('${{ always() }}');
+    expect(steps.at(-1).with['if-no-files-found']).toBe('error');
+    expect(workflow.concurrency.group).toBe(
+      'sentry-autofix-${{ github.run_id }}'
+    );
+    expect(workflow.concurrency['cancel-in-progress']).toBe(false);
   });
 
   it('closes the loop on a scheduled or manual recurrence check, never source PRs', () => {
