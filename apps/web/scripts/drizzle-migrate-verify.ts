@@ -23,6 +23,7 @@ import { PgTable } from 'drizzle-orm/pg-core';
 import ws from 'ws';
 
 import * as schema from '../lib/db/schema';
+import * as signupReplaysSchema from '../lib/db/schema/signup-replays';
 
 neonConfig.webSocketConstructor = ws;
 
@@ -86,7 +87,10 @@ function loadExpectedColumns(): {
   let tablesChecked = 0;
   let columnsChecked = 0;
 
-  for (const [_exportName, exported] of Object.entries(schema)) {
+  for (const [_exportName, exported] of Object.entries({
+    ...schema,
+    ...signupReplaysSchema,
+  })) {
     if (!is(exported, PgTable)) continue;
 
     const tableName = getTableName(exported);
