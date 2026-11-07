@@ -266,3 +266,15 @@ describe('SlashCommandMenu album-art availability', () => {
     );
   });
 });
+
+describe('SlashCommandMenu combobox required attributes (aria-required-attr)', () => {
+  it('always wires aria-controls to a real listbox id, with or without listIdProp', () => {
+    const source = readFileSync(
+      resolve(__dirname, 'SlashCommandMenu.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('const generatedListId = useId();');
+    expect(source).toContain('const listId = listIdProp ?? generatedListId;');
+    expect(source).toContain('aria-controls={listId}');
+  });
+});

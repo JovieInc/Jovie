@@ -205,7 +205,7 @@ export function LibraryAssetSharePanel({
         testId={`library-asset-share-url-${asset.id}`}
         className={cn(
           'min-w-0 flex-1',
-          (disabled || isEnsuring) && 'opacity-60'
+          (disabled || isEnsuring) && 'opacity-75'
         )}
       />
       <OverflowMenu

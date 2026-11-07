@@ -19,7 +19,7 @@ type Story = StoryObj;
 
 export const Default: Story = {
   render: () => (
-    <DropdownMenu defaultOpen>
+    <DropdownMenu defaultOpen modal={false}>
       <DropdownMenuTrigger asChild>
         <Button variant='secondary'>Menu</Button>
       </DropdownMenuTrigger>
@@ -38,7 +38,7 @@ export const EdgeCollision: Story = {
   parameters: { layout: 'fullscreen' },
   render: () => (
     <div className='flex min-h-48 items-start justify-end p-2'>
-      <DropdownMenu defaultOpen>
+      <DropdownMenu defaultOpen modal={false}>
         <DropdownMenuTrigger asChild>
           <Button variant='secondary'>Edge menu</Button>
         </DropdownMenuTrigger>

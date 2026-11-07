@@ -232,9 +232,8 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
-    // Compliance: no third-party tracker component on routes where people
-    // type (CIPA wiretap exposure). Canon: gbrain
-    // decisions/company/privacy-tracking-compliance-guidelines-2026-10-31.
+    // Compliance: no third-party tracker component on routes where people type
+    // (CIPA wiretap exposure). Canon: gbrain decisions/company/privacy-tracking-compliance-guidelines-2026-10-31.
     id: 'privacy-input-route-trackers',
     command:
       'node --test --test-isolation=none scripts/compliance/input-page-trackers.test.mjs',
@@ -1125,8 +1124,7 @@ const PREFLIGHT_COVERAGE_ARGS = [
 ];
 
 /** Keep unrelated scanners outside V8 instrumentation; run every selection once.
- * @param {readonly string[]} tests
- * @returns {string[][]}
+ * @param {readonly string[]} tests @returns {string[][]}
  */
 export function scriptContractNodeArgs(tests) {
   const focused = tests.filter(test => PREFLIGHT_COVERAGE_TESTS.includes(test));
@@ -1147,6 +1145,7 @@ export const SCRIPT_CONTRACT_NODE_COMMAND = `${PR_OPEN_COVERAGE_COMMAND} && ${DE
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
+  'scripts/lib/__tests__/merge-group-sibling-burn-contract.test.mjs',
   'scripts/lib/__tests__/gh-api-hold-retry.test.mjs',
   'scripts/lib/__tests__/prod-cert.test.mjs',
   'scripts/lib/__tests__/prod-cone-cases.test.mjs',
@@ -1318,6 +1317,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/verify-patched-dependencies.test.mjs',
   'scripts/lib/__tests__/incident-dedupe.test.mjs',
   'scripts/lib/__tests__/ci-capacity.test.mjs',
+  'scripts/lib/__tests__/tooling-health.test.mjs',
   'scripts/lib/__tests__/merge-queue-speed.test.mjs',
   'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
 ]);

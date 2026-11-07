@@ -36,6 +36,15 @@ describe('FooterBranding', () => {
     expect(screen.getByRole('link', { name: 'Made with Jovie' })).toHaveFocus();
   });
 
+  it('gives the brand link a real 44px hit box', () => {
+    render(<FooterBranding mark='brand' showCTA={false} />);
+
+    const link = screen.getByRole('link', { name: 'Made with Jovie' });
+    // Real box (axe's target-size cannot see before: pseudo hit areas).
+    expect(link).toHaveClass('min-h-11');
+    expect(link.className).not.toContain('before:h-11');
+  });
+
   it('uses untracked destinations when there is no artist', () => {
     render(<FooterBranding mark='brand' />);
 
@@ -70,10 +79,9 @@ describe('FooterBranding', () => {
   it('retains the default icon link and optional waitlist action', () => {
     render(<FooterBranding />);
 
-    expect(screen.getByRole('link', { name: 'Jovie Home' })).toHaveAttribute(
-      'href',
-      '/'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Powered by Jovie Home' })
+    ).toHaveAttribute('href', '/');
     expect(screen.queryByText('Made with Jovie')).not.toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Join the waitlist' })
@@ -85,10 +93,9 @@ describe('FooterBranding', () => {
     mark => {
       render(<FooterBranding mark={mark} size='sm' showCTA={false} />);
 
-      expect(screen.getByRole('link', { name: 'Jovie Home' })).toHaveAttribute(
-        'href',
-        '/'
-      );
+      expect(
+        screen.getByRole('link', { name: 'Powered by Jovie Home' })
+      ).toHaveAttribute('href', '/');
       expect(screen.queryByText('Made with Jovie')).not.toBeInTheDocument();
       expect(screen.getAllByRole('link')).toHaveLength(1);
       if (mark === 'text') {

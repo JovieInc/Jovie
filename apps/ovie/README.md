@@ -1,8 +1,8 @@
 # Ovie web boundary — JOV-6026
 
-This is an intermediate Next.js source/build boundary. Tim's 2026-09-23
-decision puts the final private app and Mac distribution in `JovieInc/ovie`.
-Keep Jovie's operator paths until that app has authenticated, installed proof.
+This is the Next.js deploy boundary for web Ovie, the only Ovie (founder
+decision 2026-10-28: one Ovie, web, shared shell, no native Ovie, no separate
+`JovieInc/ovie` repo). It owns no screens; Jovie's operator paths stay canonical.
 
 Ovie reuses Jovie's screens, handlers, data, chat, tokens and `packages/ui`.
 `@jovie/web` is a **source** dependency; Ovie never builds Jovie.

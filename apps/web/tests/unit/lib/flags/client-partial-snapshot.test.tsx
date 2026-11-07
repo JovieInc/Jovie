@@ -13,6 +13,40 @@ function FlagProbe({
 }
 
 describe('AppFlagProvider partial snapshots', () => {
+  it.each(['YOUTUBE_WORKSPACE_NAV', 'JOVIE_WORK_NAV'] as const)(
+    'keeps %s off without provider context or a supplied snapshot value',
+    flagName => {
+      const { rerender } = render(<FlagProbe flagName={flagName} />);
+      expect(screen.getByTestId(`flag-${flagName}`)).toHaveTextContent('false');
+
+      rerender(
+        <AppFlagProvider initialFlags={{}}>
+          <FlagProbe flagName={flagName} />
+        </AppFlagProvider>
+      );
+      expect(screen.getByTestId(`flag-${flagName}`)).toHaveTextContent('false');
+    }
+  );
+
+  it.each(['YOUTUBE_WORKSPACE_NAV', 'JOVIE_WORK_NAV'] as const)(
+    'honors explicit live true and false snapshot values for %s',
+    flagName => {
+      const { rerender } = render(
+        <AppFlagProvider initialFlags={{ [flagName]: true }}>
+          <FlagProbe flagName={flagName} />
+        </AppFlagProvider>
+      );
+      expect(screen.getByTestId(`flag-${flagName}`)).toHaveTextContent('true');
+
+      rerender(
+        <AppFlagProvider initialFlags={{ [flagName]: false }}>
+          <FlagProbe flagName={flagName} />
+        </AppFlagProvider>
+      );
+      expect(screen.getByTestId(`flag-${flagName}`)).toHaveTextContent('false');
+    }
+  );
+
   it('uses a supplied value from a trimmed payload', () => {
     render(
       <AppFlagProvider initialFlags={{ STRIPE_CONNECT_ENABLED: false }}>

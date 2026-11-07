@@ -27,6 +27,21 @@ vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
 }));
 
 describe('InspectorShell', () => {
+  it('renders definition metadata with paired terms and descriptions', async () => {
+    const { container } = render(
+      <dl>
+        <InspectorRow definitionList label='Lifecycle' value='Released' />
+      </dl>
+    );
+    expect(container.querySelector('dl > div > dt')).toHaveTextContent(
+      'Lifecycle'
+    );
+    expect(container.querySelector('dl > div > dd')).toHaveTextContent(
+      'Released'
+    );
+    await expectNoA11yViolations(container);
+  });
+
   it.each([false, true])(
     'hands focused content to its tab and respects subsequent focus movement (%s)',
     moved => {
