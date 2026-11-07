@@ -14,6 +14,8 @@ import {
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { proseOnly } from './lib/pr-prose.mjs';
+import { wipGate } from './lib/pr-wip-gate.mjs';
 import { isRepairPr, lintPrBody } from './lib/preflight-changed.mjs';
 import { requiresWin } from './lib/wins-ledger.mjs';
 import {
@@ -26,30 +28,6 @@ const PR_URL_PLACEHOLDER = '<PR URL, set after open>';
 export const CUSTOMER_MARKER =
   '<!-- customer-changelog/v1 {"releaseWorthy":false} -->';
 const REPOSITORY = 'JovieInc/Jovie';
-
-export function proseOnly(body) {
-  let fence = '';
-  return body
-    .split('\n')
-    .map(line => {
-      const marker = line.match(/^ {0,3}(`{3,}|~{3,})/);
-      if (fence) {
-        if (
-          marker &&
-          marker[1][0] === fence[0] &&
-          marker[1].length >= fence.length
-        )
-          fence = '';
-        return '';
-      }
-      if (marker) {
-        fence = marker[1];
-        return '';
-      }
-      return line.replace(/(`+)([\s\S]*?)\1(?!`)/g, '');
-    })
-    .join('\n');
-}
 
 export function commonDirectories(paths) {
   let dirs = [...new Set(paths.map(p => path.posix.dirname(p)))].sort();
@@ -417,38 +395,6 @@ function parse(argv) {
     else if (!f.startsWith('--')) a.number = f;
   }
   return a;
-}
-
-/**
- * Per-producer WIP admission (scripts/lanes/pr-wip-policy.json, one rule shared with the
- * lanes' new-issue budget): a producer that owns `cap` or more open, unheld PRs may not open
- * another until some land. Exit 3 from pr_wip.py is a refusal; any other failure admits
- * with a warning, because an unreadable count must not stall shipping.
- */
-export function wipAdmission(branch, execute, cwd) {
-  const result = execute(
-    'python3',
-    ['scripts/lanes/pr_wip.py', 'admit', '--branch', branch],
-    { cwd }
-  );
-  let decision = null;
-  try {
-    decision = JSON.parse((result.stdout || '').trim().split('\n').pop());
-  } catch {
-    decision = null;
-  }
-  if (result.status === 3 && decision)
-    return {
-      allowed: false,
-      message: `wip-cap: \`${decision.producer}/\` already owns ${decision.used} open PRs (cap ${decision.cap}, scripts/lanes/pr-wip-policy.json). Land, fix or close one of them before opening another.`,
-    };
-  return {
-    allowed: true,
-    message:
-      result.status === 0 && decision
-        ? null
-        : `wip admission unavailable (${(result.stderr || 'no decision').toString().trim().slice(0, 160)}); admitting`,
-  };
 }
 
 function record(row) {
@@ -839,26 +785,13 @@ export async function main(
       await refreshBodyChecks(a.repo, pr, body, title, { github, pause, log });
       return 0;
     }
-    const branch = git(['branch', '--show-current']).stdout.trim();
-    const wip = wipAdmission(branch, execute, a.repo);
-    // An override is visible, not silent: it is recorded and labels the PR `wip-override`
-    // so the census and Fleet Rules can count it. Lane runs never pass it.
-    const override = !wip.allowed && (a.wipOverride ?? '').trim().length >= 12;
-    record({
-      cmd: 'wip-admission',
-      branch,
-      allowed: wip.allowed,
-      ...(override ? { override: a.wipOverride } : {}),
+    const wip = wipGate(a, git(['branch', '--show-current']).stdout.trim(), {
+      execute,
+      log,
+      record,
     });
-    if (wip.message)
-      log(`${wip.allowed || override ? 'warn' : 'FAIL'}  ${wip.message}`);
-    if (!wip.allowed && !override) {
-      log(
-        'Refusing to open: over the WIP cap (--wip-override "<reason>" is recorded and labelled).'
-      );
-      return 3;
-    }
-    if (override) labels.push('wip-override');
+    if (wip.refused) return 3;
+    if (wip.override) labels.push('wip-override');
     const dir = mkdtempSync(path.join(tmpdir(), 'pr-open-create-'));
     try {
       const bodyFile = path.join(dir, 'body.md');

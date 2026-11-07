@@ -191,6 +191,14 @@ def fetch_open_prs(run_gh=None) -> list[dict] | None:
     return rows
 
 
+def safe_inventory(read) -> list[dict] | None:
+    """`read()` open PRs, or None when unreadable (admission fails open; in-flight fails closed elsewhere)."""
+    try:
+        return read() or None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def close_pr(number: int, body: str, run_gh=None) -> bool:
     """Close with a comment through the budgeted client; the branch is never deleted."""
     if run_gh is None:

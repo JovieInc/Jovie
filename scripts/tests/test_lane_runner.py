@@ -4746,22 +4746,16 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(self.linear.moves, [])
 
     def test_a_lane_at_its_wip_cap_stops_claiming_new_work(self):
-        # 2026-11-01: the per-producer WIP cap (pr-wip-policy.json) replaced "no ceiling".
         cap = lane.pr_wip.cap_for("devin", lane.pr_wip.load_policy())
-        rows = lambda n: [{"number": i, "headRefName": f"devin/jov-{i}-20260927t000000", "isDraft": True}
-                          for i in range(1, n + 1)]
-        lane.lane_prs = lambda name, fields="", *, inventory=None: []
-        ran = []
+        rows = lambda n: [{"number": i, "headRefName": f"devin/jov-{i}-20260927t000000", "isDraft": True} for i in range(1, n + 1)]
+        lane.lane_prs, ran = (lambda name, fields="", *, inventory=None: []), []
         lane.run_issue = lambda *a: ran.append(1) or {"verdict": "landing", "prUrl": "u"}
         real = lane.new_issue_budget
-        budget = lambda n: (lambda name, slots: real(name, slots, rows(n)))
-        with patch.object(lane, "read_new_issue_budget", side_effect=budget(cap)):
-            lane.worker(self.host, "devin")
-        self.assertEqual(ran, [], "at the cap it does not claim")
+        for n, claimed in ((cap, []), (cap - 1, [1])):
+            with patch.object(lane, "read_new_issue_budget", side_effect=lambda name, slots, n=n: real(name, slots, rows(n))):
+                lane.worker(self.host, "devin")
+            self.assertEqual(ran, claimed, "claims only under the cap")
         self.assertEqual(json.loads((self.host.state / "worker-idle.json").read_text())["devin"]["reason"], "wip-cap")
-        with patch.object(lane, "read_new_issue_budget", side_effect=budget(cap - 1)):
-            lane.worker(self.host, "devin")
-        self.assertEqual(ran, [1], "under the cap a lane claims")
 
     def test_new_issue_budget_uses_base_slots_not_autoscaled(self):
         """JOV-7514: parked-PR caps stay on configured slots as autoscale capacity rises."""
@@ -4957,8 +4951,7 @@ class ExhaustedRepairPublicationTest(unittest.TestCase):
 
 
 class NewIssueBudgetTest(unittest.TestCase):
-    """2026-11-01: one ceiling, the per-producer WIP cap shared with pr-open (pr-wip-policy.json);
-    the JOV-6833 x2 active / JOV-7514 x4 terminal slot caps stay gone."""
+    """2026-11-01: one ceiling, the per-producer WIP cap shared with pr-open; the slot caps stay gone."""
     def row(self, number=1, branch=None, draft=True, state="CLEAN", labels=()):
         return {"number": number, "headRefName": branch or f"codex/jov-{number}-20261002",
                 "isDraft": draft, "mergeStateStatus": state, "labels": [{"name": name} for name in labels]}
@@ -4976,12 +4969,6 @@ class NewIssueBudgetTest(unittest.TestCase):
         self.assertEqual(lane.new_issue_budget("codex", 0, None)["reason"], "provider-disabled")
         self.assertFalse(hasattr(lane, "OPEN_PRS_PER_SLOT") or hasattr(lane, "TERMINAL_PRS_PER_SLOT")
                          or hasattr(lane, "over_budget"))
-
-    def test_an_unreadable_inventory_admits(self):
-        with patch.object(lane, "open_prs_summary", side_effect=RuntimeError("github down")):
-            result = lane.read_new_issue_budget("codex", 3)
-        self.assertEqual((result["allowed"], result["reason"], result["wip"], result["error"]),
-                         (True, "within-budget", None, None))
 
 
 class OversizeDiffExitTest(unittest.TestCase):

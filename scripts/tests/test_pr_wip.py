@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import sys
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -133,6 +134,48 @@ class LaneBudget(unittest.TestCase):
                          (False, "wip-cap", cap, cap))
         self.assertTrue(lane.new_issue_budget("codex", 3, None)["allowed"], "unknown inventory admits")
         self.assertEqual(lane.new_issue_budget("codex", 0, at)["reason"], "provider-disabled")
+
+    def test_an_unreadable_inventory_admits(self):
+        import lane_runner as lane  # noqa: PLC0415
+        with patch.object(lane, "open_prs_summary", side_effect=RuntimeError("github down")):
+            result = lane.read_new_issue_budget("codex", 3)
+        self.assertEqual((result["allowed"], result["reason"], result["wip"], result["error"]), (True, "within-budget", None, None))
+
+
+class AutoscaleWipGateTest(unittest.TestCase):
+    """The autoscaler's intake `wip-cap` gate is the lane's own producer WIP, with a high repo-wide backstop."""
+
+    @staticmethod
+    def decide(budgets, open_prs):
+        import autoscale  # noqa: PLC0415
+        now = 1_800_000_000.0
+        obs = {"doctorFresh": True, "eligiblePoolByProvider": {"codex": 50, "glm": 50}, "cooling": [], "cooldownAt": {}, "rateBankAt": {},
+               "maintenanceQueueByProvider": {"codex": 20, "glm": 20}, "runningByProvider": {"codex": 3, "glm": 3}, "unhealthy": [],
+               "newIssueBudgetByProvider": budgets, "openPRCount": open_prs, "wipMax": autoscale.WIP_MAX_DEFAULT,
+               "githubRemaining": 4000, "linearRemaining": 2000, "linearLimit": 2500, "linearBudgetFresh": True,
+               "linearDimensions": {"requests": {"remaining": 2000, "limit": 2500, "observedAt": now},
+                                    "complexity": {"remaining": 1000000, "limit": 2000000, "observedAt": now}},
+               "mergeThroughputFresh": True, "disk": {"admitted": True, "freePct": 40}}
+        sample = {"cpuCount": 16, "load1": 1.0, "memAvailableBytes": 16 * 1024 ** 3,
+                  "psi": {"cpuSomeAvg10": 1.0, "memoryFullAvg10": 0.0, "ioFullAvg10": 0.0}}
+        return autoscale.decide(None, obs, sample, {"codex": 3, "glm": 3}, {"mode": "apply", "max": {"codex": 6, "glm": 6}, "hostMax": None}, now)["lanes"]
+
+    def test_only_the_lane_whose_producer_is_at_cap_stops(self):
+        ok = {"reason": "within-budget"}
+        crowded = self.decide({"codex": ok, "glm": ok}, 100)
+        self.assertEqual((crowded["codex"]["intakeBlockers"], crowded["glm"]["intakeBlockers"]), ([], []),
+                         "other producers' PRs under the backstop do not stall Symphony")
+        capped = self.decide({"codex": {"reason": "wip-cap"}, "glm": ok}, 100)
+        self.assertIn("wip-cap", capped["codex"]["intakeBlockers"])
+        self.assertEqual(capped["glm"]["intakeBlockers"], [])
+        self.assertGreaterEqual(capped["codex"]["effective"], 3, "remediation seats keep running")
+
+    def test_the_repo_wide_count_is_only_a_backstop_at_the_sum_of_caps(self):
+        import autoscale  # noqa: PLC0415
+        self.assertEqual(autoscale.WIP_MAX_DEFAULT, pr_wip.total_cap(), "the backstop is derived from the policy")
+        ok = {"reason": "within-budget"}
+        over = self.decide({"codex": ok, "glm": ok}, autoscale.WIP_MAX_DEFAULT + 1)
+        self.assertIn("wip-cap", over["glm"]["intakeBlockers"])
 
 
 if __name__ == "__main__":

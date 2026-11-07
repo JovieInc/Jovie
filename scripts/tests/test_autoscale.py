@@ -445,7 +445,7 @@ class MarginalYieldAndAdmissionTest(unittest.TestCase):
 
     def test_intake_gates_stop_new_issues_but_not_remediation_seats(self):
         base = obs(runningByProvider={"codex": 3}, eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20})
-        for extra, token in (({"openPRCount": 315, "wipMax": 122}, "wip-cap"),
+        for extra, token in (({"openPRCount": 315, "wipMax": 80}, "wip-cap"),
                              ({"mergeThroughput": {"queueDepth": 9, "queueWaitP50Minutes": 45, "mergedPerHour": 9, "openedPerHour": 5, "ejectionRate": 0.0}}, "ci-queue-wait"),
                              ({"quotaDeferredHeads": 2}, "github-quota-deferred"),
                              ({"ciQueue": {"queuedRuns": 990, "oldestMin": 18.0, "fresh": True}}, "ci-runner-backlog")):
@@ -456,20 +456,6 @@ class MarginalYieldAndAdmissionTest(unittest.TestCase):
             self.assertGreaterEqual(row["effective"], 3, "remediation seats keep running")
         under = decide(None, {**base, "openPRCount": 40, "wipMax": 80}, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
         self.assertEqual(self.lane(under, "codex")["intakeBlockers"], [])
-
-    def test_wip_cap_gate_is_per_producer_with_a_high_repo_backstop(self):
-        base = obs(runningByProvider={"codex": 3, "glm": 3}, eligiblePoolByProvider={"codex": 50, "glm": 50}, maintenanceQueueByProvider={"codex": 20, "glm": 20})
-        # Repo-wide 300 open PRs (other agents, Dependabot, changelog) but under the backstop: Symphony keeps pulling.
-        crowded = decide(None, {**base, "openPRCount": 100, "wipMax": A.WIP_MAX_DEFAULT}, sample(), {"codex": 3, "glm": 3}, cfg(max={"codex": 6, "glm": 6}), NOW)
-        self.assertEqual(self.lane(crowded, "glm")["intakeBlockers"], [])
-        # Only the lane whose own producer is at its cap stops.
-        capped = decide(None, {**base, "openPRCount": 100, "wipMax": A.WIP_MAX_DEFAULT,
-                               "newIssueBudgetByProvider": {"codex": {"reason": "wip-cap"}, "glm": {"reason": "within-budget"}}},
-                        sample(), {"codex": 3, "glm": 3}, cfg(max={"codex": 6, "glm": 6}), NOW)
-        self.assertIn("wip-cap", self.lane(capped, "codex")["intakeBlockers"])
-        self.assertEqual(self.lane(capped, "glm")["intakeBlockers"], [])
-        self.assertGreaterEqual(self.lane(capped, "codex")["effective"], 3)
-        self.assertEqual(A.WIP_MAX_DEFAULT, 122)
 
     def test_flow_metrics_and_swarm_claims(self):
         with tempfile.TemporaryDirectory() as tmp:
