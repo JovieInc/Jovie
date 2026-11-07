@@ -13,41 +13,45 @@ vi.mock('next/navigation', async importOriginal => ({
 describe('HomepageSpecSections', () => {
   it('fills copy slots from the spec and keeps the locked headline', () => {
     const spec = structuredClone(DEFAULT_HOME_SPEC);
-    const [hero, gallery, cta] = spec.sections;
+    const [hero, split, gallery, cta] = spec.sections;
     if (
       hero?.section !== 'hero' ||
+      split?.section !== 'feature-split' ||
       gallery?.section !== 'product-gallery' ||
       cta?.section !== 'cta'
     ) {
       throw new Error('default order changed');
     }
     hero.copy.subhead = 'Spec subhead.';
-    hero.copy.claimAction = 'Reserve';
+    hero.copy.primaryAction = 'Ask In';
+    split.copy.headline = 'Spec profile headline.';
     gallery.copy.headline = 'Spec gallery headline.';
     cta.copy.headline = 'Spec close headline.';
-    cta.copy.plansLinkLabel = 'See plans';
 
     render(<HomepageSpecSections sections={spec.sections} />);
 
     expect(
-      screen.getByRole('heading', { level: 1, name: /be found/i })
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Jovie helps you move your music forward.',
+      })
     ).toBeTruthy();
     expect(screen.getByText('Spec subhead.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Ask In' })).toBeTruthy();
+    expect(screen.getByText('Spec profile headline.')).toBeTruthy();
     expect(screen.getByText('Spec gallery headline.')).toBeTruthy();
     expect(screen.getByText('Spec close headline.')).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'See plans' })).toBeTruthy();
-    // The closing claim mirrors the hero claim label.
-    expect(screen.getAllByRole('button', { name: 'Reserve' })).toHaveLength(2);
   });
 
   it('renders sections in spec order', () => {
     const spec = structuredClone(DEFAULT_HOME_SPEC);
     const { container } = render(
-      <HomepageSpecSections sections={[spec.sections[0]!, spec.sections[2]!]} />
+      <HomepageSpecSections sections={[spec.sections[0]!, spec.sections[3]!]} />
     );
     const headings = [...container.querySelectorAll('h1, h2')].map(
-      node => node.id
+      node => node.tagName
     );
-    expect(headings).toEqual(['home-hero-heading', 'homepage-offer-heading']);
+    expect(headings).toEqual(['H1', 'H2']);
+    expect(container.querySelector('#request-invite')).toBeTruthy();
   });
 });

@@ -19,7 +19,7 @@ function readCertifiedCss(): string {
 
 describe('homepage-proof-no-card-v1 (JOV-6201 wave 2)', () => {
   it('omits unsupported adoption proof until it has an attributable receipt', () => {
-    const sections = read('components/homepage/HomepageCertifiedSections.tsx');
+    const sections = read('components/homepage/HomepageEditorial.tsx');
     const routeManifest = read('data/marketing/routeManifest.ts');
 
     expect(sections).not.toContain('HomeTrustSection');
@@ -30,8 +30,10 @@ describe('homepage-proof-no-card-v1 (JOV-6201 wave 2)', () => {
       routeManifest.indexOf("glob: '(home)/page.tsx'"),
       routeManifest.indexOf("glob: '(marketing)/new/page.tsx'")
     );
+    // The editorial homepage carries no logo strip or adoption claim: its
+    // proof is the real product captures.
     expect(homepageEntry).not.toContain("'logo-cloud'");
-    expect(homepageEntry).toContain('unsupported adoption strip');
+    expect(homepageEntry).not.toContain('HomeTrustSection');
   });
 
   it('keeps the editorial body on the shared page background with stable spacing', () => {

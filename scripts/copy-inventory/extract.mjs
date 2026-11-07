@@ -355,7 +355,7 @@ function recordSlots() {
   const map = new Map();
   const file = join(WEB, 'lib/content-records/marketing-page.ts');
   const sf = parse(file);
-  const homepageCopy = 'apps/web/data/homepageCopy.ts';
+  const homepageCopy = 'apps/web/data/homepageEditorialCopy.ts';
   const visit = n => {
     if (ts.isObjectLiteralExpression(n)) {
       const sectionProp = n.properties.find(
@@ -373,10 +373,10 @@ function recordSlots() {
         for (const slot of /** @type {any} */ (copyProp).initializer
           .properties) {
           if (!ts.isPropertyAssignment(slot)) continue;
-          const m = /^HOMEPAGE_COPY\.(.+)$/.exec(slot.initializer.getText(sf));
+          const m = /^(HOMEPAGE\w*)\.(.+)$/.exec(slot.initializer.getText(sf));
           if (m)
             map.set(
-              `${homepageCopy}:HOMEPAGE_COPY.${m[1]}`,
+              `${homepageCopy}:${m[1]}.${m[2]}`,
               `marketing-page/home#${section}.${slot.name.getText(sf)}`
             );
         }
