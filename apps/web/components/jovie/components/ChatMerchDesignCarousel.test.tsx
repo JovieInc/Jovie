@@ -232,4 +232,15 @@ describe('ChatMerchDesignCarousel', () => {
     );
     expect(screen.queryByAltText(/mockup/i)).toBeNull();
   });
+
+  it('says so and offers a retry when no design came back', async () => {
+    const submitted = vi.fn();
+    globalThis.addEventListener('jovie-chat-submit-prompt', submitted);
+    render(<ChatMerchDesignCarousel result={{ ...result, designs: [] }} />);
+
+    expect(screen.getByText('No designs came back this time.')).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Try Again' }));
+    expect(submitted).toHaveBeenCalledTimes(1);
+    globalThis.removeEventListener('jovie-chat-submit-prompt', submitted);
+  });
 });
