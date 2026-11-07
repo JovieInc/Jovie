@@ -670,12 +670,9 @@ const DEPLOY_WORKFLOW_CI_TEST = 'tests/unit/ci/deploy-workflow.test.ts';
 const PLAYWRIGHT_RECEIPT_INPUTS =
   /^(\.github\/|scripts\/lib\/playwright-png\.mjs$|apps\/web\/(playwright[^/]*\.config[^/]*\.ts|tests\/unit\/ci\/playwright-artifact-secrets\.test\.ts)$)/u;
 export function selectPlaywrightReceipt(event, selected, changed) {
-  if (event === 'pull_request') {
-    return (
-      !changed?.length || changed.some(f => PLAYWRIGHT_RECEIPT_INPUTS.test(f))
-    );
-  }
-  return event !== 'workflow_dispatch' && !selected.has('web');
+  return event === 'pull_request'
+    ? !changed?.length || changed.some(f => PLAYWRIGHT_RECEIPT_INPUTS.test(f))
+    : event !== 'workflow_dispatch' && !selected.has('web');
 }
 export function webCiContractTestsCommand(
   ledgerPath = resolve(process.cwd(), 'apps/web/tests/quarantine.json'),

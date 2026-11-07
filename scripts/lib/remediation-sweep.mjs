@@ -618,29 +618,18 @@ export async function runRemediationSweep({
       if (plan) plans.push(plan);
     }
   }
-  if (includesMode(mode, 'credentials')) {
-    // Credentials and spend registry (ops/registry/): expiry 7d/1d, runway
-    // under 14 days, 50/80/100% of a cap, unowned or unconsumed secrets.
-    // Summer was down 2026-10-18..20 when an unwatched grant expired.
-    if (!loadCredentials) {
-      warnings.push('Credentials registry loader not wired; not judged');
+  const collect = async (name, load, label) => {
+    if (!includesMode(mode, name)) return;
+    if (!load) {
+      warnings.push(`${label} loader not wired; not judged`);
     } else {
-      const credentials = await loadCredentials();
-      warnings.push(...(credentials.warnings ?? []));
-      plans.push(...credentials.plans);
+      const result = await load();
+      warnings.push(...(result.warnings ?? []));
+      plans.push(...result.plans);
     }
-  }
-  if (includesMode(mode, 'drift')) {
-    // Source-of-truth drift (canon/sources-of-truth.json liveChecks): Stripe
-    // prices, email DNS, production build against their owners.
-    if (!loadDrift) {
-      warnings.push('Source drift loader not wired; not judged');
-    } else {
-      const drift = await loadDrift();
-      warnings.push(...(drift.warnings ?? []));
-      plans.push(...drift.plans);
-    }
-  }
+  };
+  await collect('credentials', loadCredentials, 'Credentials registry');
+  await collect('drift', loadDrift, 'Source drift');
   if (includesMode(mode, 'swift-arch')) {
     if (!loadSwiftArch) {
       warnings.push('Swift architecture guard loader not wired; not judged');
@@ -648,17 +637,7 @@ export async function runRemediationSweep({
       plans.push(...planSwiftArchDebt(await loadSwiftArch()));
     }
   }
-  if (includesMode(mode, 'proof')) {
-    // Proof-stat loop (apps/web/data/proof-stats): establish issues for
-    // proposed stats, benchmark ratchets, stale-stat alarms.
-    if (!loadProof) {
-      warnings.push('Proof-stat loop loader not wired; not judged');
-    } else {
-      const proof = await loadProof();
-      warnings.push(...(proof.warnings ?? []));
-      plans.push(...proof.plans);
-    }
-  }
+  await collect('proof', loadProof, 'Proof-stat loop');
   const issues = await fileRemediationPlans(plans, { dryRun, upsert, apiKey });
   return { mode, dryRun, warnings, issues };
 }

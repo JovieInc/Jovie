@@ -218,6 +218,50 @@ describe('runProofLoop', () => {
 });
 
 describe('remediation sweep proof mode', () => {
+  for (const [mode, key, label] of [
+    ['credentials', 'loadCredentials', 'Credentials registry'],
+    ['drift', 'loadDrift', 'Source drift'],
+    ['proof', 'loadProof', 'Proof-stat loop'],
+  ]) {
+    it(`collects only ${mode} plans and preserves loader warnings and failures`, async () => {
+      const called = [];
+      const plans = ratchetPlans(ratchets);
+      const loaders = Object.fromEntries(
+        ['loadCredentials', 'loadDrift', 'loadProof'].map(name => [
+          name,
+          async () => {
+            called.push(name);
+            return { plans, warnings: [`${name} warning`] };
+          },
+        ])
+      );
+      const result = await runRemediationSweep({
+        mode,
+        dryRun: true,
+        ...loaders,
+      });
+      assert.deepEqual(called, [key]);
+      assert.deepEqual(result.warnings, [`${key} warning`]);
+      assert.deepEqual(
+        result.issues.map(issue => issue.fingerprint),
+        plans.map(plan => plan.fingerprint)
+      );
+      const unwired = await runRemediationSweep({ mode, dryRun: true });
+      assert.deepEqual(unwired.warnings, [
+        `${label} loader not wired; not judged`,
+      ]);
+      await assert.rejects(
+        runRemediationSweep({
+          mode,
+          dryRun: true,
+          [key]: async () => {
+            throw new Error('loader failed');
+          },
+        }),
+        /loader failed/
+      );
+    });
+  }
   it('files the loop plans and warns when unwired', async () => {
     const filed = [];
     const upsert = async args => {
