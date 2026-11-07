@@ -31,11 +31,12 @@ from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent")
+    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent")
 DETERMINISTIC = frozenset({
-    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE})
+    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
+    REGISTER_DOMAIN, ATOMIC_WRITE})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -71,6 +72,17 @@ CENSUS_CERTIFICATION = re.compile(r"source changed; renew certification evidence
 # PR added a 10px/14px utility. Snap those added utilities; do not raise the floor.
 SPACING_RATCHET_TEXT = re.compile(
     r"off-grid 10px/14px spacing steps \(\*-2\.5, \*-3\.5\) grew")
+# Cache Components ratchet (assertStackPatternRatchet). Growth is a newly added
+# `export const dynamic|fetchCache|revalidate`. Delete that added line. Never
+# raise the ceiling. Checked before platform text: the count can look like HTTP 5xx.
+CACHE_SURFACE_TEXT = re.compile(
+    r"legacy Cache Components surface grew to \d+ \(maximum \d+\)")
+LEGACY_CACHE_EXPORT = re.compile(
+    r"^\s*export const (?:dynamic|fetchCache|revalidate)\s*=")
+CACHE_SCAN_PREFIXES = ("apps/web/app/", "apps/web/lib/")
+CACHE_SOURCE = re.compile(r"\.(?:cjs|js|json|mjs|ts|tsx)$")
+# Same skip as stackAdoptionCoverage: tests and stories are not legacy surfaces.
+CACHE_SKIP = re.compile(r"\.(?:stories|test)\.[^.]+$")
 # Same utility shape as apps/web/scripts/optical-grid-scanners.ts, limited to the
 # armed conservative steps. Longer prefixes are not required: `p` fails closed on
 # `px-2.5` because the step hyphen does not follow `p`.
@@ -130,6 +142,7 @@ SIGNATURES = (
     # Before platform-infra: a Source Validation log can carry passing-test rate-limit lines beside the guard error that actually failed the job.
     ("domain-write", DOMAIN_WRITE, REGISTER_DOMAIN),
     ("changelog-metadata", CHANGELOG_MISSING, STAMP_CHANGELOG),
+    ("cache-surface", CACHE_SURFACE_TEXT, STRIP_CACHE),
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
     # Inventory assertion outranks quota/infra noise echoed in the same log.
@@ -306,6 +319,88 @@ def snap_added_conservative_spacing(root: Path, diff: str) -> list[str]:
             continue
         try:
             atomic_write_text(path, "".join(file_lines))
+        except OSError:
+            continue
+        changed.append(rel)
+    return sorted(changed)
+
+
+def _legacy_cache_path(path: str) -> bool:
+    """Product source under the Cache Components scan. Tests and stories are not counted."""
+    rel = str(path or "").replace("\\", "/")
+    if not rel or rel.startswith("/") or ".." in Path(rel).parts:
+        return False
+    if not CACHE_SOURCE.search(rel) or CACHE_SKIP.search(rel):
+        return False
+    return rel.startswith(CACHE_SCAN_PREFIXES)
+
+
+def _added_legacy_cache_exports(diff: str) -> dict[str, dict[int, str]]:
+    """Map eligible file -> {new 1-based line: added text} for cache exports the diff adds."""
+    edits: dict[str, dict[int, str]] = {}
+    rel = ""
+    eligible = False
+    new_line = 0
+    in_hunk = False
+    for raw in str(diff or "").splitlines():
+        if raw.startswith("+++ b/"):
+            rel = raw[6:]
+            eligible = _legacy_cache_path(rel)
+            in_hunk = False
+            continue
+        if raw.startswith("--- ") or raw.startswith("diff --git "):
+            continue
+        header = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", raw)
+        if header:
+            new_line = int(header.group(1))
+            in_hunk = True
+            continue
+        if not in_hunk:
+            continue
+        if raw.startswith("\\"):
+            continue
+        if raw.startswith("+"):
+            added = raw[1:]
+            if eligible and LEGACY_CACHE_EXPORT.match(added):
+                edits.setdefault(rel, {})[new_line] = added
+            new_line += 1
+        elif raw.startswith("-"):
+            continue
+        else:
+            new_line += 1
+    return edits
+
+
+def strip_added_legacy_cache_exports(root: Path, diff: str) -> list[str]:
+    """Delete route-segment cache exports on lines this diff adds. Returns the files written.
+
+    Grandfathered exports stay, including an identical line elsewhere in the file.
+    A line that no longer matches the diff stays, so a stale patch cannot delete a
+    neighbor. `export const runtime` is not a legacy surface and is left alone.
+    """
+    changed = []
+    root = Path(root)
+    for rel, lines in _added_legacy_cache_exports(diff).items():
+        path = root / rel
+        try:
+            original = path.read_text()
+        except OSError:
+            continue
+        file_lines = original.splitlines(keepends=True)
+        drop: set[int] = set()
+        for lineno, added in lines.items():
+            index = lineno - 1
+            if index < 0 or index >= len(file_lines):
+                continue
+            ending = "\r\n" if file_lines[index].endswith("\r\n") else "\n" if file_lines[index].endswith("\n") else ""
+            current = file_lines[index][: len(file_lines[index]) - len(ending)]
+            if current == added:
+                drop.add(index)
+        if not drop:
+            continue
+        kept = [line for index, line in enumerate(file_lines) if index not in drop]
+        try:
+            atomic_write_text(path, "".join(kept))
         except OSError:
             continue
         changed.append(rel)
