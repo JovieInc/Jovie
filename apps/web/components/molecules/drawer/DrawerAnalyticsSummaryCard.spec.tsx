@@ -126,3 +126,19 @@ describe('DrawerAnalyticsSummaryCard', () => {
     );
   });
 });
+
+describe('DrawerAnalyticsSummaryCard dimmed contrast (JOV-8873)', () => {
+  it('dims refreshing content to 80% opacity, not 60%', () => {
+    const { container } = render(
+      <DrawerAnalyticsSummaryCard
+        metrics={[
+          { id: 'profile-views', label: 'Profile views', value: '120' },
+        ]}
+        state='ready'
+        dimmed
+      />
+    );
+    expect(container.querySelector('.opacity-80')).not.toBeNull();
+    expect(container.querySelector('.opacity-60')).toBeNull();
+  });
+});

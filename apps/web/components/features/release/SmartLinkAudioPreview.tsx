@@ -137,14 +137,18 @@ export function SmartLinkAudioPreview({
               className='h-1.5 w-full'
             />
           </div>
-          <div className='flex h-3.5 items-center justify-between text-3xs tabular-nums text-white/35'>
-            <span className='min-w-8'>{currentTimeFormatted}</span>
-            <span className='min-w-12 text-right'>{durationSlot}</span>
+          <div className='flex h-3.5 items-center justify-between text-3xs tabular-nums text-secondary-token'>
+            <span className='min-w-8 text-secondary-token tabular-nums'>
+              {currentTimeFormatted}
+            </span>
+            <span className='min-w-12 text-right text-secondary-token tabular-nums'>
+              {durationSlot}
+            </span>
           </div>
         </div>
       </div>
       {fallbackSourceLabel ? (
-        <p className='text-3xs text-white/45'>{fallbackSourceLabel}</p>
+        <p className='text-3xs text-secondary-token'>{fallbackSourceLabel}</p>
       ) : null}
     </div>
   );

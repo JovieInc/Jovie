@@ -1,20 +1,16 @@
-// Homepage page contract (EVENT 2026-10-20, Tim: the homepage sells the
-// artist profile). One table-driven contract replaces the per-component
-// homepage locks: it renders the real `/` page module and checks the route
-// manifest, copy truth sources, the one primary action, product imagery, and
-// tokenized styles. Changing the page means changing its typed records, not
-// rewriting a dozen source-string guards.
+// Homepage page contract (Tim, 2026-11-03: "Jovie helps you move your music
+// forward." on `/`; invite-only, the story ends in the role waitlist form).
+// One table-driven contract: it renders the real `/` page module and checks
+// the route manifest, copy truth sources, the one primary action, product
+// imagery, and tokenized styles. Changing the page means changing its typed
+// records, not rewriting a dozen source-string guards.
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing';
 import { getMarketingRecipe } from '@/data/marketing/recipes';
-import {
-  formatPublicPriceDisplay,
-  getPublicPriceClaim,
-} from '@/lib/billing/offer-truth';
-import { PRICING_COMPARISON } from '@/lib/entitlements/registry';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { getEndUserPerfRouteById } from '@/scripts/performance-route-manifest';
 
 const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: true }));
@@ -71,26 +67,18 @@ async function renderHomePage() {
 }
 
 async function loadCopy() {
-  const [{ HOMEPAGE_COPY }, { HOMEPAGE_FAN_STATES_COPY }] = await Promise.all([
-    import('@/data/homepageCopy'),
-    import('@/data/homepageFanStatesCopy'),
-  ]);
-  return { HOMEPAGE_COPY, HOMEPAGE_FAN_STATES_COPY };
+  return import('@/data/homepageEditorialCopy');
 }
 
 const HOMEPAGE_SOURCES = [
-  'data/homepageCopy.ts',
-  'data/homepageFanStatesCopy.ts',
-  'components/homepage/HomepageArtistProfile.tsx',
-  'components/marketing/MarketingOfferSummary.tsx',
-  'components/marketing/MarketingPhoneStateGallery.tsx',
+  'data/homepageEditorialCopy.ts',
+  'components/homepage/HomepageEditorial.tsx',
+  'components/homepage/HomepageSpecSections.tsx',
 ] as const;
 
-const HOMEPAGE_STYLES = [
-  'components/homepage/HomepageArtistProfile.css',
-  'components/homepage/HomepageAtmosphere.css',
-  'components/marketing/MarketingProductStates.css',
-] as const;
+const HOMEPAGE_STYLES = ['components/homepage/HomepageEditorial.css'] as const;
+
+const PRICE_TEXT = /\$\s?\d|\d+\s?\/\s?mo\b|\bper month\b|\b\d+-day\b/i;
 
 describe('homepage contract', { timeout: 60_000 }, () => {
   beforeEach(() => {
@@ -132,59 +120,59 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     );
   });
 
-  it('mounts the hero light and keeps the canvas off until WebGL can run', async () => {
-    const { container } = await renderHomePage();
-    expect(
-      container.querySelector('[data-testid="homepage-hero-light"]')
-    ).not.toBeNull();
-    expect(container.querySelector('.homepage-hero-canvas')).not.toBeNull();
-    expect(container.querySelector('canvas')).toBeNull();
-  });
-
-  it('renders one h1 from the copy module and no stray headings', async () => {
-    const { HOMEPAGE_COPY, HOMEPAGE_FAN_STATES_COPY } = await loadCopy();
+  it('renders one h1, the locked line, and one h2 per chapter', async () => {
+    const { HOMEPAGE_EDITORIAL_COPY: copy } = await loadCopy();
     await renderHomePage();
 
     const h1s = screen.getAllByRole('heading', { level: 1 });
     expect(h1s).toHaveLength(1);
-    expect(h1s[0]).toHaveTextContent(HOMEPAGE_COPY.hero.headline);
+    expect(h1s[0]).toHaveTextContent(
+      'Jovie helps you move your music forward.'
+    );
+    expect(copy.hero.headline).toBe('Jovie helps you move your music forward.');
     expect(
       screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)
     ).toEqual([
-      HOMEPAGE_FAN_STATES_COPY.headline,
-      HOMEPAGE_COPY.offer.headline,
+      copy.profile.headline,
+      copy.releases.headline,
+      copy.invite.headline,
     ]);
   });
 
   it.each([true, false])(
-    'keeps one primary action, the jov.ie/ claim into /start, with waitlist=%s',
+    'ends in the one role waitlist form and links nowhere near signup, waitlist=%s',
     async waitlist => {
       gate.WAITLIST_ENABLED = waitlist;
-      const { HOMEPAGE_COPY } = await loadCopy();
-      const { MARKETING_CTA_INTENTS } = await import(
-        '@/data/marketingCtaIntents'
-      );
+      const { HOMEPAGE_EDITORIAL_COPY: copy, HOMEPAGE_INVITE_ANCHOR } =
+        await loadCopy();
       const { container } = await renderHomePage();
 
+      // One conversion: the role waitlist form inside the closing section.
       const forms = [...container.querySelectorAll('form')];
-      expect(forms).toHaveLength(2); // hero + terminal CTA, same action
-      for (const form of forms) {
-        expect(form).toHaveAttribute('action', '/start');
-        expect(
-          within(form).getByRole('button', {
-            name: HOMEPAGE_COPY.hero.claim.action,
-          })
-        ).toHaveAttribute('type', 'submit');
-      }
-      expect(screen.queryByText('Request access')).toBeNull();
-      expect(screen.getByText(HOMEPAGE_COPY.hero.supportNote)).toBeVisible();
-      expect(HOMEPAGE_COPY.hero.supportNote).toBe(
-        MARKETING_CTA_INTENTS.claimProfile.support
+      expect(forms).toHaveLength(1);
+      expect(forms[0]).toHaveAttribute('data-testid', 'waitlist-role-form');
+      const close = container.querySelector(`#${HOMEPAGE_INVITE_ANCHOR}`);
+      expect(close).toHaveAttribute('data-testid', 'marketing-section-cta');
+      expect(close?.contains(forms[0] ?? null)).toBe(true);
+      expect(within(forms[0]!).getByRole('radiogroup')).toBeVisible();
+
+      // The hero's primary action scrolls to that form; no public signup.
+      const primary = screen.getByTestId('homepage-primary-cta');
+      expect(primary).toHaveAttribute('href', `#${HOMEPAGE_INVITE_ANCHOR}`);
+      expect(primary).toHaveTextContent(copy.hero.primaryAction);
+      expect(
+        container.querySelectorAll('[data-primary-action="true"]')
+      ).toHaveLength(1);
+      const hrefs = [...container.querySelectorAll('a[href]')].map(
+        link => link.getAttribute('href') ?? ''
       );
+      expect(
+        hrefs.filter(href => /^\/(signup|sign-up|start|claim)\b/.test(href))
+      ).toEqual([]);
     }
   );
 
-  it('binds performance readiness to the rendered hero and claim', async () => {
+  it('binds performance readiness to the rendered hero and its action', async () => {
     const { container } = await renderHomePage();
     const selectors = getEndUserPerfRouteById('home')?.readySelectors.content;
     expect(selectors?.length).toBeGreaterThan(0);
@@ -193,70 +181,42 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     }
   });
 
-  it('states prices only through offer truth', async () => {
-    const { HOMEPAGE_COPY } = await loadCopy();
-    await renderHomePage();
-    const summary = screen.getByTestId('homepage-offer-summary');
-    const claim = getPublicPriceClaim(HOMEPAGE_COPY.offer.plan);
-
-    expect(summary).toHaveAttribute('data-offer-plan', claim.plan);
-    expect(summary).toHaveTextContent(formatPublicPriceDisplay(claim));
-    expect(summary).toHaveTextContent(claim.badge);
-    // No source file on the page may type a price, plan name, or trial.
-    for (const path of HOMEPAGE_SOURCES) {
-      expect(read(path), path).not.toMatch(
-        /\$\s?\d|\d+\s?\/\s?mo\b|\bper month\b/i
-      );
-      expect(read(path), path).not.toMatch(/\b\d+-day\b/i);
-    }
-  });
-
-  it('backs every free inclusion with a free entitlement row', async () => {
-    const { HOMEPAGE_COPY } = await loadCopy();
-    const features = new Map(
-      PRICING_COMPARISON.flatMap(category => category.features).map(feature => [
-        feature.name,
-        feature,
-      ])
-    );
-    for (const item of HOMEPAGE_COPY.offer.included) {
-      const feature = features.get(item.entitlement);
-      expect(feature, item.entitlement).toBeDefined();
-      expect(feature?.free, item.entitlement).not.toBe(false);
-    }
-  });
-
-  it('shows no person capture on the homepage (Tim, 2026-10-26)', async () => {
+  it('shows no prices on the page', async () => {
     const { container } = await renderHomePage();
-    const images = [...container.querySelectorAll('main img, section img')];
-    const sources = images.map(image => image.getAttribute('src') ?? '');
-
-    // One image on `/`: the hero's real product shot, the template profile
-    // capture (jov.ie/you, monogram avatar, abstract release art).
-    expect(sources).toHaveLength(1);
-    expect(sources[0]).toMatch(
-      /^\/product-screenshots\/template-profile-live-phone\.png(\?v=\w+)?$/
-    );
-    const hero = container.querySelector(
-      '[data-testid="marketing-section-hero"]'
-    );
-    expect(hero?.querySelector('[data-testid="homepage-hero-proof"] img')).toBe(
-      images[0]
-    );
-    // No person capture is wired anywhere in the homepage sources.
+    const main = [...container.querySelectorAll('section')]
+      .map(section => section.textContent ?? '')
+      .join(' ');
+    expect(main).not.toMatch(PRICE_TEXT);
     for (const path of HOMEPAGE_SOURCES) {
-      expect(read(path), path).not.toMatch(/tim-white|tim-profile/iu);
+      expect(read(path), path).not.toMatch(PRICE_TEXT);
     }
+  });
+
+  it('shows only real product captures, with no person but Tim White', async () => {
+    const { HOMEPAGE_EDITORIAL_COPY: copy } = await loadCopy();
+    const { container } = await renderHomePage();
+    const sources = [...container.querySelectorAll('section img')].map(image =>
+      (image.getAttribute('src') ?? '').replace(/\?v=\w+$/, '')
+    );
+    // The template profile (jov.ie/you, monogram avatar, abstract art), then
+    // the releases workspace and the featured release from Tim White's own
+    // catalog. Every capture comes from the screenshot registry.
+    expect(sources).toEqual([
+      '/product-screenshots/template-profile-live-phone.png',
+      '/product-screenshots/releases-dashboard-full.png',
+      '/product-screenshots/profile-state-release.png',
+    ]);
+    expect(copy.profile.scenarioId).toBe('template-profile-live-mobile');
   });
 
   it('keeps copy in data and free of em dashes and stock promotion', async () => {
-    const { HOMEPAGE_COPY, HOMEPAGE_FAN_STATES_COPY } = await loadCopy();
-    const lines = JSON.stringify([HOMEPAGE_COPY, HOMEPAGE_FAN_STATES_COPY]);
+    const { HOMEPAGE_EDITORIAL_COPY } = await loadCopy();
+    const lines = JSON.stringify(HOMEPAGE_EDITORIAL_COPY);
     expect(lines).not.toContain('—');
     expect(lines).not.toMatch(
       /\b(seamless|unlock|elevate|world-class|all-in-one|supercharge)\b/i
     );
-    const component = read('components/homepage/HomepageArtistProfile.tsx');
+    const component = read('components/homepage/HomepageEditorial.tsx');
     // Rendered text comes from props/copy, not JSX literals.
     expect(component).not.toMatch(/>\s*[A-Z][a-z]+(?: [a-z]+){2,}[.!]?\s*</);
   });
@@ -269,7 +229,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
 
     // Every `/#fragment` href in app/components navigates to the homepage
     // root with an anchor, so the fragment must name an id the homepage
-    // actually renders. A renamed claim input (e.g. the old `handle-input`)
+    // actually renders. A renamed target (e.g. the old claim input)
     // otherwise silently dead-ends every dependent CTA at the top of `/`.
     const anchors = new Set<string>();
     const collectAnchors = (dir: string): void => {

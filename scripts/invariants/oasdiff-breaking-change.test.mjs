@@ -348,12 +348,16 @@ function specRepository(t) {
     Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
   );
   const git = (...args) =>
-    execFileSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], {
-      cwd: root,
-      env,
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
+    execFileSync(
+      'git',
+      ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', ...args],
+      {
+        cwd: root,
+        env,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }
+    ).trim();
   const spec = join(root, 'apps/web/lib/api/v1/openapi.json');
   mkdirSync(dirname(spec), { recursive: true });
   mkdirSync(join(root, 'apps/web/scripts'), { recursive: true });
@@ -366,6 +370,13 @@ function specRepository(t) {
     join(root, 'apps/web/node_modules'),
     'dir'
   );
+  // pnpm's .bin/tsx shim resolves tsx through <root>/node_modules/.pnpm.
+  if (existsSync(join(REPO_ROOT, 'node_modules')))
+    symlinkSync(
+      join(REPO_ROOT, 'node_modules'),
+      join(root, 'node_modules'),
+      'dir'
+    );
   writeFileSync(join(root, '.gitignore'), 'node_modules\n');
   writeFileSync(join(root, 'package.json'), '{"type":"module"}\n');
   writeFileSync(

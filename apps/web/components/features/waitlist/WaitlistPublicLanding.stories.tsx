@@ -17,3 +17,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const SplashB: Story = {};
+
+export const SignupClosed: Story = {
+  args: { signupClosed: true },
+};

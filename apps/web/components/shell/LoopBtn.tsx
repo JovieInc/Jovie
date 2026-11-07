@@ -1,5 +1,5 @@
+import { IconButton } from '@jovie/ui';
 import { Repeat } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 export type LoopMode = 'off' | 'track' | 'section';
 
@@ -28,33 +28,35 @@ export function LoopBtn({
 }) {
   const active = mode !== 'off';
   return (
-    <button
+    <IconButton
+      variant='ghost'
+      size='sm'
       type='button'
       onClick={onClick}
-      className={cn(
-        'relative h-7 w-7 rounded-md grid place-items-center transition-colors duration-subtle ease-subtle focus-ring-themed',
-        active
-          ? 'text-primary-token'
-          : 'text-quaternary-token hover:text-primary-token',
-        className
-      )}
-      aria-label={`Loop: ${mode}`}
+      className={className}
+      aria-label={`Loop: ${mode === 'track' ? 'track 1' : mode === 'section' ? 'section ⤴' : mode}`}
       title={`Loop: ${mode}`}
     >
       <Repeat className='h-3.5 w-3.5' strokeWidth={2.25} />
       {mode === 'track' && (
-        <span className='absolute -bottom-px right-0 text-3xs font-bold leading-none text-primary-token'>
+        <span
+          aria-hidden='true'
+          className='absolute -bottom-px right-0 text-3xs font-bold leading-none text-primary-token'
+        >
           1
         </span>
       )}
       {mode === 'section' && (
-        <span className='absolute -bottom-px right-0 text-3xs font-bold leading-none text-primary-token'>
+        <span
+          aria-hidden='true'
+          className='absolute -bottom-px right-0 text-3xs font-bold leading-none text-primary-token'
+        >
           ⤴
         </span>
       )}
       {active && (
         <span className='absolute -top-px left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-primary-token' />
       )}
-    </button>
+    </IconButton>
   );
 }

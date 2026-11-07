@@ -54,6 +54,29 @@ describe('IconButton', () => {
     }
   });
 
+  it('renders quiet icon variants with a transparent border and background at rest', () => {
+    // Back/menu chrome on public pages is ghost at rest: chrome appears only
+    // on hover, focus-visible and pressed (Tim, 2026-10-25).
+    for (const variant of ['ghost', 'secondary'] as const) {
+      render(
+        <IconButton ariaLabel={`Rest ${variant}`} variant={variant} size='md'>
+          <svg aria-hidden='true' />
+        </IconButton>
+      );
+      const rest = screen
+        .getByRole('button', { name: `Rest ${variant}` })
+        .className.split(/\s+/)
+        .filter(token => !/^(hover|focus-visible|active|focus):/.test(token));
+      expect(rest, `${variant} background`).toContain('bg-transparent');
+      expect(rest, `${variant} border`).toContain('border-transparent');
+      expect(
+        rest.some(token => /^bg-(surface|icon-button|black|white)/.test(token)),
+        `${variant} must not paint a rest background`
+      ).toBe(false);
+      expect(rest, `${variant} 44px hit target`).toContain('before:h-11');
+    }
+  });
+
   it('keeps the 44px hit target pseudo-element below the xl size', () => {
     for (const size of ICON_BUTTON_SIZE_NAMES) {
       const { unmount } = render(
@@ -281,5 +304,18 @@ describe('IconButton', () => {
     expect(button.className).not.toContain('profile-pearl-shadow');
     expect(button.className).not.toMatch(/bg-\[/);
     expect(button.className).not.toMatch(/(?:hover|focus-visible):shadow-\[/);
+  });
+});
+
+describe('IconButton destructive contrast (JOV-8873)', () => {
+  it('uses the AA error text token for destructive icons', () => {
+    render(
+      <IconButton ariaLabel='Delete item' destructive>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+    const button = screen.getByRole('button', { name: 'Delete item' });
+    expect(button).toHaveClass('text-error-text');
+    expect(button).not.toHaveClass('text-error');
   });
 });

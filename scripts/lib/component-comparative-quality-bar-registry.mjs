@@ -66,6 +66,7 @@ export const QUALITY_BAR_REFERENCES = deepFreeze({
  * Approved closed-world denominator. After an intentional component taxonomy
  * change, review the path-set diff and print proposed values with:
  * pnpm exec node scripts/component-comparative-quality-bar.mjs --print-inventory-ratchet
+ * Then regenerate this derived array with --write-inventory-ratchet.
  */
 export const ATOM_MOLECULE_INVENTORY_RATCHET = deepFreeze([
   {
@@ -82,9 +83,9 @@ export const ATOM_MOLECULE_INVENTORY_RATCHET = deepFreeze([
   },
   {
     root: 'apps/web/components/**/molecules',
-    total: 169,
+    total: 175,
     sourceSetSha256:
-      '2ac14fd2dc26f0feab63b6ce37475d9947ebe2c4c04b4d805a9f16f9defba2fb',
+      '397a180090721e11ffc0ec69c4ddf53826d6adead998af61fc6cc670c2d14868',
   },
   {
     root: 'registered-out-of-taxonomy/atoms',

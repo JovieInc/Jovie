@@ -14,10 +14,11 @@
 // Pure Node, zero npm dependencies. Abuse caps live in CAPS below.
 
 import { existsSync, readFileSync } from 'node:fs';
+import { parseTurboCacheLog } from './turbo-cache-stats.mjs';
 
 export const SCHEMA_VERSION = 1;
 
-/** @type {{ maxJobPages: number, jobsPerPage: number, maxQueueRunsPages: number, maxRowsPerRunEvent: number, maxBackfillRuns: number, backfillWindowMinutes: number, retentionDays: number, maxPruneDeletes: number, dataBranch: string, dataDir: string }} */
+/** @type {{ maxJobPages: number, jobsPerPage: number, maxQueueRunsPages: number, maxRowsPerRunEvent: number, maxBackfillRuns: number, backfillWindowMinutes: number, retentionDays: number, maxPruneDeletes: number, turboCacheSampleModulo: number, maxTurboLogJobsPerRun: number, dataBranch: string, dataDir: string }} */
 export const CAPS = {
   maxJobPages: 10,
   jobsPerPage: 100,
@@ -27,9 +28,20 @@ export const CAPS = {
   backfillWindowMinutes: 15,
   retentionDays: 30,
   maxPruneDeletes: 5000,
+  // Turbo remote-cache hit rate (turbo_cache rows) comes from job logs, one
+  // REST call per log. Sample 1 in N runs of the turbo-bearing workflows and
+  // read at most M jobs per sampled run so the collector's budget stays flat.
+  turboCacheSampleModulo: 4,
+  maxTurboLogJobsPerRun: 6,
   dataBranch: 'ci-timing-data',
   dataDir: 'data',
 };
+
+/** Workflows whose jobs run turbo; only their logs are read for turbo_cache rows. */
+const TURBO_WORKFLOWS = new Set(['CI', 'Source Validation']);
+/** Job names that run a turbo task (matrix suffixes allowed). */
+const TURBO_JOB_RE =
+  /^(Source Validation|Exact-head Coverage|Unit Tests|Build \+ Layout|Visual Snapshot Compare|ci-fast)/;
 
 /** Events worth a row; everything else (schedule, workflow_dispatch, repository) is noise. */
 const COLLECTED_EVENTS = new Set(['pull_request', 'merge_group', 'push']);
@@ -87,6 +99,54 @@ function normalizeStart(run, job) {
 }
 
 /**
+ * Seconds from job created_at (queued for a runner) to started_at.
+ * @param {{ created_at?: string | null, started_at?: string | null }} job
+ */
+export function queueWaitSeconds(job) {
+  const created = job.created_at ? ms(job.created_at) : null;
+  const started = job.started_at ? ms(job.started_at) : null;
+  if (created === null || started === null) return null;
+  return Math.max(0, (started - created) / 1000);
+}
+
+const SELF_HOSTED_LABELS = new Set(['self-hosted', 'jovie-fixed']);
+
+/**
+ * Runner pool a job asked for: 'self-hosted' (gem jovie-fixed pool) or
+ * 'hosted' (GitHub-hosted). Same rule as throughput_sentinel.runner_pool.
+ * @param {string[] | undefined} labels
+ */
+export function runnerPool(labels) {
+  return (labels ?? []).some(label =>
+    SELF_HOSTED_LABELS.has(String(label).toLowerCase())
+  )
+    ? 'self-hosted'
+    : 'hosted';
+}
+
+/**
+ * Queue-wait p50/p95 (seconds) per runner pool over job_attempt rows.
+ * @param {Array<{ row_type?: string, runner_pool?: string, queue_wait_s?: number | null }>} rows
+ */
+export function poolQueueWait(rows) {
+  /** @type {Record<string, number[]>} */
+  const byPool = {};
+  for (const row of rows) {
+    if (row.row_type !== 'job_attempt' || typeof row.queue_wait_s !== 'number')
+      continue;
+    (byPool[row.runner_pool ?? 'hosted'] ??= []).push(row.queue_wait_s);
+  }
+  return Object.fromEntries(
+    Object.entries(byPool).map(([pool, waits]) => {
+      const sorted = [...waits].sort((a, b) => a - b);
+      const at = p =>
+        sorted[Math.min(sorted.length - 1, Math.ceil(p * sorted.length) - 1)];
+      return [pool, { n: sorted.length, p50S: at(0.5), p95S: at(0.95) }];
+    })
+  );
+}
+
+/**
  * @param {{ run: any, job: any, collectedAt: string, prNumber?: number | null }} args
  */
 export function jobAttemptRow({ run, job, collectedAt, prNumber }) {
@@ -114,6 +174,8 @@ export function jobAttemptRow({ run, job, collectedAt, prNumber }) {
     completed_at: job.completed_at ?? null,
     conclusion: job.conclusion ?? null,
     runner_name: job.runner_name ?? null,
+    runner_pool: runnerPool(job.labels),
+    queue_wait_s: queueWaitSeconds(job),
     collected_at: collectedAt,
   };
 }
@@ -139,6 +201,54 @@ export function queueEventRow({ run, mergedAt, queueDepth, collectedAt }) {
     queue_depth: queueDepth,
     collected_at: collectedAt,
   };
+}
+
+/**
+ * One turbo_cache row per sampled job: which remote cache the job selected
+ * and how many turbo tasks it replayed from cache.
+ * @param {{ run: any, job: any, log: string, collectedAt: string }} args
+ */
+export function turboCacheRow({ run, job, log, collectedAt }) {
+  const stats = parseTurboCacheLog(log);
+  return {
+    schema_version: SCHEMA_VERSION,
+    row_type: 'turbo_cache',
+    pr_number:
+      (run.pull_requests && run.pull_requests.length > 0
+        ? run.pull_requests[0].number
+        : null) ?? parseQueuePrNumber(run.head_branch),
+    head_sha: job.head_sha ?? run.head_sha,
+    run_id: run.id,
+    run_attempt: job.run_attempt ?? run.run_attempt,
+    job_id: job.id,
+    job_name: job.name,
+    workflow_name: run.name,
+    event: run.event,
+    backend: stats.backend ?? (stats.remoteDisabled ? 'none' : null),
+    role: stats.role,
+    turbo_runs: stats.turboRuns,
+    tasks_cached: stats.tasksCached,
+    tasks_total: stats.tasksTotal,
+    collected_at: collectedAt,
+  };
+}
+
+/**
+ * Sampled jobs whose logs are read for turbo_cache rows.
+ * @param {any} run
+ * @param {any[]} jobs
+ */
+export function turboLogJobs(run, jobs) {
+  if (!TURBO_WORKFLOWS.has(run.name)) return [];
+  if (Number(run.id) % CAPS.turboCacheSampleModulo !== 0) return [];
+  return jobs
+    .filter(
+      job =>
+        TURBO_JOB_RE.test(job.name ?? '') &&
+        job.conclusion !== 'skipped' &&
+        job.conclusion !== 'cancelled'
+    )
+    .slice(0, CAPS.maxTurboLogJobsPerRun);
 }
 
 /**
@@ -181,11 +291,17 @@ async function pagedJson(fetchJson, path, maxPages) {
 }
 
 /**
- * Collect all rows for one workflow run: one job_attempt row per job attempt
- * plus (merge_group only) one queue_event row with queue depth and merge time.
- * @param {{ run: any, fetchJson: (path: string) => Promise<any>, collectedAt: string }} args
+ * Collect all rows for one workflow run: one job_attempt row per job attempt,
+ * (merge_group only) one queue_event row with queue depth and merge time, and
+ * (sampled runs, when fetchText is given) one turbo_cache row per turbo job.
+ * @param {{ run: any, fetchJson: (path: string) => Promise<any>, fetchText?: (path: string) => Promise<string>, collectedAt: string }} args
  */
-export async function collectRunRows({ run, fetchJson, collectedAt }) {
+export async function collectRunRows({
+  run,
+  fetchJson,
+  fetchText,
+  collectedAt,
+}) {
   const jobsPath = `/repos/{owner}/{repo}/actions/runs/${run.id}/jobs?per_page=${CAPS.jobsPerPage}&filter_run_attempt=${run.run_attempt}`;
   const {
     items: jobs,
@@ -209,6 +325,22 @@ export async function collectRunRows({ run, fetchJson, collectedAt }) {
     rows = rows.concat([
       queueEventRow({ run, mergedAt, queueDepth: depth, collectedAt }),
     ]);
+  }
+
+  if (fetchText) {
+    for (const job of turboLogJobs(run, jobs)) {
+      let log = '';
+      try {
+        log = await fetchText(
+          `/repos/{owner}/{repo}/actions/jobs/${job.id}/logs`
+        );
+      } catch (error) {
+        // A missing or expired log is a gap in the sample, not a failure.
+        if (error instanceof RateLimitDeferredError) throw error;
+        continue;
+      }
+      rows.push(turboCacheRow({ run, job, log, collectedAt }));
+    }
   }
 
   return {
@@ -286,7 +418,7 @@ function repoCoords() {
  * @param {string} path
  * @param {any} [body]
  */
-async function ghApi(coords, method, path, body) {
+async function ghApi(coords, method, path, body, { raw = false } = {}) {
   const { runGh } = await import('../../packages/api-client/gh.ts');
   const resolved = path
     .replace('{owner}', coords.owner)
@@ -312,6 +444,7 @@ async function ghApi(coords, method, path, body) {
         `API call ${resolved} -> ${result.code}: ${result.stderr.slice(0, 300)}`
       );
     }
+    if (raw) return result.stdout ?? '';
     return result.stdout ? JSON.parse(result.stdout) : null;
   } finally {
     if (cleanup) cleanup();
@@ -435,6 +568,7 @@ async function modeWriteData() {
     const { rows, truncated } = await collectRunRows({
       run,
       fetchJson: path => ghApi(coords, 'GET', path),
+      fetchText: path => ghApi(coords, 'GET', path, undefined, { raw: true }),
       collectedAt: new Date().toISOString(),
     });
     if (rows.length === 0) continue;

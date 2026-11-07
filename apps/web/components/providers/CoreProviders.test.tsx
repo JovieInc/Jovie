@@ -111,3 +111,16 @@ it('keeps the public provider graph on the shared tooltip timing scope', () => {
     'data-skip'
   );
 });
+
+describe('prerendered homepage pathname', () => {
+  it('CoreProviders.tsx reads "/index" as "/" via usePublicPathname', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/providers/CoreProviders.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('usePublicPathname');
+    expect(source).not.toMatch(/\busePathname\b/);
+  });
+});

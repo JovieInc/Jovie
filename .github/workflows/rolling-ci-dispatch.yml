@@ -65,6 +65,10 @@ jobs:
             scripts/lib/changed-test-coverage.mjs
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
+            scripts/lib/onboarding-test-producers.mjs
+            scripts/lib/git-base-ref.mjs
+            scripts/lib/trusted-test-planner-snapshot.mjs
+            scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
             scripts/design-conformance-paths.mjs
             scripts/lib/ci-repo-lanes.mjs
@@ -559,6 +563,10 @@ jobs:
             scripts/lib/changed-test-coverage.mjs
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
+            scripts/lib/onboarding-test-producers.mjs
+            scripts/lib/git-base-ref.mjs
+            scripts/lib/trusted-test-planner-snapshot.mjs
+            scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
             scripts/design-conformance-paths.mjs
             scripts/lib/ci-repo-lanes.mjs
@@ -839,6 +847,7 @@ jobs:
             scripts/lib/ci-repo-lanes.mjs
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/merge-group-member-policy.mjs
+            scripts/lib/pr-size-exclusions.mjs
             scripts/lib/native-queue-policy-evidence.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/lib/pr-size-guard-policy.mjs
@@ -858,6 +867,10 @@ jobs:
             scripts/design-conformance-paths.mjs
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
+            scripts/lib/onboarding-test-producers.mjs
+            scripts/lib/git-base-ref.mjs
+            scripts/lib/trusted-test-planner-snapshot.mjs
+            scripts/lib/test-planner-contract-tests.mjs
             scripts/version-fanout-guard.mjs
           sparse-checkout-cone-mode: false
       - name: Setup Node.js for trusted policy
@@ -973,6 +986,10 @@ jobs:
             scripts/lib/changed-test-coverage.mjs
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
+            scripts/lib/onboarding-test-producers.mjs
+            scripts/lib/git-base-ref.mjs
+            scripts/lib/trusted-test-planner-snapshot.mjs
+            scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
             scripts/design-conformance-paths.mjs
             scripts/lib/ci-repo-lanes.mjs

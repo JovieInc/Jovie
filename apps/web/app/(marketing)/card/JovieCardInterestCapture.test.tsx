@@ -39,6 +39,9 @@ describe('JovieCardInterestCapture', () => {
     expect(screen.getByLabelText('Email address')).toHaveValue(
       'founder@example.com'
     );
+    // The security check arms on first touch (deferSecurityCheck), as a
+    // visitor does before submitting.
+    fireEvent.pointerDown(screen.getByLabelText('Email address'));
     fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
 
     await waitFor(() =>
