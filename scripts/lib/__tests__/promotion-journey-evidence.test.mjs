@@ -5,6 +5,7 @@ import {
   createRecoveryOverride,
   evaluatePromotion,
 } from '../promotion-journey-evidence.mjs';
+import { gradeReleaseRange } from '../release-range-risk.mjs';
 
 const SHA = 'a'.repeat(40);
 const OTHER = 'b'.repeat(40);
@@ -283,5 +284,49 @@ describe('repairs (a)-(d) stay fixed', () => {
     expect(fn.indexOf('pressSequentially')).toBeLessThan(
       fn.indexOf("waitForLoadState('load'")
     );
+  });
+});
+
+const gradeScope = paths =>
+  gradeReleaseRange({
+    baseDeployedSha: 'a'.repeat(40),
+    candidateSha: 'b'.repeat(40),
+    paths,
+  });
+
+describe('auth and billing journeys block only releases that can reach them', () => {
+  it.each([
+    [['apps/web/app/(marketing)/compare/page.tsx']],
+    [['apps/web/app/(marketing)/blog/page.tsx']],
+    [
+      [
+        'apps/web/app/(marketing)/about/page.tsx',
+        'apps/web/app/(marketing)/support/page.tsx',
+      ],
+    ],
+  ])('leaf pages ship without journeys: %j', paths => {
+    expect(evaluatePromotion({ range: gradeScope(paths) })).toMatchObject({
+      required: false,
+      decision: 'pass',
+    });
+  });
+
+  it.each([
+    // Ordinary names that render or build claim state: names alone can't protect these.
+    'apps/web/app/(marketing)/product/ProductLanding.tsx',
+    'apps/web/components/features/profile/templates/PublicProfileLayoutShell.tsx',
+    'apps/web/app/[username]/page.tsx',
+    'apps/web/lib/images/validate-magic-bytes.ts',
+    'apps/web/app/(marketing)/start/page.tsx',
+    'apps/web/app/(marketing)/waitlist/page.tsx',
+    'apps/web/app/(marketing)/compare/layout.tsx',
+    'apps/web/app/(marketing)/blog/SignupBanner.tsx',
+    'apps/web/styles/globals.css',
+    'packages/ui/src/button.tsx',
+  ])('%s can reach a protected flow, so journeys stay required', path => {
+    expect(evaluatePromotion({ range: gradeScope([path]) })).toMatchObject({
+      required: true,
+      decision: 'blocked',
+    });
   });
 });
