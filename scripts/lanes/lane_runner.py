@@ -92,7 +92,7 @@ import capacity_registry  # noqa: E402  (caps and policies come from ops/registr
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
 import qualification_guard  # noqa: E402
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
-import binding_turns, bindings  # noqa: E401,E402  (extra Linear team -> repo bindings, e.g. LYB)
+import binding_turns, bindings, ledger_read  # noqa: E401,E402  (extra Linear team -> repo bindings, e.g. LYB)
 import binding_refill  # noqa: E402  (Backlog -> Todo refill per extra binding)
 import priority_admission  # noqa: E402  (Urgent/Summer-ranked admission, Todo WIP sanity, claim rank; JOV-7073)
 import macos_pool  # noqa: E402  (shared hosted-macOS pool: measure, record, gate LYB iOS intake)
@@ -144,7 +144,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_migration_renumber.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_migration_renumber.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -7653,12 +7653,12 @@ def preserved_run(host: Host, *, pr=None, issue=None):
     if len(matches) != 1 or path.resolve().parent != root.resolve():
         raise RecoveryHandoff("ambiguous-preserved-work", path)
     try:
-        rows = [json.loads(line) for line in (host.state / "runs/ledger.jsonl").read_text().splitlines()]
-        if any(not isinstance(row, dict) for row in rows):
-            raise ValueError("ledger-record-not-object")
-    except (OSError, ValueError):
+        rows, malformed = ledger_read.rows(host.state / "runs/ledger.jsonl")
+    except OSError:
         raise RecoveryHandoff("preserved-ledger-unreadable", path)
     prior = next((row for row in reversed(rows) if row.get("runId") == marker.get("runId")), None)
+    if prior is None and malformed:  # a torn line may hold this run's receipt: absence is unproven
+        raise RecoveryHandoff("preserved-ledger-unreadable", path)
     source_safe = marker.get("pr") is None and marker.get("issue") is None
     paths = receipt_worktree_paths(prior, path) if prior else ()
     bound_paths = paths if source_safe else paths[1:]
