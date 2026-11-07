@@ -481,3 +481,27 @@ test('write calls are rate limited per grant', async () => {
 test('b64url helper', () => {
   assert.equal(b64url(new Uint8Array([251, 255])), '-_8');
 });
+
+test('a client older than a day is not pruned while it authorizes; same-origin fetch metadata is accepted', async () => {
+  const r = rig();
+  const clientId = await register(r);
+  r.clock.now += 2 * 86_400_000;
+  const request = await requestIdFrom(await startAuthorize(r, clientId));
+  const res = await r.req('/oauth/authorize', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Sec-Fetch-Site': 'same-origin',
+      Origin: 'null',
+    },
+    body: new URLSearchParams({
+      request,
+      code: await currentCode(r.clock.now),
+      scope: 'mesh:read',
+      decision: 'approve',
+    }).toString(),
+  });
+  assert.equal(res.status, 303);
+  const consent = await startAuthorize(r, clientId);
+  assert.equal(consent.headers.get('Referrer-Policy'), 'same-origin');
+});

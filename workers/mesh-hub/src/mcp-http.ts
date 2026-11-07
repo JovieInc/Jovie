@@ -31,7 +31,7 @@ export type Api = <T = unknown>(
 const SECURITY_HEADERS = {
   'Cache-Control': 'no-store',
   'X-Content-Type-Options': 'nosniff',
-  'Referrer-Policy': 'no-referrer',
+  'Referrer-Policy': 'same-origin',
 };
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -332,7 +332,10 @@ async function authorizePost(
   h: Handlers
 ): Promise<Response> {
   // Browsers always send Origin on form POSTs; require it to be this hub.
-  if (request.headers.get('Origin') !== origin)
+  if (
+    request.headers.get('Origin') !== origin &&
+    request.headers.get('Sec-Fetch-Site') !== 'same-origin'
+  )
     return errorPage(403, 'Cross-site request refused.');
   const form = new URLSearchParams(await readText(request, MAX_FORM));
   const requestId = form.get('request') ?? '';

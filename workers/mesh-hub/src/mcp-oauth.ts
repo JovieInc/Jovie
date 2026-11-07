@@ -153,7 +153,7 @@ export class OAuthStore {
     },
     now: number
   ) {
-    this.prune(now);
+    this.sql.exec('DELETE FROM pend WHERE expiresAt < ?', now);
     const open = num(
       this.sql.exec('SELECT COUNT(*) AS c FROM pend').toArray()[0]?.c
     );
@@ -170,6 +170,8 @@ export class OAuthStore {
       now,
       now + OAUTH.pendingTtlMs
     );
+    // After the insert, so the client being authorized is never pruned out from under it.
+    this.prune(now);
   }
 
   pending(hash: string, now: number) {
