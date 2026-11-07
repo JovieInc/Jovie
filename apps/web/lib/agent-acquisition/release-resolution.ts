@@ -33,12 +33,13 @@ const INVALID_SERVICES = new Set([
   'napster',
   'telmoreMusik',
 ]);
-const RELEASE_SERVICES = DSP_REGISTRY.filter(
-  entry =>
-    entry.showOnListenPage && !INVALID_SERVICES.has(entry.musicfetchService)
-)
-  .map(entry => entry.musicfetchService)
-  .join(',');
+const RELEASE_SERVICES = DSP_REGISTRY.flatMap(entry =>
+  entry.showOnListenPage &&
+  entry.musicfetchService &&
+  !INVALID_SERVICES.has(entry.musicfetchService)
+    ? [entry.musicfetchService]
+    : []
+).join(',');
 
 interface MusicfetchService {
   readonly id?: unknown;

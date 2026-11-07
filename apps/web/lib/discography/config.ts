@@ -35,6 +35,12 @@ export const PROVIDER_CONFIG: Record<
   trebel: { label: 'Trebel', accent: '#00B4E6' },
   yandex: { label: 'Yandex Music', accent: '#FFCC00' },
   amazon: { label: 'Amazon', accent: '#FF9900' },
+  vk_music: { label: 'VK Music', accent: '#0077FF' },
+  traxsource: { label: 'Traxsource', accent: '#40A0FF' },
+  bugs: { label: 'Bugs', accent: '#FF5A00' },
+  fizy: { label: 'fizy', accent: '#0057B8' },
+  juno_download: { label: 'Juno Download', accent: '#1A1A1A' },
+  emusic: { label: 'eMusic', accent: '#E4002B' },
 };
 
 export const PRIMARY_PROVIDER_KEYS: ProviderKey[] = [

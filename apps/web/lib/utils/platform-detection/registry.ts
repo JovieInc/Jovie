@@ -11,6 +11,8 @@ import {
   type PlatformMetadata,
 } from '@/constants/platforms';
 
+import { DSP_REGISTRY } from '@/lib/dsp-registry';
+
 import type { DetectionCategory, DomainPattern, PlatformInfo } from './types';
 
 /**
@@ -72,7 +74,38 @@ function createPlatformInfo(
  * Platform configuration registry
  * Uses canonical platform metadata from constants/platforms.ts with detection-specific placeholders
  */
+const LEGACY_DETECTION_IDS: Record<string, string> = {
+  qq_music: 'tencent_music',
+};
+
+/**
+ * Streaming DSPs the registry knows but the hand-written table below does not
+ * list. Derived so URL recognition cannot drift from DSP_REGISTRY.
+ */
+function escapeDomain(domain: string): string {
+  return domain.replaceAll('.', String.raw`\.`);
+}
+
+const REGISTRY_DSP_PLATFORMS: Record<string, PlatformInfo> = Object.fromEntries(
+  DSP_REGISTRY.filter(
+    e =>
+      e.category === 'streaming' &&
+      e.domains.length > 0 &&
+      !LEGACY_DETECTION_IDS[e.key] &&
+      e.key !== 'youtube' &&
+      e.key !== 'amazon'
+  ).map(e => [
+    e.key,
+    createPlatformInfo(e.key, `https://${e.domains[0]}/...`, {
+      name: e.name,
+      category: 'dsp',
+      color: e.color.replace('#', ''),
+    }),
+  ])
+);
+
 export const PLATFORMS: Record<string, PlatformInfo> = {
+  ...REGISTRY_DSP_PLATFORMS,
   // Music Platforms (DSPs)
   spotify: createPlatformInfo('spotify', 'https://open.spotify.com/artist/...'),
   apple_music: createPlatformInfo(
@@ -263,6 +296,23 @@ export const PLATFORMS: Record<string, PlatformInfo> = {
  * Domain pattern matching for platform detection
  * Uses canonical platform IDs from constants/platforms.ts (snake_case format)
  */
+function buildRegistryDomainPatterns(): DomainPattern[] {
+  return Object.values(REGISTRY_DSP_PLATFORMS).flatMap(platform => {
+    const entry = DSP_REGISTRY.find(e => e.key === platform.id);
+    if (!entry) return [];
+    const hosts = entry.domains.map(escapeDomain).join('|');
+    return [
+      {
+        pattern: new RegExp(
+          String.raw`(?:^|[/.])(?:${hosts})(?:[/:?#]|$)`,
+          'i'
+        ),
+        platformId: platform.id,
+      },
+    ];
+  });
+}
+
 export const DOMAIN_PATTERNS: DomainPattern[] = [
   // DSP platforms (Digital Service Providers)
   { pattern: /(?:open\.)?spotify\.com/i, platformId: 'spotify' },
@@ -285,7 +335,7 @@ export const DOMAIN_PATTERNS: DomainPattern[] = [
   { pattern: /(?:www\.)?youtube\.com|youtu\.be/i, platformId: 'youtube' },
   { pattern: /(?:www\.)?instagram\.com/i, platformId: 'instagram' },
   { pattern: /(?:www\.)?tiktok\.com/i, platformId: 'tiktok' },
-  { pattern: /(?:twitter\.com|x\.com)/i, platformId: 'twitter' },
+  { pattern: /(?:^|[/.])(?:twitter|x)\.com/i, platformId: 'twitter' },
   { pattern: /(?:www\.)?facebook\.com/i, platformId: 'facebook' },
   { pattern: /(?:www\.)?twitch\.tv/i, platformId: 'twitch' },
   { pattern: /(?:www\.)?linkedin\.com/i, platformId: 'linkedin' },
@@ -344,6 +394,7 @@ export const DOMAIN_PATTERNS: DomainPattern[] = [
   { pattern: /(?:www\.)?wikidata\.org/i, platformId: 'wikidata' },
   { pattern: /y\.qq\.com/i, platformId: 'tencent_music' },
   { pattern: /music\.163\.com/i, platformId: 'netease' },
+  ...buildRegistryDomainPatterns(),
 ];
 
 /**

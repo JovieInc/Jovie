@@ -52,6 +52,8 @@ const PROVIDER_PLATFORM_MAP: Record<string, string> = {
   line_music: 'linemusic',
   trebel: 'trebel',
   yandex: 'yandexmusic',
+  vk_music: 'vk',
+  traxsource: 'traxsource',
 };
 
 export function ProviderIcon({
