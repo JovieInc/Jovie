@@ -4737,6 +4737,38 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/teleprompter/takes/[takeId]/media/route.ts",
+      "kind": "handler",
+      "route": "/api/teleprompter/takes/[takeId]/media",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/teleprompter/takes/[takeId]/route.ts",
+      "kind": "handler",
+      "route": "/api/teleprompter/takes/[takeId]",
+      "methods": ["DELETE", "PATCH"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/teleprompter/takes/route.ts",
+      "kind": "handler",
+      "route": "/api/teleprompter/takes",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/teleprompter/takes/upload-token/route.ts",
+      "kind": "handler",
+      "route": "/api/teleprompter/takes/upload-token",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/tips/create-checkout/route.ts",
       "kind": "handler",
       "route": "/api/tips/create-checkout",
