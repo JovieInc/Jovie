@@ -15,19 +15,16 @@
 import { spawnSync } from 'node:child_process';
 import {
   copyFileSync,
-  existsSync,
   mkdtempSync,
   readdirSync,
-  readFileSync,
   rmSync,
   statSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { protectedBaselineReason } from './invariants/pen-diff-lib.mjs';
+import { basename, join, relative, resolve } from 'node:path';
+import { refuseProtected } from './invariants/pen-diff-lib.mjs';
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const REPO_ROOT = resolve(import.meta.dirname, '..');
 export const SNAPSHOT_ROOT = join(
   REPO_ROOT,
   'apps/web/tests/e2e/__snapshots__'
@@ -49,20 +46,7 @@ function walk(dir) {
  * Map each `<name>-actual.png` to the one committed baseline named
  * `<name>.png`. Ambiguous or unknown names are reported, never guessed.
  */
-export function loadPenGuard(root = REPO_ROOT) {
-  const read = p => (existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : {});
-  return {
-    bindings: read(join(root, 'docs/design-system/pen-bindings.json')),
-    config: read(join(root, 'scripts/invariants/pen-diff.config.json')),
-  };
-}
-
-export function planAdoption(
-  actualPaths,
-  baselinePaths,
-  guard = loadPenGuard()
-) {
-  const { bindings, config } = guard;
+export function planAdoption(actualPaths, baselinePaths, guard) {
   const byName = new Map();
   for (const path of baselinePaths) {
     const name = basename(path);
@@ -78,13 +62,7 @@ export function planAdoption(
     if (seen.has(name)) continue; // retries write the same shot more than once
     seen.add(name);
     const matches = byName.get(name) ?? [];
-    const refused =
-      matches.length === 1
-        ? protectedBaselineReason(matches[0], bindings, config)
-        : null;
-    if (refused) problems.push(`refusing to adopt ${name}: ${refused}`);
-    else if (matches.length === 1)
-      copies.push({ from: actual, to: matches[0] });
+    if (matches.length === 1) copies.push({ from: actual, to: matches[0] });
     else
       problems.push(
         matches.length === 0
@@ -92,7 +70,7 @@ export function planAdoption(
           : `ambiguous baseline ${name}: ${matches.length} matches`
       );
   }
-  return { copies, problems };
+  return refuseProtected({ copies, problems }, guard);
 }
 
 function downloadArtifact(runId, artifactName) {
@@ -156,4 +134,4 @@ function main() {
   );
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) main();
+if (process.argv[1] === import.meta.filename) main();

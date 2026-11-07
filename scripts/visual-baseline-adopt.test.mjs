@@ -55,7 +55,6 @@ test('refuses to adopt a baseline for a route that has Pen stills', () => {
         '/': {
           sources: [],
           viewports: { 1440: [{ section: 'hero', still: 's.png' }] },
-          approved: { by: 'tim', at: '2026-11-07T00:00:00Z', receipt: 'r' },
         },
       },
     },

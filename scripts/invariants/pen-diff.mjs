@@ -160,6 +160,7 @@ async function main() {
     process.exit(failures.length ? 1 : 0);
   }
 
+  /** @type {any[]} */
   const results = [];
   for (const { route, entry, enforced } of toCheck) {
     for (const viewport of config.viewports) {

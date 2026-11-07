@@ -3,9 +3,13 @@
  * Binding shape: jovie.pen-binding/v1 (docs/design-system/pen-bindings.json).
  * Thresholds and scope live in pen-diff.config.json only.
  */
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   isEnforced,
+  loadBindings,
   matchesAny,
+  REPO_ROOT,
   routesForFiles,
 } from '../design/pen-bindings-lib.mjs';
 import { diffImage, resizeImage, ssim } from './pen-still-diff-lib.mjs';
@@ -139,4 +143,34 @@ export function protectedBaselineReason(target, bindings, config) {
       return `route ${route} has Pen stills; its render must match the Pen still, not a new baseline`;
   }
   return null;
+}
+
+/**
+ * Applies the self-adoption guard to an adoption plan ({copies, problems}):
+ * protected copies become problems and are never written. `guard` is
+ * {bindings, config}; it defaults to the repo's manifest and config.
+ */
+export function refuseProtected(plan, guard) {
+  const g = guard ?? {
+    bindings: existsSync(
+      join(REPO_ROOT, 'docs/design-system/pen-bindings.json')
+    )
+      ? loadBindings(REPO_ROOT)
+      : {},
+    config: JSON.parse(
+      readFileSync(
+        join(REPO_ROOT, 'scripts/invariants/pen-diff.config.json'),
+        'utf8'
+      )
+    ),
+  };
+  const copies = [];
+  const problems = [...plan.problems];
+  for (const copy of plan.copies) {
+    const reason = protectedBaselineReason(copy.to, g.bindings, g.config);
+    if (reason)
+      problems.push(`refusing to adopt ${copy.to.split('/').pop()}: ${reason}`);
+    else copies.push(copy);
+  }
+  return { copies, problems };
 }
