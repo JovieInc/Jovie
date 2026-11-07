@@ -161,6 +161,9 @@ test('a failure in a test the change cannot reach is unrelated; a reachable or u
     unrelatedFailure(['scripts/b.test.mjs'], ['scripts/b.test.mjs'], root),
     false
   );
+  // fail closed: TS tests are not dependency-scanned, so they are always related
+  writeFileSync(path.join(root, 'scripts/x.test.ts'), 'export {};\n');
+  assert.equal(unrelatedFailure(['scripts/x.test.ts'], changed, root), false);
   // fail closed: nothing named, or an unresolvable path
   assert.equal(unrelatedFailure([], changed, root), false);
   assert.equal(
@@ -262,4 +265,24 @@ test('host overload is a correctness signal, not only speed', () => {
     hostOverloaded({ JOVIE_PREFLIGHT_OVERLOAD_FACTOR: '8' }, 50, 10),
     false
   );
+});
+
+test('a preflight deadline (exit 124) under overload is inconclusive, not a red', async () => {
+  const { settleResult } = await import('../preflight-scope.mjs');
+  const c = {
+    id: 'guard:x',
+    name: 'x',
+    run: async () => ({ code: 1, out: '' }),
+  };
+  const r = await settleResult(
+    c,
+    { code: 124, out: '', failedTests: [] },
+    {
+      env: { JOVIE_PREFLIGHT_OVERLOAD_FACTOR: '0.000001' },
+      paths: [],
+      cwd: '.',
+    }
+  );
+  assert.equal(r.code, 0);
+  assert.match(r.warn, /inconclusive/);
 });

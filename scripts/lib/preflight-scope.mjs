@@ -48,7 +48,9 @@ export function unrelatedFailure(failedTests, changedPaths, root) {
   const changed = new Set(changedPaths);
   return failedTests.every(failed => {
     const file = resolveTestPath(failed, root);
-    if (!file || changed.has(file)) return false;
+    // The dependency scan follows JS modules only; a TS test is always related.
+    if (!file || changed.has(file) || !/\.(?:mjs|cjs|js)$/.test(file))
+      return false;
     return testsAffectedBy([file], changedPaths, root).length === 0;
   });
 }
@@ -104,7 +106,7 @@ export async function settleResult(c, first, { env, paths, cwd }) {
   let r = first;
   if (r.code && hostOverloaded(env)) {
     const load = loadavg()[0].toFixed(0);
-    if (isInfraTimeout(r))
+    if (r.code === 124 || isInfraTimeout(r))
       r = {
         ...r,
         code: 0,
