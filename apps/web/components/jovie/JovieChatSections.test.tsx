@@ -190,13 +190,22 @@ describe('ChatInlineError', () => {
 function renderThreadMessages({
   collapsedFailureCount = 0,
   onShowCollapsedFailures,
+  messages = [],
+  isStreaming = false,
+  summerProgress,
 }: {
   readonly collapsedFailureCount?: number;
   readonly onShowCollapsedFailures?: () => void;
+  readonly messages?: ComponentProps<typeof ChatThreadMessages>['messages'];
+  readonly isStreaming?: boolean;
+  readonly summerProgress?: ComponentProps<
+    typeof ChatThreadMessages
+  >['summerProgress'];
 } = {}) {
   return render(
     <ChatThreadMessages
-      messages={[]}
+      summerProgress={summerProgress}
+      messages={messages}
       shouldVirtualizeMessages={false}
       virtualizer={{} as Virtualizer<HTMLDivElement, Element>}
       virtualizedMessageViewportHeight={0}
@@ -204,8 +213,8 @@ function renderThreadMessages({
       messageViewportPaddingBottom={undefined}
       totalSizeRef={() => undefined}
       bottomSentinelRef={() => undefined}
-      isStreaming={false}
-      lastAssistantIndex={-1}
+      isStreaming={isStreaming}
+      lastAssistantIndex={messages.length > 0 ? messages.length - 1 : -1}
       knownMessageIds={new Set()}
       inlineChatError={null}
       isStuckToBottom
@@ -254,6 +263,62 @@ describe('ChatThreadMessages collapsed summer failures', () => {
     expect(screen.getByTestId('chat-collapsed-failures')).toHaveTextContent(
       '3 earlier messages went unanswered. Show them'
     );
+  });
+});
+
+describe('ChatThreadMessages Summer progress', () => {
+  const progress = [
+    { kind: 'tool', name: 'shipping_state', phase: 'start', ms: null },
+  ] as const;
+  const pending = (text?: string) =>
+    [
+      {
+        id: 'a1',
+        role: 'assistant',
+        status: 'pending',
+        parts: text ? [{ type: 'text', text }] : [],
+      },
+    ] as unknown as ComponentProps<typeof ChatThreadMessages>['messages'];
+
+  it('shows truthful progress while streaming before the answer text', () => {
+    renderThreadMessages({
+      messages: pending(),
+      isStreaming: true,
+      summerProgress: progress,
+    });
+    expect(screen.getByTestId('chat-summer-progress')).toHaveTextContent(
+      'Checking shipping…'
+    );
+  });
+
+  it('collapses once answer text arrives', () => {
+    renderThreadMessages({
+      messages: pending('Queue is clear.'),
+      isStreaming: true,
+      summerProgress: progress,
+    });
+    expect(
+      screen.queryByTestId('chat-summer-progress')
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders nothing when not streaming or when no progress was sent', () => {
+    renderThreadMessages({
+      messages: pending(),
+      isStreaming: false,
+      summerProgress: progress,
+    });
+    expect(
+      screen.queryByTestId('chat-summer-progress')
+    ).not.toBeInTheDocument();
+    renderThreadMessages({
+      messages: pending(),
+      isStreaming: true,
+      summerProgress: [],
+    });
+    expect(
+      screen.queryByTestId('chat-summer-progress')
+    ).not.toBeInTheDocument();
   });
 });
 
