@@ -4,7 +4,7 @@
 // Skipped when MESH_E2E_URL is unset (the unit suite in mcp.test.mjs covers the same rules).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { base32Decode, hotp, pkceChallenge } from './mcp-oauth.ts';
+import { base32Decode, hotp, pkceChallenge } from './mcp-oauth-service.ts';
 
 const BASE = process.env.MESH_E2E_URL;
 const SECRET = process.env.MESH_E2E_TOTP_SECRET;

@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { Env } from './env.ts';
-import { callService, OAuthService, OAuthStore } from './mcp-oauth.ts';
+import { OAuthStore } from './mcp-oauth.ts';
+import { callService, OAuthService } from './mcp-oauth-service.ts';
 
 /** Durable home of the MCP OAuth server state (singleton). All auth state lives here. */
 export class McpAuth extends DurableObject<Env> {

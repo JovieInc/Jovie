@@ -2,16 +2,15 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { sqlite } from './core.test.mjs';
 import { handleMcpHttp } from './mcp-http.ts';
+import { OAUTH, OAuthStore } from './mcp-oauth.ts';
 import {
   b64url,
   base32Decode,
   callService,
   hotp,
-  OAUTH,
   OAuthService,
-  OAuthStore,
   pkceChallenge,
-} from './mcp-oauth.ts';
+} from './mcp-oauth-service.ts';
 
 const ORIGIN = 'https://hub.test';
 const REDIRECT = 'https://claude.ai/api/mcp/auth_callback';

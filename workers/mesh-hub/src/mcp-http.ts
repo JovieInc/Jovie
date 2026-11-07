@@ -5,7 +5,8 @@
  */
 import { HubError, sha256Hex } from './core.ts';
 import { type Backend, handleRpc } from './mcp.ts';
-import { OAUTH, type Principal, parseScope, type Scope } from './mcp-oauth.ts';
+import { OAUTH, type Principal, type Scope } from './mcp-oauth.ts';
+import { parseScope } from './mcp-oauth-service.ts';
 
 /** Methods the Durable Object exposes; errors come back as values. */
 export type ApiResult<T = unknown> =
