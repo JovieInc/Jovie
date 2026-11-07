@@ -23,7 +23,32 @@ export type RouteDomFindingKind =
   | 'misaligned-text-stack'
   | 'placeholder-copy'
   | 'orphaned-line'
+  // Outcome detectors (2026-11-07 homepage miss): see OUTCOME_DETECTOR_MODES.
+  | 'blank-media'
+  | 'axis-mixing'
+  | 'overlay-on-proof'
   | 'layout-shift';
+
+/**
+ * Outcome detectors added after the 2026-11-07 homepage shipped a blank
+ * product image, placeholder profile copy, mixed text axes and a cookie banner
+ * over proof. `blocking` kinds fail on any finding (strict zero) on marketing
+ * routes. `calibrating` kinds are ratcheted through the taste baseline until
+ * scripts/invariants/marketing-critic/calibrate.mjs shows precision >= 0.9
+ * (Wilson lower bound) over enough labeled routes; promoting one is a one-line
+ * change here plus its calibration evidence. Never advisory.
+ */
+export const OUTCOME_DETECTOR_MODES: Readonly<
+  Record<
+    'blank-media' | 'placeholder-copy' | 'axis-mixing' | 'overlay-on-proof',
+    'blocking' | 'calibrating'
+  >
+> = {
+  'blank-media': 'calibrating',
+  'placeholder-copy': 'calibrating',
+  'axis-mixing': 'calibrating',
+  'overlay-on-proof': 'calibrating',
+};
 
 export const MARKETING_TASTE_FINDING_KINDS: readonly RouteDomFindingKind[] = [
   'nested-decorative-surface',
@@ -31,8 +56,10 @@ export const MARKETING_TASTE_FINDING_KINDS: readonly RouteDomFindingKind[] = [
   'heading-hierarchy-inversion',
   'clipped-heading',
   'misaligned-text-stack',
-  'placeholder-copy',
   'orphaned-line',
+  ...(Object.entries(OUTCOME_DETECTOR_MODES)
+    .filter(([, mode]) => mode === 'calibrating')
+    .map(([kind]) => kind) as RouteDomFindingKind[]),
 ];
 
 export interface RouteDomFinding {
@@ -653,17 +680,229 @@ export async function inspectRouteDom(
           });
         }
 
-        // 6. Placeholder content presented as the product.
-        const placeholder = /^(?:your name|lorem ipsum\b.*|placeholder)$/i;
+        // 6. Placeholder content presented as the product. Whole-element
+        //    matches catch short labels ("Your Name", "YN"); unambiguous
+        //    tokens (lorem ipsum, jov.ie/you, John Doe) match inside longer
+        //    text. Word boundaries keep real copy ("Claim your name",
+        //    "jov.ie/yourname") clean. The same rules apply to img alt and
+        //    aria-label/title text, which is what a screen reader announces.
+        const placeholderWhole =
+          /^(?:your name|your artist name|artist name|lorem(?: ipsum\b.*)?|placeholder|untitled(?: (?:track|release|song|project|artist|page))?|tbd|tba|todo|n\/a|john doe|jane doe|jov\.ie\/you)$/i;
+        const placeholderInline =
+          /\blorem ipsum\b|\bjov\.ie\/you(?![\w-])|\b(?:john|jane) doe\b/i;
+        const placeholderInlineCase = /\bTBD\b/;
+        const initialsPlaceholder = /^y\.?n\.?$/i;
+        const placeholderReason = (
+          raw: string | null | undefined,
+          avatarContext: boolean
+        ): string | null => {
+          const text = normalizedText(raw);
+          if (!text) return null;
+          if (text.length <= 40 && placeholderWhole.test(text)) return text;
+          if (avatarContext && initialsPlaceholder.test(text)) return text;
+          const inline =
+            (raw ?? '').match(placeholderInline) ??
+            (raw ?? '').match(placeholderInlineCase);
+          return inline ? inline[0] : null;
+        };
+        const avatarContextOf = (element: Element): boolean =>
+          element.matches('[data-avatar], [role="img"]') ||
+          /avatar|initials|monogram/i.test(
+            `${element.getAttribute('class') ?? ''} ${element.parentElement?.getAttribute('class') ?? ''} ${element.getAttribute('data-slot') ?? ''} ${element.getAttribute('data-testid') ?? ''}`
+          );
         for (const element of Array.from(
-          root.querySelectorAll('h1,h2,h3,h4,p,span,li,figcaption')
+          root.querySelectorAll(
+            'h1,h2,h3,h4,h5,h6,p,span,li,figcaption,a,button,label,div,small,strong,em,td,th'
+          )
         )) {
           if (element.children.length > 0 || !visibleIn(element)) continue;
-          if (!placeholder.test(normalizedText(element.textContent))) continue;
+          const reason = placeholderReason(
+            element.textContent,
+            avatarContextOf(element)
+          );
+          if (!reason) continue;
           findings.push({
             kind: 'placeholder-copy',
-            message: 'Placeholder copy renders as product content.',
+            message: `Placeholder copy ("${reason}") renders as product content.`,
             elements: [describe(element)],
+          });
+        }
+        for (const element of Array.from(
+          root.querySelectorAll('img[alt], [aria-label], [role="img"][title]')
+        )) {
+          if (!visibleIn(element)) continue;
+          const value =
+            element.getAttribute('alt') ??
+            element.getAttribute('aria-label') ??
+            element.getAttribute('title');
+          const reason = placeholderReason(value, avatarContextOf(element));
+          if (!reason) continue;
+          findings.push({
+            kind: 'placeholder-copy',
+            message: `Placeholder text ("${reason}") in an image alt or aria label.`,
+            elements: [describe(element)],
+          });
+        }
+
+        // 8. Outcome detectors (axis-mixing, overlay-on-proof). Blank media
+        //    needs pixels, so it runs after this evaluate (inspectBlankMedia).
+        const designedMarked = Array.from(
+          document.querySelectorAll('[data-pen-section]')
+        ).filter(visibleIn);
+        const designedSections =
+          designedMarked.length > 0
+            ? designedMarked
+            : topLevelSections.filter(visibleIn);
+        const sectionName = (element: Element): string =>
+          element.getAttribute('data-pen-section') ?? describe(element);
+
+        // 8a. One primary text axis per page. A section may declare its own
+        //     with data-axis (ignored here); otherwise a hero on a different axis than
+        //     the body, or centre -> left -> centre, is mixed alignment.
+        type PageAxis = 'center' | 'left' | 'right';
+        const sectionAxis = (element: Element): PageAxis | null => {
+          if (element.closest('[data-axis]')) return null;
+          const lead =
+            Array.from(element.querySelectorAll('h1, h2, h3')).find(
+              visibleIn
+            ) ??
+            Array.from(element.querySelectorAll('p')).find(
+              candidate =>
+                visibleIn(candidate) &&
+                normalizedText(candidate.textContent).length >= 20
+            );
+          if (!lead) return null;
+          const align = getComputedStyle(lead).textAlign;
+          if (align === 'center') return 'center';
+          if (align === 'right' || align === 'end') return 'right';
+          return 'left';
+        };
+        const axes = designedSections
+          .map(element => ({ element, axis: sectionAxis(element) }))
+          .filter(
+            (entry): entry is { element: Element; axis: PageAxis } =>
+              entry.axis !== null
+          );
+        let axisSwitches = 0;
+        for (let index = 1; index < axes.length; index += 1) {
+          if (axes[index]?.axis !== axes[index - 1]?.axis) axisSwitches += 1;
+        }
+        // A lone trailing switch (left chapters, centred closing CTA) is a
+        // common deliberate close; a hero on a different axis than the body,
+        // or two or more switches, is mixing.
+        const heroAxisDiffers =
+          axes.length >= 3 &&
+          axes[0]?.axis !== axes[1]?.axis &&
+          axes[1]?.axis === axes[2]?.axis;
+        if (axisSwitches >= 2 || heroAxisDiffers) {
+          findings.push({
+            kind: 'axis-mixing',
+            message: `Primary text axis switches ${axisSwitches} times across sections (${axes
+              .map(entry => entry.axis)
+              .join(' > ')}) without data-axis.`,
+            elements: axes.map(entry => sectionName(entry.element)),
+            measurements: { switches: axisSwitches, sections: axes.length },
+          });
+        }
+
+        // 8b. Fixed/sticky chrome (consent banner, sticky nav) must not sit
+        //     over proof media in a designed section: either it overlaps the
+        //     media in the first viewport, or the media would fit the
+        //     viewport but never fits the part the chrome leaves free.
+        const proofMedia = designedSections.flatMap(section =>
+          Array.from(section.querySelectorAll('img, video, canvas'))
+            .filter(
+              media =>
+                visibleIn(media) && !media.closest('[aria-hidden="true"]')
+            )
+            .filter(media => {
+              const rect = rectOf(media);
+              return rect.width >= 120 && rect.height >= 80;
+            })
+            .map(media => ({ media, section }))
+        );
+        const overlays = Array.from(document.body.querySelectorAll('*')).filter(
+          element => {
+            if (!visibleIn(element)) return false;
+            const style = getComputedStyle(element);
+            if (style.position !== 'fixed' && style.position !== 'sticky')
+              return false;
+            if (style.pointerEvents === 'none') return false;
+            const rect = rectOf(element);
+            return rect.width >= 120 && rect.height >= 24;
+          }
+        );
+        const topOverlays = overlays.filter(element => {
+          const rect = rectOf(element);
+          return (
+            !overlays.some(
+              other => other !== element && other.contains(element)
+            ) && rect.height < window.innerHeight * 0.6
+          );
+        });
+        const stuckTop = Math.max(
+          0,
+          ...topOverlays
+            .map(rectOf)
+            .filter(rect => rect.y <= 8)
+            .map(rect => rect.bottom)
+        );
+        const stuckBottom = Math.max(
+          0,
+          ...topOverlays
+            .map(rectOf)
+            .filter(rect => rect.bottom >= window.innerHeight - 8)
+            .map(rect => window.innerHeight - rect.y)
+        );
+        const freeBand = window.innerHeight - stuckTop - stuckBottom;
+        const overlayHits = new Set<string>();
+        for (const { media, section } of proofMedia) {
+          const mediaRect = rectOf(media);
+          const docTop = mediaRect.y + window.scrollY;
+          const firstViewport =
+            docTop < window.innerHeight && docTop + mediaRect.height > 0;
+          for (const overlay of topOverlays) {
+            if (section.contains(overlay) || overlay.contains(media)) continue;
+            const overlayRect = rectOf(overlay);
+            const ix = Math.max(
+              0,
+              Math.min(mediaRect.right, overlayRect.right) -
+                Math.max(mediaRect.x, overlayRect.x)
+            );
+            const iy = Math.max(
+              0,
+              Math.min(docTop + mediaRect.height, overlayRect.bottom) -
+                Math.max(docTop, overlayRect.y)
+            );
+            const visibleHeight = Math.max(
+              1,
+              Math.min(docTop + mediaRect.height, window.innerHeight) -
+                Math.max(docTop, 0)
+            );
+            const covered = (ix * iy) / (mediaRect.width * visibleHeight);
+            if (firstViewport && covered >= 0.15) {
+              overlayHits.add(
+                `${describe(overlay)} covers ${describe(media)} in ${sectionName(section)} (${Math.round(covered * 100)}%, first viewport)`
+              );
+            }
+          }
+          if (
+            mediaRect.height <= window.innerHeight &&
+            mediaRect.height > freeBand &&
+            (stuckTop > 0 || stuckBottom > 0) &&
+            mediaRect.height - freeBand >= mediaRect.height * 0.15
+          ) {
+            overlayHits.add(
+              `${describe(media)} in ${sectionName(section)} fits the viewport (${round(mediaRect.height)}px) but fixed chrome leaves only ${round(freeBand)}px, so it is always partly covered while scrolling`
+            );
+          }
+        }
+        for (const hit of overlayHits) {
+          findings.push({
+            kind: 'overlay-on-proof',
+            message: hit,
+            elements: [hit.split(' ')[0] ?? 'overlay'],
+            measurements: { freeBand: round(freeBand) },
           });
         }
       }
@@ -818,11 +1057,192 @@ export async function inspectRouteDom(
     page.locator('body').ariaSnapshot(),
   ]);
 
+  const blankMedia =
+    options.surface === 'marketing' ? await inspectBlankMedia(page) : [];
   return {
     ...dom,
+    findings: [...dom.findings, ...blankMedia],
     ariaSnapshot,
     inspectedAt: new Date().toISOString(),
   };
+}
+
+/** Near-uniform pixels: luma stddev under this (0-255) reads as blank. */
+export const BLANK_MEDIA_LUMA_STDDEV_MAX = 3;
+/** ...and at least this share of pixels sit within 6 levels of the mean. */
+export const BLANK_MEDIA_DOMINANT_SHARE_MIN = 0.985;
+/** Share of 16x16 grid cells that are flat (stddev < 2.5) above which the media is mostly empty. */
+export const BLANK_MEDIA_EMPTY_CELL_SHARE_MAX = 0.6;
+const BLANK_MEDIA_MAX_PROBES = 16;
+
+/**
+ * Blank-media: an img, video or canvas inside a designed section (a
+ * [data-pen-section], else any top-level section) whose rendered pixels are
+ * near-uniform. Pixels come from an element screenshot decoded in the page, so
+ * what is judged is what a visitor sees (object-fit, poster, canvas draw),
+ * not naturalWidth. Opt out with data-decorative or data-dom-certification.
+ */
+export async function inspectBlankMedia(
+  page: Page
+): Promise<RouteDomFinding[]> {
+  const probes = await page.evaluate(max => {
+    const marked = Array.from(document.querySelectorAll('[data-pen-section]'));
+    const root = document.querySelector('main') ?? document.body;
+    const sections =
+      marked.length > 0
+        ? marked
+        : Array.from(root.querySelectorAll('section, article'));
+    const seen = new Set<Element>();
+    const out: { id: number; label: string; broken: boolean }[] = [];
+    for (const section of sections) {
+      for (const media of Array.from(
+        section.querySelectorAll('img, video, canvas')
+      )) {
+        if (seen.has(media) || out.length >= max) continue;
+        seen.add(media);
+        if (
+          media.closest(
+            '[data-decorative], [data-dom-certification="ignore"], [aria-hidden="true"], [hidden]'
+          )
+        )
+          continue;
+        const style = getComputedStyle(media);
+        const rect = media.getBoundingClientRect();
+        if (
+          rect.width < 120 ||
+          rect.height < 80 ||
+          style.display === 'none' ||
+          style.visibility === 'hidden' ||
+          Number.parseFloat(style.opacity || '1') === 0
+        )
+          continue;
+        const id = out.length;
+        media.setAttribute('data-blank-probe', String(id));
+        const tag = media.tagName.toLowerCase();
+        const sectionName =
+          section.getAttribute('data-pen-section') ??
+          section.tagName.toLowerCase();
+        const label =
+          tag === 'img'
+            ? `img[src="${(media.getAttribute('src') ?? '').slice(0, 80)}"] in ${sectionName}`
+            : `${tag} in ${sectionName}`;
+        out.push({
+          id,
+          label,
+          broken:
+            media instanceof HTMLImageElement &&
+            media.complete &&
+            media.naturalWidth === 0,
+        });
+      }
+    }
+    return out;
+  }, BLANK_MEDIA_MAX_PROBES);
+
+  const findings: RouteDomFinding[] = [];
+  for (const probe of probes) {
+    if (probe.broken) {
+      findings.push({
+        kind: 'blank-media',
+        message: 'Media failed to load (naturalWidth 0), so the slot is blank.',
+        elements: [probe.label],
+      });
+      continue;
+    }
+    let png: Buffer;
+    try {
+      png = await page
+        .locator(`[data-blank-probe="${probe.id}"]`)
+        .screenshot({ animations: 'disabled', timeout: 5000 });
+    } catch {
+      continue;
+    }
+    const stats = await page.evaluate(async b64 => {
+      const bitmap = await createImageBitmap(
+        await (await fetch(`data:image/png;base64,${b64}`)).blob()
+      );
+      const side = 128;
+      const canvas = document.createElement('canvas');
+      canvas.width = side;
+      canvas.height = side;
+      const context = canvas.getContext('2d');
+      if (!context) return null;
+      context.drawImage(bitmap, 0, 0, side, side);
+      const { data } = context.getImageData(0, 0, side, side);
+      const lumas: number[] = [];
+      for (let index = 0; index < data.length; index += 4) {
+        lumas.push(
+          0.2126 * (data[index] ?? 0) +
+            0.7152 * (data[index + 1] ?? 0) +
+            0.0722 * (data[index + 2] ?? 0)
+        );
+      }
+      const mean = lumas.reduce((sum, v) => sum + v, 0) / lumas.length;
+      const variance =
+        lumas.reduce((sum, v) => sum + (v - mean) ** 2, 0) / lumas.length;
+      const dominant =
+        lumas.filter(v => Math.abs(v - mean) <= 6).length / lumas.length;
+      const grid = 16;
+      const cell = side / grid;
+      let flatCells = 0;
+      for (let gy = 0; gy < grid; gy += 1) {
+        for (let gx = 0; gx < grid; gx += 1) {
+          const values: number[] = [];
+          for (let y = 0; y < cell; y += 1) {
+            for (let x = 0; x < cell; x += 1) {
+              values.push(lumas[(gy * cell + y) * side + gx * cell + x] ?? 0);
+            }
+          }
+          const cellMean =
+            values.reduce((sum, v) => sum + v, 0) / values.length;
+          const cellStd = Math.sqrt(
+            values.reduce((sum, v) => sum + (v - cellMean) ** 2, 0) /
+              values.length
+          );
+          if (cellStd < 2.5) flatCells += 1;
+        }
+      }
+      return {
+        stddev: Math.sqrt(variance),
+        dominant,
+        mean,
+        emptyShare: flatCells / (grid * grid),
+      };
+    }, png.toString('base64'));
+    if (!stats) continue;
+    if (stats.emptyShare >= BLANK_MEDIA_EMPTY_CELL_SHARE_MAX) {
+      findings.push({
+        kind: 'blank-media',
+        message: `Media is mostly empty: ${Math.round(stats.emptyShare * 100)}% of its area is flat pixels.`,
+        elements: [probe.label],
+        measurements: {
+          emptyShare: Math.round(stats.emptyShare * 1000) / 1000,
+        },
+      });
+      continue;
+    }
+    if (
+      stats.stddev < BLANK_MEDIA_LUMA_STDDEV_MAX &&
+      stats.dominant >= BLANK_MEDIA_DOMINANT_SHARE_MIN
+    ) {
+      findings.push({
+        kind: 'blank-media',
+        message: `Media renders near-uniform pixels (luma stddev ${stats.stddev.toFixed(2)}), so the slot reads as empty.`,
+        elements: [probe.label],
+        measurements: {
+          lumaStddev: Math.round(stats.stddev * 100) / 100,
+          dominantShare: Math.round(stats.dominant * 1000) / 1000,
+        },
+      });
+    }
+  }
+  await page.evaluate(() => {
+    for (const node of Array.from(
+      document.querySelectorAll('[data-blank-probe]')
+    ))
+      node.removeAttribute('data-blank-probe');
+  });
+  return findings;
 }
 
 /**

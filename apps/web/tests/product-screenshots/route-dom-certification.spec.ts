@@ -406,6 +406,132 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     await expectDeliberateRed(page, 'marketing', 'placeholder-copy');
   });
 
+  const kindsOf = async (html: string): Promise<string[]> => {
+    await page_ref.setContent(html);
+    return (
+      await inspectRouteDom(page_ref, { surface: 'marketing' })
+    ).findings.map(finding => finding.kind);
+  };
+  let page_ref: Page;
+  test.beforeEach(({ page }) => {
+    page_ref = page;
+  });
+  const svg = (inner: string) =>
+    `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400">${inner}</svg>`)}`;
+  const flatImg = svg('<rect width="600" height="400" fill="#0b0b0d"/>');
+  const busyImg = svg(
+    Array.from(
+      { length: 40 },
+      (_, i) =>
+        `<rect x="${(i % 8) * 75}" y="${Math.floor(i / 8) * 80}" width="60" height="60" fill="hsl(${i * 9} 60% ${20 + (i % 5) * 12}%)"/>`
+    ).join('')
+  );
+
+  test('blank-media: flags a near-uniform image in a designed section', async () => {
+    expect(
+      await kindsOf(
+        `<main><section data-pen-section="hero"><h1>Product</h1><img src="${flatImg}" width="600" height="400" alt="Dashboard"></section></main>`
+      )
+    ).toContain('blank-media');
+  });
+
+  test('blank-media: ignores a busy image and a data-decorative image', async () => {
+    expect(
+      await kindsOf(
+        `<main><section data-pen-section="hero"><h1>Product</h1><img src="${busyImg}" width="600" height="400" alt="Dashboard"></section></main>`
+      )
+    ).not.toContain('blank-media');
+    expect(
+      await kindsOf(
+        `<main><section data-pen-section="hero"><h1>Product</h1><img data-decorative src="${flatImg}" width="600" height="400" alt=""></section></main>`
+      )
+    ).not.toContain('blank-media');
+  });
+
+  test('placeholder-copy: flags common placeholders in text, alt and aria', async () => {
+    for (const html of [
+      '<p>Your Name</p>',
+      '<p>Lorem ipsum dolor sit amet</p>',
+      '<p>Your profile lives at jov.ie/you today.</p>',
+      '<p>Posted by John Doe</p>',
+      '<span class="avatar">YN</span>',
+      '<h3>Untitled</h3>',
+      '<p>TBD</p>',
+      '<img alt="Your Name" width="200" height="200" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">',
+      '<div role="img" aria-label="John Doe profile" style="width:40px;height:40px"></div>',
+    ]) {
+      expect(
+        await kindsOf(`<main><section><h1>Card</h1>${html}</section></main>`),
+        html
+      ).toContain('placeholder-copy');
+    }
+  });
+
+  test('placeholder-copy: leaves real copy alone (word boundaries)', async () => {
+    for (const html of [
+      '<p>Claim your name before someone else does.</p>',
+      '<p>Your profile lives at jov.ie/yourname today.</p>',
+      '<h3>Untitled Goose Game soundtrack</h3>',
+      '<span>YN</span>',
+      '<p>Stubborn tbdx and Doe the deer.</p>',
+      '<img alt="Tim White on stage" width="200" height="200" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">',
+    ]) {
+      expect(
+        await kindsOf(`<main><section><h1>Card</h1>${html}</section></main>`),
+        html
+      ).not.toContain('placeholder-copy');
+    }
+  });
+
+  const axisSection = (align: string, attrs = '') =>
+    `<section ${attrs} style="text-align:${align}"><h2>Heading ${align}</h2><p>A lede that is long enough to count as copy.</p></section>`;
+
+  test('axis-mixing: flags centre, left, centre and a centred hero over left chapters', async () => {
+    expect(
+      await kindsOf(
+        `<main>${axisSection('center')}${axisSection('left')}${axisSection('center')}</main>`
+      )
+    ).toContain('axis-mixing');
+    expect(
+      await kindsOf(
+        `<main>${axisSection('center')}${axisSection('left')}${axisSection('left')}</main>`
+      )
+    ).toContain('axis-mixing');
+  });
+
+  test('axis-mixing: allows one axis, a lone closing switch, and a declared data-axis', async () => {
+    expect(
+      await kindsOf(
+        `<main>${axisSection('left')}${axisSection('left')}${axisSection('left')}</main>`
+      )
+    ).not.toContain('axis-mixing');
+    expect(
+      await kindsOf(
+        `<main>${axisSection('left')}${axisSection('left')}${axisSection('center')}</main>`
+      )
+    ).not.toContain('axis-mixing');
+    expect(
+      await kindsOf(
+        `<main>${axisSection('center', 'data-axis="center"')}${axisSection('left')}${axisSection('center', 'data-axis="center"')}${axisSection('left')}</main>`
+      )
+    ).not.toContain('axis-mixing');
+  });
+
+  test('overlay-on-proof: flags a consent banner over section media, not one clear of it', async () => {
+    const media = `<section data-pen-section="proof"><h2>Proof</h2><img src="${busyImg}" width="600" height="400" alt="Product" style="display:block"></section>`;
+    const banner = (pos: string) =>
+      `<aside style="position:fixed;${pos};width:500px;height:220px;background:#222">Cookies</aside>`;
+    await page_ref.setViewportSize({ width: 1000, height: 600 });
+    expect(
+      await kindsOf(`<main>${media}</main>${banner('left:0;bottom:0')}`)
+    ).toContain('overlay-on-proof');
+    expect(
+      await kindsOf(
+        `<main>${media}</main>${banner('left:0;bottom:0').replace('bottom:0', 'top:2000px')}`
+      )
+    ).not.toContain('overlay-on-proof');
+  });
+
   test('rejects a one-word last line in a headline', async ({ page }) => {
     await page.setContent(
       '<main><section><h1 style="font:20px/1.2 monospace;width:12ch">aa bb cc dd ee</h1></section></main>'
