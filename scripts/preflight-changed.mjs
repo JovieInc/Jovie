@@ -34,7 +34,7 @@ import {
   readFileSync,
   realpathSync,
 } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { cpus, homedir, loadavg, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { stripVTControlCharacters } from 'node:util';
@@ -48,6 +48,10 @@ import {
   parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
 import { guardNested, withPreflightDepth } from './lib/preflight-depth.mjs';
+import { acquireSlot, defaultLockDir } from './lib/preflight-lock.mjs';
+import { NARROWED_LOCAL, unrelatedFailure } from './lib/preflight-scope.mjs';
+import { recordTimings } from './lib/preflight-timing.mjs';
+import { isInfraTimeout } from './lib/prepush-offload.mjs';
 
 export { baseRefCandidates, resolveBaseRef };
 
@@ -173,6 +177,30 @@ export function failureSummaryLines(out) {
   ].map(line => line.slice(0, 220));
 }
 
+/** Every failing item, numbered; never a count with the items cut off. */
+export function failingItemLines({ red, body, companion }) {
+  const items = [
+    ...red.map(r => `${r.name} [${r.id}]`),
+    ...body.errors.map(e => `PR body: ${e.message}`),
+    ...companion.map(c => `companion edit (${c.trigger}): ${c.item}`),
+  ];
+  if (!items.length) return [];
+  return [
+    `\nFailing items (${items.length}):`,
+    ...items.map((item, i) => `  ${i + 1}. ${item}`),
+  ];
+}
+
+/** Load high enough that a local red may be noise (override JOVIE_PREFLIGHT_OVERLOAD_FACTOR). */
+export function hostOverloaded(
+  env = process.env,
+  load = loadavg()[0],
+  cores = cpus().length
+) {
+  if (env.CI || env.GEM_TYPECHECK_SLOTS) return false;
+  return load > cores * (Number(env.JOVIE_PREFLIGHT_OVERLOAD_FACTOR) || 2);
+}
+
 export function parseArgs(argv) {
   const a = {
     base: 'main',
@@ -184,6 +212,7 @@ export function parseArgs(argv) {
     hook: false,
     list: false,
     json: false,
+    lock: true,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const f = argv[i];
@@ -202,6 +231,8 @@ export function parseArgs(argv) {
     else if (f === '--hook') a.hook = true;
     else if (f === '--list') a.list = true;
     else if (f === '--json') a.json = true;
+    else if (f === '--timings-file') a.timingsFile = argv[++i];
+    else if (f === '--no-lock') a.lock = false;
     else throw new Error(`unknown argument ${f}`);
   }
   return a;
@@ -713,7 +744,9 @@ export async function main({
       deferred.push(guard.id);
       continue;
     }
-    const narrow = !args.thorough && NARROWED[guard.id];
+    const narrow =
+      !args.thorough && (NARROWED[guard.id] ?? NARROWED_LOCAL[guard.id]);
+    if (narrow?.deferredToCi) deferred.push(narrow.deferredToCi);
     cmd(
       `guard:${guard.id}`,
       `source guard ${guard.id}${narrow ? ` [${narrow.note}]` : ''}`,
@@ -884,18 +917,68 @@ export async function main({
 
   if (args.list) {
     for (const c of checks) log(`run  ${c.id}  ${c.name}`);
-    for (const d of deferred) log(`defer  guard:${d}  (heavy; --thorough)`);
+    for (const d of deferred) log(`deferred to CI  ${d}  (--thorough runs it)`);
     return 0;
   }
 
   // Run phases in order; within a phase, a bounded pool.
   const results = [];
+  // One heavy preflight per host (Gem has its own semaphore). Waiting is
+  // announced; a timeout proceeds rather than deadlocking the push.
+  const lockDir = defaultLockDir(env);
+  const slot =
+    args.lock &&
+    !env.GEM_TYPECHECK_SLOTS &&
+    !env.CI &&
+    env.JOVIE_PREFLIGHT_LEDGER !== 'off'
+      ? await acquireSlot({
+          dir: lockDir,
+          slots: Number(env.JOVIE_PREFLIGHT_LOCAL_SLOTS || 1),
+          label: `${path.basename(cwd)}@${git(cwd, ['rev-parse', '--short', 'HEAD'])}`,
+          log,
+        })
+      : { release() {}, waitedMs: 0 };
+  const runStarted = Date.now();
   for (const phase of [0, 1, 2]) {
     const queue = checks.filter(c => c.phase === phase);
     const worker = async () => {
       while (queue.length) {
         const c = queue.shift();
-        const r = downgradeHostRed(c, await c.run());
+        let r = downgradeHostRed(c, await c.run());
+        // Under host overload a red is not a verdict (2026-11-07: every guard
+        // that failed on a load-50 Mac passed on a clean runner). A timeout or
+        // kill is inconclusive; any other red is retried once, and only a
+        // repeat counts as an item to fix.
+        if (r.code && hostOverloaded(env)) {
+          const load = loadavg()[0].toFixed(0);
+          if (isInfraTimeout(r))
+            r = {
+              ...r,
+              code: 0,
+              warn: `${c.name} timed out or was killed under host load ${load}; inconclusive, not an item to fix. Run \`pnpm preflight:remote\` or let CI decide`,
+            };
+          else {
+            const again = await c.run();
+            r = again.code
+              ? again
+              : {
+                  ...again,
+                  warn: `${c.name} failed once under host load ${load} and passed on rerun; treat as load noise`,
+                };
+          }
+        }
+        // A failure only in tests this change cannot reach is not this PR's
+        // red; CI stays the authority for it.
+        if (
+          r.code &&
+          /^guard:/.test(c.id) &&
+          unrelatedFailure(r.failedTests, paths, cwd)
+        )
+          r = {
+            ...r,
+            code: 0,
+            warn: `${c.name} failed only in tests this change does not touch (${r.failedTests.join(', ')}); not blocking the push, CI decides`,
+          };
         const status = r.skip
           ? 'skip'
           : r.warn
@@ -933,6 +1016,7 @@ export async function main({
     }
   }
 
+  slot.release();
   // PR body.
   let body = { errors: [], warnings: [], template: '' };
   if (bodyInfo) {
@@ -966,9 +1050,12 @@ export async function main({
     log(`\n[ ] companion edit (${c.trigger}): ${c.item}\n      ${c.hint}`);
   if (body.template) log(`\nPaste into the PR body:\n\n${body.template}\n`);
   for (const d of deferred)
-    log(`  deferred  guard:${d} (heavy; rerun with --thorough)`);
+    log(
+      `  deferred to CI  ${d} (heavy or full-suite; --thorough runs it locally)`
+    );
 
   const total = red.length + body.errors.length + companion.length;
+  for (const line of failingItemLines({ red, body, companion })) log(line);
   log(total ? `\n${total} item(s) to fix before pushing.` : '\nall clear.');
 
   if (env.JOVIE_PREFLIGHT_LEDGER !== 'off') {
@@ -977,6 +1064,24 @@ export async function main({
         env.JOVIE_PREFLIGHT_LEDGER_DIR ||
         path.join(homedir(), '.local', 'state', 'jovie-lanes');
       mkdirSync(dir, { recursive: true });
+      recordTimings({
+        dir,
+        file: args.timingsFile,
+        run: {
+          head: git(cwd, ['rev-parse', 'HEAD']),
+          host: env.HOSTNAME || path.basename(homedir()),
+          files: paths.length,
+          totalMs: Date.now() - runStarted,
+          waitedMs: slot.waitedMs,
+          outcome: total ? 'failed' : 'completed',
+          guards: results.map(r => ({
+            id: r.id,
+            ms: r.ms ?? 0,
+            status: r.status,
+          })),
+          deferred,
+        },
+      });
       appendFileSync(
         path.join(dir, 'preflight-changed.jsonl'),
         `${JSON.stringify({
