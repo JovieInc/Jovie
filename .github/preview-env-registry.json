@@ -168,6 +168,24 @@
         "cleanupProof": "Branch absent from the Neon project branch inventory",
         "costBudget": "One Neon branch with at most 2h of endpoint compute per staging deploy or daily dispatch (concurrency cancels superseded runs)"
       }
+    },
+    {
+      "id": "surface-recertify-neon",
+      "workflow": ".github/workflows/surface-recertify.yml",
+      "job": "recertify",
+      "kind": "neon-branch",
+      "ephemeral": true,
+      "admission": {
+        "policy": "event-driven (main push with stale certified surfaces) or manual-dispatch",
+        "reason": "A real isolated database is required to sign into app routes before renewing surface certification.",
+        "evidencePurpose": "Browser captures of the exact main SHA at 1440 and 390 pixels with authenticated route and layout checks.",
+        "owner": "gem-lanes / surface recertification",
+        "surface": "ephemeral Neon branch surface-recertify-<run_id> (isolated database only)",
+        "ttlHours": 3,
+        "cleanupTrigger": "Neon branch TTL (expires_in_hours=3); on-limit cleanup in neon-create-branch-with-retry",
+        "cleanupProof": "Branch absent from the Neon project branch inventory",
+        "costBudget": "One Neon branch with at most 3h of endpoint compute per selected main push or dispatch; workflow concurrency serializes runs"
+      }
     }
   ]
 }
