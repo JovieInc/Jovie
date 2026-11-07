@@ -690,7 +690,11 @@ test('open stops before pushing or creating when the producer is over its WIP ca
       if (args[0] === 'push') calls.push('push');
       return args[0] === 'log'
         ? okText('perf(ci): cheaper')
-        : fakeDiffRunner(command, args);
+        : args[0] === 'branch'
+          ? okText('fixture/source')
+          : args[0] === 'ls-remote'
+            ? okText(`${'c'.repeat(40)}\trefs/heads/fixture/source\n`)
+            : fakeDiffRunner(command, args);
     };
     const github = (_cwd, args) => {
       calls.push(args[1]);
