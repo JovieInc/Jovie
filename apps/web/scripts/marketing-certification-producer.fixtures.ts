@@ -2,11 +2,12 @@ import { MARKETING_COMPONENT_REGISTRY } from '../data/marketing/componentRegistr
 import { buildPacket } from './marketing-certification-producer';
 
 export const SHA = 'b'.repeat(40);
-export const footer = MARKETING_COMPONENT_REGISTRY.find(
+const footerEntry = MARKETING_COMPONENT_REGISTRY.find(
   entry => entry.id === 'shell.footer'
 );
-if (!footer?.resolvedSource)
+if (!footerEntry?.resolvedSource)
   throw new Error('fixture entry shell.footer must be source-backed');
+export const footer = footerEntry;
 
 export function report(file: string, title: string, status: string) {
   return {
@@ -36,7 +37,7 @@ export function packetFor(
   overrides: Partial<Parameters<typeof buildPacket>[0]> = {}
 ) {
   return buildPacket({
-    entry: footer!,
+    entry: footer,
     sha: SHA,
     runRef: 'run',
     penIssueIds: new Set(),
