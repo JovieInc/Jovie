@@ -62,7 +62,8 @@
 }
 
 .public-container.hpv1-wrap {
-  inline-size: min(100% - 2 * var(--hpv1-margin), 78rem);
+  /* container-width-allow: home-canonical-v1 approved Pen layout uses a 1248px content width; public-container is 1298px */
+  width: min(100% - 2 * var(--hpv1-margin), 78rem);
 }
 
 .hpv1-eyebrow {
@@ -845,7 +846,8 @@
 /* ── Footer geometry (production link data, Pen spacing) ─────────────── */
 
 .home-footer-v1 .public-container {
-  inline-size: min(100% - 2 * var(--hpv1-margin), 78rem);
+  /* container-width-allow: home-canonical-v1 approved Pen layout uses a 1248px content width; public-container is 1298px */
+  width: min(100% - 2 * var(--hpv1-margin), 78rem);
   padding-block: 2.5625rem 3.25rem;
 }
 
