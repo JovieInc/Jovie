@@ -1030,19 +1030,26 @@ async function fetchDashboardCoreWithSession(
       clerkUserId,
       selected.id
     ).catch((error: unknown) => {
-      // Expected transient timeouts on a fail-soft supplementary read are
-      // log-only (JOV-5754, same doctrine as the inbox-count and tipping
-      // reads): Neon cold-start PG statement timeouts, idle-in-transaction
-      // terminations, and JS-level query timeouts are infrastructure
-      // conditions, not data bugs. Drizzle names the failing statement —
-      // typically set_config('statement_timeout', $1, true) — so reporting
-      // them pages Sentry with this fingerprint (JOV-8864) instead of the
-      // graceful UNKNOWN fallback that already shipped to the user.
-      if (isQueryTimeoutError(error) || isPostgresTimeoutError(error)) {
+      // Fail-soft avatar reads degrade log-only for infrastructure conditions
+      // (JOV-5754). Timeouts and idle terminations keep the JOV-8864 message:
+      // Drizzle names set_config, and reporting that fingerprint pages Sentry
+      // for a degradation that already returned UNKNOWN. Connection-class
+      // failures (JOV-8900 / JOVIE-WEB-YK) are the same doctrine. Unexpected
+      // failures still report so real data bugs stay visible.
+      const timedOut =
+        isQueryTimeoutError(error) || isPostgresTimeoutError(error);
+      if (
+        timedOut ||
+        isIdleTransactionTermination(error) ||
+        isRetryableError(error)
+      ) {
         logger.warn(
-          '[avatar-quality] avatar read timed out; degrading to unknown quality',
+          timedOut
+            ? '[avatar-quality] avatar read timed out; degrading to unknown quality'
+            : '[avatar-quality] transient DB condition after retry; degrading to unknown quality',
           {
-            error: error instanceof Error ? error.message : String(error),
+            profileId: selected.id,
+            error: getDeepErrorMessage(error),
           }
         );
         return UNKNOWN_AVATAR_QUALITY;
