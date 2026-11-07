@@ -292,36 +292,25 @@ export interface RouteManifestEntry {
  * Exemptions are sanctioned (carry linearId + approvedBy + prUrl) per DX2.
  * The baseline exemption count for the ratchet = current sanctioned count.
  */
+const EDITORIAL_HOME = 'apps/web/components/homepage/HomepageEditorial.tsx';
+
 export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   // ── Proven recipes ────────────────────────────────────────────────────────
   {
     glob: '(home)/page.tsx',
     recipeId: 'homepage',
     renderedSections: [
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageArtistProfile.tsx',
-        'hero',
-        'split-claim-card'
-      ),
-      // The unsupported adoption strip is intentionally omitted until it has
-      // an attributable permission or adoption receipt.
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageArtistProfile.tsx',
-        'product-gallery',
-        'profile-grid'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageArtistProfile.tsx',
-        'cta',
-        'final-single-claim'
-      ),
+      approvedVariantBinding(EDITORIAL_HOME, 'hero', 'centered-none'),
+      approvedVariantBinding(EDITORIAL_HOME, 'feature-split', 'phone-right'),
+      approvedVariantBinding(EDITORIAL_HOME, 'product-gallery', 'release-rail'),
+      approvedVariantBinding(EDITORIAL_HOME, 'cta', 'final-single-claim'),
     ],
     bindingEvidence: {
       status: 'verified',
       source:
-        'EVENT 2026-10-20 artist-profile homepage (HomepageArtistProfile.tsx); homepage-contract render test; marketing-route-health observer on the reviewed head',
+        'Tim 2026-11-03 music-line homepage, invite-only close (HomepageEditorial.tsx); homepage-contract render test; marketing-route-health observer on the reviewed head',
       notes:
-        'One source owner for hero, product gallery, and the offer close. Deployment, visual certification, and Tim Taste remain separate receipts.',
+        'One source owner for the hero, the profile and releases chapters, and the invitation close. Deployment, visual certification, and Tim Taste remain separate receipts.',
     },
     status: 'active',
     specVersion: '1.4.0',
