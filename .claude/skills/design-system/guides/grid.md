@@ -25,4 +25,4 @@ White paper, Swiss red, Helvetica and grotesque-only type, "avoid the cream look
 
 ## Follow-up (not built)
 
-Asserting ink-left and baseline modulo in the existing rendered grid check is tracked in Linear (see the PR body). Until it exists, rule 6 is a manual check for new column layouts, with the numbers in the PR.
+Asserting ink-left and baseline modulo in the existing rendered grid check is tracked in JOV-11429. Until it exists, rule 6 is a manual check for new column layouts, with the numbers in the PR.
