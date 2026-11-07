@@ -91,8 +91,6 @@ describe('public-profile alias graduation policy', () => {
     }
     expect(receipt.schema).toBe('jovie-public-profile-alias-graduation/v2');
     expect(inventory).toHaveLength(selection.enumeratedControllers);
-    // Completeness: every selected window below is recomputed from the full
-    // enumerated inventory, so an omitted controller changes the selection.
     expect(selection.windowSize).toBe(policy.requiredConsecutiveRuns);
     expect(policy.samplesPerRoute).toBeGreaterThanOrEqual(
       MIN_SAMPLES_PER_ROUTE
@@ -140,7 +138,6 @@ describe('public-profile alias graduation policy', () => {
     const measuredAt = Date.parse(receipt.measuredAt);
     const nextReviewAt = Date.parse(policy.nextReviewAt);
     expect(nextReviewAt).toBeGreaterThan(measuredAt);
-    // A missed review warns for 72h (naming JOV-8338), then fails merge groups.
     assertReviewDeadline({
       label: 'public-profile alias graduation',
       deadline: policy.nextReviewAt,
@@ -154,7 +151,7 @@ describe('public-profile alias graduation policy', () => {
   it('keeps staging independent and bounds the production warning', () => {
     const staging = getJobBlock(RELEASE_WORKFLOW, 'promote-production');
     const production = getJobBlock(
-      RELEASE_WORKFLOW,
+      CONTROLLER_WORKFLOW,
       'production-public-profile-alias-gate'
     );
 
@@ -173,9 +170,12 @@ describe('public-profile alias graduation policy', () => {
     expect(production).toContain(
       `no later than ${review} (${policy.trackingIssue})`
     );
-    expect(production.includes('performance_status=warn')).toBe(
-      !windows.production.graduated
+    expect(production.includes('performance_status=failed')).toBe(
+      windows.production.graduated
     );
+    expect(production).toContain('scripts/lib/alias-gate-certified-routes.mjs');
+    expect(production).toContain('/api/internal/ovie/golden-path-evidence');
+    expect(production).toContain('performance_status=${status}');
     expect(production).not.toContain('JOV-4854');
   });
 
@@ -258,8 +258,6 @@ describe('public-profile alias graduation policy', () => {
   });
 
   it('reads the guard sample count from the log and checks the nearest-rank p95, not the max', () => {
-    // performance-budgets-guard takes 20 samples since #22656; its summary is
-    // the 19th of 20 sorted samples, so one 1800ms outlier still qualifies.
     const values = index => (index === 20 ? 1800 : index === 19 ? 900 : 700);
     const log = ALIAS_ROUTES.map(
       route =>
@@ -392,12 +390,20 @@ describe('public-profile alias graduation policy', () => {
     ).rejects.toThrow('Incomplete');
   });
 
-  it.each(['production', 'staging'])(
-    'executes the %s guard with the measured enforcement decision',
-    surface => {
+  it.each([
+    ['production', 'certified'],
+    ['production', 'uncertified'],
+    ['production', 'unreadable'],
+    ['staging', 'certified'],
+    ['staging', 'uncertified'],
+    ['staging', 'unreadable'],
+  ])(
+    'executes the %s guard with the measured enforcement decision (%s ledger)',
+    (surface, ledgerState) => {
       const staging = surface === 'staging';
+      const certified = ledgerState === 'certified';
       const job = getJobBlock(
-        RELEASE_WORKFLOW,
+        staging ? RELEASE_WORKFLOW : CONTROLLER_WORKFLOW,
         staging ? 'promote-production' : 'production-public-profile-alias-gate'
       );
       const script = getStepRunScript(
@@ -417,27 +423,61 @@ describe('public-profile alias graduation policy', () => {
           // Each call is appended with one write: the staged gate runs its budget lanes concurrently.
           '#!/bin/sh\ncall="$(printf "%s\\n" "$@"; printf -- "--invocation-end--\\n")"\nprintf "%s\\n" "$call" >> "$ALIAS_GUARD_ARGUMENTS"\ncase "$*" in *performance-budgets-guard*) exit "$ALIAS_GUARD_EXIT" ;; *) exit 0 ;; esac\n'
         );
+        const ledgerBody =
+          ledgerState === 'unreadable'
+            ? '<html>bad gateway</html>'
+            : JSON.stringify({
+                schema: 'jovie.prod-golden-path-certified/v1',
+                ledger: 'present',
+                certifiedSurfaces: certified
+                  ? ['landing', 'public-profile']
+                  : ['landing'],
+              });
+        writeFileSync(join(fixture.root, 'ledger.json'), ledgerBody);
+        stubCommand(
+          fixture.bin,
+          'doppler',
+          '#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nexec "$@"\n'
+        );
+        stubCommand(
+          fixture.bin,
+          'curl',
+          '#!/bin/sh\ncase "$*" in *golden-path-evidence*) cat "$ALIAS_LEDGER_BODY" ;; *) exit 22 ;; esac\n'
+        );
         const result = runScript(script, fixture, {
+          ALIAS_LEDGER_BODY: join(fixture.root, 'ledger.json'),
+          CRON_SECRET: 'fixture-cron-secret',
           ALIAS_GUARD_ARGUMENTS: join(fixture.root, 'arguments'),
           ALIAS_GUARD_EXIT: String(exit),
-          DOPPLER_TOKEN: '',
+          DOPPLER_TOKEN: staging ? 'fixture-doppler' : '',
+          // Never let a developer's real key file a ticket from this test.
+          LINEAR_API_KEY: '',
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: 'fixture-bypass',
           PRODUCTION_DEPLOYMENT_URL_B64:
             Buffer.from(DEPLOYMENT_URL).toString('base64'),
         });
+        expect(
+          result.stdout.includes(
+            '::warning::Golden-path certification ledger unavailable'
+          )
+        ).toBe(ledgerState === 'unreadable');
         const decision =
           PUBLIC_PROFILE_ALIAS_GRADUATION.windows[surface].decision;
-        expect(result.status).toBe(exit && decision === 'block' ? 1 : 0);
+        const blocks = certified && decision === 'block';
+        expect(result.status).toBe(exit && blocks ? 1 : 0);
         const outputs = parseOutputs(fixture.output);
         if (!exit) expect(outputs.performance_status).toBe('passed');
-        else if (staging)
+        else if (staging && blocks)
           expect(outputs).toMatchObject({
             failure_subtype: 'exact_build_performance_failed',
           });
-        else
-          expect(outputs.performance_status).toBe(
-            decision === 'block' ? 'failed' : 'warn'
+        else if (staging) {
+          expect(outputs.failure_subtype).toBeUndefined();
+          expect(result.stdout).toContain(
+            '::warning::Exact staged-build public-profile alias budgets missed on uncertified pages'
           );
+        } else
+          expect(outputs.performance_status).toBe(blocks ? 'failed' : 'warn');
         const calls = readFileSync(join(fixture.root, 'arguments'), 'utf8')
           .split('--invocation-end--\n')
           .filter(Boolean);
@@ -445,7 +485,6 @@ describe('public-profile alias graduation policy', () => {
           call.includes('performance-budgets-guard')
         );
         expect(guardCalls.length).toBeGreaterThan(0);
-        // The public-profile alias guard is the one carrying the alias routes.
         const args =
           guardCalls.find(call =>
             call.includes('--route-id\n' + ALIAS_ROUTES[0])
@@ -696,7 +735,6 @@ function releaseExpressions(overrides = {}) {
     'needs.deploy-staging.result': 'success',
     'needs.attest-staging-build.result': 'success',
     'needs.canary-health-gate.result': 'success',
-    'needs.production-public-profile-alias-gate.result': 'success',
     'github.repository': 'JovieInc/Jovie',
     ...overrides,
   };
@@ -740,6 +778,7 @@ function controllerVerifyExpressions(overrides = {}) {
     'needs.production-release.outputs.superseded_before_promotion': 'false',
     'needs.ci-public-profile-smoke.result': 'success',
     'needs.lighthouse-ci.result': 'success',
+    'needs.production-public-profile-alias-gate.result': 'success',
     'needs.ci-post-deploy-auth-smoke.result': 'success',
     'needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status': 'passed',
     'needs.ci-post-deploy-auth-smoke.outputs.credentials_configured': 'true',
@@ -820,6 +859,7 @@ function finalizeExpressions(overrides = {}) {
     'needs.ci-public-profile-smoke.result': 'success',
     'needs.ci-post-deploy-auth-smoke.result': 'success',
     'needs.lighthouse-ci.result': 'success',
+    'needs.production-public-profile-alias-gate.result': 'success',
     'needs.production-release.outputs.sentry_gate_status': 'passed',
     'needs.production-release.outputs.oauth_gate_status': 'passed',
     'github.repository': 'JovieInc/Jovie',
@@ -1039,12 +1079,24 @@ describe('production release supersession execution', () => {
     expect(incomplete.outputs.released).toBe('false');
   });
 
+  it('fails Production Verified when the alias gate fails', () => {
+    const failed = runControllerVerify({
+      'needs.production-public-profile-alias-gate.result': 'failure',
+    });
+    expect(failed.result.status).not.toBe(0);
+    expect(
+      failed.outputs.released ?? failed.outputs.canonical_verified
+    ).not.toBe('true');
+    expect(failed.aliasCalled).toBe(false);
+  });
+
   it('leaves a pre-promotion supersession unverified without canonical mutation', () => {
     const neutral = runControllerVerify({
       'needs.production-release.outputs.released': 'false',
       'needs.production-release.outputs.superseded_before_promotion': 'true',
       'needs.ci-public-profile-smoke.result': 'skipped',
       'needs.lighthouse-ci.result': 'skipped',
+      'needs.production-public-profile-alias-gate.result': 'skipped',
       'needs.ci-post-deploy-auth-smoke.result': 'skipped',
     });
     expect(neutral.result.status, neutral.result.stderr).toBe(0);
@@ -1281,7 +1333,6 @@ describe('required structural release regression dispatch', () => {
     const target = 'production-release-supersession.test.mjs';
     vi.mocked(spawn).mockImplementation(command => {
       commands.push(command);
-      // A minimal ChildProcess stand-in: only close/stdout/stderr are used.
       const child = /** @type {any} */ (new EventEmitter());
       child.stdout = child.stderr = new EventEmitter();
       const code = command.includes(target) ? exitCode : 0;

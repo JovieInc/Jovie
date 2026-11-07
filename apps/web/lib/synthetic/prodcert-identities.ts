@@ -1,5 +1,6 @@
 import { DEFAULT_DEV_TEST_AUTH_EMAILS } from '@/lib/auth/dev-test-auth-identity';
 import { normalizeEmail } from '@/lib/utils/email';
+import { isAdmittedCanaryEmail } from './admitted-canary-fixture';
 
 /**
  * Production certification canary identities (JOV-9625).
@@ -19,6 +20,8 @@ import { normalizeEmail } from '@/lib/utils/email';
  *     only for the admin certifications-inventory readback (JOV-9625
  *     outcome rework). It never acts as a creator: no passage-token mint
  *     scopes target it, and the readback refuses to write.
+ *   - the admitted canary (`admitted-canary-fixture.ts`), the one permanent
+ *     admitted identity with a live profile (exact address only).
  *
  * The OTP reader and the passage token both refuse every other address.
  */
@@ -45,6 +48,22 @@ export const PRODCERT_ADMIN_READBACK_EMAIL = DEFAULT_DEV_TEST_AUTH_EMAILS.admin;
 export const PRODCERT_CHAT_HEALTH_CANARY_EMAIL =
   'browse-ready+chat-health@jov.ie';
 
+/**
+ * Fixed claim-walk canary (JOV-9826). The ONLY identity allowed to walk the
+ * real claim submission + onboarding + test-mode checkout on production:
+ * a real claim per run would otherwise publish a public profile, so the
+ * walk claims this identity's one reserved handle and the canary-reset
+ * endpoint (`/api/internal/canary/reset`) returns it to its pre-claim state
+ * after every run. Exact match only — the reset endpoint refuses any other
+ * address, and the handle (`PRODCERT_CLAIM_CANARY_HANDLE`) is in the
+ * reserved-identity registry, so it stays noindex whether claimed or not.
+ */
+export const PRODCERT_CLAIM_CANARY_EMAIL =
+  'browse-ready+synthetic-prodcert-claim@jov.ie';
+
+/** The claim-walk canary's one reserved, noindex handle (JOV-9826). */
+export const PRODCERT_CLAIM_CANARY_HANDLE = 'jovie-prodcert-claim';
+
 export const PRODCERT_NEW_USER_EMAIL_PATTERN =
   /^browse-ready\+synthetic-prodcert-(?:[a-z\d]){6,24}@jov\.ie$/u;
 
@@ -57,7 +76,9 @@ export function isProdcertCanaryEmail(
     normalized === PRODCERT_RETURNING_CANARY_EMAIL ||
     normalized === PRODCERT_ADMIN_READBACK_EMAIL ||
     normalized === PRODCERT_CHAT_HEALTH_CANARY_EMAIL ||
-    PRODCERT_NEW_USER_EMAIL_PATTERN.test(normalized)
+    normalized === PRODCERT_CLAIM_CANARY_EMAIL ||
+    PRODCERT_NEW_USER_EMAIL_PATTERN.test(normalized) ||
+    isAdmittedCanaryEmail(normalized)
   );
 }
 
@@ -66,6 +87,30 @@ export function isChatHealthCanaryEmail(
   email: string | null | undefined
 ): boolean {
   return !!email && normalizeEmail(email) === PRODCERT_CHAT_HEALTH_CANARY_EMAIL;
+}
+
+/**
+ * Fixed certification canaries whose weekly AI quota the server skips: the
+ * chat-health canary and the seeded returning canary (the account every
+ * golden-path walk signs in as). Synthetic traffic must never be able to
+ * lock a certification account out of its first message, and the returning
+ * canary is a Free account that every walk and re-walk adds messages to.
+ * The hourly burst limiter still caps spend. Exact match, evaluated from the
+ * server-validated session email, never from a request header.
+ */
+export const QUOTA_EXEMPT_CANARY_EMAILS: readonly string[] = [
+  PRODCERT_CHAT_HEALTH_CANARY_EMAIL,
+  PRODCERT_RETURNING_CANARY_EMAIL,
+];
+
+export function isWeeklyQuotaExemptCanaryEmail(
+  email: string | null | undefined
+): boolean {
+  if (!email) return false;
+  const normalized = normalizeEmail(email);
+  return QUOTA_EXEMPT_CANARY_EMAILS.some(
+    exempt => normalizeEmail(exempt) === normalized
+  );
 }
 
 export function newProdcertUserEmail(runId: string): string {

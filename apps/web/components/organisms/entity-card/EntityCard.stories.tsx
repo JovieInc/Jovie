@@ -50,6 +50,29 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+export const TextEvidence: Story = {
+  args: {
+    media: 'none',
+    surface: 'app',
+    treatment: 'compact',
+    model: {
+      id: 'evidence',
+      kind: 'person',
+      imageAlt: '',
+      title: 'Fixture Artist',
+      eyebrow: 'Metric',
+      meta: '9.9K followers',
+      secondaryMeta: 'Indirect · Unverified',
+      interactive: true,
+      cta: {
+        label: 'Open Source',
+        href: 'https://example.com/artist',
+        external: true,
+      },
+    },
+  },
+};
+
 export const Portrait: Story = {
   args: {
     anatomy: 'unified',

@@ -340,6 +340,10 @@
     "lib/testing/quarantine-ledger.ts": {
       "tables": 0,
       "rates": 1
+    },
+    "lib/track-snapshots/click-counts.ts": {
+      "tables": 8,
+      "rates": 0
     }
   }
 }

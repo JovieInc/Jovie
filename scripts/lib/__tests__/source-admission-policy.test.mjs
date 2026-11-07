@@ -26,7 +26,7 @@ test('trusted source-read guards reject a deleted test on an old head and execut
   const workflow = load(
     readFileSync('.github/workflows/source-validation.yml', 'utf8')
   );
-  const step = workflow.jobs.deterministic.steps.find(
+  const step = workflow.jobs.unit.steps.find(
     step =>
       step.name === 'Validate disk-read source contracts from trusted base'
   );
@@ -142,7 +142,7 @@ test('trusted source-read guards see files main added after the PR branched, and
   const workflow = load(
     readFileSync('.github/workflows/source-validation.yml', 'utf8')
   );
-  const step = workflow.jobs.deterministic.steps.find(
+  const step = workflow.jobs.unit.steps.find(
     step =>
       step.name === 'Validate disk-read source contracts from trusted base'
   );
@@ -1368,6 +1368,35 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     // none may run on a reused metadata-only edit. Check every handoff case
     // rather than accepting an arbitrary condition after the reuse predicate.
     for (const step of rest) {
+      if (job === 'unit') {
+        const guardStart = rest.findIndex(
+          item => item.id === 'source_guard_merge'
+        );
+        if (rest.indexOf(step) >= guardStart) {
+          assert.match(step.if, /matrix\.shard == '4\/4'/, step.name);
+          continue; // Executable matrix/cleanup coverage lives in the generation suite.
+        }
+        if (
+          [
+            'Checkout exact source head for unit and merged guard proofs',
+            'Fetch head and base history only',
+          ].includes(step.name)
+        ) {
+          assert.equal(step.if, `${gate} || matrix.shard == '4/4'`);
+          continue;
+        }
+        if (
+          ['Setup Node.js and pnpm', 'Setup Playwright warm path'].includes(
+            step.name
+          )
+        ) {
+          assert.match(
+            step.if,
+            /^matrix\.shard == '4\/4' \|\| \(steps\.reuse\.outputs\.reuse != 'true' && /
+          );
+          continue; // Full truth table covers reused/no-diff cases.
+        }
+      }
       if (
         job === 'security' &&
         [
@@ -1412,7 +1441,6 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     // The disk-read guards run on every edit and can launch Chromium, so
     // their browser setup must run whenever they do (#21956, 2026-10-20).
     'Setup Playwright (Chromium)',
-    'Validate disk-read source contracts from trusted base',
     'Validate customer changelog decision from trusted base',
     'Measure actual installed source dependency graph',
     'Preserve exact source dependency evidence',
@@ -1444,10 +1472,7 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
   // never broader than it.
   const names = deterministic.map(step => step.name);
   const setup = names.indexOf('Setup Playwright (Chromium)');
-  for (const name of [
-    'Validate disk-read source contracts from trusted base',
-    'Run deterministic source contract',
-  ]) {
+  for (const name of ['Run deterministic source contract']) {
     assert.ok(setup >= 0 && names.indexOf(name) > setup, name);
     const step = deterministic[names.indexOf(name)];
     assert.ok(

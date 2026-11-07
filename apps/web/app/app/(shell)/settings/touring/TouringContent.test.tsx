@@ -65,7 +65,7 @@ describe('TouringContent', () => {
     expect(screen.getByTestId('touring-section')).toHaveTextContent(
       'profile-1'
     );
-    const copyButton = screen.getByRole('button', { name: 'Copy Link' });
+    const copyButton = screen.getByRole('button', { name: 'Copy link' });
     expect(copyButton.closest('.px-4')).toHaveClass('py-4', 'sm:px-5');
     fireEvent.click(copyButton);
 

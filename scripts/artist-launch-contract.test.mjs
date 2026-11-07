@@ -160,6 +160,8 @@ test('checks fail on new, removed and renamed routes until the inventory is revi
       'export default function Page() {}'
     );
     assert.throws(() => main(['--check'], root), /inventory drift/);
+    assert.match(main(['--write'], root), /runtime UNVERIFIED/);
+    assert.match(main(['--check'], root), /records/);
     rmSync(join(root, 'apps/web/app/unreviewed/page.tsx'));
     rmSync(join(root, 'apps/web/app/signin/page.tsx'));
     assert.throws(() => main(['--check'], root), /orphan (entry|route)/);

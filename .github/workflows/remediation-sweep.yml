@@ -233,6 +233,7 @@ jobs:
           - { suite: web, shard: 5/6 }
           - { suite: web, shard: 6/6 }
           - { suite: scripts, shard: all }
+          - { suite: research, shard: all }
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -259,7 +260,7 @@ jobs:
             # shellcheck disable=SC2086 # UNIT_EXCLUDES is a list of --exclude flags.
             node scripts/time-bomb/scan.mjs run --suite web --shard "$SHARD" --out "$out" -- $UNIT_EXCLUDES
           else
-            node scripts/time-bomb/scan.mjs run --suite scripts --out "$out"
+            node scripts/time-bomb/scan.mjs run --suite "$SUITE" --out "$out"
           fi
 
       - name: Upload findings

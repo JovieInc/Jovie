@@ -25,6 +25,7 @@ import { getDeterministicTestBetterAuthUserId } from '../../../apps/web/lib/auth
 import { db } from '../../../apps/web/lib/db';
 import { users } from '../../../apps/web/lib/db/schema/auth';
 import { baUsers } from '../../../apps/web/lib/db/schema/better-auth';
+import { chatConversations } from '../../../apps/web/lib/db/schema/chat';
 import { creatorProfiles } from '../../../apps/web/lib/db/schema/profiles';
 import {
   CANARY_SEED_SPEC_VERSION,
@@ -37,6 +38,9 @@ import {
 } from '../../../apps/web/lib/synthetic/returning-canary-seed-spec';
 
 const APPLY = process.argv.includes('--apply');
+// --reset-chat: delete the returning canary's chat threads (messages cascade) so
+// each certification run starts with an empty history. Owned rows only.
+const RESET_CHAT = process.argv.includes('--reset-chat');
 
 function log(step: string, detail: unknown): void {
   console.log(`[canary-seed] ${step}`, JSON.stringify(detail));
@@ -292,8 +296,26 @@ async function seedChatHealth(): Promise<void> {
   log('chat-health', { state: 'created', profileId });
 }
 
+async function resetReturningChat(): Promise<void> {
+  const spec = RETURNING_CANARY_SEED;
+  const row = await loadOwned(spec);
+  if (!row) throw new Error('Returning canary not found');
+  const owned = await db
+    .select({ id: chatConversations.id })
+    .from(chatConversations)
+    .where(eq(chatConversations.userId, row.userId));
+  log('reset-chat', { email: spec.email, threads: owned.length, apply: APPLY });
+  if (APPLY && owned.length > 0) {
+    await db
+      .delete(chatConversations)
+      .where(eq(chatConversations.userId, row.userId));
+    log('reset-chat', { state: 'deleted', threads: owned.length });
+  }
+}
+
 async function main(): Promise<void> {
   log('start', { version: CANARY_SEED_SPEC_VERSION, apply: APPLY });
+  if (RESET_CHAT) await resetReturningChat();
   await seedReturning();
   await seedChatHealth();
   log('done', { apply: APPLY });

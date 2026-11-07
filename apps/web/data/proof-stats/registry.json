@@ -31,6 +31,7 @@
       },
       "fallback": "Built for artists and the teams behind them",
       "methodology": "/proof/methodology#accounts_total",
+      "publicMethod": "Accounts people created on Jovie. Team, test and automated accounts are excluded, and deleted accounts are not counted.",
       "milestones": true,
       "marketing": {
         "value": 5,
@@ -66,6 +67,7 @@
       },
       "fallback": null,
       "methodology": "/proof/methodology#artists_claimed",
+      "publicMethod": "Artist profiles that an artist or their team has claimed and runs. Profiles we prepared that nobody has claimed are not counted, nor are team or test profiles.",
       "milestones": true,
       "marketing": {
         "value": 4,
@@ -101,6 +103,7 @@
       },
       "fallback": null,
       "methodology": "/proof/methodology#smart_links_total",
+      "publicMethod": "Release and track links created on Jovie profiles, counted once per link. Links on team or test profiles are excluded.",
       "milestones": true,
       "marketing": {
         "value": 3,
@@ -136,6 +139,7 @@
       },
       "fallback": null,
       "methodology": "/proof/methodology#release_alerts_delivered",
+      "publicMethod": "Release alerts sent to listeners who asked to hear about a release. Alerts from team or test profiles are excluded.",
       "milestones": true,
       "marketing": {
         "value": 4,
@@ -170,6 +174,7 @@
       },
       "fallback": null,
       "methodology": "/proof/methodology#profile_ttfb_ms",
+      "publicMethod": "Time until a public Jovie profile starts responding, the median of repeated page loads in our weekly benchmark.",
       "milestones": false,
       "marketing": {
         "value": 3,
@@ -203,6 +208,7 @@
       },
       "fallback": null,
       "methodology": "/proof/methodology#profile_agent_score",
+      "publicMethod": "A 0 to 100 score for how well AI assistants can read a public Jovie profile: crawler access, readable HTML, structured data and machine interfaces. Measured weekly.",
       "milestones": false,
       "marketing": {
         "value": 4,
@@ -213,7 +219,7 @@
     {
       "id": "profile_lcp_rank",
       "label": "Profile load speed (LCP) against link-in-bio platforms",
-      "unit": "ms",
+      "unit": "count",
       "better": "lower",
       "visibility": "public",
       "legalClass": "comparative",
@@ -230,13 +236,11 @@
       "threshold": null,
       "display": {
         "sentence": "Profiles load faster than {value} measured link-in-bio platforms",
-        "rounding": {
-          "mode": "ceil",
-          "step": 100
-        }
+        "rounding": { "mode": "floor", "step": 1 }
       },
       "fallback": null,
       "methodology": "/proof/methodology#profile_lcp_rank",
+      "publicMethod": "Largest contentful paint of a public profile on each platform, mobile, median of repeated loads. Shown only when Jovie is faster than every platform we could measure, by at least 10 percent.",
       "milestones": false,
       "marketing": {
         "value": 5,
@@ -247,7 +251,7 @@
     {
       "id": "profile_js_bytes_rank",
       "label": "Profile page weight against link-in-bio platforms",
-      "unit": "bytes",
+      "unit": "count",
       "better": "lower",
       "visibility": "public",
       "legalClass": "comparative",
@@ -264,13 +268,11 @@
       "threshold": null,
       "display": {
         "sentence": "Lighter than {value} measured link-in-bio platforms",
-        "rounding": {
-          "mode": "ceil",
-          "step": 10000
-        }
+        "rounding": { "mode": "floor", "step": 1 }
       },
       "fallback": null,
       "methodology": "/proof/methodology#profile_js_bytes_rank",
+      "publicMethod": "Total bytes downloaded to show a public profile on each platform, median of repeated loads. Shown only when Jovie is lighter than every platform we could measure, by at least 10 percent.",
       "milestones": false,
       "marketing": {
         "value": 3,
@@ -304,6 +306,7 @@
       },
       "fallback": null,
       "methodology": "/proof/methodology#agent_path_cert",
+      "publicMethod": "The checks an AI agent runs to create, claim and update a Jovie profile end to end. Shown only when every check passes.",
       "milestones": false,
       "marketing": {
         "value": 4,
@@ -370,6 +373,7 @@
       },
       "fallback": null,
       "methodology": "/proof/methodology#security_open_critical",
+      "publicMethod": "Open security findings rated critical across dependency, code and secret scanning. Shown only when the count is zero.",
       "milestones": false,
       "marketing": {
         "value": 3,
@@ -404,6 +408,7 @@
       },
       "fallback": null,
       "methodology": "/proof/methodology#security_patch_hours_p50",
+      "publicMethod": "Median hours from a high or critical security finding to its fix reaching the main branch, over the last 90 days.",
       "milestones": false,
       "marketing": {
         "value": 3,

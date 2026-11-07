@@ -1,7 +1,6 @@
 {
   "schema": "jovie.ai-call-guard-ratchet/v1",
   "entries": {
-    ".github/scripts/internal-pr-review.mjs": 1,
     "apps/web/lib/ai/gateway-spend.ts": 1,
     "apps/web/lib/services/album-art/provider-xai.ts": 1,
     "apps/web/lib/services/retouching/provider-gemini.ts": 1,

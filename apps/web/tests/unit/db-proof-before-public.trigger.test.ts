@@ -9,9 +9,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * proof": onboarding, mobile completion, the dashboard PATCH, ingestion
  * auto-publish and switch-profile all end in an UPDATE of creator_profiles.
  */
-const migration = readFileSync(
-  join(__dirname, '../../drizzle/migrations/0148_proof_before_public.sql'),
-  'utf8'
+const migrations = [
+  '0148_proof_before_public.sql',
+  '0163_taken_down_never_public.sql',
+].map(file =>
+  readFileSync(join(__dirname, '../../drizzle/migrations', file), 'utf8')
 );
 
 let db: PGlite;
@@ -33,10 +35,13 @@ describe('creator_profiles proof-before-public trigger', () => {
     await db.exec(
       'CREATE TABLE creator_profiles (id text primary key, is_public boolean default true, settings jsonb)'
     );
-    for (const statement of migration.split('--> statement-breakpoint')) {
-      if (statement.trim()) await db.exec(statement);
+    for (const migration of migrations) {
+      for (const statement of migration.split('--> statement-breakpoint')) {
+        if (statement.trim()) await db.exec(statement);
+      }
     }
-  });
+    // PGlite boot takes seconds on a loaded runner.
+  }, 60_000);
   afterAll(async () => db.close());
 
   it('inserts an unproven proof-only profile private even when asked to be public', async () => {
@@ -104,5 +109,52 @@ describe('creator_profiles proof-before-public trigger', () => {
     );
     expect(await row('f')).toBe(true);
     expect(await row('g')).toBe(true);
+  });
+
+  it('never lets a taken-down page be public, proof-only or not', async () => {
+    for (const [id, settings] of [
+      ['h', proofOnly('taken_down')],
+      ['i', JSON.stringify({ claimVerification: { status: 'taken_down' } })],
+    ] as const) {
+      await db.query(
+        'INSERT INTO creator_profiles (id, is_public, settings) VALUES ($1, true, $2::jsonb)',
+        [id, settings]
+      );
+      expect(await row(id)).toBe(false);
+      await db.query(
+        'UPDATE creator_profiles SET is_public = true WHERE id = $1',
+        [id]
+      );
+      expect(await row(id)).toBe(false);
+    }
+  });
+
+  it('takes a verified public page down in the same update that records the decision', async () => {
+    await db.query(
+      'INSERT INTO creator_profiles (id, is_public, settings) VALUES ($1, true, $2::jsonb)',
+      ['j', JSON.stringify({ claimVerification: { status: 'verified' } })]
+    );
+    await db.query(
+      'UPDATE creator_profiles SET settings = $2::jsonb WHERE id = $1',
+      ['j', JSON.stringify({ claimVerification: { status: 'taken_down' } })]
+    );
+    expect(await row('j')).toBe(false);
+  });
+
+  it('keeps a disputed page up (frozen, not offline)', async () => {
+    await db.query(
+      'INSERT INTO creator_profiles (id, is_public, settings) VALUES ($1, true, $2::jsonb)',
+      ['k', proofOnly('verified')]
+    );
+    await db.query(
+      'UPDATE creator_profiles SET settings = $2::jsonb WHERE id = $1',
+      ['k', proofOnly('disputed')]
+    );
+    expect(await row('k')).toBe(true);
+    await db.query(
+      'INSERT INTO creator_profiles (id, is_public, settings) VALUES ($1, true, $2::jsonb)',
+      ['l', JSON.stringify({ claimVerification: { status: 'disputed' } })]
+    );
+    expect(await row('l')).toBe(true);
   });
 });

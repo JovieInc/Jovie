@@ -3,12 +3,13 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import { loadPublicReleaseCredits } from '@/app/[username]/[slug]/_lib/data';
 import { isScreenCertSmartLinkProfileRequest } from '@/app/[username]/[slug]/_lib/screen-cert-fixture';
 
-// Read current publication for every profile request without changing release-route caching.
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// One-hour ISR. Publication is not decided by this cached render: the proxy
+// asks /api/profile-publication on every request and refuses to serve this
+// body when the handle is not published right now (JOV-8629 §6.2,
+// lib/routing/profile-publication-edge.ts).
+export const revalidate = 3600;
 
 import { AskJovieWidget } from '@/components/features/ask-jovie/AskJovieWidget';
-import { AliasCollisionRecovery } from '@/components/features/profile/AliasCollisionRecovery';
 import type { ProfileMode } from '@/components/features/profile/contracts';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { UnfazedProfileClient } from '@/components/features/profile/UnfazedProfileClient';
@@ -17,6 +18,9 @@ import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClien
 import { assertLiveProfileRoute } from '@/features/profile/live-profile-lock';
 import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
 import { ProfileAeoProofClaimCard } from '@/features/profile/ProfileAeoProofClaimCard';
+// Artist-paid audience data (view, pixels, funnel) must fire right after
+// hydration with no idle or interaction gate, so these stay in the entry
+// bundle; only heavy, non-revenue islands are lazy (JOV-10246).
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
@@ -82,6 +86,7 @@ import {
 } from '@/lib/validation/username-core';
 import type { PublicContact } from '@/types/contacts';
 import { convertCreatorProfileToArtist } from '@/types/db';
+import { DeferredAliasCollisionRecovery } from './_components/ProfileDeferredIslands';
 import { PublicClaimBanner } from './_components/PublicClaimBanner';
 import { PublicProfileErrorState } from './_components/PublicProfileErrorState';
 import { getProfileStaticParams } from './_lib/profile-static-params';
@@ -467,7 +472,7 @@ async function ArtistPageContent({
 
   return (
     <>
-      <AliasCollisionRecovery username={username} />
+      <DeferredAliasCollisionRecovery username={username} />
       {/* JSON-LD Structured Data for SEO — single @graph for all schemas */}
       <script type='application/ld+json'>
         {safeJsonLdStringify(structuredData)}

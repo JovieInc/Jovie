@@ -1,7 +1,8 @@
 import { expect, test } from './setup';
 
 /**
- * Homepage hero claim field, focused state (2026-10-28 regression: a square
+ * Product hero claim field, focused state (the homepage is invite-only and
+ * has no claim field; /product mounts the same hero canvas and claim form) (2026-10-28 regression: a square
  * browser/utility ring around the inner input inside the rounded pill).
  *
  * The CompositeField container owns the focus ring. The inner input paints
@@ -56,7 +57,7 @@ async function innerInputPaintsOwnRing(
   });
 }
 
-test.describe('homepage hero claim field focus', () => {
+test.describe('product hero claim field focus', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   for (const viewport of VIEWPORTS) {
@@ -67,10 +68,10 @@ test.describe('homepage hero claim field focus', () => {
         width: viewport.width,
         height: viewport.height,
       });
-      await page.goto('/');
+      await page.goto('/product');
       await page.waitForLoadState('networkidle');
 
-      const input = page.locator('#homepage-claim-handle');
+      const input = page.locator('#product-handle-input');
       await input.focus();
       await expect(input).toBeFocused();
 
@@ -126,7 +127,7 @@ test.describe('homepage hero claim field focus', () => {
         contrast(channels(ring), channels(gap || styles.pageBackground))
       ).toBeGreaterThanOrEqual(3);
 
-      const claim = page.getByTestId('homepage-hero-claim');
+      const claim = page.getByTestId('product-claim-card');
       const shot = await claim.screenshot({ animations: 'disabled' });
       await testInfo.attach(`claim-field-focused-${viewport.name}`, {
         body: shot,
@@ -143,18 +144,18 @@ test.describe('homepage hero claim field focus', () => {
     page,
   }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/');
+    await page.goto('/product');
     await page.waitForLoadState('networkidle');
     await page.addStyleTag({
       content:
-        '#homepage-claim-handle:focus, #homepage-claim-handle:focus-visible { outline: 2px solid rgb(17, 175, 255) !important; box-shadow: 0 0 0 2px rgb(17, 175, 255) !important; }',
+        '#product-handle-input:focus, #product-handle-input:focus-visible { outline: 2px solid rgb(17, 175, 255) !important; box-shadow: 0 0 0 2px rgb(17, 175, 255) !important; }',
     });
-    const input = page.locator('#homepage-claim-handle');
+    const input = page.locator('#product-handle-input');
     await input.focus();
     await expect.poll(() => innerInputPaintsOwnRing(input)).toBe(true);
     await testInfo.attach('claim-field-focused-DELIBERATE-RED-square-ring', {
       body: await page
-        .getByTestId('homepage-hero-claim')
+        .getByTestId('product-claim-card')
         .screenshot({ animations: 'disabled' }),
       contentType: 'image/png',
     });

@@ -12,12 +12,12 @@
   {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
-    "bodySha256": "9c9c6f8e5771a1c18794a77ae8ddba4aa914a2d785a143cf54bb4c8545f8446d"
+    "bodySha256": "1bd8b0d403e47bcb0b23fdbd8e8afc642136d978489bb415a7db05169bb98d4c"
   },
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "906cb63c08cbdaf6eb1fd6988470fc5f706896c3421485337a921e0d6333e67e"
+    "bodySha256": "a8260d3292af576dbc5e17b74b4ecae43c177d82c56a575650180016d1fbdec2"
   },
   {
     "file": ".claude/rules/db.md",
@@ -40,7 +40,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "3dbed7e15801a9c4e7591606fb8402bf57d040e1b2afff3996ece2ccf18e9633"
+    "bodySha256": "ef991019ec62499714178175681e240c3d7da523e236b57e4e09c5b66386086f"
   },
   {
     "file": ".claude/rules/event-driven.md",
@@ -72,12 +72,12 @@
       ".claude/skills/**",
       "docs/agent-context/**"
     ],
-    "bodySha256": "4591abc2c1aa6e310d88ec278463142cfcdd413441bd1bd04998482b22793d01"
+    "bodySha256": "81ffe4da6cf4f869dd5d627f2beeb5188a982b8088b3df6b63b429c5fb29fe66"
   },
   {
     "file": ".claude/rules/hermes-air.md",
     "paths": ["docs/HERMES_AIR.md"],
-    "bodySha256": "1146534132d4a342e1ed2d00e9594d10e4e3fcf347054041bfe91323c5de98e7"
+    "bodySha256": "8f3fe75a0a77dd812481cbea13e7e2fabf83b95d48af9f5646b2fc9a2fc725f0"
   },
   {
     "file": ".claude/rules/infra.md",
@@ -101,7 +101,7 @@
       "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "196fc8918b6923e4d1b4d67430c4dc91b2bf7e88b85f92e1e833ad103971d3d0"
+    "bodySha256": "e5839d7117c7952d97d4954d44afa73a7005c0c6f211a170022905b91aa12f63"
   },
   {
     "file": ".claude/rules/macos.md",
@@ -113,7 +113,7 @@
       "apps/ios/Packages/JovieKit/**",
       "docs/macos/**"
     ],
-    "bodySha256": "bfabfbafb0ea988e669fba7b3ea3b4c62810855ea3f977a112746271a8ba77ab"
+    "bodySha256": "d454e6f80e8fe4322b7d03ac03ed472f69095e16e935212b1f1025bdbbdb2f17"
   },
   {
     "file": ".claude/rules/motion.md",
@@ -146,7 +146,7 @@
       "workers/**",
       "tools/**"
     ],
-    "bodySha256": "e6284b5f534708944ad49285fdf6e02e3992001a1f34edfb3fd80eaca1fe60dd"
+    "bodySha256": "c7da1fd3f6b8e7274425e421cfcc49d402b247f44246fdcbd96ffaa2837236f7"
   },
   {
     "file": ".claude/rules/release.md",
@@ -157,7 +157,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "ca459e3269b5bae49e476b18e8d104ecde98d6e6de1bedd49e29d7b39f8b22cd"
+    "bodySha256": "ce42f3a66aef44cab5bcb7320262f97eee3255c56c93070eda90d6e13bbfc60c"
   },
   {
     "file": ".claude/rules/security.md",
@@ -205,7 +205,7 @@
       "**/vitest.config.*",
       "**/playwright.config.*"
     ],
-    "bodySha256": "399d49cf600940a408d99bd989415330ba811f4d3735574b54aa737bb4bb166a"
+    "bodySha256": "b435ddb3d1618cd410c0dd3200197fec57c537bf4bfa91dc72abbfb8c1e05ce7"
   },
   {
     "file": ".claude/rules/ui.md",

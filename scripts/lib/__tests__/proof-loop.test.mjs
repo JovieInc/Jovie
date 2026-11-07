@@ -263,7 +263,7 @@ describe('proof loop loaders', async () => {
       },
       fetchImpl: async (url, init) => {
         calls.push({ url, init });
-        return { ok: true, json: async () => feed };
+        return Response.json(feed);
       },
     });
     assert.equal(
@@ -271,11 +271,11 @@ describe('proof loop loaders', async () => {
       'https://staging.jov.ie/api/internal/proof-stats'
     );
     assert.equal(calls[0].init.headers['x-content-actor'], 'proof-loop');
-    assert.equal(body.metrics.published, 1);
+    assert.deepEqual(body, feed);
     await assert.rejects(
       loadProofFeed({
         env: { CONTENT_PUBLISH_SECRET: 's' },
-        fetchImpl: async () => ({ ok: false, status: 401 }),
+        fetchImpl: async () => new Response(null, { status: 401 }),
       }),
       /401/
     );
@@ -285,25 +285,44 @@ describe('proof loop loaders', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'proof-rt-'));
     writeFileSync(join(dir, 'proof-ratchets.json'), JSON.stringify(ratchets));
     const seen = [];
-    const gh = async args => {
-      seen.push(args.slice(0, 2).join(' '));
+    /** @type {typeof import('../../../packages/api-client/gh.ts').runGh} */
+    const gh = async (args, options) => {
+      seen.push({ command: args.slice(0, 2).join(' '), options });
       return args[1] === 'list'
-        ? { code: 0, stdout: '[{"databaseId":42}]', stderr: '' }
-        : { code: 0, stdout: '', stderr: '' };
+        ? {
+            code: 0,
+            stdout: '[{"databaseId":42}]',
+            stderr: '',
+            deferred: false,
+          }
+        : { code: 0, stdout: '', stderr: '', deferred: false };
     };
     const doc = await loadProofRatchets({ ghRunner: gh, dir });
-    assert.deepEqual(seen, ['run list', 'run download']);
+    assert.deepEqual(seen, [
+      { command: 'run list', options: { priority: 'report' } },
+      { command: 'run download', options: { priority: 'report' } },
+    ]);
     assert.equal(doc.ratchets.length, 2);
     await assert.rejects(
       loadProofRatchets({
-        ghRunner: async () => ({ code: 0, stdout: '[]', stderr: '' }),
+        ghRunner: async () => ({
+          code: 0,
+          stdout: '[]',
+          stderr: '',
+          deferred: false,
+        }),
         dir,
       }),
       /no successful public benchmark run/
     );
     await assert.rejects(
       loadProofRatchets({
-        ghRunner: async () => ({ code: 1, stdout: '', stderr: 'boom' }),
+        ghRunner: async () => ({
+          code: 1,
+          stdout: '',
+          stderr: 'boom',
+          deferred: false,
+        }),
         dir,
       }),
       /benchmark run lookup: boom/

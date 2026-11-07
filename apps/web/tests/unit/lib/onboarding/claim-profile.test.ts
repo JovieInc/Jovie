@@ -332,6 +332,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).rejects.toMatchObject({
       errorCode: 'SPOTIFY_IDENTITY_CONFLICT',
@@ -367,6 +368,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).rejects.toMatchObject({ errorCode: 'SPOTIFY_IDENTITY_CONFLICT' });
     expect(mockDbInsert).not.toHaveBeenCalled();
@@ -399,6 +401,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).rejects.toMatchObject({
       errorCode: 'FORBIDDEN',
@@ -425,6 +428,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).resolves.toEqual({
       profileId: null,
@@ -465,6 +469,7 @@ describe('materializeClaimedOnboardingProfile', () => {
           conversationId: 'conv_1',
           ipAddress: null,
           userAgent: null,
+          visibility: 'public',
         })
       ).resolves.toEqual({
         profileId: 'profile_new',
@@ -544,6 +549,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).resolves.toEqual({
       profileId: 'profile_new',
@@ -607,6 +613,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).resolves.toMatchObject({ profileId: 'profile_new', status: 'created' });
 
@@ -660,6 +667,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).resolves.toEqual({
       profileId: 'profile_new',
@@ -698,6 +706,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).resolves.toEqual({
       profileId: 'profile_retried',
@@ -740,6 +749,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).resolves.toMatchObject({
       profileId: 'profile_reserved',
@@ -779,6 +789,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).resolves.toEqual({
       profileId: 'profile_existing',
@@ -972,6 +983,7 @@ describe('materializeClaimedOnboardingProfile — reserved waitlist hold (JOV-72
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).resolves.toEqual({
       profileId: 'profile_held',
@@ -1007,7 +1019,7 @@ describe('materializeClaimedOnboardingProfile — unproven admission (private un
     mockFetchArtistBySpotifyUrl.mockResolvedValue(null);
   });
 
-  it('creates a claimed but private profile, holds the Spotify identity and opens a proof request', async () => {
+  it('keeps a fresh self-serve claim private by default and opens a proof request', async () => {
     setupOwnedConversationAndMessages();
     setupExistingProfileSelect(null);
     const [insertValues] = queueProfileInsert({ id: 'profile_unproven' });
@@ -1018,7 +1030,6 @@ describe('materializeClaimedOnboardingProfile — unproven admission (private un
       conversationId: 'conv_1',
       ipAddress: null,
       userAgent: null,
-      visibility: 'unproven',
     });
 
     expect(insertValues).toHaveBeenCalledWith(

@@ -43,6 +43,9 @@ class FakeLinear:
     def set_state(self, ident, t):
         self.states.append((ident, t))
 
+    def state_type(self, ident):
+        return "completed" if ident in self.closed else "unstarted"
+
 
 def iso(t):
     return pe.iso(t)
@@ -179,6 +182,67 @@ class LoopTest(unittest.TestCase):
         pe.advance(self.ledger, self.l, self.s, [], self.t + pe.CLAIM_S + 1, self.dir)
         self.assertEqual(self.ledger["101"]["escalations"], 1)
         self.assertTrue(any("Claim expired" in c[1] for c in self.l.comments))
+
+    def test_claim_expiry_stands_down_when_linked_issue_completed_externally(self):
+        # JOV-10213: a fix merges, an operator closes the Linear issue with receipts, but the
+        # merged PR sits outside the PR fetch window -- so the ledger entry stays 'claimed' and
+        # the claimer re-armed + re-filed a claim-expired alert every cycle on a DONE issue.
+        # Expiry must check the linked issue's state first and stand down quietly.
+        pe.handle_issue(self.issue(), self.ledger, self.s, self.l, [], self.t, self.dir)
+        ident = self.ledger["101"]["linear"]
+        self.l.closed.add(ident)  # FakeLinear: completed issues are in `closed`
+        pe.advance(self.ledger, self.l, self.s, [], self.t + pe.CLAIM_S + 1, self.dir)
+        self.assertEqual(self.ledger["101"]["status"], "closed")
+        self.assertNotIn("escalations", self.ledger["101"])
+        self.assertFalse(any("Claim expired" in c[1] for c in self.l.comments))
+        # And a later sweep must not re-fire: the entry is closed, expiry never revisits it.
+        pe.advance(self.ledger, self.l, self.s, [], self.t + 2 * pe.CLAIM_S + 2, self.dir)
+        self.assertEqual(self.ledger["101"]["status"], "closed")
+        self.assertFalse(any("Claim expired" in c[1] for c in self.l.comments))
+
+    def test_claim_expiry_still_escalates_when_linked_issue_open(self):
+        # Control for the stand-down: an OPEN linked issue must keep the existing escalation.
+        pe.handle_issue(self.issue(), self.ledger, self.s, self.l, [], self.t, self.dir)
+        pe.advance(self.ledger, self.l, self.s, [], self.t + pe.CLAIM_S + 1, self.dir)
+        self.assertEqual(self.ledger["101"]["status"], "claimed")
+        self.assertEqual(self.ledger["101"]["escalations"], 1)
+
+    def test_pr_matcher_binds_a_merged_fix_referencing_only_the_issue_id(self):
+        # Regression lock for the JOV-8073/10213 shape: the merged fix PR (#21394) carries the
+        # Linear identifier in title/body but never the word 'Sentry'. Once such a PR is IN the
+        # fetched list, the claim must advance to deployed.
+        pe.handle_issue(self.issue(), self.ledger, self.s, self.l, [], self.t, self.dir)
+        ident = self.ledger["101"]["linear"]
+        prs = [{"number": 21394, "title": f"fix(canary): assert SSR session boundary on /start ({ident})",
+                "body": f"Refs {ident}.\n<!-- linear-issue-identifier:{ident} -->",
+                "headRefName": "devin/jov-8073-20261012t082825", "mergedAt": iso(self.t)}]
+        pe.advance(self.ledger, self.l, self.s, prs, self.t + 60, self.dir)
+        self.assertEqual(self.ledger["101"]["status"], "deployed")
+        self.assertEqual(self.ledger["101"]["pr"], 21394)
+
+    def test_pr_fetch_includes_linear_id_references_not_just_the_word_sentry(self):
+        # The sweep fetched '--search "Sentry in:body"' only, which excludes fix PRs whose body
+        # references the Linear identifier but never says 'Sentry' (#21394): their claims could
+        # never bind to the merge. The fetch must cover the issue-reference convention too, and
+        # must dedupe the union.
+        sentry_prs = [{"number": 1, "title": "a", "body": "Sentry 9", "headRefName": "x", "mergedAt": None}]
+        jov_prs = [{"number": 1, "title": "a", "body": "Sentry 9", "headRefName": "x", "mergedAt": None},
+                   {"number": 21394, "title": "fix (JOV-8073)", "body": "Refs JOV-8073", "headRefName": "y",
+                    "mergedAt": iso(self.t)}]
+        seen_terms = []
+
+        def fake(args):
+            if args[0] == "pr":
+                term = args[args.index("--search") + 1]
+                seen_terms.append(term)
+                return sentry_prs if term.startswith("Sentry") else jov_prs
+            return []
+
+        with mock.patch.object(pe, "gh_json", side_effect=fake):
+            prs = pe.fetch_prs()
+        self.assertIn("Sentry in:body", seen_terms)
+        self.assertTrue(any("JOV" in t for t in seen_terms))
+        self.assertEqual([p["number"] for p in prs], [1, 21394])  # union, deduped
 
     def test_suspect_merge_linked(self):
         merges = [{"number": 42, "mergedAt": iso(self.t - 3600)}]

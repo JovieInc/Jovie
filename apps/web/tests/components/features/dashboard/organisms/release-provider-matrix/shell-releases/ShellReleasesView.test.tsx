@@ -102,7 +102,6 @@ vi.mock('sonner', () => ({
     dismiss: vi.fn(),
   }),
 }));
-
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/hooks/useImportPolling',
   () => ({
@@ -573,12 +572,13 @@ describe('ShellReleasesView', () => {
 
   it('keeps the settled no-banner release list mounted', () => {
     mockUseDspMatchesQuery.mockReturnValue({
-      data: [{ status: 'confirmed' }],
+      data: [],
       isLoading: false,
     });
 
     renderShell([fakeRelease({ id: 'release-2', title: 'Already linked' })], {
       spotifyConnected: true,
+      appleMusicConnected: true,
     });
 
     expect(
@@ -602,11 +602,11 @@ describe('ShellReleasesView', () => {
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
     expect(screen.getByText('Bahamas')).toBeInTheDocument();
     expect(screen.getByText('Other')).toBeInTheDocument();
-    // The catalog is a native list (not an ARIA listbox): rows own real
-    // per-cell controls, which an ARIA `option` cannot contain (axe
-    // nested-interactive).
+    // List rows own real per-cell controls and keep their list owner.
     const list = screen.getByRole('list', { name: 'Releases' });
-    expect(list.tagName).toBe('UL');
+    expect(
+      screen.getByRole('listitem', { name: 'Lost in the Light' }).closest('ul')
+    ).toBe(list);
     expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(2);
   });
 
@@ -766,7 +766,7 @@ describe('ShellReleasesView', () => {
     const probe = await screen.findByTestId('header-actions-probe');
     expect(probe).toBeInTheDocument();
     const searchTrigger = await screen.findByRole('button', {
-      name: 'Search Jovie',
+      name: /^Search Jovie/,
     });
     expect(searchTrigger).toHaveAttribute('data-app-search-trigger', 'true');
   });
@@ -792,7 +792,7 @@ describe('ShellReleasesView', () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Search Jovie' })
+      await screen.findByRole('button', { name: /^Search Jovie/ })
     );
 
     expect(
