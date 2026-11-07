@@ -1,6 +1,60 @@
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '../../constants/routes';
 
+test('starter handoff paints its composer only after its contents arrive', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 615 });
+  await page.goto(
+    '/iframe.html?id=features-onboarding-onboardingchat--starter-verification&viewMode=story',
+    { waitUntil: 'domcontentloaded' }
+  );
+  const input = page.getByRole('textbox', {
+    name: 'Chat message input',
+    exact: false,
+  });
+  await expect(input).toHaveValue('I want to claim jov.ie/sam.');
+  const dock = page.getByTestId('chat-empty-state-centered-composer');
+  const geometry = await dock.evaluate(async element => {
+    const nodes = [...element.childNodes];
+    const originalInput = element.querySelector('textarea');
+    const frame = () =>
+      new Promise<void>(resolve =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      );
+    await document.fonts.ready;
+    await frame();
+    const complete = element.getBoundingClientRect().toJSON();
+    // A network chunk can stop before any composer child has arrived. Keep
+    // the real dock, nodes, and app CSS; restore the same controls afterward.
+    element.replaceChildren();
+    await frame();
+    const pending = {
+      height: element.getBoundingClientRect().height,
+      visibility: getComputedStyle(element).visibility,
+    };
+    element.append(...nodes);
+    await frame();
+    return {
+      complete,
+      pending,
+      restored: element.getBoundingClientRect().toJSON(),
+      retainedInput: element.querySelector('textarea') === originalInput,
+    };
+  });
+  expect(geometry.pending.visibility).toBe('hidden');
+  expect(geometry.complete.height).toBeGreaterThan(geometry.pending.height);
+  expect(geometry.retainedInput).toBe(true);
+  expect(geometry.restored).toEqual(geometry.complete);
+  await expect(input).toBeVisible();
+  await expect(input).toHaveValue('I want to claim jov.ie/sam.');
+  await input.focus();
+  await expect(input).toBeFocused();
+  await expect(
+    page.getByRole('button', { name: 'Send message', exact: true })
+  ).toBeDisabled();
+});
+
 for (const viewport of [
   { width: 1440, height: 900, fontSize: 16 },
   { width: 390, height: 615, fontSize: 16 },

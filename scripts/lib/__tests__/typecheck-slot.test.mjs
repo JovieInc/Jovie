@@ -52,10 +52,6 @@ test('n+1 concurrent callers queue behind n slots and all succeed', {
   const codes = await Promise.all([1, 2, 3].map(() => runSlot(env, job(log))));
   assert.deepEqual(codes, [0, 0, 0]);
   assert.deepEqual(replay(log), { peak: 2, starts: 3 });
-});
-
-test('exit codes pass through and an unset env does not throttle', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'slots-'));
   assert.equal(
     await runSlot({ GEM_TYPECHECK_SLOTS: '1', GEM_TYPECHECK_LOCK_DIR: dir }, [
       'node',
@@ -64,8 +60,13 @@ test('exit codes pass through and an unset env does not throttle', async () => {
     ]),
     3
   );
+});
+
+test('exit codes pass through and an unset env does not throttle', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'slots-'));
   const log = join(dir, 'log');
   const env = { GEM_TYPECHECK_SLOTS: '', GEM_TYPECHECK_LOCK_DIR: dir };
+  assert.equal(await runSlot(env, ['node', '-e', 'process.exit(3)']), 3);
   await Promise.all([1, 2, 3].map(() => runSlot(env, job(log))));
   assert.equal(replay(log).peak, 3);
 });

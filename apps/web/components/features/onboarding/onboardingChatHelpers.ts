@@ -367,3 +367,22 @@ export function deriveProfileBuilderState({
     socialLinks,
   };
 }
+
+export function rollbackFailedUserTurn(
+  messages: readonly UIMessage[],
+  failedText: string | null | undefined
+): readonly UIMessage[] {
+  const trimmedFailed = failedText?.trim();
+  if (!trimmedFailed) return messages;
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role !== 'user') continue;
+    if (getMessageText(message).trim() === trimmedFailed) {
+      return messages.slice(0, index);
+    }
+    break;
+  }
+
+  return messages;
+}

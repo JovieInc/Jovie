@@ -1681,6 +1681,30 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/admin/reference-review/intake/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/reference-review/intake",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/admin/reference-review/preview/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/reference-review/preview",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/admin/reference-review/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/reference-review",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/admin/releases/route.ts",
       "kind": "handler",
       "route": "/api/admin/releases",
@@ -2505,6 +2529,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/cron/track-daily-snapshots/route.ts",
+      "kind": "handler",
+      "route": "/api/cron/track-daily-snapshots",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/cron/voice-pipeline/route.ts",
       "kind": "handler",
       "route": "/api/cron/voice-pipeline",
@@ -3293,6 +3325,14 @@
       "kind": "handler",
       "route": "/api/insights/summary",
       "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/canary/reset/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/canary/reset",
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4797,6 +4837,14 @@
       "kind": "handler",
       "route": "/api/visibility-audit/offer",
       "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/waitlist/join/route.ts",
+      "kind": "handler",
+      "route": "/api/waitlist/join",
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },

@@ -29,8 +29,8 @@ describe('consent-regions', () => {
     expect(isCookieBannerRequired('AU')).toBe(false);
   });
 
-  it('does not show the banner when country is unavailable', () => {
-    expect(isCookieBannerRequired(null)).toBe(false);
+  it('shows the banner when country is unavailable (fail closed)', () => {
+    expect(isCookieBannerRequired(null)).toBe(true);
   });
 
   describe('US state-level detection', () => {

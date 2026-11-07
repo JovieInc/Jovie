@@ -16,8 +16,13 @@ import { APP_ROUTES } from '@/constants/routes';
 import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import type { MarketingPenContractId } from '@/data/marketing/penContracts';
+import type { BrandMarkSize } from '@/lib/brand/tokens';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { cn } from '@/lib/utils';
+import {
+  getNavGroupVariantClass,
+  getNavLinkVariantClass,
+} from './header-nav-variants';
 
 // Linear header structure: full-width header with centered ~1000px content
 // Linear uses ~224px margins on 1440px viewport = ~984px content width
@@ -29,6 +34,7 @@ export interface HeaderNavProps {
   readonly className?: string;
   readonly style?: React.CSSProperties;
   readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  readonly logoMarkSize?: BrandMarkSize;
   readonly logoVariant?: LogoVariant;
   readonly hideNav?: boolean;
   readonly hideDesktopNav?: boolean;
@@ -324,42 +330,6 @@ function MarketingGlassFlyout({
   );
 }
 
-function getNavLinkVariantClass({
-  isHomepagePresentation,
-  isMarketingGlass,
-}: Readonly<{
-  isHomepagePresentation: boolean;
-  isMarketingGlass: boolean;
-}>) {
-  if (isMarketingGlass) {
-    return 'marketing-glass-header__nav-link';
-  }
-
-  if (isHomepagePresentation) {
-    return 'homepage-header-nav-link';
-  }
-
-  return 'nav-link-linear';
-}
-
-function getNavGroupVariantClass({
-  isHomepagePresentation,
-  isMarketingGlass,
-}: Readonly<{
-  isHomepagePresentation: boolean;
-  isMarketingGlass: boolean;
-}>) {
-  if (isMarketingGlass) {
-    return 'marketing-glass-header__nav';
-  }
-
-  if (isHomepagePresentation) {
-    return 'homepage-header-nav-group';
-  }
-
-  return 'gap-1 lg:gap-1.5';
-}
-
 function getNavContainerVariantClass({
   containerSize,
   isMarketingGlass,
@@ -383,6 +353,7 @@ export function HeaderNav({
   className,
   style,
   logoSize = 'sm',
+  logoMarkSize,
   logoVariant = 'word',
   hideNav = false,
   hideDesktopNav = false,
@@ -672,6 +643,7 @@ export function HeaderNav({
             <div className='flex items-center'>
               <LogoLink
                 logoSize={logoSize}
+                logoMarkSize={logoMarkSize}
                 variant={logoVariant}
                 reveal={logoReveal && logoVariant === 'icon'}
                 className='rounded-md'

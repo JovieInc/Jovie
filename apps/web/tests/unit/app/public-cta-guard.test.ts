@@ -92,6 +92,34 @@ describe('public CTA guard', () => {
     // in cookies.spec.ts hit-testing; JSDOM cannot certify rendered dimensions.
   });
 
+  it('forwards the marketing mark size without changing the default header mark or CTA', () => {
+    const props: HeaderNavProps = {
+      authMode: 'public-static',
+      presentation: 'marketing-glass',
+      logoVariant: 'icon',
+      publicCta: { href: '/start', label: 'Find yourself' },
+    };
+    const { rerender } = render(
+      createElement<HeaderNavProps>(HeaderNav, {
+        ...props,
+        logoMarkSize: 'marketing',
+      })
+    );
+    expect(document.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '28'
+    );
+    expect(screen.getByRole('link', { name: 'Find yourself' })).toHaveAttribute(
+      'href',
+      '/start'
+    );
+    rerender(createElement<HeaderNavProps>(HeaderNav, props));
+    expect(document.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '20'
+    );
+  });
+
   it('puts the glass header content on the single public container', () => {
     render(
       createElement<HeaderNavProps>(HeaderNav, {
@@ -169,6 +197,21 @@ describe('public CTA guard', () => {
     expect(headerNavSource).toContain('FEATURE_FLAGS.WAITLIST_ENABLED');
     expect(headerNavSource).toContain('publicCta = DEFAULT_PUBLIC_CTA');
     expect(headerNavSource).not.toContain("label: 'Request Access'");
+  });
+
+  it('keeps the nav variant resolvers in the extracted variants module', () => {
+    const variantsSource = readFileSync(
+      join(ROOT, 'components/organisms/header-nav-variants.ts'),
+      'utf8'
+    );
+    const headerNavSource = readFileSync(
+      join(ROOT, 'components/organisms/HeaderNav.tsx'),
+      'utf8'
+    );
+
+    expect(variantsSource).toContain('export function getNavLinkVariantClass');
+    expect(variantsSource).toContain('export function getNavGroupVariantClass');
+    expect(headerNavSource).toContain("from './header-nav-variants'");
   });
 
   it('keeps legacy public CTA classnames out of production marketing and key public feature surfaces', () => {

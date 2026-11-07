@@ -39,9 +39,9 @@ enabled = true
 #   SUMMER_HUB_WEBHOOK_SECRET  HMAC for pushes to Summer (optional until Summer consumes the hub)
 
 [vars]
-# Kinds the hub answers (read-only, Workers AI) when no real reader handled their mail within the grace.
-# aeon, grokbot and stella are out: each has a real reader (canon MESH-SWARM.md); a stand-in would ack their mail first.
-EXECUTOR_KINDS = "codex,chloe,lola,muse,dots,instinct,devin"
+# Stand-ins are disabled: registered agent mail must wait for its real runtime.
+# A hub-generated reply is never evidence that the addressed agent is available.
+EXECUTOR_KINDS = ""
 EXECUTOR_GRACE_MS = "20000"
 # Alarm once when peer mail sits unhandled this long (ms).
 MAIL_STALE_MS = "600000"

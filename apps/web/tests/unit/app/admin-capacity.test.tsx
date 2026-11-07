@@ -116,6 +116,9 @@ describe('value and alerts', () => {
   it('raises the credits alarm while Grok is under pace', () => {
     board('hyperagent');
     const alerts = screen.getByTestId('capacity-alerts');
+    // The alerts list keeps real listitem children (axe list) while the
+    // alert role lives on the inner wrapper (JOV-8873 a11y residue).
+    expect(within(alerts).getAllByRole('listitem').length).toBeGreaterThan(0);
     expect(within(alerts).getByRole('alert').textContent).toMatch(
       /Hyperagent .* under pace: route work there first/
     );
