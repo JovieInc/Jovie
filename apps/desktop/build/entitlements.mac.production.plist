@@ -4,6 +4,10 @@
   <dict>
     <key>com.apple.security.cs.allow-jit</key>
     <true/>
+    <!-- Hardened runtime silently denies the mic without this; dictation
+         (JOV-9665) records through getUserMedia. -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
     <!-- Touch ID WebAuthn (JOV-6727). Authorized only by the embedded
          Developer ID profile; without it the app will not launch. -->
     <key>com.apple.application-identifier</key>

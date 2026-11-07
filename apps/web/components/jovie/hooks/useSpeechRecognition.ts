@@ -6,13 +6,17 @@ import {
   resumePlaybackAfterInterruption,
 } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
+  createServerTranscriber,
+  isServerTranscriptionSupported,
+} from '@/lib/chat/server-transcriber';
+import {
   createWebSpeechTranscriber,
+  isWebSpeechTranscriptionSupported,
   joinDictationText,
   type Transcriber,
   type TranscriberErrorCode,
 } from '@/lib/chat/transcriber';
 import {
-  getElectronAPI,
   isElectronRuntime,
   useDesktopDictationStatus,
 } from '@/lib/desktop/electron-bridge';
@@ -31,11 +35,6 @@ interface UseSpeechRecognitionReturn {
   isListening: boolean;
   /** Last dictation error, if any */
   error: TranscriberErrorCode | null;
-  /**
-   * Plain-language guidance when dictation is unavailable but the OS offers
-   * its own dictation (Electron desktop). `null` when not applicable.
-   */
-  unavailableHint: string | null;
   /** Clear the surfaced error */
   clearError: () => void;
   /** Start listening */
@@ -59,22 +58,10 @@ const MAX_AUTO_RESTARTS = 8;
 
 type ListeningIntent = 'idle' | 'listening' | 'stopping';
 
-const MAC_SYSTEM_DICTATION_HINT =
-  'Dictation isn’t available in the desktop app. Use macOS dictation: press the 🎤 key (or Fn twice) while typing.';
-const GENERIC_SYSTEM_DICTATION_HINT =
-  'Dictation isn’t available in the desktop app. Use your system dictation shortcut while typing.';
-
-function systemDictationHint(): string {
-  const platform = getElectronAPI()?.platform;
-  // The desktop shell ships as a macOS DMG; treat an unknown platform as Mac.
-  return platform === undefined || platform === 'darwin'
-    ? MAC_SYSTEM_DICTATION_HINT
-    : GENERIC_SYSTEM_DICTATION_HINT;
-}
-
 /**
  * Hook wrapping chat dictation via the Transcriber abstraction.
- * Falls back gracefully when the API is unavailable (returns isSupported=false).
+ * Web Speech where it works, else MediaRecorder + server transcription.
+ * `isSupported` is false only when neither path can run, so the mic can hide.
  */
 export function useSpeechRecognition({
   onTranscript,
@@ -91,11 +78,9 @@ export function useSpeechRecognition({
   const [isSupported, setIsSupported] = useState(false);
   // Electron exposes webkitSpeechRecognition but Chromium's speech backend
   // needs Google API keys the shell cannot ship, so every start() fails with
-  // 'network'. Once observed, treat dictation as unavailable for the session
-  // and point at system dictation instead of a misleading network error.
+  // 'network'. Once observed, switch to server transcription for the session
+  // instead of surfacing a misleading network error.
   const [runtimeUnsupported, setRuntimeUnsupported] = useState(false);
-  // Effect-driven so SSR and the first client render agree on the hint.
-  const [isElectron, setIsElectron] = useState(false);
   const transcriberRef = useRef<Transcriber | null>(null);
   const onTranscriptRef = useRef(onTranscript);
   const intentRef = useRef<ListeningIntent>('idle');
@@ -108,10 +93,6 @@ export function useSpeechRecognition({
     onTranscriptRef.current = onTranscript;
   }, [onTranscript]);
 
-  useEffect(() => {
-    setIsElectron(isElectronRuntime());
-  }, []);
-
   const settle = useCallback(() => {
     intentRef.current = 'idle';
     setIsListening(false);
@@ -120,7 +101,16 @@ export function useSpeechRecognition({
 
   useEffect(() => {
     if (!browserWindow) return;
-    const transcriber = createWebSpeechTranscriber(
+    // Web Speech where it works; otherwise record and transcribe on the
+    // server. The mic is only offered when one of the two can run.
+    const webSpeechUsable =
+      isWebSpeechTranscriptionSupported(browserWindow) &&
+      desktopDictationStatus.webSpeechFallbackAllowed &&
+      !runtimeUnsupported;
+    const createTranscriber = webSpeechUsable
+      ? createWebSpeechTranscriber
+      : createServerTranscriber;
+    const transcriber = createTranscriber(
       {
         onTranscript: text => {
           if (intentRef.current === 'idle') return;
@@ -132,7 +122,9 @@ export function useSpeechRecognition({
         onError: code => {
           intentRef.current = 'idle';
           setIsListening(false);
-          if (code === 'network' && isElectronRuntime()) {
+          if (code === 'network' && webSpeechUsable && isElectronRuntime()) {
+            // Web Speech cannot reach its backend here; the next start()
+            // records and transcribes on the server instead.
             setRuntimeUnsupported(true);
           } else {
             setError(code);
@@ -159,13 +151,13 @@ export function useSpeechRecognition({
           settle();
         },
       },
-      { lang, browserWindow }
+      webSpeechUsable ? { lang, browserWindow } : {}
     );
     transcriberRef.current = transcriber;
     setIsSupported(
-      transcriber.isSupported &&
-        desktopDictationStatus.webSpeechFallbackAllowed &&
-        !runtimeUnsupported
+      webSpeechUsable
+        ? transcriber.isSupported
+        : isServerTranscriptionSupported()
     );
 
     return () => {
@@ -226,14 +218,10 @@ export function useSpeechRecognition({
     }
   }, [isListening, start, stop]);
 
-  const unavailableHint =
-    isElectron && !isSupported ? systemDictationHint() : null;
-
   return {
     isSupported,
     isListening,
     error,
-    unavailableHint,
     clearError,
     start,
     stop,

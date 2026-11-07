@@ -12,13 +12,10 @@ import {
 function MicButton(overrides: Partial<ComposerMicButtonProps> = {}) {
   const props: ComposerMicButtonProps = {
     isListening: false,
-    isSupported: true,
-    unavailableHint: null,
     onPreserveFocus: vi.fn(),
     onPushStart: vi.fn(),
     onPushEnd: vi.fn(),
     onToggle: vi.fn(),
-    onUnavailable: vi.fn(),
     ...overrides,
   };
   return render(
@@ -54,41 +51,15 @@ describe('ComposerMicButton', () => {
     expect(onToggle2).toHaveBeenCalledTimes(1);
   });
 
-  it('when unsupported without a hint the mic is disabled and shows browser-unavailable copy', () => {
-    MicButton({ isSupported: false, unavailableHint: null });
-
-    const mic = screen.getByTestId('dictation-toggle');
-    expect(mic).toBeDisabled();
-    expect(
-      screen.getByRole('button', { name: /dictation unavailable/i })
-    ).toBeTruthy();
-  });
-
-  it('when unsupported WITH a hint (Electron system-dictation path) the mic stays enabled and press surfaces the hint via onUnavailable', () => {
-    const onUnavailable = vi.fn();
-    const onToggle = vi.fn();
+  it('is always pressable: a mic that cannot work is not rendered at all', () => {
     const buttonRef = createRef<HTMLButtonElement>();
-    const view = MicButton({
-      buttonRef,
-      isSupported: false,
-      unavailableHint: 'Use macOS dictation (press Fn twice).',
-      onUnavailable,
-      onToggle,
-    });
-
+    const view = MicButton({ buttonRef });
     const mic = screen.getByTestId('dictation-toggle');
     expect(mic).toBeEnabled();
     expect(buttonRef.current).toBe(mic);
-    buttonRef.current?.focus({ preventScroll: true });
-    expect(mic).toHaveFocus();
     expect(
-      screen.getByRole('button', { name: /dictation unavailable/i })
+      screen.getByRole('button', { name: 'Hold to dictate' })
     ).toBeTruthy();
-
-    fireEvent.click(mic);
-    expect(onUnavailable).toHaveBeenCalledTimes(1);
-    // An unsupported mic never starts dictation.
-    expect(onToggle).not.toHaveBeenCalled();
     view.unmount();
     expect(buttonRef.current).toBeNull();
   });

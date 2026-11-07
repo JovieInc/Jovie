@@ -173,81 +173,52 @@ export function ComposerAttachButton({
 export interface ComposerMicButtonProps {
   readonly buttonRef?: React.Ref<HTMLButtonElement>;
   readonly isListening: boolean;
-  readonly isSupported: boolean;
-  /**
-   * When dictation is unavailable but the OS offers its own (Electron
-   * desktop), the mic stays pressable and shows this guidance on press.
-   */
-  readonly unavailableHint?: string | null;
   readonly onPreserveFocus: (
     event: React.MouseEvent<HTMLButtonElement>
   ) => void;
   readonly onPushStart: () => void;
   readonly onPushEnd: () => void;
   readonly onToggle: () => void;
-  readonly onUnavailable?: () => void;
 }
 
 export function ComposerMicButton({
   buttonRef,
   isListening,
-  isSupported,
-  unavailableHint = null,
   onPreserveFocus,
   onPushStart,
   onPushEnd,
   onToggle,
-  onUnavailable,
 }: ComposerMicButtonProps) {
   const suppressClickToggleRef = useRef(false);
-  const hasHint = !isSupported && Boolean(unavailableHint);
-
-  const label = isSupported
-    ? isListening
-      ? 'Release to stop dictation'
-      : 'Hold to dictate'
-    : hasHint
-      ? 'Dictation unavailable · show how to dictate'
-      : 'Dictation unavailable';
-
-  const tooltip = isSupported
-    ? isListening
-      ? 'Release to stop dictation'
-      : 'Hold to dictate · press to toggle'
-    : hasHint
-      ? (unavailableHint as string)
-      : 'Dictation unavailable in this browser';
+  const label = isListening ? 'Release to stop dictation' : 'Hold to dictate';
+  const tooltip = isListening
+    ? 'Release to stop dictation'
+    : 'Hold to dictate · press to toggle';
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLButtonElement>) => {
       onPreserveFocus(event);
-      if (!isSupported) return;
       suppressClickToggleRef.current = false;
       if (typeof event.currentTarget.setPointerCapture === 'function') {
         event.currentTarget.setPointerCapture(event.pointerId);
       }
       onPushStart();
     },
-    [isSupported, onPreserveFocus, onPushStart]
+    [onPreserveFocus, onPushStart]
   );
 
   const handlePointerEnd = useCallback(() => {
-    if (!isSupported) return;
     suppressClickToggleRef.current = true;
     onPushEnd();
-  }, [isSupported, onPushEnd]);
+  }, [onPushEnd]);
 
   const handleClick = useCallback(() => {
-    if (!isSupported) {
-      if (hasHint) onUnavailable?.();
-      return;
-    }
     if (suppressClickToggleRef.current) {
       suppressClickToggleRef.current = false;
       return;
     }
     onToggle();
-  }, [hasHint, isSupported, onToggle, onUnavailable]);
+  }, [onToggle]);
 
   return (
     <SimpleTooltip content={tooltip}>
@@ -261,16 +232,12 @@ export function ComposerMicButton({
         onPointerCancel={handlePointerEnd}
         onPointerLeave={isListening ? handlePointerEnd : undefined}
         onClick={handleClick}
-        disabled={!isSupported && !hasHint}
         data-testid='dictation-toggle'
         data-active={isListening ? 'true' : undefined}
         className={cn(
           'h-9 w-9 shrink-0 touch-none select-none border border-transparent bg-surface-0 hover:border-subtle hover:bg-surface-1 hover:text-primary-token',
-          !isSupported
-            ? 'text-quaternary-token'
-            : !isListening && 'text-tertiary-token',
-          isListening && 'border-default bg-surface-2 text-primary-token',
-          'disabled:cursor-not-allowed disabled:opacity-50'
+          !isListening && 'text-tertiary-token',
+          isListening && 'border-default bg-surface-2 text-primary-token'
         )}
         aria-label={label}
         aria-pressed={isListening}

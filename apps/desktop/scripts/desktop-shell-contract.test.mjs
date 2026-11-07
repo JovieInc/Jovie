@@ -912,7 +912,7 @@ const FORBIDDEN_MAC_ENTITLEMENTS = [
   'com.apple.security.cs.disable-library-validation',
 ];
 
-test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags)', async () => {
+test('desktop macOS entitlements keep allow-jit and audio-input only (no sandbox-weakening flags)', async () => {
   for (const fileName of [
     'entitlements.mac.plist',
     'entitlements.mac.inherit.plist',
@@ -926,6 +926,12 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
     assert.match(
       entitlements,
       /<key>com\.apple\.security\.cs\.allow-jit<\/key>\s*\n\s*<true\/>/
+    );
+
+    // Hardened runtime silently denies the mic without this (JOV-9665).
+    assert.match(
+      entitlements,
+      /<key>com\.apple\.security\.device\.audio-input<\/key>\s*\n\s*<true\/>/
     );
 
     for (const forbidden of FORBIDDEN_MAC_ENTITLEMENTS) {
@@ -1246,9 +1252,10 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(mainSource, /nativeAvailable: false/);
   // Web Speech recognition is non-functional inside Electron (no Google
   // speech keys → 'network' error on every start), so the shell must never
-  // advertise it as an allowed fallback; the renderer points at OS dictation.
+  // advertise it as an allowed fallback; the renderer transcribes on the server.
   assert.doesNotMatch(mainSource, /webSpeechFallbackAllowed: true/);
-  assert.match(mainSource, /use-(macos-)?system-dictation/);
+  assert.match(mainSource, /use-server-transcription/);
+  assert.match(mainSource, /resolveMicrophoneAccess/);
   assert.match(mainSource, /shouldGrantTrustedAudioPermission/);
   assert.match(mainSource, /shouldGrantTrustedAudioPermissionCheck/);
   assert.match(mainSource, /backgroundThrottling: false/);

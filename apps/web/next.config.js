@@ -49,7 +49,7 @@ const nextConfig = {
   allowedDevOrigins: ['localhost', '127.0.0.1', '::1', '[::1]'],
   devIndicators: false,
   // Transpile workspace packages for proper module resolution
-  transpilePackages: ['@jovie/ui'],
+  transpilePackages: ['@jovie/ui', '@jovie/api-client'],
   turbopack: {
     // Path aliases are automatically resolved from tsconfig.json paths.
     // Do NOT add resolveAlias entries for @/* — that conflicts with
