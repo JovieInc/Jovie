@@ -1544,8 +1544,7 @@ describe('current acquisition source inventory (JOV-4065)', () => {
       binding => binding.kind === 'approved-section'
     );
     expect(entry.specVersion).toBe(MARKETING_SPEC_VERSION);
-    // EVENT 2026-11-03: the music-line, invite-only homepage. The rendered contract
-    // (order, owners, copy, prices, media) lives in homepage-contract.test.
+    // EVENT 2026-11-03 invite-only homepage; rendered contract: homepage-contract.test.
     expect(bindings.map(binding => binding.sectionId)).toEqual(
       MARKETING_RECIPES.find(recipe => recipe.id === 'homepage')?.sectionOrder
     );

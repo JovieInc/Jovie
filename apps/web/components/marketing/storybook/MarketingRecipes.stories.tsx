@@ -3,12 +3,7 @@ import { Check, Minus } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
-import {
-  HomepageInviteClose,
-  HomepageProfileChapter,
-  HomepageReleasesChapter,
-  HomepageStoryHero,
-} from '@/components/homepage/HomepageEditorial';
+import * as Home from '@/components/homepage/HomepageEditorial';
 import {
   FaqSection,
   MarketingContainer,
@@ -87,10 +82,10 @@ export const homepage: Story = {
   render: () => (
     <RecipeChrome recipeId='homepage'>
       <PublicPageShell>
-        <HomepageStoryHero />
-        <HomepageProfileChapter />
-        <HomepageReleasesChapter />
-        <HomepageInviteClose />
+        <Home.HomepageStoryHero />
+        <Home.HomepageProfileChapter />
+        <Home.HomepageReleasesChapter />
+        <Home.HomepageInviteClose />
       </PublicPageShell>
     </RecipeChrome>
   ),
