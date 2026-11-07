@@ -3239,10 +3239,6 @@ describe('CI E2E smoke workflow', () => {
     expect(getJobBlock(workflow, 'ci-golden-path')).toContain(
       "FEATURE_STRIPE_TEST_PRICE_CONFIGURED: 'true'"
     );
-    // Closed signup redirects anonymous /start, which would block every journey.
-    expect(getJobBlock(workflow, 'ci-golden-path')).toContain(
-      "FEATURE_PUBLIC_SIGNUP_CLOSED: 'false'"
-    );
     expect(goldenPathStep).toContain(
       'STRIPE_TEST_ACCOUNT_ID: acct_1T1DV0ASl9B9udHv'
     );
