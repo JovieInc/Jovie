@@ -49,6 +49,13 @@ def cap_for(producer: str, policy: dict) -> int | None:
     return None if cap is None else max(int(policy.get("minCap", 1)), int(cap))
 
 
+def total_cap(policy: dict | None = None) -> int:
+    """Repo-wide backstop: the sum of every named producer's cap. Each producer is limited by
+    its own WIP, so the open-PR total can only pass this when unlisted producers pile up."""
+    policy = load_policy() if policy is None else policy
+    return sum(max(int(policy.get("minCap", 1)), int(cap)) for cap in (policy.get("caps") or {}).values())
+
+
 def _labels(pr: dict) -> set[str]:
     return {(label.get("name") if isinstance(label, dict) else str(label)).lower()
             for label in pr.get("labels") or []}
