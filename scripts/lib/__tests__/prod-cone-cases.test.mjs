@@ -5,6 +5,10 @@ import {
   SURFACE_IDS,
 } from '../prod-cert.mjs';
 import {
+  checkoutConeChecks,
+  readPricingOptions,
+} from '../prod-cert-probes.mjs';
+import {
   CONE_CASE_IDS,
   CONE_CASE_PRODUCERS,
   CONE_CASES,
@@ -195,5 +199,91 @@ describe('coneScoreboard', () => {
     expect(line).toMatch(
       /cone: 2\/31 passed, 0 failed, 0 blocked, 29 uncovered/
     );
+  });
+});
+
+// JOV-9754: /api/stripe/pricing-options serves `{ pricingOptions, options }`
+// (pinned by apps/web/tests/unit/api/stripe/pricing-options.test.ts and
+// normalized the same way by usePricingOptionsQuery and the M2 revenue-path
+// canary). The checkout cone probe must read that envelope, not a bare array.
+const PRO_OFFER_FIXTURE = Object.freeze({
+  priceId: 'price_test_artist_presence',
+  amount: 1200,
+  currency: 'usd',
+  interval: 'month',
+  description: 'Artist Presence',
+});
+
+function pricingFetch(payload) {
+  return async () =>
+    new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+}
+
+async function runOfferChecks(payload) {
+  const results = {};
+  const run = async (id, fn) => {
+    try {
+      await fn();
+      results[id] = { ok: true };
+    } catch (error) {
+      results[id] = { ok: false, error: String(error?.message ?? error) };
+    }
+  };
+  const checks = checkoutConeChecks({
+    origin: 'https://jov.ie',
+    fetchImpl: pricingFetch(payload),
+    run,
+  }).filter(check => check.id !== 'return-page-no-false-paid');
+  await Promise.all(checks);
+  return results;
+}
+
+describe('checkout cone pricing checks read the served envelope (JOV-9754)', () => {
+  it('readPricingOptions unwraps pricingOptions, then options, then a bare array', () => {
+    expect(
+      readPricingOptions(
+        JSON.stringify({
+          pricingOptions: [PRO_OFFER_FIXTURE],
+          options: [PRO_OFFER_FIXTURE],
+        })
+      )
+    ).toEqual([PRO_OFFER_FIXTURE]);
+    expect(
+      readPricingOptions(JSON.stringify({ options: [PRO_OFFER_FIXTURE] }))
+    ).toEqual([PRO_OFFER_FIXTURE]);
+    expect(readPricingOptions(JSON.stringify([PRO_OFFER_FIXTURE]))).toEqual([
+      PRO_OFFER_FIXTURE,
+    ]);
+    expect(readPricingOptions(JSON.stringify({ error: 'x' }))).toEqual([]);
+  });
+
+  it('pass on the production envelope with the canonical monthly offer', async () => {
+    const results = await runOfferChecks({
+      pricingOptions: [PRO_OFFER_FIXTURE],
+      options: [PRO_OFFER_FIXTURE],
+    });
+    expect(results['offer-canonical-pricing'].ok).toBe(true);
+    expect(results['offer-no-contradictory-pricing'].ok).toBe(true);
+  });
+
+  it('still fail when the payable monthly offer is missing', async () => {
+    const results = await runOfferChecks({
+      pricingOptions: [],
+      options: [],
+    });
+    expect(results['offer-canonical-pricing'].ok).toBe(false);
+    expect(results['offer-no-contradictory-pricing'].ok).toBe(false);
+  });
+
+  it('still fail on a contradictory monthly amount', async () => {
+    const wrong = { ...PRO_OFFER_FIXTURE, amount: 3900 };
+    const results = await runOfferChecks({
+      pricingOptions: [PRO_OFFER_FIXTURE, wrong],
+      options: [PRO_OFFER_FIXTURE, wrong],
+    });
+    expect(results['offer-no-contradictory-pricing'].ok).toBe(false);
   });
 });
