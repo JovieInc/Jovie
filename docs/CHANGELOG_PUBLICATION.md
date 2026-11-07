@@ -59,3 +59,13 @@ A separate service/store adds an authority without fixing the missing publisher.
 The customer index, feeds, and What's New project only exact copy approved by a bound daily publication receipt. Historical engineering records keep their original source, dates, and permanent version pages, linked from the collapsed engineering-history index. Unreviewed technical bullets are not customer cards.
 
 New public source metadata declares `availability: {status: "ga" | "preview" | "limited", prerequisites: string[]}`. Limited rollout requires explicit prerequisites. The publisher retains this declaration and its verified customer-path evidence; it does not infer GA from eligibility. Older receipts without a declaration remain explicitly `unverified`, with no GA claim. Public/internal and scope admission for new customer-code PRs begins October 3 UTC; existing PRs keep their admission rules.
+
+## Release ledger, audiences and editorial drafts (2026-10-25)
+
+One classification layer, `apps/web/lib/release-ledger.ts`, serves every "what shipped" surface. The daily receipt carries a compact `ledger` row per verified merge (`n` PR number, `k` kind, `a` area, optional `s` story id and `e` embargo date). Titles are never stored, theme is derived at read time, and the publisher script imports the same TypeScript module the app uses.
+
+- Customer (jov.ie/changelog, What's New): approved stories only, plus one consolidated "Under the hood" line per publication day. Tooling, internal areas and maintenance never appear, not even as counts. Embargoed security work never moves a count.
+- Ops (Ovie Shipping page, "Shipped Today By Area"): every merge from the live merge feed, grouped by area, with PR links and kind.
+- Embargo: security-looking work is held until an elapsed `embargoUntil`. Set it with `<!-- release-ledger/v1 {"embargoUntil":"2026-11-01T00:00:00Z"} -->` in the PR body. No block means held.
+- Editorial drafts: with `AI_GATEWAY_API_KEY` set, the publisher asks the cheap gateway model for one outcome-first sentence per shippable change that has no author decision. Drafts must pass the plain-language lint and a support check against the PR text, and are written to `editorial-drafts.json` in the plan output. They are advisory: never published, never fail the job, and a `customer-changelog/v1` block always wins. Jev's copy rubric is an additional judge once its approval and funding are admitted.
+- Backfill: `node scripts/backfill-changelog-ledger.mjs --keys <date>[,<date>] [--write]` adds rows to existing receipts without touching digest text.

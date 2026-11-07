@@ -51,7 +51,7 @@ export async function collectCustomerCandidates({
     const fields = batch
       .map(
         number =>
-          `p${number}:pullRequest(number:${number}){number state baseRefName url body mergeCommit{oid}}`
+          `p${number}:pullRequest(number:${number}){number state baseRefName url title mergedAt body mergeCommit{oid}}`
       )
       .join('\n');
     const response = await graphql(

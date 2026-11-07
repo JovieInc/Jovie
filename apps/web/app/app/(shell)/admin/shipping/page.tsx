@@ -3,6 +3,7 @@ import { OvieShippingStateCard } from '@/components/features/admin/hud/OvieShipp
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
+import { ShippedByArea } from './ShippedByArea';
 import { ShippingMatrix } from './ShippingMatrix';
 import { ShippingStatistics } from './ShippingStatistics';
 
@@ -24,6 +25,7 @@ export default async function ShippingPage() {
       <OvieShippingStateCard />
       <ShippingMatrix />
       <ShippingStatistics />
+      <ShippedByArea />
     </AdminPage>
   );
 }

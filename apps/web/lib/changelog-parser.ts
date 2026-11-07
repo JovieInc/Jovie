@@ -26,6 +26,12 @@
 import { z } from 'zod';
 import permalinkMigrations from '../data/customer-changelog-permalink-migrations.json';
 import { isInternalEntry } from './changelog-filter-rules';
+import {
+  fromReceiptRow,
+  LEDGER_AREAS,
+  LEDGER_KINDS,
+  summarizeUnderTheHood,
+} from './release-ledger';
 
 export interface ChangelogSection {
   featured: string[];
@@ -67,6 +73,11 @@ export interface ChangelogRelease {
   dogfood?: string[];
   /** Reviewed customer copy from a verified daily publication receipt. */
   customerOutcomes?: CustomerChangelogPublication[];
+  /**
+   * One plain-language line consolidating the verified merges that did not
+   * become customer stories (release ledger). Absent on legacy receipts.
+   */
+  underTheHood?: string;
 }
 
 const DAILY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -516,6 +527,17 @@ const PublicationReceiptSchema = z.object({
     )
     .min(1),
   stories: z.array(PublicationStorySchema).max(3),
+  ledger: z
+    .array(
+      z.object({
+        n: z.number().int(),
+        k: z.enum(LEDGER_KINDS),
+        a: z.enum(LEDGER_AREAS),
+        s: z.string().optional(),
+        e: z.string().optional(),
+      })
+    )
+    .optional(),
 });
 
 function customerStoryPermalink(
@@ -584,6 +606,11 @@ function readCustomerPublication(
       });
     }
     release.customerOutcomes = outcomes;
+    const line = summarizeUnderTheHood(
+      (receipt.ledger ?? []).map(fromReceiptRow),
+      new Date()
+    ).line;
+    if (line) release.underTheHood = line;
   } catch {
     // Corrupt/legacy receipts cannot silently approve engineering bullets.
   }

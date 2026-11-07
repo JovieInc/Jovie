@@ -493,7 +493,7 @@ export type DeliveryMerges = {
   readonly byRepo: Readonly<Record<DeliveryMergeRepo, CountMeasurement>>;
   readonly last7Days: CountMeasurement;
   readonly prior7Days: CountMeasurement;
-  /** Up to 12 PRs merged since `since`, newest first, for "done today". */
+  /** Up to 50 PRs merged since `since`, newest first (Home shows 12). */
   readonly recent?: readonly DeliveryMergedPullRequest[];
 };
 

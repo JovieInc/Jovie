@@ -338,6 +338,9 @@ function EntryRow({ entry }: { readonly entry: CustomerChangelogEntry }) {
               <EntryActionLink action={action} />
             </p>
           ) : null}
+          {entry.underTheHood ? (
+            <p className='text-sm text-secondary-token'>{entry.underTheHood}</p>
+          ) : null}
           <p className='changelog-entry__tertiary'>
             <Link href={versionHref(entry.technicalVersion)}>{tertiary}</Link>
           </p>
