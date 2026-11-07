@@ -9,7 +9,7 @@ Goal: one cohesive product that is recognizably the same, and finished to Linear
 3. Find the existing Pen master and the code owner (`docs/design-system/component-ownership.json`). Change the master, not a one-off screen.
 
 ## Craft bar (what "Linear/Apple level" means here, each is checkable)
-- Alignment: 4px beat (`--space-*`); controls 28 visual / 44 hit; optical alignment of icons and text baselines; no off-grid arbitrary values (shared-UI arbitrary ratchet counts them).
+- Alignment: column layouts per [grid.md](grid.md); 4px beat (`--space-*`); controls 28 visual / 44 hit; optical alignment of icons and text baselines; no off-grid arbitrary values (shared-UI arbitrary ratchet counts them).
 - Motion: only token durations and easings (`--duration-*`, `--ease-*`); every motion has a hierarchy or feedback purpose; respects reduced motion; no layout shift from state changes.
 - Density: scan-first rows, one primary action per region, no nested bordered cards, subtraction before decoration.
 - Delight: reserve for peak moments (first release live, first fan, checkout success, profile live). Use `docs/design-system/benchmark-judgment.*` and the benchmark library when merged; do not sprinkle.
