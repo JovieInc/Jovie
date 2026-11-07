@@ -7,6 +7,7 @@ the count and the oldest age now cover runs created in the last day only.
 """
 from __future__ import annotations
 
+import importlib.util
 import json
 import sys
 import tempfile
@@ -14,10 +15,17 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import test_throughput_sentinel as base  # noqa: E402  (loads throughput_sentinel as base.ts)
+# Self-contained: the lanes release self-test ships only LANE_TESTS, so this file must not import another test.
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts/lanes"))
+_spec = importlib.util.spec_from_file_location("throughput_sentinel", ROOT / "scripts/lanes/throughput_sentinel.py")
+ts = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(ts)
+NOW = 1_800_000_000.0
 
-ts, NOW, iso = base.ts, base.NOW, base.iso
+
+def iso(epoch):
+    return ts.datetime.fromtimestamp(epoch, ts.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class GhostQueuedRunsTest(unittest.TestCase):
