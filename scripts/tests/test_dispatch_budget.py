@@ -40,7 +40,7 @@ class DispatchBudgetTest(unittest.TestCase):
         self.assertTrue(first["admitted"])
         for index in range(count):
             attempt.boundary(self.path, self.ident, first["fencingToken"], {"spend": 0, "mutations": 1}, now + 1, LOCAL, boundary_id=f"m{index}")
-        attempt.finish(self.path, self.ident, first["fencingToken"], "failed_retryable", {}, now + 2, coordination=LOCAL)
+        attempt.finish(self.path, self.ident, first["fencingToken"], "failed_known", {"failureClass": "repair_incomplete"}, now + 2, coordination=LOCAL)
 
     def test_a_spent_mutation_budget_is_refused_at_claim_with_a_reason(self):
         self.spend_mutations(100, 6)
