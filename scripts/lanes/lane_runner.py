@@ -9658,15 +9658,15 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             if local and rung_inventory_valid else []
         # A fixed share of turns gates green drafts first: red repairs otherwise took 94-99% of
         # lane turns and green drafts waited hours for a gate (2026-10-21, Gem ledger).
-        if local and not issue_turns.due(host.state, name) and provider_may_run(name, "adopt") and adoption_turn_due(host):
+        if local and not issue_turns.due(host.state, name, skip=maintenance_only) and provider_may_run(name, "adopt") and adoption_turn_due(host):
             adopt = claim_adoptable_pr(host, name, prs, candidates)
-        red = None if adopt or issue_turns.due(host.state, name) else local and (pr_events.claim_event_pr(host, THIS, name, events)
+        red = None if adopt or issue_turns.due(host.state, name, skip=maintenance_only) else local and (pr_events.claim_event_pr(host, THIS, name, events)
                          or claim_escalation_pr(host, name, list({pr["number"]: pr
                                                                for pr in candidates + rung_candidates}.values()),
                                                 routing_context=routing_context)
                          or claim_red_pr(host, name, candidates)) or None
         if adopt is None:
-            adopt = None if red or not local or issue_turns.due(host.state, name) or not provider_may_run(name, "adopt") \
+            adopt = None if red or not local or issue_turns.due(host.state, name, skip=maintenance_only) or not provider_may_run(name, "adopt") \
                 else claim_adoptable_pr(host, name, prs, candidates)
         if local:
             selected = {red["number"]} if red else {adopt.pr["number"]} if adopt else set()
@@ -9762,7 +9762,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         issue = None
         rate_limited = red is None and adopt is None
     finally:
-        claim.release(); issue_turns.record(host.state, name, served_repair=bool(red or adopt), found_issue=issue is not None)
+        claim.release(); issue_turns.record(host.state, name, served_repair=bool(red or adopt), found_issue=issue is not None, skip=maintenance_only)
     if repair_inventory_held:
         held_summary = repair_inventory.get("summary") if isinstance(repair_inventory, dict) else None
         held_summary = held_summary if isinstance(held_summary, dict) else {}

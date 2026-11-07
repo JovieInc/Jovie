@@ -18,9 +18,14 @@ def _dir(state: Path) -> Path:
     return Path(state) / "issue-turns"
 
 
-def due(state: Path, name: str, now: float | None = None) -> bool:
-    """True when this provider's last turn served a repair and no recent issue turn came up empty."""
+def due(state: Path, name: str, now: float | None = None, *, skip: bool = False) -> bool:
+    """True when this provider's last turn served a repair and no recent issue turn came up empty.
+
+    `skip` is set for maintenance-only seats, which never scan for issues: an issue turn there
+    would waste a pass and start a false empty backoff (Sentry review on #24434)."""
     root = _dir(state)
+    if skip:
+        return False
     if not (root / f"{name}.repair").exists():
         return False
     try:
@@ -30,9 +35,12 @@ def due(state: Path, name: str, now: float | None = None) -> bool:
     return (time.time() if now is None else now) - empty_at >= EMPTY_BACKOFF_S
 
 
-def record(state: Path, name: str, *, served_repair: bool, found_issue: bool) -> None:
-    """Remember what this turn served. Best-effort: never blocks a turn."""
+def record(state: Path, name: str, *, served_repair: bool, found_issue: bool, skip: bool = False) -> None:
+    """Remember what this turn served. Best-effort: never blocks a turn. Maintenance-only seats
+    (`skip`) share the provider's marker but never scan issues, so they leave it untouched."""
     root = _dir(state)
+    if skip:
+        return
     try:
         root.mkdir(parents=True, exist_ok=True)
         repair, empty = root / f"{name}.repair", root / f"{name}.empty"

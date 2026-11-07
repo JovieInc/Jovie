@@ -36,6 +36,15 @@ class IssueTurnsTest(unittest.TestCase):
             later = (state / "issue-turns/codex.empty").stat().st_mtime + issue_turns.EMPTY_BACKOFF_S
             self.assertTrue(issue_turns.due(state, "codex", now=later))
 
+    def test_a_maintenance_only_seat_never_takes_an_issue_turn(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            issue_turns.record(state, "codex", served_repair=True, found_issue=False)
+            self.assertFalse(issue_turns.due(state, "codex", skip=True))
+            self.assertTrue(issue_turns.due(state, "codex"))
+            issue_turns.record(state, "codex", served_repair=False, found_issue=False, skip=True)  # idle maintenance pass
+            self.assertTrue(issue_turns.due(state, "codex"))  # leaves the shared marker alone
+
     def test_record_never_raises_on_an_unwritable_state(self):
         issue_turns.record(Path("/dev/null/not-a-dir"), "codex", served_repair=True, found_issue=False)
 
