@@ -350,7 +350,7 @@ describe.skipIf(!gh)(
           RESOLVE_MAIN_BUDGET_SECONDS: '0',
           RESOLVE_MAIN_RETRY_SECONDS: '0',
         },
-        route: () => null,
+        route: mainRoute(NEWER),
       });
       expect(unresolved.code).not.toBe(0);
     });
@@ -459,7 +459,8 @@ describe.skipIf(!gh)(
 
     async function resolveResult(
       overrides: Needs = {},
-      stagingVerified = 'true'
+      stagingVerified = 'true',
+      { mainRef = `${NEWER}\trefs/heads/main\n`, gitExit = 0 } = {}
     ) {
       const needs: Needs = { ...green };
       for (const [id, value] of Object.entries(overrides))
@@ -468,8 +469,9 @@ describe.skipIf(!gh)(
           ...value,
           outputs: { ...needs[id]?.outputs, ...value.outputs },
         };
-      const root = realpathSync(mkdtempSync(join(tmpdir(), 'jovie-result-')));
-      roots.push(root);
+      const { root, bin, calls } = workspace({
+        git: 'printf \'%s\' "$MAIN_REF"; exit "$GIT_EXIT"',
+      });
       const output = join(root, 'output');
       writeFileSync(output, '');
       const promote = needs['promote-production']?.outputs ?? {};
@@ -479,6 +481,9 @@ describe.skipIf(!gh)(
           inputs: { staging_verified: stagingVerified },
         }),
         env: {
+          PATH: `${bin}:${process.env.PATH ?? ''}`,
+          MAIN_REF: mainRef,
+          GIT_EXIT: String(gitExit),
           GITHUB_OUTPUT: output,
           GITHUB_WORKSPACE: repoRoot,
           EXPECTED_SHA: SHA,
@@ -488,9 +493,9 @@ describe.skipIf(!gh)(
             promote.production_deployment_url_b64 ?? '',
           PREVIOUS_PRODUCTION_DEPLOYMENT_ID: 'dpl_Prev',
         },
-        route: mainRoute(NEWER),
+        route: () => null,
       });
-      return { ...result, outputs: readOutputs(output) };
+      return { ...result, outputs: readOutputs(output), gitCalls: calls() };
     }
 
     it('runs for every production release and reads every release job', () => {
@@ -516,6 +521,25 @@ describe.skipIf(!gh)(
       });
       // A newer main does not erase the completed older generation.
       expect(released.stdout).toContain('preserving released=true');
+      expect(released.requests).toEqual([]);
+      expect(released.gitCalls).toBe(
+        'git ls-remote --refs https://github.com/JovieInc/Jovie.git refs/heads/main\n'
+      );
+    });
+
+    it('never releases on invalid or unavailable main evidence, even when REST is reachable', async () => {
+      for (const evidence of [
+        { mainRef: `${NEWER}\trefs/heads/not-main\n` },
+        { mainRef: `${'0'.repeat(40)}\trefs/heads/main\n` },
+        { mainRef: `${SHA}\trefs/heads/main\n${NEWER}\trefs/heads/main\n` },
+        { gitExit: 1 },
+      ]) {
+        const blocked = await resolveResult({}, 'true', evidence);
+        expect(blocked.code).toBe(1);
+        expect(blocked.outputs.released).toBe('false');
+        expect(blocked.requests).toEqual([]);
+        expect(blocked.gitCalls.split('\n').filter(Boolean)).toHaveLength(1);
+      }
     });
 
     it('never releases without the exact staging receipt', async () => {

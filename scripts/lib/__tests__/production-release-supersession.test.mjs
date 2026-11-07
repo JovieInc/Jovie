@@ -2485,6 +2485,170 @@ printf 'HTTP/2 200\\r\\n\\r\\n{"sha":"%s"}\\n' "$STUB_MAIN_SHA"
   });
 });
 
+describe('certification main-ref reads', () => {
+  function readMain(
+    response,
+    { exit = 0, token = 'test-token', hang = false } = {}
+  ) {
+    const fixture = makeFixture('certification-main-');
+    const calls = join(fixture.root, 'calls');
+    stubCommand(
+      fixture.bin,
+      'git',
+      `#!/bin/sh
+printf 'git\\n' >> "$STUB_CALLS"
+printf '%s\\n' "$@" > "$STUB_ARGUMENTS"
+printf '%s\\n' "$GIT_CONFIG_VALUE_0" > "$STUB_AUTH"
+if [ "$STUB_HANG" = true ]; then exec sleep 30; fi
+printf '%s' "$STUB_RESPONSE"
+exit "$STUB_EXIT"
+`
+    );
+    stubCommand(
+      fixture.bin,
+      'gh',
+      '#!/bin/sh\nprintf "rest\\n" >> "$STUB_CALLS"\nexit 1\n'
+    );
+    stubCommand(
+      fixture.bin,
+      'sleep',
+      '#!/bin/sh\nprintf "sleep\\n" >> "$STUB_CALLS"\nexit 1\n'
+    );
+    // Shorten only the fixture clock; run the real GNU timeout process boundary.
+    const realTimeout = spawnSync('which', ['timeout'], {
+      encoding: 'utf8',
+    }).stdout.trim();
+    stubCommand(
+      fixture.bin,
+      'timeout',
+      `#!/bin/sh
+printf '%s\\n' "$@" > "$STUB_DEADLINE"
+shift 2
+exec "$STUB_REAL_TIMEOUT" --signal=KILL 0.1s "$@"
+`
+    );
+    if (hang) {
+      stubCommand(fixture.bin, 'sleep', '#!/bin/sh\nexec /bin/sleep "$@"\n');
+    }
+    const result = spawnSync(
+      'bash',
+      [
+        resolve(REPO_ROOT, '.github/scripts/resolve-main-sha.sh'),
+        'JovieInc/Jovie',
+        '--once',
+      ],
+      {
+        encoding: 'utf8',
+        timeout: 5_000,
+        env: {
+          ...process.env,
+          GH_TOKEN: token,
+          GITHUB_TOKEN: '',
+          PATH: `${fixture.bin}${delimiter}${process.env.PATH || ''}`,
+          RESOLVE_MAIN_RETRY_SECONDS: '0',
+          STUB_ARGUMENTS: join(fixture.root, 'arguments'),
+          STUB_AUTH: join(fixture.root, 'auth'),
+          STUB_CALLS: calls,
+          STUB_DEADLINE: join(fixture.root, 'deadline'),
+          STUB_EXIT: String(exit),
+          STUB_HANG: String(hang),
+          STUB_REAL_TIMEOUT: realTimeout,
+          STUB_RESPONSE: response,
+        },
+      }
+    );
+    const read = name =>
+      existsSync(join(fixture.root, name))
+        ? readFileSync(join(fixture.root, name), 'utf8')
+        : '';
+    return {
+      result,
+      calls: read('calls'),
+      args: read('arguments'),
+      auth: read('auth'),
+      deadline: read('deadline'),
+    };
+  }
+
+  it.each(['test-token', ''])(
+    'reads one exact main ref within 15s (token=%s)',
+    token => {
+      const run = readMain(`${EXPECTED_SHA}\trefs/heads/main\n`, { token });
+      expect(run.result.status, run.result.stderr).toBe(0);
+      expect(run.result.stdout).toBe(`${EXPECTED_SHA}\n`);
+      expect(run.calls).toBe('git\n');
+      expect(run.args).toBe(
+        'ls-remote\n--refs\nhttps://github.com/JovieInc/Jovie.git\nrefs/heads/main\n'
+      );
+      expect(run.deadline).toBe('--signal=KILL\n15s\ngit\n' + run.args);
+      if (token)
+        expect(run.auth.trim()).toBe(
+          `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`
+        );
+    }
+  );
+
+  it.each([
+    ['empty', ''],
+    ['zero', `${'0'.repeat(40)}\trefs/heads/main\n`],
+    ['wrong ref', `${EXPECTED_SHA}\trefs/heads/not-main\n`],
+    [
+      'ambiguous',
+      `${EXPECTED_SHA}\trefs/heads/main\n${NEWER_SHA}\trefs/heads/main\n`,
+    ],
+    [
+      'duplicate',
+      `${EXPECTED_SHA}\trefs/heads/main\n${EXPECTED_SHA}\trefs/heads/main\n`,
+    ],
+    ['short SHA', 'aaaaaaa\trefs/heads/main\n'],
+    ['missing ref', `${EXPECTED_SHA}\n`],
+    ['trailing data', `${EXPECTED_SHA}\trefs/heads/main extra\n`],
+  ])(
+    'rejects %s evidence without retries or REST fallback',
+    (_name, response) => {
+      const run = readMain(response);
+      expect(run.result.status).toBe(1);
+      expect(run.result.stdout).toBe('');
+      expect(run.calls).toBe('git\n');
+    }
+  );
+
+  it('rejects valid-looking output from a failed Git process', () => {
+    const run = readMain(`${EXPECTED_SHA}\trefs/heads/main\n`, { exit: 1 });
+    expect(run.result.status).toBe(1);
+    expect(run.result.stdout).toBe('');
+    expect(run.calls).toBe('git\n');
+  });
+
+  it('kills a stalled Git read and fails closed without a second read', () => {
+    const run = readMain('', { hang: true });
+    expect(run.result.error).toBeUndefined();
+    expect(run.result.status).toBe(1);
+    expect(run.result.stdout).toBe('');
+    expect(run.calls).toBe('git\n');
+  });
+
+  it('selects single-read mode at all four final certification boundaries', () => {
+    const verified = getJobBlock(CONTROLLER_WORKFLOW, 'production-verified');
+    const scripts = [
+      getStepRunScript(
+        getJobBlock(RELEASE_WORKFLOW, 'release-result'),
+        'Resolve release result'
+      ),
+      ...[
+        'Resolve current main before final verification',
+        'Require exact deployment and every post-deploy probe',
+        'Finalize exact current release generation',
+      ].map(name => getStepRunScript(verified, name)),
+    ];
+    for (const script of scripts) {
+      expect(script.match(/resolve-main-sha\.sh[^\n]+/g)).toEqual([
+        expect.stringMatching(/ --once"?\)"$/),
+      ]);
+    }
+  });
+});
+
 describe('controller starvation bound', () => {
   it.each([
     ['current_main_sha', 'echo "is_current=true"'],
