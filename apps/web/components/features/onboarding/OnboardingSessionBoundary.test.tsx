@@ -293,16 +293,19 @@ describe('onboarding identity boundary', () => {
   });
 
   it('exposes the restore-failure code and auth state for the nightly stall annotation (JOV-7653)', async () => {
-    let mounted: ReturnType<typeof render> | null = null;
+    const unmounts: Array<() => void> = [];
     const renderStalled = async (
       rejection: () => Promise<unknown>,
       auth: Partial<typeof mocks.auth>
     ) => {
-      mounted?.unmount();
+      unmounts.pop()?.();
       mocks.fetch.mockReset();
       mocks.fetch.mockImplementationOnce(rejection);
       Object.assign(mocks.auth, auth);
-      mounted = render(<OnboardingSessionBoundary sessionLabel='pending' />);
+      const mounted = render(
+        <OnboardingSessionBoundary sessionLabel='pending' />
+      );
+      unmounts.push(() => mounted.unmount());
       return await screen.findByRole('alert');
     };
 
@@ -337,7 +340,7 @@ describe('onboarding identity boundary', () => {
     expect(boundary).toHaveAttribute('data-restore-error', 'restore-network');
     expect(boundary).toHaveAttribute('data-auth-state', 'signed-in');
 
-    mounted?.unmount();
+    unmounts.pop()?.();
   });
   it('offers restoration retry without fabricating a fresh onboarding flow', async () => {
     mocks.fetch
