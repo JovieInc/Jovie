@@ -3298,6 +3298,33 @@ console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
         self.assertEqual(events.repair_evidence_body(self.PR, updated,
                                                    customer_decision={"releaseWorthy": False}), updated)
 
+    def test_repair_adds_explicit_machine_receipt_once_and_preserves_existing_decision(self):
+        machine = "Machine: built scripts/lanes/pr_events.py"
+        updated = events.repair_evidence_body(self.PR, "Summary", machine_receipt=machine)
+        self.assertEqual(updated.count(machine), 1)
+        self.assertEqual(events.repair_evidence_body(self.PR, updated, machine_receipt=machine), updated)
+        existing = "Summary\nMachine-gap: JOV-1234\n"
+        preserved = events.repair_evidence_body(self.PR, existing, machine_receipt=machine)
+        self.assertIn("Machine-gap: JOV-1234", preserved)
+        self.assertNotIn(machine, preserved)
+        self.assertNotIn("Machine:", events.repair_evidence_body(self.PR, "Summary"))
+        for invalid in ("built scripts/machine.py", "Machine: built", "Machine: built x\nMachine-gap: JOV-1234"):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                events.repair_evidence_body(self.PR, "Summary", machine_receipt=invalid)
+
+    def test_ensure_can_publish_only_a_machine_receipt_without_inventing_red_evidence(self):
+        machine = "Machine: built scripts/lanes/pr_events.py"
+        written = []
+
+        def shell(args):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout="Summary\n")
+            written.append(Path(args[args.index("--body-file") + 1]).read_text())
+            return SimpleNamespace(returncode=0)
+
+        self.assertTrue(events.ensure_red_before_green({"number": 23251}, sh=shell, machine_receipt=machine))
+        self.assertEqual(written, ["Summary\n\n" + machine + "\n"])
+
     def test_repair_preserves_fenced_red_logs_accepted_by_the_canonical_gate(self):
         bodies = [
             "## Red-before-green\n- Failing command: `node probe.mjs`\n\n"

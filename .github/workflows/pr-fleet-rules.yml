@@ -1,4 +1,5 @@
 name: PR Fleet Rules
+# github-token-budget: 2 calls/run - one PR files read plus one free rate_limit sample
 on:
   pull_request:
     types: [opened, edited, synchronize, labeled, unlabeled, reopened]
@@ -63,3 +64,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/pr-fleet-rules.mjs --with-warnings --advisory
+      # Dedicated quota sample, every run: GET /rate_limit costs no quota. Emits
+      # one api-quota notice per resource (core, graphql, search) for
+      # scripts/lib/api-quota-report.mjs headroom, so the report never depends on
+      # Merge Queue Green Enroll having run in that hour.
+      - name: Sample API quota
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/lib/api-quota-report.mjs sample
