@@ -4041,7 +4041,7 @@ class WorkerTest(unittest.TestCase):
         # Optional file/provider reads can exceed the census TTL. A new same-call
         # receipt must select the current head, never donate a timestamp to old rows.
         for delay_in in ('scope', 'routing'):
-            with self.subTest(delay_in=delay_in):
+            with self.subTest(delay_in=delay_in), patch.object(lane.issue_turns, 'due', return_value=False):  # one pass
                 clock = [1000.0]
                 old = repair_inventory_pr()
                 current = {**old, 'headRefOid': 'b' * 40}
@@ -4332,7 +4332,7 @@ class WorkerTest(unittest.TestCase):
 
     def test_event_cleanup_waits_until_all_productive_selections_decline(self):
         for chosen in ("event", "poll", "adopt", "issue", "idle"):
-            with self.subTest(chosen=chosen):
+            with self.subTest(chosen=chosen), patch.object(lane.issue_turns, "due", return_value=False):  # one pass, no turn history
                 self.linear.issues = [issue("JOV-3")] if chosen == "issue" else []
                 with patch.object(lane.pr_events, "claim_event_pr", return_value={"number": 5} if chosen == "event" else None), \
                      patch.object(lane, "claim_red_pr", return_value={"number": 5} if chosen == "poll" else None), \

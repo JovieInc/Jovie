@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { linkOnboardingSessionReplaysToUser } from '@/lib/analytics/signup-replay.server';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { isWaitlistApprovedUserStatus } from '@/lib/auth/canonical-user-state';
 import { getDbUser } from '@/lib/auth/session';
@@ -394,6 +395,14 @@ export async function POST(req: Request) {
       // call this endpoint unconditionally after sign-up.
       return NextResponse.json({ claimed: 0 });
     }
+
+    // Best effort: tie this visitor's session replays to the new account.
+    await linkOnboardingSessionReplaysToUser(sessionId, userId).catch(error =>
+      captureError('Onboarding replay link failed', error, {
+        route: '/api/onboarding/claim',
+        method: 'POST',
+      })
+    );
 
     const accessControlled = await isWaitlistGateEnabled().catch(
       async error => {
