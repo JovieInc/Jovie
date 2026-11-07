@@ -16,4 +16,16 @@ describe('TabBar task density contract', () => {
       "cn('invisible absolute', overflowTriggerClassName)"
     );
   });
+
+  it('draws the drawer variant as the canonical pill segmented control', () => {
+    const source = readFileSync(resolve(__dirname, './TabBar.tsx'), 'utf8');
+    const rail = source.match(/TAB_BAR_RAIL_CLASSNAME =\n\s*'([^']*)'/)?.[1];
+    const trigger = source.match(
+      /TAB_BAR_DRAWER_TRIGGER_CLASSNAME =\n\s*'([^']*)'/
+    )?.[1];
+    expect(rail).toContain('rounded-full');
+    expect(trigger).toContain('rounded-full');
+    expect(trigger).not.toContain('border-b-2');
+    expect(source).toContain('bg-surface-3 font-medium text-primary-token');
+  });
 });

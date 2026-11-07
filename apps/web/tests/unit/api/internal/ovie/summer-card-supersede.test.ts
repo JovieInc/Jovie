@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   verify: vi.fn(),
   supersede: vi.fn(),
+  getCard: vi.fn(),
+  decide: vi.fn(),
   captureError: vi.fn(),
 }));
 
@@ -11,9 +13,15 @@ vi.mock('@/lib/ovie/summer-oidc.server', () => ({
 }));
 vi.mock('@/lib/ovie/summer-cards.server', () => ({
   supersedeSummerCard: mocks.supersede,
+  getSummerCard: mocks.getCard,
+  decideSummerCard: mocks.decide,
 }));
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mocks.captureError,
+}));
+vi.mock('@/lib/claim/claim-verification-review.server', () => ({
+  profileIdFromClaimCardKey: (key: string | undefined) =>
+    key?.startsWith('claim-verification_') ? 'profile-1' : null,
 }));
 
 const { POST } = await import(
@@ -80,7 +88,7 @@ describe('POST summer card supersede', () => {
     { reason: 'short' },
     { reason: '        ' },
     { reason: 'x'.repeat(301) },
-    { reason, decision: 'approve' },
+    { reason, note: 'no' },
   ])('rejects an invalid reason or extra fields: %j', async body => {
     const response = await POST(request(body), context());
     expect(response.status).toBe(400);
@@ -133,5 +141,26 @@ describe('POST summer card supersede', () => {
       error,
       { route }
     );
+  });
+
+  it('refuses a fleet approve of a founder-required card', async () => {
+    mocks.getCard.mockResolvedValue({
+      id,
+      status: 'pending',
+      kind: 'decision',
+      idempotencyKey: 'other-card',
+      defaultDecision: 'none',
+    });
+    const response = await POST(
+      request({ reason, decision: 'approve' }),
+      context()
+    );
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: 'reserved_kind',
+      kind: 'decision',
+    });
+    expect(mocks.decide).not.toHaveBeenCalled();
+    expect(mocks.supersede).not.toHaveBeenCalled();
   });
 });

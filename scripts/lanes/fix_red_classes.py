@@ -31,11 +31,12 @@ from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_LAUNCH_CACHE, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent")
+    "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-launch-cache", "agent")
 DETERMINISTIC = frozenset({
-    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE})
+    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN,
+    ATOMIC_WRITE, REPAIR_LAUNCH_CACHE})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -48,6 +49,23 @@ UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
 BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?## ?(?:Red-before-green|Blast radius)",
                        re.IGNORECASE)
+# Source Validation includes passing fixtures that print quota/network errors.
+# A concrete component error needs regression coverage, never an infra retry.
+COMPONENT_TEST_TEXT = re.compile(
+    r"::error file=[^\s:]+::\[test-not-touched\] Component changed but test "
+    r"((?:apps/web|packages/ui)/[\w./-]+\.(?:test|spec)\.[jt]sx?) was not touched in this diff\.")
+# New routes missing from the artist-launch manifest, and new files that add a
+# legacy Cache Components export. Either line is this class. Do not raise the
+# maximum and do not strip exports from files the PR did not add.
+LAUNCH_INVENTORY_DRIFT = re.compile(
+    r"launch inventory drift: classify/review new routes and regenerate the manifest")
+LEGACY_CACHE_GREW = re.compile(
+    r"legacy Cache Components surface grew to \d+ \(maximum \d+\)")
+LAUNCH_CACHE_TEXT = re.compile(LAUNCH_INVENTORY_DRIFT.pattern + r"|" + LEGACY_CACHE_GREW.pattern)
+_LEGACY_EXPORT_LINE = re.compile(
+    r"^[ \t]*export const (?:dynamic|fetchCache|revalidate)\s*=.*(?:\n|\Z)", re.M)
+_LEGACY_CACHE_ROOTS = ("apps/web/app/", "apps/web/lib/")
+_LEGACY_CACHE_SKIP = re.compile(r"\.(?:stories|test)\.[^.]+$")
 # The internal customer-changelog decision. A second note is `ambiguous`, so a body that already
 # contains one is never stamped again. The quota form is the attempt>1 mask of the same defect:
 # the guard could not re-read the body, so the log no longer says missing-metadata.
@@ -120,19 +138,21 @@ _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
+    ("component-test-evidence", COMPONENT_TEST_TEXT, AGENT),
+    # Before narrowed-preflight and platform-infra: a Source Validation log echoes
+    # the conflict script and passing-test rate-limit lines beside the guard error.
+    ("launch-cache", LAUNCH_CACHE_TEXT, REPAIR_LAUNCH_CACHE),
     ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),
-    # Before platform-infra: a Source Validation log can carry passing-test
-    # rate-limit lines beside the guard error that actually failed the job.
+    # Before platform-infra: a Source Validation log can carry passing-test rate-limit lines beside the guard error that actually failed the job.
     ("domain-write", DOMAIN_WRITE, REGISTER_DOMAIN),
     ("changelog-metadata", CHANGELOG_MISSING, STAMP_CHANGELOG),
-    # Before platform-infra: the ratchet message includes a count such as 591,
-    # and `\b5\d\d\b` would otherwise treat that count as an HTTP 5xx.
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
+    # Inventory assertion outranks quota/infra noise echoed in the same log.
+    ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
-    ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     ("atomic-write", ATOMIC_TEXT, ATOMIC_WRITE),
     ("pr-body", BODY_TEXT, AGENT),
 )
@@ -144,8 +164,10 @@ DEFAULT_BREAKER_N, MAX_BREAKER_N, MIN_CELL_RUNS = 2, 3, 10
 
 
 def error_signature(text: str) -> str:
-    """The first error-looking line with volatile tokens removed, so two runs of one failure match."""
-    for line in str(text or "").splitlines():
+    """Prefer the failed-test summary to setup/mock output; normalize volatile tokens."""
+    text = re.sub(r"\x1b\[[0-9;]*m", "", str(text or ""))
+    text = re.split(r"(?m)^.*?\bFailed (?:Tests|Suites) [1-9]\d*\s*[⎯─-]*\s*$", text)[-1]
+    for line in text.splitlines():
         if re.search(r"\b(error|fail(?:ed|ure)?|assert|expected|unwired|violation)\b", line, re.IGNORECASE):
             line = re.sub(r"^\S*\d{4}-\d\d-\d\dT[\d:.]+Z\s*", "", line.strip())
             line = re.sub(r"\b[0-9a-f]{7,40}\b|\d+", "#", line)
@@ -163,6 +185,36 @@ def fingerprint_key(cls: str, names: list[str], signature: str = "") -> str:
     if cls in {"other", "mixed"}:
         parts.append(signature)
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:12]
+
+
+def strip_added_legacy_cache_exports(root: Path, added_files) -> list[str]:
+    """Drop legacy Cache Components exports from files this change adds.
+
+    `added_files` is the PR's added paths. Files that already existed stay
+    grandfathered, including an identical export in a neighbor. The ratchet
+    maximum is never raised. Returns the relative paths written.
+    """
+    changed = []
+    root = Path(root)
+    for rel in sorted({str(path or "").replace("\\", "/") for path in added_files or []}):
+        if not rel or rel.startswith("/") or ".." in Path(rel).parts:
+            continue
+        if not rel.startswith(_LEGACY_CACHE_ROOTS) or _LEGACY_CACHE_SKIP.search(rel):
+            continue
+        path = root / rel
+        try:
+            original = path.read_text()
+        except OSError:
+            continue
+        updated = _LEGACY_EXPORT_LINE.sub("", original)
+        if updated == original:
+            continue
+        try:
+            atomic_write_text(path, updated)
+        except OSError:
+            continue
+        changed.append(rel)
+    return changed
 
 
 def stamp_internal_changelog(body) -> str | None:
@@ -192,6 +244,14 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         cls, action = "mixed", AGENT
     else:
         cls, action = "other", AGENT
+    # Launch-inventory drift and a grown legacy-cache surface are one repair.
+    # An unexplained companion (Tently, an empty log) does not send that repair
+    # back to a model. A second deterministic class still stays mixed.
+    if cls == "mixed":
+        routed = {(item_cls, item_action) for item_cls, item_action in per_check if item_cls == "launch-cache"}
+        companions = {item_cls for item_cls, _item_action in per_check if item_cls != "launch-cache"}
+        if routed and companions <= {"other"}:
+            cls, action = next(iter(routed))
     signature = error_signature("\n".join(logs.get(name) or "" for name in names)) if cls in {"other", "mixed"} else ""
     if cls in {"other", "mixed"} and pr.get("mergeStateStatus") == "BEHIND":
         cls, action = BEHIND_CLASS, SYNC_MAIN
@@ -201,6 +261,8 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
             and stamp_internal_changelog(pr.get("body")) is not None:
         cls, action, signature = "changelog-metadata", STAMP_CHANGELOG, ""
     files = []
+    if cls == "component-test-evidence":
+        files = sorted({test for name in names for test in COMPONENT_TEST_TEXT.findall(logs.get(name) or "")})
     if cls == "ci-fast-wiring":
         for name in names:
             found = UNWIRED.search(logs.get(name) or "")
@@ -1032,6 +1094,48 @@ def wire_ci_fast(root: Path, files: list[str]) -> list[str]:
     if added:
         atomic_write_text(lanes, text)
     return added
+
+
+def _ensure_objects(literal: str) -> str:
+    """Add the objects map install_release archives, unless this flat dict already has one."""
+    if not literal.startswith("{") or not literal.endswith("}") or "\n" in literal or "**" in literal:
+        return literal
+    if re.search(r"""['"]objects['"]\s*:""", literal):
+        return literal
+    body = literal[1:-1].rstrip()
+    suffix = "" if not body.strip() or body.endswith(",") else ","
+    return "{" + body + suffix + ' "objects": {"scripts/lanes": "f" * 40}}'
+
+
+def _complete_block(block: str) -> str:
+    names = set()
+    for match in re.finditer(r"return_value\s*=\s*([A-Za-z_]\w*)\b", block):
+        if match.end() < len(block) and block[match.end()] == ".":
+            continue
+        names.add(match.group(1))
+
+    def rewrite(found):
+        return found.group(1) + _ensure_objects(found.group(2))
+
+    for name in sorted(names):
+        block = re.sub(rf"(?m)^(\s*{re.escape(name)}\s*=\s*)(\{{[^\n]*\}})", rewrite, block)
+    return re.sub(r"(return_value\s*=\s*)(\{[^\n]*\})", rewrite, block)
+
+
+def complete_release_identity_stubs(source: str) -> str:
+    """Fill one-line release_identity fixtures that install_release will archive.
+
+    A top-level function or test method that both stubs release_identity and calls
+    install_release needs an objects map: install_release archives sorted(bundle["objects"])
+    before prove-staging. On 2026-10-29 that KeyError failed Source Validation for an
+    incomplete custody stub, and the update backoff test uses the same shape. Multiline
+    literals and **spreads stay as written. The checked-in lane runner tests are a fixed
+    point of this function.
+    """
+    parts = re.split(r"(?=^(?:def |    def ))", source, flags=re.M)
+    return "".join(
+        _complete_block(part) if "install_release" in part and "release_identity" in part else part
+        for part in parts)
 
 
 # ---- measurement ---------------------------------------------------------------------------------

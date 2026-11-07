@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 const checkout = vi.hoisted(() => ({
@@ -14,7 +14,6 @@ vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
 vi.mock('@/lib/queries', () => ({ useCheckoutMutation: () => checkout }));
 
 import { WaitlistOutcomeView } from '@/components/features/waitlist/WaitlistOutcomeView';
-import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 
 describe('WaitlistOutcomeView pending receipt', () => {
   it('claims jov.ie/<handle> is reserved only when a held handle is passed', () => {
@@ -42,44 +41,34 @@ describe('WaitlistOutcomeView pending receipt', () => {
   });
 });
 
-describe('WaitlistOutcomeView Start Pro (JOV-7701: anyone can buy)', () => {
+describe('WaitlistOutcomeView has no payment ask (invite-only GTM)', () => {
   it.each([
-    ['a reserved handle', 'coolartist'],
-    ['no link', null],
-  ])('offers Start Pro on the pending receipt with %s', (_label, handle) => {
-    checkout.mutate.mockClear();
-    render(
-      <WaitlistOutcomeView
-        outcome='pending'
-        reservedHandle={handle}
-        proCheckoutPriceId='price_pro_monthly'
-      />
-    );
+    ['pending with a reserved handle', 'pending', 'coolartist'],
+    ['pending with no link', 'pending', null],
+    ['save_failed', 'save_failed', null],
+    ['rate_limited', 'rate_limited', null],
+    ['receipt_unavailable', 'receipt_unavailable', null],
+  ] as const)(
+    '%s shows no payment CTA or skip-the-line copy',
+    (_l, outcome, handle) => {
+      const { container } = render(
+        <WaitlistOutcomeView outcome={outcome} reservedHandle={handle} />
+      );
 
-    const cta = screen.getByTestId('waitlist-start-pro-checkout');
-    expect(cta).toHaveTextContent(getPublicPriceClaim('pro').ctaLabel);
-    expect(cta).toHaveTextContent('Start Artist Presence');
-    expect(cta).not.toHaveTextContent('Start Pro');
-    fireEvent.click(cta);
-    // Default checkout: no onboarding source, so success lands on
-    // /billing/success and routes a link-less buyer to /start.
-    expect(checkout.mutate).toHaveBeenCalledWith(
-      { priceId: 'price_pro_monthly' },
-      expect.any(Object)
-    );
-    expect(screen.getByTestId('waitlist-resume-start')).toBeInTheDocument();
-  });
+      expect(screen.queryByTestId('waitlist-start-pro-checkout')).toBeNull();
+      expect(screen.queryByTestId('waitlist-start-pro-note')).toBeNull();
+      expect(container.textContent).not.toMatch(
+        /skip the waitlist|payment|checkout|\$\d|\/month|Artist Presence|Start Pro|credit card|\bcard\b/i
+      );
+      expect(checkout.mutate).not.toHaveBeenCalled();
+    }
+  );
 
-  it('hides Start Pro without a configured price or on error receipts', () => {
-    const { rerender } = render(<WaitlistOutcomeView outcome='pending' />);
-    expect(screen.queryByTestId('waitlist-start-pro-checkout')).toBeNull();
-
-    rerender(
-      <WaitlistOutcomeView
-        outcome='save_failed'
-        proCheckoutPriceId='price_pro_monthly'
-      />
+  it('keeps the pending confirmation actionable: resume at /start, no dead end', () => {
+    render(<WaitlistOutcomeView outcome='pending' />);
+    expect(screen.getByTestId('waitlist-resume-start')).toHaveAttribute(
+      'href',
+      '/start'
     );
-    expect(screen.queryByTestId('waitlist-start-pro-checkout')).toBeNull();
   });
 });

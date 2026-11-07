@@ -99,10 +99,10 @@ const DESTRUCTIVE_CLASSES: Record<ButtonVariant, string> = {
   primary:
     'border-btn-destructive bg-btn-destructive text-btn-destructive-foreground hover:border-btn-destructive/95 hover:bg-btn-destructive/95',
   secondary:
-    'border-0 bg-error-subtle text-error hover:bg-error-subtle hover:text-error',
-  tertiary: 'text-error hover:bg-error-subtle hover:text-error',
-  ghost: 'text-error hover:bg-error-subtle hover:text-error',
-  link: 'text-error hover:text-error',
+    'border-0 bg-error-subtle text-error-text hover:bg-error-subtle hover:text-error-text',
+  tertiary: 'text-error-text hover:bg-error-subtle hover:text-error-text',
+  ghost: 'text-error-text hover:bg-error-subtle hover:text-error-text',
+  link: 'text-error-text hover:text-error-text',
 };
 
 const warnedDeprecatedValues = new Set<string>();

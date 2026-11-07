@@ -12,7 +12,10 @@
 //   3. the user's OWN walk (walk subject == subject) on the same SHA has a
 //      strong-tier `pay` verdict that clears the ready hysteresis;
 //   4. the ICP controls still come out no_pay on that SHA (a judge that says
-//      pay to the off-ICP control is sycophantic, so its yes means nothing).
+//      pay to the off-ICP control is sycophantic, so its yes means nothing);
+//   5. every REQUIRED_PERSONAS buyer says pay on that SHA, ratcheted: a
+//      persona is report-only (an advisory) until it has passed RATCHET_PASSES
+//      times in a row, then it enforces for good.
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -20,6 +23,28 @@ import { fileURLToPath } from 'node:url';
 import { holdoutHolds, RUBRIC_VERSION, readyFlag } from './rubric.mjs';
 
 export const MIN_HOLDOUTS = 3;
+export const REQUIRED_PERSONAS = Object.freeze(['heritage-rock-manager']);
+export const RATCHET_PASSES = 3;
+
+/**
+ * Report-only until `RATCHET_PASSES` consecutive pay verdicts on the current
+ * rubric (oldest first), then enforcing forever: a later fail does not
+ * demote it.
+ */
+export function personaRatchet(receipts, personaId) {
+  const rows = receipts.filter(
+    row =>
+      row.rubric === RUBRIC_VERSION &&
+      !row.holdout &&
+      row.persona?.id === personaId
+  );
+  let streak = 0;
+  for (const row of rows) {
+    streak = row.verdict === 'pay' ? streak + 1 : 0;
+    if (streak >= RATCHET_PASSES) return 'enforce';
+  }
+  return 'report';
+}
 export const MAX_AGE_DAYS = 3;
 
 export function readReceipts(stateDir) {
@@ -90,6 +115,19 @@ export function buyerReady({
   if (controls.some(row => row.verdict === 'pay'))
     reasons.push('control-said-pay:judge-untrusted');
 
+  const advisories = [];
+  for (const personaId of REQUIRED_PERSONAS) {
+    const row = onSha.filter(r => r.persona?.id === personaId).at(-1);
+    const miss = !row
+      ? `persona-not-run-on-sha:${personaId}`
+      : row.verdict !== 'pay'
+        ? `persona-verdict:${personaId}:${row.verdict}(p=${row.pPay})`
+        : null;
+    if (!miss) continue;
+    if (personaRatchet(receipts, personaId) === 'enforce') reasons.push(miss);
+    else advisories.push(`report-only:${miss}`);
+  }
+
   const own = onSha
     .filter(row => row.subject === subject && row.walkSubject === subject)
     .at(-1);
@@ -110,6 +148,7 @@ export function buyerReady({
     ready: reasons.length === 0,
     next: reasons.length === 0 ? 'ask-tim' : 'keep-cooking',
     reasons,
+    advisories,
     receipt: own?.id ?? null,
   };
 }

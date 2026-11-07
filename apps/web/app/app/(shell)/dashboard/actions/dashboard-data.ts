@@ -18,6 +18,10 @@ import { resolveUserState } from '@/lib/auth/gate';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
 import { isProofBlockingPublication } from '@/lib/claim/claim-verification';
+import {
+  type LegacyNudge,
+  legacyNudgeForDashboard,
+} from '@/lib/claim/legacy-verification';
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import type { DbOrTransaction } from '@/lib/db';
 import { DB_CONFIG, isRetryableError } from '@/lib/db/client/retry';
@@ -164,6 +168,11 @@ export interface DashboardData {
   isFirstSession?: boolean;
   /** Settled server-derived Inbox availability for conditional shell navigation. */
   inboxNavigation?: InboxNavigationAvailability;
+  /**
+   * Grandfathered claim waiting for a real proof (claim-verify spec Q2).
+   * Null when the selected profile is not a legacy claim. No UI reads it yet.
+   */
+  legacyNudge?: LegacyNudge | null;
 }
 
 export interface ProfileCompletionStep {
@@ -914,6 +923,7 @@ async function fetchDashboardBaseWithSession(
     profileCompletion: buildProfileCompletion(selected, false),
     bioLinkActivation: null,
     inboxNavigation,
+    legacyNudge: legacyNudgeForDashboard(selected.settings, new Date()),
     dashboardLoadError: undefined,
     isFirstSession: deriveIsFirstSession(selected),
   };
@@ -1020,6 +1030,31 @@ async function fetchDashboardCoreWithSession(
       clerkUserId,
       selected.id
     ).catch((error: unknown) => {
+      // Fail-soft avatar reads degrade log-only for infrastructure conditions
+      // (JOV-5754). Timeouts and idle terminations keep the JOV-8864 message:
+      // Drizzle names set_config, and reporting that fingerprint pages Sentry
+      // for a degradation that already returned UNKNOWN. Connection-class
+      // failures (JOV-8900 / JOVIE-WEB-YK) are the same doctrine. Unexpected
+      // failures still report so real data bugs stay visible.
+      const timedOut =
+        isQueryTimeoutError(error) || isPostgresTimeoutError(error);
+      if (
+        timedOut ||
+        isIdleTransactionTermination(error) ||
+        isRetryableError(error)
+      ) {
+        logger.warn(
+          timedOut
+            ? '[avatar-quality] avatar read timed out; degrading to unknown quality'
+            : '[avatar-quality] transient DB condition after retry; degrading to unknown quality',
+          {
+            profileId: selected.id,
+            error: getDeepErrorMessage(error),
+          }
+        );
+        return UNKNOWN_AVATAR_QUALITY;
+      }
+
       Sentry.captureException(error, {
         level: 'warning',
         tags: {

@@ -115,16 +115,15 @@ describe('EntityCard', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('$45.00')).toBeInTheDocument();
     expect(screen.getByText('Shop')).toBeInTheDocument();
-  });
-
-  it('keeps editorial helper lines outside paragraph anatomy', () => {
-    render(<EntityCard model={merchModel} treatment='detailed' />);
     expect(screen.getByText('Premium tee').tagName).toBe('SPAN');
     expect(screen.getByText('Profit $11.87').tagName).toBe('SPAN');
   });
 
   it('hides the status pill in the compact treatment (progressive disclosure)', () => {
-    render(<EntityCard model={merchModel} treatment='compact' />);
+    const view = render(
+      <EntityCard model={merchModel} treatment='compact' media='none' />
+    );
+    expect(view.container.querySelector('img, .aspect-square')).toBeNull();
     expect(screen.queryByText('Live')).not.toBeInTheDocument();
     render(<EntityCard model={merchModel} treatment='detailed' />);
     expect(screen.getByText('Live')).toBeInTheDocument();

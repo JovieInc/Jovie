@@ -214,7 +214,7 @@ export function ProfilePrimaryCTA({
           prefetch={false}
           className={cn(ctaLinkClass, 'max-w-sm')}
           // ui-casing-allow: natural aria-label phrasing
-          aria-label='Open Listen page with music links'
+          aria-label='Listen now — Open Listen page with music links'
         >
           Listen now
         </Link>

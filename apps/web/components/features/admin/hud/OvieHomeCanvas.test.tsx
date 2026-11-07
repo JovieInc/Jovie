@@ -10,6 +10,7 @@ import { INTERACTION_CASE_CONTRACT } from '@/lib/ovie/interaction-case';
 import { SUMMER_OPS_CARD_SCHEMA } from '@/lib/ovie/ops-card';
 import { emptyDeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import { OvieHomeCanvas } from './OvieHomeCanvas';
+import { snapshot } from './OvieHomeCanvas.test-fixtures';
 
 const toastMock = vi.hoisted(() =>
   Object.assign(vi.fn(), {
@@ -70,59 +71,60 @@ const INBOX: OvieInbox = {
   ],
 };
 
-function snapshot() {
-  const delivery = emptyDeliverySummary();
-  return {
-    operationalRequestState: 'idle',
-    view: {
-      connection: 'connected',
-      delivery: {
-        ...delivery,
-        merges: {
-          ...delivery.merges,
-          since: '2026-10-20T07:00:00.000Z',
-          today: { state: 'measured-nonzero', value: 3 },
-        },
-      },
-    },
-    operationalTasks: {
-      canonicalSource: 'linear',
-      cacheMode: 'local-reconciled',
-      syncState: 'fresh',
-      sourceId: 'lane-pull-requests',
-      observedAt: null,
-      lastSyncedAt: null,
-      freshnessDeadline: null,
-      deltas: [],
-      tasks: [
-        {
-          id: 'linear:JOV-1',
-          linearIdentifier: 'JOV-1',
-          linearUrl: null,
-          title: 'Blocked task',
-          workflowState: 'blocked',
-          priority: 'high',
-          attempt: null,
-          retryAt: null,
-          sourceRevision: null,
-          updatedAt: '2026-10-20T18:00:00.000Z',
-          pullRequest: null,
-        },
-      ],
-    },
-  };
-}
-
 function renderCanvas(chat?: HomeCanvasState) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
+  const view = render(
     <QueryClientProvider client={client}>
       <OvieHomeCanvas chat={chat} />
     </QueryClientProvider>
   );
+  return {
+    ...view,
+    rerenderChat: (next: HomeCanvasState) =>
+      view.rerender(
+        <QueryClientProvider client={client}>
+          <OvieHomeCanvas chat={next} />
+        </QueryClientProvider>
+      ),
+  };
 }
+
+/** Home opens on the company loop; turns asked this session render in place. */
+function renderThenAsk(chat: HomeCanvasState) {
+  const view = renderCanvas({ ...chat, messages: [] });
+  view.rerenderChat(chat);
+  return view;
+}
+
+const COMPANY_RESPONSES: Record<string, unknown> = {
+  '/api/hud/metrics': {
+    overview: {
+      mrrUsd: 0,
+      activeSubscribers: 0,
+      balanceUsd: 22.96,
+      burnRateUsd: 110,
+      runwayMonths: 0.2,
+      defaultStatus: 'dead',
+      defaultStatusDetail: '',
+      financialDataAvailable: true,
+      weekAgo: { mrrUsd: 0, activeSubscribers: 0 },
+    },
+  },
+  '/api/admin/hud/founder-funnel?range=7d': {
+    stages: [{ key: 'accounts_created', count: 2, drillDownHref: null }],
+  },
+  '/api/ovie/certifications': {
+    rows: [
+      {
+        domain: 'flows',
+        state: 'working',
+        tiers: { runtime_dogfood: 'passed' },
+      },
+    ],
+  },
+};
 
 function opsCard(kind: 'shipping' | 'revenue', title: string) {
   return {
@@ -179,17 +181,23 @@ function chatState(overrides: Partial<HomeCanvasState> = {}): HomeCanvasState {
 describe('OvieHomeCanvas', () => {
   const fetchMock = vi.fn();
   let inbox: OvieInbox;
+  let companyResponses: Record<string, unknown>;
 
   beforeEach(() => {
     readyTiming.mockReset();
     panelAlert.mockReset();
     shipping.data = snapshot();
     inbox = INBOX;
+    companyResponses = COMPANY_RESPONSES;
     toastMock.mockClear();
     fetchMock.mockReset();
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
       if (url === '/api/ovie/inbox')
         return new Response(JSON.stringify(inbox), { status: 200 });
+      if (url in companyResponses)
+        return new Response(JSON.stringify(companyResponses[url]), {
+          status: 200,
+        });
       if (init?.method === 'POST')
         return new Response(JSON.stringify({ ok: true }), { status: 200 });
       return new Response('not found', { status: 404 });
@@ -207,56 +215,21 @@ describe('OvieHomeCanvas', () => {
       await screen.findByText('Vercel on-demand concurrency')
     ).toBeVisible();
     expect(screen.getByTestId('home-loop-constraint')).toHaveTextContent(
-      '1 item is blocked'
+      'Shipping off target: 1 item blocked'
+    );
+    const companyRow = await screen.findByTestId('home-loop-tile-runway');
+    expect(companyRow).toHaveTextContent('6 days');
+    expect(companyRow).toHaveTextContent('Default dead');
+    expect(screen.getByTestId('home-loop-tile-golden-path')).toHaveTextContent(
+      '1 of 1 pass in prod'
     );
     expect(screen.getByTestId('home-loop-done')).toHaveTextContent('3 merges');
-    const strip = screen.getByTestId('home-loop-stage-strip');
-    expect(strip).toHaveTextContent('Not measured');
-    expect(strip).toHaveTextContent('Stage events not published yet');
-    expect(within(strip).queryByTestId('home-loop-strip-item')).toBeNull();
+    // Stage time lives on Shipping; Home shows only metrics with a target.
+    expect(screen.queryByTestId('home-loop-stage-strip')).toBeNull();
     expect(screen.getByTestId('home-loop-kanban-card')).toHaveAttribute(
       'data-attention',
       'blocked'
     );
-  });
-
-  it('renders live stage spans and measurement coverage', () => {
-    const base = snapshot();
-    shipping.data = {
-      ...base,
-      view: {
-        ...base.view,
-        delivery: {
-          ...base.view.delivery,
-          lanes: {
-            ...base.view.delivery.lanes,
-            stageSummary: {
-              at: '2026-10-21T12:00:00.000Z',
-              stagesTotal: 31,
-              stagesWithData: 14,
-              regressions: [],
-              slowestP95: [],
-              endToEnd7d: [
-                {
-                  pipeline: 'shipping:pr-open->merged',
-                  p50: 2280,
-                  p95: 102600,
-                  n: 571,
-                  regressed: false,
-                },
-              ],
-            },
-          },
-        },
-      },
-    };
-    renderCanvas();
-    const strip = screen.getByRole('region', {
-      name: 'Stage Time 7d (P50 / P95)',
-    });
-    expect(strip).toHaveTextContent('Shipping · PR Open → Merged 38m / 29h');
-    expect(strip).toHaveTextContent('14 of 31 stages measured');
-    expect(strip).not.toHaveTextContent('Not measured');
   });
 
   it('links overflowing in-flight tasks to the shipping surface', () => {
@@ -324,6 +297,12 @@ describe('OvieHomeCanvas', () => {
         },
       };
       renderCanvas();
+      // A failed read never claims the all-clear; the banner names the
+      // failure beside the sections that could not load (JOV-9019).
+      const banner = screen.getByTestId('home-loop-constraint');
+      expect(banner).toHaveTextContent('Shipping data could not load.');
+      expect(banner).not.toHaveTextContent('Shipping is on target');
+      expect(banner).toHaveAttribute('data-tone', 'unknown');
       expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
         'data-state',
         'error'
@@ -343,6 +322,36 @@ describe('OvieHomeCanvas', () => {
       );
     }
   );
+
+  it('preserves the named unknown shipping health when no metric is measured', async () => {
+    const base = snapshot();
+    companyResponses = {
+      '/api/hud/metrics': { overview: { financialDataAvailable: false } },
+      '/api/admin/hud/founder-funnel?range=7d': { stages: [] },
+      '/api/ovie/certifications': { rows: [] },
+    };
+    shipping.data = {
+      ...base,
+      view: { ...base.view, delivery: emptyDeliverySummary() },
+      operationalTasks: { ...base.operationalTasks, tasks: [] },
+    };
+    renderCanvas();
+    await screen.findByTestId('home-loop-tile-runway');
+    const banner = screen.getByTestId('home-loop-constraint');
+    expect(banner).toHaveTextContent(
+      'Shipping health unknown: merges, queue ejections, production, lanes not measured'
+    );
+    expect(banner).not.toHaveTextContent('Shipping is on target');
+    expect(banner).toHaveAttribute('data-tone', 'warn');
+    expect(
+      within(banner).getByRole('link', { name: 'Details' })
+    ).toHaveAttribute('href', APP_ROUTES.ADMIN_SHIPPING);
+    // Current main renders six shipping metrics and four company metrics.
+    expect(screen.getAllByTestId(/^home-loop-tile-/)).toHaveLength(10);
+    for (const tile of screen.getAllByTestId(/^home-loop-tile-/)) {
+      expect(tile).toHaveAttribute('data-measured', 'false');
+    }
+  });
 
   it('raises no panel alert when every section is ready', async () => {
     shipping.data = snapshot();
@@ -613,9 +622,36 @@ describe('OvieHomeCanvas', () => {
     ).toHaveAttribute('href', '/app/ov/inbox');
   });
 
+  it('shows at most three asks; the rest resolve by their defaults', async () => {
+    const base = INBOX.cases[0];
+    if (!base) throw new Error('fixture');
+    inbox = {
+      issues: [],
+      cases: Array.from({ length: 5 }, (_, index) => ({
+        ...base,
+        id: `summer:card-${index}`,
+        title: `Ask ${index}`,
+        decisionTarget: { kind: 'summer' as const, id: `card-${index}` },
+      })),
+    };
+    renderCanvas();
+    await screen.findByText('Ask 0');
+    expect(screen.queryByText('Ask 3')).toBeNull();
+    expect(
+      screen.getByTestId('home-loop-asks-section-notice')
+    ).toHaveTextContent('2 more resolve by their defaults');
+  });
+
+  it('opens on the company loop, not an earlier conversation', async () => {
+    renderCanvas(chatState());
+    await screen.findByText('Vercel on-demand concurrency');
+    expect(screen.queryByTestId('home-loop-answer')).toBeNull();
+    expect(screen.getByTestId('home-loop-kanban-card')).toBeVisible();
+  });
+
   it('renders the latest turn in place and restores earlier canvas states', async () => {
     const chat = chatState();
-    renderCanvas(chat);
+    renderThenAsk(chat);
     await screen.findByText('Vercel on-demand concurrency');
 
     const answer = screen.getByTestId('home-loop-answer');
@@ -644,7 +680,7 @@ describe('OvieHomeCanvas', () => {
   });
 
   it('reserves the answer slot while a reply streams', async () => {
-    renderCanvas(
+    renderThenAsk(
       chatState({
         isStreaming: true,
         messages: [

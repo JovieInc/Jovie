@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils';
 const VALUE_TONE: Record<HomeLoopStripItem['tone'], string> = {
   good: 'text-primary-token',
   neutral: 'text-primary-token',
-  warn: 'text-warning',
-  bad: 'text-error',
+  warn: 'text-warning-text',
+  bad: 'text-error-text',
 };
 
 /**

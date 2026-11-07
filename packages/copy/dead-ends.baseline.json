@@ -1,7 +1,7 @@
 {
   "schema": "jovie.dead-ends/v1",
   "invariant": "JOV-INV-046",
-  "totalFindings": 157,
+  "totalFindings": 156,
   "files": {
     "apps/desktop/src/build-identity.ts": {
       "copy:dead-end-not-available:development (build time unavailable)": 1
@@ -341,9 +341,6 @@
     },
     "apps/web/components/shell/HeaderSearchSurface.tsx": {
       "copy:dead-end-not-available:Search unavailable": 1
-    },
-    "apps/web/components/shell/SidebarInboxLink.tsx": {
-      "copy:dead-end-not-available:Inbox — Status Unavailable": 1
     },
     "apps/web/components/shell/SidebarThreadsSection.tsx": {
       "copy:dead-end-not-available:Conversations unavailable": 1

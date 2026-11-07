@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { mockFitLayout } from './fit-layout.test-utils';
@@ -28,6 +30,28 @@ describe('HomeLoopKanban', () => {
     ).toHaveLength(2);
     expect(within(building).getByText('Failing')).toBeVisible();
     expect(screen.queryByTestId('home-loop-kanban-more')).toBeNull();
+  });
+
+  it('keeps strip status values on the AA status-text tokens', () => {
+    const stripSource = readFileSync(
+      resolve(__dirname, 'HomeLoopStageStrip.tsx'),
+      'utf8'
+    );
+
+    expect(stripSource).toContain("warn: 'text-warning-text'");
+    expect(stripSource).toContain("bad: 'text-error-text'");
+    expect(stripSource).not.toContain("warn: 'text-warning'");
+    expect(stripSource).not.toContain("bad: 'text-error'");
+  });
+
+  it('gives only the stages it is passed, as equal lanes', () => {
+    const stages = HOME_LOOP_FIXTURE_STAGES.slice(0, 3);
+    render(<HomeLoopKanban stages={stages} rows={HOME_LOOP_FIXTURE_ROWS} />);
+    expect(screen.getAllByTestId('home-loop-kanban-lane')).toHaveLength(3);
+    expect(screen.getByTestId('home-loop-kanban')).toHaveClass(
+      '@4xl:auto-cols-fr',
+      '@4xl:grid-flow-col'
+    );
   });
 
   it('collapses what does not fit a lane into +N more', () => {

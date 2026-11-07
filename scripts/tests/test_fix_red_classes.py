@@ -26,6 +26,8 @@ class ClassifyTest(unittest.TestCase):
             "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.": ("spacing-scale", "snap-spacing"),
             "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence": ("census-certification", "sync-main"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "atomic-write"),
+            "launch inventory drift: classify/review new routes and regenerate the manifest": ("launch-cache", "repair-launch-cache"),
+            "Error: legacy Cache Components surface grew to 246 (maximum 245):": ("launch-cache", "repair-launch-cache"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
             "AssertionError: expected 1": ("other", "agent"),
         }
@@ -33,11 +35,74 @@ class ClassifyTest(unittest.TestCase):
             got = classes.classify(pr("Source Validation"), {"Source Validation": log})
             self.assertEqual((got["cls"], got["action"]), (cls, action), log)
 
+    def test_launch_cache_outranks_rate_limit_noise_and_unexplained_companions(self):
+        log = (
+            "launch inventory drift: classify/review new routes and regenerate the manifest\n"
+            "Error: legacy Cache Components surface grew to 246 (maximum 245):\n"
+            "run 900 attempt 1 failed on GitHub primary-rate-limit: re-ran failed jobs\n"
+            "HttpError: API rate limit exceeded for installation\n"
+        )
+        got = classes.classify(pr("Source Validation"), {"Source Validation": log})
+        self.assertEqual((got["cls"], got["action"]), ("launch-cache", "repair-launch-cache"))
+        companion = classes.classify(pr("Source Validation", "Tently"), {
+            "Source Validation": log, "Tently": "provider timeout"})
+        self.assertEqual((companion["cls"], companion["action"]), ("launch-cache", "repair-launch-cache"))
+        blocked = classes.classify(pr("Source Validation", "Migration Guard"), {
+            "Source Validation": log, "Migration Guard": "API rate limit exceeded"})
+        self.assertEqual(blocked["cls"], "mixed")
+
+    def test_strip_added_legacy_cache_exports_leaves_grandfathered_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            added = root / "apps/web/app/api/x/route.ts"
+            added.parent.mkdir(parents=True)
+            added.write_text(
+                "export const runtime = 'nodejs';\n"
+                "export const dynamic = 'force-dynamic';\n"
+                "export async function POST() {}\n")
+            old = root / "apps/web/app/old/route.ts"
+            old.parent.mkdir(parents=True)
+            old.write_text("export const dynamic = 'force-dynamic';\n")
+            changed = classes.strip_added_legacy_cache_exports(
+                root, ["apps/web/app/api/x/route.ts"])
+            self.assertEqual(changed, ["apps/web/app/api/x/route.ts"])
+            text = added.read_text()
+            self.assertIn("export const runtime", text)
+            self.assertNotIn("dynamic", text)
+            self.assertIn("dynamic", old.read_text())
+            again = classes.strip_added_legacy_cache_exports(root, ["apps/web/app/api/x/route.ts"])
+            self.assertEqual(again, [])
+
     def test_unwired_files_are_extracted_and_aggregates_ignored(self):
         got = classes.classify(pr("Source Validation"), {"Source Validation":
-                               "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane"})
+            "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane"})
         self.assertEqual(got["files"], ["scripts/a.test.mjs", "scripts/b.test.mjs"])
         self.assertEqual(got["checks"], ["Source Validation"])
+
+    def test_unwired_guard_error_outranks_quota_and_infra_fixture_output(self):
+        log = ("echo 'github-quota-deferred; Fleet rule evidence is missing'\n"
+               "✔ handles API rate limit exceeded and HTTP 503\n"
+               "AssertionError: Unwired: scripts/lib/__tests__/tooling-health.test.mjs. Wire each file into a ci-fast lane\n"
+               "##[error]script-contracts failed (exit 1); read its output above.\n")
+        got = classes.classify(pr("Source Validation"), {"Source Validation": log})
+        self.assertEqual((got["cls"], got["action"]), ("ci-fast-wiring", "wire-ci-fast"))
+        self.assertEqual(got["files"], ["scripts/lib/__tests__/tooling-health.test.mjs"])
+    def test_component_test_errors_outrank_mocked_infra_and_name_required_tests(self):
+        tests = ["apps/web/tests/components/profile/ProfileDrawerShell.interaction.test.tsx",
+                 "apps/web/tests/unit/cookie-banner-fixes.test.tsx"]
+        errors = [f"::error file=apps/web/components/{name}.tsx::[test-not-touched] "
+                  f"Component changed but test {test} was not touched in this diff. Update the test."
+                  for name, test in zip(["ProfileDrawerShell", "CookieBannerSection"], tests)]
+        log = "passing fixture: github-quota-deferred; API rate limit exceeded\n" + "\n".join(errors + errors)
+        got = classes.classify(pr("Source Validation", merge="BEHIND"), {"Source Validation": log})
+        self.assertEqual((got["cls"], got["action"]), ("component-test-evidence", "agent"))
+        self.assertEqual(got["files"], tests)
+        self.assertNotIn(got["action"], classes.DETERMINISTIC, "real regression coverage needs a repair")
+
+    def test_component_test_explanation_without_error_annotation_is_not_a_failure(self):
+        got = classes.classify(pr("Source Validation"), {"Source Validation":
+            "passing test explains [test-not-touched] Component changed but test apps/web/tests/unit/example.test.tsx was not touched in this diff."})
+        self.assertEqual(got["cls"], "other")
 
     def test_mixed_classes_go_to_the_model_and_behind_branches_sync_main(self):
         mixed = classes.classify(pr("A", "B"), {"A": "API rate limit exceeded", "B": "AssertionError"})
@@ -213,11 +278,9 @@ class AdditiveIdentifierListMergeTest(unittest.TestCase):
 
 
 class AndChainMergeTest(unittest.TestCase):
-    OURS = (
-        "node scripts/run-affected-tests.mjs --control && "
-        "node --test scripts/ci-workflow-topology.test.mjs scripts/workflow-runner-pin-check.test.mjs && "
-        "node scripts/ci-workflow-topology.mjs && pnpm ownership:check"
-    )
+    OURS = ("node scripts/run-affected-tests.mjs --control && "
+            "node --test scripts/ci-workflow-topology.test.mjs scripts/workflow-runner-pin-check.test.mjs && "
+            "node scripts/ci-workflow-topology.mjs && pnpm ownership:check")
     THEIRS = (
         "node scripts/run-affected-tests.mjs --control && "
         "node --test scripts/ci-workflow-topology.test.mjs && "
@@ -479,23 +542,14 @@ class DomainWriteTest(unittest.TestCase):
             self.assertEqual(classes.register_direct_domain_writes(root, self.LOG), [])
 
     def test_private_helper_extra_table_and_missing_side_effect_stay_unregistered(self):
-        private = (
-            "function writeProfile(): void {\n"
-            "  db.update(creatorProfiles).set({ claimToken: hash });\n"
-            "}\n"
-            "export async function persistLeadClaimToken(): Promise<void> {\n"
-            "  writeProfile();\n"
-            "}\n"
-        )
+        private = ("function writeProfile(): void {\n"
+                   "  db.update(creatorProfiles).set({ claimToken: hash });\n}\n"
+                   "export async function persistLeadClaimToken(): Promise<void> {\n"
+                   "  writeProfile();\n}\n")
         extra = self.SOURCE + "\nexport function dropUser(): void {\n  db.delete(users);\n}\n"
-        social = (
-            "export async function persistLeadClaimToken(): Promise<void> {\n"
-            "  db.update(socialLinks).set({ url });\n"
-            "}\n"
-        )
-        social_log = (
-            "domain-write-guard: apps/web/lib/leads/lead-claim-token.ts writes socialLinks directly 1x (allowed 0).\n"
-        )
+        social = ("export async function persistLeadClaimToken(): Promise<void> {\n"
+                  "  db.update(socialLinks).set({ url });\n}\n")
+        social_log = "domain-write-guard: apps/web/lib/leads/lead-claim-token.ts writes socialLinks directly 1x (allowed 0).\n"
         with tempfile.TemporaryDirectory() as tmp:
             root = self.tree(tmp, private)
             self.assertEqual(classes.register_direct_domain_writes(root, self.LOG), [])
@@ -541,6 +595,54 @@ class MeasureTest(unittest.TestCase):
         rows = self.rows()
         self.assertEqual(classes.breaker_n(rows), 2)
         self.assertEqual(classes.breaker_n([]), classes.DEFAULT_BREAKER_N)
+
+
+class ReleaseIdentityStubTest(unittest.TestCase):
+    SNIPPET = """
+class T(unittest.TestCase):
+    def test_backoff(self):
+        identity = patch.object(lane, "release_identity", return_value={"bundleDigest": "t1", "sourceCommit": "a" * 40})
+        lane.install_release(host)
+
+    def test_custody(self):
+        bundle = {"bundleDigest": "b" * 64, "sourceCommit": "a" * 40}
+        patch.object(lane, "release_identity", return_value=bundle)
+        lane.install_release(self.host)
+
+    def test_multiline(self):
+        bundle = {
+            "bundleDigest": "b" * 64,
+        }
+        patch.object(lane, "release_identity", return_value=bundle)
+        lane.install_release(self.host)
+
+    def test_other(self):
+        bundle = {"bundleDigest": "keep"}
+        patch.object(lane, "release_identity", return_value=bundle)
+
+    def test_spread(self):
+        with patch.object(lane, "release_identity", return_value={**self.manifest, "sourceCommit": "b" * 40}):
+            lane.install_release(self.host)
+"""
+
+    def test_stubs_that_reach_install_release_gain_objects_once(self):
+        once = classes.complete_release_identity_stubs(self.SNIPPET)
+        self.assertEqual(classes.complete_release_identity_stubs(once), once)
+        self.assertIn(
+            'return_value={"bundleDigest": "t1", "sourceCommit": "a" * 40, "objects": {"scripts/lanes": "f" * 40}}',
+            once)
+        self.assertIn(
+            'bundle = {"bundleDigest": "b" * 64, "sourceCommit": "a" * 40, "objects": {"scripts/lanes": "f" * 40}}',
+            once)
+        self.assertIn('bundle = {\n            "bundleDigest": "b" * 64,\n        }', once)
+        self.assertIn('bundle = {"bundleDigest": "keep"}', once)
+        self.assertIn('{**self.manifest, "sourceCommit": "b" * 40}', once)
+        self.assertEqual(once.count('"objects"'), 2)
+
+    def test_checked_in_lane_runner_tests_need_no_further_stub_completion(self):
+        path = Path(__file__).resolve().parents[1] / "tests" / "test_lane_runner.py"
+        text = path.read_text()
+        self.assertEqual(classes.complete_release_identity_stubs(text), text)
 
 
 if __name__ == "__main__":

@@ -80,6 +80,8 @@ describe('support route header contract', () => {
     expect(headerSource).toContain(
       "logoReveal={resolvedLogoVariant === 'icon'}"
     );
+    // Every shared marketing shell selects the named 28px mark, including support.
+    expect(headerSource).toContain("logoMarkSize='marketing'");
     expect(headerSource).not.toMatch(
       /textContent|innerText|querySelector\('h1/
     );

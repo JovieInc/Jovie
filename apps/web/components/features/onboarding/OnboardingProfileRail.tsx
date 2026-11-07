@@ -328,7 +328,15 @@ export function resolvePreviewArtist(
       tagline: draft.outcome,
     };
   }
-  if (state.artist) return state.artist;
+  if (state.artist) {
+    // JOV-10169: the artist preview must never render a fabricated
+    // jov.ie/your-handle identity. Between the artist pick and a known
+    // handle, the rail stays empty (the shell falls back to the entry
+    // preview) instead of flashing the placeholder URL and /your-handle
+    // links.
+    if (!state.handle) return null;
+    return state.artist;
+  }
   // Pen R6As7U: the draft profile is present as soon as a handle is known,
   // before any artist or link is attached.
   if (!state.handle) return null;
@@ -440,7 +448,7 @@ export function OnboardingProfileRail({
       <div
         className={cn(
           'flex min-h-0 items-center justify-center',
-          isInline ? 'h-full px-0 py-2' : 'min-h-full lg:w-95 lg:px-4 lg:py-4'
+          isInline ? 'h-full px-0 py-2' : 'min-h-full lg:w-95 lg:px-4 lg:pb-4'
         )}
       >
         <div className='flex min-h-0 w-full flex-col items-center'>
@@ -491,14 +499,14 @@ export function OnboardingProfileRail({
             className={cn('w-full', isInline ? 'max-w-86' : 'h-full max-w-87')}
             heroClassName={cn(
               'w-full rounded-3xl',
-              isInline ? 'min-h-114 p-4' : 'min-h-0 max-h-170 p-5'
+              isInline ? 'min-h-114 p-4' : 'min-h-0 max-h-170 px-5'
             )}
             // Width only: the screen keeps its 402:874 aspect, so a fixed frame
             // height let it overflow the frame (JOV-7192).
             phoneFrameClassName={isInline ? 'w-50 sm:w-57' : 'w-71'}
             topRight={
               <span
-                className='inline-flex h-6 items-center rounded-full border border-white/12 bg-black/50 px-2.5 text-3xs font-semibold uppercase tracking-wider text-white backdrop-blur-md dark:text-white'
+                className='inline-flex h-6 items-center rounded-full border border-white/12 bg-black/60 px-2.5 text-3xs font-semibold uppercase tracking-wider text-white backdrop-blur-md dark:text-white'
                 data-testid='onboarding-profile-preview-badge'
               >
                 Preview

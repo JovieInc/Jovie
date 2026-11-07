@@ -12,16 +12,24 @@
  * preseeded row. Production monitors may still render their public routes.
  */
 
+import { ADMITTED_CANARY_FIXTURE } from '@/lib/synthetic/admitted-canary-fixture';
+
 export type PublicProfileIdentityExclusionReason =
   | 'claim_flow_fixture'
   | 'fabricated_identity_fixture'
   | 'legacy_claim_fixture'
   | 'production_canary'
   | 'qa_auth_fixture'
-  | 'screen_cert_fixture';
+  | 'screen_cert_fixture'
+  | 'capture_profile_fixture';
 
 const EXCLUDED_HANDLES_BY_REASON = {
-  claim_flow_fixture: ['e2eclaimartist'],
+  // The claim-walk canary's reserved handle (JOV-9826): excluded from every
+  // general create/rename/ingestion path like the other fixtures, but — as
+  // the one claim_flow_fixture exception allows — claimable by its owner
+  // through the verified token-backed takeover the cert walk uses. Stays
+  // noindex in every state via the identity-exclusion indexing rule.
+  claim_flow_fixture: ['e2eclaimartist', 'jovie-prodcert-claim'],
   fabricated_identity_fixture: [
     'dualipa',
     'taylorswift',
@@ -29,8 +37,16 @@ const EXCLUDED_HANDLES_BY_REASON = {
     'edgecase-long',
   ],
   legacy_claim_fixture: ['testartist'],
-  production_canary: ['authqaprod', 'gooddropouts', 'jovie-chat-health'],
+  // The admitted canary's handle is created only by its reconciler; reserving
+  // it keeps every general create/rename/ingestion path off it.
+  production_canary: [
+    'authqaprod',
+    'gooddropouts',
+    'jovie-chat-health',
+    ADMITTED_CANARY_FIXTURE.handle,
+  ],
   screen_cert_fixture: ['jovie-screen-fixture'],
+  capture_profile_fixture: ['unfazed'],
   qa_auth_fixture: [
     'authiosprod',
     'authiosstaging',

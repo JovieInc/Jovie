@@ -7,6 +7,9 @@ also the supported stack-construction path: dependent PRs may temporarily target
 their immediate parent, then are retargeted and rebased onto `main` after that
 parent lands. There is no second landing transport.
 
+Steward decisions (proven-culprit dequeue, flake handling, failure class to guard) live in
+[`canon/MERGE_QUEUE_STEWARD.md`](../canon/MERGE_QUEUE_STEWARD.md).
+
 ## How a PR lands
 
 1. Open a root PR against `main`. A dependent child may instead target its
@@ -34,7 +37,7 @@ Branch protection pins aggregate contexts only—never individual CI jobs.
 
 | Context           | Source PR                                                                                                                | Native `merge_group`                                                                                                                                                                 |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `PR Ready`        | Path selection, risk classification, `ci-fast` (including the portable iOS contract), diff secret scan, Golden Path Lock | Path selection, risk classification, `ci-fast`, ten affected unit shards, one hosted build + layout workspace, path-selected iOS unit + coverage, diff secret scan, Golden Path Lock |
+| `PR Ready`        | Path selection, risk classification, `ci-fast` (including the portable iOS contract), diff secret scan, Golden Path Lock | Path selection, risk classification, `ci-fast`, 14 web unit shards + `packages/ui`, one hosted build + layout workspace, path-selected iOS unit + coverage, diff secret scan, Golden Path Lock; emits `Merge Suite Scope / full_web_units` so main may skip duplicate lanes (JOV-10687). An `ordinary_admission` scope must not authorize that skip. |
 | `Migration Guard` | Path-gated migration policy                                                                                              | Re-emitted and evaluated on the combined head                                                                                                                                        |
 | `Fork PR Gate`    | Human approval policy for external forks                                                                                 | Revalidates every exact group member before emitting the combined-head context                                                                                                       |
 | `PR Size Guard`   | Source-diff size policy                                                                                                  | Revalidates every exact group member before emitting the combined-head context                                                                                                       |
@@ -176,6 +179,11 @@ The finishing agent requests GitHub Merge when ready against the exact PR head.
 GitHub owns queue membership, combined-head checks, and merge ordering. A
 one-shot `gh pr merge --auto --match-head-commit` request is not a queue receipt;
 read `mergeQueueEntry` before claiming admission.
+
+Never dequeue to re-prioritize; label `compounding` and let green-enroll re-route.
+A queued `compounding` PR with a non-compounding entry ahead of it is dequeued and
+re-enqueued with `jump` by Merge Queue Green Enroll (receipt `relabel-jump`), under
+the same caps as a fresh enqueue: `MAX_JUMPED`, `JUMP_MAX_BUILD_S`, `JUMP_BATCH_S`.
 
 `drain-pr-queue.sh` remains a guarded manual maintenance tool. Its legacy
 source-admission and rebase path has no automatic caller. Hard-gate labels block
@@ -411,3 +419,39 @@ person or agent arming auto-merge by hand). When a parent merges,
 the parent's squash-merged commits, then dispatches green enroll's per-PR path
 for it, so admission (green head, holds, draft) stays in the single queue
 writer. `QUEUE_FREEZE=1` stops that dispatch; the retarget and rebase still run.
+
+## Runner pool variables
+
+Control-plane and the cheap required `PR Ready` job read their pool from repo
+variables so a saturated hosted pool can be relieved without a PR. Unset means
+`ubuntu-latest`. Values are JSON:
+
+- `RUNNER_CONTROL_PLANE`: Green Enroll, Lane Fix Relay, PR Fleet Rules (fork PRs stay hosted) and PR targets main (non-merge-group events). Gem: `["self-hosted","Linux","X64","jovie-fixed"]`.
+- `RUNNER_READY`: the `PR Ready` job in Source Validation.
+
+- `RUNNER_SOURCE_VALIDATION`: the six Source Validation jobs except `PR Ready`. Fork PRs always stay on their hosted label. Gem has 5 slots (one job each) against Source Validation's ~26 average concurrent hosted jobs, so only flip this for a measured subset; compare per-job time before and after.
+
+Auto-Ready Drafts fleet controllers stay hosted to preserve their verified `gh` CLI contract.
+
+Fork PR Gate stays hosted: it handles untrusted fork events and must not run on persistent runners.
+Flip: `gh variable set RUNNER_CONTROL_PLANE --body '["self-hosted","Linux","X64","jovie-fixed"]'`; revert: `gh variable delete RUNNER_CONTROL_PLANE`.
+
+### Marketing priority
+
+Apply `priority:marketing` to a marketing-page PR and its ready Linear issue.
+Green Enroll considers labeled PRs first in reconciliation and uses the existing
+bounded jump and relabel-jump path. Marketing and `compounding` entries share
+`MAX_JUMPED`, `JUMP_MAX_BUILD_S` and `JUMP_BATCH_S`; an active build or cap can
+defer a jump. The label never clears a hold or substitutes for current-head checks.
+
+Symphony admits ready labeled Backlog issues through the existing bounded
+priority replacement and protects them from low-priority displacement. Signed
+Summer portfolio ranks and explicit Linear Urgent remain ahead; marketing
+precedes other eligible work. Removing the label restores ordinary ordering.
+The mesh board still orders stuck-PR repairs before detector issues and goals;
+it does not interpret arbitrary task text as a priority grant. Existing admission
+timestamps and Green Enroll decision receipts measure the effect.
+
+Ship now: reuse the existing priority paths. Re-evaluate when marketing is
+cleared or jump-reset receipts show lost throughput. Then remove the label or
+adjust the existing bounded policy with measured evidence, retaining every gate.
