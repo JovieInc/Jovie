@@ -67,6 +67,44 @@ type Target = {
   readonly url: string;
   readonly mode: 'loopback' | 'certification';
 };
+
+function fixtureClient(target: Target, schema: string) {
+  // postgres.js applies URL query settings after `connection`. Keep provider
+  // routing/TLS options, but bind every pool session to this fixture schema.
+  const url = new URL(target.url);
+  url.searchParams.set('search_path', schema);
+  return postgres(url.toString(), {
+    max: 2,
+    connect_timeout: 10,
+    connection: { search_path: schema, statement_timeout: 10_000 },
+    ...(target.mode === 'certification' ? { ssl: 'require' as const } : {}),
+  });
+}
+
+async function assertFixtureSessions(
+  pool: ReturnType<typeof postgres>,
+  schema: string
+) {
+  const first = await pool.reserve();
+  try {
+    const second = await pool.reserve();
+    try {
+      for (const session of [first, second]) {
+        const [row] = await session`
+          SELECT current_schema() AS schema_name,
+            to_regclass('failure_control')::oid AS actual_control,
+            to_regclass(${`${schema}.failure_control`})::oid AS expected_control`;
+        expect(row.schema_name).toBe(schema);
+        expect(row.expected_control).not.toBeNull();
+        expect(row.actual_control).toBe(row.expected_control);
+      }
+    } finally {
+      second.release();
+    }
+  } finally {
+    first.release();
+  }
+}
 const definition = {
   ...MARKETING_PAGE_KIND,
   renderSmoke: async ({ identity }: { identity: ContentReviewIdentity }) => ({
@@ -138,12 +176,9 @@ export function registerContentPublicationCertification(
       }
       // Each concurrent transaction has a real connection and sees only the
       // fixture schema. No production tables are read, truncated or dropped.
-      client = postgres(target.url, {
-        max: 2,
-        connect_timeout: 10,
-        connection: { search_path: schema, statement_timeout: 10_000 },
-        ...ssl,
-      });
+      client = fixtureClient(target, schema);
+      // Fail before unqualified fixture or store writes if isolation was lost.
+      await assertFixtureSessions(client, schema);
       previousDb = getInternalDb();
       const database = drizzle(client);
       const faultableDatabase = new Proxy(database, {
@@ -263,6 +298,20 @@ export function registerContentPublicationCertification(
         client`SELECT * FROM content_record_events ORDER BY id`,
         client`SELECT * FROM content_record_versions ORDER BY id`,
       ]);
+
+    it('pins both fixture sessions when the URL requests public search_path', async () => {
+      const target = getTarget();
+      if (!target)
+        throw new Error('Isolated certification database is required');
+      const url = new URL(target.url);
+      url.searchParams.set('search_path', 'public');
+      const probe = fixtureClient({ ...target, url: url.toString() }, schema);
+      try {
+        await assertFixtureSessions(probe, schema);
+      } finally {
+        await probe.end({ timeout: 3 });
+      }
+    });
 
     it('rolls back both write boundaries, then commits and reconciles without duplicate history', async () => {
       const prior = await draft();
