@@ -108,7 +108,7 @@
       "kind": "neon-branch",
       "policy": "event-driven (main push with stale certified surfaces) or manual-dispatch",
       "owner": "gem-lanes / surface recertification",
-      "surface": "ephemeral Neon branch surface-recertify-<run_id> (isolated database only)",
+      "surface": "Isolated database for Surface Recertify browser evidence",
       "evidencePurpose": "Browser captures of the exact main SHA at 1440 and 390 pixels with authenticated route and layout checks.",
       "ttlHours": 3,
       "cleanupTrigger": "Neon branch TTL (expires_in_hours=3); on-limit cleanup in neon-create-branch-with-retry",

@@ -180,7 +180,7 @@
         "reason": "A real isolated database is required to sign into app routes before renewing surface certification.",
         "evidencePurpose": "Browser captures of the exact main SHA at 1440 and 390 pixels with authenticated route and layout checks.",
         "owner": "gem-lanes / surface recertification",
-        "surface": "ephemeral Neon branch surface-recertify-<run_id> (isolated database only)",
+        "surface": "Isolated database for Surface Recertify browser evidence",
         "ttlHours": 3,
         "cleanupTrigger": "Neon branch TTL (expires_in_hours=3); on-limit cleanup in neon-create-branch-with-retry",
         "cleanupProof": "Branch absent from the Neon project branch inventory",
