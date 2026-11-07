@@ -76,6 +76,10 @@ const WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ci.yml'),
   'utf8'
 );
+const CI_REPO_LANES_SOURCE = readFileSync(
+  resolve(REPO_ROOT, 'scripts/lib/ci-repo-lanes.mjs'),
+  'utf8'
+);
 const CI_FAST_SOURCE = readFileSync(
   resolve(REPO_ROOT, 'scripts/ci-fast-lanes.mjs'),
   'utf8'
@@ -1675,7 +1679,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'Structural skipped (Summer/ops only; no Jovie or Symphony suites)'
     );
     expect(CI_FAST_SOURCE).toContain('No guardrail product lane selected');
-    expect(CI_FAST_SOURCE).toContain(
+    expect(CI_REPO_LANES_SOURCE).toContain(
       "process.env.CI_PRODUCT_LANES || 'ios,mac,web,operations,cross-product'"
     );
     expect(CI_FAST_SOURCE).toContain('files === null || files.length === 0');
