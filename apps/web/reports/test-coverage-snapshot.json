@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-11-04T19:31:55.840Z",
+  "generated_at": "2026-11-07T07:56:35.316Z",
   "surfaces": {
     "rls-access-control": {
-      "coverage_pct": 78.1,
+      "coverage_pct": 78,
       "branch_pct": 0,
       "risk_score": 42.1,
       "status": "RED"
@@ -32,9 +32,9 @@
       "status": "RED"
     },
     "public-profile-isr": {
-      "coverage_pct": 87.7,
-      "branch_pct": 81.1,
-      "risk_score": 27.6,
+      "coverage_pct": 88,
+      "branch_pct": 81.6,
+      "risk_score": 27.5,
       "status": "YELLOW"
     },
     "claim-onboarding": {
@@ -57,7 +57,7 @@
     },
     "marketing-static": {
       "coverage_pct": 77.9,
-      "branch_pct": 70.1,
+      "branch_pct": 69.9,
       "risk_score": 10.6,
       "status": "GREEN"
     }
