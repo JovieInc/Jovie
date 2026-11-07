@@ -237,7 +237,7 @@ function packet(
       proof('tests_coverage', `${entry.id}-assurance-correctness`),
     ],
     visualProof: [
-      proof('visual_proof', `${entry.id}-visual`),
+      proof('visual_proof', `dogfood-judge:${entry.id}`),
       proof('visual_proof', `${entry.id}-assurance-accessibility`),
     ],
     ...overrides,
