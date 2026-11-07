@@ -8,6 +8,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
+import {
+  buildSystemPromptParts,
+  joinSystemPromptParts,
+} from '@/lib/chat/system-prompt';
 import { HELPFULNESS_CASES } from './cases';
 import { buildFixture, nextFriday } from './fixtures';
 import {
@@ -33,7 +37,9 @@ describe('helpfulness case set', () => {
 
   it('covers every fixture and states what a great reply does', () => {
     const fixtures = new Set(HELPFULNESS_CASES.map(c => c.fixture));
-    expect(fixtures).toEqual(new Set(['established', 'new', 'lapsed']));
+    expect(fixtures).toEqual(
+      new Set(['established', 'new', 'lapsed', 'catalog'])
+    );
     for (const c of HELPFULNESS_CASES)
       expect(c.great.length).toBeGreaterThan(20);
   });
@@ -117,5 +123,87 @@ describe('judge contract', () => {
     const result = scoreCase('x', [{ id: 'copy_floor', ok: false }], verdict);
     expect(result.score).toBe(40);
     expect(result.passed).toBe(false);
+  });
+});
+
+describe('2026-11-01 transcript: dead ends and blind context', () => {
+  const youtubeCase = HELPFULNESS_CASES.find(
+    c => c.id === 'catalog-youtube-optimize'
+  );
+
+  it('fails the replies the artist actually got (deliberate red)', () => {
+    if (!youtubeCase) throw new Error('missing case');
+    const replies = [
+      "I can see you have social links set, but not which platforms, and I can't view or edit connected accounts from here. That's a settings-page item on your end.",
+      "Give me your YouTube channel URL and I'll add it to your profile.",
+    ];
+    for (const text of replies) {
+      const checks = runHardChecks(youtubeCase, { text, toolCalls: [] }, [
+        'youtube',
+        'instagram',
+      ]);
+      expect(checks.find(c => c.id === 'no_dead_end')?.ok).toBe(false);
+      expect(checks.find(c => c.id === 'expected_tool')?.ok).toBe(false);
+      expect(scoreCase(youtubeCase.id, checks, null).passed).toBe(false);
+    }
+  });
+
+  it('passes a reply that knows the channel and returns a plan', () => {
+    if (!youtubeCase) throw new Error('missing case');
+    const checks = runHardChecks(youtubeCase, {
+      text: 'Your channel is @cassarden. Top move: add each song’s jov.ie/cassarden link to the first line of your 10 most-viewed video descriptions. Then a pinned comment on each, and one playlist per era. Connect YouTube below and I will apply the descriptions.',
+      toolCalls: [{ name: 'auditYouTubeChannel', input: {} }],
+    });
+    expect(checks.filter(c => !c.ok)).toEqual([]);
+  });
+
+  it('allows asking for a platform the profile does not have', () => {
+    if (!youtubeCase) throw new Error('missing case');
+    const ask = 'Send me your TikTok handle and I will add it.';
+    expect(
+      runHardChecks(youtubeCase, { text: ask, toolCalls: [] }, [
+        'youtube',
+      ]).find(c => c.id === 'no_dead_end')?.ok
+    ).toBe(true);
+    expect(
+      runHardChecks(youtubeCase, { text: ask, toolCalls: [] }, ['tiktok']).find(
+        c => c.id === 'no_dead_end'
+      )?.ok
+    ).toBe(false);
+  });
+
+  it('allows a truthful limit on data Jovie does not have', () => {
+    if (!songOutFriday) throw new Error('missing case');
+    const checks = runHardChecks(songOutFriday, {
+      text: "I can't see your Spotify stream counts since that account is synced for followers only. Night Swim is out Friday.",
+      toolCalls: [],
+    });
+    expect(checks.find(c => c.id === 'no_dead_end')?.ok).toBe(true);
+  });
+
+  it('allows a transient retry line', () => {
+    if (!songOutFriday) throw new Error('missing case');
+    const checks = runHardChecks(songOutFriday, {
+      text: 'Night Swim is out Friday. The upload is not available right now, try again in a moment.',
+      toolCalls: [],
+    });
+    expect(checks.find(c => c.id === 'no_dead_end')?.ok).toBe(true);
+  });
+
+  it('gives the catalog artist links and connection state in the prompt', () => {
+    const fixture = buildFixture('catalog', NOW);
+    const parts = buildSystemPromptParts(fixture.artist, [...fixture.releases]);
+    const prompt = joinSystemPromptParts(parts);
+    expect(prompt).toContain('youtube: https://www.youtube.com/@cassarden');
+    expect(prompt).toContain('YouTube: not connected');
+    expect(prompt).not.toMatch(/Requires settings page/);
+    expect(fixture.releases).toHaveLength(48);
+  });
+
+  it('every real-transcript case carries an intent card', () => {
+    for (const c of HELPFULNESS_CASES.filter(x => x.fixture === 'catalog')) {
+      expect(c.intent?.source).toBe('real-anonymized');
+      expect(c.intent?.goal.length).toBeGreaterThan(10);
+    }
   });
 });

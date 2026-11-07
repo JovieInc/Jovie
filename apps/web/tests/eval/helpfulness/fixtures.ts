@@ -5,7 +5,9 @@
  * to the run clock so "my song comes out Friday" stays true on every run.
  */
 
-export type FixtureId = 'established' | 'new' | 'lapsed';
+import type { ArtistLinksContext } from '@/lib/chat/artist-links';
+
+export type FixtureId = 'established' | 'new' | 'lapsed' | 'catalog';
 
 export interface EvalArtistContext {
   readonly displayName: string;
@@ -19,6 +21,7 @@ export interface EvalArtistContext {
   readonly profileViews: number;
   readonly hasSocialLinks: boolean;
   readonly hasMusicLinks: boolean;
+  readonly linksContext?: ArtistLinksContext;
   readonly tippingStats: {
     readonly tipClicks: number;
     readonly tipsSubmitted: number;
@@ -85,7 +88,82 @@ function release(
   };
 }
 
+/** Deterministic legacy catalog: one release every ~70 days, newest ~5 months ago. */
+const CATALOG_TITLES = [
+  'Paper Satellites',
+  'Glass Hours',
+  'Northbound',
+  'Static Bloom',
+  'Weightless',
+  'Silver Line',
+  'Afterglow Motel',
+  'Low Orbit',
+  'Kite Season',
+  'Blue Hour Radio',
+  'Daybreak Static',
+  'Heatwave Letters',
+] as const;
+
+function buildCatalogFixture(now: Date): EvalFixture {
+  const releases: EvalRelease[] = Array.from({ length: 48 }, (_, i) => {
+    const base = CATALOG_TITLES[i % CATALOG_TITLES.length] ?? 'Untitled';
+    const title = i < CATALOG_TITLES.length ? base : `${base} (Remix ${i})`;
+    return release(
+      `rel-cat-${i + 1}`,
+      title,
+      i % 6 === 5 ? 'ep' : 'single',
+      daysFrom(now, -(150 + i * 70)),
+      i % 6 === 5 ? 4 : 1,
+      Math.max(5, 40 - i)
+    );
+  });
+  return {
+    id: 'catalog',
+    artist: {
+      displayName: 'Cass Arden',
+      username: 'cassarden',
+      bio: null,
+      genres: ['pop', 'electronic'],
+      spotifyFollowers: null,
+      spotifyPopularity: null,
+      spotifyUrl: 'https://open.spotify.com/artist/eval-cass-arden',
+      appleMusicUrl: 'https://music.apple.com/artist/eval-cass-arden',
+      profileViews: 58,
+      hasSocialLinks: true,
+      hasMusicLinks: true,
+      linksContext: {
+        links: [
+          { platform: 'youtube', url: 'https://www.youtube.com/@cassarden' },
+          { platform: 'instagram', url: 'https://instagram.com/cassarden' },
+          { platform: 'tiktok', url: 'https://www.tiktok.com/@cassarden' },
+          {
+            platform: 'spotify',
+            url: 'https://open.spotify.com/artist/eval-cass-arden',
+          },
+          { platform: 'website', url: 'https://cassarden.example' },
+        ],
+        connectedAccounts: [],
+      },
+      tippingStats: {
+        tipClicks: 0,
+        tipsSubmitted: 0,
+        totalReceivedCents: 0,
+        monthReceivedCents: 0,
+      },
+    },
+    releases,
+    facts: [
+      'Cass Arden (@cassarden), profile jov.ie/cassarden. Bio is empty. Genres: pop, electronic. 58 profile views.',
+      'Profile links: YouTube https://www.youtube.com/@cassarden, Instagram, TikTok, Spotify, website. No OAuth-connected accounts (YouTube not connected).',
+      `48 releases, all past; newest "Paper Satellites" ~150 days ago, oldest ~9 years ago. No upcoming release.`,
+      'If auditYouTubeChannel is called, its result is the channel data (about 24.1K subscribers) and the ranked plan; facts in it count as grounded.',
+    ],
+    insights: { insights: [], relevant: false },
+  };
+}
+
 export function buildFixture(id: FixtureId, now: Date): EvalFixture {
+  if (id === 'catalog') return buildCatalogFixture(now);
   if (id === 'new') {
     return {
       id,
@@ -132,6 +210,19 @@ export function buildFixture(id: FixtureId, now: Date): EvalFixture {
         profileViews: 610,
         hasSocialLinks: true,
         hasMusicLinks: true,
+        linksContext: {
+          links: [
+            {
+              platform: 'spotify',
+              url: 'https://open.spotify.com/artist/eval-harbor-static',
+            },
+            {
+              platform: 'instagram',
+              url: 'https://instagram.com/harborstatic.eval',
+            },
+          ],
+          connectedAccounts: [],
+        },
         tippingStats: {
           tipClicks: 3,
           tipsSubmitted: 0,
@@ -184,6 +275,23 @@ export function buildFixture(id: FixtureId, now: Date): EvalFixture {
       profileViews: 3200,
       hasSocialLinks: true,
       hasMusicLinks: true,
+      linksContext: {
+        links: [
+          {
+            platform: 'spotify',
+            url: 'https://open.spotify.com/artist/eval-luna-waves',
+          },
+          {
+            platform: 'apple_music',
+            url: 'https://music.apple.com/artist/eval-luna-waves',
+          },
+          {
+            platform: 'instagram',
+            url: 'https://instagram.com/lunawaves.eval',
+          },
+        ],
+        connectedAccounts: ['spotify'],
+      },
       tippingStats: {
         tipClicks: 42,
         tipsSubmitted: 8,

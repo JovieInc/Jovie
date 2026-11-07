@@ -10,7 +10,7 @@
  * threshold changes, so scores are only compared within one version.
  */
 
-export const HELPFULNESS_EVAL_VERSION = '2026-10-28.1';
+export const HELPFULNESS_EVAL_VERSION = '2026-11-01.1';
 
 export type BehaviorId =
   | 'grounded'
