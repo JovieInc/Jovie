@@ -6704,6 +6704,10 @@ jobs:
       # the active test-mode USD 1200/month price. The assertion stays
       # fail-closed; true reports a contract breach instead of a missing secret.
       FEATURE_STRIPE_TEST_PRICE_CONFIGURED: 'true'
+      # This job proves the admitted journey from /start to billing. Closed public
+      # signup redirects anonymous /start to /waitlist, and that handoff has its
+      # own proof in auth-public-ready.spec.ts.
+      FEATURE_PUBLIC_SIGNUP_CLOSED: 'false'
     # Scope pending replacement to one PR. GitHub replaces the older pending job in
     # a constant concurrency group even when cancel-in-progress is false, which can
     # cancel a required check before it obtains a runner. Golden-path cleanup only
