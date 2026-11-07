@@ -79,9 +79,9 @@ async function capture() {
           }
         );
         status = response?.status() ?? 0;
-        const metrics = await page.evaluate(() => ({
-          scrollWidth: document.documentElement.scrollWidth,
-          clientWidth: document.documentElement.clientWidth,
+        const metrics = await page.locator('html').evaluate(element => ({
+          scrollWidth: element.scrollWidth,
+          clientWidth: element.clientWidth,
         }));
         const file = `${group.route.replace(/\W+/g, '_') || 'root'}-${width}.png`;
         const buffer = await page.screenshot({

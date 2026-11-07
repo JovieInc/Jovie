@@ -245,15 +245,18 @@ test('renewal CLI and bot PR body report the measured win required by Fleet', ()
   assert.deepEqual(applied, { renewed: ['pricing'], failed: [], skipped: [] });
   assert.deepEqual(after, []);
 
-  const workflow = yamlLoad(
-    readFileSync(
-      new URL(
-        '../../../.github/workflows/surface-recertify.yml',
-        import.meta.url
-      ),
-      'utf8'
-    )
-  );
+  const workflow =
+    /** @type {{ jobs: { recertify: { steps: { name?: string, run?: string }[] } } }} */ (
+      yamlLoad(
+        readFileSync(
+          new URL(
+            '../../../.github/workflows/surface-recertify.yml',
+            import.meta.url
+          ),
+          'utf8'
+        )
+      )
+    );
   const step = workflow.jobs.recertify.steps.find(
     item => item.name === 'Open or update the renewal PR'
   );

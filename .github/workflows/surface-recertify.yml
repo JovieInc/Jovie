@@ -181,7 +181,7 @@ jobs:
           git config user.email "jovie-bot[bot]@users.noreply.github.com"
           renewed="$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).renewed.join(", ")' "$RUNNER_TEMP/apply.json")"
           renewed_count="$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).renewed.length' "$RUNNER_TEMP/apply.json")"
-          node scripts/surface-recertify.mjs list > "$RUNNER_TEMP/remaining.json"
+          node scripts/surface-recertify.mjs list | tee "$RUNNER_TEMP/remaining.json"
           remaining_count="$(node -e 'const fs = require("fs"); const renewed = JSON.parse(fs.readFileSync(process.argv[1],"utf8")).renewed; console.log(JSON.parse(fs.readFileSync(process.argv[2],"utf8")).filter(row => renewed.includes(row.id)).length)' "$RUNNER_TEMP/apply.json" "$RUNNER_TEMP/remaining.json")"
           git checkout -B "$BRANCH"
           git add apps/web/data/designSystem/surfaceCensus.json
