@@ -368,6 +368,34 @@ describe('isolated marketing entrypoint promotion applicability', () => {
   );
 
   it.each([
+    ['apps/web/app/(marketing)/compare/page.tsx'],
+    ['apps/web/app/[username]/shop/page.tsx'],
+    ['apps/web/components/features/profile/ProfileHeader.tsx'],
+    [leaves[0], 'apps/web/lib/images/resize.ts'],
+  ])('leaf UI outside auth, billing and signup ships: %j', (...paths) => {
+    expect(evaluatePromotion({ range: grade(paths) })).toMatchObject({
+      required: false,
+      decision: 'pass',
+    });
+  });
+
+  it.each([
+    'apps/web/app/[username]/claim/page.tsx',
+    'apps/web/components/features/profile/ProfileTipButton.tsx',
+    'apps/web/components/features/profile/ClaimBanner.tsx',
+    'apps/web/app/(marketing)/start/page.tsx',
+    'apps/web/app/(marketing)/waitlist/page.tsx',
+    'apps/web/app/(marketing)/compare/layout.tsx',
+    'apps/web/styles/globals.css',
+    'packages/ui/src/button.tsx',
+  ])('%s can reach a protected flow, so journeys stay required', path => {
+    expect(evaluatePromotion({ range: grade([path]) })).toMatchObject({
+      required: true,
+      decision: 'blocked',
+    });
+  });
+
+  it.each([
     { paths: [] },
     { paths: null },
     { paths: [{ path: leaves[0], class: 'safe', level: 'low' }] },

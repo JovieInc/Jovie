@@ -35,14 +35,24 @@ const AUTOMATION_APPROVER =
   /bot|github-actions|automation|system|claude|agent|hermes/i;
 
 // Bounded consequence mapping over the existing range-risk receipt, not a
-// replacement risk classifier. These entrypoints still select the Web lane,
-// medium release evidence and exact-route browser/visual checks. Their imported
-// shared owners are unchanged only when the COMPLETE range contains these
-// leaves alone. Any additional input retains the protected journey requirement.
-const ISOLATED_MARKETING_ENTRYPOINTS = new Set([
-  'apps/web/app/(marketing)/about/page.tsx',
-  'apps/web/app/(marketing)/artist-profiles/page.tsx',
-]);
+// replacement risk classifier. These surfaces still select the Web lane, medium
+// release evidence and exact-route browser/visual checks. Auth and billing
+// journeys block only a release that can reach auth, billing or signup (Tim,
+// 2026-11-06), so the COMPLETE range must be leaf UI outside those flows.
+// Shared owners (layouts, data, styles, packages/ui) and the homepage's entry
+// CTAs retain the requirement, as does any path naming a protected flow.
+const JOURNEY_FREE_UI_SURFACE =
+  /^apps\/web\/(?:app\/\(marketing\)\/|app\/\[username\]\/|components\/features\/profile\/|lib\/images\/|screenshot-catalog\/)/;
+const JOURNEY_PROTECTED_PATH =
+  /auth|billing|checkout|claim|layout\.|onboarding|pay|pricing|sign-?in|sign-?up|start|stripe|subscri|tip|waitlist/i;
+
+function isJourneyFreeUiPath(path) {
+  return (
+    typeof path === 'string' &&
+    JOURNEY_FREE_UI_SURFACE.test(path) &&
+    !JOURNEY_PROTECTED_PATH.test(path)
+  );
+}
 
 export function journeysRequired(range) {
   if (!range || range.schema !== 'jovie.release-range-risk/v1') return true;
@@ -106,7 +116,7 @@ export function journeysRequired(range) {
       row =>
         row?.class === 'public-ui' &&
         row.level === 'medium' &&
-        ISOLATED_MARKETING_ENTRYPOINTS.has(row.path)
+        isJourneyFreeUiPath(row.path)
     )
   );
 }
