@@ -1,3 +1,4 @@
+import { getRegistryEntry } from '@/lib/dsp-registry';
 import type { ProviderKey, ReleaseTemplate } from './types';
 
 export const PROVIDER_CONFIG: Record<
@@ -35,13 +36,21 @@ export const PROVIDER_CONFIG: Record<
   trebel: { label: 'Trebel', accent: '#00B4E6' },
   yandex: { label: 'Yandex Music', accent: '#FFCC00' },
   amazon: { label: 'Amazon', accent: '#FF9900' },
-  vk_music: { label: 'VK Music', accent: '#0077FF' },
-  traxsource: { label: 'Traxsource', accent: '#40A0FF' },
-  bugs: { label: 'Bugs', accent: '#FF5A00' },
-  fizy: { label: 'fizy', accent: '#0057B8' },
-  juno_download: { label: 'Juno Download', accent: '#1A1A1A' },
-  emusic: { label: 'eMusic', accent: '#E4002B' },
 };
+
+// URL-only services take label and accent from the DSP registry so brand
+// data keeps a single source of truth.
+for (const key of [
+  'vk_music',
+  'traxsource',
+  'bugs',
+  'fizy',
+  'juno_download',
+  'emusic',
+]) {
+  const entry = getRegistryEntry(key);
+  if (entry) PROVIDER_CONFIG[key] = { label: entry.name, accent: entry.color };
+}
 
 export const PRIMARY_PROVIDER_KEYS: ProviderKey[] = [
   'spotify',

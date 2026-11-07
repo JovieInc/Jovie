@@ -283,12 +283,14 @@ const INTERNATIONAL_STREAMING_DSP_INPUTS: readonly CompactDspInput[] = [
  * off (musicfetchService null) until a service name is verified.
  * Source of truth for coverage: lib/dsp-coverage/distributor-stores.json.
  */
+// Brand colors for services without a published brand hex use a neutral grey
+// rather than an invented color.
 const URL_ONLY_STREAMING_DSP_INPUTS: readonly CompactDspInput[] = [
   [
     'vk_music',
     'VK Music',
     null,
-    '#0077FF',
+    `#${SOCIAL_ICON_DATA.vk.hex}`,
     ['vk.com', 'www.vk.com', 'vk.ru', 'music.vk.com'],
     null,
     { aliases: ['vkmusic', 'vk', 'vkontakte'], iconKey: 'vk' },
@@ -297,7 +299,7 @@ const URL_ONLY_STREAMING_DSP_INPUTS: readonly CompactDspInput[] = [
     'traxsource',
     'Traxsource',
     null,
-    '#40A0FF',
+    `#${SOCIAL_ICON_DATA.traxsource.hex}`,
     ['traxsource.com', 'www.traxsource.com'],
     'https://www.traxsource.com/search?term={query}',
     { iconKey: 'traxsource' },
@@ -306,22 +308,22 @@ const URL_ONLY_STREAMING_DSP_INPUTS: readonly CompactDspInput[] = [
     'bugs',
     'Bugs',
     null,
-    '#FF5A00',
+    '#666666',
     ['bugs.co.kr', 'music.bugs.co.kr'],
     null,
     { aliases: ['bugsmusic'] },
   ],
-  ['fizy', 'fizy', null, '#0057B8', ['fizy.com', 'www.fizy.com'], null],
+  ['fizy', 'fizy', null, '#666666', ['fizy.com', 'www.fizy.com'], null],
   [
     'juno_download',
     'Juno Download',
     null,
-    '#1A1A1A',
+    '#666666',
     ['junodownload.com', 'www.junodownload.com'],
     'https://www.junodownload.com/search/?q%5Ball%5D%5B%5D={query}',
     { aliases: ['juno', 'junorecords'] },
   ],
-  ['emusic', 'eMusic', null, '#E4002B', ['emusic.com', 'www.emusic.com'], null],
+  ['emusic', 'eMusic', null, '#666666', ['emusic.com', 'www.emusic.com'], null],
 ] as const;
 
 // ============================================================================
