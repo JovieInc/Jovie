@@ -11,7 +11,7 @@ main's schema changes too; a real conflict raises Unmergeable and the model gets
 Pure helpers plus `renumber(root, git, base_ref, pr_number, others)` which edits the worktree and returns the
 changed paths. The caller commits, merges main and pushes.
 
-After restoring main's metadata and running `pnpm --filter @jovie/web drizzle:generate`, use
+Use `prepare_regeneration` during a main merge, run `pnpm --filter @jovie/web drizzle:generate`, then
 `normalize_generated(root, git, base_ref, pr_number, others)` for sparse migration numbering.
 It renames generated artifacts without merging or rewriting snapshot contents.
 """
@@ -72,6 +72,28 @@ def three_way(base, mine, theirs):
 def _numbers(paths) -> list[int]:
     return sorted({int(m.group(1)) for p in paths if p.startswith(MIG_DIR + "/") and "/" not in p[len(MIG_DIR) + 1:]
                    for m in [NUM.match(p[len(MIG_DIR) + 1:])] if m})
+
+
+def prepare_regeneration(root: Path, git, base_ref: str) -> list[str]:
+    """Restore base metadata and remove pristine PR artifacts before canonical generation.
+
+    Prevalidate all removals; refuse local edits. Never merge generated snapshot contents.
+    """
+    root = Path(root)
+    ancestor = git("merge-base", base_ref, "HEAD").strip()
+    added = git("diff", "--name-only", "--diff-filter=A", f"{ancestor}..HEAD", "--", MIG_DIR).splitlines()
+    artifacts = [p for p in added if re.fullmatch(rf"{MIG_DIR}/\d{{4}}_[^/]+\.sql|{META}/\d{{4}}_snapshot\.json", p)]
+    base_files = set(git("ls-tree", "-r", "--name-only", base_ref, MIG_DIR).splitlines())
+    metadata = {p: git("show", f"{base_ref}:{p}") for p in sorted(base_files) if p.startswith(META + "/")}
+    for path in artifacts:
+        if (root / path).exists() and (root / path).read_text() != git("show", f"HEAD:{path}"):
+            raise Unmergeable(f"local artifact edits: {path}")
+    removed = [p for p in artifacts if p not in base_files and (root / p).exists()]
+    for path in removed:
+        (root / path).unlink()
+    for path, content in metadata.items():
+        atomic_write_text(root / path, content)
+    return sorted(set(removed) | set(metadata))
 
 
 def normalize_generated(root: Path, git, base_ref: str, pr_number: int,
