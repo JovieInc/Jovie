@@ -13,6 +13,7 @@ import {
   BADGE_SHARED_GEOMETRY_CLASS,
   BADGE_SIZE_GEOMETRY,
 } from '../lib/badge-geometry-contract';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 import { Badge, badgeVariants } from './badge';
 import {
   BADGE_BLUE_HOVER_FIXTURE_SOURCE,
@@ -416,5 +417,21 @@ describe('Badge status text contrast (JOV-8873)', () => {
   ] as const)('renders %s with the AA text token', (variant, token) => {
     render(<Badge variant={variant}>Status</Badge>);
     expect(screen.getByText('Status')).toHaveClass(token);
+  });
+});
+
+describe('Badge accessibility', () => {
+  it('has no axe violations across variants and a long RTL label', async () => {
+    const { container } = render(
+      <div>
+        <Badge>Beta</Badge>
+        <Badge variant='error'>Sync failed</Badge>
+        <Badge variant='permission-restricted'>Admin only</Badge>
+        <span dir='rtl'>
+          <Badge variant='success'>تم النشر على جميع المنصات</Badge>
+        </span>
+      </div>
+    );
+    await expectNoA11yViolations(container);
   });
 });

@@ -3,6 +3,7 @@
  * Component certificate CLI.
  *   node scripts/component-certificate.mjs --all [--out report.json] [--summary]
  *   node scripts/component-certificate.mjs --component apps/web/components/x/Y.tsx [--spec]
+ *   node scripts/component-certificate.mjs --gate   (fail on any gated criterion in component-certification.json)
  * Optional evidence inputs (absent evidence = `unknown`, which counts as missing):
  *   --mutation-state sweep-state.json  --a11y a11y.json  --visual visual.json  --journeys journeys.json
  */
@@ -48,6 +49,7 @@ const { values } = parseArgs({
     },
     sha: { type: 'string', default: 'unknown' },
     guards: { type: 'boolean', default: false },
+    gate: { type: 'boolean', default: false },
     'guard-registry': {
       type: 'string',
       default: 'docs/design-system/defect-guard-registry.json',
@@ -114,7 +116,7 @@ const mutationInventory = (() => {
 
 /** @type {any[]} */
 let list = [];
-if (values.all)
+if (values.all || values.gate)
   for (const r of [...new Set(COVERAGE_ROOTS)])
     list.push(...listComponentsInRoot(r, root));
 const seen = new Set();
@@ -175,6 +177,15 @@ const certificates = list.map(c => {
 });
 
 const report = buildReport({ certificates, headSha: values.sha });
+if (values.gate) {
+  // Loaded only for --gate so the report CLI keeps its minimal import closure.
+  const { evaluateCertificateGates, formatGateResult } = await import(
+    './lib/component-certificate-gate.mjs'
+  );
+  const result = evaluateCertificateGates(report, registry.gates ?? {});
+  console.log(formatGateResult(result));
+  process.exit(result.ok ? 0 : 1);
+}
 if (values.out)
   writeFileSync(values.out, `${JSON.stringify(report, null, 1)}\n`);
 if (values.spec)
