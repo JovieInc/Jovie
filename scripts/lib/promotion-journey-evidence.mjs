@@ -38,13 +38,14 @@ const AUTOMATION_APPROVER =
 // replacement risk classifier. These surfaces still select the Web lane, medium
 // release evidence and exact-route browser/visual checks. Auth and billing
 // journeys block only a release that can reach auth, billing or signup (Tim,
-// 2026-11-06), so the COMPLETE range must be leaf UI outside those flows.
-// Shared owners (layouts, data, styles, packages/ui) and the homepage's entry
-// CTAs retain the requirement, as does any path naming a protected flow.
+// 2026-11-06), so the COMPLETE range must be leaf pages outside those flows.
+// This is an allowlist of pages that hold no claim, signup or checkout form;
+// the name check is only a backstop. Profile pages stay out: their templates
+// and loaders carry the claim footer and owner state under ordinary names.
 const JOURNEY_FREE_UI_SURFACE =
-  /^apps\/web\/(?:app\/\(marketing\)\/|app\/\[username\]\/|components\/features\/profile\/|lib\/images\/|screenshot-catalog\/)/;
+  /^apps\/web\/(?:app\/\(marketing\)\/(?:(?:about|alternatives|api-versioning|blog|changelog|cli|compare|developers|engineering|integrations|proof|support|voice)\/|artist-profiles\/page\.tsx$)|screenshot-catalog\/)/;
 const JOURNEY_PROTECTED_PATH =
-  /auth|billing|checkout|claim|layout\.|onboarding|pay|pricing|sign-?in|sign-?up|start|stripe|subscri|tip|waitlist/i;
+  /auth|billing|buy|checkout|claim|cta|donate|handle|invite|join|layout|log-?in|onboarding|owner|pay|plans?\b|pricing|register|sign|start|stripe|subscri|tip|upgrade|waitlist/i;
 
 function isJourneyFreeUiPath(path) {
   return (
