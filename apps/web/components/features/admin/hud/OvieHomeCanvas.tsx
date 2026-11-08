@@ -19,6 +19,10 @@ import {
   partitionCanvasCards,
 } from '@/lib/ovie/home/canvas-turns';
 import {
+  type CompanyBlocker,
+  homeConstraint,
+} from '@/lib/ovie/home/company-blocker';
+import {
   buildCompanyTiles,
   type OvieFunnelInput,
   type OvieGoldenPathRow,
@@ -50,6 +54,12 @@ const OVIE_HOME_COPY: HomeLoopCopy = {
   inFlightError: 'Shipping data could not load.',
   doneTitle: 'Done Today',
   doneEmpty: 'Nothing has landed yet today.',
+};
+
+/** Once the revenue blocker reads, a clear banner means revenue is clear. */
+const OVIE_HOME_REVENUE_COPY: HomeLoopCopy = {
+  ...OVIE_HOME_COPY,
+  constraintClear: 'Nothing is blocking revenue',
 };
 
 const INBOX_QUERY_KEY = ['ovie', 'inbox'] as const;
@@ -126,6 +136,11 @@ const COMPANY_PLACEHOLDER = buildCompanyTiles({
   goldenPath: null,
 });
 
+interface OvieHomeBlockerResponse {
+  readonly blocker: CompanyBlocker | null;
+  readonly generatedAt: string;
+}
+
 async function fetchInbox(signal: AbortSignal): Promise<OvieInbox> {
   const response = await fetch('/api/ovie/inbox', {
     signal,
@@ -154,6 +169,18 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     ...FREQUENT_CACHE,
     refetchOnWindowFocus: true,
     refetchInterval: 30_000,
+  });
+
+  // The one revenue blocker, from the cached company snapshot (no
+  // third-party calls). Summer's brief reads the same field.
+  const revenueBlocker = useQuery<OvieHomeBlockerResponse>({
+    queryKey: ['ovie', 'home', 'blocker'],
+    queryFn: ({ signal }) =>
+      fetchJson<OvieHomeBlockerResponse>('/api/ovie/home/blocker', signal),
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    staleTime: 30_000,
+    retry: false,
   });
 
   const [lastVisit] = useState<OvieLastVisit>(readLastVisit);
@@ -318,11 +345,19 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
         ? 'loading'
         : 'ready';
   // A disconnected feed keeps the last values but must say so in text.
-  const constraint =
+  const shippingConstraint =
     home?.constraint ??
     (connection === 'disconnected'
       ? { tone: 'warn' as const, text: 'Shipping data is disconnected' }
       : null);
+  // Home leads with the revenue blocker; shipping health is the floor shown
+  // only when revenue is clear. An unreadable blocker never reads as clear.
+  // Until it reads (or if it can't), the banner keeps its shipping behavior,
+  // so an unreadable blocker never reads as "nothing is blocking revenue".
+  const revenueRead = revenueBlocker.isSuccess;
+  const constraint = revenueRead
+    ? homeConstraint(revenueBlocker.data.blocker, shippingConstraint)
+    : shippingConstraint;
   const asksStatus: HomeLoopSectionStatus = inbox.data
     ? 'ready'
     : inbox.isError
@@ -335,6 +370,10 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
         ? 'unauthorized'
         : 'operational-tasks-unavailable'
       : null;
+  useEffect(() => {
+    if (revenueBlocker.isError)
+      reportOvieHomePanelError('revenue-blocker', 'company-state-unavailable');
+  }, [revenueBlocker.isError]);
   useEffect(() => {
     if (loopErrorReason)
       reportOvieHomePanelError('shipping-loop', loopErrorReason);
@@ -412,9 +451,10 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     <HomeLoopCanvas
       answer={answerPanel}
       inFlightOverride={inFlightOverride}
-      copy={OVIE_HOME_COPY}
+      copy={revenueRead ? OVIE_HOME_REVENUE_COPY : OVIE_HOME_COPY}
       stages={activeStages}
       constraint={constraint}
+      constraintStatus={revenueRead ? 'ready' : undefined}
       pulse={home?.pulse ?? []}
       asks={asks}
       rows={home?.rows ?? []}

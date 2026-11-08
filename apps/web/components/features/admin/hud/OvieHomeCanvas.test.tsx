@@ -1,5 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HomeCanvasState } from '@/components/jovie/types';
 import { mockFitLayout } from '@/components/organisms/home-loop/fit-layout.test-utils';
@@ -123,6 +130,10 @@ const COMPANY_RESPONSES: Record<string, unknown> = {
         tiers: { runtime_dogfood: 'passed' },
       },
     ],
+  },
+  '/api/ovie/home/blocker': {
+    generatedAt: '2026-11-08T23:00:00.000Z',
+    blocker: null,
   },
 };
 
@@ -698,5 +709,64 @@ describe('OvieHomeCanvas', () => {
       'pending'
     );
     expect(screen.getByTestId('home-loop-answer-pending')).toBeVisible();
+  });
+  it('leads the banner with the revenue blocker over shipping health', async () => {
+    companyResponses = {
+      ...COMPANY_RESPONSES,
+      '/api/ovie/home/blocker': {
+        generatedAt: '2026-11-08T23:00:00.000Z',
+        blocker: {
+          schema: 'jovie.company-blocker/v1',
+          id: 'certification:public_profile',
+          kind: 'certification',
+          step: 'public_profile',
+          tone: 'bad',
+          text: 'The public profile fails certification, so no artist can be sent their profile yet',
+          detailsHref: APP_ROUTES.ADMIN_CERTIFICATIONS,
+          since: null,
+          nextAction: null,
+          observedAt: '2026-11-08T23:00:00.000Z',
+        },
+      },
+    };
+    renderCanvas();
+    const banner = screen.getByTestId('home-loop-constraint');
+    await waitFor(() =>
+      expect(banner).toHaveTextContent(
+        'The public profile fails certification, so no artist can be sent their profile yet'
+      )
+    );
+    expect(banner).toHaveAttribute('data-tone', 'bad');
+    expect(
+      within(banner).getByRole('link', { name: 'Details' })
+    ).toHaveAttribute('href', APP_ROUTES.ADMIN_CERTIFICATIONS);
+  });
+
+  it('drops the shipping all-clear once revenue reads clear', async () => {
+    renderCanvas();
+    const banner = screen.getByTestId('home-loop-constraint');
+    await waitFor(() =>
+      expect(banner).not.toHaveTextContent('Shipping is on target')
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/ovie/home/blocker',
+      expect.anything()
+    );
+  });
+
+  it('reports an unreadable blocker and keeps the shipping banner', async () => {
+    const { '/api/ovie/home/blocker': _blocker, ...withoutBlocker } =
+      COMPANY_RESPONSES;
+    companyResponses = withoutBlocker;
+    renderCanvas();
+    await waitFor(() =>
+      expect(panelAlert).toHaveBeenCalledWith(
+        'revenue-blocker',
+        'company-state-unavailable'
+      )
+    );
+    expect(screen.getByTestId('home-loop-constraint')).not.toHaveTextContent(
+      'Nothing is blocking revenue'
+    );
   });
 });
