@@ -2055,8 +2055,8 @@ function EmptyCatalog({
 function NoResults({ onReset }: { readonly onReset: () => void }) {
   return (
     <TableEmptyState
-      heading='No work matches'
-      description='No releases, products, or files match the selected view or filters.'
+      heading='No Work Matches'
+      description='Nothing in this view matches the selected filters.'
       className='min-h-75'
       action={{
         label: 'Reset View',
