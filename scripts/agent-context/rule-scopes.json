@@ -40,7 +40,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "ef991019ec62499714178175681e240c3d7da523e236b57e4e09c5b66386086f"
+    "bodySha256": "e9c46b96f7549ccf1a2c9a380c6cae1497bda7c6e10c9ae8e957ae7944e62d7e"
   },
   {
     "file": ".claude/rules/event-driven.md",

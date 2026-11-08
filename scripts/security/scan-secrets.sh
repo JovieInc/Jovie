@@ -16,31 +16,11 @@ GITLEAKS_VERSION="${GITLEAKS_VERSION:-8.21.2}"
 TRUFFLEHOG_VERSION="${TRUFFLEHOG_VERSION:-3.99.8}"
 EXCLUDE_PATHS="$REPO_ROOT/.trufflehog-exclude.txt"
 
-# Release downloads hit resets (curl 35, JOV-6809) and HTTP 504 runs (#24269,
-# #24488). Fetch to a temp file so a restart never feeds tar a concatenated
-# body, abort stalls, back off with jitter (6 tries, 62-124s), fail closed.
-SCAN_SECRETS_RETRY_DELAY="${SCAN_SECRETS_RETRY_DELAY:-2}"
-SCAN_SECRETS_DOWNLOAD_ATTEMPTS="${SCAN_SECRETS_DOWNLOAD_ATTEMPTS:-6}"
-fetch_release_tarball() {
-  local url="$1" dest_dir="$2" member="$3" tmp attempt delay="$SCAN_SECRETS_RETRY_DELAY"
-  tmp="$(mktemp)"
-  for ((attempt = 1; attempt <= SCAN_SECRETS_DOWNLOAD_ATTEMPTS; attempt++)); do
-    if curl -sSfL --connect-timeout 20 --speed-limit 1024 --speed-time 30 -o "$tmp" "$url" \
-      && tar -xzf "$tmp" -C "$dest_dir" "$member"; then
-      chmod +x "$dest_dir/$member"
-      rm -f "$tmp"
-      return 0
-    fi
-    if [[ $attempt -lt $SCAN_SECRETS_DOWNLOAD_ATTEMPTS ]]; then
-      echo "scanner download attempt $attempt failed; retrying" >&2
-      sleep "$((delay + RANDOM % (delay + 1)))"
-      delay=$((delay * 2))
-    fi
-  done
-  rm -f "$tmp"
-  echo "::error title=Secret scanner download failed::Could not fetch $member after $SCAN_SECRETS_DOWNLOAD_ATTEMPTS attempts ($url)." >&2
-  return 1
-}
+# Scanner binaries come from fetch-scanner.sh: warm cache, then the GitHub
+# release, then a container-image fallback (release CDN 504s, JOV-11689), with
+# the binary sha256 pinned in scanner-pins.txt on every path.
+# shellcheck source=scripts/security/fetch-scanner.sh
+source "$REPO_ROOT/scripts/security/fetch-scanner.sh"
 
 ensure_gitleaks() {
   if [[ -n "${GITLEAKS_BIN:-}" ]]; then
@@ -51,22 +31,7 @@ ensure_gitleaks() {
     return
   fi
 
-  local os arch cache_dir tarball
-  os="$(uname -s | tr '[:upper:]' '[:lower:]')"
-  arch="$(uname -m)"
-  case "$arch" in
-    x86_64) arch="x64" ;;
-    aarch64 | arm64) arch="arm64" ;;
-  esac
-  cache_dir="${TMPDIR:-/tmp}/gitleaks-${GITLEAKS_VERSION}"
-  mkdir -p "$cache_dir"
-  tarball="gitleaks_${GITLEAKS_VERSION}_${os}_${arch}.tar.gz"
-  if [[ ! -x "$cache_dir/gitleaks" ]]; then
-    fetch_release_tarball \
-      "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${tarball}" \
-      "$cache_dir" gitleaks
-  fi
-  GITLEAKS_BIN="$cache_dir/gitleaks"
+  GITLEAKS_BIN="$(fetch_scanner gitleaks "$GITLEAKS_VERSION")" || exit 1
 }
 
 ensure_trufflehog() {
@@ -78,22 +43,7 @@ ensure_trufflehog() {
     return
   fi
 
-  local os arch cache_dir tarball
-  os="$(uname -s | tr '[:upper:]' '[:lower:]')"
-  arch="$(uname -m)"
-  case "$arch" in
-    x86_64) arch="amd64" ;;
-    aarch64 | arm64) arch="arm64" ;;
-  esac
-  cache_dir="${TMPDIR:-/tmp}/trufflehog-${TRUFFLEHOG_VERSION}"
-  mkdir -p "$cache_dir"
-  tarball="trufflehog_${TRUFFLEHOG_VERSION}_${os}_${arch}.tar.gz"
-  if [[ ! -x "$cache_dir/trufflehog" ]]; then
-    fetch_release_tarball \
-      "https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}/${tarball}" \
-      "$cache_dir" trufflehog
-  fi
-  TRUFFLEHOG_BIN="$cache_dir/trufflehog"
+  TRUFFLEHOG_BIN="$(fetch_scanner trufflehog "$TRUFFLEHOG_VERSION")" || exit 1
 }
 
 trufflehog_exclude_args() {
