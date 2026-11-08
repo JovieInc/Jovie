@@ -330,6 +330,23 @@ describe('resolvePreviewArtist', () => {
 // the browser default, which the live chat's focus/keyboard layers can shadow
 // mid-journey — leaving the rail at its bottom edge with the preview badge
 // clipped at the scrollport top (golden-path toBeInViewport ratio 0.8125).
+// 2026-11-08 production: the draft profile shouted at the artist with an
+// all-caps eyebrow and badges. The rail chrome now forces no caps at all.
+describe('OnboardingProfileRail casing (ASR-022)', () => {
+  it('forces no text into all caps in the rail chrome', () => {
+    render(<OnboardingProfileRail state={CONFIRMED_STATE} />);
+
+    const rail = screen.getByTestId('onboarding-profile-rail');
+    const shouting = Array.from(rail.querySelectorAll('[class]')).filter(el =>
+      /(?:^|\s)uppercase(?:\s|$)/.test(el.getAttribute('class') ?? '')
+    );
+    expect(shouting.map(el => el.textContent)).toEqual([]);
+    expect(
+      screen.getByTestId('onboarding-profile-preview-badge')
+    ).toHaveTextContent('Preview');
+  });
+});
+
 describe('OnboardingProfileRail keyboard scrolling (JOV-7973)', () => {
   it('scrolls itself to the top edge on Home', async () => {
     const user = userEvent.setup();

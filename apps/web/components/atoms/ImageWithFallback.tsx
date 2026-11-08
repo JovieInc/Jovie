@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/atoms/ImageWithFallback.test.tsx
+
 import type { ImageProps } from 'next/image';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';

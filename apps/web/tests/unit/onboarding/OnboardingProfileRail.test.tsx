@@ -226,34 +226,6 @@ describe('OnboardingProfileRail', () => {
     expect(within(phone).getAllByText('UNMARKED').length).toBeGreaterThan(0);
   });
 
-  it('forces no text into all caps anywhere in the draft profile', () => {
-    fastRender(
-      <OnboardingProfileRail
-        state={{
-          artist: {
-            id: 'artist-1',
-            name: 'Test Artist',
-            url: 'https://open.spotify.com/artist/artist-1',
-            imageUrl: 'https://i.scdn.co/image/test',
-            genres: [],
-          },
-          artistConfirmed: true,
-          handle: 'testartist',
-          socialLinks: [],
-        }}
-      />
-    );
-
-    const rail = screen.getByTestId('onboarding-profile-rail');
-    const shouting = Array.from(rail.querySelectorAll('[class]')).filter(el =>
-      /(?:^|\s)uppercase(?:\s|$)/.test(el.getAttribute('class') ?? '')
-    );
-    expect(shouting.map(el => el.textContent)).toEqual([]);
-    expect(
-      screen.getByTestId('onboarding-profile-preview-badge')
-    ).toHaveTextContent('Preview');
-  });
-
   it('renders nothing before a handle or profile is known', () => {
     fastRender(
       <OnboardingProfileRail

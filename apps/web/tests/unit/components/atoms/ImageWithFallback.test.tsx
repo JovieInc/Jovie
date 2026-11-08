@@ -1,6 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
+import { DirectDspImagesProvider } from '@/lib/images/direct-dsp-images';
+
+const { nextImage } = vi.hoisted(() => ({ nextImage: vi.fn() }));
 
 // Mock next/image
 vi.mock('next/image', () => ({
@@ -9,20 +12,61 @@ vi.mock('next/image', () => ({
     alt,
     onError,
     onLoad,
+    unoptimized,
     ...props
-  }: React.ComponentProps<'img'>) => (
-    <img
-      src={src}
-      alt={alt}
-      onError={onError}
-      onLoad={onLoad}
-      {...props}
-      data-testid='next-image'
-    />
-  ),
+  }: React.ComponentProps<'img'> & { readonly unoptimized?: boolean }) => {
+    nextImage({ src, unoptimized });
+    return (
+      <img
+        src={src}
+        alt={alt}
+        onError={onError}
+        onLoad={onLoad}
+        {...props}
+        data-testid='next-image'
+      />
+    );
+  },
 }));
 
 describe('ImageWithFallback', () => {
+  // 2026-11-08: one-off previews (onboarding draft profile) load Spotify
+  // artwork straight from Spotify's CDN so it paints at once; everywhere
+  // else keeps next/image optimization.
+  it('loads Spotify artwork directly inside a direct-DSP preview', () => {
+    nextImage.mockClear();
+    const src =
+      'https://i.scdn.co/image/ab67616d0000b273d9985092cd88bffd97653b58';
+    render(
+      <DirectDspImagesProvider>
+        <ImageWithFallback
+          src={src}
+          alt='Vibe artwork'
+          width={64}
+          height={64}
+        />
+      </DirectDspImagesProvider>
+    );
+    expect(nextImage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ src, unoptimized: true })
+    );
+  });
+
+  it('keeps Spotify artwork optimized outside a direct-DSP preview', () => {
+    nextImage.mockClear();
+    render(
+      <ImageWithFallback
+        src='https://i.scdn.co/image/test.jpg'
+        alt='Album art'
+        width={64}
+        height={64}
+      />
+    );
+    expect(nextImage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ unoptimized: false })
+    );
+  });
+
   it('renders an image when src is provided', () => {
     render(
       <ImageWithFallback
