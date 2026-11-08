@@ -63,6 +63,10 @@ const KNOWN = new Set([
   'app/app/(shell)/admin/costs/CostsTable.tsx#No cost items',
   'app/app/(shell)/admin/features/AdminFeaturesTable.tsx#No feature flags',
   'app/app/(shell)/admin/revenue-lift/page.tsx#Could not load revenue-lift metrics.',
+  // Creator pages whose copy moves with a story or lint cleanup in a later slice.
+  'components/features/dashboard/organisms/SettingsContactsSection.tsx#No contacts yet',
+  'components/features/dashboard/organisms/grouped-links/GroupedLinksManager.tsx#Add your first link',
+  'components/features/dashboard/youtube/YouTubeChannelPilotPanel.tsx#Authorized Channel Is Waiting for Its First Sync',
   // Queued for deletion as dead code (#24513).
   "components/features/dashboard/organisms/jovie-work-feed/JovieWorkPanel.tsx#Select a profile to see Jovie's autonomous work.",
   'components/features/dashboard/organisms/DashboardAnalyticsCards.tsx#No profile views yet',
