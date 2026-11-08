@@ -3,6 +3,8 @@ import 'server-only';
 import { eq } from 'drizzle-orm';
 import { getContactCertificationInspection } from '@/lib/admin/contact-certification';
 import { getCanonicalContactByKey } from '@/lib/admin/contacts';
+import { checkDogfoodJudgeGate } from '@/lib/agent-os/dogfood-judge-ledger';
+import { getDogfoodJudgeLedger } from '@/lib/agent-os/dogfood-judge-runtime-store';
 import type { ContactCertificationInspection } from '@/lib/contacts/certification';
 import { contactDedupeKey } from '@/lib/contacts/lifecycle';
 import { db } from '@/lib/db';
@@ -64,7 +66,15 @@ export async function getOutboundCertification(
 
 type Result =
   | { readonly ok: true }
-  | { readonly ok: false; readonly reason: OutboundRefusal };
+  | {
+      readonly ok: false;
+      readonly reason: OutboundRefusal;
+      /** Present when the dogfood judge gate denied. */
+      readonly judgeReasons?: readonly string[];
+    };
+
+/** Surface the outbound review cards are judged under. */
+export const OUTBOUND_JUDGE_SURFACE = 'outbound-review-cards';
 
 /**
  * Approve one target and one exact message revision. Requires the current
@@ -85,6 +95,14 @@ export async function approveOutbound(input: {
   const certification = await getOutboundCertification(lead);
   if (certification?.status !== 'certified_for_outreach')
     return { ok: false, reason: 'not_certified' };
+  // No outreach becomes sendable unless the dogfood judge passes the cards.
+  const judge = await checkDogfoodJudgeGate(
+    getDogfoodJudgeLedger(),
+    OUTBOUND_JUDGE_SURFACE,
+    { prodSha: process.env.VERCEL_GIT_COMMIT_SHA ?? null }
+  ).catch(() => ({ allow: false, reasons: ['gate-error'] }));
+  if (!judge.allow)
+    return { ok: false, reason: 'judge_denied', judgeReasons: judge.reasons };
   const target = await recordOutboundDecision({
     lead,
     actorUserId: input.actorUserId,

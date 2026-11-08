@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import {
   Tooltip,
@@ -379,5 +380,55 @@ describe('Tooltip', () => {
       expect(content).toHaveTextContent('Bold');
       expect(content).toHaveTextContent('italic');
     });
+  });
+});
+
+describe('Tooltip accessibility', () => {
+  it('has no axe violations with default, danger and RTL tooltips open', async () => {
+    const { container } = render(
+      <TooltipProvider delayDuration={0}>
+        <Tooltip open>
+          <TooltipTrigger>
+            <button type='button'>Copy link</button>
+          </TooltipTrigger>
+          <TooltipContent showArrow>
+            Copies the public profile URL
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip open>
+          <TooltipTrigger>
+            <button type='button'>Retry sync</button>
+          </TooltipTrigger>
+          <TooltipContent tone='danger' testId='danger-tooltip'>
+            Spotify sync failed
+          </TooltipContent>
+        </Tooltip>
+        <div dir='rtl'>
+          <Tooltip open>
+            <TooltipTrigger>
+              <button type='button' aria-label='مشاركة'>
+                <svg aria-hidden='true' />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent dir='rtl' testId='rtl-tooltip'>
+              انسخ رابط الملف الشخصي
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </TooltipProvider>
+    );
+    expect(screen.getByTestId('tooltip-content')).toBeInTheDocument();
+    expect(screen.getByTestId('danger-tooltip')).toBeInTheDocument();
+    expect(screen.getByTestId('rtl-tooltip')).toHaveAttribute('dir', 'rtl');
+    // Audit the triggers and every portalled tooltip layer in document.body.
+    // The bare test page has no landmarks, so each rendered subtree is
+    // audited on its own rather than the landmark-less page shell.
+    const layers = document.body.querySelectorAll(
+      '[data-radix-popper-content-wrapper]'
+    );
+    expect(layers).toHaveLength(3);
+    for (const node of [container, ...layers]) {
+      await expectNoA11yViolations(node);
+    }
   });
 });

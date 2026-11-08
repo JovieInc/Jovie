@@ -30,6 +30,7 @@ import {
   postStripeWebhook,
   sendSubscriptionWebhook,
 } from './helpers/stripe-helpers';
+import { measureWebVitals } from './utils/performance-test-utils';
 
 /**
  * $12/month self-serve artist profile (EVENT: Tim, 2026-10-20):
@@ -42,6 +43,18 @@ import {
  * with Stripe's documented test PaymentMethod and the signed event goes
  * through the real webhook route.
  */
+// A paying artist must not watch the claim or unlock screen jump around.
+// 0.1 is the Web Vitals "good" ceiling for cumulative layout shift.
+async function expectStableLayout(page: Page, screen: string): Promise<void> {
+  await page.waitForTimeout(1500); // let late shifts land
+  const { cls = 0 } = await measureWebVitals(page);
+  test
+    .info()
+    .annotations.push({ type: 'cls', description: `${screen} ${cls}` });
+  // Soft, so a shift is reported without hiding the payment checks after it.
+  expect.soft(cls, `${screen} layout shift`).toBeLessThan(0.1);
+}
+
 test.describe('Self-serve artist profile checkout', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -91,6 +104,7 @@ test.describe('Self-serve artist profile checkout', () => {
     );
 
     await page.goto('/claim', { waitUntil: 'domcontentloaded' });
+    await expectStableLayout(page, '/claim');
     const { sessionId } = await createCheckoutSession(page, priceId, {
       source: 'onboarding',
       returnTo: '/chat?from=onboarding',
@@ -156,6 +170,7 @@ test.describe('Self-serve artist profile checkout', () => {
       await expect(page.getByText(/You're on .+: unlocked/)).toBeVisible({
         timeout: 30_000,
       });
+      await expectStableLayout(page, '/billing/success');
 
       // An existing subscriber is never charged twice.
       const again = await page.request.get('/claim/start?new=1', {
