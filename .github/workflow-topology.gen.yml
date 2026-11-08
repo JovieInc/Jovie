@@ -267,6 +267,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - merge_group
       - pull_request
       - push
     terminalReceipt: job:company-guards
@@ -725,6 +726,19 @@ nodes:
       - workflow_call
     terminalReceipt: job:build
     jobCount: 2
+  - name: Main Health
+    path: .github/workflows/main-health.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers:
+      - Main Red Eject
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:health
+    jobCount: 1
   - name: Main Red Eject
     path: .github/workflows/main-red-eject.yml
     active: true
@@ -912,6 +926,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:canary
     jobCount: 1
+  - name: Pen draft missing frames
+    path: .github/workflows/pen-draft.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:draft
+    jobCount: 1
   - name: Pen still diff (advisory)
     path: .github/workflows/pen-still-diff.yml
     active: true
@@ -949,7 +975,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:notify-failure
-    jobCount: 7
+    jobCount: 8
   - name: PR Conflict Handler
     path: .github/workflows/pr-conflict-handler.yml
     active: false
@@ -1071,6 +1097,18 @@ nodes:
       - pull_request
       - push
     terminalReceipt: job:guard
+    jobCount: 1
+  - name: Product crawl
+    path: .github/workflows/product-crawl.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - workflow_dispatch
+    terminalReceipt: job:crawl
     jobCount: 1
   - name: Production Continuity Guard
     path: .github/workflows/production-continuity.yml
@@ -1455,6 +1493,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:check
     jobCount: 2
+  - name: Surface Recertify
+    path: .github/workflows/surface-recertify.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:recertify
+    jobCount: 2
   - name: Production Synthetic Monitoring
     path: .github/workflows/synthetic-monitoring.yml
     active: true
@@ -1713,6 +1763,9 @@ edges:
     to: Mac Lane Route
     type: workflow_call
   - from: CI
+    to: Main Red Eject
+    type: workflow_run
+  - from: Main Health
     to: Main Red Eject
     type: workflow_run
   - from: Merge Queue Green Enroll

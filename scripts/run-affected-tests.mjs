@@ -469,6 +469,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/merge-group-member-policy.test.mjs',
   'scripts/lib/__tests__/merge-group-size-bootstrap-contract.test.mjs',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/merge-group-sibling-burn-contract.test.mjs',
   'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',

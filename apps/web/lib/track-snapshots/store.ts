@@ -1,7 +1,6 @@
 import 'server-only';
 import { and, sql as drizzleSql, eq, inArray, isNull, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { getReleaseClickCounts } from '@/lib/db/queries/analytics';
 import {
   discogRecordings,
   discogReleases,
@@ -11,6 +10,7 @@ import {
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { trackDailySnapshots } from '@/lib/db/schema/track-daily-snapshots';
+import { getReleaseClickCounts } from './click-counts';
 import { parseYouTubeVideoId } from './contract';
 import type {
   SnapshotCatalog,

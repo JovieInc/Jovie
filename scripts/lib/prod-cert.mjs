@@ -5,10 +5,24 @@
  * steps (returning sign-in, new-user signup, onboarding, chat, checkout entry)
  * come from the post-deploy Playwright run as a steps file and are folded in
  * here, so one receipt per surface is built from every kind of evidence.
- * Receipts are SHA-bound to /api/health/build-info and carry per-check
- * timestamps. A surface that was not exercised is `blocked` with a reason,
- * never silently passed.
+ * Receipts are SHA-bound to /api/health/build-info with per-check times; a
+ * surface that was not exercised is `blocked` with a reason, never passed.
  */
+
+// Cone probes and HTTP helpers live in prod-cert-probes.mjs (size baseline).
+import {
+  checkoutConeChecks,
+  coneClaimChecks,
+  coneLandingChecks,
+  EXPECTED_BROWSER_CHECKS,
+  expectOk,
+  get,
+} from './prod-cert-probes.mjs';
+import {
+  loadPenInputs,
+  strangerChecks,
+  truthChecks,
+} from './prod-cert-truth.mjs';
 
 export const RECEIPT_SCHEMA = 'jovie.prod-golden-path-receipt/v1';
 
@@ -34,9 +48,6 @@ export const SURFACES = Object.freeze({
 });
 
 export const SURFACE_IDS = Object.keys(SURFACES);
-
-const ERROR_TEXT =
-  /application error|something went wrong|internal server error|this page could not be found/i;
 
 export function statusFromChecks(checks) {
   if (checks.some(c => c.status === 'failed')) return 'failed';
@@ -124,23 +135,6 @@ export async function runCheck(id, fn, now = () => new Date().toISOString()) {
   }
 }
 
-async function get(origin, path, fetchImpl, init = {}) {
-  const response = await fetchImpl(new URL(path, origin), {
-    redirect: 'follow',
-    headers: { 'user-agent': 'jovie-prod-cert/1 (+synthetic)' },
-    ...init,
-  });
-  const body = await response.text();
-  return { response, body };
-}
-
-function expectOk({ response, body }, what) {
-  if (response.status !== 200)
-    throw new Error(`${what}: HTTP ${response.status}`);
-  if (ERROR_TEXT.test(body.slice(0, 200_000)))
-    throw new Error(`${what}: error text rendered`);
-}
-
 async function ogImageCheck(origin, html, fetchImpl, what) {
   const match = html.match(
     /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i
@@ -162,7 +156,14 @@ async function ogImageCheck(origin, html, fetchImpl, what) {
 
 /**
  * Anonymous HTTP checks per surface, in launch order.
- * @param {{ origin: string, fetchImpl?: typeof fetch, now?: any, profileHandle?: string, env?: Record<string, string | undefined> }} options
+ * @param {{
+ *   origin: string,
+ *   fetchImpl?: typeof fetch,
+ *   now?: any,
+ *   profileHandle?: string,
+ *   env?: Record<string, string | undefined>,
+ *   coneCases?: boolean,
+ * }} options
  */
 export function anonymousChecks({
   origin,
@@ -170,9 +171,18 @@ export function anonymousChecks({
   now,
   profileHandle = 'tim',
   env = {},
+  /** JOV-6920 cone checks; off keeps the legacy check set byte-identical. */
+  coneCases = false,
 }) {
   const run = (id, fn) => runCheck(id, fn, now);
   const takenHandle = env.PROD_CERT_TAKEN_HANDLE || profileHandle;
+  const coneLanding = coneCases
+    ? coneLandingChecks({ origin, fetchImpl, run })
+    : [];
+  const coneClaim = coneCases
+    ? coneClaimChecks({ origin, fetchImpl, run })
+    : [];
+  const stranger = strangerChecks({ origin, fetchImpl, run });
   return {
     landing: () => [
       run('landing-renders', async () => {
@@ -181,6 +191,8 @@ export function anonymousChecks({
         if (!/<title>[^<]{3,}/i.test(page.body))
           throw new Error('GET /: empty title');
       }),
+      ...coneLanding,
+      ...stranger.landing(),
     ],
     'signup-signin': () => [
       run('signin-form-renders', async () => {
@@ -189,9 +201,7 @@ export function anonymousChecks({
         if (!/type="email"|name="email"/i.test(page.body))
           throw new Error('GET /signin: no email field');
       }),
-      run('signup-renders', async () => {
-        expectOk(await get(origin, '/signup', fetchImpl), 'GET /signup');
-      }),
+      stranger.signup(),
     ],
     claim: () => [
       run('claim-renders', async () => {
@@ -203,9 +213,8 @@ export function anonymousChecks({
           'GET /claim?claim=1'
         );
       }),
-      run('start-renders', async () => {
-        expectOk(await get(origin, '/start', fetchImpl), 'GET /start');
-      }),
+      stranger.start(),
+      ...coneClaim,
       run('taken-handle-rejected', async () => {
         const { response, body } = await get(
           origin,
@@ -293,6 +302,10 @@ export function anonymousChecks({
         };
       }),
     ],
+    checkout: () => [
+      ...(coneCases ? checkoutConeChecks({ origin, fetchImpl, run }) : []),
+      ...stranger.checkout(),
+    ],
   };
 }
 
@@ -345,9 +358,8 @@ export function stepChecks(
       };
       continue;
     }
-    // A Playwright retry re-records the same check. The latest attempt is
-    // the verdict, so one failed attempt followed by a pass is one passed
-    // check, not a failed surface (JOV-9822).
+    // A Playwright retry re-records the check; the latest attempt is the
+    // verdict, so a fail then a pass is one passed check (JOV-9822).
     const checks = (bySurface[step.surface] ??= []);
     const record = {
       id: step.id,
@@ -373,23 +385,8 @@ export function stepChecks(
   };
 }
 
-/** The browser-owned checks every surface is expected to carry. */
-export const EXPECTED_BROWSER_CHECKS = Object.freeze({
-  'signup-signin': ['returning-user-email-otp', 'new-user-email-otp'],
-  claim: [
-    'claimed-profile-owned',
-    'start-chat-first-reply',
-    'golden-path-preview-has-release',
-  ],
-  onboarding: ['dashboard-first-value', 'fresh-user-onboarding-first-value'],
-  chat: ['composer-ready', 'first-reply'],
-  'public-profile': [
-    'owned-profile-renders-publicly',
-    'profile-edit-save-readback',
-  ],
-  smartlink: ['click-analytics-capture'],
-  checkout: ['checkout-entry-renders'],
-});
+// Browser-check contract lives in prod-cert-probes.mjs; re-exported for consumers.
+export { EXPECTED_BROWSER_CHECKS };
 
 export function missingBrowserChecks({ surface, present, authStatus, now }) {
   const expected = EXPECTED_BROWSER_CHECKS[surface] ?? [];
@@ -419,9 +416,7 @@ export async function readServedBuild(origin, fetchImpl = fetch) {
   return { sha: json.commitSha, deploymentId: json.deploymentId ?? null };
 }
 
-/**
- * Build one receipt per surface in launch order.
- */
+/** Build one receipt per surface in launch order. */
 export async function runProductionCertification({
   origin = 'https://jov.ie',
   fetchImpl = fetch,
@@ -432,8 +427,11 @@ export async function runProductionCertification({
   expectedSha = null,
   profileHandle = 'tim',
   env = {},
+  /** JOV-6920 full-cone checks; the runner enables them, legacy callers keep the legacy set. */
+  coneCases = false,
 } = {}) {
   const served = await readServedBuild(origin, fetchImpl);
+  const pen = await loadPenInputs();
   const stepState = stepChecks(steps, authStatus, now);
   const probes = anonymousChecks({
     origin,
@@ -441,6 +439,7 @@ export async function runProductionCertification({
     now,
     profileHandle,
     env,
+    coneCases,
   });
   const receipts = [];
   for (const surface of SURFACE_IDS) {
@@ -461,8 +460,9 @@ export async function runProductionCertification({
       if (probes[surface])
         checks.push(...(await Promise.all(probes[surface]())));
       const present = stepState.bySurface[surface] ?? [];
-      checks.push(...present);
       checks.push(
+        ...present,
+        ...truthChecks(surface, stepState.observationsBySurface[surface], pen),
         ...missingBrowserChecks({ surface, present, authStatus, now })
       );
     }

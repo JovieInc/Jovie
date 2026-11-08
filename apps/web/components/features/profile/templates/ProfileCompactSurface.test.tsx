@@ -235,7 +235,9 @@ describe('ProfileCompactSurface', () => {
     mockUseIsAuthenticated.mockReturnValue(false);
   });
 
-  it.each(['drawer', 'notifications'])(
+  // Drawer no longer lazy-loads (JOV-7973): its same-commit render contract
+  // lives in ProfileCompactSurface.drawer-import.test.tsx.
+  it.each(['notifications'])(
     'keeps the mounted profile and focused claim available while the %s module loads',
     async kind => {
       let releaseModule!: (value: { default: React.ComponentType }) => void;

@@ -5,6 +5,21 @@ import { LIBRARY_INSPECTOR_TABS } from './inspector-tabs';
 const meta = {
   title: 'Molecules/Inspector/InspectorTabs',
   component: InspectorTabs,
+  decorators: [
+    Story => (
+      <>
+        <Story />
+        <div
+          id='inspector-tab-panel'
+          role='tabpanel'
+          aria-label='Details'
+          className='sr-only'
+        >
+          Release details
+        </div>
+      </>
+    ),
+  ],
   args: {
     value: 'details' as const,
     onValueChange: () => undefined,

@@ -1,5 +1,7 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { IconButton } from './icon-button';
 import {
@@ -304,5 +306,88 @@ describe('IconButton', () => {
     expect(button.className).not.toContain('profile-pearl-shadow');
     expect(button.className).not.toMatch(/bg-\[/);
     expect(button.className).not.toMatch(/(?:hover|focus-visible):shadow-\[/);
+  });
+});
+
+describe('IconButton destructive contrast (JOV-8873)', () => {
+  it('uses the AA error text token for destructive icons', () => {
+    render(
+      <IconButton ariaLabel='Delete item' destructive>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+    const button = screen.getByRole('button', { name: 'Delete item' });
+    expect(button).toHaveClass('text-error-text');
+    expect(button).not.toHaveClass('text-error');
+  });
+});
+
+describe('IconButton interaction', () => {
+  it('activates on click, Enter and Space', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(
+      <IconButton ariaLabel='Share profile' onClick={onClick}>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+
+    const button = screen.getByRole('button', { name: 'Share profile' });
+    await user.click(button);
+    expect(onClick).toHaveBeenCalledTimes(1);
+
+    button.focus();
+    await user.keyboard('{Enter}');
+    await user.keyboard(' ');
+    expect(onClick).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not activate while disabled or loading', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(
+      <>
+        <IconButton ariaLabel='Disabled share' disabled onClick={onClick}>
+          <svg aria-hidden='true' />
+        </IconButton>
+        <IconButton ariaLabel='Loading share' loading onClick={onClick}>
+          <svg aria-hidden='true' />
+        </IconButton>
+      </>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Disabled share' }));
+    await user.click(screen.getByRole('button', { name: /Loading share/ }));
+    expect(onClick).not.toHaveBeenCalled();
+  });
+});
+
+describe('IconButton accessibility', () => {
+  it('has no axe violations across variants, error, loading and RTL states', async () => {
+    const { container } = render(
+      <div>
+        {ICON_BUTTON_VARIANT_NAMES.map(variant => (
+          <IconButton
+            key={variant}
+            ariaLabel={`${variant} action`}
+            variant={variant}
+          >
+            <svg aria-hidden='true' />
+          </IconButton>
+        ))}
+        <IconButton ariaLabel='Retry upload' destructive>
+          <svg aria-hidden='true' />
+        </IconButton>
+        <IconButton ariaLabel='Saving' loading>
+          <svg aria-hidden='true' />
+        </IconButton>
+        <div dir='rtl'>
+          <IconButton ariaLabel='مشاركة'>
+            <svg aria-hidden='true' />
+          </IconButton>
+        </div>
+      </div>
+    );
+    await expectNoA11yViolations(container);
   });
 });

@@ -45,7 +45,24 @@ export const WAITLIST_ROLE_FORM_ENDPOINT = '/api/waitlist/join';
 export function WaitlistRoleForm({
   variant = 'artist',
   headingLevel = 1,
-}: Readonly<{ variant?: 'artist' | 'general'; headingLevel?: 1 | 2 | 3 }>) {
+  title = 'Request access',
+  description,
+  headingClassName,
+  align = 'center',
+}: Readonly<{
+  variant?: 'artist' | 'general';
+  headingLevel?: 1 | 2 | 3;
+  /** Form heading; a host page may name the action in its own words. */
+  title?: string;
+  /** Optional single support line under the heading. */
+  description?: string;
+  /** Host type role for the heading (e.g. the marketing section title). */
+  headingClassName?: string;
+  /** Stack alignment. `start` keeps heading, copy and controls on one edge. */
+  align?: 'center' | 'start';
+}>) {
+  const stackAlign =
+    align === 'start' ? 'items-start text-left' : 'items-center text-center';
   const formId = useId();
   const Heading = headingLevel === 1 ? 'h1' : headingLevel === 2 ? 'h2' : 'h3';
   const roles = variant === 'general' ? GENERAL_WAITLIST_ROLES : WAITLIST_ROLES;
@@ -61,6 +78,10 @@ export function WaitlistRoleForm({
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
   const [turnstileFailed, setTurnstileFailed] = useState(false);
+  // Load Cloudflare's check only once the visitor touches the form: on load
+  // it put a CSP-blocked probe and vendor console errors on every homepage
+  // view (product crawl, 2026-11-08).
+  const [securityCheckArmed, setSecurityCheckArmed] = useState(false);
   const turnstileRequired =
     isTurnstileClientConfigured() && !isTurnstileClientBypassed();
 
@@ -164,7 +185,10 @@ export function WaitlistRoleForm({
           tabIndex={-1}
           data-testid='waitlist-role-form-joined'
           role='status'
-          className='col-start-1 row-start-1 flex w-full flex-col items-center gap-2 text-center'
+          className={cn(
+            'col-start-1 row-start-1 flex w-full flex-col gap-2',
+            stackAlign
+          )}
         >
           <Heading className='text-balance text-xl font-medium tracking-tight text-primary-token'>
             Request received
@@ -178,19 +202,35 @@ export function WaitlistRoleForm({
         inert={status === 'joined'}
         aria-hidden={status === 'joined' || undefined}
         onSubmit={handleSubmit}
+        onFocusCapture={() => setSecurityCheckArmed(true)}
+        onPointerDownCapture={() => setSecurityCheckArmed(true)}
         data-testid='waitlist-role-form'
         aria-labelledby={`${formId}-heading`}
         className={cn(
-          'col-start-1 row-start-1 flex w-full flex-col items-center gap-5',
+          'col-start-1 row-start-1 flex w-full flex-col gap-5',
+          align === 'start' ? 'items-start' : 'items-center',
           status === 'joined' && 'invisible'
         )}
       >
         <Heading
           id={`${formId}-heading`}
-          className='text-balance text-xl font-medium tracking-tight text-primary-token'
+          className={cn(
+            'text-balance text-primary-token',
+            headingClassName ?? 'text-xl font-medium tracking-tight'
+          )}
         >
-          Request access
+          {title}
         </Heading>
+        {description ? (
+          <p
+            className={cn(
+              'max-w-md text-pretty text-sm text-secondary-token',
+              align === 'start' ? 'text-left' : 'text-balance text-center'
+            )}
+          >
+            {description}
+          </p>
+        ) : null}
         {variant === 'general' ? (
           <label
             className='grid w-full gap-2 text-sm text-primary-token'
@@ -260,7 +300,7 @@ export function WaitlistRoleForm({
           invalid={status === 'error' && !turnstileFailed}
           describedBy={`${formId}-error`}
         />
-        {status !== 'joined' ? (
+        {status !== 'joined' && securityCheckArmed ? (
           <InvisibleTurnstile
             onToken={setTurnstileToken}
             onStateChange={handleTurnstileStateChange}

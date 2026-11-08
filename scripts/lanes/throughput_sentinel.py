@@ -215,13 +215,13 @@ def sample_release_flow(state: Path, now: float, run=None, repo: str = REPO) -> 
         leases = [(now - started) / 60 for row in held.get("workflow_runs") or []
                   if (started := _iso_epoch(row.get("run_started_at"))) is not None]
         runs = [row.get("id") for row in held.get("workflow_runs") or []]
-        # Hosted-runner backlog: queued runs repo-wide and the oldest one's wait. 2026-10-28: 990 queued
-        # runs, oldest 18 min, 64 in progress, so a green head waited on runner concurrency, not on lanes.
-        queued = _gh_json(run, f"repos/{repo}/actions/runs?status=queued&per_page=1")
+        # Hosted-runner backlog: queued runs and the oldest one's wait (2026-10-28: 990 queued, oldest 18 min).
+        day = datetime.fromtimestamp(now - 86400, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")  # GitHub cancels queued runs after 24h; older "queued" rows are ghosts (2026-11-07: Aug-Oct ghosts held the brake)
+        queued = _gh_json(run, f"repos/{repo}/actions/runs?status=queued&per_page=1&created=%3E%3D{day}")
         queued_total = queued.get("total_count") if isinstance(queued.get("total_count"), int) else None
         oldest_min = None
         if queued_total:
-            tail = _gh_json(run, f"repos/{repo}/actions/runs?status=queued&per_page=1&page={queued_total}")
+            tail = _gh_json(run, f"repos/{repo}/actions/runs?status=queued&per_page=1&page={queued_total}&created=%3E%3D{day}")
             created = _iso_epoch(((tail.get("workflow_runs") or [{}])[0]).get("created_at"))
             oldest_min = round((now - created) / 60, 1) if created is not None else None
         signal = {"schema": "symphony-release-flow/v1", "observedAt": now,

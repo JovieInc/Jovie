@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { drawerStoryFrame } from './drawer.fixtures';
 import { StatTile } from './StatTile';
 
 const meta = {
@@ -29,4 +30,29 @@ export const WithHint: Story = {
   args: {
     hint: '+8% vs last week',
   },
+};
+
+export const Loading: Story = {
+  args: {
+    state: 'loading',
+  },
+};
+
+export const NotMeasured: Story = {
+  args: {
+    state: 'not-measured',
+    notMeasuredSource: 'streaming ingestion',
+  },
+};
+
+export const LongContent: Story = {
+  args: {
+    label: 'Top referrer territory this quarter',
+    value: '1,234,567',
+    hint: 'Measures the leading territory by referred clicks over the rolling quarter window',
+  },
+};
+
+export const Rtl: Story = {
+  decorators: [drawerStoryFrame('w-40 bg-surface-0 p-3', 'rtl')],
 };

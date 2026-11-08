@@ -199,6 +199,21 @@ describe('public CTA guard', () => {
     expect(headerNavSource).not.toContain("label: 'Request Access'");
   });
 
+  it('keeps the nav variant resolvers in the extracted variants module', () => {
+    const variantsSource = readFileSync(
+      join(ROOT, 'components/organisms/header-nav-variants.ts'),
+      'utf8'
+    );
+    const headerNavSource = readFileSync(
+      join(ROOT, 'components/organisms/HeaderNav.tsx'),
+      'utf8'
+    );
+
+    expect(variantsSource).toContain('export function getNavLinkVariantClass');
+    expect(variantsSource).toContain('export function getNavGroupVariantClass');
+    expect(headerNavSource).toContain("from './header-nav-variants'");
+  });
+
   it('keeps legacy public CTA classnames out of production marketing and key public feature surfaces', () => {
     const missingDirs = TARGET_DIRS.filter(dir => !existsSync(dir));
     const missingFiles = TARGET_FILES.filter(file => !existsSync(file));

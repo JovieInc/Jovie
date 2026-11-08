@@ -1441,14 +1441,6 @@ export {
   tourDateProviderEnum,
   tourDates,
 } from './tour';
-// Per-song daily signals (catalog-reactivation proof)
-export {
-  type NewTrackDailySnapshot,
-  TRACK_DAILY_SNAPSHOT_SOURCES,
-  type TrackDailySnapshot,
-  type TrackDailySnapshotSource,
-  trackDailySnapshots,
-} from './track-daily-snapshots';
 // User Interviews (Mom Test interviews post-onboarding)
 export {
   type InterviewMetadata,

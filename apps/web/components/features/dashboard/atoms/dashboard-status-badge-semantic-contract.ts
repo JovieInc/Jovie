@@ -20,17 +20,17 @@ export const CONFIDENCE_BADGE_STYLES: Record<
 > = {
   high: {
     label: 'High',
-    className: 'border-success/20 bg-surface-1 text-success',
+    className: 'border-success/20 bg-surface-1 text-success-text',
     dotClassName: 'bg-success',
   },
   medium: {
     label: 'Medium',
-    className: 'border-warning/20 bg-surface-1 text-warning',
+    className: 'border-warning/20 bg-surface-1 text-warning-text',
     dotClassName: 'bg-warning',
   },
   low: {
     label: 'Low',
-    className: 'border-error/20 bg-surface-1 text-error',
+    className: 'border-error/20 bg-surface-1 text-error-text',
     dotClassName: 'bg-error',
   },
 };
@@ -41,17 +41,17 @@ export const MATCH_STATUS_BADGE_STYLES: Record<
 > = {
   suggested: {
     label: 'Suggested',
-    className: 'border-info/20 bg-surface-1 text-info',
+    className: 'border-info/20 bg-surface-1 text-accent-text',
     dotClassName: 'bg-info',
   },
   confirmed: {
     label: 'Confirmed',
-    className: 'border-success/20 bg-surface-1 text-success',
+    className: 'border-success/20 bg-surface-1 text-success-text',
     dotClassName: 'bg-success',
   },
   auto_confirmed: {
     label: 'Auto-confirmed',
-    className: 'border-success/20 bg-surface-1 text-success',
+    className: 'border-success/20 bg-surface-1 text-success-text',
     dotClassName: 'bg-success',
   },
   rejected: {
