@@ -31,7 +31,19 @@ done
 member="${!#}"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$dest/$member"
 EOF
-  chmod +x "$fixture_bin/curl" "$fixture_bin/tar"
+  # Authenticated fallback: record the token and args, then write the asset.
+  cat >"$fixture_bin/gh" <<'EOF'
+#!/usr/bin/env bash
+printf '%s %s\n' "${GH_TOKEN:-}" "$*" >>"$GH_CALLS"
+out=''
+prev=''
+for arg in "$@"; do
+  [[ "$prev" == '-O' ]] && out="$arg"
+  prev="$arg"
+done
+printf 'fake-tarball' >"$out"
+EOF
+  chmod +x "$fixture_bin/curl" "$fixture_bin/tar" "$fixture_bin/gh"
   # Keep scanner discovery isolated while retaining the actual Node runtime.
   ln -s "$(node -p 'process.execPath')" "$fixture_bin/node"
 }

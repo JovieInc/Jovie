@@ -16,31 +16,9 @@ GITLEAKS_VERSION="${GITLEAKS_VERSION:-8.21.2}"
 TRUFFLEHOG_VERSION="${TRUFFLEHOG_VERSION:-3.99.8}"
 EXCLUDE_PATHS="$REPO_ROOT/.trufflehog-exclude.txt"
 
-# Release downloads hit resets (curl 35, JOV-6809) and HTTP 504 runs (#24269,
-# #24488). Fetch to a temp file so a restart never feeds tar a concatenated
-# body, abort stalls, back off with jitter (6 tries, 62-124s), fail closed.
-SCAN_SECRETS_RETRY_DELAY="${SCAN_SECRETS_RETRY_DELAY:-2}"
-SCAN_SECRETS_DOWNLOAD_ATTEMPTS="${SCAN_SECRETS_DOWNLOAD_ATTEMPTS:-6}"
-fetch_release_tarball() {
-  local url="$1" dest_dir="$2" member="$3" tmp attempt delay="$SCAN_SECRETS_RETRY_DELAY"
-  tmp="$(mktemp)"
-  for ((attempt = 1; attempt <= SCAN_SECRETS_DOWNLOAD_ATTEMPTS; attempt++)); do
-    if curl -sSfL --connect-timeout 20 --speed-limit 1024 --speed-time 30 -o "$tmp" "$url" \
-      && tar -xzf "$tmp" -C "$dest_dir" "$member"; then
-      chmod +x "$dest_dir/$member"
-      rm -f "$tmp"
-      return 0
-    fi
-    if [[ $attempt -lt $SCAN_SECRETS_DOWNLOAD_ATTEMPTS ]]; then
-      echo "scanner download attempt $attempt failed; retrying" >&2
-      sleep "$((delay + RANDOM % (delay + 1)))"
-      delay=$((delay * 2))
-    fi
-  done
-  rm -f "$tmp"
-  echo "::error title=Secret scanner download failed::Could not fetch $member after $SCAN_SECRETS_DOWNLOAD_ATTEMPTS attempts ($url)." >&2
-  return 1
-}
+# Pinned release download with backoff and an authenticated fallback.
+# shellcheck source=scripts/security/fetch-release-tarball.sh
+source "$REPO_ROOT/scripts/security/fetch-release-tarball.sh"
 
 ensure_gitleaks() {
   if [[ -n "${GITLEAKS_BIN:-}" ]]; then

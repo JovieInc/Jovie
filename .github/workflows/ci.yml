@@ -1585,6 +1585,9 @@ jobs:
           # Keep Git-valid but shell-significant branch characters out of the
           # generated run script; GitHub transports this value as environment.
           PULL_REQUEST_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          # Read-only job token: lets scan-secrets.sh retry a failed anonymous
+          # scanner download through the releases API (unused on healthy runs).
+          SCANNER_RELEASE_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
