@@ -4931,6 +4931,9 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           URL_ENCRYPTION_KEY: lighthouse-dashboard-ci-url-encryption-key
           AI_GATEWAY_API_KEY: lighthouse-dashboard-ci
+          # Playwright writes error-context.md on a failed attempt; the
+          # artifact guard rejects markdown unless this is set.
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
