@@ -274,7 +274,6 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
 
   it('does not call the proxy-backed One Tap route when the plugin is unconfigured', async () => {
     render(<AuthShell mode='sign-up' />);
-
     await waitFor(() => {
       expect(oneTapMock).not.toHaveBeenCalled();
     });

@@ -64,6 +64,56 @@ describe('GoogleOneTap', () => {
     }
   });
 
+  it('skips One Tap on a phone, where its sheet would cover the form', async () => {
+    const original = globalThis.matchMedia;
+    globalThis.matchMedia = vi.fn((query: string) => ({
+      matches: query === '(max-width: 599px)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })) as unknown as typeof globalThis.matchMedia;
+
+    try {
+      render(<GoogleOneTap mode='sign-in' suppress={false} />);
+
+      await waitFor(() => {
+        expect(oneTapMock).not.toHaveBeenCalled();
+      });
+    } finally {
+      globalThis.matchMedia = original;
+    }
+  });
+
+  it('skips One Tap in the sign-in dialog without FedCM', async () => {
+    Reflect.deleteProperty(globalThis.window, 'IdentityCredential');
+    render(<GoogleOneTap mode='sign-in' suppress={false} inDialog />);
+
+    await waitFor(() => {
+      expect(oneTapMock).not.toHaveBeenCalled();
+    });
+  });
+
+  it('prompts One Tap in the sign-in dialog when FedCM draws it', async () => {
+    Object.defineProperty(globalThis.window, 'IdentityCredential', {
+      configurable: true,
+      value: function IdentityCredential() {},
+    });
+
+    try {
+      render(<GoogleOneTap mode='sign-in' suppress={false} inDialog />);
+
+      await waitFor(() => {
+        expect(oneTapMock).toHaveBeenCalledTimes(1);
+      });
+    } finally {
+      Reflect.deleteProperty(globalThis.window, 'IdentityCredential');
+    }
+  });
+
   it('skips One Tap while suppressed', async () => {
     render(<GoogleOneTap mode='sign-up' suppress />);
 
