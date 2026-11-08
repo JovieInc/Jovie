@@ -1,6 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
 import {
   compareWorkers,
   fetchDeployedWorkers,
@@ -51,12 +52,44 @@ describe('workers inventory', () => {
       fetchDeployedWorkers({
         accountId: 'a',
         token: 't',
-        fetchImpl: async () => ({
-          ok: false,
-          status: 403,
-          json: async () => ({ success: false }),
-        }),
+        store: new MemoryLedgerStore(),
+        fetchImpl: async () =>
+          new Response(JSON.stringify({ success: false }), { status: 403 }),
       })
     ).rejects.toThrow(/workers-list-unreadable/);
+  });
+
+  it('lists Workers through the shared Cloudflare client and records its request', async () => {
+    const store = new MemoryLedgerStore();
+    const calls = [];
+    const workers = await fetchDeployedWorkers({
+      accountId: 'account',
+      token: 'secret',
+      store,
+      fetchImpl: async (url, init) => {
+        calls.push([
+          String(url),
+          new Headers(init.headers).get('authorization'),
+        ]);
+        return new Response(
+          JSON.stringify({ success: true, result: [{ id: 'worker' }] })
+        );
+      },
+    });
+    expect(workers).toEqual(['worker']);
+    expect(calls).toEqual([
+      [
+        'https://api.cloudflare.com/client/v4/accounts/account/workers/scripts',
+        'Bearer secret',
+      ],
+    ]);
+    const credentials = Object.values(
+      (await store.read('cloudflare')).credentials
+    );
+    expect(credentials).toHaveLength(1);
+    expect(Object.values(credentials[0].usage)[0].repair).toMatchObject({
+      attempts: 1,
+      ok: 1,
+    });
   });
 });

@@ -2489,6 +2489,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/cron/queue-tick/route.ts",
+      "kind": "handler",
+      "route": "/api/cron/queue-tick",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/cron/schedule-release-notifications/route.ts",
       "kind": "handler",
       "route": "/api/cron/schedule-release-notifications",

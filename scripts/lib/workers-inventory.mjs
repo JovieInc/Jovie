@@ -2,8 +2,12 @@
 // A Worker deployed to the account must be declared by a committed
 // workers/**/wrangler*.toml|json(c) `name`, or be listed in
 // canon/deployed-workers.json as unversioned debt (the list only shrinks).
+// api-budget: cloudflare-api 1/hr - one read-only Worker listing per manual pre-deploy inventory; no retries or polling
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createApiClient } from '../../packages/api-client/client.ts';
+import { providerSpec } from '../../packages/api-client/contract.ts';
+import { hashCredential } from '../../packages/api-client/store.ts';
 
 export const DEPLOYED_PATH = 'canon/deployed-workers.json';
 
@@ -66,16 +70,29 @@ export async function fetchDeployedWorkers({
   accountId,
   token,
   fetchImpl = fetch,
+  store = undefined,
 }) {
-  const res = await fetchImpl(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts`,
-    {
-      headers: { authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(15_000),
-    }
-  );
+  if (!token) throw new Error('workers-list-token-missing');
+  const client = createApiClient({
+    provider: 'cloudflare',
+    credential: hashCredential('cloudflare', token),
+    fetch: fetchImpl,
+    store,
+  });
+  const res = await client.request({
+    url: `https://${providerSpec('cloudflare').hosts[0]}/client/v4/accounts/${accountId}/workers/scripts`,
+    headers: { authorization: `Bearer ${token}` },
+    priority: 'repair',
+    timeoutMs: 15_000,
+    maxAttempts: 1,
+  });
   const body = await res.json();
-  if (!res.ok || !body.success || !Array.isArray(body.result))
+  if (
+    res.status < 200 ||
+    res.status >= 300 ||
+    !body.success ||
+    !Array.isArray(body.result)
+  )
     throw new Error(`workers-list-unreadable:${res.status}`); // unreadable is red, never green
   return body.result.map(s => s.id);
 }
