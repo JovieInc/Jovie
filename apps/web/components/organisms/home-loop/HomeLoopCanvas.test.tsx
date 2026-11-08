@@ -10,15 +10,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockFitLayout } from './fit-layout.test-utils';
 import {
   HOME_LOOP_FIXTURE_ASKS,
-  HOME_LOOP_FIXTURE_COPY,
-  HOME_LOOP_FIXTURE_DONE,
-  HOME_LOOP_FIXTURE_PULSE,
-  HOME_LOOP_FIXTURE_ROWS,
-  HOME_LOOP_FIXTURE_STAGES,
+  HOME_LOOP_FIXTURE_UNMEASURED_PULSE,
 } from './fixtures';
 import { HomeLoopAnswerPanel } from './HomeLoopAnswerPanel';
 import { HomeLoopAsks } from './HomeLoopAsks';
 import { HomeLoopCanvas, type HomeLoopCanvasProps } from './HomeLoopCanvas';
+import { props } from './HomeLoopCanvas.test-fixtures';
 import {
   HOME_LOOP_UNDO_WINDOW_MS,
   useUndoableAnswers,
@@ -33,30 +30,44 @@ const toastMock = vi.hoisted(() =>
 );
 vi.mock('@/components/feedback', () => ({ toast: toastMock }));
 
-function props(
-  overrides: Partial<HomeLoopCanvasProps> = {}
-): HomeLoopCanvasProps {
-  return {
-    copy: HOME_LOOP_FIXTURE_COPY,
-    stages: HOME_LOOP_FIXTURE_STAGES,
-    constraint: { tone: 'bad', text: '2 items are blocked' },
-    pulse: HOME_LOOP_FIXTURE_PULSE,
-    asks: HOME_LOOP_FIXTURE_ASKS,
-    rows: HOME_LOOP_FIXTURE_ROWS,
-    done: HOME_LOOP_FIXTURE_DONE,
-    doneSummary: '12 merges',
-    loopStatus: 'ready',
-    asksStatus: 'ready',
-    answers: {},
-    onApprove: vi.fn(),
-    onReply: vi.fn(),
-    onRetryLoop: vi.fn(),
-    onRetryAsks: vi.fn(),
-    ...overrides,
-  };
-}
-
 describe('HomeLoopCanvas', () => {
+  it('puts the company row above the shipping verdict with its caption', () => {
+    render(
+      <HomeLoopCanvas
+        {...props({
+          company: [
+            {
+              key: 'runway',
+              label: 'Runway',
+              value: '6 days',
+              was: null,
+              tone: 'bad',
+              measured: true,
+              target: 'Default dead · $23 cash',
+            },
+          ],
+          pulseCaption: 'Shipping · compared with your visit 3h ago',
+        })}
+      />
+    );
+    const company = screen.getByRole('region', { name: 'Company' });
+    expect(company).toHaveTextContent('6 days');
+    expect(company).toHaveTextContent('Default dead · $23 cash');
+    expect(
+      company.compareDocumentPosition(
+        screen.getByTestId('home-loop-constraint')
+      ) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(screen.getByTestId('home-loop-pulse-caption')).toHaveTextContent(
+      'compared with your visit 3h ago'
+    );
+  });
+
+  it('omits the company row when the persona has none', () => {
+    render(<HomeLoopCanvas {...props()} />);
+    expect(screen.queryByRole('region', { name: 'Company' })).toBeNull();
+  });
+
   it('renders every section populated with named headings and counts', () => {
     render(<HomeLoopCanvas {...props()} />);
 
@@ -121,6 +132,12 @@ describe('HomeLoopCanvas', () => {
         })}
       />
     );
+    // A failed read never claims the all-clear; the banner names the
+    // failure (JOV-9019).
+    const banner = screen.getByTestId('home-loop-constraint');
+    expect(banner).toHaveTextContent('Shipping data could not load.');
+    expect(banner).not.toHaveTextContent('Nothing is blocking shipping');
+    expect(banner).toHaveAttribute('data-tone', 'unknown');
     expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
       'data-state',
       'error'
@@ -154,6 +171,21 @@ describe('HomeLoopCanvas', () => {
     expect(screen.getByText('Nothing needs your decision.')).toBeVisible();
     expect(screen.getByText('No work in flight.')).toBeVisible();
     expect(screen.getByText('Nothing has landed yet today.')).toBeVisible();
+  });
+
+  it('never claims the all-clear while no metric is measured', () => {
+    render(
+      <HomeLoopCanvas
+        {...props({
+          constraint: null,
+          pulse: HOME_LOOP_FIXTURE_UNMEASURED_PULSE,
+        })}
+      />
+    );
+    const banner = screen.getByTestId('home-loop-constraint');
+    expect(banner).toHaveTextContent('Shipping status is unknown');
+    expect(banner).not.toHaveTextContent('Nothing is blocking shipping');
+    expect(banner).toHaveAttribute('data-tone', 'unknown');
   });
 
   it('answers in one click and sends a written reply', () => {
@@ -331,8 +363,8 @@ describe('HomeLoopAsks escalation', () => {
       'Waiting 52h',
       'Waiting 26h',
     ]);
-    expect(badges[0]).toHaveClass('text-error');
-    expect(badges[1]).toHaveClass('text-warning');
+    expect(badges[0]).toHaveClass('text-error-text');
+    expect(badges[1]).toHaveClass('text-warning-text');
   });
 });
 
@@ -587,7 +619,7 @@ describe('useUndoableAnswers', () => {
 });
 
 describe('HomeLoopCanvas answered ask dim (a11y AA floor)', () => {
-  it('dims an answered ask card at opacity-75, never 0.70', () => {
+  it('dims an answered ask card at opacity-80, never 0.70', () => {
     const askId = HOME_LOOP_FIXTURE_ASKS[0]!.id;
     render(
       <HomeLoopCanvas
@@ -603,11 +635,11 @@ describe('HomeLoopCanvas answered ask dim (a11y AA floor)', () => {
         name: HOME_LOOP_FIXTURE_ASKS[0]!.title,
       })
     );
-    expect(card).toHaveClass('opacity-75');
+    expect(card).toHaveClass('opacity-80');
     expect(card).not.toHaveClass('opacity-70');
     for (const openCard of cards.filter(candidate => candidate !== card)) {
       expect(openCard).toHaveAttribute('data-answer-state', 'open');
-      expect(openCard).not.toHaveClass('opacity-75');
+      expect(openCard).not.toHaveClass('opacity-80');
       expect(openCard).not.toHaveClass('opacity-70');
     }
   });

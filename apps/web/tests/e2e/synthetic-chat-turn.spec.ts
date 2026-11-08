@@ -14,8 +14,12 @@
  * out at the end.
  *
  * Required env (Doppler jovie-web/prd):
- *  - E2E_PROD_USER_EMAIL  — the canary, browse-ready+clerk_test@jov.ie
  *  - DATABASE_URL         — read-only OTP and profile lookup
+ *
+ * Identity: the dedicated chat-health canary
+ * (`PRODCERT_CHAT_HEALTH_CANARY_EMAIL`), not the returning-creator canary, so
+ * health checks never consume the golden-path walk's weekly AI quota. The
+ * server skips the weekly quota for exactly that session email.
  *
  * Clerk is retired: this spec used to mint a Clerk Backend API session.
  *
@@ -31,7 +35,7 @@
 import { randomUUID } from 'node:crypto';
 import { neon } from '@neondatabase/serverless';
 import { expect, request as playwrightRequest, test } from '@playwright/test';
-import { resolveProductionAuthCredentials } from './utils/production-auth-credentials';
+import { PRODCERT_CHAT_HEALTH_CANARY_EMAIL } from '@/lib/synthetic/prodcert-identities';
 import { waitForProductionAuthOtp } from './utils/production-auth-otp';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -65,16 +69,15 @@ test.describe('Authenticated prod chat turn', () => {
   test('one real /api/chat message streams to a finish part without CHAT_STREAM_FAILED', async () => {
     test.setTimeout(120_000);
 
-    const credentials = resolveProductionAuthCredentials();
     const databaseUrl = process.env.DATABASE_URL ?? '';
-    if (credentials?.source !== 'primary' || !databaseUrl) {
+    if (!databaseUrl) {
       // Fail loudly — a silently skipped canary is the failure mode this
       // spec exists to prevent.
       throw new Error(
-        'Chat canary needs the Better Auth canary (E2E_PROD_USER_EMAIL) and DATABASE_URL from Doppler jovie-web/prd.'
+        'Chat canary needs DATABASE_URL from Doppler jovie-web/prd.'
       );
     }
-    const email = credentials.email.trim().toLowerCase();
+    const email = PRODCERT_CHAT_HEALTH_CANARY_EMAIL;
     const origin = new URL(BASE_URL).origin;
     const api = await playwrightRequest.newContext({
       baseURL: origin,

@@ -4,11 +4,19 @@ import { SmartLinkShell } from './SmartLinkShell';
 const meta = {
   title: 'Release/SmartLinkShell',
   component: SmartLinkShell,
-  parameters: { layout: 'centered' },
+  parameters: {
+    layout: 'centered',
+    // Smart link pages render the Noir stage; white text tokens assume it.
+    themes: { themeOverride: 'dark' },
+    backgrounds: { default: 'dark' },
+  },
   args: {
     artworkUrl: 'https://placehold.co/640x640/111827/E5E7EB?text=Artwork',
     artworkAlt: 'Never Say A Word artwork',
-    showMenuButton: false,
+    // Production shells always carry the brand/menu row; keeping it gives
+    // the scrollable viewport focusable content (scrollable-region-focusable).
+    showMenuButton: true,
+    onMenuOpen: () => undefined,
     children: <p>Listen</p>,
   },
 } satisfies Meta<typeof SmartLinkShell>;

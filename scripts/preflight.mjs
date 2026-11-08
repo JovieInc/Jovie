@@ -20,7 +20,8 @@
  *   --list       print the derived plan and exit (no execution)
  *   --body-file  also lint the PR body with the Fleet Rules policy
  *   --hook       pre-push mode: honour JOVIE_PREFLIGHT=0 and skip when HEAD has
- *                no commits ahead of the base
+ *                no commits ahead of the base; retain every source check,
+ *                including commands excluded by standalone preflight
  *
  * The changelog guard needs a token: export GH_TOKEN (your gh login token) to
  * run it locally; without one that step is listed as skipped.
@@ -32,26 +33,95 @@
 import { spawn, spawnSync } from 'node:child_process';
 import {
   appendFileSync,
+  closeSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   realpathSync,
 } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { cpus, freemem, homedir, loadavg, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as yamlLoad } from 'js-yaml';
+import { guardNested, withPreflightDepth } from './lib/preflight-depth.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const WORKFLOW_PATH = '.github/workflows/source-validation.yml';
 export const JOB_ID = 'deterministic';
 
+/** Read-only integration proof; source checks and the native queue stay required. */
+export async function hookBaseProof({ base, cwd, env, expectedHead = '' }) {
+  const deadline = Date.now() + 60_000;
+  const run = args => {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new Error('mergeability proof deadline exceeded');
+    return spawnSync('git', args, {
+      cwd,
+      env: { ...env, GIT_TERMINAL_PROMPT: '0' },
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: remaining,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+  };
+  const ref = `refs/remotes/origin/${base}`;
+  if (run(['check-ref-format', `refs/heads/${base}`]).status !== 0)
+    throw new Error('invalid base branch');
+  if (
+    run([
+      'fetch',
+      '--no-tags',
+      '--no-write-fetch-head',
+      '--no-recurse-submodules',
+      '-q',
+      'origin',
+      `refs/heads/${base}:${ref}`,
+    ]).status !== 0
+  )
+    throw new Error(`cannot fetch origin/${base}; mergeability is unknown`);
+  const commit = name => {
+    const r = run(['rev-parse', '--verify', '-q', `${name}^{commit}`]);
+    const oid = r.stdout?.trim();
+    if (r.status !== 0 || !/^[0-9a-f]{40,64}$/.test(oid ?? ''))
+      throw new Error(`cannot resolve ${name}; mergeability is unknown`);
+    return oid;
+  };
+  const baseSha = commit(ref);
+  const headSha = commit('HEAD');
+  if (expectedHead && headSha !== expectedHead)
+    throw new Error(
+      'source head changed during its checks; rerun qualification'
+    );
+  const merged = run(['merge-tree', '--write-tree', baseSha, headSha]);
+  const treeSha = merged.stdout?.split('\n')[0]?.trim();
+  if (merged.status === 1 && /^[0-9a-f]{40,64}$/.test(treeSha ?? '')) {
+    const { parseMergeConflicts } = await import('./lib/preflight-changed.mjs');
+    const paths = parseMergeConflicts(merged.stdout);
+    throw new Error(
+      `merge conflict with origin/${base}${paths.length ? `: ${paths.join(', ')}` : ''}; resolve before pushing`
+    );
+  }
+  if (merged.status !== 0 || !/^[0-9a-f]{40,64}$/.test(treeSha ?? ''))
+    throw new Error(`cannot prove mergeability with origin/${base}`);
+  const tree = run(['cat-file', '-t', treeSha]);
+  if (tree.status !== 0 || tree.stdout?.trim() !== 'tree')
+    throw new Error(`cannot prove mergeability with origin/${base}`);
+  if (commit('HEAD') !== headSha)
+    throw new Error('source head changed during mergeability proof');
+  if (commit(ref) !== baseSha)
+    throw new Error(
+      'base moved during mergeability proof; rerun qualification'
+    );
+  return { headSha, baseSha, treeSha };
+}
+
 /** Keep hook-local Git routing out of gates that create fixture repositories. */
 export function buildPreflightEnv(source = process.env, cwd = ROOT) {
   const result = spawnSync('git', ['rev-parse', '--local-env-vars'], {
     cwd,
-    env: source,
+    env: { ...source },
     encoding: 'utf8',
   });
   const names = result.stdout?.trim().split('\n') ?? [];
@@ -114,7 +184,18 @@ export function deriveSteps(workflowText, jobId = JOB_ID) {
   const job = doc?.jobs?.[jobId];
   if (!job || !Array.isArray(job.steps))
     throw new Error(`workflow has no job "${jobId}" with steps`);
-  return job.steps.map((step, index) => {
+  // Merged-source guards share the fourth required unit runner. Keep deriving
+  // their real commands locally after the hosted partition changes ownership.
+  const unitSteps = doc?.jobs?.unit?.steps ?? [];
+  const start = unitSteps.findIndex(step => step.id === 'source_guard_merge');
+  const end = unitSteps.findIndex(step => step.id === 'source_guard_proof');
+  if (jobId === JOB_ID && start >= 0 && end < start)
+    throw new Error('merged source guard transaction has no cleanup proof');
+  const steps =
+    jobId === JOB_ID && start >= 0
+      ? [...job.steps, ...unitSteps.slice(start, end + 1)]
+      : job.steps;
+  return steps.map((step, index) => {
     const name = step.name ?? step.id ?? `step ${index + 1}`;
     let skip = '';
     if (typeof step.run !== 'string') skip = 'uses an action (CI only)';
@@ -164,16 +245,100 @@ export function splitStatements(script) {
 const SET_E = /^set\s+-[a-z]*e[a-z]*\b/;
 const TYPECHECK = /^(\s*)(pnpm\b[^\n]*\btypecheck[^\n]*)$/gm;
 
+/**
+ * Statements preflight does not run, each with the reason. Hosted CI runs them
+ * on free runners; running them on a shared dev host costs shipping capacity
+ * (fleet charter). A test requires every statement matching a heavy pattern in
+ * the real workflow to be listed here, so nothing is dropped silently.
+ * @type {ReadonlyArray<readonly [RegExp, string]>}
+ */
+export const EXCLUDED_STATEMENTS = Object.freeze([
+  [/\btypecheck(?::[a-z]+)?\b/, 'full typecheck; hosted CI runs it'],
+  [
+    /\bbiome:check\b/,
+    'whole-repo biome; the pre-commit hook checks changed files',
+  ],
+  [/\bci:control:test\b/, 'full control suite; hosted CI runs it'],
+  [
+    /\bnext build\b|\brun build\b|\bpack:dry\b|\bchaos:gate\b|\btest:coverage\b/,
+    'build or full coverage run; hosted CI runs it',
+  ],
+  [/storybook/i, 'Storybook build; hosted CI runs it'],
+]);
+
+/** Reason a single command line is excluded; empty when it should run. */
+export function lineExclusion(line) {
+  const text = line.trim();
+  if (text.endsWith('\\')) return '';
+  // Only commands are excluded, never assignments or conditionals around them.
+  if (!/^(?:[A-Z_]+=\S+\s+)*(?:pnpm|node)\b/.test(text)) return '';
+  for (const [pattern, reason] of EXCLUDED_STATEMENTS)
+    if (pattern.test(text)) return reason;
+  return '';
+}
+
+/** Excluded lines of a statement, and the statement with them made no-ops. */
+export function applyExclusions(statement, { qualification = false } = {}) {
+  // Qualification preserves every source check; standalone preflight stays light.
+  if (qualification) return { text: statement, excluded: [] };
+  const excluded = [];
+  const text = statement
+    .split('\n')
+    .map(line => {
+      const reason = lineExclusion(line);
+      if (!reason) return line;
+      excluded.push({ label: line.trim(), reason });
+      return `${line.match(/^\s*/)[0]}true`;
+    })
+    .join('\n');
+  return { text, excluded };
+}
+
+// Kept for callers that ask about a whole single-line statement.
+export const exclusionReason = statement =>
+  statement.includes('\n') ? '' : lineExclusion(statement);
+
 /** Statement-level adjustments that keep one failure from hiding the rest. */
 export function prepareStatement(statement, { flockPath = '' } = {}) {
   let text = statement;
   // `set -e` would end the process at the first red statement.
   if (SET_E.test(text.trim())) return 'set -uo pipefail';
+  // CI starts shallow; a developer checkout may already have full history.
+  // Still fetch the same refs, and preserve failures in either form.
+  if (/^git fetch\b.*\s--unshallow(?:\s|$)/u.test(text)) {
+    const completeFetch = text.replace(/\s+--unshallow(?=\s|$)/u, '');
+    text = `if [ "$(git rev-parse --is-shallow-repository)" = false ]; then\n${completeFetch}\nelse\n${text}\nfi`;
+  }
   // `exit` would end the process; contain it in a subshell.
   if (/\bexit\b/.test(text)) text = `( ${text}\n)`;
   // Typechecks share gem's CPU: serialize them under the host lock.
-  if (flockPath) text = text.replace(TYPECHECK, `$1flock ${flockPath} $2`);
+  if (flockPath) {
+    const quotedLock = `'${flockPath.replace(/'/g, `'\\''`)}'`;
+    text = text.replace(
+      TYPECHECK,
+      (_match, indent, command) => `${indent}flock ${quotedLock} ${command}`
+    );
+  }
   return text;
+}
+
+/**
+ * Steps in separate shells are independent (CI runs them as separate shells),
+ * so they can overlap. Bound it by what the host has: keep 8 GB RAM free
+ * (fleet charter), assume ~3 GB per extra step, and stay serial when the load
+ * average already exceeds 1.5x the cores. PREFLIGHT_JOBS overrides.
+ */
+export function chooseConcurrency({
+  freeGb,
+  load1,
+  cores,
+  override = '',
+  max = 3,
+}) {
+  const forced = Number(override);
+  if (Number.isInteger(forced) && forced >= 1) return forced;
+  if (load1 / cores > 1.5) return 1;
+  return Math.max(1, Math.min(max, Math.floor((freeGb - 8) / 3)));
 }
 
 const MARK = '@@PF';
@@ -181,12 +346,26 @@ const MARK = '@@PF';
 /** The bash program for one step; markers delimit each statement's output. */
 export function buildProgram(statements, envVars, opts = {}) {
   const lines = ['exec 2>&1', 'set -uo pipefail'];
+  if (opts.qualification) {
+    // Collect parent-shell failures, but stop a failed subshell so a later
+    // success cannot hide it from the workflow's background wait/status guard.
+    lines.push('set -E');
+    lines.push(
+      `trap '__pf_failure=$?; if (( BASH_SUBSHELL > 0 )); then exit "$__pf_failure"; fi' ERR`
+    );
+  }
   for (const [key, value] of Object.entries(envVars))
     lines.push(`export ${key}=${JSON.stringify(String(value))}`);
   statements.forEach((statement, index) => {
     lines.push(`printf '\\n${MARK}-BEGIN ${index}\\n'`);
-    lines.push(prepareStatement(statement, opts));
-    lines.push(`__pf_rc=$?; printf '\\n${MARK}-END ${index} %s\\n' "$__pf_rc"`);
+    if (opts.qualification) lines.push('__pf_failure=0');
+    lines.push(prepareStatement(applyExclusions(statement, opts).text, opts));
+    lines.push('__pf_rc=$?');
+    if (opts.qualification)
+      lines.push(
+        'if [ "$__pf_failure" -ne 0 ]; then __pf_rc=$__pf_failure; fi'
+      );
+    lines.push(`printf '\\n${MARK}-END ${index} %s\\n' "$__pf_rc"`);
   });
   return lines.join('\n');
 }
@@ -361,11 +540,21 @@ export async function main({
     log('[preflight] skipped (JOVIE_PREFLIGHT=0)');
     return 0;
   }
-  const childEnv = buildPreflightEnv(env, cwd);
+  const childEnv = withPreflightDepth(buildPreflightEnv(env, cwd));
   const workflowFile = path.resolve(cwd, args.workflow ?? WORKFLOW_PATH);
-  // A branch behind base fails CI on files it never saw (#23313: a missing
-  // scripts/anti-slop/run.mjs). Bring base in first; the hook only reports.
-  if (!args.list) {
+  let hookProof = null;
+  if (args.hook && !args.list) {
+    try {
+      hookProof = await hookBaseProof({ base: args.base, cwd, env: childEnv });
+      log(
+        `[preflight] mergeable head=${hookProof.headSha} base=${hookProof.baseSha} tree=${hookProof.treeSha}`
+      );
+    } catch (error) {
+      log(`[preflight] ${error.message}`);
+      return 1;
+    }
+    // Interactive preflight retains its existing ordinary forward merge.
+  } else if (!args.list) {
     spawnSync('git', ['fetch', '--no-tags', '-q', 'origin', args.base], {
       cwd,
       env: childEnv,
@@ -382,12 +571,6 @@ export async function main({
         ['merge-base', '--is-ancestor', `origin/${args.base}`, 'HEAD'],
         { cwd, env: childEnv }
       ).status !== 0;
-    if (behind && args.hook) {
-      log(
-        `[preflight] branch is behind origin/${args.base}; merge it, then push.`
-      );
-      return 1;
-    }
     if (behind) {
       log(`[preflight] merging origin/${args.base} into the branch first`);
       const merged = spawnSync(
@@ -433,9 +616,30 @@ export async function main({
       spawnSync('which', ['flock'], { cwd, env: childEnv }).status !== 0
     )
       return '';
-    return path.join(homedir(), '.cache', 'gem-typecheck.lock');
+    const prepareLock = root => {
+      mkdirSync(root, { recursive: true });
+      const file = path.join(root, 'gem-typecheck.lock');
+      closeSync(openSync(file, 'a'));
+      return file;
+    };
+    try {
+      // Retain the existing host lock even when callers have different XDG roots.
+      return prepareLock(path.join(homedir(), '.cache'));
+    } catch (error) {
+      const code = /** @type {NodeJS.ErrnoException} */ (error).code;
+      if (
+        !['EACCES', 'EPERM', 'EROFS', 'ENOENT', 'ENOTDIR'].includes(
+          code ?? ''
+        ) ||
+        !procEnv.XDG_CACHE_HOME ||
+        !path.isAbsolute(procEnv.XDG_CACHE_HOME)
+      )
+        throw error;
+      // Restricted-host agents must share one fallback root to share the mutex.
+      // A failed fallback remains an error; never silently drop serialization.
+      return prepareLock(procEnv.XDG_CACHE_HOME);
+    }
   })();
-  if (flockPath) mkdirSync(path.dirname(flockPath), { recursive: true });
 
   const plan = steps.map(step => {
     const script = substitute(step.run, values);
@@ -448,7 +652,9 @@ export async function main({
     }
     let skip = step.skip;
     if (!skip && unresolved.length)
-      skip = `needs CI context (${[...new Set(unresolved)].join(', ')})`;
+      skip = unresolved.includes('github.token')
+        ? 'no GH_TOKEN; export GH_TOKEN=$(gh auth token) to run it locally'
+        : `needs CI context (${[...new Set(unresolved)].join(', ')})`;
     return { ...step, run: script.text, stepEnv, skip };
   });
 
@@ -464,24 +670,30 @@ export async function main({
   const failures = [];
   const timings = [];
   const skipped = [];
+  const excluded = [];
   let passed = 0;
+  const runnable = [];
   for (const step of plan) {
     if (args.only && !step.name.includes(args.only)) continue;
-    if (step.skip) {
-      skipped.push({ name: step.name, reason: step.skip });
-      continue;
-    }
-    log(`\n== ${step.name}`);
+    if (step.skip) skipped.push({ name: step.name, reason: step.skip });
+    else runnable.push(step);
+  }
+
+  const execStep = async step => {
+    const out = [`\n== ${step.name}`];
     const statements = splitStatements(step.run);
     const program = buildProgram(
       statements,
       {
         ...step.stepEnv,
         RUNNER_TEMP: runnerTemp,
+        ...(step.name === 'Preserve merged action generation'
+          ? { SOURCE_GUARD_ACTION_WORKSPACE: runnerTemp }
+          : {}),
         GITHUB_BASE_REF: args.base,
         GITHUB_EVENT_NAME: 'pull_request',
       },
-      { flockPath }
+      { flockPath, qualification: args.hook }
     );
     const seen = new Set();
     let mark = Date.now();
@@ -490,19 +702,19 @@ export async function main({
       seen.add(index);
       const took = Date.now() - mark;
       mark = Date.now();
-      timings.push({
-        step: step.name,
-        label: labelFor(statements[index]),
-        ms: took,
-      });
       const label = labelFor(statements[index]);
+      for (const item of applyExclusions(statements[index], {
+        qualification: args.hook,
+      }).excluded)
+        excluded.push({ step: step.name, ...item });
+      timings.push({ step: step.name, label, ms: took });
       if (code !== 0) {
         failures.push({ step: step.name, label, code, output });
-        log(`  FAIL (${code})  ${label} (${(took / 1000).toFixed(1)}s)`);
+        out.push(`  FAIL (${code})  ${label} (${(took / 1000).toFixed(1)}s)`);
       } else {
         passed += 1;
         if (!PLUMBING.test(label))
-          log(`  ok  ${label} (${(took / 1000).toFixed(1)}s)`);
+          out.push(`  ok  ${label} (${(took / 1000).toFixed(1)}s)`);
       }
     });
     statements.forEach((statement, index) => {
@@ -513,10 +725,25 @@ export async function main({
         code: 'not run',
         output: ['the step shell ended before this statement'],
       });
-      log(`  FAIL (not run)  ${labelFor(statement)}`);
+      out.push(`  FAIL (not run)  ${labelFor(statement)}`);
     });
-    log(`  (${((Date.now() - t0) / 1000).toFixed(0)}s)`);
-  }
+    out.push(`  (${((Date.now() - t0) / 1000).toFixed(0)}s)`);
+    log(out.join('\n'));
+  };
+
+  const jobs = chooseConcurrency({
+    freeGb: freemem() / 2 ** 30,
+    load1: loadavg()[0],
+    cores: cpus().length,
+    override: env.PREFLIGHT_JOBS,
+  });
+  log(`[preflight] running ${runnable.length} steps, ${jobs} at a time`);
+  const queue = [...runnable];
+  await Promise.all(
+    Array.from({ length: Math.min(jobs, queue.length) }, async () => {
+      while (queue.length) await execStep(queue.shift());
+    })
+  );
 
   let bodyIssues = { errors: [], warnings: [] };
   if (args.bodyFile) {
@@ -540,16 +767,43 @@ export async function main({
     }
   }
 
+  if (hookProof && failures.length === 0) {
+    try {
+      const refreshed = await hookBaseProof({
+        base: args.base,
+        cwd,
+        env: childEnv,
+        expectedHead: hookProof.headSha,
+      });
+      if (refreshed.baseSha !== hookProof.baseSha)
+        log(
+          `[preflight] base moved; mergeable head=${refreshed.headSha} base=${refreshed.baseSha} tree=${refreshed.treeSha}`
+        );
+      hookProof = refreshed;
+    } catch (error) {
+      failures.push({
+        step: 'Mergeability',
+        label: error.message,
+        code: 1,
+        output: [],
+      });
+    }
+  }
+
   log('\n== preflight summary');
-  for (const item of skipped) log(`  skipped  ${item.name}  [${item.reason}]`);
+  for (const item of skipped) log(`  SKIPPED: ${item.name} (${item.reason})`);
+  for (const item of excluded)
+    log(`  EXCLUDED: ${item.label} (${item.reason})`);
   if (failures.length === 0) log(`  all clear (${passed} statements passed)`);
   for (const failure of failures) {
     log(`\n[ ] ${failure.step}: ${failure.label} (exit ${failure.code})`);
     const lines = failure.output.filter(Boolean);
-    const loud = lines.filter(line =>
-      /\b(?:fail|error|violation|missing|not registered)\b|✗|×|TS\d{4}/i.test(
-        line
-      )
+    const loud = lines.filter(
+      line =>
+        !/\bfail 0\b|^\s*✔/.test(line) &&
+        /::error|exit [1-9]|\b(?:fail|error|violation|missing|not registered)\b|✗|×|TS\d{4}/i.test(
+          line
+        )
     );
     for (const line of (loud.length ? loud : lines).slice(-15))
       log(`      ${line.slice(0, 240)}`);
@@ -560,6 +814,7 @@ export async function main({
     {
       at: new Date().toISOString(),
       head: headSha,
+      ...(hookProof ? { mergeability: hookProof } : {}),
       durationMs: Date.now() - started,
       red: failures.map(f => `${f.step}: ${f.label}`),
       timings: timings.filter(t => t.ms >= 1000),
@@ -574,4 +829,4 @@ if (
   existsSync(process.argv[1]) &&
   realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])
 )
-  process.exitCode = await main();
+  process.exitCode = guardNested('preflight') ?? (await main());

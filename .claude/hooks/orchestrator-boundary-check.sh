@@ -1,10 +1,9 @@
 #!/bin/bash
 # Block non-coding orchestration profiles from editing product code.
 #
-# This hook is intentionally inert unless a launcher sets one of the profile
-# environment variables below. Hermes/Conductor should set JOVIE_AGENT_PROFILE
-# before starting Claude Code/Codex sessions so profile drift becomes a hard
-# gate instead of a memory test.
+# This hook is intentionally inert unless a launcher sets JOVIE_AGENT_PROFILE.
+# Older launchers may still export HERMES_PROFILE. That name is a fallback,
+# not a runtime to start.
 
 if command -v jq &> /dev/null; then
   file_path=$(echo "$TOOL_INPUT" | jq -r '.file_path // empty' 2>/dev/null)
@@ -41,7 +40,7 @@ case "$file_path" in
     echo "or update a HUD/delegation manifest and dispatch an authorized coder profile."
     echo ""
     echo "Required manifest fields:"
-    echo "  hud_id, kpi, owner, hermes_profile, runtime, model_route, worktree,"
+    echo "  hud_id, kpi, owner, runtime, model_route, worktree,"
     echo "  gstack_skills, gbrain_queries, hard_gates, expected_output, verification"
     exit 1
     ;;

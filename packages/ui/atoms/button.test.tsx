@@ -445,7 +445,7 @@ describe('Button', () => {
     expect(btn.className).toContain('hover:bg-(--color-btn-secondary-hover)');
   });
 
-  it('keeps destructive secondary buttons borderless', () => {
+  it('keeps destructive secondary buttons borderless with AA text (JOV-8873)', () => {
     render(
       <Button variant='secondary' destructive>
         Delete
@@ -454,7 +454,7 @@ describe('Button', () => {
     const btn = screen.getByRole('button');
     expect(btn.className).toContain('border-0');
     expect(btn.className).not.toMatch(/(?:^|\s)border(?:\s|$)/);
-    expect(btn.className).not.toMatch(/border-error/);
+    expect(btn.className).toContain('text-error-text');
     expect(btn.className).not.toMatch(/hover:border-/);
     expect(btn.className).toContain('bg-error-subtle');
   });

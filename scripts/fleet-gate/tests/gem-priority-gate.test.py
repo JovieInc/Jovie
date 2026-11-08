@@ -3706,9 +3706,7 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertTrue(products["jovie"]["newIssueIntakeAllowed"])
         self.assertTrue(products["logyourbody"]["newIssueIntakeAllowed"])
-        self.assertTrue(products["ovie"]["newIssueIntakeAllowed"])
         self.assertTrue(receipt["workAdmission"]["productNewIssueLeaseAllowed"]["logyourbody"])
-        self.assertTrue(receipt["workAdmission"]["productNewIssueLeaseAllowed"]["ovie"])
         self.assertTrue(receipt["closureAdmission"]["remediationContinues"])
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["promotionAdmission"]["allowed"])
@@ -5871,7 +5869,7 @@ class ClosureObservationContractTests(unittest.TestCase):
                 self.assertFalse(products["jovie"]["newIssueIntakeAllowed"])
                 self.assertEqual(products["jovie"]["status"], "red")
                 self.assertEqual(products["jovie"]["reasons"], closure["reasons"])
-                for peer in ("logyourbody", "ovie"):
+                for peer in ("logyourbody",):
                     self.assertTrue(products[peer]["newIssueIntakeAllowed"])
             self.assertTrue(receipt["remediationAdmission"]["allowed"])
 
@@ -6126,6 +6124,44 @@ class NativeControllerObservationTest(unittest.TestCase):
                 self.tick = old
         (self.state / "tick.json").unlink()
         self.assertEqual(self.observe()["status"], "failed")
+
+    def beat(self, age_s):
+        heartbeat = self.state / "tick-heartbeat"
+        heartbeat.touch()
+        os.utime(heartbeat, (self.now.timestamp() - age_s,) * 2)
+
+    def test_long_in_flight_tick_with_a_fresh_heartbeat_stays_green(self):
+        # A working tick holds tick.json's start-of-tick stamp past the receipt TTL
+        # while the heartbeat proves progress (25-60 minute ticks: 2026-10-26) — the
+        # same liveness evidence the stay-up watchdog consumes, never a threshold change.
+        old = self.tick.copy(); self.tick.update(at="2026-10-16T15:19:50Z"); self.write_receipts()
+        self.beat(60)
+        result = self.observe()
+        self.assertEqual(result["status"], "green")
+        self.assertEqual(result["heartbeatAgeS"], 60.0)
+        self.tick = old; self.write_receipts()
+
+    def test_stale_or_irregular_heartbeat_never_certifies_a_stale_tick(self):
+        old = self.tick.copy(); self.tick.update(at="2026-10-16T15:19:50Z"); self.write_receipts()
+        heartbeat = self.state / "tick-heartbeat"
+        heartbeat.touch()
+        os.utime(heartbeat, (self.now.timestamp() - MODULE.NATIVE_HEARTBEAT_ALIVE_S - 1,) * 2)
+        self.assertEqual(self.observe()["status"], "failed")
+        heartbeat.unlink(); heartbeat.symlink_to(self.home / "absent-target")
+        self.assertEqual(self.observe()["status"], "failed")
+        self.tick = old; self.write_receipts()
+
+    def test_a_fresh_heartbeat_never_excuses_a_failed_tick(self):
+        old = self.tick.copy(); self.tick.update(error="controller failed"); self.write_receipts()
+        self.beat(5)
+        self.assertEqual(self.observe()["status"], "failed")
+        self.tick = old; self.write_receipts()
+
+    def test_a_fresh_heartbeat_never_excuses_a_future_dated_tick(self):
+        old = self.tick.copy(); self.tick.update(at="2026-10-16T15:30:31Z"); self.write_receipts()
+        self.beat(5)
+        self.assertEqual(self.observe()["status"], "failed")
+        self.tick = old; self.write_receipts()
 
     def test_failed_stopped_or_unbound_service_remains_failed(self):
         for target, changes in ((self.service, {"Result": "exit-code"}),

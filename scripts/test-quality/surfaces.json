@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "note": "High-touch ranking input for the test-quality loop. A module's touch score is tierWeight + churnWeight * (commits touching it in the churn window, capped). Expand coverage and mutation score from the highest score outward. Tiers are matched by first path-prefix hit, relative to apps/web.",
+  "churnWindowDays": 90,
+  "churnWeight": 2,
+  "churnCap": 40,
+  "tiers": [
+    {
+      "name": "billing",
+      "weight": 100,
+      "prefixes": [
+        "lib/billing/",
+        "lib/stripe/",
+        "lib/entitlements/",
+        "app/api/billing/",
+        "app/api/stripe/",
+        "app/api/webhooks/"
+      ]
+    },
+    {
+      "name": "auth",
+      "weight": 95,
+      "prefixes": [
+        "lib/auth/",
+        "lib/claim/",
+        "lib/cron/auth.ts",
+        "lib/idempotency.ts",
+        "proxy.ts"
+      ]
+    },
+    {
+      "name": "golden-path",
+      "weight": 85,
+      "prefixes": [
+        "lib/chat/",
+        "app/api/chat/",
+        "lib/onboarding/",
+        "app/api/onboarding/",
+        "lib/profile/",
+        "app/api/dashboard/profile/",
+        "lib/smart-links/",
+        "lib/tips/",
+        "app/api/tips/"
+      ]
+    },
+    {
+      "name": "public-traffic",
+      "weight": 60,
+      "prefixes": [
+        "app/api/track/",
+        "app/api/audience/",
+        "lib/audience/",
+        "lib/rate-limit/",
+        "lib/analytics/"
+      ]
+    },
+    { "name": "default", "weight": 10, "prefixes": [""] }
+  ]
+}

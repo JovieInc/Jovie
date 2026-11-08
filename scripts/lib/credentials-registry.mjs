@@ -24,6 +24,8 @@ export const DEFAULT_THRESHOLDS = Object.freeze({
   expiryWarnDays: 7,
   expiryCriticalDays: 1,
   runwayAlertDays: 14,
+  /** Under this many days of runway the provider is paged: failover to the other provider must already be live. */
+  runwayPageDays: 3,
   capAlertPercents: [50, 80, 100],
   observationMaxAgeDays: 8,
 });
@@ -146,7 +148,53 @@ export function validateSpendLedger(ledger) {
     if (entry.cap && !(entry.cap.amountUsd > 0))
       errors.push(`${entry.id}: cap.amountUsd must be positive`);
   }
+  // funding says who pays: `cash`, or `credits` drawn from another entry (the credit pool).
+  // Summer reads it to report net cash spend; an entry without it is reported as unknown.
+  for (const entry of ledger?.providers ?? []) {
+    const funding = entry.funding;
+    if (funding === undefined) continue;
+    if (funding?.source === 'credits') {
+      if (!ids.has(funding.creditPoolId))
+        errors.push(
+          `${entry.id}: funding.creditPoolId ${funding.creditPoolId} is not a spend entry`
+        );
+    } else if (funding?.source !== 'cash') {
+      errors.push(`${entry.id}: funding.source must be cash or credits`);
+    }
+  }
   return errors;
+}
+
+// A selected slice is valid only together with the credit pools it draws from.
+// Walk those pool ids through `providers` and return the closure in ledger
+// order. A pool id absent from `providers` stays unresolved so validation
+// still fails closed. Entries in `selected` that are not in the ledger are
+// kept at the end, unchanged.
+export function closeSpendFunding(providers, selected) {
+  const all = providers ?? [];
+  const byId = new Map();
+  for (const entry of all) if (entry?.id) byId.set(entry.id, entry);
+  const want = new Set();
+  const queue = [];
+  for (const entry of selected ?? []) {
+    if (!entry?.id || want.has(entry.id)) continue;
+    want.add(entry.id);
+    queue.push(entry.id);
+  }
+  while (queue.length > 0) {
+    const entry = byId.get(queue.pop());
+    const pool =
+      entry?.funding?.source === 'credits' ? entry.funding.creditPoolId : null;
+    if (typeof pool === 'string' && pool && !want.has(pool) && byId.has(pool)) {
+      want.add(pool);
+      queue.push(pool);
+    }
+  }
+  const extras = [];
+  for (const entry of selected ?? []) {
+    if (entry?.id && !byId.has(entry.id)) extras.push(entry);
+  }
+  return [...all.filter(entry => want.has(entry.id)), ...extras];
 }
 
 export function evaluateCredentials(registry, nowMs, thresholds = {}) {
@@ -379,6 +427,19 @@ export function evaluateSpend(ledger, nowMs, live = {}, thresholds = {}) {
         })
       );
     }
+    if (runwayDays !== null && runwayDays < t.runwayPageDays) {
+      findings.push(
+        finding({
+          fingerprint: `spend-runway-page:${entry.id}`,
+          type: 'runway-page',
+          severity: 'critical',
+          subject: entry.id,
+          owner: entry.owner ?? null,
+          runwayDays: round(runwayDays, 1),
+          message: `PAGE: ${entry.label ?? entry.id} has ${round(runwayDays, 1)} days of runway, under ${t.runwayPageDays}. Confirm model failover to the other provider is live before it hits zero.`,
+        })
+      );
+    }
     if (percent !== null) {
       const crossed = [...(entry.cap.alertPercents ?? t.capAlertPercents)]
         .sort((a, b) => b - a)
@@ -445,6 +506,7 @@ export function evaluateRegistry({
   credentials,
   spend,
   thirdPartyGrants = [],
+  privateDataIssues = [],
   nowMs = Date.now(),
   live = /** @type {{ credentials?: object[], spend?: Record<string, object> }} */ ({}),
   thresholds = {},
@@ -468,6 +530,7 @@ export function evaluateRegistry({
     ...inventory.findings,
     ...spendResult.findings,
     ...evaluateThirdPartyGrants(thirdPartyGrants, nowMs),
+    ...privateDataFindings(privateDataIssues),
   ]);
   const counts = {
     credentials: merged.credentials.length,
@@ -550,6 +613,26 @@ export function lastUsedMonths(text) {
   const n = Number(match[1]);
   const unit = match[2].toLowerCase();
   return unit === 'week' ? n / 4.35 : unit === 'year' ? n * 12 : n;
+}
+
+/**
+ * Private inputs (JovieInc/Ops jovie-private/) a host could not read. A missing
+ * private file must never read as "nothing to report": each becomes a high
+ * finding, which the remediation intake files as an alert.
+ *
+ * @param {Array<{ subject: string, path: string, reason: string }>} issues
+ */
+export function privateDataFindings(issues) {
+  return (issues ?? []).map(issue =>
+    finding({
+      fingerprint: `private-data:${issue.subject}-unavailable`,
+      type: 'private-data',
+      severity: 'high',
+      subject: issue.subject,
+      owner: 'tim',
+      message: `Private ${issue.subject} unavailable on this host (${issue.reason}); the check ran WITHOUT it. Provision a JovieInc/Ops checkout and set JOVIE_PRIVATE_DIR to its jovie-private/ folder (expected file: ${issue.path}).`,
+    })
+  );
 }
 
 /**

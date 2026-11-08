@@ -10,7 +10,7 @@ import {
   getWaitlistReservedHandle,
   resolveUserState,
 } from '@/lib/auth/gate';
-import { PRICING } from '@/lib/config/pricing';
+import { isPublicSignupClosed } from '@/lib/waitlist/public-signup-gate';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import { isWaitlistPendingStatus } from '@/lib/waitlist/state-machine';
 
@@ -49,7 +49,7 @@ export default async function WaitlistPage() {
   if (process.env.PUBLIC_NOAUTH_SMOKE === '1') {
     return (
       <WaitlistRouteWithContract>
-        <WaitlistPublicLanding />
+        <WaitlistPublicLanding signupClosed={isPublicSignupClosed()} />
       </WaitlistRouteWithContract>
     );
   }
@@ -63,14 +63,10 @@ export default async function WaitlistPage() {
   if (authResult.state === CanonicalUserState.UNAUTHENTICATED) {
     return (
       <WaitlistRouteWithContract>
-        <WaitlistPublicLanding />
+        <WaitlistPublicLanding signupClosed={isPublicSignupClosed()} />
       </WaitlistRouteWithContract>
     );
   }
-
-  // Anyone signed in can buy the self-serve Pro offer while waiting; a
-  // verified payment admits them (JOV-7701 founder decision, 2026-10-03).
-  const proCheckoutPriceId = PRICING.pro.monthly.priceId || null;
 
   // JOV-6449: gate-off post-auth must not depend on a waitlist table read.
   // Canonical WAITLIST_PENDING is enough to render the receipt.
@@ -81,10 +77,7 @@ export default async function WaitlistPage() {
   ) {
     return (
       <WaitlistRouteWithContract>
-        <WaitlistSuccessView
-          email={authResult.context.email}
-          proCheckoutPriceId={proCheckoutPriceId}
-        />
+        <WaitlistSuccessView email={authResult.context.email} />
       </WaitlistRouteWithContract>
     );
   }
@@ -99,7 +92,6 @@ export default async function WaitlistPage() {
         <WaitlistSuccessView
           email={authResult.context.email}
           reservedHandle={reservedHandle}
-          proCheckoutPriceId={proCheckoutPriceId}
         />
       </WaitlistRouteWithContract>
     );

@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
-import { CopyLinkInput } from '@/components/features/dashboard/atoms/CopyLinkInput';
 import { toast } from '@/components/feedback';
+import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import {
   OverflowMenu,
   type OverflowMenuItem,
@@ -154,26 +154,16 @@ export function LibraryAssetSharePanel({
         onSelect: onSharePrivately,
       });
     }
-    items.push(
-      {
-        id: 'visibility',
-        label: visibility === 'public' ? 'Make private' : 'Make public',
-        disabled: overflowBusy,
-        onSelect: () => {
-          handleVisibilityToggle(visibility !== 'public').catch(() => {
-            toast.error('Unable to change share visibility right now');
-          });
-        },
+    items.push({
+      id: 'visibility',
+      label: visibility === 'public' ? 'Make private' : 'Make public',
+      disabled: overflowBusy,
+      onSelect: () => {
+        handleVisibilityToggle(visibility !== 'public').catch(() => {
+          toast.error('Unable to change share visibility right now');
+        });
       },
-      {
-        id: 'open',
-        label: 'Open',
-        disabled: !shareUrl,
-        onSelect: () => {
-          globalThis.open(shareUrl, '_blank', 'noopener,noreferrer');
-        },
-      }
-    );
+    });
 
     if (visibility === 'private') {
       items.push({
@@ -197,7 +187,6 @@ export function LibraryAssetSharePanel({
     onSharePrivately,
     overflowBusy,
     profileId,
-    shareUrl,
     visibility,
   ]);
 
@@ -206,15 +195,17 @@ export function LibraryAssetSharePanel({
       className='flex items-center gap-1.5'
       data-testid={`library-asset-share-${asset.id}`}
     >
-      <CopyLinkInput
+      <CopyableUrlRow
         url={shareUrl || ' '}
         displayValue={displayUrl}
         size='sm'
-        stopPropagation
+        surface='flat'
+        showOpen={false}
+        valueClassName='font-sans'
         testId={`library-asset-share-url-${asset.id}`}
         className={cn(
           'min-w-0 flex-1',
-          (disabled || isEnsuring) && 'opacity-60'
+          (disabled || isEnsuring) && 'opacity-75'
         )}
       />
       <OverflowMenu

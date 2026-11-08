@@ -508,6 +508,36 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(exhausted.made("gh", "api", "-X", "POST"), [],
                          "a terminal head never gets another repair signal")
 
+    def test_red_label_needs_a_completed_failure_not_a_pending_rerun_or_green_head(self):
+        # 2026-11-01: lane-fix-red landed on queued #24141 while Source Validation only re-ran;
+        # green enroll read it as a hold and dequeued the PR.
+        run = {"event": "pull_request", "conclusion": "failure", "head_sha": "h1", "pull_requests": [{"number": 5}]}
+
+        def checks(*rows):
+            return {"data": {"repository": {"pullRequest": {"commits": {"nodes": [{"commit": {
+                "statusCheckRollup": {"contexts": {"nodes": list(rows)}}}}]}}}}}
+
+        def relay(merge, rows):
+            view = {"state": "OPEN", "isDraft": False, "headRefName": "tim/fix", "headRefOid": "h1",
+                    "isCrossRepository": False, "mergeStateStatus": merge, "labels": []}
+            shell = Shell({("gh", "pr", "view"): view, ("gh", "api", "graphql"): checks(*rows)})
+            return events.relay("workflow_run", {"workflow_run": run}, shell, set()), shell
+
+        failed = {"__typename": "CheckRun", "name": "Source Validation", "conclusion": "FAILURE",
+                  "completedAt": "2026-11-01T03:00:00Z"}
+        rerun = {"__typename": "CheckRun", "name": "Source Validation", "conclusion": None,
+                 "startedAt": "2026-11-01T03:13:00Z"}
+        passed = {**failed, "conclusion": "SUCCESS", "completedAt": "2026-11-01T03:20:00Z"}
+        added, _ = relay("BLOCKED", [failed])
+        self.assertEqual(added, [(5, "red")], "a completed failure still labels")
+        for merge, rows, why in (("BLOCKED", [failed, rerun], "pending re-run of the failed check"),
+                                 ("BLOCKED", [failed, passed], "the re-run passed"),
+                                 ("CLEAN", [failed], "required-green merge state"),
+                                 ("UNSTABLE", [failed], "only a non-required check is red")):
+            added, shell = relay(merge, rows)
+            self.assertEqual(added, [], why)
+            self.assertEqual(shell.made("gh", "api", "-X", "POST"), [], why)
+
     def test_required_green_success_clears_stale_lane_fix_red_and_a_red_head_keeps_it(self):
         def success(status, **extra):
             view = pr(branch="cursor/fix", sha="h1", merge=status, labels=["lane-fix-red"],
@@ -542,6 +572,39 @@ class RelayTest(unittest.TestCase):
                "pull_requests": [{"number": 5}]}
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()), [])
         self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [])
+
+    def test_a_blocked_success_clears_lane_fix_red_when_every_required_check_succeeded(self):
+        # The check rollup is the event. Merge state can still say BLOCKED.
+        # No sleep: a pending or failed check keeps the label for its own completion.
+        blocked = pr(branch="cursor/fix", sha="h1", merge="BLOCKED", labels=["lane-fix-red"], state="OPEN")
+        passed = {"__typename": "CheckRun", "name": "CI", "conclusion": "SUCCESS",
+                  "completedAt": "2026-11-04T06:00:00Z"}
+        pending = {"__typename": "CheckRun", "name": "CI", "conclusion": None,
+                   "startedAt": "2026-11-04T06:00:00Z"}
+        failed = {**passed, "conclusion": "FAILURE"}
+        green_checks = {"data": {"repository": {"pullRequest": {"commits": {"nodes": [{"commit": {
+            "statusCheckRollup": {"contexts": {"nodes": [passed]}}}}]}}}}}
+        waiting_checks = {"data": {"repository": {"pullRequest": {"commits": {"nodes": [{"commit": {
+            "statusCheckRollup": {"contexts": {"nodes": [pending]}}}}]}}}}}
+        red_checks = {"data": {"repository": {"pullRequest": {"commits": {"nodes": [{"commit": {
+            "statusCheckRollup": {"contexts": {"nodes": [failed]}}}}]}}}}}
+        run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
+               "pull_requests": [{"number": 5}]}
+
+        settled = Shell({("gh", "pr", "view"): blocked, ("gh", "api", "graphql"): green_checks})
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, settled, set()),
+                         [(5, "cleared-red"), (5, "enroll-wake")])
+        self.assertEqual(settled.made("gh", "api", "-X", "DELETE"),
+                         [["gh", "api", "-X", "DELETE",
+                           f"repos/{events.REPO}/issues/5/labels/lane-fix-red"]])
+
+        waiting = Shell({("gh", "pr", "view"): blocked, ("gh", "api", "graphql"): waiting_checks})
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, waiting, set()), [])
+        self.assertEqual(waiting.made("gh", "api", "-X", "DELETE"), [])
+
+        failing = Shell({("gh", "pr", "view"): blocked, ("gh", "api", "graphql"): red_checks})
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, failing, set()), [])
+        self.assertEqual(failing.made("gh", "api", "-X", "DELETE"), [])
 
     def test_a_stale_success_and_a_red_event_do_not_clear_lane_fix_red(self):
         view = pr(branch="cursor/fix", sha="new", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
@@ -1759,6 +1822,9 @@ class GapTest(unittest.TestCase):
         self.assertIs(events.head_red(1, reply(cancelled, passed, failed_old, passed_new)), False)
         self.assertIs(events.head_red(1, reply(passed, {**failed_old, "completedAt": "2026-10-21T02:00:00Z"})), True)
         self.assertIs(events.head_red(1, reply({"context": "ci/legacy", "state": "ERROR", "createdAt": "x"})), True)
+        tently = {"name": "Tently", "conclusion": "FAILURE", "completedAt": "2026-10-21T03:00:00Z"}
+        self.assertIs(events.head_red(1, reply(passed, tently)), False, "a non-required AI review is no repair signal")
+        self.assertIs(events.head_red(1, reply(tently, {**failed_old, "completedAt": "2026-10-21T02:00:00Z"})), True)
         self.assertIsNone(events.head_red(1, reply(passed, code=1)))
         self.assertIsNone(events.head_red(1, lambda *a, **k: SimpleNamespace(returncode=0, stdout="nope", stderr="")))
 
@@ -3002,6 +3068,33 @@ class WakeFileTest(unittest.TestCase):
             names = list((state / "wake").glob("red-*.json"))
             self.assertEqual([p.name for p in names], [f"red-22868-{'a' * 40}-1.json"])
 
+    def test_wake_cli_reads_the_red_event_when_no_prs_are_passed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            event = {"workflow_run": {"id": 4, "run_attempt": 1, "conclusion": "failure",
+                                      "head_sha": "b" * 40, "updated_at": "2026-11-04T06:00:00Z",
+                                      "pull_requests": [{"number": 24254}]}}
+            event_path = Path(tmp) / "event.json"
+            event_path.write_text(json.dumps(event))
+            state = Path(tmp) / "state"
+            with patch.dict(os.environ, {"LANES_STATE": str(state),
+                                         "GITHUB_EVENT_PATH": str(event_path)}):
+                self.assertEqual(events.main(["wake"]), 0)
+            path = state / "wake" / f"red-24254-{'b' * 40}-1.json"
+            self.assertEqual(json.loads(path.read_text())["redAt"], "2026-11-04T06:00:00Z")
+
+    def test_wake_cli_ignores_a_success_when_no_prs_are_passed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            event = {"workflow_run": {"id": 4, "run_attempt": 1, "conclusion": "success",
+                                      "head_sha": "b" * 40, "updated_at": "2026-11-04T06:00:00Z",
+                                      "pull_requests": [{"number": 24254}]}}
+            event_path = Path(tmp) / "event.json"
+            event_path.write_text(json.dumps(event))
+            state = Path(tmp) / "state"
+            with patch.dict(os.environ, {"LANES_STATE": str(state),
+                                         "GITHUB_EVENT_PATH": str(event_path)}):
+                self.assertEqual(events.main(["wake"]), 0)
+            self.assertFalse((state / "wake").exists())
+
     def test_wake_cli_writes_nothing_without_workflow_run_event(self):
         with tempfile.TemporaryDirectory() as tmp:
             event_path = Path(tmp) / "event.json"
@@ -3017,6 +3110,123 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
     PR = {"number": 7, "headRefOid": "a" * 40, "statusCheckRollup": [
         {"name": "Source Validation", "conclusion": "FAILURE",
          "detailsUrl": "https://github.com/JovieInc/Jovie/actions/runs/123/job/456"}]}
+
+    WIN = ("## Win\n\n- Claim: Complete measured repair evidence.\n- Area: quality\n"
+           "- Theme: repair-evidence\n"
+           "- Metric: missing evidence fields | count | lower | 1 | 0 | Fleet policy | node --test\n"
+           "- Verify: https://github.com/JovieInc/Jovie/actions/runs/123\n")
+
+    PREMISE = {
+        "Assumption": "The new hold block adds the third direct profile write.",
+        "Falsifying test": "node /tmp/compare-profile-writes.mjs",
+        "Result": "Main: 2; head: 3; head without hold block: 2.",
+    }
+
+    def test_explicit_premise_repairs_body_and_passes_canonical_policy(self):
+        body = events.red_before_green_block(self.PR)
+        updated = events.repair_evidence_body(self.PR, body, premise=self.PREMISE)
+        self.assertIn(body, updated)
+        self.assertEqual(updated.count("## Premise check"), 1)
+        self.assertEqual(events.repair_evidence_body(self.PR, updated, premise=self.PREMISE), updated)
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { hasPremiseEvidence } from './scripts/pr-fleet-rules.mjs';
+console.log(hasPremiseEvidence(readFileSync(0, 'utf8')));
+"""], cwd=ROOT, input=updated, text=True, capture_output=True, check=True)
+        self.assertEqual(checked.stdout.strip(), "true")
+
+    def test_premise_is_explicit_preserves_existing_and_rejects_invalid_fields(self):
+        body = events.red_before_green_block(self.PR)
+        self.assertNotIn("## Premise check", events.repair_evidence_body(self.PR, body))
+        original = body + "\n## Premise check\n\nOriginal observation\n"
+        self.assertEqual(events.repair_evidence_body(self.PR, original, premise=self.PREMISE), original)
+        for invalid in ({}, {**self.PREMISE, "Result": ""},
+                        {**self.PREMISE, "Result": "passed\n## Win"},
+                        {**self.PREMISE, "Result": 1}, "observed pass"):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                events.repair_evidence_body(self.PR, body, premise=invalid)
+
+    def test_ensure_repairs_premise_without_a_red_check_and_preserves_other_evidence(self):
+        body = self.WIN + '<!-- customer-changelog/v1 {"releaseWorthy":false} -->\n'
+        written = []
+
+        def shell(args):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout=body)
+            written.append(Path(args[args.index("--body-file") + 1]).read_text())
+            return SimpleNamespace(returncode=0, stdout="")
+
+        self.assertTrue(events.ensure_red_before_green({"number": 7}, sh=shell, premise=self.PREMISE))
+        self.assertEqual(len(written), 1)
+        self.assertTrue(written[0].startswith(body))
+        self.assertIn("- Falsifying test: " + self.PREMISE["Falsifying test"], written[0])
+
+    def test_explicit_measured_win_repairs_compounding_body_and_passes_fleet(self):
+        body = events.red_before_green_block(self.PR)
+        updated = events.repair_evidence_body(self.PR, body, win_section=self.WIN,
+                                              customer_decision={"releaseWorthy": False})
+        self.assertIn(body, updated)
+        self.assertIn(self.WIN, updated)
+        self.assertEqual(events.repair_evidence_body(self.PR, updated, win_section=self.WIN), updated)
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+const bodies = JSON.parse(readFileSync(0, 'utf8'));
+console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
+  pr: {title: 'fix(music-resolver): repair certification', body, labels: ['compounding']}, files: [],
+}).errors)));
+"""], cwd=ROOT, input=json.dumps([body, updated]), text=True, capture_output=True, check=True)
+        before, after = json.loads(checked.stdout)
+        self.assertTrue(any(error.startswith("win:") for error in before), before)
+        self.assertEqual(after, [])
+
+    def test_measured_win_is_explicit_and_preserves_existing_decisions(self):
+        body = events.red_before_green_block(self.PR)
+        self.assertNotIn("## Win", events.repair_evidence_body(self.PR, body))
+        for existing in ("## Win\n\nnone\n", self.WIN, "### Win\n\n- Claim: incomplete\n"):
+            with self.subTest(existing=existing):
+                original = body + "\n" + existing
+                self.assertEqual(events.repair_evidence_body(self.PR, original, win_section=self.WIN), original)
+        # A template in a comment or failure log is not the author's Win section.
+        template = "\n<!--\n## Win\n-->\n```text\n## Win\n```\n"
+        updated = events.repair_evidence_body(self.PR, body + template, win_section=self.WIN)
+        self.assertTrue(updated.endswith(self.WIN))
+
+    def test_ensure_can_write_measured_win_without_a_red_run(self):
+        written = []
+        def shell(args):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout="Summary")
+            written.append(Path(args[args.index("--body-file") + 1]).read_text())
+            return SimpleNamespace(returncode=0, stdout="")
+        self.assertTrue(events.ensure_red_before_green({"number": 7}, sh=shell, win_section=self.WIN))
+        self.assertEqual(written, ["Summary\n\n" + self.WIN])
+
+    def test_measured_win_cannot_inject_other_repair_metadata(self):
+        body = events.red_before_green_block(self.PR)
+        body = events.repair_evidence_body(self.PR, body, customer_decision={"releaseWorthy": False})
+        for injected in ("\n## Red-before-green\nReplacement proof\n",
+                         "\n### Premise check\nFabricated observation\n",
+                         '\n<!-- customer-changelog/v1 {"releaseWorthy":true} -->\n'):
+            with self.subTest(injected=injected), self.assertRaisesRegex(ValueError, "only Win evidence"):
+                events.repair_evidence_body(self.PR, body, win_section=self.WIN + injected)
+        repaired = events.repair_evidence_body(self.PR, body, win_section=self.WIN,
+                                               premise=self.PREMISE)
+        self.assertTrue(repaired.startswith(body))
+        self.assertEqual(repaired.count("customer-changelog/v1"), 1)
+        self.assertEqual(repaired.count("## Red-before-green"), 1)
+        self.assertEqual(repaired.count("## Win"), 1)
+        self.assertEqual(repaired.count("## Premise check"), 1)
+
+    def test_explicit_invalid_win_is_rejected_instead_of_silently_omitted(self):
+        for invalid in (0, False, [], {}, "- Metric: incomplete"):
+            with self.subTest(invalid=invalid):
+                with self.assertRaisesRegex(ValueError, "complete ## Win section"):
+                    events.repair_evidence_body(self.PR, "Summary", win_section=invalid)
+
+    def test_empty_optional_win_keeps_existing_caller_contract(self):
+        body = events.repair_evidence_body(self.PR, "Summary")
+        self.assertEqual(events.repair_evidence_body(self.PR, "Summary", win_section=""), body)
 
     def test_block_carries_the_failing_run_and_red_output_and_passes_the_parser_shape(self):
         block = events.red_before_green_block(self.PR, "### Source Validation\n# not a heading\nAssertionError: x")
@@ -3058,6 +3268,35 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
     def test_no_red_check_means_no_block(self):
         self.assertIsNone(events.red_before_green_block({"statusCheckRollup": [{"name": "x", "conclusion": "SUCCESS"}]}))
 
+    def test_conflict_only_repair_records_observed_merge_failure_and_preserves_decision(self):
+        pr = {"number": 23520, "headRefOid": "a" * 40, "mergeable": "CONFLICTING"}
+        excerpt = (
+            "Auto-merging apps/web/lib/chat/system-prompt.ts\n"
+            "CONFLICT (content): Merge conflict in apps/web/lib/chat/system-prompt.ts\n"
+            "Automatic merge failed; fix conflicts and then commit the result.\n"
+        )
+        body = 'Registry\n<!-- customer-changelog/v1 {"releaseWorthy":false} -->\n'
+        updated = events.repair_evidence_body(pr, body, excerpt, customer_decision={"releaseWorthy": False})
+        self.assertTrue(events.red_section_complete(updated))
+        self.assertIn("Failing command: `git merge origin/main --no-edit`", updated)
+        self.assertIn("CONFLICT (content): Merge conflict in apps/web/lib/chat/system-prompt.ts", updated)
+        self.assertNotIn("Failing run (before fix):", updated)
+        self.assertEqual(updated.count("customer-changelog/v1"), 1)
+        self.assertEqual(events.repair_evidence_body(pr, updated, excerpt), updated)
+        self.assertIsNotNone(events.red_before_green_block({"mergeStateStatus": "DIRTY"}, excerpt))
+
+    def test_conflict_state_without_observed_merge_failure_never_fabricates_red(self):
+        conflict = "CONFLICT (content): Merge conflict in file.ts\n"
+        failure = "Automatic merge failed; fix conflicts and then commit the result.\n"
+        for pr, excerpt in (
+            ({"mergeable": "CONFLICTING"}, ""),
+            ({"mergeable": "CONFLICTING"}, conflict),
+            ({"mergeable": "CONFLICTING"}, failure),
+            ({"mergeable": "MERGEABLE"}, conflict + failure),
+        ):
+            with self.subTest(pr=pr, excerpt=excerpt):
+                self.assertIsNone(events.red_before_green_block(pr, excerpt))
+
     def test_placeholder_section_is_replaced_and_complete_one_is_untouched(self):
         block = events.red_before_green_block(self.PR, "FAIL x")
         body = "## Summary\nx\n\n## Red-before-green\n\nFailing command:\n\n## Blast radius\ny\n"
@@ -3074,6 +3313,53 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         self.assertIn('<!-- customer-changelog/v1 {"releaseWorthy":false} -->', updated)
         self.assertEqual(events.repair_evidence_body(self.PR, updated,
                                                    customer_decision={"releaseWorthy": False}), updated)
+
+    def test_repair_preserves_fenced_red_logs_accepted_by_the_canonical_gate(self):
+        bodies = [
+            "## Red-before-green\n- Failing command: `node probe.mjs`\n\n"
+            "```text\n# launcher probe\nFAIL status null\n```\n",
+            "~~~markdown\n## Red-before-green\nExample only.\n~~~\n\n"
+            "## Red-before-green\n- Failing command: `node probe.mjs`\n\n"
+            "```text\n### heap diagnostic\nError: launcher timed out\n```\n",
+        ]
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body =>
+  evaluateFleetRules({pr: {title: 'fix: preserve red logs', body}, files: []}).errors
+)));
+"""], cwd=ROOT, input=json.dumps(bodies), text=True, capture_output=True, check=True, timeout=15)
+        self.assertEqual(json.loads(checked.stdout), [[], []])
+        for body in bodies:
+            with self.subTest(body=body):
+                self.assertTrue(events.red_section_complete(body))
+                updated = events.repair_evidence_body(self.PR, body, "FAIL newer run",
+                                                      customer_decision={"releaseWorthy": False})
+                self.assertTrue(updated.startswith(body))
+                self.assertNotIn("FAIL newer run", updated)
+                self.assertEqual(updated.count("customer-changelog/v1"), 1)
+                self.assertEqual(events.repair_evidence_body(self.PR, updated), updated)
+
+    def test_replacement_ignores_fenced_headings_and_preserves_the_next_section(self):
+        example = "```markdown\n## Red-before-green\nExample only.\n```\n\n"
+        following = "## Blast radius\nKeep existing proof.\n"
+        body = (example + "## Red-before-green\n- Failing command: `<cmd>`\n\n"
+                "```text\n# diagnostic\nFAIL incomplete command\n```\n\n" + following)
+        block = events.red_before_green_block(self.PR, "FAIL real run")
+        updated = events.with_red_section(body, block)
+        self.assertTrue(updated.startswith(example + block))
+        self.assertTrue(updated.endswith(following))
+        self.assertNotIn("FAIL incomplete command", updated)
+        self.assertTrue(events.red_section_complete(updated))
+        self.assertTrue(events.with_red_section(example + following, block).startswith(example + following))
+
+    def test_replacement_ignores_comment_fences_without_deleting_following_proof(self):
+        following = "## Blast radius\nPreserve existing proof.\n\n## Review\nPreserve verdict.\n"
+        body = ("## Red-before-green\n- Failing command: <cmd>\n\n"
+                "<!-- reviewer scratch\n```text\n-->\n\n" + following)
+        updated = events.repair_evidence_body(self.PR, body, "FAIL real run")
+        self.assertTrue(events.red_section_complete(updated))
+        self.assertTrue(updated.endswith(following))
 
     def test_explicit_locking_pr_repairs_missing_provenance_and_passes_fleet(self):
         body = events.red_before_green_block(self.PR)

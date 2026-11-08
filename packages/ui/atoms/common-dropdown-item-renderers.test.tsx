@@ -75,4 +75,34 @@ describe('renderActionItem', () => {
     expect(badge.style.backgroundColor).toBe('rgb(124, 58, 237)');
     expect(badge.style.color).toBe('var(--color-badge-text)');
   });
+
+  it('renders subText with the secondary text color for contrast', () => {
+    render(
+      <DropdownMenuPrimitive.Root defaultOpen>
+        <DropdownMenuPrimitive.Trigger>Actions</DropdownMenuPrimitive.Trigger>
+        <DropdownMenuPrimitive.Portal>
+          <DropdownMenuPrimitive.Content>
+            {renderActionItem(
+              {
+                id: 'copy-id',
+                type: 'action',
+                label: 'Copy ID',
+                onClick: () => undefined,
+                subText: 'usr_123',
+              },
+              {
+                kind: 'dropdown',
+                itemBase: MENU_ITEM_BASE,
+                disablePortal: false,
+              }
+            )}
+          </DropdownMenuPrimitive.Content>
+        </DropdownMenuPrimitive.Portal>
+      </DropdownMenuPrimitive.Root>
+    );
+
+    expect(screen.getByText('usr_123')).toHaveClass(
+      'text-(--linear-text-secondary)'
+    );
+  });
 });

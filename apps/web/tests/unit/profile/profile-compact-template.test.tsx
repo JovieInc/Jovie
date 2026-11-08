@@ -40,6 +40,7 @@ const {
   mockProfileInlineNotificationsCTA,
   mockProfileDesktopSurface,
   mockProfileUnifiedDrawer,
+  mockDrawerSlot,
   mockProfilePrimaryTabPanel,
   MockProfileDesktopSurface,
   mockClientNavigation,
@@ -74,26 +75,22 @@ const {
     mockProfileInlineNotificationsCTA: vi.fn(),
     mockProfileDesktopSurface,
     mockProfileUnifiedDrawer: vi.fn(),
+    mockDrawerSlot: (props: unknown) => mockProfileUnifiedDrawer(props),
     mockProfilePrimaryTabPanel: vi.fn(),
     MockProfileDesktopSurface,
     mockClientNavigation: vi.fn((_href: string) => false),
   };
 });
 
+vi.mock(
+  '../../../components/features/profile/templates/useProfileUnifiedDrawerModule',
+  () => ({ ProfileUnifiedDrawerSlot: mockDrawerSlot })
+);
 vi.mock('next/dynamic', () => ({
   default: (loader: unknown) => {
     const source = String(loader);
-
-    if (source.includes('ProfileUnifiedDrawer')) {
-      return (props: unknown) => mockProfileUnifiedDrawer(props);
-    }
-
     if (source.includes('ProfileInlineNotificationsCTA')) {
       return (props: unknown) => mockProfileInlineNotificationsCTA(props);
-    }
-
-    if (source.includes('ProfileDesktopSurface')) {
-      return MockProfileDesktopSurface;
     }
 
     return () => null;
@@ -1614,6 +1611,9 @@ describe('ProfileCompactTemplate', () => {
     }));
     window.history.replaceState(null, '', '/artist-profiles');
     window.history.pushState(null, '', '/test-artist?mode=listen&source=qr');
+    // Fresh trace ring: earlier tests in this file share the same window.
+    (window as unknown as Record<string, unknown>).__JOVIE_RUNTIME_TRACE__ =
+      undefined;
     const pushStateSpy = vi.spyOn(window.history, 'pushState');
 
     render(
@@ -1659,6 +1659,20 @@ describe('ProfileCompactTemplate', () => {
     );
     expect(pushStateSpy).not.toHaveBeenCalled();
     expect(window.history.length).toBe(historyLengthAfterLanding);
+
+    // Runtime-trace receipts (lib/testing/runtime-trace): the correction path
+    // is recorded so a red matrix run names the guard that fired.
+    const trace = (
+      window as unknown as {
+        __JOVIE_RUNTIME_TRACE__?: { events: { event: string }[] };
+      }
+    ).__JOVIE_RUNTIME_TRACE__;
+    expect(trace?.events.map(event => event.event)).toEqual(
+      expect.arrayContaining(['arrival', 'strip-correction-replace'])
+    );
+    expect(trace?.events.some(event => event.event === 'mode-push')).toBe(
+      false
+    );
 
     pushStateSpy.mockRestore();
   });

@@ -33,13 +33,13 @@ function aggregateProgressLabel(done: number, total: number): string {
 function statusColor(status: PendingFile['status']): string {
   switch (status) {
     case 'ready':
-      return 'text-accent-green';
+      return 'text-success-text';
     case 'failed':
-      return 'text-error';
+      return 'text-error-text';
     case 'cancelled':
       return 'text-tertiary-token';
     case 'duplicate':
-      return 'text-warning';
+      return 'text-warning-text';
     case 'uploading':
     case 'processing':
       return 'text-primary-token';
@@ -284,7 +284,7 @@ export function ChatUploadManifest({
         </AnimatePresence>
         {/* Duplicate summary */}
         {hasDuplicates ? (
-          <div className='flex items-center gap-2 px-2 py-1.5 text-xs text-warning'>
+          <div className='flex items-center gap-2 px-2 py-1.5 text-xs text-warning-text'>
             <Copy className='h-3 w-3' />
             {duplicateCount} duplicate{duplicateCount > 1 ? 's' : ''} skipped
           </div>

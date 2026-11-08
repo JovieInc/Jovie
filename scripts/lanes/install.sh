@@ -80,6 +80,31 @@ PLIST
 else
   units="$HOME/.config/systemd/user"
   mkdir -p "$units"
+  # Keep scanner clones and validation temporaries on the operator-selected volume.
+  # Unset leaves existing placement intact; never chmod a shared temporary root.
+  if [ -n "${LANES_TMPDIR:-}" ]; then
+    temp_dir="$(python3 -c '
+import os, pathlib, sys
+value = sys.argv[1]
+path = pathlib.Path(value)
+if not path.is_absolute() or any(c in value for c in ("\"", "\\", "%", "\n", "\r", "\0")):
+    raise SystemExit("LANES_TMPDIR must be an absolute, unit-safe path")
+if not path.exists():
+    path.mkdir(mode=0o700, parents=True)
+info = path.lstat()
+if path.is_symlink() or not path.is_dir() or info.st_uid != os.getuid() or info.st_mode & 0o7777 != 0o700:
+    raise SystemExit("LANES_TMPDIR must be a private mode-700 directory owned by the installing user")
+print(path)
+' "$LANES_TMPDIR")"
+    for lane_unit in jovie-lanes jovie-lanes-watchdog jovie-lanes-wake; do
+      mkdir -p "$units/$lane_unit.service.d"
+      cat >"$units/$lane_unit.service.d/65-temp-placement.conf" <<UNIT
+[Service]
+# Managed by scripts/lanes/install.sh with LANES_TMPDIR.
+Environment="TMPDIR=$temp_dir"
+UNIT
+    done
+  fi
   cat >"$units/jovie-lanes.service" <<UNIT
 [Unit]
 Description=Jovie shipping lanes: drain-safe update, then dispatch free slots
@@ -120,6 +145,8 @@ Description=Verify and recover Jovie shipping lanes every minute
 [Timer]
 OnActiveSec=15s
 OnUnitActiveSec=60s
+# A wall-clock trigger too: a stopped or failed oneshot chain must never silence the dead-man.
+OnCalendar=minutely
 Persistent=true
 [Install]
 WantedBy=timers.target
@@ -137,6 +164,7 @@ KillMode=process
 Environment=PATH=$path
 Environment=LANES_STATE=$state
 Environment=LANES_REPO=$repo
+Environment=CODEX_LEDGER_CADENCE_S=$ledger_cadence
 Environment=LANES_LINEAR_ENV=${LANES_LINEAR_ENV:-$HOME/.config/symphony/linear.env}
 ExecStart=/bin/bash -c 'exec python3 $state/current/lane_runner.py fix-now'
 UNIT
@@ -149,6 +177,66 @@ Unit=jovie-lanes-wake.service
 [Install]
 WantedBy=default.target
 UNIT
+  # Wake repairs must inherit the same subscription/provider and resource
+  # policy as normal lanes. Share only declarative Service drop-ins, never a
+  # main-unit command override; preserve source order and operator-owned files.
+  python3 -c '
+import os, pathlib, re, sys
+units = pathlib.Path(sys.argv[1])
+main = units / "jovie-lanes.service.d"
+wake = units / "jovie-lanes-wake.service.d"
+allowed = {"Environment", "EnvironmentFile", "UnsetEnvironment", "Slice", "Nice",
+           "CPUWeight", "CPUQuota", "MemoryHigh", "MemoryMax", "MemorySwapMax", "TasksMax"}
+sources = sorted(main.glob("*.conf"))
+simple_escapes = dict(zip("abfnrtv", map(chr, (7, 8, 12, 10, 13, 9, 11))))
+simple_escapes.update({"s": " ", chr(92): chr(92), chr(34): chr(34), chr(39): chr(39)})
+def unescape(match):
+    token = match.group(1)
+    if token in simple_escapes:
+        return simple_escapes[token]
+    if token[0] in "xuU" and len(token) > 1:
+        point = int(token[1:], 16)
+    elif len(token) == 3 and all(c in "01234567" for c in token):
+        point = int(token, 8)
+    else:
+        raise SystemExit("Unsupported escape in shared lane policy")
+    if point == 0 or point > 0x10ffff or 0xd800 <= point <= 0xdfff:
+        raise SystemExit("Invalid character in shared lane policy")
+    return chr(point)
+for source in sources:
+    section = None
+    for raw in source.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith(("#", ";")):
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            section = line[1:-1]
+            if section != "Service":
+                raise SystemExit("Cannot share non-Service lane policy: " + str(source))
+            continue
+        if section != "Service" or "=" not in line or line.split("=", 1)[0].strip() not in allowed:
+            raise SystemExit("Cannot share executable or unsupported lane policy: " + str(source))
+        directive, value = line.split("=", 1)
+        if directive.strip() in ("Environment", "EnvironmentFile", "UnsetEnvironment", "Slice"):
+            decoded = re.sub(r"\\(x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|[0-7]{3}|.)", unescape, value)
+            if any(match.group(1) not in ("%", "h", "u", "U", "t", "H", "m") for match in re.finditer(r"%(.)?", decoded)):
+                raise SystemExit("Cannot share a unit-specific lane policy specifier: " + str(source))
+wake.mkdir(parents=True, exist_ok=True)
+if wake.is_symlink():
+    raise SystemExit("Wake policy directory must not be a symlink")
+active = {"50-main-" + source.name: source for source in sources}
+for link in wake.glob("50-main-*.conf"):
+    expected = main / link.name.removeprefix("50-main-")
+    if not link.is_symlink() or os.readlink(link) != str(expected):
+        raise SystemExit("Refusing to replace operator-owned wake policy: " + str(link))
+for name, source in active.items():
+    link = wake / name
+    if not link.is_symlink():
+        link.symlink_to(source)
+for link in wake.glob("50-main-*.conf"):
+    if link.name not in active:
+        link.unlink()
+' "$units"
   if [ "${LANES_HUD:-0}" = "1" ]; then
     # The console HUD (tty1). Font and sudo setfont mirror the retired Symphony Elixir HUD unit.
     font="$HOME/.local/state/gem-checkin-hud/fonts/hud-symbols.psf"

@@ -27,7 +27,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -37,6 +37,7 @@ import {
 } from './lib/blog-publish-latency.mjs';
 import { ciRoundsMetrics, flattenCiRounds } from './lib/ci-rounds.mjs';
 import { formatBiomeJson } from './lib/format-biome-json.mjs';
+import { digestBlock } from './lib/merge-queue-speed.mjs';
 import {
   buildGistSloBlock,
   ciWalltimeByEvent,
@@ -67,6 +68,10 @@ const BASELINE_PATH = resolve(
   'docs/metrics/shipping-slo-baseline.json'
 );
 const LATEST_PATH = resolve(REPO_ROOT, 'docs/metrics/shipping-slo-latest.json');
+const ESCAPES_PATH = resolve(
+  REPO_ROOT,
+  'docs/metrics/review-escapes-latest.json'
+);
 const BLOG_LATENCY_PATH = resolve(
   REPO_ROOT,
   'docs/metrics/blog-publish-latency-latest.json'
@@ -413,7 +418,12 @@ export function collectRaw({ workflows, days }) {
 export function buildReport(
   raw,
   baseline,
-  { now = Date.now(), stageManifest = null, ciCapacity = null } = {}
+  {
+    now = Date.now(),
+    stageManifest = null,
+    ciCapacity = null,
+    mergeQueueSpeed = null,
+  } = {}
 ) {
   const nowMs = typeof now === 'number' ? now : Date.parse(now);
   const weekMs = 7 * 86_400_000;
@@ -547,10 +557,57 @@ export function buildReport(
     }
     gistSlo.stages = buildStageSummary(stageTimings);
   }
+  // Escape tracking (scripts/review-escapes.mjs) writes its snapshot before
+  // this report runs; Summer reads it through the same lanes status feed.
+  if (existsSync(ESCAPES_PATH)) {
+    try {
+      const {
+        windowDays,
+        mergedPrs,
+        escapedPrs,
+        escapeRate,
+        byLayer,
+        guardRate,
+      } = JSON.parse(readFileSync(ESCAPES_PATH, 'utf8'));
+      gistSlo.escapes = {
+        windowDays,
+        mergedPrs,
+        escapedPrs,
+        escapeRate,
+        byLayer,
+        guardRate,
+      };
+    } catch {
+      // A malformed escape snapshot must not fail the SLO report.
+    }
+  }
 
   // Hosted-runner capacity (scripts/ci-capacity-slo.mjs): queue wait p50/p95
   // and control-plane job-minutes/hour, with the p95 > 120s alarm flag.
   if (ciCapacity) gistSlo.ciCapacity = ciCapacity;
+  // Merge-queue speed (scripts/merge-queue-speed.mjs): merges/h, group
+  // success and merge-group p50 for Summer's digest.
+  const mqDigest = digestBlock(mergeQueueSpeed, {
+    now: nowMs,
+    collectionId: process.env.GITHUB_RUN_ID
+      ? `${process.env.GITHUB_RUN_ID}/${process.env.GITHUB_RUN_ATTEMPT || '1'}`
+      : null,
+  });
+  if (mqDigest) gistSlo.mergeQueueSpeed = mqDigest;
+
+  // Test-quality loop (mutation score per surface, survivors killed, test minutes,
+  // flake budget) so Summer reads it with the rest of the Shipping SLO feed.
+  try {
+    const tq = JSON.parse(
+      readFileSync(
+        resolve(REPO_ROOT, 'docs/metrics/test-quality-latest.json'),
+        'utf8'
+      )
+    );
+    gistSlo.testQuality = { ...tq, survivorsByModule: undefined };
+  } catch {
+    // No report published yet.
+  }
 
   return {
     schemaVersion: 1,
@@ -801,7 +858,22 @@ async function main() {
   } catch {
     // No capacity sample this run; the SLO report is unaffected.
   }
-  const report = buildReport(raw, baseline, { stageManifest, ciCapacity });
+  let mergeQueueSpeed = null;
+  try {
+    mergeQueueSpeed = JSON.parse(
+      readFileSync(
+        resolve(REPO_ROOT, 'docs/metrics/merge-queue-speed-latest.json'),
+        'utf8'
+      )
+    );
+  } catch {
+    // No merge-queue speed sample this run; the SLO report is unaffected.
+  }
+  const report = buildReport(raw, baseline, {
+    stageManifest,
+    ciCapacity,
+    mergeQueueSpeed,
+  });
 
   if (hasArg(args, '--ratchet')) {
     const { next, tightened } = ratchetBaseline(
