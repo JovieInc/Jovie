@@ -127,6 +127,7 @@ async function visit({ route, target, viewport, identity, fixture }) {
     )
       failedRequests.push(`${r.status()} ${u.pathname}`);
   });
+  /** @type {Record<string, any>} */
   const row = { route, url: target, identity, viewport };
   if (fixture === 'unclaimed') row.expectClaimBanner = true;
   const t0 = Date.now();
@@ -192,6 +193,7 @@ for (const route of routes) {
   }
 }
 // A context that fails to open still gets a row, so the receipt is written.
+/** @type {(job: any) => Promise<Record<string, any>>} */
 const safeVisit = job =>
   visit(job).catch(e => {
     const { route, target, viewport, identity } = job;
