@@ -316,8 +316,8 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
         <div className='mx-auto w-full max-w-3xl space-y-3'>{inputSection}</div>
         <div className='mx-auto w-full max-w-3xl'>
           <EmptyState
-            heading='Add your first link'
-            description='Start with your most important link — music, socials, or a landing page.'
+            heading='Add Your First Link'
+            description='Start with the link that matters most: music, socials, or a landing page.'
             size='sm'
             className='mt-3 w-full'
           />

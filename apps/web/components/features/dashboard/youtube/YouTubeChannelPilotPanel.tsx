@@ -122,7 +122,7 @@ export function YouTubeChannelPilotPanel({
             {workspace.videos.length === 0 ? (
               <ContentSurfaceCard className='overflow-hidden p-0'>
                 <EmptyState
-                  heading='Authorized Channel Is Waiting for Its First Sync'
+                  heading='Authorized Channel Is Waiting For Its First Sync'
                   description='No local videos are shown because Jovie has not yet received a complete API-backed uploads ledger for this channel.'
                   testId='youtube-channel-awaiting-sync'
                   className='min-h-48'
