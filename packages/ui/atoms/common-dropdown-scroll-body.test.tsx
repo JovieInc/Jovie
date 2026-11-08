@@ -7,7 +7,7 @@ import {
   getMenuScrollEdges,
   getMenuScrollMask,
   MENU_SCROLL_FADE_SIZE,
-} from './common-dropdown-renderer';
+} from './common-dropdown-scroll-body';
 import type { CommonDropdownItem } from './common-dropdown-types';
 import { getScrollBodyWidth } from './common-dropdown-utils';
 
@@ -144,6 +144,20 @@ describe('CommonDropdown scrollBody', () => {
     expect(getScrollBodyWidth()).toBe(
       'min(25rem, calc(100vw - var(--space-8, 2rem)))'
     );
+  });
+
+  it('keeps the default menu as one scrolling surface with fade motion', () => {
+    render(<CommonDropdown items={historyItems(5)} open searchable />);
+    const content = document.querySelector<HTMLElement>(
+      '[data-slot="common-dropdown-content"]'
+    );
+
+    expect(
+      document.querySelector('[data-slot="common-dropdown-scroll-body"]')
+    ).toBeNull();
+    expect(content?.style.overflowY).toBe('auto');
+    expect(content).toHaveAttribute('data-motion', 'fade');
+    expect(content?.className).not.toContain('zoom-in');
   });
 
   it('fades the bottom while rows are below and clears it at the end', () => {

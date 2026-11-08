@@ -22,11 +22,11 @@ import { cn } from '../lib/utils';
 import {
   type MenuPrimitiveKind,
   type MenuRenderContext,
-  MenuScrollBody,
   renderItem,
   renderRootBody,
   SearchableContent,
 } from './common-dropdown-renderer';
+import { MenuScrollBody } from './common-dropdown-scroll-body';
 import type {
   CommonDropdownItem,
   CommonDropdownProps,

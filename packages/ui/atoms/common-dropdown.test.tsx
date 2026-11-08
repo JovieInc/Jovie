@@ -716,7 +716,7 @@ describe('CommonDropdown', () => {
         <CommonDropdown items={basicItems} open={true} isLoading={true} />
       );
       const menu = screen.getByRole('menu');
-      expect(menu).toBeInTheDocument();
+      expect(menu).toHaveAttribute('data-motion', 'fade');
       expect(menu).toHaveAttribute('data-slot', 'common-dropdown-content');
       expect(menu).toHaveAttribute('aria-busy', 'true');
       expect(screen.getByRole('status')).toHaveTextContent(
@@ -1592,27 +1592,5 @@ describe('CommonDropdown', () => {
       const items = screen.getAllByRole('menuitem');
       expect(items.length).toBeGreaterThan(0);
     });
-  });
-});
-
-describe('CommonDropdown opt-in list behaviour', () => {
-  it('keeps the default menu as one scrolling surface with fade motion', () => {
-    render(
-      <CommonDropdown
-        items={[{ type: 'action', id: 'one', label: 'One', onClick: vi.fn() }]}
-        open
-        searchable
-      />
-    );
-    const content = document.querySelector<HTMLElement>(
-      '[data-slot="common-dropdown-content"]'
-    );
-
-    expect(
-      document.querySelector('[data-slot="common-dropdown-scroll-body"]')
-    ).toBeNull();
-    expect(content?.style.overflowY).toBe('auto');
-    expect(content).toHaveAttribute('data-motion', 'fade');
-    expect(content?.className).not.toContain('zoom-in');
   });
 });

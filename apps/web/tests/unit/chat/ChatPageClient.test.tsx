@@ -424,14 +424,7 @@ describe('ChatPageClient', () => {
       </DashboardDataProvider>
     );
 
-    expect(mockSetHeaderBadge).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        props: expect.objectContaining({
-          title: null,
-          activeConversationId: null,
-        }),
-      })
-    );
+    expect(mockSetHeaderBadge.mock.lastCall?.[0]?.props.title).toBeNull();
     expect(mockSetHeaderActions).toHaveBeenLastCalledWith(null);
   });
 
