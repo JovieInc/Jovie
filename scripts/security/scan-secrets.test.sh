@@ -457,13 +457,11 @@ while IFS= read -r slept; do
 done <"$SLEEP_LOG"
 grep -q 'Secret scanner download failed' "$TEST_ROOT/download-fail.output" \
   || fail 'download failure must emit an explicit CI classification'
-# Anonymous 5xx with a CI token falls back to the exact pinned asset via gh.
-export GH_CALLS="$TEST_ROOT/download.gh-calls" && : >"$GH_CALLS" && mkdir -p "$TEST_ROOT/dl-tmp3"
+export GH_CALLS="$TEST_ROOT/download.gh-calls" && : >"$GH_CALLS" && mkdir -p "$TEST_ROOT/dl-tmp3" # CI-token fallback
 PATH="$DL_BIN:/usr/bin:/bin" TMPDIR="$TEST_ROOT/dl-tmp3" SCAN_SECRETS_RETRY_DELAY=0 CURL_ALWAYS_FAIL=1 \
   GITLEAKS_BIN= TRUFFLEHOG_BIN= RELEASE_DOWNLOAD_TOKEN=ci-token bash "$SCAN_SCRIPT" pre-commit \
   >"$TEST_ROOT/download-gh.output" 2>&1 || fail 'authenticated fallback must rescue anonymous 5xx'
-grep -qE '^ci-token release download v([0-9.]+) -R gitleaks/gitleaks -p gitleaks_\1_[a-z]+_[a-z0-9]+\.tar\.gz -O .+ --clobber$' "$GH_CALLS" \
-  || fail 'authenticated fallback must fetch the exact pinned gitleaks asset'
+grep -qE '^ci-token release download v([0-9.]+) -R gitleaks/gitleaks -p gitleaks_\1_[a-z]+_[a-z0-9]+\.tar\.gz -O .+ --clobber$' "$GH_CALLS" || fail 'authenticated fallback must fetch the exact pinned gitleaks asset'
 
 # Outside CI and without a partial clone (e.g. a git worktree on an ops host),
 # the repair must refuse instead of running a full `git fetch --refetch`.
