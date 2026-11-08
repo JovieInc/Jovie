@@ -384,7 +384,7 @@ web.settings-data-privacy|web|screen.settings.data-privacy|apps/web/app/app/(she
 web.settings-connectors|web|settings-connectors|apps/web/app/app/(shell)/settings/connectors/|desktop,mobile
 web.settings|web|screen.settings|apps/web/app/app/(shell)/settings/layout.tsx|desktop,mobile
 web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout/page.tsx,apps/web/app/onboarding/checkout/loading.tsx|desktop,mobile
-web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx|desktop,mobile
+web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx,apps/web/app/billing/success/loading.tsx|desktop,mobile
 web.billing-youtube-thumbnails|web|billing-youtube-thumbnails|apps/web/app/billing/youtube-thumbnails/page.tsx|desktop,mobile
 web.billing-youtube-thumbnails-success|web|billing-youtube-thumbnails-success|apps/web/app/billing/youtube-thumbnails/success/page.tsx|desktop,mobile
 web.billing-shell|web|billing-shell|apps/web/app/billing/layout.tsx|desktop,mobile
