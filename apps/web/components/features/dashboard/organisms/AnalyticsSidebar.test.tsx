@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { useDashboardAnalyticsQuery as useQuery } from '@/lib/queries';
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 
@@ -17,7 +18,7 @@ import {
 } from './AnalyticsSidebar';
 
 vi.mock('@/lib/queries', () => ({
-  useDashboardAnalyticsQuery: () => ({
+  useDashboardAnalyticsQuery: vi.fn(() => ({
     data: {
       profile_views: 120,
       unique_users: 48,
@@ -32,7 +33,7 @@ vi.mock('@/lib/queries', () => ({
     },
     isPending: false,
     isFetching: false,
-  }),
+  })),
 }));
 
 vi.mock('@/components/molecules/drawer', async () => ({
@@ -177,6 +178,11 @@ describe('AnalyticsSidebar', () => {
     expect(screen.getByText('Link Clicks')).toBeInTheDocument();
   });
 
+  it('shows the skeleton, not zero counts, while the first fetch is paused offline', () => {
+    vi.mocked(useQuery).mockReturnValueOnce({ isPending: true } as never);
+    render(<AnalyticsSidebar isOpen onClose={vi.fn()} />);
+    expect(screen.queryByText('Unique Visitors')).not.toBeInTheDocument();
+  });
   it('keeps tab selection and ranked content in one accessible rail', () => {
     render(<AnalyticsSidebar isOpen onClose={vi.fn()} />);
 
