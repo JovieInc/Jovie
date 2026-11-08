@@ -301,7 +301,7 @@ export function SearchableSubmenu({
       >
         {triggerIcon}
         <span className='flex-1'>{triggerLabel}</span>
-        <ChevronRight className='ml-auto h-4 w-4' />
+        <ChevronRight className='ms-auto h-4 w-4 rtl:rotate-180' />
       </DropdownMenuPrimitive.SubTrigger>
 
       <DropdownMenuPrimitive.Portal>

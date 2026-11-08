@@ -73,30 +73,24 @@ describe('SearchableList', () => {
       expect(buttons.length).toBe(5);
     });
 
-    it('renders search input', () => {
-      render(<SearchableList items={sampleItems} onSelect={vi.fn()} />);
-      expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument();
-    });
-
-    it('renders item descriptions', () => {
-      render(<SearchableList items={sampleItems} onSelect={vi.fn()} />);
-      expect(screen.getByText('A yellow fruit')).toBeInTheDocument();
-    });
-
-    it('renders item badges', () => {
-      render(<SearchableList items={sampleItems} onSelect={vi.fn()} />);
-      expect(screen.getByText('10')).toBeInTheDocument();
-    });
-
-    it('renders custom search placeholder', () => {
+    it.each([
+      [undefined, 'Search...'],
+      ['Find fruits...', 'Find fruits...'],
+    ])('renders the search input (%s)', (searchPlaceholder, placeholder) => {
       render(
         <SearchableList
           items={sampleItems}
           onSelect={vi.fn()}
-          searchPlaceholder='Find fruits...'
+          searchPlaceholder={searchPlaceholder}
         />
       );
-      expect(screen.getByPlaceholderText('Find fruits...')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(placeholder)).toBeInTheDocument();
+    });
+
+    it('renders item descriptions and badges', () => {
+      render(<SearchableList items={sampleItems} onSelect={vi.fn()} />);
+      expect(screen.getByText('A yellow fruit')).toBeInTheDocument();
+      expect(screen.getByText('10')).toBeInTheDocument();
     });
 
     it('supports controlled query and placeholder aliases', () => {
@@ -432,14 +426,17 @@ describe('SearchableSubmenu', () => {
     expect(trigger).toBeInTheDocument();
     expect(trigger.className).toContain('before:h-11');
     expect(trigger.className).toContain('before:min-w-11');
+    // Logical insets mirror the chevron and search field chrome in RTL.
+    const chevron = trigger.querySelector('svg.lucide-chevron-right');
+    expect(chevron).toHaveClass('ms-auto', 'rtl:rotate-180');
 
     await user.hover(screen.getByText('Choose platform'));
     const input = await screen.findByRole('combobox', { name: 'Search...' });
+    expect(input).toHaveClass('ps-7', 'pe-7');
     await user.type(input, 'apple', { skipClick: true });
 
     const clear = screen.getByRole('button', { name: 'Clear search' });
-    expect(clear.className).toContain('before:h-11');
-    expect(clear.className).toContain('before:min-w-11');
+    expect(clear).toHaveClass('before:h-11', 'before:min-w-11', 'end-1.5');
   });
 
   it('keeps typed search text when the parent re-renders while open', async () => {
