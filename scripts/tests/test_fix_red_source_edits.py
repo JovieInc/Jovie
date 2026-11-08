@@ -191,31 +191,34 @@ class AdditiveNodeTestFileTest(unittest.TestCase):
             git("remote", "add", "origin", str(origin))
             path = work / "draft.test.mjs"
             base = "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\n"
-            path.write_text(base)
+            divider = "".join(f"// unchanged boundary {i}\n" for i in range(8))
+            path.write_text(base + divider)
             git("add", ".")
             git("commit", "-qm", "base")
             git("branch", "feature")
             git("checkout", "-q", "feature")
             ours = "test('head retry budget', () => {\n  assert.equal(1 + 1, 2);\n});\n\n"
-            path.write_text(base + ours)
+            ours_tail = AdditiveNodeTestMergeTest.block("head second insertion")
+            path.write_text(base + ours + divider + ours_tail)
             git("commit", "-qam", "head test")
             git("push", "-q", "origin", "HEAD:refs/heads/feature")
             before = git("rev-parse", "HEAD").stdout.strip()
             git("checkout", "-q", "main")
             theirs = "test('main verbose errors', () => {\n  assert.ok(true);\n});\n\n"
-            path.write_text(base + theirs)
+            theirs_tail = AdditiveNodeTestMergeTest.block("main second insertion")
+            path.write_text(base + theirs + divider + theirs_tail)
             git("commit", "-qam", "main test")
             git("push", "-q", "origin", "HEAD:refs/heads/main")
             git("checkout", "-q", "feature")
             self.assertTrue(lane.resolve_additive_list_conflict(work, "feature", None))
-            self.assertEqual(path.read_text(), base + theirs + ours)
+            self.assertEqual(path.read_text(), base + theirs + ours + divider + theirs_tail + ours_tail)
             after = git("rev-parse", "HEAD").stdout.strip()
             self.assertNotEqual(after, before)
             self.assertEqual(after, git("rev-parse", "origin/feature").stdout.strip())
             git("merge-base", "--is-ancestor", before, after)
             result = subprocess.run(["node", "--test", str(path)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("# pass 2", result.stdout.replace("ℹ", "#"))
+            self.assertIn("# pass 4", result.stdout.replace("ℹ", "#"))
 
     def test_unknown_files_missing_stages_and_merge_errors_fail_closed(self):
         for rel, replies in (("code.mjs", []),
@@ -224,6 +227,16 @@ class AdditiveNodeTestFileTest(unittest.TestCase):
                               + [SimpleNamespace(returncode=2, stdout="")])):
             with self.subTest(rel=rel, replies=replies), patch.object(lane, "sh", side_effect=replies):
                 self.assertIsNone(classes.resolve_additive_node_test_file(Path("."), rel, lane.sh))
+
+    def test_merge_status_bounds_preserve_fail_closed_behavior(self):
+        block = AdditiveNodeTestMergeTest.block
+        conflict = AdditiveNodeTestMergeTest().conflict(block("head"), block("main"))
+        for code in (0, -1, 128, 255, 127):
+            replies = [SimpleNamespace(returncode=0, stdout="")] * 3
+            replies.append(SimpleNamespace(returncode=code, stdout=conflict))
+            with self.subTest(code=code), patch.object(lane, "sh", side_effect=replies):
+                actual = classes.resolve_additive_node_test_file(Path("."), "draft.test.mjs", lane.sh)
+                self.assertEqual(actual, block("main") + block("head") if code == 127 else None)
 
 
 if __name__ == "__main__":

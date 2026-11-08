@@ -255,7 +255,8 @@ def resolve_additive_node_test_file(worktree: Path, rel: str, sh) -> str | None:
             atomic_write_text(path, blob.stdout)
             paths.append(str(path))
         probe = sh(["git", "merge-file", "-p", "--diff3", *paths], cwd=worktree)
-        if probe.returncode != 1:
+        # Git returns the conflict count (capped at 127); errors wrap above it.
+        if not 1 <= probe.returncode <= 127:
             return None
         return resolve_additive_node_tests_text(probe.stdout)
 
