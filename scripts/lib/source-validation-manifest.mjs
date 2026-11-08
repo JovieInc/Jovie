@@ -216,6 +216,10 @@ export const NOT_LOCAL = Object.freeze([
   { match: 'lint:motion-css', reason: 'covered by the web lint pass in CI' },
   { match: 'component-ship-gate', reason: 'preflight:changed ship-gate check' },
   {
+    match: 'component-certificate:gate',
+    reason: 'pre-push runs it right after component-ship-gate',
+  },
+  {
     match: 'mac-header-two-lines-v1',
     reason: 'preflight:changed merge-group-unit-guards (narrowed)',
   },

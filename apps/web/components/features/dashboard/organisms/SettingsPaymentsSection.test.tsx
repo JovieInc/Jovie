@@ -33,9 +33,13 @@ describe('SettingsPaymentsSection', () => {
     expect(
       await screen.findByText('Payout setup temporarily unavailable')
     ).toBeInTheDocument();
+    // No permanently disabled Connect Stripe button: the row explains the pause.
+    expect(screen.queryByRole('button', { name: 'Connect Stripe' })).toBeNull();
     expect(
-      screen.getByRole('button', { name: 'Connect Stripe' })
-    ).toBeDisabled();
+      screen.getByText(
+        'Stripe payouts open once Jovie finishes platform setup. Your account is safe.'
+      )
+    ).toBeInTheDocument();
     expect(
       screen.getByText(
         'Payout setup is temporarily unavailable. Please try again later.'

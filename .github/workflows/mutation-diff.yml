@@ -5,7 +5,7 @@
 name: Mutation Diff
 
 # Diff-scoped mutation testing for changed high-risk apps/web source
-# (billing, entitlements, auth, Stripe, webhooks, claim). Runs after merge on
+# (billing, entitlements, auth, Stripe, webhooks, claim, shell navigation). Runs after merge on
 # main, path-filtered, so it adds no PR or merge-group check. Scores and
 # surviving mutants land in the job summary. A file in
 # scripts/mutation-score-baseline.json fails the job when its score is under
@@ -34,6 +34,8 @@ on:
       - 'apps/web/app/api/billing/**'
       - 'apps/web/app/api/stripe/**'
       - 'apps/web/app/api/webhooks/**'
+      - 'apps/web/components/features/dashboard/dashboard-nav/**'
+      - 'apps/web/lib/app-shell/**'
       - 'apps/web/lib/auth/**'
       - 'apps/web/lib/billing/**'
       - 'apps/web/lib/claim/**'
