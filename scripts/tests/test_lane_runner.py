@@ -13587,7 +13587,8 @@ class NoHumanHoldTest(unittest.TestCase):
         self.assertEqual(helper.read_text(), HELPER)
         self.assertEqual(caller.read_text(), _hunk(SOURCE, INLINE))
         self.assertFalse(any(args[:2] == ["git", "push"] for args in calls))
-        unknown.write_text(_hunk("run: node --test a.test.mjs\n", "run: node --test b.test.mjs\n"))
+        unknown.write_text(_hunk("run: node --test a.test.mjs && pnpm ownership:check\n",
+                                 "run: node --test b.test.mjs && pnpm ownership:check\n"))
         with patch.object(lane, "sh", side_effect=shell):
             self.assertTrue(lane.resolve_and_chain_conflict(root, "feature", None))
         self.assertIn("--speed-time 30", helper.read_text())
