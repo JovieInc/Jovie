@@ -229,7 +229,10 @@ export function classifyAutoReadyPromotion(input = {}) {
     }
   );
   if (proof.ok) return { eligible: true, reason: 'writer-proof-complete' };
-  if (hasOnGreenOptIn(input)) {
+  // Only the green-source path may take the opt-in: it has already proven the
+  // head green and CLEAN. The writer-proof path readies drafts with pending
+  // checks, so it never may.
+  if (input.greenSource === true && hasOnGreenOptIn(input)) {
     return { eligible: true, reason: 'writer-on-green-opt-in' };
   }
   return { eligible: false, reason: `writer-proof-${proof.reason}` };

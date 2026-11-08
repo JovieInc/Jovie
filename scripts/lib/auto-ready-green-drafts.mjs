@@ -139,6 +139,7 @@ export function classifyGreenSourceDraft(input = {}) {
     body: input.body,
     headSha: head,
     prNumber: number,
+    greenSource: true,
   });
   if (!proof.eligible) return proof;
 
