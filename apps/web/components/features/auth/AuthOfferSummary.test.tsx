@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearPlanIntent } from '@/lib/auth/plan-intent';
 import { formatUsdAmount } from '@/lib/billing/offer-truth';
 import { PLAN_PRICES } from '@/lib/config/plan-prices';
 
@@ -27,6 +28,7 @@ import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { AuthOfferSummary } from './AuthOfferSummary';
 
 describe('AuthOfferSummary', () => {
+  beforeEach(() => clearPlanIntent());
   afterEach(() => {
     searchParamsState.cache = null;
   });
@@ -40,6 +42,18 @@ describe('AuthOfferSummary', () => {
       screen.queryByText('Start your 14-day Artist Presence trial')
     ).not.toBeInTheDocument();
   });
+
+  it.each(['', 'plan=unknown'])(
+    'renders no recap without a valid offer (%s)',
+    query => {
+      searchParamsState.value = query;
+      const { container } = render(<AuthOfferSummary mode='sign-up' enabled />);
+      expect(container).toBeEmptyDOMElement();
+      expect(
+        screen.queryByTestId('auth-offer-summary')
+      ).not.toBeInTheDocument();
+    }
+  );
 
   it('shows a Pro trial summary on sign-up with the published monthly price', () => {
     searchParamsState.value = 'plan=pro&interval=month';

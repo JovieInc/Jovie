@@ -1,10 +1,4 @@
-/**
- * Price versions (Tim, 2026-10-29): a person sees one price everywhere, their
- * locked price. Names each list price (amounts from plan-prices.ts, Stripe ids
- * from price-ids.ts at lock time) so a lock can point at it. A list-price
- * change (JOV-9769) adds a version for new signups only; a test fails when the
- * current version stops matching the list price. Pure and client-importable.
- */
+/** Signup price versions; amounts from plan-prices, Stripe IDs snapshotted at lock time (JOV-9769). */
 
 import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
 
@@ -21,7 +15,6 @@ export interface PriceVersion {
   /** ISO date this list price became the price for new signups. */
   readonly introducedOn: string;
 }
-
 /** Append-only. Never edit or remove a version a lock may point at. */
 export const PRICE_VERSIONS: readonly PriceVersion[] = [
   {
@@ -33,7 +26,6 @@ export const PRICE_VERSIONS: readonly PriceVersion[] = [
     introducedOn: '2026-10-20',
   },
 ];
-
 /** The version new signups lock to. Must match the list price (tested). */
 export const CURRENT_PRICE_VERSION_ID = 'pro-2026-10-20-m12';
 
@@ -45,7 +37,6 @@ export const PRICE_LOCK_SOURCES = [
   'backfill_subscription',
 ] as const;
 export type PriceLockSource = (typeof PRICE_LOCK_SOURCES)[number];
-
 /** What a lock stores. Amounts and Stripe ids are snapshots. */
 export interface PriceLockSnapshot {
   readonly plan: PriceLockPlan;
@@ -109,7 +100,6 @@ export interface StripePriceIdSnapshot {
   readonly monthly: string | null;
   readonly yearly: string | null;
 }
-
 /** Builds the lock a new signup gets: the current list version, snapshotted. */
 export function buildPriceLockSnapshot(input: {
   readonly source: PriceLockSource;
@@ -133,7 +123,6 @@ export function buildPriceLockSnapshot(input: {
     lockedAt: input.now.toISOString(),
   };
 }
-
 /** Backfill lock from a live subscription price (matching version, else `sub-price:<id>`). */
 export function buildPriceLockFromSubscriptionPrice(input: {
   readonly stripePriceId: string;
@@ -174,7 +163,6 @@ export interface ResolvedLockedPrice {
   /** True when this came from the person's lock, false when it is the list price. */
   readonly locked: boolean;
 }
-
 /** The price a person sees and pays: their lock for the interval, else the current list version. */
 export function resolveLockedPrice(input: {
   readonly lock: PriceLockSnapshot | null;

@@ -571,6 +571,40 @@ const commitOnFeature = (repo, name) => {
   gitIn(repo, ['commit', '-m', name]);
 };
 
+test('component and story edits select the certificate gate before publication', async t => {
+  for (const name of [
+    'Card.tsx',
+    'Card.stories.tsx',
+    'Card.stories.ts',
+    'Card.states.stories.tsx',
+  ]) {
+    const repo = baseFixtureRepo('certificate');
+    t.after(() => rmSync(repo, { recursive: true, force: true }));
+    mkdirSync(join(repo, 'scripts/lib'), { recursive: true });
+    writeFileSync(
+      join(repo, 'scripts/ci-fast-lanes.mjs'),
+      'export const selectSourceGuards = () => [];'
+    );
+    writeFileSync(
+      join(repo, 'scripts/lib/source-validation-manifest.mjs'),
+      'export const selectManifestGuards = () => [];'
+    );
+    mkdirSync(join(repo, 'apps/web/components'), { recursive: true });
+    commitOnFeature(repo, `apps/web/components/${name}`);
+    const lines = [];
+    const code = await main({
+      argv: ['--repo', repo, '--list', '--fast'],
+      env: { ...process.env, JOVIE_PREFLIGHT_LEDGER: 'off' },
+      log: line => lines.push(String(line)),
+    });
+    assert.equal(code, 0);
+    assert.ok(
+      lines.some(line => line.startsWith('run  component-certificate  ')),
+      `${name}: ${lines.join('\n')}`
+    );
+  }
+});
+
 test('base ref candidates never double-prefix a qualified ref', () => {
   assert.deepEqual(baseRefCandidates('main'), ['origin/main', 'main']);
   assert.deepEqual(baseRefCandidates('origin/main'), ['origin/main']);
