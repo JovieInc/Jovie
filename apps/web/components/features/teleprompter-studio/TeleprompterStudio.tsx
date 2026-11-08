@@ -4,6 +4,7 @@ import {
   type CSSProperties,
   useCallback,
   useEffect,
+  useEffectEvent,
   useMemo,
   useRef,
   useState,
@@ -158,7 +159,8 @@ export function TeleprompterStudio({
     }
   }, [funnel, detectVoice]);
 
-  useEffect(() => {
+  // Mount-only: the host keys the studio per proposal.
+  const onOpen = useEffectEvent(() => {
     previousFocusRef.current = document.activeElement;
     trackTeleprompterFunnel('teleprompter_studio_opened', {
       ...funnel,
@@ -167,14 +169,16 @@ export function TeleprompterStudio({
       followMode,
     });
     void startCamera();
-    return () => {
-      recordingRef.current?.cancel();
-      stopStream(streamRef.current);
-      const focusTarget = previousFocusRef.current;
-      if (focusTarget instanceof HTMLElement) focusTarget.focus();
-    };
-    // Mount-only: the studio is keyed per proposal by its host.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+  const onUnmount = useEffectEvent(() => {
+    recordingRef.current?.cancel();
+    stopStream(streamRef.current);
+    const focusTarget = previousFocusRef.current;
+    if (focusTarget instanceof HTMLElement) focusTarget.focus();
+  });
+  useEffect(() => {
+    onOpen();
+    return () => onUnmount();
   }, []);
 
   useEffect(() => {
@@ -206,16 +210,16 @@ export function TeleprompterStudio({
     return () => globalThis.clearInterval(timer);
   }, [phase, mode, followMode, wordsPerMinute, words.length, follower]);
 
+  // Track each shown question once.
+  const onQuestionShown = useEffectEvent((index: number) => {
+    trackTeleprompterFunnel('teleprompter_question_shown', {
+      ...funnel,
+      questionIndex: index,
+      voice: voiceEnabled,
+    });
+  });
   useEffect(() => {
-    if (phase === 'between') {
-      trackTeleprompterFunnel('teleprompter_question_shown', {
-        ...funnel,
-        questionIndex,
-        voice: voiceEnabled,
-      });
-    }
-    // Track each shown question once.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (phase === 'between') onQuestionShown(questionIndex);
   }, [phase, questionIndex]);
 
   const isRecordingNow = useCallback(() => recordingRef.current !== null, []);
@@ -304,11 +308,8 @@ export function TeleprompterStudio({
 
   const toggleRecording = useCallback(() => {
     if (camera.status !== 'live') return;
-    if (phase === 'recording') {
-      void stopRecording();
-    } else {
-      startRecording(phase === 'between' ? 'answer' : 'script');
-    }
+    if (phase === 'recording') void stopRecording();
+    else startRecording(phase === 'between' ? 'answer' : 'script');
   }, [camera.status, phase, startRecording, stopRecording]);
 
   const close = useCallback(() => {
