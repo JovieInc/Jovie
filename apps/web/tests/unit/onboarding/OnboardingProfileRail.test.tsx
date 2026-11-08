@@ -228,6 +228,17 @@ describe('OnboardingProfileRail', () => {
     );
     // The artist keeps their own spelling; the UI never forces caps.
     expect(within(phone).getAllByText('UNMARKED').length).toBeGreaterThan(0);
+    // Required fields are filled (mirrors expectRequiredFieldsPainted): the
+    // release named by the artwork renders its title as text, the handle is
+    // not blank, and nothing is left as a loading skeleton.
+    expect(within(phone).getAllByText(/Vibe/).length).toBeGreaterThan(0);
+    const handle = within(phone).getByTestId('profile-identity-handle');
+    expect(handle.textContent?.split('/').pop()?.trim()).not.toBe('');
+    expect(
+      phone.querySelectorAll(
+        '[aria-busy="true"], [data-skeleton], .animate-pulse, [class*="skeleton" i]'
+      )
+    ).toHaveLength(0);
   });
 
   it('renders nothing before a handle or profile is known', () => {
