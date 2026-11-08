@@ -166,12 +166,12 @@ export async function run(
     now,
     Number(env.FAILURES_TO_PAGE) || 2
   );
-  if (env.STATE) await env.STATE.put('state', JSON.stringify(state));
-  if (env.STATE)
-    await env.STATE.put(
-      'last',
-      JSON.stringify({ at: new Date(now).toISOString(), results, state })
-    );
+  // KV allows one write per key per second. Hold `pagedAt` until a channel
+  // accepts the page, then write `state` once. A second put in the same
+  // second 429s and leaves the quiet window armed with no delivery log.
+  let persisted = state;
+  if (page && page !== 'recovered')
+    persisted = { ...state, pagedAt: prev.pagedAt ?? null };
   const urls = (env.PAGE_URLS ?? '')
     .split(',')
     .map(s => s.trim())
@@ -224,6 +224,7 @@ export async function run(
         : []),
     ]);
     delivered = sent.filter(s => s.status === 'fulfilled' && s.value.ok).length;
+    if (delivered > 0) persisted = state;
     if (delivered === 0)
       console.error(
         JSON.stringify({
@@ -233,6 +234,17 @@ export async function run(
           text,
         })
       );
+  }
+  if (env.STATE) {
+    await env.STATE.put('state', JSON.stringify(persisted));
+    await env.STATE.put(
+      'last',
+      JSON.stringify({
+        at: new Date(now).toISOString(),
+        results,
+        state: persisted,
+      })
+    );
   }
   return {
     results,
