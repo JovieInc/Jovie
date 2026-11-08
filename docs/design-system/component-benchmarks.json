@@ -26,21 +26,23 @@
     },
     "packages/ui/atoms/avatar.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "599e090cab61f8dfe73648a2863f6ec03cecd00cdd8e4e91d007959f9e21d3a5",
+      "sourceHash": "f3f712510dbb3175f59415d0a6addfde94ccedcc930dafd841cd717e4a1f4dd2",
       "reference": "Radix Avatar; shadcn/ui Avatar; WAI-ARIA img role (no APG widget pattern)",
       "checked": "img alt, fallback initials, status dot name, intrinsic size, forwardRef, RTL dot",
       "gaps": [
         {
           "item": "Composed Avatar + AvatarImage shows a broken image instead of AvatarFallback on load error; Radix Avatar renders the fallback until the image loads",
           "decision": "adopt",
-          "status": "open",
-          "reference": "Radix Avatar"
+          "status": "done",
+          "reference": "Radix Avatar",
+          "resolution": "composed AvatarImage stays out of view behind AvatarFallback until it loads, is hidden on error and removes the fallback once loaded (avatar.composed.test.tsx)"
         },
         {
           "item": "RTL: status dot uses physical -right offsets and does not move to the inline end",
           "decision": "adapt",
-          "status": "open",
-          "reference": "Radix Avatar"
+          "status": "done",
+          "reference": "Radix Avatar",
+          "resolution": "status dot offsets are logical -end-* at every size (avatar-contract)"
         }
       ]
     },
@@ -94,15 +96,16 @@
     },
     "packages/ui/atoms/checkbox.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "4db202e06e4100685011ca1e538e90e3dfb40140a4d48bf195655f59f63ed57f",
+      "sourceHash": "091947083e8a6642598bcb8fc744a4ba5751ea5d516b1748cd31fb29338d3ace",
       "reference": "WAI-ARIA APG Checkbox (tri-state); Radix Checkbox; shadcn/ui Checkbox",
       "checked": "Space toggles, tri-state aria-checked, controlled and uncontrolled, 44px target, forwardRef",
       "gaps": [
         {
           "item": "Uncontrolled defaultChecked=\"indeterminate\" renders the check icon: the icon follows the checked prop, not Radix state",
           "decision": "adopt",
-          "status": "open",
-          "reference": "Radix Checkbox"
+          "status": "done",
+          "reference": "Radix Checkbox",
+          "resolution": "indicator icon follows a mirrored uncontrolled state seeded from defaultChecked and updated on change"
         }
       ]
     },
@@ -325,15 +328,16 @@
     },
     "packages/ui/atoms/input-group.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "1a3fb39f782ed3aaadb2af1a1bbc538e309fc4dad66ed82e4cce0944e3159c31",
+      "sourceHash": "7a34e492e0b02618b5fdf4ddc131c412ac6541f2e673c7a07b97e527386c10a0",
       "reference": "shadcn/ui InputGroup (no APG widget pattern)",
       "checked": "icon slots decorative, RTL icon and padding sides",
       "gaps": [
         {
           "item": "RTL: icon slots use physical left-/right- and the input pl-/pr- padding, so icons stay on the LTR sides",
           "decision": "adopt",
-          "status": "open",
-          "reference": "shadcn/ui InputGroup"
+          "status": "done",
+          "reference": "shadcn/ui InputGroup",
+          "resolution": "icon slots use start-/end- and the wrapped input ps-/pe- padding"
         }
       ]
     },
@@ -382,35 +386,38 @@
     },
     "packages/ui/atoms/native-select.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "d3132e002753027f548552dbf775717c46fd73518e74dd083915465525e3586e",
+      "sourceHash": "b1927735e9d8eaed59d079129039c7442d7f20d1a0b5b7ba77e9ddcefb61967d",
       "reference": "HTML select; shadcn/ui NativeSelect",
       "checked": "native select, label htmlFor, aria-describedby/invalid, RTL asterisk, live regions, forwardRef",
       "gaps": [
         {
           "item": "RTL: required asterisk uses physical ml-1",
           "decision": "adopt",
-          "status": "open",
-          "reference": "shadcn/ui NativeSelect"
+          "status": "done",
+          "reference": "shadcn/ui NativeSelect",
+          "resolution": "required asterisk uses logical ms-1"
         },
         {
           "item": "error role=alert sits inside an aria-live=polite wrapper, so the error can be announced twice",
           "decision": "adapt",
-          "status": "open",
-          "reference": "WAI-ARIA live regions"
+          "status": "done",
+          "reference": "WAI-ARIA live regions",
+          "resolution": "error slot drops aria-live; role=alert alone announces the error once"
         }
       ]
     },
     "packages/ui/atoms/overflow-menu-trigger.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "f4c3429e0b4a5a84022dac768cd24ded177cab14d6554e101a607861c16aabaa",
+      "sourceHash": "bf903c5ae213ee329b4f391f464c0d81a61fca43a30ccca9d5a8803d9eb0f72e",
       "reference": "WAI-ARIA APG Menu Button (trigger); shadcn/ui DropdownMenuTrigger + Button",
       "checked": "accessible name, aria-haspopup/expanded from the Radix trigger, RTL dot",
       "gaps": [
         {
           "item": "RTL: active-overflow dot uses physical -right-0.5",
           "decision": "adapt",
-          "status": "open",
-          "reference": "APG Menu Button"
+          "status": "done",
+          "reference": "APG Menu Button",
+          "resolution": "active-overflow dot uses logical -end-0.5"
         }
       ]
     },
@@ -423,15 +430,16 @@
     },
     "packages/ui/atoms/progress.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "ee9d68133ea05ddf468c2cc26c367619f81db33ebb8d066251eda190d7ae543f",
+      "sourceHash": "5eee064c6685df7ef177c44cc17290e21014456315267157e011e1fa97ae99b2",
       "reference": "WAI-ARIA progressbar role; Radix Progress; library progress-steps",
       "checked": "progressbar valuemin/max/now/valuetext, indeterminate omits valuenow, RTL fill and sweep",
       "gaps": [
         {
           "item": "RTL: the indeterminate sweep keyframes always travel left to right",
           "decision": "adapt",
-          "status": "open",
-          "reference": "Radix Progress"
+          "status": "done",
+          "reference": "Radix Progress",
+          "resolution": "indeterminate track mirrors with rtl:-scale-x-100 so the sweep runs toward the inline end"
         },
         {
           "item": "no forwardRef or HTML attribute pass-through",
@@ -508,15 +516,16 @@
     },
     "packages/ui/atoms/select.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "c7077254414fc7b1ae20c17ae87de4be4339e675604d35f38248ce3647b45984",
+      "sourceHash": "713fcb22e6d23b8b03284def33767c230c74528146acd699d7df9ec3552ff9c2",
       "reference": "WAI-ARIA APG Combobox (select-only) and Listbox; Radix Select; shadcn/ui Select",
       "checked": "Radix Select keys and typeahead, dir passthrough, RTL indicator and padding",
       "gaps": [
         {
           "item": "RTL: item indicator is absolute left-2 and SELECT_ITEM_BASE pads pl-8 pr-2",
           "decision": "adopt",
-          "status": "open",
-          "reference": "shadcn/ui Select"
+          "status": "done",
+          "reference": "shadcn/ui Select",
+          "resolution": "item indicator is absolute start-2 and SELECT_ITEM_BASE pads ps-8 pe-2"
         }
       ]
     },

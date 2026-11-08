@@ -247,7 +247,7 @@ export const CHECKBOX_RADIO_ITEM_BASE =
  * Select item base — unified with MENU_ITEM_BASE hover/focus behavior
  */
 export const SELECT_ITEM_BASE =
-  `relative flex min-h-8 w-full cursor-default select-none items-center ${OVERLAY_ITEM_RADIUS} py-1.5 pl-8 pr-2 text-app font-normal leading-5 outline-none ` +
+  `relative flex min-h-8 w-full cursor-default select-none items-center ${OVERLAY_ITEM_RADIUS} py-1.5 ps-8 pe-2 text-app font-normal leading-5 outline-none ` +
   'transition-colors duration-fast ease-interactive ' +
   'text-secondary-token ' +
   `${OVERLAY_ITEM_FOCUS} focus-visible:text-primary-token ` +
