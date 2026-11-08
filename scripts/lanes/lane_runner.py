@@ -6507,7 +6507,7 @@ def resolve_identifier_list_conflict(worktree: Path, branch: str, log, *, guard=
             target = worktree / path
             try:
                 ancestor = sh(["git", "show", f":1:{path}"], cwd=worktree)
-                base = ancestor.stdout if ancestor.returncode == 0 else ""
+                base = ancestor.stdout if ancestor.returncode == 0 and target.suffix in {".js", ".mjs"} else ""
                 text = fix_red_classes.resolve_additive_identifier_list_text(target.read_text(), base=base)
             except (OSError, UnicodeError):
                 text = None
@@ -6521,6 +6521,13 @@ def resolve_identifier_list_conflict(worktree: Path, branch: str, log, *, guard=
         except OSError:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
+        # A union can collide with bindings in another hunk or untouched code.
+        # Use Node's parser for the whole file; other source formats stay unresolved.
+        for path in resolved:
+            if Path(path).suffix in {".js", ".mjs"} and sh(
+                    ["node", "--check", path], cwd=worktree, log=log).returncode != 0:
+                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+                return False
         guard()
         if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
                 or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:

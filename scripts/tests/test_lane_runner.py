@@ -13636,6 +13636,23 @@ class NoHumanHoldTest(unittest.TestCase):
             "import { execFileSync } from 'node:child_process';\n" + base,
             "import { execFileSync, spawnSync } from 'node:child_process';\n" + base)
 
+    def test_identifier_import_conflict_rejects_duplicate_bindings_across_hunks(self):
+        base = ("import { readFileSync } from 'node:fs';\n" + "// unchanged separator\n" * 12
+                + "import { tmpdir } from 'node:os';\n")
+        self._identifier_list_conflict(
+            "fixture.mjs", base,
+            base.replace("readFileSync }", "readFileSync, constants }").replace("tmpdir }", "tmpdir, homedir }"),
+            base.replace("readFileSync }", "readFileSync, writeFileSync }").replace("tmpdir }", "tmpdir, constants }"),
+            None)
+
+    def test_identifier_import_conflict_leaves_unvalidated_typescript_unresolved(self):
+        base = "// both branches add imports\n"
+        self._identifier_list_conflict(
+            "fixture.ts", base,
+            "import { spawnSync } from 'node:child_process';\n" + base,
+            "import { execFileSync } from 'node:child_process';\n" + base,
+            None)
+
     def _identifier_list_conflict(self, filename, base, head, main, expected):
         root = Path(self.tmp.name)
         origin = root / "origin.git"
@@ -13669,7 +13686,15 @@ class NoHumanHoldTest(unittest.TestCase):
         git("push", "-q", "origin", "HEAD:refs/heads/main")
         git("checkout", "-q", "feature")
         before = git("rev-parse", "HEAD").stdout.strip()
-        self.assertTrue(lane.resolve_identifier_list_conflict(work, "feature", None))
+        result = lane.resolve_identifier_list_conflict(work, "feature", None)
+        if expected is None:
+            self.assertFalse(result)
+            self.assertEqual(path.read_text(), head)
+            self.assertEqual(git("rev-parse", "HEAD").stdout.strip(), before)
+            self.assertEqual(git("rev-parse", "origin/feature").stdout.strip(), before)
+            self.assertEqual(git("status", "--porcelain").stdout, "")
+            return
+        self.assertTrue(result)
         text = path.read_text()
         self.assertEqual(text, expected)
         self.assertNotIn("<<<<<<<", text)

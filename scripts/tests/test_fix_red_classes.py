@@ -274,6 +274,7 @@ class AdditiveIdentifierListMergeTest(unittest.TestCase):
         for conflict, base in (
             (self.IMPORT_CONFLICT.replace("mkdirSync, mkdtempSync, readFileSync", "mkdirSync, mkdtempSync"), self.BASE_IMPORTS),
             (self.IMPORT_CONFLICT.replace("writeFileSync", "writeFileSync as write"), self.BASE_IMPORTS),
+            (self.IMPORT_CONFLICT.replace("writeFileSync", "readFileSync"), self.BASE_IMPORTS),
             (self.IMPORT_CONFLICT.replace("'node:fs'", "'other'", 1), self.BASE_IMPORTS),
             (self.IMPORT_CONFLICT.replace("import { join } from 'node:path';", "doSomething();"), self.BASE_IMPORTS),
             (self.IMPORT_CONFLICT, self.BASE_IMPORTS + self.BASE_IMPORTS),
