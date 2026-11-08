@@ -411,6 +411,7 @@ describe('component certificate CLI evidence freshness', () => {
       'scripts/lib/component-benchmark-review.mjs',
       'scripts/lib/component-certificate-mutation.mjs',
       'scripts/lib/component-evidence.mjs',
+      'scripts/lib/design-rules/forced-caps.mjs',
       'scripts/lib/mutation-sweep.mjs',
       'scripts/lib/mutation-sweep-root.mjs',
       'scripts/lib/mutation-diff.mjs',

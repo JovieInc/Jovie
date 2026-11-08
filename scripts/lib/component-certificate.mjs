@@ -10,6 +10,7 @@
  */
 import { createHash } from 'node:crypto';
 import ts from 'typescript';
+import { findForcedCaps } from './design-rules/forced-caps.mjs';
 import { moduleKey } from './mutation-sweep.mjs';
 
 export const CERT_SCHEMA = 'jovie.component-certificate/v1';
@@ -22,6 +23,7 @@ export const CRITERIA = Object.freeze([
   'tests',
   'a11y',
   'frontend-rules',
+  'forced-caps',
   'mutation',
   'visual',
   'journeys',
@@ -579,6 +581,19 @@ export function certifyComponent({
         'Add a test that types into every input, forces a parent rerender and an Escape/blur, and asserts toHaveValue is unchanged and focus stays'
       );
   } else criteria.push(crit('frontend-rules', 'pass'));
+
+  // forced-caps (ASR-022): UI never forces text into capitals
+  const caps = findForcedCaps(source);
+  if (caps.length) {
+    criteria.push(
+      crit('forced-caps', 'fail', { lines: caps.map(h => h.line) })
+    );
+    miss(
+      'forced-caps',
+      `uppercase styling at line ${caps.map(h => h.line).join(', ')}`,
+      'Remove the uppercase utility or text-transform and write the label in Title Case or sentence case (ASR-022); artist and release names keep their own spelling'
+    );
+  } else criteria.push(crit('forced-caps', 'pass'));
 
   // mutation
   const m = evidence.mutation;

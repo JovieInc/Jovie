@@ -236,6 +236,23 @@ describe('screen gate', () => {
     );
   });
 
+  it('lets debt grow only for a criterion the base registry did not list', () => {
+    const report = {
+      certificates: withFailure('apps/web/components/ClaimCard.tsx'),
+    };
+    const owed = registry({ 'apps/web/components/ClaimCard.tsx': ['tests'] });
+    const before = { ...registry(), criteria: ['a11y'] };
+    assert.equal(evaluateScreenGates(report, owed, byScreen, before).ok, true);
+    const dropped = evaluateScreenGates(
+      { certificates: passing },
+      { ...registry(), criteria: ['a11y'] },
+      byScreen,
+      registry()
+    );
+    assert.equal(dropped.ok, false);
+    assert.match(dropped.errors[0], /criterion tests was removed/);
+  });
+
   it('ranks issues by screens then fewest criteria, and debt mirrors them', () => {
     const report = {
       certificates: passing.map(c =>
