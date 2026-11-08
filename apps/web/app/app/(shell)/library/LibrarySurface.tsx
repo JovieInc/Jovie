@@ -171,10 +171,7 @@ import { updateLibraryProfileVisibility } from '@/lib/library/profile-visibility
 import { releaseStatusDotClasses } from '@/lib/library/release-status';
 import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import type { WorkLaunchSummary } from '@/lib/library/work-actions';
-import {
-  deriveWorkInspectorPresentation,
-  scopeWorkInspectorBundle,
-} from '@/lib/library/work-inspector-read-model';
+import { scopeWorkInspectorBundle } from '@/lib/library/work-inspector-read-model';
 import { getCacheScope } from '@/lib/queries/cache-isolation';
 import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries/useReleaseMutations';
 import {
@@ -238,6 +235,7 @@ import {
   type LibrarySortKey,
   uniqueSorted,
 } from './library-sort-helpers';
+import { libraryWorkPresentation } from './library-take-assets';
 import { PostReleasePanel, RightsholdersList } from './PostReleasePanel';
 import {
   YouTubeMerchRelationshipEditor,
@@ -2337,7 +2335,7 @@ function AssetDrawer({
     [current, postReleaseBundle, findings]
   );
   const presentation = useMemo(
-    () => (current ? deriveWorkInspectorPresentation(current) : null),
+    () => libraryWorkPresentation(current),
     [current]
   );
   const contextualBlockers = inspectorBundle.findings.filter(
