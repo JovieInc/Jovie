@@ -177,7 +177,7 @@ for (const verdict of ['render-untrusted', 'needs-fix']) {
     const events = [];
     const receipt = await reviewFrame(
       'F',
-      { receiptsDir: dir, fixer: 'none' },
+      { receiptsDir: dir, fixer: 'none', holder: 'test' },
       {
         getTrees: () => [{ id: 'F', name: 'PROPOSAL / timing' }],
         getFacts: () => ({
@@ -192,10 +192,24 @@ for (const verdict of ['render-untrusted', 'needs-fix']) {
           md5: 'a',
           guard: verdict === 'render-untrusted' ? ['garbled'] : [],
           attempt: 0,
+          buf: encodePng(image()),
+          renderer: 'pen-headless',
+          stable: true,
         }),
         panelFor: async () => ({
           complete: true,
-          gates: { status: 'evaluated', pass: true, rules: {} },
+          gates: {
+            status: 'evaluated',
+            pass: true,
+            rules: {},
+            failed: [],
+            schema: 'test',
+            model: 'test',
+            profile: 'app',
+            surface: 'test',
+            advisory: false,
+            certified: false,
+          },
           judges: [],
         }),
         rename: () => {},
