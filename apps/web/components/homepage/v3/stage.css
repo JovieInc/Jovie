@@ -30,7 +30,12 @@
   --hv3-display: var(--font-display);
   --hv3-ui: var(--font-sans);
   --hv3-mono: var(--font-geist-mono, var(--font-mono));
-  --hv3-cam: rotateX(18deg) rotateY(-14deg) rotateZ(2deg);
+  /*
+   * Yaw then pitch, never roll. CSS applies the rightmost turn first, so the
+   * pitch turns every row about its own axis and rows and type stay level;
+   * pitch first would tip rows by about 4.4 degrees.
+   */
+  --hv3-cam: rotateY(-14deg) rotateX(18deg);
   --hv3-cast:
     0 3.75rem 7.5rem -1.25rem
     color-mix(in srgb, var(--hv3-shade) 85%, transparent),

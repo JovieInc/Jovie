@@ -54,7 +54,8 @@ export const HOMEPAGE_EDITORIAL_COPY = {
       { label: 'Stay close', value: 'Updates only for people who ask' },
     ],
     alt: `An example artist’s Jovie profile, Listen mode, with ${HOMEPAGE_FEATURED_ARTIST.releases[0].title}.`,
-    handleCallout: `${HOMEPAGE_FEATURED_ARTIST.profileDisplay} · one handle`,
+    // The handle is printed on the phone beside it; the callout names the idea.
+    handleCallout: 'one handle',
     updatesCallout: 'get updates · opt-in only',
     phone: {
       getUpdates: 'Get Updates',
