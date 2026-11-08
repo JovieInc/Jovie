@@ -79,9 +79,9 @@ jobs:
 
       - name: Run secret scan (gitleaks + trufflehog)
         env:
-          # Read-only job token: lets scan-secrets.sh retry a failed anonymous
-          # scanner download through the releases API (unused on healthy runs).
-          SCANNER_RELEASE_TOKEN: ${{ github.token }}
+          # Read-only job token: lets a failed anonymous pinned release download
+          # retry through the authenticated releases API (unused when healthy).
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -217,9 +217,9 @@ jobs:
 
       - name: Run TruffleHog (full history on main/schedule, PR diff on pull_request)
         env:
-          # Read-only job token: lets scan-secrets.sh retry a failed anonymous
-          # scanner download through the releases API (unused on healthy runs).
-          SCANNER_RELEASE_TOKEN: ${{ github.token }}
+          # Read-only job token: lets a failed anonymous pinned release download
+          # retry through the authenticated releases API (unused when healthy).
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail

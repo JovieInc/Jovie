@@ -342,28 +342,36 @@ test('the pinned oasdiff release is exact and sha-verified', () => {
 });
 
 test('an HTTP 5xx download fails as a download, never as a sha mismatch', t => {
-  // The stub behaves like curl: an error page on stdout, exit 22 only with -f.
+  // The stub behaves like curl --fail: partial error bytes, status, exit 22.
   const dir = mkdtempSync(join(tmpdir(), 'jovie-oasdiff-curl-'));
   const argsLog = join(dir, 'args');
   writeFileSync(
     join(dir, 'curl'),
-    `#!/usr/bin/env bash\nprintf '%s\\n' "$@" >${JSON.stringify(argsLog)}\necho '<html>504 Gateway Time-out</html>'\n[[ "$1" == -f* ]] && exit 22\nexit 0\n`
+    `#!/usr/bin/env bash\nprintf '%s\\n' "$@" >${JSON.stringify(argsLog)}\nwhile [[ $# -gt 0 ]]; do [[ "$1" == --output ]] && out="$2"; shift; done\necho '<html>504</html>' >"$out"\nprintf 504\nexit 22\n`
   );
   chmodSync(join(dir, 'curl'), 0o755);
-  const saved = { PATH: process.env.PATH, BIN: process.env.OASDIFF_BIN };
+  const keys = ['PATH', 'OASDIFF_BIN', 'RELEASE_DOWNLOAD_ATTEMPTS'];
+  const tokens = ['RELEASE_DOWNLOAD_TOKEN', 'GH_TOKEN', 'GITHUB_TOKEN'];
+  const saved = Object.fromEntries(
+    [...keys, ...tokens].map(k => [k, process.env[k]])
+  );
   process.env.PATH = `${dir}:${process.env.PATH}`;
-  delete process.env.OASDIFF_BIN;
+  process.env.RELEASE_DOWNLOAD_ATTEMPTS = '1';
+  for (const k of ['OASDIFF_BIN', ...tokens]) delete process.env[k];
   t.after(() => {
-    process.env.PATH = saved.PATH;
-    if (saved.BIN !== undefined) process.env.OASDIFF_BIN = saved.BIN;
+    for (const [k, v] of Object.entries(saved))
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
     rmSync(dir, { recursive: true, force: true });
   });
   const result = ensureOasdiffBinary({ cacheDir: join(dir, 'cache') });
   assert.equal(result.code, 1);
-  assert.match(result.error, /download failed: curl exit 22/);
+  assert.match(
+    result.error,
+    /download failed: release download exit 1 \(last HTTP 504\)/
+  );
   const args = readFileSync(argsLog, 'utf8').split('\n');
-  assert.ok(args.includes('--retry-all-errors'));
-  assert.ok(Number(args[args.indexOf('--retry') + 1]) >= 6);
+  assert.ok(args.includes('--fail') && args.includes('--output'));
 });
 
 function specRepository(t) {

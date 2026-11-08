@@ -73,12 +73,19 @@ trap 'rm -rf "$tool_dir"' EXIT
 
 # GitHub release downloads 504 in bursts longer than curl's default 3-retry
 # window (1+2+4s); one burst failed a merge group on 10-12. Six exponential
-# retries ride out about a minute of 5xx before failing closed.
+# retries ride out about a minute of 5xx before failing closed. Release
+# assets go through the shared helper, which also falls back to the
+# authenticated releases API (anonymous 504s for hours on 11-08).
 download() {
   local url="$1" out="$2" sha="$3"
-  curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
-    --retry 6 --retry-all-errors --max-time 120 --output "$out" "$url" ||
-    fail "download failed: $url"
+  if [[ "$url" == https://github.com/*/releases/download/* ]]; then
+    "${BASH:-bash}" "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/scripts/lib/github-release-asset.sh" \
+      "$url" "$out" || fail "download failed: $url"
+  else
+    curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+      --retry 6 --retry-all-errors --max-time 120 --output "$out" "$url" ||
+      fail "download failed: $url"
+  fi
   printf '%s  %s\n' "$sha" "$out" | sha256sum --check --status ||
     fail "sha256 mismatch: $url"
 }

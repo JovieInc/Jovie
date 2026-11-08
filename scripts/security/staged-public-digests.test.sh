@@ -8,8 +8,7 @@ tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 git -C "$tmp_dir" init -q
 mkdir -p "$tmp_dir/scripts/security"
-cp "$root/scripts/security/scan-secrets.sh" "$root/scripts/security/fetch-release-tarball.sh" \
-  "$tmp_dir/scripts/security/"
+cp "$root/scripts/security/scan-secrets.sh" "$tmp_dir/scripts/security/"
 cp "$root/scripts/security/gitleaks-staged-public-digests.b64" "$tmp_dir/scripts/security/"
 cp "$root/.gitleaks.toml" "$tmp_dir/.gitleaks.toml"
 mkdir -p "$tmp_dir/scripts/invariants/art-direction"

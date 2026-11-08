@@ -408,7 +408,7 @@ status=0
 # CI exports TRUFFLEHOG_BIN for the installed-binary regression run; the
 # download path must be exercised without either scanner env override.
 PATH="$DL_BIN:/usr/bin:/bin" TMPDIR="$DL_TMP" SCAN_SECRETS_RETRY_DELAY=0 \
-  GITLEAKS_BIN= TRUFFLEHOG_BIN= SCANNER_RELEASE_TOKEN= \
+  GITLEAKS_BIN= TRUFFLEHOG_BIN= RELEASE_DOWNLOAD_TOKEN= GH_TOKEN= GITHUB_TOKEN= \
   bash "$SCAN_SCRIPT" pre-commit >"$TEST_ROOT/download.output" 2>&1 \
   || status=$?
 if [[ $status -ne 0 ]]; then
@@ -435,7 +435,7 @@ chmod +x "$TEST_ROOT/dl-sleep-bin/sleep"
 status=0
 PATH="$TEST_ROOT/dl-sleep-bin:$DL_BIN:/usr/bin:/bin" TMPDIR="$TEST_ROOT/dl-tmp2" \
   SCAN_SECRETS_RETRY_DELAY=1 CURL_ALWAYS_FAIL=1 \
-  GITLEAKS_BIN= TRUFFLEHOG_BIN= SCANNER_RELEASE_TOKEN= \
+  GITLEAKS_BIN= TRUFFLEHOG_BIN= RELEASE_DOWNLOAD_TOKEN= GH_TOKEN= GITHUB_TOKEN= \
   bash "$SCAN_SCRIPT" pre-commit >"$TEST_ROOT/download-fail.output" 2>&1 \
   || status=$?
 [[ $status -ne 0 ]] || fail 'exhausted download retries must fail the scan'
@@ -458,7 +458,7 @@ grep -q 'Secret scanner download failed' "$TEST_ROOT/download-fail.output" \
 # Anonymous 5xx with a CI token falls back to the exact pinned asset via gh.
 export GH_CALLS="$TEST_ROOT/download.gh-calls" && : >"$GH_CALLS" && mkdir -p "$TEST_ROOT/dl-tmp3"
 PATH="$DL_BIN:/usr/bin:/bin" TMPDIR="$TEST_ROOT/dl-tmp3" SCAN_SECRETS_RETRY_DELAY=0 CURL_ALWAYS_FAIL=1 \
-  GITLEAKS_BIN= TRUFFLEHOG_BIN= SCANNER_RELEASE_TOKEN=ci-token bash "$SCAN_SCRIPT" pre-commit \
+  GITLEAKS_BIN= TRUFFLEHOG_BIN= RELEASE_DOWNLOAD_TOKEN=ci-token bash "$SCAN_SCRIPT" pre-commit \
   >"$TEST_ROOT/download-gh.output" 2>&1 || fail 'authenticated fallback must rescue anonymous 5xx'
 grep -qE '^ci-token release download v([0-9.]+) -R gitleaks/gitleaks -p gitleaks_\1_[a-z]+_[a-z0-9]+\.tar\.gz -O .+ --clobber$' "$GH_CALLS" \
   || fail 'authenticated fallback must fetch the exact pinned gitleaks asset'

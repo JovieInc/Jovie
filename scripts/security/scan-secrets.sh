@@ -16,9 +16,24 @@ GITLEAKS_VERSION="${GITLEAKS_VERSION:-8.21.2}"
 TRUFFLEHOG_VERSION="${TRUFFLEHOG_VERSION:-3.99.8}"
 EXCLUDE_PATHS="$REPO_ROOT/.trufflehog-exclude.txt"
 
-# Pinned release download with backoff and an authenticated fallback.
-# shellcheck source=scripts/security/fetch-release-tarball.sh
-source "$REPO_ROOT/scripts/security/fetch-release-tarball.sh"
+# Pinned scanner release download: scripts/lib/github-release-asset.sh backs
+# off, falls back to the authenticated releases API and fails closed.
+SCAN_SECRETS_RETRY_DELAY="${SCAN_SECRETS_RETRY_DELAY:-2}"
+SCAN_SECRETS_DOWNLOAD_ATTEMPTS="${SCAN_SECRETS_DOWNLOAD_ATTEMPTS:-6}"
+fetch_release_tarball() {
+  local url="$1" dest_dir="$2" member="$3" tmp
+  tmp="$(mktemp)"
+  if RELEASE_DOWNLOAD_ATTEMPTS="$SCAN_SECRETS_DOWNLOAD_ATTEMPTS" RELEASE_DOWNLOAD_RETRY_DELAY="$SCAN_SECRETS_RETRY_DELAY" \
+    bash "$REPO_ROOT/scripts/lib/github-release-asset.sh" "$url" "$tmp" \
+    && tar -xzf "$tmp" -C "$dest_dir" "$member"; then
+    chmod +x "$dest_dir/$member"
+    rm -f "$tmp"
+    return 0
+  fi
+  rm -f "$tmp"
+  echo "::error title=Secret scanner download failed::Could not fetch $member after $SCAN_SECRETS_DOWNLOAD_ATTEMPTS attempts ($url)." >&2
+  return 1
+}
 
 ensure_gitleaks() {
   if [[ -n "${GITLEAKS_BIN:-}" ]]; then

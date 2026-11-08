@@ -255,6 +255,9 @@ jobs:
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
           BASE_BRANCH: ${{ github.base_ref }}
+          # Read-only job token: lets a failed anonymous pinned release download
+          # retry through the authenticated releases API (unused when healthy).
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
           SHELLCHECK_OPTS: >-
             --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
         run: |
@@ -468,9 +471,9 @@ jobs:
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           SECURITY_GATE_ENABLED: ${{ vars.SECURITY_GATE_ENABLED }}
-          # Read-only job token: lets scan-secrets.sh retry a failed anonymous
-          # scanner download through the releases API (unused on healthy runs).
-          SCANNER_RELEASE_TOKEN: ${{ github.token }}
+          # Read-only job token: lets a failed anonymous pinned release download
+          # retry through the authenticated releases API (unused when healthy).
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         run: |
           git fetch --no-tags origin "${{ github.base_ref }}"
           base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
@@ -553,6 +556,10 @@ jobs:
           pnpm exec tsx scripts/online-index-migrate.ts --validate-only
       - name: Lint added or changed migration SQL
         if: steps.reuse.outputs.reuse != 'true'
+        env:
+          # Read-only job token: lets a failed anonymous pinned release download
+          # retry through the authenticated releases API (unused when healthy).
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin "${{ github.base_ref }}"

@@ -15,7 +15,7 @@ fi
 out=''
 prev=''
 for arg in "$@"; do
-  [[ "$prev" == '-o' ]] && out="$arg"
+  [[ "$prev" == '-o' || "$prev" == '--output' ]] && out="$arg"
   prev="$arg"
 done
 printf 'fake-tarball' >"$out"
