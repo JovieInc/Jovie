@@ -105,6 +105,15 @@ describe('Lighthouse identity admission', () => {
     const serverReady = probe.run.indexOf('SERVER_READY" = "false"');
     expect(nav).toBeGreaterThan(serverReady);
     expect(lighthouse).toBeGreaterThan(nav);
+    // Chat and onboarding have no identity-free job of their own, so the
+    // dashboard gate holds them to their budgets on the same server.
+    const chat = probe.run.indexOf('pnpm run test:lighthouse:chat:pr');
+    const onboarding = probe.run.indexOf(
+      'LIGHTHOUSE_TEST_PERSONA=creator pnpm run test:lighthouse:onboarding:pr'
+    );
+    expect(chat).toBeGreaterThan(lighthouse);
+    expect(onboarding).toBeGreaterThan(lighthouse);
+    expect(probe.run).not.toMatch(/test:lighthouse:[a-z]+:pr[^\n]*\|\|\s*true/);
     expect(probe.run).not.toMatch(
       /click-(?:navigation|through)[^\n]*\|\|\s*true/
     );
