@@ -114,14 +114,10 @@ const NAVIGATION_LATENCY_BUCKET_DEFINITIONS = [
   upperBoundMs: number | null;
 }>;
 
-// The zod schemas that validate these payloads live in
-// ./navigation-telemetry-schema, imported only by the server route. The client
-// tracker needs just the constants and bucketing helpers below; keeping zod out
-// of this module keeps it out of the signed-in shell's first-load chunk.
-export type {
-  NavigationTelemetryBatch,
-  NavigationTelemetryPayload,
-} from './navigation-telemetry-schema';
+// The zod schemas (and the payload types inferred from them) live in
+// ./navigation-telemetry-schema. The client tracker needs just the constants
+// and bucketing helpers below; keeping zod out of this module keeps it out of
+// the signed-in shell's first-load chunk.
 
 function stripQueryAndFragment(value: string): string {
   const [withoutFragment] = value.split('#', 1);
