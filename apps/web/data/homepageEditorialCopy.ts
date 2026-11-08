@@ -1,3 +1,4 @@
+import { HOMEPAGE_INVITE_ANCHOR } from '@/data/homepageInviteAnchor';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 /**
@@ -16,8 +17,7 @@ import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
  * derive from the DSP registry (`components/homepage/v3/home-spec.ts`).
  */
 
-/** In-page anchor for the closing waitlist form. */
-export const HOMEPAGE_INVITE_ANCHOR = 'request-invite';
+export { HOMEPAGE_INVITE_ANCHOR };
 
 /**
  * Approved homepage "v3" (Tim, 2026-11-08 01:43Z, design-approvals receipt
