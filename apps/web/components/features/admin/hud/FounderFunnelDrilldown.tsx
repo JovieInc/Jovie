@@ -48,6 +48,9 @@ const FOUNDER_FUNNEL_COLUMNS = [
   columnHelper.accessor('enteredAt', {
     id: 'enteredAt',
     header: 'Signed Up',
+    // The drawer shows at most the first page of a stage, so a client sort
+    // would reorder only the loaded subset.
+    enableSorting: false,
     size: 140,
     minSize: 120,
     meta: { align: 'right' },

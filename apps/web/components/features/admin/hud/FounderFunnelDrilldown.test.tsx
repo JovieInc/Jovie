@@ -61,6 +61,8 @@ describe('FounderFunnelDrilldown', () => {
       .getAllByRole('columnheader')
       .map(header => header.textContent);
     expect(headers).toEqual(['Person', 'Signed Up']);
+    // Only the first page of a stage loads, so no header offers a client sort.
+    expect(within(table).queryAllByRole('button')).toHaveLength(0);
     const [, firstRow] = within(table).getAllByRole('row');
     expect(firstRow.className).toContain('system-b-table-row-shell');
     expect(
