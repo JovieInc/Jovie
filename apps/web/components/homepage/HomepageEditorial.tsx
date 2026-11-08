@@ -320,7 +320,6 @@ export function HomepageInviteClose({
     >
       <ChapterRule index='04' label={COPY.chapters[3]} />
       <div className='hv3-invite__inner'>
-        <Orbit id='hv3-orbit-invite' rings={[760]} arc={[0, 360]} closed />
         <h2 className='hv3-statement text-balance'>{lines(copy.headline)}</h2>
         <p className='hv3-lede hv3-lede--center'>{copy.subhead}</p>
         <div className='hv3-form'>

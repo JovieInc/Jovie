@@ -273,17 +273,8 @@
     transform-origin: 0 0;
   }
 
-  /* Invite: any ring size crosses text at 390, so the Orbit is hidden. */
   .hv3-invite__inner {
     padding-top: 7.5rem;
-  }
-
-  .hv3-invite__inner > .hv3-orbit {
-    top: -0.625rem;
-  }
-
-  .hv3-invite__inner > .hv3-orbit .hv3-orbit__svg {
-    display: none;
   }
 
   .hv3-invite .hv3-lede--center {
