@@ -18,34 +18,17 @@
  *   assigned to a real retail product.
  */
 
-export interface DemoArtistRelease {
-  readonly title: string;
-  readonly byline: string;
-  readonly year: string;
-  readonly src: string;
-}
+import {
+  FEATURED_ARTIST_OPT_INS,
+  type FeaturedArtistProfile,
+  type FeaturedArtistRelease,
+  selectFeaturedArtist,
+} from '@/data/featuredArtists';
 
-export interface DemoArtist {
+export type DemoArtistRelease = FeaturedArtistRelease;
+
+export interface DemoArtist extends FeaturedArtistProfile {
   readonly demo: true;
-  readonly slug: string;
-  readonly name: string;
-  readonly handle: string;
-  readonly profileDisplay: string;
-  readonly avatarSrc: string;
-  /** Newest first. */
-  readonly releases: readonly DemoArtistRelease[];
-  /** The release the product mockups open in the inspector and release page. */
-  readonly inspected: {
-    readonly title: string;
-    readonly src: string;
-    readonly date: string;
-    readonly type: string;
-    readonly tracks: string;
-    readonly duration: string;
-    readonly genres: readonly string[];
-    readonly label: string;
-    readonly upc: string;
-  };
 }
 
 const IVO = '/img/demo-artists/ivo-lindqvist';
@@ -109,10 +92,12 @@ export const DEMO_ARTIST_IVO_LINDQVIST: DemoArtist = {
 };
 
 /**
- * The artist the homepage features. A demo artist today; the opt-in featured
- * slot (real artists, certified content) replaces it later.
+ * The artist the homepage features: the best-ranked real artist who opted in
+ * and passed certification (`data/featuredArtists.ts`), otherwise the demo
+ * artist. No real artist has opted in yet, so this is Ivo Lindqvist.
  */
-export const HOMEPAGE_FEATURED_ARTIST: DemoArtist = DEMO_ARTIST_IVO_LINDQVIST;
+export const HOMEPAGE_FEATURED_ARTIST: FeaturedArtistProfile =
+  selectFeaturedArtist(FEATURED_ARTIST_OPT_INS, DEMO_ARTIST_IVO_LINDQVIST);
 
 /** True when a featured slot still shows an invented artist. */
 export function isDemoArtist(artist: { readonly demo?: boolean }): boolean {
