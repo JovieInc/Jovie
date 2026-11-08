@@ -12,6 +12,11 @@
  * receipt.json, so a missing secret reads as blocked, never as done.
  *
  *   node scripts/design/pen-draft.mjs --out DIR [--only claim,homepage]
+ *   node scripts/design/pen-draft.mjs --plan [--changed FILE] [--only ...]
+ *
+ * --plan prints the frames a run should draft as a JSON array. CI drafts
+ * each one in its own job, because ten briefs at up to 15 minutes each
+ * outran the 75-minute job on Nov 8 and lost every draft to the timeout.
  */
 import { execFileSync } from 'node:child_process';
 import {
@@ -50,7 +55,10 @@ export function loadBriefs(dir = BRIEFS_DIR, only = null) {
   return readdirSync(dir)
     .filter(f => f.endsWith('.md'))
     .sort()
-    .map(f => parseBrief(readFileSync(join(dir, f), 'utf8'), f))
+    .map(f => ({
+      ...parseBrief(readFileSync(join(dir, f), 'utf8'), f),
+      file: f,
+    }))
     .filter(b => !only || only.includes(b.frame));
 }
 
@@ -61,8 +69,8 @@ export const LOAD_NOTE =
   'The document is large and the editor can take a few minutes to load it. Work in the open editor (leave the file path empty), and when a canvas call times out, wait and retry it rather than giving up.';
 /** Attempts per brief: a second try starts with the editor cache warm. */
 export const ATTEMPTS = 2;
-// The job has 75 minutes; stop starting attempts in time to upload drafts.
-export const BUDGET_MS = 70 * 60_000;
+// Each matrix job has 25 minutes; reserve five for setup and uploading.
+export const BUDGET_MS = 20 * 60_000;
 const ATTEMPT_MS = 15 * 60_000;
 const MIN_ATTEMPT_MS = 5 * 60_000;
 
@@ -70,6 +78,34 @@ const MIN_ATTEMPT_MS = 5 * 60_000;
 export function attemptTimeout(elapsedMs, budgetMs = BUDGET_MS) {
   const left = budgetMs - elapsedMs;
   return left < MIN_ATTEMPT_MS ? 0 : Math.min(ATTEMPT_MS, left);
+}
+
+/** Files whose change means every frame has to be drafted again. */
+export const DRAFTER_FILES = [
+  'scripts/design/pen-draft.mjs',
+  '.github/workflows/pen-draft.yml',
+];
+
+/**
+ * The frames a run drafts. A push drafts only the briefs it changed, so
+ * editing one brief doesn't redraw (and pay for) all of them; a change to
+ * the drafter itself, or no list of changed files, drafts every brief.
+ */
+export function planFrames({ briefs, changed = null, only = null }) {
+  if (only?.length) {
+    const unknown = only.filter(f => !briefs.some(b => b.frame === f));
+    if (unknown.length)
+      throw new Error(`no brief for --only ${unknown.join(', ')}`);
+    return briefs.filter(b => only.includes(b.frame)).map(b => b.frame);
+  }
+  if (!changed || changed.some(p => DRAFTER_FILES.includes(p)))
+    return briefs.map(b => b.frame);
+  const edited = new Set(
+    changed
+      .filter(p => dirname(p) === BRIEFS_DIR && p.endsWith('.md'))
+      .map(p => basename(p))
+  );
+  return briefs.filter(b => edited.has(b.file)).map(b => b.frame);
 }
 
 /** The pen arguments for one brief, drafting into its own output file. */
@@ -176,8 +212,29 @@ export function writeCanonical(bytes, workDir, wanted) {
 async function main() {
   const startedAt = Date.now();
   const { values } = parseArgs({
-    options: { out: { type: 'string' }, only: { type: 'string' } },
+    options: {
+      out: { type: 'string' },
+      only: { type: 'string' },
+      plan: { type: 'boolean' },
+      changed: { type: 'string' },
+    },
   });
+  if (values.plan) {
+    const only = values.only
+      ?.split(',')
+      .map(f => f.trim())
+      .filter(Boolean);
+    const changed = values.changed
+      ? readFileSync(values.changed, 'utf8')
+          .split('\n')
+          .map(l => l.trim())
+          .filter(Boolean)
+      : null;
+    console.log(
+      JSON.stringify(planFrames({ briefs: loadBriefs(), changed, only }))
+    );
+    return;
+  }
   if (!values.out) throw new Error('--out DIR is required');
   // Absolute: pen runs from the workspace folder so its assets resolve.
   const outDir = resolve(values.out);

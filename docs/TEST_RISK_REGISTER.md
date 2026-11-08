@@ -223,6 +223,28 @@ surfaces:
       currently describe.skip'd. Must run against a non-BYPASSRLS role on a real
       Neon ephemeral branch. Covers owner-read, owner-write, cross-user denial.
     last_reviewed: 2026-05-10
+
+  - id: app-shell-navigation
+    surface: App shell navigation
+    glob: apps/web/components/features/dashboard/dashboard-nav/**
+    key_ranges:
+      - apps/web/components/features/dashboard/dashboard-nav/NavMenuItem.tsx:194-300
+    blast_radius: 5
+    reversibility: 2
+    visibility: 5
+    target_coverage: 80
+    target_e2e: 2
+    owner: '@itstimwhite'
+    last_incident: 2026-11-08
+    lessons_ref: null
+    notes: >-
+      Production dashboard links stopped navigating on 2026-11-08 with every
+      pre-merge check green: unit tests mock next/link, and the only
+      signed-in browser specs ran on manual dispatch. The blocking proof is
+      the merge-group Lighthouse (dashboard gate) job, which runs
+      tests/e2e/dashboard-click-navigation.spec.ts (desktop sidebar) and
+      tests/e2e/shell-nav-click-through.spec.ts (mobile tabs).
+    last_reviewed: 2026-11-08
 ---
 
 # Test Risk Register
@@ -255,6 +277,7 @@ The heatmap generator computes a numeric priority score and joins it with measur
 | Onboarding & claim | `apps/web/app/(onboarding)/**` | 4 | 3 | 5 | 75% | 2 |
 | Marketing (static) | `apps/web/app/(marketing)/**` | 2 | 1 | 5 | 30% | 4 |
 | RLS access control | `apps/web/lib/db/schema/**` | 5 | 5 | 3 | 80% | 0 |
+| App shell navigation | `apps/web/components/features/dashboard/dashboard-nav/**` | 5 | 2 | 5 | 80% | 2 |
 
 ## Maintenance
 

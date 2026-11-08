@@ -14,6 +14,7 @@ import {
   missingSecrets,
   parseBrief,
   penArgs,
+  planFrames,
   writeCanonical,
 } from './pen-draft.mjs';
 
@@ -89,10 +90,11 @@ test('the agent is told the editor loads slowly and may retry timed-out calls', 
   assert.ok(ATTEMPTS >= 2);
 });
 
-test('attempts stop in time for the 75-minute job to upload its drafts', () => {
+test('attempts leave upload time in each 25-minute frame job', () => {
   assert.equal(attemptTimeout(0), 15 * 60_000);
-  assert.equal(attemptTimeout(60 * 60_000), 10 * 60_000);
-  assert.equal(attemptTimeout(66 * 60_000), 0);
+  assert.equal(attemptTimeout(10 * 60_000), 10 * 60_000);
+  assert.equal(attemptTimeout(15 * 60_000), 5 * 60_000);
+  assert.equal(attemptTimeout(15 * 60_000 + 1), 0);
 });
 
 test('missing secrets are named, so a blocked run never reads as done', () => {
@@ -156,4 +158,38 @@ test('a plain .pen is used as is, and anything else is named, not drafted', () =
     () => writeCanonical(Buffer.from('<html>expired</html>'), work, 'x.pen'),
     /neither a \.pen file nor a \.tar\.gz/
   );
+});
+
+test('a push drafts only the briefs it changed', () => {
+  const briefs = [
+    { frame: 'claim', file: 'claim.md' },
+    { frame: 'homepage', file: 'homepage.md' },
+    { frame: 'workspace-table', file: 'links-table.md' },
+  ];
+  assert.deepEqual(
+    planFrames({
+      briefs,
+      changed: [
+        'docs/design-system/pen-briefs/links-table.md',
+        'docs/design-system/pen-briefs/retired.md',
+        'apps/web/app/page.tsx',
+      ],
+    }),
+    ['workspace-table']
+  );
+  assert.deepEqual(planFrames({ briefs, changed: ['README.md'] }), []);
+});
+
+test('a drafter change, a manual run or --only picks the right frames', () => {
+  const briefs = [
+    { frame: 'claim', file: 'claim.md' },
+    { frame: 'homepage', file: 'homepage.md' },
+  ];
+  assert.deepEqual(
+    planFrames({ briefs, changed: ['scripts/design/pen-draft.mjs'] }),
+    ['claim', 'homepage']
+  );
+  assert.deepEqual(planFrames({ briefs }), ['claim', 'homepage']);
+  assert.deepEqual(planFrames({ briefs, only: ['homepage'] }), ['homepage']);
+  assert.throws(() => planFrames({ briefs, only: ['hompage'] }), /hompage/);
 });
