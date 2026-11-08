@@ -72,7 +72,39 @@ describe('Lighthouse identity admission', () => {
     });
   };
 
-  for (const surface of ['dashboard', 'onboarding']) {
+  const PROBE_NAMES = {
+    dashboard: 'Run signed-in shell navigation and dashboard Lighthouse',
+    onboarding: 'Run authenticated onboarding Lighthouse',
+  };
+
+  it('dashboard: runs without an identity secret and blocks on the shell nav click-through', () => {
+    const job = workflow.jobs['ci-lighthouse-dashboard-pr'];
+    // The persona bypass seeds its own Better Auth user. Gating on the retired
+    // Clerk secret made this merge-group check skip and report green.
+    expect(job.steps.some(step => step.id === 'lighthouse-identity')).toBe(
+      false
+    );
+    expect(JSON.stringify(job.steps)).not.toContain('E2E_CLERK_');
+    const probe = job.steps.find(step => step.name === PROBE_NAMES.dashboard);
+    expect(selected(probe, 'false')).toBe(true);
+    const nav = probe.run.indexOf(
+      'tests/e2e/dashboard-click-navigation.spec.ts'
+    );
+    expect(probe.run).toContain('tests/e2e/shell-nav-click-through.spec.ts');
+    const lighthouse = probe.run.indexOf(
+      'pnpm run test:lighthouse:dashboard:pr'
+    );
+    const serverReady = probe.run.indexOf('SERVER_READY" = "false"');
+    expect(nav).toBeGreaterThan(serverReady);
+    expect(lighthouse).toBeGreaterThan(nav);
+    expect(probe.run).not.toMatch(
+      /click-(?:navigation|through)[^\n]*\|\|\s*true/
+    );
+    expect(probe['continue-on-error']).toBeUndefined();
+    expect(job['continue-on-error']).toBeUndefined();
+  });
+
+  for (const surface of ['onboarding']) {
     const job = workflow.jobs[`ci-lighthouse-${surface}-pr`];
     it(`${surface}: missing identity succeeds before any checkout, provisioning or build`, () => {
       const first = job.steps[0];
@@ -105,7 +137,7 @@ describe('Lighthouse identity admission', () => {
             // The previous probe's existing missing-identity branch also exits
             // successfully: moving it must not turn the job into SKIPPED/red.
             const probe = job.steps.find(
-              step => step.name === `Run authenticated ${surface} Lighthouse`
+              step => step.name === PROBE_NAMES[surface]
             );
             const oldEarlyExit = probe.run.slice(
               probe.run.indexOf('if [ -z'),
@@ -123,7 +155,10 @@ describe('Lighthouse identity admission', () => {
         rmSync(dir, { recursive: true, force: true });
       }
     });
+  }
 
+  for (const surface of ['dashboard', 'onboarding']) {
+    const job = workflow.jobs[`ci-lighthouse-${surface}-pr`];
     it(`${surface}: present identity preserves artifact fallback, real probes and failure cleanup`, () => {
       const byName = name => job.steps.find(step => step.name === name);
       const fallback = byName(`Build app fallback for ${surface} Lighthouse`);
@@ -135,7 +170,7 @@ describe('Lighthouse identity admission', () => {
           download: 'success',
         })
       ).toBe(true);
-      const probe = byName(`Run authenticated ${surface} Lighthouse`);
+      const probe = byName(PROBE_NAMES[surface]);
       expect(selected(probe, 'true')).toBe(true);
       expect(selected(probe, 'true', { failed: true })).toBe(false);
       expect(probe.run).toContain(`pnpm run test:lighthouse:${surface}:pr`);
@@ -145,7 +180,7 @@ describe('Lighthouse identity admission', () => {
       );
       expect(probe.env.BASE_URL).toBe('http://localhost:3000');
       expect(probe.env.E2E_CLERK_USER_ID).toBe(
-        '${{ secrets.E2E_CLERK_USER_ID }}'
+        surface === 'dashboard' ? undefined : '${{ secrets.E2E_CLERK_USER_ID }}'
       );
       expect(
         selected(byName(`Upload ${surface} Lighthouse artifacts`), 'true', {
