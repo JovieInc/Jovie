@@ -61,6 +61,8 @@ export interface BuyerPrescreenResult {
   readonly decision: 'pass' | 'fail';
   readonly score: number;
   readonly hardStop: PrescreenHardStop | null;
+  /** A replaced tool or enough budget evidence; false on any hard stop. */
+  readonly hasSpend: boolean;
   readonly signals: readonly BuyerSignal[];
   /** Human-readable, one line per signal or stop, strongest first. */
   readonly reasons: readonly string[];
@@ -128,6 +130,7 @@ export function prescreenBuyer(
     decision: 'fail',
     score: 0,
     hardStop,
+    hasSpend: false,
     signals: [],
     reasons: [reason],
     replacedTools: [],
@@ -261,8 +264,17 @@ export function prescreenBuyer(
     decision: passes ? 'pass' : 'fail',
     score,
     hardStop: null,
+    hasSpend,
     signals,
     reasons,
     replacedTools,
   };
+}
+
+/** Run-log label for a failed pre-screen: hard stop, low score, or no spend. */
+export function prescreenFailReason(
+  prescreen: BuyerPrescreenResult
+): PrescreenHardStop | 'score_below_threshold' | 'no_spend_signal' {
+  if (prescreen.hardStop) return prescreen.hardStop;
+  return prescreen.hasSpend ? 'score_below_threshold' : 'no_spend_signal';
 }

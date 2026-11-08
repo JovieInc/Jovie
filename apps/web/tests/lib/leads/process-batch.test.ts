@@ -12,9 +12,13 @@ const {
   const mockUpdateSet = vi.fn().mockReturnValue({ where: mockUpdateWhere });
   const mockUpdate = vi.fn().mockReturnValue({ set: mockUpdateSet });
 
+  // A Laylo lead: Linktree and Beacons leads never reach qualifyLead (see
+  // process-batch-search-evidence.test.ts).
   const mockSelectLimit = vi
     .fn()
-    .mockResolvedValue([{ linktreeUrl: 'https://linktr.ee/test' }]);
+    .mockResolvedValue([
+      { linktreeUrl: 'https://laylo.com/test', sourcePlatform: 'laylo' },
+    ]);
   const mockSelectWhere = vi.fn().mockReturnValue({ limit: mockSelectLimit });
   const mockSelectFrom = vi.fn().mockReturnValue({ where: mockSelectWhere });
   const mockSelect = vi.fn().mockReturnValue({ from: mockSelectFrom });
@@ -61,7 +65,7 @@ describe('processLeadBatch — scrape retry', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDb._selectLimit.mockResolvedValue([
-      { linktreeUrl: 'https://linktr.ee/test' },
+      { linktreeUrl: 'https://laylo.com/test', sourcePlatform: 'laylo' },
     ]);
     mockDb._updateSet.mockReturnValue({ where: mockDb._updateWhere });
     mockDb._updateWhere.mockReturnValue({ returning: mockDb._returning });

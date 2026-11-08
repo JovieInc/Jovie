@@ -1,23 +1,43 @@
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { leadSearchResults, leads } from '@/lib/db/schema/leads';
+import {
+  type LeadSignalSnapshot,
+  leadSearchResults,
+  leads,
+} from '@/lib/db/schema/leads';
 import { sqlArray } from '@/lib/db/sql-helpers';
+import { captureError } from '@/lib/error-tracking';
+import {
+  extractBeaconsHandle,
+  isBeaconsUrl,
+} from '@/lib/ingestion/strategies/beacons';
 import {
   extractLinktreeHandle,
   isLinktreeUrl,
 } from '@/lib/ingestion/strategies/linktree';
-import { type BuyerPrescreenResult, prescreenBuyer } from './buyer-signals';
+import type { BuyerPrescreenResult } from './buyer-signals';
 import { recordLeadFunnelEvent } from './funnel-events';
 import type { SearchOutcome, SearchProviderName } from './google-cse';
+import {
+  buildSearchEvidence,
+  discoverySignalSnapshot,
+  mergeSearchEvidence,
+  prescreenFromSearchEvidence,
+} from './search-evidence';
+
+export { queryImpliedDomains } from './search-evidence';
 
 export interface DiscoveryCandidate {
+  /** Lead identity key; Beacons handles carry a `beacons:` prefix. */
   linktreeHandle: string;
   linktreeUrl: string;
   discoverySource: 'google_cse';
   discoveryQuery: string;
-  sourcePlatform: 'linktree';
+  sourcePlatform: 'linktree' | 'beacons';
   sourceHandle: string;
   sourceUrl: string;
+  /** Carries the search evidence; nobody read the page. */
+  signalSnapshot: LeadSignalSnapshot;
 }
 
 export interface ScreenedCandidate {
@@ -48,6 +68,8 @@ function discoveredEventMetadata(
     prescreenScore: screened.prescreen.score,
     prescreenReasons: screened.prescreen.reasons,
     replacedTools: screened.prescreen.replacedTools,
+    searchTools:
+      screened.candidate.signalSnapshot.searchEvidence?.[0]?.tools ?? [],
     queryCostShareUsd,
   };
 }
@@ -124,6 +146,10 @@ export async function insertScreenedCandidates(
       .onConflictDoNothing({ target: leads.linktreeHandle })
       .returning({ id: leads.id, handle: leads.linktreeHandle });
     await recordDiscovered(insertedRows, screened, queryCostShareUsd);
+    const insertedHandles = new Set(insertedRows.map(row => row.handle));
+    await mergeEvidenceIntoExistingLeads(
+      screened.filter(s => !insertedHandles.has(s.candidate.linktreeHandle))
+    );
     return {
       inserted: insertedRows.length,
       duplicates: screened.length - insertedRows.length,
@@ -131,6 +157,55 @@ export async function insertScreenedCandidates(
   } catch (error) {
     if (!isMissingLeadInsertColumnError(error)) throw error;
     return insertWithLegacyFallback(screened, queryCostShareUsd);
+  }
+}
+
+/**
+ * A lead already on file that a new query found again gains that query's
+ * search evidence, so a page seen under several tool queries scores on all
+ * of them, even when this one query alone would not pass the pre-screen.
+ * Best-effort: a failed merge never fails the discovery run.
+ */
+export async function mergeEvidenceIntoExistingLeads(
+  duplicates: readonly ScreenedCandidate[]
+): Promise<void> {
+  if (duplicates.length === 0 || typeof db.select !== 'function') return;
+  const byHandle = new Map(
+    duplicates.map(s => [s.candidate.linktreeHandle, s.candidate])
+  );
+  try {
+    const existing = await db
+      .select({
+        id: leads.id,
+        handle: leads.linktreeHandle,
+        signalSnapshot: leads.signalSnapshot,
+      })
+      .from(leads)
+      .where(inArray(leads.linktreeHandle, [...byHandle.keys()]));
+    await Promise.all(
+      existing.map(row => {
+        const candidate = byHandle.get(row.handle);
+        if (!candidate) return undefined;
+        const base = row.signalSnapshot ?? candidate.signalSnapshot;
+        return db
+          .update(leads)
+          .set({
+            signalSnapshot: {
+              ...base,
+              searchEvidence: mergeSearchEvidence(
+                row.signalSnapshot?.searchEvidence,
+                candidate.signalSnapshot.searchEvidence ?? []
+              ),
+            },
+          })
+          .where(eq(leads.id, row.id));
+      })
+    );
+  } catch (error) {
+    await captureError('Lead search evidence merge failed', error, {
+      route: 'leads/discovery',
+      contextData: { duplicates: duplicates.length },
+    });
   }
 }
 
@@ -153,7 +228,8 @@ function normalizeSearchResultUrl(rawUrl: string): string | null {
 async function shouldSkipSeenSearchResult(
   query: string,
   rawUrl: string,
-  rank: number
+  rank: number,
+  sourcePlatform: LinkPage['platform']
 ): Promise<boolean> {
   if (typeof db.select !== 'function') {
     return false;
@@ -196,7 +272,7 @@ async function shouldSkipSeenSearchResult(
     await db.insert(leadSearchResults).values({
       query,
       normalizedResultUrl,
-      sourcePlatform: 'linktree',
+      sourcePlatform,
       firstSeenAt: now,
       lastSeenAt: now,
       timesSeen: 1,
@@ -210,26 +286,36 @@ async function shouldSkipSeenSearchResult(
   return false;
 }
 
-/**
- * Domains a keyword quotes, e.g. `site:linktr.ee "ffm.to"`. Google (SerpAPI)
- * returns only pages that contain a quoted term, so each result carries that
- * footprint even when its snippet does not show it. Exa is semantic and does
- * not honour quotes, so its results get no query-implied evidence.
- */
-export function queryImpliedDomains(
-  query: string,
-  provider: SearchProviderName
-): string[] {
-  if (provider !== 'serpapi') return [];
-  return [...query.matchAll(/"([a-z0-9-]+(?:\.[a-z0-9-]+)+)"/gi)]
-    .map(match => match[1]!.toLowerCase())
-    .filter(domain => !/(^|\.)linktr\.ee$/.test(domain));
+interface LinkPage {
+  readonly platform: 'linktree' | 'beacons';
+  readonly handle: string;
+  readonly url: string;
+  /** Lead identity key; namespaced so a Beacons handle never hits Linktree's. */
+  readonly key: string;
+}
+
+/** Identifies a Linktree or Beacons profile from a result URL alone. */
+function linkPageOf(link: string): LinkPage | null {
+  if (isLinktreeUrl(link)) {
+    const handle = extractLinktreeHandle(link);
+    if (!handle) return null;
+    const url = `https://linktr.ee/${handle}`;
+    return { platform: 'linktree', handle, url, key: handle };
+  }
+  if (isBeaconsUrl(link)) {
+    const handle = extractBeaconsHandle(link);
+    if (!handle) return null;
+    const url = `https://beacons.ai/${handle}`;
+    return { platform: 'beacons', handle, url, key: `beacons:${handle}` };
+  }
+  return null;
 }
 
 /**
- * Turns one page of search results into pre-screened, unseen Linktree
- * candidates. The pre-screen reads the title and snippet the paid query
- * already returned, so it costs nothing extra. Seen-checks run in parallel.
+ * Turns one page of search results into pre-screened, unseen Linktree and
+ * Beacons candidates. The pre-screen reads the title and snippet the paid
+ * query already returned, plus the tool domains the query quoted, so it costs
+ * nothing extra and never requests the page. Seen-checks run in parallel.
  */
 export async function screenSearchResults(
   results: SearchOutcome['results'],
@@ -237,57 +323,59 @@ export async function screenSearchResults(
   currentOffset: number,
   provider: SearchProviderName
 ): Promise<{ screened: ScreenedCandidate[]; duplicatesSkipped: number }> {
-  const implied = queryImpliedDomains(query, provider).join(' ');
-  const firstByHandle = new Map<
+  const firstByKey = new Map<
     string,
-    { item: SearchOutcome['results'][number]; rank: number }
+    { item: SearchOutcome['results'][number]; rank: number; page: LinkPage }
   >();
   let duplicatesSkipped = 0;
   for (const [index, item] of results.entries()) {
-    if (!isLinktreeUrl(item.link)) continue;
-    const handle = extractLinktreeHandle(item.link);
-    if (!handle) continue;
+    const page = linkPageOf(item.link);
+    if (!page) continue;
     // A repeat inside one page is one candidate (the insert counts it once).
-    if (firstByHandle.has(handle)) continue;
-    firstByHandle.set(handle, { item, rank: currentOffset + index });
+    if (firstByKey.has(page.key)) continue;
+    firstByKey.set(page.key, { item, rank: currentOffset + index, page });
   }
 
-  const entries = [...firstByHandle.entries()];
+  const entries = [...firstByKey.values()];
   const seen = await Promise.all(
-    entries.map(([, { item, rank }]) =>
-      shouldSkipSeenSearchResult(query, item.link, rank)
+    entries.map(({ item, rank, page }) =>
+      shouldSkipSeenSearchResult(query, item.link, rank, page.platform)
     )
   );
 
   const screened: ScreenedCandidate[] = [];
-  entries.forEach(([handle, { item }], index) => {
+  entries.forEach(({ item, page }, index) => {
     if (seen[index]) {
       duplicatesSkipped++;
       return;
     }
-    const url = `https://linktr.ee/${handle}`;
+    const evidence = buildSearchEvidence({
+      query,
+      provider,
+      title: item.title,
+      snippet: item.snippet,
+    });
     screened.push({
       candidate: {
-        linktreeHandle: handle,
-        linktreeUrl: url,
+        linktreeHandle: page.key,
+        linktreeUrl: page.url,
         discoverySource: 'google_cse',
         discoveryQuery: query,
-        sourcePlatform: 'linktree',
-        sourceHandle: handle,
-        sourceUrl: url,
+        sourcePlatform: page.platform,
+        sourceHandle: page.handle,
+        sourceUrl: page.url,
+        signalSnapshot: discoverySignalSnapshot({
+          query,
+          sourcePlatform: page.platform,
+          evidence,
+        }),
       },
-      prescreen: prescreenBuyer(
-        {
-          handle,
-          displayName:
-            (item.title ?? '').replace(/\s*\|\s*linktree\s*$/i, '') || null,
-          bio: item.snippet ?? null,
-          text: implied,
-          links: [],
-        },
-        // A snippet is a partial view of the page.
-        { pageSeenInFull: false }
-      ),
+      // The same scorer qualification later runs on the stored evidence.
+      prescreen: prescreenFromSearchEvidence({
+        handle: page.handle,
+        displayName: null,
+        evidence: [evidence],
+      }),
     });
   });
 
