@@ -2,10 +2,10 @@ import { Button, SegmentControl } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-// JOV-8873: the covering tests for these changed source lines were moved out
-// of button.test.tsx / segment-control.test.tsx to get back under the
-// merge-base size pins (JOV-8873 shrink). This file restores that coverage
-// additively in a fresh, unbaselined file.
+// JOV-8873: the covering tests for these changed source lines moved out of
+// button.test.tsx / segment-control.test.tsx when the merge-base size pins
+// were restored. This file restores that coverage additively in a fresh,
+// unbaselined file.
 const options = [
   { value: 'links', label: 'Links' },
   { value: 'music', label: 'Music' },

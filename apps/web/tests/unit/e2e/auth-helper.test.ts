@@ -232,9 +232,11 @@ describe('waitForAuthenticatedHealth', () => {
 });
 
 describe('describeShellReadyStall', () => {
-  function buildStalledPage(restoreState: string | null) {
+  function buildStalledPage(attributes: Record<string, string | null>) {
     const visibleLocator = { isVisible: () => Promise.resolve(false) };
-    const boundary = { getAttribute: vi.fn(async () => restoreState) };
+    const boundary = {
+      getAttribute: vi.fn(async (name: string) => attributes[name] ?? null),
+    };
     const page = {
       url: () => 'http://localhost:3100/start',
       locator: vi.fn((selector: string) => ({
@@ -249,7 +251,11 @@ describe('describeShellReadyStall', () => {
   }
 
   it('names the stuck restore boundary state for the nightly annotation', async () => {
-    const { page, boundary } = buildStalledPage('failed');
+    const { page, boundary } = buildStalledPage({
+      'data-restore-state': 'failed',
+      'data-restore-error': 'status:503',
+      'data-auth-state': 'signed-in',
+    });
     const main = {
       isVisible: () => Promise.resolve(false),
     } as unknown as Locator;
@@ -263,11 +269,15 @@ describe('describeShellReadyStall', () => {
     expect(detail).toContain('main=false');
     expect(detail).toContain('composer=false');
     expect(detail).toContain('boundary-restore-state=failed');
+    expect(detail).toContain('boundary-restore-error=status:503');
+    expect(detail).toContain('boundary-auth-state=signed-in');
     expect(boundary.getAttribute).toHaveBeenCalledWith('data-restore-state');
+    expect(boundary.getAttribute).toHaveBeenCalledWith('data-restore-error');
+    expect(boundary.getAttribute).toHaveBeenCalledWith('data-auth-state');
   });
 
   it('reports an absent boundary instead of throwing when the landing never mounted it', async () => {
-    const { page } = buildStalledPage(null);
+    const { page } = buildStalledPage({});
 
     const detail = await describeShellReadyStall(
       page,
@@ -277,5 +287,7 @@ describe('describeShellReadyStall', () => {
 
     expect(detail).toContain('main=true');
     expect(detail).toContain('boundary-restore-state=absent');
+    expect(detail).toContain('boundary-restore-error=absent');
+    expect(detail).toContain('boundary-auth-state=absent');
   });
 });

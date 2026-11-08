@@ -50,3 +50,52 @@ export const LeadingAndTrailing: Story = {
     </InputGroup>
   ),
 };
+
+export const LongContent: Story = {
+  render: () => (
+    <InputGroup className='w-56'>
+      <span data-slot='icon' aria-hidden='true'>
+        @
+      </span>
+      <Input
+        aria-label='Profile link'
+        defaultValue='https://jov.ie/an-extremely-long-artist-handle-that-keeps-going'
+      />
+      <span data-slot='icon' aria-hidden='true'>
+        ↗
+      </span>
+    </InputGroup>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A long value in a narrow group clips inside the padded input without running under the leading or trailing icon.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl' className='w-56'>
+      <InputGroup>
+        <span data-slot='icon' aria-hidden='true'>
+          ?
+        </span>
+        <Input
+          aria-label='ابحث عن الفنانين'
+          placeholder='ابحث عن الفنانين والإصدارات وقوائم التشغيل المفضلة لديك'
+        />
+      </InputGroup>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Arabic placeholder in a narrow right-to-left container: the text starts at the right edge and clips before the icon slot.',
+      },
+    },
+  },
+};

@@ -155,16 +155,11 @@ export function AiCrawlerIntelligenceCard({
         className
       )}
       data-testid='ai-crawler-intelligence-card'
-      // Label-in-name (WCAG 2.5.3): the accessible name starts with the
-      // visible label. The earlier sr-only prefix concatenated without a
-      // boundary space ("…detailsAI Crawler Reads420 reads…"), so the full
-      // name is composed here from the same fields the row renders.
-      aria-label={
-        model.status
-          ? `View ${CRAWLER_READ_DISCLOSURE.label} — ${model.title} · ${model.meta} · ${model.status.label}`
-          : `View ${CRAWLER_READ_DISCLOSURE.label} — ${model.title} · ${model.meta}`
-      }
     >
+      {/* No aria-label: the visible row text must be part of the accessible
+          name (axe label-content-name-mismatch). The sr-only prefix keeps the
+          action first; the row's own text follows it. */}
+      <span className='sr-only'>View AI Crawler Read Details:</span>
       {rowContent}
       <ChevronRight
         className='h-4 w-4 shrink-0 text-tertiary-token'

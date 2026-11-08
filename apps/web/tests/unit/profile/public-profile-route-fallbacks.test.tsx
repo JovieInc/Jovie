@@ -9,12 +9,14 @@
  * - /[username]/error — profile-level boundary sharing the same fallback
  * - /[username]/[slug]/sounds/error — branded sounds error with reset and a
  *   smart-link escape link derived from route params
- * - /[username]/notifications/loading — loading skeleton
+ * - /[username]/notifications — redirects before streaming (no skeleton)
  * - generateStaticParams — build-time DB failure degrades to no params
  *
  * Related surface: public-profile-isr (docs/TEST_RISK_REGISTER.md, 75% target).
  */
 
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
@@ -26,7 +28,6 @@ import '@/app/[username]/[slug]/not-found';
 import '@/app/[username]/[slug]/error';
 import '@/app/[username]/error';
 import '@/app/[username]/[slug]/sounds/error';
-import '@/app/[username]/notifications/loading';
 import '@/app/[username]/_lib/profile-static-params';
 
 const { captureErrorInSentryMock, getTopProfilesForStaticGenerationMock } =
@@ -88,10 +89,6 @@ async function importProfileError() {
 
 async function importSoundsError() {
   return import('@/app/[username]/[slug]/sounds/error');
-}
-
-async function importNotificationsLoading() {
-  return import('@/app/[username]/notifications/loading');
 }
 
 async function importStaticParams() {
@@ -190,14 +187,15 @@ describe('sounds error boundary (JOV-5778)', () => {
   });
 });
 
-describe('notifications loading skeleton (JOV-5778)', () => {
-  it('renders the loading skeleton without content flashes', async () => {
-    const { default: NotificationsLoading } =
-      await importNotificationsLoading();
-
-    const { container } = render(createElement(NotificationsLoading));
-
-    expect(container.querySelectorAll('.skeleton').length).toBeGreaterThan(0);
+describe('notifications redirect (JOV-11559)', () => {
+  it('redirects before streaming, with no loading skeleton to shift', () => {
+    // A loading boundary streams a skeleton first, so redirect() becomes a
+    // client-side swap to the profile: a 0.114 layout shift on phones.
+    const loading = join(
+      process.cwd(),
+      'app/[username]/notifications/loading.tsx'
+    );
+    expect(existsSync(loading)).toBe(false);
   });
 });
 

@@ -14,6 +14,8 @@ import {
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { proseOnly } from './lib/pr-prose.mjs';
+import { wipGate } from './lib/pr-wip-gate.mjs';
 import { isRepairPr, lintPrBody } from './lib/preflight-changed.mjs';
 import { requiresWin } from './lib/wins-ledger.mjs';
 import {
@@ -26,30 +28,6 @@ const PR_URL_PLACEHOLDER = '<PR URL, set after open>';
 export const CUSTOMER_MARKER =
   '<!-- customer-changelog/v1 {"releaseWorthy":false} -->';
 const REPOSITORY = 'JovieInc/Jovie';
-
-export function proseOnly(body) {
-  let fence = '';
-  return body
-    .split('\n')
-    .map(line => {
-      const marker = line.match(/^ {0,3}(`{3,}|~{3,})/);
-      if (fence) {
-        if (
-          marker &&
-          marker[1][0] === fence[0] &&
-          marker[1].length >= fence.length
-        )
-          fence = '';
-        return '';
-      }
-      if (marker) {
-        fence = marker[1];
-        return '';
-      }
-      return line.replace(/(`+)([\s\S]*?)\1(?!`)/g, '');
-    })
-    .join('\n');
-}
 
 export function commonDirectories(paths) {
   let dirs = [...new Set(paths.map(p => path.posix.dirname(p)))].sort();
@@ -411,6 +389,7 @@ function parse(argv) {
     else if (f === '--customer-visible') a.customerVisible = v();
     else if (f === '--body-file') a.bodyFile = v();
     else if (f === '--draft') a.draft = true;
+    else if (f === '--wip-override') a.wipOverride = v();
     else if (f === '--dry-run') a.dryRun = true;
     else if (f === '--no-push') a.noPush = true;
     else if (!f.startsWith('--')) a.number = f;
@@ -806,6 +785,13 @@ export async function main(
       await refreshBodyChecks(a.repo, pr, body, title, { github, pause, log });
       return 0;
     }
+    const wip = wipGate(a, git(['branch', '--show-current']).stdout.trim(), {
+      execute,
+      log,
+      record,
+    });
+    if (wip.refused) return 3;
+    if (wip.override) labels.push('wip-override');
     const dir = mkdtempSync(path.join(tmpdir(), 'pr-open-create-'));
     try {
       const bodyFile = path.join(dir, 'body.md');

@@ -13,6 +13,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { cpus, homedir, loadavg } from 'node:os';
 import path from 'node:path';
+import { defaultLockDir, slotsBusy } from '../lib/preflight-lock.mjs';
 import {
   chooseBackend,
   chooseMode,
@@ -71,8 +72,24 @@ export async function main() {
   const t0 = Date.now();
   const load = loadavg()[0];
   const cores = cpus().length;
-  const gem = chooseMode({ load, cores, env }) === 'local' ? null : gemLoad();
-  const first = chooseBackend({ load, cores, gem, env });
+  // Another heavy preflight already holds this host's slot: a second local run
+  // would only queue (or pile load on), so prefer a healthy Gem right away.
+  const busy =
+    env.JOVIE_PREPUSH_REMOTE !== '0' &&
+    env.JOVIE_PREPUSH_BACKEND !== 'local' &&
+    slotsBusy({
+      dir: defaultLockDir(env),
+      slots: Number(env.JOVIE_PREFLIGHT_LOCAL_SLOTS || 1),
+    });
+  const gem =
+    chooseMode({ load, cores, env }) === 'local' && !busy ? null : gemLoad();
+  let first = chooseBackend({ load, cores, gem, env });
+  if (busy && first === 'local' && gem?.cores && gem.load <= gem.cores * 1.5) {
+    console.error(
+      '[pre-push] a preflight is already running on this host; running on Gem instead of waiting for the preflight slot'
+    );
+    first = 'gem';
+  }
   // Fallbacks only when a backend is unavailable (infra); the gate is never skipped.
   const order = [
     first,

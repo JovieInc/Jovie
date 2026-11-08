@@ -518,10 +518,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/jovie/components/EntityMentionSpan.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/jovie/components/FileAttachmentChip.tsx",
       "linearIssue": "JOV-8847"
     },

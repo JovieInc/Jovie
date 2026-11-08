@@ -37,15 +37,6 @@ function git(cwd, args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 }
 
-/** @param {string} cwd */
-function keepFixtureMaintenanceSynchronous(cwd) {
-  // --refetch can repack promisor objects after fetch returns. Keep real
-  // maintenance, but finish it before no-lazy-fetch assertions read the
-  // snapshot packs or afterEach removes this isolated repository.
-  git(cwd, ['config', 'maintenance.autoDetach', 'false']);
-  git(cwd, ['config', 'gc.autoDetach', 'false']);
-}
-
 /** @param {string} cwd @param {string} message */
 function commit(cwd, message) {
   writeFileSync(join(cwd, `${message}.txt`), `${message}\n`);
@@ -53,19 +44,16 @@ function commit(cwd, message) {
   git(cwd, ['commit', '-q', '-m', message]);
   return git(cwd, ['rev-parse', 'HEAD']);
 }
-
 const dirs = /** @type {string[]} */ ([]);
 afterEach(() => {
   for (const dir of dirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true });
   }
 });
-
 describe('PR Size Guard base resolution', () => {
   it('never judges a PR against the event base SHA', () => {
     // pull_request.base.sha is not refreshed on synchronize: #18131's run
-    // archived a three-day-old base without projected-tree-budget.mjs and
-    // failed with MODULE_NOT_FOUND.
+    // archived a three-day-old base without projected-tree-budget.mjs (MODULE_NOT_FOUND).
     expect(step('Resolve exact PR merge base')).not.toContain(
       'github.event.pull_request.base.sha'
     );
@@ -73,7 +61,6 @@ describe('PR Size Guard base resolution', () => {
       'PR_BASE_SHA: ${{ steps.pr-merge-base.outputs.base_tip }}'
     );
   });
-
   it('resolves the fetched base branch tip, not the stale event base', () => {
     const root = mkdtempSync(join(tmpdir(), 'pr-size-guard-base-'));
     dirs.push(root);
@@ -114,8 +101,7 @@ describe('PR Size Guard base resolution', () => {
         .map(line => line.split('='))
     );
     expect(outputs.base_tip).toBe(mainTip);
-    // The PR merged main, so its only merge base is the current tip and the
-    // hygiene/budget delta covers only the PR's own changes.
+    // The PR merged main: its only merge base is the current tip, so the delta covers only the PR's own changes.
     expect(outputs.sha).toBe(mainTip);
   });
 });
@@ -182,7 +168,10 @@ function shallowFixture(mainCommits = 80) {
     'refs/tags/unrelated-tag',
   ]);
   execFileSync('git', ['init', '-q', clone]);
-  keepFixtureMaintenanceSynchronous(clone);
+  // Finish git maintenance synchronously: a --refetch repack can race
+  // no-lazy-fetch assertions and afterEach teardown of this repository.
+  git(clone, ['config', 'maintenance.autoDetach', 'false']);
+  git(clone, ['config', 'gc.autoDetach', 'false']);
   git(clone, ['remote', 'add', 'origin', `file://${remote}`]);
   git(clone, [
     'fetch',
@@ -361,9 +350,8 @@ describe('targeted complete ancestry for PR Size Guard', () => {
   });
 
   it('fails closed on wrong head, invalid or missing base, and missing token', () => {
-    // Validation rejects these before fetch. One short clone covers the
-    // three pre-fetch failures. missing-base reaches fetch, so it gets its
-    // own clone. Four full 80-commit fixtures sat on the 30s timeout.
+    // Validation rejects these before fetch; one short clone covers the three
+    // pre-fetch failures. missing-base reaches fetch, so it gets its own clone.
     const shared = shallowFixture(1);
     for (const change of ['wrong-head', 'invalid-base', 'missing-token']) {
       const result = workflowStep(
@@ -412,7 +400,8 @@ function makeCommit(cwd, tree, parents, message) {
 function cloneDepth(root, remote, head, depth = 1) {
   const clone = join(root, `clone-${head.slice(0, 8)}`);
   execFileSync('git', ['init', '-q', clone]);
-  keepFixtureMaintenanceSynchronous(clone);
+  git(clone, ['config', 'maintenance.autoDetach', 'false']);
+  git(clone, ['config', 'gc.autoDetach', 'false']);
   git(clone, ['remote', 'add', 'origin', `file://${remote}`]);
   git(clone, ['fetch', '-q', '--no-tags', `--depth=${depth}`, 'origin', head]);
   git(clone, ['checkout', '-q', '--detach', head]);

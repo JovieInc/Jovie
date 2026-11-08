@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 import {
   STATUS_GLYPH_STATE_SPECS,
   STATUS_GLYPH_STATES,
@@ -128,4 +129,75 @@ it('animates only a visible working ring and preserves the status owner on compl
   } finally {
     vi.unstubAllGlobals();
   }
+});
+
+describe('StatusGlyph state stories', () => {
+  it('uses the tooltip label as the accessible name for a failed state', () => {
+    render(
+      <StatusGlyph
+        state='failed'
+        label='Failed'
+        tooltipLabel='Distributor rejected the release'
+      />
+    );
+
+    const glyph = screen.getByRole('img', {
+      name: 'Distributor rejected the release',
+    });
+    expect(glyph.querySelector('svg')).toHaveAttribute('data-fill', 'x');
+    expect(screen.getByText('Failed')).toBeInTheDocument();
+  });
+
+  it('renders fractional fills for partial progress states', () => {
+    render(
+      <div>
+        <StatusGlyph state='in_progress' />
+        <StatusGlyph state='in_review' />
+      </div>
+    );
+
+    expect(
+      screen.getByRole('img', { name: 'In progress' }).querySelector('svg')
+    ).toHaveAttribute('data-fill', 'half');
+    expect(
+      screen.getByRole('img', { name: 'In review' }).querySelector('svg')
+    ).toHaveAttribute('data-fill', 'three-quarter');
+  });
+
+  it('keeps the glyph fixed beside a long visible label', () => {
+    render(
+      <StatusGlyph
+        state='blocked'
+        label='Blocked until the label approves the final master and artwork'
+      />
+    );
+
+    const glyph = screen.getByRole('img', {
+      name: 'Blocked until the label approves the final master and artwork',
+    });
+    expect(glyph.querySelector('svg')).toHaveClass('shrink-0', 'h-4', 'w-4');
+  });
+});
+
+describe('StatusGlyph accessibility', () => {
+  it('has no axe violations for every state, labelled glyphs and RTL labels', async () => {
+    const { container } = render(
+      <div>
+        {STATUS_GLYPH_STATES.map(state => (
+          <StatusGlyph key={state} state={state} />
+        ))}
+        <StatusGlyph state='working' label='Working' />
+        <StatusGlyph
+          state='failed'
+          label='Failed'
+          tooltipLabel='Distributor rejected the release'
+        />
+        <div dir='rtl' lang='ar'>
+          <StatusGlyph state='success' label='تم النشر' />
+        </div>
+      </div>
+    );
+
+    await expectNoA11yViolations(container);
+  });
 });

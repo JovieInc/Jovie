@@ -678,6 +678,39 @@
         "feasibility": 4,
         "why": "Company story for investors and hiring. Internal until Tim chooses."
       }
+    },
+    {
+      "id": "eng_wins_verified",
+      "label": "Verified engineering wins, trailing 7 days",
+      "unit": "count",
+      "better": "higher",
+      "visibility": "internal",
+      "legalClass": "plain",
+      "status": "proposed",
+      "source": {
+        "kind": "wins-ledger",
+        "ref": "docs/metrics/wins-latest.json#winsVerified",
+        "note": "Count of wins in canon/wins/wins.jsonl whose computed status is verified (post-merge receipt kept at least half the claimed gain). The wins ledger owns each win; this stat is its aggregate, posted by the wins-ledger workflow."
+      },
+      "owner": "summer",
+      "refreshCadence": "daily",
+      "freshnessSlaHours": 30,
+      "threshold": null,
+      "display": {
+        "sentence": "{value} verified engineering wins this week",
+        "rounding": {
+          "mode": "floor",
+          "step": 1
+        }
+      },
+      "fallback": null,
+      "methodology": null,
+      "milestones": true,
+      "marketing": {
+        "value": 3,
+        "feasibility": 5,
+        "why": "Company and hiring story; feeds Summer's engineering posts. Internal until a post cites it."
+      }
     }
   ]
 }

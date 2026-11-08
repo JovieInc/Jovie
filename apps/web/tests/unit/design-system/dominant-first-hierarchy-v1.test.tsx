@@ -5,8 +5,8 @@
 // recedes substantially rather than competing at nearly equal weight."
 //
 // Representative surface: the canonical homepage hero
-// (apps/web/components/homepage/HomepageArtistProfile.tsx), the flagship
-// marketing surface. This renders
+// (HomepageStoryHero in components/homepage/HomepageEditorial.tsx),
+// the flagship marketing surface. This renders
 // the real component tree (not a source-text scan) and reads the actual
 // declared type-scale and ink tokens from its stylesheet, so a refactor that
 // makes the headline and support copy compete at nearly equal weight fails
@@ -15,25 +15,11 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { HomepageArtistHero } from '@/components/homepage/HomepageArtistProfile';
+import { HomepageStoryHero } from '@/components/homepage/HomepageEditorial';
 import { contrastRatio } from '@/lib/utils/color';
 
-vi.mock('@/components/homepage/homepage-analytics', () => ({
-  trackHomepageEvent: vi.fn(),
-}));
-vi.mock('@/lib/flags/marketing-static', () => ({
-  FEATURE_FLAGS: { WAITLIST_ENABLED: true },
-}));
 vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
-  useArtistSearchQuery: () => ({
-    results: [],
-    state: 'idle',
-    search: vi.fn(),
-    clear: vi.fn(),
-  }),
-}));
 vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => {
     const { fill, priority, quality, ...rest } = props;
@@ -45,8 +31,9 @@ vi.mock('next/image', () => ({
   },
 }));
 
-const HEADLINE_SELECTOR = '.marketing-type-display';
-const SUPPORT_SELECTOR = '.marketing-type-lede';
+const EDITORIAL_CSS = 'components/homepage/HomepageEditorial.css';
+const HEADLINE_SELECTOR = '.homepage-editorial-hero .marketing-hero-headline';
+const SUPPORT_SELECTOR = '.homepage-editorial-hero .marketing-hero-subtitle';
 // A minimum ratio, not the exact locked value (currently ~2.25x-3.2x): tight
 // enough that "nearly equal weight" fails closed, loose enough that routine
 // type-scale tuning does not make this brittle.
@@ -55,7 +42,7 @@ const read = (path: string) =>
   readFileSync(resolve(process.cwd(), path), 'utf8');
 
 function css(): string {
-  return read('app/globals.css');
+  return read(EDITORIAL_CSS);
 }
 
 /** First declaration of each custom property in the System B token sheet. */
@@ -144,17 +131,15 @@ function clampRangePx(
 
 describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () => {
   it('renders exactly one dominant heading and a structurally secondary support line', () => {
-    render(<HomepageArtistHero />);
+    render(<HomepageStoryHero />);
 
     const hero = screen.getByTestId('marketing-section-hero');
     const headings = within(hero).getAllByRole('heading');
     expect(headings).toHaveLength(1);
-    expect(headings[0]).toHaveClass('marketing-type-display');
-    expect(headings[0]).toHaveClass('text-primary-token');
+    expect(headings[0]).toHaveClass('marketing-hero-headline');
 
-    const support = hero.querySelector('.marketing-type-lede');
+    const support = hero.querySelector('.marketing-hero-subtitle');
     expect(support).not.toBeNull();
-    expect(support).toHaveClass('text-secondary-token');
     // Support copy must not itself be a heading — it recedes structurally,
     // it does not compete as a second thing to perceive first.
     expect(support?.tagName.toLowerCase()).not.toMatch(/^h[1-6]$/);
@@ -190,11 +175,15 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
   });
 
   it('keeps the headline at full ink weight while the support line recedes via a lighter ink token', () => {
-    // The hero paints ink through the semantic token utilities only; the
-    // homepage stylesheet must not re-mix or fade either ink.
-    const source = read('components/homepage/HomepageArtistProfile.css');
+    // The hero paints ink through the semantic text tokens only; the
+    // homepage stylesheet must not redefine, re-mix or fade either ink.
+    const source = read(EDITORIAL_CSS);
     expect(source).not.toMatch(/--color-text-(?:primary|secondary)-token\s*:/);
-    const support = cssBlock(source, '.homepage-artist-hero__subhead');
+    const headline = cssBlock(source, HEADLINE_SELECTOR);
+    expect(headline).toContain('color: var(--color-text-primary-token)');
+    expect(headline).not.toContain('color-mix');
+    const support = cssBlock(source, SUPPORT_SELECTOR);
+    expect(support).toContain('color: var(--color-text-secondary-token)');
     expect(support).not.toContain('color-mix');
 
     const theme = read('styles/design-system.css');

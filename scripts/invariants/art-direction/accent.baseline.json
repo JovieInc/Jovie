@@ -41,7 +41,6 @@
     "missing-accent:apps/web/app/(marketing)/support/SupportContent.tsx",
     "missing-accent:apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailPasteForm.tsx",
     "missing-accent:apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx",
-    "missing-accent:apps/web/components/homepage/HomepageArtistProfile.tsx",
     "missing-accent:apps/web/components/homepage/HomepageCertifiedSections.tsx",
     "missing-accent:apps/web/components/homepage/HomepageEditorialHero.tsx",
     "missing-accent:apps/web/components/marketing/CliLandingPage.tsx",

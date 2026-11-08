@@ -63,11 +63,9 @@ export const Default: Story = {};
 export const DspDetails: Story = {
   parameters: { layout: 'fullscreen' },
   args: { onSelect: fn() },
-  render: args => (
-    <ul aria-label='Releases'>
-      <ShellReleaseRow {...args} />
-    </ul>
-  ),
+  // The meta decorator already supplies the semantic <ul> parent; a second
+  // nested <ul> here tripped axe's list rule (ul > ul is not allowed).
+  render: args => <ShellReleaseRow {...args} />,
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const document = canvasElement.ownerDocument;
@@ -156,11 +154,9 @@ export const DspScrollableDetails: Story = {
       })),
     },
   },
-  render: args => (
-    <ul aria-label='Releases'>
-      <ShellReleaseRow {...args} />
-    </ul>
-  ),
+  // The meta decorator already supplies the semantic <ul> parent; a second
+  // nested <ul> here tripped axe's list rule (ul > ul is not allowed).
+  render: args => <ShellReleaseRow {...args} />,
 };
 
 export const Selected: Story = {

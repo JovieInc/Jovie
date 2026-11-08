@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { Field } from './field';
 import { Input } from './input';
@@ -386,5 +387,37 @@ describe('Field', () => {
       );
       expect(screen.getByRole('link')).toBeInTheDocument();
     });
+  });
+});
+
+describe('Field certificate evidence', () => {
+  it('has no axe violations across described, invalid, and disabled fields', async () => {
+    const { container } = render(
+      <div>
+        <Field
+          label='Display name'
+          description='Shown on your profile'
+          id='f-a11y-name'
+        >
+          <Input placeholder='Artist name' />
+        </Field>
+        <Field
+          label='Email'
+          error='Enter a valid email address'
+          required
+          id='f-a11y-email'
+        >
+          <Input type='email' defaultValue='not-an-email' />
+        </Field>
+        <Field
+          label='Payout email'
+          description='Only the account owner can change where payouts are sent.'
+          id='f-a11y-locked'
+        >
+          <Input type='email' defaultValue='owner@jov.ie' disabled />
+        </Field>
+      </div>
+    );
+    await expectNoA11yViolations(container);
   });
 });

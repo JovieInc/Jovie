@@ -4041,7 +4041,7 @@ class WorkerTest(unittest.TestCase):
         # Optional file/provider reads can exceed the census TTL. A new same-call
         # receipt must select the current head, never donate a timestamp to old rows.
         for delay_in in ('scope', 'routing'):
-            with self.subTest(delay_in=delay_in):
+            with self.subTest(delay_in=delay_in), patch.object(lane.issue_turns, 'due', return_value=False):  # one pass
                 clock = [1000.0]
                 old = repair_inventory_pr()
                 current = {**old, 'headRefOid': 'b' * 40}
@@ -4332,7 +4332,7 @@ class WorkerTest(unittest.TestCase):
 
     def test_event_cleanup_waits_until_all_productive_selections_decline(self):
         for chosen in ("event", "poll", "adopt", "issue", "idle"):
-            with self.subTest(chosen=chosen):
+            with self.subTest(chosen=chosen), patch.object(lane.issue_turns, "due", return_value=False):  # one pass, no turn history
                 self.linear.issues = [issue("JOV-3")] if chosen == "issue" else []
                 with patch.object(lane.pr_events, "claim_event_pr", return_value={"number": 5} if chosen == "event" else None), \
                      patch.object(lane, "claim_red_pr", return_value={"number": 5} if chosen == "poll" else None), \
@@ -4745,14 +4745,17 @@ class WorkerTest(unittest.TestCase):
         self.assertFalse((self.host.state / "worker-idle.json").exists())
         self.assertEqual(self.linear.moves, [])
 
-    def test_open_red_prs_never_stop_a_lane_claiming_new_work(self):
-        # Tim 2026-10-12: no open-PR ceiling; only real limits bound a lane.
-        red = [{"number": n, "headRefName": f"devin/jov-{n}-20260927t000000", "isDraft": True} for n in range(1, 9)]
-        lane.lane_prs = lambda name, fields="", *, inventory=None: red if fields else []
-        ran = []
+    def test_a_lane_at_its_wip_cap_stops_claiming_new_work(self):
+        cap = lane.pr_wip.cap_for("devin", lane.pr_wip.load_policy())
+        rows = lambda n: [{"number": i, "headRefName": f"devin/jov-{i}-20260927t000000", "isDraft": True} for i in range(1, n + 1)]
+        lane.lane_prs, ran = (lambda name, fields="", *, inventory=None: []), []
         lane.run_issue = lambda *a: ran.append(1) or {"verdict": "landing", "prUrl": "u"}
-        lane.worker(self.host, "devin")
-        self.assertEqual(ran, [1])
+        real = lane.new_issue_budget
+        for n, claimed in ((cap, []), (cap - 1, [1])):
+            with patch.object(lane, "read_new_issue_budget", side_effect=lambda name, slots, n=n: real(name, slots, rows(n))):
+                lane.worker(self.host, "devin")
+            self.assertEqual(ran, claimed, "claims only under the cap")
+        self.assertEqual(json.loads((self.host.state / "worker-idle.json").read_text())["devin"]["reason"], "wip-cap")
 
     def test_new_issue_budget_uses_base_slots_not_autoscaled(self):
         """JOV-7514: parked-PR caps stay on configured slots as autoscale capacity rises."""
@@ -4948,27 +4951,24 @@ class ExhaustedRepairPublicationTest(unittest.TestCase):
 
 
 class NewIssueBudgetTest(unittest.TestCase):
-    """Tim 2026-10-12: no open-PR ceiling (JOV-6833 x2 active / JOV-7514 x4 terminal are gone)."""
+    """2026-11-01: one ceiling, the per-producer WIP cap shared with pr-open; the slot caps stay gone."""
     def row(self, number=1, branch=None, draft=True, state="CLEAN", labels=()):
         return {"number": number, "headRefName": branch or f"codex/jov-{number}-20261002",
                 "isDraft": draft, "mergeStateStatus": state, "labels": [{"name": name} for name in labels]}
 
-    def test_no_pr_count_ever_refuses_new_issues(self):
+    def test_only_the_wip_cap_refuses_new_issues_and_held_prs_do_not_count(self):
+        cap = lane.pr_wip.cap_for("codex", lane.pr_wip.load_policy())
         parked = [self.row(n, labels=("hold",)) for n in range(1, 40)]
-        active = [self.row(n, state="BLOCKED") for n in range(40, 80)]
-        result = lane.new_issue_budget("codex", 1, parked + active + [self.row(99, branch="codex/manual")])
+        active = [self.row(n, state="BLOCKED") for n in range(40, 40 + cap - 1)]
+        result = lane.new_issue_budget("codex", 1, parked + active)
         self.assertEqual((result["allowed"], result["reason"], result["cap"], result["terminalCap"]),
                          (True, "within-budget", None, None))
-        self.assertEqual((result["used"], result["terminal"]), (40, 39), "counts stay visible, never a ceiling")
+        self.assertEqual((result["used"], result["terminal"], result["wip"]), (cap - 1, 39, cap - 1))
+        full = lane.new_issue_budget("codex", 1, parked + active + [self.row(99, branch="codex/manual")])
+        self.assertEqual((full["allowed"], full["reason"], full["wipCap"]), (False, "wip-cap", cap))
         self.assertEqual(lane.new_issue_budget("codex", 0, None)["reason"], "provider-disabled")
         self.assertFalse(hasattr(lane, "OPEN_PRS_PER_SLOT") or hasattr(lane, "TERMINAL_PRS_PER_SLOT")
                          or hasattr(lane, "over_budget"))
-
-    def test_the_claim_path_makes_no_pr_count_read(self):
-        with patch.object(lane, "sh", side_effect=AssertionError("no GitHub read")):
-            result = lane.read_new_issue_budget("codex", 3)
-        self.assertEqual((result["allowed"], result["reason"], result["used"], result["error"]),
-                         (True, "within-budget", None, None))
 
 
 class OversizeDiffExitTest(unittest.TestCase):

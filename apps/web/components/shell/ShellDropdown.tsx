@@ -18,7 +18,6 @@
 // Entity hover: rows rendered via .EntityItem reveal an EntityPopover next
 // to the row after a 200ms hover delay (or instantly on keyboard focus).
 // One popover at a time; pointer-bridge between row and popover.
-
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { Check, ChevronRight, Link2, Search, X } from 'lucide-react';
 import {
@@ -303,6 +302,7 @@ function ShellDropdownRoot({
       <DropdownMenuPrimitive.Portal>
         <DropdownMenuPrimitive.Content
           role={searchable ? 'dialog' : 'menu'}
+          aria-orientation={searchable ? undefined : 'vertical'}
           aria-label={searchable ? 'Filter Menu' : undefined}
           align={align}
           side={side}

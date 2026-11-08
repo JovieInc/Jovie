@@ -46,10 +46,16 @@ import lifecycle  # noqa: E402
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
 from atomic_state import atomic_write_text  # noqa: E402
+from disk_headroom import (HEADROOM_CRIT_PCT, HEADROOM_WARN_PCT, REPORT_INTERVAL_S, daily_report, headroom,  # noqa: E402,F401
+                           publish_headroom, report_targets, tree_kib, volumes, alarm_strip, STRIP_ONLY_STAMP)
 
 PRESERVED_REPAIR = ".jovie-preserved-repair.json"
 IDLE_S = 12 * 3600
 CLOSED_GRACE_S = 3600
+# Regenerable build dirs (node_modules is ~7 GB per Jovie checkout) of a checkout that stays on disk
+# (preserved repair, held snapshot) are stripped after this idle time. Gem hit 95% on 2026-11-07
+# with ~230 GB of node_modules in 36 kept checkouts that no retire path ever stripped.
+KEPT_STRIP_IDLE_S = 3600
 PRESERVED_TTL_S = 3 * 86400
 INTERVAL_S = 3600
 LINKED_SWEEP_BUDGET_S = 20 * 60  # linked-worktree phase; the standalone reclaim runs after it, always
@@ -380,6 +386,14 @@ def strip_build_dirs(path: Path) -> None:
         dirs[:] = keep
 
 
+def strip_kept(path: Path, info: dict, now: float, report: dict) -> None:
+    """Drop regenerable build dirs from a checkout the sweep keeps (never busy: callers checked)."""
+    if now - info["activity"] < KEPT_STRIP_IDLE_S or not (path / "node_modules").exists():
+        return
+    strip_build_dirs(path)
+    report["stripped"].append(str(path))
+
+
 def preserved_age(path: Path, now: float) -> float | None:
     try:
         return now - (path / PRESERVED_REPAIR).stat().st_mtime
@@ -428,15 +442,19 @@ def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: 
     reason = decide(path, branch, info, now, closed, idle_s=idle_s, preserved_ttl_s=preserved_ttl_s)
     if reason is None:
         report["kept"] += 1
+        strip_kept(path, info, now, report)
         return
     if info["dirty"] or info["unpushed"] != "0":
         try:
             saved = backup(path, info, run, prefix, date)
         except SnapshotHeld as held:
             # Keep the checkout untouched (no strip): the doctor raises sweep-snapshot-secret.
+            # Source and .git stay untouched; only regenerable build dirs go, so a stuck archive
+            # push can no longer pin gigabytes per checkout.
             report["kept"] += 1
             report.setdefault("secretHeld", []).append({"name": held.name, "path": str(path),
                                                         "reason": held.reason})
+            strip_kept(path, info, now, report)
             return
         if not saved:
             strip_build_dirs(path)
@@ -568,6 +586,10 @@ def maybe_spawn(state: Path, repo: Path, free_pct: float | None, *, now: float |
     if not (repo / ".git").is_dir():
         return "no-repo"
     now = time.time() if now is None else now
+    try:
+        alarm_strip(state, repo, json.loads((state / "disk-headroom.json").read_text()), now=now)
+    except (OSError, ValueError, AttributeError):
+        pass
     stamp = state / "worktree-sweep.json"
     try:
         last = json.loads(stamp.read_text()).get("startedAt", 0)
@@ -582,6 +604,60 @@ def maybe_spawn(state: Path, repo: Path, free_pct: float | None, *, now: float |
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      start_new_session=True, **lifecycle.spawn_kwargs())
     return "spawned"
+
+
+
+
+def strip_pass(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecycle.run,
+               now: float | None = None, idle_s: float = KEPT_STRIP_IDLE_S) -> dict:
+    """Strip-only phase: drop regenerable build dirs from every idle, non-busy linked checkout.
+
+    No backup, no removal and no PR lookups, so it is cheap enough to run the moment a volume
+    crosses the critical alarm instead of waiting behind the hourly sweep's budget."""
+    now = time.time() if now is None else now
+    report = {"stripped": [], "kept": 0, "errors": []}
+    live = live_paths(run)
+    if live is None:
+        report["errors"].append("process-state-unavailable")
+        return report
+    for repo in repos:
+        try:
+            entries = linked_worktrees(repo, run)
+        except (OSError, subprocess.SubprocessError) as error:
+            report["errors"].append(f"list:{repo}:{type(error).__name__}")
+            continue
+        for path, _branch in entries:
+            if not path.exists() or not in_scope(path, roots, never) or busy(path, live) \
+                    or (path / ".sweep-keep").exists() or not (path / "node_modules").exists():
+                continue
+            info = inspect(path, run)
+            if info is None or now - info["activity"] < idle_s:
+                report["kept"] += 1
+                continue
+            strip_build_dirs(path)
+            report["stripped"].append(str(path))
+    return report
+
+
+def strip_only_main(args) -> int:
+    ensure_sbin_on_path()
+    home = Path.home()
+    with open(args.state / "disk-cleanup.lock", "a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return 0  # a sweep or disk_guard is already cleaning: coalesce
+        stamp = args.state / STRIP_ONLY_STAMP
+        try:
+            triggered = json.loads(stamp.read_text()).get("triggeredAt")
+        except (OSError, ValueError, AttributeError):
+            triggered = None
+        started = time.time()
+        report = strip_pass(default_repos(home, args.repo), default_roots(home, args.state), default_never(home))
+        atomic_write_text(stamp, json.dumps({"triggeredAt": triggered or started, "startedAt": started,
+                                             "endedAt": time.time(), "strippedCount": len(report["stripped"]),
+                                             "errors": report["errors"]}, indent=1))
+    return 0
 
 
 # ---- standalone clones, volume headroom and the daily disk report (gem disk incident 2026-10-24) ----
@@ -602,9 +678,6 @@ RETIRED_ROOT_GLOBS = ("grok-ship-workspaces/*/*", "codex-ship-workspaces/*/*", "
 # busy / keep-marker / state-referenced guards still decide. Clone-anchored globs: `wt/*` is a
 # checkout under ~/wt, `wt-*` a checkout named wt-* directly in home, `codex-worktrees/*` as listed.
 ARTIFACT_ROOT_GLOBS = RETIRED_ROOT_GLOBS + ("wt/*", "wt-*", "codex-worktrees/*")
-HEADROOM_WARN_PCT = 70
-HEADROOM_CRIT_PCT = 85
-REPORT_INTERVAL_S = 86400
 STATE_REF_MAX_BYTES = 8 * 1024 * 1024
 DEFAULT_MOUNTED_ROOTS = (Path("/srv/worktrees"),)
 
@@ -718,17 +791,6 @@ def standalone_verdict(path: Path, live: set[Path], run, now: float, state: Path
     return None
 
 
-def tree_kib(path: Path, run) -> int | None:
-    try:
-        result = run(["du", "-sk", "--", str(path)], capture_output=True, text=True, timeout=300)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    try:
-        return int(result.stdout.split()[0])
-    except (IndexError, ValueError):
-        return None
-
-
 def artifact_prunable_root(home: Path, path: Path) -> bool:
     return any(path in home.glob(pattern) for pattern in ARTIFACT_ROOT_GLOBS)
 
@@ -794,87 +856,6 @@ def sweep_standalone(home: Path, state: Path, repos: list[Path], never: list[Pat
     return report
 
 
-def volumes(home: Path, state: Path, mounts: list[Path] | None = None) -> list[Path]:
-    """Mount points holding agent data: root, the home and state volumes, and every /srv/* mount."""
-    if mounts is None:
-        mounts = [p for p in sorted(Path("/srv").glob("*")) if os.path.ismount(p)] if Path("/srv").is_dir() else []
-    found = [Path("/"), *mounts]
-    for anchor in (home, state):
-        probe = anchor
-        while not os.path.ismount(probe) and probe != probe.parent:
-            probe = probe.parent
-        found.append(probe)
-    return list(dict.fromkeys(found))
-
-
-def headroom(vols: list[Path], *, usage=shutil.disk_usage) -> dict:
-    rows, alarms = [], []
-    for mount in vols:
-        try:
-            total, _, free = usage(mount)
-        except OSError:
-            continue
-        used_pct = round(100 * (total - free) / total, 1) if total else 0.0
-        level = "crit" if used_pct >= HEADROOM_CRIT_PCT else "warn" if used_pct >= HEADROOM_WARN_PCT else "ok"
-        rows.append({"mount": str(mount), "usedPct": used_pct, "freeGiB": round(free / 2**30, 1),
-                     "totalGiB": round(total / 2**30, 1), "level": level})
-        if level != "ok":
-            alarms.append({"mount": str(mount), "level": level, "usedPct": used_pct})
-    return {"volumes": rows, "alarms": alarms, "thresholds": {"warn": HEADROOM_WARN_PCT, "crit": HEADROOM_CRIT_PCT}}
-
-
-def publish_headroom(state: Path, current: dict, now: float) -> None:
-    """state/disk-headroom.json is the sentinel's input; an alarm event is appended on each level change."""
-    path = state / "disk-headroom.json"
-    try:
-        before = {v["mount"]: v["level"] for v in json.loads(path.read_text()).get("volumes", [])}
-    except (OSError, ValueError, AttributeError, KeyError, TypeError):
-        before = {}
-    at = datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    atomic_write_text(path, json.dumps({"at": at, **current}, indent=1))
-    changed = [v for v in current["volumes"] if v["level"] != before.get(v["mount"], "ok")]
-    if changed:
-        with open(state / "host-alarms.jsonl", "a") as handle:
-            for row in changed:
-                handle.write(json.dumps({"at": at, "kind": "disk-headroom", **row}) + "\n")
-
-
-def report_targets(home: Path, state: Path) -> list[Path]:
-    roots = [state / "runs", state / "worktrees", state / "bindings", state / "releases",
-             state / "preserved-artifacts", state / "cache", home / "codex-worktrees", home / "grok-wt",
-             home / "grok-ship-workspaces", home / "gem-workspace", home / ".cache", home / ".local/share",
-             home / ".npm"]
-    srv = Path("/srv")
-    if srv.is_dir():
-        roots += [p for p in sorted(srv.glob("*")) if p.is_dir()]
-    return [p for p in roots if p.exists()]
-
-
-def daily_report(home: Path, state: Path, now: float, *, run=lifecycle.run, targets: list[Path] | None = None,
-                 interval_s: float = REPORT_INTERVAL_S) -> str:
-    """Per-volume usage plus the biggest growers since the last report; at most once per interval."""
-    path = state / "disk-report.json"
-    try:
-        previous = json.loads(path.read_text())
-    except (OSError, ValueError):
-        previous = {}
-    if now - previous.get("epoch", 0) < interval_s:
-        return "not-due"
-    sizes = {}
-    for target in (targets if targets is not None else report_targets(home, state)):
-        kib = tree_kib(target, lambda args, **kw: run(["nice", "-n", "19", *args], **kw))
-        if kib is not None:
-            sizes[str(target)] = kib
-    before = previous.get("sizes", {})
-    growers = sorted(({"path": p, "gib": round(k / 2**20, 2), "deltaGiB": round((k - before.get(p, k)) / 2**20, 2)}
-                      for p, k in sizes.items()), key=lambda row: row["deltaGiB"], reverse=True)
-    atomic_write_text(path, json.dumps({
-        "at": datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "epoch": now,
-        "volumes": headroom(volumes(home, state))["volumes"], "sizes": sizes,
-        "topGrowers": growers[:10], "largest": sorted(growers, key=lambda r: -r["gib"])[:10]}, indent=1))
-    return "written"
-
-
 def guarded_main(args) -> int:
     ensure_sbin_on_path()
     home = Path.home()
@@ -893,10 +874,16 @@ def guarded_main(args) -> int:
         prefix = sweep_prefix()
         # Alarm input first: it is a few statvfs calls and must not wait behind hours of cleanup.
         publish_headroom(args.state, headroom(volumes(home, args.state)), time.time())
+        linked_started = time.monotonic()
         report = sweep(repos, default_roots(home, args.state), default_never(home),
                        closed=closed, prefix=prefix, state=args.state, budget_s=LINKED_SWEEP_BUDGET_S)
+        # Stage metric (p50/p95 of the sweep phases): a spent budget or a slow phase is what let
+        # Gem fill to 95% unnoticed on 2026-11-07.
+        report["stageSeconds"] = {"linked": round(time.monotonic() - linked_started, 1)}
         if not report.get("drained") and not lifecycle.draining(args.state):
+            standalone_started = time.monotonic()
             report["standalone"] = sweep_standalone(home, args.state, repos, default_never(home))
+            report["stageSeconds"]["standalone"] = round(time.monotonic() - standalone_started, 1)
             now = time.time()
             publish_headroom(args.state, headroom(volumes(home, args.state)), now)
             report["dailyReport"] = daily_report(home, args.state, now)
@@ -915,10 +902,11 @@ def main(argv: list[str] | None = None) -> int:
         "LANES_STATE", Path.home() / ".local/state/jovie-lanes")))
     parser.add_argument("--repo", type=Path, default=Path(os.environ.get(
         "LANES_REPO", Path.home() / "devin-sweep/Jovie")))
+    parser.add_argument("--strip-only", action="store_true", help="only strip build dirs (alarm trigger)")
     args = parser.parse_args(argv)
     try:
         with lifecycle.Guard(args.state):
-            return guarded_main(args)
+            return strip_only_main(args) if args.strip_only else guarded_main(args)
     except lifecycle.AdmissionHeld as error:
         print(f"lifecycle admission held: {error}", file=sys.stderr)
         return 75

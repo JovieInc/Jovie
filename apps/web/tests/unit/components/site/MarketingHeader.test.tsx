@@ -253,16 +253,18 @@ describe('MarketingHeader', () => {
     ).toHaveLength(0);
   });
 
-  it('uses the one claim CTA on the homepage header (JOV-5085)', () => {
+  it('uses the one invite CTA on the invite-only homepage header', () => {
     mockUsePathname.mockReturnValue('/');
     render(<MarketingHeader />);
 
-    const ctas = screen.getAllByRole('link', { name: 'Claim your profile' });
+    const ctas = screen.getAllByRole('link', { name: 'Request an Invite' });
     expect(ctas.length).toBeGreaterThanOrEqual(1);
     for (const cta of ctas) {
-      expect(cta).toHaveAttribute('href', '/start');
+      expect(cta).toHaveAttribute('href', '/#request-invite');
     }
-    expect(screen.queryByRole('link', { name: 'Request access' })).toBeNull();
+    expect(
+      screen.queryByRole('link', { name: 'Claim your profile' })
+    ).toBeNull();
   });
 
   it('scopes homepage-style header overrides to the artist-profiles route', () => {
@@ -310,8 +312,8 @@ describe('MarketingHeader', () => {
       '/product'
     );
     expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute('href', '/start');
+      screen.getByRole('link', { name: 'Request an Invite' })
+    ).toHaveAttribute('href', '/#request-invite');
   });
 
   it('docks with no glass at the top and fades it in once the sentinel scrolls away', () => {
