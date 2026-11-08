@@ -736,6 +736,8 @@ jobs:
       # PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL it exports nothing, and the
       # certification below reports those frames as not exported. --record
       # exits 0 once a receipt is written; certification fails on its verdict.
+      # If the Pen tooling itself fails first, certification still runs and
+      # reports those frames as not exported, so no verdict is skipped.
       - name: Export Golden Path Pen frames and compare with production
         env:
           PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
@@ -743,6 +745,7 @@ jobs:
         run: node scripts/invariants/pen-golden-path.mjs --record --out "${RUNNER_TEMP}/pen-golden-path" --base-url https://jov.ie
 
       - name: Certify the golden path on production
+        if: ${{ !cancelled() }}
         env:
           PROD_CERT_PEN_DIFF_RECEIPT: ${{ runner.temp }}/pen-golden-path/receipt.json
           AUTH_SMOKE_STATUS: ${{ needs.auth-smoke.outputs.auth_smoke_status || (needs.auth-smoke.result == 'success' && 'passed') || 'failed' }}

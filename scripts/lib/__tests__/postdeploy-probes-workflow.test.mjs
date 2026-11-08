@@ -16,7 +16,7 @@ import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 import { runWithRealGh } from '../real-gh-harness.mjs';
 
-/** @typedef {{ id?: string, run?: string, env?: Record<string, string> }} WorkflowStep */
+/** @typedef {{ id?: string, name?: string, if?: string, run?: string, env?: Record<string, string> }} WorkflowStep */
 /** @typedef {{ if?: string, outputs?: { should_probe?: string, quota_deferred?: string }, steps?: WorkflowStep[] }} WorkflowJob */
 
 const workflow = /** @type {{ jobs: Record<string, WorkflowJob> }} */ (
@@ -860,4 +860,15 @@ it('keeps quota deferral observable without claiming executed probe evidence', (
   expect(workflow.jobs['resolve-target'].outputs.quota_deferred).toBe(
     "${{ steps.trigger.outputs.quota_deferred == 'true' }}"
   );
+});
+
+describe('golden path certification after the Pen export', () => {
+  it('still certifies when the Pen tooling fails before writing a receipt', () => {
+    const steps = Object.values(workflow.jobs).flatMap(job => job.steps ?? []);
+    const certify = steps.find(
+      s => s.name === 'Certify the golden path on production'
+    );
+    // A skipped step posts no verdict; a missing receipt fails the Pen frames.
+    expect(certify?.if).toBe('${{ !cancelled() }}');
+  });
 });
