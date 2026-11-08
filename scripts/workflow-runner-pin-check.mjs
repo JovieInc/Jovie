@@ -19,11 +19,30 @@ import { load as yamlLoad } from 'js-yaml';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const FLOATING = /(?<![\w-])ubuntu-latest(?![\w.-])/u;
 
-function usesPlaywright(job) {
+// A script a step runs can install Playwright itself (pen-golden-path.mjs
+// runs `playwright install --with-deps`), so the step text alone misses it.
+const INSTALLS_PLAYWRIGHT =
+  /playwright['"]?\s*,?\s*['"]?install\b|playwright\s+install\b/u;
+
+/** @param {string} run @param {string} repoRoot */
+function runsPlaywrightScript(run, repoRoot) {
+  for (const [, file] of run.matchAll(/\bnode\s+(\S+\.[cm]?js)\b/gu)) {
+    const full = path.join(repoRoot, file);
+    if (
+      existsSync(full) &&
+      INSTALLS_PLAYWRIGHT.test(readFileSync(full, 'utf8'))
+    )
+      return true;
+  }
+  return false;
+}
+
+function usesPlaywright(job, repoRoot) {
   return (job.steps ?? []).some(
     step =>
       /setup-playwright/u.test(String(step?.uses ?? '')) ||
-      /\bplaywright\b/u.test(String(step?.run ?? ''))
+      /\bplaywright\b/u.test(String(step?.run ?? '')) ||
+      runsPlaywrightScript(String(step?.run ?? ''), repoRoot)
   );
 }
 
@@ -33,7 +52,7 @@ function floats(job) {
 }
 
 /** @returns {{ key: string, playwright: boolean }[]} */
-export function findFloatingJobs(workflowsDir) {
+export function findFloatingJobs(workflowsDir, repoRoot = root) {
   const found = [];
   for (const file of readdirSync(workflowsDir).sort()) {
     if (!/\.ya?ml$/u.test(file)) continue;
@@ -41,7 +60,10 @@ export function findFloatingJobs(workflowsDir) {
     if (!doc || typeof doc !== 'object' || !('jobs' in doc)) continue;
     for (const [id, job] of Object.entries(doc.jobs ?? {})) {
       if (job && floats(job))
-        found.push({ key: `${file}#${id}`, playwright: usesPlaywright(job) });
+        found.push({
+          key: `${file}#${id}`,
+          playwright: usesPlaywright(job, repoRoot),
+        });
     }
   }
   return found;
@@ -50,13 +72,14 @@ export function findFloatingJobs(workflowsDir) {
 export function checkRunnerPins({
   workflowsDir = path.join(root, '.github/workflows'),
   allowlistPath = path.join(root, '.github/runner-pin-allowlist.json'),
+  repoRoot = root,
 } = {}) {
   const allowed = new Set(
     existsSync(allowlistPath)
       ? JSON.parse(readFileSync(allowlistPath, 'utf8')).jobs
       : []
   );
-  const found = findFloatingJobs(workflowsDir);
+  const found = findFloatingJobs(workflowsDir, repoRoot);
   const floatingKeys = new Set(found.map(job => job.key));
   const errors = [];
   for (const job of found) {
