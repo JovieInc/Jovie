@@ -29,6 +29,15 @@ describe('claim page layout', () => {
     expect(main.className).not.toContain('items-center');
   });
 
+  it('scrolls itself, because html and body never scroll on this route', async () => {
+    await renderClaimPage();
+    const classes = screen.getByRole('main').className.split(' ');
+    // A min-height box grows instead of scrolling, so six results on a short
+    // phone pushed the card's bottom and its button out of reach.
+    expect(classes).toContain('h-svh');
+    expect(classes).toContain('overflow-y-auto');
+  });
+
   it('aligns the heading with the search body padding', async () => {
     await renderClaimPage();
     const heading = screen.getByRole('heading', {

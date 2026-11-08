@@ -84,7 +84,9 @@ export default async function ClaimPage({
   return (
     // Top-aligned, not centered: centering re-centers the card each time the
     // search results change height, so the whole card jumps while typing.
-    <StandaloneProductPage width='sm' className='sm:pt-24'>
+    // h-svh makes the page its own scroll container: html and body never
+    // scroll here, so a min-height page would clip the card on short phones.
+    <StandaloneProductPage width='sm' className='h-svh sm:pt-24'>
       {showCookieBanner ? <CookieBannerSection initialVisible /> : null}
       <div className='space-y-4' data-testid='claim-page'>
         {stateCopy ? (

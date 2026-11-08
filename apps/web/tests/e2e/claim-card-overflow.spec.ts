@@ -54,4 +54,22 @@ test.describe('claim card at phone width', () => {
       });
     }
   }
+
+  test('keeps the create-profile button reachable on a short phone', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 600 });
+    await page.route('**/api/spotify/search**', route =>
+      route.fulfill({ json: RESULTS })
+    );
+
+    await page.goto('/claim', { waitUntil: 'domcontentloaded' });
+    await page.getByTestId('claim-artist-search').fill('stub');
+    await expect(page.getByTestId('claim-artist-results')).toBeVisible();
+
+    // html and body never scroll here, so the page itself has to.
+    const create = page.getByTestId('claim-create-profile');
+    await create.scrollIntoViewIfNeeded();
+    await expect(create).toBeInViewport();
+  });
 });
