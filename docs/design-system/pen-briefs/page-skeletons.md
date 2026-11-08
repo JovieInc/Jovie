@@ -1,6 +1,7 @@
 ---
 frame: page-skeletons
 route: /app/calendar
+context: dashboard, calendar, skeleton, loading
 ---
 Design the loading skeleton a signed-in Jovie page shows on its first load, desktop 1440 wide and mobile 390 wide, dark mode first.
 
