@@ -1,5 +1,4 @@
 import 'server-only';
-
 import { and, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import type { DbOrTransaction } from '@/lib/db';
 import { db } from '@/lib/db';
@@ -20,7 +19,6 @@ import {
   type PriceLockSource,
   type StripePriceIdSnapshot,
 } from './price-versions';
-
 /** Ids the list price checks out with right now (env, via the one reader). */
 export function getListStripePriceIds(): StripePriceIdSnapshot {
   const ids = getStripePriceIds();
@@ -29,7 +27,6 @@ export function getListStripePriceIds(): StripePriceIdSnapshot {
     yearly: ids.proAnnual || ids.proYearly || null,
   };
 }
-
 export function rowToSnapshot(row: PriceLockRow): PriceLockSnapshot {
   return {
     plan: row.plan as PriceLockSnapshot['plan'],
@@ -43,7 +40,6 @@ export function rowToSnapshot(row: PriceLockRow): PriceLockSnapshot {
     lockedAt: row.lockedAt.toISOString(),
   };
 }
-
 function snapshotToValues(snapshot: PriceLockSnapshot) {
   return {
     plan: snapshot.plan,
@@ -57,7 +53,6 @@ function snapshotToValues(snapshot: PriceLockSnapshot) {
     lockedAt: new Date(snapshot.lockedAt),
   };
 }
-
 export async function getPriceLockRowForUser(
   userId: string,
   client: DbOrTransaction = db
@@ -69,7 +64,6 @@ export async function getPriceLockRowForUser(
     .limit(1);
   return row ?? null;
 }
-
 export async function getPriceLockForUser(
   userId: string,
   client: DbOrTransaction = db
