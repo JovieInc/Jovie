@@ -1031,7 +1031,7 @@
   "scripts/lib/__tests__/changed-test-coverage.test.mjs": 882,
   "scripts/lib/__tests__/ci-fast-lanes.test.mjs": 2818,
   "scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs": 3781,
-  "scripts/lib/__tests__/ci-harness.test.mjs": 1133,
+  "scripts/lib/__tests__/ci-harness.test.mjs": 968,
   "scripts/lib/__tests__/component-certificate.test.mjs": 525,
   "scripts/lib/__tests__/component-comparative-quality-bar.test.mjs": 799,
   "scripts/lib/__tests__/component-live-storybook-certification.test.mjs": 1880,
