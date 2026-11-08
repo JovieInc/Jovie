@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-
 import { ConfirmDialog } from './confirm-dialog';
+import { expectNoA11yViolations } from './test-utils/a11y';
 
 describe('ConfirmDialog', () => {
   it('renders title, body, cancel slot, and destructive confirm slot', () => {
@@ -191,5 +191,68 @@ describe('ConfirmDialog', () => {
     );
     expect(onError).toHaveBeenCalled();
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+});
+
+describe('ConfirmDialog accessibility', () => {
+  it('has no axe violations when open with only the required props', async () => {
+    render(
+      <ConfirmDialog
+        open
+        onOpenChange={vi.fn()}
+        title='Discard unsaved changes?'
+        onConfirm={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await expectNoA11yViolations(document.body);
+  });
+
+  it('has no axe violations in the error state', async () => {
+    render(
+      <ConfirmDialog
+        open
+        onOpenChange={vi.fn()}
+        title='Disconnect Spotify?'
+        body='Synced data stays in your library.'
+        confirmLabel='Disconnect'
+        onConfirm={vi.fn().mockRejectedValue(new Error('Request failed'))}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Action failed. Please try again.'
+    );
+    await expectNoA11yViolations(document.body);
+  });
+
+  it('has no axe violations while pending and with long right-to-left copy', async () => {
+    const { unmount } = render(
+      <ConfirmDialog
+        open
+        onOpenChange={vi.fn()}
+        title='Disconnect Spotify?'
+        isLoading
+        onConfirm={vi.fn()}
+      />
+    );
+    await expectNoA11yViolations(document.body);
+    unmount();
+
+    render(
+      <div dir='rtl'>
+        <ConfirmDialog
+          open
+          onOpenChange={vi.fn()}
+          variant='destructive'
+          title='هل تريد حذف جهة الاتصال من جمهورك نهائيًا؟'
+          body='لن تظهر جهة الاتصال بعد الآن في قائمة الجمهور.'
+          cancelLabel='الإبقاء على جهة الاتصال'
+          confirmLabel='حذف جهة الاتصال'
+          onConfirm={vi.fn()}
+        />
+      </div>
+    );
+    await expectNoA11yViolations(document.body);
   });
 });
