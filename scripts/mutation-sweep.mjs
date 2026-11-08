@@ -5,6 +5,7 @@
 //        --max-files 6 --max-minutes 90            # rolling sweep batch
 //   node scripts/mutation-sweep.mjs --mode incremental  # only modules changed since scored
 //   node scripts/mutation-sweep.mjs --list-only          # print the next batch, run nothing
+//   node scripts/mutation-sweep.mjs --include packages/ui/atoms/  # @jovie/ui, keyed by repo path
 //
 // Per module it runs scripts/mutation-diff.mjs --scope all (same Stryker
 // harness as the enforced high-risk lane), then records score, mutant counts,
@@ -33,7 +34,6 @@ import {
   readReportMutants,
   readTestSources,
   selectHighRiskSources,
-  WEB_ROOT,
 } from './lib/mutation-diff.mjs';
 import { buildWorkflowRunUrl } from './lib/mutation-floor-intake.mjs';
 import { loadMutationScoreBaseline } from './lib/mutation-score-floor.mjs';
@@ -50,9 +50,15 @@ import {
   recordRun,
   validateEquivalents,
 } from './lib/mutation-sweep.mjs';
+import {
+  harnessArgs,
+  reportName,
+  resolveSweepRoot,
+  rootRelative,
+  stateKey,
+} from './lib/mutation-sweep-root.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const webRoot = join(repoRoot, WEB_ROOT);
 
 const { values } = parseArgs({
   options: {
@@ -61,7 +67,7 @@ const { values } = parseArgs({
     'max-files': { type: 'string', default: '4' },
     'max-minutes': { type: 'string', default: '60' },
     'file-timeout-minutes': { type: 'string', default: '25' },
-    include: { type: 'string', default: 'lib/,app/api/' },
+    include: { type: 'string' }, // default lib/,app/api/ (apps/web)
     'max-loc': { type: 'string', default: '700' },
     files: { type: 'string' },
     sha: { type: 'string' },
@@ -146,6 +152,10 @@ if (equivalentErrors.length > 0)
     `Invalid mutation-equivalents.json: ${equivalentErrors.join('; ')}`
   );
 
+const target = resolveSweepRoot(values);
+const rootDir = join(repoRoot, target.root);
+const rel = (/** @type {string} */ key) => rootRelative(target, key);
+
 const statePath = values.state ? resolve(values.state) : null;
 let state = emptyState();
 if (statePath && existsSync(statePath)) {
@@ -156,8 +166,8 @@ if (statePath && existsSync(statePath)) {
   }
 }
 
-// --- candidates: every apps/web source under --include that has a related test
-const staged = git(['ls-files', '-s', '-z', '--', WEB_ROOT])
+// --- candidates: every source of the target root under --include with a related test
+const staged = git(['ls-files', '-s', '-z', '--', target.root])
   .stdout.split('\0')
   .filter(Boolean);
 /** @type {Map<string, string>} repo path -> blob */
@@ -167,14 +177,19 @@ for (const row of staged) {
   if (match) blobs.set(match[2], match[1]);
 }
 const tracked = [...blobs.keys()];
-const readModule = readModuleSource(webRoot);
-const includes = values.include.split(',').filter(Boolean);
+const readModule = readModuleSource(rootDir);
+const includes = target.includes;
 const maxLoc = num('max-loc');
 const explicit = values.files?.split(/[\s,]+/u).filter(Boolean);
 const sources = selectHighRiskSources(explicit ?? tracked, readModule, {
   prefixes: null,
+  root: target.root,
 }).filter(file => explicit || includes.some(prefix => file.startsWith(prefix)));
-const selectTests = createTestSelector(readTestSources(webRoot), readModule);
+const selectRootTests = createTestSelector(
+  readTestSources(rootDir),
+  readModule
+);
+const selectTests = (/** @type {string} */ key) => selectRootTests(rel(key));
 // Test selection costs ~1.3s per source (import-graph walk), so it runs lazily
 // on the ranked batch only. Modules with a same-named test rank first.
 const testStems = new Set(
@@ -213,8 +228,9 @@ const touchByFile = values['touch-file']
       ])
     )
   : {};
-for (const file of sources) {
-  const text = readModule(file);
+for (const source of sources) {
+  const file = stateKey(target, source);
+  const text = readModule(source);
   if (typeof text !== 'string' || text.split('\n').length > maxLoc) continue;
   const stem = file
     .split('/')
@@ -223,7 +239,7 @@ for (const file of sources) {
   candidates.push({
     file,
     blob: moduleKey(
-      blobs.get(`${WEB_ROOT}/${file}`) ?? '',
+      blobs.get(`${target.root}/${source}`) ?? '',
       testBlobsByStem.get(stem) ?? []
     ),
     touch: touchByFile[file] ?? 0,
@@ -293,7 +309,7 @@ if (values['list-only'] || batch.length === 0) {
 const deadline = Date.now() + num('max-minutes') * 60_000;
 const runUrl = buildWorkflowRunUrl(process.env);
 const runsLog = `${statePath}.runs.jsonl`;
-const reportDir = join(webRoot, 'reports/mutation/diff');
+const reportDir = join(rootDir, 'reports/mutation/diff');
 const tasksDir = join(dirname(statePath), 'survivor-tasks');
 mkdirSync(tasksDir, { recursive: true });
 /** @type {string[]} */ const summaryRows = [];
@@ -314,20 +330,12 @@ for (const file of batch) {
   const started = Date.now();
   const candidate = candidates.find(c => c.file === file);
   const blob = candidate?.blob ?? '';
-  const reportFile = join(reportDir, `${file.replace(/[^\w.-]+/gu, '_')}.json`);
+  const reportFile = join(reportDir, reportName(rel(file)));
   rmSync(reportFile, { force: true });
   console.log(`\n=== sweep ${file}`);
   const run = spawnSync(
     process.execPath,
-    [
-      join(repoRoot, 'scripts/mutation-diff.mjs'),
-      '--scope',
-      'all',
-      '--files',
-      `${WEB_ROOT}/${file}`,
-      '--max-files',
-      '1',
-    ],
+    [join(repoRoot, target.harness), ...harnessArgs(target, rel(file))],
     {
       cwd: repoRoot,
       stdio: 'inherit',
@@ -344,7 +352,7 @@ for (const file of batch) {
   const at = new Date().toISOString();
   const previous = state.modules[file];
   const mutants = existsSync(reportFile)
-    ? readReportMutants(reportFile, file)
+    ? readReportMutants(reportFile, rel(file))
     : null;
   let entry;
   if (!mutants || mutants.length === 0) {
@@ -358,7 +366,7 @@ for (const file of batch) {
   } else {
     const survivors = extractSurvivors(
       file,
-      readFileSync(join(webRoot, file), 'utf8'),
+      readFileSync(join(rootDir, rel(file)), 'utf8'),
       // Stryker reports carry full spans; the diff-lib Mutant typedef is narrower.
       /** @type {Parameters<typeof extractSurvivors>[2]} */ (
         /** @type {unknown} */ (mutants)
@@ -435,13 +443,13 @@ for (const file of batch) {
   rmSync(reportFile, { force: true });
   rmSync(`${reportFile}.tests.json`, { force: true });
   rmSync(`${reportFile}.coverage`, { recursive: true, force: true });
-  rmSync(join(webRoot, '.stryker-tmp'), { recursive: true, force: true });
+  rmSync(join(rootDir, '.stryker-tmp'), { recursive: true, force: true });
 }
 
 writeOutputs(batch.length);
 const scored = Object.values(state.modules).filter(m => m.status === 'scored');
 const summary = [
-  '## Mutation sweep',
+  `## Mutation sweep (${target.root})`,
   '',
   `Mode \`${values.mode}\` @ ${headSha.slice(0, 10)}. ${scored.length} module(s) scored in total; ${candidates.length} eligible.`,
   '',
