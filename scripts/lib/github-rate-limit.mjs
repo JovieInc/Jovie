@@ -56,16 +56,31 @@ const TRANSIENT_TEXT = [
   /\bstream error: stream ID \d+; (?:CANCEL|INTERNAL_ERROR)\b/,
   /\bThe operation was aborted due to timeout\b/,
 ];
-// A pinned scanner/linter release download that exhausted its retries on
-// GitHub's release CDN (HTTP 504 runs on 2026-11-08: jobs 128679832845,
-// 128680939625, 128685078954). Exact guard messages only; a curl 4xx in the
-// same step is a bad pin, not an outage, and stays a real failure.
+// A pinned release download that exhausted its retries on GitHub's release CDN
+// (HTTP 504 runs on 2026-11-08: jobs 128679832845, 128680939625, 128685078954).
+// scripts/lib/github-release-asset.sh ends with "release download failed after
+// N attempts (last HTTP S): <url>"; its .mjs adapter returns "release download
+// exit N (last HTTP S)". Only 5xx, 408 and 000 (no response: timeout or reset)
+// are an outage.
+const RELEASE_ASSET_EXHAUSTED =
+  /\brelease download (?:failed after \d+ attempts|exit \d+) \(last HTTP (?:50[0234]|408|000)\)/;
+// The callers' own error lines, which carry no status; the whole step decides.
 const RELEASE_DOWNLOAD_TEXT = [
-  /\bCould not fetch (?:gitleaks|trufflehog) after \d+ attempts \(https:\/\/github\.com\/(?:gitleaks\/gitleaks|trufflesecurity\/trufflehog)\/releases\/download\//,
-  /\bSquawk \d+\.\d+\.\d+ download failed: (?:50[0234]|fetch failed) https:\/\/github\.com\/sbdchd\/squawk\/releases\/download\//,
+  /\bCould not fetch (?:gitleaks|trufflehog|osv-scanner) after \d+ attempts \(https:\/\/github\.com\/(?:gitleaks\/gitleaks|trufflesecurity\/trufflehog|google\/osv-scanner)\/releases\/download\//,
+  /\bSquawk \d+\.\d+\.\d+ download failed: (?:50[0234]|408|000|fetch failed) https:\/\/github\.com\/sbdchd\/squawk\/releases\/download\//,
+  // .github/scripts/run-actionlint.sh
+  /(?:^|\])download failed: https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/releases\/download\//m,
 ];
+// A curl 4xx in the same step is a bad pin, not an outage.
 const RELEASE_DOWNLOAD_CLIENT_ERROR =
   /\bThe requested URL returned error: 4(?!08|29)\d\d\b/;
+// A download that ended on a 4xx, or bytes that failed their sha256 pin, is a
+// real failure even when an earlier attempt in the same step saw a 5xx.
+const RELEASE_DOWNLOAD_REAL = [
+  /\brelease download (?:failed after \d+ attempts|exit \d+) \(last HTTP 4(?!08|29)\d\d\)/,
+  /\b(?:sha256|checksum) mismatch\b/i,
+  /\bsha256 [0-9a-f]+ does not match (?:the )?pinned\b/,
+];
 
 function header(headers, name) {
   if (!headers) return null;
@@ -120,7 +135,9 @@ export function classifyGitHubFailure({
     return result(SECONDARY);
   }
   if ([500, 502, 503, 504].includes(Number(status))) return result(TRANSIENT);
+  if (RELEASE_DOWNLOAD_REAL.some(re => re.test(text))) return result(NONE);
   if (TRANSIENT_TEXT.some(re => re.test(text))) return result(TRANSIENT);
+  if (RELEASE_ASSET_EXHAUSTED.test(text)) return result(TRANSIENT);
   if (
     RELEASE_DOWNLOAD_TEXT.some(re => re.test(text)) &&
     !RELEASE_DOWNLOAD_CLIENT_ERROR.test(text)
