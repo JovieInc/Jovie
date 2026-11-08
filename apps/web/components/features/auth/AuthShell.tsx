@@ -442,6 +442,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
           otpStepActive
         }
         callbackURL={offerCallback ?? fallbackRedirectUrl}
+        inDialog={compact}
       />
       <AuthOAuthStartSurface
         mode={mode}
