@@ -262,15 +262,16 @@
     },
     "packages/ui/atoms/icon-button.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "7f91c924aff09e580bb30798448b29a15940d77e0bbd2f0d9df5f592ada07aec",
+      "sourceHash": "1598c93b73d57dc48a68f84707c0d71ce8e30ab3a72c7e93d0573e0e5db1b508",
       "reference": "WAI-ARIA APG Button (icon-only needs an accessible name); shadcn/ui Button size icon",
       "checked": "accessible name, 44px target, destructive state, forwardRef",
       "gaps": [
         {
           "item": "Accessible name is optional in the types and unchecked at runtime, so an icon-only button can render nameless",
           "decision": "adopt",
-          "status": "open",
-          "reference": "APG Button"
+          "status": "done",
+          "reference": "APG Button",
+          "resolution": "IconButtonProps requires ariaLabel, aria-label or aria-labelledby (IconButtonName union); the web typecheck compiles expect-error cases that fail if an unnamed icon button type-checks again"
         }
       ]
     },
