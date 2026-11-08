@@ -3481,6 +3481,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/summer-company/charts/metric/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-company/charts/metric",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/summer-company/charts/shipping/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/charts/shipping",
@@ -3548,6 +3556,14 @@
       "source": "apps/web/app/api/internal/ovie/summer-company/history/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/history",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/summer-company/metrics/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-company/metrics",
       "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
