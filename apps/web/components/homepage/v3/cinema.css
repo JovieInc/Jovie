@@ -106,3 +106,86 @@
     transform: translate3d(0, 6rem, 0) scale(0.96);
   }
 }
+
+/* ── Precision ────────────────────────────────────────────────────── *
+ * Tim (2026-11-08): "make it feel premium not consumer" and "polished
+ * linear, like ocd designer/tech savvy djs types. they want precision but
+ * cool sexy dark mode."
+ *
+ * 1. Frame guides: one hairline on each content edge runs the length of the
+ *    page, so every column visibly sits on the same grid. Drawn as hard
+ *    gradient stops on the box width, so they land on whole pixels.
+ * 2. Registration marks: a small cross where each chapter rule meets a
+ *    guide, the way a print sheet marks its trim.
+ * 3. Headline ink: display type falls off from primary ink at the top to a
+ *    cooler grey at the baseline, so large type reads cut, not printed.
+ */
+
+.hv3 {
+  --hv3-guide: color-mix(in srgb, var(--hv3-b1) 70%, transparent);
+  --hv3-mark: var(--hv3-b3);
+  --hv3-mark-size: 0.5625rem;
+}
+
+.hv3-hero,
+.hv3-chapter {
+  background-image: linear-gradient(
+    90deg,
+    transparent var(--hv3-side),
+    var(--hv3-guide) var(--hv3-side),
+    var(--hv3-guide) calc(var(--hv3-side) + 1px),
+    transparent calc(var(--hv3-side) + 1px),
+    transparent calc(100% - var(--hv3-side) - 1px),
+    var(--hv3-guide) calc(100% - var(--hv3-side) - 1px),
+    var(--hv3-guide) calc(100% - var(--hv3-side)),
+    transparent calc(100% - var(--hv3-side))
+  );
+}
+
+.hv3-chapter > .hv3-rule {
+  position: relative;
+}
+
+.hv3-chapter > .hv3-rule::before,
+.hv3-chapter > .hv3-rule::after {
+  position: absolute;
+  /* Centred on the rule's hairline, which sits just above the padding box. */
+  top: calc(var(--hv3-mark-size) / -2 - 1px / 2);
+  z-index: 2;
+  width: var(--hv3-mark-size);
+  height: var(--hv3-mark-size);
+  background:
+    linear-gradient(var(--hv3-mark), var(--hv3-mark)) center / 100% 1px
+    no-repeat,
+    linear-gradient(var(--hv3-mark), var(--hv3-mark)) center / 1px 100%
+    no-repeat;
+  content: "";
+  pointer-events: none;
+}
+
+.hv3-chapter > .hv3-rule::before {
+  left: calc(var(--hv3-side) + 1px / 2 - var(--hv3-mark-size) / 2);
+}
+
+.hv3-chapter > .hv3-rule::after {
+  right: calc(var(--hv3-side) + 1px / 2 - var(--hv3-mark-size) / 2);
+}
+
+.hv3 :is(.hv3-display, .hv3-statement) {
+  background-image: linear-gradient(
+    180deg,
+    var(--hv3-t1) 35%,
+    color-mix(in srgb, var(--hv3-t1) 62%, var(--hv3-t3))
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Forced colours paint text in the system ink; drop the clip so it shows. */
+@media (forced-colors: active) {
+  .hv3 :is(.hv3-display, .hv3-statement) {
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}

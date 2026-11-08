@@ -128,12 +128,14 @@
 
 .hv3-orbit__ring {
   fill: none;
-  stroke: var(--hv3-b1);
+  /* The rings recede to a trace so the lit arc carries the light alone
+     (Tim, 2026-11-08: "premium not consumer"). */
+  stroke: color-mix(in srgb, var(--hv3-b1) 55%, transparent);
   stroke-width: 1;
 }
 
 .hv3-orbit__ring--outer {
-  stroke: var(--hv3-b2);
+  stroke: var(--hv3-b1);
 }
 
 .hv3-orbit__arc {
