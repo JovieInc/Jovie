@@ -2,6 +2,7 @@ import {
   HOMEPAGE_EDITORIAL_COPY,
   HOMEPAGE_PRODUCT_UI,
 } from '@/data/homepageEditorialCopy';
+import { PUBLIC_ARTIST_API_VERSIONING_POLICY } from '@/lib/api/v1/contract';
 import { HOME_SPEC } from './home-spec';
 import { Orbit } from './Orbit';
 import { ReleaseInspector } from './ProductUi';
@@ -14,6 +15,27 @@ interface SheetCell {
   readonly title: string;
   readonly detail: string;
   readonly mono?: boolean;
+  /** value and detail name a fact resolved from its source, not copy. */
+  readonly derived?: boolean;
+}
+
+const API_VERSION = PUBLIC_ARTIST_API_VERSIONING_POLICY.activeVersion;
+const INSPECTED = HOMEPAGE_PRODUCT_UI.inspector;
+
+/** Facts the sheet shows, read from where they live. */
+const DERIVED: Readonly<Record<string, string>> = {
+  upc: `${INSPECTED.upc} · ${INSPECTED.title}`,
+  apiVersion: API_VERSION,
+  apiSpec: `openapi spec at /api/${API_VERSION}`,
+};
+
+function resolveCell(cell: SheetCell): SheetCell {
+  if (!cell.derived) return cell;
+  return {
+    ...cell,
+    value: DERIVED[cell.value] ?? cell.value,
+    detail: DERIVED[cell.detail] ?? cell.detail,
+  };
 }
 
 function Cell({
@@ -68,7 +90,7 @@ export function SpecsChapter() {
       className='hv3 hv3-chapter hv3-specs'
     >
       <div className='hv3-rule'>
-        <span className='hv3-mono'>{HOMEPAGE_EDITORIAL_COPY.specsRule}</span>
+        <span className='hv3-mono'>{`03 · ${HOMEPAGE_EDITORIAL_COPY.chapters[2]}`}</span>
       </div>
       <div className='hv3-specs__head hv3-reveal'>
         <h2 className='hv3-statement text-balance'>{SPECS.headline}</h2>
@@ -99,7 +121,7 @@ export function SpecsChapter() {
           <div key={row.label} className='hv3-sheet__row'>
             <h3 className='hv3-sheet__label text-balance'>{row.label}</h3>
             {row.cells.map(cell => (
-              <Cell key={cell.title} cell={cell} />
+              <Cell key={cell.title} cell={resolveCell(cell)} />
             ))}
           </div>
         ))}

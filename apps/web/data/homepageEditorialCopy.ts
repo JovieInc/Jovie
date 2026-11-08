@@ -42,8 +42,6 @@ export const HOMEPAGE_EDITORIAL_COPY = {
       'Jovie for Mac: the Releases list with Supernova Girl open in the inspector',
     upcCallout: 'per release',
   },
-  /** Chapter rule shown at the top of the specs chapter. */
-  specsRule: '03 · specs',
   /** Chapter index (mono, lowercase, as approved). */
   chapters: ['profile', 'releases', 'specs', 'invitation'],
   chaptersLabel: 'On this page',
@@ -121,7 +119,9 @@ export const HOMEPAGE_EDITORIAL_COPY = {
           {
             value: 'Per release',
             title: 'UPC',
-            detail: '5054526843813 · Supernova Girl',
+            /** Resolved from the inspector's release (the same UPC on screen). */
+            detail: 'upc',
+            derived: true,
           },
         ],
       },
@@ -145,10 +145,12 @@ export const HOMEPAGE_EDITORIAL_COPY = {
         label: 'Developers',
         cells: [
           {
-            value: 'v1',
+            /** Resolved from the public API contract's active version. */
+            value: 'apiVersion',
             title: 'REST API',
-            detail: 'openapi spec at /api/v1',
+            detail: 'apiSpec',
             mono: true,
+            derived: true,
           },
           {
             value: 'Per artist',
