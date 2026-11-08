@@ -10,8 +10,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
+// Push/overlay presentation coverage lives in RightDrawer.presentation.test.tsx.
 const mockUseBreakpointDown = vi.fn();
-
 vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpointDown: (...args: unknown[]) => mockUseBreakpointDown(...args),
 }));
@@ -59,29 +59,6 @@ describe('RightDrawer', () => {
       await expectNoA11yViolations(drawer);
     }
   );
-
-  it('pushes by default and lets only a transient preview request the overlay', () => {
-    const { rerender } = render(
-      <RightDrawer isOpen width={360} ariaLabel='Push details'>
-        <div>Body</div>
-      </RightDrawer>
-    );
-    const drawer = screen.getByRole('complementary', { name: 'Push details' });
-    expect(drawer).toHaveAttribute('data-rail-presentation', 'push');
-    // Capped against the main plane like the slot, minus the shell gap.
-    expect(drawer.style.maxWidth).toBe('calc(50cqw - var(--app-shell-gap))');
-    rerender(
-      <RightDrawer
-        isOpen
-        width={360}
-        ariaLabel='Push details'
-        presentation='overlay'
-      >
-        <div>Body</div>
-      </RightDrawer>
-    );
-    expect(drawer).toHaveAttribute('data-rail-presentation', 'overlay');
-  });
 
   it('updates aria-hidden when toggling open and closed', () => {
     const { rerender } = render(

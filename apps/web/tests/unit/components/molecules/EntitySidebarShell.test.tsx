@@ -10,7 +10,6 @@ vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
     id,
     className,
     onKeyDown,
-    presentation,
     'data-testid': testId,
   }: {
     readonly children: ReactNode;
@@ -18,11 +17,9 @@ vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
     readonly id?: string;
     readonly className?: string;
     readonly onKeyDown?: (event: KeyboardEvent) => void;
-    readonly presentation?: string;
     readonly 'data-testid'?: string;
   }) => (
     <aside
-      data-presentation={presentation}
       id={id}
       data-testid={testId ?? 'right-drawer'}
       aria-label={ariaLabel}
@@ -183,30 +180,6 @@ describe('EntitySidebarShell', () => {
       'shadow-none'
     );
     expect(workspace).not.toHaveClass('rounded-(--linear-app-shell-radius)');
-  });
-
-  it('forwards the requested rail presentation to the drawer', () => {
-    const { rerender } = render(
-      <EntitySidebarShell isOpen ariaLabel='Contact details'>
-        <div>Body content</div>
-      </EntitySidebarShell>
-    );
-    expect(screen.getByTestId('right-drawer')).not.toHaveAttribute(
-      'data-presentation'
-    );
-    rerender(
-      <EntitySidebarShell
-        isOpen
-        ariaLabel='Contact details'
-        presentation='overlay'
-      >
-        <div>Body content</div>
-      </EntitySidebarShell>
-    );
-    expect(screen.getByTestId('right-drawer')).toHaveAttribute(
-      'data-presentation',
-      'overlay'
-    );
   });
 
   it('forwards a route-specific surface class to the outer drawer', () => {

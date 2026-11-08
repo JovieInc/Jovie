@@ -49,17 +49,20 @@ describe('AppShellRightRail', () => {
     expect(base).toContain('flex: none;');
     expect(base).toContain('height: 100%;');
     expect(base).toContain('width: auto;');
-    expect(base).toContain('padding-inline-start: var(--app-shell-gap);');
+    // No gap until a drawer is phased in: a slot whose drawer has not
+    // mounted yet (a lazily loaded panel) must not narrow the route.
+    expect(base).toContain('padding-inline-start: 0;');
+    expect(base).not.toContain('padding-inline-start: var(--app-shell-gap);');
     // Same half-plane cap as the drawer so the pushed route keeps a column.
     expect(base).toContain('max-width: 50cqw;');
   });
 
   it('gives the gap back with the drawer and floats only a requested preview', () => {
     const utility = railUtility();
-    // The gap collapses once no drawer is opening or open, so a closed rail
-    // allocates nothing and the route reclaims the full plane.
+    // The gap exists only while a drawer is opening or open, so a closed or
+    // not-yet-mounted rail allocates nothing and the route keeps the plane.
     expect(utility).toMatch(
-      /&:has\(\[data-rail-phase\]\):not\(\s*:has\(\[data-rail-phase="open"\]\),\s*:has\(\[data-rail-phase="opening"\]\)\s*\)\s*\{\s*padding-inline-start: 0;/
+      /&:has\(\[data-rail-phase="open"\], \[data-rail-phase="opening"\]\)\s*\{\s*padding-inline-start: var\(--app-shell-gap\);/
     );
     // Only a drawer that requests the transient overlay floats; the slot
     // then allocates no width (clamped to 0, the inset margin cancels its

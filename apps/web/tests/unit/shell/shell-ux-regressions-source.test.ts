@@ -92,10 +92,12 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
     expect(desktopBase).not.toContain('inset-inline-end');
     expect(desktopBase).toContain('flex: none;');
     expect(desktopBase).toContain('width: auto;');
-    expect(desktopBase).toContain(
-      'padding-inline-start: var(--app-shell-gap);'
+    // A rail with no phased drawer (still loading) reserves no gap.
+    expect(desktopBase).toContain('padding-inline-start: 0;');
+    expect(desktopBase).not.toContain('var(--app-shell-gap)');
+    expect(slot).toContain(
+      '&:has([data-rail-phase="open"], [data-rail-phase="opening"])'
     );
-    expect(slot).toContain('&:has([data-rail-phase]):not(');
     // Only a transient preview drawer may float over the route.
     expect(slot).toContain(
       '&:has([data-rail-presentation="overlay"]:not([data-rail-phase="closed"]))'

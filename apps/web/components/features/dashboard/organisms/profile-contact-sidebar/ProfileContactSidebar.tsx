@@ -261,10 +261,18 @@ function getConflictVersion(error: unknown): number | undefined {
  */
 export function ProfileContactSidebar() {
   const { isOpen, isFloating, close } = usePreviewPanelState();
-  // A hover/focus preview floats over the route; an open or pinned rail
-  // pushes it. Placement outlives the preview's visibility so its exit stays
-  // an overlay too; pinning clears it and the route yields in step.
-  const presentation = isFloating ? 'overlay' : 'push';
+  // Props shared by every rail state. A hover/focus preview floats over the
+  // route (placement outlives visibility, so its exit stays an overlay too);
+  // an open or pinned rail pushes it, and pinning makes the route yield in step.
+  const railProps = {
+    id: 'shell-artist-profile-rail',
+    onClose: close,
+    isOpen,
+    presentation: isFloating ? 'overlay' : 'push',
+    workspaceSurface: 'raised',
+    headerMode: 'minimal',
+    hideMinimalHeaderBar: true,
+  } as const;
   const { previewData, setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
 
@@ -1175,15 +1183,9 @@ export function ProfileContactSidebar() {
   if (!previewData) {
     return (
       <EntitySidebarShell
-        id='shell-artist-profile-rail'
-        onClose={close}
-        isOpen={isOpen}
-        presentation={presentation}
+        {...railProps}
         ariaLabel='Profile Contact'
         data-testid='profile-contact-sidebar-skeleton'
-        workspaceSurface='raised'
-        headerMode='minimal'
-        hideMinimalHeaderBar
         showMobileDismissal
         contentBleed
       >
@@ -1246,15 +1248,9 @@ export function ProfileContactSidebar() {
   if (mode === 'view') {
     return (
       <EntitySidebarShell
-        id='shell-artist-profile-rail'
-        onClose={close}
-        isOpen={isOpen}
-        presentation={presentation}
+        {...railProps}
         ariaLabel='Profile Preview'
         data-testid='profile-contact-sidebar'
-        workspaceSurface='raised'
-        headerMode='minimal'
-        hideMinimalHeaderBar
         showMobileDismissal
         contentBleed
       >
@@ -1271,15 +1267,9 @@ export function ProfileContactSidebar() {
 
   return (
     <EntitySidebarShell
-      id='shell-artist-profile-rail'
-      onClose={close}
-      isOpen={isOpen}
-      presentation={presentation}
+      {...railProps}
       ariaLabel='Profile Contact'
       data-testid='profile-contact-sidebar'
-      workspaceSurface='raised'
-      headerMode='minimal'
-      hideMinimalHeaderBar
       entityHeaderSurface='flat'
       entityHeader={
         <ProfileSidebarHeaderCard

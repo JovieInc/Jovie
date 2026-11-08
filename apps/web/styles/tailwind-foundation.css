@@ -347,14 +347,14 @@
        keeps a usable column. Overlay previews clamp this to 0, so pinning
        one animates the clamp and the route yields without a jump. */
     max-width: 50cqw;
-    padding-inline-start: var(--app-shell-gap);
     /* The shell gap travels with the drawer: it opens with `opening` and
-       gives itself back through `closing`, so the route never steps 8px. */
-    &:has([data-rail-phase]):not(
-        :has([data-rail-phase="open"]),
-        :has([data-rail-phase="opening"])
-      ) {
-      padding-inline-start: 0;
+       gives itself back through `closing`, so the route never steps 8px.
+       A slot whose drawer has not mounted yet (a lazily loaded panel)
+       reserves nothing; the settings companion holds its space with its own
+       min-width reservation in system-b-app.css. */
+    padding-inline-start: 0;
+    &:has([data-rail-phase="open"], [data-rail-phase="opening"]) {
+      padding-inline-start: var(--app-shell-gap);
     }
     /* A transient hover/focus preview (its drawer requests the overlay
        presentation) floats over the route instead of allocating canvas,
