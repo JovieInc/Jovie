@@ -79,8 +79,7 @@ jobs:
 
       - name: Run secret scan (gitleaks + trufflehog)
         env:
-          # Read-only job token: lets a failed anonymous pinned release download
-          # retry through the authenticated releases API (unused when healthy).
+          # Read-only token for the release-download fallback.
           RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         shell: bash
         run: |
@@ -217,8 +216,7 @@ jobs:
 
       - name: Run TruffleHog (full history on main/schedule, PR diff on pull_request)
         env:
-          # Read-only job token: lets a failed anonymous pinned release download
-          # retry through the authenticated releases API (unused when healthy).
+          # Read-only token for the release-download fallback.
           RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         shell: bash
         run: |

@@ -1,20 +1,11 @@
 #!/usr/bin/env bash
 # Fetch one pinned GitHub release asset to a file, failing closed.
-#
 #   github-release-asset.sh https://github.com/<owner>/<repo>/releases/download/<tag>/<asset> <out>
-#
-# On 2026-11-08 anonymous github.com release downloads answered HTTP 504 for
-# hours, from Actions runners and elsewhere, and red-lined every merge group
-# (gitleaks, trufflehog, shellcheck, squawk, oasdiff). Each attempt here:
-#   1. anonymous curl to <out> (--output truncates on every try, so a retried
-#      transfer can never append to a partial body), then
-#   2. when a token is set (RELEASE_DOWNLOAD_TOKEN, else GH_TOKEN, else
-#      GITHUB_TOKEN), the identical asset through the authenticated releases
-#      API via the shared gh client (packages/api-client). Healthy runs never
-#      spend the shared token bucket; only a failed anonymous attempt does.
-# Six attempts with doubling, jittered backoff (2-4 ... 32-64s, 62-124s in
-# total), then exit 1 with a classified error. This verifies nothing itself:
-# every caller keeps its own sha256 pins and checks the bytes afterwards.
+# Anonymous release downloads answered HTTP 504 for hours on 2026-11-08. Each
+# attempt tries anonymous curl (--output truncates, so a retry never appends),
+# then, with RELEASE_DOWNLOAD_TOKEN/GH_TOKEN/GITHUB_TOKEN set, the same asset
+# via the authenticated releases API. Six attempts, doubling jittered backoff
+# (62-124s), then exit 1. Callers keep and check their own sha256 pins.
 # api-budget: github-actions-token 120/hr - zero while anonymous downloads work; in an outage two REST reads (release by tag, asset) per failed attempt, at most 12 per calling step, ~10 failing steps an hour
 set -euo pipefail
 
@@ -40,7 +31,6 @@ status='none'
 
 for ((attempt = 1; attempt <= attempts; attempt++)); do
   rm -f "$out"
-  # The write-out names the HTTP status and the host that answered it.
   if status="$(curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
     --connect-timeout 20 --speed-limit 1024 --speed-time 30 --output "$out" \
     --write-out '%{http_code}' "$url")"; then

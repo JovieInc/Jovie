@@ -31,16 +31,11 @@ done
 member="${!#}"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$dest/$member"
 EOF
-  # Authenticated fallback: record the token and args, then write the asset.
+  # Authenticated fallback: log token and args, write the asset to -O.
   cat >"$fixture_bin/gh" <<'EOF'
 #!/usr/bin/env bash
 printf '%s %s\n' "${GH_TOKEN:-}" "$*" >>"$GH_CALLS"
-out=''
-prev=''
-for arg in "$@"; do
-  [[ "$prev" == '-O' ]] && out="$arg"
-  prev="$arg"
-done
+while [[ $# -gt 0 ]]; do [[ "$1" == -O ]] && out="$2"; shift; done
 printf 'fake-tarball' >"$out"
 EOF
   chmod +x "$fixture_bin/curl" "$fixture_bin/tar" "$fixture_bin/gh"

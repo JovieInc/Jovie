@@ -1,8 +1,6 @@
-// Node adapter for scripts/lib/github-release-asset.sh: one pinned GitHub
-// release asset, downloaded to a temp file (never streamed through stdout, so
-// a retried transfer cannot append duplicate bytes) and read back. The shell
-// helper owns the backoff and the authenticated fallback; callers keep their
-// own sha256 pins and must verify the returned bytes.
+// Node adapter for github-release-asset.sh: downloads to a temp file (never
+// stdout, so a retry cannot append bytes) and reads it back. Callers verify
+// the returned bytes against their own sha256 pins.
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

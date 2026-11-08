@@ -22,9 +22,8 @@ afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
 });
 
-// No test contacts the network. curl answers like `curl --fail`: anonymous
-// status on stdout, exit 22 on an HTTP error. gh records how the shared gh
-// client invoked it and writes the asset to -O.
+// No network: curl acts like `curl --fail` (status on stdout, exit 22); gh
+// logs its token and args and writes the asset to -O.
 function harness({ anonymous = '504', gh = 'ok' } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'release-asset-'));
   temporary.push(dir);
@@ -98,8 +97,10 @@ describe('github-release-asset.sh', () => {
     expect(result.stderr).toContain('anonymous HTTP 504');
   });
 
-  it('reads GH_TOKEN when no dedicated token is set', () => {
+  it('reads GH_TOKEN and never calls the API without a token', () => {
     const h = harness();
+    expect(h.run({ RELEASE_DOWNLOAD_ATTEMPTS: '2' }).status).toBe(1);
+    expect(h.read('gh')).toEqual([]);
     expect(h.run({ GH_TOKEN: 'gh-token' }).status).toBe(0);
     expect(h.read('gh')[0]).toMatch(/^gh-token release download /);
   });
@@ -120,12 +121,6 @@ describe('github-release-asset.sh', () => {
       expect(slept).toBeGreaterThanOrEqual(2 ** i);
       expect(slept).toBeLessThanOrEqual(2 ** (i + 1));
     });
-  });
-
-  it('never calls the API without a token', () => {
-    const h = harness();
-    expect(h.run({ RELEASE_DOWNLOAD_ATTEMPTS: '2' }).status).toBe(1);
-    expect(h.read('gh')).toEqual([]);
   });
 
   it.each([

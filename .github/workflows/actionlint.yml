@@ -33,8 +33,7 @@ jobs:
           cache: false
       - name: Run actionlint (checksum-pinned toolchain)
         env:
-          # Read-only job token: lets a failed anonymous pinned release download
-          # retry through the authenticated releases API (unused when healthy).
+          # Read-only token for the release-download fallback.
           RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         run: bash .github/scripts/run-actionlint.sh
       - name: Verify agent workflow hygiene
