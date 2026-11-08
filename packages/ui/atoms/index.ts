@@ -34,7 +34,7 @@ export {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './dropdown-menu';
-export type { IconButtonProps } from './icon-button';
+export type { IconButtonName, IconButtonProps } from './icon-button';
 export { IconButton, iconButtonVariants } from './icon-button';
 export {
   ICON_BUTTON_FADE_CLASSNAME,

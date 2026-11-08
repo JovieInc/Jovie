@@ -934,6 +934,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - pull_request
       - push
       - workflow_dispatch
     terminalReceipt: job:draft
