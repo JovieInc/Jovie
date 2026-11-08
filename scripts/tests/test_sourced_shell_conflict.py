@@ -146,6 +146,15 @@ class SourcedShellConflictTest(unittest.TestCase):
                                  f"kept-before\n{canonical}kept-after\n{callers}")
                 self.assertEqual(extras, [])
                 self.assertEqual((root / REL).read_text(), HELPER)
+                for changed in (
+                    text.replace(callers, "# " + callers.replace("\n", "\n# ")),
+                    text + 'fetch_release_tarball "$url" "$dir" "$member"\n',
+                    text.replace(SOURCE, SOURCE + 'GITLEAKS_VERSION="${GITLEAKS_VERSION:-9.0.0}"\n'),
+                ):
+                    self.assertIsNone(conflict.resolve_shell_conflict(changed, root, []))
+                downloader.write_text("<<<<<<< HEAD\nold\n=======\nnew\n>>>>>>> main\n")
+                self.assertIsNone(conflict.resolve_shell_conflict(text, root, []))
+                downloader.write_text("# canonical downloader fixture\n")
                 for missing in (callers, callers.splitlines(keepends=True)[0]):
                     self.assertIsNone(conflict.resolve_shell_conflict(text.replace(missing, ""), root, []))
                 unknown = _hunk("unknown\n", "also unknown\n")
@@ -158,6 +167,24 @@ class SourcedShellConflictTest(unittest.TestCase):
                 unexpected = text.replace('source "$REPO_ROOT/scripts/security/fetch-scanner.sh"',
                                           'source "$REPO_ROOT/scripts/security/unknown.sh"')
                 self.assertIsNone(conflict.resolve_shell_conflict(unexpected, root, []))
+
+    def test_unknown_inline_commands_and_settings_stay_unresolved(self):
+        for inline in (
+            INLINE.replace('      chmod +x', '      verify_download_signature "$dest_dir/$member"\n      chmod +x'),
+            INLINE.replace('SCAN_SECRETS_RETRY_DELAY=', 'VERIFY_SIGNATURE="${VERIFY_SIGNATURE:-1}"\nSCAN_SECRETS_RETRY_DELAY=', 1),
+            INLINE.replace('return 1', 'return 0'),
+        ):
+            with self.subTest(inline=inline):
+                resolved, extras, helper, _mode = self._resolve(_hunk(SOURCE, inline))
+                self.assertIsNone(resolved)
+                self.assertEqual(extras, [])
+                self.assertEqual(helper, HELPER)
+
+        existing = 'SCAN_SECRETS_DOWNLOAD_ATTEMPTS="${SCAN_SECRETS_DOWNLOAD_ATTEMPTS:-3}"\n' + HELPER
+        resolved, extras, helper, _mode = self._resolve(_hunk(SOURCE, INLINE), existing)
+        self.assertIsNone(resolved)
+        self.assertEqual(extras, [])
+        self.assertEqual(helper, existing)
 
     def test_and_chain_still_resolves_without_writing_a_helper(self):
         ours = ("pnpm --filter @jovie/extension test && node --experimental-strip-types "

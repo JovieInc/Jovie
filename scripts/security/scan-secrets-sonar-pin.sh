@@ -6,7 +6,7 @@
 
 is_recorded_workflow_pin() {
   local rev="$1" raw="$2" path line
-  local pin_re="uses:[[:space:]]+[[:alnum:]_.-]+/[[:alnum:]_./-]+@${raw}([[:space:]]|#|$)"
+  local pin_re="^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]+[[:alnum:]_.-]+/[[:alnum:]_./-]+@${raw}[[:space:]]*(#.*)?$"
   [[ "$raw" =~ ^[0-9a-f]{40}$ ]] || return 1
   for path in .github/workflows .github/actions; do
     while IFS= read -r line; do

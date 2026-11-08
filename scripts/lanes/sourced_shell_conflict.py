@@ -32,15 +32,36 @@ _ARITHMETIC = "for ((attempt = 1; attempt <= SCAN_SECRETS_DOWNLOAD_ATTEMPTS; att
 _JITTER = 'sleep "$((delay + RANDOM % (delay + 1)))"'
 _DOUBLING = "delay=$((delay * 2))"
 _NOTE = "Stalled downloads abort (--speed-time) and retries back off with jitter."
+_INLINE_BODY = r'''fetch_release_tarball() {
+  local url="$1" dest_dir="$2" member="$3" tmp attempt delay="$SCAN_SECRETS_RETRY_DELAY"
+  tmp="$(mktemp)"
+  for ((attempt = 1; attempt <= SCAN_SECRETS_DOWNLOAD_ATTEMPTS; attempt++)); do
+    if curl -sSfL @STALL_FLAGS@ -o "$tmp" "$url" \
+      && tar -xzf "$tmp" -C "$dest_dir" "$member"; then
+      chmod +x "$dest_dir/$member"
+      rm -f "$tmp"
+      return 0
+    fi
+    if [[ $attempt -lt $SCAN_SECRETS_DOWNLOAD_ATTEMPTS ]]; then
+      echo "scanner download attempt $attempt failed; retrying" >&2
+      sleep "$((delay + RANDOM % (delay + 1)))"
+      delay=$((delay * 2))
+    fi
+  done
+  rm -f "$tmp"
+  echo "::error title=Secret scanner download failed::Could not fetch $member after $SCAN_SECRETS_DOWNLOAD_ATTEMPTS attempts ($url)." >&2
+  return 1
+}'''
 
 
-def resolve_shell_conflict(text: str, worktree, extras: list) -> str | None:
+def resolve_shell_conflict(text: str, worktree, extras: list, *, helper_updates=None) -> str | None:
     """Return conflict text with sourced-helper hunks kept, or an &&-chain union.
 
     The known checksum-verified scanner replacement is kept when both callers
     have migrated and its downloader and pin files are present.
     `extras` receives helper paths whose bytes changed, so the caller can stage
-    them. None leaves the merge untouched aside from a failed read.
+    them. With `helper_updates`, collect writes until every file is validated.
+    None leaves the merge untouched aside from a failed read.
     """
     chained = fix_red_classes.resolve_and_chain_text(text)
     if chained is not None:
@@ -94,6 +115,13 @@ def resolve_shell_conflict(text: str, worktree, extras: list) -> str | None:
         if upgraded != current:
             pending.append((rel, helper_path, upgraded))
     for rel, helper_path, upgraded in pending:
+        if helper_updates is not None:
+            if helper_path in helper_updates and helper_updates[helper_path] != upgraded:
+                return None
+            helper_updates[helper_path] = upgraded
+            if rel not in extras:
+                extras.append(rel)
+            continue
         mode = helper_path.stat().st_mode
         try:
             atomic_state.atomic_write_text(helper_path, upgraded)
@@ -113,11 +141,23 @@ def _scanner_replacement(ours: str, theirs: str, text: str, worktree) -> str | N
     left, right = _helper_rel(ours), _helper_rel(theirs)
     if {left, right} != {legacy, canonical}:
         return None
+    legacy_side = ours if left == legacy else theirs
+    for line in legacy_side.splitlines():
+        if _ASSIGN.match(line) and line.strip() != 'SCAN_SECRETS_RETRY_DELAY="${SCAN_SECRETS_RETRY_DELAY:-2}"':
+            return None
+    outside = fix_red_classes._NARROWED_HUNK.sub("", text)
+    if re.search(r"\bfetch_release_tarball\b", outside):
+        return None
     for tool in ("gitleaks", "trufflehog"):
-        if f'$(fetch_scanner {tool} "${tool.upper()}_VERSION")' not in text:
+        caller = f'{tool.upper()}_BIN="$(fetch_scanner {tool} "${tool.upper()}_VERSION")" || exit 1'
+        if not any(line.strip() == caller for line in outside.splitlines()):
             return None
     root = Path(worktree)
-    if not all((root / rel).is_file() for rel in (canonical, "scripts/security/scanner-pins.txt")):
+    try:
+        dependencies = [(root / rel).read_text() for rel in (canonical, "scripts/security/scanner-pins.txt")]
+    except (OSError, UnicodeError):
+        return None
+    if any("<<<<<<<" in body or ">>>>>>>" in body for body in dependencies):
         return None
     return ours if left == canonical else theirs
 
@@ -137,7 +177,17 @@ def _classify(side: str) -> str | None:
     funcs = [line.strip() for line in lines if line.strip().endswith("() {")]
     if funcs == [_FUNC] and not source_hits:
         func_at = next(index for index, line in enumerate(lines) if line.strip() == _FUNC)
-        if any(not _preamble(line) for line in lines[:func_at]):
+        settings = {
+            'SCAN_SECRETS_RETRY_DELAY="${SCAN_SECRETS_RETRY_DELAY:-2}"',
+            _one(_ATTEMPTS.findall(side)),
+        }
+        if any(line.strip() and not line.strip().startswith("#") and line.strip() not in settings
+               for line in lines[:func_at]):
+            return None
+        flags = _one(_STALL.findall(side))
+        normalize = lambda body: [line.strip() for line in body.splitlines() if line.strip()]
+        if flags is None or normalize("\n".join(lines[func_at:])) != normalize(
+                _INLINE_BODY.replace("@STALL_FLAGS@", flags)):
             return None
         if not lines or lines[-1].strip() != "}":
             # splitlines drops the trailing newline; the last physical line is `}`.
@@ -252,6 +302,8 @@ def _port_local(text: str) -> str | None:
 def _port_attempts(text: str, line: str) -> str | None:
     if line in text:
         return text
+    if _ATTEMPTS.search(text):
+        return None
     if text.count(_FUNC) != 1:
         return None
     return text.replace(_FUNC, f"{line}\n\n{_FUNC}", 1)

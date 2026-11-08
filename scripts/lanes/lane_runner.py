@@ -6456,16 +6456,19 @@ def resolve_and_chain_conflict(worktree: Path, branch: str, log, *, guard=lambda
             return False
         extras: list[str] = []
         resolved_texts: dict[Path, str] = {}
+        helper_updates: dict[Path, str] = {}
         for rel in conflicted:
             target = worktree / rel
             try:
-                outcome = sourced_shell_conflict.resolve_shell_conflict(target.read_text(), worktree, extras)
+                outcome = sourced_shell_conflict.resolve_shell_conflict(
+                    target.read_text(), worktree, extras, helper_updates=helper_updates)
             except (OSError, UnicodeError):
                 outcome = None
             if outcome is None:
                 sh(["git", "merge", "--abort"], cwd=worktree, log=log)
                 return False
             resolved_texts[target] = outcome
+        resolved_texts.update(helper_updates)
         try:
             for target, outcome in resolved_texts.items():
                 mode = target.stat().st_mode
