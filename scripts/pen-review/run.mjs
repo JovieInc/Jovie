@@ -172,6 +172,18 @@ export async function reviewFrame(
     rounds: [],
     verdict: null,
   };
+  function finishRound(r) {
+    const finishedAt = now();
+    receipt.rounds.push({ ...r, finishedAt });
+    record({
+      stage: 'pen-review-round',
+      frame: id,
+      round: r.round,
+      action: r.decision.action,
+      startedAt: r.startedAt,
+      finishedAt,
+    });
+  }
   let quietRounds = 0;
   for (let round = 0; round < maxRounds; round++) {
     assertLease();
@@ -192,7 +204,7 @@ export async function reviewFrame(
     if (round === 0) copyFileSync(render.path, join(dir, 'before.png'));
     if (render.guard.length) {
       r.decision = { action: 'render-untrusted' };
-      receipt.rounds.push({ ...r, finishedAt: now() });
+      finishRound(r);
       receipt.verdict = 'render-untrusted';
       break;
     }
@@ -244,7 +256,7 @@ export async function reviewFrame(
     r.decision = decision;
     if (decision.action === 'fix') {
       if (fixer !== 'agent') {
-        receipt.rounds.push({ ...r, finishedAt: now() });
+        finishRound(r);
         receipt.verdict = 'needs-fix';
         receipt.nextFix = decision.topIssue;
         break;
@@ -254,15 +266,7 @@ export async function reviewFrame(
         { model: fixerModel(decision.topIssue) }
       );
     }
-    receipt.rounds.push({ ...r, finishedAt: now() });
-    record({
-      stage: 'pen-review-round',
-      frame: id,
-      round,
-      action: decision.action,
-      startedAt: r.startedAt,
-      finishedAt: now(),
-    });
+    finishRound(r);
     if (decision.action === 'pass' || decision.action === 'fail') {
       receipt.verdict = decision.action;
       break;

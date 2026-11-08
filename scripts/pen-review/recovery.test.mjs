@@ -168,3 +168,42 @@ test('review workflow repairs deterministic defects during incomplete panel and 
   assert.ok(existsSync(join(dir, 'F', 'after.png')));
   assert.equal(events.filter(e => e.stage === 'pen-review-round').length, 4);
 });
+
+for (const verdict of ['render-untrusted', 'needs-fix']) {
+  test(`early ${verdict} exit retains round timing`, async t => {
+    const dir = scratch(t);
+    const path = join(dir, 'render.png');
+    writeFileSync(path, encodePng(image()));
+    const events = [];
+    const receipt = await reviewFrame(
+      'F',
+      { receiptsDir: dir, fixer: 'none' },
+      {
+        getTrees: () => [{ id: 'F', name: 'PROPOSAL / timing' }],
+        getFacts: () => ({
+          name: 'PROPOSAL / timing',
+          w: 800,
+          nodes: [{ id: 'bad', t: 'frame', x: 1.5, y: 0, w: 20, h: 20, r: {} }],
+        }),
+        renderFrame: async () => ({
+          path,
+          md5: 'a',
+          guard: verdict === 'render-untrusted' ? ['garbled'] : [],
+          attempt: 0,
+        }),
+        panelFor: async () => ({
+          complete: true,
+          gates: { status: 'evaluated', pass: true, rules: {} },
+          judges: [],
+        }),
+        rename: () => {},
+        record: event => events.push(event),
+      }
+    );
+    assert.equal(receipt.verdict, verdict);
+    const rounds = events.filter(event => event.stage === 'pen-review-round');
+    assert.equal(rounds.length, 1);
+    assert.equal(rounds[0].startedAt, receipt.rounds[0].startedAt);
+    assert.equal(rounds[0].finishedAt, receipt.rounds[0].finishedAt);
+  });
+}
