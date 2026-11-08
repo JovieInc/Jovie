@@ -3,6 +3,7 @@ import type { Virtualizer } from '@tanstack/react-virtual';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { TOOL_STATUS_PARTS } from '@/components/jovie/fixtures/tool-status';
 import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { fastRender } from '@/tests/utils/fast-render';
 import { ChatThreadMessages } from '../JovieChatSections';
@@ -55,6 +56,75 @@ describe('inline typed source evidence', () => {
       </TooltipProvider>
     );
     expect(await findSourceChip()).toHaveTextContent('9.9K followers');
+  });
+
+  it.each(['succeeded', 'failed'] as const)(
+    'keeps one feedback row beside source evidence for a %s tool',
+    async state => {
+      fastRender(
+        <TooltipProvider>
+          <ChatMessage
+            {...sourceMessageFixture('tool-with-source', '9.9K followers')}
+            parts={[
+              { type: 'text', text: '9.9K followers' },
+              ...TOOL_STATUS_PARTS[state],
+            ]}
+            sourceFacts={[sourceFixture()]}
+            enableFeedback
+          />
+        </TooltipProvider>
+      );
+
+      expect(await findSourceChip()).toHaveTextContent('9.9K followers');
+      const feedback = screen.getAllByTestId('chat-feedback-control');
+      expect(feedback).toHaveLength(1);
+      expect(feedback[0]).toHaveAttribute(
+        'data-tool-call-id',
+        'press-source:attempt-1'
+      );
+      expect(
+        screen.getAllByRole('button', { name: 'Good response' })
+      ).toHaveLength(1);
+    }
+  );
+
+  it('retains message feedback when a separate surface renders the tool', () => {
+    fastRender(
+      <TooltipProvider>
+        <ChatMessage
+          {...sourceMessageFixture('separate-tool-surface', 'Source saved.')}
+          parts={[
+            { type: 'text', text: 'Source saved.' },
+            ...TOOL_STATUS_PARTS.succeeded,
+          ]}
+          renderTools={false}
+          enableFeedback
+        />
+      </TooltipProvider>
+    );
+
+    const feedback = screen.getAllByTestId('chat-feedback-control');
+    expect(feedback).toHaveLength(1);
+    expect(feedback[0]).not.toHaveAttribute('data-tool-call-id');
+  });
+
+  it('retains message feedback for a text-only reply', () => {
+    fastRender(
+      <TooltipProvider>
+        <ChatMessage
+          {...sourceMessageFixture(
+            'text-only',
+            'Tell me about your next release.'
+          )}
+          parts={[{ type: 'text', text: 'Tell me about your next release.' }]}
+          enableFeedback
+        />
+      </TooltipProvider>
+    );
+
+    const feedback = screen.getAllByTestId('chat-feedback-control');
+    expect(feedback).toHaveLength(1);
+    expect(feedback[0]).not.toHaveAttribute('data-tool-call-id');
   });
   it('keeps inline markdown fragments inline with inspectable evidence', async () => {
     fastRender(

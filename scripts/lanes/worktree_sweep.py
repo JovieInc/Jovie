@@ -50,6 +50,10 @@ from atomic_state import atomic_write_text  # noqa: E402
 PRESERVED_REPAIR = ".jovie-preserved-repair.json"
 IDLE_S = 12 * 3600
 CLOSED_GRACE_S = 3600
+# Regenerable build dirs (node_modules is ~7 GB per Jovie checkout) of a checkout that stays on disk
+# (preserved repair, held snapshot) are stripped after this idle time. Gem hit 95% on 2026-11-07
+# with ~230 GB of node_modules in 36 kept checkouts that no retire path ever stripped.
+KEPT_STRIP_IDLE_S = 3600
 PRESERVED_TTL_S = 3 * 86400
 INTERVAL_S = 3600
 LINKED_SWEEP_BUDGET_S = 20 * 60  # linked-worktree phase; the standalone reclaim runs after it, always
@@ -380,6 +384,14 @@ def strip_build_dirs(path: Path) -> None:
         dirs[:] = keep
 
 
+def strip_kept(path: Path, info: dict, now: float, report: dict) -> None:
+    """Drop regenerable build dirs from a checkout the sweep keeps (never busy: callers checked)."""
+    if now - info["activity"] < KEPT_STRIP_IDLE_S or not (path / "node_modules").exists():
+        return
+    strip_build_dirs(path)
+    report["stripped"].append(str(path))
+
+
 def preserved_age(path: Path, now: float) -> float | None:
     try:
         return now - (path / PRESERVED_REPAIR).stat().st_mtime
@@ -428,15 +440,19 @@ def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: 
     reason = decide(path, branch, info, now, closed, idle_s=idle_s, preserved_ttl_s=preserved_ttl_s)
     if reason is None:
         report["kept"] += 1
+        strip_kept(path, info, now, report)
         return
     if info["dirty"] or info["unpushed"] != "0":
         try:
             saved = backup(path, info, run, prefix, date)
         except SnapshotHeld as held:
             # Keep the checkout untouched (no strip): the doctor raises sweep-snapshot-secret.
+            # Source and .git stay untouched; only regenerable build dirs go, so a stuck archive
+            # push can no longer pin gigabytes per checkout.
             report["kept"] += 1
             report.setdefault("secretHeld", []).append({"name": held.name, "path": str(path),
                                                         "reason": held.reason})
+            strip_kept(path, info, now, report)
             return
         if not saved:
             strip_build_dirs(path)
@@ -893,10 +909,16 @@ def guarded_main(args) -> int:
         prefix = sweep_prefix()
         # Alarm input first: it is a few statvfs calls and must not wait behind hours of cleanup.
         publish_headroom(args.state, headroom(volumes(home, args.state)), time.time())
+        linked_started = time.monotonic()
         report = sweep(repos, default_roots(home, args.state), default_never(home),
                        closed=closed, prefix=prefix, state=args.state, budget_s=LINKED_SWEEP_BUDGET_S)
+        # Stage metric (p50/p95 of the sweep phases): a spent budget or a slow phase is what let
+        # Gem fill to 95% unnoticed on 2026-11-07.
+        report["stageSeconds"] = {"linked": round(time.monotonic() - linked_started, 1)}
         if not report.get("drained") and not lifecycle.draining(args.state):
+            standalone_started = time.monotonic()
             report["standalone"] = sweep_standalone(home, args.state, repos, default_never(home))
+            report["stageSeconds"]["standalone"] = round(time.monotonic() - standalone_started, 1)
             now = time.time()
             publish_headroom(args.state, headroom(volumes(home, args.state)), now)
             report["dailyReport"] = daily_report(home, args.state, now)
