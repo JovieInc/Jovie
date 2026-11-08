@@ -681,11 +681,17 @@ describe('UnifiedSidebar library route', () => {
     const link = within(nav).getByRole('link', { name: 'Shipping' });
     fireEvent.mouseOver(link);
     fireEvent.focus(link);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/hud/shipping-state',
-      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    // The shipping query loads on demand, so wait for its request, then check
+    // that hover and focus together sent only one.
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/hud/shipping-state',
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      )
     );
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === '/api/hud/shipping-state')
+    ).toHaveLength(1);
     fetchMock.mockRestore();
   });
 

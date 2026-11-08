@@ -48,7 +48,6 @@ import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { useAppFlag } from '@/lib/flags/client';
-import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
@@ -125,7 +124,12 @@ function OperatorNavGroup({
   const queryClient = useQueryClient();
   const prefetchShipping = (item: NavItem) => {
     if (item.href === APP_ROUTES.ADMIN_SHIPPING) {
-      void queryClient.prefetchQuery(shippingStateQueryOptions);
+      // Loaded on hover so the shipping query and its zod schema stay out of
+      // the shell that every dashboard page downloads.
+      void import('@/lib/queries/shipping-state').then(
+        ({ shippingStateQueryOptions }) =>
+          queryClient.prefetchQuery(shippingStateQueryOptions)
+      );
     }
   };
   const [stored, setStored] = useState(false);
