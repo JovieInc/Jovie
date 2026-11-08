@@ -1,7 +1,5 @@
 'use client';
 
-// @coverage-via apps/web/components/features/dashboard/organisms/AnalyticsSidebar.test.tsx
-
 import type { ComponentType } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 

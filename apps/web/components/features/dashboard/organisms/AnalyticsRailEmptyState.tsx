@@ -1,7 +1,5 @@
 'use client';
 
-// @coverage-via apps/web/components/features/dashboard/organisms/AnalyticsSidebar.test.tsx
-
 import { ChartColumn } from 'lucide-react';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { APP_ROUTES } from '@/constants/routes';
