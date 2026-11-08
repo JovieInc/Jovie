@@ -24,16 +24,17 @@ export interface SparklineProps {
 const VIEWBOX_W = 340;
 const VIEWBOX_H = 120;
 
-// Design tokens, so the chart reads in light and dark and matches the
-// up / down delta chips beside it (system-b-opportunity-inbox-report-delta).
+// Status TEXT tokens, not the neon accent fills: --color-accent-green is
+// about 1.3:1 on white cards, while the -text tokens hold contrast in light
+// and dark, so the line clears 3:1 for graphics in both modes.
 const STROKE_BY_TREND: Record<SparklineTrend, string> = {
-  up: 'var(--color-accent-green)',
-  down: 'var(--color-accent-red)',
+  up: 'var(--color-success-text)',
+  down: 'var(--color-error-text)',
   flat: 'var(--color-text-tertiary-token)',
 };
 const FILL_BY_TREND: Record<SparklineTrend, string> = {
-  up: 'color-mix(in oklab, var(--color-accent-green) 12%, transparent)',
-  down: 'color-mix(in oklab, var(--color-accent-red) 12%, transparent)',
+  up: 'color-mix(in oklab, var(--color-success-text) 12%, transparent)',
+  down: 'color-mix(in oklab, var(--color-error-text) 12%, transparent)',
   flat: 'color-mix(in oklab, var(--color-text-tertiary-token) 8%, transparent)',
 };
 const PLAYHEAD_STROKE = 'var(--color-border-strong)';

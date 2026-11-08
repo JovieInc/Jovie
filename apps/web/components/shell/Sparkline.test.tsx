@@ -16,13 +16,25 @@ describe('Sparkline', () => {
     const { container } = render(<Sparkline points={[1, 2, 3]} trend='up' />);
     const lines = container.querySelectorAll('path');
     // Second path is the line stroke
-    expect(lines[1]?.getAttribute('stroke')).toBe('var(--color-accent-green)');
+    expect(lines[1]?.getAttribute('stroke')).toBe('var(--color-success-text)');
   });
 
   it('uses the down palette for a down trend', () => {
     const { container } = render(<Sparkline points={[3, 2, 1]} trend='down' />);
     const lines = container.querySelectorAll('path');
-    expect(lines[1]?.getAttribute('stroke')).toBe('var(--color-accent-red)');
+    expect(lines[1]?.getAttribute('stroke')).toBe('var(--color-error-text)');
+  });
+
+  it('never strokes with the neon accent fills, which fail 3:1 on white', () => {
+    for (const trend of ['up', 'down'] as const) {
+      const { container, unmount } = render(
+        <Sparkline points={[1, 2, 3]} trend={trend} />
+      );
+      for (const path of container.querySelectorAll('path')) {
+        expect(path.outerHTML).not.toMatch(/--color-accent-(green|red)/);
+      }
+      unmount();
+    }
   });
 
   it('renders a playhead when hoverIdx is provided', () => {
