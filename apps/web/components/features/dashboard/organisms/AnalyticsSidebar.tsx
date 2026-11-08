@@ -33,12 +33,7 @@ import { AnalyticsRankedList as RankedList } from './AnalyticsRankedList';
  * Calculate conversion rate between two funnel stages.
  * Suppresses misleading percents on small bases — see formatAnalyticsStageRate.
  */
-export function calculateConversionRate(
-  current: number,
-  previous: number
-): string | null {
-  return formatAnalyticsStageRate(current, previous);
-}
+export const calculateConversionRate = formatAnalyticsStageRate;
 
 const RANGE_VALUES: readonly AnalyticsRange[] = ['7d', '30d'];
 
@@ -189,8 +184,10 @@ export interface AnalyticsSidebarViewProps extends AnalyticsSidebarProps {
   readonly loading: boolean;
   readonly isFetching?: boolean;
   readonly range: AnalyticsRange;
-  readonly onRangeChange: (range: AnalyticsRange) => void;
-  readonly showRangeControl?: boolean;
+  /** Omit to hide the range control (static demo rails have one window). */
+  readonly onRangeChange?: (range: AnalyticsRange) => void;
+  /** Set only when the fetch failed; with no data the rail shows the error state. */
+  readonly onRetry?: () => void;
   readonly activeTab: AnalyticsTab;
   readonly onActiveTabChange: (tab: AnalyticsTab) => void;
   readonly testId?: string;
@@ -205,14 +202,17 @@ export function AnalyticsSidebarView({
   isFetching = false,
   range,
   onRangeChange,
-  showRangeControl = true,
+  onRetry,
   activeTab,
   onActiveTabChange,
   testId = 'analytics-sidebar',
   tabbedCardTestId = 'analytics-sidebar-tabbed-card',
 }: AnalyticsSidebarViewProps) {
   const showTipLinkVisits = (data?.tip_link_visits ?? 0) > 0;
-  const isEmpty = !loading && !hasAudienceActivity(data);
+  // A failed fetch has no data, so it must never read as "no visits yet".
+  const showError = !loading && onRetry != null && data == null;
+  const isEmpty = !loading && data != null && !hasAudienceActivity(data);
+  const hideMetrics = showError || isEmpty;
   const stages = [
     {
       label: CANONICAL_METRICS.profile_views.label,
@@ -240,7 +240,7 @@ export function AnalyticsSidebarView({
       tabDistribution='fill'
       tabbedCardTestId={tabbedCardTestId}
       tabbedSurfaceVariant='card'
-      hideTabbedCard={isEmpty}
+      hideTabbedCard={hideMetrics}
       sectionKind='details'
       contentClassName='pt-2'
       entityHeader={
@@ -262,7 +262,7 @@ export function AnalyticsSidebarView({
                   Views, clicks, and top traffic sources.
                 </p>
               </div>
-              {showRangeControl ? (
+              {onRangeChange ? (
                 <TimeRangeSelector
                   value={range}
                   onValueChange={onRangeChange}
@@ -284,25 +284,41 @@ export function AnalyticsSidebarView({
             )}
             data-right-rail-section='status'
           >
-            {/* First look: one empty state instead of a funnel of zeros */}
-            {isEmpty ? (
+            {/* A failed fetch must never read as "no visits yet"; a first
+                look shows one empty state instead of a funnel of zeros. */}
+            {hideMetrics ? (
               <EmptyState
-                icon={<ChartColumn className='h-5 w-5' strokeWidth={1.75} />}
-                heading='No Profile Visits Yet'
-                description={describeNoAudienceActivity(range)}
-                action={{
-                  label: 'Share Your Profile',
-                  href: APP_ROUTES.CHAT_PROFILE_PANEL,
-                }}
+                variant={showError ? 'error' : undefined}
+                icon={
+                  showError ? undefined : (
+                    <ChartColumn className='h-5 w-5' strokeWidth={1.75} />
+                  )
+                }
+                heading={
+                  showError ? 'Analytics Did Not Load' : 'No Profile Visits Yet'
+                }
+                description={
+                  showError ? undefined : describeNoAudienceActivity(range)
+                }
+                action={
+                  showError
+                    ? { label: 'Retry', onClick: onRetry }
+                    : {
+                        label: 'Share Your Profile',
+                        href: APP_ROUTES.CHAT_PROFILE_PANEL,
+                      }
+                }
                 className='min-h-80'
-                testId='analytics-rail-empty-state'
+                testId={`analytics-rail-${showError ? 'error' : 'empty'}-state`}
               />
             ) : null}
             {/* Funnel waterfall — vertical bars show dropoff at a glance */}
-            {isEmpty ? null : <FunnelCard stages={stages} loading={loading} />}
+            {hideMetrics ? null : (
+              <FunnelCard stages={stages} loading={loading} />
+            )}
 
             {/* Engagement — compact 2-col, secondary to the funnel */}
-            {isEmpty ? null : (
+            {hideMetrics ? null : (
               <DrawerStatGrid
                 variant='flush'
                 className={cn(
@@ -395,19 +411,23 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
   const [range, setRange] = useState<AnalyticsRange>('30d');
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('cities');
 
-  const { data, isLoading, isFetching } = useDashboardAnalyticsQuery({
-    range,
-    view: 'full',
-    enabled: true,
-  });
+  const { data, isPending, isFetching, isError, refetch } =
+    useDashboardAnalyticsQuery({
+      range,
+      view: 'full',
+      enabled: true,
+    });
 
   return (
     <AnalyticsSidebarView
       isOpen={isOpen}
       onClose={onClose}
       data={data}
-      loading={isLoading}
+      // isPending, not isLoading: a fetch paused offline has no data and must
+      // show the skeleton, not zeros. Disabled queries never reach this rail.
+      loading={isPending}
       isFetching={isFetching}
+      onRetry={isError ? refetch : undefined}
       range={range}
       onRangeChange={setRange}
       activeTab={activeTab}
@@ -436,8 +456,6 @@ export function StaticAnalyticsSidebar({
       data={data}
       loading={false}
       range='30d'
-      onRangeChange={() => {}}
-      showRangeControl={false}
       activeTab={activeTab}
       onActiveTabChange={setActiveTab}
       testId={testId}
