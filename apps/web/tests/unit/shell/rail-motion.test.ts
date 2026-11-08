@@ -163,7 +163,7 @@ describe('shell rail-motion tokens (JOV-4522)', () => {
       'utf8'
     );
     expect(css).toMatch(
-      /@utility transition-shell-rail-allocation\s*\{\s*transition-property: flex-basis, width, border-width, opacity, transform;/
+      /@utility transition-shell-rail-allocation\s*\{\s*transition-property:\s*flex-basis, width, max-width, border-width, margin, padding, opacity,\s*transform;/
     );
   });
 
