@@ -30,9 +30,11 @@ import {
 import {
   NAVIGATION_TELEMETRY_ENDPOINT,
   NAVIGATION_TELEMETRY_MAX_BATCH_SIZE,
-  type NavigationTelemetryBatch,
-  type NavigationTelemetryPayload,
 } from './navigation-telemetry-contract';
+import type {
+  NavigationTelemetryBatch,
+  NavigationTelemetryPayload,
+} from './navigation-telemetry-schema';
 
 function emittedPayloads(): NavigationTelemetryPayload[] {
   return (

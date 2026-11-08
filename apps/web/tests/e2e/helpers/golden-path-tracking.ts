@@ -1,9 +1,9 @@
 import type { Page } from '@playwright/test';
+import { NAVIGATION_TELEMETRY_ENDPOINT } from '@/lib/tracking/navigation-telemetry-contract';
 import {
-  NAVIGATION_TELEMETRY_ENDPOINT,
   navigationTelemetryBatchSchema,
   navigationTelemetryPayloadSchema,
-} from '@/lib/tracking/navigation-telemetry-contract';
+} from '@/lib/tracking/navigation-telemetry-schema';
 
 // Match the production endpoint's byte limit without importing server code.
 const MAX_NAVIGATION_BODY_BYTES = 8192;

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { SearchableContent } from './common-dropdown-renderer';
+import { renderRootBody, SearchableContent } from './common-dropdown-renderer';
 
 describe('SearchableContent', () => {
   it('renders a semantic search field and clears without losing focus', () => {
@@ -60,4 +60,31 @@ describe('SearchableContent', () => {
     );
     expect(fixture).not.toHaveClass('before:h-11', 'before:w-11');
   });
+});
+
+describe('renderRootBody', () => {
+  it.each([
+    ['loading', true, 'Loading menu items'],
+    ['empty', false, 'Nothing here'],
+  ])(
+    'renders the %s state as one disabled menu item',
+    (_name, isLoading, text) => {
+      render(
+        <div role='menu' aria-label='Actions'>
+          {renderRootBody({
+            isLoading,
+            items: [],
+            emptyMessage: 'Nothing here',
+            renderItems: () => null,
+          })}
+        </div>
+      );
+
+      const row = screen.getByRole('menuitem');
+      expect(row).toHaveAttribute('aria-disabled', 'true');
+      expect(row).toHaveAttribute('tabindex', '-1');
+      expect(screen.getByRole('status')).toHaveTextContent(text);
+      expect(row).toContainElement(screen.getByRole('status'));
+    }
+  );
 });

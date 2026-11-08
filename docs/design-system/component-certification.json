@@ -103,6 +103,8 @@
   },
   "waivers": {
     "packages/ui/atoms/avatar.tsx": {
+      "loading": "While a composed AvatarImage loads, the avatar shows its AvatarFallback in the same frame, which the Default and ImageFailure stories show; a static story cannot hold an image request in flight, so avatar.composed.test.tsx covers the loading swap.",
+      "offline": "Avatar never fetches or mutates; lost connectivity reaches it only as an image that fails to load, which the ImageFailure story shows.",
       "permission-denied": "Avatar only renders an identity image or initials and has no gated action or permission input; the detector matched role='img' on the fallback and presence dot."
     },
     "packages/ui/atoms/button.tsx": {

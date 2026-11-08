@@ -168,4 +168,11 @@ describe('OverflowMenuTrigger accessibility', () => {
     expect(screen.getAllByRole('button')).toHaveLength(4);
     await expectNoA11yViolations(container);
   });
+
+  it('anchors the active-overflow dot to the inline end', () => {
+    const { container } = render(<OverflowMenuTrigger hasActiveOverflow />);
+    const dot = container.querySelector('.rounded-full.bg-accent');
+    expect(dot).toHaveClass('-end-0.5');
+    expect(dot?.className).not.toContain('-right-');
+  });
 });

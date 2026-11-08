@@ -236,7 +236,7 @@ export const MENU_ITEM_BASE =
  * Checkbox and radio item styles (with left indicator space)
  */
 export const CHECKBOX_RADIO_ITEM_BASE =
-  `relative flex min-h-8 cursor-default select-none items-center ${OVERLAY_ITEM_RADIUS} py-1 pl-7 pr-2 text-xs font-normal leading-4 outline-none ` +
+  `relative flex min-h-8 cursor-default select-none items-center ${OVERLAY_ITEM_RADIUS} py-1 ps-7 pe-2 text-xs font-normal leading-4 outline-none ` +
   'transition-colors duration-fast ease-interactive ' +
   'text-secondary-token hover:bg-surface-1 hover:text-primary-token ' +
   'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
@@ -247,7 +247,7 @@ export const CHECKBOX_RADIO_ITEM_BASE =
  * Select item base — unified with MENU_ITEM_BASE hover/focus behavior
  */
 export const SELECT_ITEM_BASE =
-  `relative flex min-h-8 w-full cursor-default select-none items-center ${OVERLAY_ITEM_RADIUS} py-1.5 pl-8 pr-2 text-app font-normal leading-5 outline-none ` +
+  `relative flex min-h-8 w-full cursor-default select-none items-center ${OVERLAY_ITEM_RADIUS} py-1.5 ps-8 pe-2 text-app font-normal leading-5 outline-none ` +
   'transition-colors duration-fast ease-interactive ' +
   'text-secondary-token ' +
   `${OVERLAY_ITEM_FOCUS} focus-visible:text-primary-token ` +
@@ -297,7 +297,7 @@ export const MENU_SEPARATOR_BASE =
  * Keyboard shortcut indicator styles
  */
 export const MENU_SHORTCUT_BASE =
-  'ml-auto text-3xs font-medium text-tertiary-token';
+  'ms-auto text-3xs font-medium text-tertiary-token';
 
 /**
  * Shared leading/trailing slots for structured menu rows
@@ -306,7 +306,7 @@ export const MENU_LEADING_SLOT_BASE =
   'flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token';
 
 export const MENU_TRAILING_SLOT_BASE =
-  'ml-auto inline-flex min-w-4 shrink-0 items-center justify-end gap-1 text-tertiary-token';
+  'ms-auto inline-flex min-w-4 shrink-0 items-center justify-end gap-1 text-tertiary-token';
 
 /**
  * Secondary line inside a structured menu row

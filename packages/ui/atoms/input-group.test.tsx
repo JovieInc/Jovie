@@ -91,7 +91,7 @@ describe('InputGroup', () => {
       const group = screen.getByTestId('input-group');
       // md size uses specific padding classes for icons
       expect(group.className).toContain(
-        '[&:has(>[data-slot=icon]:first-child)_input]:pl-9'
+        '[&:has(>[data-slot=icon]:first-child)_input]:ps-9'
       );
     });
 
@@ -103,7 +103,7 @@ describe('InputGroup', () => {
       );
       const group = screen.getByTestId('input-group');
       expect(group.className).toContain(
-        '[&:has(>[data-slot=icon]:first-child)_input]:pl-8'
+        '[&:has(>[data-slot=icon]:first-child)_input]:ps-8'
       );
     });
 
@@ -115,7 +115,7 @@ describe('InputGroup', () => {
       );
       const group = screen.getByTestId('input-group');
       expect(group.className).toContain(
-        '[&:has(>[data-slot=icon]:first-child)_input]:pl-12'
+        '[&:has(>[data-slot=icon]:first-child)_input]:ps-12'
       );
     });
   });
@@ -187,9 +187,9 @@ describe('InputGroup', () => {
       expect(group).toHaveAttribute('data-size', 'lg');
       expect(group.className).toContain('[&>[data-slot=icon]]:size-5');
       expect(group.className).toContain(
-        '[&>[data-slot=icon]:first-child]:left-3.5'
+        '[&>[data-slot=icon]:first-child]:start-3.5'
       );
-      expect(group.className).toContain('[&>*+[data-slot=icon]]:right-3.5');
+      expect(group.className).toContain('[&>*+[data-slot=icon]]:end-3.5');
       expect(group.className).not.toContain('${');
     });
 
@@ -205,12 +205,12 @@ describe('InputGroup', () => {
       const group = screen.getByTestId('input-group');
       // Deliberate-red: the old selectors only matched a direct input child.
       expect(group.className).toContain(
-        '[&:has(>[data-slot=icon]:first-child)_input]:pl-9'
+        '[&:has(>[data-slot=icon]:first-child)_input]:ps-9'
       );
       expect(group.className).toContain(
-        '[&:has(>*+[data-slot=icon])_input]:pr-9'
+        '[&:has(>*+[data-slot=icon])_input]:pe-9'
       );
-      expect(group.className).toContain('[&>*+[data-slot=icon]]:right-3');
+      expect(group.className).toContain('[&>*+[data-slot=icon]]:end-3');
     });
 
     it('merges custom className', () => {

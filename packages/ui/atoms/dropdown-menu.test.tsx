@@ -142,7 +142,7 @@ describe('DropdownMenu', () => {
         </DropdownMenu>
       );
       const label = screen.getByTestId('label');
-      expect(label.className).toContain('pl-10');
+      expect(label.className).toContain('ps-10');
     });
   });
 
@@ -173,7 +173,7 @@ describe('DropdownMenu', () => {
         </DropdownMenu>
       );
       const item = screen.getByTestId('item');
-      expect(item.className).toContain('pl-10');
+      expect(item.className).toContain('ps-10');
     });
   });
 
@@ -449,5 +449,40 @@ describe('DropdownMenu accessibility', () => {
     );
     await expectNoA11yViolations(container);
     await expectNoA11yViolations(screen.getByRole('menu'));
+  });
+
+  describe('RTL', () => {
+    it('lays rows, indicators, shortcuts and the submenu chevron out by reading direction', () => {
+      render(
+        <div dir='rtl' lang='ar'>
+          <DropdownMenu open={true}>
+            <DropdownMenuTrigger>Trigger</DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuCheckboxItem checked>إظهار</DropdownMenuCheckboxItem>
+              <DropdownMenuItem>
+                نسخ <DropdownMenuShortcut>⌘C</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger inset>نقل إلى</DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuItem>مجلد</DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      );
+      const checkbox = screen.getByRole('menuitemcheckbox', { name: 'إظهار' });
+      expect(checkbox).toHaveClass('ps-7', 'pe-2');
+      expect(checkbox).not.toHaveClass('pl-7', 'pr-2');
+      const indicatorSlot = checkbox.querySelector('span.absolute');
+      expect(indicatorSlot).toHaveClass('start-2');
+      expect(indicatorSlot).not.toHaveClass('left-2');
+      expect(screen.getByText('⌘C')).toHaveClass('ms-auto');
+      const sub = screen.getByRole('menuitem', { name: 'نقل إلى' });
+      expect(sub).toHaveClass('ps-10');
+      const chevron = sub.querySelector('svg');
+      expect(chevron).toHaveClass('ms-auto', 'rtl:rotate-180');
+    });
   });
 });
