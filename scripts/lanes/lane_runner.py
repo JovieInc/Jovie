@@ -6490,7 +6490,7 @@ def resolve_additive_node_test_file(worktree: Path, rel: str, log) -> str | None
             if blob.returncode:
                 return None
             path = Path(scratch) / str(stage)
-            path.write_text(blob.stdout)
+            atomic_write_text(path, blob.stdout)
             paths.append(str(path))
         probe = sh(["git", "merge-file", "-p", "--diff3", *paths], cwd=worktree)
         if probe.returncode != 1:
