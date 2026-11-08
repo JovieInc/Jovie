@@ -26,6 +26,7 @@ test('every checked-in brief parses and names a unique frame', () => {
       'insights',
       'request-access',
       'tour-dates-connect',
+      'workspace-table',
     ]
   );
   for (const b of briefs) assert.ok(b.prompt.length > 100, b.frame);
