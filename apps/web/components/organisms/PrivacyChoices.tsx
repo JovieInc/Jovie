@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Switch } from '@jovie/ui';
-import { useEffect, useState } from 'react';
+import { type ComponentType, useCallback, useEffect, useState } from 'react';
 import {
   Dialog,
   DialogActions,
@@ -10,7 +10,8 @@ import {
   DialogTitle,
 } from '@/components/organisms/Dialog';
 import { shouldSuppressCookieBannerForPathname } from '@/lib/cookies/banner-visibility';
-import { saveConsent } from '@/lib/cookies/consent';
+import { type Consent, saveConsent } from '@/lib/cookies/consent';
+import { isCookieBannerRequiredFromCookieString } from '@/lib/cookies/consent-regions';
 import {
   GPC_CONFIRMATION,
   PRIVACY_CHOICES_HREF,
@@ -182,5 +183,96 @@ export function PrivacyChoicesHost({
     >
       <p role='status'>{GPC_CONFIRMATION}</p>
     </aside>
+  );
+}
+
+type CookieModalComponent = ComponentType<{
+  readonly open: boolean;
+  readonly onClose: () => void;
+  readonly onSave?: (consent: Consent) => void;
+}>;
+
+function shouldMountCookieBanner(pathname: string): boolean {
+  if (isGPCEnabled() || shouldSuppressCookieBannerForPathname(pathname)) {
+    return false;
+  }
+
+  if (!isCookieBannerRequiredFromCookieString(document.cookie)) {
+    return false;
+  }
+
+  try {
+    return !localStorage.getItem('jv_cc');
+  } catch {
+    return true;
+  }
+}
+
+export function CookieBannerRuntime({
+  preferencesRequests,
+}: Readonly<{ preferencesRequests: number }>) {
+  const [Banner, setBanner] = useState<ComponentType | null>(null);
+  const [Modal, setModal] = useState<CookieModalComponent | null>(null);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
+
+  const openPrivacy = useCallback(() => {
+    setPreferencesOpen(false);
+    setPrivacyOpen(true);
+  }, []);
+  const closePrivacy = useCallback(() => setPrivacyOpen(false), []);
+
+  const openPreferences = useCallback(() => {
+    void import('@/components/organisms/CookieModal').then(mod => {
+      setPrivacyOpen(false);
+      setModal(() => mod.CookieModal);
+      setPreferencesOpen(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (preferencesRequests > 0) openPreferences();
+  }, [preferencesRequests, openPreferences]);
+
+  useEffect(() => {
+    // A page that server-renders the card (see
+    // resolveInitialCookieBannerVisible) already owns it; mounting a second
+    // one would double the dialog.
+    if (document.querySelector('[data-testid="cookie-banner"]')) return;
+    if (shouldMountCookieBanner(globalThis.location.pathname)) {
+      void import('@/components/organisms/CookieBannerSection').then(mod => {
+        setBanner(() => mod.CookieBannerSection);
+      });
+    }
+  }, []);
+
+  const applyConsentLocally = (consent: Consent) => {
+    setConsentState(
+      consent.analytics || consent.marketing ? 'accepted' : 'rejected'
+    );
+    try {
+      localStorage.setItem('jv_cc', JSON.stringify(consent));
+    } catch {
+      // ignore — restricted browsing context
+    }
+    globalThis.JVConsent?._emit(consent);
+  };
+
+  return (
+    <>
+      <PrivacyChoicesHost
+        open={privacyOpen}
+        onOpen={openPrivacy}
+        onClose={closePrivacy}
+      />
+      {Banner && !privacyOpen ? <Banner /> : null}
+      {Modal ? (
+        <Modal
+          open={preferencesOpen}
+          onClose={() => setPreferencesOpen(false)}
+          onSave={applyConsentLocally}
+        />
+      ) : null}
+    </>
   );
 }
