@@ -25,6 +25,10 @@ import {
 } from './helpers/golden-path-keyframes';
 import { interceptGoldenPathTrackingCalls } from './helpers/golden-path-tracking';
 import {
+  expectNoForcedCaps,
+  expectPreviewMediaPainted,
+} from './helpers/preview-media-quality';
+import {
   installRuntimeAutomationBypass,
   resetAuthStatePreservingOnboardingSession,
 } from './utils/runtime-automation-bypass';
@@ -629,6 +633,10 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
     'A pricing step rendered before the catalog preview'
   ).toBe(0);
   expect(new URL(page.url()).pathname).not.toBe('/onboarding/checkout');
+  // A release count is not a preview: the portrait and the artwork must be
+  // real painted images, and no UI text may be forced into caps.
+  await expectPreviewMediaPainted(previewRail);
+  await expectNoForcedCaps(page.locator('main'));
   await captureKeyframe(page, 'catalog-preview');
 
   const handleResponse = await sendChatMessage('Set my profile handle');

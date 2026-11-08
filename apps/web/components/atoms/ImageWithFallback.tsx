@@ -3,6 +3,7 @@
 import type { ImageProps } from 'next/image';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import { useDirectDspImage } from '@/lib/images/direct-dsp-images';
 import { cn } from '@/lib/utils';
 import { shouldBypassImageOptimization } from '@/lib/utils/dsp-images';
 
@@ -132,6 +133,8 @@ export function ImageWithFallback({
     sourceUrl = src.src;
   }
 
+  const direct = useDirectDspImage(sourceUrl);
+
   // Reset error state when src changes
   useEffect(() => {
     setHasError(false);
@@ -171,7 +174,7 @@ export function ImageWithFallback({
         setHasError(true);
         onLoadError?.();
       }}
-      unoptimized={shouldBypassImageOptimization(sourceUrl)}
+      unoptimized={direct || shouldBypassImageOptimization(sourceUrl)}
       {...rest}
     />
   );

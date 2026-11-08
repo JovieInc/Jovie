@@ -175,6 +175,85 @@ describe('OnboardingProfileRail', () => {
     ).toHaveTextContent('jov.ie/avery');
   });
 
+  // 2026-11-08 production: the draft profile showed an empty portrait and an
+  // empty artwork square for an artist whose Spotify data had both. The
+  // preview must paint the real media, straight from Spotify's CDN.
+  it('shows the real Spotify portrait and release artwork when the source has them', () => {
+    const portraitUrl =
+      'https://i.scdn.co/image/ab6761610000e5ebcdce7620dc940db079bf4952';
+    const artworkUrl =
+      'https://i.scdn.co/image/ab67616d0000b273d9985092cd88bffd97653b58';
+    fastRender(
+      <OnboardingProfileRail
+        state={{
+          artist: {
+            id: '1ZlSI1juLMMN1HU8X7RViN',
+            name: 'UNMARKED',
+            url: 'https://open.spotify.com/artist/1ZlSI1juLMMN1HU8X7RViN',
+            imageUrl: portraitUrl,
+            followers: 203,
+            genres: [],
+            catalog: {
+              total: 1,
+              releases: [
+                {
+                  id: 'vibe1',
+                  title: 'Vibe',
+                  releaseType: 'single',
+                  releaseDate: '2024-05-01',
+                  artworkUrl,
+                  spotifyUrl: 'https://open.spotify.com/album/vibe1',
+                },
+              ],
+            },
+          },
+          artistConfirmed: true,
+          handle: 'unmarked',
+          socialLinks: [],
+        }}
+      />
+    );
+
+    const phone = screen.getByTestId('onboarding-phone-preview');
+    const portrait = within(phone)
+      .getByTestId('profile-identity-portrait')
+      .querySelector('img');
+    expect(portrait, 'portrait fell back to a placeholder').not.toBeNull();
+    expect(portrait?.getAttribute('src')).toBe(portraitUrl);
+    const artwork = within(phone).getByRole('img', { name: 'Vibe artwork' });
+    expect(artwork.getAttribute('src')).toBe(artworkUrl);
+    // The artist keeps their own spelling; the UI never forces caps.
+    expect(within(phone).getAllByText('UNMARKED').length).toBeGreaterThan(0);
+  });
+
+  it('forces no text into all caps anywhere in the draft profile', () => {
+    fastRender(
+      <OnboardingProfileRail
+        state={{
+          artist: {
+            id: 'artist-1',
+            name: 'Test Artist',
+            url: 'https://open.spotify.com/artist/artist-1',
+            imageUrl: 'https://i.scdn.co/image/test',
+            genres: [],
+          },
+          artistConfirmed: true,
+          handle: 'testartist',
+          socialLinks: [],
+        }}
+      />
+    );
+
+    const rail = screen.getByTestId('onboarding-profile-rail');
+    const shouting = Array.from(rail.querySelectorAll('[class]')).filter(el =>
+      /(?:^|\s)uppercase(?:\s|$)/.test(el.getAttribute('class') ?? '')
+    );
+    expect(shouting.map(el => el.textContent)).toEqual([]);
+    expect(
+      screen.getByTestId('onboarding-profile-preview-badge')
+    ).toHaveTextContent('Preview');
+  });
+
   it('renders nothing before a handle or profile is known', () => {
     fastRender(
       <OnboardingProfileRail

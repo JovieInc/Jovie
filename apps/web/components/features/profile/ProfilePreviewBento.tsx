@@ -164,7 +164,7 @@ export function ProfilePreviewBento({
         {showLiveBadge && (
           <span className='absolute left-3.5 top-3.5 z-20 inline-flex h-6 items-center gap-1.5 rounded-full border border-white/12 bg-black/50 px-2.5 backdrop-blur-md'>
             <span className='h-1.5 w-1.5 rounded-full bg-(--color-accent-green)' />
-            <span className='text-3xs font-semibold uppercase tracking-wider text-white dark:text-white'>
+            <span className='text-2xs font-medium text-white dark:text-white'>
               Live
             </span>
           </span>
