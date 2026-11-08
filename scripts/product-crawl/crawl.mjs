@@ -8,10 +8,12 @@
 // requests, placeholder text and sideways scroll. The public profile is also
 // crawled on an unclaimed test profile, where the claim banner must show.
 // The crawl only loads pages: it never clicks, submits or pays.
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
+import { skipSignedIn, uncoveredEntry } from './accepted-uncovered.mjs';
 import {
   CLAIM_BANNER,
   fromThirdPartyFrame,
@@ -22,6 +24,16 @@ import {
   TIMING_SAMPLES,
   timingSuspect,
 } from './ready-gate.mjs';
+import {
+  COLLECT,
+  coverRoute,
+  followUps,
+  pickSamples,
+  repoSamples,
+  SIGNED_IN_DISCOVERY,
+  sitemapPaths,
+  strangerDiscovery,
+} from './sample-params.mjs';
 
 const { values: args } = parseArgs({
   options: {
@@ -39,9 +51,6 @@ const VIEWPORTS = {
   phone: { width: 390, height: 844 },
 };
 const SIGN_IN = /^\/(sign-?in|sign-?up|login|signin)(\/|$)/;
-// Pages a signed-in load could change the test account from, or that
-// would end the session; the stranger crawl still covers them.
-const SIGNED_IN_SKIP = /delete|sign-?out|logout|cancel|remove|unsubscribe/;
 // Where a route needs a query to land on its real screen when signed in.
 const SIGNED_IN_TARGET = {
   '/onboarding/checkout':
@@ -85,7 +94,7 @@ const pages = [];
 const uncovered = [];
 const host = new URL(args.origin).host;
 
-async function visit({ route, target, viewport, identity, fixture }) {
+async function visit({ route, target, viewport, identity, fixture, collect }) {
   const ctx = await browser.newContext({
     viewport: VIEWPORTS[viewport],
     ...(identity === 'signed-in'
@@ -151,6 +160,7 @@ async function visit({ route, target, viewport, identity, fixture }) {
     row.consoleErrors = [...new Set(consoleErrors)];
     row.thirdPartyConsole = thirdPartyConsole;
     row.failedRequests = [...new Set(failedRequests)];
+    if (collect) row.collected = await page.evaluate(COLLECT);
   } catch (e) {
     row.error = String(e.message || e)
       .split('\n')[0]
@@ -160,13 +170,68 @@ async function visit({ route, target, viewport, identity, fixture }) {
   return row;
 }
 
-const todo = [];
+// A context that fails to open still gets a row, so the receipt is written.
+/** @type {(job: any) => Promise<any>} */
+const safeVisit = job =>
+  visit(job).catch(e => {
+    const { route, target, viewport, identity } = job;
+    const error = String(e?.message || e)
+      .split('\n')[0]
+      .slice(0, 200);
+    return { route, url: target, identity, viewport, error };
+  });
+
+// Real values for dynamic routes (sample-params.mjs): repo constants, the
+// deployed sitemap, and links on pages read first (they are crawled too).
 const signedIn = Boolean(args['storage-state']);
+const hosts = new Set([host, 'jov.ie', 'www.jov.ie']);
+const repo = repoSamples({
+  read: p => (existsSync(p) ? readFileSync(p, 'utf8') : null),
+  list: d => (existsSync(d) ? readdirSync(d) : []),
+  exists: existsSync,
+  handle: args.handle,
+});
+const sitemap = await fetch(new URL('/sitemap.xml', args.origin), {
+  headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {},
+})
+  .then(r => (r.ok ? r.text() : ''))
+  .then(xml => sitemapPaths(xml, hosts))
+  .catch(() => []);
+const seen = [];
+const look = (target, identity) =>
+  safeVisit({
+    route: target,
+    target,
+    viewport: 'desktop',
+    identity,
+    collect: true,
+  }).then(row => row.collected && seen.push({ url: target, ...row.collected }));
+const sample = () =>
+  pickSamples({
+    routes,
+    handle: args.handle,
+    hosts,
+    repo,
+    sitemap,
+    pages: seen,
+  });
+await Promise.all([
+  ...strangerDiscovery(args.handle).map(t => look(t, 'stranger')),
+  ...(signedIn ? SIGNED_IN_DISCOVERY.map(t => look(t, 'signed-in')) : []),
+]);
+await Promise.all(followUps(sample()).map(t => look(t, 'stranger')));
+const samples = sample();
+
+const todo = [];
 for (const route of routes) {
-  const target = concrete(route);
+  let target = concrete(route);
   if (!target) {
-    uncovered.push({ route, reason: 'needs sample data for its parameters' });
-    continue;
+    const cover = coverRoute(route, samples, { signedIn });
+    if (cover.uncovered) {
+      uncovered.push(cover.uncovered);
+      continue;
+    }
+    target = cover.target;
   }
   for (const viewport of Object.keys(VIEWPORTS)) {
     todo.push({ route, target, viewport, identity: 'stranger' });
@@ -178,12 +243,14 @@ for (const route of routes) {
         identity: 'stranger',
         fixture: 'unclaimed',
       });
-    if (signedIn && SIGNED_IN_SKIP.test(route) && viewport === 'desktop')
-      uncovered.push({
-        route,
-        reason: 'not loaded signed in: it could change the test account',
-      });
-    if (signedIn && !SIGNED_IN_SKIP.test(route))
+    if (skipSignedIn(route) && viewport === 'desktop')
+      uncovered.push(
+        uncoveredEntry(
+          route,
+          'not loaded signed in: it could change the test account'
+        )
+      );
+    if (signedIn && !skipSignedIn(route))
       todo.push({
         route,
         target: SIGNED_IN_TARGET[route] ?? target,
@@ -192,16 +259,6 @@ for (const route of routes) {
       });
   }
 }
-// A context that fails to open still gets a row, so the receipt is written.
-/** @type {(job: any) => Promise<any>} */
-const safeVisit = job =>
-  visit(job).catch(e => {
-    const { route, target, viewport, identity } = job;
-    const error = String(e?.message || e)
-      .split('\n')[0]
-      .slice(0, 200);
-    return { route, url: target, identity, viewport, error };
-  });
 const jobs = new Map();
 for (let i = 0; i < todo.length; i += 4) {
   const batch = todo.slice(i, i + 4);
@@ -233,6 +290,7 @@ const receipt = {
   sha: args.sha || null,
   at: new Date().toISOString(),
   routes,
+  samples: Object.fromEntries(samples),
   uncovered,
   closedInProduction,
   pages,
@@ -253,7 +311,7 @@ for (const f of verdict.findings) byKind[f.kind] = (byKind[f.kind] ?? 0) + 1;
 const lines = [
   `## Product crawl: ${verdict.ready ? 'ready' : 'not ready'}`,
   '',
-  `${routes.length} page routes; ${pages.filter(p => p.identity === 'stranger').length} page loads as a stranger, ${pages.filter(p => p.identity === 'signed-in').length} signed in; ${uncovered.length} routes need sample data; ${pages.filter(p => p.authGated).length} loads hit the sign-in wall.`,
+  `${routes.length} page routes; ${pages.filter(p => p.identity === 'stranger').length} page loads as a stranger, ${pages.filter(p => p.identity === 'signed-in').length} signed in; ${uncovered.filter(u => !u.accepted).length} routes uncovered, ${uncovered.filter(u => u.accepted).length} reviewed exceptions; ${pages.filter(p => p.authGated).length} loads hit the sign-in wall.`,
   '',
   `Not ready because: ${verdict.reasons.join('; ') || 'nothing'}`,
   '',
