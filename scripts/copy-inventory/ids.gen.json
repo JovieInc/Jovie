@@ -528,6 +528,7 @@
     "apps/web/components/features/waitlist/WaitlistRoleForm.tsx#Request received": "WAIT-61",
     "apps/web/components/features/waitlist/WaitlistRoleForm.tsx#Role": "WAIT-65",
     "apps/web/components/features/waitlist/WaitlistRoleForm.tsx#Songwriter": "HOME-288",
+    "apps/web/components/features/waitlist/WaitlistRoleForm.tsx#Step": "HOME-354",
     "apps/web/components/features/waitlist/WaitlistRoleForm.tsx#We&apos;ll email you an invite when your spot opens.": "WAIT-62",
     "apps/web/components/feedback/Banner.tsx#Dismiss": "SITE-97",
     "apps/web/components/feedback/BannerViewport.tsx#System Notifications": "SITE-98",

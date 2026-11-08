@@ -15,6 +15,7 @@ import {
   listComponentsInRoot,
   REPO_ROOT,
 } from './component-ship-policy.mjs';
+import { applyBenchmarkReview } from './lib/component-benchmark-review.mjs';
 import {
   buildReport,
   certifyComponent,
@@ -180,7 +181,7 @@ const certificates = list.map(c => {
         ),
       }
     : null;
-  return certifyComponent({
+  const cert = certifyComponent({
     path: c.sourceRel,
     source,
     testSource,
@@ -199,6 +200,8 @@ const certificates = list.map(c => {
       benchmark: benchmarks[c.sourceRel],
     },
   });
+  // A current judgment must also record what it was compared against.
+  return applyBenchmarkReview(cert, benchmarks[c.sourceRel]);
 });
 
 const report = buildReport({ certificates, headSha: values.sha });

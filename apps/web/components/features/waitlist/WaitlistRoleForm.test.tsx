@@ -176,6 +176,22 @@ describe('WaitlistRoleForm', () => {
     });
   });
 
+  it('sends an artist straight through when the host does not ask the questions', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ state: 'joined' }), { status: 201 })
+    );
+    render(<WaitlistRoleForm />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Artist' }));
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'artist@example.com' },
+    });
+    expect(screen.queryByTestId('waitlist-step-counter')).toBeNull();
+    fireEvent.submit(screen.getByTestId('waitlist-role-form'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).not.toHaveProperty('momTest');
+  });
+
   it('recovers a stalled join after 15 seconds and preserves input for retry', async () => {
     vi.useFakeTimers();
     const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
