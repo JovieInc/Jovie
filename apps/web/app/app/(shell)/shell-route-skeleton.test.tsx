@@ -129,16 +129,14 @@ describe('route skeletons', () => {
     }
   });
 
-  it('keeps the settings form column the settings layout uses', () => {
+  it('draws the settings skeleton inside the real settings layout', () => {
     render(<SettingsRouteSkeleton />);
-    const column = screen
-      .getByTestId('settings-route-skeleton')
-      .querySelector('[data-settings-layout-column="true"]');
-    expect(column).not.toBeNull();
-    const layoutSource = readFileSync(
-      join(shellDirectory, 'settings', 'layout.tsx'),
-      'utf8'
-    );
-    expect(layoutSource).toContain(column?.getAttribute('class') ?? '');
+    const skeleton = screen.getByTestId('settings-route-skeleton');
+    expect(
+      skeleton.closest('[data-settings-layout-column="true"]')
+    ).not.toBeNull();
+    expect(
+      skeleton.closest('[data-testid="settings-shell-content"]')
+    ).not.toBeNull();
   });
 });

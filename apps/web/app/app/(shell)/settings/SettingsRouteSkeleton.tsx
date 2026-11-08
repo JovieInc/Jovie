@@ -1,4 +1,4 @@
-import { PageShell } from '@/components/canonical';
+import SettingsLayout from './layout';
 
 const SETTINGS_FIELD_ROW_KEYS = [
   'settings-field-1',
@@ -8,26 +8,19 @@ const SETTINGS_FIELD_ROW_KEYS = [
 
 /**
  * First-boot fallback for /app/settings/* (and /app/earnings, which
- * redirects into settings). Same frame and form column as `SettingsLayout`,
+ * redirects into settings), rendered inside the real `SettingsLayout`,
  * with one section header and three field rows, so the section header does
  * not move when the page arrives.
  */
 export function SettingsRouteSkeleton() {
   return (
-    <PageShell
-      aria-busy='true'
-      aria-label='Loading Settings'
-      aria-live='polite'
-      maxWidth='wide'
-      frame='none'
-      contentPadding='none'
-      scroll='page'
-      surfaceClassName='pb-10'
-      data-testid='settings-route-skeleton'
-    >
-      <div
-        className='mx-auto min-w-0 w-full max-w-(--app-shell-content-max-form) space-y-6'
-        data-settings-layout-column='true'
+    <SettingsLayout>
+      <output
+        className='block'
+        aria-busy='true'
+        aria-label='Loading Settings'
+        aria-live='polite'
+        data-testid='settings-route-skeleton'
       >
         <section aria-hidden='true' className='scroll-mt-6'>
           <div
@@ -54,7 +47,7 @@ export function SettingsRouteSkeleton() {
             ))}
           </div>
         </section>
-      </div>
-    </PageShell>
+      </output>
+    </SettingsLayout>
   );
 }

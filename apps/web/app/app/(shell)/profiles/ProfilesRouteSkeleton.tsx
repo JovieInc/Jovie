@@ -1,9 +1,9 @@
 'use client';
 
 import styles from '@/components/features/presence/presence-workspace.module.css';
-import { PageShell } from '@/components/organisms/PageShell';
 import { PageToolbar } from '@/components/organisms/table';
 import { UnifiedTableSkeleton } from '@/components/organisms/table/organisms/UnifiedTableSkeleton';
+import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import type { ColumnDef } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 
@@ -70,7 +70,7 @@ const PROFILES_SKELETON_CONFIG = [
  */
 export function ProfilesRouteSkeleton() {
   return (
-    <PageShell
+    <WorkspacePage
       aria-busy='true'
       aria-label='Loading Profiles'
       aria-live='polite'
@@ -104,6 +104,6 @@ export function ProfilesRouteSkeleton() {
         minWidth='0'
         className={styles.table}
       />
-    </PageShell>
+    </WorkspacePage>
   );
 }
