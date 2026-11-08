@@ -47,6 +47,7 @@ import {
   affectsWebTestTypecheck,
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
+import { STRUCTURAL_PYTEST_FILES } from './lib/ci-structural-pytest-files.mjs';
 import { testsAffectedBy } from './lib/test-file-dependencies.mjs';
 import { TEST_PLANNER_CONTRACT_TESTS } from './lib/test-planner-contract-tests.mjs';
 
@@ -260,11 +261,9 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
-    // The repo-wide design-system, metrics-layer and locked Pen chrome
-    // guards (~42s) ran only in ci-fast, i.e. merge groups: group pr-21458
+    // The repo-wide design-system, metrics-layer and locked Pen chrome guards (~42s) ran only in ci-fast, i.e. merge groups: group pr-21458
     // (2026-10-13) was ejected because a PR added text-destructive to
-    // OutboundRail.tsx and tripped destructive-red-drift-ratchet. They read
-    // web source from disk, so any web change can trip them.
+    // OutboundRail.tsx and tripped destructive-red-drift-ratchet. Any web change can trip them.
     id: 'merge-group-unit-guards',
     command: MERGE_GROUP_GUARDS_COMMAND,
     inputs: /^(?:apps\/web\/(?!tests\/e2e\/)|packages\/ui\/)/u,
@@ -284,9 +283,9 @@ export const SOURCE_GUARDS = Object.freeze([
     // measured and auditable), and the dead-man liveness contract stays green.
     id: 'automation-registry',
     command:
-      'node --test --experimental-test-coverage --test-coverage-include=scripts/installation-budget-sentinel.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 scripts/installation-budget-sentinel.test.mjs && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/automation-registry.test.mjs lib/__tests__/automation-liveness.test.mjs',
+      'node --test --experimental-test-coverage --test-coverage-include=scripts/installation-budget-sentinel.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 scripts/installation-budget-sentinel.test.mjs && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/automation-registry.test.mjs lib/__tests__/automation-liveness.test.mjs lib/__tests__/workers-inventory.test.mjs',
     inputs:
-      /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:apps\/[^/]+\/)?vercel\.json|scripts\/lanes\/continuity_clock\.py|canon\/automation-registry\.jsonl|scripts\/(?:automation-liveness\.mjs|installation-budget-sentinel(?:\.test)?\.mjs)|scripts\/lib\/(?:automation-registry\.mjs|__tests__\/automation-(?:registry|liveness)\.test\.mjs))/u,
+      /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:apps\/[^/]+\/)?vercel\.json|workers\/[^/]+\/wrangler[\w.-]*\.(?:toml|jsonc?)|scripts\/lanes\/continuity_clock\.py|canon\/(?:automation-registry\.jsonl|deployed-workers\.json|schedulers\.json)|scripts\/(?:automation-liveness\.mjs|installation-budget-sentinel(?:\.test)?\.mjs)|scripts\/lib\/(?:automation-registry\.mjs|workers-inventory\.mjs|__tests__\/(?:automation-(?:registry|liveness)|workers-inventory)\.test\.mjs))/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -438,7 +437,7 @@ export const SOURCE_GUARDS = Object.freeze([
     // source fails; prices derive from lib/config/plan-prices.ts (JOV-10183).
     command: `node ${shellQuote(fileURLToPath(new URL('./external-api-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./model-id-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./ai-call-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./subscription-cli-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./price-literal-guard.mjs', import.meta.url)))}`,
     inputs:
-      /(?:\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$|^packages\/api-client\/providers\.json$|^scripts\/lib\/external-api-guard\.|^scripts\/lib\/subscription-cli-guard\.json$|^scripts\/lib\/price-literal-guard\.ratchet\.json$)/u,
+      /(?:\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$|^packages\/api-client\/providers\.json$|^apps\/web\/lib\/email\/stream-registry\.json$|^scripts\/lib\/(?:external-api-guard|mail-send-guard)\.|^scripts\/lib\/subscription-cli-guard\.json$|^scripts\/lib\/price-literal-guard\.ratchet\.json$)/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -670,12 +669,9 @@ const DEPLOY_WORKFLOW_CI_TEST = 'tests/unit/ci/deploy-workflow.test.ts';
 const PLAYWRIGHT_RECEIPT_INPUTS =
   /^(\.github\/|scripts\/lib\/playwright-png\.mjs$|apps\/web\/(playwright[^/]*\.config[^/]*\.ts|tests\/unit\/ci\/playwright-artifact-secrets\.test\.ts)$)/u;
 export function selectPlaywrightReceipt(event, selected, changed) {
-  if (event === 'pull_request') {
-    return (
-      !changed?.length || changed.some(f => PLAYWRIGHT_RECEIPT_INPUTS.test(f))
-    );
-  }
-  return event !== 'workflow_dispatch' && !selected.has('web');
+  return event === 'pull_request'
+    ? !changed?.length || changed.some(f => PLAYWRIGHT_RECEIPT_INPUTS.test(f))
+    : event !== 'workflow_dispatch' && !selected.has('web');
 }
 export function webCiContractTestsCommand(
   ledgerPath = resolve(process.cwd(), 'apps/web/tests/quarantine.json'),
@@ -731,19 +727,7 @@ const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
 const structuralPythonRegression = body =>
   `if python3 -c "import coverage, pytest, xdist" 2>/dev/null; then ${body}; elif [ "\${CI:-}" = "true" ]; then echo "::error::pytest/coverage/xdist missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage/xdist not installed — skip local structural regressions"; fi`;
 
-/** Files of the structural pytest suite (one collection, sharded below). */
-export const STRUCTURAL_PYTEST_FILES = Object.freeze([
-  'scripts/prod-errors/test_prod_errors.py',
-  'scripts/tests/test_gh_retry.py',
-  'scripts/tests/test_vercel_prebuilt_deploy.py',
-  'scripts/tests/test_brand_scrub.py',
-  'scripts/tests/test_agent_workflow_hygiene.py',
-  'scripts/tests/test_fleet_audit.py',
-  'scripts/tests/test_runner_routing.py',
-  'scripts/tests/test_signal_watch.py',
-  'scripts/tests/test_x_grok.py',
-  'scripts/tests/test_pr_remediation_swarm.py',
-]);
+export { STRUCTURAL_PYTEST_FILES };
 
 /**
  * The structural pytest suite (420 tests, 132s of one hosted run) was the
@@ -795,7 +779,7 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 
 /** Files of the lanes coverage suite (one coverage map, sharded below). */
 export const LANES_PYTEST_FILES = Object.freeze(
-  'scripts/tests/test_factory_signals.py scripts/tests/test_factory_intake.py scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_board_intake.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_cloud_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_conftest_host_isolation.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_cli.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_families.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_priority_admission.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
+  'scripts/tests/test_factory_signals.py scripts/tests/test_factory_intake.py scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_board_intake.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_cloud_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_conftest_host_isolation.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_health_checks.py scripts/tests/test_main_health.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_cli.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_families.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_priority_admission.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
     ' '
   )
 );
@@ -931,6 +915,8 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/hostops/pen-golden-path-sync.test.mjs',
+  'scripts/hostops/pen-files-worker/src/index.test.mjs',
   'scripts/runner-pool-routing.test.mjs',
   'scripts/sentry-build-config.test.mjs',
   'scripts/next-telemetry.test.mjs',
@@ -957,6 +943,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/offer-claims/offer-claims.test.mjs',
   'scripts/copy-inventory/extract.test.mjs',
   'scripts/invariants/stat-claims/stat-claims.test.mjs',
+  'scripts/lib/__tests__/proof-loop.test.mjs',
   'scripts/public-benchmark/proof-observations.test.mjs',
   ...TEST_PLANNER_CONTRACT_TESTS,
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',
@@ -1001,9 +988,13 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/evals/summer-ops-card-copy.test.mjs',
   'scripts/buyer-eval/buyer-eval.test.mjs',
   'scripts/buyer-eval/gate.test.mjs',
+  'scripts/investor-deck/investor-deck.test.mjs',
+  'scripts/investor-deck/eval.test.mjs',
+  'scripts/investor-deck/gate.test.mjs',
   'scripts/queue-dequeue.test.mjs',
   'scripts/fleet-audit/import-github-audit.test.mjs',
   'scripts/golden-path-walk/latency-gate.test.mjs',
+  'scripts/product-crawl/ready-gate.test.mjs',
   'scripts/positioning/positioning.test.mjs',
   'scripts/funnel-judge/preview-gate.test.mjs',
   'scripts/funnel-judge/proof-gate.test.mjs',
@@ -1149,6 +1140,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/gh-api-hold-retry.test.mjs',
   'scripts/lib/__tests__/prod-cert.test.mjs',
   'scripts/lib/__tests__/prod-cone-cases.test.mjs',
+  'scripts/lib/__tests__/cert-bottleneck.test.mjs',
   'scripts/lib/__tests__/self-hosted-workspace-reset-contract.test.mjs',
   'scripts/lib/__tests__/ci-timing-collector.test.mjs',
   'scripts/lib/__tests__/turbo-cache-stats.test.mjs',
@@ -1209,6 +1201,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/design-surface-census.test.mjs',
   'scripts/lib/__tests__/main-red-eject.test.mjs',
   'scripts/lib/__tests__/main-red-eject-failing-head.test.mjs',
+  'scripts/lib/__tests__/main-health.test.mjs',
+  'scripts/lib/__tests__/surface-recertify.test.mjs',
   'scripts/lib/__tests__/doc-freshness.test.mjs',
   'scripts/lib/__tests__/flaky-test-filing.test.mjs',
   'scripts/lib/__tests__/gbrain-pool-env.test.mjs',
@@ -1231,6 +1225,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/pr-comment-analysis.test.mjs',
   'scripts/lib/__tests__/pr-liveness.test.mjs',
   'scripts/lib/__tests__/postdeploy-probes-workflow.test.mjs',
+  'scripts/lib/__tests__/postdeploy-cert-after-pen.test.mjs',
   'scripts/lib/__tests__/pr-preparation-safety.test.mjs',
   'scripts/lib/__tests__/production-environment-secrets.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-base-tip.test.mjs',
@@ -1304,6 +1299,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/workflow-triggers.test.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/external-api-guard.test.mjs',
+  'scripts/lib/__tests__/mail-send-guard.test.mjs',
+  'scripts/lib/__tests__/broadcast-send-gate.test.mjs',
   'scripts/lib/__tests__/source-validation-manifest.test.mjs',
   'scripts/lib/__tests__/model-id-guard.test.mjs',
   'scripts/lib/__tests__/ai-gateway-report.test.mjs',
@@ -1320,6 +1317,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/tooling-health.test.mjs',
   'scripts/lib/__tests__/merge-queue-speed.test.mjs',
   'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
+  'scripts/lib/__tests__/workers-inventory.test.mjs',
+  'scripts/lib/__tests__/setup-pinned-node.test.mjs',
 ]);
 export const MESH_HOST_ACK_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-host-ack.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-host-ack.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-host-ack-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=99 --coverage.thresholds.statements=99 --coverage.thresholds.branches=90 --coverage.thresholds.functions=100';
@@ -3143,7 +3142,7 @@ export async function runStructural(opts = {}) {
     // Revision-bound acquisition decisions and unchanged marketing CAS behavior.
     ACQUISITION_CERTIFICATION_COMMAND,
     // JOV-4421: hard ship gate — tests + matching stories for shippable UI.
-    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs',
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs lib/__tests__/component-certificate-gate.test.mjs lib/__tests__/component-certificate-companions.test.mjs lib/__tests__/component-evidence.test.mjs',
     // JOV-5454: live Storybook certification evaluator + lifecycle.
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs',
     'pnpm component-ship-gate',

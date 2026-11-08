@@ -22,15 +22,22 @@ export async function describeShellReadyStall(
   chatComposer: Locator
 ): Promise<string> {
   const bits: string[] = [`url=${page.url()}`];
-  const restoreState = await page
+  const boundary = page
     .locator('[data-testid="onboarding-session-boundary"]')
-    .first()
-    .getAttribute('data-restore-state')
-    .catch(() => null);
+    .first();
+  const readAttr = async (name: string) =>
+    boundary.getAttribute(name).catch(() => null);
+  const [restoreState, restoreError, authState] = await Promise.all([
+    readAttr('data-restore-state'),
+    readAttr('data-restore-error'),
+    readAttr('data-auth-state'),
+  ]);
   bits.push(
     `main=${await main.isVisible().catch(() => 'unknown')}`,
     `composer=${await chatComposer.isVisible().catch(() => 'unknown')}`,
-    `boundary-restore-state=${restoreState ?? 'absent'}`
+    `boundary-restore-state=${restoreState ?? 'absent'}`,
+    `boundary-restore-error=${restoreError ?? 'absent'}`,
+    `boundary-auth-state=${authState ?? 'absent'}`
   );
   const bodyText = await page
     .locator('body')

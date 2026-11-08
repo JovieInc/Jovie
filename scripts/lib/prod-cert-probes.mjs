@@ -34,6 +34,21 @@ const PRO_OFFER = Object.freeze({
   amountCents: 1200,
   interval: 'month',
 });
+/**
+ * /api/stripe/pricing-options answers `{ pricingOptions, options }` (the
+ * same dual-field envelope usePricingOptionsQuery and the M2 revenue-path
+ * canary normalize), not a bare array. Read it the same way; a bare array
+ * is still accepted.
+ * @param {string} body
+ * @returns {any[]}
+ */
+export function readPricingOptions(body) {
+  const parsed = JSON.parse(body);
+  if (Array.isArray(parsed)) return parsed;
+  if (Array.isArray(parsed?.pricingOptions)) return parsed.pricingOptions;
+  if (Array.isArray(parsed?.options)) return parsed.options;
+  return [];
+}
 /** Copy the /billing/success page renders when no payment is verified. */
 const UNCONFIRMED_RETURN_COPY = [
   'Confirming checkout',
@@ -131,8 +146,8 @@ export function checkoutConeChecks({ origin, fetchImpl = fetch, run }) {
       );
       if (response.status !== 200)
         throw new Error(`pricing-options HTTP ${response.status}`);
-      const options = JSON.parse(body);
-      const pro = (Array.isArray(options) ? options : []).find(
+      const options = readPricingOptions(body);
+      const pro = options.find(
         option =>
           option?.description === PRO_OFFER.displayName &&
           option?.interval === PRO_OFFER.interval &&
@@ -160,8 +175,8 @@ export function checkoutConeChecks({ origin, fetchImpl = fetch, run }) {
       );
       if (response.status !== 200)
         throw new Error(`pricing-options HTTP ${response.status}`);
-      const options = JSON.parse(body);
-      const monthlyPro = (Array.isArray(options) ? options : []).filter(
+      const options = readPricingOptions(body);
+      const monthlyPro = options.filter(
         option =>
           option?.description === PRO_OFFER.displayName &&
           option?.interval === PRO_OFFER.interval
@@ -220,5 +235,8 @@ export const EXPECTED_BROWSER_CHECKS = Object.freeze({
     'profile-edit-save-readback',
   ],
   smartlink: ['click-analytics-capture'],
-  checkout: ['checkout-entry-renders'],
+  // fresh-user-checkout-entry: an account that signed up through the public
+  // path reaches checkout. Blocked until the browser run walks it (truthful
+  // certification, 2026-11-08); the seeded canary alone proves nothing.
+  checkout: ['checkout-entry-renders', 'fresh-user-checkout-entry'],
 });

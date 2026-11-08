@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { ProgressBar } from './progress';
 
@@ -132,5 +133,53 @@ describe('ProgressBar', () => {
     expect(bar).toHaveAttribute('data-state', 'indeterminate');
     expect(bar).not.toHaveAttribute('aria-valuenow');
     expect(bar).not.toHaveAttribute('aria-valuetext');
+  });
+});
+
+describe('ProgressBar state stories', () => {
+  it('renders the track without a header when only an aria-label is given', () => {
+    const { container } = render(
+      <ProgressBar value={64} aria-label='Uploading cover artwork' />
+    );
+
+    expect(
+      screen.getByRole('progressbar', { name: 'Uploading cover artwork' })
+    ).toHaveAttribute('aria-valuenow', '64');
+    expect(container.querySelector('.justify-between')).toBeNull();
+  });
+
+  it('truncates a long label while keeping the percentage visible', () => {
+    render(
+      <ProgressBar
+        value={73}
+        label='Importing the complete back catalog from every connected distributor'
+        showValue
+      />
+    );
+
+    expect(
+      screen.getByText(
+        'Importing the complete back catalog from every connected distributor'
+      )
+    ).toHaveClass('min-w-0', 'truncate');
+    expect(screen.getByText('73%')).toHaveClass('shrink-0');
+  });
+});
+
+describe('ProgressBar accessibility', () => {
+  it('has no axe violations for labelled, aria-labelled, empty, indeterminate and RTL bars', async () => {
+    const { container } = render(
+      <div>
+        <ProgressBar value={42} label='Importing releases' showValue />
+        <ProgressBar value={64} aria-label='Uploading cover artwork' />
+        <ProgressBar value={0} label='Waiting to start import' showValue />
+        <ProgressBar indeterminate label='Matching profiles' />
+        <div dir='rtl' lang='ar'>
+          <ProgressBar value={42} label='جارٍ استيراد الإصدارات' showValue />
+        </div>
+      </div>
+    );
+
+    await expectNoA11yViolations(container);
   });
 });

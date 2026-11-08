@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "jovie.pen-binding/v1",
+  "title": "Pen binding manifest",
+  "description": "Binds approved Pen frames to routes. A route without `approved` is UNBOUND. Structural schema only; scripts/design/pen-bindings.mjs validate also checks source globs, still paths, and sha256 against the files.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "routes"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "_comment": { "type": "string" },
+    "schema": { "const": "jovie.pen-binding/v1" },
+    "routes": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^/" },
+      "additionalProperties": { "$ref": "#/$defs/route" }
+    }
+  },
+  "$defs": {
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "enforce", "sources", "viewports"],
+      "properties": {
+        "scope": { "enum": ["marketing", "golden-path"] },
+        "enforce": {
+          "type": "boolean",
+          "description": "Default false. The diff gate fails a PR on this route only when true; otherwise it reports without failing. `approve` sets it to true together with `approved`."
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "approved": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["by", "at", "receipt"],
+          "properties": {
+            "by": { "type": "string", "minLength": 1 },
+            "at": { "type": "string", "format": "date-time" },
+            "receipt": { "type": "string", "minLength": 1 }
+          }
+        },
+        "viewports": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "1440": { "$ref": "#/$defs/frames" },
+            "390": { "$ref": "#/$defs/frames" }
+          }
+        }
+      }
+    },
+    "frames": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["section", "penFile", "nodeId", "still", "sha256"],
+        "properties": {
+          "section": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
+          "penFile": { "type": "string", "pattern": "\\.(pen|html)$" },
+          "nodeId": { "type": "string", "minLength": 1 },
+          "still": {
+            "type": "string",
+            "pattern": "^docs/pen-stills/[^/]+/(1440|390)/[a-z0-9-]+\\.png$"
+          },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    }
+  }
+}

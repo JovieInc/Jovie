@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { Textarea } from './textarea';
 
@@ -338,5 +340,113 @@ describe('Textarea', () => {
       const textarea = screen.getByLabelText('Description');
       expect(textarea).toHaveAttribute('id');
     });
+  });
+});
+
+function ControlledTextareaHarness({ note }: { readonly note: string }) {
+  const [value, setValue] = React.useState('');
+  return (
+    <div>
+      <p>{note}</p>
+      <Textarea
+        label='Bio'
+        value={value}
+        onChange={event => setValue(event.target.value)}
+      />
+    </div>
+  );
+}
+
+describe('Textarea certificate evidence', () => {
+  it('keeps typed input and focus across a parent rerender, feedback, Escape, and blur', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <Textarea
+        id='retention-textarea'
+        label='Release notes'
+        helpText='Public'
+      />
+    );
+    const textarea = screen.getByLabelText('Release notes');
+
+    await user.type(textarea, 'hello');
+    expect(textarea).toHaveValue('hello');
+
+    rerender(
+      <Textarea
+        id='retention-textarea'
+        label='Release notes'
+        helpText='Public'
+      />
+    );
+    expect(screen.getByLabelText('Release notes')).toBe(textarea);
+    expect(textarea).toHaveFocus();
+    expect(textarea).toHaveValue('hello');
+
+    rerender(
+      <Textarea
+        id='retention-textarea'
+        label='Release notes'
+        helpText='Public'
+        error='Use at least 20 characters.'
+      />
+    );
+    expect(screen.getByLabelText('Release notes')).toBe(textarea);
+    expect(textarea).toHaveFocus();
+    expect(textarea).toHaveValue('hello');
+
+    await user.keyboard('{Escape}');
+    expect(textarea).toHaveValue('hello');
+    expect(textarea).toHaveFocus();
+
+    await user.tab();
+    expect(textarea).not.toHaveFocus();
+    expect(textarea).toHaveValue('hello');
+  });
+
+  it('keeps a controlled value when an unrelated parent state changes', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<ControlledTextareaHarness note='first' />);
+    const textarea = screen.getByLabelText('Bio');
+
+    await user.type(textarea, 'hello');
+    rerender(<ControlledTextareaHarness note='second' />);
+
+    expect(screen.getByText('second')).toBeInTheDocument();
+    expect(screen.getByLabelText('Bio')).toBe(textarea);
+    expect(textarea).toHaveValue('hello');
+    expect(textarea).toHaveFocus();
+  });
+
+  it('has no axe violations across labelled, error, read-only, and pending states', async () => {
+    const { container } = render(
+      <div>
+        <Textarea
+          id='a11y-ta-default'
+          label='Release notes'
+          helpText='Keep it concise and specific.'
+        />
+        <Textarea
+          id='a11y-ta-error'
+          label='Bio'
+          required
+          defaultValue='Too short'
+          error='Use at least 20 characters.'
+        />
+        <Textarea
+          id='a11y-ta-readonly'
+          label='Label copy'
+          readOnly
+          defaultValue='Distributed by Jovie Records.'
+          helpText='Only your label admin can edit label copy.'
+        />
+        <Textarea
+          id='a11y-ta-pending'
+          aria-label='Checking copy'
+          validationState='pending'
+        />
+      </div>
+    );
+    await expectNoA11yViolations(container);
   });
 });

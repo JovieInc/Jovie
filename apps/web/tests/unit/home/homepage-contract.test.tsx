@@ -76,7 +76,16 @@ const HOMEPAGE_SOURCES = [
   'components/homepage/HomepageSpecSections.tsx',
 ] as const;
 
-const HOMEPAGE_STYLES = ['components/homepage/HomepageEditorial.css'] as const;
+const HOMEPAGE_STYLES = [
+  'components/homepage/v3/stage.css',
+  'components/homepage/v3/product-ui.css',
+  'components/homepage/v3/surfaces.css',
+  'components/homepage/v3/phone.css',
+  'components/homepage/v3/chapters.css',
+  'components/homepage/v3/specs.css',
+  'components/homepage/v3/form.css',
+  'components/homepage/v3/responsive.css',
+] as const;
 
 const PRICE_TEXT = /\$\s?\d|\d+\s?\/\s?mo\b|\bper month\b|\b\d+-day\b/i;
 
@@ -122,19 +131,21 @@ describe('homepage contract', { timeout: 60_000 }, () => {
 
   it('renders one h1, the locked line, and one h2 per chapter', async () => {
     const { HOMEPAGE_EDITORIAL_COPY: copy } = await loadCopy();
+    const { HOMEPAGE_SPECS_COPY: specs } = await import(
+      '@/data/homepageProductUi'
+    );
     await renderHomePage();
 
     const h1s = screen.getAllByRole('heading', { level: 1 });
     expect(h1s).toHaveLength(1);
-    expect(h1s[0]).toHaveTextContent(
-      'Jovie helps you move your music forward.'
-    );
-    expect(copy.hero.headline).toBe('Jovie helps you move your music forward.');
+    expect(h1s[0]).toHaveTextContent('Move your music forward.');
+    expect(copy.hero.headline).toBe('Move your music forward.');
     expect(
       screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)
     ).toEqual([
       copy.profile.headline,
       copy.releases.headline,
+      specs.headline,
       copy.invite.headline,
     ]);
   });
@@ -154,7 +165,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
       const close = container.querySelector(`#${HOMEPAGE_INVITE_ANCHOR}`);
       expect(close).toHaveAttribute('data-testid', 'marketing-section-cta');
       expect(close?.contains(forms[0] ?? null)).toBe(true);
-      expect(within(forms[0]!).getByRole('radiogroup')).toBeVisible();
+      expect(within(forms[0]!).getAllByRole('radio')).toHaveLength(6);
 
       // The hero's primary action scrolls to that form; no public signup.
       const primary = screen.getByTestId('homepage-primary-cta');
@@ -198,15 +209,22 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     const sources = [...container.querySelectorAll('section img')].map(image =>
       (image.getAttribute('src') ?? '').replace(/\?v=\w+$/, '')
     );
-    // The template profile (jov.ie/you, monogram avatar, abstract art), then
-    // the releases workspace and the featured release from Tim White's own
-    // catalog. Every capture comes from the screenshot registry.
-    expect(sources).toEqual([
-      '/product-screenshots/template-profile-live-phone.png',
-      '/product-screenshots/releases-dashboard-full.png',
-      '/product-screenshots/profile-state-release.png',
-    ]);
-    expect(copy.profile.scenarioId).toBe('template-profile-live-mobile');
+    // Approved v3 (receipt home-canonical-v3): Tim White's own profile photo
+    // and his real release covers inside the live product UI. Nothing else,
+    // and the only person shown is Tim (his avatar and Never Say A Word).
+    const allowed = [
+      '/images/avatars/tim-white-profile.jpg',
+      '/img/releases/never-say-a-word.jpg',
+      '/img/releases/take-me-over-remix.jpg',
+      '/img/releases/doge-to-mars.jpg',
+      '/img/releases/tomorrow-sounds.jpg',
+      '/img/releases/supernova-girl.jpg',
+      '/img/releases/this-is-love.jpg',
+    ];
+    expect(sources.length).toBeGreaterThan(0);
+    expect(sources.filter(src => !allowed.includes(src))).toEqual([]);
+    expect([...new Set(sources)].sort()).toEqual([...allowed].sort());
+    expect(copy.profile.alt).toBeTruthy();
   });
 
   it('keeps copy in data and free of em dashes and stock promotion', async () => {
