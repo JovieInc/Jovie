@@ -79,6 +79,9 @@ jobs:
 
       - name: Run secret scan (gitleaks + trufflehog)
         shell: bash
+        env:
+          # Actions gh refuses release metadata unless this step sets a token.
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
@@ -213,6 +216,9 @@ jobs:
 
       - name: Run TruffleHog (full history on main/schedule, PR diff on pull_request)
         shell: bash
+        env:
+          # Actions gh refuses release metadata unless this step sets a token.
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then

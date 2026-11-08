@@ -1582,6 +1582,9 @@ jobs:
           fetch-depth: 1
       - name: Run secret scan
         env:
+          # Actions gh refuses release metadata unless this step sets a token.
+          # The CDN 504 fallback is the only caller; a healthy download uses none.
+          GH_TOKEN: ${{ github.token }}
           # Keep Git-valid but shell-significant branch characters out of the
           # generated run script; GitHub transports this value as environment.
           PULL_REQUEST_BASE_REF: ${{ github.event.pull_request.base.ref }}

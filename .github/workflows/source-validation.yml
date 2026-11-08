@@ -466,6 +466,9 @@ jobs:
       - name: Scan the exact source diff
         if: steps.reuse.outputs.reuse != 'true'
         env:
+          # Actions gh refuses release metadata unless this step sets a token.
+          # The CDN 504 fallback is the only caller; a healthy download uses none.
+          GH_TOKEN: ${{ github.token }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           SECURITY_GATE_ENABLED: ${{ vars.SECURITY_GATE_ENABLED }}
         run: |
