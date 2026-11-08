@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -253,5 +255,20 @@ describe('DashboardAudienceTableUnified', () => {
     expect(text).not.toContain('level1@example.com');
     expect(text).not.toContain('+15550000001');
     expect(text).not.toContain('••• 0001');
+  });
+
+  it('loads the analytics rails on demand, off the workspace first-load JS', () => {
+    // /demo/audience sits at its first-load budget; the rails render only
+    // when the analytics panel opens, so they come from the lazy module.
+    const source = readFileSync(
+      join(__dirname, 'DashboardAudienceTableUnified.tsx'),
+      'utf8'
+    );
+    expect(source).toContain(
+      "from '@/features/dashboard/organisms/LazyAnalyticsSidebar'"
+    );
+    expect(source).not.toContain(
+      "from '@/features/dashboard/organisms/AnalyticsSidebar'"
+    );
   });
 });
