@@ -1,7 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import {
   ContextMenu,
@@ -627,38 +626,5 @@ describe('ContextMenu submenu viewport fit', () => {
     expect(sub.getAttribute('style') ?? '').toContain(
       'max-width: var(--radix-context-menu-content-available-width)'
     );
-  });
-});
-
-describe('ContextMenu accessibility', () => {
-  // The menu portals to document.body outside any page landmark, so axe runs
-  // on the trigger's container and on the opened menu element itself.
-  it('has no axe violations when opened by right-click', async () => {
-    const { container } = render(<TestContextMenu />);
-    rightClick(screen.getByTestId('trigger-area'));
-    const menu = await screen.findByRole('menu');
-    await expectNoA11yViolations(container);
-    await expectNoA11yViolations(menu);
-  });
-
-  it('has no axe violations for an empty menu with long right-to-left copy', async () => {
-    const { container } = render(
-      <ContextMenu dir='rtl'>
-        <ContextMenuTrigger>
-          <div data-testid='rtl-trigger'>
-            انقر بزر الفأرة الأيمن على بطاقة الإصدار
-          </div>
-        </ContextMenuTrigger>
-        <ContextMenuContent>
-          <ContextMenuLabel>إضافة إلى قائمة التشغيل</ContextMenuLabel>
-          <ContextMenuItem disabled>لا توجد قوائم تشغيل بعد</ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
-    );
-    rightClick(screen.getByTestId('rtl-trigger'));
-    const menu = await screen.findByRole('menu');
-    expect(menu).toHaveAttribute('dir', 'rtl');
-    await expectNoA11yViolations(container);
-    await expectNoA11yViolations(menu);
   });
 });

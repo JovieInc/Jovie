@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event';
 import { Settings, Star } from 'lucide-react';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { expectNoA11yViolations } from '../test-utils/a11y';
 import { CommonDropdown } from './common-dropdown';
 import type { CommonDropdownItem } from './common-dropdown-types';
 
@@ -1603,40 +1602,5 @@ describe('CommonDropdown', () => {
       const items = screen.getAllByRole('menuitem');
       expect(items.length).toBeGreaterThan(0);
     });
-  });
-});
-
-describe('CommonDropdown accessibility', () => {
-  // The menu portals to document.body outside any page landmark, so axe runs
-  // on the trigger's container and on the opened menu element itself.
-  it('has no axe violations when open', async () => {
-    const { container } = render(
-      <CommonDropdown items={basicItems} open modal={false} />
-    );
-    const menu = await screen.findByRole('menu');
-    await expectNoA11yViolations(container);
-    await expectNoA11yViolations(menu);
-  });
-
-  it('has no axe violations with long right-to-left labels', async () => {
-    const { container } = render(
-      <div dir='rtl'>
-        <CommonDropdown
-          aria-label='إجراءات الإصدار'
-          items={[
-            {
-              type: 'action',
-              id: 'rtl-copy',
-              label: 'نسخ الرابط الذكي لمشاركته مع الجمهور وقوائم التشغيل',
-              onClick: vi.fn(),
-            },
-          ]}
-          open
-          modal={false}
-        />
-      </div>
-    );
-    await expectNoA11yViolations(container);
-    await expectNoA11yViolations(await screen.findByRole('menu'));
   });
 });

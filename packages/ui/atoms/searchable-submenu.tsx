@@ -44,6 +44,12 @@ import {
   searchableSubMenuContentClasses,
 } from '../lib/dropdown-styles';
 import { cn } from '../lib/utils';
+import {
+  defaultFilterFn,
+  firstEnabledIndex,
+  focusOnNextTick,
+  nextEnabledIndex,
+} from './searchable-submenu-helpers';
 
 // ============================================================================
 // TYPES
@@ -104,54 +110,10 @@ export interface SearchableSubmenuProps {
   readonly disabled?: boolean;
 }
 
-// ============================================================================
-// DEFAULT FILTER FUNCTION
-// ============================================================================
-
-function defaultFilterFn(item: SearchableSubmenuItem, query: string): boolean {
-  const normalizedQuery = query.toLowerCase().trim();
-  if (!normalizedQuery) return true;
-
-  const searchableText = [item.label, item.description]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-
-  return searchableText.includes(normalizedQuery);
-}
-
-function firstEnabledIndex(items: readonly SearchableSubmenuItem[]): number {
-  const index = items.findIndex(item => !item.disabled);
-  return Math.max(index, 0);
-}
-
-function nextEnabledIndex(
-  items: readonly SearchableSubmenuItem[],
-  currentIndex: number,
-  direction: 1 | -1
-): number {
-  if (items.every(item => item.disabled)) return 0;
-
-  let candidate = currentIndex;
-  do {
-    candidate = (candidate + direction + items.length) % items.length;
-  } while (items[candidate]?.disabled);
-
-  return candidate;
-}
-
 // Keep compact menu visuals while giving every button the canonical 44px hit
 // container required by the design system touch-target invariant.
 const MENU_TOUCH_TARGET_BASE =
   'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
-
-/** Focus an element on the next tick, after portalled content mounts. */
-function focusOnNextTick(ref: React.RefObject<HTMLElement | null>): () => void {
-  const timer = setTimeout(() => {
-    ref.current?.focus();
-  }, 0);
-  return () => clearTimeout(timer);
-}
 
 // ============================================================================
 // COMPONENT
