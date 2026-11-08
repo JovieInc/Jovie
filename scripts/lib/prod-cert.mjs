@@ -20,6 +20,7 @@ import {
   expectOk,
   get,
 } from './prod-cert-probes.mjs';
+import { jankChecks, strangerChecks } from './prod-cert-truth.mjs';
 
 export const RECEIPT_SCHEMA = 'jovie.prod-golden-path-receipt/v1';
 
@@ -179,6 +180,7 @@ export function anonymousChecks({
   const coneClaim = coneCases
     ? coneClaimChecks({ origin, fetchImpl, run })
     : [];
+  const stranger = strangerChecks({ origin, fetchImpl, run });
   return {
     landing: () => [
       run('landing-renders', async () => {
@@ -188,6 +190,7 @@ export function anonymousChecks({
           throw new Error('GET /: empty title');
       }),
       ...coneLanding,
+      ...stranger.landing(),
     ],
     'signup-signin': () => [
       run('signin-form-renders', async () => {
@@ -196,9 +199,7 @@ export function anonymousChecks({
         if (!/type="email"|name="email"/i.test(page.body))
           throw new Error('GET /signin: no email field');
       }),
-      run('signup-renders', async () => {
-        expectOk(await get(origin, '/signup', fetchImpl), 'GET /signup');
-      }),
+      stranger.signup(),
     ],
     claim: () => [
       run('claim-renders', async () => {
@@ -210,9 +211,7 @@ export function anonymousChecks({
           'GET /claim?claim=1'
         );
       }),
-      run('start-renders', async () => {
-        expectOk(await get(origin, '/start', fetchImpl), 'GET /start');
-      }),
+      stranger.start(),
       ...coneClaim,
       run('taken-handle-rejected', async () => {
         const { response, body } = await get(
@@ -301,9 +300,10 @@ export function anonymousChecks({
         };
       }),
     ],
-    ...(coneCases
-      ? { checkout: () => checkoutConeChecks({ origin, fetchImpl, run }) }
-      : {}),
+    checkout: () => [
+      ...(coneCases ? checkoutConeChecks({ origin, fetchImpl, run }) : []),
+      ...stranger.checkout(),
+    ],
   };
 }
 
@@ -384,8 +384,7 @@ export function stepChecks(
   };
 }
 
-// The browser-check contract moved to prod-cert-probes.mjs together with the
-// JOV-6920 cone probes; re-exported so consumer import paths are unchanged.
+// Browser-check contract lives in prod-cert-probes.mjs; re-exported for consumers.
 export { EXPECTED_BROWSER_CHECKS };
 
 export function missingBrowserChecks({ surface, present, authStatus, now }) {
@@ -461,8 +460,9 @@ export async function runProductionCertification({
       if (probes[surface])
         checks.push(...(await Promise.all(probes[surface]())));
       const present = stepState.bySurface[surface] ?? [];
-      checks.push(...present);
       checks.push(
+        ...present,
+        ...jankChecks(stepState.observationsBySurface[surface]),
         ...missingBrowserChecks({ surface, present, authStatus, now })
       );
     }

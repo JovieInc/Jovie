@@ -159,6 +159,7 @@ export function createSurfaceTelemetry(page: Page): SurfaceTelemetryCollector {
       write(telemetry);
     },
     async capture(currentPage, surface) {
+      await recordJank(currentPage, surface);
       // The ledger route caps each data URL (JOV-9625): fall back to a lower
       // quality once, then record nothing rather than reject the whole POST.
       for (const quality of [40, 20]) {
@@ -184,6 +185,81 @@ export function createSurfaceTelemetry(page: Page): SurfaceTelemetryCollector {
       }
     },
   };
+}
+
+/**
+ * Jank evidence (truthful certification, 2026-11-08). Reads the current
+ * document's layout shifts and long animation frames since it loaded
+ * (buffered observers, so it works even when telemetry started after
+ * navigation) and records them as `jank.*` observations. scripts/prod-cert.mjs
+ * fails the surface past CLS 0.1 or a frame blocked over 200 ms
+ * (scripts/lib/prod-cert-truth.mjs JANK_LIMITS). CLS here is the plain sum of
+ * unexpected shifts, stricter than the session-window CLS of Web Vitals.
+ */
+async function recordJank(currentPage: Page, surface: string): Promise<void> {
+  if (!process.env.PROD_CERT_STEPS_FILE) return;
+  try {
+    const jank = await currentPage.evaluate(
+      () =>
+        new Promise<{ cls: number; worstFrameMs: number; frames: boolean }>(
+          resolve => {
+            const types = PerformanceObserver.supportedEntryTypes ?? [];
+            const out = {
+              cls: 0,
+              worstFrameMs: 0,
+              frames: types.includes('long-animation-frame'),
+            };
+            let pending = 2;
+            const done = () => {
+              pending -= 1;
+              if (pending === 0) resolve(out);
+            };
+            const watch = (
+              type: string,
+              take: (entry: PerformanceEntry) => void
+            ) => {
+              if (!types.includes(type)) return done();
+              const observer = new PerformanceObserver(list =>
+                list.getEntries().forEach(take)
+              );
+              observer.observe({ type, buffered: true });
+              setTimeout(() => {
+                observer.takeRecords().forEach(take);
+                observer.disconnect();
+                done();
+              }, 50);
+            };
+            watch('layout-shift', entry => {
+              const shift = entry as PerformanceEntry & {
+                value: number;
+                hadRecentInput: boolean;
+              };
+              if (!shift.hadRecentInput) out.cls += shift.value;
+            });
+            watch('long-animation-frame', entry => {
+              out.worstFrameMs = Math.max(out.worstFrameMs, entry.duration);
+            });
+          }
+        )
+    );
+    recordCertObservation({
+      surface,
+      contractId: 'jank.cls',
+      dimension: 'stability',
+      value: jank.cls,
+      unit: 'score',
+    });
+    if (!jank.frames) return;
+    recordCertObservation({
+      surface,
+      contractId: 'jank.worst-frame-ms',
+      dimension: 'responsiveness',
+      value: jank.worstFrameMs,
+      unit: 'ms',
+    });
+  } catch {
+    // Best-effort evidence: a page that cannot be evaluated records nothing.
+  }
 }
 
 /**

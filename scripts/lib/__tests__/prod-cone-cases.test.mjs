@@ -2,12 +2,19 @@ import { describe, expect, it } from 'vitest';
 import {
   anonymousChecks,
   EXPECTED_BROWSER_CHECKS,
+  runCheck,
   SURFACE_IDS,
 } from '../prod-cert.mjs';
 import {
   checkoutConeChecks,
   readPricingOptions,
 } from '../prod-cert-probes.mjs';
+import {
+  jankChecks,
+  paidEntries,
+  STRANGER_USER_AGENT,
+  strangerChecks,
+} from '../prod-cert-truth.mjs';
 import {
   CONE_CASE_IDS,
   CONE_CASE_PRODUCERS,
@@ -276,5 +283,96 @@ describe('checkout cone pricing checks (JOV-9815)', () => {
       options: [PRO, wrong],
     });
     expect(results['offer-no-contradictory-pricing'].ok).toBe(false);
+  });
+});
+
+describe('truthful certification: a stranger, no token, no canary', () => {
+  const ORIGIN = 'https://jov.ie';
+  /** @param {Record<string, { url?: string, body?: string, status?: number }>} routes */
+  const strangerFetch =
+    (routes, seen = []) =>
+    async (url, init) => {
+      seen.push({ path: new URL(url).pathname, headers: init?.headers ?? {} });
+      const r = routes[new URL(url).pathname] ?? {};
+      return {
+        status: r.status ?? 200,
+        url: r.url ?? String(url),
+        text: async () => r.body ?? '<title>Jovie</title>',
+      };
+    };
+  const runAll = (fetchImpl, surface) => {
+    const run = (id, fn) => runCheck(id, fn);
+    const checks = strangerChecks({ origin: ORIGIN, fetchImpl, run });
+    const out = checks[surface]();
+    return Promise.all(Array.isArray(out) ? out : [out]);
+  };
+  const waitlisted = { url: `${ORIGIN}/waitlist`, body: 'Request access' };
+
+  it('fails /signup and /start when a stranger lands on the waitlist', async () => {
+    const fetchImpl = strangerFetch({
+      '/signup': waitlisted,
+      '/start': waitlisted,
+    });
+    const [signup] = await runAll(fetchImpl, 'signup');
+    const [start] = await runAll(fetchImpl, 'start');
+    expect(signup).toMatchObject({ id: 'signup-renders', status: 'failed' });
+    expect(signup.summary).toContain('lands on the waitlist');
+    expect(start).toMatchObject({ id: 'start-renders', status: 'failed' });
+  });
+
+  it('passes when signup is open, and sends no synthetic or passage header', async () => {
+    const seen = [];
+    const [signup] = await runAll(strangerFetch({}, seen), 'signup');
+    expect(signup.status).toBe('passed');
+    expect(Object.keys(seen[0].headers)).toEqual(['user-agent']);
+    expect(STRANGER_USER_AGENT).not.toMatch(/synthetic|prod-cert|jovie/i);
+  });
+
+  it('fails a homepage that offers a stranger no way in (invite only)', async () => {
+    const [entry] = await runAll(
+      strangerFetch({
+        '/': { body: '<a href="#waitlist">Request an Invite</a>' },
+      }),
+      'landing'
+    );
+    expect(entry.status).toBe('failed');
+    expect(entry.summary).toContain('invite only');
+  });
+
+  it('follows the $12 CTA from /pricing and fails when it ends on the waitlist', async () => {
+    const pricing = {
+      body: '<a href="/claim?plan=pro">Start Artist Presence</a>',
+    };
+    const [open] = await runAll(
+      strangerFetch({ '/pricing': pricing }),
+      'checkout'
+    );
+    expect(open).toMatchObject({
+      id: 'stranger-paid-cta-reaches-signup',
+      status: 'passed',
+    });
+    const [closed] = await runAll(
+      strangerFetch({ '/pricing': pricing, '/start': waitlisted }),
+      'checkout'
+    );
+    expect(closed.status).toBe('failed');
+    expect(paidEntries('<a href="/signup?plan=free">f</a>')).toEqual([]);
+  });
+
+  it('turns layout shift and long frames into checks at the good-experience bounds', () => {
+    const checks = jankChecks(
+      [
+        { contractId: 'jank.cls', value: 0.04 },
+        { contractId: 'jank.cls', value: 0.27 },
+        { contractId: 'jank.worst-frame-ms', value: 120 },
+        { contractId: 'other', value: 9999 },
+      ],
+      'T'
+    );
+    expect(checks.map(c => [c.id, c.status])).toEqual([
+      ['jank.cls', 'failed'],
+      ['jank.worst-frame-ms', 'passed'],
+    ]);
+    expect(jankChecks([])).toEqual([]);
   });
 });
