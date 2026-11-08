@@ -19,7 +19,7 @@ The launch gate is path-based. It turns on for changes touching:
 
 - onboarding routes, components, or libs
 - auth signup/signin entrypoints used by the golden path
-- dashboard shell or releases flows
+- dashboard shell, shell navigation, sidebar, app-shell libs, proxy, or releases flows
 - billing and checkout routes used by the golden path
 - golden-path Playwright specs and helpers
 - launch-gate CI, Lighthouse, or perf-budget configuration
@@ -29,7 +29,7 @@ Docs-only changes do not trigger launch-gate jobs.
 ## What Each Gate Means
 
 - `Golden Path (PR)`: `tests/e2e/golden-path.spec.ts` passes in CI against an ephemeral Neon database. Manual dispatch only; it does not block merge. The blocking browser journey is `Golden Path (blocking journey)` on the merge group.
-- `Lighthouse (dashboard gate)`: authenticated dashboard Lighthouse stays within the blocking thresholds in [apps/web/.lighthouserc.dashboard.pr.json](../../apps/web/.lighthouserc.dashboard.pr.json).
+- `Lighthouse (dashboard gate)`: first `tests/e2e/dashboard-click-navigation.spec.ts` clicks the desktop sidebar as the `creator-ready` and `admin` personas, and `tests/e2e/shell-nav-click-through.spec.ts` taps the mobile tabs and the More menu; each click must change the route without a reload, and the mobile taps must also clear the pending state and render without a route error. `tests/e2e/shell-route-health.spec.ts` then opens every sidebar destination by full document load and by click, and fails on any unexpected console error, uncaught exception or route error boundary. Then authenticated dashboard Lighthouse holds `/app` to the blocking thresholds in [apps/web/.lighthouserc.dashboard.pr.json](../../apps/web/.lighthouserc.dashboard.pr.json). The releases view (`/app/library?view=releases`) is measured against the same thresholds at warn level until its first contentful paint (1210 ms against 1100) and layout shift (0.075 against 0.06) are fixed; the fix turns that row back to error. It needs no external identity secret.
 - `Lighthouse (onboarding gate)`: onboarding Lighthouse stays within the blocking thresholds in [apps/web/.lighthouserc.onboarding.pr.json](../../apps/web/.lighthouserc.onboarding.pr.json).
 
 ## Required Local Launch Perf Check

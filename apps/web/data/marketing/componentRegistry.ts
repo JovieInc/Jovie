@@ -281,9 +281,9 @@ const SECTION_RESOLUTIONS = {
         rootBinding: "sectionVariant='centered-none'",
       },
       {
-        variantId: 'centered-none',
+        variantId: 'left-none',
         componentPath: 'apps/web/components/homepage/HomepageEditorial.tsx',
-        rootBinding: "sectionVariant='centered-none'",
+        rootBinding: "data-marketing-variant='left-none'",
       },
       {
         variantId: 'left-none',
@@ -386,7 +386,7 @@ const SECTION_RESOLUTIONS = {
       {
         variantId: 'phone-right',
         componentPath: 'apps/web/components/homepage/HomepageEditorial.tsx',
-        rootBinding: "sectionVariant='phone-right'",
+        rootBinding: "data-marketing-variant='phone-right'",
       },
       {
         variantId: 'phone-left',
@@ -534,7 +534,7 @@ const SECTION_RESOLUTIONS = {
       {
         variantId: 'final-single-claim',
         componentPath: 'apps/web/components/homepage/HomepageEditorial.tsx',
-        rootBinding: "sectionVariant='final-single-claim'",
+        rootBinding: "data-marketing-variant='final-single-claim'",
       },
       {
         variantId: 'included-single',
@@ -574,7 +574,7 @@ const SECTION_RESOLUTIONS = {
       {
         variantId: 'release-rail',
         componentPath: 'apps/web/components/homepage/HomepageEditorial.tsx',
-        rootBinding: "sectionVariant='release-rail'",
+        rootBinding: "data-marketing-variant='release-rail'",
       },
       {
         variantId: 'release-rail',

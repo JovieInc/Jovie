@@ -284,3 +284,93 @@ export const DarkMode: Story = {
     },
   },
 };
+
+export const Partial: Story = {
+  render: () => (
+    <Popover defaultOpen>
+      <PopoverTrigger asChild>
+        <Button variant='outline'>Details</Button>
+      </PopoverTrigger>
+      <PopoverContent aria-label='Release details'>
+        <p className='text-sm text-secondary-token'>Released June 12.</p>
+      </PopoverContent>
+    </Popover>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Only children, with the optional size, arrow, align and portal props omitted; the defaults keep padding and offset.',
+      },
+    },
+  },
+};
+
+export const LongContent: Story = {
+  render: () => (
+    <Popover defaultOpen>
+      <PopoverTrigger asChild>
+        <Button variant='outline'>Share link</Button>
+      </PopoverTrigger>
+      <PopoverContent aria-label='Share link details' className='w-72'>
+        <div className='space-y-2'>
+          <h4 className='font-medium leading-snug'>
+            Share your smart link with playlist curators, press contacts and
+            every fan who follows you
+          </h4>
+          <p className='text-sm text-secondary-token'>
+            https://jov.ie/artist/this-is-a-very-long-public-profile-slug/releases/summer-single-extended-mix
+          </p>
+          <p className='text-sm text-secondary-token'>
+            The link opens the release on each listener&apos;s preferred
+            platform and remembers their choice for future releases.
+          </p>
+        </div>
+      </PopoverContent>
+    </Popover>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A long heading, an unbroken URL and a paragraph wrap inside a fixed-width popover without horizontal overflow.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl'>
+      <Popover defaultOpen>
+        <PopoverTrigger asChild>
+          <Button variant='outline'>الإعدادات</Button>
+        </PopoverTrigger>
+        <PopoverContent
+          aria-label='إعدادات الحساب'
+          className='w-72'
+          dir='rtl'
+          showArrow
+        >
+          <div className='space-y-2'>
+            <h4 className='font-medium leading-snug'>
+              إعدادات الحساب والإشعارات
+            </h4>
+            <p className='text-sm text-secondary-token'>
+              حدّث تفضيلات حسابك واختر الإشعارات التي تصلك عند نشر إصدار جديد أو
+              عند انضمام مشترك جديد إلى قائمتك البريدية.
+            </p>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Right-to-left Arabic copy wraps inside the popover and text aligns to the start edge.',
+      },
+    },
+  },
+};

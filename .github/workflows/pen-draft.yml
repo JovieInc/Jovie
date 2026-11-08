@@ -7,7 +7,9 @@ name: Pen draft missing frames
 
 # Design first (Tim, 2026-11-08): every Golden Path screen gets a Pen design
 # before code. This drafts one frame per brief in docs/design-system/pen-briefs
-# from the canonical workspace and uploads the drafts for review. It never
+# from the canonical workspace and uploads the drafts for review. A push
+# drafts only the briefs it changed (every brief when the drafter changed),
+# one job per frame, so no frame waits on another's 15-minute budget. It never
 # writes back to the canonical file or approves anything in pen-bindings.json.
 # A run without the Pen secrets fails and says which one is missing.
 
@@ -27,17 +29,77 @@ on:
 
 permissions: {}
 
+# One group per commit: a push drafts only the briefs its own commit changed,
+# so a shared group would let GitHub drop a queued run and those briefs with it.
 concurrency:
-  group: pen-draft-${{ github.ref }}
+  group: pen-draft-${{ github.event_name }}-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
-  draft:
-    name: Draft Pen frames
+  plan:
+    name: Plan Pen frames
     runs-on: ubuntu-24.04
-    timeout-minutes: 75
+    timeout-minutes: 5
     permissions:
       contents: read
+    outputs:
+      frames: ${{ steps.pick.outputs.frames }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The pushed commit and its parent, to list what the push changed.
+          fetch-depth: 2
+
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Unit tests
+        run: node --test scripts/design/pen-draft.test.mjs
+
+      - name: Pick frames
+        id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          ONLY: ${{ inputs.only }}
+        run: |
+          set -euo pipefail
+          args=(--plan)
+          if [ -n "${ONLY:-}" ]; then args+=(--only "$ONLY"); fi
+          # A push of one commit (a queue merge) drafts what that commit
+          # changed. Any other push drafts every brief.
+          if [ "$EVENT" = push ] && [ "$(git rev-parse -q --verify HEAD^ || true)" = "${BEFORE:-}" ]; then
+            changed="$RUNNER_TEMP/pen-changed.txt"
+            git diff --name-only HEAD^ HEAD > "$changed"
+            args+=(--changed "$changed")
+          fi
+          frames=$(node scripts/design/pen-draft.mjs "${args[@]}")
+          echo "frames=$frames" >> "$GITHUB_OUTPUT"
+          echo "Pen frames to draft: $frames"
+
+  draft:
+    name: Draft Pen frame
+    needs: plan
+    if: ${{ needs.plan.outputs.frames != '[]' }}
+    runs-on: ubuntu-24.04
+    # pen-draft.mjs gives each frame 15 minutes; the rest is setup and upload.
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      # One at a time: the Pen editor behind one PEN_CLI_KEY serves one
+      # document. With 4 in parallel on Nov 8, 19 of 20 drafts got only
+      # "Timeout waiting for document"; one after another, 4 of 8 drew.
+      max-parallel: 1
+      matrix:
+        frame: ${{ fromJSON(needs.plan.outputs.frames) }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,26 +113,19 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      - name: Unit tests
-        run: node --test scripts/design/pen-draft.test.mjs
-
-      - name: Draft frames from briefs
+      - name: Draft frame from its brief
         env:
           PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
           PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          ONLY: ${{ inputs.only }}
-        run: |
-          set -euo pipefail
-          args=(--out "$RUNNER_TEMP/pen-draft")
-          if [ -n "${ONLY:-}" ]; then args+=(--only "$ONLY"); fi
-          node scripts/design/pen-draft.mjs "${args[@]}"
+          FRAME: ${{ matrix.frame }}
+        run: node scripts/design/pen-draft.mjs --out "$RUNNER_TEMP/pen-draft" --only "$FRAME"
 
-      - name: Upload drafts
+      - name: Upload draft
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: pen-drafts
+          name: pen-draft-${{ matrix.frame }}
           path: |
             ${{ runner.temp }}/pen-draft/*.pen
             ${{ runner.temp }}/pen-draft/*.png

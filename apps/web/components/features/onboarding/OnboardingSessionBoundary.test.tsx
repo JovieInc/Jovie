@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('@/hooks/useJovieAuth', () => ({ useJovieAuth: () => mocks.auth }));
 vi.mock('./OnboardingShell', () => ({
+  ONBOARDING_FRAME_CLASS: 'onboarding-frame',
   OnboardingShell: (props: OnboardingShellProps) => {
     mocks.shell(props);
     return (
@@ -170,6 +171,18 @@ describe('onboarding identity boundary', () => {
         name: 'Restoring your conversation…',
       })
     ).toBeVisible();
+  });
+  it('restores inside the same shell panel the chat paints into', () => {
+    mocks.auth.isLoaded = false;
+    const { container } = render(
+      <OnboardingSessionBoundary sessionLabel='pending' />
+    );
+    const frame = container.querySelector('[data-app-shell-placeholder]');
+    expect(frame).not.toBeNull();
+    expect(
+      frame?.querySelector('main [data-testid="onboarding-session-boundary"]')
+    ).not.toBeNull();
+    expect(container.querySelector('#main-content')).toBeNull();
   });
   it('keeps an actual empty anonymous entry available for a new homepage handoff', async () => {
     mocks.auth.userId = null;

@@ -6,7 +6,7 @@
  * adding one entry here — nothing else.
  *
  * ┌─────────────────────────────────┐
- * │        DSP_REGISTRY (41)        │
+ * │        DSP_REGISTRY (derived)   │
  * └──────────┬──────────────────────┘
  *            │ derives
  *      ┌─────┴─────┬──────────┬────────────┬──────────────┐
@@ -15,65 +15,15 @@
  *  (visual)     (type)       _PROVIDER    DOMAINS      _DSP_MAPPINGS
  */
 
-// ============================================================================
-// Types
-// ============================================================================
+import { type CompactDspInput, compactDsp, dsp } from './dsp-registry-builders';
+import type {
+  DSPConfig,
+  DspCategory,
+  DspRegistryEntry,
+} from './dsp-registry-types';
+import { URL_ONLY_DSPS } from './dsp-url-only';
 
-export type DspCategory = 'streaming' | 'video' | 'metadata' | 'social';
-
-export interface DspRegistryEntry {
-  /** Internal key (snake_case). Used as ProviderKey throughout the app. */
-  key: string;
-  /** Human-readable display name. */
-  name: string;
-  /** MusicFetch API service name (camelCase, as their API expects). */
-  musicfetchService: string;
-  /** Brand color hex. */
-  color: string;
-  /** Text color on brand background. */
-  textColor: string;
-  /** SVG icon string. */
-  logoSvg: string;
-  /** Valid URL domains for link validation. */
-  domains: string[];
-  /** Search URL template. Use `{query}` as placeholder. null = no search URL. */
-  searchUrlTemplate: string | null;
-  /**
-   * Category determines how this service is treated:
-   * - streaming: shown on listen page, stored as DSP social link
-   * - video: for "Use This Sound" feature (tiktok, instagram, youtubeShorts)
-   * - metadata: stored but not shown on listen page or as social links (genius, discogs)
-   * - social: social profile links (currently unused — instagram/tiktok are categorized as video)
-   */
-  category: DspCategory;
-  /** Whether to show on the fan-facing listen page. True for streaming DSPs only. */
-  showOnListenPage: boolean;
-  /** Additional keyword aliases for platform name matching (e.g. 'itunes' for apple_music). */
-  aliases: string[];
-}
-
-export interface DSPConfig {
-  name: string;
-  color: string;
-  textColor: string;
-  logoSvg: string;
-}
-
-// ============================================================================
-// Logo Helpers
-// ============================================================================
-
-function buildMonogramLogo(name: string): string {
-  const monogram = name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map(word => word[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-
-  return `<svg role="img" viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg"><title>${name}</title><circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.2"/><text x="12" y="15" text-anchor="middle" font-size="8" font-family="system-ui, -apple-system, sans-serif" font-weight="700" fill="currentColor">${monogram}</text></svg>`;
-}
+export type { DSPConfig, DspCategory, DspRegistryEntry };
 
 // Full SVG logos for major platforms
 const SPOTIFY_LOGO = `<svg role="img" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><title>Spotify</title><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.48.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.32 11.28-1.08 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>`;
@@ -81,74 +31,6 @@ const SOUNDCLOUD_LOGO = `<svg role="img" viewBox="0 0 24 24" width="20" height="
 const APPLE_MUSIC_LOGO = `<svg role="img" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><title>Apple Music</title><path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.84 7.088 7.088 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026-.747.043-1.49.123-2.193.401-1.336.53-2.3 1.452-2.865 2.78-.192.448-.292.925-.363 1.408-.056.392-.088.785-.1 1.18v11.498c.012.395.044.788.1 1.18.07.483.17.96.362 1.408.566 1.328 1.53 2.25 2.865 2.78.703.278 1.446.358 2.193.401.152.009.303.016.455.026h12.023c.04-.003.083-.01.124-.013a7.088 7.088 0 001.564-.15 5.022 5.022 0 001.877-.84c1.118-.733 1.863-1.732 2.18-3.043.176-.72.24-1.451.24-2.19V6.124zm-6.282 5.117v4.667c0 .378-.05.748-.2 1.1-.249.578-.682.96-1.296 1.127-.191.052-.39.08-.59.09-.63.03-1.18-.14-1.63-.57-.45-.43-.65-.97-.6-1.59.07-.86.57-1.47 1.37-1.79.32-.13.66-.2 1-.24.38-.04.76-.08 1.14-.15.18-.03.32-.12.38-.31.02-.06.03-.13.03-.2V9.39c0-.13-.05-.22-.18-.26-.07-.02-.15-.03-.22-.04l-4.12-.82c-.17-.03-.28.02-.33.2-.01.05-.02.1-.02.16v6.96c0 .41-.05.81-.22 1.19-.26.59-.7.98-1.33 1.14-.19.05-.39.08-.59.09-.63.03-1.18-.14-1.63-.57-.45-.43-.65-.97-.6-1.59.07-.86.57-1.47 1.37-1.79.32-.13.66-.2 1-.24.38-.04.76-.08 1.14-.15.21-.04.35-.15.39-.37.01-.05.01-.1.01-.15V6.56c0-.2.06-.35.24-.42.05-.02.1-.03.16-.04l5.69-1.13c.2-.04.39-.08.59-.09.27-.02.47.12.52.39.01.06.02.13.02.19v5.78z"/></svg>`;
 const YOUTUBE_LOGO = `<svg role="img" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><title>YouTube</title><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`;
 const YOUTUBE_MUSIC_LOGO = `<svg role="img" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><title>YouTube Music</title><path d="M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm0 19.104c-3.924 0-7.104-3.18-7.104-7.104S8.076 4.896 12 4.896s7.104 3.18 7.104 7.104-3.18 7.104-7.104 7.104zm0-13.332c-3.432 0-6.228 2.796-6.228 6.228S8.568 18.228 12 18.228 18.228 15.432 18.228 12 15.432 5.772 12 5.772zM9.684 15.54V8.46L15.816 12l-6.132 3.54z"/></svg>`;
-
-// ============================================================================
-// Registry Builder — eliminates repetitive object literals
-// ============================================================================
-
-interface DspInput {
-  key: string;
-  name: string;
-  musicfetchService: string;
-  color: string;
-  domains: string[];
-  searchUrlTemplate?: string | null;
-  textColor?: string;
-  logoSvg?: string;
-  category?: DspCategory;
-  showOnListenPage?: boolean;
-  aliases?: string[];
-}
-
-type CompactDspOptions = Pick<DspInput, 'aliases' | 'textColor'>;
-
-type CompactDspInput = readonly [
-  key: string,
-  name: string,
-  musicfetchService: string,
-  color: string,
-  domains: string[],
-  searchUrlTemplate: string | null,
-  options?: CompactDspOptions,
-];
-
-/** Build a registry entry with sensible defaults for streaming DSPs. */
-function dsp(input: DspInput): DspRegistryEntry {
-  const category = input.category ?? 'streaming';
-  return {
-    key: input.key,
-    name: input.name,
-    musicfetchService: input.musicfetchService,
-    color: input.color,
-    textColor: input.textColor ?? 'white',
-    logoSvg: input.logoSvg ?? buildMonogramLogo(input.name),
-    domains: input.domains,
-    searchUrlTemplate: input.searchUrlTemplate ?? null,
-    category,
-    showOnListenPage: input.showOnListenPage ?? category === 'streaming',
-    aliases: input.aliases ?? [],
-  };
-}
-
-function compactDsp([
-  key,
-  name,
-  musicfetchService,
-  color,
-  domains,
-  searchUrlTemplate,
-  options,
-]: CompactDspInput): DspRegistryEntry {
-  return dsp({
-    key,
-    name,
-    musicfetchService,
-    color,
-    domains,
-    searchUrlTemplate,
-    ...options,
-  });
-}
 
 const INTERNATIONAL_STREAMING_DSP_INPUTS: readonly CompactDspInput[] = [
   [
@@ -255,6 +137,19 @@ const INTERNATIONAL_STREAMING_DSP_INPUTS: readonly CompactDspInput[] = [
     { aliases: ['yandexmusic'], textColor: '#0A0A0A' },
   ],
 ] as const;
+
+// URL-only services (no MusicFetch name yet) come from lib/dsp-url-only.ts so
+// client code can read them without importing this whole registry.
+const URL_ONLY_STREAMING_DSP_INPUTS: readonly CompactDspInput[] =
+  URL_ONLY_DSPS.map(d => [
+    d.key,
+    d.name,
+    null,
+    `#${d.hex}`,
+    [...d.domains],
+    d.searchUrlTemplate ?? null,
+    { aliases: d.aliases ? [...d.aliases] : undefined },
+  ]);
 
 // ============================================================================
 // Registry
@@ -416,6 +311,7 @@ export const DSP_REGISTRY: readonly DspRegistryEntry[] = [
 
   // ─── New International Streaming DSPs ──────────────────────────────────
   ...INTERNATIONAL_STREAMING_DSP_INPUTS.map(compactDsp),
+  ...URL_ONLY_STREAMING_DSP_INPUTS.map(compactDsp),
 
   // ─── Video / Sound Platforms ───────────────────────────────────────────
   dsp({
@@ -541,12 +437,12 @@ for (const entry of DSP_REGISTRY) {
 /** Lookup by MusicFetch service name */
 const _byService = new Map<string, DspRegistryEntry>();
 for (const entry of DSP_REGISTRY) {
-  _byService.set(entry.musicfetchService, entry);
+  if (entry.musicfetchService) _byService.set(entry.musicfetchService, entry);
 }
 
 /** All MusicFetch service names (for API requests). */
-export const MUSICFETCH_ALL_SERVICES: string[] = DSP_REGISTRY.map(
-  e => e.musicfetchService
+export const MUSICFETCH_ALL_SERVICES: string[] = DSP_REGISTRY.flatMap(e =>
+  e.musicfetchService ? [e.musicfetchService] : []
 );
 
 /**
@@ -562,7 +458,9 @@ export const STREAMING_DSP_KEYS: string[] = DSP_REGISTRY.filter(
  * Used when processing MusicFetch API responses.
  */
 export const SERVICE_TO_PROVIDER: Record<string, string> = Object.fromEntries(
-  DSP_REGISTRY.map(e => [e.musicfetchService, e.key])
+  DSP_REGISTRY.flatMap(e =>
+    e.musicfetchService ? [[e.musicfetchService, e.key] as const] : []
+  )
 );
 
 /**
@@ -697,17 +595,20 @@ export const PLATFORM_TO_DSP_MAPPINGS: Array<{
 export const MUSICFETCH_LINK_MAPPINGS: Array<{
   serviceKey: string;
   platformId: string;
-}> = DSP_REGISTRY.filter(e => e.category === 'streaming').map(e => ({
-  serviceKey: e.musicfetchService,
-  platformId: e.key,
-}));
+}> = DSP_REGISTRY.flatMap(e =>
+  e.category === 'streaming' && e.musicfetchService
+    ? [{ serviceKey: e.musicfetchService, platformId: e.key }]
+    : []
+);
 
 /**
  * MusicFetch service key → DSP registry entry lookup.
  * Used by the identity layer to map raw MusicFetch services to DSP metadata.
  */
 export const MUSICFETCH_SERVICE_TO_DSP = new Map(
-  DSP_REGISTRY.map(e => [e.musicfetchService, e] as const)
+  DSP_REGISTRY.flatMap(e =>
+    e.musicfetchService ? [[e.musicfetchService, e] as const] : []
+  )
 );
 
 /**

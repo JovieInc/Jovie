@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-
 import { ConfirmDialog } from './confirm-dialog';
+import { expectNoA11yViolations } from './test-utils/a11y';
 
 describe('ConfirmDialog', () => {
   it('renders title, body, cancel slot, and destructive confirm slot', () => {
@@ -191,5 +191,117 @@ describe('ConfirmDialog', () => {
     );
     expect(onError).toHaveBeenCalled();
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  it('describes the dialog by its body, including fragment bodies', () => {
+    render(
+      <ConfirmDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        title='Archive release?'
+        body={
+          <>
+            <p>Fans keep their links.</p>
+            <p>You can restore it later.</p>
+          </>
+        }
+        onConfirm={vi.fn()}
+      />
+    );
+
+    const ids = screen.getByRole('dialog').getAttribute('aria-describedby');
+    expect(ids).toBeTruthy();
+    const described = (ids ?? '')
+      .split(' ')
+      .map(id => document.getElementById(id)?.textContent ?? '')
+      .join(' ');
+    expect(described).toContain('Fans keep their links.');
+    expect(described).toContain('You can restore it later.');
+  });
+
+  it('omits aria-describedby without a body and adds the error once shown', async () => {
+    render(
+      <ConfirmDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        title='Disconnect Spotify?'
+        confirmLabel='Disconnect'
+        onConfirm={async () => {
+          throw new Error('Request failed');
+        }}
+      />
+    );
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).not.toHaveAttribute('aria-describedby');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
+    const alert = await screen.findByRole('alert');
+    expect(dialog.getAttribute('aria-describedby')?.split(' ')).toContain(
+      alert.id
+    );
+  });
+});
+
+describe('ConfirmDialog accessibility', () => {
+  it('has no axe violations when open with only the required props', async () => {
+    render(
+      <ConfirmDialog
+        open
+        onOpenChange={vi.fn()}
+        title='Discard unsaved changes?'
+        onConfirm={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await expectNoA11yViolations(document.body);
+  });
+
+  it('has no axe violations in the error state', async () => {
+    render(
+      <ConfirmDialog
+        open
+        onOpenChange={vi.fn()}
+        title='Disconnect Spotify?'
+        body='Synced data stays in your library.'
+        confirmLabel='Disconnect'
+        onConfirm={vi.fn().mockRejectedValue(new Error('Request failed'))}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Action failed. Please try again.'
+    );
+    await expectNoA11yViolations(document.body);
+  });
+
+  it('has no axe violations while pending and with long right-to-left copy', async () => {
+    const { unmount } = render(
+      <ConfirmDialog
+        open
+        onOpenChange={vi.fn()}
+        title='Disconnect Spotify?'
+        isLoading
+        onConfirm={vi.fn()}
+      />
+    );
+    await expectNoA11yViolations(document.body);
+    unmount();
+
+    render(
+      <div dir='rtl'>
+        <ConfirmDialog
+          open
+          onOpenChange={vi.fn()}
+          variant='destructive'
+          title='هل تريد حذف جهة الاتصال من جمهورك نهائيًا؟'
+          body='لن تظهر جهة الاتصال بعد الآن في قائمة الجمهور.'
+          cancelLabel='الإبقاء على جهة الاتصال'
+          confirmLabel='حذف جهة الاتصال'
+          onConfirm={vi.fn()}
+        />
+      </div>
+    );
+    await expectNoA11yViolations(document.body);
   });
 });
