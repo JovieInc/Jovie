@@ -63,13 +63,24 @@ async function enterShell(page: Page) {
 async function expectClientNavigation(
   page: Page,
   link: Locator,
-  destination: Destination
+  destination: Destination,
+  { expectActive = false }: { readonly expectActive?: boolean } = {}
 ) {
   await link.click();
   await expect(page, `${destination.label} changes the URL`).toHaveURL(
     urlPattern(destination.href),
     { timeout: NAVIGATION_TIMEOUT_MS }
   );
+  if (expectActive) {
+    // The mobile tab bar has no pending marker, so the tapped tab turning
+    // current is what proves the tab bar followed the route change.
+    await expect(
+      link,
+      `${destination.label} becomes the current tab`
+    ).toHaveAttribute('aria-current', 'page', {
+      timeout: NAVIGATION_TIMEOUT_MS,
+    });
+  }
   await expect(
     page.locator('[data-navigation-pending="true"]'),
     `${destination.label} settles its pending state`
@@ -105,7 +116,8 @@ test.describe('mobile shell navigation click-through', () => {
       await expectClientNavigation(
         page,
         tabs.getByRole('link', { name: destination.label, exact: true }),
-        destination
+        destination,
+        { expectActive: true }
       );
     }
 
@@ -117,7 +129,8 @@ test.describe('mobile shell navigation click-through', () => {
     await expectClientNavigation(
       page,
       expanded.getByRole('link', { name: 'Settings', exact: true }),
-      { label: 'Settings', href: APP_ROUTES.SETTINGS }
+      // The Settings link points at /app/settings, which redirects to Account.
+      { label: 'Settings', href: APP_ROUTES.SETTINGS_ACCOUNT }
     );
   });
 });
