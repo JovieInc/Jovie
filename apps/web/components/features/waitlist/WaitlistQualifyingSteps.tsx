@@ -2,7 +2,7 @@
 
 import { Button, Textarea } from '@jovie/ui';
 import { RadioGroup, RadioGroupItem } from '@jovie/ui/atoms/radio-group';
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { formatAmountNoCents } from '@/lib/utils/format-number';
 import {
   PROMO_SPEND_BANDS,
@@ -49,6 +49,16 @@ function WaitlistArtistAnswer({
   const [showPick, setShowPick] = useState(
     () => spotifyArtistIdFromUrl(answers.spotifyUrl) !== null
   );
+  // The search opens in search mode, which hides the link field, so a
+  // leftover link that names no artist is dropped on arrival rather than
+  // blocking Continue with nothing on screen to fix.
+  const arrival = useRef({ url: answers.spotifyUrl, onChange });
+  useEffect(() => {
+    const { url, onChange: change } = arrival.current;
+    if (url.trim() !== '' && spotifyArtistIdFromUrl(url) === null) {
+      change({ spotifyUrl: '', artistName: null });
+    }
+  }, []);
   if (!showPick) {
     return (
       <WaitlistSpotifySearch

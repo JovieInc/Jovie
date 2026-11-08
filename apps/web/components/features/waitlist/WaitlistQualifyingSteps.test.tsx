@@ -206,4 +206,26 @@ describe('WaitlistRoleForm request-access questions', () => {
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('drops a leftover link that names no artist when the artist question opens again', async () => {
+    startAsArtist();
+    submit();
+    await screen.findByTestId('waitlist-qualifying-step');
+    fireEvent.change(screen.getByLabelText(/search spotify/i), {
+      target: { value: 'Maya' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /manually add url/i }));
+    fireEvent.change(screen.getByLabelText('Spotify link'), {
+      target: { value: 'https://open.spotify.com/album/1A2B3C' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    submit();
+    await screen.findByTestId('waitlist-qualifying-step');
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.queryByText(/not a Spotify artist/i)).toBeNull();
+    expect(screen.getByTestId('waitlist-qualifying-step')).toHaveAttribute(
+      'data-step',
+      'growth'
+    );
+  });
 });
