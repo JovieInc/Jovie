@@ -33,6 +33,7 @@ const FAIL_FAST_STEP = 'Post a failing PR Ready on the combined head';
  * - skipped-in-merge-group: the script returns before any API read.
  * - owned: REST reads owned by another lane, budgeted separately.
  * - on-rebuild: spends calls only when a superseded run exists.
+ * - cdn-fallback: release metadata only after the scanner CDN returns HTTP 504.
  * @type {Record<string, { kind: string, greenGroupCalls: number }>}
  */
 const LEDGER = {
@@ -126,6 +127,11 @@ const LEDGER = {
   },
   'security-gate/Report-only security gate': {
     kind: 'skipped-in-merge-group',
+    greenGroupCalls: 0,
+  },
+  // A green download never calls gh. The token is only for the CDN 504 fallback.
+  'ci-secret-scan/Run secret scan': {
+    kind: 'cdn-fallback',
     greenGroupCalls: 0,
   },
   // ci-slop-guard runs on pull_request only (job-level if), so a merge group never pays for it.
