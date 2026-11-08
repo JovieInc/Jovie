@@ -40,28 +40,21 @@ _scanner_verify() { # file expected tool
 }
 
 _scanner_from_release() { # url member out [max-attempts]
-  local url="$1" member="$2" out="$3" max="${4:-$SCAN_SECRETS_DOWNLOAD_ATTEMPTS}" tmp work attempt delay="$SCAN_SECRETS_RETRY_DELAY"
+  local url="$1" member="$2" out="$3" max="${4:-$SCAN_SECRETS_DOWNLOAD_ATTEMPTS}" tmp work
   tmp="$(mktemp)"
   work="$(mktemp -d)"
-  for ((attempt = 1; attempt <= max; attempt++)); do
-    if [[ -z "$member" ]]; then
-      # Raw binary release asset (no archive).
-      if curl -sSfL --connect-timeout 20 --speed-limit 1024 --speed-time 30 -o "$tmp" "$url" && [[ -s "$tmp" ]]; then
-        mv "$tmp" "$out"
-        rm -rf "$work"
-        return 0
-      fi
-    elif curl -sSfL --connect-timeout 20 --speed-limit 1024 --speed-time 30 -o "$tmp" "$url" && tar -xzf "$tmp" -C "$work" "$member" \
-      && [[ -f "$work/$member" ]]; then
+  # The shared helper backs off, falls back to the authenticated releases API
+  # and downloads to a file (a retry never appends); a bad archive fails closed.
+  if RELEASE_DOWNLOAD_ATTEMPTS="$max" RELEASE_DOWNLOAD_RETRY_DELAY="$SCAN_SECRETS_RETRY_DELAY" \
+    bash "$FETCH_SCANNER_DIR/../lib/github-release-asset.sh" "$url" "$tmp"; then
+    if [[ -z "$member" ]]; then # raw binary release asset (no archive)
+      [[ -s "$tmp" ]] && mv "$tmp" "$out" && rm -rf "$work" && return 0
+    elif tar -xzf "$tmp" -C "$work" "$member" && [[ -f "$work/$member" ]]; then
       mv "$work/$member" "$out"
       rm -rf "$tmp" "$work"
       return 0
     fi
-    [[ $attempt -lt $max ]] || break
-    echo "scanner download attempt $attempt failed; retrying" >&2
-    sleep "$((delay + RANDOM % (delay + 1)))"
-    delay=$((delay * 2))
-  done
+  fi
   rm -rf "$tmp" "$work"
   return 1
 }

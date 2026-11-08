@@ -1605,6 +1605,8 @@ jobs:
           # Keep Git-valid but shell-significant branch characters out of the
           # generated run script; GitHub transports this value as environment.
           PULL_REQUEST_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          # Read-only token for the release-download fallback.
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -2244,6 +2246,9 @@ jobs:
           go-version: '1.26.10'
           cache: false
       - name: Run actionlint
+        env:
+          # Read-only token for the release-download fallback.
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         run: bash .github/scripts/run-actionlint.sh
       - name: Fetch base-branch history
         # Await the background fetch. Fails closed on a non-zero fetch exit,
