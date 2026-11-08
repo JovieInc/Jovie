@@ -5,7 +5,6 @@
  * Full protocol and owner setup: ../README.md#remote-mcp-mcp-for-claudeai-custom-connectors.
  */
 import { HubError, type Sql } from './core.ts';
-
 export const OAUTH = {
   scopes: ['mesh:read', 'mesh:write'] as const,
   codeTtlMs: 60_000,
@@ -27,9 +26,7 @@ export const OAUTH = {
   callsPerMinute: 120,
   writesPerMinute: 30,
 } as const;
-
 export type Scope = (typeof OAUTH.scopes)[number];
-
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS oc (
      id TEXT PRIMARY KEY, name TEXT NOT NULL, uris TEXT NOT NULL, createdAt INTEGER NOT NULL);
@@ -53,27 +50,22 @@ CREATE TABLE IF NOT EXISTS rate (
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)`.split(
   ';'
 );
-
 export type Client = { id: string; name: string; uris: string[] };
 export type Principal = { grantId: string; clientId: string; scope: Scope[] };
 export type Issued = { scope: string; expiresIn: number };
-
 const num = (value: unknown) => Number(value);
 export const fail = (status: number, code: string): never => {
   throw new HubError(status, code);
 };
-
 export class OAuthStore {
   private readonly sql: Sql;
   constructor(sql: Sql) {
     this.sql = sql;
     for (const statement of SCHEMA) sql.exec(statement);
   }
-
   private exec(query: string, bindings: unknown[] = []) {
     return this.sql.exec(query, ...bindings).toArray();
   }
-
   /** Fixed-window counter. Returns false when the window is already full. */
   rate(bucket: string, limit: number, windowMs: number, now: number): boolean {
     const row = this.exec('SELECT windowStart, n FROM rate WHERE bucket = ?', [
@@ -90,7 +82,6 @@ export class OAuthStore {
     this.exec('UPDATE rate SET n = n + 1 WHERE bucket = ?', [bucket]);
     return true;
   }
-
   private prune(now: number) {
     this.exec('DELETE FROM pend WHERE expiresAt < ?', [now]);
     this.exec('DELETE FROM codes WHERE expiresAt < ?', [now - 3_600_000]);
@@ -102,7 +93,6 @@ export class OAuthStore {
       [now - 86_400_000]
     );
   }
-
   registerClient(id: string, name: string, uris: string[], now: number) {
     this.prune(now);
     if (!this.rate('register', OAUTH.registrationsPerHour, 3_600_000, now))
@@ -114,7 +104,6 @@ export class OAuthStore {
       [id, name, JSON.stringify(uris), now]
     );
   }
-
   client(id: string): Client | null {
     const row = this.exec('SELECT * FROM oc WHERE id = ?', [id])[0];
     return row
@@ -125,7 +114,6 @@ export class OAuthStore {
         }
       : null;
   }
-
   begin(
     hash: string,
     p: {
@@ -157,7 +145,6 @@ export class OAuthStore {
     // After the insert, so the client being authorized is never pruned out from under it.
     this.prune(now);
   }
-
   pending(hash: string, now: number) {
     const row = this.exec(
       'SELECT * FROM pend WHERE hash = ? AND expiresAt >= ?',
@@ -174,7 +161,6 @@ export class OAuthStore {
       challenge: String(row.challenge),
     };
   }
-
   consentLocked(now: number): boolean {
     const since = (ms: number) =>
       num(
@@ -187,11 +173,9 @@ export class OAuthStore {
       since(OAUTH.consentLongMs) >= OAUTH.consentFailsLong
     );
   }
-
   deny(hash: string) {
     this.exec('DELETE FROM pend WHERE hash = ?', [hash]);
   }
-
   /**
    * The owner-proof gate. `candidates` are the valid TOTP codes for the current window, each
    * with its step; `submitted` must equal one and its step must be newer than the last one
@@ -243,14 +227,12 @@ export class OAuthStore {
     );
     return { redirectUri: pending.redirectUri, state: pending.state };
   }
-
   private revokeGrant(grantId: string, now: number) {
     this.exec(
       'UPDATE grants SET revokedAt = ? WHERE id = ? AND revokedAt IS NULL',
       [now, grantId]
     );
   }
-
   private insertTokens(
     grantId: string,
     accessHash: string,
@@ -266,7 +248,6 @@ export class OAuthStore {
       [refreshHash, 'refresh', grantId, now + OAUTH.refreshTtlMs]
     );
   }
-
   exchangeCode(
     p: {
       codeHash: string;
@@ -312,7 +293,6 @@ export class OAuthStore {
     this.insertTokens(p.grantId, p.accessHash, p.refreshHash, now);
     return { scope: String(row.scope), expiresIn: OAUTH.accessTtlMs / 1000 };
   }
-
   refresh(
     p: {
       refreshHash: string;
@@ -346,7 +326,6 @@ export class OAuthStore {
       expiresIn: OAUTH.accessTtlMs / 1000,
     };
   }
-
   /** Resolve a presented access token and enforce the per-grant call limit. */
   authenticate(accessHash: string, now: number): Principal | null {
     const row = this.exec(
@@ -370,11 +349,9 @@ export class OAuthStore {
       scope: String(row.scope).split(' ').filter(Boolean) as Scope[],
     };
   }
-
   allowWrite(grantId: string, now: number): boolean {
     return this.rate(`writes:${grantId}`, OAUTH.writesPerMinute, 60_000, now);
   }
-
   /** RFC 7009: revoking any token of a grant ends the whole grant. */
   revokeToken(hash: string, clientId: string | null, now: number) {
     const row = this.exec(
@@ -384,21 +361,18 @@ export class OAuthStore {
     if (row && (clientId === null || row.clientId === clientId))
       this.revokeGrant(String(row.grantId), now);
   }
-
   revokeById(grantId: string, now: number): number {
     return this.exec(
       'UPDATE grants SET revokedAt = ? WHERE id = ? AND revokedAt IS NULL RETURNING id',
       [now, grantId]
     ).length;
   }
-
   revokeAll(now: number): number {
     return this.exec(
       'UPDATE grants SET revokedAt = ? WHERE revokedAt IS NULL RETURNING id',
       [now]
     ).length;
   }
-
   grants() {
     return this.exec(
       `SELECT g.id, g.scope, g.createdAt, g.lastUsedAt, c.name AS client FROM grants g
@@ -406,7 +380,6 @@ export class OAuthStore {
     );
   }
 }
-
 function constantEq(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
