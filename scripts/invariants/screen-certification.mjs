@@ -193,15 +193,6 @@ export const SCREEN_PROOF_ROUTES = Object.freeze({
   'web.marketing-solutions': '/solutions/artists',
   'web.public-profile-about': '/unfazed/about',
 });
-// JOV-7973: closed public signup (canon/PRODUCT.md, 2026-11-02) hands the
-// anonymous /start entry to the waitlist role form, and the public-screens
-// producer already follows that handoff. The resolver must accept exactly
-// those declared landing paths for that screen, or every main screenshot run
-// fails web.start and no screen-audit receipt is ever written. Each entry is
-// a bare pathname; anything else (another path, a query, a hash) still fails.
-export const SCREEN_PROOF_FINAL_PATHS = Object.freeze({
-  'web.start': Object.freeze(['/waitlist']),
-});
 export const SCREEN_PLATFORMS = Object.freeze(['web', 'macos-electron', 'ios']);
 export const EXCLUDED_OWNERS = Object.freeze([
   'ovie',
@@ -806,7 +797,6 @@ export function resolveTrustedProofForScreen(request) {
     viewports: [...screen.viewports],
     marketingRoute: SCREEN_MARKETING_ROUTES[screen.id],
     proofRoute: SCREEN_PROOF_ROUTES[screen.id],
-    proofFinalPaths: SCREEN_PROOF_FINAL_PATHS[screen.id] ?? [],
   };
   const resolved = resolveTrustedScreenProof({ artifactId, context });
   if (!resolved.proof) {

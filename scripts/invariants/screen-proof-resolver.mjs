@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { validPlaywrightPng } from '../lib/playwright-png.mjs';
+import { finalPathMatches } from './screen-proof-final-paths.mjs';
 
 export const PRODUCER = Object.freeze({
   repository: 'JovieInc/Jovie',
@@ -94,26 +95,18 @@ const equal = (left, right) =>
 // (every other screen) still requires an exactly empty search string —
 // this only widens what an exact, caller-declared query can additionally
 // match, never what an empty one does.
-// JOV-7973: `alternatePaths` are bare pathnames a screen's own producer may
-// land on after a declared handoff (web.start -> /waitlist while signup is
-// closed). An alternate must match exactly and carries no query.
-const validLocalFinalUrl = (value, expectedRoute, alternatePaths = []) => {
+const validLocalFinalUrl = (value, expectedRoute) => {
   if (typeof value !== 'string' || typeof expectedRoute !== 'string')
     return false;
   try {
     const url = new URL(value);
     const expected = new URL(expectedRoute, 'http://localhost');
-    const local =
+    return (
       url.protocol === 'http:' &&
       ['localhost', '127.0.0.1'].includes(url.hostname) &&
-      url.hash === '';
-    const exact =
-      url.pathname === expected.pathname && url.search === expected.search;
-    const alternate =
-      Array.isArray(alternatePaths) &&
-      alternatePaths.includes(url.pathname) &&
-      url.search === '';
-    return local && (exact || alternate);
+      finalPathMatches(url, expected) &&
+      url.hash === ''
+    );
   } catch {
     return false;
   }
@@ -619,11 +612,7 @@ export function resolveTrustedScreenProof({
           item.rendered !== true ||
           (context.proofRoute &&
             (item.requestedRoute !== context.proofRoute ||
-              !validLocalFinalUrl(
-                item.finalUrl,
-                context.proofRoute,
-                context.proofFinalPaths
-              ))) ||
+              !validLocalFinalUrl(item.finalUrl, context.proofRoute))) ||
           typeof item.axe?.violations !== 'number' ||
           typeof item.overflow?.maxHorizontalPx !== 'number' ||
           item.interaction?.passed !== true ||
