@@ -247,3 +247,53 @@ describe('dashboard Lighthouse collect URLs', () => {
     ]);
   });
 });
+
+describe('signed-in Lighthouse budgets', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const webRoot = resolve(import.meta.dirname, '..');
+  const scripts = (
+    JSON.parse(readFileSync(resolve(webRoot, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>;
+    }
+  ).scripts;
+
+  it.each([
+    'test:lighthouse:dashboard:pr',
+    'test:lighthouse:onboarding:pr',
+    'test:lighthouse:admin:pr',
+    'test:lighthouse:chat:pr',
+  ])('%s holds every page it measures to a budget', commandName => {
+    const command = scripts[commandName] ?? '';
+    const config =
+      /LIGHTHOUSE_CONFIG=(\S+)/.exec(command)?.[1] ??
+      '.lighthouserc.dashboard.pr.json';
+    vi.stubEnv(
+      'LIGHTHOUSE_DASHBOARD_URLS',
+      /LIGHTHOUSE_DASHBOARD_URLS=(\S+)/.exec(command)?.[1] ?? ''
+    );
+    const urls = seedDashboardAuth.resolveCollectUrls('http://localhost:3000');
+    const matrix = (
+      JSON.parse(readFileSync(resolve(webRoot, config), 'utf8')) as {
+        ci: { assert: { assertMatrix: { matchingUrlPattern: string }[] } };
+      }
+    ).ci.assert.assertMatrix;
+    const patterns = matrix.map(row => new RegExp(row.matchingUrlPattern));
+
+    expect(urls.length, commandName).toBeGreaterThan(0);
+    for (const url of urls) {
+      expect(
+        patterns.some(pattern => pattern.test(url)),
+        `${config} has no budget for ${url}`
+      ).toBe(true);
+    }
+    for (const pattern of patterns) {
+      expect(
+        urls.some(url => pattern.test(url)),
+        `${config} budget ${pattern} matches no measured page`
+      ).toBe(true);
+    }
+  });
+});

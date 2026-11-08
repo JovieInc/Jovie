@@ -1,11 +1,15 @@
 import type { Board } from './board-do.ts';
 import type { Mailbox } from './mailbox.ts';
+import type { McpAuth } from './mcp-oauth-do.ts';
 import type { Registry } from './registry.ts';
 
 export type Env = {
   MAILBOX: DurableObjectNamespace<Mailbox>;
   REGISTRY: DurableObjectNamespace<Registry>;
   BOARD: DurableObjectNamespace<Board>;
+  MCP_AUTH: DurableObjectNamespace<McpAuth>;
+  /** Base32 TOTP secret of the hub owner (Tim). Unset means no MCP consent can ever succeed. */
+  MCP_OWNER_TOTP_SECRET?: string;
   /** Registry writes only. Lives in Doppler agent-mesh/prd, never on agent hosts. */
   HUB_ADMIN_TOKEN: string;
   /** Unset until summer-config consumes /summer/v1/mesh/hub. */
