@@ -7,8 +7,15 @@
  * to all verified subscribers. Runs locally after a PR merges.
  *
  * Usage:
- *   pnpm changelog:send              # sends with 24h cooldown protection
- *   pnpm changelog:send --force      # bypasses cooldown (e.g., critical update)
+ *   pnpm changelog:send -- --approval-card sc_<id>          # 24h cooldown protection
+ *   pnpm changelog:send -- --approval-card sc_<id> --force  # bypasses cooldown
+ *
+ * Broadcast stream (apps/web/lib/email/stream-registry.json): fails closed
+ * without an approved Ovie outbound card, LEGAL_MAILING_ADDRESS, or while the
+ * stream is paused; skips suppressed addresses; sender comes from the registry.
+ * The ordinary CLI is disabled until a maintained adapter to the app gateway's
+ * shared hourly reservation exists. A per-run cap or --force cannot replace it.
+ * See scripts/lib/broadcast-send-gate.mjs.
  *
  * Spam protection:
  *   - 24-hour cooldown between product update emails (per subscriber)
@@ -21,19 +28,26 @@
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import {
+  assertBroadcastAllowed,
+  cardIdFromArgv,
+  filterRecipients,
+  legalEntityName,
+  loadBroadcastPolicy,
+  postalFooter,
+  requireSharedBroadcastQuota,
+} from './lib/broadcast-send-gate.mjs';
 import { isInternalEntry } from './lib/changelog-filter-rules.mjs';
 import { getLatestRelease } from './lib/changelog-parser.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
-const CHANGELOG_PATH = join(ROOT, 'CHANGELOG.md');
 
 const BATCH_SIZE = 10;
 const BATCH_DELAY_MS = 1_000;
 // Minimum hours between product update emails to the same subscriber list
 const MIN_HOURS_BETWEEN_SENDS = 24;
-const FORCE = process.argv.includes('--force');
 
 // Public-facing labels for CHANGELOG.md section keys, in render order.
 const SECTION_LABELS = Object.freeze({
@@ -105,13 +119,27 @@ function entriesToText(sections, summary) {
   return text.trim();
 }
 
-async function main() {
-  const changelog = readFileSync(CHANGELOG_PATH, 'utf-8');
+export async function main({
+  root = ROOT,
+  env = process.env,
+  argv = process.argv,
+  createEmailClient = async apiKey => {
+    const { Resend } = await import('resend');
+    return new Resend(apiKey);
+  },
+  createClient = async connectionString => {
+    const { default: pg } = await import('pg');
+    return new pg.Client({ connectionString });
+  },
+  delay = sleep,
+  reserveSharedQuota = undefined,
+} = {}) {
+  const changelog = readFileSync(join(root, 'CHANGELOG.md'), 'utf-8');
   const latest = getLatestRelease(changelog);
 
   if (!latest) {
     console.log('⚠️  No releases found in CHANGELOG.md. Nothing to send.');
-    process.exit(0);
+    return;
   }
 
   console.log(
@@ -123,38 +151,50 @@ async function main() {
 
   if (!entriesText) {
     console.log('⚠️  Latest release has no entries. Nothing to send.');
-    process.exit(0);
+    return;
   }
 
+  // No shared-reservation adapter is wired into the plain-Node CLI. Fail
+  // before even constructing clients; tests inject fake reservations only.
+  const reserveQuota = requireSharedBroadcastQuota(reserveSharedQuota);
+
   // Dynamic import to avoid loading DB/email modules at parse time
-  const resendApiKey = process.env.RESEND_API_KEY;
-  const databaseUrl = process.env.DATABASE_URL;
+  const resendApiKey = env.RESEND_API_KEY;
+  const databaseUrl = env.DATABASE_URL;
 
   if (!resendApiKey) {
     console.error('❌ RESEND_API_KEY not set. Cannot send emails.');
-    process.exit(1);
+    throw new Error('Required email configuration is missing');
   }
 
   if (!databaseUrl) {
     console.error('❌ DATABASE_URL not set. Cannot query subscribers.');
-    process.exit(1);
+    throw new Error('Required email configuration is missing');
   }
 
   // Use Resend directly since we're in a standalone script
-  const { Resend } = await import('resend');
-  const resend = new Resend(resendApiKey);
+  const resend = await createEmailClient(resendApiKey);
 
   // Query subscribers directly via pg
-  const { default: pg } = await import('pg');
-  const client = new pg.Client({ connectionString: databaseUrl });
+  const client = await createClient(databaseUrl);
   await client.connect();
 
   try {
+    // ── Broadcast gate (approval card, postal address, pause) ───────
+    const broadcast = loadBroadcastPolicy(root, env);
+    const mailingAddress = env[broadcast.mailingAddressEnv];
+    await assertBroadcastAllowed({
+      client,
+      cardId: cardIdFromArgv(argv),
+      mailingAddress,
+    });
+    const footer = postalFooter(legalEntityName(root), mailingAddress);
+
     // ── Cooldown check ──────────────────────────────────────────────
     // Prevent spamming subscribers when shipping multiple releases per day.
     // Uses a simple "last sent" timestamp on each subscriber row.
     // Override with --force flag.
-    if (!FORCE) {
+    if (!argv.includes('--force')) {
       const { rows: recentSend } = await client.query(
         `SELECT COUNT(*) AS cnt FROM product_update_subscribers
          WHERE last_product_update_at > NOW() - INTERVAL '${MIN_HOURS_BETWEEN_SENDS} hours'
@@ -166,28 +206,38 @@ async function main() {
           `⏳ ${recentCount} subscriber(s) received a product update in the last ${MIN_HOURS_BETWEEN_SENDS}h.`
         );
         console.log('   Skipping to avoid spam. Use --force to override.');
-        process.exit(0);
+        return;
       }
     }
 
     // Get verified non-user subscribers who haven't been emailed recently
-    const { rows: subscribers } = await client.query(
+    const { rows: allSubscribers } = await client.query(
       `SELECT email, unsubscribe_token FROM product_update_subscribers
        WHERE verified = true AND unsubscribed_at IS NULL`
     );
 
-    console.log(`📬 Found ${subscribers.length} subscriber(s)\n`);
+    const {
+      allowed: subscribers,
+      suppressed,
+      capped,
+    } = await filterRecipients({
+      client,
+      subscribers: allSubscribers,
+      perHour: broadcast.policy.rateLimit.perHour,
+    });
+    console.log(
+      `📬 Found ${allSubscribers.length} subscriber(s); ${suppressed} suppressed, ${capped} over the hourly cap\n`
+    );
 
     if (subscribers.length === 0) {
       console.log('No subscribers to email. Done.');
-      process.exit(0);
+      return;
     }
 
-    const fromEmail =
-      process.env.RESEND_FROM_EMAIL || 'notifications@send.jov.ie';
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://jov.ie';
+    const appUrl = env.NEXT_PUBLIC_APP_URL || 'https://jov.ie';
     let sent = 0;
     let errors = 0;
+    const sentEmails = [];
 
     for (let i = 0; i < subscribers.length; i += BATCH_SIZE) {
       const batch = subscribers.slice(i, i + BATCH_SIZE);
@@ -196,8 +246,18 @@ async function main() {
         const unsubscribeUrl = `${appUrl}/api/changelog/unsubscribe?token=${sub.unsubscribe_token}`;
 
         try {
-          await resend.emails.send({
-            from: fromEmail,
+          const reserved = await reserveQuota({
+            stream: 'broadcast',
+            perHour: broadcast.policy.rateLimit.perHour,
+          });
+          if (reserved !== true)
+            throw new Error(
+              'Shared broadcast quota reservation was not confirmed'
+            );
+          const result = await resend.emails.send({
+            from: broadcast.from,
+            ...(broadcast.replyTo && { replyTo: broadcast.replyTo }),
+            tags: broadcast.tags,
             to: sub.email,
             subject: `What's new at Jovie — v${latest.version}`,
             html: buildEmailHtml(
@@ -205,20 +265,27 @@ async function main() {
               latest.date,
               entriesHtml,
               unsubscribeUrl,
-              appUrl
+              appUrl,
+              footer
             ),
             text: buildEmailText(
               latest.version,
               latest.date,
               entriesText,
               unsubscribeUrl,
-              appUrl
+              appUrl,
+              footer
             ),
             headers: {
               'List-Unsubscribe': `<${unsubscribeUrl}>`,
               'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
             },
           });
+          if (result.error || !result.data?.id)
+            throw new Error(
+              result.error?.message || 'Provider did not confirm the send'
+            );
+          sentEmails.push(sub.email);
           sent++;
         } catch (err) {
           errors++;
@@ -231,7 +298,7 @@ async function main() {
       await Promise.all(promises);
 
       if (i + BATCH_SIZE < subscribers.length) {
-        await sleep(BATCH_DELAY_MS);
+        await delay(BATCH_DELAY_MS);
       }
     }
 
@@ -240,7 +307,8 @@ async function main() {
       await client.query(
         `UPDATE product_update_subscribers
          SET last_product_update_at = NOW(), updated_at = NOW()
-         WHERE verified = true AND unsubscribed_at IS NULL`
+         WHERE email = ANY($1::text[]) AND verified = true AND unsubscribed_at IS NULL`,
+        [sentEmails]
       );
     }
 
@@ -250,7 +318,14 @@ async function main() {
   }
 }
 
-function buildEmailHtml(version, date, entriesHtml, unsubscribeUrl, appUrl) {
+function buildEmailHtml(
+  version,
+  date,
+  entriesHtml,
+  unsubscribeUrl,
+  appUrl,
+  footer
+) {
   return `
 <!DOCTYPE html>
 <html>
@@ -263,7 +338,7 @@ function buildEmailHtml(version, date, entriesHtml, unsubscribeUrl, appUrl) {
         <tr><td style="padding:0 32px 8px;"><h1 style="margin:0;font-size:22px;font-weight:600;color:#000;">What's new — v${escapeHtml(version)}</h1><p style="margin:4px 0 0;font-size:13px;color:#999;">${escapeHtml(date)}</p></td></tr>
         <tr><td style="padding:16px 32px 24px;font-size:15px;line-height:1.6;color:#333;">${entriesHtml}</td></tr>
         <tr><td style="padding:0 32px 32px;text-align:center;"><a href="${escapeHtml(appUrl)}/changelog" style="display:inline-block;padding:12px 32px;background:#000;color:#fff;text-decoration:none;border-radius:9999px;font-weight:500;font-size:14px;">View full changelog</a></td></tr>
-        <tr><td style="padding:24px 32px;background:#f9f9f9;border-top:1px solid #eee;"><p style="margin:0;font-size:12px;color:#999;text-align:center;">You're receiving this because you subscribed to Jovie product updates.</p><p style="margin:8px 0 0;font-size:12px;color:#999;text-align:center;"><a href="${escapeHtml(unsubscribeUrl)}" style="color:#999;text-decoration:underline;">Unsubscribe</a></p></td></tr>
+        <tr><td style="padding:24px 32px;background:#f9f9f9;border-top:1px solid #eee;"><p style="margin:0;font-size:12px;color:#999;text-align:center;">You're receiving this because you subscribed to Jovie product updates.</p><p style="margin:8px 0 0;font-size:12px;color:#999;text-align:center;"><a href="${escapeHtml(unsubscribeUrl)}" style="color:#999;text-decoration:underline;">Unsubscribe</a></p><p style="margin:8px 0 0;font-size:11px;color:#999;text-align:center;">${escapeHtml(footer)}</p></td></tr>
       </table>
     </td></tr>
   </table>
@@ -271,7 +346,14 @@ function buildEmailHtml(version, date, entriesHtml, unsubscribeUrl, appUrl) {
 </html>`;
 }
 
-function buildEmailText(version, date, entriesText, unsubscribeUrl, appUrl) {
+function buildEmailText(
+  version,
+  date,
+  entriesText,
+  unsubscribeUrl,
+  appUrl,
+  footer
+) {
   return `What's new at Jovie — v${version} (${date})
 
 ${entriesText}
@@ -279,10 +361,16 @@ ${entriesText}
 View full changelog: ${appUrl}/changelog
 
 ---
-Unsubscribe: ${unsubscribeUrl}`;
+Unsubscribe: ${unsubscribeUrl}
+${footer}`;
 }
 
-main().catch(err => {
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  main().catch(err => {
+    console.error('Fatal error:', err);
+    process.exitCode = 1;
+  });
+}

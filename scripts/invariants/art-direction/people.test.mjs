@@ -26,7 +26,7 @@ describe('approved people registry', () => {
     );
   });
 
-  it('requires a per-route allowlist and never allows the homepage', () => {
+  it('requires a per-route allowlist and allows an approved person on any listed route', () => {
     const base = { people: [tim] };
     const none = validateRegistry(
       { ...base, images: [{ path: 'a.jpg', person: 'tim-white' }] },
@@ -42,7 +42,18 @@ describe('approved people registry', () => {
       },
       () => true
     );
-    assert.ok(home.some(error => /homepage/u.test(error)));
+    assert.deepEqual(home, []);
+  });
+
+  it('still blocks anyone who is not on the approved list, on every route', () => {
+    const blocked = validateRegistry(
+      {
+        people: [tim],
+        images: [{ path: 'b.jpg', person: 'someone-else', routes: ['/'] }],
+      },
+      () => true
+    );
+    assert.ok(blocked.some(error => /unknown person/u.test(error)));
   });
 
   it('rejects missing consent, provenance and unknown people', () => {
