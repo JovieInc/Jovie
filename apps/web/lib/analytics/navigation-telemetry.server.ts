@@ -16,8 +16,8 @@ import {
   type NavigationTelemetryPayload,
   type NavigationVariant,
   navigationLatencyBucketUpperBoundMs,
-  navigationTelemetryPayloadSchema,
 } from '@/lib/tracking/navigation-telemetry-contract';
+import { navigationTelemetryPayloadSchema } from '@/lib/tracking/navigation-telemetry-schema';
 
 export const NAVIGATION_TELEMETRY_BASELINE_DAYS = 30;
 export const NAVIGATION_TELEMETRY_MINIMUM_SAMPLE = 50;

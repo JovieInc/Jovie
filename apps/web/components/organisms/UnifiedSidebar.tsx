@@ -4,7 +4,6 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -42,7 +41,6 @@ import {
 } from '@/features/dashboard/dashboard-nav/config';
 import { NavMenuItem } from '@/features/dashboard/dashboard-nav/NavMenuItem';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
-import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCompletionCard';
 import { useProfileData } from '@/hooks/useProfileData';
 import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
@@ -60,11 +58,10 @@ import {
 } from './operator-navigation';
 import { IdentitySwitcher } from './ProfileSwitcher';
 import { SidebarDockBridge } from './SidebarDockBridge';
-
-// Founder-only (OV) block: split out so creator routes never ship it.
-const OperatorListsNav = dynamic(() =>
-  import('./OperatorListsNav').then(module => module.OperatorListsNav)
-);
+import {
+  OperatorListsNav,
+  ProfileCompletionCard,
+} from './unified-sidebar-lazy';
 
 export interface UnifiedSidebarProps {
   readonly section: AppShellSection;

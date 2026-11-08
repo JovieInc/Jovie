@@ -890,15 +890,15 @@ describe('UnifiedSidebar profile completion widget (JOV-8137)', () => {
     profileIsLive: false,
   };
 
-  it('renders the completion widget while the profile is incomplete', () => {
+  it('renders the completion widget while the profile is incomplete', async () => {
     renderUnifiedSidebar({
       section: 'dashboard',
       data: { profileCompletion: incompleteCompletion },
     });
 
     expect(
-      document.querySelector('[data-testid="sidebar-profile-completion"]')
-    ).not.toBeNull();
+      await screen.findByRole('link', { name: /Add A Profile Photo/ })
+    ).toHaveAttribute('href', APP_ROUTES.SETTINGS_PROFILE);
   });
 
   it('renders no completion widget once the profile is complete', () => {

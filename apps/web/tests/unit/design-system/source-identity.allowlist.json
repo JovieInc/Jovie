@@ -108,6 +108,12 @@
       "rule": "arbitrary-value",
       "value": "font-[540]",
       "reason": "JOV-8873: page-toolbar action classes extracted into the shared page-toolbar-classes module; value-identical to PageToolbar.tsx's grandfathered string (ACTION_BAR_BUTTON_CLASS === APP_CONTROL_BUTTON_CLASS). File-move registration only."
+    },
+    {
+      "file": "apps/web/lib/tracking/navigation-telemetry-schema.ts",
+      "rule": "arbitrary-property",
+      "value": "[a-zA-Z0-9:_-]",
+      "reason": "Zod character-class regex for opaque navigation analytics ids, moved unchanged out of navigation-telemetry-contract.ts so the client tracker no longer bundles zod. Not a Tailwind arbitrary property; no canonical design token applies."
     }
   ],
   "notes": "Documented escapes only. Each identity is file<TAB>rule<TAB>value (or {file, rule, value}). Prefer deleting the debt over adding an escape. The JOV-[1-9] entry is a zod issue-key validation regex in that route (identifier: /^JOV-[1-9][0-9]*$/u), not a style token; no canonical design token applies."
