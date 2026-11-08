@@ -75,6 +75,7 @@ function runStep(
     cwd: root,
     encoding: 'utf8',
     env: {
+      NODE_ENV: 'test',
       PATH: `${bin}:${process.env.PATH ?? ''}`,
       HOME: root,
       RUNNER_TEMP: root,
