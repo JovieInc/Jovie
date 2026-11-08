@@ -148,6 +148,12 @@
   padding-top: calc(var(--hv3-mark-size) / 2);
 }
 
+/* The ion glow and light line ride down with the rule they light. */
+.hv3-chapter::before,
+.hv3-chapter::after {
+  top: calc(var(--hv3-mark-size) / 2);
+}
+
 .hv3-chapter > .hv3-rule {
   position: relative;
 }

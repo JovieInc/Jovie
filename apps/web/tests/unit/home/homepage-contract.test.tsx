@@ -402,6 +402,10 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     expect(cinema).toMatch(
       /\.hv3-chapter\s*\{\s*padding-top: calc\(var\(--hv3-mark-size\) \/ 2\);/
     );
+    // The ion light stays on the rule it lights.
+    expect(cinema).toMatch(
+      /\.hv3-chapter::before,\s*\.hv3-chapter::after\s*\{\s*top: calc\(var\(--hv3-mark-size\) \/ 2\);/
+    );
     // Clipped headline ink has room for ascenders and descenders.
     expect(cinema).toMatch(
       /background-clip: text;[^}]*padding-block: 0\.12em;\s*margin-block: -0\.12em;/
