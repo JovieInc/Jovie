@@ -170,7 +170,8 @@ describe('standalone broadcast safety', () => {
           LEGAL_MAILING_ADDRESS: 'Test address',
         },
         argv: ['--force', '--approval-card', cardId],
-        createClient: async () => client,
+        // @types/pg from a parent node_modules types this factory as pg.Client.
+        createClient: async () => /** @type {any} */ (client),
         createEmailClient: async () => ({ emails: { send } }),
         reserveSharedQuota,
       });
