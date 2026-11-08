@@ -130,7 +130,7 @@ describe('ContextMenu', () => {
 
       await waitFor(() => {
         const label = screen.getByTestId('label');
-        expect(label.className).toContain('pl-10');
+        expect(label.className).toContain('ps-10');
       });
     });
   });
@@ -174,7 +174,7 @@ describe('ContextMenu', () => {
 
       await waitFor(() => {
         const item = screen.getByTestId('item');
-        expect(item.className).toContain('pl-10');
+        expect(item.className).toContain('ps-10');
       });
     });
   });
@@ -410,7 +410,7 @@ describe('ContextMenu', () => {
 
       await waitFor(() => {
         const subtrigger = screen.getByTestId('subtrigger');
-        expect(subtrigger.className).toContain('pl-10');
+        expect(subtrigger.className).toContain('ps-10');
       });
     });
   });
@@ -626,5 +626,36 @@ describe('ContextMenu submenu viewport fit', () => {
     expect(sub.getAttribute('style') ?? '').toContain(
       'max-width: var(--radix-context-menu-content-available-width)'
     );
+  });
+
+  describe('RTL', () => {
+    it('mirrors the submenu chevron and uses logical row padding', async () => {
+      render(
+        <div dir='rtl' lang='ar'>
+          <ContextMenu>
+            <ContextMenuTrigger>منطقة</ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuCheckboxItem checked>إظهار</ContextMenuCheckboxItem>
+              <ContextMenuSub>
+                <ContextMenuSubTrigger>نقل إلى</ContextMenuSubTrigger>
+                <ContextMenuSubContent>
+                  <ContextMenuItem>مجلد</ContextMenuItem>
+                </ContextMenuSubContent>
+              </ContextMenuSub>
+            </ContextMenuContent>
+          </ContextMenu>
+        </div>
+      );
+      fireEvent.contextMenu(screen.getByText('منطقة'));
+      const checkbox = await screen.findByRole('menuitemcheckbox', {
+        name: 'إظهار',
+      });
+      expect(checkbox).toHaveClass('ps-7', 'pe-2');
+      expect(checkbox.querySelector('span.absolute')).toHaveClass('start-2');
+      const chevron = screen
+        .getByRole('menuitem', { name: 'نقل إلى' })
+        .querySelector('svg');
+      expect(chevron).toHaveClass('ms-auto', 'rtl:rotate-180');
+    });
   });
 });

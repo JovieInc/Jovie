@@ -150,8 +150,9 @@
         {
           "item": "RTL: menu rows, inset labels, item indicators and the submenu chevron use physical pl-/pr-/left-/ml-auto (here and in lib/dropdown-styles MENU_ITEM_BASE); the chevron does not mirror (common-dropdown-renderer, item renderers)",
           "decision": "adopt",
-          "status": "open",
-          "reference": "APG Menu"
+          "status": "done",
+          "reference": "APG Menu",
+          "resolution": "rows, inset labels, check and radio indicators, shortcuts and trailing slots use logical ps-/pe-/start-/ms-auto (here and in lib/dropdown-styles), and the submenu chevron mirrors with rtl:rotate-180; physical overrides from callers still win in LTR because Tailwind emits physical utilities after logical ones"
         },
         {
           "item": "context variant cannot be opened programmatically",
@@ -177,15 +178,16 @@
     },
     "packages/ui/atoms/context-menu.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "5e0f2c2ff604a9fe0af83107752fe8a2a10784a7639b3e534562513e9951aa06",
+      "sourceHash": "a003a96f72ea05c32ea8e995eb437325c5de4a19b407b9a43ac4f85d6ceadeb8",
       "reference": "WAI-ARIA APG Menu; Radix ContextMenu; shadcn/ui ContextMenu",
       "checked": "Radix roles and keys, dir passthrough, RTL indicators and chevron",
       "gaps": [
         {
           "item": "RTL: menu rows, inset labels, item indicators and the submenu chevron use physical pl-/pr-/left-/ml-auto (here and in lib/dropdown-styles MENU_ITEM_BASE); the chevron does not mirror",
           "decision": "adopt",
-          "status": "open",
-          "reference": "shadcn/ui ContextMenu"
+          "status": "done",
+          "reference": "shadcn/ui ContextMenu",
+          "resolution": "rows, inset labels, check and radio indicators, shortcuts and trailing slots use logical ps-/pe-/start-/ms-auto (here and in lib/dropdown-styles), and the submenu chevron mirrors with rtl:rotate-180; physical overrides from callers still win in LTR because Tailwind emits physical utilities after logical ones"
         }
       ]
     },
@@ -211,15 +213,16 @@
     },
     "packages/ui/atoms/dropdown-menu.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "8d740b212d5d5d1b88584518c68879be6dd2d0f0f5d64114e413aa72fa5c4738",
+      "sourceHash": "06f601787e582942746d68b82e23acdf3cc77e827e777f198bcb9418ce692461",
       "reference": "WAI-ARIA APG Menu Button and Menu; Radix DropdownMenu; shadcn/ui DropdownMenu",
       "checked": "Radix roles and keys, dir passthrough, RTL indicators and chevron",
       "gaps": [
         {
           "item": "RTL: menu rows, inset labels, item indicators and the submenu chevron use physical pl-/pr-/left-/ml-auto (here and in lib/dropdown-styles MENU_ITEM_BASE); the chevron does not mirror",
           "decision": "adopt",
-          "status": "open",
-          "reference": "shadcn/ui DropdownMenu"
+          "status": "done",
+          "reference": "shadcn/ui DropdownMenu",
+          "resolution": "rows, inset labels, check and radio indicators, shortcuts and trailing slots use logical ps-/pe-/start-/ms-auto (here and in lib/dropdown-styles), and the submenu chevron mirrors with rtl:rotate-180; physical overrides from callers still win in LTR because Tailwind emits physical utilities after logical ones"
         }
       ]
     },
@@ -483,8 +486,9 @@
         {
           "item": "trigger row uses the physical MENU_ITEM_BASE padding (lib/dropdown-styles)",
           "decision": "adopt",
-          "status": "open",
-          "reference": "APG Menu"
+          "status": "done",
+          "reference": "APG Menu",
+          "resolution": "MENU_ITEM_BASE pads both edges equally (px-2.5) and the touch target centres with translate, so the trigger row is direction-neutral; the chevron already mirrors"
         }
       ]
     },

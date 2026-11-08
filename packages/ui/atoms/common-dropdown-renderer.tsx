@@ -472,7 +472,7 @@ function CommonDropdownSubmenuRenderer({
           {renderIcon(item.icon, 'h-4 w-4')}
         </span>
         <span className='min-w-0 flex-1 truncate'>{item.label}</span>
-        <ChevronRight className='ml-auto h-3.5 w-3.5' />
+        <ChevronRight className='ms-auto h-3.5 w-3.5 rtl:rotate-180' />
       </SubTrigger>
       {context.disablePortal ? (
         content
