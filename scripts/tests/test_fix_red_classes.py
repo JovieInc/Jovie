@@ -37,6 +37,20 @@ class ClassifyTest(unittest.TestCase):
             got = classes.classify(pr("Source Validation"), {"Source Validation": log})
             self.assertEqual((got["cls"], got["action"]), (cls, action), log)
 
+    def test_failed_live_design_cli_syncs_main_before_retrying_fixture_infra(self):
+        summary = (" FAIL  workspace-scripts lib/__tests__/design-system-source-ratchet.test.mjs"
+                   " > design-system source identity ratchet (JOV-5301)"
+                   " > exits zero from the CLI on the live tree\n")
+        noise = "passing fixture: github-quota-deferred; API rate limit exceeded; HTTP 503\n"
+        for log in (summary, noise + summary, noise + "\x1b[31m" + summary + "\x1b[0m"):
+            got = classes.classify(pr("Source Validation"), {"Source Validation": log})
+            self.assertEqual((got["cls"], got["action"]), ("design-source-cli", "sync-main"))
+        for passing in (summary.replace("FAIL", "PASS"),
+                        summary.replace("design-system-source-ratchet.test.mjs", "other.test.mjs"),
+                        summary.replace("exits zero from the CLI on the live tree", "another test")):
+            got = classes.classify(pr("Source Validation"), {"Source Validation": noise + passing})
+            self.assertEqual((got["cls"], got["action"]), ("quota-deferred", "rerun"))
+
     def test_unwired_outranks_incidental_http_status_in_the_same_log(self):
         log = (
             "✔ recovers HTTP 502/503/504\n"

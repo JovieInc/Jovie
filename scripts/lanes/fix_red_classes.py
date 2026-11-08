@@ -74,6 +74,13 @@ CHANGELOG_QUOTA_READ = re.compile(r"github-quota-deferred: PR metadata read hit 
 # lines. A branch that already contains main fails update-branch and still
 # reaches a model, which is the only path that may renew a digest the PR owns.
 CENSUS_CERTIFICATION = re.compile(r"source changed; renew certification evidence")
+# The CLI compares source with origin/main as well as the committed baseline.
+# An inherited identity removed on main can fail a stale branch (#24406).
+# Match the failed-test summary, never passing-test titles or fixture API errors.
+# The existing sync route tries once per head, then falls back to the agent.
+DESIGN_SOURCE_CLI = re.compile(
+    r"\bFAIL\b[^\n]*lib/__tests__/design-system-source-ratchet\.test\.mjs[^\n]*"
+    r">[^\n]*exits zero from the CLI on the live tree")
 # Armed spacing ratchet (spacing-scale-ratchet.test.ts). The count grew because a
 # PR added a 10px/14px utility. Snap those added utilities; do not raise the floor.
 SPACING_RATCHET_TEXT = re.compile(
@@ -139,6 +146,7 @@ SIGNATURES = (
     ("cache-surface", CACHE_SURFACE_TEXT, STRIP_CACHE),
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
+    ("design-source-cli", DESIGN_SOURCE_CLI, SYNC_MAIN),
     # Inventory assertion outranks quota/infra noise echoed in the same log.
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     # The license error is the job failure. A passing fixture can echo quota text.
