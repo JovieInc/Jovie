@@ -7,12 +7,12 @@ import {
   emptyOnboardingProfileDraft,
   onboardingRoleSchema,
 } from '@/lib/onboarding/profile-draft';
+import { OnboardingProfileRail } from './OnboardingProfileRail';
+import { deriveProfileBuilderState } from './onboardingChatHelpers';
 import {
   type OnboardingProfileBuilderState,
-  OnboardingProfileRail,
   resolvePreviewArtist,
-} from './OnboardingProfileRail';
-import { deriveProfileBuilderState } from './onboardingChatHelpers';
+} from './onboardingProfileRailState';
 
 vi.mock('@/features/profile/templates/ProfileCompactSurface', () => ({
   ProfileCompactSurface: ({

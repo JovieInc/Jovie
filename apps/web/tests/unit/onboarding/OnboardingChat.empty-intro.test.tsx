@@ -382,7 +382,6 @@ describe('OnboardingChat empty intro', () => {
     render(
       <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
     );
-
     expect(screen.getByTestId('onboarding-empty-intro')).toBeTruthy();
     expect(
       screen.getByTestId('chat-empty-state-composer-region')
@@ -391,6 +390,7 @@ describe('OnboardingChat empty intro', () => {
     expect(screen.getByText(ONBOARDING_ENTRY_TITLE)).toBeTruthy();
     expect(screen.queryByTestId('onboarding-sign-in-skip')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
+    expect(screen.queryByTestId(/^onboarding-profile-rail/)).toBeNull();
   });
 
   it('keeps a validated starter as a draft while verification is pending', () => {

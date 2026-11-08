@@ -45,6 +45,13 @@ describe('OnboardingChat entry bundle', () => {
     expect(staticImportOf('./ChatProposeNextStepCard')).toBeUndefined();
   });
 
+  it('loads the profile preview rail only when there is a preview (perf)', () => {
+    expect(staticImportOf('./OnboardingProfileRail')).toBeUndefined();
+    expect(staticImportOf('./OnboardingProfileRailLazy')).toMatch(
+      /\bOnboardingProfileRail\b/
+    );
+  });
+
   it('loads conversation renderers on demand and warms them when idle', () => {
     // Inline import() keeps Next preload metadata. The transcript owns one
     // boundary; tool cards retain local fallbacks instead of suspending the route.

@@ -27,18 +27,18 @@ import {
 } from '@/lib/turnstile/keys';
 import { cn } from '@/lib/utils';
 import { OnboardingChat } from './OnboardingChat';
-import {
-  EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
-  type OnboardingProfileBuilderState,
-  OnboardingProfileRail,
-  resolvePreviewArtist,
-} from './OnboardingProfileRail';
+import { OnboardingProfileRail } from './OnboardingProfileRailLazy';
 import {
   isOnboardingTurnstilePanelVisible,
   OnboardingTurnstile,
   type OnboardingTurnstileState,
 } from './OnboardingTurnstile';
 import { endsInTerminalNextStep } from './onboardingChatHelpers';
+import {
+  EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
+  type OnboardingProfileBuilderState,
+  resolvePreviewArtist,
+} from './onboardingProfileRailState';
 import { useOnboardingClaim } from './useOnboardingClaim';
 import { useOnboardingTurnstileFailOpen } from './useOnboardingTurnstileFailOpen';
 
