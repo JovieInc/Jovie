@@ -15,8 +15,10 @@ export const THRESHOLDS = Object.freeze({
   loadMs: 5000,
 });
 
+// Sentence-start capitals count; TODO and NaN stay exact so "Todo list" or
+// "Nan" (a name) aren't flagged. [object Object] has no word edges.
 export const PLACEHOLDER =
-  /\b(lorem ipsum|TODO|FIXME|undefined|NaN|\[object Object\]|placeholder text)\b/;
+  /\b(?:[Ll]orem ipsum|TODO|FIXME|undefined|NaN|[Pp]laceholder text)\b|\[object Object\]/;
 
 export const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 // Frames whose own console output is not the product's: Cloudflare's

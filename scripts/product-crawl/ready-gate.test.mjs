@@ -4,6 +4,7 @@ import {
   CLAIM_BANNER,
   fromThirdPartyFrame,
   isClosedInProduction,
+  PLACEHOLDER,
   pageFindings,
   productReady,
   rankFindings,
@@ -190,4 +191,17 @@ test('signed in, a sign-in wall is lost session; an unclaimed profile needs its 
     ),
     true
   );
+});
+
+test('placeholder text is caught at sentence start and around [object Object]', () => {
+  for (const text of [
+    'Lorem ipsum dolor',
+    'Price: [object Object]',
+    '[object Object]',
+    'Placeholder text here',
+    'Total: NaN',
+  ])
+    assert.match(text, PLACEHOLDER, text);
+  for (const text of ['My todo list', 'Nan and Pop', 'An undefinedness'])
+    assert.doesNotMatch(text, PLACEHOLDER, text);
 });
