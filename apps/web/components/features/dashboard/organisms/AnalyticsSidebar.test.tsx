@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { useDashboardAnalyticsQuery as useQuery } from '@/lib/queries';
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 
@@ -17,7 +18,7 @@ import {
 } from './AnalyticsSidebar';
 
 vi.mock('@/lib/queries', () => ({
-  useDashboardAnalyticsQuery: () => ({
+  useDashboardAnalyticsQuery: vi.fn(() => ({
     data: {
       profile_views: 120,
       unique_users: 48,
@@ -30,9 +31,9 @@ vi.mock('@/lib/queries', () => ({
       top_referrers: [{ referrer: 'Instagram', count: 6 }],
       top_links: [{ id: 'spotify', url: 'Spotify', clicks: 5 }],
     },
-    isLoading: false,
+    isPending: false,
     isFetching: false,
-  }),
+  })),
 }));
 
 vi.mock('@/components/molecules/drawer', async () => ({
@@ -177,6 +178,11 @@ describe('AnalyticsSidebar', () => {
     expect(screen.getByText('Link Clicks')).toBeInTheDocument();
   });
 
+  it('shows the skeleton, not zero counts, while the first fetch is paused offline', () => {
+    vi.mocked(useQuery).mockReturnValueOnce({ isPending: true } as never);
+    render(<AnalyticsSidebar isOpen onClose={vi.fn()} />);
+    expect(screen.queryByText('Unique Visitors')).not.toBeInTheDocument();
+  });
   it('keeps tab selection and ranked content in one accessible rail', () => {
     render(<AnalyticsSidebar isOpen onClose={vi.fn()} />);
 
@@ -321,7 +327,7 @@ describe('AnalyticsSidebar ranked-list density (JOV densify pass)', () => {
     );
   });
 });
-
+// The Cities tab's empty state lives in AnalyticsSidebar.cities-empty.test.tsx.
 describe('AnalyticsSidebar first look (no visits in range)', () => {
   const zeroData = {
     profile_views: 0,
@@ -415,5 +421,80 @@ describe('FunnelStage bar honesty', () => {
 
     expect(zero.querySelector<HTMLElement>('[style]')?.style.width).toBe('0%');
     expect(tiny.querySelector<HTMLElement>('[style]')?.style.width).toBe('2%');
+  });
+});
+
+describe('AnalyticsSidebar failed fetch (regression: Sentry on #24521)', () => {
+  const baseProps = {
+    isOpen: true,
+    onClose: vi.fn(),
+    loading: false,
+    range: '30d' as const,
+    onRangeChange: vi.fn(),
+    activeTab: 'cities' as const,
+    onActiveTabChange: vi.fn(),
+  };
+
+  it('shows the error state, not "No Profile Visits Yet", when the fetch fails', () => {
+    const onRetry = vi.fn();
+    render(
+      <AnalyticsSidebarView {...baseProps} data={undefined} onRetry={onRetry} />
+    );
+
+    const error = screen.getByTestId('analytics-rail-error-state');
+    expect(error).toHaveAttribute('data-content-state', 'error');
+    expect(error).toHaveTextContent('Analytics Did Not Load');
+    expect(
+      screen.queryByTestId('analytics-rail-empty-state')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('No Profile Visits Yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('Unique Visitors')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the last good numbers when a refetch fails', () => {
+    render(
+      <AnalyticsSidebarView
+        {...baseProps}
+        data={{
+          profile_views: 120,
+          unique_users: 48,
+          subscribers: 12,
+          total_clicks: 22,
+          listen_clicks: 9,
+          top_cities: [],
+          top_countries: [],
+          top_referrers: [],
+        }}
+        onRetry={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.queryByTestId('analytics-rail-error-state')
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Unique Visitors')).toBeInTheDocument();
+  });
+
+  it('never claims zero visits without data; range control needs a handler', () => {
+    const { rerender } = render(
+      <AnalyticsSidebarView {...baseProps} data={undefined} />
+    );
+    expect(
+      screen.queryByTestId('analytics-rail-empty-state')
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '7D' })).toBeInTheDocument();
+
+    rerender(
+      <AnalyticsSidebarView
+        {...baseProps}
+        onRangeChange={undefined}
+        data={undefined}
+      />
+    );
+    expect(screen.queryByRole('tab', { name: '7D' })).not.toBeInTheDocument();
   });
 });

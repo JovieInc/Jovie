@@ -168,13 +168,6 @@ describe('JOV-5466 --linear-app-* retire', () => {
     expect(source).not.toMatch(RETIRED);
   });
 
-  it('keeps components/features/dashboard/atoms/CategorySection.tsx off retired linear-app tokens', () => {
-    const source = readSource(
-      'components/features/dashboard/atoms/CategorySection.tsx'
-    );
-    expect(source).not.toMatch(RETIRED);
-  });
-
   it('keeps components/features/dashboard/atoms/DashboardHeaderActionGroup.tsx off retired linear-app tokens', () => {
     const source = readSource(
       'components/features/dashboard/atoms/DashboardHeaderActionGroup.tsx'
@@ -189,13 +182,6 @@ describe('JOV-5466 --linear-app-* retire', () => {
     expect(source).not.toMatch(RETIRED);
   });
 
-  it('keeps components/features/dashboard/molecules/ProfileLiveCelebration.tsx off retired linear-app tokens', () => {
-    const source = readSource(
-      'components/features/dashboard/molecules/ProfileLiveCelebration.tsx'
-    );
-    expect(source).not.toMatch(RETIRED);
-  });
-
   it('keeps components/features/dashboard/molecules/UniversalLinkInputUrlMode.tsx off retired linear-app tokens', () => {
     const source = readSource(
       'components/features/dashboard/molecules/UniversalLinkInputUrlMode.tsx'
@@ -203,23 +189,9 @@ describe('JOV-5466 --linear-app-* retire', () => {
     expect(source).not.toMatch(RETIRED);
   });
 
-  it('keeps components/features/dashboard/organisms/GetStartedChecklistCard.tsx off retired linear-app tokens', () => {
-    const source = readSource(
-      'components/features/dashboard/organisms/GetStartedChecklistCard.tsx'
-    );
-    expect(source).not.toMatch(RETIRED);
-  });
-
   it('keeps components/features/dashboard/organisms/MobileProfileDrawer.tsx off retired linear-app tokens', () => {
     const source = readSource(
       'components/features/dashboard/organisms/MobileProfileDrawer.tsx'
-    );
-    expect(source).not.toMatch(RETIRED);
-  });
-
-  it('keeps components/features/dashboard/organisms/MusicImportHero.tsx off retired linear-app tokens', () => {
-    const source = readSource(
-      'components/features/dashboard/organisms/MusicImportHero.tsx'
     );
     expect(source).not.toMatch(RETIRED);
   });
@@ -234,13 +206,6 @@ describe('JOV-5466 --linear-app-* retire', () => {
   it('keeps components/features/dashboard/organisms/OnboardingHandleOnlyForm.tsx off retired linear-app tokens', () => {
     const source = readSource(
       'components/features/dashboard/organisms/OnboardingHandleOnlyForm.tsx'
-    );
-    expect(source).not.toMatch(RETIRED);
-  });
-
-  it('keeps components/features/dashboard/organisms/SettingsPolished.tsx off retired linear-app tokens', () => {
-    const source = readSource(
-      'components/features/dashboard/organisms/SettingsPolished.tsx'
     );
     expect(source).not.toMatch(RETIRED);
   });
@@ -290,13 +255,6 @@ describe('JOV-5466 --linear-app-* retire', () => {
   it('keeps components/features/dashboard/organisms/onboarding/OnboardingHandleStep.tsx off retired linear-app tokens', () => {
     const source = readSource(
       'components/features/dashboard/organisms/onboarding/OnboardingHandleStep.tsx'
-    );
-    expect(source).not.toMatch(RETIRED);
-  });
-
-  it('keeps components/features/dashboard/organisms/onboarding/OnboardingNameStep.tsx off retired linear-app tokens', () => {
-    const source = readSource(
-      'components/features/dashboard/organisms/onboarding/OnboardingNameStep.tsx'
     );
     expect(source).not.toMatch(RETIRED);
   });

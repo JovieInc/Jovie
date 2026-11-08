@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
@@ -14,6 +15,10 @@ import {
 import type { AppShellMode } from '@/types/app-shell';
 import type { DashboardData } from './dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
+import {
+  shouldDefaultOpenShellPreview,
+  shouldUseEssentialShellData,
+} from './shell-route-matches';
 
 const EMPTY_PROFILE_COMPLETION: DashboardData['profileCompletion'] = {
   percentage: 0,
@@ -73,6 +78,18 @@ export function DashboardShellPrivacyBoundary({
   unlockedShellChrome?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  // The (shell) layout computes the rail default once, from the first
+  // request's path, and is not re-rendered on client navigation. Loading
+  // Account and then opening Profile kept that stale `false`, so the profile
+  // companion never opened. Recompute it from the live path; the server value
+  // only covers a render with no router path.
+  const livePathname = usePathname();
+  const livePreviewPanelDefaultOpen = livePathname
+    ? shouldDefaultOpenShellPreview(
+        livePathname,
+        shouldUseEssentialShellData(livePathname)
+      )
+    : previewPanelDefaultOpen;
   const [privacyState, setPrivacyState] = useState<WorkspacePrivacyLockState>(
     () => ({
       enabled: privacyEnabled,
@@ -278,7 +295,7 @@ export function DashboardShellPrivacyBoundary({
         isWorkspaceLocked={effectiveLock}
         persistSidebarCollapsed={persistSidebarCollapsed}
         sidebarDefaultOpen={sidebarDefaultOpen}
-        previewPanelDefaultOpen={previewPanelDefaultOpen}
+        previewPanelDefaultOpen={livePreviewPanelDefaultOpen}
       >
         {effectiveLock ? (
           recovery ? (

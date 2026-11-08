@@ -189,7 +189,7 @@ test('rejects a squawk download that does not match the pinned sha256', async ()
       installSquawk({
         platform: 'linux',
         arch: 'x64',
-        fetchImpl: async () => new Response('not-the-release'),
+        download: () => ({ ok: true, bytes: Buffer.from('not-the-release') }),
       }),
     /Squawk checksum mismatch/
   );
@@ -198,6 +198,25 @@ test('rejects a squawk download that does not match the pinned sha256', async ()
     /mismatch/
   );
   assert.match(SQUAWK_VERSION, /^2\.70\.0$/);
+});
+
+test('a squawk release outage fails closed with the HTTP status', async () => {
+  const urls = [];
+  await assert.rejects(
+    () =>
+      installSquawk({
+        platform: 'linux',
+        arch: 'x64',
+        download: url => {
+          urls.push(url);
+          return { ok: false, status: '504', error: 'release download exit 1' };
+        },
+      }),
+    /^Error: Squawk 2\.70\.0 download failed: 504 https:\/\/github\.com\/sbdchd\/squawk\/releases\/download\/v2\.70\.0\/squawk-linux-x64$/
+  );
+  assert.deepEqual(urls, [
+    'https://github.com/sbdchd/squawk/releases/download/v2.70.0/squawk-linux-x64',
+  ]);
 });
 
 test('source validation blocks dependency and migration diffs', () => {
