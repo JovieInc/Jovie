@@ -344,7 +344,7 @@ export default function CheckoutSuccessPage() {
   } else if (isOnboardingUpgrade) {
     successTitle = 'Your profile is live and upgraded';
   } else if (paidDisplayName) {
-    successTitle = `Welcome to ${paidDisplayName}`;
+    successTitle = `Welcome to ${paidDisplayName}!`;
   } else {
     successTitle = CHECKOUT_RECOVERY_COPY.title;
   }
