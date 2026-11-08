@@ -369,7 +369,7 @@ export function EmailCodeAuthForm({
         </p>
         <Button
           type='button'
-          className={`${AUTH_CLASSES.authCta} my-2`}
+          className={AUTH_CLASSES.authEntryCta}
           static
           onClick={handleRequestNewCode}
         >
@@ -410,7 +410,7 @@ export function EmailCodeAuthForm({
         <FormError id='auth-email-code-error' message={errorMessage} />
         <Button
           type='submit'
-          className={`${AUTH_CLASSES.authCta} my-2`}
+          className={AUTH_CLASSES.authEntryCta}
           static
           disabled={isPending || code.length < 6}
         >
@@ -422,13 +422,13 @@ export function EmailCodeAuthForm({
           <button
             type='button'
             onClick={handleBackToEmail}
-            className='auth-quiet-target focus-ring-themed rounded-md text-app text-secondary-token underline underline-offset-2'
+            className='auth-quiet-target focus-ring-themed rounded-md text-[13px] font-[550] text-secondary-token transition-colors duration-subtle hover:text-primary-token'
           >
             {AUTH_EMAIL_CHANGE_LABEL}
           </button>
           {resendCooldown > 0 ? (
             <span
-              className='auth-quiet-target text-app text-tertiary-token'
+              className='auth-quiet-target text-[13px] font-[550] text-tertiary-token'
               aria-live='polite'
             >
               Resend in {resendCooldown}s
@@ -439,7 +439,7 @@ export function EmailCodeAuthForm({
               onClick={handleResendCode}
               disabled={isPending}
               aria-label='Resend Verification Code'
-              className='auth-quiet-target focus-ring-themed rounded-md text-app text-secondary-token underline underline-offset-2 disabled:opacity-50'
+              className='auth-quiet-target focus-ring-themed rounded-md text-[13px] font-[550] text-secondary-token transition-colors duration-subtle hover:text-primary-token disabled:opacity-50'
             >
               Resend code
             </button>
@@ -484,7 +484,7 @@ export function EmailCodeAuthForm({
       </div>
       <Button
         type='submit'
-        className={`${AUTH_CLASSES.authCta} my-2`}
+        className={AUTH_CLASSES.authEntryCta}
         static
         disabled={isPending || !isHydrated}
         aria-busy={isPending || undefined}
