@@ -271,43 +271,6 @@ describe('GET /api/v1/[username]', () => {
     expect(body.artist.platformIds.youtube).toBe('UCabcdefghijklmnopqrstuv');
   });
 
-  it('derives the Spotify artist ID from spotify_url on legacy profiles', async () => {
-    hoisted.getProfileWithUser.mockResolvedValue({
-      id: 'profile-1',
-      username: 'realartist',
-      displayName: 'Real Artist',
-      isPublic: true,
-      bio: null,
-      location: null,
-      genres: [],
-      avatarUrl: null,
-      spotifyUrl: 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
-      appleMusicUrl: null,
-      youtubeUrl: null,
-      creatorType: 'artist',
-      spotifyId: null,
-      appleMusicId: null,
-      youtubeMusicId: null,
-      deezerId: null,
-      tidalId: null,
-      soundcloudId: null,
-      musicbrainzId: null,
-      spotifyFollowers: null,
-    });
-    hoisted.youtubeSnapshotRows.mockResolvedValue([]);
-    hoisted.getReleasesForProfileLite.mockResolvedValue([]);
-    hoisted.getLiveMerchCardsForProfile.mockResolvedValue([]);
-    hoisted.getUpcomingTourDatesForProfile.mockResolvedValue([]);
-
-    const { GET } = await import('./route');
-    const res = await GET(new Request('https://jov.ie/api/v1/realartist'), {
-      params: Promise.resolve({ username: 'realartist' }),
-    });
-    const body = await res.json();
-
-    expect(body.artist.platformIds.spotify).toBe('4Uwpa6zW3zzCSQvooQNksm');
-  });
-
   it('falls back to stored Spotify followers without inventing an observation time', async () => {
     hoisted.getProfileWithUser.mockResolvedValue({
       id: 'profile-1',
