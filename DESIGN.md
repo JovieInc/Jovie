@@ -163,7 +163,7 @@ unless linked below.
 | `deprecated-button-alias` | `error` | G | Yes | 91 |
 | `linear-namespace` | `error` | G + I | Yes | 687 |
 | `shadcn/no-restyle` | `error` | L + G | Yes | 212 files; 2991 messages (grandfathered) |
-| `source-identity` | `error` | I | Yes | 2042 |
+| `source-identity` | `error` | I | Yes | 2036 |
 | `spacing-scale (conservative)` | `error` | S + G | Yes | 589; armed=true; marketing=46; packages/ui=11; web-other=289; web-shell=243 |
 | `spacing-scale (strict)` | `warn` | S + G | No | 2190; armed=false; marketing=143; packages/ui=60; web-other=1126; web-shell=837 |
 | `touch-target` | `error` | D | Yes | 153 |

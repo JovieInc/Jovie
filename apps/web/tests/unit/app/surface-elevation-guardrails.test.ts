@@ -1,4 +1,4 @@
-import { globSync, readFileSync } from 'node:fs';
+import { existsSync, globSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -180,10 +180,6 @@ describe('surface elevation guardrails', () => {
       ),
       'utf-8'
     );
-    const onboardingLoading = readFileSync(
-      join(ROOT, 'app/onboarding/loading.tsx'),
-      'utf-8'
-    );
     const demoOnboarding = readFileSync(
       join(ROOT, 'components/features/demo/OnboardingDemoContent.tsx'),
       'utf-8'
@@ -194,8 +190,9 @@ describe('surface elevation guardrails', () => {
     );
 
     expect(onboardingForm).toContain('OnboardingExperienceShell');
-    expect(onboardingLoading).toContain('OnboardingExperienceShell');
-    expect(onboardingLoading).toContain("stageVariant='flat'");
+    // app/onboarding/loading.tsx is gone: /onboarding only redirects to
+    // /start, and its setup skeleton flashed before the checkout.
+    expect(existsSync(join(ROOT, 'app/onboarding/loading.tsx'))).toBe(false);
     expect(demoOnboarding).toContain('OnboardingExperienceShell');
     expect(demoOnboarding).toContain('OnboardingHandleStep');
     expect(demoOnboarding).toContain('OnboardingDspStep');
