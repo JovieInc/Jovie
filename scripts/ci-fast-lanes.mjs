@@ -283,9 +283,9 @@ export const SOURCE_GUARDS = Object.freeze([
     // measured and auditable), and the dead-man liveness contract stays green.
     id: 'automation-registry',
     command:
-      'node --test --experimental-test-coverage --test-coverage-include=scripts/installation-budget-sentinel.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 scripts/installation-budget-sentinel.test.mjs && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/automation-registry.test.mjs lib/__tests__/automation-liveness.test.mjs',
+      'node --test --experimental-test-coverage --test-coverage-include=scripts/installation-budget-sentinel.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 scripts/installation-budget-sentinel.test.mjs && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/automation-registry.test.mjs lib/__tests__/automation-liveness.test.mjs lib/__tests__/workers-inventory.test.mjs',
     inputs:
-      /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:apps\/[^/]+\/)?vercel\.json|scripts\/lanes\/continuity_clock\.py|canon\/automation-registry\.jsonl|scripts\/(?:automation-liveness\.mjs|installation-budget-sentinel(?:\.test)?\.mjs)|scripts\/lib\/(?:automation-registry\.mjs|__tests__\/automation-(?:registry|liveness)\.test\.mjs))/u,
+      /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:apps\/[^/]+\/)?vercel\.json|workers\/[^/]+\/wrangler[\w.-]*\.(?:toml|jsonc?)|scripts\/lanes\/continuity_clock\.py|canon\/(?:automation-registry\.jsonl|deployed-workers\.json|schedulers\.json)|scripts\/(?:automation-liveness\.mjs|installation-budget-sentinel(?:\.test)?\.mjs)|scripts\/lib\/(?:automation-registry\.mjs|workers-inventory\.mjs|__tests__\/(?:automation-(?:registry|liveness)|workers-inventory)\.test\.mjs))/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -1312,6 +1312,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-queue-speed.test.mjs',
   'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
   'scripts/lib/__tests__/workers-inventory.test.mjs',
+  'scripts/lib/__tests__/setup-pinned-node.test.mjs',
 ]);
 export const MESH_HOST_ACK_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-host-ack.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-host-ack.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-host-ack-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=99 --coverage.thresholds.statements=99 --coverage.thresholds.branches=90 --coverage.thresholds.functions=100';
@@ -3135,7 +3136,7 @@ export async function runStructural(opts = {}) {
     // Revision-bound acquisition decisions and unchanged marketing CAS behavior.
     ACQUISITION_CERTIFICATION_COMMAND,
     // JOV-4421: hard ship gate — tests + matching stories for shippable UI.
-    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs',
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs lib/__tests__/component-certificate-gate.test.mjs lib/__tests__/component-certificate-companions.test.mjs',
     // JOV-5454: live Storybook certification evaluator + lifecycle.
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs',
     'pnpm component-ship-gate',

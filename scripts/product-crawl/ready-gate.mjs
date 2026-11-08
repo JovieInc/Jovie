@@ -15,8 +15,31 @@ export const THRESHOLDS = Object.freeze({
   loadMs: 5000,
 });
 
+// Sentence-start capitals count; TODO and NaN stay exact so "Todo list" or
+// "Nan" (a name) aren't flagged. [object Object] has no word edges.
 export const PLACEHOLDER =
-  /\b(lorem ipsum|TODO|FIXME|undefined|NaN|\[object Object\]|placeholder text)\b/;
+  /\b(?:[Ll]orem ipsum|TODO|FIXME|undefined|NaN|[Pp]laceholder text)\b|\[object Object\]/;
+
+// Timing on a shared CI runner is noisy: across three crawls on Nov 8 only
+// one of 13 frozen frames came back on the same page. A page that trips a
+// timing threshold is loaded twice more and judged on the median of three.
+// Layout shift, errors and broken routes are judged on the first load.
+export const TIMING_SAMPLES = 3;
+
+/** @param {{ error?: string, lcpMs?: number, longestTaskMs?: number }} page */
+export function timingSuspect(page) {
+  return (
+    !page.error &&
+    ((page.lcpMs ?? 0) > THRESHOLDS.lcpMs ||
+      (page.longestTaskMs ?? 0) > THRESHOLDS.longTaskMs)
+  );
+}
+
+/** Median of the samples; the lower middle for an even count. */
+export function median(xs) {
+  const s = [...xs].sort((a, b) => a - b);
+  return s[Math.floor((s.length - 1) / 2)];
+}
 
 export const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 // Frames whose own console output is not the product's: Cloudflare's
@@ -52,14 +75,21 @@ export function isClosedInProduction(route, closed) {
   );
 }
 
+// What the claim banner says on an unclaimed profile.
+export const CLAIM_BANNER = /profile is unclaimed|claim (this|your) profile/i;
+
 export const IDENTITIES = Object.freeze(['stranger', 'signed-in']);
+
+const ofSamples = page =>
+  page.timingSamples > 1 ? ` (median of ${page.timingSamples} loads)` : '';
 
 /**
  * @param {{ route: string, identity: string, viewport: string, status?: number,
  *   error?: string, authGated?: boolean, cls?: number, lcpMs?: number,
  *   longestTaskMs?: number, loadMs?: number, consoleErrors?: string[],
  *   failedRequests?: string[], placeholder?: string|null,
- *   horizontalOverflow?: boolean }} page
+ *   horizontalOverflow?: boolean, url?: string, expectClaimBanner?: boolean,
+ *   claimBanner?: boolean, timingSamples?: number }} page
  * @returns {{ route: string, identity: string, viewport: string, kind: string, detail: string }[]}
  */
 export function pageFindings(page, closed = []) {
@@ -79,24 +109,35 @@ export function pageFindings(page, closed = []) {
             `HTTP ${page.status}; listed as closed in production`
           ),
         ];
-  if (page.authGated) return [];
+  // Signed in, a sign-in wall means the session was lost: that is jank.
+  if (page.authGated)
+    return page.identity === 'signed-in'
+      ? [f('session-lost', 'sent to sign in while signed in')]
+      : [];
   const out = [];
   if (page.status >= 500) out.push(f('server-error', `HTTP ${page.status}`));
   else if (page.status >= 400)
     out.push(f('broken-route', `HTTP ${page.status}`));
+  if (page.expectClaimBanner && page.claimBanner === false)
+    out.push(
+      f('claim-banner-missing', `no claim banner on ${page.url ?? page.route}`)
+    );
   if ((page.cls ?? 0) > THRESHOLDS.cls)
     out.push(
       f('layout-shift', `CLS ${page.cls.toFixed(3)} > ${THRESHOLDS.cls}`)
     );
   if ((page.lcpMs ?? 0) > THRESHOLDS.lcpMs)
     out.push(
-      f('slow-paint', `LCP ${Math.round(page.lcpMs)}ms > ${THRESHOLDS.lcpMs}ms`)
+      f(
+        'slow-paint',
+        `LCP ${Math.round(page.lcpMs)}ms > ${THRESHOLDS.lcpMs}ms${ofSamples(page)}`
+      )
     );
   if ((page.longestTaskMs ?? 0) > THRESHOLDS.longTaskMs)
     out.push(
       f(
         'frozen-frame',
-        `main thread blocked ${Math.round(page.longestTaskMs)}ms`
+        `main thread blocked ${Math.round(page.longestTaskMs)}ms${ofSamples(page)}`
       )
     );
   if ((page.loadMs ?? 0) > THRESHOLDS.loadMs)
@@ -156,6 +197,8 @@ const ORDER = [
   'unreachable',
   'server-error',
   'broken-route',
+  'session-lost',
+  'claim-banner-missing',
   'closed-route-open',
   'frozen-frame',
   'layout-shift',
