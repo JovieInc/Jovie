@@ -1,12 +1,15 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ProfileEventsCard } from './ProfileEventsCard';
 
 const ACCENT = { accent: 'pulse', strength: 'text' } as const;
 
 describe('ProfileEventsCard', () => {
-  it('states plainly that there are no events, with no invented CTA', () => {
-    render(<ProfileEventsCard accent={ACCENT} hasEvents={false} />);
+  it('states plainly that there are no events, with no invented CTA', async () => {
+    const { container } = render(
+      <ProfileEventsCard accent={ACCENT} hasEvents={false} />
+    );
 
     const card = screen.getByTestId('profile-primary-tab-events-empty');
     expect(card).toHaveAccessibleName('Events');
@@ -17,10 +20,11 @@ describe('ProfileEventsCard', () => {
     expect(within(card).getByText('New dates will appear here.')).toBeVisible();
     expect(within(card).queryByRole('link')).toBeNull();
     expect(within(card).queryByRole('button')).toBeNull();
+    await expectNoA11yViolations(container);
   });
 
-  it('hosts the event list when dates exist', () => {
-    render(
+  it('hosts the event list when dates exist', async () => {
+    const { container } = render(
       <ProfileEventsCard accent={ACCENT} hasEvents>
         <ul>
           <li>The Echo</li>
@@ -32,10 +36,11 @@ describe('ProfileEventsCard', () => {
     expect(within(card).getByText('The Echo')).toBeInTheDocument();
     expect(within(card).queryByRole('heading')).toBeNull();
     expect(screen.queryByTestId('profile-primary-tab-events-empty')).toBeNull();
+    await expectNoA11yViolations(container);
   });
 
-  it('renders only the provided alerts opt-in under the empty state', () => {
-    render(
+  it('renders only the provided alerts opt-in under the empty state', async () => {
+    const { container } = render(
       <ProfileEventsCard
         accent={ACCENT}
         hasEvents={false}
@@ -52,5 +57,6 @@ describe('ProfileEventsCard', () => {
       within(card).getByRole('link', { name: 'Turn On Event Alerts' })
     ).toBeInTheDocument();
     expect(within(card).queryByText('Hidden list')).toBeNull();
+    await expectNoA11yViolations(container);
   });
 });
