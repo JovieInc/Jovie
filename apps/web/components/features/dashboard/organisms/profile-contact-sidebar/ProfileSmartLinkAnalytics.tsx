@@ -3,17 +3,18 @@
 import { useState } from 'react';
 import { toast } from '@/components/feedback';
 import {
-  DrawerInlineNote,
-  DrawerSurfaceCard,
+  DrawerAnalyticsSummaryCard,
+  type DrawerAnalyticsSummaryMetric,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { CANONICAL_METRICS } from '@/lib/analytics/metrics';
 import { getTimeRangeLabel } from '@/lib/analytics/time-range';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
-import { cn } from '@/lib/utils';
-import type { AnalyticsRange } from '@/types/analytics';
+import type {
+  AnalyticsRange,
+  DashboardAnalyticsResponse,
+} from '@/types/analytics';
 
 const numberFormatter = new Intl.NumberFormat();
 
@@ -46,6 +47,80 @@ function ProfileSmartLinkControl({
   );
 }
 
+/** Profile views and link clicks for the window, or none when both are zero. */
+export function buildProfileSmartLinkMetrics(
+  data: Pick<DashboardAnalyticsResponse, 'profile_views' | 'total_clicks'>,
+  range: AnalyticsRange
+): DrawerAnalyticsSummaryMetric[] {
+  const views = data.profile_views ?? 0;
+  const clicks = data.total_clicks ?? 0;
+  if (views <= 0 && clicks <= 0) return [];
+
+  const hint = getTimeRangeLabel(range, 'description');
+  return [
+    {
+      id: 'profile-views',
+      label: CANONICAL_METRICS.profile_views.label,
+      value: numberFormatter.format(views),
+      hint,
+    },
+    {
+      // Display alias for CANONICAL_METRICS.total_clicks
+      id: 'link-clicks',
+      label: 'Link Clicks',
+      value: numberFormatter.format(clicks),
+      hint,
+    },
+  ];
+}
+
+export interface ProfileSmartLinkAnalyticsViewProps
+  extends ProfileSmartLinkAnalyticsProps {
+  readonly data: DashboardAnalyticsResponse | null | undefined;
+  readonly range: AnalyticsRange;
+  readonly loading: boolean;
+  readonly isFetching?: boolean;
+  readonly isError?: boolean;
+}
+
+/**
+ * Profile drawer analytics on the shared DrawerAnalyticsSummaryCard, so its
+ * tiles, loading skeleton and empty line match the release and tour-date
+ * drawers, and the share link sits in a reserved footer that never moves.
+ */
+export function ProfileSmartLinkAnalyticsView({
+  profileUrl,
+  variant = 'card',
+  data,
+  range,
+  loading,
+  isFetching = false,
+  isError = false,
+}: ProfileSmartLinkAnalyticsViewProps) {
+  let state: 'loading' | 'error' | 'ready' = 'ready';
+  if (loading && !data) state = 'loading';
+  else if (isError && !data) state = 'error';
+
+  const metrics = data ? buildProfileSmartLinkMetrics(data, range) : [];
+  const windowLabel = getTimeRangeLabel(range, 'description').toLowerCase();
+
+  return (
+    <DrawerAnalyticsSummaryCard
+      metrics={metrics}
+      state={state}
+      dimmed={isFetching && state === 'ready'}
+      emptyMessage={`No visits in the ${windowLabel}. Share your profile link to start counting views and clicks.`}
+      errorMessage='Analytics unavailable'
+      testId='profile-smart-link-analytics'
+      variant={variant}
+      stableLayout
+      reserveFooterSlot
+      metricSlotCount={2}
+      footer={<ProfileSmartLinkControl profileUrl={profileUrl} />}
+    />
+  );
+}
+
 export function ProfileSmartLinkAnalytics({
   profileUrl,
   variant = 'card',
@@ -56,107 +131,15 @@ export function ProfileSmartLinkAnalytics({
     view: 'traffic',
   });
 
-  const profileViews = data?.profile_views ?? 0;
-  const totalClicks = data?.total_clicks ?? 0;
-
-  const showSkeleton = isLoading && !data;
-
-  const currentRangeLabel = getTimeRangeLabel(range, 'description');
-
-  const content = (
-    <>
-      {/* Analytics metrics */}
-      <div className='min-h-19 px-3 pb-3 pt-3'>
-        {showSkeleton && (
-          <div className='grid grid-cols-2 gap-3'>
-            <div className='space-y-1'>
-              <div className='h-2 w-12 rounded skeleton' />
-              <div className='h-4 w-8 rounded skeleton' />
-              <div className='h-2 w-10 rounded skeleton' />
-            </div>
-            <div className='space-y-1'>
-              <div className='h-2 w-12 rounded skeleton' />
-              <div className='h-4 w-8 rounded skeleton' />
-              <div className='h-2 w-10 rounded skeleton' />
-            </div>
-          </div>
-        )}
-
-        {!showSkeleton && isError && (
-          <DrawerInlineNote
-            className='min-h-13 px-0 py-0'
-            message='Analytics unavailable'
-          />
-        )}
-
-        {!showSkeleton && !isError && (
-          <div
-            className={cn(
-              'space-y-1.5 transition-opacity duration-subtle',
-              isFetching && 'opacity-50'
-            )}
-          >
-            <div className='grid grid-cols-2 gap-3'>
-              <AnalyticsMetric
-                label={CANONICAL_METRICS.profile_views.label}
-                value={numberFormatter.format(profileViews)}
-              />
-              {/* Display alias for CANONICAL_METRICS.total_clicks */}
-              <AnalyticsMetric
-                label='Link Clicks'
-                value={numberFormatter.format(totalClicks)}
-              />
-            </div>
-            <p className='text-3xs leading-[13px] text-tertiary-token'>
-              {currentRangeLabel}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Smart link control */}
-      <div className='px-3 pb-3 pt-0'>
-        <ProfileSmartLinkControl profileUrl={profileUrl} />
-      </div>
-    </>
-  );
-
-  if (variant === 'flat') {
-    return <div data-testid='profile-smart-link-analytics'>{content}</div>;
-  }
-
   return (
-    <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
-      testId='profile-smart-link-analytics'
-    >
-      {content}
-    </DrawerSurfaceCard>
-  );
-}
-
-function AnalyticsMetric({
-  label,
-  value,
-  hint,
-  className,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly hint?: string;
-  readonly className?: string;
-}) {
-  return (
-    <div className={cn('space-y-px', className)}>
-      <p className='text-3xs font-medium leading-[14px] text-tertiary-token'>
-        {label}
-      </p>
-      <p className='tabular-nums text-lg font-semibold leading-none tracking-tighter text-primary-token'>
-        {value}
-      </p>
-      {hint ? (
-        <p className='text-3xs leading-[13px] text-tertiary-token'>{hint}</p>
-      ) : null}
-    </div>
+    <ProfileSmartLinkAnalyticsView
+      profileUrl={profileUrl}
+      variant={variant}
+      data={data}
+      range={range}
+      loading={isLoading}
+      isFetching={isFetching}
+      isError={isError}
+    />
   );
 }
