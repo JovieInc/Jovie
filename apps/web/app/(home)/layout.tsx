@@ -1,4 +1,6 @@
 import './home.css';
+import localFont from 'next/font/local';
+import { Orbit } from '@/components/homepage/v3/Orbit';
 import '../../components/marketing/MarketingSnapRail.css';
 import { WebMcpTools } from '@/components/marketing/WebMcpTools';
 import { ClientProviders } from '@/components/providers/ClientProviders';
@@ -10,6 +12,16 @@ import { getMarketingPageContractForRouteGlob } from '@/data/marketing/pageContr
 import { getSiteChrome } from '@/lib/content-records/site-chrome.server';
 
 export const revalidate = false;
+
+// Geist Mono sets the approved v3 meta line (callouts, chapter index, specs
+// detail). Homepage only, not preloaded: it is never the largest paint.
+const geistMono = localFont({
+  src: '../../public/fonts/GeistMono-Latin.woff2',
+  variable: '--font-geist-mono',
+  display: 'swap',
+  preload: false,
+  weight: '400 500',
+});
 
 // The homepage is statically prerendered, and its server-side usePathname()
 // is not "/" (the markup shipped without the page-contract markers and with
@@ -26,16 +38,9 @@ export default async function HomeLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const siteChrome = await getSiteChrome();
-  // The design's legal row also names Cookies and DMCA (both are live pages).
-  const chrome = {
-    ...siteChrome,
-    legalLinks: [
-      ...siteChrome.legalLinks,
-      { href: APP_ROUTES.LEGAL_COOKIES, label: 'Cookies' },
-      { href: APP_ROUTES.LEGAL_DMCA, label: 'DMCA' },
-    ],
-  };
+  // The approved v3 footer is the published chrome as is: 15 links in
+  // Product, Company and Resources, and Privacy and Terms in the legal row.
+  const chrome = await getSiteChrome();
   // The homepage uses the one canonical marketing shell: the docked
   // landing header (with the Customers flyout) and the full footer. The
   // hero opts into `marketing-hero-dock`, so its cinematic field bleeds
@@ -45,8 +50,11 @@ export default async function HomeLayout({
     <ClientProviders forceSignedOutDefaults>
       <PublicPageShell
         chrome={chrome}
-        className='home-viewport home-viewport--hero-canvas min-h-svh overflow-x-clip bg-base text-primary-token'
-        footerClassName='home-footer-v1'
+        className={`${geistMono.variable} home-viewport home-viewport--hero-canvas min-h-svh overflow-x-clip bg-base text-primary-token`}
+        footerClassName='hv3 hv3-footer'
+        footerDecoration={
+          <Orbit id='hv3-orbit-footer' rings={[2800]} arc={[346, 28]} />
+        }
         footerPenSection='footer'
         footerShowCta={false}
         footerVariant='expanded'

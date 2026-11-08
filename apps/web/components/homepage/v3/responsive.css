@@ -1,0 +1,287 @@
+/* Homepage v3 below the approved 1440 frame: the 390 composition (phones and
+   small tablets) and fluid display type in between. */
+
+@media (min-width: 768px) and (max-width: 1439px) {
+  .hv3-display {
+    font-size: clamp(64px, 7.78vw, 112px);
+    line-height: 0.9;
+  }
+
+  .hv3-statement {
+    font-size: clamp(48px, 5vw, 72px);
+    line-height: 1;
+  }
+
+  .hv3-sheet__row {
+    grid-template-columns: minmax(120px, 20.8vw) 1fr 1fr 1fr;
+  }
+
+  .hv3-num {
+    font-size: clamp(56px, 6.1vw, 88px);
+    line-height: 1;
+  }
+
+  .hv3-num--sm {
+    font-size: clamp(32px, 3.33vw, 48px);
+    line-height: 1.17;
+  }
+}
+
+@media (max-width: 1279px) {
+  .hv3 {
+    --hv3-gutter: 48px;
+  }
+}
+
+@media (max-width: 767px) {
+  .hv3 {
+    --hv3-gutter: 16px;
+  }
+
+  .hv3-display {
+    font-size: 52px;
+    letter-spacing: -0.045em;
+    line-height: 50px;
+  }
+
+  .hv3-statement {
+    font-size: 40px;
+    line-height: 42px;
+  }
+
+  .hv3-lede {
+    font-size: 17px;
+    line-height: 27px;
+  }
+
+  .hv3-chapter {
+    padding-bottom: 96px;
+  }
+
+  /* Hero */
+  .hv3-hero {
+    height: 1120px;
+    padding-top: 120px;
+  }
+
+  .hv3-hero > .hv3-orbit {
+    top: 80px;
+    left: -725px;
+    transform: rotate(47deg);
+  }
+
+  .hv3-hero
+    > .hv3-orbit
+    :is(.hv3-orbit__arc, .hv3-orbit__bloom, .hv3-orbit__sweep) {
+    display: none;
+  }
+
+  .hv3-hero__copy {
+    grid-template-columns: 1fr;
+    row-gap: 20px;
+  }
+
+  .hv3-ctas {
+    flex-wrap: wrap;
+    margin-top: 24px;
+  }
+
+  .hv3-stage--hero {
+    top: 470px;
+    height: 560px;
+  }
+
+  .hv3-rig--hero {
+    top: 10px;
+    left: -330px;
+    transform: var(--hv3-cam) scale(0.72);
+  }
+
+  .hv3-app :is(.hv3-main__search, .hv3-rrow__y, .hv3-rrow__m),
+  .hv3-app .hv3-main__cols span:nth-child(3) {
+    visibility: hidden;
+  }
+
+  .hv3-stage--hero .hv3-bounce {
+    top: 320px;
+    left: 0;
+    width: 600px;
+    height: 120px;
+  }
+
+  .hv3-stage--hero .hv3-callout {
+    display: none;
+  }
+
+  .hv3-index {
+    grid-template-columns: repeat(2, 1fr);
+    row-gap: 8px;
+  }
+
+  /* Profile */
+  .hv3-split {
+    grid-template-columns: 1fr;
+    padding-top: 72px;
+  }
+
+  .hv3-stage--profile {
+    height: 640px;
+    margin-top: 24px;
+  }
+
+  .hv3-stage--profile > .hv3-orbit {
+    top: 40px;
+    left: -60px;
+  }
+
+  .hv3-rig--profile {
+    top: 40px;
+    left: 40px;
+    transform: var(--hv3-cam) scale(1);
+    transform-origin: 0 0;
+  }
+
+  .hv3-stage--profile .hv3-bounce {
+    top: 520px;
+    left: -40px;
+    width: 460px;
+  }
+
+  .hv3-stage--profile .hv3-callout {
+    display: none;
+  }
+
+  /* Releases */
+  .hv3-centered {
+    padding: 96px var(--hv3-gutter) 0;
+    text-align: left;
+  }
+
+  .hv3-centered .hv3-lede--center {
+    margin: 28px 0 0;
+    text-align: left;
+  }
+
+  .hv3-stage--releases {
+    height: 660px;
+    margin-top: 80px;
+  }
+
+  .hv3-stage--releases > .hv3-orbit {
+    top: 20px;
+    left: -120px;
+  }
+
+  .hv3-rig--releases {
+    top: 50px;
+    left: -335px;
+    transform: var(--hv3-cam) scale(0.8);
+    transform-origin: 0 0;
+  }
+
+  .hv3-plate,
+  .hv3-connector,
+  .hv3-stage--releases .hv3-callout {
+    display: none;
+  }
+
+  .hv3-stage--releases .hv3-bounce {
+    top: 500px;
+    left: -100px;
+    width: 560px;
+  }
+
+  .hv3-captions {
+    grid-template-columns: 1fr;
+    row-gap: 20px;
+  }
+
+  /* Specs */
+  .hv3-specs__head {
+    grid-template-columns: 1fr;
+    row-gap: 16px;
+    padding: 96px var(--hv3-gutter) 40px;
+  }
+
+  .hv3-sheet__row {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 28px;
+    padding: 28px 0 32px;
+  }
+
+  .hv3-sheet__label,
+  .hv3-sheet__cell--meter {
+    grid-column: 1 / -1;
+  }
+
+  .hv3-num {
+    font-size: 56px;
+    line-height: 56px;
+  }
+
+  .hv3-num--sm {
+    font-size: 36px;
+    line-height: 40px;
+  }
+
+  .hv3-moments {
+    grid-template-columns: 1fr;
+    margin-top: 64px;
+  }
+
+  .hv3-moment__stage {
+    height: 420px;
+  }
+
+  .hv3-palette {
+    top: 40px;
+    left: 20px;
+    width: 560px;
+  }
+
+  .hv3-keys {
+    right: 20px;
+    bottom: 24px;
+  }
+
+  .hv3-key {
+    width: 60px;
+    height: 60px;
+  }
+
+  .hv3-moment__cap {
+    padding: 20px;
+    font-size: 15px;
+    line-height: 24px;
+  }
+
+  .hv3-rig--moment {
+    top: 36px;
+    left: 40px;
+    transform: scale(0.8);
+    transform-origin: 0 0;
+  }
+
+  /* Invite: any ring size crosses text at 390, so the Orbit is hidden. */
+  .hv3-invite__inner {
+    padding-top: 120px;
+  }
+
+  .hv3-invite__inner > .hv3-orbit {
+    top: -10px;
+  }
+
+  .hv3-invite__inner > .hv3-orbit .hv3-orbit__svg {
+    display: none;
+  }
+
+  .hv3-invite .hv3-lede--center {
+    margin: 20px auto 0;
+    padding: 0 var(--hv3-gutter);
+  }
+
+  .hv3-steps {
+    grid-template-columns: 1fr;
+    margin-top: 64px;
+  }
+}

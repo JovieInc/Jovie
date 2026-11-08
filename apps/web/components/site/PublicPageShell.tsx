@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
 import type { MarketingHeaderBrand } from '@/data/marketing/headerBrand';
@@ -26,6 +27,8 @@ export interface PublicPageShellProps {
   readonly footerClassName?: string;
   /** Pen design-diff section id for the footer. */
   readonly footerPenSection?: string;
+  /** Decorative art behind the footer content (the homepage Orbit horizon). */
+  readonly footerDecoration?: ReactNode;
   /** Set false when the route owns its final CTA (the homepage). */
   readonly footerShowCta?: boolean;
   readonly footerVariant?: 'auto' | 'expanded' | 'minimal';
@@ -63,6 +66,7 @@ export function PublicPageShell({
   className,
   footerClassName,
   footerPenSection,
+  footerDecoration,
   footerShowCta,
   footerVariant,
   headerBrand,
@@ -116,6 +120,7 @@ export function PublicPageShell({
         className={footerClassName}
         columns={chrome?.footerColumns}
         penSection={footerPenSection}
+        decoration={footerDecoration}
         showCta={footerShowCta}
         legalLinks={chrome?.legalLinks}
         variant={footerVariant}

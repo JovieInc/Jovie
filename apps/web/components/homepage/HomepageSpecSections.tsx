@@ -1,11 +1,16 @@
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import {
   HomepageInviteClose,
   HomepageProfileChapter,
   HomepageReleasesChapter,
   HomepageStoryHero,
 } from '@/components/homepage/HomepageEditorial';
-import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
+import { SpecsChapter } from '@/components/homepage/v3/SpecsChapter';
+import { StageMotion } from '@/components/homepage/v3/StageMotion';
+import {
+  HOMEPAGE_EDITORIAL_COPY,
+  HOMEPAGE_PRODUCT_UI,
+} from '@/data/homepageEditorialCopy';
 import type {
   MarketingPageSection,
   MarketingPageSections,
@@ -33,8 +38,13 @@ function renderSection(
     case 'feature-split':
       return <HomepageProfileChapter key='feature-split' copy={entry.copy} />;
     case 'product-gallery':
+      // The specs chapter is code-owned (its numbers derive from the DSP
+      // registry, so it has no copy slots) and follows the releases chapter.
       return (
-        <HomepageReleasesChapter key='product-gallery' copy={entry.copy} />
+        <Fragment key='product-gallery'>
+          <HomepageReleasesChapter copy={entry.copy} />
+          <SpecsChapter />
+        </Fragment>
       );
     case 'cta':
       return <HomepageInviteClose key='cta' copy={entry.copy} />;
@@ -48,5 +58,13 @@ export function HomepageSpecSections({
   sections: MarketingPageSections;
   headingId?: string;
 }>) {
-  return <>{sections.map(entry => renderSection(entry, headingId))}</>;
+  return (
+    <>
+      {sections.map(entry => renderSection(entry, headingId))}
+      <StageMotion
+        paletteQuery={HOMEPAGE_PRODUCT_UI.palette.query}
+        paletteTarget={HOMEPAGE_PRODUCT_UI.palette.queryTarget}
+      />
+    </>
+  );
 }

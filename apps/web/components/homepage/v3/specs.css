@@ -1,0 +1,193 @@
+/* Homepage v3 specs chapter (an Apple tech-specs sheet) and the footer horizon. */
+
+.hv3-specs__head {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  align-items: end;
+  column-gap: 24px;
+  padding: 160px var(--hv3-side) 80px;
+}
+
+.hv3-specs__head .hv3-statement {
+  margin-left: -0.05em;
+}
+
+.hv3-specs__head .hv3-body {
+  max-width: 420px;
+}
+
+.hv3-sheet {
+  margin: 0 var(--hv3-side);
+}
+
+.hv3-sheet__row {
+  display: grid;
+  grid-template-columns: 300px 1fr 1fr 1fr;
+  column-gap: 24px;
+  padding: 40px 0 44px;
+  border-top: 1px solid var(--hv3-b2);
+}
+
+.hv3-sheet__row:last-child {
+  border-bottom: 1px solid var(--hv3-b2);
+}
+
+.hv3-sheet__label {
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+.hv3-num {
+  display: block;
+  font-family: var(--hv3-display);
+  font-size: 88px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 88px;
+}
+
+.hv3-num--sm {
+  font-size: 48px;
+  letter-spacing: -0.035em;
+  line-height: 56px;
+}
+
+.hv3-sheet__cell p {
+  margin-top: 14px;
+  color: var(--hv3-t3);
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.hv3-sheet__cell strong {
+  display: block;
+  color: var(--hv3-t1);
+  font-weight: 500;
+}
+
+.hv3-sheet__cell--meter {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-bottom: 4px;
+}
+
+.hv3-meter {
+  display: grid;
+  grid-template-columns: repeat(var(--hv3-meter-n), 1fr);
+  gap: 2px;
+}
+
+.hv3-meter i {
+  height: 28px;
+  border-radius: 2px;
+  background: var(--hv3-floating);
+}
+
+.hv3-meter i[data-on="true"] {
+  background: var(--hv3-ion);
+  box-shadow: 0 0 12px var(--hv3-ion-glow);
+}
+
+.hv3-moments {
+  display: grid;
+  grid-template-columns: 7fr 5fr;
+  align-items: stretch;
+  gap: 24px;
+  margin: 120px var(--hv3-side) 0;
+}
+
+.hv3-moment {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--hv3-shell);
+  box-shadow: inset 0 0 0 1px var(--hv3-b1);
+}
+
+.hv3-moment__stage {
+  position: relative;
+  height: 520px;
+  overflow: hidden;
+  perspective: 2000px;
+}
+
+.hv3-moment__cap {
+  flex: 1;
+  padding: 24px 32px 30px;
+  border-top: 1px solid var(--hv3-b1);
+  color: var(--hv3-t3);
+  font-size: 16px;
+  line-height: 26px;
+}
+
+.hv3-moment__cap b {
+  color: var(--hv3-t1);
+  font-weight: 500;
+}
+
+.hv3-moment__stage > .hv3-orbit {
+  top: -260px;
+  left: -180px;
+}
+
+.hv3-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(50px);
+}
+
+.hv3-glow--palette {
+  top: 60px;
+  left: 120px;
+  width: 560px;
+  height: 340px;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--hv3-ion) 22%, transparent),
+    transparent
+  );
+}
+
+.hv3-glow--insp {
+  top: 80px;
+  left: 40px;
+  width: 520px;
+  height: 420px;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--hv3-ion) 16%, transparent),
+    transparent
+  );
+}
+
+.hv3-rig--moment {
+  top: 60px;
+  left: 70px;
+  width: 400px;
+  height: 544px;
+}
+
+.hv3-lift--moment {
+  inset: 0;
+}
+
+/* ── Footer (MarketingFooter, homepage presentation) ─────────────── */
+
+.hv3-footer {
+  position: relative;
+  overflow: hidden;
+  border-top: 1px solid var(--hv3-b1);
+}
+
+.hv3-footer > .hv3-orbit {
+  top: -18px;
+  left: calc(50% - 1420px);
+  opacity: 0.9;
+}
+
+.hv3-footer > .hv3-orbit::after {
+  opacity: 0.5;
+}

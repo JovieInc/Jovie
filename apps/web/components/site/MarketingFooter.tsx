@@ -1,5 +1,7 @@
 'use client';
 
+import type { ReactNode } from 'react';
+
 import './MarketingFooter.css';
 import Link from 'next/link';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -76,6 +78,8 @@ interface MarketingFooterProps {
   readonly legalLinks?: readonly MarketingFooterLink[];
   /** Section id for the Pen design-diff gate (`data-pen-section`). */
   readonly penSection?: string;
+  /** Static, decorative art drawn behind the footer content (aria-hidden by the caller). */
+  readonly decoration?: ReactNode;
 }
 
 type ResolvedVariant = 'expanded' | 'minimal';
@@ -204,6 +208,7 @@ export function MarketingFooter({
   columns,
   legalLinks,
   penSection,
+  decoration,
 }: Readonly<MarketingFooterProps>) {
   const pathname = usePublicPathname();
   const resolvedVariant = resolveFooterVariant(variant, pathname);
@@ -229,6 +234,7 @@ export function MarketingFooter({
       data-pen-section={penSection}
       data-footer-variant={resolvedVariant}
     >
+      {decoration}
       <div
         className={cn(
           'public-container',

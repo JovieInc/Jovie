@@ -1,26 +1,34 @@
 // @coverage-via apps/web/tests/unit/home/homepage-contract.test.tsx
-import { Button } from '@jovie/ui/atoms/button';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, type ReactNode } from 'react';
-import { DisplayText } from '@/components/atoms/DisplayText';
 import { WaitlistRoleForm } from '@/components/features/waitlist/WaitlistRoleForm';
 import { HomepageProfilePhone } from '@/components/homepage/HomepageProfilePhone';
-import { ImageryStage } from '@/components/marketing/ImageryStage';
 import {
   HOMEPAGE_EDITORIAL_COPY,
   HOMEPAGE_HEADLINE_BREAKS,
-  HOMEPAGE_HERO_PLATE,
   HOMEPAGE_INVITE_ANCHOR,
-  HOMEPAGE_RELEASES,
+  HOMEPAGE_LATEST_RELEASE,
 } from '@/data/homepageEditorialCopy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
-import './HomepageEditorial.css';
+import { HOME_SPEC } from './v3/home-spec';
+import { Orbit } from './v3/Orbit';
+import { AppWindow, CatalogPlate, ReleaseInspector } from './v3/ProductUi';
+import { Callout, ReleasePage } from './v3/Surfaces';
+import './v3/stage.css';
+import './v3/product-ui.css';
+import './v3/surfaces.css';
+import './v3/phone.css';
+import './v3/chapters.css';
+import './v3/specs.css';
+import './v3/responsive.css';
 
 const OWNER = 'apps/web/components/homepage/HomepageEditorial.tsx';
+const COPY = HOMEPAGE_EDITORIAL_COPY;
 const CHAPTER_ANCHORS = [
   'feature-split',
   'product-gallery',
+  'specs',
   HOMEPAGE_INVITE_ANCHOR,
 ];
 
@@ -33,25 +41,26 @@ function lines(text: string): ReactNode {
   const parts = HOMEPAGE_HEADLINE_BREAKS[text] ?? [text];
   return parts.map((line, index) => (
     <Fragment key={line}>
-      <span className='hpv1-line'>{line}</span>
+      <span className='hv3-line'>{line}</span>
       {index < parts.length - 1 ? ' ' : null}
     </Fragment>
   ));
 }
 
-function Eyebrow({ index, label }: Readonly<{ index: string; label: string }>) {
+function ChapterRule({
+  index,
+  label,
+}: Readonly<{ index: string; label: string }>) {
   return (
-    <p className='hpv1-eyebrow'>
-      <span className='hpv1-eyebrow__n'>{index}</span>
-      {label}
-    </p>
+    <div className='hv3-rule'>
+      <span className='hv3-mono'>{`${index} · ${label}`}</span>
+    </div>
   );
 }
 
 /**
- * Hero: the locked line on the left editorial axis over the matte signal
- * field, one primary action that scrolls to the on-page invitation form, one
- * quiet link to a real profile, and the chapter index.
+ * Hero: the locked line beside the lede and actions, then Jovie for Mac under
+ * the one camera, its inspector lifted out of the window, lit by the Orbit.
  */
 export function HomepageStoryHero({
   copy = HOMEPAGE_EDITORIAL_COPY.hero,
@@ -65,69 +74,74 @@ export function HomepageStoryHero({
       data-accent='ion'
       data-marketing-owner={OWNER}
       aria-labelledby={headingId}
-      className='hpv1-hero marketing-hero-dock'
+      className='hv3 hv3-hero marketing-hero-dock'
     >
-      <div className='hpv1-hero__art' aria-hidden>
-        <ImageryStage
-          src={HOMEPAGE_HERO_PLATE}
-          alt=''
-          fill
-          priority
-          sizes='100vw'
-          className='hpv1-hero__img'
-        />
-        <div className='hpv1-hero__veil' />
-      </div>
-      <div className='public-container hpv1-wrap hpv1-hero__copy'>
-        <DisplayText as='h1' id={headingId} className='hpv1-display'>
+      <Orbit
+        id='hv3-orbit-hero'
+        rings={[1800, 1400, 1000]}
+        arc={[282, 34]}
+        arcRing={1}
+      />
+      <div className='hv3-hero__copy'>
+        <h1 id={headingId} className='hv3-display'>
           {lines(HOMEPAGE_EDITORIAL_COPY.hero.headline)}
-        </DisplayText>
-        <p className='hpv1-lede'>{copy.subhead}</p>
-        <div className='hpv1-actions'>
-          <div className='hpv1-cta'>
-            <Button
-              asChild
-              variant='primary'
-              size='lg'
+        </h1>
+        <div className='hv3-hero__side'>
+          <p className='hv3-lede'>{copy.subhead}</p>
+          <div className='hv3-ctas'>
+            <Link
+              href={copy.primaryHref}
+              prefetch={false}
+              className='hv3-btn hv3-btn--primary'
               data-testid='homepage-primary-cta'
               data-primary-action='true'
             >
-              <Link href={copy.primaryHref} prefetch={false}>
-                {copy.primaryAction}
-              </Link>
-            </Button>
+              {copy.primaryAction}
+            </Link>
+            <Link
+              href={copy.secondaryHref}
+              prefetch={false}
+              className='hv3-btn hv3-btn--ghost'
+              data-testid='homepage-hero-live-profile'
+            >
+              {copy.secondaryAction}
+              <ArrowRight className='size-4' aria-hidden />
+            </Link>
           </div>
-          <Link
-            href={copy.secondaryHref}
-            prefetch={false}
-            className='hpv1-quiet-link'
-            data-testid='homepage-hero-live-profile'
-          >
-            {copy.secondaryAction}
-            <ArrowRight className='size-4' aria-hidden />
-          </Link>
-          <p className='hpv1-note hpv1-note--compact'>
-            {HOMEPAGE_EDITORIAL_COPY.hero.noteCompact}
-          </p>
+          <p className='hv3-mono hv3-hero__note'>{COPY.hero.note}</p>
         </div>
-        <p className='hpv1-note hpv1-note--wide'>
-          {HOMEPAGE_EDITORIAL_COPY.hero.note}
-        </p>
       </div>
-      <nav
-        className='public-container hpv1-wrap hpv1-index'
-        aria-label={HOMEPAGE_EDITORIAL_COPY.chaptersLabel}
-      >
-        <ol>
-          {HOMEPAGE_EDITORIAL_COPY.chapters.map((label, index) => (
-            <li key={label}>
-              <a href={`#${CHAPTER_ANCHORS[index]}`}>
-                <span className='hpv1-eyebrow__n'>{`0${index + 1}`}</span>
-                {label}
-              </a>
-            </li>
-          ))}
-        </ol>
+      <div className='hv3-stage hv3-stage--hero'>
+        <div className='hv3-bounce' />
+        <div
+          className='hv3-rig hv3-rig--hero'
+          role='img'
+          aria-label={COPY.hero.windowLabel}
+        >
+          <div className='hv3-window hv3-edge'>
+            <AppWindow />
+            <div className='hv3-sheen' />
+          </div>
+          <div
+            className='hv3-lift hv3-lift--inspector hv3-edge'
+            data-hv3-parallax
+          >
+            <ReleaseInspector anchor='upc' eager />
+          </div>
+        </div>
+        <Callout anchor='upc' label={COPY.hero.upcCallout} />
+      </div>
+      <nav className='hv3-index' aria-label={COPY.chaptersLabel}>
+        {COPY.chapters.map((label, index) => (
+          <a
+            key={label}
+            href={`#${CHAPTER_ANCHORS[index]}`}
+            className='hv3-mono'
+          >
+            <b>{`0${index + 1}`}</b>
+            {label}
+          </a>
+        ))}
       </nav>
     </section>
   );
@@ -138,11 +152,11 @@ interface ChapterCopy {
   readonly body: string;
 }
 
-/** jov.ie/tim: Tim's real profile, with what the profile does in three rows. */
+/** 01 profile: jov.ie/tim, Tim's real profile, with what it does in three rows. */
 export function HomepageProfileChapter({
   copy = HOMEPAGE_EDITORIAL_COPY.profile,
 }: Readonly<{ copy?: ChapterCopy }>) {
-  const media = HOMEPAGE_EDITORIAL_COPY.profile;
+  const media = COPY.profile;
   return (
     <section
       id='feature-split'
@@ -151,28 +165,47 @@ export function HomepageProfileChapter({
       data-marketing-variant='phone-right'
       data-marketing-owner={OWNER}
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.featureSplit}
-      className='hpv1-chapter hpv1-profile'
+      className='hv3 hv3-chapter hv3-profile'
     >
-      <div className='public-container hpv1-wrap hpv1-profile__grid'>
-        <div className='hpv1-profile__copy'>
-          <Eyebrow index='01' label={HOMEPAGE_EDITORIAL_COPY.chapters[0]} />
-          <DisplayText as='h2' className='hpv1-display hpv1-display--section'>
-            {lines(copy.headline)}
-          </DisplayText>
-          <p className='hpv1-body'>{copy.body}</p>
-          <dl className='hpv1-rows'>
+      <ChapterRule index='01' label={COPY.chapters[0]} />
+      <div className='hv3-split'>
+        <div className='hv3-reveal'>
+          <h2 className='hv3-statement'>{lines(copy.headline)}</h2>
+          <p className='hv3-body'>{copy.body}</p>
+          <dl className='hv3-rows'>
             {media.rows.map(row => (
-              <div key={row.label} className='hpv1-row'>
+              <div key={row.label}>
                 <dt>{row.label}</dt>
                 <dd>{row.value}</dd>
               </div>
             ))}
           </dl>
         </div>
-        <div className='hpv1-stage'>
-          <HomepageProfilePhone
-            alt={media.alt}
-            release={HOMEPAGE_RELEASES[0]}
+        <div className='hv3-stage hv3-stage--profile'>
+          <Orbit
+            id='hv3-orbit-profile'
+            rings={[380, 300, 220]}
+            arc={[38, 44]}
+          />
+          <div className='hv3-bounce' />
+          <div className='hv3-rig hv3-rig--profile'>
+            <div className='hv3-phone hv3-edge'>
+              <HomepageProfilePhone
+                alt={media.alt}
+                release={HOMEPAGE_LATEST_RELEASE}
+              />
+            </div>
+          </div>
+          <Callout
+            anchor='handle'
+            label={media.handleCallout}
+            className='hv3-callout--handle'
+          />
+          <Callout
+            anchor='updates'
+            side='left'
+            label={media.updatesCallout}
+            className='hv3-callout--updates'
           />
         </div>
       </div>
@@ -180,11 +213,12 @@ export function HomepageProfileChapter({
   );
 }
 
-/** Tim's real catalog: four covers, titles below, never over, the art. */
+/** 02 releases: the catalog row and the release page it becomes. */
 export function HomepageReleasesChapter({
   copy = HOMEPAGE_EDITORIAL_COPY.releases,
 }: Readonly<{ copy?: ChapterCopy }>) {
-  const media = HOMEPAGE_EDITORIAL_COPY.releases;
+  const media = COPY.releases;
+  const captions = media.captions;
   return (
     <section
       id='product-gallery'
@@ -195,63 +229,69 @@ export function HomepageReleasesChapter({
       data-pen-contract={
         MARKETING_PEN_CONTRACT_IDS.section.productGalleryReleaseRail
       }
-      className='hpv1-chapter hpv1-releases'
+      className='hv3 hv3-chapter hv3-releases'
     >
-      <div className='public-container hpv1-wrap'>
-        <div className='hpv1-releases__head'>
-          <div>
-            <Eyebrow index='02' label={HOMEPAGE_EDITORIAL_COPY.chapters[1]} />
-            <DisplayText as='h2' className='hpv1-display hpv1-display--section'>
-              {lines(copy.headline)}
-            </DisplayText>
+      <ChapterRule index='02' label={COPY.chapters[1]} />
+      <div className='hv3-centered hv3-reveal'>
+        <h2 className='hv3-statement'>{lines(copy.headline)}</h2>
+        <p className='hv3-lede hv3-lede--center'>{copy.body}</p>
+      </div>
+      <div className='hv3-stage hv3-stage--releases hv3-frame'>
+        <Orbit id='hv3-orbit-releases' rings={[620, 500]} arc={[345, 36]} />
+        <div className='hv3-bounce' />
+        <div className='hv3-rig hv3-rig--releases'>
+          <div
+            className='hv3-plate hv3-edge'
+            role='img'
+            aria-label={media.catalogLabel}
+          >
+            <CatalogPlate />
           </div>
-          <p className='hpv1-body'>{copy.body}</p>
+          <div
+            className='hv3-phone hv3-phone--release hv3-edge'
+            role='img'
+            aria-label={media.releasePageLabel}
+          >
+            <ReleasePage />
+          </div>
         </div>
-        <ul className='hpv1-catalog'>
-          {HOMEPAGE_RELEASES.map(release => (
-            <li key={release.title} className='hpv1-release'>
-              <div className='hpv1-release__art'>
-                <ImageryStage
-                  src={release.src}
-                  alt={`${release.title} cover art`}
-                  fill
-                  sizes='(min-width: 1200px) 276px, 163px'
-                />
-              </div>
-              <p className='hpv1-release__title'>{release.title}</p>
-              <p className='hpv1-release__meta'>
-                <span className='hpv1-meta--wide'>{release.meta}</span>
-                <span className='hpv1-meta--compact'>
-                  {'metaCompact' in release
-                    ? release.metaCompact
-                    : release.meta}
-                </span>
-              </p>
-            </li>
-          ))}
-        </ul>
-        <Link
-          href={TIM_CATALOG_HREF}
-          prefetch={false}
-          className='hpv1-quiet-link hpv1-catalog-link'
-        >
-          {media.catalogLink}
-          <ArrowRight className='size-4' aria-hidden />
-        </Link>
+        <Callout
+          anchor='row'
+          side='left'
+          label={media.rowCallout}
+          className='hv3-callout--row'
+        />
+        <svg
+          aria-hidden
+          className='hv3-connector'
+          data-hv3-connector='rowR>title'
+        />
+      </div>
+      <div className='hv3-captions hv3-reveal'>
+        <div>
+          <h3>{captions.page.title}</h3>
+          <p>{captions.page.body}</p>
+        </div>
+        <div>
+          <h3>{captions.services.title}</h3>
+          <p>{captions.services.body(HOME_SPEC.listen)}</p>
+        </div>
+        <div>
+          <h3>{captions.catalog.title}</h3>
+          <p>{captions.catalog.body}</p>
+        </div>
       </div>
     </section>
   );
 }
 
-const TIM_CATALOG_HREF = HOMEPAGE_EDITORIAL_COPY.hero.secondaryHref;
-
-/** Close: the role waitlist form, the page's one conversion. */
+/** 04 invitation: the role waitlist form, the page's one conversion. */
 export function HomepageInviteClose({
   copy = HOMEPAGE_EDITORIAL_COPY.invite,
 }: Readonly<{
   copy?: { readonly headline: string; readonly subhead: string };
 }>) {
-  const invite = HOMEPAGE_EDITORIAL_COPY.invite;
+  const invite = COPY.invite;
   return (
     <section
       id={HOMEPAGE_INVITE_ANCHOR}
@@ -260,33 +300,29 @@ export function HomepageInviteClose({
       data-marketing-variant='final-single-claim'
       data-marketing-owner={OWNER}
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.cta}
-      className='hpv1-chapter hpv1-invite'
+      className='hv3 hv3-chapter hv3-invite'
     >
-      <div className='public-container hpv1-wrap hpv1-invite__grid'>
-        <div className='hpv1-invite__form'>
-          <Eyebrow index='03' label={HOMEPAGE_EDITORIAL_COPY.chapters[2]} />
-          <DisplayText as='h2' className='hpv1-display hpv1-display--section'>
-            {lines(copy.headline)}
-          </DisplayText>
-          <p className='hpv1-body'>{copy.subhead}</p>
+      <ChapterRule index='04' label={COPY.chapters[3]} />
+      <div className='hv3-invite__inner'>
+        <Orbit id='hv3-orbit-invite' rings={[760]} arc={[0, 360]} closed />
+        <h2 className='hv3-statement'>{lines(copy.headline)}</h2>
+        <p className='hv3-lede hv3-lede--center'>{copy.subhead}</p>
+        <div className='hv3-form'>
           <WaitlistRoleForm
             presentation='chips'
-            align='start'
+            align='center'
             headingLevel={2}
             title={copy.headline}
             roleLabel={invite.roleLabel}
             submitLabel={invite.action}
-            note={invite.note}
           />
         </div>
-        <ol className='hpv1-steps'>
+        <ol className='hv3-steps hv3-reveal'>
           {invite.steps.map((step, index) => (
-            <li key={step.title} className='hpv1-step'>
-              <span className='hpv1-step__n'>{index + 1}</span>
-              <div>
-                <p className='hpv1-step__title'>{step.title}</p>
-                <p className='hpv1-step__body'>{step.body}</p>
-              </div>
+            <li key={step.title}>
+              <span className='hv3-mono'>{`0${index + 1}`}</span>
+              <b>{step.title}</b>
+              <span>{step.body}</span>
             </li>
           ))}
         </ol>

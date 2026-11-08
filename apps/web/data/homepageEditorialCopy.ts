@@ -12,16 +12,17 @@ import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
  * These are the code defaults. The published `marketing-page/home` content
  * record fills the open slots (`lib/content-records/marketing-page.ts`); the
  * headline is locked and has no slot. No prices, plan names or trial terms
- * here: those come from offer truth only.
+ * here: those come from offer truth only. Spec numbers are not copy: they
+ * derive from the DSP registry (`components/homepage/v3/home-spec.ts`).
  */
 
 /** In-page anchor for the closing waitlist form. */
 export const HOMEPAGE_INVITE_ANCHOR = 'request-invite';
 
 /**
- * Approved Pen design "Homepage canonical v1" (receipt home-canonical-v1,
- * 2026-11-07). Headlines are single lines (the content record requires it);
- * `HOMEPAGE_HEADLINE_BREAKS` carries where the design breaks each default
+ * Approved homepage "v3" (Tim, 2026-11-08 01:43Z, design-approvals receipt
+ * home-canonical-v3). Headlines are single lines (the content record requires
+ * it); `HOMEPAGE_HEADLINE_BREAKS` carries where the design breaks each default
  * headline. A published headline that differs wraps naturally.
  */
 export const HOMEPAGE_EDITORIAL_COPY = {
@@ -36,10 +37,13 @@ export const HOMEPAGE_EDITORIAL_COPY = {
     primaryHref: `#${HOMEPAGE_INVITE_ANCHOR}`,
     secondaryAction: 'See a live profile',
     secondaryHref: TIM_WHITE_PROFILE.publicProfilePath,
-    note: 'Jovie opens by invitation.',
-    noteCompact: 'Opens by invitation',
+    note: 'jovie opens by invitation',
+    windowLabel:
+      'Jovie for Mac: Tim White’s releases with Supernova Girl open in the inspector',
+    upcCallout: 'per release',
   },
-  chapters: ['Profile', 'Releases', 'Invitation'],
+  /** Chapter index (mono, lowercase, as approved). */
+  chapters: ['profile', 'releases', 'specs', 'invitation'],
   chaptersLabel: 'On this page',
   profile: {
     headline: 'One name. Found everywhere.',
@@ -49,7 +53,9 @@ export const HOMEPAGE_EDITORIAL_COPY = {
       { label: 'Every service', value: 'One link to wherever they listen' },
       { label: 'Stay close', value: 'Updates only for people who ask' },
     ],
-    alt: 'Tim White’s Jovie profile.',
+    alt: 'Tim White’s Jovie profile, Listen mode, with Never Say A Word.',
+    handleCallout: 'jov.ie/tim · one handle',
+    updatesCallout: 'get updates · opt-in only',
     phone: {
       getUpdates: 'Get Updates',
       listen: 'Listen',
@@ -59,7 +65,104 @@ export const HOMEPAGE_EDITORIAL_COPY = {
   releases: {
     headline: 'Every release, ready on day one.',
     body: 'Your catalog comes in once. Each release gets its own page with listen links for every service, and your profile always leads with the newest one.',
-    catalogLink: 'See the full catalog on jov.ie/tim',
+    catalogLabel: 'Tim White’s release catalog in Jovie',
+    releasePageLabel: 'The Supernova Girl release page',
+    rowCallout: 'catalog row → its own page',
+    captions: {
+      page: {
+        title: 'One page per release.',
+        body: 'Cover, title and artists up top, the way the release looks everywhere else.',
+      },
+      services: {
+        title: 'Every service, one tap.',
+        body: (listen: number) =>
+          `Spotify, Apple Music and YouTube Music up top, then the rest of the ${listen} supported streaming services.`,
+      },
+      catalog: {
+        title: 'Made from your catalog.',
+        body: 'Your catalog comes in once, and every release gets its own page.',
+      },
+    },
+  },
+  specs: {
+    headline: 'The details.',
+    body: 'The numbers behind the page, read from the product source.',
+    meter: (listen: number, recognised: number) =>
+      `${listen} of ${recognised} recognised services are streaming`,
+    paletteCaption: {
+      lead: 'Everything is one keystroke away.',
+      body: 'Jump to a release, open your profile, or run a skill like drafting a pitch.',
+    },
+    inspectorCaption: {
+      lead: 'Every field, inspected.',
+      body: 'Date, type, tracks, duration, genres, label and UPC in one panel.',
+    },
+    upcCallout: 'upc',
+    services: {
+      label: 'Services',
+      listen: { title: 'Streaming services', detail: 'supported' },
+      recognised: {
+        title: 'Services recognised',
+        detail: 'streaming, video and metadata',
+      },
+    },
+    /** Sheet rows after Services: label, then up to three cells. */
+    rows: [
+      {
+        label: 'Identifiers',
+        cells: [
+          {
+            value: 'Per track',
+            title: 'ISRC',
+            detail: 'on recordings and tracks',
+          },
+          {
+            value: 'Per release',
+            title: 'UPC',
+            detail: '5054526843813 · Supernova Girl',
+          },
+        ],
+      },
+      {
+        label: 'Keyboard',
+        cells: [
+          {
+            value: '⌘K',
+            title: 'Command palette',
+            detail: 'releases, profile, skills',
+          },
+          {
+            value: '⌘1-3',
+            title: 'Go to',
+            detail: 'Profile, Presence, Connections',
+          },
+          { value: 'Esc', title: 'Close', detail: 'the command palette' },
+        ],
+      },
+      {
+        label: 'Developers',
+        cells: [
+          {
+            value: 'v1',
+            title: 'REST API',
+            detail: 'openapi spec at /api/v1',
+            mono: true,
+          },
+          {
+            value: 'Per artist',
+            title: 'MCP server',
+            detail: '/api/mcp/{handle}',
+            mono: true,
+          },
+          {
+            value: '@jovie/cli',
+            title: 'Command line',
+            detail: 'published on npm',
+            mono: true,
+          },
+        ],
+      },
+    ],
   },
   invite: {
     headline: 'Jovie opens by invitation.',
@@ -67,7 +170,6 @@ export const HOMEPAGE_EDITORIAL_COPY = {
       'Tell us your role and where to reach you. We’ll email you when your spot opens.',
     roleLabel: 'I’m a',
     action: 'Request invite',
-    note: 'One email when your invite is ready. Nothing else.',
     steps: [
       {
         title: 'Tell us who you are',
@@ -85,30 +187,151 @@ export const HOMEPAGE_EDITORIAL_COPY = {
   },
 } as const;
 
-/** Tim White's real catalog, as shown in the approved design. */
-export const HOMEPAGE_RELEASES = [
+export interface HomepageCatalogRelease {
+  readonly title: string;
+  readonly byline: string;
+  readonly year: string;
+  readonly src: string;
+  readonly selected?: boolean;
+}
+
+/** Tim White's real catalog, as the approved design shows it (newest first). */
+export const HOMEPAGE_CATALOG: readonly HomepageCatalogRelease[] = [
   {
     title: 'Never Say A Word',
-    meta: 'Single · 2024',
+    byline: 'Tim White',
+    year: '2024',
     src: '/img/releases/never-say-a-word.jpg',
   },
   {
     title: 'Take Me Over',
-    meta: 'Austin Leeds Remix · 2024',
+    byline: 'Austin Leeds Remix · Tim White',
+    year: '2024',
     src: '/img/releases/take-me-over-remix.jpg',
   },
   {
-    title: 'The Deep End',
-    meta: 'Single · Cosmic Gate & Tim White',
-    metaCompact: 'Cosmic Gate & Tim White',
-    src: '/img/releases/the-deep-end-art.jpg',
+    title: 'Doge (To Mars)',
+    byline: 'Tim White',
+    year: '2021',
+    src: '/img/releases/doge-to-mars.jpg',
   },
   {
     title: 'Tomorrow Sounds',
-    meta: 'Single · 2020',
+    byline: 'Tim White',
+    year: '2020',
     src: '/img/releases/tomorrow-sounds.jpg',
   },
-] as const;
+  {
+    title: 'Supernova Girl',
+    byline: 'Tim White',
+    year: '2020',
+    src: '/img/releases/supernova-girl.jpg',
+    selected: true,
+  },
+  {
+    title: 'This Is Love',
+    byline: 'Tim White',
+    year: '2020',
+    src: '/img/releases/this-is-love.jpg',
+  },
+];
+
+/** The release the profile phone leads with. */
+export const HOMEPAGE_LATEST_RELEASE = HOMEPAGE_CATALOG[0];
+
+const SUPERNOVA = '/img/releases/supernova-girl.jpg';
+
+/** Visible strings inside the live product UI on the homepage. */
+export const HOMEPAGE_PRODUCT_UI = {
+  searchChats: 'Search chats',
+  inbox: 'Inbox',
+  releases: 'Releases',
+  releaseCount: '18',
+  searchCommand: 'Search or run a command',
+  columns: { title: 'Title', platforms: 'Platforms', released: 'Released' },
+  inspector: {
+    src: SUPERNOVA,
+    title: 'Supernova Girl',
+    artist: 'Tim White',
+    tabs: ['Details', 'Assets', 'Links', 'Rights'],
+    /** Field names as the product inspector shows them (sentence case). */
+    fields: {
+      date: 'Release date',
+      type: 'Type',
+      tracks: 'Tracks',
+      duration: 'Duration',
+      genres: 'Genres',
+      label: 'Label',
+      upc: 'UPC',
+    },
+    date: 'Mar 6',
+    type: 'Single',
+    tracks: '1',
+    duration: '2:34',
+    genres: ['Melodic Techno', 'Trance'],
+    label: 'The Bubblegum Factory',
+    upc: '5054526843813',
+  },
+  releasePage: {
+    src: SUPERNOVA,
+    title: 'Supernova Girl',
+    artist: 'Tim White',
+    play: 'Play',
+    more: (count: number) => `+${count} more services`,
+    madeWith: 'Made with Jovie',
+  },
+  palette: {
+    placeholder: 'Search Jovie or run a command…',
+    goToLabel: 'Go To',
+    skillsLabel: 'Skills',
+    query: 'releases',
+    queryTarget: 'Releases',
+    goTo: [
+      {
+        icon: 'profile',
+        label: 'Profile',
+        description: 'Open your profile in the chat workspace.',
+        shortcut: '⌘1',
+        selected: true,
+      },
+      {
+        icon: 'presence',
+        label: 'Presence',
+        description: 'Monitor artist profiles and public pages.',
+        shortcut: '⌘2',
+      },
+      {
+        icon: 'connections',
+        label: 'Connections',
+        description: 'Manage authorized services.',
+        shortcut: '⌘3',
+      },
+      {
+        icon: 'chats',
+        label: 'Chats',
+        description: 'Open the chats workspace.',
+      },
+      {
+        icon: 'releases',
+        label: 'Releases',
+        description: 'Manage your release catalog.',
+      },
+    ],
+    skills: [
+      {
+        icon: 'art',
+        label: 'Generate album art',
+        description: 'Three options for a release.',
+      },
+      {
+        icon: 'pitch',
+        label: 'Generate pitch',
+        description: 'Draft a release pitch in chat.',
+      },
+    ],
+  },
+  keys: { command: 'command' },
+} as const;
 
 export const HOMEPAGE_HEADLINE_BREAKS: Readonly<
   Record<string, readonly string[]>
@@ -124,7 +347,3 @@ export const HOMEPAGE_HEADLINE_BREAKS: Readonly<
   ],
   [HOMEPAGE_EDITORIAL_COPY.invite.headline]: ['Jovie opens', 'by invitation.'],
 };
-
-/** The approved hero field (Pen library A14, blue signal grain). Sidecar declares its accent. */
-export const HOMEPAGE_HERO_PLATE =
-  '/assets/generated/homepage-hero-signal-grain-v1.webp';

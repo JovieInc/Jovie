@@ -1,6 +1,7 @@
 import {
   Bell,
   CalendarDays,
+  CircleCheck,
   Ellipsis,
   House,
   Music2,
@@ -11,14 +12,16 @@ import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ImageryStage } from '@/components/marketing/ImageryStage';
 import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
+import { Anchor } from './v3/ProductUi';
 
 const PHONE_COPY = HOMEPAGE_EDITORIAL_COPY.profile.phone;
 
 /**
- * Tim White's real profile at jov.ie/tim, drawn at the canonical 310px phone
- * (Pen WyQJb): identity, Get Updates, the latest release as the one thing the
- * profile leads with, and the profile tabs. Static, no data fetch: the page
- * stays fully static.
+ * Tim White's real profile at jov.ie/tim, Listen mode (Pen WyQJb): identity
+ * with the verification badge, Get Updates, Instagram and TikTok, the latest
+ * release as the one thing the profile leads with, and the profile tabs.
+ * Static, no data fetch: the page stays fully static. The anchors are where
+ * the homepage callouts attach.
  */
 export function HomepageProfilePhone({
   alt,
@@ -28,59 +31,79 @@ export function HomepageProfilePhone({
   release: { readonly title: string; readonly src: string };
 }>) {
   return (
-    <div className='hpv1-phone' role='img' aria-label={alt}>
-      <div className='hpv1-phone__top' aria-hidden>
-        <BrandLogo size='chrome' tone='muted' rounded={false} aria-hidden />
-        <Ellipsis className='size-4' />
-      </div>
-      <div className='hpv1-phone__identity' aria-hidden>
-        <ImageryStage
-          src='/images/avatars/tim-white-profile.jpg'
-          alt=''
-          width={80}
-          height={80}
-          sizes='80px'
-          className='hpv1-phone__avatar'
+    <div className='hv3-pp' role='img' aria-label={alt}>
+      <div className='hv3-pp__bar' aria-hidden>
+        <BrandLogo
+          size='compact'
+          rounded={false}
+          aria-hidden
+          className='hv3-pp__mark'
         />
-        <p className='hpv1-phone__name'>{TIM_WHITE_PROFILE.name}</p>
-        <p className='hpv1-phone__handle'>
+        <Ellipsis className='hv3-ui-i' />
+      </div>
+      <div className='hv3-pp__id' aria-hidden>
+        <span className='hv3-pp__av'>
+          <ImageryStage
+            src='/images/avatars/tim-white-profile.jpg'
+            alt=''
+            width={72}
+            height={72}
+            sizes='160px'
+          />
+          <i className='hv3-pp__badge'>
+            <CircleCheck className='hv3-ui-i' />
+          </i>
+        </span>
+        <p className='hv3-pp__name'>
+          {TIM_WHITE_PROFILE.name}
+          <Anchor id='name' style={{ right: -4 }} />
+        </p>
+        <p className='hv3-pp__handle'>
           {TIM_WHITE_PROFILE.publicProfileDisplay}
+          <Anchor id='handle' style={{ right: -6 }} />
         </p>
       </div>
-      <div className='hpv1-phone__actions' aria-hidden>
-        <span className='hpv1-phone__pill'>
-          <Bell className='size-3.5' />
+      <div className='hv3-pp__acts' aria-hidden>
+        <span className='hv3-pp__upd'>
+          <Anchor id='updates' style={{ left: -2 }} />
+          <Bell className='hv3-ui-i' />
           {PHONE_COPY.getUpdates}
         </span>
-        <SocialIcon platform='instagram' size={16} aria-hidden />
-        <SocialIcon platform='tiktok' size={16} aria-hidden />
+        <span>
+          <SocialIcon platform='instagram' size={16} aria-hidden />
+        </span>
+        <span>
+          <SocialIcon platform='tiktok' size={16} aria-hidden />
+        </span>
       </div>
-      <div className='hpv1-phone__card' aria-hidden>
-        <span className='hpv1-phone__card-label'>{PHONE_COPY.listen}</span>
-        <ImageryStage
-          src={release.src}
-          alt=''
-          width={104}
-          height={104}
-          sizes='104px'
-          className='hpv1-phone__cover'
-        />
-        <p className='hpv1-phone__release'>{release.title}</p>
-        <p className='hpv1-phone__artist'>{TIM_WHITE_PROFILE.name}</p>
-        <span className='hpv1-phone__listen'>{PHONE_COPY.listenNow}</span>
+      <div className='hv3-pp__card' aria-hidden>
+        <p className='hv3-pp__lbl'>{PHONE_COPY.listen}</p>
+        <div className='hv3-pp__art'>
+          <ImageryStage
+            src={release.src}
+            alt=''
+            width={112}
+            height={112}
+            sizes='240px'
+            className='hv3-cover'
+          />
+        </div>
+        <p className='hv3-pp__title'>{release.title}</p>
+        <p className='hv3-pp__by'>{TIM_WHITE_PROFILE.name}</p>
+        <span className='hv3-pp__cta'>{PHONE_COPY.listenNow}</span>
       </div>
-      <div className='hpv1-phone__tabs' aria-hidden>
+      <div className='hv3-pp__nav' aria-hidden>
         <span data-active='true'>
-          <House className='size-4' />
+          <House className='hv3-ui-i' />
         </span>
         <span>
-          <Music2 className='size-4' />
+          <Music2 className='hv3-ui-i' />
         </span>
         <span>
-          <CalendarDays className='size-4' />
+          <CalendarDays className='hv3-ui-i' />
         </span>
         <span>
-          <User className='size-4' />
+          <User className='hv3-ui-i' />
         </span>
       </div>
     </div>
