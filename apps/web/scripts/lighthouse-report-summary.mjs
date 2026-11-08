@@ -102,6 +102,15 @@ export function summarizeReport(report) {
           causes.length > 0 ? ` (${causes.join('; ')})` : ''
         }`
       );
+      // The selector alone is often a chain of utility classes; the element's
+      // opening tag and box say which part of the page it is.
+      const rect = node.boundingRect;
+      const box = rect
+        ? ` at ${Math.round(rect.left)},${Math.round(rect.top)} ${Math.round(rect.width)}x${Math.round(rect.height)}`
+        : '';
+      if (node.snippet || box) {
+        lines.push(`      ${clip(node.snippet ?? '')}${box}`);
+      }
     }
   }
   return lines;

@@ -61,7 +61,11 @@ const releasesReport = {
           },
           {
             score: 0.061,
-            node: { selector: 'div.releases-table > div.row' },
+            node: {
+              selector: 'div.releases-table > div.row',
+              snippet: '<div class="row" data-testid="release-row">',
+              boundingRect: { left: 240.4, top: 96.6, width: 800, height: 56 },
+            },
             subItems: {
               items: [{ cause: 'Media element lacking an explicit size' }],
             },
@@ -83,6 +87,7 @@ describe('Lighthouse report summary', () => {
       '    /_next/static/css/small.css 2.0 KiB 40 ms',
       '  Layout shifts:',
       '    0.061 div.releases-table > div.row (Media element lacking an explicit size)',
+      '      <div class="row" data-testid="release-row"> at 240,97 800x56',
       '    0.012 main > header',
     ]);
   });
