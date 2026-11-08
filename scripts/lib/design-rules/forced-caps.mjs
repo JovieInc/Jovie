@@ -64,3 +64,21 @@ export function isForcedCapsElement(el) {
   if (el.display === 'none' || el.visibility === 'hidden') return false;
   return Boolean(el.ownText?.trim());
 }
+
+export const FORCED_CAPS_FIX =
+  'Remove the uppercase utility or text-transform and write the label in Title Case or sentence case (ASR-022); artist and release names keep their own spelling';
+
+/**
+ * The certificate's `forced-caps` row for a component source.
+ * @param {string} source
+ * @returns {{status: 'pass' | 'fail', extra: {lines?: number[]}, miss: [string, string] | null}}
+ */
+export function forcedCapsCriterion(source) {
+  const lines = findForcedCaps(source).map(h => h.line);
+  if (!lines.length) return { status: 'pass', extra: {}, miss: null };
+  return {
+    status: 'fail',
+    extra: { lines },
+    miss: [`uppercase styling at line ${lines.join(', ')}`, FORCED_CAPS_FIX],
+  };
+}

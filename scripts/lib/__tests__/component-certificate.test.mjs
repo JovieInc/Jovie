@@ -412,6 +412,7 @@ describe('component certificate CLI evidence freshness', () => {
       'scripts/lib/component-certificate-mutation.mjs',
       'scripts/lib/component-evidence.mjs',
       'scripts/lib/design-rules/forced-caps.mjs',
+      'scripts/lib/design-rules/raw-colors.mjs',
       'scripts/lib/mutation-sweep.mjs',
       'scripts/lib/mutation-sweep-root.mjs',
       'scripts/lib/mutation-diff.mjs',
@@ -425,10 +426,8 @@ describe('component certificate CLI evidence freshness', () => {
       join(f.root, 'node_modules/typescript'),
       'dir'
     );
-    assert.equal(
-      f.invoke(join(f.root, 'scripts/component-certificate.mjs')).certified,
-      true
-    );
+    const entry = join(f.root, 'scripts/component-certificate.mjs');
+    assert.equal(f.invoke(entry).certified, true);
   });
 
   it('component edit and benchmark-only refresh cannot reuse old CI or mutation evidence', () => {

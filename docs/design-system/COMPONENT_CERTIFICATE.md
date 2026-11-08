@@ -116,7 +116,8 @@ the registry's `criteria`. `pnpm component-certificate:gate` enforces it:
   failures become debt in that PR, then only shrink); criteria are never removed;
 - a screen with no debt left is must-pass.
 
-One rule per concern. The all-caps rule lives in
+One rule per concern, in `scripts/lib/design-rules/` (raw colours for `tokens`
+in `raw-colors.mjs`). The all-caps rule lives in
 `scripts/lib/design-rules/forced-caps.mjs` (`FORCED_CAPS_PATTERN`,
 `countForcedCaps`, `findForcedCaps`, `isForcedCapsElement`). The certificate
 reads it; the repo ratchet (`no-uppercase-ratchet.test.ts`) and the

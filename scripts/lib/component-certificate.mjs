@@ -10,7 +10,8 @@
  */
 import { createHash } from 'node:crypto';
 import ts from 'typescript';
-import { findForcedCaps } from './design-rules/forced-caps.mjs';
+import { forcedCapsCriterion } from './design-rules/forced-caps.mjs';
+import { RAW_COLOR_PATTERNS } from './design-rules/raw-colors.mjs';
 import { moduleKey } from './mutation-sweep.mjs';
 
 export const CERT_SCHEMA = 'jovie.component-certificate/v1';
@@ -64,20 +65,6 @@ const gitBlob = text =>
     .update(`blob ${Buffer.byteLength(text)}\0`)
     .update(text)
     .digest('hex');
-
-const RAW_COLOR_PATTERNS = [
-  [
-    /\b(?:bg|text|border|ring|fill|stroke|from|to|via|divide|outline|decoration|shadow|accent|caret)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}\b/g,
-    'tailwind-palette',
-  ],
-  [
-    /\b(?:bg|text|border|ring|fill|stroke)-(?:white|black)(?:\/\d+)?\b/g,
-    'raw-white-black',
-  ],
-  [/#[0-9a-fA-F]{3,8}\b/g, 'hex'],
-  [/\b(?:rgba?|hsla?|oklch|oklab|lab|lch)\(\s*[\d.]/g, 'color-function'],
-  [/\[(?:#|rgb|hsl|oklch)[^\]]*\]/g, 'arbitrary-color'],
-];
 
 export function parseSource(source, fileName = 'x.tsx') {
   return ts.createSourceFile(
@@ -582,18 +569,9 @@ export function certifyComponent({
       );
   } else criteria.push(crit('frontend-rules', 'pass'));
 
-  // forced-caps (ASR-022): UI never forces text into capitals
-  const caps = findForcedCaps(source);
-  if (caps.length) {
-    criteria.push(
-      crit('forced-caps', 'fail', { lines: caps.map(h => h.line) })
-    );
-    miss(
-      'forced-caps',
-      `uppercase styling at line ${caps.map(h => h.line).join(', ')}`,
-      'Remove the uppercase utility or text-transform and write the label in Title Case or sentence case (ASR-022); artist and release names keep their own spelling'
-    );
-  } else criteria.push(crit('forced-caps', 'pass'));
+  const caps = forcedCapsCriterion(source); // ASR-022
+  criteria.push(crit('forced-caps', caps.status, caps.extra));
+  if (caps.miss) miss('forced-caps', ...caps.miss);
 
   // mutation
   const m = evidence.mutation;
