@@ -189,8 +189,11 @@ export interface AnalyticsSidebarViewProps extends AnalyticsSidebarProps {
   readonly loading: boolean;
   readonly isFetching?: boolean;
   readonly range: AnalyticsRange;
-  readonly onRangeChange: (range: AnalyticsRange) => void;
-  readonly showRangeControl?: boolean;
+  /** Omit to hide the range control (static demo rails have one window). */
+  readonly onRangeChange?: (range: AnalyticsRange) => void;
+  /** The fetch failed and there is no data to show. */
+  readonly isError?: boolean;
+  readonly onRetry?: () => void;
   readonly activeTab: AnalyticsTab;
   readonly onActiveTabChange: (tab: AnalyticsTab) => void;
   readonly testId?: string;
@@ -205,14 +208,18 @@ export function AnalyticsSidebarView({
   isFetching = false,
   range,
   onRangeChange,
-  showRangeControl = true,
+  isError = false,
+  onRetry,
   activeTab,
   onActiveTabChange,
   testId = 'analytics-sidebar',
   tabbedCardTestId = 'analytics-sidebar-tabbed-card',
 }: AnalyticsSidebarViewProps) {
   const showTipLinkVisits = (data?.tip_link_visits ?? 0) > 0;
-  const isEmpty = !loading && !hasAudienceActivity(data);
+  // A failed fetch has no data, so it must never read as "no visits yet".
+  const showError = !loading && isError && data == null;
+  const isEmpty = !loading && data != null && !hasAudienceActivity(data);
+  const hideMetrics = showError || isEmpty;
   const stages = [
     {
       label: CANONICAL_METRICS.profile_views.label,
@@ -240,7 +247,7 @@ export function AnalyticsSidebarView({
       tabDistribution='fill'
       tabbedCardTestId={tabbedCardTestId}
       tabbedSurfaceVariant='card'
-      hideTabbedCard={isEmpty}
+      hideTabbedCard={hideMetrics}
       sectionKind='details'
       contentClassName='pt-2'
       entityHeader={
@@ -262,7 +269,7 @@ export function AnalyticsSidebarView({
                   Views, clicks, and top traffic sources.
                 </p>
               </div>
-              {showRangeControl ? (
+              {onRangeChange ? (
                 <TimeRangeSelector
                   value={range}
                   onValueChange={onRangeChange}
@@ -284,6 +291,18 @@ export function AnalyticsSidebarView({
             )}
             data-right-rail-section='status'
           >
+            {showError ? (
+              <EmptyState
+                variant='error'
+                heading='Analytics Unavailable'
+                description='Your analytics did not load. Nothing is lost; try again in a moment.'
+                action={
+                  onRetry ? { label: 'Retry', onClick: onRetry } : undefined
+                }
+                className='min-h-80'
+                testId='analytics-rail-error-state'
+              />
+            ) : null}
             {/* First look: one empty state instead of a funnel of zeros */}
             {isEmpty ? (
               <EmptyState
@@ -299,10 +318,12 @@ export function AnalyticsSidebarView({
               />
             ) : null}
             {/* Funnel waterfall — vertical bars show dropoff at a glance */}
-            {isEmpty ? null : <FunnelCard stages={stages} loading={loading} />}
+            {hideMetrics ? null : (
+              <FunnelCard stages={stages} loading={loading} />
+            )}
 
             {/* Engagement — compact 2-col, secondary to the funnel */}
-            {isEmpty ? null : (
+            {hideMetrics ? null : (
               <DrawerStatGrid
                 variant='flush'
                 className={cn(
@@ -395,11 +416,12 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
   const [range, setRange] = useState<AnalyticsRange>('30d');
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('cities');
 
-  const { data, isLoading, isFetching } = useDashboardAnalyticsQuery({
-    range,
-    view: 'full',
-    enabled: true,
-  });
+  const { data, isLoading, isFetching, isError, refetch } =
+    useDashboardAnalyticsQuery({
+      range,
+      view: 'full',
+      enabled: true,
+    });
 
   return (
     <AnalyticsSidebarView
@@ -408,6 +430,10 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
       data={data}
       loading={isLoading}
       isFetching={isFetching}
+      isError={isError}
+      onRetry={() => {
+        void refetch();
+      }}
       range={range}
       onRangeChange={setRange}
       activeTab={activeTab}
@@ -436,8 +462,6 @@ export function StaticAnalyticsSidebar({
       data={data}
       loading={false}
       range='30d'
-      onRangeChange={() => {}}
-      showRangeControl={false}
       activeTab={activeTab}
       onActiveTabChange={setActiveTab}
       testId={testId}

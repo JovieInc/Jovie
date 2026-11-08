@@ -68,3 +68,11 @@ export const NoVisitsYet: Story = {
     },
   },
 };
+
+export const Unavailable: Story = {
+  args: {
+    data: undefined,
+    isError: true,
+    onRetry: () => {},
+  },
+};

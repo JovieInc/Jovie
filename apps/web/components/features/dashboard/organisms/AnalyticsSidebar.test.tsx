@@ -417,3 +417,88 @@ describe('FunnelStage bar honesty', () => {
     expect(tiny.querySelector<HTMLElement>('[style]')?.style.width).toBe('2%');
   });
 });
+
+describe('AnalyticsSidebar failed fetch (regression: Sentry on #24521)', () => {
+  const baseProps = {
+    isOpen: true,
+    onClose: vi.fn(),
+    loading: false,
+    range: '30d' as const,
+    onRangeChange: vi.fn(),
+    activeTab: 'cities' as const,
+    onActiveTabChange: vi.fn(),
+  };
+
+  it('shows the error state, not "No Profile Visits Yet", when the fetch fails', () => {
+    const onRetry = vi.fn();
+    render(
+      <AnalyticsSidebarView
+        {...baseProps}
+        data={undefined}
+        isError
+        onRetry={onRetry}
+      />
+    );
+
+    const error = screen.getByTestId('analytics-rail-error-state');
+    expect(error).toHaveAttribute('data-content-state', 'error');
+    expect(error).toHaveTextContent('Analytics Unavailable');
+    expect(
+      screen.queryByTestId('analytics-rail-empty-state')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('No Profile Visits Yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('Unique Visitors')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the last good numbers when a refetch fails', () => {
+    render(
+      <AnalyticsSidebarView
+        {...baseProps}
+        data={{
+          profile_views: 120,
+          unique_users: 48,
+          subscribers: 12,
+          total_clicks: 22,
+          listen_clicks: 9,
+          top_cities: [],
+          top_countries: [],
+          top_referrers: [],
+        }}
+        isError
+      />
+    );
+
+    expect(
+      screen.queryByTestId('analytics-rail-error-state')
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Unique Visitors')).toBeInTheDocument();
+  });
+
+  it('never claims zero visits without data', () => {
+    render(<AnalyticsSidebarView {...baseProps} data={undefined} />);
+
+    expect(
+      screen.queryByTestId('analytics-rail-empty-state')
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the range control only when a range handler is given', () => {
+    const { rerender } = render(
+      <AnalyticsSidebarView {...baseProps} data={undefined} />
+    );
+    expect(screen.getByRole('tab', { name: '7D' })).toBeInTheDocument();
+
+    rerender(
+      <AnalyticsSidebarView
+        {...baseProps}
+        onRangeChange={undefined}
+        data={undefined}
+      />
+    );
+    expect(screen.queryByRole('tab', { name: '7D' })).not.toBeInTheDocument();
+  });
+});
