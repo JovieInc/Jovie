@@ -104,7 +104,7 @@ export function ClaimBanner({
       <div className='relative max-w-4xl mx-auto px-4 py-2 sm:py-3'>
         <div className='flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3'>
           {/* Banner text */}
-          <div className='flex min-w-0 items-center gap-2 text-center sm:max-w-sm sm:text-left'>
+          <div className='flex min-w-0 items-center gap-2 text-center sm:max-w-sm sm:text-start'>
             <Sparkles
               className='h-4 w-4 shrink-0 max-sm:hidden'
               aria-hidden='true'
