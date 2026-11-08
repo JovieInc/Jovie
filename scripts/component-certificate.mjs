@@ -159,8 +159,16 @@ const seen = new Set();
 list = list.filter(c =>
   seen.has(c.sourceRel) ? false : seen.add(c.sourceRel)
 );
-for (const rel of values.component ?? [])
-  if (!seen.has(rel))
+// A gate key naming one .tsx file outside the coverage roots (an app-route
+// component such as app/[username]/_components/X.tsx) is certified as if
+// passed with --component; a missing file still fails "matches no component".
+const gatedFiles = values.gate
+  ? Object.keys(registry.gates ?? {}).filter(
+      k => k.endsWith('.tsx') && existsSync(join(root, k))
+    )
+  : [];
+for (const rel of [...(values.component ?? []), ...gatedFiles])
+  if (!seen.has(rel) && seen.add(rel))
     list.push({
       sourceRel: rel,
       testRel: rel.replace(/\.tsx$/, '.test.tsx'),

@@ -30,7 +30,7 @@ export function CheckoutUnlockCards({
     <>
       {shareUrl ? (
         <ContentSurfaceCard surface='nested' data-testid='paid-share-prompt'>
-          <div className='space-y-3 p-4 text-left'>
+          <div className='space-y-3 p-4 text-start'>
             <p className='text-app font-semibold text-primary-token'>
               {ARTIST_VISIBILITY_SHARE_PROMPT.title}
             </p>
@@ -53,7 +53,7 @@ export function CheckoutUnlockCards({
       ) : null}
       {showFanListExport ? (
         <ContentSurfaceCard surface='nested' data-testid='paid-unlock-fan-list'>
-          <div className='space-y-3 p-4 text-left'>
+          <div className='space-y-3 p-4 text-start'>
             <Download className='h-5 w-5 text-accent' aria-hidden='true' />
             <p className='text-2xs font-medium text-secondary-token'>
               {ARTIST_VISIBILITY_FAN_LIST_UNLOCK.header}

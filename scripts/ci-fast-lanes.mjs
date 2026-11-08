@@ -1189,6 +1189,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/github-installation-quota.test.mjs',
   'scripts/lib/__tests__/main-red-eject-quota-failover.test.mjs',
   'scripts/lib/__tests__/github-rate-limit.test.mjs',
+  'scripts/lib/__tests__/github-release-asset.test.mjs',
   'scripts/lib/__tests__/help-center-recertification-workflow.test.mjs',
   'scripts/lib/__tests__/isolated-ui-docs-policy.test.mjs',
   'scripts/lib/__tests__/learning-evidence.test.mjs',

@@ -88,6 +88,9 @@ jobs:
             /tmp/osv-scanner-2.5.1
           key: scanner-bins-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/security/scanner-pins.txt') }}
       - name: Run secret scan (gitleaks + trufflehog)
+        env:
+          # Read-only token for the release-download fallback.
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -242,6 +245,9 @@ jobs:
             /tmp/osv-scanner-2.5.1
           key: scanner-bins-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/security/scanner-pins.txt') }}
       - name: Run TruffleHog (full history on main/schedule, PR diff on pull_request)
+        env:
+          # Read-only token for the release-download fallback.
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
