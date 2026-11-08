@@ -27,6 +27,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -50,6 +51,11 @@ DEMOTE_PRIORITIES = (3, 4)  # P3/P4 only; unset priority is unknown, not unimpor
 MARKETING_LABEL = "priority:marketing"
 PROTECT_LABELS = frozenset({MARKETING_LABEL, "dispatch-next", "plan-approved", "tim-approved", "incident", "factory"})
 MIRROR_MAX_AGE_S = 6 * 3600  # candidates are re-read live, so a lagging mirror only needs to be recent enough to nominate
+URGENT_SLA_S = 30 * 60      # an unclaimed Urgent Todo row older than this is an SLA breach (JOV-11615)
+# Production-breakage Urgent work (prod synthetic red, main CI/release failures, golden-path breaks) outranks
+# the general Urgent pile: with ~160 Urgent rows in Todo, FIFO among Urgent left a fresh prod outage ~6h unclaimed.
+PROD_BREAKAGE = re.compile(r"\bprod(?:uction)?\s+synthetic\b|^\s*\[ci\]|\bmain-failure\b|\bgolden[- ]path\b.*\b(?:broken|red|failing|never)\b"
+                           r"|\bproduction\s+(?:release|controller)\b", re.I)
 PUBKEY_ENV = "LANES_SUMMER_PORTFOLIO_PUBKEY"
 DEFAULT_PUBKEY = Path.home() / ".config" / "symphony" / "summer-portfolio-pubkey.pem"
 
@@ -196,6 +202,23 @@ def claim_key(identifier: str, ranks: dict[str, int]) -> tuple[int, int]:
 def marketing_priority(labels) -> bool:
     """Explicit, reversible routing label; never a readiness or hold exemption."""
     return MARKETING_LABEL in {str(label).strip().lower() for label in labels or ()}
+
+
+def production_breakage(title, priority) -> bool:
+    """Explicit Urgent (P1) work that reports production breakage; never inferred for other tiers."""
+    return priority == 1 and bool(PROD_BREAKAGE.search(str(title or "")))
+
+
+def urgent_sla_breaches(todo: list[dict], now: float, sla_s: int = URGENT_SLA_S) -> list[dict]:
+    """Unclaimed Urgent Todo rows older than the SLA, oldest first. `todo` is already unclaimed
+    (`linear_sync.todo` drops active claims), so age here is time waiting for a claim."""
+    out = []
+    for row in todo:
+        created = _epoch(row.get("createdAt"))
+        if row.get("priority") == 1 and created is not None and now - created > sla_s:
+            out.append({"id": row["identifier"], "issueId": row["id"], "createdAt": row.get("createdAt"),
+                        "waitingS": round(now - created), "productionBreakage": production_breakage(row.get("title"), 1)})
+    return sorted(out, key=lambda item: -item["waitingS"])
 
 
 def protected(row: dict, ranks: dict[str, int]) -> bool:
@@ -379,6 +402,17 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
                                                   "marketing": marketing_priority(row.get("labels")),
                                                   "backlogAgeS": round(now - (_epoch(row.get("createdAt")) or now)),
                                                   "displaced": displaced["identifier"] if displaced else None})
+    breaches = urgent_sla_breaches(live_todo, now)
+    receipt["urgentSla"] = {"slaS": URGENT_SLA_S, "breaches": len(breaches), "worst": breaches[:10]}
+    seen = set()
+    try:
+        seen = {json.loads(line)["id"] for line in (state / "urgent-sla.jsonl").read_text().splitlines() if line}
+    except (OSError, ValueError, KeyError):
+        pass
+    for item in breaches:  # stage timestamp: first moment the SLA was seen breached, once per issue
+        if item["id"] not in seen:
+            _log(state, "urgent-sla.jsonl", {**item, "breachedAt": now, "team": team})
+    binding_refill._write(state / "urgent-sla.json", {"at": now, "team": team, **receipt["urgentSla"]})
     excess = len(live_todo) - ceiling(goal)
     if excess > 0:
         for row in stale_demotions(live_todo, ranks, now, min(excess, MAX_DEMOTE_PER_TICK)):

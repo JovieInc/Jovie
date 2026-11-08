@@ -875,7 +875,8 @@ def admission_order(issue: Issue, now: float) -> tuple:
             else 0 if effective_priority == 1 or workstreams.compounding(stream) else 1)
     # Summer's signed rank comes first, then Urgent, marketing, tier, aged priority, age (JOV-7073).
     return (*priority_admission.claim_key(issue.identifier, priority_admission.summer_ranks(now=now)),
-            0 if priority == 1 else 1, not priority_admission.marketing_priority(issue.labels),
+            0 if priority == 1 else 1, not priority_admission.production_breakage(issue.title, priority),
+            not priority_admission.marketing_priority(issue.labels),
             tier, effective_priority, workstreams.rank(stream),
             created_at if created_at is not None else float("inf"))
 
