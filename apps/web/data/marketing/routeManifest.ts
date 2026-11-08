@@ -300,7 +300,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     glob: '(home)/page.tsx',
     recipeId: 'homepage',
     renderedSections: [
-      approvedVariantBinding(EDITORIAL_HOME, 'hero', 'centered-none'),
+      approvedVariantBinding(EDITORIAL_HOME, 'hero', 'left-none'),
       approvedVariantBinding(EDITORIAL_HOME, 'feature-split', 'phone-right'),
       approvedVariantBinding(EDITORIAL_HOME, 'product-gallery', 'release-rail'),
       approvedVariantBinding(EDITORIAL_HOME, 'cta', 'final-single-claim'),
