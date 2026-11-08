@@ -11,6 +11,7 @@ machine instead of another run).
 Pure functions over parsed values; lane_runner owns every side effect (gh, git, state files).
 
     python3 fix_red_classes.py measure [--state DIR] [--days N]   # before/after numbers from the ledger
+    python3 fix_red_classes.py split-plan --plan FILE           # validate measured, ordered PR layers
 """
 from __future__ import annotations
 
@@ -1101,13 +1102,51 @@ def costs_from_metrics(state: Path) -> dict:
     return out
 
 
+def reviewable_split(changes: dict[str, int], layers: list[list[str]], cap: int = 1500) -> list[int]:
+    """Validate an exhaustive split, counting tests. Caller measures generated paths as zero.
+
+    This plans file-level layers only; each layer still owes dependency/build/test proof.
+    No Git mutation or policy exception is authorized by a passing plan.
+    """
+    if type(cap) is not int or cap < 1 or not changes or not layers:
+        raise ValueError("nonempty measurements/layers and a positive integer cap required")
+    if any(type(count) is not int or count < 0 for count in changes.values()):
+        raise ValueError("unknown, binary or negative line count")
+    seen, totals = set(), []
+    for layer in layers:
+        if not isinstance(layer, list) or not layer:
+            raise ValueError("empty or invalid layer")
+        for path in layer:
+            if path not in changes or path in seen:
+                raise ValueError(f"unknown or duplicate path: {path}")
+            seen.add(path)
+        total = sum(changes[path] for path in layer)
+        if total > cap:
+            raise ValueError(f"layer {len(totals) + 1} exceeds cap: {total}/{cap}")
+        totals.append(total)
+    if seen != set(changes):
+        raise ValueError(f"unassigned paths: {sorted(set(changes) - seen)}")
+    return totals
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("command", choices=["measure"])
+    parser.add_argument("command", choices=["measure", "split-plan"])
+    parser.add_argument("--plan", type=Path, help="JSON {changes: {path: measured lines}, layers: [[path]]}")
     parser.add_argument("--state", default=str(Path.home() / ".local/state/jovie-lanes"))
     parser.add_argument("--days", type=int, default=5)
     parser.add_argument("--now", type=float, default=None)
     args = parser.parse_args(argv)
+    if args.command == "split-plan":
+        if args.plan is None:
+            parser.error("split-plan requires --plan")
+        plan = json.loads(args.plan.read_text())
+        try:
+            totals = reviewable_split(plan["changes"], plan["layers"])
+        except ValueError as error:
+            parser.error(str(error))
+        print(json.dumps({"reviewableLines": totals, "cap": 1500, "testsIncluded": True}))
+        return 0
     now = args.now or datetime.now(timezone.utc).timestamp()
     print(json.dumps(measure(read_ledger(Path(args.state)), now, args.days, costs_from_metrics(Path(args.state))), indent=1))
     return 0

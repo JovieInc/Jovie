@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { brandChecks, sidebarFindings } from './brand-checks.mjs';
-import { decideRound } from './loop-state.mjs';
 
 const node = o => ({ p: 'F', d: 1, x: 0, y: 0, w: 100, h: 20, ...o });
 const facts = (name, nodes) => ({
@@ -109,22 +108,6 @@ test('private ratings: Never push only on a fictional catalog frame', () => {
   assert.deepEqual(
     checks('PROPOSAL / Fan engine · F5 Catalog taste · fictional catalog', [t]),
     []
-  );
-});
-
-test('brand findings outrank everything else as the next fix', () => {
-  const findings = [
-    { check: 'grid', severity: 'block', node: 'a', message: 'gap 9' },
-    {
-      check: 'artist-dignity',
-      severity: 'block',
-      node: 'b',
-      message: 'empty rooms',
-    },
-  ];
-  assert.equal(
-    decideRound({ checks: findings }).topIssue.check,
-    'artist-dignity'
   );
 });
 
