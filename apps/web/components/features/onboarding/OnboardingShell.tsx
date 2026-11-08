@@ -439,7 +439,7 @@ export function OnboardingIdentityConflict({
           ) : !isSignedIn ? (
             <JovieLink asChild variant='compact' touchTarget>
               <NextLink href={APP_ROUTES.SIGNIN}>
-                Sign in with original account
+                Sign In with Original Account
               </NextLink>
             </JovieLink>
           ) : null}

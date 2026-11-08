@@ -171,6 +171,18 @@ describe('onboarding identity boundary', () => {
       })
     ).toBeVisible();
   });
+  it('restores inside the same shell panel the chat paints into', () => {
+    mocks.auth.isLoaded = false;
+    const { container } = render(
+      <OnboardingSessionBoundary sessionLabel='pending' />
+    );
+    const frame = container.querySelector('[data-app-shell-placeholder]');
+    expect(frame).not.toBeNull();
+    expect(
+      frame?.querySelector('main [data-testid="onboarding-session-boundary"]')
+    ).not.toBeNull();
+    expect(container.querySelector('#main-content')).toBeNull();
+  });
   it('keeps an actual empty anonymous entry available for a new homepage handoff', async () => {
     mocks.auth.userId = null;
     mocks.auth.isSignedIn = false;
