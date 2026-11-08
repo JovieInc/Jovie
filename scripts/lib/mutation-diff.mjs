@@ -22,6 +22,10 @@ export const HIGH_RISK_PREFIXES = Object.freeze([
   'app/api/billing/',
   'app/api/stripe/',
   'app/api/webhooks/',
+  // Shell navigation: production dashboard links stopped navigating on
+  // 2026-11-08 with every check green.
+  'components/features/dashboard/dashboard-nav/',
+  'lib/app-shell/',
   'lib/auth/',
   'lib/billing/',
   'lib/claim/',
