@@ -239,7 +239,9 @@ test('hash failures with no comparable frames cannot qualify using a passing sam
 test('pen-bindings.json adapts to frames: unbound routes yield none, bound routes yield dark active frames', async () => {
 const { bindingsToStillFrames } = await import('../design/pen-bindings-lib.mjs');
 const doc = JSON.parse(readFileSync(join(import.meta.dirname, '../../docs/design-system/pen-bindings.json'), 'utf8'));
-assert.deepEqual(bindingsToStillFrames(doc), []);
+const live = bindingsToStillFrames(doc); // `/` is bound to the 12 approved homepage v3 stills (home-canonical-v3)
+assert.deepEqual(live.map(f => f.stillPath).sort(), ['1440', '390'].flatMap(v => ['footer', 'hero', 'invite', 'profile', 'releases', 'specs'].map(s => `docs/pen-stills/home/${v}/${s}.png`)).sort());
+assert.ok(live.every(f => f.mode === 'dark' && /^sha256:[0-9a-f]{64}$/.test(f.fileHash)));
 const bound = { routes: { '/': { approved: { by: 'tim', at: '2026-11-07T00:00:00Z', receipt: 'r' }, viewports: { 1440: [{ section: 'hero', nodeId: 'N1', still: 'docs/pen-stills/home/1440/hero.png', sha256: 'a'.repeat(64) }], 390: [] } } } };
 const frames = bindingsToStillFrames(bound);
 assert.equal(frames.length, 1); assert.equal(frames[0].sectionSelector, "[data-pen-section='hero']");

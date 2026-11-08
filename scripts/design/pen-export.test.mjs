@@ -42,6 +42,13 @@ function sandbox() {
   const root = mkdtempSync(join(tmpdir(), 'pen-export-'));
   mkdirSync(join(root, dirname(BINDINGS_PATH)), { recursive: true });
   copyFileSync(join(REPO_ROOT, BINDINGS_PATH), join(root, BINDINGS_PATH));
+  // Start every sandbox from an unbound `/`, whatever the live manifest binds,
+  // so these tests exercise export and approve rather than the live approval.
+  const doc = JSON.parse(readFileSync(join(root, BINDINGS_PATH), 'utf8'));
+  delete doc.routes['/'].approved;
+  doc.routes['/'].enforce = false;
+  doc.routes['/'].viewports = {};
+  writeFileSync(join(root, BINDINGS_PATH), `${JSON.stringify(doc, null, 2)}\n`);
   const penFile = join(root, 'Home review.pen');
   writeFileSync(penFile, 'not a real pen file');
   const calls = [];

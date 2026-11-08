@@ -400,7 +400,7 @@ export function OnboardingCheckoutClient({
       if (data.url) {
         globalThis.location.href = data.url;
       } else {
-        throw new Error('No checkout URL returned.');
+        throw new Error('Checkout failed. Please try again.');
       }
     } catch (err) {
       setError(
@@ -435,7 +435,7 @@ export function OnboardingCheckoutClient({
           </h1>
           <p className={FORM_LAYOUT.hint}>
             {isDefaultUpsell && username
-              ? `Congrats! Your profile, links, and fan capture are live at jov.ie/${username} — free forever. Here's what ${planMarketing.displayName} adds on top.`
+              ? `Your profile, links, and fan capture are live at jov.ie/${username}, free forever. Here's what ${planMarketing.displayName} adds on top.`
               : username
                 ? `Your profile is live and stays free either way. Here's what ${planMarketing.displayName} adds on top.`
                 : `Here's what ${planMarketing.displayName} adds on top of the free plan.`}

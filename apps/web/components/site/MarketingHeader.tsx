@@ -104,6 +104,10 @@ export interface MarketingHeaderProps
      */
     readonly chromeNav?: MarketingHeaderChromeNav;
     readonly primaryCta?: MarketingHeaderCta;
+    /** Show Log in only (the invite-only homepage has one CTA, in the hero). */
+    readonly hidePrimaryCta?: boolean;
+    /** Wordmark beside the mark at the left (the homepage); the centre nav drops it. */
+    readonly leftWordmark?: boolean;
     readonly showHomepageCenterNav?: boolean;
     readonly variant?: MarketingHeaderVariant;
   }> {}
@@ -178,6 +182,8 @@ export function MarketingHeader({
   navLinks,
   chromeNav,
   primaryCta,
+  hidePrimaryCta = false,
+  leftWordmark = false,
   showHomepageCenterNav = true,
   variant = 'landing',
 }: MarketingHeaderProps) {
@@ -233,13 +239,16 @@ export function MarketingHeader({
     hasSimpleNav,
     centerNavDisabled,
     resolvedNavLinks,
-    iconOnly,
+    iconOnly || leftWordmark,
     chromeNav
   );
   const resolvedPrimaryCta =
     primaryCta ?? resolveMarketingHeaderPrimaryCta(pathname);
-  const resolvedLogoVariant =
-    presentation === 'marketing-glass' || isArtistProfiles || iconOnly
+  // leftWordmark (the homepage) renders the mark with its reveal wordmark; the
+  // homepage stylesheet keeps that wordmark shown beside the 28px mark.
+  const resolvedLogoVariant = leftWordmark
+    ? 'icon'
+    : presentation === 'marketing-glass' || isArtistProfiles || iconOnly
       ? 'icon'
       : logoVariant;
 
@@ -264,6 +273,7 @@ export function MarketingHeader({
       presentation={presentation}
       flyoutMenus={navConfig.flyoutMenus}
       publicCta={resolvedPrimaryCta}
+      hidePublicCta={hidePrimaryCta}
       mobileNavLinks={navConfig.mobileNavLinks}
       navLinks={navConfig.desktopNavLinks}
       showContactLink={false}
