@@ -289,6 +289,20 @@ describe('InsightsPanelView', () => {
     return handlers;
   }
 
+  it('after a run that found nothing, offers no Generate press the cooldown would refuse', () => {
+    renderView({ lastRun: { insightsGenerated: 0, dataPointsAnalyzed: 1240 } });
+    expect(screen.getByText('Nothing New To Report')).toBeVisible();
+    expect(screen.getByTestId('insights-empty-state')).toHaveTextContent(
+      'can run again in an hour'
+    );
+    expect(
+      screen.queryByRole('button', { name: /^Generate (Again|Insights)$/ })
+    ).toBeNull();
+    expect(
+      screen.getByRole('link', { name: 'Share Your Profile' })
+    ).toBeVisible();
+  });
+
   it('a 429 says the cooldown and offers no immediate retry', () => {
     renderView({
       generateFailed: true,

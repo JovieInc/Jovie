@@ -7,7 +7,10 @@
  */
 
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
-import { MIN_TOTAL_CLICKS } from '@/lib/services/insights/thresholds';
+import {
+  GENERATION_COOLDOWN_HOURS,
+  MIN_TOTAL_CLICKS,
+} from '@/lib/services/insights/thresholds';
 import type { InsightGenerateResponse } from '@/types/insights';
 
 export type InsightsEmptyMode =
@@ -34,6 +37,12 @@ export interface InsightsEmptyCopy {
 
 function clicks(count: number): string {
   return `${count.toLocaleString('en-US')} link ${count === 1 ? 'click' : 'clicks'}`;
+}
+
+function cooldownWindow(): string {
+  return GENERATION_COOLDOWN_HOURS === 1
+    ? 'an hour'
+    : `${GENERATION_COOLDOWN_HOURS} hours`;
 }
 
 function cooldownEnd(nextAllowedAt: string | null | undefined): string | null {
@@ -116,7 +125,9 @@ export function getInsightsEmptyCopy({
     return {
       mode: 'nothing-new',
       heading: 'Nothing New To Report',
-      description: `Jovie read ${clicks(lastRun.dataPointsAnalyzed)} and found no change worth flagging. Generate again after your next release or share.`,
+      // Every completed run starts the server cooldown, so this copy offers
+      // no Generate button: pressing it now would only return a 429.
+      description: `Jovie read ${clicks(lastRun.dataPointsAnalyzed)} and found no change worth flagging. Insights can run again in ${cooldownWindow()}, so share a release or your profile in the meantime.`,
     };
   }
 

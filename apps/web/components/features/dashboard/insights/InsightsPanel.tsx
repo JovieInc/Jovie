@@ -117,9 +117,7 @@ function InsightsLoadingRows() {
 }
 
 function generateLabel(copy: InsightsEmptyCopy): string {
-  if (copy.mode === 'failed') return 'Try Again';
-  if (copy.mode === 'nothing-new') return 'Generate Again';
-  return 'Generate Insights';
+  return copy.mode === 'failed' ? 'Try Again' : 'Generate Insights';
 }
 
 const SHARE_PROFILE_ACTION = {
@@ -128,8 +126,9 @@ const SHARE_PROFILE_ACTION = {
 } as const;
 
 /**
- * One next step per empty mode. A cooldown or a plan gate gets no Generate
- * button, because pressing it again would only fail the same way.
+ * One next step per empty mode. A finished run, a cooldown or a plan gate
+ * gets no Generate button: the server cooldown or the plan would only refuse
+ * it again.
  */
 function emptyStateActions(
   copy: InsightsEmptyCopy,
@@ -145,6 +144,7 @@ function emptyStateActions(
 ): Pick<EmptyStateProps, 'action' | 'secondaryAction'> {
   switch (copy.mode) {
     case 'needs-activity':
+    case 'nothing-new':
     case 'rate-limited':
       return { action: SHARE_PROFILE_ACTION };
     case 'needs-plan':
