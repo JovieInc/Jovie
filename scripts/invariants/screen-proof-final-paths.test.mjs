@@ -30,10 +30,17 @@ import {
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const sha256 = bytes =>
   `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
-const at = (path, route) => [
-  new URL(path, 'http://localhost:3000'),
-  new URL(route, 'http://localhost'),
-];
+/**
+ * @param {string} path
+ * @param {string} route
+ * @param {Record<string, readonly string[]>} [declared]
+ */
+const lands = (path, route, declared) =>
+  finalPathMatches(
+    new URL(path, 'http://localhost:3000'),
+    new URL(route, 'http://localhost'),
+    declared
+  );
 
 // JOV-7973: closed public signup sends the anonymous /start entry to the
 // waitlist. The screen proof resolver must accept exactly that declared
@@ -41,19 +48,19 @@ const at = (path, route) => [
 // is ever written.
 describe('screen proof final paths (JOV-7973)', () => {
   it('matches the exact route, or a declared bare alternate only', () => {
-    assert.equal(finalPathMatches(...at('/start', '/start')), true);
-    assert.equal(finalPathMatches(...at('/waitlist', '/start')), true);
-    assert.equal(finalPathMatches(...at('/waitlist?ref=x', '/start')), false);
-    assert.equal(finalPathMatches(...at('/signin', '/start')), false);
-    assert.equal(finalPathMatches(...at('/waitlist', '/')), false);
-    assert.equal(finalPathMatches(...at('/waitlist', '/start'), {}), false);
+    assert.equal(lands('/start', '/start'), true);
+    assert.equal(lands('/waitlist', '/start'), true);
+    assert.equal(lands('/waitlist?ref=x', '/start'), false);
+    assert.equal(lands('/signin', '/start'), false);
+    assert.equal(lands('/waitlist', '/'), false);
+    assert.equal(lands('/waitlist', '/start', {}), false);
     assert.equal(
-      finalPathMatches(...at('/a?x=1', '/a?x=1')),
+      lands('/a?x=1', '/a?x=1'),
       true,
       'exact query routes keep matching'
     );
     assert.equal(
-      finalPathMatches(...at('/waitlist', '/constructor'), {}),
+      lands('/waitlist', '/constructor', {}),
       false,
       'inherited keys never declare alternates'
     );
