@@ -506,7 +506,7 @@ export function OnboardingProfileRail({
             phoneFrameClassName={isInline ? 'w-50 sm:w-57' : 'w-71'}
             topRight={
               <span
-                className='inline-flex h-6 items-center rounded-full border border-white/12 bg-black/50 px-2.5 text-3xs font-semibold uppercase tracking-wider text-white backdrop-blur-md dark:text-white'
+                className='inline-flex h-6 items-center rounded-full border border-white/12 bg-black/60 px-2.5 text-3xs font-semibold uppercase tracking-wider text-white backdrop-blur-md dark:text-white'
                 data-testid='onboarding-profile-preview-badge'
               >
                 Preview

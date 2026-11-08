@@ -44,9 +44,10 @@ describe('(home) layout hydration', () => {
     expect(await renderHtml('/')).toBe(server);
   });
 
-  it('always renders the homepage page-contract marker and /start CTA', async () => {
+  it('always renders the homepage page-contract marker and the invite CTA', async () => {
     const html = await renderHtml(null);
     expect(html).toContain('data-primary-cta="true"');
-    expect(html).toContain('href="/start"');
+    expect(html).toContain('href="/#request-invite"');
+    expect(html).not.toContain('href="/start"');
   });
 });

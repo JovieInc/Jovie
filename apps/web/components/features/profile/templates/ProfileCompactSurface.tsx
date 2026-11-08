@@ -75,17 +75,7 @@ import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import type { NotificationSourceContext } from '../artist-notifications-cta/types';
 import { useProfileMobileOverflow } from './useProfileMobileOverflow';
-
-// Optional overlays must suspend locally. A late visitor assignment can mount
-// their lazy modules after the profile is visible; without a local fallback,
-// the page-level loading boundary hides the artist and navigation together.
-const ProfileUnifiedDrawer = dynamic(
-  () =>
-    import('@/features/profile/ProfileUnifiedDrawer').then(mod => ({
-      default: mod.ProfileUnifiedDrawer,
-    })),
-  { loading: () => null }
-);
+import { ProfileUnifiedDrawerSlot } from './useProfileUnifiedDrawerModule';
 
 const ProfileInlineNotificationsCTA = dynamic(
   () =>
@@ -939,7 +929,7 @@ export function ProfileCompactSurface({
       </div>
 
       {renderMode !== 'preview' && renderInteractiveOverlays ? (
-        <ProfileUnifiedDrawer
+        <ProfileUnifiedDrawerSlot
           open={drawerOpen}
           onOpenChange={onDrawerOpenChange}
           view={drawerView}

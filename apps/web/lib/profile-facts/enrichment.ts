@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isUnsafeUrl } from '@/lib/utils/platform-detection/normalizer';
+import { isUnsafeUrl } from '@/lib/utils/platform-detection/url-safety';
 import type { FactConfidence, FactPublicationPermission } from './types';
 
 /** Role adapters share one subject; no role requires a music-provider ID. */

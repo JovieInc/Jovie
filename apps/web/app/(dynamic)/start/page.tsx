@@ -13,6 +13,10 @@ import { resolveStartEntryProfile } from '@/lib/onboarding/start-entry-profile.s
 import { documentTitle } from '@/lib/seo/document-title';
 import { resolveSyntheticPassage } from '@/lib/synthetic/passage.server';
 import { resolveSyntheticPassageToken } from '@/lib/synthetic/passage-token.server';
+import {
+  isPublicSignupClosed,
+  PUBLIC_SIGNUP_CLOSED_REDIRECT,
+} from '@/lib/waitlist/public-signup-gate';
 
 /**
  * Canonical onboarding chat entry point.
@@ -104,6 +108,13 @@ export default async function StartPage(
 
   const isSignedIn = authResult.state !== CanonicalUserState.UNAUTHENTICATED;
   const turnstileTestMode = await resolveSyntheticTurnstileTestMode(isSignedIn);
+  // Closed public signup (canon/PRODUCT.md, 2026-11-02): anonymous visitors
+  // join the waitlist. Signed-in users (including redeemed invitees) keep the
+  // golden path, and the production certification canary (verified passage
+  // token) still exercises anonymous /start.
+  if (!isSignedIn && !turnstileTestMode && isPublicSignupClosed()) {
+    redirect(PUBLIC_SIGNUP_CLOSED_REDIRECT);
+  }
   // No account and no onboarding cookie: there is nothing to restore, so the
   // client does not need to fetch an empty snapshot before showing the chat.
   const freshAnonymous =

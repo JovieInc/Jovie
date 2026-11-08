@@ -89,3 +89,20 @@ Footer geometry stays fixed after hydration/fonts; navigation intentionally
 changes location. Certification checks and captures are recorded with the PR.
 Local source/browser evidence, hosted CI, merge and production certification are
 separate receipts. The census never claims this branch has deployed.
+
+## Automatic recertification and main health
+
+A canonical census row fingerprints the bytes of its page and owners (`sourceDigest`). A push to main that
+changes those bytes without renewing the row fails `design-surface-census.test.mjs` for every later PR.
+
+- `Surface Recertify` (`.github/workflows/surface-recertify.yml`) runs on pushes to main that touch certified
+  source. `node scripts/surface-recertify.mjs list` finds stale rows; `capture` renders each route in Chromium at
+  1440 and 390; `apply` validates the evidence (HTTP 200, no horizontal overflow, no page errors) and writes the new
+  `sourceDigest` with the census module itself. One `compounding` bot PR carries the renewal. Screenshots live in the
+  run artifact (90 days); the repo keeps their sha256 digests and the run URL in `evidence.ref`. No object-store
+  credential is needed, so this works while PR #23631 (off-repo evidence ledger) waits on its R2 secret; when that
+  lands, only the evidence location changes. Rows that cannot be captured (dynamic route, several sources, failed
+  render) stay red by design.
+- `Main Health` (`.github/workflows/main-health.yml`, `scripts/main-health.mjs`) runs the census and design
+  conformance checks on main after every push. The Gem lanes doctor (`scripts/lanes/main_health.py`) reads the latest
+  run and raises the `main-health` incident to Summer while it is red; it clears when a later run passes.

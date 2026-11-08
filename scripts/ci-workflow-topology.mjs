@@ -19,7 +19,8 @@ const events = value => value && typeof value === 'object' ? Object.keys(value) 
 function category(name) {
   const owned = policy.authoritativeOwners.find(owner => owner.workflow === name);
   if (owned) return owned.category;
-  if (/coverage/i.test(name)) return 'source-validation';
+  // Main Health produces certification verdicts consumed by Main Red Eject.
+  if (name === 'Main Health' || /coverage/i.test(name)) return 'source-validation';
   if (/receipt|audit|monitor|health|ratchet|observability|flakiness/i.test(name))
     return 'telemetry-aggregation';
   if (/remedi|autofix|relay|pipeline|conflict/i.test(name))

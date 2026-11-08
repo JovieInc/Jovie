@@ -1,4 +1,4 @@
-import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
+import { isCookieBannerRequiredFromCookieString } from '@/lib/cookies/consent-regions';
 import { parseConsentCookieValue } from '@/lib/cookies/consent-state';
 
 /**
@@ -42,13 +42,9 @@ function readCookie(name: string): string {
 
 function isConsentRequiredForCurrentVisitor(): boolean {
   try {
-    return globalThis.document.cookie
-      .split(';')
-      .some(cookie =>
-        cookie.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=1`)
-      );
+    return isCookieBannerRequiredFromCookieString(globalThis.document.cookie);
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -190,10 +186,15 @@ export function isAnalyticsAllowed(): boolean {
       return !isConsentRequiredForCurrentVisitor();
     }
 
+    if (isConsentRequiredForCurrentVisitor()) {
+      // Consent-required regions need an affirmative, well-formed choice.
+      return parseConsentCookieValue(raw)?.analytics === true;
+    }
+
     const parsed = JSON.parse(raw);
     return parsed?.analytics !== false;
   } catch {
-    return true;
+    return !isConsentRequiredForCurrentVisitor();
   }
 }
 

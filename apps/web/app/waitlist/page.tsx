@@ -10,6 +10,7 @@ import {
   getWaitlistReservedHandle,
   resolveUserState,
 } from '@/lib/auth/gate';
+import { isPublicSignupClosed } from '@/lib/waitlist/public-signup-gate';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import { isWaitlistPendingStatus } from '@/lib/waitlist/state-machine';
 
@@ -48,7 +49,7 @@ export default async function WaitlistPage() {
   if (process.env.PUBLIC_NOAUTH_SMOKE === '1') {
     return (
       <WaitlistRouteWithContract>
-        <WaitlistPublicLanding />
+        <WaitlistPublicLanding signupClosed={isPublicSignupClosed()} />
       </WaitlistRouteWithContract>
     );
   }
@@ -62,7 +63,7 @@ export default async function WaitlistPage() {
   if (authResult.state === CanonicalUserState.UNAUTHENTICATED) {
     return (
       <WaitlistRouteWithContract>
-        <WaitlistPublicLanding />
+        <WaitlistPublicLanding signupClosed={isPublicSignupClosed()} />
       </WaitlistRouteWithContract>
     );
   }

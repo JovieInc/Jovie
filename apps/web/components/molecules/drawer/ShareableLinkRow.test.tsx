@@ -45,6 +45,20 @@ describe('ShareableLinkRow', () => {
     expect(screen.getByTestId('row')).toHaveClass('h-8');
   });
 
+  it('keeps compact density copy/open targets at the 24px minimum', () => {
+    render(
+      <ShareableLinkRow
+        url='https://jov.ie/tim'
+        density='compact'
+        testId='row'
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Copy link' })).toHaveClass(
+      'h-6',
+      'w-6'
+    );
+  });
+
   it('locks rail density to the 32px desktop control contract', () => {
     render(
       <ShareableLinkRow url='https://jov.ie/tim' density='rail' testId='row' />

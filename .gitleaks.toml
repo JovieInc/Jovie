@@ -151,6 +151,10 @@ regexes = [
     '''claim_invite_followup_[0-9]+''',
     # Trivial fake hex literal used by iOS API client tests.
     '''0123456789abcdef''',
+    # Public Summer decision-card idempotency key in the Ovie Inbox story.
+    # generic-api-key matches the idempotencyKey assignment. The value is the
+    # filed card id, not a credential, and commit 1927007 stays in the PR range.
+    '''^mvp-pricing-v1-20261029$''',
     # Docs placeholders (docs/integration-checklist.md).
     '''YOUR_ANON_KEY''',
     '''eyJhbGciOiJIUzI1NiIs\.\.\.''',

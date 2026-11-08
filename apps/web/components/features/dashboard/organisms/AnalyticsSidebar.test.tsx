@@ -35,7 +35,7 @@ vi.mock('@/lib/queries', () => ({
   }),
 }));
 
-vi.mock('@/components/molecules/drawer', () => ({
+vi.mock('@/components/molecules/drawer', async () => ({
   DrawerStatGrid: ({
     children,
     variant,
@@ -102,12 +102,7 @@ vi.mock('@/components/molecules/drawer', () => ({
       </div>
     </div>
   ),
-  StatTile: ({ label, value }: { label: string; value: string }) => (
-    <div>
-      <span>{label}</span>
-      <span>{value}</span>
-    </div>
-  ),
+  ...(await import('@/components/molecules/drawer/StatTile')),
 }));
 
 vi.mock('@/components/molecules/drawer-header/DrawerHeaderActions', () => ({
@@ -208,6 +203,11 @@ describe('AnalyticsSidebar', () => {
       container.querySelectorAll('[data-surface-variant="card"]')
     ).toHaveLength(2);
     expect(screen.queryByText('Tip Link Visits')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('stat-tile-value')).toHaveLength(2);
+    for (const value of screen.getAllByTestId('stat-tile-value')) {
+      expect(value).toHaveAttribute('aria-busy', 'true');
+    }
+    expect(screen.queryByText('Not measured')).not.toBeInTheDocument();
 
     rerender(
       <AnalyticsSidebarView
@@ -235,6 +235,10 @@ describe('AnalyticsSidebar', () => {
     );
 
     expect(screen.getByText('Tip Link Visits')).toBeInTheDocument();
+    expect(screen.getByText('22')).toHaveAttribute('data-state', 'value');
+    expect(screen.getByText('9')).toHaveAttribute('data-state', 'value');
+    expect(screen.getByText('4')).toHaveAttribute('data-state', 'value');
+    expect(screen.queryByText('Loading')).not.toBeInTheDocument();
     expect(container.querySelector('.opacity-70')).not.toBeNull();
   });
 });

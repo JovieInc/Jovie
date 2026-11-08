@@ -70,7 +70,10 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
         className
       )}
       title={`Copy ${label}`}
-      aria-label={`Copy ${label}`}
+      // aria-label keeps the visible value inside the accessible name with a
+      // real space (WCAG 2.5.3); an sr-only prefix lost its trailing space at
+      // the element boundary ("Copy ISRC:USRC…").
+      aria-label={`Copy ${label}: ${value}`}
     >
       <span
         className='truncate'

@@ -2084,7 +2084,7 @@ function MetadataRow({
   readonly label: string;
   readonly value: ReactNode;
 }) {
-  return <InspectorRow label={label} value={value} />;
+  return <InspectorRow definitionList label={label} value={value} />;
 }
 
 function PreviewActionButton({
@@ -2176,13 +2176,13 @@ function ApprovalStatusEditor({
           type='button'
           variant='ghost'
           disabled={isDisabled}
-          aria-label='Approval Status'
           data-testid={`library-approval-status-select-${asset.id}`}
           className={cn(
             '-ml-1 inline-flex h-6 max-w-full items-center justify-start gap-1 truncate px-1 font-normal text-primary-token hover:bg-surface-1 disabled:opacity-100',
             LIBRARY_BUTTON_FOCUS_CLASS
           )}
         >
+          <span className='sr-only'>Approval Status:</span>{' '}
           <span>{formatLibraryApprovalStatus(asset.approvalStatus)}</span>
           <ChevronDown
             className='h-3 w-3 shrink-0 opacity-70'

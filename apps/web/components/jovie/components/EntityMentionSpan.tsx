@@ -1,12 +1,12 @@
 'use client';
 
-import { type CSSProperties } from 'react';
+import { type CSSProperties, type ReactNode } from 'react';
 import type { EntityKind } from '@/lib/chat/tokens';
 import { ENTITY_KIND_ACCENT_VAR } from './entity-accent';
 
 interface EntityMentionSpanProps {
   readonly kind: EntityKind;
-  readonly label: string;
+  readonly label: ReactNode;
 }
 
 /**

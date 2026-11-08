@@ -48,12 +48,10 @@ const CACHE_TTL_SECONDS = 10 * 60;
 export const CONE_WORKFLOWS = {
   /** Includes the canonical artist profile certificate (JOV-6920). */
   revenuePath: 'm2-revenue-path-canary.yml',
-  /**
-   * signup → claim → checkout → verified payment → entitlement → refund: the
-   * Golden Path job of the latest dispatched main ci.yml run. The nightly
-   * workflow only dispatches it, so its own run proves nothing.
-   */
+  // Golden Path job (signup to refund) of the latest dispatched main ci.yml
+  // run; the nightly only dispatches it, so its own run proves nothing.
   goldenPath: 'ci.yml#Golden Path (manual)',
+  buyerEval: 'buyer-eval-gate.yml', // green only when buyer-eval/gate.mjs passes
 } as const;
 
 const M2_STEP_REQUIREMENTS: Record<M2RevenuePathStepName, ConeRequirementId> = {
@@ -493,7 +491,7 @@ export async function computeAcquisitionEligibility(
 ): Promise<AcquisitionEligibilityReport> {
   try {
     const now = deps.now();
-    const [m2, auth, profile, m2Workflow, goldenPath, funnel, commerce] =
+    const [m2, auth, profile, m2Workflow, goldenPath, funnel, commerce, buyer] =
       await Promise.all([
         revenuePathEvidence(deps),
         canaryEvidence(
@@ -514,6 +512,7 @@ export async function computeAcquisitionEligibility(
         ),
         funnelEvidence(deps),
         commerceDecisionEvidence(deps, now),
+        workflowEvidence('buyer_would_pay', CONE_WORKFLOWS.buyerEval, deps),
       ]);
     return {
       ...evaluateAcquisitionEligibility({
@@ -525,6 +524,7 @@ export async function computeAcquisitionEligibility(
           goldenPath,
           funnel.evidence,
           ...commerce.evidence,
+          buyer,
         ],
         now,
       }),
