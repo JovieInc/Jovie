@@ -5,9 +5,9 @@ import {
   BadgeCheck,
   BarChart3,
   CalendarClock,
+  CircleCheck,
   Loader2,
   Mail,
-  PartyPopper,
   Rocket,
   ShieldCheck,
   Workflow,
@@ -16,7 +16,6 @@ import {
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ConfettiOverlay } from '@/components/atoms/Confetti';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
@@ -25,7 +24,6 @@ import { StandaloneProductPage } from '@/components/organisms/StandaloneProductP
 import { APP_ROUTES } from '@/constants/routes';
 import { page, track } from '@/lib/analytics';
 import { PROOF_PENDING_TERMS } from '@/lib/claim/proof-terms';
-import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { useBillingStatusQuery } from '@/lib/queries';
 import {
   ARTIST_VISIBILITY_ACTIVATION_COPY,
@@ -148,8 +146,7 @@ export default function CheckoutSuccessPage() {
     error: billingError,
   } = useBillingStatusQuery();
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [hasHydratedMotion, setHasHydratedMotion] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
+  const [hasHydrated, setHasHydrated] = useState(false);
   const [isSessionPlanPending, setIsSessionPlanPending] = useState(
     Boolean(checkoutSessionId)
   );
@@ -159,8 +156,6 @@ export default function CheckoutSuccessPage() {
   // Private until we confirm it is the artist's: never say "live".
   const [proofPending, setProofPending] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const prefersReducedMotion = useReducedMotion();
-  const shouldSuppressMotion = hasHydratedMotion && prefersReducedMotion;
   const isBillingPending =
     !checkoutSessionId &&
     isBillingLoading === true &&
@@ -172,7 +167,7 @@ export default function CheckoutSuccessPage() {
   const celebrationTrackedRef = useRef(false);
 
   useEffect(() => {
-    setHasHydratedMotion(true);
+    setHasHydrated(true);
   }, []);
 
   useEffect(() => {
@@ -241,19 +236,6 @@ export default function CheckoutSuccessPage() {
   );
 
   useEffect(() => {
-    if (!hasHydratedMotion) return;
-
-    if (prefersReducedMotion) {
-      setIsVisible(true);
-      return;
-    }
-
-    setIsVisible(false);
-    const frame = requestAnimationFrame(() => setIsVisible(true));
-    return () => cancelAnimationFrame(frame);
-  }, [hasHydratedMotion, prefersReducedMotion]);
-
-  useEffect(() => {
     if (!shouldCelebratePaidSuccess(view) || conversionTrackedRef.current) {
       return;
     }
@@ -283,7 +265,7 @@ export default function CheckoutSuccessPage() {
   }, [checkoutSessionId, isOnboardingUpgrade, isSessionPlanPending, view]);
 
   const canNativeShare =
-    hasHydratedMotion &&
+    hasHydrated &&
     typeof navigator !== 'undefined' &&
     typeof navigator.share === 'function';
   const handleNativeShare = (url: string) => {
@@ -366,21 +348,9 @@ export default function CheckoutSuccessPage() {
     successSubtitle = "Your plan is active. Here's what you just unlocked.";
   }
 
-  let contentClassName: string;
-  if (shouldSuppressMotion) {
-    contentClassName = 'space-y-6 px-5 py-5 text-center sm:px-6';
-  } else if (isVisible) {
-    contentClassName =
-      'space-y-6 px-5 py-5 text-center opacity-100 translate-y-0 scale-100 transition-[opacity,transform] duration-cinematic ease-out sm:px-6';
-  } else {
-    contentClassName =
-      'space-y-6 px-5 py-5 text-center opacity-0 translate-y-6 scale-[0.98] transition-[opacity,transform] duration-cinematic ease-out sm:px-6';
-  }
-
-  const showConfetti =
-    shouldCelebratePaidSuccess(view) &&
-    !shouldSuppressMotion &&
-    hasHydratedMotion;
+  // The page settles in place: no confetti and no entrance slide, so the
+  // headline, the next steps and the button never move once drawn.
+  const contentClassName = 'space-y-6 px-5 py-5 text-center sm:px-6';
   const viewTestId =
     view.kind === 'pending'
       ? 'checkout-success-pending'
@@ -395,8 +365,6 @@ export default function CheckoutSuccessPage() {
       className='relative'
       contentClassName='relative z-10'
     >
-      {showConfetti ? <ConfettiOverlay viewport /> : null}
-
       <ContentSurfaceCard
         surface='details'
         className='overflow-hidden'
@@ -409,28 +377,34 @@ export default function CheckoutSuccessPage() {
         />
 
         <div className={contentClassName}>
-          <div
-            className={
-              view.kind === 'pending'
-                ? 'mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-subtle bg-surface-2'
-                : view.kind === 'recovery'
-                  ? 'mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-warning/20 bg-warning-subtle'
-                  : 'mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-success/20 bg-success-subtle'
-            }
-            aria-live={view.kind === 'pending' ? 'polite' : undefined}
-            aria-busy={view.kind === 'pending' ? true : undefined}
-          >
-            {view.kind === 'pending' ? (
-              <Loader2
-                className='h-8 w-8 animate-spin text-secondary-token'
-                aria-hidden='true'
-              />
-            ) : view.kind === 'recovery' ? (
-              <XCircle className='h-8 w-8 text-warning' aria-hidden='true' />
-            ) : (
-              <PartyPopper className='h-8 w-8 text-success' />
-            )}
-          </div>
+          {view.kind === 'success' ? (
+            <p
+              className='mx-auto inline-flex items-center gap-1.5 rounded-full border border-success/20 bg-success-subtle px-2.5 py-1 text-xs font-medium text-success'
+              data-testid='checkout-success-status'
+            >
+              <CircleCheck className='h-3.5 w-3.5' aria-hidden='true' />
+              Payment confirmed
+            </p>
+          ) : (
+            <div
+              className={
+                view.kind === 'pending'
+                  ? 'mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-subtle bg-surface-2'
+                  : 'mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-warning/20 bg-warning-subtle'
+              }
+              aria-live={view.kind === 'pending' ? 'polite' : undefined}
+              aria-busy={view.kind === 'pending' ? true : undefined}
+            >
+              {view.kind === 'pending' ? (
+                <Loader2
+                  className='h-8 w-8 animate-spin text-secondary-token'
+                  aria-hidden='true'
+                />
+              ) : (
+                <XCircle className='h-8 w-8 text-warning' aria-hidden='true' />
+              )}
+            </div>
+          )}
 
           {view.kind === 'success' && isArtistVisibilitySuccess ? (
             <div
@@ -529,6 +503,16 @@ export default function CheckoutSuccessPage() {
                     {feedback}
                   </output>
                 ) : null}
+                <p className='text-xs text-tertiary-token'>
+                  Your billing history and plan are on the{' '}
+                  <Link
+                    href={APP_ROUTES.BILLING}
+                    className='underline underline-offset-2 hover:text-secondary-token'
+                  >
+                    Billing page
+                  </Link>
+                  .
+                </p>
               </>
             ) : (
               <p className='text-app text-secondary-token'>
