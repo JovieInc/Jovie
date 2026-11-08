@@ -1,8 +1,5 @@
-// Render ledger deck slides to one HTML document of 16:9 pages on the Jovie
-// design system: every colour is a CSS variable generated from the canonical
-// design.tokens.json (semantic names only), type is the DS pair (Satoshi
-// display, Inter body). The template holds no raw colour literal; the test
-// suite enforces that.
+// Render 16:9 slides with canonical semantic tokens and embedded DS fonts.
+// Policy: .claude/rules/investor-deck.md; the template contains no raw colours.
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

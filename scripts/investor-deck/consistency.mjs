@@ -1,7 +1,5 @@
-// Cross-document consistency for the investor deck: the deck may not say
-// anything the claims ledger has retired, and its headline quantities must
-// agree with the application drafts. Pure functions over text; build.mjs
-// feeds it the private ledger and drafts.
+// Cross-check ledger retirement and deck/application quantities.
+// Pure inputs supplied by build.mjs; policy: .claude/rules/investor-deck.md.
 
 import {
   claimNumbers,
@@ -9,11 +7,7 @@ import {
   normalizeClaimNumber,
 } from '../../apps/web/lib/investors/yc-deck.ts';
 
-/**
- * Quantity families an investor compares across the deck and the
- * application. A family value in the deck that the drafts never state is a
- * contradiction (e.g. deck "29 months", drafts "23 months").
- */
+/** Every deck quantity must also occur in the application drafts. */
 export const QUANTITY_FAMILIES = Object.freeze([
   { id: 'runway-months', pattern: /\b(\d+(?:\.\d+)?)[ -]months?\b/gu },
   {
@@ -46,10 +40,7 @@ function familyValues(text, family) {
   return out;
 }
 
-/**
- * Values of retired claims that no live claim, metric or fact also states.
- * Seeing one anywhere means a dropped figure came back.
- */
+/** Retired values not also supported by a live claim, metric or fact. */
 export function retiredValues(ledger) {
   const live = new Set();
   const retired = new Map();

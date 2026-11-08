@@ -1,14 +1,8 @@
 #!/usr/bin/env node
-// "Would you invest" eval (system-1 loop, like scripts/buyer-eval). Each
-// simulated investor persona reads the generated deck text and forecasts
-// invest / pass with p, objections and the most fixable objection. Calls go
-// through the sanctioned Workers AI relay (routing.json caller
-// dev.investor-eval) with the shared API client; never a subscription CLI.
-//
-//   node scripts/investor-deck/eval.mjs --deck <dir with deck.txt> [--samples 3] [--skip-calibration]
-//
-// api-budget: cloudflare-api 144/hr - one manual full default eval/hour: 6 x 3 candidate + 6 x (3 x 2 holdout + 3 anchor) = 72 calls, up to two transport attempts each; additional runs/samples scale this budget
-// Writes <dir>/invest-eval.json (private). Exit 0 always; gate.mjs decides.
+// Simulated investor forecasts through the shared Workers AI client.
+// Policy: .claude/rules/investor-deck.md. Writes private invest-eval.json; gate.mjs decides.
+// node scripts/investor-deck/eval.mjs --deck <build dir> [--samples 3] [--skip-calibration]
+// api-budget: cloudflare-api 144/hr - one manual default eval/hour: 72 calls, two transport attempts each; additional runs/samples scale the budget
 
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -135,13 +129,7 @@ export async function judgeDeck({
   };
 }
 
-/**
- * Calibration (policy, not probability). Under low base rates a judge gives
- * even a deck YC funded p < 0.5 (2026-11-01: anchor 0.09 to 0.43), so the bar
- * is relative: per persona, every known-bad holdout must score below the
- * funded anchor (separation). At most one persona may fail separation; that
- * persona's vote is not counted.
- */
+/** Relative separation policy, including the one-persona tolerance, lives in the scoped rule. */
 export function calibrationHolds(rows) {
   /** @type {Map<string, string>} */
   const expected = new Map([[ANCHOR.id, 'anchor']]);

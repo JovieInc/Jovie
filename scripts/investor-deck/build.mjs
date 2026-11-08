@@ -1,14 +1,7 @@
 #!/usr/bin/env node
-// Generate the investor deck from the private fundraising ledger.
-//
-//   node scripts/investor-deck/build.mjs [--ledger <registry dir>] [--out <dir>] [--no-pdf]
-//
-// Ledger dir (default $JOVIE_FUNDRAISING_DIR, else
-// ~/conductor/ops-wt/fundraising/registry) holds deck.yaml (story),
-// claims.yaml, metrics.yaml, and ../drafts/*.md (application drafts). Output
-// (default ~/.local/state/jovie-investor-deck/<sha12>/) is private: deck.html,
-// deck.pdf, slide PNGs, deck.txt and build.json. Exit 1 on any generator or
-// consistency issue; nothing renders from a failing ledger.
+// Generate a private ledger-bound deck; policy: .claude/rules/investor-deck.md.
+// node scripts/investor-deck/build.mjs [--ledger <registry dir>] [--out <dir>] [--no-pdf]
+// The registry holds deck.yaml, claims.yaml and metrics.yaml; drafts are ../drafts/*.md.
 
 import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';

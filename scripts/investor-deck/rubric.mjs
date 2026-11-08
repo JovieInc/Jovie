@@ -97,10 +97,7 @@ const median = values => {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 };
 
-/**
- * One persona's verdict from its coherent samples: invest when the median
- * p >= YES_MEDIAN and no sample is below YES_FLOOR. Too few samples abstain.
- */
+/** Aggregate coherent samples with the median, floor and minimum count above. */
 export function aggregateInvest(samples) {
   if (samples.length < MIN_SAMPLES)
     return {

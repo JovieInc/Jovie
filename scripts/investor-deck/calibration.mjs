@@ -1,10 +1,5 @@
-// Calibration decks for the "would you invest" eval. Known-bad holdouts must
-// come out `pass` for every persona; the positive anchor must come out
-// `invest` for most. If not, the judge is sycophantic (holdout yes) or too
-// harsh to mean anything (anchor no), and the gate stays closed.
-//
-// The anchor paraphrases the public 2008 AirBed&Breakfast seed deck (Airbnb,
-// YC W09), anonymized so the judge cannot score the brand it knows.
+// Known-bad holdouts and an anonymized public 2008 AirBed&Breakfast seed deck.
+// Relative calibration policy: .claude/rules/investor-deck.md.
 
 export const HOLDOUTS = Object.freeze([
   {
