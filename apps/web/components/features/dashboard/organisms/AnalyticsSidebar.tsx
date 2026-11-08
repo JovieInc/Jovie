@@ -2,7 +2,7 @@
 
 // @coverage-via apps/web/components/features/dashboard/organisms/AnalyticsSidebar.test.tsx
 
-import { Globe, Link2, MapPin } from 'lucide-react';
+import { ChartColumn, Globe, Link2, MapPin } from 'lucide-react';
 import { useState } from 'react';
 import {
   DrawerStatGrid,
@@ -11,9 +11,14 @@ import {
   StatTile,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { TimeRangeSelector } from '@/components/molecules/TimeRangeSelector';
-import { hasAudienceActivity } from '@/lib/analytics/audience-activity';
+import { APP_ROUTES } from '@/constants/routes';
+import {
+  describeNoAudienceActivity,
+  hasAudienceActivity,
+} from '@/lib/analytics/audience-activity';
 import { CANONICAL_METRICS } from '@/lib/analytics/metrics';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -22,7 +27,6 @@ import type {
   AnalyticsRange,
   DashboardAnalyticsResponse,
 } from '@/types/analytics';
-import { AnalyticsRailEmptyState } from './AnalyticsRailEmptyState';
 import { AnalyticsRankedList as RankedList } from './AnalyticsRankedList';
 
 /**
@@ -280,7 +284,20 @@ export function AnalyticsSidebarView({
             )}
             data-right-rail-section='status'
           >
-            {isEmpty ? <AnalyticsRailEmptyState range={range} /> : null}
+            {/* First look: one empty state instead of a funnel of zeros */}
+            {isEmpty ? (
+              <EmptyState
+                icon={<ChartColumn className='h-5 w-5' strokeWidth={1.75} />}
+                heading='No Profile Visits Yet'
+                description={describeNoAudienceActivity(range)}
+                action={{
+                  label: 'Share Your Profile',
+                  href: APP_ROUTES.CHAT_PROFILE_PANEL,
+                }}
+                className='min-h-80'
+                testId='analytics-rail-empty-state'
+              />
+            ) : null}
             {/* Funnel waterfall — vertical bars show dropoff at a glance */}
             {isEmpty ? null : <FunnelCard stages={stages} loading={loading} />}
 
