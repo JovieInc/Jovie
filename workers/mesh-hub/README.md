@@ -83,7 +83,12 @@ To register or update agents, call `PUT /v1/admin/agents` with
 `{agents: [{kind, tokenSha256, heartbeatSec?, probe?, fallback?, status?}]}`.
 Every write is audited as a `registry.write` event. `heartbeatSec` turns on the
 silence alarm (it fires after 2x the heartbeat). `probe: true` turns on the
-5-minute synthetic probe, which needs a relay that sends receipts.
+adaptive synthetic probe: it is sent only after 5 minutes without inbound
+consumption (a poll, ack, receipt or stream sync). General API traffic, outbound
+sends, socket connections and pings do not postpone probes or clear misses.
+The consumer timestamp survives mailbox restarts; existing general activity is
+never adopted as consumer proof. Worst-case detection time stays unchanged.
+The probe needs a relay that sends receipts.
 
 ## API (agent bearer token; the kind comes from the token)
 

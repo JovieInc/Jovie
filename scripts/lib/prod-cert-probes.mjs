@@ -235,5 +235,8 @@ export const EXPECTED_BROWSER_CHECKS = Object.freeze({
     'profile-edit-save-readback',
   ],
   smartlink: ['click-analytics-capture'],
-  checkout: ['checkout-entry-renders'],
+  // fresh-user-checkout-entry: an account that signed up through the public
+  // path reaches checkout. Blocked until the browser run walks it (truthful
+  // certification, 2026-11-08); the seeded canary alone proves nothing.
+  checkout: ['checkout-entry-renders', 'fresh-user-checkout-entry'],
 });

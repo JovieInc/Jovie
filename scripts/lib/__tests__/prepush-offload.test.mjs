@@ -9,6 +9,7 @@ import {
   hostOverloaded,
   NARROWED_LOCAL,
   unrelatedFailure,
+  verdictLine,
 } from '../preflight-scope.mjs';
 import { percentile, recordTimings, summarize } from '../preflight-timing.mjs';
 import {
@@ -254,6 +255,17 @@ test('the failing list names every item, however many', () => {
     failingItemLines({ red: [], body: { errors: [] }, companion: [] }),
     []
   );
+});
+
+test('a skipped check is named in the verdict, never a bare all clear', () => {
+  const ran = [{ name: 'lint' }];
+  assert.equal(verdictLine(0, ran), '\nall clear.');
+  const skipped = [...ran, { name: 'private data guard', skip: 'no gh' }];
+  assert.equal(
+    verdictLine(0, skipped),
+    '\nall clear; SKIPPED here (CI runs): private data guard.'
+  );
+  assert.match(verdictLine(2, skipped), /^\n2 item\(s\) to fix .*SKIPPED/);
 });
 
 test('host overload is a correctness signal, not only speed', () => {

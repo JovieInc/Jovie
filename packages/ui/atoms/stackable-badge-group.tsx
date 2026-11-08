@@ -152,7 +152,12 @@ export function StackableBadgeGroup({
               +{overflowCount} more
             </Button>
           </PopoverTrigger>
-          <PopoverContent align='end' className='w-56 p-1' side='bottom'>
+          <PopoverContent
+            align='end'
+            aria-label='All badges'
+            className='w-56 p-1'
+            side='bottom'
+          >
             <ul aria-label='All badges' className='grid gap-0.5'>
               {items.map(item => (
                 <li

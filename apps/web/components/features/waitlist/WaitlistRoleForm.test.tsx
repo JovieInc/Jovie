@@ -14,6 +14,8 @@ const challenge = vi.hoisted(() => ({
     | ((state: InvisibleTurnstileState) => void)
     | undefined,
 }));
+// Read the latest handler without the caller's narrowing sticking to it.
+const currentStateHandler = () => challenge.onStateChange;
 vi.mock('@/components/atoms/InvisibleTurnstile', () => ({
   InvisibleTurnstile: ({
     onStateChange,
@@ -222,9 +224,16 @@ describe('WaitlistRoleForm', () => {
       new Response(JSON.stringify({ state: 'joined' }), { status: 201 })
     );
     fireEvent.submit(screen.getByTestId('waitlist-role-form'));
-    expect(
-      await screen.findByTestId('waitlist-role-form-joined')
-    ).toHaveFocus();
+    // Focus moves in an effect after the confirmation renders.
+    const confirmation = await screen.findByTestId('waitlist-role-form-joined');
+    await waitFor(() => expect(confirmation).toHaveFocus());
+  });
+
+  it('loads the security check only once the visitor touches the form', () => {
+    render(<WaitlistRoleForm />);
+    expect(screen.queryByTestId('turnstile-mock')).toBeNull();
+    fireEvent.focus(screen.getByLabelText('Email address'));
+    expect(screen.getByTestId('turnstile-mock')).toBeInTheDocument();
   });
 
   it('keeps the focused confirmation after a queued challenge failure arrives', async () => {
@@ -232,7 +241,9 @@ describe('WaitlistRoleForm', () => {
       new Response(JSON.stringify({ state: 'joined' }), { status: 201 })
     );
     render(<WaitlistRoleForm />);
-    const lateFailure = challenge.onStateChange;
+    challenge.onStateChange = undefined;
+    fireEvent.focus(screen.getByLabelText('Email address'));
+    const lateFailure = currentStateHandler();
     expect(lateFailure).toBeTypeOf('function');
     fireEvent.click(screen.getByRole('radio', { name: 'Artist' }));
     fireEvent.change(screen.getByLabelText('Email address'), {
@@ -269,5 +280,33 @@ describe('WaitlistRoleForm', () => {
     expect(screen.getByLabelText('Email address')).toHaveValue(
       'person@example.com'
     );
+  });
+
+  it('chips presentation preselects Artist and maps Producer and Songwriter to one role', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ state: 'joined' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <WaitlistRoleForm
+        presentation='chips'
+        headingLevel={2}
+        title='Jovie opens by invitation.'
+        submitLabel='Request invite'
+        note='One email when your invite is ready. Nothing else.'
+      />
+    );
+    expect(screen.getByRole('radio', { name: 'Artist' })).toBeChecked();
+    fireEvent.click(screen.getByRole('radio', { name: 'Songwriter' }));
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'tim@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Request invite' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).role).toBe(
+      'producer_songwriter'
+    );
+    vi.unstubAllGlobals();
   });
 });

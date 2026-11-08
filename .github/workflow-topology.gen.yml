@@ -267,6 +267,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - merge_group
       - pull_request
       - push
     terminalReceipt: job:company-guards
@@ -925,6 +926,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:canary
     jobCount: 1
+  - name: Pen draft missing frames
+    path: .github/workflows/pen-draft.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:draft
+    jobCount: 1
   - name: Pen still diff (advisory)
     path: .github/workflows/pen-still-diff.yml
     active: true
@@ -962,7 +975,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:notify-failure
-    jobCount: 7
+    jobCount: 8
   - name: PR Conflict Handler
     path: .github/workflows/pr-conflict-handler.yml
     active: false
@@ -1084,6 +1097,18 @@ nodes:
       - pull_request
       - push
     terminalReceipt: job:guard
+    jobCount: 1
+  - name: Product crawl
+    path: .github/workflows/product-crawl.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - workflow_dispatch
+    terminalReceipt: job:crawl
     jobCount: 1
   - name: Production Continuity Guard
     path: .github/workflows/production-continuity.yml

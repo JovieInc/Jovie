@@ -63,6 +63,7 @@ import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
 import hyperagent_repair  # noqa: E402
 import migration_renumber  # noqa: E402  (no-model fix for migration number collisions)
+import fix_red_rewrite  # noqa: E402
 import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
 import machine_gap  # noqa: E402
@@ -144,7 +145,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -207,7 +208,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-ho
                   "scripts/invariants/screen-certification.mjs", "scripts/invariants/screen-decision-routing.mjs",
                   "scripts/invariants/screen-proof-resolver.mjs", "scripts/invariants/product-reference-coherence.mjs",
                   "scripts/invariants/browser-owned-input.mjs", "scripts/invariants/browser-owned-input-matrix.json",
-                  "scripts/lib/playwright-png.mjs",
+                  "scripts/lib/playwright-png.mjs", "scripts/invariants/screen-proof-final-paths.mjs",
                   # Six-hourly credentials/spend check (credentials_spend.py) reads the reviewed registry.
                   "scripts/credentials-spend-check.mjs", "scripts/lib/credentials-live-reads.mjs",
                   "scripts/lib/credentials-registry.mjs", "scripts/lib/linear-issue-intake.mjs",
@@ -7153,41 +7154,18 @@ def wire_ci_fast_fix(host: Host, pr: dict, route: dict, worktree: Path, log, rec
 def snap_spacing_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
     """The no-model fix for a grown spacing ratchet: snap added 10px/14px utilities onto the
     4px grid, commit and push. Returns a finished-agent stand-in, or None when nothing applies."""
-    diff = sh(["git", "diff", "-U0", "origin/main...HEAD", "--", "apps/web", "packages/ui"],
-              cwd=worktree, log=log, timeout=300)
-    if diff.returncode:
-        return None
-    changed = fix_red_classes.snap_added_conservative_spacing(worktree, diff.stdout or "")
-    if not changed:
-        return None
-    steps = [["git", "add", "--", *changed],
-             ["git", "commit", "-q", "-m", "fix(ui): snap added off-grid spacing onto the 4px scale"],
-             ["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"]]
-    for step in steps:
-        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
-            return None
-    receipt.update(resolution="snapped-spacing", snappedFiles=changed)
-    return types.SimpleNamespace(returncode=0)
+    return fix_red_rewrite.rewrite_commit_push(
+        sh, pr, worktree, log, receipt, ("apps/web", "packages/ui"), fix_red_classes.snap_added_conservative_spacing,
+        "fix(ui): snap added off-grid spacing onto the 4px scale", "snapped-spacing", "snappedFiles")
 
 
 def strip_cache_exports_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
     """The no-model fix for a grown Cache Components ratchet: delete added
     dynamic/fetchCache/revalidate exports, commit and push. Never raise the ceiling."""
-    diff = sh(["git", "diff", "-U0", "origin/main...HEAD", "--", "apps/web"],
-              cwd=worktree, log=log, timeout=300)
-    if diff.returncode:
-        return None
-    changed = fix_red_classes.strip_added_legacy_cache_exports(worktree, diff.stdout or "")
-    if not changed:
-        return None
-    steps = [["git", "add", "--", *changed],
-             ["git", "commit", "-q", "-m", "fix(ci): drop added legacy cache segment exports"],
-             ["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"]]
-    for step in steps:
-        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
-            return None
-    receipt.update(resolution="stripped-cache-exports", strippedFiles=changed)
-    return types.SimpleNamespace(returncode=0)
+    return fix_red_rewrite.rewrite_commit_push(
+        sh, pr, worktree, log, receipt, ("apps/web",), fix_red_classes.strip_added_legacy_cache_exports,
+        "fix(ci): drop added legacy cache segment exports", "stripped-cache-exports", "strippedFiles")
+
 
 
 def claim_route(host: Host, pr: dict, action: str) -> bool:
