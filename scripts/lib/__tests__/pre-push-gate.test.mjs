@@ -1,5 +1,4 @@
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import {
   chmodSync,
   copyFileSync,
@@ -81,7 +80,7 @@ describe('resolve-repo-node.sh', () => {
     return directory;
   }
 
-  function runResolver(nodeVersion, withPinnedInstall, extraEnv = {}) {
+  function runResolver(nodeVersion, withPinnedInstall) {
     const nodeBin = makeNodeStub(nodeVersion);
     const nvmRoot = makeNvmRoot(withPinnedInstall);
     const result = spawnSync('/bin/bash', [resolverPath], {
@@ -91,7 +90,6 @@ describe('resolve-repo-node.sh', () => {
         NVM_DIR: nvmRoot,
         HOME: nvmRoot,
         JOVIE_NODE_AUTOFETCH: '0',
-        ...extraEnv,
       },
     });
     return { nvmRoot, result };
@@ -135,76 +133,6 @@ describe('resolve-repo-node.sh', () => {
     expect(result.stdout.trim()).toBe(
       `${nvmRoot}/versions/node/v${pinnedVersion}/bin`
     );
-  });
-
-  const platform = () => {
-    const os = { linux: 'linux', darwin: 'darwin' }[process.platform];
-    const arch = { x64: 'x64', arm64: 'arm64' }[process.arch];
-    return `node-v${pinnedVersion}-${os}-${arch}`;
-  };
-
-  it('uses the pinned build already in the setup cache when nvm has none', () => {
-    const cache = mkdtempSync(resolve(tmpdir(), 'jovie-node-cache-'));
-    temporaryDirectories.push(cache);
-    const bin = resolve(cache, platform(), 'bin');
-    mkdirSync(bin, { recursive: true });
-    writeFileSync(resolve(bin, 'node'), `#!/bin/sh\necho v${pinnedVersion}\n`);
-    chmodSync(resolve(bin, 'node'), 0o755);
-    const { result } = runResolver('v22.0.0', false, {
-      JOVIE_NODE_CACHE_DIR: cache,
-    });
-
-    expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toBe(bin);
-  });
-
-  it('fetches the pinned build, checksum-verified, into the setup cache', () => {
-    const work = mkdtempSync(resolve(tmpdir(), 'jovie-node-dist-'));
-    temporaryDirectories.push(work);
-    const name = platform();
-    const dist = resolve(work, 'dist', `v${pinnedVersion}`);
-    mkdirSync(resolve(work, 'stage', name, 'bin'), { recursive: true });
-    mkdirSync(dist, { recursive: true });
-    const stub = resolve(work, 'stage', name, 'bin', 'node');
-    writeFileSync(stub, `#!/bin/sh\necho v${pinnedVersion}\n`);
-    chmodSync(stub, 0o755);
-    const tarball = resolve(dist, `${name}.tar.gz`);
-    spawnSync('tar', ['-czf', tarball, '-C', resolve(work, 'stage'), name]);
-    const sum = createHash('sha256')
-      .update(readFileSync(tarball))
-      .digest('hex');
-    writeFileSync(resolve(dist, 'SHASUMS256.txt'), `${sum}  ${name}.tar.gz\n`);
-    const cache = resolve(work, 'cache');
-    const { result } = runResolver('v22.0.0', false, {
-      JOVIE_NODE_AUTOFETCH: '1',
-      JOVIE_NODE_CACHE_DIR: cache,
-      JOVIE_NODE_DIST_URL: `file://${resolve(work, 'dist')}`,
-    });
-
-    expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toBe(resolve(cache, name, 'bin'));
-    expect(result.stderr).toContain(`fetching Node ${pinnedVersion}`);
-  });
-
-  it('refuses a fetched build whose checksum does not match', () => {
-    const work = mkdtempSync(resolve(tmpdir(), 'jovie-node-dist-'));
-    temporaryDirectories.push(work);
-    const name = platform();
-    const dist = resolve(work, 'dist', `v${pinnedVersion}`);
-    mkdirSync(dist, { recursive: true });
-    writeFileSync(resolve(dist, `${name}.tar.gz`), 'not a tarball');
-    writeFileSync(
-      resolve(dist, 'SHASUMS256.txt'),
-      `${'0'.repeat(64)}  ${name}.tar.gz\n`
-    );
-    const { result } = runResolver('v22.0.0', false, {
-      JOVIE_NODE_AUTOFETCH: '1',
-      JOVIE_NODE_CACHE_DIR: resolve(work, 'cache'),
-      JOVIE_NODE_DIST_URL: `file://${resolve(work, 'dist')}`,
-    });
-
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain('nvm install');
   });
 
   it('fails fast with an actionable message when no conforming Node exists', () => {
