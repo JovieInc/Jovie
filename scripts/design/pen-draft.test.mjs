@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { test } from 'node:test';
 import {
   ATTEMPTS,
@@ -15,10 +15,15 @@ import {
   parseBrief,
   penArgs,
   planFrames,
+  spliceDraft,
+  trimCanonical,
+  useTrimmedInput,
   writeCanonical,
 } from './pen-draft.mjs';
 
 test('every checked-in brief parses and names a unique frame', () => {
+  for (const b of loadBriefs())
+    assert.ok(b.context.length, `${b.file} names the screens it builds on`);
   const briefs = loadBriefs();
   assert.deepEqual(
     briefs.map(b => b.frame),
@@ -91,10 +96,89 @@ test('the agent is told the editor loads slowly and may retry timed-out calls', 
 });
 
 test('attempts leave upload time in each 25-minute frame job', () => {
-  assert.equal(attemptTimeout(0), 15 * 60_000);
+  assert.equal(attemptTimeout(0), 14 * 60_000);
   assert.equal(attemptTimeout(10 * 60_000), 10 * 60_000);
   assert.equal(attemptTimeout(15 * 60_000), 5 * 60_000);
   assert.equal(attemptTimeout(15 * 60_000 + 1), 0);
+  const first = attemptTimeout(2000);
+  assert.ok(attemptTimeout(2000 + first + 10, undefined, 2) >= 5 * 60_000);
+  assert.equal(attemptTimeout(0, undefined, 2), 15 * 60_000);
+  assert.equal(attemptTimeout(0, 4 * 60_000), 0);
+});
+
+test('the CLI retries a timed-out draft after setup and process cleanup, including opt-in trimming', () => {
+  const work = mkdtempSync(join(tmpdir(), 'pen-retry-'));
+  const preload = join(work, 'timeout.mjs');
+  // Exercise the real CLI and receipt writer. Only the provider boundary and
+  // clock are replaced: no paid Pen calls or fifteen-minute sleeps in CI.
+  writeFileSync(
+    preload,
+    `
+    import cp from 'node:child_process';
+    import fs from 'node:fs';
+    import { syncBuiltinESMExports } from 'node:module';
+    let now = 0, calls = 0;
+    Date.now = () => now;
+    const fetch = globalThis.fetch;
+    globalThis.fetch = async (...args) => {
+      const response = await fetch(...args);
+      now += 2000;
+      return response;
+    };
+    cp.execFileSync = (command, args, options) => {
+      if (command !== 'npx') throw new Error('unexpected command');
+      calls++;
+      if (calls === 1) {
+        now += options.timeout + 10;
+        throw new Error('spawnSync npx ETIMEDOUT');
+      }
+      const arg = flag => args[args.indexOf(flag) + 1];
+      const doc = JSON.parse(fs.readFileSync(arg('--in'), 'utf8'));
+      doc.children.push({type: 'frame', id: 'draft', name: 'claim'});
+      fs.writeFileSync(arg('--out'), JSON.stringify(doc));
+      fs.writeFileSync(arg('--export'), 'fixture preview');
+    };
+    syncBuiltinESMExports();
+  `
+  );
+  const canonical = {
+    children: [
+      { type: 'frame', id: 'old', name: 'unrelated', x: 100, width: 100 },
+    ],
+  };
+  for (const trim of ['0', '1']) {
+    const out = join(work, trim);
+    execFileSync(
+      process.execPath,
+      [
+        '--import',
+        preload,
+        resolve('scripts/design/pen-draft.mjs'),
+        '--out',
+        out,
+        '--only',
+        'claim',
+      ],
+      {
+        env: {
+          ...process.env,
+          PEN_CLI_KEY: 'fixture',
+          PEN_DRAFT_TRIM: trim,
+          PEN_GOLDEN_PATH_FILE_URL: `data:application/json,${encodeURIComponent(JSON.stringify(canonical))}`,
+        },
+      }
+    );
+    const { drafts } = JSON.parse(
+      readFileSync(join(out, 'receipt.json'), 'utf8')
+    );
+    assert.equal(drafts[0].status, 'drafted');
+    assert.equal(drafts[0].attempts, 2);
+    assert.equal(drafts[0].error, undefined);
+    const doc = JSON.parse(readFileSync(join(out, 'claim.pen'), 'utf8'));
+    assert.deepEqual(doc.children[0], canonical.children[0]);
+    assert.equal(doc.children[1].name, 'claim');
+    if (trim === '1') assert.equal(doc.children[1].x, 600);
+  }
 });
 
 test('missing secrets are named, so a blocked run never reads as done', () => {
@@ -192,4 +276,103 @@ test('a drafter change, a manual run or --only picks the right frames', () => {
   assert.deepEqual(planFrames({ briefs }), ['claim', 'homepage']);
   assert.deepEqual(planFrames({ briefs, only: ['homepage'] }), ['homepage']);
   assert.throws(() => planFrames({ briefs, only: ['hompage'] }), /hompage/);
+});
+
+const frame = (id, name, extra = {}) => ({
+  type: 'frame',
+  id,
+  name,
+  x: 0,
+  width: 100,
+  children: [],
+  ...extra,
+});
+
+test('a draft starts from components, related screens and what they use, not the whole file', () => {
+  const doc = {
+    version: '2',
+    variables: { '--bg': { type: 'color', value: '#000' } },
+    themes: { mode: ['dark'] },
+    children: [
+      frame('LIB', 'Components', {
+        children: [{ type: 'frame', id: 'Btn', reusable: true, children: [] }],
+      }),
+      frame('PRO', 'Public profile, desktop', {
+        children: [{ type: 'ref', id: 'r1', ref: 'Shell' }],
+      }),
+      frame('SHL', 'Layouts', {
+        children: [{ type: 'frame', id: 'Shell', children: [] }],
+      }),
+      frame('BIL', 'Billing settings'),
+      frame('OLD', 'Archive 2025'),
+    ],
+  };
+  const bare = trimCanonical(doc, { frame: 'claim', route: '/[username]' });
+  assert.deepEqual(
+    bare.children.map(c => c.id),
+    ['LIB'],
+    'components, and no screen the brief does not name'
+  );
+  const claim = trimCanonical(doc, {
+    frame: 'claim',
+    context: ['profile', 'sign in'],
+  });
+  assert.deepEqual(
+    claim.children.map(c => c.id),
+    ['LIB', 'PRO', 'SHL'],
+    'the screens a brief builds on come with the frames they use'
+  );
+  assert.deepEqual(
+    trimCanonical(
+      { children: [frame('D', 'Design tokens')] },
+      {
+        frame: 'x',
+        context: ['sign in', 'sign'],
+      }
+    ).children,
+    [],
+    'terms match whole words only'
+  );
+  const profile = trimCanonical(doc, { frame: 'profile-analytics-card' });
+  assert.deepEqual(
+    profile.children.map(c => c.id),
+    ['LIB', 'PRO', 'SHL'],
+    'a word of the frame name counts too'
+  );
+  assert.deepEqual(profile.variables, doc.variables);
+  assert.deepEqual(profile.themes, doc.themes);
+  assert.equal(doc.children.length, 5, 'the canonical document is not changed');
+});
+
+test('a drafted frame lands in the whole file, clear of every existing frame', () => {
+  const full = {
+    variables: { a: 1 },
+    children: [frame('A', 'A'), frame('B', 'B', { x: 500, width: 300 })],
+  };
+  const trimmed = { variables: { a: 1 }, children: [frame('A', 'A')] };
+  const drafted = {
+    variables: { a: 2, b: 3 },
+    children: [frame('A', 'A'), frame('N', 'claim', { x: 200, width: 1440 })],
+  };
+  const out = spliceDraft(full, trimmed, drafted);
+  assert.deepEqual(
+    out.children.map(c => c.id),
+    ['A', 'B', 'N']
+  );
+  assert.equal(out.children[2].x, 1200, 'placed 400 right of the last frame');
+  assert.deepEqual(out.children.slice(0, 2), full.children);
+  assert.deepEqual(out.variables, { a: 1, b: 3 }, 'existing values win');
+});
+
+test('the whole canonical file is the input unless the cut-down copy is asked for', () => {
+  assert.equal(useTrimmedInput({}), false);
+  assert.equal(useTrimmedInput({ PEN_DRAFT_TRIM: '0' }), false);
+  assert.equal(useTrimmedInput({ PEN_DRAFT_TRIM: '1' }), true);
+  const brief = { frame: 'claim', route: '/x', prompt: 'P' };
+  const prompt = opts => {
+    const args = penArgs(brief, { input: 'c.pen', outDir: 'o', ...opts });
+    return args[args.indexOf('--prompt') + 1];
+  };
+  assert.doesNotMatch(prompt({}), /not every screen/);
+  assert.match(prompt({ trim: true }), /not every screen/);
 });

@@ -1,1 +1,688 @@
-{ "schema": "jovie.component-benchmarks/v1", "components": {} }
+{
+  "schema": "jovie.component-benchmarks/v1",
+  "judge": "claude-opus-5-5",
+  "date": "2026-11-08",
+  "referenceSet": "WAI-ARIA APG pattern plus the Radix/shadcn equivalent each component wraps, and benchmark-library.json v1 patterns where one names the primitive. See COMPONENT_CERTIFICATE.md.",
+  "components": {
+    "packages/ui/atoms/alert-dialog.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "40e803e8c2ddc63f85bc22c17634c9a015831e9bdc0e9befb94bfdb74a4d215a",
+      "reference": "WAI-ARIA APG Alert Dialog; Radix AlertDialog; shadcn/ui AlertDialog; library form-in-drawer",
+      "checked": "focus trap and return, Escape, title/description wiring, no outside dismiss, forwardRef, RTL header",
+      "gaps": [
+        {
+          "item": "RTL: shared header reserved a physical pr-10 gutter and text-left (lib/overlay-styles)",
+          "decision": "adopt",
+          "status": "done",
+          "reference": "APG Alert Dialog"
+        },
+        {
+          "item": "dirty-close guard (form-in-drawer)",
+          "decision": "skip",
+          "reason": "Radix AlertDialog never dismisses on outside press; only Cancel/Action close it",
+          "reference": "library form-in-drawer"
+        }
+      ]
+    },
+    "packages/ui/atoms/avatar.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "599e090cab61f8dfe73648a2863f6ec03cecd00cdd8e4e91d007959f9e21d3a5",
+      "reference": "Radix Avatar; shadcn/ui Avatar; WAI-ARIA img role (no APG widget pattern)",
+      "checked": "img alt, fallback initials, status dot name, intrinsic size, forwardRef, RTL dot",
+      "gaps": [
+        {
+          "item": "Composed Avatar + AvatarImage shows a broken image instead of AvatarFallback on load error; Radix Avatar renders the fallback until the image loads",
+          "decision": "adopt",
+          "status": "open",
+          "reference": "Radix Avatar"
+        },
+        {
+          "item": "RTL: status dot uses physical -right offsets and does not move to the inline end",
+          "decision": "adapt",
+          "status": "open",
+          "reference": "Radix Avatar"
+        }
+      ]
+    },
+    "packages/ui/atoms/badge.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "9bb70aca71858d8bb1cf7bc81fbf2fff38b3c6a8a6de2271641cb201a7bd921a",
+      "reference": "shadcn/ui Badge (static text; no APG widget pattern)",
+      "checked": "static span, variants, forwardRef, no interactive role",
+      "gaps": [
+        {
+          "item": "asChild polymorphism (shadcn Badge)",
+          "decision": "skip",
+          "reason": "Badge is non-interactive here; interactive chips compose Link or Button",
+          "reference": "shadcn/ui Badge"
+        }
+      ]
+    },
+    "packages/ui/atoms/button.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "0998119e1adcfaef3b634d899872a30d581bb620a048d19227243812a53f66fc",
+      "reference": "WAI-ARIA APG Button; Radix Slot (asChild); shadcn/ui Button; library checkout-success",
+      "checked": "native button type, asChild Slot, aria-disabled/aria-busy, loading focus, 44px target, forwardRef",
+      "gaps": [
+        {
+          "item": "Default loading path sets native disabled, so a focused button loses focus and leaves the tab order mid-action; reference keeps it focusable with aria-disabled + aria-busy (only the opt-in morph path does)",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "library checkout-success"
+        }
+      ]
+    },
+    "packages/ui/atoms/card.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "3b9e96ff809a39685518c01c88da54a39d3077303f767addab66df36d4d7c917",
+      "reference": "shadcn/ui Card (structural container; no APG widget pattern)",
+      "checked": "asChild on every part, aria-busy for partial, focus ring on hoverable, forwardRef",
+      "gaps": [
+        {
+          "item": "hoverable variant is not operable by itself",
+          "decision": "skip",
+          "reason": "interaction comes from asChild onto Link or Button, as with shadcn; Card adds no role",
+          "reference": "shadcn/ui Card"
+        },
+        {
+          "item": "CardTitle fixed to h3",
+          "decision": "skip",
+          "reason": "asChild lets callers pick the heading level",
+          "reference": "shadcn/ui Card"
+        }
+      ]
+    },
+    "packages/ui/atoms/checkbox.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "4db202e06e4100685011ca1e538e90e3dfb40140a4d48bf195655f59f63ed57f",
+      "reference": "WAI-ARIA APG Checkbox (tri-state); Radix Checkbox; shadcn/ui Checkbox",
+      "checked": "Space toggles, tri-state aria-checked, controlled and uncontrolled, 44px target, forwardRef",
+      "gaps": [
+        {
+          "item": "Uncontrolled defaultChecked=\"indeterminate\" renders the check icon: the icon follows the checked prop, not Radix state",
+          "decision": "adopt",
+          "status": "open",
+          "reference": "Radix Checkbox"
+        }
+      ]
+    },
+    "packages/ui/atoms/close-button.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "fe0ff01d562ba7f1096f7f80618928202c05c23876d86fd55d2156978ef724b1",
+      "reference": "WAI-ARIA APG Dialog (close control); Radix Dialog.Close; shadcn/ui Dialog close",
+      "checked": "accessible name, 44px target, focus ring, RTL inset",
+      "gaps": [
+        {
+          "item": "RTL: close control used physical right-4; now logical end-4",
+          "decision": "adopt",
+          "status": "done",
+          "reference": "APG Dialog"
+        },
+        {
+          "item": "sr-only label is fixed English \"Close\"",
+          "decision": "skip",
+          "reason": "the product ships English copy; aria-label on the Close primitive overrides it",
+          "reference": "shadcn/ui Dialog"
+        }
+      ]
+    },
+    "packages/ui/atoms/common-dropdown.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "1257848a79fdde8cb864238a71188780177d172ad260116193d6ec17378a13ff",
+      "reference": "WAI-ARIA APG Menu Button and Menu; APG Combobox for in-menu search; Radix DropdownMenu and ContextMenu",
+      "checked": "menu roles, roving focus, typeahead, search keys, submenus, dir, RTL, loading/empty",
+      "gaps": [
+        {
+          "item": "No dir prop: submenu arrow keys stayed LTR in RTL documents; now passed to both Radix roots",
+          "decision": "adopt",
+          "status": "done",
+          "reference": "Radix DropdownMenu"
+        },
+        {
+          "item": "aria-required-children: the search header (textbox + clear button) and the loading/empty role=status nodes render as direct children of role=menu, so a loading or empty menu owns no menuitem (renderer)",
+          "decision": "adopt",
+          "status": "open",
+          "reference": "APG Menu"
+        },
+        {
+          "item": "RTL: menu rows, inset labels, item indicators and the submenu chevron use physical pl-/pr-/left-/ml-auto (here and in lib/dropdown-styles MENU_ITEM_BASE); the chevron does not mirror (common-dropdown-renderer, item renderers)",
+          "decision": "adopt",
+          "status": "open",
+          "reference": "APG Menu"
+        },
+        {
+          "item": "context variant cannot be opened programmatically",
+          "decision": "skip",
+          "reason": "Radix ContextMenu exposes no open prop; it opens from the pointer or keyboard context action",
+          "reference": "Radix ContextMenu"
+        }
+      ]
+    },
+    "packages/ui/atoms/composite-field.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "43c22ffd0691fb51930e7cca7f62c3955dd5398635c3f3eb9ded10875d7353e8",
+      "reference": "shadcn/ui InputGroup (field container; no APG widget pattern)",
+      "checked": "focus ring on :has(:focus-visible), forwardRef, RTL padding",
+      "gaps": [
+        {
+          "item": "RTL: md size pads with physical pr-2 pl-4, so the prefix/submit gutters do not mirror",
+          "decision": "adopt",
+          "status": "done",
+          "reference": "shadcn/ui InputGroup"
+        }
+      ]
+    },
+    "packages/ui/atoms/context-menu.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "5e0f2c2ff604a9fe0af83107752fe8a2a10784a7639b3e534562513e9951aa06",
+      "reference": "WAI-ARIA APG Menu; Radix ContextMenu; shadcn/ui ContextMenu",
+      "checked": "Radix roles and keys, dir passthrough, RTL indicators and chevron",
+      "gaps": [
+        {
+          "item": "RTL: menu rows, inset labels, item indicators and the submenu chevron use physical pl-/pr-/left-/ml-auto (here and in lib/dropdown-styles MENU_ITEM_BASE); the chevron does not mirror",
+          "decision": "adopt",
+          "status": "open",
+          "reference": "shadcn/ui ContextMenu"
+        }
+      ]
+    },
+    "packages/ui/atoms/dialog.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "c721228bd7b220b72976d5496428277044f8c75a2e8224ca4ba9e1946e7c9970",
+      "reference": "WAI-ARIA APG Dialog (Modal); Radix Dialog; shadcn/ui Dialog; library form-in-drawer",
+      "checked": "focus trap and return, Escape, outside dismiss, title/description wiring, forwardRef, RTL close",
+      "gaps": [
+        {
+          "item": "RTL: close button (right-4) and header gutter (pr-10, text-left) were physical; now end-4, pe-10, text-start",
+          "decision": "adopt",
+          "status": "done",
+          "reference": "APG Dialog"
+        },
+        {
+          "item": "dirty-close guard (form-in-drawer)",
+          "decision": "skip",
+          "reason": "the primitive exposes onEscapeKeyDown/onInteractOutside; the guard belongs to the form owner",
+          "reference": "library form-in-drawer"
+        }
+      ]
+    },
+    "packages/ui/atoms/dropdown-menu.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "8d740b212d5d5d1b88584518c68879be6dd2d0f0f5d64114e413aa72fa5c4738",
+      "reference": "WAI-ARIA APG Menu Button and Menu; Radix DropdownMenu; shadcn/ui DropdownMenu",
+      "checked": "Radix roles and keys, dir passthrough, RTL indicators and chevron",
+      "gaps": [
+        {
+          "item": "RTL: menu rows, inset labels, item indicators and the submenu chevron use physical pl-/pr-/left-/ml-auto (here and in lib/dropdown-styles MENU_ITEM_BASE); the chevron does not mirror",
+          "decision": "adopt",
+          "status": "open",
+          "reference": "shadcn/ui DropdownMenu"
+        }
+      ]
+    },
+    "packages/ui/atoms/field.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "57def08f429d300f43e65009647a86f640ae745ce8a955213b7aa440b5798263",
+      "reference": "WAI-ARIA forms (label, aria-describedby, aria-invalid); shadcn/ui Field; library error-recovery",
+      "checked": "label htmlFor, aria-describedby merge, aria-invalid, aria-required, role=alert error, reserved feedback row",
+      "gaps": [
+        {
+          "item": "focus moves to the first invalid field on submit (error-recovery)",
+          "decision": "skip",
+          "reason": "a single Field cannot see the form; the form owner (Form / react-hook-form) moves focus",
+          "reference": "library error-recovery"
+        }
+      ]
+    },
+    "packages/ui/atoms/form.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "c897149c990dc057f42712bb607faff1622e9f52a1431a69b0f0acdc3232e391",
+      "reference": "shadcn/ui Form (react-hook-form); WAI-ARIA forms; library error-recovery",
+      "checked": "FormControl id/aria-describedby/aria-invalid, role=alert message, forwardRef",
+      "gaps": [
+        {
+          "item": "FormControl always lists the FormDescription id in aria-describedby, even when none renders",
+          "decision": "skip",
+          "reason": "same as shadcn Form; AT ignores a missing idref and the id stays stable for a late description",
+          "reference": "shadcn/ui Form"
+        },
+        {
+          "item": "focus first invalid field on submit",
+          "decision": "skip",
+          "reason": "react-hook-form shouldFocusError (default true) does this",
+          "reference": "library error-recovery"
+        }
+      ]
+    },
+    "packages/ui/atoms/icon-button.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "7f91c924aff09e580bb30798448b29a15940d77e0bbd2f0d9df5f592ada07aec",
+      "reference": "WAI-ARIA APG Button (icon-only needs an accessible name); shadcn/ui Button size icon",
+      "checked": "accessible name, 44px target, destructive state, forwardRef",
+      "gaps": [
+        {
+          "item": "Accessible name is optional in the types and unchecked at runtime, so an icon-only button can render nameless",
+          "decision": "adopt",
+          "status": "open",
+          "reference": "APG Button"
+        }
+      ]
+    },
+    "packages/ui/atoms/inline-offline.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "12e8ddf0765f448feda2ef8202ca1162bc429464d35a8cf4eaf6038c2112f499",
+      "reference": "library offline-degraded; WAI-ARIA status live region",
+      "checked": "role=status polite atomic, retry button, logical text-start",
+      "gaps": [
+        {
+          "item": "writes queued or clearly blocked (offline-degraded)",
+          "decision": "skip",
+          "reason": "the notice reports state; queuing belongs to the data owner",
+          "reference": "library offline-degraded"
+        }
+      ]
+    },
+    "packages/ui/atoms/inline-subscribe.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "59d9007dd679b3fe0a3e2fd1d5f63390778cead87339f9997ed3379d91177b8d",
+      "reference": "WAI-ARIA forms; library error-recovery and form-in-drawer (input retention)",
+      "checked": "aria-label, aria-invalid, aria-describedby, autocomplete email, pending focus",
+      "gaps": [
+        {
+          "item": "pending sets native disabled on the email input, which drops focus and hides the value from AT mid-submit; reference keeps it focusable (readOnly + aria-busy)",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "library error-recovery"
+        }
+      ]
+    },
+    "packages/ui/atoms/input.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "0e8ea660176287b54377e7d16a12a7efe006e21da7fae8b45f87e27d4b611965",
+      "reference": "WAI-ARIA forms (label, aria-describedby, aria-invalid); shadcn/ui Input; library error-recovery",
+      "checked": "label htmlFor, aria-describedby, aria-invalid, aria-busy, loading focus, RTL trailing slot, live regions",
+      "gaps": [
+        {
+          "item": "loading sets native disabled: focus and the submitted value are lost while validating",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "library error-recovery",
+          "resolution": "loading keeps focus and value: readOnly + aria-busy, never native disabled"
+        },
+        {
+          "item": "RTL: trailing slot uses physical pr-*/right-* and the required asterisk ml-1",
+          "decision": "adopt",
+          "status": "done",
+          "reference": "shadcn/ui Input"
+        },
+        {
+          "item": "error role=alert sits inside an aria-live=polite wrapper, so the error can be announced twice",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "WAI-ARIA live regions"
+        }
+      ]
+    },
+    "packages/ui/atoms/input-group.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "1a3fb39f782ed3aaadb2af1a1bbc538e309fc4dad66ed82e4cce0944e3159c31",
+      "reference": "shadcn/ui InputGroup (no APG widget pattern)",
+      "checked": "icon slots decorative, RTL icon and padding sides",
+      "gaps": [
+        {
+          "item": "RTL: icon slots use physical left-/right- and the input pl-/pr- padding, so icons stay on the LTR sides",
+          "decision": "adopt",
+          "status": "open",
+          "reference": "shadcn/ui InputGroup"
+        }
+      ]
+    },
+    "packages/ui/atoms/kbd.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "bbbb6936333a7687dfed078070f77806e1682ab1880a4abfd386198ceede644f",
+      "reference": "shadcn/ui Kbd; HTML kbd semantics (no APG widget pattern)",
+      "checked": "kbd element, Shift spoken name, other modifier glyph names, forwardRef",
+      "gaps": [
+        {
+          "item": "Only Shift gets a spoken name; Command, Option and Control glyphs are read as raw symbols or skipped",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "shadcn/ui Kbd",
+          "resolution": "glyph keycaps keep the visible glyphs aria-hidden and add sr-only names (Command, Option, Control, Shift)"
+        }
+      ]
+    },
+    "packages/ui/atoms/label.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "e4ca3d36e8f71990f8a617e7a89f328c678d3672fcf86c93c0f07ba6c9c4767a",
+      "reference": "Radix Label; shadcn/ui Label",
+      "checked": "Radix Label htmlFor, required spoken text, disabled state, forwardRef, RTL asterisk",
+      "gaps": [
+        {
+          "item": "RTL: required asterisk uses physical ml-1",
+          "decision": "adopt",
+          "status": "done",
+          "reference": "shadcn/ui Label"
+        }
+      ]
+    },
+    "packages/ui/atoms/link.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "1c2fc40c2af23f21c48d9c705e38ee900c7a273eb2d41e0a34baf1f26fc8ae53",
+      "reference": "WAI-ARIA APG Link; Radix Slot (asChild); shadcn/ui Button link variant",
+      "checked": "anchor semantics, asChild Slot, aria-disabled blocks activation, aria-current via active, 44px target, forwardRef",
+      "gaps": [
+        {
+          "item": "disabled links stay in the tab order",
+          "decision": "skip",
+          "reason": "aria-disabled with activation blocked is the APG-accepted form for a disabled link",
+          "reference": "APG Link"
+        }
+      ]
+    },
+    "packages/ui/atoms/native-select.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "d3132e002753027f548552dbf775717c46fd73518e74dd083915465525e3586e",
+      "reference": "HTML select; shadcn/ui NativeSelect",
+      "checked": "native select, label htmlFor, aria-describedby/invalid, RTL asterisk, live regions, forwardRef",
+      "gaps": [
+        {
+          "item": "RTL: required asterisk uses physical ml-1",
+          "decision": "adopt",
+          "status": "open",
+          "reference": "shadcn/ui NativeSelect"
+        },
+        {
+          "item": "error role=alert sits inside an aria-live=polite wrapper, so the error can be announced twice",
+          "decision": "adapt",
+          "status": "open",
+          "reference": "WAI-ARIA live regions"
+        }
+      ]
+    },
+    "packages/ui/atoms/overflow-menu-trigger.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "f4c3429e0b4a5a84022dac768cd24ded177cab14d6554e101a607861c16aabaa",
+      "reference": "WAI-ARIA APG Menu Button (trigger); shadcn/ui DropdownMenuTrigger + Button",
+      "checked": "accessible name, aria-haspopup/expanded from the Radix trigger, RTL dot",
+      "gaps": [
+        {
+          "item": "RTL: active-overflow dot uses physical -right-0.5",
+          "decision": "adapt",
+          "status": "open",
+          "reference": "APG Menu Button"
+        }
+      ]
+    },
+    "packages/ui/atoms/popover.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "d174b941bedd001711643a0bf4782ba45ff3678bdf954f51a647dbde7c661675",
+      "reference": "WAI-ARIA APG Dialog (non-modal); Radix Popover; shadcn/ui Popover",
+      "checked": "Radix focus and Escape, controlled and uncontrolled, closes when anchors unmount, collision padding",
+      "gaps": []
+    },
+    "packages/ui/atoms/progress.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "ee9d68133ea05ddf468c2cc26c367619f81db33ebb8d066251eda190d7ae543f",
+      "reference": "WAI-ARIA progressbar role; Radix Progress; library progress-steps",
+      "checked": "progressbar valuemin/max/now/valuetext, indeterminate omits valuenow, RTL fill and sweep",
+      "gaps": [
+        {
+          "item": "RTL: the indeterminate sweep keyframes always travel left to right",
+          "decision": "adapt",
+          "status": "open",
+          "reference": "Radix Progress"
+        },
+        {
+          "item": "no forwardRef or HTML attribute pass-through",
+          "decision": "skip",
+          "reason": "closed props by design; label and value cover every caller",
+          "reference": "Radix Progress"
+        }
+      ]
+    },
+    "packages/ui/atoms/radio-group.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "acb739f3f697fbc9c7f993ba4996f9afd1cb21bd53c55f942b2414f922d608a3",
+      "reference": "WAI-ARIA APG Radio Group; Radix RadioGroup; shadcn/ui RadioGroup",
+      "checked": "arrow keys and roving focus, dir passthrough, controlled and uncontrolled, 44px target, forwardRef",
+      "gaps": []
+    },
+    "packages/ui/atoms/searchable-submenu.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "bc3b9d298ae39871e653d518c59ce4215abc92feb9dd6c62784ef7409516ee15",
+      "reference": "WAI-ARIA APG Combobox (listbox popup) inside APG Menu; Radix DropdownMenu.Sub",
+      "checked": "combobox ARIA, activedescendant target, live regions, submenu keys, RTL search chrome",
+      "gaps": [
+        {
+          "item": "RTL: search icon (left-2.5), clear button (right-1.5), input padding (pl-7 pr-7) and the submenu chevron were physical; now logical, chevron mirrors",
+          "decision": "adopt",
+          "status": "done",
+          "reference": "APG Combobox"
+        },
+        {
+          "item": "combobox aria-controls/aria-activedescendant point into a visually hidden native select while the visible rows are aria-hidden; APG Combobox uses role=listbox with role=option rows",
+          "decision": "adopt",
+          "status": "open",
+          "reference": "APG Combobox"
+        },
+        {
+          "item": "two polite status regions announce loading at once (sr-only summary and the loading row)",
+          "decision": "adapt",
+          "status": "open",
+          "reference": "WAI-ARIA live regions"
+        },
+        {
+          "item": "trigger row uses the physical MENU_ITEM_BASE padding (lib/dropdown-styles)",
+          "decision": "adopt",
+          "status": "open",
+          "reference": "APG Menu"
+        }
+      ]
+    },
+    "packages/ui/atoms/segment-control.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "a697b4edc6981ea591718333ac770d3484507d55add801df06609a1f1b05ae28",
+      "reference": "WAI-ARIA APG Tabs (automatic activation); Radix Tabs; shadcn/ui Tabs",
+      "checked": "tablist naming, arrow/Home/End keys, dir, disabled tabs, panel relationship",
+      "gaps": [
+        {
+          "item": "dir was not honored: arrow keys ran LTR in RTL; now a dir prop reaches Radix Tabs",
+          "decision": "adopt",
+          "status": "done",
+          "reference": "Radix Tabs"
+        },
+        {
+          "item": "standalone use exposes tabs whose aria-controls target empty, aria-hidden panels; for a pure choice APG Radio Group (or toggle-group) semantics fit",
+          "decision": "adapt",
+          "status": "open",
+          "reference": "APG Tabs"
+        },
+        {
+          "item": "controlled only (no defaultValue)",
+          "decision": "skip",
+          "reason": "deliberate: callers own the view state",
+          "reference": "Radix Tabs"
+        }
+      ]
+    },
+    "packages/ui/atoms/select.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "c7077254414fc7b1ae20c17ae87de4be4339e675604d35f38248ce3647b45984",
+      "reference": "WAI-ARIA APG Combobox (select-only) and Listbox; Radix Select; shadcn/ui Select",
+      "checked": "Radix Select keys and typeahead, dir passthrough, RTL indicator and padding",
+      "gaps": [
+        {
+          "item": "RTL: item indicator is absolute left-2 and SELECT_ITEM_BASE pads pl-8 pr-2",
+          "decision": "adopt",
+          "status": "open",
+          "reference": "shadcn/ui Select"
+        }
+      ]
+    },
+    "packages/ui/atoms/separator.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "51590e7fe0d450b647f1bedadd962e15bfd4aa0a1cf8e92251e5fe22340669c7",
+      "reference": "Radix Separator; shadcn/ui Separator; WAI-ARIA separator role",
+      "checked": "decorative by default, orientation, forwardRef",
+      "gaps": []
+    },
+    "packages/ui/atoms/sheet.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "8cd2180732bc8403ea4386a69ce353d1d75e1277f4e952809a6d7baac52b1373",
+      "reference": "WAI-ARIA APG Dialog (Modal); Radix Dialog; shadcn/ui Sheet; library form-in-drawer",
+      "checked": "focus trap and return, Escape, title/description wiring, side variants, RTL close",
+      "gaps": [
+        {
+          "item": "RTL: close button and header gutter were physical; now logical",
+          "decision": "adopt",
+          "status": "done",
+          "reference": "APG Dialog"
+        },
+        {
+          "item": "side variants are physical only; the default right side does not resolve to the inline end in RTL",
+          "decision": "adapt",
+          "status": "open",
+          "reference": "shadcn/ui Sheet"
+        }
+      ]
+    },
+    "packages/ui/atoms/simple-tooltip.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "a818862f0159f8d671d294ede86fc38e678118cac60231fdf9826618a2e12ea1",
+      "reference": "WAI-ARIA APG Tooltip; Radix Tooltip",
+      "checked": "focusable trigger, Radix hover/focus open, Escape, aria-describedby",
+      "gaps": []
+    },
+    "packages/ui/atoms/skeleton.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "18a749cacd7217bf687338cfa9c90459bc20d5af4697421a8df6df8f65cdaaa6",
+      "reference": "library loading-skeleton; shadcn/ui Skeleton",
+      "checked": "aria-hidden blocks, single status owner, reserved geometry, reduced motion",
+      "gaps": []
+    },
+    "packages/ui/atoms/spinner.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "4ff147de90efaa33bd5bf1be05e0aead0b114794b8b6e379b4b65bdacb1b35ae",
+      "reference": "WAI-ARIA status role; shadcn/ui Spinner",
+      "checked": "role=status with label, reduced motion",
+      "gaps": [
+        {
+          "item": "mounts its own polite status region",
+          "decision": "skip",
+          "reason": "role=status is the reference loading semantics; the LiveAnnouncer rule covers success and error messages",
+          "reference": "shadcn/ui Spinner"
+        },
+        {
+          "item": "no forwardRef or HTML attribute pass-through",
+          "decision": "skip",
+          "reason": "closed leaf indicator; no caller needs a ref",
+          "reference": "shadcn/ui Spinner"
+        }
+      ]
+    },
+    "packages/ui/atoms/stackable-badge-group.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "3bfb7698c17b0da3b58a66f400c92df4a4feefadcaef972aaeed8ee135e530dc",
+      "reference": "WAI-ARIA APG Disclosure (overflow) via Radix Popover; WAI-ARIA group role",
+      "checked": "group name, overflow disclosure button name, logical overlap, popover list",
+      "gaps": [
+        {
+          "item": "fieldset used for a non-form group",
+          "decision": "skip",
+          "reason": "fieldset maps to role=group and is named by aria-label",
+          "reference": "WAI-ARIA group role"
+        }
+      ]
+    },
+    "packages/ui/atoms/status-glyph.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "9486ecab1287345b4390e29e32e566bc836206cfec393b8d0e32e9f1f7e03627",
+      "reference": "WAI-ARIA APG Tooltip; WAI-ARIA img role",
+      "checked": "img name, tooltip reachability, reduced motion",
+      "gaps": [
+        {
+          "item": "tooltip trigger is a non-focusable span, so keyboard users cannot open the label tooltip",
+          "decision": "adapt",
+          "status": "open",
+          "reference": "APG Tooltip"
+        }
+      ]
+    },
+    "packages/ui/atoms/switch.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "60dcec00d6726107492739c33de45454c7036345a412c519dbe19d5370dc4e08",
+      "reference": "WAI-ARIA APG Switch; Radix Switch; shadcn/ui Switch",
+      "checked": "role=switch via Radix, Space/Enter, controlled and uncontrolled, RTL thumb, forwardRef",
+      "gaps": []
+    },
+    "packages/ui/atoms/textarea.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "a7867fc959aee5281d2fb3bb749f2b9a2a1b4cce72708d0763ad398f2defeaab",
+      "reference": "WAI-ARIA forms; shadcn/ui Textarea; library error-recovery",
+      "checked": "label htmlFor, aria-describedby, aria-invalid, aria-busy, RTL asterisk, live regions, forwardRef",
+      "gaps": [
+        {
+          "item": "RTL: required asterisk uses physical ml-1",
+          "decision": "adopt",
+          "status": "done",
+          "reference": "shadcn/ui Textarea"
+        },
+        {
+          "item": "error role=alert sits inside an aria-live=polite wrapper, so the error can be announced twice",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "WAI-ARIA live regions"
+        }
+      ]
+    },
+    "packages/ui/atoms/tooltip.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "6320ebfaa71e85e6e14daacc5067c11e2c19a8ba927796ac069ab964247cea70",
+      "reference": "WAI-ARIA APG Tooltip; Radix Tooltip; shadcn/ui Tooltip",
+      "checked": "Radix hover/focus open, Escape, provider delays, collision padding, reduced motion",
+      "gaps": []
+    },
+    "packages/ui/atoms/tooltip-shortcut.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "c65ee4f06d4d3f340cb6c4f0bac90b0e7b29007827583f8cc77b6e0dda93cb46",
+      "reference": "WAI-ARIA APG Tooltip; Radix Tooltip; library command-and-keyboard",
+      "checked": "Radix tooltip, aria-describedby content, Kbd tooltip variant",
+      "gaps": [
+        {
+          "item": "shortcut not exposed as aria-keyshortcuts",
+          "decision": "skip",
+          "reason": "tooltip content reaches AT through aria-describedby; aria-keyshortcuts belongs to the control that registers the shortcut",
+          "reference": "library command-and-keyboard"
+        },
+        {
+          "item": "side accepts physical left/right",
+          "decision": "skip",
+          "reason": "same API as Radix; collision handling flips it",
+          "reference": "Radix Tooltip"
+        }
+      ]
+    },
+    "packages/ui/confirm-dialog.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "4244ad0fe087bf5263bc7a73ebd96615d15e501f2aace3697a897512187c972b",
+      "reference": "WAI-ARIA APG Alert Dialog; Radix AlertDialog; shadcn/ui AlertDialog",
+      "checked": "focus trap, initial focus on Cancel, Escape/overlay cancel, pending blocks dismissal, aria-describedby, role",
+      "gaps": [
+        {
+          "item": "aria-describedby: a fragment body lost the description id (dangling idref) and the error alert was not described; now a wrapper keeps the id and the error joins aria-describedby",
+          "decision": "adopt",
+          "status": "done",
+          "reference": "APG Alert Dialog"
+        },
+        {
+          "item": "built on Dialog, so it exposes role=dialog and closes on overlay press; APG Alert Dialog uses role=alertdialog",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "APG Alert Dialog",
+          "resolution": "role=alertdialog as Radix AlertDialog passes it; overlay press and Escape stay as Cancel (the safe action) and pending blocks both"
+        }
+      ]
+    }
+  }
+}

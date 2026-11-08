@@ -168,6 +168,13 @@ describe('AlertDialog', () => {
       expect(screen.getByTestId('alert-dialog-header')).toBeInTheDocument();
     });
 
+    it('uses a logical header gutter so RTL text starts at the inline start', () => {
+      render(<TestAlertDialog open={true} />);
+      const header = screen.getByTestId('alert-dialog-header');
+      expect(header).toHaveClass('pe-10', 'text-start');
+      expect(header).not.toHaveClass('pr-10', 'text-left');
+    });
+
     it('contains title and description', () => {
       render(
         <TestAlertDialog

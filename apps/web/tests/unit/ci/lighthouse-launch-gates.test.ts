@@ -98,6 +98,7 @@ describe('Lighthouse identity admission', () => {
       'tests/e2e/dashboard-click-navigation.spec.ts'
     );
     expect(probe.run).toContain('tests/e2e/shell-nav-click-through.spec.ts');
+    expect(probe.run).toContain('tests/e2e/shell-route-health.spec.ts');
     const lighthouse = probe.run.indexOf(
       'pnpm run test:lighthouse:dashboard:pr'
     );

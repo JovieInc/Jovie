@@ -14,6 +14,11 @@
  *   node scripts/design/pen-draft.mjs --out DIR [--only claim,homepage]
  *   node scripts/design/pen-draft.mjs --plan [--changed FILE] [--only ...]
  *
+ * With PEN_DRAFT_TRIM=1 a draft starts from a cut-down copy of the canonical
+ * file (components, related screens, variables) and the new frame is spliced
+ * back into the full file. It is off by default: it did not stop the Pen
+ * editor's "Timeout waiting for document" on Nov 8.
+ *
  * --plan prints the frames a run should draft as a JSON array. CI drafts
  * each one in its own job, because ten briefs at up to 15 minutes each
  * outran the 75-minute job on Nov 8 and lost every draft to the timeout.
@@ -34,7 +39,10 @@ export const PEN_MAX_FAILED_CALLS = 30;
 export const BRIEFS_DIR = 'docs/design-system/pen-briefs';
 export const MANIFEST = 'docs/pen-stills/golden-path/manifest.json';
 
-/** Split a brief into its front matter (frame, route) and prompt body. */
+/**
+ * Split a brief into its front matter (frame, route, and context: the
+ * comma-separated names of existing screens it builds on) and prompt body.
+ */
 export function parseBrief(source, file = 'brief') {
   const m = source.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!m) throw new Error(`${file}: missing front matter`);
@@ -48,7 +56,11 @@ export function parseBrief(source, file = 'brief') {
     throw new Error(`${file}: frame must be lowercase kebab-case`);
   const prompt = m[2].trim();
   if (!prompt) throw new Error(`${file}: empty brief`);
-  return { frame: meta.frame, route: meta.route ?? null, prompt };
+  const context = (meta.context ?? '')
+    .split(',')
+    .map(t => t.trim())
+    .filter(Boolean);
+  return { frame: meta.frame, route: meta.route ?? null, context, prompt };
 }
 
 export function loadBriefs(dir = BRIEFS_DIR, only = null) {
@@ -75,9 +87,15 @@ const ATTEMPT_MS = 15 * 60_000;
 const MIN_ATTEMPT_MS = 5 * 60_000;
 
 /** How long the next attempt may run, or 0 when the budget can't fit one. */
-export function attemptTimeout(elapsedMs, budgetMs = BUDGET_MS) {
+export function attemptTimeout(elapsedMs, budgetMs = BUDGET_MS, attempt = 1) {
   const left = budgetMs - elapsedMs;
-  return left < MIN_ATTEMPT_MS ? 0 : Math.min(ATTEMPT_MS, left);
+  // Reserve a retry plus one minute for process teardown/startup. Giving the
+  // first attempt all 15 minutes left <5 minutes after even 1 ms of overhead.
+  const reserve = MIN_ATTEMPT_MS + 60_000;
+  const retry = attempt < ATTEMPTS && left >= MIN_ATTEMPT_MS + reserve;
+  return left < MIN_ATTEMPT_MS
+    ? 0
+    : Math.min(ATTEMPT_MS, left - (retry ? reserve : 0));
 }
 
 /** Files whose change means every frame has to be drafted again. */
@@ -109,7 +127,7 @@ export function planFrames({ briefs, changed = null, only = null }) {
 }
 
 /** The pen arguments for one brief, drafting into its own output file. */
-export function penArgs(brief, { input, outDir }) {
+export function penArgs(brief, { input, outDir, trim = false }) {
   return [
     '-y',
     `@pen.dev/cli@${PEN_CLI_VERSION}`,
@@ -117,7 +135,7 @@ export function penArgs(brief, { input, outDir }) {
     '--out',
     join(outDir, `${brief.frame}.pen`),
     '--prompt',
-    `Add a new top-level frame named "${brief.frame}" (route ${brief.route ?? 'n/a'}). Leave every existing frame untouched.\n\n${LOAD_NOTE}\n\n${brief.prompt}`,
+    `Add a new top-level frame named "${brief.frame}" (route ${brief.route ?? 'n/a'}). Leave every existing frame untouched.${trim ? " This file holds the design system's components and the screens this frame builds on, not every screen." : ''}\n\n${LOAD_NOTE}\n\n${brief.prompt}`,
     '--agent',
     'claude',
     '--export',
@@ -131,6 +149,11 @@ export function penArgs(brief, { input, outDir }) {
     '--max-failed-calls',
     String(PEN_MAX_FAILED_CALLS),
   ];
+}
+
+/** The cut-down input is opt-in, with PEN_DRAFT_TRIM=1. */
+export function useTrimmedInput(env) {
+  return env.PEN_DRAFT_TRIM === '1';
 }
 
 export function missingSecrets(env) {
@@ -172,6 +195,116 @@ export function draftProblem(before, after, frame) {
     (doc?.children ?? []).filter(n => n?.name === frame).length;
   if (named(after) <= named(before)) return `no new top-level frame ${frame}`;
   return null;
+}
+
+/** Each top-level frame's index, keyed by every node id inside it. */
+function topLevelIndex(doc) {
+  const index = new Map();
+  doc.children.forEach((top, i) => {
+    const walk = node => {
+      if (node?.id) index.set(node.id, i);
+      for (const child of node?.children ?? []) walk(child);
+    };
+    walk(top);
+  });
+  return index;
+}
+
+function collect(node, test, out = []) {
+  if (test(node)) out.push(node);
+  for (const child of node?.children ?? []) collect(child, test, out);
+  return out;
+}
+
+const words = text =>
+  String(text ?? '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+
+/**
+ * Terms that name the screens a brief builds on: its `context` list, plus
+ * the longer words of its frame and route. Each term matches whole words
+ * of a frame name, so "sign in" never matches "Design".
+ */
+export function briefTerms(brief) {
+  const fromName = words(`${brief.frame} ${brief.route ?? ''}`).filter(
+    w => w.length >= 4
+  );
+  return [
+    ...new Set(
+      [...fromName, ...(brief.context ?? [])].map(t => words(t).join(' '))
+    ),
+  ].filter(Boolean);
+}
+
+const namesTerm = (name, term) =>
+  ` ${words(name).join(' ')} `.includes(` ${term} `);
+
+/**
+ * The canonical document cut down to what one brief needs: every top-level
+ * frame that holds a reusable component, every frame named by one of the
+ * brief's terms (see briefTerms), and every frame those reference,
+ * with all variables and themes. On Nov 8, 9 of 10 drafts failed because
+ * the Pen editor never finished loading the whole 25 MB file ("Timeout
+ * waiting for document"), so the agent never read or drew anything.
+ */
+export function trimCanonical(doc, brief) {
+  const index = topLevelIndex(doc);
+  const terms = briefTerms(brief);
+  const keep = new Set();
+  doc.children.forEach((top, i) => {
+    if (
+      terms.some(t => namesTerm(top?.name, t)) ||
+      collect(top, n => n?.reusable === true).length
+    )
+      keep.add(i);
+  });
+  const queue = [...keep];
+  while (queue.length) {
+    const i = queue.pop();
+    for (const ref of collect(
+      doc.children[i],
+      n => typeof n?.ref === 'string'
+    )) {
+      const j = index.get(ref.ref);
+      if (j !== undefined && !keep.has(j)) {
+        keep.add(j);
+        queue.push(j);
+      }
+    }
+  }
+  return { ...doc, children: doc.children.filter((_, i) => keep.has(i)) };
+}
+
+/**
+ * The full canonical document with the frames a draft added to its trimmed
+ * copy, moved right of every existing frame so nothing overlaps, plus any
+ * variables or themes the draft added. Existing frames stay as they were.
+ */
+export function spliceDraft(full, trimmed, drafted) {
+  const had = new Set(trimmed.children.map(c => c?.id));
+  const added = drafted.children.filter(c => !had.has(c?.id));
+  const right = Math.max(
+    0,
+    ...full.children.map(c => (Number(c?.x) || 0) + (Number(c?.width) || 0))
+  );
+  const left = Math.min(...added.map(c => Number(c?.x) || 0));
+  const shift = right + 400 - (Number.isFinite(left) ? left : 0);
+  const merge = (base, extra) =>
+    base || extra ? { ...(extra ?? {}), ...(base ?? {}) } : undefined;
+  const out = {
+    ...full,
+    children: [
+      ...full.children,
+      ...added.map(c => ({ ...c, x: (Number(c?.x) || 0) + shift })),
+    ],
+  };
+  const variables = merge(full.variables, drafted.variables);
+  const themes = merge(full.themes, drafted.themes);
+  if (variables) out.variables = variables;
+  if (themes) out.themes = themes;
+  return out;
 }
 
 /**
@@ -281,10 +414,40 @@ async function main() {
     wanted
   );
 
+  const canonical = readJsonFile(input);
+  if (!Array.isArray(canonical?.children))
+    throw new Error('the canonical Pen file is not a Pen document');
+  const fullBytes = readFileSync(input).length;
+
+  // Off by default: on Nov 8, 0 of 13 drafts from the cut-down copy drew a
+  // frame, against 5 of 18 from the whole file, so the copy is opt-in.
+  const trim = useTrimmedInput(process.env);
+
   for (const brief of briefs) {
     const row = { frame: brief.frame, route: brief.route };
+    let before = canonical;
+    let from = input;
+    if (trim) {
+      // Beside the canonical file, so its fonts and images still resolve.
+      from = join(dirname(input), `${brief.frame}.trimmed.pen`);
+      before = trimCanonical(canonical, brief);
+      writeFileSync(from, JSON.stringify(before));
+      row.trimmed = {
+        frames: before.children.length,
+        of: canonical.children.length,
+        bytes: readFileSync(from).length,
+        ofBytes: fullBytes,
+      };
+      console.log(
+        `pen-draft: ${brief.frame} starts from ${row.trimmed.frames} of ${row.trimmed.of} frames (${(row.trimmed.bytes / 1e6).toFixed(1)} of ${(fullBytes / 1e6).toFixed(1)} MB)`
+      );
+    }
     for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
-      const timeout = attemptTimeout(Date.now() - startedAt);
+      const timeout = attemptTimeout(
+        Date.now() - startedAt,
+        BUDGET_MS,
+        attempt
+      );
       if (!timeout) {
         row.status ??= 'failed';
         row.error ??= 'no time left in the job for an attempt';
@@ -293,7 +456,7 @@ async function main() {
       row.attempts = attempt;
       delete row.error;
       try {
-        execFileSync('npx', penArgs(brief, { input, outDir }), {
+        execFileSync('npx', penArgs(brief, { input: from, outDir, trim }), {
           stdio: ['ignore', 'inherit', 'inherit'],
           timeout,
           // Workspace fonts and images resolve relative to the .pen file.
@@ -304,12 +467,19 @@ async function main() {
         const problem = missing.length
           ? `pen wrote no ${missing.join(' or ')}`
           : draftProblem(
-              readJsonFile(input),
+              before,
               readJsonFile(join(outDir, `${brief.frame}.pen`)),
               brief.frame
             );
         row.status = problem ? 'failed' : 'drafted';
         if (problem) row.error = problem;
+        else if (trim) {
+          const out = join(outDir, `${brief.frame}.pen`);
+          writeFileSync(
+            out,
+            JSON.stringify(spliceDraft(canonical, before, readJsonFile(out)))
+          );
+        }
       } catch (e) {
         row.status = 'failed';
         row.error = String(e.message || e)

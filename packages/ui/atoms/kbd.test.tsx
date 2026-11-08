@@ -184,10 +184,26 @@ describe('Kbd', () => {
           <Kbd variant='tooltip'>⌘K</Kbd>
         </div>
       );
-      const kbd = screen.getByText('⌘K');
+      const kbd = screen.getByText('⌘K').closest('kbd') as HTMLElement;
       expect(kbd.className).toContain('bg-surface-tooltip');
       expect(kbd.className).toContain('text-tooltip-foreground');
     });
+  });
+
+  it.each([
+    ['⌘K', 'Command K'],
+    ['⌥⌘P', 'Option Command P'],
+    ['⌃Enter', 'Control Enter'],
+    ['⇧⌘K', 'Shift Command K'],
+  ])('gives %s spoken modifier names (%s)', (glyphs, spoken) => {
+    render(<Kbd data-testid='kbd'>{glyphs}</Kbd>);
+    expect(screen.getByText(glyphs)).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText(spoken)).toHaveClass('sr-only');
+  });
+
+  it('leaves plain keys unchanged', () => {
+    render(<Kbd data-testid='kbd'>Esc</Kbd>);
+    expect(screen.getByTestId('kbd').innerHTML).toBe('Esc');
   });
 });
 

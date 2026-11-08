@@ -652,7 +652,7 @@ describe('Button', () => {
       );
       expect(screen.getByTestId('spinner')).toBeInTheDocument();
       expect(screen.getByRole('button')).toHaveAttribute('aria-busy', 'true');
-      expect(screen.getByRole('button')).toBeDisabled();
+      expect(screen.getByRole('button')).not.toBeDisabled();
       expect(screen.getByRole('button')).not.toHaveAttribute(
         'data-pending-presentation'
       );

@@ -192,6 +192,76 @@ describe('ConfirmDialog', () => {
     expect(onError).toHaveBeenCalled();
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
+
+  it('describes the dialog by its body, including fragment bodies', () => {
+    render(
+      <ConfirmDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        title='Archive release?'
+        body={
+          <>
+            <p>Fans keep their links.</p>
+            <p>You can restore it later.</p>
+          </>
+        }
+        onConfirm={vi.fn()}
+      />
+    );
+
+    const ids = screen
+      .getByRole('alertdialog')
+      .getAttribute('aria-describedby');
+    expect(ids).toBeTruthy();
+    const described = (ids ?? '')
+      .split(' ')
+      .map(id => document.getElementById(id)?.textContent ?? '')
+      .join(' ');
+    expect(described).toContain('Fans keep their links.');
+    expect(described).toContain('You can restore it later.');
+  });
+
+  it('omits aria-describedby without a body and adds the error once shown', async () => {
+    render(
+      <ConfirmDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        title='Disconnect Spotify?'
+        confirmLabel='Disconnect'
+        onConfirm={async () => {
+          throw new Error('Request failed');
+        }}
+      />
+    );
+
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog).not.toHaveAttribute('aria-describedby');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
+    const alert = await screen.findByRole('alert');
+    expect(dialog.getAttribute('aria-describedby')?.split(' ')).toContain(
+      alert.id
+    );
+  });
+
+  it('exposes the APG alertdialog role, not a plain dialog', () => {
+    render(
+      <ConfirmDialog
+        open
+        onOpenChange={() => undefined}
+        title='Cancel your plan?'
+        body='You keep access until the period ends.'
+        onConfirm={() => undefined}
+      />
+    );
+    const dialog = screen.getByRole('alertdialog', {
+      name: 'Cancel your plan?',
+    });
+    expect(dialog).toHaveAccessibleDescription(
+      'You keep access until the period ends.'
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
 });
 
 describe('ConfirmDialog accessibility', () => {
@@ -204,7 +274,7 @@ describe('ConfirmDialog accessibility', () => {
         onConfirm={vi.fn()}
       />
     );
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
     await expectNoA11yViolations(document.body);
   });
 

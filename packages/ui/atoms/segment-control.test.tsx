@@ -226,47 +226,45 @@ describe('SegmentControl', () => {
   });
 
   describe('Sizes', () => {
-    it('applies md size by default', () => {
+    it.each([
+      [undefined, ['text-app', 'h-7', 'px-2.5']],
+      ['sm', ['text-xs', 'px-2']],
+      ['lg', ['text-sm', 'px-4']],
+    ] as const)('applies size %s (md by default)', (size, classes) => {
       render(
         <SegmentControl
           value='links'
           onValueChange={vi.fn()}
           options={defaultOptions}
-          data-testid='segment'
+          size={size}
         />
       );
       const tab = screen.getByRole('tab', { name: 'Links' });
-      expect(tab.className).toContain('text-app');
-      expect(tab.className).toContain('h-7');
-      expect(tab.className).toContain('px-2.5');
+      for (const name of classes) expect(tab.className).toContain(name);
     });
+  });
 
-    it('applies sm size', () => {
+  describe('Direction', () => {
+    it('follows dir so ArrowLeft selects the next segment in RTL', async () => {
+      const user = userEvent.setup();
+      const onValueChange = vi.fn();
       render(
         <SegmentControl
+          dir='rtl'
           value='links'
-          onValueChange={vi.fn()}
+          onValueChange={onValueChange}
           options={defaultOptions}
-          size='sm'
         />
       );
-      const tab = screen.getByRole('tab', { name: 'Links' });
-      expect(tab.className).toContain('text-xs');
-      expect(tab.className).toContain('px-2');
-    });
+      const first = screen.getByRole('tab', { name: 'Links' });
+      act(() => first.focus());
+      await user.keyboard('{ArrowLeft}');
 
-    it('applies lg size', () => {
-      render(
-        <SegmentControl
-          value='links'
-          onValueChange={vi.fn()}
-          options={defaultOptions}
-          size='lg'
-        />
+      expect(screen.getByRole('tablist').closest('[dir]')).toHaveAttribute(
+        'dir',
+        'rtl'
       );
-      const tab = screen.getByRole('tab', { name: 'Links' });
-      expect(tab.className).toContain('text-sm');
-      expect(tab.className).toContain('px-4');
+      expect(onValueChange).toHaveBeenCalledWith('music');
     });
   });
 
