@@ -18,7 +18,10 @@ import {
   runtimeStatus,
   validateReply,
 } from './executor.ts';
+import { type Liveness, mailboxLiveness } from './mailbox-liveness.ts';
 import { backoffFor, isOpen, Outbox, type RecipientStatus } from './outbox.ts';
+
+export type { Liveness } from './mailbox-liveness.ts';
 
 const SWEEP_MS = 5 * 60_000;
 /** Only statuses that mean "this message is bad", never "the route is not ready". */
@@ -32,18 +35,6 @@ export type MailboxConfig = {
   kind: string;
   fallback: string | null;
   deadAfterMs: number;
-};
-
-export type Liveness = {
-  kind: string | null;
-  connected: number;
-  lastPingAt: number | null;
-  lastActivityAt: number | null;
-  /** Inbound poll, ack, receipt or stream sync; never sends or socket pings. */
-  lastConsumerActivityAt: number | null;
-  unhandled: number;
-  oldestUnhandledAgeMs: number | null;
-  lastProbe: { acceptedAt: number; receivedAt: number | null } | null;
 };
 
 /**
@@ -214,30 +205,7 @@ export class Mailbox extends DurableObject<Env> {
   }
 
   async liveness(): Promise<Liveness> {
-    const now = Date.now();
-    let lastPingAt: number | null = null;
-    const sockets = this.ctx.getWebSockets();
-    for (const ws of sockets) {
-      const at =
-        this.ctx.getWebSocketAutoResponseTimestamp(ws)?.getTime() ?? null;
-      if (at !== null && (lastPingAt === null || at > lastPingAt))
-        lastPingAt = at;
-    }
-    const oldest = this.store.oldestUnacked();
-    const activity = this.store.getMeta('lastActivityAt');
-    const consumerActivity = this.store.getMeta('lastConsumerActivityAt');
-    return {
-      kind: this.config()?.kind ?? null,
-      connected: sockets.length,
-      lastPingAt,
-      lastActivityAt: activity ? Number(activity) : null,
-      lastConsumerActivityAt: consumerActivity
-        ? Number(consumerActivity)
-        : null,
-      unhandled: this.store.unackedCount(),
-      oldestUnhandledAgeMs: oldest ? now - oldest.acceptedAt : null,
-      lastProbe: this.store.lastProbe(),
-    };
+    return mailboxLiveness(this.ctx, this.store, this.config()?.kind ?? null);
   }
 
   /** WebSocket stream for a relay: pushes everything not yet received. */

@@ -44,6 +44,8 @@ const ALERTING = new Set([
   'executor.failed',
 ]);
 const TOUCH_DEBOUNCE_MS = 15_000;
+const numberOrNull = (value: unknown): number | null =>
+  value === null ? null : Number(value);
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS agents (
@@ -272,20 +274,17 @@ export class Registry extends DurableObject<Env> {
         // Mailbox unreachable: do not guess; skip this agent this round.
         continue;
       }
-      const heartbeatSec =
-        agent.heartbeat_sec === null ? null : Number(agent.heartbeat_sec);
+      const heartbeatSec = numberOrNull(agent.heartbeat_sec);
       if (heartbeatSec) heartbeatAgents++;
       const presence = evaluatePresence({
         now,
         heartbeatSec,
         state: String(agent.state) as AgentState,
-        lastSeenAt:
-          agent.last_seen_at === null ? null : Number(agent.last_seen_at),
+        lastSeenAt: numberOrNull(agent.last_seen_at),
         connected: live.connected,
         lastPingAt: live.lastPingAt,
         lastActivityAt: live.lastActivityAt,
-        registeredAt:
-          agent.updated_at === null ? null : Number(agent.updated_at),
+        registeredAt: numberOrNull(agent.updated_at),
       });
       if (presence.state !== agent.state)
         this.sql.exec(
@@ -297,10 +296,7 @@ export class Registry extends DurableObject<Env> {
       if (presence.event) {
         const previous = {
           state: String(agent.state),
-          changedAt:
-            agent.state_changed_at === null
-              ? null
-              : Number(agent.state_changed_at),
+          changedAt: numberOrNull(agent.state_changed_at),
         };
         pending.push({
           type: presence.event,
@@ -327,8 +323,7 @@ export class Registry extends DurableObject<Env> {
             live,
             Number(agent.probe_misses),
             now,
-            pending,
-            lastConsumerAlive(live)
+            pending
           );
         } catch {
           // One unreachable mailbox must not abort the sweep for every agent.
@@ -383,12 +378,11 @@ export class Registry extends DurableObject<Env> {
       kind: string;
       detail: Detail;
       revert?: () => void;
-    }[],
-    lastAliveAt: number | null
+    }[]
   ) {
     const result = evaluateProbe({
       now,
-      lastAliveAt,
+      lastAliveAt: lastConsumerAlive(live),
       lastProbeAt: live.lastProbe?.acceptedAt ?? null,
       lastProbeAckAt: live.lastProbe?.receivedAt ?? null,
       misses,
@@ -443,8 +437,7 @@ export class Registry extends DurableObject<Env> {
         owner: row.owner === null ? null : String(row.owner),
         status: String(row.status),
         fallback: row.fallback === null ? null : String(row.fallback),
-        heartbeatSec:
-          row.heartbeat_sec === null ? null : Number(row.heartbeat_sec),
+        heartbeatSec: numberOrNull(row.heartbeat_sec),
         probe: Boolean(row.probe),
         lastSeenAt:
           row.last_seen_at === null
@@ -456,7 +449,7 @@ export class Registry extends DurableObject<Env> {
             ? null
             : new Date(Number(row.state_changed_at)).toISOString(),
         probeMisses: Number(row.probe_misses),
-        probeRttMs: row.probe_rtt_ms === null ? null : Number(row.probe_rtt_ms),
+        probeRttMs: numberOrNull(row.probe_rtt_ms),
       }));
   }
 
