@@ -2,33 +2,6 @@
 
 import * as React from 'react';
 
-/** Height of the list's edge fade; focused rows scroll clear of it. */
-export const MENU_SCROLL_FADE_SIZE = '1.5rem';
-
-export interface MenuScrollEdges {
-  readonly top: boolean;
-  readonly bottom: boolean;
-}
-
-/** Which edges still have rows clipped behind them. 1px slack for subpixel layout. */
-export function getMenuScrollEdges(
-  element: Pick<HTMLElement, 'scrollTop' | 'scrollHeight' | 'clientHeight'>
-): MenuScrollEdges {
-  const { scrollTop, scrollHeight, clientHeight } = element;
-  return {
-    top: scrollTop > 1,
-    bottom: scrollTop + clientHeight < scrollHeight - 1,
-  };
-}
-
-/** Mask that fades only the clipped edges; undefined when nothing is clipped. */
-export function getMenuScrollMask(edges: MenuScrollEdges): string | undefined {
-  if (!edges.top && !edges.bottom) return undefined;
-  const top = edges.top ? MENU_SCROLL_FADE_SIZE : '0px';
-  const bottom = edges.bottom ? MENU_SCROLL_FADE_SIZE : '0px';
-  return `linear-gradient(to bottom, transparent, black ${top}, black calc(100% - ${bottom}), transparent)`;
-}
-
 /**
  * Scroll region for `scrollBody` menus: the search header stays pinned above
  * it and only the rows scroll. Edge state lives in data attributes so tests
@@ -85,4 +58,31 @@ export function MenuScrollBody({
       {children}
     </div>
   );
+}
+
+/** Height of the list's edge fade; focused rows scroll clear of it. */
+export const MENU_SCROLL_FADE_SIZE = '1.5rem';
+
+export interface MenuScrollEdges {
+  readonly top: boolean;
+  readonly bottom: boolean;
+}
+
+/** Which edges still have rows clipped behind them. 1px slack for subpixel layout. */
+export function getMenuScrollEdges(
+  element: Pick<HTMLElement, 'scrollTop' | 'scrollHeight' | 'clientHeight'>
+): MenuScrollEdges {
+  const { scrollTop, scrollHeight, clientHeight } = element;
+  return {
+    top: scrollTop > 1,
+    bottom: scrollTop + clientHeight < scrollHeight - 1,
+  };
+}
+
+/** Mask that fades only the clipped edges; undefined when nothing is clipped. */
+export function getMenuScrollMask(edges: MenuScrollEdges): string | undefined {
+  if (!edges.top && !edges.bottom) return undefined;
+  const top = edges.top ? MENU_SCROLL_FADE_SIZE : '0px';
+  const bottom = edges.bottom ? MENU_SCROLL_FADE_SIZE : '0px';
+  return `linear-gradient(to bottom, transparent, black ${top}, black calc(100% - ${bottom}), transparent)`;
 }
