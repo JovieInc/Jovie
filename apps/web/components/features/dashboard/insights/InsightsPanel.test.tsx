@@ -48,7 +48,7 @@ describe('InsightsPanelView', () => {
     const tablist = screen.getByRole('tablist', {
       name: 'Filter Insights By Category',
     });
-    expect(tablist).toHaveClass('flex-wrap', 'gap-1.5');
+    expect(tablist).toHaveClass('flex-wrap');
 
     const tabs = screen.getAllByRole('tab');
     expect(tabs).toHaveLength(9);
@@ -285,5 +285,25 @@ describe('InsightsPanelView', () => {
     expect(rows.querySelector('.h-7.w-7')).not.toBeNull();
     expect(container.querySelector('.p-4')).toBeNull();
     expect(screen.queryByTestId('insights-empty-state')).toBeNull();
+  });
+
+  it('uses the typographic ellipsis while generating', () => {
+    render(
+      <TooltipProvider>
+        <InsightsPanelView
+          insights={[]}
+          isLoading={false}
+          error={null}
+          selectedCategory='all'
+          onCategoryChange={vi.fn()}
+          onGenerate={vi.fn()}
+          onRetry={vi.fn()}
+          isGenerating
+        />
+      </TooltipProvider>
+    );
+
+    expect(screen.getByRole('button', { name: 'Generating…' })).toBeDisabled();
+    expect(document.body.textContent).not.toContain('...');
   });
 });

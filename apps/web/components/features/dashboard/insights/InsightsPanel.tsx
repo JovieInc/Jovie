@@ -156,9 +156,7 @@ function InsightsPanelContent({
             }
           : {
               action: {
-                label: isGenerating
-                  ? 'Generating...'
-                  : generateLabel(emptyCopy),
+                label: isGenerating ? 'Generating…' : generateLabel(emptyCopy),
                 onClick: onGenerate,
                 disabled: isGenerating,
               },
@@ -259,10 +257,10 @@ export function InsightsPanelView({
               className={isGenerating ? 'animate-spin' : undefined}
             />
           }
-          label={isGenerating ? 'Generating...' : 'Generate'}
+          label={isGenerating ? 'Generating…' : 'Generate'}
           iconOnly
           tooltipLabel={
-            isGenerating ? 'Generating insights...' : 'Generate insights'
+            isGenerating ? 'Generating insights…' : 'Generate insights'
           }
         />
       }
@@ -280,7 +278,7 @@ export function InsightsPanelView({
             aria-label='Filter Insights By Category'
             surface='ghost'
             layout='hug'
-            listClassName='flex-wrap gap-1.5'
+            listClassName='flex-wrap'
           />
 
           <InsightsPanelContent
