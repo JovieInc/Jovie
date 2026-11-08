@@ -136,4 +136,3 @@ class NativeNodeImportConflictTest(unittest.TestCase):
         self.assertEqual(after, git("rev-parse", "origin/feature").stdout.strip())
         self.assertNotEqual(after, before)
         self.assertEqual(git("merge-base", "--is-ancestor", before, after).returncode, 0)
-
