@@ -1,16 +1,16 @@
 {
-  "generated_at": "2026-11-04T19:31:55.840Z",
+  "generated_at": "2026-11-08T08:16:37.186Z",
   "surfaces": {
     "rls-access-control": {
-      "coverage_pct": 78.1,
+      "coverage_pct": 78,
       "branch_pct": 0,
       "risk_score": 42.1,
       "status": "RED"
     },
     "proxy": {
-      "coverage_pct": 95.1,
-      "branch_pct": 89.7,
-      "risk_score": 40.8,
+      "coverage_pct": 95.3,
+      "branch_pct": 90,
+      "risk_score": 40.7,
       "status": "RED"
     },
     "stripe-webhooks": {
@@ -32,9 +32,9 @@
       "status": "RED"
     },
     "public-profile-isr": {
-      "coverage_pct": 87.7,
-      "branch_pct": 81.1,
-      "risk_score": 27.6,
+      "coverage_pct": 88,
+      "branch_pct": 81.6,
+      "risk_score": 27.5,
       "status": "YELLOW"
     },
     "claim-onboarding": {
@@ -50,14 +50,14 @@
       "status": "YELLOW"
     },
     "api-routes-contract": {
-      "coverage_pct": 76.5,
-      "branch_pct": 66.6,
+      "coverage_pct": 76.6,
+      "branch_pct": 66.8,
       "risk_score": 24.8,
       "status": "YELLOW"
     },
     "marketing-static": {
       "coverage_pct": 77.9,
-      "branch_pct": 70.1,
+      "branch_pct": 69.9,
       "risk_score": 10.6,
       "status": "GREEN"
     }
