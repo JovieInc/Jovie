@@ -24,6 +24,7 @@ test('every checked-in brief parses and names a unique frame', () => {
       'claim',
       'homepage',
       'insights',
+      'profile-analytics-card',
       'request-access',
       'tour-dates-connect',
       'workspace-table',
