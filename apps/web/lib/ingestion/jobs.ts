@@ -1,7 +1,5 @@
 import { and, sql as drizzleSql, eq, inArray, isNull, or } from 'drizzle-orm';
-import { kickQueue } from '@/lib/cron/kick-queue';
 import { type DbOrTransaction, db } from '@/lib/db';
-import { isUniqueViolation } from '@/lib/db/errors';
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { musicfetchNetworkAllowed } from '@/lib/music-resolver/musicfetch-gate';
 import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
@@ -17,6 +15,7 @@ import {
   twitterJobPayloadSchema,
   youtubeJobPayloadSchema,
 } from '@/lib/validation/schemas';
+import { insertJobWithDedup } from './jobs/insert';
 import { disabledSocialHtmlDocument } from './social-html-policy';
 import { isBeaconsUrl, validateBeaconsUrl } from './strategies/beacons';
 import { validateInstagramUrl } from './strategies/instagram';
@@ -30,60 +29,6 @@ import {
 } from './strategies/youtube';
 
 // Ingestion job payload schemas are now centralized in @/lib/validation/schemas/ingestion.ts
-
-/**
- * Safely insert an ingestion job with dedup handling.
- *
- * The `dedup_key` unique index is partial (`WHERE dedup_key IS NOT NULL`),
- * so targeting `dedup_key` in `ON CONFLICT` can fail to infer the constraint.
- * This wrapper uses generic conflict handling, then catches PostgreSQL unique
- * violations (23505) and falls back to returning the existing job.
- */
-async function insertJobWithDedup(
-  values: typeof ingestionJobs.$inferInsert
-): Promise<string | null> {
-  const dedupKey = values.dedupKey;
-  let caughtUniqueViolation: Error | undefined;
-
-  try {
-    const result = await db
-      .insert(ingestionJobs)
-      .values(values)
-      .onConflictDoNothing()
-      .returning({ id: ingestionJobs.id });
-
-    if (result.length > 0) {
-      kickQueue('ingestion');
-      return result[0].id;
-    }
-  } catch (error: unknown) {
-    // PostgreSQL unique_violation (23505) from the partial index race condition
-    if (!isUniqueViolation(error)) {
-      throw error;
-    }
-    caughtUniqueViolation = error as Error;
-  }
-
-  // Race condition: another concurrent insert won — return the existing job's id
-  if (!dedupKey) return null;
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
-    .limit(1);
-
-  if (winner?.id) {
-    return winner.id;
-  }
-
-  // If we caught a 23505 but the winner row has vanished, surface the original
-  // error instead of silently returning null — this indicates an anomaly.
-  if (caughtUniqueViolation) {
-    throw caughtUniqueViolation;
-  }
-
-  return null;
-}
 
 /** Legacy HTML imports are unavailable without an official API integration. */
 export async function enqueueLinktreeIngestionJob(params: {
