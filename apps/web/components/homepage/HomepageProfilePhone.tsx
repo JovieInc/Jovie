@@ -10,14 +10,16 @@ import {
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ImageryStage } from '@/components/marketing/ImageryStage';
+import { HOMEPAGE_FEATURED_ARTIST } from '@/data/demoArtists';
 import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
-import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import { Anchor } from './v3/ProductUi';
 
 const PHONE_COPY = HOMEPAGE_EDITORIAL_COPY.profile.phone;
+const ARTIST = HOMEPAGE_FEATURED_ARTIST;
 
 /**
- * Tim White's real profile at jov.ie/tim, Listen mode (Pen WyQJb): identity
+ * The featured artist's profile, Listen mode (Pen WyQJb). A demo artist until
+ * real artists opt in to be featured (Tim, 2026-11-08): identity
  * with the verification badge, Get Updates, Instagram and TikTok, the latest
  * release as the one thing the profile leads with, and the profile tabs.
  * Static, no data fetch: the page stays fully static. The anchors are where
@@ -44,7 +46,7 @@ export function HomepageProfilePhone({
       <div className='hv3-pp__id' aria-hidden>
         <span className='hv3-pp__av'>
           <ImageryStage
-            src='/images/avatars/tim-white-profile.jpg'
+            src={ARTIST.avatarSrc}
             alt=''
             width={72}
             height={72}
@@ -55,11 +57,11 @@ export function HomepageProfilePhone({
           </i>
         </span>
         <p className='hv3-pp__name'>
-          {TIM_WHITE_PROFILE.name}
+          {ARTIST.name}
           <Anchor id='name' className='hv3-anchor--after-tight' />
         </p>
         <p className='hv3-pp__handle'>
-          {TIM_WHITE_PROFILE.publicProfileDisplay}
+          {ARTIST.profileDisplay}
           <Anchor id='handle' className='hv3-anchor--after' />
         </p>
       </div>
@@ -89,7 +91,7 @@ export function HomepageProfilePhone({
           />
         </div>
         <p className='hv3-pp__title'>{release.title}</p>
-        <p className='hv3-pp__by'>{TIM_WHITE_PROFILE.name}</p>
+        <p className='hv3-pp__by'>{ARTIST.name}</p>
         <span className='hv3-pp__cta'>{PHONE_COPY.listenNow}</span>
       </div>
       <div className='hv3-pp__nav' aria-hidden>

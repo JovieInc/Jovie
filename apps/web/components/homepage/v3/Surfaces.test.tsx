@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { HOMEPAGE_PRODUCT_UI } from '@/data/homepageProductUi';
-import { Callout, CommandPaletteCard } from './Surfaces';
+import { Callout, CommandPaletteCard, ReleasePage } from './Surfaces';
 
 const PALETTE = HOMEPAGE_PRODUCT_UI.palette;
 
@@ -18,6 +18,14 @@ describe('homepage v3 surfaces', () => {
     expect(
       container.querySelector(`li[data-hv3-row="${PALETTE.queryTarget}"]`)
     ).not.toBeNull();
+  });
+
+  it('shows the featured demo artist release, never Tim', () => {
+    const { container } = render(<ReleasePage />);
+    const page = HOMEPAGE_PRODUCT_UI.releasePage;
+    expect(container).toHaveTextContent(page.title);
+    expect(container).toHaveTextContent(page.artist);
+    expect(container).not.toHaveTextContent('Tim White');
   });
 
   it('renders a hidden-until-placed callout bound to its anchor', () => {
