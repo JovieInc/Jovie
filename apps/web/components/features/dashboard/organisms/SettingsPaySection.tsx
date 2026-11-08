@@ -21,9 +21,14 @@ function LoadingState() {
     >
       <div className='min-w-0 space-y-3'>
         <div className='h-5 w-28 rounded-full skeleton' />
-        <div className='space-y-1'>
-          <div className='h-[19px] w-full max-w-md rounded skeleton' />
-          <div className='h-[19px] w-3/4 rounded skeleton' />
+        {/* Two 19px line boxes, the narrative's leading, with no gap. */}
+        <div data-testid='settings-pay-loading-narrative'>
+          <div className='flex h-[19px] items-center'>
+            <div className='h-3.5 w-full max-w-md rounded skeleton' />
+          </div>
+          <div className='flex h-[19px] items-center'>
+            <div className='h-3.5 w-3/4 rounded skeleton' />
+          </div>
         </div>
         <div className='flex gap-2'>
           <div className='h-8 w-28 rounded-md skeleton' />

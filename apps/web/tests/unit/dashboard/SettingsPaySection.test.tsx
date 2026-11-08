@@ -121,4 +121,23 @@ describe('SettingsPaySection', () => {
     );
     expect(getByTestId('settings-pay-loading-qr')).toHaveClass('h-37', 'w-37');
   });
+
+  it('holds the narrative as two 19px lines with no gap between them', () => {
+    // The narrative is leading-[19px]; two 19px bars with a 4px gap stood
+    // 42px tall against a 38px two-line paragraph.
+    mockUseProfileMonetizationSummary.mockReturnValue({
+      data: undefined,
+      isError: false,
+      isLoading: true,
+      refetch: mockRefetch,
+    });
+
+    const { getByTestId } = fastRender(<SettingsPaySection />);
+    const narrative = getByTestId('settings-pay-loading-narrative');
+
+    expect(narrative.className).not.toMatch(/space-y|gap-/);
+    const lines = Array.from(narrative.children);
+    expect(lines).toHaveLength(2);
+    for (const line of lines) expect(line).toHaveClass('h-[19px]');
+  });
 });
