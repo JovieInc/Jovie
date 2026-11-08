@@ -118,7 +118,6 @@
     "pen-still-diff.yml#diff",
     "pen-still-diff.yml#comment",
     "pen-token-parity.yml#parity",
-    "postdeploy-probes.yml#golden-path-cert",
     "postdeploy-probes.yml#resolve-target",
     "postdeploy-probes.yml#smoke",
     "postdeploy-probes.yml#remediation",

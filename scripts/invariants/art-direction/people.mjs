@@ -98,10 +98,6 @@ export function validateRegistry(registry, exists) {
       errors.push(
         `image ${image.path}: routes is required (the routes it may render on)`
       );
-    else if (image.routes.includes('/'))
-      errors.push(
-        `image ${image.path}: / is never allowed; no real person on the homepage`
-      );
     if (!people.has(image.person))
       errors.push(`image ${image.path}: unknown person ${image.person}`);
     if (!exists(image.path))

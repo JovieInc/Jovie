@@ -37,6 +37,12 @@ CI a11y, visual, and benchmark records must carry that SHA-256 `sourceHash`;
 stale or unbound records remain `unknown`. Current unit-axe assertions remain
 an independent source of a11y evidence.
 
+A passing a11y or visual record is a story-capture receipt
+(`jovie.component-story-evidence/v1`, `scripts/lib/component-evidence.mjs`):
+`sourceHash`, `captured`, and `stories: [{ id, themes }]` where every story was
+captured in both `light` and `dark`. A pass without that proof is ignored (the
+CLI names it on stderr), so the criterion stays unknown; a `fail` always stands.
+
 Mutation records keep the canonical sweep format: `blob` is
 `moduleKey(source Git blob, same-stem test Git blobs)` and `sha` is the measured
 commit. The CLI recomputes the key from the current component and all tracked
