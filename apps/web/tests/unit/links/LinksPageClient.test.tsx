@@ -64,7 +64,11 @@ describe('LinksPageClient', () => {
     renderLinksWorkspace(<LinksPageClient rows={[]} />);
 
     expect(screen.getByTestId('links-empty-state')).toBeInTheDocument();
-    expect(screen.getByText('No links yet')).toBeInTheDocument();
+    expect(screen.getByText('No Links Yet')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open Releases' })).toHaveAttribute(
+      'href',
+      '/app/releases'
+    );
   });
 
   it('renders each row with status, clicks, and campaign fallbacks', () => {

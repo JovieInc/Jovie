@@ -17,6 +17,7 @@ import {
   rowState,
   typography,
 } from '@/components/organisms/table/table.styles';
+import { APP_ROUTES } from '@/constants/routes';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { cn } from '@/lib/utils';
@@ -190,8 +191,9 @@ export function LinksPageClient({ rows }: { readonly rows: LinkRow[] }) {
       <TableEmptyState
         testId='links-empty-state'
         icon={<Link2 className='size-5' aria-hidden='true' />}
-        heading='No links yet'
-        description='Jovie finds your stuff — releases, events, merch, videos, and profiles — creates trackable links for it, and measures what happens when those links are shared.'
+        heading='No Links Yet'
+        description='Every release, show, and video Jovie finds gets a trackable link here.'
+        action={{ label: 'Open Releases', href: APP_ROUTES.RELEASES }}
       />
     );
   }

@@ -174,9 +174,9 @@ describe('SettingsContactsSection', () => {
       </QueryClientProvider>
     );
 
-    expect(screen.getByText('No contacts yet')).toBeInTheDocument();
+    expect(screen.getByText('No Contacts Yet')).toBeInTheDocument();
     expect(
-      screen.getByText('Add your first contact to get started.')
+      screen.getByText('Add bookings, management, and press contacts.')
     ).toBeInTheDocument();
   });
 });

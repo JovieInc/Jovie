@@ -2027,25 +2027,15 @@ function EmptyCatalog({
       toolbar={
         <PageToolbar
           start={<span className={PAGE_TOOLBAR_META_TEXT_CLASS}>0 items</span>}
-          end={
-            <>
-              <YouTubeLedgerLink />
-              <LibraryFirstAction
-                canSyncSpotify={canSyncSpotify}
-                isSyncing={isSyncing}
-                onSyncSpotify={onSyncSpotify}
-                testId='library-sync-spotify-toolbar'
-              />
-            </>
-          }
+          end={<YouTubeLedgerLink />}
         />
       }
     >
       <NavigationDestinationReady destination='library' />
       <EmptyState
-        icon={<Music2 className='h-5 w-5' strokeWidth={2.25} />}
-        heading='No work yet'
-        description='Releases, merch, images, videos, and audio will appear here as they land.'
+        icon={<Music2 className='h-5 w-5' aria-hidden='true' />}
+        heading='No Work Yet'
+        description='Your releases, videos, images, audio, and merch live here.'
         presentation='workspace'
         testId='library-workspace-empty-state'
         className='min-h-90'

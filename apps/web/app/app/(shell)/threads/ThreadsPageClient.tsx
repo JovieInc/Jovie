@@ -3,7 +3,7 @@
 import { Button, ConfirmDialog } from '@jovie/ui';
 import { Search } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppSearchField } from '@/components/molecules/AppSearchField';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
@@ -47,24 +47,28 @@ function ChatListSkeleton() {
   );
 }
 
-export function ChatsEmptyState({ query }: Readonly<{ query: string }>) {
+export function ChatsEmptyState({
+  query,
+  onClearQuery,
+}: Readonly<{ query: string; onClearQuery?: () => void }>) {
   const trimmedQuery = query.trim();
   const hasQuery = trimmedQuery.length > 0;
 
   return (
     <EmptyState
       variant={hasQuery ? 'search' : 'default'}
-      heading={hasQuery ? `No chats match "${trimmedQuery}".` : 'No chats yet'}
+      heading={hasQuery ? `No Chats Match "${trimmedQuery}"` : 'No Chats Yet'}
       description={
         hasQuery
-          ? 'Clear the search or try a different phrase.'
-          : 'Start a new chat and it will appear here.'
+          ? 'Try a different phrase.'
+          : 'Your conversations with Jovie live here.'
       }
-      action={{
-        href: APP_ROUTES.CHAT,
-        label: 'New Chat',
-        variant: 'secondary',
-      }}
+      action={
+        hasQuery && onClearQuery
+          ? { label: 'Clear Search', onClick: onClearQuery }
+          : { href: APP_ROUTES.CHAT, label: 'New Chat' }
+      }
+      presentation='workspace'
       className='min-h-72'
       testId='chats-empty-state'
     />
@@ -73,6 +77,7 @@ export function ChatsEmptyState({ query }: Readonly<{ query: string }>) {
 
 export function ChatsPageClient() {
   const [query, setQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [archiveAllOpen, setArchiveAllOpen] = useState(false);
   const [threadReadAtById, setThreadReadAtById] =
     useState<Record<string, string>>(readThreadReadState);
@@ -164,6 +169,7 @@ export function ChatsPageClient() {
             <AppSearchField
               value={query}
               onChange={setQuery}
+              inputRef={searchInputRef}
               placeholder='Search chats'
               ariaLabel='Search Chats'
               className='max-w-2xl flex-1'
@@ -216,7 +222,14 @@ export function ChatsPageClient() {
               }}
             />
           ) : filteredThreads.length === 0 ? (
-            <ChatsEmptyState query={trimmedQuery} />
+            <ChatsEmptyState
+              query={trimmedQuery}
+              onClearQuery={() => {
+                setQuery('');
+                // Clear Search unmounts with the empty state; keep focus.
+                searchInputRef.current?.focus();
+              }}
+            />
           ) : (
             <div className='space-y-1.5'>
               {filteredThreads.map(thread => (
