@@ -447,7 +447,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(38);
+    expect(LANES_PYTEST_FILES).toHaveLength(39);
     expect(whole).toContain('scripts/tests/test_board_intake.py');
     expect(whole).toContain('scripts/tests/test_priority_admission.py');
     expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS.join(' ')).toContain(
