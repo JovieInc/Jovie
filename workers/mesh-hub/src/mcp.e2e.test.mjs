@@ -4,7 +4,8 @@
 // Skipped when MESH_E2E_URL is unset (the unit suite in mcp.test.mjs covers the same rules).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { base32Decode, hotp, pkceChallenge } from './mcp-oauth-service.ts';
+import { HOTP, Secret } from 'otpauth';
+import { pkceChallenge } from './mcp-oauth-service.ts';
 
 const BASE = process.env.MESH_E2E_URL;
 const SECRET = process.env.MESH_E2E_TOTP_SECRET;
@@ -29,10 +30,10 @@ async function connect(scope, step) {
   });
   const html = await (await fetch(`${BASE}/oauth/authorize?${q}`)).text();
   const request = /name="request" value="([^"]+)"/.exec(html)[1];
-  const code = await hotp(
-    base32Decode(SECRET),
-    Math.floor(Date.now() / 30_000) + step
-  );
+  const code = HOTP.generate({
+    secret: Secret.fromBase32(SECRET),
+    counter: Math.floor(Date.now() / 30_000) + step,
+  });
   const res = await fetch(`${BASE}/oauth/authorize`, {
     method: 'POST',
     redirect: 'manual',

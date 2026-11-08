@@ -64,29 +64,15 @@ The hyperagent board bridge lives at `scripts/hyperagent/board_bridge.py` (one c
 
 ## Remote MCP (`/mcp`, for claude.ai custom connectors)
 
-Streamable HTTP MCP (JSON responses) with an OAuth 2.1 server in the same worker
-(`src/mcp-oauth.ts`, state in the `McpAuth` Durable Object). Tools map one-to-one onto
-existing hub routes and act as identity `tim`: `board_list`, `board_get`, `board_post`,
-`board_claim`, `board_update`, `board_done`, `board_answer`, `mailbox_read`, `mailbox_send`,
-`agents_list`. The hub's own validation, secret scan and limits still apply.
+MCP `2025-06-18` Streamable HTTP (JSON) and OAuth 2.1 run in the existing worker, with durable state in `McpAuth` (`src/mcp-oauth.ts`). Ten tools call existing hub routes as `tim`, retaining hub validation, secret scanning and limits: `board_list`, `board_get`, `board_post`, `board_claim`, `board_update`, `board_done`, `board_answer`, `mailbox_read`, `mailbox_send`, `agents_list`.
 
-- **Owner-only consent.** DCR is open, so registering a client grants nothing. A code is only
-  minted after the consent page receives a valid TOTP code from `MCP_OWNER_TOTP_SECRET`
-  (Tim's authenticator). No secret set means every authorization is refused. Wrong codes:
-  5 per 15 min or 20 per 24 h lock consent. A TOTP step is accepted once.
-- **Scopes** chosen on the consent page: `mesh:read` or `mesh:read mesh:write`. A read-only
-  token never sees or runs write tools.
-- **Tokens:** PKCE S256 only, public clients, codes 60 s and single use (reuse revokes), access
-  1 h, refresh 30 d rotating (reuse revokes). Only sha256 is stored.
-- **Revoke:** `POST /oauth/revoke`, or admin `GET /v1/admin/mcp/grants` and
-  `POST /v1/admin/mcp/revoke {grantId}|{all:true}` (HUB_ADMIN_TOKEN).
-- **Limits:** 20 client registrations/h, 200 clients, 100 pending approvals, 25 grants,
-  120 calls/min and 30 write calls/min per grant, 64 KB request bodies, 20 batched messages.
-- **Setup:** `openssl rand 20 | base32` (or any 20+ random bytes as base32), add it to an
-  authenticator app as a TOTP account (SHA-1, 6 digits, 30 s), then
-  `wrangler secret put MCP_OWNER_TOTP_SECRET`. Connector URL: `https://<hub host>/mcp`.
-- **Live check:** `src/mcp.e2e.test.mjs` runs the whole flow against `wrangler dev`
-  (`MESH_E2E_URL`, `MESH_E2E_TOTP_SECRET`); skipped otherwise.
+- **Consent:** Open DCR grants nothing. OTPAuth 9.6.0 verifies owner TOTP from `MCP_OWNER_TOTP_SECRET` (SHA-1, six digits, 30 s); an unset/invalid secret refuses authorization. Each step works once. Five wrong codes per 15 min or 20 per day lock consent.
+- **Scopes:** The owner chooses `mesh:read` or `mesh:read mesh:write`. Read-only grants cannot see or run writes.
+- **Tokens:** Public clients, PKCE S256 and exact redirect matching; single-use codes last 60 s, access tokens 1 h, rotating refresh tokens 30 d. Code/refresh reuse revokes the grant. Only SHA-256 hashes are stored.
+- **Revoke:** `POST /oauth/revoke`, or admin `GET /v1/admin/mcp/grants` and `POST /v1/admin/mcp/revoke {grantId}|{all:true}` with `HUB_ADMIN_TOKEN`.
+- **Limits:** 20 registrations/h, 200 clients, 100 pending approvals, 25 grants, 120 calls/min and 30 writes/min per grant, 64 KB bodies; JSON-RPC batches are refused (MCP `2025-06-18`). Oversized results fail explicitly; mailbox messages stay unacknowledged until a smaller page fits.
+- **Setup:** Generate 20+ random bytes as base32, add the secret to an authenticator, then use `wrangler secret put MCP_OWNER_TOTP_SECRET`. Connector: `https://<hub host>/mcp`.
+- **Live check:** `src/mcp.e2e.test.mjs` exercises `wrangler dev` when `MESH_E2E_URL` and `MESH_E2E_TOTP_SECRET` are set; otherwise it skips.
 
 ## Operate
 

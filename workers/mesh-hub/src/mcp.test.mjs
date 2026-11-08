@@ -1,133 +1,24 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { sqlite } from './core.test.mjs';
-import { handleMcpHttp } from './mcp-http.ts';
-import { OAUTH, OAuthStore } from './mcp-oauth.ts';
 import {
-  b64url,
-  base32Decode,
-  callService,
-  hotp,
-  OAuthService,
-  pkceChallenge,
-} from './mcp-oauth-service.ts';
-
-const ORIGIN = 'https://hub.test';
-const REDIRECT = 'https://claude.ai/api/mcp/auth_callback';
-// Base32 of the RFC 6238 test key "12345678901234567890".
-const SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
-
-async function currentCode(now) {
-  return hotp(base32Decode(SECRET), Math.floor(now / 30_000));
-}
-
-function rig({ secret = SECRET } = {}) {
-  const clock = { now: 1_800_000_000_000 };
-  const svc = new OAuthService(
-    new OAuthStore(sqlite()),
-    () => secret,
-    () => clock.now
-  );
-  const calls = [];
-  const h = {
-    api: (method, ...args) => callService(svc, method, args),
-    backend: async (method, path, body) => {
-      calls.push({ method, path, body });
-      return { status: 200, json: { ok: true, path } };
-    },
-    newCorrelationId: () => 'tim-mcp-test-0001',
-  };
-  const req = (path, init = {}) => {
-    const request = new Request(ORIGIN + path, init);
-    return handleMcpHttp(request, new URL(request.url), h);
-  };
-  return { svc, clock, calls, req };
-}
-
-async function register(r) {
-  const res = await r.req('/oauth/register', {
-    method: 'POST',
-    body: JSON.stringify({ client_name: 'Claude', redirect_uris: [REDIRECT] }),
-  });
-  assert.equal(res.status, 201);
-  return (await res.json()).client_id;
-}
-
-const verifier = 'v'.repeat(64);
-
-async function startAuthorize(r, clientId, extra = {}) {
-  const params = new URLSearchParams({
-    client_id: clientId,
-    redirect_uri: REDIRECT,
-    response_type: 'code',
-    code_challenge: await pkceChallenge(verifier),
-    code_challenge_method: 'S256',
-    state: 'st1',
-    ...extra,
-  });
-  const res = await r.req(`/oauth/authorize?${params}`);
-  return res;
-}
-
-async function requestIdFrom(res) {
-  const html = await res.text();
-  const match = /name="request" value="([^"]+)"/.exec(html);
-  assert.ok(match, 'consent page carries a request id');
-  return match[1];
-}
-
-function approve(
-  r,
-  request,
-  code,
-  scope = 'mesh:read mesh:write',
-  origin = ORIGIN
-) {
-  return r.req('/oauth/authorize', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      ...(origin ? { Origin: origin } : {}),
-    },
-    body: new URLSearchParams({
-      request,
-      code,
-      scope,
-      decision: 'approve',
-    }).toString(),
-  });
-}
-
-async function connect(r, scope) {
-  const clientId = await register(r);
-  const request = await requestIdFrom(await startAuthorize(r, clientId));
-  const res = await approve(r, request, await currentCode(r.clock.now), scope);
-  assert.equal(res.status, 303);
-  const location = new URL(res.headers.get('Location'));
-  assert.equal(location.searchParams.get('state'), 'st1');
-  const code = location.searchParams.get('code');
-  const token = await r.req('/oauth/token', {
-    method: 'POST',
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      client_id: clientId,
-      code,
-      redirect_uri: REDIRECT,
-      code_verifier: verifier,
-    }).toString(),
-  });
-  return { clientId, code, token, body: await token.clone().json() };
-}
-
-const rpc = (r, access, method, params, id = 1) =>
-  r.req('/mcp', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${access}` },
-    body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
-  });
+  approve,
+  connect,
+  currentCode,
+  ORIGIN,
+  REDIRECT,
+  register,
+  requestIdFrom,
+  rig,
+  rpc,
+  SECRET,
+  startAuthorize,
+  verifier,
+} from './fixtures/mcp.mjs';
+import { OAUTH } from './mcp-oauth.ts';
+import { b64url, totpCandidates } from './mcp-oauth-service.ts';
 
 test('TOTP matches the RFC 6238 vector', async () => {
-  assert.equal(await hotp(base32Decode(SECRET), Math.floor(59 / 30)), '287082');
+  assert.equal((await totpCandidates(SECRET, 59_000))[1].code, '287082');
 });
 
 test('discovery documents advertise S256 PKCE, DCR and public clients', async () => {
@@ -398,7 +289,7 @@ test('tools/list and tools/call smoke with a read+write token', async () => {
   });
   const sent = r.calls.at(-1);
   assert.equal(sent.path, '/v1/send');
-  assert.equal(sent.body.correlationId, 'tim-mcp-test-0001');
+  assert.match(sent.body.correlationId, /^tim-mcp-[a-f0-9-]+$/);
   assert.match(sent.body.sha256, /^[a-f0-9]{64}$/);
   const notification = await r.req('/mcp', {
     method: 'POST',
@@ -504,4 +395,24 @@ test('a client older than a day is not pruned while it authorizes; same-origin f
   assert.equal(res.status, 303);
   const consent = await startAuthorize(r, clientId);
   assert.equal(consent.headers.get('Referrer-Policy'), 'same-origin');
+});
+
+test('MCP 2025-06-18 refuses JSON-RPC batches without executing tools', async () => {
+  const r = rig();
+  const { body } = await connect(r, 'mesh:read mesh:write');
+  const res = await r.req('/mcp', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${body.access_token}` },
+    body: JSON.stringify([
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'board_post', arguments: { title: 'never run' } },
+      },
+    ]),
+  });
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).error.code, -32600);
+  assert.equal(r.calls.length, 0);
 });

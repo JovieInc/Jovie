@@ -46,8 +46,12 @@ function board(env: Env) {
   return env.BOARD.get(env.BOARD.idFromName('board'));
 }
 function mcpApi(env: Env): Api {
-  const stub = env.MCP_AUTH.get(env.MCP_AUTH.idFromName('mcp-auth'));
-  return ((method, ...args) => stub.call(method, args)) as Api;
+  return (async (method, ...args) => {
+    const stub = env.MCP_AUTH.get(env.MCP_AUTH.idFromName('mcp-auth'));
+    const out = await stub.call(method, args);
+    if (!out.ok) throw new HubError(out.status, out.code);
+    return out.value;
+  }) as Api;
 }
 function mailbox(env: Env, kind: string) {
   return env.MAILBOX.get(env.MAILBOX.idFromName(kind));
@@ -282,25 +286,22 @@ async function route(request: Request, env: Env): Promise<Response> {
       }
     }
     if (path === '/v1/admin/mcp/grants' && request.method === 'GET') {
-      const out = await mcpApi(env)('grants' as never);
-      return json(200, { ok: true, grants: out.ok ? out.value : [] });
+      const out = await mcpApi(env)('grants');
+      return json(200, { ok: true, grants: out });
     }
     if (path === '/v1/admin/mcp/revoke' && request.method === 'POST') {
       const body = (await readJson(request)) as {
         grantId?: string;
         all?: boolean;
       };
-      const api = mcpApi(env) as unknown as (
-        m: string,
-        ...a: unknown[]
-      ) => Promise<{ ok: boolean; value?: unknown }>;
-      if (body?.all === true)
-        return json(200, { ok: true, revoked: (await api('revokeAll')).value });
-      if (typeof body?.grantId === 'string')
-        return json(200, {
-          ok: true,
-          revoked: (await api('revokeGrant', body.grantId)).value,
-        });
+      const api = mcpApi(env);
+      const out =
+        body?.all === true
+          ? await api('revokeAll')
+          : typeof body?.grantId === 'string'
+            ? await api('revokeGrant', body.grantId)
+            : null;
+      if (out !== null) return json(200, { ok: true, revoked: out });
       return failure(422, 'invalid_revoke');
     }
     if (path === '/v1/admin/sweep' && request.method === 'POST')
@@ -311,7 +312,6 @@ async function route(request: Request, env: Env): Promise<Response> {
     api: mcpApi(env),
     backend: (method, apiPath, body) =>
       asTim(env, url.origin, method, apiPath, body),
-    newCorrelationId: () => `tim-mcp-${crypto.randomUUID()}`,
   });
   if (mcp) return mcp;
   return authed(request, env, await authenticate(request, env), url);

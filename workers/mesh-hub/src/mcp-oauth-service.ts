@@ -1,9 +1,11 @@
+import { HOTP, Secret } from 'otpauth';
 /**
  * TOTP owner proof, PKCE helpers and the async service over OAuthStore (see mcp-oauth.ts for
  * the security model). The service hashes/derives values, then makes one synchronous store call.
  */
 import { HubError, sha256Hex } from './core.ts';
 import {
+  fail,
   type Issued,
   OAUTH,
   OAuthStore,
@@ -11,74 +13,26 @@ import {
   type Scope,
 } from './mcp-oauth.ts';
 
-// ---- TOTP (RFC 6238, SHA-1, 6 digits, 30 s) ---------------------------------------------
-
-const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-export function base32Decode(input: string): Uint8Array<ArrayBuffer> {
-  const clean = input.replace(/[\s=-]/g, '').toUpperCase();
-  let bits = 0;
-  let value = 0;
-  const out: number[] = [];
-  for (const ch of clean) {
-    const idx = B32.indexOf(ch);
-    if (idx < 0) throw new Error('invalid base32');
-    value = (value << 5) | idx;
-    bits += 5;
-    if (bits >= 8) {
-      out.push((value >>> (bits - 8)) & 0xff);
-      bits -= 8;
-    }
-  }
-  return new Uint8Array(out) as Uint8Array<ArrayBuffer>;
+function ownerKey(encoded: string) {
+  const key = Secret.fromBase32(encoded.replace(/[\s=-]/g, '').toUpperCase());
+  if (key.buffer.byteLength < 10) throw new Error('owner secret too short');
+  return key;
 }
 
-export async function hotp(
-  secret: Uint8Array<ArrayBuffer>,
-  counter: number
-): Promise<string> {
-  const msg = new Uint8Array(8);
-  new DataView(msg.buffer).setUint32(0, Math.floor(counter / 2 ** 32));
-  new DataView(msg.buffer).setUint32(4, counter >>> 0);
-  const key = await crypto.subtle.importKey(
-    'raw',
-    secret,
-    { name: 'HMAC', hash: 'SHA-1' },
-    false,
-    ['sign']
-  );
-  const mac = new Uint8Array(await crypto.subtle.sign('HMAC', key, msg));
-  const offset = mac[mac.length - 1]! & 0x0f;
-  const bin =
-    ((mac[offset]! & 0x7f) << 24) |
-    (mac[offset + 1]! << 16) |
-    (mac[offset + 2]! << 8) |
-    mac[offset + 3]!;
-  return String(bin % 1_000_000).padStart(6, '0');
-}
-
-/** The valid codes for now-30 s, now and now+30 s. */
-export async function totpCandidates(secretBase32: string, now: number) {
-  const secret = base32Decode(secretBase32);
-  if (secret.length < 10) throw new Error('owner secret too short');
+/** RFC 6238: SHA-1, six digits, 30 s, with one step of clock skew. */
+export async function totpCandidates(encoded: string, now: number) {
+  const secret = ownerKey(encoded);
   const step = Math.floor(now / 30_000);
-  return Promise.all(
-    [step - 1, step, step + 1].map(async s => ({
-      step: s,
-      code: await hotp(secret, s),
-    }))
-  );
+  return [step - 1, step, step + 1].map(counter => ({
+    step: counter,
+    code: HOTP.generate({ secret, counter, algorithm: 'SHA1', digits: 6 }),
+  }));
 }
 
 // ---- Service ---------------------------------------------------------------------------
 
-const fail = (status: number, code: string): never => {
-  throw new HubError(status, code);
-};
-
-const randomToken = (prefix: string, bytes = 32) => {
-  const raw = crypto.getRandomValues(new Uint8Array(bytes));
-  return `${prefix}${b64url(raw)}`;
-};
+const randomToken = (prefix: string, bytes = 32) =>
+  `${prefix}${b64url(crypto.getRandomValues(new Uint8Array(bytes)))}`;
 export const b64url = (bytes: Uint8Array) =>
   btoa(String.fromCharCode(...bytes))
     .replace(/\+/g, '-')
@@ -98,12 +52,8 @@ const CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
 
 function validRedirect(uri: string): boolean {
   if (uri.length > OAUTH.maxUriChars) return false;
-  let url: URL;
-  try {
-    url = new URL(uri);
-  } catch {
-    return false;
-  }
+  if (!URL.canParse(uri)) return false;
+  const url = new URL(uri);
   if (url.hash || url.username || url.password) return false;
   if (url.protocol === 'https:') return true;
   return (
@@ -116,14 +66,11 @@ export function parseScope(
   raw: string | null | undefined,
   fallback: readonly Scope[]
 ): Scope[] {
-  if (!raw?.trim()) return [...fallback];
-  const out = new Set<Scope>();
-  for (const part of raw.trim().split(/\s+/)) {
-    if (!(OAUTH.scopes as readonly string[]).includes(part))
-      return fail(400, 'invalid_scope');
-    out.add(part as Scope);
-  }
-  return [...out];
+  const scope = raw?.trim().split(/\s+/).filter(Boolean) ?? [];
+  if (!scope.length) return [...fallback];
+  if (scope.some(s => !(OAUTH.scopes as readonly string[]).includes(s)))
+    return fail(400, 'invalid_scope');
+  return [...new Set(scope)] as Scope[];
 }
 
 export class OAuthService {
@@ -142,19 +89,13 @@ export class OAuthService {
 
   ownerConfigured(): boolean {
     try {
-      return (
-        !!this.ownerSecret() && base32Decode(this.ownerSecret()!).length >= 10
-      );
+      return Boolean(this.ownerSecret() && ownerKey(this.ownerSecret()!));
     } catch {
       return false;
     }
   }
 
-  register(body: unknown): {
-    client_id: string;
-    client_name: string;
-    redirect_uris: string[];
-  } {
+  register(body: unknown) {
     const b = (body ?? {}) as Record<string, unknown>;
     const uris = b.redirect_uris;
     if (
@@ -186,13 +127,7 @@ export class OAuthService {
     return this.store.client(id);
   }
 
-  async begin(p: {
-    clientId: string;
-    redirectUri: string;
-    state: string | null;
-    challenge: string;
-    scope: Scope[];
-  }): Promise<string> {
+  async begin(p: Parameters<OAuthStore['begin']>[1]): Promise<string> {
     if (!CHALLENGE.test(p.challenge)) return fail(400, 'invalid_request');
     const raw = randomToken('mcp_p_');
     this.store.begin(await sha256Hex(raw), p, this.clock());
@@ -205,6 +140,7 @@ export class OAuthService {
 
   async deny(raw: string) {
     this.store.deny(await sha256Hex(raw));
+    return true;
   }
 
   /** Owner approves. Returns the redirect target data plus the raw one-time code. */
@@ -229,13 +165,8 @@ export class OAuthService {
     return { ...out, code };
   }
 
-  async token(form: URLSearchParams): Promise<{
-    access_token: string;
-    refresh_token: string;
-    token_type: 'Bearer';
-    expires_in: number;
-    scope: string;
-  }> {
+  async token(encoded: URLSearchParams | string) {
+    const form = new URLSearchParams(encoded);
     const grantType = form.get('grant_type');
     const clientId = form.get('client_id') ?? '';
     if (!this.store.client(clientId)) return fail(401, 'invalid_client');
@@ -272,7 +203,7 @@ export class OAuthService {
     return {
       access_token: access,
       refresh_token: refresh,
-      token_type: 'Bearer',
+      token_type: 'Bearer' as const,
       expires_in: issued.expiresIn,
       scope: issued.scope,
     };
@@ -288,6 +219,7 @@ export class OAuthService {
 
   async revoke(rawToken: string, clientId: string | null) {
     this.store.revokeToken(await sha256Hex(rawToken), clientId, this.clock());
+    return true;
   }
 
   revokeAll() {
@@ -312,55 +244,16 @@ export async function callService(
   { ok: true; value: unknown } | { ok: false; status: number; code: string }
 > {
   try {
-    switch (method) {
-      case 'ownerConfigured':
-        return { ok: true, value: svc.ownerConfigured() };
-      case 'register':
-        return { ok: true, value: svc.register(args[0]) };
-      case 'client':
-        return { ok: true, value: svc.client(String(args[0])) };
-      case 'begin':
-        return {
-          ok: true,
-          value: await svc.begin(
-            args[0] as Parameters<OAuthService['begin']>[0]
-          ),
-        };
-      case 'pending':
-        return { ok: true, value: await svc.pending(String(args[0])) };
-      case 'deny':
-        await svc.deny(String(args[0]));
-        return { ok: true, value: true };
-      case 'consent':
-        return {
-          ok: true,
-          value: await svc.consent(
-            String(args[0]),
-            String(args[1]),
-            args[2] as Scope[]
-          ),
-        };
-      case 'token':
-        return {
-          ok: true,
-          value: await svc.token(new URLSearchParams(String(args[0]))),
-        };
-      case 'authenticate':
-        return { ok: true, value: await svc.authenticate(String(args[0])) };
-      case 'allowWrite':
-        return { ok: true, value: svc.allowWrite(String(args[0])) };
-      case 'revoke':
-        await svc.revoke(String(args[0]), args[1] ? String(args[1]) : null);
-        return { ok: true, value: true };
-      case 'grants':
-        return { ok: true, value: svc.grants() };
-      case 'revokeAll':
-        return { ok: true, value: svc.revokeAll() };
-      case 'revokeGrant':
-        return { ok: true, value: svc.revokeGrant(String(args[0])) };
-      default:
-        return { ok: false, status: 404, code: 'not_found' };
-    }
+    // Only explicit service methods cross the internal RPC boundary; never prototype helpers.
+    if (
+      method === 'constructor' ||
+      !Object.hasOwn(OAuthService.prototype, method)
+    )
+      return { ok: false, status: 404, code: 'not_found' };
+    const call = svc[method as keyof OAuthService] as (
+      ...values: unknown[]
+    ) => unknown;
+    return { ok: true, value: await call.apply(svc, args) };
   } catch (error) {
     if (error instanceof HubError)
       return { ok: false, status: error.status, code: error.code };

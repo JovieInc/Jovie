@@ -1,32 +1,14 @@
-/**
- * HTTP surface for the hub's remote MCP server: OAuth metadata, Dynamic Client Registration,
- * the owner consent page, token and revocation endpoints, and `/mcp` itself.
- * The security-critical rules live in mcp-oauth.ts; this file only parses and renders.
- */
-import { HubError, sha256Hex } from './core.ts';
-import { type Backend, handleRpc } from './mcp.ts';
-import { OAUTH, type Principal, type Scope } from './mcp-oauth.ts';
-import { parseScope } from './mcp-oauth-service.ts';
+/** OAuth HTTP parsing/consent and authenticated MCP transport; state lives in McpAuth. */
+import { HubError } from './core.ts';
+import { type Backend, handleRpc, rpcError } from './mcp.ts';
+import { OAUTH, type Scope } from './mcp-oauth.ts';
+import { type OAuthService, parseScope } from './mcp-oauth-service.ts';
 
 /** Methods the Durable Object exposes; errors come back as values. */
-export type ApiResult<T = unknown> =
-  | { ok: true; value: T }
-  | { ok: false; status: number; code: string };
-export type Api = <T = unknown>(
-  method:
-    | 'ownerConfigured'
-    | 'register'
-    | 'client'
-    | 'begin'
-    | 'pending'
-    | 'deny'
-    | 'consent'
-    | 'token'
-    | 'authenticate'
-    | 'allowWrite'
-    | 'revoke',
-  ...args: unknown[]
-) => Promise<ApiResult<T>>;
+export type Api = <M extends keyof OAuthService>(
+  method: M,
+  ...args: M extends 'token' ? [string] : Parameters<OAuthService[M]>
+) => Promise<Awaited<ReturnType<OAuthService[M]>>>;
 
 const SECURITY_HEADERS = {
   'Cache-Control': 'no-store',
@@ -54,11 +36,7 @@ const json = (
       ...extra,
     },
   });
-const oauthError = (status: number, error: string, description?: string) =>
-  json(status, {
-    error,
-    ...(description ? { error_description: description } : {}),
-  });
+const oauthError = (status: number, error: string) => json(status, { error });
 
 const MAX_FORM = 8_192;
 const MAX_MCP = 65_536;
@@ -143,17 +121,7 @@ function redirectTo(
   });
 }
 
-const fromResult = <T>(r: ApiResult<T>): T => {
-  if (!r.ok) throw new HubError(r.status, r.code);
-  return r.value;
-};
-
-type Handlers = {
-  api: Api;
-  /** Calls the hub's own authed routes as identity `tim`. */
-  backend: Backend;
-  newCorrelationId: () => string;
-};
+type Handlers = { api: Api; backend: Backend };
 
 export async function handleMcpHttp(
   request: Request,
@@ -162,14 +130,7 @@ export async function handleMcpHttp(
 ): Promise<Response | null> {
   const path = url.pathname;
   const origin = url.origin;
-  if (
-    !(
-      path === '/mcp' ||
-      path.startsWith('/oauth/') ||
-      path.startsWith('/.well-known/oauth-')
-    )
-  )
-    return null;
+  if (!/^\/(?:mcp$|oauth\/|\.well-known\/oauth-)/.test(path)) return null;
   if (request.method === 'OPTIONS')
     return new Response(null, {
       status: 204,
@@ -180,7 +141,12 @@ export async function handleMcpHttp(
   } catch (error) {
     if (error instanceof HubError) {
       if (path === '/oauth/authorize')
-        return errorPage(error.status, `Request refused (${error.code}).`);
+        return errorPage(
+          error.status,
+          error.code === 'consent_locked'
+            ? 'Too many wrong codes. Try again later.'
+            : `Request refused (${error.code}).`
+        );
       if (path === '/mcp')
         return json(
           error.status,
@@ -196,15 +162,13 @@ export async function handleMcpHttp(
 const challenge = (origin: string, error?: string) =>
   `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource"${error ? `, error="${error}"` : ''}`;
 
+const OAUTH_ERRORS = new Set(
+  'invalid_grant invalid_client invalid_scope unsupported_grant_type invalid_redirect_uri invalid_request'.split(
+    ' '
+  )
+);
 const mapError = (code: string) =>
-  ({
-    invalid_grant: 'invalid_grant',
-    invalid_client: 'invalid_client',
-    invalid_scope: 'invalid_scope',
-    unsupported_grant_type: 'unsupported_grant_type',
-    invalid_redirect_uri: 'invalid_redirect_uri',
-    invalid_request: 'invalid_request',
-  })[code] ?? 'invalid_request';
+  OAUTH_ERRORS.has(code) ? code : 'invalid_request';
 
 async function dispatch(
   request: Request,
@@ -245,13 +209,7 @@ async function dispatch(
       if (error instanceof HubError) throw error;
       return oauthError(400, 'invalid_client_metadata');
     }
-    const out = fromResult(
-      await h.api<{
-        client_id: string;
-        client_name: string;
-        redirect_uris: string[];
-      }>('register', body)
-    );
+    const out = await h.api('register', body);
     return json(201, {
       ...out,
       token_endpoint_auth_method: 'none',
@@ -265,14 +223,14 @@ async function dispatch(
     return authorizePost(request, origin, h);
   if (method === 'POST' && path === '/oauth/token') {
     const form = new URLSearchParams(await readText(request, MAX_FORM));
-    const out = fromResult(await h.api('token', form.toString()));
+    const out = await h.api('token', form.toString());
     return json(200, out);
   }
   if (method === 'POST' && path === '/oauth/revoke') {
     const form = new URLSearchParams(await readText(request, MAX_FORM));
     const token = form.get('token');
     if (token && token.length <= 512)
-      fromResult(await h.api('revoke', token, form.get('client_id')));
+      await h.api('revoke', token, form.get('client_id'));
     return json(200, {});
   }
   if (path === '/mcp') return mcp(request, origin, h);
@@ -281,19 +239,14 @@ async function dispatch(
 
 async function authorizeGet(url: URL, h: Handlers): Promise<Response> {
   const q = url.searchParams;
-  if (!fromResult(await h.api<boolean>('ownerConfigured')))
+  if (!(await h.api('ownerConfigured')))
     return errorPage(
       503,
       'Owner verification is not configured on this hub, so no connector can be authorized.'
     );
   const clientId = q.get('client_id') ?? '';
   const redirectUri = q.get('redirect_uri') ?? '';
-  const client = fromResult(
-    await h.api<{ id: string; name: string; uris: string[] } | null>(
-      'client',
-      clientId
-    )
-  );
+  const client = await h.api('client', clientId);
   // Never redirect to an unverified URI: these two failures render an error page.
   if (!client) return errorPage(400, 'Unknown client.');
   if (!client.uris.includes(redirectUri))
@@ -314,16 +267,14 @@ async function authorizeGet(url: URL, h: Handlers): Promise<Response> {
   } catch {
     return fail('invalid_scope');
   }
-  const begun = await h.api<string>('begin', {
+  const begun = await h.api('begin', {
     clientId,
     redirectUri,
     state: state && state.length <= 512 ? state : null,
-    challenge: q.get('code_challenge'),
+    challenge: q.get('code_challenge') ?? '',
     scope,
   });
-  if (!begun.ok)
-    return errorPage(begun.status, `Request refused (${begun.code}).`);
-  return consentPage(begun.value, client, redirectUri, scope);
+  return consentPage(begun, client, redirectUri, scope);
 }
 
 async function authorizePost(
@@ -339,14 +290,7 @@ async function authorizePost(
     return errorPage(403, 'Cross-site request refused.');
   const form = new URLSearchParams(await readText(request, MAX_FORM));
   const requestId = form.get('request') ?? '';
-  const pending = fromResult(
-    await h.api<{
-      client: { name: string };
-      redirectUri: string;
-      state: string | null;
-      scope: Scope[];
-    } | null>('pending', requestId)
-  );
+  const pending = await h.api('pending', requestId);
   if (!pending)
     return errorPage(
       400,
@@ -366,13 +310,20 @@ async function authorizePost(
   } catch {
     return errorPage(400, 'Invalid scope.');
   }
-  const out = await h.api<{
-    redirectUri: string;
-    state: string | null;
-    code: string;
-  }>('consent', requestId, form.get('code') ?? '', scope);
-  if (!out.ok) {
-    if (out.code === 'invalid_owner_code')
+  try {
+    const out = await h.api(
+      'consent',
+      requestId,
+      form.get('code') ?? '',
+      scope
+    );
+    return redirectTo(out.redirectUri, {
+      code: out.code,
+      state: out.state,
+      iss: origin,
+    });
+  } catch (error) {
+    if (error instanceof HubError && error.code === 'invalid_owner_code')
       return consentPage(
         requestId,
         pending.client,
@@ -380,18 +331,8 @@ async function authorizePost(
         pending.scope,
         'That code was not accepted.'
       );
-    return errorPage(
-      out.status,
-      out.code === 'consent_locked'
-        ? 'Too many wrong codes. Try again later.'
-        : `Request refused (${out.code}).`
-    );
+    throw error;
   }
-  return redirectTo(out.value.redirectUri, {
-    code: out.value.code,
-    state: out.value.state,
-    iss: origin,
-  });
 }
 
 async function mcp(
@@ -407,9 +348,8 @@ async function mcp(
       { error: 'unauthorized' },
       { 'WWW-Authenticate': challenge(origin) }
     );
-  const auth = await h.api<Principal | null>('authenticate', token);
-  if (!auth.ok) return json(auth.status, { error: auth.code });
-  if (!auth.value)
+  const principal = await h.api('authenticate', token);
+  if (!principal)
     return json(
       401,
       { error: 'invalid_token' },
@@ -422,40 +362,20 @@ async function mcp(
     body = JSON.parse(await readText(request, MAX_MCP));
   } catch (error) {
     if (error instanceof HubError) throw error;
-    return json(400, {
-      jsonrpc: '2.0',
-      id: null,
-      error: { code: -32700, message: 'Parse error' },
-    });
+    return json(400, rpcError(null, -32700, 'Parse error'));
   }
-  const principal = auth.value;
   const ctx = {
     scope: principal.scope,
     backend: h.backend,
-    allowWrite: async () => {
-      const allowed = await h.api<boolean>('allowWrite', principal.grantId);
-      return allowed.ok && allowed.value;
-    },
-    newCorrelationId: h.newCorrelationId,
-    sha256: sha256Hex,
+    allowWrite: () => h.api('allowWrite', principal.grantId),
   };
-  const batch = Array.isArray(body);
-  const messages = batch ? (body as unknown[]) : [body];
-  if (!messages.length || messages.length > 20)
-    return json(400, {
-      jsonrpc: '2.0',
-      id: null,
-      error: { code: -32600, message: 'Invalid batch' },
-    });
-  const results: object[] = [];
-  for (const message of messages) {
-    const out = await handleRpc(message, ctx);
-    if (out) results.push(out);
-  }
-  if (!results.length)
-    return new Response(null, {
-      status: 202,
-      headers: { ...SECURITY_HEADERS, ...CORS },
-    });
-  return json(200, batch ? results : results[0]);
+  if (Array.isArray(body))
+    return json(400, rpcError(null, -32600, 'Invalid Request'));
+  const out = await handleRpc(body, ctx);
+  return out
+    ? json(200, out)
+    : new Response(null, {
+        status: 202,
+        headers: { ...SECURITY_HEADERS, ...CORS },
+      });
 }

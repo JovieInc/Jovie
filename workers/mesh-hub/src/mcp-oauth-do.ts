@@ -5,15 +5,10 @@ import { callService, OAuthService } from './mcp-oauth-service.ts';
 
 /** Durable home of the MCP OAuth server state (singleton). All auth state lives here. */
 export class McpAuth extends DurableObject<Env> {
-  private readonly svc: OAuthService;
-
-  constructor(ctx: DurableObjectState, env: Env) {
-    super(ctx, env);
-    this.svc = new OAuthService(
-      new OAuthStore(ctx.storage.sql),
-      () => this.env.MCP_OWNER_TOTP_SECRET
-    );
-  }
+  private readonly svc = new OAuthService(
+    new OAuthStore(this.ctx.storage.sql),
+    () => this.env.MCP_OWNER_TOTP_SECRET
+  );
 
   async call(method: string, args: unknown[]) {
     return callService(this.svc, method, args) as Promise<
