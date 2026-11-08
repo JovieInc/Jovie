@@ -242,10 +242,12 @@ async function recordJank(currentPage: Page, surface: string): Promise<void> {
           }
         )
     );
+    // The contract ledger keys on contract and dimension, so the dimension
+    // names the surface: one surface's jank must not overwrite another's.
     recordCertObservation({
       surface,
       contractId: 'jank.cls',
-      dimension: 'stability',
+      dimension: `stability:${surface}`,
       value: jank.cls,
       unit: 'score',
     });
@@ -253,7 +255,7 @@ async function recordJank(currentPage: Page, surface: string): Promise<void> {
     recordCertObservation({
       surface,
       contractId: 'jank.worst-frame-ms',
-      dimension: 'responsiveness',
+      dimension: `responsiveness:${surface}`,
       value: jank.worstFrameMs,
       unit: 'ms',
     });
