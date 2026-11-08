@@ -888,8 +888,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:policy
-    jobCount: 1
+    terminalReceipt: job:bump
+    jobCount: 2
   - name: Publish @jovie/cli to npm
     path: .github/workflows/npm-publish.yml
     active: true
