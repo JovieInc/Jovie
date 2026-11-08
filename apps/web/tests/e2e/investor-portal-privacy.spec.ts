@@ -91,7 +91,7 @@ test.describe('investor portal with an admin session', () => {
       expect(response?.status()).toBe(200);
 
       const targets = [
-        page.getByRole('link', { name: 'Jovie Home' }),
+        page.getByRole('link', { name: 'Powered by Jovie Home' }),
         page.getByRole('link', { name: 'Request A Meeting' }).first(),
         ...(await page.locator('summary').all()),
       ];

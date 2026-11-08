@@ -158,8 +158,8 @@ Profile is historical ledger drift, not a reason to change the current code.
 ## macOS screen and state registry
 
 `apps/macos` contains one macOS **Swift** target: `MenuMonitor`, a
-menu-bar-only operator tool. The shipped Mac product / Ovie shell is Electron
-in `apps/desktop`. The [native Mac direction](../macos/ADR-swift-native-mac.md)
+menu-bar-only operator tool. The shipped Mac product is Electron
+in `apps/desktop`; Ovie is web at `/app/ov`, never native. The [native Mac direction](../macos/ADR-swift-native-mac.md)
 plans a separate `apps/ios/JovieMac` product target on shared iOS foundations;
 this registry does not certify that planned target or its parity. MenuMonitor
 is not a public artist

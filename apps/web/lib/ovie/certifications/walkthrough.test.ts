@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { fixturePacket, fixtureReceipt, fixtureRow } from './fixtures';
+import {
+  fixtureJudgeReceipt,
+  fixturePacket,
+  fixtureReceipt,
+  fixtureRow,
+} from './fixtures';
 import {
   appendTranscriptSegment,
   buildWalkthroughNotes,
@@ -242,6 +247,7 @@ describe('buildWalkthroughNotes', () => {
             'passed',
             'https://example.test/proof.webm'
           ),
+          fixtureJudgeReceipt('flow-a'),
         ],
       }),
     });

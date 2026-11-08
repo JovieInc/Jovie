@@ -1544,19 +1544,19 @@ describe('current acquisition source inventory (JOV-4065)', () => {
       binding => binding.kind === 'approved-section'
     );
     expect(entry.specVersion).toBe(MARKETING_SPEC_VERSION);
-    // EVENT 2026-10-20: the artist-profile homepage. The rendered contract
-    // (order, owners, copy, prices, media) lives in homepage-contract.test.
+    // EVENT 2026-11-03 invite-only homepage; rendered contract: homepage-contract.test.
     expect(bindings.map(binding => binding.sectionId)).toEqual(
       MARKETING_RECIPES.find(recipe => recipe.id === 'homepage')?.sectionOrder
     );
     expect(new Set(bindings.map(binding => binding.componentPath))).toEqual(
-      new Set(['apps/web/components/homepage/HomepageArtistProfile.tsx'])
+      new Set(['apps/web/components/homepage/HomepageEditorial.tsx'])
     );
     // Source inventory is separate from deployed mounted and visual certification.
     expect(entry.bindingEvidence.status).toBe('verified');
     expect(bindings.map(binding => binding.variantId)).toEqual([
-      'split-claim-card',
-      'profile-grid',
+      'centered-none',
+      'phone-right',
+      'release-rail',
       'final-single-claim',
     ]);
   });

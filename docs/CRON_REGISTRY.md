@@ -97,18 +97,14 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 | Cron Path | Schedule | Frequency |
 |-----------|----------|-----------|
 | `/api/cron/frequent` | `*/30 * * * *` | Every 30 minutes (cut 2026-10-29 from `*/15 * * * *`: zero-user cost cut) |
+| `/api/cron/queue-tick` | `*/30 * * * *` | Every 30 minutes: shared fail-safe drain for interview, ingestion, workflow-run and merch queues. Enqueue sites kick individual queues at insert time; per-queue routes remain callable. Replaces five direct schedules, including the voice-pipeline no-op, while preserving the zero-user polling cost cut. |
 | `/api/cron/daily-maintenance` | `0 0 * * *` | Daily at midnight UTC |
 | `/api/cron/generate-insights` | `0 5 * * *` | Daily at 05:00 UTC |
-| `/api/cron/process-ingestion-jobs` | `*/30 * * * *` | Every 30 minutes (cut 2026-10-29 from `*/6 * * * *`: zero-user cost cut) (JOV-2500: lets Neon 5min autosuspend reclaim compute) |
-| `/api/cron/process-merch-fulfillment` | `*/30 * * * *` | Every 30 minutes (cut 2026-10-29 from `*/10 * * * *`: zero-user cost cut) |
 | `/api/cron/purge-pixel-ips` | `0 3 * * *` | Daily at 03:00 UTC |
-| `/api/cron/summarize-interviews` | `0 * * * *` | Hourly (cut 2026-10-29 from `*/5 * * * *`: zero-user cost cut) |
 | `/api/cron/generate-playlist` | `0 6 * * *` | Daily at 06:00 UTC |
 | `/api/cron/process-pre-saves` | `0 2 * * *` | Daily at 02:00 UTC |
 | `/api/cron/monitor-metadata-submissions` | `0 * * * *` | Hourly |
 | `/api/cron/process-metadata-submissions` | `0 4 * * *` | Daily at 04:00 UTC |
-| `/api/cron/process-workflow-runs` | `0 * * * *` | Hourly (cut 2026-10-29 from `*/6 * * * *`: zero-user cost cut) (403 at the trusted-origin check on every call as of 2026-10-20) |
-| `/api/cron/voice-pipeline` | `0 * * * *` | Hourly (cut 2026-10-29 from `*/5 * * * *`: zero-user cost cut) (missing from the unused root `vercel.json`) |
 | `/api/cron/public-profile-canary` | `13 6 * * *` | Daily at 06:13 UTC |
 | `/api/cron/auth-signup-onboarding-canary` | `23 6 * * *` | Daily at 06:23 UTC (JOV-1871) |
 | `/api/cron/artist-daily-snapshots` | `15 9 * * *` | Daily at 09:15 UTC. No-op unless `ARTIST_DAILY_SNAPSHOTS` is true. YouTube Data API statistics when `YOUTUBE_DATA_API_KEY` is set; Wikimedia pageviews. Social HTML waits for isolated egress. |
@@ -175,10 +171,7 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | Route | maxDuration | Description | Also called by |
 |-------|-------------|-------------|----------------|
 | `/api/cron/generate-insights` | 300s | AI insights for eligible Pro/Founding/Growth profiles with sufficient click data | — |
-| `/api/cron/process-ingestion-jobs` | 300s | Claims up to 5 pending ingestion jobs, processes 3 concurrently | `frequent` (fallback) |
-| `/api/cron/process-merch-fulfillment` | 300s | Submits queued paid merch orders to Printful and confirms them idempotently | — |
 | `/api/cron/purge-pixel-ips` | 60s | NULLs `client_ip` from pixel events >48h old (privacy); retains `ip_hash` | — |
-| `/api/cron/summarize-interviews` | 300s (default) | Haiku-powered interview summarization; queued jobs stall without this schedule | — |
 | `/api/cron/generate-playlist` | 300s (default) | Daily AI playlist generation for admin review | — |
 | `/api/cron/process-pre-saves` | 300s (default) | Processes pending Spotify pre-saves where release date has passed; up to 500/run | — |
 | `/api/cron/cleanup-sms-intents` | 60s | Marks expired SMS subscribe intents and hard-deletes rows >24h old (no longer scheduled directly — called via `daily-maintenance` sub-job; file kept as admin escape hatch) | `daily-maintenance` |
@@ -196,6 +189,7 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | `/api/cron/public-profile-canary` | 30s | Lightweight HTTP health check: GET /tim, /tim/alerts, /tim/pay, POST /api/audience/visit; emits Sentry breadcrumb + writes Redis key for admin ops panel (JOV-1872) | — |
 | `/api/cron/auth-signup-onboarding-canary` | 30s | Lightweight HTTP golden-path check: GET /signup, /signin, /start, POST /api/chat onboarding probe; emits Sentry breadcrumb + writes Redis key for admin ops panel (JOV-1871) | — |
 | `/api/cron/artist-daily-snapshots` | 300s | Append-only official-API snapshots for a capped batch of known artists. Default-off (`ARTIST_DAILY_SNAPSHOTS`). Social HTML is not fetched from core. Failures fingerprint as `remediation:artist-snapshots`. | — |
+| `/api/cron/track-daily-snapshots` | 300s | Unscheduled, disabled by default. Requires explicit TRACK_DAILY_SNAPSHOTS=true and TRACK_DAILY_SNAPSHOT_USERNAMES; append-only per-song daily signals; idempotent per song, source and UTC day. Failures fingerprint as `remediation:track-snapshots`. | — |
 
 ## LLM Model Usage in Web App Crons
 

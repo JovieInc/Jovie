@@ -16,9 +16,10 @@ Summer → Symphony/Jovie Lanes path today:
   `lane-capacity.mjs`, `stale-lease-guard.mjs`). Team routes JOV/LYB are code, not
   model output (`deterministic-gates.mjs` `TEAM_ROUTES`).
 - **Workers:** `scripts/lanes/` Python harness (claude/codex/devin lanes) with
-  capacity limits, leases, and HOT ZONE claims. Hermes-Air is the always-on
-  ingestion node; the retired Elixir control plane lives in
-  `JovieInc/symphony-control` (see `docs/AGENT_OS_ARCHITECTURE.md`).
+  capacity limits, leases, and HOT ZONE claims. The MacBook Air is the Mac
+  lane, not an ingestion node (`.claude/rules/hermes-air.md`). The retired
+  Elixir control plane lives in `JovieInc/symphony-control`.
+  `docs/AGENT_OS_ARCHITECTURE.md` is a retired pointer.
 - **Bounded judgments:** `scripts/invariants/jev-gateway.mjs` provides Jev
   (`jev-shadow/v1`) typed evaluation behind fingerprinted, admission-bounded
   approvals with funding envelopes — exactly the "decision model for narrow

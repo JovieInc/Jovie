@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import type { ContentReviewIdentity } from './publication';
 
 /**
  * A content kind is one schema-validated shape that ships as data instead of
@@ -32,6 +33,22 @@ export interface ContentKindDefinition<T> {
    * record that throws or drops content cannot be stored.
    */
   readonly smoke?: (data: T, key: string) => readonly string[];
+  /**
+   * Same-version evidence from the real preview renderer. Structural/resolver
+   * checks above are not rendering evidence. No hook means no publication.
+   * Implementations must honor cancellation and return their observed binding.
+   */
+  readonly renderSmoke?: (input: {
+    readonly data: T;
+    readonly key: string;
+    readonly identity: ContentReviewIdentity;
+    readonly signal: AbortSignal;
+  }) => Promise<{
+    readonly reviewDigest: string;
+    readonly versionId: string;
+    readonly renderBuildId: string;
+    readonly errors: readonly string[];
+  }>;
   /** Paths to revalidate after the live pointer moves for `key`. */
   readonly livePaths: (key: string) => readonly string[];
   /**

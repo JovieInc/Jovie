@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GET as getLlmsTxt } from '@/app/llms.txt/route';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
-import { HOMEPAGE_COPY } from '@/data/homepageCopy';
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import {
   buildHomepageMarkdown,
   buildNotFoundMarkdown,
@@ -72,16 +72,18 @@ describe('agent-facing site copy positioning (JOV-7638 follow-up)', () => {
     );
   });
 
-  it('leads the homepage markdown with the general identity, then the labeled artist offer', () => {
+  it('leads the homepage markdown with the hero headline, then the general identity and the chapters', () => {
     const body = buildHomepageMarkdown();
 
     expectCreatorPositioning(body);
-    expect(body.startsWith(`# ${COMPANY_IDENTITY.headline}`)).toBe(true);
-    expect(body).toContain(COMPANY_IDENTITY.definition);
-    expect(body).toContain('## Artist profiles');
-    expect(body).toContain(HOMEPAGE_COPY.hero.subhead);
-    for (const item of HOMEPAGE_COPY.offer.included) {
-      expect(body).toContain(`- ${item.label}`);
+    const { hero, profile, releases, invite } = HOMEPAGE_EDITORIAL_COPY;
+    expect(body.startsWith(`# ${hero.headline}`)).toBe(true);
+    expect(body).toContain(hero.subhead);
+    expect(body.indexOf(COMPANY_IDENTITY.definition)).toBeGreaterThan(
+      body.indexOf(hero.subhead)
+    );
+    for (const chapter of [profile, releases, invite]) {
+      expect(body).toContain(`## ${chapter.headline}`);
     }
     expect(body).not.toContain('All your music');
     expect(body).not.toContain('Connect your music');

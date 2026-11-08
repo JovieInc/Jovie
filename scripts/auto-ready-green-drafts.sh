@@ -236,7 +236,7 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
   state_after="$(jq -r '.state // "UNKNOWN"' <<<"$after")"
   merge_after="$(jq -r '.mergeStateStatus // "UNKNOWN"' <<<"$after")"
   held_after="$(jq -r --arg hold_re "$HOLD_LABEL_RE" '[.labels[] | select(test($hold_re))] | join(",")' <<<"$after")"
-  proof_after="$(jq --argjson prNumber "$n" '. + {headSha: .head, prNumber: $prNumber}' <<<"$after" | node "$SCRIPT_DIR/lib/auto-ready-provenance.mjs" classify)"
+  proof_after="$(jq --argjson prNumber "$n" '. + {headSha: .head, prNumber: $prNumber, greenSource: true}' <<<"$after" | node "$SCRIPT_DIR/lib/auto-ready-provenance.mjs" classify)"
 
   if [[ "$state_after" != "OPEN" ]]; then
     upsert_status_comment "$n" "🤖 Auto-ready green-source: the exact head reached terminal state=${state_after} during verification. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"

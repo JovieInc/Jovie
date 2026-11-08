@@ -106,16 +106,21 @@ const AvatarImage = React.forwardRef<HTMLImageElement, AvatarImageProps>(
     const context = React.useContext(AvatarContext);
     const resolvedSize = context?.size ?? size ?? 'md';
     const resolvedShape = context?.shape ?? shape ?? 'person';
+    const px = getAvatarSizePx(resolvedSize);
 
     return (
       <img
         ref={ref}
         alt={alt}
+        // Intrinsic dimensions reserve the frame before the image decodes;
+        // the h-full/w-full classes still size it to the Avatar root.
+        width={px}
+        height={px}
         className={cn(
           'h-full w-full',
           className,
           resolvedShape === 'artwork' ? 'object-contain' : 'object-cover',
-          getAvatarShapeClassName(resolvedShape, getAvatarSizePx(resolvedSize))
+          getAvatarShapeClassName(resolvedShape, px)
         )}
         {...props}
       />

@@ -546,6 +546,7 @@ needs an auditable PR-body marker line — `api-breaking: <reason>`.
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/waitlist` | GET, POST | `auth` | Get waitlist status or join |
+| `/api/waitlist/join` | POST | `public` | Closed-signup waitlist join (role + email, Turnstile, 404 unless `PUBLIC_SIGNUP_CLOSED`) |
 
 ### Webhooks
 

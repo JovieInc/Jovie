@@ -209,7 +209,7 @@ export function ConnectorCard({
           <p
             className={cn(
               'min-h-4 text-xs',
-              needsAttention || !available ? 'text-error' : 'text-tertiary'
+              needsAttention || !available ? 'text-error-text' : 'text-tertiary'
             )}
             data-testid={`connector-detail-${provider}`}
           >
@@ -251,7 +251,7 @@ export function ConnectorCard({
             </details>
           )}
           {missingCapabilities && (
-            <p className='text-xs text-warning'>
+            <p className='text-xs text-warning-text'>
               Reconnect to enable missing permissions.
             </p>
           )}
@@ -287,14 +287,14 @@ export function ConnectorCard({
           size='sm'
           onClick={actionHandler}
           disabled={!canAct}
-          aria-label={`${actionLabel} ${definition.label}`}
           className='w-32'
         >
           {pending
             ? pendingAction === 'disconnect'
               ? 'Disconnecting…'
               : 'Connecting…'
-            : actionLabel}
+            : actionLabel}{' '}
+          <span className='sr-only'>{definition.label}</span>
         </Button>
       </div>
     </div>
