@@ -139,6 +139,20 @@ describe('companyBlocker', () => {
     ).toBeNull();
   });
 
+  it('never reads as clear when paid signups are unmeasured', () => {
+    const blocker = companyBlocker(
+      snapshot({
+        activeConstraint: 'funnel:claim_shown',
+        funnel: { claim_shown: null, paid: null },
+      }),
+      NOW
+    );
+    expect(blocker).toMatchObject({ id: 'funnel:paid', tone: 'warn' });
+    expect(blocker?.text).toBe(
+      "Paid signups aren't measured yet, so the funnel can't say where it stops"
+    );
+  });
+
   it('does not read an all-zero funnel with nothing paid as clear', () => {
     const zero = Object.fromEntries(
       COMPANY_FUNNEL_STEPS.map(step => [step, 0])

@@ -162,7 +162,12 @@ export function companyBlocker(
   )
     ? null
     : snapshot.activeConstraint;
-  const fallback = active ? null : firstZeroStep(snapshot.funnel);
+  // Unmeasured paid signups mean revenue can't be called clear.
+  const fallback = active
+    ? null
+    : snapshot.funnel.paid.value === null
+      ? 'paid'
+      : firstZeroStep(snapshot.funnel);
   const id = active ?? (fallback ? `funnel:${fallback}` : null);
   if (!id) return null;
   const [kind, step] = id.split(':') as [string, string];
