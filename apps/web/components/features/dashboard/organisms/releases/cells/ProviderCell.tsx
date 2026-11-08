@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/dashboard/organisms/releases/cells/ProviderCell.interaction.test.tsx
 import {
   type MouseEvent,
   memo,
