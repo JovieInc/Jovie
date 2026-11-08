@@ -185,6 +185,9 @@ for (const { storyIds } of components.values())
 log(
   `capturing ${jobs.length} story × theme renders for ${components.size} components`
 );
+// No jobs writes nothing, so the certificate keeps its prior evidence. An
+// unfiltered index that maps no @jovie/ui story is broken, so that goes red.
+if (!jobs.length) process.exit(selection.components.size ? 0 : 1);
 
 const webRequire = createRequire(join(root, 'apps/web/package.json'));
 const { chromium } = webRequire('playwright');
