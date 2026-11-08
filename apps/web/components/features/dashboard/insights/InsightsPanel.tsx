@@ -4,7 +4,10 @@ import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
-import { EmptyState } from '@/components/molecules/EmptyState';
+import {
+  EmptyState,
+  type EmptyStateProps,
+} from '@/components/molecules/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   PageToolbar,
@@ -15,8 +18,10 @@ import { PageErrorState } from '@/features/feedback/PageErrorState';
 import {
   getInsightsEmptyCopy,
   type InsightsEmptyCopy,
+  type InsightsGenerateFailure,
 } from '@/lib/insights/empty-state-copy';
 import { useGenerateInsightsMutation, useInsightsQuery } from '@/lib/queries';
+import { FetchError } from '@/lib/queries/fetch';
 import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import type {
   InsightCategory,
@@ -69,6 +74,7 @@ interface InsightsPanelContentProps {
   readonly onRetry: () => void;
   readonly isGenerating: boolean;
   readonly emptyCopy: InsightsEmptyCopy;
+  readonly onShowAll: () => void;
 }
 
 const SKELETON_ROW_KEYS = ['row-1', 'row-2', 'row-3'] as const;
@@ -116,6 +122,49 @@ function generateLabel(copy: InsightsEmptyCopy): string {
   return 'Generate Insights';
 }
 
+const SHARE_PROFILE_ACTION = {
+  label: 'Share Your Profile',
+  href: APP_ROUTES.CHAT_PROFILE_PANEL,
+} as const;
+
+/**
+ * One next step per empty mode. A cooldown or a plan gate gets no Generate
+ * button, because pressing it again would only fail the same way.
+ */
+function emptyStateActions(
+  copy: InsightsEmptyCopy,
+  {
+    isGenerating,
+    onGenerate,
+    onShowAll,
+  }: {
+    readonly isGenerating: boolean;
+    readonly onGenerate: () => void;
+    readonly onShowAll: () => void;
+  }
+): Pick<EmptyStateProps, 'action' | 'secondaryAction'> {
+  switch (copy.mode) {
+    case 'needs-activity':
+    case 'rate-limited':
+      return { action: SHARE_PROFILE_ACTION };
+    case 'needs-plan':
+      return {
+        action: { label: 'See Plans', href: APP_ROUTES.SETTINGS_BILLING },
+      };
+    case 'category-empty':
+      return { action: { label: 'Show All', onClick: onShowAll } };
+    default:
+      return {
+        action: {
+          label: isGenerating ? 'Generating…' : generateLabel(copy),
+          onClick: onGenerate,
+          disabled: isGenerating,
+        },
+        secondaryAction: SHARE_PROFILE_ACTION,
+      };
+  }
+}
+
 function InsightsPanelContent({
   isLoading,
   error,
@@ -125,6 +174,7 @@ function InsightsPanelContent({
   onRetry,
   isGenerating,
   emptyCopy,
+  onShowAll,
 }: InsightsPanelContentProps) {
   if (isLoading) {
     return <InsightsLoadingRows />;
@@ -147,24 +197,11 @@ function InsightsPanelContent({
       <EmptyState
         heading={emptyCopy.heading}
         description={emptyCopy.description}
-        {...(emptyCopy.mode === 'needs-activity'
-          ? {
-              action: {
-                label: 'Share Your Profile',
-                href: APP_ROUTES.CHAT_PROFILE_PANEL,
-              },
-            }
-          : {
-              action: {
-                label: isGenerating ? 'Generating…' : generateLabel(emptyCopy),
-                onClick: onGenerate,
-                disabled: isGenerating,
-              },
-              secondaryAction: {
-                label: 'Share Your Profile',
-                href: APP_ROUTES.CHAT_PROFILE_PANEL,
-              },
-            })}
+        {...emptyStateActions(emptyCopy, {
+          isGenerating,
+          onGenerate,
+          onShowAll,
+        })}
         presentation='workspace'
         testId='insights-empty-state'
       />
@@ -219,6 +256,8 @@ export interface InsightsPanelViewProps {
     'insightsGenerated' | 'dataPointsAnalyzed'
   > | null;
   readonly generateFailed?: boolean;
+  /** Status of the failed Generate press (429 cooldown, 403 plan gate). */
+  readonly generateFailure?: InsightsGenerateFailure | null;
   readonly testId?: string;
 }
 
@@ -233,9 +272,20 @@ export function InsightsPanelView({
   isGenerating,
   lastRun = null,
   generateFailed = false,
+  generateFailure = null,
   testId = 'dashboard-insights-workspace',
 }: Readonly<InsightsPanelViewProps>) {
-  const emptyCopy = getInsightsEmptyCopy({ lastRun, generateFailed });
+  const categoryLabel =
+    selectedCategory === 'all'
+      ? null
+      : (CATEGORY_FILTERS.find(f => f.value === selectedCategory)?.label ??
+        null);
+  const emptyCopy = getInsightsEmptyCopy({
+    lastRun,
+    generateFailed,
+    generateFailure,
+    categoryLabel,
+  });
   const grouped = useMemo(() => {
     const high = insights.filter(i => i.priority === 'high');
     const medium = insights.filter(i => i.priority === 'medium');
@@ -290,11 +340,21 @@ export function InsightsPanelView({
             onRetry={onRetry}
             isGenerating={isGenerating}
             emptyCopy={emptyCopy}
+            onShowAll={() => onCategoryChange('all')}
           />
         </div>
       </div>
     </PageShell>
   );
+}
+
+function readGenerateFailure(error: unknown): InsightsGenerateFailure {
+  if (!(error instanceof FetchError)) return { status: null };
+  const next = error.parsedBody?.nextAllowedAt;
+  return {
+    status: error.status,
+    nextAllowedAt: typeof next === 'string' ? next : null,
+  };
 }
 
 export function InsightsPanel() {
@@ -317,6 +377,7 @@ export function InsightsPanel() {
     isPending: isGenerating,
     data: lastRun,
     isError: generateFailed,
+    error: generateError,
   } = useGenerateInsightsMutation();
 
   const insights = useMemo(() => data?.insights ?? [], [data?.insights]);
@@ -335,6 +396,9 @@ export function InsightsPanel() {
       isGenerating={isGenerating}
       lastRun={lastRun ?? null}
       generateFailed={generateFailed}
+      generateFailure={
+        generateFailed ? readGenerateFailure(generateError) : null
+      }
     />
   );
 }

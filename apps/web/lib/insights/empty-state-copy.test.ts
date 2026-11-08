@@ -45,4 +45,36 @@ describe('getInsightsEmptyCopy', () => {
     expect(copy.mode).toBe('failed');
     expect(copy.heading).toBe('Insights Did Not Generate');
   });
+
+  it('turns a 429 into cooldown copy with the end time when sent', () => {
+    const copy = getInsightsEmptyCopy({
+      generateFailure: {
+        status: 429,
+        nextAllowedAt: '2026-11-08T15:30:00.000Z',
+      },
+    });
+    expect(copy.mode).toBe('rate-limited');
+    expect(copy.description).toMatch(/You can generate again after /);
+  });
+
+  it('turns a 403 into plan copy', () => {
+    const copy = getInsightsEmptyCopy({ generateFailure: { status: 403 } });
+    expect(copy.mode).toBe('needs-plan');
+  });
+
+  it('keeps a failure ahead of the category filter', () => {
+    const copy = getInsightsEmptyCopy({
+      generateFailure: { status: 500 },
+      categoryLabel: 'Tour',
+    });
+    expect(copy.mode).toBe('failed');
+  });
+
+  it('names the filtered category when it is empty', () => {
+    const copy = getInsightsEmptyCopy({ categoryLabel: 'Revenue' });
+    expect(copy).toMatchObject({
+      mode: 'category-empty',
+      heading: 'No Revenue Insights Yet',
+    });
+  });
 });

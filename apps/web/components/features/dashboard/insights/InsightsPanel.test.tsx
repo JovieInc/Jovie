@@ -1,6 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { useInsightsQueryMock, useGenerateInsightsMutationMock, generateMock } =
@@ -179,7 +180,9 @@ describe('InsightsPanelView', () => {
       limit: 50,
     });
 
-    await user.click(screen.getByRole('button', { name: 'Generate Insights' }));
+    // An empty category offers Show All; the toolbar still generates.
+    expect(screen.getByRole('button', { name: 'Show All' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Generate insights' }));
     expect(generateMock).toHaveBeenCalledOnce();
   });
 
@@ -260,6 +263,81 @@ describe('InsightsPanelView', () => {
     expect(screen.getByText('Insights Did Not Generate')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Try Again' }));
     expect(onGenerate).toHaveBeenCalledOnce();
+  });
+
+  function renderView(
+    props: Partial<React.ComponentProps<typeof InsightsPanelView>> = {}
+  ) {
+    const handlers = {
+      onGenerate: vi.fn(),
+      onCategoryChange: vi.fn(),
+    };
+    render(
+      <TooltipProvider>
+        <InsightsPanelView
+          insights={[]}
+          isLoading={false}
+          error={null}
+          selectedCategory='all'
+          onRetry={vi.fn()}
+          isGenerating={false}
+          {...handlers}
+          {...props}
+        />
+      </TooltipProvider>
+    );
+    return handlers;
+  }
+
+  it('a 429 says the cooldown and offers no immediate retry', () => {
+    renderView({
+      generateFailed: true,
+      generateFailure: { status: 429, nextAllowedAt: null },
+    });
+    expect(screen.getByText('Insights Are Cooling Down')).toBeVisible();
+    expect(screen.getByTestId('insights-empty-state')).toHaveTextContent(
+      'Try again later.'
+    );
+    expect(screen.queryByRole('button', { name: 'Try Again' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Generate Insights' })
+    ).toBeNull();
+  });
+
+  it('a 403 names the plan and links to billing, not a retry', () => {
+    renderView({
+      generateFailed: true,
+      generateFailure: { status: 403 },
+    });
+    expect(screen.getByText(/^Insights Need /)).toBeVisible();
+    expect(screen.getByRole('link', { name: 'See Plans' })).toHaveAttribute(
+      'href',
+      '/app/settings/billing'
+    );
+    expect(screen.queryByRole('button', { name: 'Try Again' })).toBeNull();
+  });
+
+  it('any other failure keeps the generic retry', async () => {
+    const user = userEvent.setup();
+    const { onGenerate } = renderView({
+      generateFailed: true,
+      generateFailure: { status: 500 },
+    });
+    expect(screen.getByText('Insights Did Not Generate')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Try Again' }));
+    expect(onGenerate).toHaveBeenCalledOnce();
+  });
+
+  it('an empty category speaks to that filter and offers Show All', async () => {
+    const user = userEvent.setup();
+    const { onCategoryChange } = renderView({
+      selectedCategory: 'tour',
+      lastRun: { insightsGenerated: 0, dataPointsAnalyzed: 6 },
+    });
+    expect(screen.getByText('No Tour Insights Yet')).toBeVisible();
+    expect(screen.queryByText('Not Enough Activity Yet')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Show All' }));
+    expect(onCategoryChange).toHaveBeenCalledWith('all');
   });
 
   it('loads in the same rows as a loaded insight card, under the same filters', () => {

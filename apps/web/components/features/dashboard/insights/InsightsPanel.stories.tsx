@@ -51,3 +51,18 @@ export const NothingNew: Story = {
 export const GenerateFailed: Story = {
   args: { generateFailed: true },
 };
+
+export const CoolingDown: Story = {
+  args: {
+    generateFailed: true,
+    generateFailure: { status: 429, nextAllowedAt: null },
+  },
+};
+
+export const NeedsPlan: Story = {
+  args: { generateFailed: true, generateFailure: { status: 403 } },
+};
+
+export const EmptyCategory: Story = {
+  args: { selectedCategory: 'tour' },
+};
