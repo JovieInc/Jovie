@@ -56,6 +56,15 @@ jobs:
           path: ~/.local/state/jovie-mutation
           key: mutation-sweep-state-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: mutation-sweep-state-
+      # Story-capture receipts from visual-a11y.yml (component-story-evidence,
+      # hosted runners only). Receipts bind to source hashes, so an older
+      # capture only counts for components that have not changed since.
+      - name: Restore story evidence
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/state/jovie-story-evidence
+          key: component-story-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: component-story-evidence-
       - name: Install typescript only
         run: |
           set -euo pipefail
@@ -67,13 +76,17 @@ jobs:
       - name: Build the certificate report
         run: |
           set -euo pipefail
-          mutation_args=()
+          evidence_args=()
           state="$HOME/.local/state/jovie-mutation/sweep-state.json"
-          if [ -f "$state" ]; then mutation_args+=(--mutation-state "$state"); fi
+          if [ -f "$state" ]; then evidence_args+=(--mutation-state "$state"); fi
+          stories="$HOME/.local/state/jovie-story-evidence"
+          for kind in visual a11y; do
+            if [ -f "$stories/$kind.json" ]; then evidence_args+=("--$kind" "$stories/$kind.json"); fi
+          done
           mkdir -p "$RUNNER_TEMP/component-certificate"
           nice -n 19 node scripts/component-certificate.mjs --all --sha "$CERT_SHA" \
             --out "$RUNNER_TEMP/component-certificate/report.json" \
-            "${mutation_args[@]}"
+            "${evidence_args[@]}"
           node scripts/lib/component-certificate-summary.mjs \
             "$RUNNER_TEMP/component-certificate/report.json" >> "$GITHUB_STEP_SUMMARY"
       - name: Locate certificate report

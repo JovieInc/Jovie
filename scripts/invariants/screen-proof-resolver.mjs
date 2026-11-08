@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { validPlaywrightPng } from '../lib/playwright-png.mjs';
+import { finalPathMatches } from './screen-proof-final-paths.mjs';
 
 export const PRODUCER = Object.freeze({
   repository: 'JovieInc/Jovie',
@@ -103,8 +104,7 @@ const validLocalFinalUrl = (value, expectedRoute) => {
     return (
       url.protocol === 'http:' &&
       ['localhost', '127.0.0.1'].includes(url.hostname) &&
-      url.pathname === expected.pathname &&
-      url.search === expected.search &&
+      finalPathMatches(url, expected) &&
       url.hash === ''
     );
   } catch {
