@@ -44,4 +44,22 @@ describe('CookieBannerMount consent gate', () => {
     await waitFor(() => expect(globalThis.JVConsent).toBeDefined());
     expect(screen.getAllByTestId('cookie-banner')).toHaveLength(1);
   });
+
+  it('does not mount the consent question when GPC already opts out', async () => {
+    vi.spyOn(document, 'cookie', 'get').mockReturnValue('jv_cc_required=1');
+    Object.defineProperty(navigator, 'globalPrivacyControl', {
+      configurable: true,
+      value: true,
+    });
+    try {
+      render(<CookieBannerMount />);
+      await waitFor(() => expect(globalThis.JVConsent).toBeDefined());
+      expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
+    } finally {
+      Object.defineProperty(navigator, 'globalPrivacyControl', {
+        configurable: true,
+        value: false,
+      });
+    }
+  });
 });
