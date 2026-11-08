@@ -136,10 +136,13 @@ function emptyStateActions(
     isGenerating,
     onGenerate,
     onShowAll,
+    onRetry,
   }: {
     readonly isGenerating: boolean;
     readonly onGenerate: () => void;
     readonly onShowAll: () => void;
+    /** Refetches the insights list; never starts a new run. */
+    readonly onRetry: () => void;
   }
 ): Pick<EmptyStateProps, 'action' | 'secondaryAction'> {
   switch (copy.mode) {
@@ -153,6 +156,8 @@ function emptyStateActions(
       };
     case 'category-empty':
       return { action: { label: 'Show All', onClick: onShowAll } };
+    case 'still-working':
+      return { action: { label: 'Check Again', onClick: onRetry } };
     default:
       return {
         action: {
@@ -201,6 +206,7 @@ function InsightsPanelContent({
           isGenerating,
           onGenerate,
           onShowAll,
+          onRetry,
         })}
         presentation='workspace'
         testId='insights-empty-state'
@@ -354,6 +360,7 @@ function readGenerateFailure(error: unknown): InsightsGenerateFailure {
   return {
     status: error.status,
     nextAllowedAt: typeof next === 'string' ? next : null,
+    kind: error.kind,
   };
 }
 

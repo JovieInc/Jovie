@@ -20,6 +20,7 @@ export type InsightsEmptyMode =
   | 'failed'
   | 'rate-limited'
   | 'needs-plan'
+  | 'still-working'
   | 'category-empty';
 
 /** Why the last Generate press failed, read from the API's error status. */
@@ -27,6 +28,8 @@ export interface InsightsGenerateFailure {
   readonly status: number | null;
   /** ISO time the cooldown ends, sent with a 429. */
   readonly nextAllowedAt?: string | null;
+  /** FetchError kind; 'deadline' and 'network' mean the reply was lost. */
+  readonly kind?: string;
 }
 
 export interface InsightsEmptyCopy {
@@ -56,6 +59,20 @@ function cooldownEnd(nextAllowedAt: string | null | undefined): string | null {
 }
 
 function failureCopy(failure: InsightsGenerateFailure): InsightsEmptyCopy {
+  // A timeout or dropped connection loses the reply, not the run: the
+  // server keeps generating, and a retry would only hit the cooldown.
+  if (
+    failure.status === 408 ||
+    failure.kind === 'deadline' ||
+    failure.kind === 'network'
+  ) {
+    return {
+      mode: 'still-working',
+      heading: 'Insights Are Still Generating',
+      description:
+        'Jovie is still reading your analytics. Check again in a minute and new insights show up here.',
+    };
+  }
   if (failure.status === 429) {
     const end = cooldownEnd(failure.nextAllowedAt);
     return {

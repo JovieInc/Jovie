@@ -303,6 +303,21 @@ describe('InsightsPanelView', () => {
     ).toBeVisible();
   });
 
+  it('a timeout reads as still working and only refetches the list', async () => {
+    const user = userEvent.setup();
+    const onRetry = vi.fn();
+    const { onGenerate } = renderView({
+      onRetry,
+      generateFailed: true,
+      generateFailure: { status: 408, kind: 'deadline' },
+    });
+    expect(screen.getByText('Insights Are Still Generating')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Try Again' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Check Again' }));
+    expect(onRetry).toHaveBeenCalledOnce();
+    expect(onGenerate).not.toHaveBeenCalled();
+  });
+
   it('a 429 says the cooldown and offers no immediate retry', () => {
     renderView({
       generateFailed: true,

@@ -77,4 +77,15 @@ describe('getInsightsEmptyCopy', () => {
       heading: 'No Revenue Insights Yet',
     });
   });
+
+  it('treats a lost reply (timeout or network drop) as still working', () => {
+    for (const failure of [
+      { status: 408, kind: 'deadline' },
+      { status: 0, kind: 'network' },
+    ]) {
+      expect(getInsightsEmptyCopy({ generateFailure: failure }).mode).toBe(
+        'still-working'
+      );
+    }
+  });
 });
