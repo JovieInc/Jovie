@@ -15,6 +15,12 @@ describe('desktop sign-out', () => {
     expect(resolveDesktopSignOutRedirect('/pricing', true)).toBe('/signin');
   });
 
+  it('keeps a sign-in target and its return path in the Mac app', () => {
+    const target = '/signin?redirect_url=%2Fapp%2Fsettings%2Faccount';
+    expect(resolveDesktopSignOutRedirect(target, true)).toBe(target);
+    expect(resolveDesktopSignOutRedirect('/signinx', true)).toBe('/signin');
+  });
+
   it('keeps the web sign-out target unchanged', () => {
     expect(resolveDesktopSignOutRedirect('/', false)).toBe('/');
   });
