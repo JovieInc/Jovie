@@ -38,7 +38,7 @@ export const HOMEPAGE_EDITORIAL_COPY = {
     primaryHref: `#${HOMEPAGE_INVITE_ANCHOR}`,
     secondaryAction: 'See a live profile',
     secondaryHref: TIM_WHITE_PROFILE.publicProfilePath,
-    note: 'jovie opens by invitation',
+    note: 'two fields · we email when your spot opens',
     windowLabel: `Jovie for Mac: an example artist's Releases list with ${HOMEPAGE_FEATURED_ARTIST.inspected.title} open in the inspector`,
     upcCallout: 'per release',
   },

@@ -68,6 +68,17 @@ and a nonnegative integer `valid` count; this adds no minimum-mutant floor.
 Mutation sweep default scope is `lib/,app/api/`; pass
 `--include components/...` to score components.
 
+## Empty data (one rule)
+
+A field is empty only when its source is empty. When the source has no value,
+the component shows its Empty state, and that state needs a story (or a written
+waiver) under `states`. When the source has a value, the field must paint it:
+never a blank name, a blank handle, a title missing next to its artwork, or a
+loading skeleton left after the data arrived. The rendered check is
+`expectRequiredFieldsPainted` in `apps/web/tests/e2e/helpers/preview-media-quality.ts`,
+which the Golden Path runs through `expectPreviewIsReal`; reuse it rather than
+writing a second check.
+
 ## Benchmark library
 
 `benchmark-library.json` maps a job to the best-in-class behavior and to the

@@ -206,6 +206,23 @@
   --ds-public-gutter: max(6rem, calc((100% - 78rem) / 2));
 }
 
+/* Once scrolled, the bar's backing runs the full width of the screen and is
+   near-opaque, so no stage scrolls into view beside the bar or reads through
+   it. The row itself stays on the content box. The viewport clips the
+   overshoot of 100vw past a scrollbar. */
+.home-viewport .header-nav--docked {
+  --marketing-dock-glass: color-mix(
+    in oklab,
+    var(--noir-ion-shell) 94%,
+    transparent
+  );
+}
+
+.home-viewport .header-nav--docked::before {
+  right: calc(50% - 50vw);
+  left: calc(50% - 50vw);
+}
+
 /* Brand: the 28px mark with the Jovie wordmark beside it, always shown. */
 .home-viewport .header-nav .logo-reveal {
   gap: 0.625rem;
