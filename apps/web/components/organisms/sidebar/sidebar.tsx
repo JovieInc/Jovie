@@ -80,7 +80,7 @@ export const Sidebar = React.forwardRef<
             data-sidebar='sidebar'
             data-mobile='true'
             id={isMobile ? 'shell-left-rail' : undefined}
-            className='w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground outline-none'
+            className='w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground'
             hideClose
             // Opening the phone drawer moves focus into it, onto the drawer
             // itself rather than its first control: auto-focusing the brand
