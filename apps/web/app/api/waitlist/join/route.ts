@@ -50,9 +50,25 @@ const joinSchema = z.object({
  * row for an unknown id (scored as unresolved) and throws when Spotify is
  * unreachable (left unscored), so the two never blur.
  */
+/**
+ * The client's own timeout and retries can outlast the function, so the join
+ * waits at most this long for Spotify and then saves the entrant unscored.
+ */
+const SPOTIFY_QUALIFY_DEADLINE_MS = 3_000;
+
 const readSpotifyArtist: SpotifyArtistReader = async artistId => {
   if (!spotifyClient.isAvailable()) throw new Error('Spotify unavailable');
-  const [artist] = await spotifyClient.getArtists([artistId]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error('Spotify read timed out')),
+      SPOTIFY_QUALIFY_DEADLINE_MS
+    );
+  });
+  const [artist] = await Promise.race([
+    spotifyClient.getArtists([artistId]),
+    deadline,
+  ]).finally(() => clearTimeout(timer));
   return artist
     ? {
         id: artist.spotifyId,

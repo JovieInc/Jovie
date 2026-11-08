@@ -195,6 +195,23 @@ describe('POST /api/waitlist/join', () => {
       expect(call.qualification.admissionScore).toBeNull();
     });
 
+    it('saves the entrant unscored when Spotify outlasts the deadline', async () => {
+      vi.useFakeTimers();
+      try {
+        mocks.getArtists.mockReturnValue(new Promise(() => {}));
+        const pending = POST(
+          request({ ...validBody, spotifyArtistId: artistId })
+        );
+        await vi.advanceTimersByTimeAsync(3_000);
+        const response = await pending;
+        expect(response.status).toBe(201);
+        const call = mocks.joinWaitlistWithRole.mock.calls[0][0];
+        expect(call.qualification.admissionScore).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('rejects a malformed artist id or an unknown answer before any work', async () => {
       expect(
         (await POST(request({ ...validBody, spotifyArtistId: 'nope' }))).status
