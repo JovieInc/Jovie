@@ -1,13 +1,24 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { privacyState, updatePrivacyState, lockWorkspaceMock, ensureReady } =
-  vi.hoisted(() => ({
-    privacyState: vi.fn(),
-    updatePrivacyState: vi.fn(),
-    lockWorkspaceMock: vi.fn(),
-    ensureReady: vi.fn(),
-  }));
+const {
+  privacyState,
+  updatePrivacyState,
+  lockWorkspaceMock,
+  ensureReady,
+  route,
+  shellProps,
+} = vi.hoisted(() => ({
+  privacyState: vi.fn(),
+  updatePrivacyState: vi.fn(),
+  lockWorkspaceMock: vi.fn(),
+  ensureReady: vi.fn(),
+  route: { pathname: null as string | null },
+  shellProps: { previewPanelDefaultOpen: undefined as boolean | undefined },
+}));
+vi.mock('next/navigation', () => ({
+  usePathname: () => route.pathname,
+}));
 vi.mock('@/lib/workspace-lock/workspace-lock', async () => ({
   ...(await vi.importActual<
     typeof import('@/lib/workspace-lock/workspace-lock')
@@ -24,10 +35,15 @@ vi.mock('@/components/organisms/AuthShellWrapper', () => ({
   AuthShellWrapper: ({
     children,
     isWorkspaceLocked,
+    previewPanelDefaultOpen,
   }: {
     children: React.ReactNode;
     isWorkspaceLocked: boolean;
-  }) => <div data-locked={String(isWorkspaceLocked)}>{children}</div>,
+    previewPanelDefaultOpen?: boolean;
+  }) => {
+    shellProps.previewPanelDefaultOpen = previewPanelDefaultOpen;
+    return <div data-locked={String(isWorkspaceLocked)}>{children}</div>;
+  },
 }));
 vi.mock('./dashboard/DashboardDataContext', () => ({
   DashboardDataProvider: ({
@@ -90,9 +106,11 @@ function renderBoundary({
   initiallyLocked = false,
   privacyEnabled = mode === 'ov',
   lockedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  previewPanelDefaultOpen = true,
   children = <div>Private page content</div>,
 }: {
   mode?: 'ov' | 'customer';
+  previewPanelDefaultOpen?: boolean;
   initiallyLocked?: boolean;
   privacyEnabled?: boolean;
   lockedUntil?: string | null;
@@ -107,7 +125,7 @@ function renderBoundary({
       privacyEnabled={privacyEnabled}
       lockedUntil={lockedUntil}
       sidebarDefaultOpen
-      previewPanelDefaultOpen
+      previewPanelDefaultOpen={previewPanelDefaultOpen}
       persistSidebarCollapsed={async () => {}}
       unlockedShellChrome={<div>Private shell chrome</div>}
     >
@@ -123,6 +141,8 @@ describe('DashboardShellPrivacyBoundary', () => {
     updatePrivacyState.mockReset();
     lockWorkspaceMock.mockReset();
     ensureReady.mockReset();
+    route.pathname = null;
+    shellProps.previewPanelDefaultOpen = undefined;
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -717,5 +737,25 @@ describe('DashboardShellPrivacyBoundary', () => {
     await act(async () => window.dispatchEvent(new Event('online')));
     expect(privacyState).not.toHaveBeenCalled();
     expectLocked();
+  });
+  it('opens the profile companion after client navigation from Account', () => {
+    privacyState.mockResolvedValue(serverState(false, null, false));
+    // The layout rendered for /app/settings/account and computed `false`.
+    route.pathname = '/app/settings/profile';
+    renderBoundary({ mode: 'customer', previewPanelDefaultOpen: false });
+    expect(shellProps.previewPanelDefaultOpen).toBe(true);
+  });
+
+  it('follows the live path back to Account', () => {
+    privacyState.mockResolvedValue(serverState(false, null, false));
+    route.pathname = '/app/settings/account';
+    renderBoundary({ mode: 'customer', previewPanelDefaultOpen: true });
+    expect(shellProps.previewPanelDefaultOpen).toBe(false);
+  });
+
+  it('keeps the server value when there is no router path', () => {
+    privacyState.mockResolvedValue(serverState(false, null, false));
+    renderBoundary({ mode: 'customer', previewPanelDefaultOpen: false });
+    expect(shellProps.previewPanelDefaultOpen).toBe(false);
   });
 });
