@@ -1150,6 +1150,15 @@ jobs:
             echo "run_marketing_dom=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Select Pen diff gate (bound or scope route touched)
+        id: pen-diff-scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHANGED_PATHS="$RUNNER_TEMP/product-lane-classification/changed-paths.txt"
+          test -f "$CHANGED_PATHS"
+          echo "run_pen_diff=$(node scripts/invariants/pen-diff.mjs --scope-only --changed-files "$CHANGED_PATHS")" >> "$GITHUB_OUTPUT"
+
       - name: Preserve intake product-lane receipt
         if: ${{ github.event_name != 'workflow_dispatch' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -1675,15 +1684,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Select Pen diff gate (bound or scope route touched)
-        id: pen-diff-scope
-        shell: bash
-        run: |
-          set -euo pipefail
-          CHANGED_PATHS="$RUNNER_TEMP/product-lane-classification/changed-paths.txt"
-          test -f "$CHANGED_PATHS"
-          echo "run_pen_diff=$(node scripts/invariants/pen-diff.mjs --scope-only --changed-files "$CHANGED_PATHS")" >> "$GITHUB_OUTPUT"
-
   ci-pen-diff:
     name: Pen Diff
     # Pen-to-code merge gate: routes with enforce:true in pen-bindings.json must
@@ -1698,8 +1698,6 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 20
-    env:
-      PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
