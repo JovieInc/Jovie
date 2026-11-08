@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { nextState, probe, run } from './index.ts';
+import worker, { nextState, probe, run } from './index.ts';
 
 const res = (status, headers = {}) => new Response('', { status, headers });
 test('probe classifies a paused deployment, quota, http failure and network error', async () => {
@@ -186,4 +186,21 @@ test('a page that reaches no channel does not start the re-page quiet window', a
   assert.equal(third.delivered, 1);
   const fourth = await run(env, 181_000, ok);
   assert.equal(fourth.page, null, 'a delivered page starts the quiet window');
+});
+
+test('cron-hub dispatch: unauthenticated or secretless calls are rejected, authenticated runs the probe', async () => {
+  const env = { TARGETS: '' };
+  const post = headers =>
+    new Request('https://x/__cron', { method: 'POST', headers });
+  assert.equal((await worker.fetch(post({}), env)).status, 401);
+  assert.equal(
+    (await worker.fetch(post({ authorization: 'Bearer s' }), env)).status,
+    401,
+    'no secret configured'
+  );
+  const ok = await worker.fetch(post({ authorization: 'Bearer s' }), {
+    ...env,
+    CRON_HUB_SECRET: 's',
+  });
+  assert.equal(ok.status, 200);
 });

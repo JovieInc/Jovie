@@ -276,6 +276,27 @@ class AndChainMergeTest(unittest.TestCase):
             classes.merge_narrowed_guard_command(NarrowedPreflightMergeTest.OURS, NarrowedPreflightMergeTest.THEIRS),
         )
 
+    def test_unions_plain_yaml_run_chains_in_main_order(self):
+        ours = "pnpm --filter @jovie/extension test && node --experimental-strip-types --test workers/cron-hub/src/index.test.mjs"
+        theirs = "pnpm --filter @jovie/extension test && pnpm --filter @jovie/mesh-hub test"
+        conflict = (f"<<<<<<< HEAD\n        run: {ours}\n=======\n"
+                    f"        run: {theirs}\n>>>>>>> origin/main\n")
+        self.assertEqual(
+            classes.resolve_and_chain_text(conflict),
+            f"        run: {theirs} && node --experimental-strip-types --test workers/cron-hub/src/index.test.mjs\n",
+        )
+        for changed in [theirs.replace("extension test", "extension test --strict"),
+                        theirs + " | cat", theirs + " # comment", theirs + " && echo 'quoted'",
+                        theirs + " && echo ${UNTRUSTED}"]:
+            with self.subTest(changed=changed):
+                self.assertIsNone(classes.resolve_and_chain_text(conflict.replace(theirs, changed)))
+        self.assertIsNone(classes.resolve_and_chain_text(conflict.replace("run:", "name:", 1)))
+        for key in ["if", "name", "working-directory", "env"]:
+            metadata = conflict.replace("        run:", f"        {key}: false\n        run:", 1)
+            metadata = metadata.replace("=======\n", f"=======\n        {key}: true\n", 1)
+            with self.subTest(key=key):
+                self.assertIsNone(classes.resolve_and_chain_text(metadata))
+
     def test_rejects_a_changed_script_quotes_and_a_second_file_list(self):
         self.assertIsNone(classes.merge_and_chain(self.OURS, self.THEIRS.replace("ownership:check", "ownership:check --strict")))
         self.assertIsNone(classes.merge_and_chain(self.OURS + " && echo 'x'", self.THEIRS))
