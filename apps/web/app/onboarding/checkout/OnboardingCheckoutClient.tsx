@@ -24,6 +24,7 @@ import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import type { ClaimTimeFinding } from '@/lib/proof/claim-time-proof';
 import { cn } from '@/lib/utils';
 import { formatAmount } from '@/lib/utils/format-number';
+import { OnboardingCheckoutColumn } from './OnboardingCheckoutColumn';
 import { OnboardingCheckoutFrame } from './OnboardingCheckoutFrame';
 
 interface OnboardingCheckoutClientProps {
@@ -427,118 +428,120 @@ export function OnboardingCheckoutClient({
 
   return (
     <OnboardingCheckoutFrame>
-      <div className={FORM_LAYOUT.headerSection}>
-        <h1 className={FORM_LAYOUT.title}>
-          {`Upgrade To ${planMarketing.displayName}`}
-        </h1>
-        <p className={FORM_LAYOUT.hint}>
-          {isDefaultUpsell && username
-            ? `Congrats! Your profile, links, and fan capture are live at jov.ie/${username} — free forever. Here's what ${planMarketing.displayName} adds on top.`
-            : username
-              ? `Your profile is live and stays free either way. Here's what ${planMarketing.displayName} adds on top.`
-              : `Here's what ${planMarketing.displayName} adds on top of the free plan.`}
-        </p>
-      </div>
-
-      {username || displayName ? (
-        <ProfilePreviewCard
-          avatarUrl={avatarUrl}
-          displayName={displayName}
-          offerName={planMarketing.displayName}
-          spotifyFollowers={spotifyFollowers}
-          username={username}
-        />
-      ) : null}
-
-      {catalog ? <CatalogPreviewCard catalog={catalog} /> : null}
-
-      {proofPending ? (
-        <p
-          className='mb-6 text-sm text-secondary-token'
-          data-testid='checkout-go-live-terms'
-        >
-          {PROOF_PENDING_TERMS}
-        </p>
-      ) : null}
-
-      <ClaimTimeProofCard findings={proofFindings} />
-
-      {/* Certified plan highlights (JOV-7794) */}
-      <ContentSurfaceCard className='mb-6 p-4'>
-        <div className='space-y-2.5'>
-          {OFFER_HIGHLIGHTS.map(item => (
-            <div key={item.label} className='flex items-start gap-3'>
-              <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-1'>
-                <item.icon className='h-4 w-4 text-(--linear-accent)' />
-              </div>
-              <div>
-                <p className='text-app font-medium text-primary-token'>
-                  {item.label}
-                </p>
-                <p className='text-xs text-tertiary-token'>{item.detail}</p>
-              </div>
-            </div>
-          ))}
+      <OnboardingCheckoutColumn>
+        <div className={FORM_LAYOUT.headerSection}>
+          <h1 className={FORM_LAYOUT.title}>
+            {`Upgrade To ${planMarketing.displayName}`}
+          </h1>
+          <p className={FORM_LAYOUT.hint}>
+            {isDefaultUpsell && username
+              ? `Congrats! Your profile, links, and fan capture are live at jov.ie/${username} — free forever. Here's what ${planMarketing.displayName} adds on top.`
+              : username
+                ? `Your profile is live and stays free either way. Here's what ${planMarketing.displayName} adds on top.`
+                : `Here's what ${planMarketing.displayName} adds on top of the free plan.`}
+          </p>
         </div>
-      </ContentSurfaceCard>
 
-      {/* Annual toggle */}
-      {hasAnnualOption ? (
-        <BillingIntervalSelector
-          isAnnual={isAnnual}
-          savingsPercent={annualSavingsPercent}
-          onSelect={setIsAnnual}
-        />
-      ) : null}
+        {username || displayName ? (
+          <ProfilePreviewCard
+            avatarUrl={avatarUrl}
+            displayName={displayName}
+            offerName={planMarketing.displayName}
+            spotifyFollowers={spotifyFollowers}
+            username={username}
+          />
+        ) : null}
 
-      {/* Price display */}
-      <div className='mb-6 text-center'>
-        <span className='text-3xl font-semibold tracking-tight tabular-nums text-primary-token'>
-          {formatAmount(currentAmount)}
-        </span>
-        <span className='text-sm text-tertiary-token'>
-          /{interval === 'year' ? 'yr' : 'mo'}
-        </span>
-      </div>
+        {catalog ? <CatalogPreviewCard catalog={catalog} /> : null}
 
-      {/* CTA */}
-      <Button
-        onClick={handleCheckout}
-        disabled={isLoading}
-        variant='primary'
-        size='xl'
-        className='w-full'
-        aria-busy={isLoading}
-      >
-        {isLoading
-          ? 'Redirecting to checkout...'
-          : `Upgrade to ${planMarketing.displayName}`}
-      </Button>
+        {proofPending ? (
+          <p
+            className='mb-6 text-sm text-secondary-token'
+            data-testid='checkout-go-live-terms'
+          >
+            {PROOF_PENDING_TERMS}
+          </p>
+        ) : null}
 
-      {/* Below the button, so a failed checkout never pushes it down */}
-      {error ? (
-        <ContentSurfaceCard
-          className='mt-4 border-error/30 bg-error/5 px-4 py-3 text-app text-error'
-          role='alert'
-        >
-          {error}
+        <ClaimTimeProofCard findings={proofFindings} />
+
+        {/* Certified plan highlights (JOV-7794) */}
+        <ContentSurfaceCard className='mb-6 p-4'>
+          <div className='space-y-2.5'>
+            {OFFER_HIGHLIGHTS.map(item => (
+              <div key={item.label} className='flex items-start gap-3'>
+                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-1'>
+                  <item.icon className='h-4 w-4 text-(--linear-accent)' />
+                </div>
+                <div>
+                  <p className='text-app font-medium text-primary-token'>
+                    {item.label}
+                  </p>
+                  <p className='text-xs text-tertiary-token'>{item.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </ContentSurfaceCard>
-      ) : null}
 
-      {/* Skip — the free profile is already live; never imply otherwise */}
-      <button
-        type='button'
-        onClick={handleSkip}
-        disabled={isLoading}
-        className='mt-4 w-full text-center text-app text-tertiary-token hover:text-secondary-token transition-colors disabled:opacity-50'
-      >
-        {isDefaultUpsell ? 'Keep My Free Profile' : 'Continue with Free'}
-      </button>
-      {isDefaultUpsell ? (
-        <p className='mt-2 text-center text-xs text-tertiary-token'>
-          Your public profile stays live and free forever.
-        </p>
-      ) : null}
+        {/* Annual toggle */}
+        {hasAnnualOption ? (
+          <BillingIntervalSelector
+            isAnnual={isAnnual}
+            savingsPercent={annualSavingsPercent}
+            onSelect={setIsAnnual}
+          />
+        ) : null}
+
+        {/* Price display */}
+        <div className='mb-6 text-center'>
+          <span className='text-3xl font-semibold tracking-tight tabular-nums text-primary-token'>
+            {formatAmount(currentAmount)}
+          </span>
+          <span className='text-sm text-tertiary-token'>
+            /{interval === 'year' ? 'yr' : 'mo'}
+          </span>
+        </div>
+
+        {/* CTA */}
+        <Button
+          onClick={handleCheckout}
+          disabled={isLoading}
+          variant='primary'
+          size='xl'
+          className='w-full'
+          aria-busy={isLoading}
+        >
+          {isLoading
+            ? 'Redirecting to checkout...'
+            : `Upgrade to ${planMarketing.displayName}`}
+        </Button>
+
+        {/* Below the button, so a failed checkout never pushes it down */}
+        {error ? (
+          <ContentSurfaceCard
+            className='mt-4 border-error/30 bg-error/5 px-4 py-3 text-app text-error'
+            role='alert'
+          >
+            {error}
+          </ContentSurfaceCard>
+        ) : null}
+
+        {/* Skip — the free profile is already live; never imply otherwise */}
+        <button
+          type='button'
+          onClick={handleSkip}
+          disabled={isLoading}
+          className='mt-4 w-full text-center text-app text-tertiary-token hover:text-secondary-token transition-colors disabled:opacity-50'
+        >
+          {isDefaultUpsell ? 'Keep My Free Profile' : 'Continue with Free'}
+        </button>
+        {isDefaultUpsell ? (
+          <p className='mt-2 text-center text-xs text-tertiary-token'>
+            Your public profile stays live and free forever.
+          </p>
+        ) : null}
+      </OnboardingCheckoutColumn>
     </OnboardingCheckoutFrame>
   );
 }
