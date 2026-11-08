@@ -73,24 +73,12 @@ export const URL_ONLY_DSPS: readonly UrlOnlyDsp[] = [
 ];
 
 /**
- * Registry streaming DSPs that URL detection must also recognise, mirrored
+ * Registry streaming DSPs named in the AWAL / Orchard lists that URL detection must also recognise, mirrored
  * here so the detector does not import the whole DSP registry (logo markup
  * included) into client bundles. tests/lib/dsp/url-only-hex.test.ts fails if
  * any row drifts from its DSP_REGISTRY entry.
  */
 export const DETECTION_ONLY_DSPS: readonly UrlOnlyDsp[] = [
-  {
-    key: 'pandora',
-    name: 'Pandora',
-    hex: '224099',
-    domains: ['pandora.com', 'www.pandora.com'],
-  },
-  {
-    key: 'napster',
-    name: 'Napster',
-    hex: '2259FF',
-    domains: ['web.napster.com', 'napster.com', 'us.napster.com'],
-  },
   {
     key: 'audiomack',
     name: 'Audiomack',
@@ -116,63 +104,9 @@ export const DETECTION_ONLY_DSPS: readonly UrlOnlyDsp[] = [
     domains: ['boomplay.com', 'www.boomplay.com'],
   },
   {
-    key: 'iheartradio',
-    name: 'iHeartRadio',
-    hex: 'C6002B',
-    domains: ['iheart.com', 'www.iheart.com'],
-  },
-  {
-    key: 'awa',
-    name: 'AWA',
-    hex: 'FC5B11',
-    domains: ['awa.fm', 'www.awa.fm'],
-  },
-  {
-    key: 'audius',
-    name: 'Audius',
-    hex: 'CC0FE0',
-    domains: ['audius.co', 'www.audius.co'],
-  },
-  {
-    key: 'flo',
-    name: 'FLO',
-    hex: '00C3C1',
-    domains: ['music-flo.com', 'www.music-flo.com'],
-  },
-  {
-    key: 'gaana',
-    name: 'Gaana',
-    hex: 'E72C30',
-    domains: ['gaana.com', 'www.gaana.com'],
-  },
-  {
-    key: 'jio_saavn',
-    name: 'JioSaavn',
-    hex: '2BC5B4',
-    domains: ['jiosaavn.com', 'www.jiosaavn.com', 'saavn.com'],
-  },
-  {
-    key: 'joox',
-    name: 'JOOX',
-    hex: '00D96F',
-    domains: ['joox.com', 'www.joox.com'],
-  },
-  {
     key: 'kkbox',
     name: 'KKBOX',
     hex: '09CEF6',
     domains: ['kkbox.com', 'www.kkbox.com'],
-  },
-  {
-    key: 'trebel',
-    name: 'Trebel',
-    hex: '8B5CF6',
-    domains: ['trebel.io', 'www.trebel.io'],
-  },
-  {
-    key: 'yandex',
-    name: 'Yandex Music',
-    hex: 'FFCC00',
-    domains: ['music.yandex.ru', 'music.yandex.com'],
   },
 ];
