@@ -16,29 +16,29 @@ GITLEAKS_VERSION="${GITLEAKS_VERSION:-8.21.2}"
 TRUFFLEHOG_VERSION="${TRUFFLEHOG_VERSION:-3.99.8}"
 EXCLUDE_PATHS="$REPO_ROOT/.trufflehog-exclude.txt"
 
-# Release downloads hit transient resets and 504 bursts (JOV-6809); retry five
-# times with a growing pause (2, 8, 18, 32 s) so one short outage can't fail it.
-# Download to a temp file before extracting so a restarted transfer never
-# streams a concatenated response into tar.
+# Release downloads hit resets (curl 35, JOV-6809) and HTTP 504 runs (#24269,
+# #24488). Fetch to a temp file so a restart never feeds tar a concatenated
+# body, abort stalls, back off with jitter (6 tries, 62-124s), fail closed.
 SCAN_SECRETS_RETRY_DELAY="${SCAN_SECRETS_RETRY_DELAY:-2}"
+SCAN_SECRETS_DOWNLOAD_ATTEMPTS="${SCAN_SECRETS_DOWNLOAD_ATTEMPTS:-6}"
 fetch_release_tarball() {
-  local url="$1" dest_dir="$2" member="$3"
-  local tmp attempt
+  local url="$1" dest_dir="$2" member="$3" tmp attempt delay="$SCAN_SECRETS_RETRY_DELAY"
   tmp="$(mktemp)"
-  for attempt in 1 2 3 4 5; do
-    if curl -sSfL -o "$tmp" "$url" \
+  for ((attempt = 1; attempt <= SCAN_SECRETS_DOWNLOAD_ATTEMPTS; attempt++)); do
+    if curl -sSfL --connect-timeout 20 --speed-limit 1024 --speed-time 30 -o "$tmp" "$url" \
       && tar -xzf "$tmp" -C "$dest_dir" "$member"; then
       chmod +x "$dest_dir/$member"
       rm -f "$tmp"
       return 0
     fi
-    if [[ $attempt -lt 5 ]]; then
+    if [[ $attempt -lt $SCAN_SECRETS_DOWNLOAD_ATTEMPTS ]]; then
       echo "scanner download attempt $attempt failed; retrying" >&2
-      sleep "$((SCAN_SECRETS_RETRY_DELAY * attempt * attempt))"
+      sleep "$((delay + RANDOM % (delay + 1)))"
+      delay=$((delay * 2))
     fi
   done
   rm -f "$tmp"
-  echo "::error title=Secret scanner download failed::Could not fetch $member after 5 attempts ($url)." >&2
+  echo "::error title=Secret scanner download failed::Could not fetch $member after $SCAN_SECRETS_DOWNLOAD_ATTEMPTS attempts ($url)." >&2
   return 1
 }
 

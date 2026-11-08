@@ -85,6 +85,7 @@ const HOMEPAGE_STYLES = [
   'components/homepage/v3/specs.css',
   'components/homepage/v3/form.css',
   'components/homepage/v3/responsive.css',
+  'components/homepage/v3/cinema.css',
 ] as const;
 
 const PRICE_TEXT = /\$\s?\d|\d+\s?\/\s?mo\b|\bper month\b|\b\d+-day\b/i;
@@ -203,27 +204,30 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     }
   });
 
-  it('shows only real product captures, with no person but Tim White', async () => {
+  it('shows no real person: only the featured demo artist inside the product UI', async () => {
     const { HOMEPAGE_EDITORIAL_COPY: copy } = await loadCopy();
+    const { HOMEPAGE_FEATURED_ARTIST: artist } = await import(
+      '@/data/demoArtists'
+    );
     const { container } = await renderHomePage();
     const sources = [...container.querySelectorAll('section img')].map(image =>
       (image.getAttribute('src') ?? '').replace(/\?v=\w+$/, '')
     );
-    // Approved v3 (receipt home-canonical-v3): Tim White's own profile photo
-    // and his real release covers inside the live product UI. Nothing else,
-    // and the only person shown is Tim (his avatar and Never Say A Word).
+    // Tim, 2026-11-08: the homepage does not feature him. The live product UI
+    // shows an invented demo artist (procedural art, no people) until real
+    // artists opt in to be featured. No real person renders on `/`.
     const allowed = [
-      '/images/avatars/tim-white-profile.jpg',
-      '/img/releases/never-say-a-word.jpg',
-      '/img/releases/take-me-over-remix.jpg',
-      '/img/releases/doge-to-mars.jpg',
-      '/img/releases/tomorrow-sounds.jpg',
-      '/img/releases/supernova-girl.jpg',
-      '/img/releases/this-is-love.jpg',
+      artist.avatarSrc,
+      ...artist.releases.map(release => release.src),
     ];
+    expect(artist.demo).toBe(true);
     expect(sources.length).toBeGreaterThan(0);
     expect(sources.filter(src => !allowed.includes(src))).toEqual([]);
-    expect([...new Set(sources)].sort()).toEqual([...allowed].sort());
+    expect([...new Set(sources)].sort()).toEqual([...new Set(allowed)].sort());
+    expect(sources.some(src => /tim-white|img\/releases\//.test(src))).toBe(
+      false
+    );
+    expect(container.textContent).not.toContain('Tim White');
     expect(copy.profile.alt).toBeTruthy();
   });
 
@@ -347,6 +351,33 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     }
     for (const path of HOMEPAGE_SOURCES) {
       expect(read(path), `${path}: uppercase`).not.toMatch(/\buppercase\b/);
+    }
+  });
+
+  it('moves the cinema layer by transform and opacity only, behind reduced motion', () => {
+    const css = read('components/homepage/v3/cinema.css').replace(
+      /\/\*[\s\S]*?\*\//g,
+      ''
+    );
+    // Scroll-driven only, and only where the user has not asked for less motion.
+    expect(css).toMatch(
+      /@supports \(animation-timeline: view\(\)\)\s*\{\s*@media \(prefers-reduced-motion: no-preference\)/
+    );
+    expect(css).not.toMatch(/addEventListener|position:\s*(?:fixed|sticky)/);
+    // view() binds to the nearest scroll container, so the hero and chapters
+    // clip without becoming one (overflow: hidden would idle every timeline).
+    expect(css).toMatch(
+      /@supports \(animation-timeline: view\(\)\)\s*\{\s*\.hv3-hero,\s*\.hv3-chapter\s*\{\s*overflow: clip;\s*\}/
+    );
+    // Keyframes touch only compositor properties, and never fade to nothing.
+    for (const [, body] of css.matchAll(
+      /@keyframes [\w-]+\s*\{([\s\S]*?\})\s*\}/g
+    )) {
+      const props = [...body.matchAll(/([a-z-]+)\s*:/g)].map(
+        ([, prop]) => prop
+      );
+      expect(new Set(props)).toEqual(new Set(['opacity', 'transform']));
+      expect(body).not.toMatch(/opacity:\s*0(?:\.0+)?\s*;/);
     }
   });
 });
