@@ -52,6 +52,7 @@ HOSTED_DEEP_EVIDENCE_JOBS = (
     ("cost-anomaly-gate.yml", "evaluate"),
     ("visual-a11y.yml", "ci-visual-path-changes"),
     ("visual-a11y.yml", "storybook-a11y"),
+    ("visual-a11y.yml", "component-story-evidence"),
     ("visual-regression.yml", "visual-regression"),
 )
 

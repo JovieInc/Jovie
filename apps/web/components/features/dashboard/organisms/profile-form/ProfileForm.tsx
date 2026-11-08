@@ -101,7 +101,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
         Update Profile
       </Button>
 
-      <FormStatus success={success ? 'Profile updated!' : undefined} />
+      <FormStatus success={success ? 'Profile updated' : undefined} />
     </form>
   );
 }

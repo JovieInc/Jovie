@@ -24,6 +24,7 @@ test('every checked-in brief parses and names a unique frame', () => {
       'claim',
       'empty-states',
       'homepage',
+      'insights',
       'request-access',
     ]
   );
