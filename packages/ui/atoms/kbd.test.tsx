@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { Kbd } from './kbd';
 
@@ -168,5 +169,24 @@ describe('Kbd', () => {
       expect(kbd.className).toContain('bg-surface-tooltip');
       expect(kbd.className).toContain('text-tooltip-foreground');
     });
+  });
+});
+
+describe('Kbd accessibility', () => {
+  it('has no axe violations for default, tooltip, Shift glyph, long and RTL keys', async () => {
+    const { container } = render(
+      <div>
+        <Kbd>⌘K</Kbd>
+        <Kbd variant='tooltip'>Esc</Kbd>
+        <Kbd>⇧</Kbd>
+        <Kbd>Ctrl Alt Shift ArrowRight</Kbd>
+        <p dir='rtl'>
+          افتح لوحة الأوامر <Kbd>⌘</Kbd>
+          <Kbd>P</Kbd>
+        </p>
+      </div>
+    );
+    expect(screen.getByText('Shift')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 });
