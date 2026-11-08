@@ -174,10 +174,19 @@ const TOOLS: Tool[] = [
         MAX_RESULT_CHARS
       )
         return tooLarge();
-      if (ids.length) await c.backend('POST', '/v1/ack', { ids });
+      if (!ids.length) {
+        return {
+          status: out.status,
+          json: { ...(out.json as object), acked: 0 },
+        };
+      }
+      const ack = await c.backend('POST', '/v1/ack', { ids });
+      if (ack.status >= 300) return ack;
+      const acked = acknowledgedCount(ack.json);
+      if (acked === null) return unconfirmedAck();
       return {
         status: out.status,
-        json: { ...(out.json as object), acked: ids.length },
+        json: { ...(out.json as object), acked },
       };
     },
   },
@@ -213,6 +222,21 @@ const TOOLS: Tool[] = [
 ];
 
 const serialize = (value: unknown) => JSON.stringify(value, null, 2);
+const acknowledgedCount = (json: unknown): number | null => {
+  if (!json || typeof json !== 'object') return null;
+  const acked = (json as { acked?: unknown }).acked;
+  return typeof acked === 'number' && Number.isInteger(acked) && acked >= 0
+    ? acked
+    : null;
+};
+const unconfirmedAck = () => ({
+  status: 502,
+  json: {
+    ok: false,
+    code: 'ack_unconfirmed',
+    message: 'Messages were read but acknowledgement was not confirmed.',
+  },
+});
 const tooLarge = () => ({
   status: 413,
   json: {
