@@ -284,8 +284,12 @@ async function captureOne(browser, { storyId, theme }) {
     for (const error of state.errors) record(error);
     result.rendered = state.rendered && !state.errors.length;
     if (!result.rendered) return result;
-    await page.evaluate(() => document.fonts?.ready);
+    // Page-side callbacks (serialized, so no closures); scripts/ has no DOM lib.
+    await page.evaluate(
+      () => /** @type {any} */ (globalThis).document.fonts?.ready
+    );
     result.appliedTheme = await page.evaluate(() => {
+      const { document } = /** @type {any} */ (globalThis);
       const list = document.documentElement.classList;
       if (list.contains('dark')) return 'dark';
       return list.contains('light') ? 'light' : null;
