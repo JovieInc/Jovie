@@ -39,20 +39,18 @@
   overflow-wrap: anywhere;
 }
 
-/* Pen oaz9c ghost pills. The button is the 44px tap target; the face is the
-   28px hairline pill people see. Geometry and type are shared so stacked
-   provider buttons always match; only the artwork differs per provider. */
+/* Pen oaz9c ghost pills: a 44px tap target around a 28px hairline face, with
+   shared geometry so stacked providers match; only the artwork differs. */
 .auth-provider-button {
   display: flex;
-  position: relative;
   align-items: center;
   justify-content: center;
   min-height: 44px;
   padding: 8px 0;
   border: 0;
+  outline: none;
   background: transparent;
   color: var(--color-text-primary);
-  overflow-wrap: anywhere;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
@@ -69,38 +67,24 @@
   border-radius: 9999px;
   font-size: 0.875rem;
   font-weight: 510;
-  line-height: 1.2;
-  transition:
-    background-color var(--duration-subtle, 150ms) ease-out,
-    border-color var(--duration-subtle, 150ms) ease-out;
+  transition: background-color 150ms ease-out;
 }
 
 .auth-provider-button:enabled:hover .auth-provider-face {
-  background: rgb(255 255 255 / 0.04);
-  border-color: rgb(255 255 255 / 0.14);
-}
-
-.auth-provider-button:focus-visible {
-  outline: none;
+  background: rgb(255 255 255 / 0.05);
 }
 
 .auth-provider-button:focus-visible .auth-provider-face {
-  box-shadow:
-    0 0 0 2px var(--color-bg-base),
-    0 0 0 4px rgb(255 255 255 / 0.5);
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.5);
 }
 
-/* Hydration disables the control so a click cannot no-op. That wait is not
-   a pending request, so the button stays at full strength until it is. */
+/* Hydration disables the control; that wait is not a pending request. */
 .auth-provider-button:disabled:not([data-auth-provider-pending]) {
   cursor: default;
   opacity: 1;
 }
 
-.auth-provider-face img,
-.auth-provider-face svg {
-  width: 16px;
-  height: 16px;
+.auth-provider-face > :first-child {
   flex-shrink: 0;
 }
 
