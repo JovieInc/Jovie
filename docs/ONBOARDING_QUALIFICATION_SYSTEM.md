@@ -1,6 +1,6 @@
 # Onboarding qualification system
 
-Status: spec, slice 1 shipping
+Status: spec, slice 1 shipped (#24499), slice 2 in design
 Date: 2026-11-08
 Goal (Tim, 2026-11-07): "driving homepage to first paid signup as would buy on a
 real customer test".
@@ -28,11 +28,10 @@ question variant), so the system can see where each cohort drops.
   on the chat claim path. The ranked queue sorts role-form entrants last.
 - The Mom Test vocabulary exists (`lib/acquisition/conversation-loop.ts`), but
   nobody on the waitlist is asked anything.
-- Suspected, not yet walked: the chat checkout card links to the organic
-  upsell (`/onboarding/checkout?plan=pro`), which redirects back to `/start`
-  while the profile is neither live nor waiting on proof. The claim flow
-  carries `source=intent` instead. The per-customer walk (section 3) should
-  confirm or clear this before anyone changes it.
+- Fixed in #24500: the chat checkout card used to link to the organic
+  upsell, which redirected back to `/start` while the profile was neither
+  live nor waiting on proof. It now carries `source=intent`, as the claim
+  flow does. The per-customer walk (section 3) should still confirm it.
 - Customer certification is a spec only. Nothing walks a specific person's
   path with their data before they are let in.
 - There are no approved Pen frames for `/waitlist`, `/start` or checkout
