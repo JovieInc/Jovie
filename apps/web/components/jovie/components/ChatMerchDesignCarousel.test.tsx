@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MerchDesignCarouselResult } from '@/lib/merch/types';
@@ -236,11 +236,22 @@ describe('ChatMerchDesignCarousel', () => {
   it('says so and offers a retry when no design came back', async () => {
     const submitted = vi.fn();
     globalThis.addEventListener('jovie-chat-submit-prompt', submitted);
-    render(<ChatMerchDesignCarousel result={{ ...result, designs: [] }} />);
+    try {
+      render(<ChatMerchDesignCarousel result={{ ...result, designs: [] }} />);
 
-    expect(screen.getByText('No designs came back this time.')).toBeVisible();
-    await userEvent.click(screen.getByRole('button', { name: 'Try Again' }));
-    expect(submitted).toHaveBeenCalledTimes(1);
-    globalThis.removeEventListener('jovie-chat-submit-prompt', submitted);
+      const retry = within(
+        screen.getByRole('region', { name: 'Retry Merch Concepts' })
+      );
+      expect(retry.getByText('No designs came back this time.')).toBeVisible();
+      await userEvent.click(retry.getByRole('button', { name: 'Try Again' }));
+      expect(submitted).toHaveBeenCalledTimes(1);
+      expect(submitted).toHaveBeenCalledWith(
+        expect.objectContaining({
+          detail: { prompt: 'Try generating the merch designs again' },
+        })
+      );
+    } finally {
+      globalThis.removeEventListener('jovie-chat-submit-prompt', submitted);
+    }
   });
 });

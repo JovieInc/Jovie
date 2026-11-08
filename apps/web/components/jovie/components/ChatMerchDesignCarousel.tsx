@@ -261,7 +261,7 @@ export function ChatMerchDesignCarousel({
 
   if (result.designs.length === 0) {
     return (
-      <section aria-label='Merch Concepts Unavailable' className='max-w-3xl'>
+      <section aria-label='Retry Merch Concepts' className='max-w-3xl'>
         <p className='text-sm text-secondary-token'>
           No designs came back this time.
         </p>
