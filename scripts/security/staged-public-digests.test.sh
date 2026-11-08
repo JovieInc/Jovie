@@ -8,7 +8,16 @@ tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 git -C "$tmp_dir" init -q
 mkdir -p "$tmp_dir/scripts/security"
-cp "$root/scripts/security/scan-secrets.sh" "$root/scripts/security/fetch-scanner.sh" "$root/scripts/security/scanner-pins.txt" "$tmp_dir/scripts/security/"
+cp "$root/scripts/security/scan-secrets.sh" "$tmp_dir/scripts/security/"
+# Copy every helper scan-secrets.sh sources. A fixed list misses the next one.
+while IFS= read -r helper; do
+  cp "$root/$helper" "$tmp_dir/$helper"
+done < <(
+  grep -E '^(\.|source) "\$REPO_ROOT/scripts/security/[^"]+"' \
+    "$root/scripts/security/scan-secrets.sh" |
+    sed -E 's/.*"\$REPO_ROOT\/([^"]+)".*/\1/'
+)
+cp "$root/scripts/security/scanner-pins.txt" "$tmp_dir/scripts/security/"
 cp "$root/scripts/security/gitleaks-staged-public-digests.b64" "$tmp_dir/scripts/security/"
 cp "$root/.gitleaks.toml" "$tmp_dir/.gitleaks.toml"
 mkdir -p "$tmp_dir/scripts/invariants/art-direction"
@@ -19,7 +28,7 @@ printf '#!/bin/sh\nexit 0\n' >"$tmp_dir/fake-trufflehog"
 chmod 700 "$tmp_dir/fake-trufflehog"
 export GITLEAKS_BIN="$scanner" TRUFFLEHOG_BIN="$tmp_dir/fake-trufflehog"
 cd "$tmp_dir"
-git add .gitleaks.toml scripts/security/scan-secrets.sh scripts/security/gitleaks-staged-public-digests.b64 scripts/invariants/art-direction/vision-observations.jsonl docs
+git add .gitleaks.toml scripts/security/scan-secrets.sh scripts/security/scan-secrets-sonar-pin.sh scripts/security/gitleaks-staged-public-digests.b64 scripts/invariants/art-direction/vision-observations.jsonl docs
 bash scripts/security/scan-secrets.sh pre-commit >"$tmp_dir/known.log" 2>&1
 
 # Frame identifiers are data, but credentials beside them must still block.
