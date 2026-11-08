@@ -340,25 +340,3 @@ export function InsightsPanel() {
     />
   );
 }
-
-const noop = () => undefined;
-
-/**
- * Route-level loading state for /app/insights: the same workspace (toolbar,
- * category filters, list rows) the panel renders while its query loads, so
- * the hand-off from route skeleton to panel skeleton to data never shifts.
- */
-export function InsightsPanelLoading() {
-  return (
-    <InsightsPanelView
-      insights={[]}
-      isLoading
-      error={null}
-      selectedCategory='all'
-      onCategoryChange={noop}
-      onGenerate={noop}
-      onRetry={noop}
-      isGenerating={false}
-    />
-  );
-}

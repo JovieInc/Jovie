@@ -16,11 +16,7 @@ vi.mock('@/lib/queries', () => ({
   useUpdateInsightMutation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
-import {
-  InsightsPanel,
-  InsightsPanelLoading,
-  InsightsPanelView,
-} from './InsightsPanel';
+import { InsightsPanel, InsightsPanelView } from './InsightsPanel';
 
 describe('InsightsPanelView', () => {
   beforeEach(() => {
@@ -269,7 +265,16 @@ describe('InsightsPanelView', () => {
   it('loads in the same rows as a loaded insight card, under the same filters', () => {
     const { container } = render(
       <TooltipProvider>
-        <InsightsPanelLoading />
+        <InsightsPanelView
+          insights={[]}
+          isLoading
+          error={null}
+          selectedCategory='all'
+          onCategoryChange={vi.fn()}
+          onGenerate={vi.fn()}
+          onRetry={vi.fn()}
+          isGenerating={false}
+        />
       </TooltipProvider>
     );
 
