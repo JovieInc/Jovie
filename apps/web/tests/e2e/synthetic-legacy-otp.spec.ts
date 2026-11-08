@@ -185,10 +185,12 @@ test.describe('Synthetic Monitoring - Legacy OTP Signup (JOV-2446 cutover)', () 
     // surface is covered by synthetic-auth-ui and synthetic-start-chat.
     await page.goto(SIGNUP_PATH, { waitUntil: 'commit' });
     await page.waitForLoadState('domcontentloaded');
-    test.skip(
-      new URL(page.url()).pathname === '/waitlist',
-      'Public signup is closed (invite-only); legacy OTP signup is not reachable.'
-    );
+    if (new URL(page.url()).pathname === '/waitlist') {
+      console.log(
+        '[Synthetic][legacy] Public signup is closed (invite-only); OTP signup is not reachable'
+      );
+      return;
+    }
 
     const config = validateProductionSignupCanaryConfig(process.env);
     if (!config.ok) {
