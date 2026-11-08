@@ -77,7 +77,7 @@ export const centeredContentClassName = [
  * Header styles for modal components.
  */
 export const headerStyles = {
-  base: 'flex min-w-0 flex-col gap-1.5 pr-10 text-left',
+  base: 'flex min-w-0 flex-col gap-1.5 pe-10 text-start',
 } as const;
 
 /**

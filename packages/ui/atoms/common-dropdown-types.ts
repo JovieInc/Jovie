@@ -219,6 +219,11 @@ export interface CommonDropdownProps {
   readonly triggerIcon?: LucideIcon;
 
   /**
+   * Reading direction for submenu arrow keys; inherits DirectionProvider.
+   */
+  readonly dir?: 'ltr' | 'rtl';
+
+  /**
    * Alignment of dropdown content relative to trigger
    */
   readonly align?: 'start' | 'center' | 'end';
