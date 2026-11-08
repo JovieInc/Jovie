@@ -162,7 +162,11 @@ test.describe('API failure resilience', () => {
     // list data endpoint (/api/dashboard/audience/** used by
     // useAudienceInfiniteQuery) both fail — the page must show error UI, not
     // a blank surface (JOV-8791).
+    // Counts requests the 500 mocks answered: zero means the page never
+    // reached the failure path and the blank has another cause.
+    let routedRequests = 0;
     await page.route('**/api/audience/**', route => {
+      routedRequests += 1;
       route.fulfill({
         status: 500,
         contentType: 'application/json',
@@ -170,6 +174,7 @@ test.describe('API failure resilience', () => {
       });
     });
     await page.route('**/api/dashboard/audience/**', route => {
+      routedRequests += 1;
       route.fulfill({
         status: 500,
         contentType: 'application/json',
@@ -220,6 +225,7 @@ test.describe('API failure resilience', () => {
               url: page.url(),
               bodyTextExcerpt: bodyText.slice(0, 2000),
               bodyTextLength: bodyText.trim().length,
+              routedRequests,
               pageErrors,
               failedResponses,
             },
@@ -230,7 +236,7 @@ test.describe('API failure resilience', () => {
         })
         .catch(() => undefined);
       process.stdout.write(
-        `${JSON.stringify({ name: 'audience-api-500', url: page.url(), bodyTextLength: bodyText.trim().length, pageErrors, failedResponses: failedResponses.slice(0, 20) })}\n`
+        `${JSON.stringify({ name: 'audience-api-500', url: page.url(), bodyTextLength: bodyText.trim().length, bodyTextExcerpt: bodyText.trim().slice(0, 200), routedRequests, pageErrors, failedResponses: failedResponses.slice(0, 20) })}\n`
       );
       throw error;
     }
