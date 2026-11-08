@@ -332,13 +332,12 @@ export function stepChecks(
   let readback = null;
   for (const step of steps ?? []) {
     if (step.kind === 'observation') {
+      const { contractId, dimension, value, unit, sampleSize, samples } = step;
+      const measured = { contractId, dimension, value, unit };
       (observationsBySurface[step.surface] ??= []).push({
-        contractId: step.contractId,
-        dimension: step.dimension,
-        value: step.value,
-        unit: step.unit,
-        sampleSize: step.sampleSize ?? 1,
-        ...(Array.isArray(step.samples) ? { samples: step.samples } : {}),
+        ...measured,
+        sampleSize: sampleSize ?? 1,
+        ...(Array.isArray(samples) ? { samples } : {}),
       });
       continue;
     }
