@@ -183,7 +183,9 @@ for (const verdict of ['render-untrusted', 'needs-fix']) {
         getFacts: () => ({
           name: 'PROPOSAL / timing',
           w: 800,
-          nodes: [{ id: 'bad', t: 'frame', x: 1.5, y: 0, w: 20, h: 20, r: {} }],
+          nodes: [
+            { id: 'bad', t: 'frame', d: 1, x: 1.5, y: 0, w: 20, h: 20, r: {} },
+          ],
         }),
         renderFrame: async () => ({
           path,
