@@ -214,46 +214,71 @@ export function recordCertCapabilities(
 /**
  * Reads the current document's layout shifts and long animation frames since
  * it loaded (buffered observers, so it works even when telemetry started
- * after navigation). Runs in the page, so it must stay self-contained.
+ * after navigation). Frames are split at the first user input: `loadWorstMs`
+ * is the longest frame before it (all frames when there was none) and
+ * `inputWorstMs` the longest from it on. Runs in the page, so it must stay
+ * self-contained.
  */
 const measureJank = () =>
-  new Promise<{ cls: number; worstFrameMs: number; frames: boolean }>(
-    resolve => {
-      const types = PerformanceObserver.supportedEntryTypes ?? [];
-      const out = {
-        cls: 0,
-        worstFrameMs: 0,
+  new Promise<{
+    cls: number;
+    worstFrameMs: number;
+    loadWorstMs: number;
+    inputWorstMs: number;
+    frames: boolean;
+  }>(resolve => {
+    const types = PerformanceObserver.supportedEntryTypes ?? [];
+    let cls = 0;
+    let firstInputAt = Number.POSITIVE_INFINITY;
+    const frames: { startTime: number; duration: number }[] = [];
+    let pending = 3;
+    const done = () => {
+      pending -= 1;
+      if (pending > 0) return;
+      let loadWorstMs = 0;
+      let inputWorstMs = 0;
+      // Without first-input timing every frame counts as after input, so
+      // none is ever averaged away.
+      const split = types.includes('first-input') ? firstInputAt : 0;
+      for (const frame of frames) {
+        if (frame.startTime < split)
+          loadWorstMs = Math.max(loadWorstMs, frame.duration);
+        else inputWorstMs = Math.max(inputWorstMs, frame.duration);
+      }
+      resolve({
+        cls,
+        worstFrameMs: Math.max(loadWorstMs, inputWorstMs),
+        loadWorstMs,
+        inputWorstMs,
         frames: types.includes('long-animation-frame'),
-      };
-      let pending = 2;
-      const done = () => {
-        pending -= 1;
-        if (pending === 0) resolve(out);
-      };
-      const watch = (type: string, take: (entry: PerformanceEntry) => void) => {
-        if (!types.includes(type)) return done();
-        const observer = new PerformanceObserver(list =>
-          list.getEntries().forEach(take)
-        );
-        observer.observe({ type, buffered: true });
-        setTimeout(() => {
-          observer.takeRecords().forEach(take);
-          observer.disconnect();
-          done();
-        }, 50);
-      };
-      watch('layout-shift', entry => {
-        const shift = entry as PerformanceEntry & {
-          value: number;
-          hadRecentInput: boolean;
-        };
-        if (!shift.hadRecentInput) out.cls += shift.value;
       });
-      watch('long-animation-frame', entry => {
-        out.worstFrameMs = Math.max(out.worstFrameMs, entry.duration);
-      });
-    }
-  );
+    };
+    const watch = (type: string, take: (entry: PerformanceEntry) => void) => {
+      if (!types.includes(type)) return done();
+      const observer = new PerformanceObserver(list =>
+        list.getEntries().forEach(take)
+      );
+      observer.observe({ type, buffered: true });
+      setTimeout(() => {
+        observer.takeRecords().forEach(take);
+        observer.disconnect();
+        done();
+      }, 50);
+    };
+    watch('layout-shift', entry => {
+      const shift = entry as PerformanceEntry & {
+        value: number;
+        hadRecentInput: boolean;
+      };
+      if (!shift.hadRecentInput) cls += shift.value;
+    });
+    watch('first-input', entry => {
+      firstInputAt = Math.min(firstInputAt, entry.startTime);
+    });
+    watch('long-animation-frame', entry => {
+      frames.push({ startTime: entry.startTime, duration: entry.duration });
+    });
+  });
 
 /** scripts/lib/prod-cert-truth.mjs JANK_LIMITS['jank.worst-frame-ms'].max */
 const FRAME_LIMIT_MS = 200;
@@ -287,7 +312,7 @@ async function coldLoadWorstFrame(
       .waitForLoadState('networkidle', { timeout: 5_000 })
       .catch(() => undefined);
     const jank = await tab.evaluate(measureJank);
-    return jank.frames ? jank.worstFrameMs : null;
+    return jank.frames ? jank.loadWorstMs : null;
   } catch {
     return null;
   } finally {
@@ -305,10 +330,11 @@ async function coldLoadWorstFrame(
  *
  * Frame timing on a shared CI runner is noisy (Nov 8: one cert load of the
  * profile measured 376.6 ms, the crawl's repeat loads 106 and 176 ms). A
- * frame over the limit is measured on two more cold loads and judged on the
- * median of three, like the product crawl; every sample, the worst included,
- * stays on the receipt. If a repeat load fails, the first load's number
- * stands.
+ * page-load frame over the limit is measured on two more cold loads and
+ * judged on the median of three, like the product crawl; the check summary
+ * names the worst load. Frames after the step's first input are never
+ * repeated or averaged: the worst of them stands. If a repeat load fails,
+ * the first load's number stands.
  */
 async function recordJank(currentPage: Page, surface: string): Promise<void> {
   if (!process.env.PROD_CERT_STEPS_FILE) return;
@@ -324,8 +350,10 @@ async function recordJank(currentPage: Page, surface: string): Promise<void> {
       unit: 'score',
     });
     if (!jank.frames) return;
-    const samples = [jank.worstFrameMs];
-    if (jank.worstFrameMs > FRAME_LIMIT_MS) {
+    // Only the load is repeated, so only the load's frames are compared
+    // across loads; a long frame after the first input stands as measured.
+    const samples = [jank.loadWorstMs];
+    if (jank.loadWorstMs > FRAME_LIMIT_MS) {
       const url = currentPage.url();
       for (let n = 1; n < FRAME_SAMPLES; n += 1) {
         const again = await coldLoadWorstFrame(currentPage, url);
@@ -334,11 +362,12 @@ async function recordJank(currentPage: Page, surface: string): Promise<void> {
       }
     }
     const judged = samples.length === FRAME_SAMPLES;
+    const load = judged ? medianMs(samples) : jank.loadWorstMs;
     recordCertObservation({
       surface,
       contractId: 'jank.worst-frame-ms',
       dimension: `responsiveness:${surface}`,
-      value: judged ? medianMs(samples) : jank.worstFrameMs,
+      value: Math.max(load, jank.inputWorstMs),
       unit: 'ms',
       ...(judged ? { sampleSize: samples.length, samples } : {}),
     });

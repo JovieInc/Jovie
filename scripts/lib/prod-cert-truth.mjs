@@ -189,7 +189,7 @@ export function jankChecks(observations = [], at = new Date().toISOString()) {
       : [];
     const across =
       samples.length > 1
-        ? ` (middle of ${samples.length} loads; worst ${round(Math.max(...samples))})`
+        ? ` (load judged on the middle of ${samples.length}; worst load ${round(Math.max(...samples))})`
         : '';
     return {
       id: contractId,

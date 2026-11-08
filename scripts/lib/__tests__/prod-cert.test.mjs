@@ -211,7 +211,7 @@ describe('quality observations', () => {
     ]);
     expect(
       landing.checks.find(c => c.id === 'jank.worst-frame-ms').summary
-    ).toContain('middle of 3 loads; worst 376.6');
+    ).toContain('load judged on the middle of 3; worst load 376.6');
   });
 });
 

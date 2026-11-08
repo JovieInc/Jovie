@@ -402,7 +402,7 @@ describe('truthful certification: a stranger, no token, no canary', () => {
     );
     expect(noisy.status).toBe('passed');
     expect(noisy.summary).toBe(
-      'longest blocked frame (ms) 176 (middle of 3 loads; worst 376.6) (limit 200)'
+      'longest blocked frame (ms) 176 (load judged on the middle of 3; worst load 376.6) (limit 200)'
     );
     const [slow] = jankChecks(
       [
