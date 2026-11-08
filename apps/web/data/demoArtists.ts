@@ -10,7 +10,8 @@
  * - `demo: true`. Nothing in this file is a real person, artist, label or
  *   release. Swap a slot to a real artist only through an opt-in record.
  * - Names were searched before use and match no artist we could find.
- * - Imagery is drawn procedurally by `scripts/demo-artists/render-demo-covers.py`:
+ * - Imagery is rendered procedurally as photographic night stills by
+ *   `scripts/demo-artists/render-demo-covers.py`:
  *   no people, no faces, no text (approved-people.json: no real person on `/`).
  * - No testimonials, follower counts, revenue or other performance claims.
  * - Barcodes use the GS1 restricted-circulation prefix 2, which is never
