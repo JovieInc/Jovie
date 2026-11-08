@@ -1,25 +1,17 @@
-/**
- * JOV-INV-048 consumer: checkout and plan change price resolution (pure). A
- * lock covering the plan and interval charges the locked (maybe retired) price.
- */
-
 import {
   type PriceInterval,
   type PriceLockSnapshot,
   resolveLockedPrice,
 } from './price-versions';
-
 export interface CheckoutPriceMapping {
   readonly plan: string;
   readonly interval: PriceInterval;
 }
-
 export interface LockedCheckoutExpectation {
   readonly amountCents: number;
   readonly currency: string;
   readonly interval: PriceInterval;
 }
-
 export type CheckoutPriceDecision =
   | { readonly kind: 'list'; readonly priceId: string }
   | {
@@ -27,17 +19,14 @@ export type CheckoutPriceDecision =
       readonly priceId: string;
       readonly plan: PriceLockSnapshot['plan'];
       readonly expectation: LockedCheckoutExpectation;
-      /** True when the requested id differed from the locked one. */
       readonly substituted: boolean;
     };
-
 function lockOwnsPriceId(lock: PriceLockSnapshot, priceId: string): boolean {
   return (
     priceId === lock.stripePriceIdMonthly ||
     priceId === lock.stripePriceIdYearly
   );
 }
-
 export function resolveCheckoutPrice(input: {
   readonly requestedPriceId: string;
   readonly requestedMapping: CheckoutPriceMapping | null;
@@ -45,7 +34,6 @@ export function resolveCheckoutPrice(input: {
 }): CheckoutPriceDecision {
   const { requestedPriceId, requestedMapping, lock } = input;
   if (!lock) return { kind: 'list', priceId: requestedPriceId };
-
   // The requested id is one of the lock's own ids (possibly retired/unmapped).
   const interval: PriceInterval | null = requestedMapping
     ? requestedMapping.plan === lock.plan
@@ -57,7 +45,6 @@ export function resolveCheckoutPrice(input: {
         ? 'year'
         : null;
   if (!interval) return { kind: 'list', priceId: requestedPriceId };
-
   const price = resolveLockedPrice({ lock, interval });
   if (!price?.locked || !price.stripePriceId) {
     // The lock does not cover this interval (or has no Stripe id for it): a

@@ -1,10 +1,4 @@
-/**
- * Pure reconcile of Stripe charges against locks. Verdicts: overcharged
- * (blocked), undercharged, missing_lock, unmapped_locked_price, ok.
- */
-
 import type { PriceInterval, PriceLockSnapshot } from './price-versions';
-
 export const PRICE_LOCK_VERDICTS = [
   'ok',
   'overcharged',
@@ -13,7 +7,6 @@ export const PRICE_LOCK_VERDICTS = [
   'unmapped_locked_price',
 ] as const;
 export type PriceLockVerdict = (typeof PRICE_LOCK_VERDICTS)[number];
-
 export interface ReconcileSubscription {
   readonly subscriptionId: string;
   readonly status: string;
@@ -22,36 +15,28 @@ export interface ReconcileSubscription {
   readonly currency: string | null;
   readonly interval: PriceInterval | null;
 }
-
 export interface ReconcileCandidate {
   readonly userId: string;
   readonly lock: PriceLockSnapshot | null;
-  /** Null when Stripe has no such subscription (handled by billing reconciliation). */
   readonly subscription: ReconcileSubscription | null;
 }
-
 export interface ReconcileFinding {
   readonly userId: string;
   readonly subscriptionId: string | null;
   readonly verdict: PriceLockVerdict;
   readonly detail: string;
 }
-
 const CHARGING_STATUSES = new Set(['active', 'trialing', 'past_due']);
-
 export function isChargingStatus(status: string): boolean {
   return CHARGING_STATUSES.has(status);
 }
-
 export function judgeCandidate(
   candidate: ReconcileCandidate,
-  /** True when the app can map this Stripe price id to a plan. */
   isPriceMapped: (priceId: string) => boolean
 ): ReconcileFinding | null {
   const { userId, lock, subscription } = candidate;
   if (!subscription || !isChargingStatus(subscription.status)) return null;
   const base = { userId, subscriptionId: subscription.subscriptionId };
-
   if (!lock) {
     return {
       ...base,
@@ -59,7 +44,6 @@ export function judgeCandidate(
       detail: 'paying subscriber has no price lock',
     };
   }
-
   const lockedIds = [lock.stripePriceIdMonthly, lock.stripePriceIdYearly];
   for (const id of lockedIds) {
     if (id && !isPriceMapped(id)) {
@@ -70,11 +54,9 @@ export function judgeCandidate(
       };
     }
   }
-
   if (subscription.priceId && lockedIds.includes(subscription.priceId)) {
     return { ...base, verdict: 'ok', detail: 'price id matches the lock' };
   }
-
   const interval = subscription.interval;
   const lockedAmount = interval
     ? interval === 'month'
@@ -105,15 +87,12 @@ export function judgeCandidate(
     detail: `charging ${subscription.unitAmountCents} cents per ${interval}, lock ${lock.priceVersionId} is ${lockedAmount}`,
   };
 }
-
 export interface ReconcileSummary {
   readonly checked: number;
   readonly counts: Readonly<Record<PriceLockVerdict, number>>;
   readonly findings: readonly ReconcileFinding[];
-  /** Findings that need an alarm (everything but ok). */
   readonly alarms: readonly ReconcileFinding[];
 }
-
 export function reconcilePriceLocks(
   candidates: readonly ReconcileCandidate[],
   isPriceMapped: (priceId: string) => boolean
@@ -141,8 +120,6 @@ export function reconcilePriceLocks(
     alarms: findings.filter(f => f.verdict !== 'ok'),
   };
 }
-
-/** Overcharge is a legal exposure; the rest degrade. */
 export function alarmSeverity(
   verdict: PriceLockVerdict
 ): 'blocked' | 'degraded' {

@@ -5,13 +5,10 @@ export interface PriceVersion {
   readonly id: string;
   readonly plan: PriceLockPlan;
   readonly monthlyUsd: number;
-  /** Null when no annual price is offered in this version. */
   readonly yearlyUsd: number | null;
   readonly currency: 'usd';
-  /** ISO date this list price became the price for new signups. */
   readonly introducedOn: string;
 }
-/** Append-only. Never edit or remove a version a lock may point at. */
 export const PRICE_VERSIONS: readonly PriceVersion[] = [
   {
     id: 'pro-2026-10-20-m12',
@@ -22,7 +19,6 @@ export const PRICE_VERSIONS: readonly PriceVersion[] = [
     introducedOn: '2026-10-20',
   },
 ];
-/** The version new signups lock to. Must match the list price (tested). */
 export const CURRENT_PRICE_VERSION_ID = 'pro-2026-10-20-m12';
 export const PRICE_LOCK_SOURCES = [
   'signup',
@@ -32,18 +28,15 @@ export const PRICE_LOCK_SOURCES = [
   'backfill_subscription',
 ] as const;
 export type PriceLockSource = (typeof PRICE_LOCK_SOURCES)[number];
-/** What a lock stores. Amounts and Stripe ids are snapshots. */
 export interface PriceLockSnapshot {
   readonly plan: PriceLockPlan;
   readonly priceVersionId: string;
   readonly currency: string;
-  /** Null for a lock taken from an annual subscription. */
   readonly monthlyAmountCents: number | null;
   readonly yearlyAmountCents: number | null;
   readonly stripePriceIdMonthly: string | null;
   readonly stripePriceIdYearly: string | null;
   readonly source: PriceLockSource;
-  /** ISO timestamp. */
   readonly lockedAt: string;
 }
 export function usdToCents(dollars: number): number {
@@ -91,7 +84,6 @@ export interface StripePriceIdSnapshot {
   readonly monthly: string | null;
   readonly yearly: string | null;
 }
-/** Builds the lock a new signup gets: the current list version, snapshotted. */
 export function buildPriceLockSnapshot(input: {
   readonly source: PriceLockSource;
   readonly now: Date;
@@ -114,7 +106,6 @@ export function buildPriceLockSnapshot(input: {
     lockedAt: input.now.toISOString(),
   };
 }
-/** Backfill lock from a live subscription price (matching version, else `sub-price:<id>`). */
 export function buildPriceLockFromSubscriptionPrice(input: {
   readonly stripePriceId: string;
   readonly plan: PriceLockPlan;
@@ -144,17 +135,14 @@ export function buildPriceLockFromSubscriptionPrice(input: {
     lockedAt: input.now.toISOString(),
   };
 }
-
 export interface ResolvedLockedPrice {
   readonly amountCents: number;
   readonly currency: string;
   readonly interval: PriceInterval;
   readonly stripePriceId: string | null;
   readonly priceVersionId: string;
-  /** True when this came from the person's lock, false when it is the list price. */
   readonly locked: boolean;
 }
-/** The price a person sees and pays: their lock for the interval, else the current list version. */
 export function resolveLockedPrice(input: {
   readonly lock: PriceLockSnapshot | null;
   readonly interval: PriceInterval;
@@ -195,8 +183,6 @@ export function resolveLockedPrice(input: {
     locked: false,
   };
 }
-
-/** Monthly or yearly label such as "$N/mo": whole dollars drop the cents. */
 export function formatLockedPrice(
   price: Pick<ResolvedLockedPrice, 'amountCents' | 'interval' | 'currency'>
 ): string {
@@ -208,8 +194,6 @@ export function formatLockedPrice(
   }).format(dollars);
   return `${formatted}/${price.interval === 'month' ? 'mo' : 'yr'}`;
 }
-
-/** Disclosure: states only the person's own locked amount. */
 export function priceLockDisclosure(
   price: Pick<ResolvedLockedPrice, 'amountCents' | 'interval' | 'currency'>
 ): string {
