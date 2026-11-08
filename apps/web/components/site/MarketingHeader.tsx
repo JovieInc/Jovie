@@ -244,8 +244,10 @@ export function MarketingHeader({
   );
   const resolvedPrimaryCta =
     primaryCta ?? resolveMarketingHeaderPrimaryCta(pathname);
+  // leftWordmark (the homepage) renders the mark with its reveal wordmark; the
+  // homepage stylesheet keeps that wordmark shown beside the 28px mark.
   const resolvedLogoVariant = leftWordmark
-    ? 'full'
+    ? 'icon'
     : presentation === 'marketing-glass' || isArtistProfiles || iconOnly
       ? 'icon'
       : logoVariant;
