@@ -52,6 +52,12 @@ export const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
   qq_music: null,
   trebel: null,
   yandex: null,
+  vk_music: null,
+  traxsource: null,
+  bugs: null,
+  fizy: null,
+  juno_download: null,
+  emusic: null,
 };
 
 /**
