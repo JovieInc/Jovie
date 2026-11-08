@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('@/hooks/useJovieAuth', () => ({ useJovieAuth: () => mocks.auth }));
 vi.mock('./OnboardingShell', () => ({
+  ONBOARDING_FRAME_CLASS: 'onboarding-frame',
   OnboardingShell: (props: OnboardingShellProps) => {
     mocks.shell(props);
     return (

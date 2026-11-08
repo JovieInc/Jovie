@@ -105,6 +105,9 @@ export function buildEntryProfileBuilderState(
   };
 }
 
+/** The /start frame runs dark; the restore state reuses it so nothing repaints. */
+export const ONBOARDING_FRAME_CLASS = '[color-scheme:dark]';
+
 export function OnboardingShell({
   isSignedIn = false,
   intentId,
@@ -273,7 +276,7 @@ export function OnboardingShell({
       <AppShellFrame
         sidebar={null}
         flushContent
-        containerClassName='[color-scheme:dark]'
+        containerClassName={ONBOARDING_FRAME_CLASS}
         contentClassName='overflow-clip!'
         main={
           <div className='flex min-h-0 min-w-0 flex-1'>

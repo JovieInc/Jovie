@@ -7,7 +7,11 @@ import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { SidebarProvider } from '@/components/organisms/sidebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { useJovieAuth } from '@/hooks/useJovieAuth';
-import { OnboardingShell, type OnboardingShellProps } from './OnboardingShell';
+import {
+  ONBOARDING_FRAME_CLASS,
+  OnboardingShell,
+  type OnboardingShellProps,
+} from './OnboardingShell';
 
 export interface OnboardingSessionSnapshot {
   readonly identityId: string | null;
@@ -247,7 +251,7 @@ export function OnboardingSessionBoundary({
           placeholder
           sidebar={null}
           flushContent
-          containerClassName='[color-scheme:dark]'
+          containerClassName={ONBOARDING_FRAME_CLASS}
           contentClassName='overflow-clip!'
           main={
             <>
