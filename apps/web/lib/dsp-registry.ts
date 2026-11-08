@@ -15,7 +15,7 @@
  *  (visual)     (type)       _PROVIDER    DOMAINS      _DSP_MAPPINGS
  */
 
-import { SOCIAL_ICON_DATA } from '@/lib/social-icons/icon-data';
+import { DSP_GLYPH_DATA } from '@/lib/social-icons/dsp-glyph-data';
 import {
   buildGlyphLogo,
   type CompactDspInput,
@@ -156,7 +156,7 @@ const URL_ONLY_STREAMING_DSP_INPUTS: readonly CompactDspInput[] = [
     'vk_music',
     'VK Music',
     null,
-    `#${SOCIAL_ICON_DATA.vk.hex}`,
+    `#${DSP_GLYPH_DATA.vk.hex}`,
     ['vk.com', 'www.vk.com', 'vk.ru', 'music.vk.com'],
     null,
     { aliases: ['vkmusic', 'vk', 'vkontakte'], iconKey: 'vk' },
@@ -165,7 +165,7 @@ const URL_ONLY_STREAMING_DSP_INPUTS: readonly CompactDspInput[] = [
     'traxsource',
     'Traxsource',
     null,
-    `#${SOCIAL_ICON_DATA.traxsource.hex}`,
+    `#${DSP_GLYPH_DATA.traxsource.hex}`,
     ['traxsource.com', 'www.traxsource.com'],
     'https://www.traxsource.com/search?term={query}',
     { iconKey: 'traxsource' },

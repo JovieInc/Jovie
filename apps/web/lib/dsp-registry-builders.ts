@@ -1,4 +1,7 @@
-import { SOCIAL_ICON_DATA } from '@/lib/social-icons/icon-data';
+import {
+  DSP_GLYPH_DATA,
+  type DspGlyphKey,
+} from '@/lib/social-icons/dsp-glyph-data';
 import type { DspCategory, DspRegistryEntry } from './dsp-registry-types';
 
 // ============================================================================
@@ -19,11 +22,11 @@ export function buildMonogramLogo(name: string): string {
 
 /**
  * Build a logo from canonical brand-icon path data (simple-icons, CC0).
- * The path comes from SOCIAL_ICON_DATA so there is one glyph source of truth.
+ * The path comes from DSP_GLYPH_DATA (spread into SOCIAL_ICON_DATA) so there
+ * is one glyph source of truth without bundling every social icon.
  */
-export function buildGlyphLogo(name: string, iconKey: string): string {
-  const entry = SOCIAL_ICON_DATA[iconKey];
-  if (!entry) return buildMonogramLogo(name);
+export function buildGlyphLogo(name: string, iconKey: DspGlyphKey): string {
+  const entry = DSP_GLYPH_DATA[iconKey];
   return `<svg role="img" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><title>${name}</title><path d="${entry.path}"/></svg>`;
 }
 
@@ -46,8 +49,8 @@ interface DspInput {
 }
 
 type CompactDspOptions = Pick<DspInput, 'aliases' | 'textColor'> & {
-  /** SOCIAL_ICON_DATA key for a real brand glyph (omit = monogram). */
-  iconKey?: string;
+  /** DSP_GLYPH_DATA key for a real brand glyph (omit = monogram). */
+  iconKey?: DspGlyphKey;
 };
 
 export type CompactDspInput = readonly [
