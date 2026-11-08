@@ -11,6 +11,7 @@ import {
   missingSecrets,
   parseBrief,
   penArgs,
+  planFrames,
   writeCanonical,
 } from './pen-draft.mjs';
 
@@ -25,6 +26,7 @@ test('every checked-in brief parses and names a unique frame', () => {
       'empty-states',
       'homepage',
       'insights',
+      'page-skeletons',
       'profile-analytics-card',
       'request-access',
       'workspace-table',
@@ -59,6 +61,17 @@ test('pen draws into its own file from the canonical input and keeps other frame
     /Leave every existing frame untouched/
   );
   assert.equal(args[args.indexOf('--export') + 1], 'o/claim.png');
+});
+
+test('the Pen agent sees why a tool call failed and has room to recover', () => {
+  // Run 42457693051: three drafts aborted at 8 failed calls with no error
+  // text; the one that finished needed 7.
+  const args = penArgs(
+    { frame: 'claim', prompt: 'P' },
+    { input: 'i.pen', outDir: 'o' }
+  );
+  assert.ok(args.includes('--verbose-mcp'));
+  assert.ok(Number(args[args.indexOf('--max-failed-calls') + 1]) >= 20);
 });
 
 test('missing secrets are named, so a blocked run never reads as done', () => {
@@ -122,4 +135,38 @@ test('a plain .pen is used as is, and anything else is named, not drafted', () =
     () => writeCanonical(Buffer.from('<html>expired</html>'), work, 'x.pen'),
     /neither a \.pen file nor a \.tar\.gz/
   );
+});
+
+test('a push drafts only the briefs it changed', () => {
+  const briefs = [
+    { frame: 'claim', file: 'claim.md' },
+    { frame: 'homepage', file: 'homepage.md' },
+    { frame: 'workspace-table', file: 'links-table.md' },
+  ];
+  assert.deepEqual(
+    planFrames({
+      briefs,
+      changed: [
+        'docs/design-system/pen-briefs/links-table.md',
+        'docs/design-system/pen-briefs/retired.md',
+        'apps/web/app/page.tsx',
+      ],
+    }),
+    ['workspace-table']
+  );
+  assert.deepEqual(planFrames({ briefs, changed: ['README.md'] }), []);
+});
+
+test('a drafter change, a manual run or --only picks the right frames', () => {
+  const briefs = [
+    { frame: 'claim', file: 'claim.md' },
+    { frame: 'homepage', file: 'homepage.md' },
+  ];
+  assert.deepEqual(
+    planFrames({ briefs, changed: ['scripts/design/pen-draft.mjs'] }),
+    ['claim', 'homepage']
+  );
+  assert.deepEqual(planFrames({ briefs }), ['claim', 'homepage']);
+  assert.deepEqual(planFrames({ briefs, only: ['homepage'] }), ['homepage']);
+  assert.throws(() => planFrames({ briefs, only: ['hompage'] }), /hompage/);
 });

@@ -119,6 +119,27 @@ describe('workflow runner pins', () => {
       /a\.yml#x runs Playwright on floating ubuntu-latest/
     );
   });
+  it('follows other interpreters and one level of imports', () => {
+    const paths = fixture({
+      'a.yml':
+        'jobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - run: pnpm exec tsx tools/record.ts\n      - run: bash tools/go.sh\n',
+    });
+    const repoRoot = path.dirname(paths.workflowsDir);
+    mkdirSync(path.join(repoRoot, 'tools'));
+    writeFileSync(
+      path.join(repoRoot, 'tools/record.ts'),
+      "import { setup } from './setup.ts';\n"
+    );
+    writeFileSync(
+      path.join(repoRoot, 'tools/setup.ts'),
+      "run('pnpm', ['exec', 'playwright', 'install', 'chromium']);\n"
+    );
+    writeFileSync(path.join(repoRoot, 'tools/go.sh'), 'echo hi\n');
+    assert.match(
+      checkRunnerPins({ ...paths, repoRoot })[0],
+      /runs Playwright on floating/
+    );
+  });
   it('does not match unrelated names', () => {
     assert.deepEqual(
       checkRunnerPins(

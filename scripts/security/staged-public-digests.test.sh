@@ -13,10 +13,11 @@ cp "$root/scripts/security/scan-secrets.sh" "$tmp_dir/scripts/security/"
 while IFS= read -r helper; do
   cp "$root/$helper" "$tmp_dir/$helper"
 done < <(
-  grep -E '^\. "\$REPO_ROOT/scripts/security/[^"]+"' \
+  grep -E '^(\.|source) "\$REPO_ROOT/scripts/security/[^"]+"' \
     "$root/scripts/security/scan-secrets.sh" |
     sed -E 's/.*"\$REPO_ROOT\/([^"]+)".*/\1/'
 )
+cp "$root/scripts/security/scanner-pins.txt" "$tmp_dir/scripts/security/"
 cp "$root/scripts/security/gitleaks-staged-public-digests.b64" "$tmp_dir/scripts/security/"
 cp "$root/.gitleaks.toml" "$tmp_dir/.gitleaks.toml"
 mkdir -p "$tmp_dir/scripts/invariants/art-direction"

@@ -11,6 +11,94 @@
       "tests",
       "a11y",
       "frontend-rules"
+    ],
+    "apps/web/components/features/profile/ClaimBanner.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules"
+    ],
+    "apps/web/app/[username]/_components/PublicClaimBanner.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules"
+    ],
+    "apps/web/components/features/profile/SubscriptionConfirmedBanner.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules"
+    ],
+    "apps/web/components/features/profile/ProfileAeoProofClaimCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules"
+    ],
+    "apps/web/components/features/profile/ProfileHomeRail.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules"
+    ],
+    "apps/web/components/molecules/ContentSurfaceCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules"
+    ],
+    "apps/web/components/molecules/ContentSectionHeader.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules"
+    ],
+    "apps/web/components/organisms/StandaloneProductPage.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules"
+    ],
+    "apps/web/components/organisms/billing/CheckoutUnlockCards.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules"
+    ],
+    "apps/web/components/molecules/CopyableUrlRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules"
+    ],
+    "apps/web/components/features/auth/AuthOfferSummary.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules"
     ]
   },
   "waivers": {
@@ -94,6 +182,25 @@
     "packages/ui/confirm-dialog.tsx": {
       "offline": "ConfirmDialog never fetches; it awaits the caller's onConfirm, so a request that fails offline surfaces as the ErrorState story's retry alert and connectivity is owned by the caller.",
       "permission-denied": "ConfirmDialog has no role, permission or entitlement logic (the detector matched role='alert' on its error message); callers decide access before opening it, and a blocked confirm is the existing ConfirmationRequired story."
+    },
+    "apps/web/components/features/profile/ClaimBanner.tsx": {
+      "empty": "ClaimBanner renders no collection: it always shows one ownership message and at most one CTA; the detector matched the items-center class. The no-CTA variant is PartialNoClaimAction."
+    },
+    "apps/web/components/features/profile/SubscriptionConfirmedBanner.tsx": {
+      "long-content": "The banner's title and description are fixed copy with no props or user text, so its content cannot grow; the detector matched the Banner title and description props."
+    },
+    "apps/web/components/features/profile/ProfileAeoProofClaimCard.tsx": {
+      "empty": "The proof claim card renders no collection: one heading, one note and one CTA, all required props; the detector matched the items-start class."
+    },
+    "apps/web/components/molecules/ContentSectionHeader.tsx": {
+      "empty": "ContentSectionHeader renders no collection: a required title with optional subtitle and actions (PartialTitleOnly); the detector matched the items-center class."
+    },
+    "apps/web/components/organisms/StandaloneProductPage.tsx": {
+      "empty": "StandaloneProductPage is a layout shell that renders its required children in a main landmark; it owns no collection, and the detector matched the items-center class.",
+      "partial": "Its optional props (className, contentClassName, width, centered) are layout options, not content fields, so there is no partially filled state; Centered and NarrowWidth show them."
+    },
+    "apps/web/components/features/auth/AuthOfferSummary.tsx": {
+      "permission-denied": "The recap has no permission input or gated action; the detector matched the pricing plan. Sign-in for an existing subscriber is shown by SignInContinue."
     }
   }
 }

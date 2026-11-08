@@ -1320,6 +1320,28 @@ class QuotaRelayTest(unittest.TestCase):
         self.assertEqual(events.classify_github_failure(self.QUOTA_LOG), "primary-rate-limit")
         self.assertEqual(events.classify_github_failure(self.REAL_LOG), "none")
 
+    @staticmethod
+    def release_log(last, error="download failed: https://github.com/koalaman/shellcheck/releases/download/v0.10.0/s.tar.xz"):
+        # scripts/lib/github-release-asset.sh, called by .github/scripts/run-actionlint.sh.
+        url = "https://github.com/koalaman/shellcheck/releases/download/v0.10.0/s.tar.xz"
+        return ("##[group]Run bash .github/scripts/run-actionlint.sh\n"
+                f"curl: (22) The requested URL returned error: {last}\n"
+                f"release download: anonymous HTTP {last} for {url}\n"
+                "release download attempt 5 failed; retrying\n"
+                f"release download failed after 6 attempts (last HTTP {last}): {url}\n"
+                f"##[error]{error}\n"
+                "##[error]Process completed with exit code 1.\n")
+
+    @unittest.skipUnless(events.RATE_LIMIT_HELPER.exists(), "shared classifier lands separately")
+    def test_an_exhausted_release_download_is_infra_but_a_bad_pin_is_not(self):
+        """2026-11-08: release downloads answered 504 for hours; the helper's exhausted 5xx is
+        re-run, while a 4xx (bad pin) or a sha256 mismatch stays repair work."""
+        self.assertEqual(events.quota_failure(self.RUN, self.shell([self.release_log("504")])),
+                         "transient-server")
+        for log in (self.release_log("404"),
+                    self.release_log("504", "sha256 mismatch: https://github.com/koalaman/shellcheck/releases/download/v0.10.0/s.tar.xz")):
+            self.assertIsNone(events.quota_failure(self.RUN, self.shell([log])), log)
+
     def test_failed_step_text_is_the_failing_steps_slice(self):
         log = ("##[group]Run earlier step\nHTTP 502 recovered\n##[endgroup]\n" + self.REAL_LOG)
         step = events.failed_step_text(log)
@@ -1476,7 +1498,7 @@ class ClaimTest(unittest.TestCase):
         runner.record_held(self.host, 5, "h1", ["check-failed:x", "boom"])
         claimed = events.claim_event_pr(self.host, lane, "devin", [pr(kinds=["red"], checks=[RED_CHECK])], NOW)
         self.assertEqual((claimed["number"], claimed["gateEvidence"][1]), (5, "boom"))
-        self.assertEqual(self.attempts()["5"], {"sha": "h1", "count": 1, "lane": "devin", "at": NOW})
+        self.assertEqual(self.attempts()["5"], {"sha": "h1", "count": 1, "lane": "devin", "at": NOW, "headClaims": 1})
         self.assertEqual(lane.posted, [5])
         self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [],
                          "the repair signal remains until the worker publishes a new head")
@@ -2550,7 +2572,7 @@ class NativeQueueClaimTest(unittest.TestCase):
             self.assertIsNotNone(selected);self.assertEqual(selected["number"], 105)
             self.assertEqual(events.label_names(backend[5]), ["lane-fix-red"], "native queued row remains preserved")
             self.assertEqual(json.loads((host.state / "fix-attempts.json").read_text()),
-                             {"105": {"sha": "h1", "count": 1, "lane": "devin", "at": NOW + cycle * 60}})
+                             {"105": {"sha": "h1", "count": 1, "lane": "devin", "at": NOW + cycle * 60, "headClaims": 1}})
 
     def test_cleanup_cached_false_never_overrides_live_queue_or_preservation(self):
         for change in ("queued", "spent", "active", "held", "new-head", "now-red", "exhaustion-label"):

@@ -134,6 +134,8 @@ export interface SegmentControlProps<T extends string = string>
    * Accessible label for the segment control
    */
   readonly 'aria-label'?: string;
+  /** Reading direction for arrow-key order; inherits DirectionProvider. */
+  readonly dir?: 'ltr' | 'rtl';
   /**
    * Additional class name for the root element
    */
@@ -190,6 +192,7 @@ export function SegmentControl<T extends string = string>({
   size = 'md',
   layout = 'fill',
   'aria-label': ariaLabel = 'Choose a view',
+  dir,
   className,
   listClassName,
   triggerClassName,
@@ -279,6 +282,7 @@ export function SegmentControl<T extends string = string>({
 
   return (
     <RadixTabs.Root
+      dir={dir}
       value={value}
       onValueChange={onValueChange as (value: string) => void}
       data-layout={layout}

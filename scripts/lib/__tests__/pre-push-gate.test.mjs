@@ -22,7 +22,9 @@ function sourcedSecurityHelpers() {
     'utf8'
   );
   return [
-    ...scanner.matchAll(/^\. "\$REPO_ROOT\/(scripts\/security\/[^"]+)"/gm),
+    ...scanner.matchAll(
+      /^(?:\.|source) "\$REPO_ROOT\/(scripts\/security\/[^"]+)"/gm
+    ),
   ].map(match => match[1]);
 }
 const resolverPath = resolve(repoRoot, 'scripts/hooks/resolve-repo-node.sh');
@@ -276,6 +278,7 @@ describe('publication range failures', () => {
       'scripts/hooks/biome-pre-push.sh',
       'scripts/security/scan-secrets.sh',
       ...sourcedSecurityHelpers(),
+      'scripts/security/scanner-pins.txt',
       'biome.json',
       '.nvmrc',
     ]) {
@@ -387,7 +390,7 @@ describe('publication range failures', () => {
     expect(f.scanLog()).toContain('candidate.txt');
     expect(f.scanLog()).not.toContain('seed.txt');
     expect(sourcedSecurityHelpers()).toContain(
-      'scripts/security/scan-secrets-release-fetch.sh'
+      'scripts/security/fetch-scanner.sh'
     );
   });
 

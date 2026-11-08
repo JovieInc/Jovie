@@ -18,11 +18,11 @@ GITLEAKS_VERSION="${GITLEAKS_VERSION:-8.21.2}"
 TRUFFLEHOG_VERSION="${TRUFFLEHOG_VERSION:-3.99.8}"
 EXCLUDE_PATHS="$REPO_ROOT/.trufflehog-exclude.txt"
 
-# Retry release downloads after curl 35 resets (JOV-6809). HTTP 504 falls
-# back to the release asset URL inside the sourced fetcher.
-SCAN_SECRETS_RETRY_DELAY="${SCAN_SECRETS_RETRY_DELAY:-2}"
-# shellcheck source=scripts/security/scan-secrets-release-fetch.sh
-. "$REPO_ROOT/scripts/security/scan-secrets-release-fetch.sh"
+# Scanner binaries come from fetch-scanner.sh: warm cache, then the GitHub
+# release, then a container-image fallback (release CDN 504s, JOV-11689), with
+# the binary sha256 pinned in scanner-pins.txt on every path.
+# shellcheck source=scripts/security/fetch-scanner.sh
+source "$REPO_ROOT/scripts/security/fetch-scanner.sh"
 
 ensure_gitleaks() {
   if [[ -n "${GITLEAKS_BIN:-}" ]]; then
@@ -33,22 +33,7 @@ ensure_gitleaks() {
     return
   fi
 
-  local os arch cache_dir tarball
-  os="$(uname -s | tr '[:upper:]' '[:lower:]')"
-  arch="$(uname -m)"
-  case "$arch" in
-    x86_64) arch="x64" ;;
-    aarch64 | arm64) arch="arm64" ;;
-  esac
-  cache_dir="${TMPDIR:-/tmp}/gitleaks-${GITLEAKS_VERSION}"
-  mkdir -p "$cache_dir"
-  tarball="gitleaks_${GITLEAKS_VERSION}_${os}_${arch}.tar.gz"
-  if [[ ! -x "$cache_dir/gitleaks" ]]; then
-    fetch_release_tarball \
-      "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${tarball}" \
-      "$cache_dir" gitleaks
-  fi
-  GITLEAKS_BIN="$cache_dir/gitleaks"
+  GITLEAKS_BIN="$(fetch_scanner gitleaks "$GITLEAKS_VERSION")" || exit 1
 }
 
 ensure_trufflehog() {
@@ -60,22 +45,7 @@ ensure_trufflehog() {
     return
   fi
 
-  local os arch cache_dir tarball
-  os="$(uname -s | tr '[:upper:]' '[:lower:]')"
-  arch="$(uname -m)"
-  case "$arch" in
-    x86_64) arch="amd64" ;;
-    aarch64 | arm64) arch="arm64" ;;
-  esac
-  cache_dir="${TMPDIR:-/tmp}/trufflehog-${TRUFFLEHOG_VERSION}"
-  mkdir -p "$cache_dir"
-  tarball="trufflehog_${TRUFFLEHOG_VERSION}_${os}_${arch}.tar.gz"
-  if [[ ! -x "$cache_dir/trufflehog" ]]; then
-    fetch_release_tarball \
-      "https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}/${tarball}" \
-      "$cache_dir" trufflehog
-  fi
-  TRUFFLEHOG_BIN="$cache_dir/trufflehog"
+  TRUFFLEHOG_BIN="$(fetch_scanner trufflehog "$TRUFFLEHOG_VERSION")" || exit 1
 }
 
 trufflehog_exclude_args() {

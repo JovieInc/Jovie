@@ -255,6 +255,8 @@ jobs:
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
           BASE_BRANCH: ${{ github.base_ref }}
+          # Read-only token for the release-download fallback.
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
           SHELLCHECK_OPTS: >-
             --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
         run: |
@@ -463,14 +465,24 @@ jobs:
       - &reused-setup
         if: steps.reuse.outputs.reuse != 'true'
         uses: ./.github/actions/setup-node-pnpm
+      - name: Restore pinned scanner binaries
+        # Warm cache never touches the network (JOV-11689). Contents are
+        # re-verified against scripts/security/scanner-pins.txt on every use.
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            /tmp/trufflehog-3.99.8
+            /tmp/gitleaks-8.21.2
+            /tmp/osv-scanner-2.5.1
+          key: scanner-bins-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/security/scanner-pins.txt') }}
       - name: Scan the exact source diff
         if: steps.reuse.outputs.reuse != 'true'
         env:
-          # Actions gh refuses release metadata unless this step sets a token.
-          # The CDN 504 fallback is the only caller; a healthy download uses none.
-          GH_TOKEN: ${{ github.token }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           SECURITY_GATE_ENABLED: ${{ vars.SECURITY_GATE_ENABLED }}
+          # Read-only token for the release-download fallback.
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         run: |
           git fetch --no-tags origin "${{ github.base_ref }}"
           base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
@@ -553,6 +565,9 @@ jobs:
           pnpm exec tsx scripts/online-index-migrate.ts --validate-only
       - name: Lint added or changed migration SQL
         if: steps.reuse.outputs.reuse != 'true'
+        env:
+          # Read-only token for the release-download fallback.
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin "${{ github.base_ref }}"

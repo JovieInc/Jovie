@@ -37,6 +37,8 @@ _NOTE = "Stalled downloads abort (--speed-time) and retries back off with jitter
 def resolve_shell_conflict(text: str, worktree, extras: list) -> str | None:
     """Return conflict text with sourced-helper hunks kept, or an &&-chain union.
 
+    The known checksum-verified scanner replacement is kept when both callers
+    have migrated and its downloader and pin files are present.
     `extras` receives helper paths whose bytes changed, so the caller can stage
     them. None leaves the merge untouched aside from a failed read.
     """
@@ -55,6 +57,11 @@ def resolve_shell_conflict(text: str, worktree, extras: list) -> str | None:
     upgrades: dict[str, str] = {}
     last = 0
     for hunk in hunks:
+        replacement = _scanner_replacement(hunk.group("ours"), hunk.group("theirs"), text, worktree)
+        if replacement is not None:
+            pieces.extend((text[last:hunk.start()], replacement))
+            last = hunk.end()
+            continue
         source_side, inline = _hunk_sides(hunk.group("ours"), hunk.group("theirs"))
         if source_side is None or inline is None:
             return None
@@ -96,6 +103,23 @@ def resolve_shell_conflict(text: str, worktree, extras: list) -> str | None:
         if rel not in extras:
             extras.append(rel)
     return resolved
+
+
+def _scanner_replacement(ours: str, theirs: str, text: str, worktree) -> str | None:
+    legacy = "scripts/security/scan-secrets-release-fetch.sh"
+    canonical = "scripts/security/fetch-scanner.sh"
+    if _classify(ours) != "source" or _classify(theirs) != "source":
+        return None
+    left, right = _helper_rel(ours), _helper_rel(theirs)
+    if {left, right} != {legacy, canonical}:
+        return None
+    for tool in ("gitleaks", "trufflehog"):
+        if f'$(fetch_scanner {tool} "${tool.upper()}_VERSION")' not in text:
+            return None
+    root = Path(worktree)
+    if not all((root / rel).is_file() for rel in (canonical, "scripts/security/scanner-pins.txt")):
+        return None
+    return ours if left == canonical else theirs
 
 
 def _hunk_sides(ours: str, theirs: str) -> tuple[str | None, str | None]:

@@ -125,6 +125,40 @@ class SourcedShellConflictTest(unittest.TestCase):
                 again = conflict._upgrade_helper(helper, INLINE)
                 self.assertEqual(again, helper)
 
+    def test_canonical_scanner_replaces_legacy_fetcher_in_either_orientation(self):
+        canonical = ('# Checksum-verified canonical scanner downloader.\n'
+                     'source "$REPO_ROOT/scripts/security/fetch-scanner.sh"\n')
+        callers = ('GITLEAKS_BIN="$(fetch_scanner gitleaks "$GITLEAKS_VERSION")" || exit 1\n'
+                   'TRUFFLEHOG_BIN="$(fetch_scanner trufflehog "$TRUFFLEHOG_VERSION")" || exit 1\n')
+        for ours, theirs in ((SOURCE, canonical), (canonical, SOURCE)):
+            with self.subTest(canonical_first=ours == canonical), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                security = root / "scripts/security"
+                security.mkdir(parents=True)
+                (root / REL).write_text(HELPER)
+                downloader = security / "fetch-scanner.sh"
+                pins = security / "scanner-pins.txt"
+                downloader.write_text("# canonical downloader fixture\n")
+                pins.write_text("# canonical pins fixture\n")
+                text = _hunk(ours, theirs) + callers
+                extras = []
+                self.assertEqual(conflict.resolve_shell_conflict(text, root, extras),
+                                 f"kept-before\n{canonical}kept-after\n{callers}")
+                self.assertEqual(extras, [])
+                self.assertEqual((root / REL).read_text(), HELPER)
+                for missing in (callers, callers.splitlines(keepends=True)[0]):
+                    self.assertIsNone(conflict.resolve_shell_conflict(text.replace(missing, ""), root, []))
+                unknown = _hunk("unknown\n", "also unknown\n")
+                self.assertIsNone(conflict.resolve_shell_conflict(text + unknown, root, []))
+                for path in (pins, downloader):
+                    saved = path.read_text()
+                    path.unlink()
+                    self.assertIsNone(conflict.resolve_shell_conflict(text, root, []))
+                    path.write_text(saved)
+                unexpected = text.replace('source "$REPO_ROOT/scripts/security/fetch-scanner.sh"',
+                                          'source "$REPO_ROOT/scripts/security/unknown.sh"')
+                self.assertIsNone(conflict.resolve_shell_conflict(unexpected, root, []))
+
     def test_and_chain_still_resolves_without_writing_a_helper(self):
         ours = ("pnpm --filter @jovie/extension test && node --experimental-strip-types "
                 "--test workers/cron-hub/src/index.test.mjs")
