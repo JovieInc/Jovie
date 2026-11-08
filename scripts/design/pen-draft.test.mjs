@@ -23,6 +23,7 @@ test('every checked-in brief parses and names a unique frame', () => {
       'billing-success',
       'claim',
       'homepage',
+      'insights',
       'request-access',
     ]
   );

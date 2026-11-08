@@ -16,56 +16,7 @@ import {
 } from '../prod-cert.mjs';
 import { PEN_IDS } from './fixtures/pen-green-env.mjs';
 
-const SHA = 'a'.repeat(40);
-const T = '2026-10-28T20:00:00.000Z';
-const check = (status, id = 'c') => ({
-  id,
-  status,
-  startedAt: T,
-  endedAt: T,
-  summary: 's',
-});
-
-/** @param {{ failPath?: string, sha?: string }} [options] */
-function fakeFetch({ failPath, sha = SHA } = {}) {
-  return async url => {
-    const u = new URL(url);
-    const html = (body, status = 200) =>
-      new Response(body, { status, headers: { 'content-type': 'text/html' } });
-    if (u.pathname === '/api/health/build-info') {
-      return new Response(
-        JSON.stringify({ commitSha: sha, deploymentId: 'dpl_1' })
-      );
-    }
-    if (u.pathname === failPath) return html('boom', 500);
-    if (u.pathname === '/api/handle/check') {
-      const taken = u.searchParams.get('handle') === 'tim';
-      return new Response(
-        JSON.stringify(
-          taken ? { available: false, reason: 'taken' } : { available: true }
-        )
-      );
-    }
-    if (u.pathname === '/og.png') {
-      return new Response('x', { headers: { 'content-type': 'image/png' } });
-    }
-    if (u.pathname === '/tim') {
-      return html(
-        '<title>Tim</title><h1>Tim</h1><meta property="og:image" content="/og.png"/><a href="/tim/song-1">s</a>'
-      );
-    }
-    if (u.pathname === '/tim/song-1') {
-      return html(
-        '<title>Song</title><meta property="og:image" content="/og.png"/>'
-      );
-    }
-    if (u.pathname === '/signin')
-      return html('<title>Sign in</title><input type="email">');
-    return html(
-      '<title>Jovie</title><a href="/signup">s</a><a href="/claim?plan=pro">p</a>'
-    );
-  };
-}
+import { check, fakeFetch, SHA, T } from './fixtures/prod-cert-fakes.mjs';
 
 describe('statusFromChecks', () => {
   it('failed beats blocked beats passed, and no checks is never a pass', () => {
