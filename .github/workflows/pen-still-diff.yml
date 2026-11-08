@@ -20,6 +20,8 @@ on:
       - 'scripts/invariants/clef-screenshot-evaluator.mjs'
       - 'scripts/invariants/clef-screenshot-evaluator.test.mjs'
       - 'docs/pen-stills/**'
+      - 'docs/design-system/pen-bindings.json'
+      - 'scripts/design/**'
       - 'scripts/invariants/pen-golden-path.mjs'
       - 'scripts/invariants/pen-golden-path.test.mjs'
       - '.github/scripts/pen-still-diff-comment.mjs'
@@ -54,10 +56,10 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Unit tests
-        run: node --test scripts/invariants/pen-still-diff.test.mjs scripts/invariants/pen-golden-path.test.mjs scripts/invariants/clef-screenshot-evaluator.test.mjs .github/scripts/pen-still-diff-comment.test.mjs
+        run: node --test scripts/design/pen-bindings.test.mjs scripts/design/pen-export.test.mjs scripts/design/design-loop-ledger.test.mjs scripts/invariants/pen-still-diff.test.mjs scripts/invariants/pen-golden-path.test.mjs scripts/invariants/clef-screenshot-evaluator.test.mjs .github/scripts/pen-still-diff-comment.test.mjs
 
       - name: Advisory diff
-        run: node scripts/invariants/pen-still-diff.mjs --manifest docs/pen-stills/homepage/manifest.json --out pen-still-out
+        run: node scripts/invariants/pen-still-diff.mjs --manifest docs/design-system/pen-bindings.json --out pen-still-out
 
       - name: Upload triptych
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
