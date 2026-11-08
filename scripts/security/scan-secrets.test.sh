@@ -401,6 +401,8 @@ DL_TMP="$TEST_ROOT/dl-tmp"
 mkdir -p "$DL_BIN" "$DL_TMP"
 source "$REPO_ROOT/scripts/security/test-fixtures/scanner-download-runtime.sh"
 setup_scanner_download_fixture "$DL_BIN"
+write_scanner_download_pins "$TEST_ROOT/dl-pins.txt"
+export SCANNER_PINS_FILE="$TEST_ROOT/dl-pins.txt"
 
 export CURL_COUNT="$TEST_ROOT/download.curl-count"
 : >"$CURL_COUNT"
@@ -423,17 +425,36 @@ grep -q 'PASS: secret scan' "$TEST_ROOT/download.output" \
   || fail 'scan must still pass after a retried download'
 
 # Exhausted retries still fail the scan with an explicit classification.
-mkdir -p "$TEST_ROOT/dl-tmp2"
+# A recording sleep stub proves the backoff doubles with bounded jitter
+# without making the test wait.
+mkdir -p "$TEST_ROOT/dl-tmp2" "$TEST_ROOT/dl-sleep-bin"
+export SLEEP_LOG="$TEST_ROOT/download.sleep-log"
+: >"$SLEEP_LOG"
+printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$1" >>"$SLEEP_LOG"\n' \
+  >"$TEST_ROOT/dl-sleep-bin/sleep"
+chmod +x "$TEST_ROOT/dl-sleep-bin/sleep"
 : >"$CURL_COUNT"
 status=0
-PATH="$DL_BIN:/usr/bin:/bin" TMPDIR="$TEST_ROOT/dl-tmp2" \
-  SCAN_SECRETS_RETRY_DELAY=0 CURL_ALWAYS_FAIL=1 \
+PATH="$TEST_ROOT/dl-sleep-bin:$DL_BIN:/usr/bin:/bin" TMPDIR="$TEST_ROOT/dl-tmp2" \
+  SCAN_SECRETS_RETRY_DELAY=1 CURL_ALWAYS_FAIL=1 \
   GITLEAKS_BIN= TRUFFLEHOG_BIN= \
   bash "$SCAN_SCRIPT" pre-commit >"$TEST_ROOT/download-fail.output" 2>&1 \
   || status=$?
 [[ $status -ne 0 ]] || fail 'exhausted download retries must fail the scan'
-[[ "$(cat "$CURL_COUNT")" -eq 3 ]] \
-  || fail 'download must stop after exactly 3 attempts'
+[[ "$(cat "$CURL_COUNT")" -eq 6 ]] \
+  || fail 'download must stop after exactly 6 attempts'
+grep -q 'download attempt 5 failed; retrying' "$TEST_ROOT/download-fail.output" \
+  || fail 'download must retry through attempt 5'
+grep -q 'after 6 attempts' "$TEST_ROOT/download-fail.output" \
+  || fail 'download failure must report the attempt count'
+[[ "$(wc -l <"$SLEEP_LOG" | tr -d ' ')" -eq 5 ]] \
+  || fail 'download must back off between each of its 6 attempts'
+backoff=1
+while IFS= read -r slept; do
+  ((slept >= backoff && slept <= 2 * backoff)) \
+    || fail "backoff sleep $slept outside [$backoff, $((2 * backoff))]"
+  backoff=$((backoff * 2))
+done <"$SLEEP_LOG"
 grep -q 'Secret scanner download failed' "$TEST_ROOT/download-fail.output" \
   || fail 'download failure must emit an explicit CI classification'
 

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Route, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { ensureSignedInUser, hasClerkCredentials } from '../helpers/auth';
 
@@ -162,20 +162,18 @@ test.describe('API failure resilience', () => {
     // list data endpoint (/api/dashboard/audience/** used by
     // useAudienceInfiniteQuery) both fail — the page must show error UI, not
     // a blank surface (JOV-8791).
-    await page.route('**/api/audience/**', route => {
-      route.fulfill({
+    // routedRequests 0 in a red receipt: the failure path never ran.
+    let routedRequests = 0;
+    const fail500 = (route: Route) => {
+      routedRequests += 1;
+      return route.fulfill({
         status: 500,
         contentType: 'application/json',
         body: JSON.stringify({ error: 'Service unavailable' }),
       });
-    });
-    await page.route('**/api/dashboard/audience/**', route => {
-      route.fulfill({
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({ error: 'Service unavailable' }),
-      });
-    });
+    };
+    await page.route('**/api/audience/**', fail500);
+    await page.route('**/api/dashboard/audience/**', fail500);
 
     const response = await gotoWithRetry(page, APP_ROUTES.AUDIENCE, {
       waitUntil: 'domcontentloaded',
@@ -220,6 +218,7 @@ test.describe('API failure resilience', () => {
               url: page.url(),
               bodyTextExcerpt: bodyText.slice(0, 2000),
               bodyTextLength: bodyText.trim().length,
+              routedRequests,
               pageErrors,
               failedResponses,
             },
@@ -230,7 +229,7 @@ test.describe('API failure resilience', () => {
         })
         .catch(() => undefined);
       process.stdout.write(
-        `${JSON.stringify({ name: 'audience-api-500', url: page.url(), bodyTextLength: bodyText.trim().length, pageErrors, failedResponses: failedResponses.slice(0, 20) })}\n`
+        `${JSON.stringify({ name: 'audience-api-500', url: page.url(), bodyTextLength: bodyText.trim().length, bodyTextExcerpt: bodyText.trim().slice(0, 200), routedRequests, pageErrors, failedResponses: failedResponses.slice(0, 20) })}\n`
       );
       throw error;
     }

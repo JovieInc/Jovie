@@ -153,4 +153,16 @@ describe('JOV-5466 token retire', () => {
     );
     expect(source).not.toMatch(/--linear-app-/);
   });
+  it('uses the theme popover shadow instead of a fixed dark one', () => {
+    const state: ContextMenuState = {
+      x: 0,
+      y: 0,
+      items: [{ label: 'Play', onSelect: () => undefined }],
+    };
+    const { container } = render(
+      <ContextMenuOverlay state={state} onClose={() => undefined} />
+    );
+    expect(container.innerHTML).toContain('shadow-(--shadow-popover)');
+    expect(container.innerHTML).not.toMatch(/shadow-\[[^\]]*rgba/);
+  });
 });
