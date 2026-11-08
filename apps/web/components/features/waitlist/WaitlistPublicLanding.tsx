@@ -45,7 +45,7 @@ export function WaitlistPublicLanding({
       >
         <AuthRoutePrefetch href={APP_ROUTES.SIGNIN} />
         {signupClosed ? (
-          <WaitlistRoleForm />
+          <WaitlistRoleForm qualify />
         ) : (
           <AuthShell
             mode='sign-up'

@@ -937,7 +937,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:draft
-    jobCount: 1
+    jobCount: 2
   - name: Pen still diff (advisory)
     path: .github/workflows/pen-still-diff.yml
     active: true

@@ -11,7 +11,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const seedDashboardAuth = require('./lighthouse-dashboard-auth.cjs') as (
+const seedDashboardAuth = require('./lighthouse-dashboard-auth.cjs') as ((
   browser: {
     newPage(): Promise<Record<string, unknown>>;
     defaultBrowserContext?(): {
@@ -19,7 +19,7 @@ const seedDashboardAuth = require('./lighthouse-dashboard-auth.cjs') as (
     };
   },
   options: { url: string }
-) => Promise<void>;
+) => Promise<void>) & { resolveCollectUrls(baseUrl: string): string[] };
 
 const temporaryDirectories: string[] = [];
 
@@ -219,5 +219,31 @@ describe('authenticated performance entrypoints', () => {
     );
     expect(page.waitForSelector).not.toHaveBeenCalled();
     expect(page.close).toHaveBeenCalledOnce();
+  });
+});
+
+describe('dashboard Lighthouse collect URLs', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('measures the pages /app and /app/releases land on by default', () => {
+    vi.stubEnv('LIGHTHOUSE_DASHBOARD_URLS', '');
+    expect(
+      seedDashboardAuth.resolveCollectUrls('http://localhost:3000')
+    ).toEqual([
+      'http://localhost:3000/app',
+      'http://localhost:3000/app/library?view=releases',
+    ]);
+  });
+
+  it('uses the configured list when one is set', () => {
+    vi.stubEnv('LIGHTHOUSE_DASHBOARD_URLS', '/start, /app/chat');
+    expect(
+      seedDashboardAuth.resolveCollectUrls('http://localhost:3000')
+    ).toEqual([
+      'http://localhost:3000/start',
+      'http://localhost:3000/app/chat',
+    ]);
   });
 });

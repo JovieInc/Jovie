@@ -8,6 +8,8 @@ ROOT="$(mktemp -d)"
 trap 'rm -rf "$ROOT"' EXIT
 BIN="$ROOT/bin"; mkdir -p "$BIN"
 export SCAN_SECRETS_RETRY_DELAY=0
+# No authenticated release fallback: the stubs below are the only sources.
+export RELEASE_DOWNLOAD_TOKEN= GH_TOKEN= GITHUB_TOKEN=
 
 sha() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
 
@@ -25,7 +27,7 @@ cat >"$BIN/curl" <<'SH'
 echo x >>"$CURL_CALLS"
 [[ "${CURL_MODE:-504}" == 504 ]] && { echo "curl: (22) The requested URL returned error: 504" >&2; exit 22; }
 # CURL_MODE=tarball: serve a tarball containing the payload as trufflehog
-out=""; while [[ $# -gt 0 ]]; do [[ "$1" == -o ]] && out="$2"; shift; done
+out=""; while [[ $# -gt 0 ]]; do [[ "$1" == -o || "$1" == --output ]] && out="$2"; shift; done
 d="$(mktemp -d)"; cp "$DOCKER_PAYLOAD" "$d/trufflehog"; tar -czf "$out" -C "$d" trufflehog
 SH
 cat >"$BIN/docker" <<'SH'
