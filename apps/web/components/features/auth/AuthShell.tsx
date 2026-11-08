@@ -231,8 +231,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     },
     [trackOfferAuthStarted]
   );
-  // Return through a server auth entry for canonical access/subscriber resolution.
-  // Native and explicit callback destinations retain their existing precedence.
+  // Return via a server auth entry; native/explicit callbacks keep precedence.
   const offerCallback =
     handoff &&
     !searchParams.get('auth_state') &&

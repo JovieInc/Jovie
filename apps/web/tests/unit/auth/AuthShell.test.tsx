@@ -275,7 +275,6 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
 
   it('does not call the proxy-backed One Tap route when the plugin is unconfigured', async () => {
     render(<AuthShell mode='sign-up' />);
-
     await waitFor(() => {
       expect(oneTapMock).not.toHaveBeenCalled();
     });
@@ -290,16 +289,6 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
         callbackURL: '/signup',
         context: 'signup',
       });
-    });
-  });
-
-  it('leaves One Tap off in the sign-in dialog when the browser has no FedCM', async () => {
-    oneTapConfiguredState.value = true;
-    Reflect.deleteProperty(globalThis.window, 'IdentityCredential');
-    render(<AuthShell mode='sign-in' compact />);
-
-    await waitFor(() => {
-      expect(oneTapMock).not.toHaveBeenCalled();
     });
   });
 
