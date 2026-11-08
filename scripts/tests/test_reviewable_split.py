@@ -26,5 +26,3 @@ class SplitPlanTest(unittest.TestCase):
         for cap in (0, -1, True):
             with self.assertRaises(ValueError):
                 classes.reviewable_split({"a": 1}, [["a"]], cap)
-
-
