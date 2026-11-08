@@ -69,14 +69,18 @@ export function Cover({
   );
 }
 
-/** A registry DSP logo, drawn from its path data in the brand colour. */
+/**
+ * A registry DSP logo, drawn from its path data in the surrounding ink. The
+ * homepage sets every service in one tone, so colour never competes with
+ * the product (Tim, 2026-11-08: "premium not consumer").
+ */
 export function DspGlyph({
   glyph,
   size,
 }: Readonly<{ glyph: DspGlyphData; size: number }>) {
   return (
     <svg aria-hidden viewBox={glyph.viewBox} width={size} height={size}>
-      <path fill={glyph.color} d={glyph.path} />
+      <path fill='currentColor' d={glyph.path} />
     </svg>
   );
 }

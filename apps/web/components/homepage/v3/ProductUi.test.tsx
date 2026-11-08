@@ -23,8 +23,13 @@ describe('homepage v3 product UI', () => {
     const selected = container.querySelector('.hv3-rrow[data-selected="true"]');
     expect(selected).toHaveTextContent(HOMEPAGE_PRODUCT_UI.inspector.title);
     expect(container).not.toHaveTextContent('Tim White');
-    // Three registry glyphs per row, in the registry's brand colours.
-    expect(rows[0]?.querySelectorAll('.hv3-dsp svg')).toHaveLength(3);
+    // Three registry glyphs per row, all in the surrounding ink: the
+    // homepage never sets a service in its brand colour.
+    const paths = rows[0]?.querySelectorAll('.hv3-dsp svg path') ?? [];
+    expect(paths).toHaveLength(3);
+    for (const path of paths) {
+      expect(path.getAttribute('fill')).toBe('currentColor');
+    }
   });
 
   it('inspects the release with every field and anchors the UPC callout', () => {
