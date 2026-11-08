@@ -3,6 +3,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCAN_SCRIPT="$REPO_ROOT/scripts/security/scan-secrets.sh"
+export SCAN_TEST_BASELINE_SOURCE="$REPO_ROOT/scripts/security/gitleaks-staged-public-digests.b64"
 # The repair path is CI-only by default; these scenarios exercise it locally.
 export SECRET_SCAN_ALLOW_LOCAL_REPAIR=1
 TEST_ROOT="$(mktemp -d)"
@@ -24,6 +25,11 @@ case "${1:-}" in
     printf '%s\n' "${SCAN_TEST_STAGED_FILES:-}"
     ;;
   show)
+    if [[ "${2:-}" == ':scripts/security/gitleaks-staged-public-digests.b64' ]]; then
+      [[ "${SCAN_TEST_BASELINE_MISSING:-}" != 1 ]] || exit 1
+      cat "$SCAN_TEST_BASELINE_SOURCE"
+      exit 0
+    fi
     [[ "${SCAN_TEST_PIN_READ_ERROR:-}" != 1 ]] || exit 42
     cat "$SCAN_TEST_PIN_SOURCE"
     ;;
@@ -174,6 +180,19 @@ run_gitleaks_scenario() {
     bash "$SCAN_SCRIPT" "$mode" origin/main >"$TEST_ROOT/$scenario.$mode.output" 2>&1 || status=$?
   printf '%s\n' "$status"
 }
+
+# The staged baseline must be the exact, reviewed set of public digests.
+# Gitleaks itself silently accepts a missing baseline, so the wrapper must
+# reject missing or modified staged bytes before invoking either scanner.
+status="$(SCAN_TEST_BASELINE_MISSING=1 run_gitleaks_scenario baseline-missing pre-commit)"
+[[ $status -ne 0 ]] || fail 'missing staged Gitleaks baseline must fail closed'
+[[ ! -s "$TEST_ROOT/baseline-missing.pre-commit.gitleaks-calls" ]] \
+  || fail 'Gitleaks must not run with a missing staged baseline'
+printf '%s\n' '[]' >"$TEST_ROOT/baseline-tampered.json"
+status="$(SCAN_TEST_BASELINE_SOURCE="$TEST_ROOT/baseline-tampered.json" run_gitleaks_scenario baseline-tampered pre-commit)"
+[[ $status -ne 0 ]] || fail 'modified staged Gitleaks baseline must fail closed'
+[[ ! -s "$TEST_ROOT/baseline-tampered.pre-commit.gitleaks-calls" ]] \
+  || fail 'Gitleaks must not run with a modified staged baseline'
 
 for mode in publication ci-pr full; do
   status="$(run_gitleaks_scenario gitleaks-corruption "$mode")"
@@ -384,36 +403,8 @@ bash "$REPO_ROOT/scripts/security/prepare-ci-secret-scan-range.test.sh"
 DL_BIN="$TEST_ROOT/dl-bin"
 DL_TMP="$TEST_ROOT/dl-tmp"
 mkdir -p "$DL_BIN" "$DL_TMP"
-cat >"$DL_BIN/curl" <<'EOF'
-#!/usr/bin/env bash
-count=0
-[[ -f "$CURL_COUNT" ]] && count="$(cat "$CURL_COUNT")"
-count=$((count + 1))
-printf '%s\n' "$count" >"$CURL_COUNT"
-if [[ "${CURL_ALWAYS_FAIL:-}" == "1" || $count -eq 1 ]]; then
-  echo "curl: (35) Recv failure: Connection reset by peer" >&2
-  exit 35
-fi
-out=''
-prev=''
-for arg in "$@"; do
-  [[ "$prev" == '-o' ]] && out="$arg"
-  prev="$arg"
-done
-printf 'fake-tarball' >"$out"
-EOF
-cat >"$DL_BIN/tar" <<'EOF'
-#!/usr/bin/env bash
-dest=''
-prev=''
-for arg in "$@"; do
-  [[ "$prev" == '-C' ]] && dest="$arg"
-  prev="$arg"
-done
-member="${!#}"
-printf '#!/usr/bin/env bash\nexit 0\n' >"$dest/$member"
-EOF
-chmod +x "$DL_BIN/curl" "$DL_BIN/tar"
+source "$REPO_ROOT/scripts/security/test-fixtures/scanner-download-runtime.sh"
+setup_scanner_download_fixture "$DL_BIN"
 
 export CURL_COUNT="$TEST_ROOT/download.curl-count"
 : >"$CURL_COUNT"
@@ -424,8 +415,10 @@ PATH="$DL_BIN:/usr/bin:/bin" TMPDIR="$DL_TMP" SCAN_SECRETS_RETRY_DELAY=0 \
   GITLEAKS_BIN= TRUFFLEHOG_BIN= \
   bash "$SCAN_SCRIPT" pre-commit >"$TEST_ROOT/download.output" 2>&1 \
   || status=$?
-[[ $status -eq 0 ]] \
-  || fail "transient download failure must be retried to success: $status"
+if [[ $status -ne 0 ]]; then
+  cat "$TEST_ROOT/download.output" >&2
+  fail "transient download failure must be retried to success: $status"
+fi
 [[ "$(cat "$CURL_COUNT")" -eq 3 ]] \
   || fail 'expected 1 failed attempt + 2 successful downloads (gitleaks, trufflehog)'
 grep -q 'download attempt 1 failed; retrying' "$TEST_ROOT/download.output" \

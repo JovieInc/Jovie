@@ -40,6 +40,7 @@ import {
   MAX_PLAYWRIGHT_PNG_WIDTH,
   validPlaywrightPng,
 } from '../../../../../scripts/lib/playwright-png.mjs';
+import productionSmokeProducers from './fixtures/production-smoke-producers.json';
 
 const webRoot = resolve(import.meta.dirname, '../../..');
 const repoRoot = resolve(webRoot, '../..');
@@ -169,7 +170,14 @@ const markdownAllowedJobs = new Set([
   'claim-checkout-dogfood.yml:dogfood',
 ]);
 // Workflow-level secrets a Playwright child may inherit (remote build cache).
-const inheritedSecretAllowlist = new Set(['TURBO_TOKEN', 'TURBO_TEAM']);
+const inheritedSecretAllowlist = new Set([
+  'TURBO_TOKEN',
+  'TURBO_TEAM',
+  'CF_TURBO_CACHE_URL',
+  'CF_TURBO_CACHE_RO_TOKEN',
+  'CF_TURBO_CACHE_RW_TOKEN',
+  'CF_TURBO_SIGNATURE_KEY',
+]);
 const policyWorkflow = (file: string) =>
   parseYaml(readFileSync(join(workflowsRoot, file), 'utf8')) as PolicyWorkflow;
 const policyJob = (source: string): PolicyJob =>
@@ -1266,6 +1274,14 @@ ${fixtureCheckout}
           ].map(name => `${file}:${id}:${name}`)
     );
     expect(violations).toEqual([]);
+    expect([...inheritedSecretAllowlist].sort()).toEqual([
+      'CF_TURBO_CACHE_RO_TOKEN',
+      'CF_TURBO_CACHE_RW_TOKEN',
+      'CF_TURBO_CACHE_URL',
+      'CF_TURBO_SIGNATURE_KEY',
+      'TURBO_TEAM',
+      'TURBO_TOKEN',
+    ]);
     expect(
       secretNames({ A: '${{ secrets.OPENAI_API_KEY }}', B: 'literal' })
     ).toEqual(['OPENAI_API_KEY']);
@@ -1547,11 +1563,7 @@ ${fixtureCheckout}
   );
 
   it('requires step-scoped Markdown allowance for every production smoke producer', () => {
-    const expected = [
-      'postdeploy-probes.yml:auth-smoke:Run production auth smoke tests',
-      'production-controller.yml:ci-post-deploy-auth-smoke:Run production auth smoke tests',
-      'production-release.yml:promote-production:Prove canonical navigation budgets on exact staged build',
-    ];
+    const expected = productionSmokeProducers;
     const discovered = readdirSync(workflowsRoot)
       .filter(name => /\.ya?ml$/.test(name))
       .flatMap(file => {

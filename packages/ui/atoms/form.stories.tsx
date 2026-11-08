@@ -95,3 +95,137 @@ export const LongValidationMessage: Story = {
     );
   },
 };
+
+function ServerErrorForm() {
+  const form = useForm({
+    defaultValues: { handle: 'jovie' },
+    errors: {
+      handle: { type: 'server', message: 'That handle is already taken.' },
+    },
+  });
+  return (
+    <Form {...form}>
+      <form className='w-72' onSubmit={event => event.preventDefault()}>
+        <FormField
+          control={form.control}
+          name='handle'
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Public handle</FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+              <FormDescription>Letters, numbers, and dashes.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </form>
+    </Form>
+  );
+}
+
+export const ErrorState: Story = {
+  render: () => <ServerErrorForm />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A server error set through react-hook-form: the label turns destructive, the control gets aria-invalid, and the message is announced.',
+      },
+    },
+  },
+};
+
+function LockedFieldForm() {
+  const form = useForm({ defaultValues: { payoutEmail: 'owner@jov.ie' } });
+  return (
+    <Form {...form}>
+      <form className='w-72' onSubmit={event => event.preventDefault()}>
+        <FormField
+          control={form.control}
+          name='payoutEmail'
+          disabled
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Payout email</FormLabel>
+              <FormControl>
+                <Input type='email' {...field} />
+              </FormControl>
+              <FormDescription>
+                Only the account owner can change where payouts are sent.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </form>
+    </Form>
+  );
+}
+
+export const PermissionDenied: Story = {
+  render: () => <LockedFieldForm />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A field disabled through FormField for a viewer without rights; the description explains who can change it.',
+      },
+    },
+  },
+};
+
+function RtlForm() {
+  const form = useForm({ defaultValues: { name: '' } });
+  return (
+    <Form {...form}>
+      <form
+        dir='rtl'
+        className='flex w-64 flex-col gap-3'
+        onSubmit={form.handleSubmit(() => undefined)}
+      >
+        <FormField
+          control={form.control}
+          name='name'
+          rules={{
+            required:
+              'اختر اسمًا عامًا قبل المتابعة حتى يتمكن المعجبون من العثور على ملفك الشخصي.',
+          }}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>اسم العرض كما يظهر في ملفك الشخصي العام</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder='اكتب الاسم الذي يعرفك به المعجبون'
+                  {...field}
+                />
+              </FormControl>
+              <FormDescription>
+                يظهر هذا الاسم في أعلى صفحة الروابط الخاصة بك.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type='submit'>حفظ</Button>
+      </form>
+    </Form>
+  );
+}
+
+export const Rtl: Story = {
+  render: () => <RtlForm />,
+  play: async ({ canvasElement }) => {
+    const button = canvasElement.querySelector('button[type="submit"]');
+    if (button instanceof HTMLButtonElement) button.click();
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Arabic label, description, and a long validation message in a narrow right-to-left form; submitting empty shows the wrapped message.',
+      },
+    },
+  },
+};

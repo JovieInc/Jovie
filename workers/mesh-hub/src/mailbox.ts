@@ -12,13 +12,16 @@ import type { Env } from './env.ts';
 import {
   allowedUrls,
   buildPrompt,
-  executorKinds,
   fetchEvidence,
   isExecutable,
   runModel,
+  runtimeStatus,
   validateReply,
 } from './executor.ts';
+import { type Liveness, mailboxLiveness } from './mailbox-liveness.ts';
 import { backoffFor, isOpen, Outbox, type RecipientStatus } from './outbox.ts';
+
+export type { Liveness } from './mailbox-liveness.ts';
 
 const SWEEP_MS = 5 * 60_000;
 /** Only statuses that mean "this message is bad", never "the route is not ready". */
@@ -32,16 +35,6 @@ export type MailboxConfig = {
   kind: string;
   fallback: string | null;
   deadAfterMs: number;
-};
-
-export type Liveness = {
-  kind: string | null;
-  connected: number;
-  lastPingAt: number | null;
-  lastActivityAt: number | null;
-  unhandled: number;
-  oldestUnhandledAgeMs: number | null;
-  lastProbe: { acceptedAt: number; receivedAt: number | null } | null;
 };
 
 /**
@@ -78,6 +71,11 @@ export class Mailbox extends DurableObject<Env> {
 
   private touch(now = Date.now()) {
     this.store.setMeta('lastActivityAt', String(now));
+  }
+
+  private touchConsumer(now = Date.now()) {
+    this.touch(now);
+    this.store.setMeta('lastConsumerActivityAt', String(now));
   }
 
   private async arm(): Promise<void> {
@@ -162,7 +160,7 @@ export class Mailbox extends DurableObject<Env> {
 
   /** Agent read (`mesh read`/long-poll): claim unhandled messages, waiting up to `wait` s. */
   async poll(waitSeconds: number, limit: number) {
-    this.touch();
+    this.touchConsumer();
     let messages = this.store.claim(Date.now(), limit);
     const wait = Math.min(Math.max(waitSeconds, 0), LIMITS.longPollMaxSeconds);
     if (!messages.length && wait > 0) {
@@ -193,12 +191,12 @@ export class Mailbox extends DurableObject<Env> {
   }
 
   async ack(ids: string[]) {
-    this.touch();
+    this.touchConsumer();
     return this.store.ack(ids, Date.now());
   }
 
   async receipt(ids: string[]) {
-    this.touch();
+    this.touchConsumer();
     return this.store.receipt(ids, Date.now());
   }
 
@@ -207,26 +205,7 @@ export class Mailbox extends DurableObject<Env> {
   }
 
   async liveness(): Promise<Liveness> {
-    const now = Date.now();
-    let lastPingAt: number | null = null;
-    const sockets = this.ctx.getWebSockets();
-    for (const ws of sockets) {
-      const at =
-        this.ctx.getWebSocketAutoResponseTimestamp(ws)?.getTime() ?? null;
-      if (at !== null && (lastPingAt === null || at > lastPingAt))
-        lastPingAt = at;
-    }
-    const oldest = this.store.oldestUnacked();
-    const activity = this.store.getMeta('lastActivityAt');
-    return {
-      kind: this.config()?.kind ?? null,
-      connected: sockets.length,
-      lastPingAt,
-      lastActivityAt: activity ? Number(activity) : null,
-      unhandled: this.store.unackedCount(),
-      oldestUnhandledAgeMs: oldest ? now - oldest.acceptedAt : null,
-      lastProbe: this.store.lastProbe(),
-    };
+    return mailboxLiveness(this.ctx, this.store, this.config()?.kind ?? null);
   }
 
   /** WebSocket stream for a relay: pushes everything not yet received. */
@@ -277,12 +256,15 @@ export class Mailbox extends DurableObject<Env> {
           .slice(0, 500)
       : [];
     if (frame.type === 'receipt' || frame.type === 'ack') {
+      this.touchConsumer();
       if (frame.type === 'receipt') this.store.receipt(ids, Date.now());
       else this.store.ack(ids, Date.now());
       // A page is capped; drain the rest of the backlog as the client catches up.
       if (ids.length) this.sendBatch(ws, this.store.unreceived(Date.now()));
-    } else if (frame.type === 'sync')
+    } else if (frame.type === 'sync') {
+      this.touchConsumer();
       this.sendBatch(ws, this.store.unreceived(Date.now()));
+    }
   }
 
   async webSocketClose(ws: WebSocket, code: number) {
@@ -301,8 +283,7 @@ export class Mailbox extends DurableObject<Env> {
     const kind = this.config()?.kind;
     return Boolean(
       kind &&
-        this.env.AI &&
-        executorKinds(this.env.EXECUTOR_KINDS).has(kind) &&
+        runtimeStatus(kind, this.env).executorAvailable &&
         isExecutable({ ...envelope, to: kind })
     );
   }
@@ -314,7 +295,13 @@ export class Mailbox extends DurableObject<Env> {
    */
   private async runExecutor(now: number) {
     const config = this.config();
-    if (!config || !this.env.AI) return;
+    // Old exec alarms survive configuration changes. Recheck before claiming mail.
+    if (
+      !config ||
+      !this.env.AI ||
+      !runtimeStatus(config.kind, this.env).executorAvailable
+    )
+      return;
     const batch = this.store.claimForExecutor(now, this.graceMs(), 120_000, 3);
     const registry = this.env.REGISTRY.get(
       this.env.REGISTRY.idFromName('registry')
@@ -351,11 +338,13 @@ export class Mailbox extends DurableObject<Env> {
       }
       const body =
         `[hub-executor:workers-ai for ${config.kind}] ${reply}`.slice(0, 3_900);
-      const correlationId =
-        `reply-${config.kind}-${message.correlationId}`.slice(0, 120);
+      // The shared hub sender needs a collision-free namespace across target kinds.
+      const correlationId = `reply-exec-${await sha256Hex(
+        JSON.stringify([config.kind, message.id])
+      )}`;
       const envelope: Envelope = {
-        id: `${config.kind}:${correlationId}`,
-        from: config.kind,
+        id: `mesh-hub:${correlationId}`,
+        from: 'mesh-hub',
         to: message.from,
         correlationId,
         sha256: await sha256Hex(body),

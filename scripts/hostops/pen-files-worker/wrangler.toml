@@ -1,0 +1,12 @@
+name = "jovie-pen-files"
+main = "src/index.ts"
+compatibility_date = "2026-10-15"
+workers_dev = true
+preview_urls = false
+
+# Serves exactly one R2 object (the Pen golden-path workspace archive) so CI can
+# fetch it. The bucket stays private. Secret: OBJECT_KEY, the unguessable
+# "<hex>/workspace.tar.gz" key; any other path is a 404.
+[[r2_buckets]]
+binding = "PEN_FILES"
+bucket_name = "jovie-pen-golden-path"

@@ -11,4 +11,13 @@ describe('DrawerSectionHeading', () => {
       'tracking-normal'
     );
   });
+
+  it('outranks sub-headings: semibold secondary, never all caps', () => {
+    render(<DrawerSectionHeading>Activity</DrawerSectionHeading>);
+    expect(screen.getByText('Activity')).toHaveClass(
+      'font-semibold',
+      'text-secondary-token'
+    );
+    expect(screen.getByText('Activity').className).not.toContain('uppercase');
+  });
 });

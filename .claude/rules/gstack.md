@@ -33,7 +33,7 @@ This repo vendors a Jovie-customized fork of [gstack](https://github.com/garryta
 | Lavish | `/lavish` | Turn agent responses into rich HTML artifacts the user can annotate and send targeted feedback on (design comps, reports, dashboards, review surfaces) |
 | Upgrade | `/gstack-upgrade` | Upgrade gstack to latest version |
 | Last 30 Days | `/last30days` | Multi-source signal search (Reddit/HN/X/YouTube/TikTok/Polymarket/GitHub) scored by real engagement; synthesized to one brief. Use for idea discovery and market research. (mvanhorn) |
-| Idea Radar | `/idea-radar` | Event-driven external opportunity-signal producer — normalizes observations into JOV-5916 and routes bounded benchmark work to JOV-2966. (Jovie AgentOS) |
+| Idea Radar | `/idea-radar` | Event-driven external opportunity-signal producer — normalizes observations into JOV-5916 and routes bounded benchmark work to JOV-2966. |
 
 ## Setup
 

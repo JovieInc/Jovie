@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { normalizePull } from '../../remediation-sweep.mjs';
+import { HOLD_LABELS } from '../merge-group-member-policy.mjs';
 import {
   DAY_MS,
   DRAFT_STALE_MS,
@@ -228,6 +229,88 @@ describe('remediation sweep selection', () => {
         NOW
       )
     ).toEqual([]);
+  });
+
+  it('does not file exhausted conflict cards for PRs a hold parks', () => {
+    const held = planExhaustedConflicts(
+      [
+        pull({
+          number: 22809,
+          labels: ['lane-fix-exhausted', 'incident'],
+          exhaustedSince: ago(DAY_MS + 1),
+        }),
+      ],
+      NOW
+    );
+    expect(held.plans).toEqual([]);
+    expect(held.warnings).toHaveLength(1);
+    expect(held.warnings[0]).toContain('#22809');
+    expect(held.warnings[0]).toContain('incident');
+    // The hold nag, not the conflict card, owns a held PR's disposition.
+    expect(
+      planIdleHolds(
+        [
+          pull({
+            number: 22809,
+            labels: ['lane-fix-exhausted', 'incident'],
+            updatedAt: ago(7 * DAY_MS + 1),
+          }),
+        ],
+        NOW
+      )[0].fingerprint
+    ).toBe('remediation:pr-22809-hold');
+    // An unheld exhausted PR past the deadline still files its conflict card.
+    expect(
+      planExhaustedConflicts(
+        [
+          pull({
+            number: 22810,
+            labels: ['lane-fix-exhausted'],
+            exhaustedSince: ago(DAY_MS + 1),
+          }),
+        ],
+        NOW
+      ).plans[0].fingerprint
+    ).toBe('remediation:pr-22810-conflict');
+  });
+
+  it.each([...HOLD_LABELS])(
+    'keeps canonical %s holds with their existing nag',
+    hold => {
+      for (const label of [hold, { name: hold.toUpperCase() }]) {
+        const item = pull({
+          labels: ['lane-fix-exhausted', label],
+          exhaustedSince: ago(DAY_MS + 1),
+          updatedAt: ago(7 * DAY_MS + 1),
+        });
+        const result = planExhaustedConflicts([item], NOW);
+        expect(result.plans).toEqual([]);
+        expect(result.warnings).toHaveLength(1);
+        expect(result.warnings[0].toLowerCase()).toContain(hold);
+        expect(planIdleHolds([item], NOW)).toHaveLength(1);
+      }
+    }
+  );
+
+  it.each([
+    'tim-hold',
+    'tim:hold',
+    'hold:tim',
+    'needs-human',
+    'human-review-required',
+    'no-auto',
+    'do-not-merge',
+  ])('keeps retired human hold %s actionable', label => {
+    const item = pull({
+      labels: ['lane-fix-exhausted', { name: label.toUpperCase() }],
+      exhaustedSince: ago(DAY_MS + 1),
+      updatedAt: ago(7 * DAY_MS + 1),
+    });
+    const result = planExhaustedConflicts([item], NOW);
+    expect(result.plans).toHaveLength(1);
+    expect(result.plans[0].fingerprint).toBe('remediation:pr-1-conflict');
+    expect(result.warnings).toEqual([]);
+    expect(planIdleHolds([item], NOW)).toEqual([]);
   });
 
   it('files Summer receipts per provider on age, not on commissioning', () => {

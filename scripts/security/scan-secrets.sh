@@ -15,7 +15,7 @@ cd "$REPO_ROOT"
 MODE="${1:-pre-commit}"
 BASE_REF="${2:-origin/main}"
 GITLEAKS_VERSION="${GITLEAKS_VERSION:-8.21.2}"
-TRUFFLEHOG_VERSION="${TRUFFLEHOG_VERSION:-3.95.5}"
+TRUFFLEHOG_VERSION="${TRUFFLEHOG_VERSION:-3.99.8}"
 EXCLUDE_PATHS="$REPO_ROOT/.trufflehog-exclude.txt"
 
 # Retry release downloads after curl 35 resets (JOV-6809) via a temp file.
@@ -144,11 +144,32 @@ run_gitleaks_checked() {
 }
 
 run_gitleaks_pre_commit() {
+  # These exact findings are public source/artifact SHA-256 values already on
+  # main, not credentials. A forward merge can stage those evidence records
+  # again. Gitleaks compares each baseline finding's path, rule, match, secret,
+  # and position; all other findings remain blocking. CI/history scans do not
+  # use this baseline.
+  local encoded baseline status
+  encoded="$(mktemp)"
+  baseline="$(mktemp)"
+  # Store the public baseline encoded because its literal match strings would
+  # themselves trigger the scanner. Decode only the pinned staged bytes.
+  if ! git show ':scripts/security/gitleaks-staged-public-digests.b64' >"$encoded" \
+    || ! node -e 'const fs = require("node:fs"); const crypto = require("node:crypto"); const text = fs.readFileSync(process.argv[1], "utf8").trim(); const bytes = Buffer.from(text, "base64"); if (bytes.toString("base64") !== text || crypto.createHash("sha256").update(bytes).digest("hex") !== "940e3fe1b1e76ced4011368f5a94d3fc4abc6016f22d2a6a458e4277141e0b75") process.exit(1); fs.writeFileSync(process.argv[2], bytes, {mode: 0o600});' "$encoded" "$baseline"; then
+    rm -f "$encoded" "$baseline"
+    echo '::error title=Secret scan baseline invalid::The staged public-digest baseline is missing or modified.' >&2
+    return 1
+  fi
+  rm -f "$encoded"
   echo "Running gitleaks protect on staged changes..."
+  status=0
   run_gitleaks_checked staged protect \
     --staged \
     --config "$REPO_ROOT/.gitleaks.toml" \
-    --verbose
+    --baseline-path "$baseline" \
+    --verbose || status=$?
+  rm -f "$baseline"
+  return "$status"
 }
 
 run_gitleaks_ci_pr() {
@@ -235,7 +256,7 @@ trufflehog_filesystem_scan() {
   local out log status=0 filtered_status=0
   out="$(mktemp)"
   log="$(mktemp)"
-  "$TRUFFLEHOG_BIN" filesystem "$@" --no-verification --json --fail >"$out" 2>"$log" || status=$?
+  "$TRUFFLEHOG_BIN" filesystem "$@" --no-update --no-verification --json --fail >"$out" 2>"$log" || status=$?
   cat "$log" >&2
   if grep -q 'encountered errors during scan' "$log"; then
     echo '::error title=Secret scan incomplete::TruffleHog aborted its filesystem scan; failing closed.' >&2
@@ -397,7 +418,7 @@ run_trufflehog_git() {
   out="$(mktemp)"
   status=0
   # shellcheck disable=SC2046
-  "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) --json \
+  "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) --no-update --json \
     >"$out" 2>"$log" || status=$?
   if [[ $status -ne 0 ]] && grep -qiE "$CLONE_CORRUPTION_SIGNATURE" "$log"; then
     echo "::error title=Secret scan checkout corruption::TruffleHog could not read the runner's Git object store; repairing the checkout and retrying once." >&2
@@ -413,7 +434,7 @@ run_trufflehog_git() {
     : >"$log"
     : >"$out"
     # shellcheck disable=SC2046
-    "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) --json \
+    "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) --no-update --json \
       >"$out" 2>"$log" || status=$?
   fi
   cat "$log"

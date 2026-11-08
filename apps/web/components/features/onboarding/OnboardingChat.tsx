@@ -1,5 +1,7 @@
 'use client';
 
+import { useSourceFactsByMessage } from '@/components/jovie/source-evidence-context';
+
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx
 
 import { useChat } from '@ai-sdk/react';
@@ -7,6 +9,7 @@ import { DefaultChatTransport, type UIMessage } from 'ai';
 import dynamic from 'next/dynamic';
 import type { ReactNode } from 'react';
 import {
+  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -85,6 +88,7 @@ import {
   isHandleCheckOutput,
   isNextStepPayload,
   isSocialLinkOutput,
+  rollbackFailedUserTurn,
   THINKING_PLACEHOLDER_ID,
   type ToolPart,
 } from './onboardingChatHelpers';
@@ -99,7 +103,9 @@ import {
  * Guard: tests/unit/onboarding/OnboardingChat.entry-bundle.test.ts
  */
 const loadChatMessage = () =>
-  import('@/components/jovie/components').then(mod => mod.ChatMessage);
+  import('@/components/jovie/components/ChatMessage').then(
+    mod => mod.ChatMessage
+  );
 const loadToolPartsRenderer = () =>
   import('@/components/jovie/tool-ui').then(mod => mod.ToolPartsRenderer);
 const loadChatProposeCheckoutCard = () =>
@@ -108,16 +114,17 @@ const loadChatProposeNextStepCard = () =>
   import('./ChatProposeNextStepCard').then(mod => mod.ChatProposeNextStepCard);
 
 // Inline import() inside dynamic() keeps Next's loadable preload metadata; the
-// loaders above resolve to the same chunks for idle preloading. Each `loading`
-// placeholder reserves the slot locally so a not-yet-fetched chunk never
-// suspends up to the route-level fallback.
+// loaders above resolve to the same chunks for idle preloading. Message rows
+// reveal together inside OnboardingMessageList; tool cards reserve their slots
+// locally so a pending chunk never suspends up to the route-level fallback.
 function ReservedChatSlot({ minHeightClass }: { minHeightClass: string }) {
   return <div aria-hidden='true' className={`w-full ${minHeightClass}`} />;
 }
 
-const ChatMessage = dynamic(
-  () => import('@/components/jovie/components').then(mod => mod.ChatMessage),
-  { loading: () => <ReservedChatSlot minHeightClass='min-h-10' /> }
+const ChatMessage = dynamic(() =>
+  import('@/components/jovie/components/ChatMessage').then(
+    mod => mod.ChatMessage
+  )
 );
 const ToolPartsRenderer = dynamic(
   () => import('@/components/jovie/tool-ui').then(mod => mod.ToolPartsRenderer),
@@ -558,6 +565,7 @@ function OnboardingMessageList({
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
 }) {
+  const sourceFacts = useSourceFactsByMessage(displayMessages);
   const handleStepDone =
     hasToolOutputAction(
       displayMessages,
@@ -579,60 +587,66 @@ function OnboardingMessageList({
     selectedArtist: null,
   }).handle;
 
+  // A generic per-message placeholder cannot match both a wrapped user
+  // bubble and the thinking dots. Reveal the first transcript as one unit,
+  // including its speaker rows, while the surrounding composer stays mounted.
   return (
-    <div className='flex flex-col pb-4'>
-      {displayMessages.map((message, index) => {
-        const text = getMessageText(message);
-        const toolParts = getToolParts(message);
-        const isThinking = message.id === THINKING_PLACEHOLDER_ID;
-        const shouldRenderMessage =
-          isThinking || Boolean(text) || toolParts.length === 0;
-        // Pen R6As7U: one Jovie speaker row opens each agent turn; a run of
-        // assistant messages is one turn and keeps a single row.
-        const startsAgentTurn =
-          message.role === 'assistant' &&
-          displayMessages[index - 1]?.role !== 'assistant';
+    <Suspense fallback={null}>
+      <div className='flex flex-col pb-4'>
+        {displayMessages.map((message, index) => {
+          const text = getMessageText(message);
+          const toolParts = getToolParts(message);
+          const isThinking = message.id === THINKING_PLACEHOLDER_ID;
+          const shouldRenderMessage =
+            isThinking || Boolean(text) || toolParts.length === 0;
+          // Pen R6As7U: one Jovie speaker row opens each agent turn; a run of
+          // assistant messages is one turn and keeps a single row.
+          const startsAgentTurn =
+            message.role === 'assistant' &&
+            displayMessages[index - 1]?.role !== 'assistant';
 
-        return (
-          <div
-            key={message.id}
-            className='pb-5 transition-opacity duration-fast'
-          >
-            {startsAgentTurn ? <OnboardingSpeakerRow /> : null}
-            {shouldRenderMessage ? (
-              <ChatMessage
-                id={message.id}
-                role={message.role}
-                parts={(message.parts ?? []) as MessagePart[]}
-                isThinking={isThinking}
-                isStreaming={
-                  isStreaming && message.id === lastAssistantMessageId
-                }
-                renderTools={false}
-                showAssistantActions={false}
-              />
-            ) : null}
-            {!isThinking
-              ? renderOnboardingTools({
-                  messageId: message.id,
-                  toolParts,
-                  hasMessageText: Boolean(text),
-                  isBusy,
-                  onHandleCandidateChange,
-                  onConfirmHandle,
-                  onAttachAccount,
-                  onNoneOfTheseArtists,
-                  onSelectArtist,
-                  selectedArtistId,
-                  handleStepDone,
-                  socialStepDone,
-                  claimHandle,
-                })
-              : null}
-          </div>
-        );
-      })}
-    </div>
+          return (
+            <div
+              key={message.id}
+              className='pb-5 transition-opacity duration-fast'
+            >
+              {startsAgentTurn ? <OnboardingSpeakerRow /> : null}
+              {shouldRenderMessage ? (
+                <ChatMessage
+                  id={message.id}
+                  role={message.role}
+                  parts={(message.parts ?? []) as MessagePart[]}
+                  sourceFacts={sourceFacts.get(message.id)}
+                  isThinking={isThinking}
+                  isStreaming={
+                    isStreaming && message.id === lastAssistantMessageId
+                  }
+                  renderTools={false}
+                  showAssistantActions={false}
+                />
+              ) : null}
+              {!isThinking
+                ? renderOnboardingTools({
+                    messageId: message.id,
+                    toolParts,
+                    hasMessageText: Boolean(text),
+                    isBusy,
+                    onHandleCandidateChange,
+                    onConfirmHandle,
+                    onAttachAccount,
+                    onNoneOfTheseArtists,
+                    onSelectArtist,
+                    selectedArtistId,
+                    handleStepDone,
+                    socialStepDone,
+                    claimHandle,
+                  })
+                : null}
+            </div>
+          );
+        })}
+      </div>
+    </Suspense>
   );
 }
 
@@ -642,25 +656,6 @@ function isTurnstileTokenUsable(
 ): boolean {
   if (!token) return false;
   return !BLOCKED_TURNSTILE_TOKEN_STATUSES.has(status);
-}
-
-function rollbackFailedUserTurn(
-  messages: readonly UIMessage[],
-  failedText: string | null | undefined
-): readonly UIMessage[] {
-  const trimmedFailed = failedText?.trim();
-  if (!trimmedFailed) return messages;
-
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message.role !== 'user') continue;
-    if (getMessageText(message).trim() === trimmedFailed) {
-      return messages.slice(0, index);
-    }
-    break;
-  }
-
-  return messages;
 }
 
 function getDisplayMessages(
@@ -1418,6 +1413,7 @@ export function OnboardingChat({
         {...onboardingChatInputProps}
         pickerPlacement={sendLocalError ? 'flow' : 'overlay'}
       />
+      <span hidden aria-hidden='true' data-onboarding-composer-complete />
     </div>
   );
 
@@ -1426,6 +1422,7 @@ export function OnboardingChat({
       className='system-b-onboarding-chat relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)'
       aria-label='Jovie Onboarding Chat'
       data-testid='onboarding-chat'
+      data-starter-handoff={hasInitialStarterPrompt ? 'true' : undefined}
       data-picker-open={composerPickerOpen ? 'true' : undefined}
     >
       {/* Scroll area (flex-1) — upper content morphs on first message */}

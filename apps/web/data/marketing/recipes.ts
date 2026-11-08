@@ -15,8 +15,7 @@
  * Post-charter stubs per ARCHITECTURE.md §15: newsletter-signup (JOV-4067).
  */
 
-import { HOMEPAGE_COPY } from '../homepageCopy';
-import { HOMEPAGE_FAN_STATES_COPY } from '../homepageFanStatesCopy';
+import { HOMEPAGE_EDITORIAL_COPY as HOME } from '../homepageEditorialCopy';
 import type { MarketingAudience, MarketingSectionId } from './sections';
 
 export type RecipeId =
@@ -164,52 +163,49 @@ export interface MarketingRecipe {
 
 export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
   // ── homepage (proven — reference: /) ─────────────────────────────────────
-  // EVENT 2026-10-20 (Tim): the homepage sells the artist profile. Company
-  // metadata and structured data stay general; the page body does not.
+  // Tim 2026-11-03: "Jovie helps you move your music forward." (`/` only).
+  // Invite-only: the story ends in the role waitlist form, never signup.
   {
     id: 'homepage',
     label: 'Homepage',
     status: 'proven',
     referenceRoute: '/', // /new is a retired redirect, not a rendered reference
     audience: 'general',
-    // Claim + live profile, three real fan states, then the free offer with
-    // the same claim. Prices and plan terms come from offer truth only.
-    sectionOrder: ['hero', 'product-gallery', 'cta'],
+    // Hero, the jov.ie/you profile, the releases workspace, then the
+    // invitation form. No prices on the page.
+    sectionOrder: ['hero', 'feature-split', 'product-gallery', 'cta'],
     arc: [
+      { beat: 'promise', feeling: HOME.hero.headline, section: 'hero' },
       {
-        beat: 'promise',
-        feeling: HOMEPAGE_COPY.hero.headline,
-        section: 'hero',
+        beat: 'proof',
+        feeling: HOME.profile.headline,
+        section: 'feature-split',
       },
       {
         beat: 'proof',
-        feeling: HOMEPAGE_FAN_STATES_COPY.headline,
+        feeling: HOME.releases.headline,
         section: 'product-gallery',
       },
-      {
-        beat: 'action',
-        feeling: HOMEPAGE_COPY.offer.headline,
-        section: 'cta',
-      },
+      { beat: 'action', feeling: HOME.invite.headline, section: 'cta' },
     ],
     hierarchy: {
-      oneBigIdea: HOMEPAGE_COPY.hero.subhead,
+      oneBigIdea: HOME.hero.subhead,
       seeFirst: 'hero',
-      second: 'product-gallery',
-      third: 'cta',
+      second: 'feature-split',
+      third: 'product-gallery',
       emphasisBudget: {
         maxDisplayScaleMoments: 1,
         maxFullBleedBreaks: 1,
         maxHeroWeightProofElements: 1,
       },
       aboveTheFoldContract: {
-        desktop: ['hero'], // headline + claim + the live profile capture
+        desktop: ['hero'], // headline + the invite action + the live-profile link
         mobile: ['hero'],
       },
     },
     ctaCadence: {
       strategy: 'sparse',
-      primaryLabel: HOMEPAGE_COPY.hero.claim.action,
+      primaryLabel: HOME.hero.primaryAction,
       cadence: 'hero-and-close',
     },
     fallbacks: [
@@ -218,9 +214,9 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
         fallback: 'omit section logo-cloud (zero-proof path)',
       },
       {
-        missing: 'a public paid artist-profile offer in offer truth',
+        missing: 'open public signup (PUBLIC_SIGNUP_CLOSED is on)',
         fallback:
-          'state the free offer only and link to /pricing (JOV-8368 owns the paid pilot)',
+          'close on the role waitlist form; no signup link and no prices on the page',
       },
     ],
     minContent: [

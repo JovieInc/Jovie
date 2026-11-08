@@ -45,10 +45,37 @@ describe('ShareableLinkRow', () => {
     expect(screen.getByTestId('row')).toHaveClass('h-8');
   });
 
+  it('keeps compact density copy/open targets at the 24px minimum', () => {
+    render(
+      <ShareableLinkRow
+        url='https://jov.ie/tim'
+        density='compact'
+        testId='row'
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Copy link' })).toHaveClass(
+      'h-6',
+      'w-6'
+    );
+  });
+
   it('locks rail density to the 32px desktop control contract', () => {
     render(
       <ShareableLinkRow url='https://jov.ie/tim' density='rail' testId='row' />
     );
     expect(screen.getByTestId('row')).toHaveClass('h-8');
+  });
+
+  it('flat surface adds no horizontal inset and uses body text size', () => {
+    render(
+      <ShareableLinkRow
+        url='https://jov.ie/tim'
+        density='compact'
+        surface='flat'
+        testId='row'
+      />
+    );
+    expect(screen.getByTestId('row')).toHaveClass('px-0');
+    expect(screen.getByText('jov.ie/tim')).toHaveClass('text-xs');
   });
 });

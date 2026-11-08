@@ -1,5 +1,12 @@
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   MESH_CURRENT_WIRE_COVERAGE_COMMAND,
@@ -104,6 +111,64 @@ describe('scripts test inventory guard', () => {
       orphans,
       `Unwired: ${orphans.join(', ')}. Wire each file into a ci-fast lane (SCRIPT_CONTRACT_NODE_TESTS / SCRIPT_CONTRACT_VITEST_TESTS in scripts/ci-fast-lanes.mjs) or delete it if obsolete.`
     ).toEqual([]);
+  });
+
+  it('discovers the wired planner group and leaves unwired helpers and new orphans unrun', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'planner-ci-inventory-'));
+    const test = 'scripts/lib/__tests__/planner-fixture.test.mjs';
+    const orphan = 'scripts/lib/__tests__/unregistered-fixture.test.mjs';
+    const helper = 'scripts/lib/test-planner-contract-tests.mjs';
+    const importLine =
+      "import { TEST_PLANNER_CONTRACT_TESTS } from './lib/test-planner-contract-tests.mjs';";
+    mkdirSync(join(root, 'scripts/lib'), { recursive: true });
+    writeFileSync(join(root, 'package.json'), '{"scripts":{}}');
+    writeFileSync(
+      join(root, helper),
+      "export const TEST_PLANNER_CONTRACT_TESTS = ['" + test + "'];"
+    );
+    const referenced = async (wiredImport, wiredSpread) => {
+      writeFileSync(
+        join(root, 'scripts/ci-fast-lanes.mjs'),
+        (wiredImport ? importLine : '') +
+          '\nexport const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([' +
+          (wiredSpread ? '...TEST_PLANNER_CONTRACT_TESTS,' : '') +
+          ']);'
+      );
+      return mapTestReferences(await collectCiCommands(root), [test, orphan]);
+    };
+    try {
+      expect((await referenced(true, true)).get(test)?.has(helper)).toBe(true);
+      expect((await referenced(true, true)).get(orphan)?.size).toBe(0);
+      expect((await referenced(false, true)).get(test)?.size).toBe(0);
+      expect((await referenced(true, false)).get(test)?.size).toBe(0);
+      const actualLane =
+        importLine +
+        '\nexport const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([\n...TEST_PLANNER_CONTRACT_TESTS,\n]);';
+      for (const inert of [
+        actualLane
+          .split('\n')
+          .map(line => '// ' + line)
+          .join('\n'),
+        '/*\n' + actualLane + '\n*/',
+        'const inert = ' + JSON.stringify(actualLane) + ';',
+      ]) {
+        writeFileSync(join(root, 'scripts/ci-fast-lanes.mjs'), inert);
+        const refs = mapTestReferences(await collectCiCommands(root), [
+          test,
+          orphan,
+        ]);
+        expect(refs.get(test)?.size).toBe(0);
+        expect(refs.get(orphan)?.size).toBe(0);
+      }
+      writeFileSync(join(root, 'scripts/ci-fast-lanes.mjs'), 'export const =;');
+      await expect(collectCiCommands(root)).rejects.toThrow(
+        /Cannot parse CI planner wiring/
+      );
+      rmSync(join(root, helper));
+      await expect(referenced(true, true)).rejects.toThrow(/ENOENT/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('keeps every exception real, reasoned and still unwired', async () => {

@@ -10,7 +10,8 @@ parsed all of it on every pass. Rotation keeps the live file to RETAIN_S of rows
   * `runs/ledger-prior-attempts.json` keeps one entry per issue that ever had a native attempt, which is
     all backlog admission uses old rows for (any prior attempt holds an issue as unknown custody).
 
-Appenders open the ledger by path with mode "a" and take no lock, so rotation never rewrites in place:
+Maintained appenders and rotation share the stable ledger.jsonl.lock inode. Legacy
+writers must be excluded by the controller during adoption. Rotation never rewrites in place:
 it renames the file away, waits for in-flight appends to land in the renamed inode, writes the retained
 rows to a temp file and `link()`s it into place (EEXIST means an appender already recreated the file; the
 retained rows are then appended to it). A crash leaves `ledger.rotating.jsonl`, merged on the next run.
@@ -23,6 +24,8 @@ import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+from atomic_state import ledger_lock_path
 
 RETAIN_S = 10 * 86400
 ROTATE_MIN_BYTES = 8 * 1024 * 1024
@@ -98,7 +101,9 @@ def rotate(state: Path, now: float | None = None, settle_s: float = SETTLE_S, sl
     state, now = Path(state), time.time() if now is None else now
     runs = state / "runs"
     ledger, rotating = runs / "ledger.jsonl", runs / ROTATING
-    lock = open(state / "ledger-rotate.lock", "a")
+    if not runs.exists():
+        return {"status": "no-ledger"}
+    lock = os.fdopen(os.open(ledger_lock_path(ledger), os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600), "rb+")
     try:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)

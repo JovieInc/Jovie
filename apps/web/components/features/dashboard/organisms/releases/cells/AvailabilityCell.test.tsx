@@ -27,4 +27,23 @@ describe('AvailabilityCell token compliance', () => {
     expect(source).toContain("'ring-2 ring-quaternary-token/40'");
     expect(source).toContain("isCopied && 'text-success'");
   });
+
+  it('keeps the trigger accessible name anchored by the sr-only prefix (WCAG 2.5.3)', () => {
+    const source = readFileSync(
+      resolve(
+        webRoot,
+        'components/features/dashboard/organisms/releases/cells/AvailabilityCell.tsx'
+      ),
+      'utf8'
+    );
+
+    // The sr-only prefix leads the name and the visible rail text follows:
+    // no shadowing aria-label on the trigger.
+    expect(source).toContain(
+      "<span className='sr-only'>Show provider availability details:</span>"
+    );
+    expect(source).not.toMatch(
+      /aria-label='Show Provider Availability Details'/
+    );
+  });
 });

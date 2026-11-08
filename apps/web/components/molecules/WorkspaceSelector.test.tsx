@@ -73,7 +73,7 @@ describe('WorkspaceSelector', () => {
       <WorkspaceSelector currentWorkspaceId='ov' workspaces={workspaces} />
     );
 
-    const trigger = screen.getByRole('button', { name: 'Switch Workspace' });
+    const trigger = screen.getByRole('button', { name: /^Switch Workspace: / });
     expect(trigger).toHaveTextContent('OV');
     expect(trigger.querySelector('svg.lucide-chevron-down')).toBeNull();
     expect(trigger.querySelector('[data-brand-mark-size]')).toHaveAttribute(
@@ -87,7 +87,7 @@ describe('WorkspaceSelector', () => {
       <WorkspaceSelector currentWorkspaceId='ov' workspaces={workspaces} />
     );
 
-    const trigger = screen.getByRole('button', { name: 'Switch Workspace' });
+    const trigger = screen.getByRole('button', { name: /^Switch Workspace: / });
     const label = within(trigger).getByText('OV');
     // JOV-4522: max-width + opacity + travel keep the label mounted during
     // the rail collapse instead of popping to display:none at frame one.
@@ -129,7 +129,7 @@ describe('WorkspaceSelector', () => {
     );
 
     expect(
-      screen.getByRole('button', { name: 'Switch Workspace' })
+      screen.getByRole('button', { name: /^Switch Workspace: / })
     ).toHaveTextContent('Jovie');
   });
 

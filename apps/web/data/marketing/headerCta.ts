@@ -1,12 +1,13 @@
-import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_INVITE_ANCHOR } from '@/data/homepageInviteAnchor';
 
 /**
- * Homepage header CTA (JOV-5085 conversion lock). A plain data module so the
- * server-rendered (home) layout and the client MarketingHeader share one value
- * without crossing the 'use client' boundary.
+ * Homepage header CTA. A plain data module so the server-rendered (home)
+ * layout and the client MarketingHeader share one value without crossing the
+ * 'use client' boundary. Signup is invite-only (PUBLIC_SIGNUP_CLOSED), so the
+ * header action scrolls to the homepage's own invitation form, the same
+ * destination as the hero action.
  */
-// ui-casing-allow: shared CTA intent copy (sentence case, as on /artist-profiles)
 export const HOME_MARKETING_HEADER_CTA = {
-  label: 'Claim your profile',
-  href: APP_ROUTES.START,
+  label: 'Request an Invite',
+  href: `/#${HOMEPAGE_INVITE_ANCHOR}`,
 } as const;
