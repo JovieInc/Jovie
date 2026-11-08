@@ -1675,7 +1675,11 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-pricing-page .marketing-pricing-plan-card) {
   min-height: 0;
   border: 0;
-  border-radius: var(--radius-xl);
+  /* The plans render as one joined panel: the 1px grid gap is the divider and
+     the panel's own radius clips the outer corners. Rounding each card here
+     let the divider colour show through as notches at every join; the panel
+     is the rounded card here. */
+  border-radius: var(--radius-none);
   background: var(--system-b-bg-surface-0);
   box-shadow: none;
   padding: var(--space-6);
@@ -2010,8 +2014,8 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
   .system-b-pricing-table-shell[data-variant="mobile"]
     .system-b-pricing-chart-cell--feature-heading
 ) {
-  /* One plan column on phones: give feature names the room to sit on one line. */
-  width: 62%;
+  /* Balance feature labels with the full plan heading on narrow phones. */
+  width: 50%;
 }
 
 :where(.system-b-pricing-chart-cell--value),

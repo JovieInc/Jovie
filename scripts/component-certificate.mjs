@@ -3,12 +3,13 @@
  * Component certificate CLI.
  *   node scripts/component-certificate.mjs --all [--out report.json] [--summary]
  *   node scripts/component-certificate.mjs --component apps/web/components/x/Y.tsx [--spec]
+ *   node scripts/component-certificate.mjs --gate   (fail on any gated criterion in component-certification.json)
  * Optional evidence inputs (absent evidence = `unknown`, which counts as missing):
  *   --mutation-state sweep-state.json  --a11y a11y.json  --visual visual.json  --journeys journeys.json
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
   COVERAGE_ROOTS,
@@ -22,6 +23,7 @@ import {
   renderAgentSpec,
   summarizeGuards,
 } from './lib/component-certificate.mjs';
+import { acceptStoryReceipts } from './lib/component-evidence.mjs';
 
 const { values } = parseArgs({
   options: {
@@ -48,6 +50,7 @@ const { values } = parseArgs({
     },
     sha: { type: 'string', default: 'unknown' },
     guards: { type: 'boolean', default: false },
+    gate: { type: 'boolean', default: false },
     'guard-registry': {
       type: 'string',
       default: 'docs/design-system/defect-guard-registry.json',
@@ -66,6 +69,29 @@ const read = rel => {
   const abs = join(root, rel);
   return existsSync(abs) ? readFileSync(abs, 'utf8') : null;
 };
+// Evidence for one component may span companion files (button.test.tsx plus
+// button.certificate.test.tsx, button.stories.tsx plus button.states.stories.tsx)
+// so each file stays under the repo's 500-line cap; the certificate reads them as one.
+const readWithCompanions = (rel, suffix) => {
+  const dir = dirname(rel);
+  const base = basename(rel, suffix);
+  let names = [];
+  try {
+    names = readdirSync(join(root, dir));
+  } catch {}
+  const companions = names
+    .filter(
+      n =>
+        n !== `${base}${suffix}` &&
+        n.startsWith(`${base}.`) &&
+        n.endsWith(suffix)
+    )
+    .sort();
+  const parts = [rel, ...companions.map(n => join(dir, n))]
+    .map(read)
+    .filter(text => typeof text === 'string');
+  return parts.length ? parts.join('\n') : null;
+};
 
 if (values.guards) {
   const s = summarizeGuards(
@@ -79,8 +105,20 @@ const registry = readJson(values.registry, { policy: {}, waivers: {} });
 const policy = { ...DEFAULT_POLICY, ...(registry.policy ?? {}) };
 const mutation =
   readJson(values['mutation-state'], { modules: {} }).modules ?? {};
-const a11y = readJson(values.a11y, { components: {} }).components ?? {};
-const visual = readJson(values.visual, { components: {} }).components ?? {};
+// Story-capture receipts count only when every story was captured in light
+// and dark; partial passes are dropped (and listed) rather than trusted.
+const receipts = kind => {
+  const { components, rejected } = acceptStoryReceipts(
+    readJson(values[kind], { components: {} }).components
+  );
+  for (const r of rejected)
+    console.error(
+      `[component-certificate] ignored ${kind} receipt for ${r.path}: ${r.problem}`
+    );
+  return components;
+};
+const a11y = receipts('a11y');
+const visual = receipts('visual');
 const journeyMap = readJson(values.journeys, { components: {}, journeys: {} });
 const benchmarks =
   readJson(values.benchmarks, { components: {} }).components ?? {};
@@ -114,7 +152,7 @@ const mutationInventory = (() => {
 
 /** @type {any[]} */
 let list = [];
-if (values.all)
+if (values.all || values.gate)
   for (const r of [...new Set(COVERAGE_ROOTS)])
     list.push(...listComponentsInRoot(r, root));
 const seen = new Set();
@@ -133,8 +171,12 @@ if (!values.all && values.component)
 
 const certificates = list.map(c => {
   const source = read(c.sourceRel) ?? '';
-  const testSource = c.testRel ? read(c.testRel) : null;
-  const storySource = c.storyRel ? read(c.storyRel) : null;
+  const testSource = c.testRel
+    ? readWithCompanions(c.testRel, '.test.tsx')
+    : null;
+  const storySource = c.storyRel
+    ? readWithCompanions(c.storyRel, '.stories.tsx')
+    : null;
   const mutationTests = mutationInventory?.tracked.has(c.sourceRel)
     ? (mutationInventory.tests.get(
         c.sourceRel
@@ -175,6 +217,15 @@ const certificates = list.map(c => {
 });
 
 const report = buildReport({ certificates, headSha: values.sha });
+if (values.gate) {
+  // Loaded only for --gate so the report CLI keeps its minimal import closure.
+  const { evaluateCertificateGates, formatGateResult } = await import(
+    './lib/component-certificate-gate.mjs'
+  );
+  const result = evaluateCertificateGates(report, registry.gates ?? {});
+  console.log(formatGateResult(result));
+  process.exit(result.ok ? 0 : 1);
+}
 if (values.out)
   writeFileSync(values.out, `${JSON.stringify(report, null, 1)}\n`);
 if (values.spec)

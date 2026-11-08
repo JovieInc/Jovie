@@ -104,3 +104,87 @@ export const Fullscreen: Story = {
     </Dialog>
   ),
 };
+
+export const Partial: Story = {
+  render: () => (
+    <Dialog defaultOpen>
+      <DialogContent aria-describedby={undefined}>
+        <DialogTitle>Rename playlist</DialogTitle>
+      </DialogContent>
+    </Dialog>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Only the required title, with the optional header, description and footer omitted; the close button still anchors the corner.',
+      },
+    },
+  },
+};
+
+export const LongContent: Story = {
+  render: () => (
+    <Dialog defaultOpen>
+      <DialogContent className='max-w-sm'>
+        <DialogHeader>
+          <DialogTitle>
+            Review every change to your artist profile, release links and
+            audience settings before publishing
+          </DialogTitle>
+          <DialogDescription>
+            Publishing pushes the updated profile to every public link,
+            including smart links already shared with fans, playlist curators
+            and press contacts across all of your connected platforms.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant='secondary'>Keep editing</Button>
+          <Button>Publish all profile changes now</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  ),
+  parameters: {
+    viewport: { defaultViewport: 'mobile1' },
+    docs: {
+      description: {
+        story:
+          'A long title, description and action labels wrap inside a narrow dialog without horizontal overflow.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl'>
+      <Dialog defaultOpen>
+        <DialogContent dir='rtl'>
+          <DialogHeader>
+            <DialogTitle>
+              تعديل الملف الشخصي للفنان وروابط الإصدارات
+            </DialogTitle>
+            <DialogDescription>
+              حدّث اسمك المعروض وصورتك ونبذتك التعريفية. تظهر هذه التغييرات فورًا
+              على صفحتك العامة وعلى جميع الروابط التي شاركتها مع جمهورك.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant='secondary'>إلغاء</Button>
+            <Button>حفظ التغييرات</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  ),
+  parameters: {
+    viewport: { defaultViewport: 'mobile1' },
+    docs: {
+      description: {
+        story:
+          'Right-to-left Arabic copy wraps inside the dialog and the footer actions follow the reading direction.',
+      },
+    },
+  },
+};

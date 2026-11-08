@@ -52,7 +52,7 @@ import autoscale  # noqa: E402
 import capacity_limit  # noqa: E402
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
-from atomic_state import atomic_write_text  # noqa: E402
+from atomic_state import append_json_object, atomic_write_text  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 import fleet_gate_emitter  # noqa: E402
@@ -63,6 +63,7 @@ import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
 import hyperagent_repair  # noqa: E402
 import migration_renumber  # noqa: E402  (no-model fix for migration number collisions)
+import fix_red_rewrite  # noqa: E402
 import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
 import machine_gap  # noqa: E402
@@ -70,6 +71,7 @@ import slot_yield  # noqa: E402  (slot ceilings from measured merged-per-dollar)
 import update_drain  # noqa: E402  (drain gate admission while an update waits)
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
 import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
+import escalation_reconcile  # noqa: E402  (lane-fix-escalating is consumed, never parked)
 import board_intake  # noqa: E402  (mesh board work for codex, closed on verified outcomes)
 import ownership  # noqa: E402  (started-state live-owner invariant)
 import fleet_ledger  # noqa: E402  (external agent claims, stranded-claim view)
@@ -91,8 +93,8 @@ import capacity_registry  # noqa: E402  (caps and policies come from ops/registr
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
 import qualification_guard  # noqa: E402
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
-import bindings  # noqa: E402  (extra Linear team -> repo bindings, e.g. LYB)
-import binding_refill  # noqa: E402  (Backlog -> Todo refill per extra binding)
+import binding_turns, bindings, issue_turns, ledger_read  # noqa: E401,E402  (extra Linear team -> repo bindings, e.g. LYB)
+import binding_refill, pr_wip  # noqa: E401,E402  (Backlog -> Todo refill per extra binding; per-producer PR WIP cap)
 import priority_admission  # noqa: E402  (Urgent/Summer-ranked admission, Todo WIP sanity, claim rank; JOV-7073)
 import macos_pool  # noqa: E402  (shared hosted-macOS pool: measure, record, gate LYB iOS intake)
 import decompose_pass  # noqa: E402  (standing epic decomposition when Todo < half target)
@@ -143,7 +145,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_migration_renumber.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -155,16 +157,16 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_worktree_pool.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
-              "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py",
+              "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py", "scripts/tests/test_pr_wip.py",
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
-              "scripts/tests/test_board_intake.py", "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_priority_admission.py", "scripts/tests/test_macos_pool.py",
+              "scripts/tests/test_escalation_reconcile.py", "scripts/tests/test_board_intake.py", "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_priority_admission.py", "scripts/tests/test_macos_pool.py",
               "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
               "scripts/tests/test_pytest_hook_names.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
-RELEASE_EXTRAS = ["scripts/shipping_origin.py",
+RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-host-git.sh",
                   # Subsidy pool burn policy (floor, burn order) that codex_lane reads at runtime.
                   "apps/web/lib/ai/routing.json",
                   # Shared client layer (budgeted gh) used by the throughput sentinel.
@@ -206,7 +208,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py",
                   "scripts/invariants/screen-certification.mjs", "scripts/invariants/screen-decision-routing.mjs",
                   "scripts/invariants/screen-proof-resolver.mjs", "scripts/invariants/product-reference-coherence.mjs",
                   "scripts/invariants/browser-owned-input.mjs", "scripts/invariants/browser-owned-input-matrix.json",
-                  "scripts/lib/playwright-png.mjs",
+                  "scripts/lib/playwright-png.mjs", "scripts/invariants/screen-proof-final-paths.mjs",
                   # Six-hourly credentials/spend check (credentials_spend.py) reads the reviewed registry.
                   "scripts/credentials-spend-check.mjs", "scripts/lib/credentials-live-reads.mjs",
                   "scripts/lib/credentials-registry.mjs", "scripts/lib/linear-issue-intake.mjs",
@@ -869,9 +871,10 @@ def admission_order(issue: Issue, now: float) -> tuple:
     labels = {label.lower() for label in issue.labels}
     tier = (-1 if {SHARED_LABEL, "dispatch-next"} <= labels
             else 0 if effective_priority == 1 or workstreams.compounding(stream) else 1)
-    # Summer's signed portfolio rank is the first key, then explicit Urgent, tier, aged priority, age (JOV-7073).
+    # Summer's signed rank comes first, then Urgent, marketing, tier, aged priority, age (JOV-7073).
     return (*priority_admission.claim_key(issue.identifier, priority_admission.summer_ranks(now=now)),
-            0 if priority == 1 else 1, tier, effective_priority, workstreams.rank(stream),
+            0 if priority == 1 else 1, not priority_admission.marketing_priority(issue.labels),
+            tier, effective_priority, workstreams.rank(stream),
             created_at if created_at is not None else float("inf"))
 
 
@@ -3517,8 +3520,7 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear: Linear | 
             receipt.update(hold("remote-adapter-unavailable"))
     receipt.update(endedAt=now_iso(), result={"verdict": receipt.get("verdict"), "pr": receipt.get("pr"),
                    "prUrl": receipt.get("prUrl"), "commit": receipt.get("headSha")})
-    with (runs / "ledger.jsonl").open("a") as ledger:
-        ledger.write(json.dumps(receipt) + "\n")
+    append_json_object(runs / "ledger.jsonl", receipt)
     return receipt
 
 
@@ -3551,8 +3553,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     except RecoveryHandoff as error:
         receipt.update(verdict="recovery-handoff", reasons=[str(error)], recovery=error.evidence,
                        endedAt=now_iso(), result={"verdict": "recovery-handoff", "pr": None, "commit": None})
-        with open(runs / "ledger.jsonl", "a") as ledger:
-            ledger.write(json.dumps(receipt) + "\n")
+        append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
     policy = {"attempts": MAX_FAILURES, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FAILURES,
               "spend": MAX_FAILURES, "mutations": MAX_FAILURES,
@@ -3578,8 +3579,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
         verdict = receipt["verdict"]
         receipt.update(endedAt=now_iso(),
                        result={"verdict": verdict, "commit": None, "pr": None, "prUrl": None})
-        with open(runs / "ledger.jsonl", "a") as ledger:
-            ledger.write(json.dumps(receipt) + "\n")
+        append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
     receipt["offer"]["accepted"] = True
     with open(runs / f"{run_id}.log", "w") as log:
@@ -3714,8 +3714,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
          "costs": {"apiCalls": 1}, "mutationsPerformed": receipt.get("pr") and ["pull_request"] or [],
          "confidence": "high" if result == "succeeded" else "unknown", "dependencies": [name]},
         coordination=coordination)
-    with open(runs / "ledger.jsonl", "a") as ledger:
-        ledger.write(json.dumps(receipt) + "\n")
+    append_json_object(runs / "ledger.jsonl", receipt)
     return receipt
 
 
@@ -4603,10 +4602,13 @@ def record_held(host: Host, number: int, head: str, evidence: list[str]) -> None
     update_json(path, lambda held: held.update({str(number): pr_events.held_record(head, evidence)}))
 
 
-def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | None:
+def red_pr(prs: list[dict], attempts: dict, held: dict | None = None, capped=frozenset()) -> dict | None:
     """A lane PR that is stuck at a head we have not tried twice: checks settled red, or
-    merge conflicts with main (GitHub drops auto-merge on those, so nothing else frees them)."""
-    for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
+    merge conflicts with main (GitHub drops auto-merge on those, so nothing else frees them).
+    Oldest first, except PRs of a producer at its WIP cap go first: they block that producer's
+    intake (2026-11-08: codex sat at 8/8 with 6 DIRTY PRs queued behind ~120 older ones)."""
+    for pr in sorted(best_per_issue(prs), key=lambda item: (pr_wip.producer_of(item.get("headRefName")) not in capped,
+                                                           item["number"])):
         if pr.get("isInMergeQueue") is True:
             continue  # Native landing owns this head; cached absence still needs a fresh claim read.
         if (pr.get("headRefName") or "").startswith("dependabot/"):
@@ -5101,6 +5103,14 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
         if last.get("main") == main or publication_revocation(host, pr.get("headRefName")) \
                 or claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
             continue
+        # Comment transport is not a verified Dependabot source generation.
+        # Keep a same-head request pending across main changes, including legacy
+        # receipts that mistook successful comment posting for recreation.
+        if dependabot and last.get("head") == pr["headRefOid"] \
+                and last.get("action") == "dependabot-recreate" \
+                and (last.get("requested") or last.get("ok")):
+            continue
+        requested = False
         # A held PR (preservation hold, live repair) is not a revisit: it took one of the few
         # per-pass slots and was ledgered as revisit-failed without any GitHub call (~334/day).
         if not dependabot and pr.get("mergeStateStatus") != "DIRTY" and pr_events.maintenance_hold(
@@ -5110,7 +5120,9 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
             action = "dependabot-recreate"
             result = sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG,
                          "--body", "@dependabot recreate"])
-            ok = result.returncode == 0
+            requested = result.returncode == 0
+            # Only observed new source can release terminal-generation fences.
+            ok = False
         elif pr.get("mergeStateStatus") == "DIRTY":
             action = "partial-main-sync"
             ok = partial_main_sync(host, pr) is not None
@@ -5123,6 +5135,8 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
                 if label in present:
                     sh(["gh", "api", "-X", "DELETE", f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/{label}"])
         visit = {"at": now, "head": pr["headRefOid"], "main": main, "action": action, "ok": ok}
+        if dependabot:
+            visit["requested"] = requested
         update_json(path, lambda rows, key=str(pr["number"]), visit=visit: rows.update({key: visit}))
         pr_events.ledger(host, {"schema": "jovie-lane-run/v1", "kind": "terminal-revisit", "origin": AUTONOMOUS_ORIGIN,
                                 "attribution": {"category": "finalizer-only", "provider": "lane-event"},
@@ -7140,21 +7154,18 @@ def wire_ci_fast_fix(host: Host, pr: dict, route: dict, worktree: Path, log, rec
 def snap_spacing_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
     """The no-model fix for a grown spacing ratchet: snap added 10px/14px utilities onto the
     4px grid, commit and push. Returns a finished-agent stand-in, or None when nothing applies."""
-    diff = sh(["git", "diff", "-U0", "origin/main...HEAD", "--", "apps/web", "packages/ui"],
-              cwd=worktree, log=log, timeout=300)
-    if diff.returncode:
-        return None
-    changed = fix_red_classes.snap_added_conservative_spacing(worktree, diff.stdout or "")
-    if not changed:
-        return None
-    steps = [["git", "add", "--", *changed],
-             ["git", "commit", "-q", "-m", "fix(ui): snap added off-grid spacing onto the 4px scale"],
-             ["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"]]
-    for step in steps:
-        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
-            return None
-    receipt.update(resolution="snapped-spacing", snappedFiles=changed)
-    return types.SimpleNamespace(returncode=0)
+    return fix_red_rewrite.rewrite_commit_push(
+        sh, pr, worktree, log, receipt, ("apps/web", "packages/ui"), fix_red_classes.snap_added_conservative_spacing,
+        "fix(ui): snap added off-grid spacing onto the 4px scale", "snapped-spacing", "snappedFiles")
+
+
+def strip_cache_exports_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """The no-model fix for a grown Cache Components ratchet: delete added
+    dynamic/fetchCache/revalidate exports, commit and push. Never raise the ceiling."""
+    return fix_red_rewrite.rewrite_commit_push(
+        sh, pr, worktree, log, receipt, ("apps/web",), fix_red_classes.strip_added_legacy_cache_exports,
+        "fix(ci): drop added legacy cache segment exports", "stripped-cache-exports", "strippedFiles")
+
 
 
 def claim_route(host: Host, pr: dict, action: str) -> bool:
@@ -7643,12 +7654,12 @@ def preserved_run(host: Host, *, pr=None, issue=None):
     if len(matches) != 1 or path.resolve().parent != root.resolve():
         raise RecoveryHandoff("ambiguous-preserved-work", path)
     try:
-        rows = [json.loads(line) for line in (host.state / "runs/ledger.jsonl").read_text().splitlines()]
-        if any(not isinstance(row, dict) for row in rows):
-            raise ValueError("ledger-record-not-object")
-    except (OSError, ValueError):
+        rows, malformed = ledger_read.rows(host.state / "runs/ledger.jsonl")
+    except OSError:
         raise RecoveryHandoff("preserved-ledger-unreadable", path)
     prior = next((row for row in reversed(rows) if row.get("runId") == marker.get("runId")), None)
+    if prior is None and malformed:  # a torn line may hold this run's receipt: absence is unproven
+        raise RecoveryHandoff("preserved-ledger-unreadable", path)
     source_safe = marker.get("pr") is None and marker.get("issue") is None
     paths = receipt_worktree_paths(prior, path) if prior else ()
     bound_paths = paths if source_safe else paths[1:]
@@ -8012,8 +8023,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
         )
         if branch_held:
             end_local_fix_attempt(host, pr, receipt)
-        with open(runs / "ledger.jsonl", "a") as ledger:
-            ledger.write(json.dumps(receipt) + "\n")
+        append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
     pr = live
     infra = infra_only_red(host, pr) if branch_held else None
@@ -8021,8 +8031,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
         receipt.update(verdict="skipped", reasons=[f"infra-rerun:{infra}"], endedAt=now_iso(),
                        result={"verdict": "skipped", "commit": None, "pr": pr["number"]})
         end_local_fix_attempt(host, pr, receipt)
-        with open(runs / "ledger.jsonl", "a") as ledger:
-            ledger.write(json.dumps(receipt) + "\n")
+        append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
     route = route_fix_red(host, pr) if branch_held else None
     if route:
@@ -8035,8 +8044,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             receipt.update(verdict="skipped", reasons=[reason], endedAt=now_iso(),
                            result={"verdict": "skipped", "commit": None, "pr": pr["number"]})
             end_local_fix_attempt(host, pr, receipt)
-            with open(runs / "ledger.jsonl", "a") as ledger:
-                ledger.write(json.dumps(receipt) + "\n")
+            append_json_object(runs / "ledger.jsonl", receipt)
             return receipt
     failure = {"checks": [(check.get("name"), check.get("conclusion")) for check in pr.get("statusCheckRollup") or []],
                "merge": pr.get("mergeStateStatus"), "review": pr.get("reviewDecision")}
@@ -8071,8 +8079,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             receipt["preservedRecoveryObservations"] = preserved_observations
         if branch_held:
             end_local_fix_attempt(host, pr, receipt)
-        with open(runs / "ledger.jsonl", "a") as ledger:
-            ledger.write(json.dumps(receipt) + "\n")
+        append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
     if preserved_observations:
         receipt["preservedRecoveryObservations"] = preserved_observations
@@ -8085,7 +8092,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                            "mutations": max(MAX_FIX_ATTEMPTS * 2, len(conflict_resolvers()) + 1),
                                            "leaseSeconds": host.agent_timeout + 900, "version": "lanes-v1"},
                                           {"triggerId": run_id, "correlationId": f"pr-{pr['number']}",
-                                           "causationId": pr["headRefOid"]}, coordination=coordination)
+                                           "causationId": pr["headRefOid"]}, coordination=coordination,
+                                          min_reservation={"spend": 1, "mutations": 1})
     except Exception as error:
         # Same contract as run_issue (JOV-7191): a claim failure must leave a ledger
         # receipt instead of a worker exit the doctor can only see as spawn-exit.
@@ -8102,8 +8110,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             receipt["recovery"] = RecoveryHandoff(receipt["reasons"][0], preserved[0]).evidence
         receipt.update(endedAt=now_iso(),
                        result={"verdict": receipt["verdict"], "commit": None, "pr": pr["number"]})
-        with open(runs / "ledger.jsonl", "a") as ledger:
-            ledger.write(json.dumps(receipt) + "\n")
+        append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
     if preserved:
         worktree, prior = preserved
@@ -8193,6 +8200,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                          fix_red_classes.ATOMIC_WRITE: atomic_state_fix,
                          fix_red_classes.RENUMBER: renumber_migrations_fix,
                          fix_red_classes.SNAP_SPACING: snap_spacing_fix,
+                         fix_red_classes.STRIP_CACHE: strip_cache_exports_fix,
                          fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix,
                          fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix}.get((route or {}).get("action"))
                 agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
@@ -8310,8 +8318,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
          "confidence": "unknown" if target_unavailable else "high",
          "dependencies": [name, "github-target-state"] if target_unavailable else [name]}, coordination=coordination)
     opened.clear()
-    with open(runs / "ledger.jsonl", "a") as ledger:
-        ledger.write(json.dumps(receipt) + "\n")
+    append_json_object(runs / "ledger.jsonl", receipt)
     return receipt
 
 
@@ -8392,8 +8399,7 @@ def _adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim, *, sensitive: b
     receipt["endedAt"] = now_iso()
     receipt["result"] = {"verdict": receipt.get("verdict"), "commit": receipt.get("headSha"),
                          "pr": receipt.get("pr")}
-    with open(runs / "ledger.jsonl", "a") as ledger:
-        ledger.write(json.dumps(receipt) + "\n")
+    append_json_object(runs / "ledger.jsonl", receipt)
     return receipt
 
 
@@ -8767,22 +8773,22 @@ def pr_is_terminal(pr: dict) -> bool:
 
 
 def new_issue_budget(name: str, slots: int, inventory: list[dict] | None = None) -> dict:
-    """A lane's new-issue admission. Tim 2026-10-12: no PR-count ceilings (the JOV-6833
-    `slots x 2` active and JOV-7514 `slots x 4` terminal caps are gone); only real limits
-    (compute, credits, quotas) bound a lane, and those live in autoscale. Repair of existing
-    PRs never consulted this. `inventory` is reported for visibility only."""
+    """A lane's new-issue admission: its producer's WIP cap (pr-wip-policy.json, same rule as pr-open;
+    the retired JOV-6833/JOV-7514 slot caps stay gone). Repairs never consult it; unknown inventory admits."""
     if slots <= 0:
         return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": None, "terminal": 0, "terminalCap": None}
     dated = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
     own = [pr for pr in inventory or [] if dated.match(pr.get("headRefName") or "")]
-    return {"allowed": True, "reason": "within-budget",
+    wip = pr_wip.admit(inventory, name)
+    return {"allowed": wip["allowed"], "reason": "within-budget" if wip["allowed"] else "wip-cap",
             "used": None if inventory is None else sum(not is_green(pr) and not pr_is_terminal(pr) for pr in own),
-            "cap": None, "terminal": None if inventory is None else sum(pr_is_terminal(pr) for pr in own), "terminalCap": None}
+            "cap": None, "terminal": None if inventory is None else sum(pr_is_terminal(pr) for pr in own), "terminalCap": None, "wip": wip["used"], "wipCap": wip["cap"]}
 
 
 def read_new_issue_budget(name: str, slots: int) -> dict:
-    """No GitHub read: with no PR ceiling there is nothing to count before claiming."""
-    return {**new_issue_budget(name, slots), "observedAt": now_iso(), "error": None}
+    """The WIP count reads the shared open-PR summary (60 s cache); an unreadable one admits."""
+    inventory = pr_wip.safe_inventory(open_prs_summary) if slots > 0 else None
+    return {**new_issue_budget(name, slots, inventory), "observedAt": now_iso(), "error": None}
 
 
 def last_pushes() -> dict[int, float]:
@@ -9072,6 +9078,7 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     providers = load_providers()
     order, now = pr_events.cost_order(providers), time.time()
     disabled = set(providers) - set(order)
+    capped = pr_wip.capped_producers(prs)  # counted before any filter: every open PR holds a cap slot
     prs = [pr for pr in prs if not pr_recovery_held(host, pr, now) and not pr_breaker_open(host, pr["number"], now, pr.get("headRefOid"))
            and pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
     settled = []
@@ -9081,7 +9088,7 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
             note_owner_settle(host, pr, left, now)  # only a PR a repair would take is a deferral
             settled.append(pr["number"])
     prs = [pr for pr in prs if pr["number"] not in settled]
-    pr = red_pr(prs, attempts, held)
+    pr = red_pr(prs, attempts, held, capped)
     # A head another host is fixing is skipped (no attempt charged); the next red PR is ours.
     while pr:
         live = None if claimed_elsewhere(pr["number"], pr["headRefOid"], "fix") else \
@@ -9101,7 +9108,7 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
             held = {str(pr["number"]): entry}
             break
         prs = [other for other in prs if other["number"] != pr["number"]]
-        pr = red_pr(prs, attempts, held)
+        pr = red_pr(prs, attempts, held, capped)
     if pr:
         entry = held.get(str(pr["number"]), {})
         if entry.get("sha") == pr["headRefOid"]:
@@ -9154,7 +9161,7 @@ def finish_deferred_retry(host: Host, name: str, pr: dict, retry, context, *, sl
             issue, outcome = retry(live)
             if outcome and outcome.get("verdict") in ("landing", "verified-not-queued", "gate-timeout", "remote-repair-required"):
                 receipt = qualification_receipt(name, issue, outcome)
-                with (host.state / "runs/ledger.jsonl").open("a") as ledger: ledger.write(json.dumps(receipt) + "\n")
+                append_json_object(host.state / "runs/ledger.jsonl", receipt)
                 return receipt
         try:
             receipt = run_deferred_requeue(host, pr, invoke, slot=slot)
@@ -9566,14 +9573,14 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         record_idle_exit(host, name, "disk-unobservable")
         slot.release()
         return 1
-    # Extra repository bindings (LYB) share this seat. Jovie-only holds below never block them,
-    # and a binding fault never blocks the Jovie path. No configured binding = no reads at all.
+    # Extra repository bindings (LYB) share this seat, alternating with pending Jovie work (binding_turns).
+    pending, bound = jovie_repair_pending(host), None  # a binding fault never blocks the Jovie path
     try:
-        bound = bindings.work(THIS, host, name, spec, maintenance_only=maintenance_only,
-                              jovie_repair_pending=jovie_repair_pending(host))
+        if not binding_turns.yields(host.state, name, pending):
+            bound = bindings.work(THIS, host, name, spec, maintenance_only=maintenance_only, jovie_repair_pending=pending)
     except Exception as error:
-        bound = None
         print(f"binding pass failed: {type(error).__name__}: {error}"[:300], file=sys.stderr)
+    binding_turns.record(host.state, name, bound is not None)
     if bound is not None:
         slot.release()
         return 1 if bound == "disk-held" else reexec(host, name)
@@ -9655,15 +9662,15 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             if local and rung_inventory_valid else []
         # A fixed share of turns gates green drafts first: red repairs otherwise took 94-99% of
         # lane turns and green drafts waited hours for a gate (2026-10-21, Gem ledger).
-        if local and provider_may_run(name, "adopt") and adoption_turn_due(host):
+        if local and not issue_turns.due(host.state, name, skip=maintenance_only) and provider_may_run(name, "adopt") and adoption_turn_due(host):
             adopt = claim_adoptable_pr(host, name, prs, candidates)
-        red = None if adopt else local and (pr_events.claim_event_pr(host, THIS, name, events)
+        red = None if adopt or issue_turns.due(host.state, name, skip=maintenance_only) else local and (pr_events.claim_event_pr(host, THIS, name, events)
                          or claim_escalation_pr(host, name, list({pr["number"]: pr
                                                                for pr in candidates + rung_candidates}.values()),
                                                 routing_context=routing_context)
                          or claim_red_pr(host, name, candidates)) or None
         if adopt is None:
-            adopt = None if red or not local or not provider_may_run(name, "adopt") \
+            adopt = None if red or not local or issue_turns.due(host.state, name, skip=maintenance_only) or not provider_may_run(name, "adopt") \
                 else claim_adoptable_pr(host, name, prs, candidates)
         if local:
             selected = {red["number"]} if red else {adopt.pr["number"]} if adopt else set()
@@ -9759,7 +9766,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         issue = None
         rate_limited = red is None and adopt is None
     finally:
-        claim.release()
+        claim.release(); issue_turns.record(host.state, name, served_repair=bool(red or adopt), found_issue=issue is not None, skip=maintenance_only)
     if repair_inventory_held:
         held_summary = repair_inventory.get("summary") if isinstance(repair_inventory, dict) else None
         held_summary = held_summary if isinstance(held_summary, dict) else {}
@@ -10113,6 +10120,20 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
         except Exception as error:  # the sweep never takes dispatch down
             tick["worktreeSweep"] = f"{type(error).__name__}: {error}"[:200]
         if not tick["disk"].get("admitted"):
+            if not os.environ.get("LANES_SELFTEST"):
+                try:
+                    # Drain the Linear outbox even on a denied tick (JOV-10355, four recurrences):
+                    # the outbox is the doctor's own reporting channel — the writes that raise
+                    # and clear the disk condition travel through it — and starving it during a
+                    # disk emergency blinds the board exactly then. The flush is bounded
+                    # (FLUSH_LIMIT/FLUSH_BUDGET_S) and writes only small state JSONs on the
+                    # state root, never the worktree volume that is full; `admit` here is the
+                    # Linear client's rate budget, not disk admission.
+                    client = Linear(host.linear_env)
+                    tick["linearSync"] = {"outbox": linear_sync.flush(host.state, client, client.admit,
+                                                                     (LinearRateLimited,))}
+                except (Exception, SystemExit) as error:
+                    tick["linearSyncError"] = f"{type(error).__name__}: {error}"[:200]
             raise DiskAdmissionError(tick["disk"].get("reason", "disk-unobservable"))
         ensure_full_history(host)
         if not os.environ.get("LANES_SELFTEST"):
@@ -10166,6 +10187,23 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 tick["backlogDecompose"] = decompose_pass.maybe_spawn(host.state, [binding.key for binding in refill_for])
             except (Exception, SystemExit) as error:  # a refill fault never blocks dispatch
                 tick["backlogRefillError"] = f"{type(error).__name__}: {error}"[:200]
+        # A release self-test or local fixture never reads GitHub. fetch_labeled uses
+        # subprocess.run, and dispatch tests count that Popen as a worker spawn.
+        if (not os.environ.get("LANES_SELFTEST")
+                and os.environ.get("LANES_EXECUTION_BACKEND") != "local-test"
+                and escalation_reconcile.due(host.state)):
+            try:
+                labeled = escalation_reconcile.fetch_labeled()
+                if labeled is not None:
+                    receipt = escalation_reconcile.reconcile(
+                        host.state, labeled, load_providers(),
+                        update_attempts=lambda change: update_json(host.state / "fix-attempts.json", change),
+                        remove_label=escalation_reconcile.remove_label_via(),
+                        slots=lambda name, default: host.slots(name, default))
+                    escalation_reconcile.stamp(host.state, receipt)
+                    tick["escalationReconcile"] = {k: (len(v) if isinstance(v, list) else v) for k, v in receipt.items()}
+            except (Exception, SystemExit) as error:  # a stale-escalation pass never takes dispatch down
+                tick["escalationReconcileError"] = f"{type(error).__name__}: {error}"[:200]
         try:
             tick["linear"] = linear_sync.status(host.state)
         except Exception as error:

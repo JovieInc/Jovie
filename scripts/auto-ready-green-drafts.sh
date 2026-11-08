@@ -53,7 +53,7 @@ read_state() {  # read_state <num>
   local name="${REPO#*/}"
   [[ -n "$owner" && -n "$name" && "$owner" != "$name" ]]
   gh_retry api graphql \
-    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){isDraft headRefOid headRefName baseRefName body title author{login} state mergeable mergeStateStatus labels(first:100){nodes{name}} timelineItems(last:50,itemTypes:[CONVERT_TO_DRAFT_EVENT,PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT]){nodes{__typename ... on ConvertToDraftEvent{createdAt} ... on PullRequestCommit{commit{committedDate}} ... on HeadRefForcePushedEvent{createdAt}}}}}}' \
+    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){isDraft headRefOid headRefName baseRefName body title author{__typename login} state mergeable mergeStateStatus labels(first:100){nodes{name}} timelineItems(last:50,itemTypes:[CONVERT_TO_DRAFT_EVENT,PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT]){nodes{__typename ... on ConvertToDraftEvent{createdAt} ... on PullRequestCommit{commit{committedDate}} ... on HeadRefForcePushedEvent{createdAt}}}}}}' \
     -f owner="$owner" \
     -f name="$name" \
     -F number="$n" \
@@ -63,7 +63,13 @@ read_state() {  # read_state <num>
       branch: .headRefName,
       base: .baseRefName,
       body: (.body // ""),
-      authorLogin: .author.login,
+      # GraphQL Bot.login omits the REST suffix; User identities stay literal.
+      authorLogin: (
+        .author as $author
+        | if $author.__typename == "Bot" and ($author.login | type) == "string"
+          then ($author.login | if (test("\\S") | not) or (ascii_downcase | endswith("[bot]")) then . else . + "[bot]" end)
+          else $author.login end
+      ),
       title: (.title // ""),
       labels: [.labels.nodes[].name],
       state: .state,
@@ -230,7 +236,7 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
   state_after="$(jq -r '.state // "UNKNOWN"' <<<"$after")"
   merge_after="$(jq -r '.mergeStateStatus // "UNKNOWN"' <<<"$after")"
   held_after="$(jq -r --arg hold_re "$HOLD_LABEL_RE" '[.labels[] | select(test($hold_re))] | join(",")' <<<"$after")"
-  proof_after="$(jq --argjson prNumber "$n" '. + {headSha: .head, prNumber: $prNumber}' <<<"$after" | node "$SCRIPT_DIR/lib/auto-ready-provenance.mjs" classify)"
+  proof_after="$(jq --argjson prNumber "$n" '. + {headSha: .head, prNumber: $prNumber, greenSource: true}' <<<"$after" | node "$SCRIPT_DIR/lib/auto-ready-provenance.mjs" classify)"
 
   if [[ "$state_after" != "OPEN" ]]; then
     upsert_status_comment "$n" "🤖 Auto-ready green-source: the exact head reached terminal state=${state_after} during verification. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"

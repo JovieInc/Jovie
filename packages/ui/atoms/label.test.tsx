@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { Label } from './label';
 
@@ -160,5 +161,29 @@ describe('Label', () => {
       expect(label).toHaveAttribute('id', 'custom-id');
       expect(label).toHaveAttribute('data-custom', 'value');
     });
+  });
+});
+
+describe('Label certificate evidence', () => {
+  it('has no axe violations when labelling default, required, error, and disabled controls', async () => {
+    const { container } = render(
+      <div>
+        <Label htmlFor='l-a11y-name'>Display name</Label>
+        <input id='l-a11y-name' />
+        <Label htmlFor='l-a11y-email' required>
+          Email
+        </Label>
+        <input id='l-a11y-email' type='email' required />
+        <Label htmlFor='l-a11y-error' variant='error'>
+          Payout email
+        </Label>
+        <input id='l-a11y-error' aria-invalid='true' />
+        <Label htmlFor='l-a11y-disabled' disabled>
+          Managed identity
+        </Label>
+        <input id='l-a11y-disabled' disabled />
+      </div>
+    );
+    await expectNoA11yViolations(container);
   });
 });

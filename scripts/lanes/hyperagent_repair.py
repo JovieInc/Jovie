@@ -45,7 +45,7 @@ from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import hyperagent_lane  # noqa: E402
-from atomic_state import atomic_write_text  # noqa: E402
+from atomic_state import append_json_object, atomic_write_text  # noqa: E402
 import pr_events  # noqa: E402
 
 REPO = "JovieInc/Jovie"
@@ -511,8 +511,7 @@ def repair(deps: Deps, only: int | None = None) -> dict:
         stamps["endedAt"] = now_iso(deps.clock())
         receipt["durationS"] = round(deps.clock() - started, 1)
         receipt.setdefault("success", False)
-        with (deps.runs / "ledger.jsonl").open("a") as ledger:
-            ledger.write(json.dumps(receipt) + "\n")
+        append_json_object(deps.runs / "ledger.jsonl", receipt)
         if pushed:
             deps.gh(["pr", "comment", str(number), "--repo", REPO, "--body",
                      f"🤖 hyperagent repair verdict={receipt['verdict']} kind={kind} run={run_id} "

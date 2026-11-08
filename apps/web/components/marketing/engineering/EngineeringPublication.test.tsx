@@ -41,13 +41,14 @@ describe('EngineeringPublication', () => {
     expect(screen.getByText(/only ever lists finished work/)).toBeVisible();
   });
 
-  it('renders the unique docked hero photo on the public index only', () => {
+  it('keeps the public index and preview matte without hero wallpaper', () => {
     const view = render(<EngineeringIndex stories={[]} />);
-    const heroPhoto = screen.getByTestId('engineering-hero-photo');
-    expect(heroPhoto).toBeInTheDocument();
-    expect(heroPhoto.querySelector('img')?.getAttribute('src')).toContain(
-      'engineering-index.webp'
-    );
+    expect(
+      screen.queryByTestId('engineering-hero-photo')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Engineering' })
+    ).toBeVisible();
     view.unmount();
 
     // The founder-only preview gallery stays text-only.

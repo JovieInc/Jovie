@@ -35,6 +35,9 @@ describe('DrawerEditableTextField', () => {
     // label-content-name-mismatch on the /product/isrc marketing capture.
     expect(trigger).not.toHaveAttribute('aria-label');
     expect(trigger).toHaveTextContent('QMT671400005');
+    // The sr-only prefix comes first so the accessible name still contains
+    // the visible value (WCAG 2.5.3 label-in-name).
+    expect(trigger).toHaveAccessibleName(/^Edit ISRC:/);
     fireEvent.click(trigger);
 
     const input = screen.getByLabelText('Edit ISRC');

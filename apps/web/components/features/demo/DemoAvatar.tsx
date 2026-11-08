@@ -1,3 +1,4 @@
+import { getContrastTextOnBrand } from '@/lib/utils/color';
 import type { DemoAssignee } from './demo-types';
 
 export function DemoAvatar({
@@ -9,11 +10,12 @@ export function DemoAvatar({
 }) {
   return (
     <div
-      className='inline-flex shrink-0 items-center justify-center rounded-full text-3xs font-medium text-white dark:text-white'
+      className='inline-flex shrink-0 items-center justify-center rounded-full text-3xs font-medium'
       style={{
         width: size,
         height: size,
         backgroundColor: assignee.color,
+        color: getContrastTextOnBrand(assignee.color),
       }}
       title={assignee.name}
     >
