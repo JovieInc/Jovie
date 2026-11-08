@@ -495,7 +495,12 @@ export function DashboardNav({
         ) : (
           <SidebarGroup className='p-0'>
             {newChatOwnsRow ? (
-              <div data-nav-section='create'>
+              <div
+                data-nav-section='create'
+                // The create row has free space above and below, so it gets
+                // the full 44px touch target the "+" used to carry.
+                className='[&_a]:after:-inset-y-2'
+              >
                 {renderSection([newChatRowItem])}
               </div>
             ) : (
