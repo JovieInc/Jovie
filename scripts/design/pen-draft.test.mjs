@@ -14,6 +14,7 @@ import {
   planFrames,
   spliceDraft,
   trimCanonical,
+  useTrimmedInput,
   writeCanonical,
 } from './pen-draft.mjs';
 
@@ -259,4 +260,17 @@ test('a drafted frame lands in the whole file, clear of every existing frame', (
   assert.equal(out.children[2].x, 1200, 'placed 400 right of the last frame');
   assert.deepEqual(out.children.slice(0, 2), full.children);
   assert.deepEqual(out.variables, { a: 1, b: 3 }, 'existing values win');
+});
+
+test('the whole canonical file is the input unless the cut-down copy is asked for', () => {
+  assert.equal(useTrimmedInput({}), false);
+  assert.equal(useTrimmedInput({ PEN_DRAFT_TRIM: '0' }), false);
+  assert.equal(useTrimmedInput({ PEN_DRAFT_TRIM: '1' }), true);
+  const brief = { frame: 'claim', route: '/x', prompt: 'P' };
+  const prompt = opts => {
+    const args = penArgs(brief, { input: 'c.pen', outDir: 'o', ...opts });
+    return args[args.indexOf('--prompt') + 1];
+  };
+  assert.doesNotMatch(prompt({}), /not every screen/);
+  assert.match(prompt({ trim: true }), /not every screen/);
 });
