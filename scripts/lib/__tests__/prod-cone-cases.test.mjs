@@ -12,6 +12,7 @@ import {
 import {
   jankChecks,
   paidEntries,
+  penDesignChecks,
   STRANGER_USER_AGENT,
   strangerChecks,
 } from '../prod-cert-truth.mjs';
@@ -374,5 +375,55 @@ describe('truthful certification: a stranger, no token, no canary', () => {
       ['jank.worst-frame-ms', 'passed'],
     ]);
     expect(jankChecks([])).toEqual([]);
+  });
+});
+
+describe('design first: every Golden Path screen needs a Pen frame', () => {
+  const frame = (sectionId, penNodeId) => ({
+    sectionId,
+    penNodeId,
+    stillPath: `${sectionId}.png`,
+    viewport: 1440,
+    mode: 'dark',
+    status: 'active',
+  });
+  const manifest = {
+    frames: [
+      frame('signup-signin/signin', 'oaz9c'),
+      frame('signup-signin/request-access', 'pending-no-design'),
+      frame('checkout/pricing', 'hLRZB'),
+    ],
+  };
+  const run = (surface, extra = {}) =>
+    penDesignChecks(surface, { manifest, exists: () => true, ...extra }).map(
+      c => [c.id, c.status, c.summary]
+    );
+
+  it('fails a surface with an undesigned screen or none listed', () => {
+    expect(run('signup-signin')[0]).toEqual([
+      'pen.design-exists',
+      'failed',
+      'no Pen design yet: request-access',
+    ]);
+    expect(run('claim')[0].slice(0, 2)).toEqual([
+      'pen.design-exists',
+      'failed',
+    ]);
+  });
+
+  it('fails an unexported frame, then follows the production comparison', () => {
+    expect(run('checkout', { exists: () => false })[1].slice(0, 2)).toEqual([
+      'pen.still-exported',
+      'failed',
+    ]);
+    expect(run('checkout')[1].slice(0, 2)).toEqual([
+      'pen.matches-production',
+      'blocked',
+    ]);
+    const receipt = verdict => ({
+      frames: [{ ...frame('checkout/pricing', 'hLRZB'), verdict }],
+    });
+    expect(run('checkout', { receipt: receipt('pass') })[1][1]).toBe('passed');
+    expect(run('checkout', { receipt: receipt('fail') })[1][1]).toBe('failed');
   });
 });

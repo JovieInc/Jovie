@@ -1,0 +1,111 @@
+{
+  "schema": "pen-still-manifest/v1",
+  "surface": "golden-path",
+  "primaryMode": "dark",
+  "penFile": {
+    "name": "Jovie Design Studio — canonical.lib.pen",
+    "sha256": null,
+    "note": "Design first (Tim, 2026-11-08): every Golden Path screen needs a Pen frame before it can certify. penNodeId 'pending-no-design' means no Pen frame exists yet. Node ids come from scripts/pen-review/export-refs.mjs CANONICAL_SURFACES (PR #24239) and the approved Homepage canonical v1 (UfvR8); scripts/agent/pen-golden-path-export.mjs fails loudly on an id the file does not have. Stills are written by that exporter on the Pen machine, never by hand."
+  },
+  "frames": [
+    {
+      "sectionId": "landing/homepage",
+      "penNodeId": "UfvR8",
+      "fileHash": null,
+      "stillPath": "docs/pen-stills/golden-path/landing.homepage.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "status": "active",
+      "route": "/"
+    },
+    {
+      "sectionId": "signup-signin/signin",
+      "penNodeId": "oaz9c",
+      "fileHash": null,
+      "stillPath": "docs/pen-stills/golden-path/signup-signin.signin.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "status": "active",
+      "route": "/signin"
+    },
+    {
+      "sectionId": "signup-signin/request-access",
+      "penNodeId": "pending-no-design",
+      "fileHash": null,
+      "stillPath": "docs/pen-stills/golden-path/signup-signin.request-access.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "status": "active",
+      "route": "/waitlist"
+    },
+    {
+      "sectionId": "claim/claim",
+      "penNodeId": "pending-no-design",
+      "fileHash": null,
+      "stillPath": "docs/pen-stills/golden-path/claim.claim.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "status": "active",
+      "route": "/claim"
+    },
+    {
+      "sectionId": "onboarding/start",
+      "penNodeId": "hGHPE",
+      "fileHash": null,
+      "stillPath": "docs/pen-stills/golden-path/onboarding.start.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "status": "active",
+      "route": "/start"
+    },
+    {
+      "sectionId": "chat/app-chat",
+      "penNodeId": "hkkdJ",
+      "fileHash": null,
+      "stillPath": "docs/pen-stills/golden-path/chat.app-chat.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "status": "active",
+      "route": "/app/chat"
+    },
+    {
+      "sectionId": "public-profile/profile",
+      "penNodeId": "D9kdx",
+      "fileHash": null,
+      "stillPath": "docs/pen-stills/golden-path/public-profile.profile.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "status": "active",
+      "route": "/tim"
+    },
+    {
+      "sectionId": "smartlink/release",
+      "penNodeId": "SVPSC",
+      "fileHash": null,
+      "stillPath": "docs/pen-stills/golden-path/smartlink.release.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "status": "active"
+    },
+    {
+      "sectionId": "checkout/pricing",
+      "penNodeId": "hLRZB",
+      "fileHash": null,
+      "stillPath": "docs/pen-stills/golden-path/checkout.pricing.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "status": "active",
+      "route": "/pricing"
+    },
+    {
+      "sectionId": "checkout/billing-success",
+      "penNodeId": "pending-no-design",
+      "fileHash": null,
+      "stillPath": "docs/pen-stills/golden-path/checkout.billing-success.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "status": "active",
+      "route": "/billing/success"
+    }
+  ]
+}

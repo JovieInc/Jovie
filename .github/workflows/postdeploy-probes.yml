@@ -706,7 +706,7 @@ jobs:
     needs: [resolve-target, auth-smoke]
     if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
@@ -731,8 +731,20 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: node .github/scripts/resolve-synthetic-secrets.mjs --name CRON_SECRET
 
+      # Design first (Tim, 2026-11-08): export every Golden Path Pen frame with
+      # the headless Pen CLI and diff it against production. Without
+      # PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL it exports nothing, and the
+      # certification below reports those frames as not exported.
+      - name: Export Golden Path Pen frames and compare with production
+        continue-on-error: true
+        env:
+          PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
+          PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
+        run: node scripts/invariants/pen-golden-path.mjs --out "${RUNNER_TEMP}/pen-golden-path" --base-url https://jov.ie
+
       - name: Certify the golden path on production
         env:
+          PROD_CERT_PEN_DIFF_RECEIPT: ${{ runner.temp }}/pen-golden-path/receipt.json
           AUTH_SMOKE_STATUS: ${{ needs.auth-smoke.outputs.auth_smoke_status || (needs.auth-smoke.result == 'success' && 'passed') || 'failed' }}
           EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}

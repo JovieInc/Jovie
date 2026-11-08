@@ -13,6 +13,10 @@
  * a surface that jumps or freezes is not certified either.
  */
 
+import { existsSync, readFileSync } from 'node:fs';
+import { isAbsolute, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 /** A real desktop browser, no `+synthetic` marker: what a stranger sends. */
 export const STRANGER_USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -156,4 +160,116 @@ export function jankChecks(observations = [], at = new Date().toISOString()) {
       summary: `${what} ${shown} (limit ${max})`,
     };
   });
+}
+
+/** Golden Path Pen frames (Tim, 2026-11-08: every screen has a Pen design first). */
+export const GOLDEN_PATH_PEN_MANIFEST =
+  'docs/pen-stills/golden-path/manifest.json';
+const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url));
+const fromRepo = path => (isAbsolute(path) ? path : join(REPO_ROOT, path));
+
+function readJson(path) {
+  try {
+    return path ? JSON.parse(readFileSync(fromRepo(path), 'utf8')) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Design-first checks for one surface. A screen with no Pen frame fails, and
+ * so does a frame whose still was never exported. With every still exported,
+ * `pen.matches-production` follows the pen-still-diff receipt for those
+ * frames (scripts/invariants/pen-still-diff.mjs): pass passes, fail fails,
+ * anything else is blocked, so a design alone never certifies a surface.
+ * PROD_CERT_PEN_MANIFEST and PROD_CERT_PEN_DIFF_RECEIPT override the paths.
+ * @param {string} surface
+ * @param {{ manifest?: any, receipt?: any, exists?: (path: string) => boolean, at?: string, env?: Record<string, string | undefined> }} [deps]
+ */
+export function penDesignChecks(surface, deps = {}) {
+  const env = deps.env ?? process.env;
+  const at = deps.at ?? new Date().toISOString();
+  const exists = deps.exists ?? (path => existsSync(fromRepo(path)));
+  const manifest = deps.manifest ??
+    readJson(env.PROD_CERT_PEN_MANIFEST || GOLDEN_PATH_PEN_MANIFEST) ?? {
+      frames: [],
+    };
+  const receipt = deps.receipt ?? readJson(env.PROD_CERT_PEN_DIFF_RECEIPT);
+  const check = (id, status, summary) => ({
+    id,
+    status,
+    startedAt: at,
+    endedAt: at,
+    summary,
+  });
+  const frames = (manifest.frames ?? []).filter(
+    f => f.status === 'active' && String(f.sectionId).startsWith(`${surface}/`)
+  );
+  if (frames.length === 0) {
+    return [
+      check(
+        'pen.design-exists',
+        'failed',
+        `no Pen frame is listed for ${surface}`
+      ),
+    ];
+  }
+  const screen = f =>
+    `${f.sectionId.split('/')[1]}${f.route ? ` (${f.route})` : ''}`;
+  const undesigned = frames.filter(f =>
+    String(f.penNodeId).startsWith('pending')
+  );
+  const designed = frames.filter(f => !undesigned.includes(f));
+  const unexported = designed.filter(f => !exists(f.stillPath));
+  const checks = [
+    check(
+      'pen.design-exists',
+      undesigned.length ? 'failed' : 'passed',
+      undesigned.length
+        ? `no Pen design yet: ${undesigned.map(screen).join(', ')}`
+        : `Pen frames ${frames.map(f => f.penNodeId).join(', ')}`
+    ),
+  ];
+  if (unexported.length) {
+    const list = unexported.map(f => `${screen(f)} ${f.penNodeId}`);
+    checks.push(
+      check(
+        'pen.still-exported',
+        'failed',
+        `Pen frame not exported: ${list.join(', ')}`
+      )
+    );
+    return checks;
+  }
+  if (undesigned.length) return checks;
+  const verdicts = designed.map(f => {
+    const row = (receipt?.frames ?? []).find(
+      r =>
+        r.sectionId === f.sectionId &&
+        r.mode === f.mode &&
+        r.viewport === f.viewport
+    );
+    return { f, verdict: row?.verdict ?? 'missing', reason: row?.reason };
+  });
+  const failed = verdicts.filter(v => v.verdict === 'fail');
+  const pending = verdicts.filter(
+    v => v.verdict !== 'pass' && v.verdict !== 'fail'
+  );
+  checks.push(
+    check(
+      'pen.matches-production',
+      failed.length ? 'failed' : pending.length ? 'blocked' : 'passed',
+      failed.length
+        ? `production differs from Pen: ${failed.map(v => `${screen(v.f)}${v.reason ? ` ${v.reason}` : ''}`).join(', ')}`
+        : pending.length
+          ? `no Pen comparison yet for ${pending.map(v => screen(v.f)).join(', ')}`
+          : `production matches Pen for ${designed.map(screen).join(', ')}`
+    )
+  );
+  return checks;
+}
+
+/** Jank and design-first checks for one surface's browser run. */
+export function truthChecks(surface, observations) {
+  return [...jankChecks(observations), ...penDesignChecks(surface)];
 }

@@ -20,7 +20,7 @@ import {
   expectOk,
   get,
 } from './prod-cert-probes.mjs';
-import { jankChecks, strangerChecks } from './prod-cert-truth.mjs';
+import { strangerChecks, truthChecks } from './prod-cert-truth.mjs';
 
 export const RECEIPT_SCHEMA = 'jovie.prod-golden-path-receipt/v1';
 
@@ -462,7 +462,7 @@ export async function runProductionCertification({
       const present = stepState.bySurface[surface] ?? [];
       checks.push(
         ...present,
-        ...jankChecks(stepState.observationsBySurface[surface]),
+        ...truthChecks(surface, stepState.observationsBySurface[surface]),
         ...missingBrowserChecks({ surface, present, authStatus, now })
       );
     }

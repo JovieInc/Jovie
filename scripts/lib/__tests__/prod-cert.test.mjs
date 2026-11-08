@@ -14,6 +14,7 @@ import {
   SURFACE_IDS,
   statusFromChecks,
 } from '../prod-cert.mjs';
+import { PEN_IDS } from './fixtures/pen-green-env.mjs';
 
 const SHA = 'a'.repeat(40);
 const T = '2026-10-28T20:00:00.000Z';
@@ -131,6 +132,7 @@ describe('runProductionCertification', () => {
     ).toEqual([
       'release-link-resolves',
       'release-og-image',
+      ...PEN_IDS,
       'click-analytics-capture',
     ]);
   });
@@ -237,7 +239,6 @@ describe('fileSurfaceIssues', () => {
     });
     await fileSurfaceIssues(receipts, { deps: { upsert, close } });
     const fp = calls => calls.map(c => c[0].fingerprint).join();
-    // The paid CTA (/claim?plan=pro) 500s too, so checkout fails with claim.
     expect(fp(upsert.mock.calls)).toBe('prod-cert-claim,prod-cert-checkout');
     expect(upsert.mock.calls[0][0].labelKey).toBe('prod-cert-claim');
     expect(fp(close.mock.calls)).toBe('prod-cert-landing');
