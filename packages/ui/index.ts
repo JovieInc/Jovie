@@ -5,6 +5,11 @@ export {
   OverflowMenuTrigger,
   type OverflowMenuTriggerProps,
 } from './atoms/overflow-menu-trigger';
+// Title Menu Trigger
+export {
+  TitleMenuTrigger,
+  type TitleMenuTriggerProps,
+} from './atoms/title-menu-trigger';
 export type {
   TabOverflowOption,
   UseTabOverflowOptions,

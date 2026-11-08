@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { run as axeRun } from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatConversation } from '@/lib/queries/useChatConversationsQuery';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ChatHistorySwitcher } from './ChatHistorySwitcher';
 
 const push = vi.fn();
@@ -283,6 +284,16 @@ describe('ChatHistorySwitcher', () => {
     const trigger = screen.getByTestId('chat-history-trigger');
     expect(trigger.className).not.toMatch(/(^|\s)-m[xl]-/);
     expect(trigger.className).toContain('focus-visible:ring-inset');
+  });
+
+  it('has no axe violations closed, as a chat title or a new chat', async () => {
+    const { container } = render(
+      <div>
+        <ChatHistorySwitcher title='Tour Budget' activeConversationId='c2' />
+        <ChatHistorySwitcher title={null} activeConversationId={null} />
+      </div>
+    );
+    await expectNoA11yViolations(container);
   });
 
   it('has no axe violations open (besides the tracked in-menu search gap)', async () => {

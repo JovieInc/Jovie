@@ -4,8 +4,8 @@ import {
   CommonDropdown,
   type CommonDropdownItem,
   type CommonDropdownProps,
+  TitleMenuTrigger,
 } from '@jovie/ui';
-import { ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -13,7 +13,6 @@ import {
   writeThreadReadState,
 } from '@/components/shell/SidebarThreadsSection';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
-import { cn } from '@/lib/utils';
 import {
   buildChatHistoryRows,
   CHAT_HISTORY_ERROR,
@@ -31,16 +30,6 @@ export interface ChatHistorySwitcherProps {
   /** Current conversation id, used to mark its row selected. */
   readonly activeConversationId: string | null;
 }
-
-// The header title truncates (overflow hidden), so the pill stays inside its
-// box and the focus ring is drawn inset rather than outside the edges.
-const TRIGGER_CLASS = cn(
-  'inline-flex h-7 min-w-0 max-w-full items-center gap-1 rounded-lg px-1.5',
-  'text-primary-token',
-  'transition-colors duration-subtle ease-subtle',
-  'hover:bg-surface-1 aria-expanded:bg-surface-1',
-  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus/35'
-);
 
 const MAX_LIST_HEIGHT = 'min(30rem, calc(100dvh - 6rem))';
 
@@ -188,20 +177,15 @@ export function ChatHistorySwitcher({
       motion='anchored'
       maxHeight={MAX_LIST_HEIGHT}
       trigger={
-        <button
-          type='button'
-          className={TRIGGER_CLASS}
+        // The header title truncates (overflow hidden), so the atom keeps
+        // the pill inside its box and draws the focus ring inset.
+        <TitleMenuTrigger
+          label={label}
           data-testid='chat-history-trigger'
           title={label}
           onPointerEnter={markIntent}
           onFocus={markIntent}
-        >
-          <span className='min-w-0 truncate'>{label}</span>
-          <ChevronDown
-            aria-hidden='true'
-            className='size-3.5 shrink-0 text-tertiary-token'
-          />
-        </button>
+        />
       }
     />
   );

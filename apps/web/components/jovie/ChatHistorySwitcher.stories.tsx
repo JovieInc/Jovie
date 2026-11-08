@@ -35,12 +35,16 @@ const HISTORY: ChatConversation[] = [
   chat('budget', 'Studio Budget', 9000),
 ];
 
-function withHistory(history: ChatConversation[]): Decorator {
-  return function WithHistory(Story) {
+type SeedCache = (client: QueryClient) => void;
+
+function withClient(seed: SeedCache): Decorator {
+  return function WithClient(Story) {
     const client = new QueryClient({
-      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+      defaultOptions: {
+        queries: { retry: false, retryOnMount: false, staleTime: Infinity },
+      },
     });
-    client.setQueryData(queryKeys.chat.conversations(), history);
+    seed(client);
     return (
       <QueryClientProvider client={client}>
         <div className='min-h-120 bg-base p-4'>
@@ -49,6 +53,19 @@ function withHistory(history: ChatConversation[]): Decorator {
       </QueryClientProvider>
     );
   };
+}
+
+function withHistory(history: ChatConversation[]): Decorator {
+  return withClient(client =>
+    client.setQueryData(queryKeys.chat.conversations(), history)
+  );
+}
+
+async function openMenu(canvasElement: HTMLElement) {
+  await userEvent.click(
+    within(canvasElement).getByTestId('chat-history-trigger')
+  );
+  return within(document.body).findByRole('menu');
 }
 
 const meta = {
@@ -71,10 +88,7 @@ export const NewChat: Story = {
 /** Open on a long list: pinned search, the current chat selected, bottom fade. */
 export const Open: Story = {
   play: async ({ canvasElement }) => {
-    await userEvent.click(
-      within(canvasElement).getByTestId('chat-history-trigger')
-    );
-    const menu = await within(document.body).findByRole('menu');
+    const menu = await openMenu(canvasElement);
     await expect(
       within(menu).getByPlaceholderText('Chat History')
     ).toBeInTheDocument();
@@ -83,10 +97,7 @@ export const Open: Story = {
 
 export const NoMatches: Story = {
   play: async ({ canvasElement }) => {
-    await userEvent.click(
-      within(canvasElement).getByTestId('chat-history-trigger')
-    );
-    const menu = await within(document.body).findByRole('menu');
+    const menu = await openMenu(canvasElement);
     await userEvent.type(
       within(menu).getByPlaceholderText('Chat History'),
       'zzz'
@@ -95,14 +106,98 @@ export const NoMatches: Story = {
   },
 };
 
-export const NoHistory: Story = {
+export const EmptyHistory: Story = {
   args: { title: null, activeConversationId: null },
   decorators: [withHistory([])],
   play: async ({ canvasElement }) => {
-    await userEvent.click(
-      within(canvasElement).getByTestId('chat-history-trigger')
-    );
-    const menu = await within(document.body).findByRole('menu');
+    const menu = await openMenu(canvasElement);
     await expect(menu).toHaveTextContent('No Chats Yet');
+  },
+};
+
+/** First open with nothing cached: the list request is still in flight. */
+export const LoadingHistory: Story = {
+  decorators: [withClient(() => undefined)],
+  beforeEach: () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = () => new Promise<Response>(() => undefined);
+    return () => {
+      globalThis.fetch = realFetch;
+    };
+  },
+  play: async ({ canvasElement }) => {
+    await openMenu(canvasElement);
+  },
+};
+
+/** The list failed to load (offline lands here too): message plus Retry. */
+export const ErrorLoadingHistory: Story = {
+  decorators: [
+    withClient(client => {
+      client
+        .getQueryCache()
+        .build(client, { queryKey: queryKeys.chat.conversations() })
+        .setState({
+          status: 'error',
+          fetchStatus: 'idle',
+          error: new Error('offline'),
+          errorUpdatedAt: Date.now(),
+        });
+    }),
+  ],
+  play: async ({ canvasElement }) => {
+    const menu = await openMenu(canvasElement);
+    await expect(menu).toHaveTextContent("Couldn't Load Chats");
+    await expect(
+      within(menu).getByRole('menuitem', { name: 'Retry' })
+    ).toBeInTheDocument();
+  },
+};
+
+/** A long title truncates inside a narrow header; long rows truncate too. */
+export const LongContent: Story = {
+  args: {
+    title:
+      'Setlist, Merch And Travel Budget For The Brooklyn, Philly And Boston Run',
+  },
+  decorators: [
+    withHistory([
+      chat(
+        'long',
+        'Setlist, Merch And Travel Budget For The Brooklyn, Philly And Boston Run',
+        0.2
+      ),
+      ...HISTORY,
+    ]),
+    Story => (
+      <div className='w-64'>
+        <Story />
+      </div>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    await openMenu(canvasElement);
+  },
+};
+
+export const RtlOverflow: Story = {
+  args: {
+    title: 'خطة إصدار الربيع وميزانية الجولة الطويلة جدا',
+    activeConversationId: 'ar1',
+  },
+  decorators: [
+    withHistory([
+      chat('ar1', 'خطة إصدار الربيع وميزانية الجولة الطويلة جدا', 0.1),
+      chat('ar2', 'أفكار إطلاق البضائع', 30),
+      chat('ar3', 'قائمة الأغاني لعرض بروكلين', 200),
+    ]),
+    Story => (
+      <div dir='rtl' lang='ar' className='w-64'>
+        <Story />
+      </div>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    await openMenu(canvasElement);
   },
 };

@@ -236,6 +236,12 @@
     },
     "apps/web/components/shell/Tooltip.tsx": {
       "empty": "The shell Tooltip wraps exactly one trigger with a required label and takes no collection; the detector matched the word rows in comments about sidebar nav rows."
+    },
+    "apps/web/components/jovie/ChatHistorySwitcher.tsx": {
+      "offline": "ChatHistorySwitcher only reads the chat list through useChatConversationsQuery and never submits; lost connectivity reaches it as the failed load, which the ErrorLoadingHistory story shows with its Retry row."
+    },
+    "packages/ui/atoms/title-menu-trigger.tsx": {
+      "empty": "TitleMenuTrigger renders one title slot and a fixed chevron and takes no collection; the detector matched the items-center utility class. A blank title is the caller's to replace (ChatHistorySwitcher shows New Chat)."
     }
   }
 }
