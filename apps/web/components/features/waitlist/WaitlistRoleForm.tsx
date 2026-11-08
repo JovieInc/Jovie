@@ -5,6 +5,7 @@ import { Input } from '@jovie/ui/atoms/input';
 import { RadioGroup, RadioGroupItem } from '@jovie/ui/atoms/radio-group';
 import {
   type FormEvent,
+  Fragment,
   useCallback,
   useEffect,
   useId,
@@ -38,6 +39,23 @@ const TURNSTILE_FAILURE_STATUSES = new Set([
 export const WAITLIST_ROLE_FORM_ENDPOINT = '/api/waitlist/join';
 
 /**
+ * Chip presentation (homepage v1): the design names Producer and Songwriter
+ * separately; the stored role is still the one `producer_songwriter` value.
+ */
+const ROLE_CHIPS: ReadonlyArray<{
+  readonly key: string;
+  readonly label: string;
+  readonly role: WaitlistRole;
+}> = [
+  { key: 'artist', label: 'Artist', role: 'artist' },
+  { key: 'manager', label: 'Manager', role: 'manager' },
+  { key: 'label', label: 'Label', role: 'label' },
+  { key: 'producer', label: 'Producer', role: 'producer_songwriter' },
+  { key: 'songwriter', label: 'Songwriter', role: 'producer_songwriter' },
+  { key: 'other', label: 'Other', role: 'other' },
+];
+
+/**
  * Closed-signup waitlist form (canon/PRODUCT.md, 2026-11-02): role and email,
  * Turnstile-gated, no account. Uses the one email-capture control
  * (`InlineSubscribe`, built on `CompositeField`).
@@ -45,7 +63,34 @@ export const WAITLIST_ROLE_FORM_ENDPOINT = '/api/waitlist/join';
 export function WaitlistRoleForm({
   variant = 'artist',
   headingLevel = 1,
-}: Readonly<{ variant?: 'artist' | 'general'; headingLevel?: 1 | 2 | 3 }>) {
+  title = 'Request access',
+  description,
+  headingClassName,
+  align = 'center',
+  presentation = 'stack',
+  roleLabel = 'I’m a',
+  submitLabel = 'Join',
+  note,
+}: Readonly<{
+  variant?: 'artist' | 'general';
+  /** `chips` renders role chips and a labelled submit; the host owns the heading. */
+  presentation?: 'stack' | 'chips';
+  roleLabel?: string;
+  submitLabel?: string;
+  /** Microcopy under the field (chips presentation). */
+  note?: string;
+  headingLevel?: 1 | 2 | 3;
+  /** Form heading; a host page may name the action in its own words. */
+  title?: string;
+  /** Optional single support line under the heading. */
+  description?: string;
+  /** Host type role for the heading (e.g. the marketing section title). */
+  headingClassName?: string;
+  /** Stack alignment. `start` keeps heading, copy and controls on one edge. */
+  align?: 'center' | 'start';
+}>) {
+  const stackAlign =
+    align === 'start' ? 'items-start text-left' : 'items-center text-center';
   const formId = useId();
   const Heading = headingLevel === 1 ? 'h1' : headingLevel === 2 ? 'h2' : 'h3';
   const roles = variant === 'general' ? GENERAL_WAITLIST_ROLES : WAITLIST_ROLES;
@@ -54,13 +99,23 @@ export function WaitlistRoleForm({
   const joinedRef = useRef(false);
   const nameRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [role, setRole] = useState<WaitlistRole | ''>('');
+  const [role, setRole] = useState<WaitlistRole | ''>(
+    presentation === 'chips' ? 'artist' : ''
+  );
+  const [chipKey, setChipKey] = useState(
+    presentation === 'chips' ? 'artist' : ''
+  );
+  const chips = presentation === 'chips';
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
   const [turnstileFailed, setTurnstileFailed] = useState(false);
+  // Load Cloudflare's check only once the visitor touches the form: on load
+  // it put a CSP-blocked probe and vendor console errors on every homepage
+  // view (product crawl, 2026-11-08).
+  const [securityCheckArmed, setSecurityCheckArmed] = useState(false);
   const turnstileRequired =
     isTurnstileClientConfigured() && !isTurnstileClientBypassed();
 
@@ -164,7 +219,10 @@ export function WaitlistRoleForm({
           tabIndex={-1}
           data-testid='waitlist-role-form-joined'
           role='status'
-          className='col-start-1 row-start-1 flex w-full flex-col items-center gap-2 text-center'
+          className={cn(
+            'col-start-1 row-start-1 flex w-full flex-col gap-2',
+            stackAlign
+          )}
         >
           <Heading className='text-balance text-xl font-medium tracking-tight text-primary-token'>
             Request received
@@ -178,19 +236,40 @@ export function WaitlistRoleForm({
         inert={status === 'joined'}
         aria-hidden={status === 'joined' || undefined}
         onSubmit={handleSubmit}
+        onFocusCapture={() => setSecurityCheckArmed(true)}
+        onPointerDownCapture={() => setSecurityCheckArmed(true)}
         data-testid='waitlist-role-form'
-        aria-labelledby={`${formId}-heading`}
+        data-presentation={presentation}
+        aria-label={chips ? title : undefined}
+        aria-labelledby={chips ? undefined : `${formId}-heading`}
         className={cn(
-          'col-start-1 row-start-1 flex w-full flex-col items-center gap-5',
+          'col-start-1 row-start-1 flex w-full flex-col',
+          chips ? 'gap-6' : 'gap-5',
+          align === 'start' ? 'items-start' : 'items-center',
           status === 'joined' && 'invisible'
         )}
       >
-        <Heading
-          id={`${formId}-heading`}
-          className='text-balance text-xl font-medium tracking-tight text-primary-token'
-        >
-          Request access
-        </Heading>
+        {chips ? null : (
+          <Heading
+            id={`${formId}-heading`}
+            className={cn(
+              'text-balance text-primary-token',
+              headingClassName ?? 'text-xl font-medium tracking-tight'
+            )}
+          >
+            {title}
+          </Heading>
+        )}
+        {description && !chips ? (
+          <p
+            className={cn(
+              'max-w-md text-pretty text-sm text-secondary-token',
+              align === 'start' ? 'text-left' : 'text-balance text-center'
+            )}
+          >
+            {description}
+          </p>
+        ) : null}
         {variant === 'general' ? (
           <label
             className='grid w-full gap-2 text-sm text-primary-token'
@@ -215,37 +294,78 @@ export function WaitlistRoleForm({
             />
           </label>
         ) : null}
-        <RadioGroup
-          aria-label='Role'
-          value={role}
-          onValueChange={value => {
-            setRole(value as WaitlistRole);
-            if (status === 'error' && !turnstileFailed) {
-              setStatus('idle');
-              setErrorMessage('');
-            }
-          }}
-        >
-          {roles.map(option => (
-            <label
-              key={option.value}
-              htmlFor={`${formId}-${option.value}`}
-              className='flex min-h-11 cursor-pointer items-center gap-3 text-sm text-primary-token'
+        {chips ? (
+          <div className='waitlist-chips'>
+            <p id={`${formId}-role-label`} className='waitlist-chips__label'>
+              {roleLabel}
+            </p>
+            <fieldset
+              aria-labelledby={`${formId}-role-label`}
+              className='waitlist-chips__row'
             >
-              <RadioGroupItem
-                id={`${formId}-${option.value}`}
-                value={option.value}
-              />
-              {option.label}
-            </label>
-          ))}
-        </RadioGroup>
+              {ROLE_CHIPS.map((chip, index) => (
+                <Fragment key={chip.key}>
+                  {index === 3 ? (
+                    <span aria-hidden className='waitlist-chips__break' />
+                  ) : null}
+                  <label
+                    className='waitlist-chip'
+                    data-selected={chipKey === chip.key ? 'true' : undefined}
+                  >
+                    <input
+                      type='radio'
+                      name={`${formId}-role`}
+                      value={chip.key}
+                      checked={chipKey === chip.key}
+                      className='sr-only'
+                      onChange={() => {
+                        setChipKey(chip.key);
+                        setRole(chip.role);
+                        if (status === 'error' && !turnstileFailed) {
+                          setStatus('idle');
+                          setErrorMessage('');
+                        }
+                      }}
+                    />
+                    {chip.label}
+                  </label>
+                </Fragment>
+              ))}
+            </fieldset>
+          </div>
+        ) : (
+          <RadioGroup
+            aria-label='Role'
+            value={role}
+            onValueChange={value => {
+              setRole(value as WaitlistRole);
+              if (status === 'error' && !turnstileFailed) {
+                setStatus('idle');
+                setErrorMessage('');
+              }
+            }}
+          >
+            {roles.map(option => (
+              <label
+                key={option.value}
+                htmlFor={`${formId}-${option.value}`}
+                className='flex min-h-11 cursor-pointer items-center gap-3 text-sm text-primary-token'
+              >
+                <RadioGroupItem
+                  id={`${formId}-${option.value}`}
+                  value={option.value}
+                />
+                {option.label}
+              </label>
+            ))}
+          </RadioGroup>
+        )}
         <InlineSubscribe
           className='w-full'
           inputId={`${formId}-email`}
           inputRef={inputRef}
           ariaLabel='Email address'
-          buttonLabel='Join'
+          buttonLabel={submitLabel}
           value={email}
           onValueChange={value => {
             setEmail(value);
@@ -260,16 +380,22 @@ export function WaitlistRoleForm({
           invalid={status === 'error' && !turnstileFailed}
           describedBy={`${formId}-error`}
         />
-        {status !== 'joined' ? (
+        {status !== 'joined' && securityCheckArmed ? (
           <InvisibleTurnstile
             onToken={setTurnstileToken}
             onStateChange={handleTurnstileStateChange}
             resetSignal={turnstileResetSignal}
           />
         ) : null}
+        {chips && note && !(status === 'error') ? (
+          <p className='waitlist-chips__note'>{note}</p>
+        ) : null}
         <p
           id={`${formId}-error`}
-          className='min-h-5 text-sm text-accent-red'
+          className={cn(
+            'text-sm text-accent-red',
+            chips ? 'waitlist-chips__error' : 'min-h-5'
+          )}
           role={status === 'error' ? 'alert' : undefined}
         >
           {status === 'error' ? errorMessage : ''}

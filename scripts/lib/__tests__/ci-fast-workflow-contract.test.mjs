@@ -381,6 +381,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/tests/test_signal_watch.py',
       'scripts/tests/test_x_grok.py',
       'scripts/tests/test_pr_remediation_swarm.py',
+      'scripts/tests/test_codex_launcher.py',
+      'scripts/tests/test_loose_exec_guard.py',
     ]);
     const shards = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command => {
       const [, keyword, files] = /-k "([^"]+)" (.+)$/u.exec(command) ?? [];
@@ -447,7 +449,8 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(36);
+    expect(LANES_PYTEST_FILES).toHaveLength(39);
+    expect(whole).toContain('scripts/tests/test_pr_events_repair_evidence.py');
     expect(whole).toContain('scripts/tests/test_board_intake.py');
     expect(whole).toContain('scripts/tests/test_priority_admission.py');
     expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS.join(' ')).toContain(

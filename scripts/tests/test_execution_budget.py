@@ -15,8 +15,8 @@ import execution_attempt as attempt  # noqa: E402
 DAY = 86_400.0
 
 
-def start(token: str, at: float) -> dict:
-    return {"event": "attempt_started", "fencingToken": token, "at": at}
+def start(token: str, at: float, lease: float = DAY) -> dict:
+    return {"event": "attempt_started", "fencingToken": token, "at": at, "leaseExpiresAt": at + lease}
 
 
 def finish(token: str, at: float) -> dict:
@@ -33,6 +33,12 @@ class WallBudgetTest(unittest.TestCase):
 
     def test_a_running_attempt_counts_until_now(self):
         self.assertEqual(attempt._usage([start("a", 100.0)], 400.0)["wallSeconds"], 300.0)
+
+    def test_a_lost_attempt_counts_only_until_its_lease_expired(self):
+        # 2026-11-07 PR23434: attempts lost in the Nov 2 stall were finished days later on reconcile.
+        rows = [start("a", 0.0, lease=600.0), finish("a", 5 * DAY)]
+        self.assertEqual(attempt._usage(rows, 5 * DAY)["wallSeconds"], 600.0)
+        self.assertEqual(attempt._usage([start("b", 0.0, lease=600.0)], 5 * DAY)["wallSeconds"], 600.0)
 
     def test_no_attempts_spend_nothing(self):
         self.assertEqual(attempt._usage([], 1_000.0)["wallSeconds"], 0)

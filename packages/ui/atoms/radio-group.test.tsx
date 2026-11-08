@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { RadioGroup, RadioGroupItem } from './radio-group';
 
@@ -398,5 +399,30 @@ describe('RadioGroup', () => {
       );
       expect(ref.current).toBeInstanceOf(HTMLButtonElement);
     });
+  });
+});
+
+describe('RadioGroup certificate evidence', () => {
+  it('has no axe violations for empty, selected, and disabled groups', async () => {
+    const { container } = render(
+      <div>
+        <TestRadioGroup />
+        <RadioGroup
+          aria-label='Payout schedule'
+          defaultValue='monthly'
+          disabled
+        >
+          <RadioGroupItem value='weekly' id='rg-a11y-weekly' />
+          <label htmlFor='rg-a11y-weekly'>Weekly</label>
+          <RadioGroupItem value='monthly' id='rg-a11y-monthly' />
+          <label htmlFor='rg-a11y-monthly'>Monthly</label>
+        </RadioGroup>
+      </div>
+    );
+    await expectNoA11yViolations(container);
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Option 2' }));
+    expect(screen.getByRole('radio', { name: 'Option 2' })).toBeChecked();
+    await expectNoA11yViolations(container);
   });
 });

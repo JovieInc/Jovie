@@ -29,7 +29,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import disk_guard  # noqa: E402
-import lifecycle  # noqa: E402
+import lifecycle, pr_wip  # noqa: E402  (pr_wip: per-producer WIP census for the lanes feed)
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -1104,11 +1104,9 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
                          premise: dict | None = None) -> str:
     """Complete repair metadata without replacing existing evidence or customer decisions.
 
-    The caller chooses the customer outcome and supplies any locking PR provenance;
-    never infer either from a failed check. Existing locked-area decisions are preserved.
-    Measured wins must be supplied by the caller, never inferred from a red check.
-    Premise evidence must describe the caller's actual falsifying test and observation.
-    The canonical Fleet/changelog guards still validate the resulting body.
+    The caller supplies the customer outcome, locking PR provenance, measured wins and premise
+    evidence (its actual falsifying test and observation); never infer any from a failed check.
+    Existing locked-area decisions are kept; canonical Fleet/changelog guards validate the body.
     """
     updated = body
     if not red_section_complete(updated):
@@ -1133,6 +1131,8 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
     if win_section is not None and win_section != "":
         if not isinstance(win_section, str) or not re.match(r"\A## Win\s*\n", win_section):
             raise ValueError("measured win requires a complete ## Win section")
+        if re.search(r"^#{1,6}\s+|customer-changelog/v1", win_section.split("\n", 1)[1], re.M):
+            raise ValueError("measured win must contain only Win evidence; use the dedicated repair fields")
         if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Win\s*$", re.I)) is None:
             updated = updated.rstrip("\n") + "\n\n" + win_section.rstrip("\n") + "\n"
     if premise is not None:
@@ -2645,7 +2645,7 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
         settling = age < ORPHAN_GRACE_S or pr.get("rollup") in ("PENDING", "EXPECTED")
         if not (explicitly_held or queued or settling):
             plan["orphans"].append(number)
-    plan["counts"] = counts
+    plan["counts"] = {**counts, "wip": pr_wip.census(prs, now)}
     plan["dispositions"] = dispositions(prs, plan, attempts, max_attempts, now, held)
     return plan
 

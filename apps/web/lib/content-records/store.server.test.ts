@@ -60,10 +60,14 @@ describe('content record store', () => {
   });
 
   it('refuses to store an invalid draft', async () => {
+    const invalid = structuredClone(DEFAULT_HOME_SPEC);
+    const cta = invalid.sections[3];
+    if (cta?.section !== 'cta') throw new Error('cta last');
+    cta.copy.subhead = 'Only $12 to start';
     await expect(
       store.createContentVersion(MARKETING_PAGE_KIND, {
         key: 'home',
-        data: DEFAULT_HOME_SPEC,
+        data: invalid,
         author: 'agent:summer',
       })
     ).rejects.toBeInstanceOf(store.ContentValidationError);
