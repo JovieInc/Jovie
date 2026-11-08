@@ -1,84 +1,29 @@
-import { appendFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { load as loadYaml } from 'js-yaml';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { join } from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
 import { createGitHubClient } from '../../../packages/api-client/github.ts';
-import { SOURCE_GUARDS } from '../../ci-fast-lanes.mjs';
 import {
   checkSyntheticCanary,
   main,
 } from '../../synthetic-canary-liveness.mjs';
+import {
+  check,
+  githubFor,
+  installSplitSuiteHooks,
+  iso,
+  job,
+  NOW,
+  repo,
+  run,
+} from './synthetic-canary-liveness.fixtures.mjs';
+// Collected by this file's vitest command; not a second test entry.
+import './synthetic-canary-liveness.cases.mjs';
 
 vi.mock('../../../packages/api-client/github.ts', () => ({
   createGitHubClient: vi.fn(),
 }));
-const NOW = Date.parse('2026-10-23T13:17:00Z');
-const iso = minutes => new Date(NOW - minutes * 60_000).toISOString();
-const repo = 'JovieInc/Jovie';
-const root = resolve(import.meta.dirname, '../../..');
-const job = (conclusion = 'success') => ({
-  name: 'Production Synthetic Tests',
-  status: 'completed',
-  conclusion,
-});
-const run = (overrides = {}) => ({
-  id: 100,
-  run_attempt: 1,
-  event: 'schedule',
-  head_branch: 'main',
-  created_at: iso(30),
-  updated_at: iso(1),
-  status: 'completed',
-  conclusion: 'success',
-  display_title: 'Production Synthetic Monitoring (17 */6 * * *)',
-  ...overrides,
-});
-/**
- * @param {Array<ReturnType<typeof run>>} runs
- * @param {Record<string, Array<ReturnType<typeof job>>>} [jobs]
- */
-function githubFor(runs, jobs = { 100: [job()] }) {
-  return {
-    rest: vi.fn(async (_method, path) => ({
-      status: 200,
-      json: /** @returns {unknown} */ () =>
-        path.includes('/workflows/')
-          ? { workflow_runs: runs }
-          : {
-              jobs: jobs[path.match(/runs\/(\d+)/)[1]],
-              total_count: jobs[path.match(/runs\/(\d+)/)[1]]?.length,
-            },
-    })),
-  };
-}
-const check = github => checkSyntheticCanary({ github, repo, now: NOW });
-
-// This lane's job logs are admin-gated, so a CI-only failure here is invisible
-// to the remote diagnoser. Echo suite progress and failures into the run's
-// step summary, which is publicly readable on the workflow run page.
-const stepSummary = process.env.GITHUB_STEP_SUMMARY;
-const trace = message => {
-  if (!stepSummary) return;
-  try {
-    appendFileSync(stepSummary, `synthetic-canary-liveness: ${message}\n`);
-  } catch {
-    // Diagnostics must never fail the suite.
-  }
-};
-trace('suite loaded');
-afterEach(context => {
-  const { result } = context.task;
-  if (result?.state === 'fail') {
-    trace(
-      `FAILED ${context.task.name}: ${String(
-        result.errors?.map(error => error.message).join(' || ') ?? ''
-      ).slice(0, 2000)}`
-    );
-  }
-});
-afterEach(() => vi.restoreAllMocks());
-
+installSplitSuiteHooks();
 describe('synthetic canary dead-man', () => {
   it('uses the scheduled main job for this attempt, through the shared polling client', async () => {
     const github = githubFor([run({ run_attempt: 2 })]);
@@ -417,7 +362,6 @@ describe('synthetic canary dead-man', () => {
     expect(await main({ env: {}, now: NOW })).toBe(0);
   });
 });
-
 describe('missed-slot dispatch fallback', () => {
   const staleRun = () => [run({ id: 110, created_at: iso(421) })];
   const withPost = (github, status) => {
@@ -529,103 +473,5 @@ describe('missed-slot dispatch fallback', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  });
-});
-
-describe('watchdog wiring', () => {
-  /** @typedef {{name?: string, id?: string, uses?: string, run?: string, if?: string,
-   * env?: Record<string, string>, with?: Record<string, string>, 'continue-on-error'?: boolean}} Step */
-  /** @typedef {{on: {schedule?: unknown, workflow_run: {workflows: string[]}},
-   * jobs: Record<string, {steps: Step[]}>, 'run-name'?: string}} Workflow */
-  const load = name =>
-    /** @type {Workflow} */ (
-      loadYaml(readFileSync(join(root, '.github/workflows', name), 'utf8'))
-    );
-  const observer = load('automation-liveness.yml');
-  const producer = load('synthetic-monitoring.yml');
-  const steps = observer.jobs.liveness.steps;
-
-  it('uses exactly the synthetic failure alert action, channel and webhook', () => {
-    const failure = producer.jobs['synthetic-test'].steps.find(
-      step => step.name === 'Send Slack Alert on Failure'
-    );
-    const alarm = steps.find(
-      step => step.name === 'Send Slack Alert on Synthetic Silence'
-    );
-    expect(alarm.uses).toBe(failure.uses);
-    expect(alarm.with.channel).toBe(failure.with.channel);
-    expect(alarm.with.author_name).toBe(failure.with.author_name);
-    expect(alarm.env).toEqual(failure.env);
-    expect(alarm.if).toContain('always()');
-    expect(alarm.if).toContain(
-      "steps.synthetic-heartbeat.outcome != 'success'"
-    );
-    expect(alarm.with.custom_payload).toContain(
-      'heartbeat check did not complete'
-    );
-    const intake = steps.find(
-      step => step.name === 'File synthetic heartbeat Linear issue'
-    );
-    const failureIntake = producer.jobs['synthetic-test'].steps.find(
-      step => step.name === 'File or resolve the synthetic Linear issue'
-    );
-    expect(intake.run).toBe('node scripts/synthetic-monitoring-intake.mjs');
-    expect(failureIntake.run).toContain(
-      'node scripts/synthetic-monitoring-intake.mjs'
-    );
-    expect(intake.env.LINEAR_API_KEY).toBe(failureIntake.env.LINEAR_API_KEY);
-    expect(intake.env.REMEDIATION_TRIGGERS_DISABLED).toBe(
-      failureIntake.env.REMEDIATION_TRIGGERS_DISABLED
-    );
-    expect(intake.env.TEST_STATUS).toBe('failed');
-    expect(intake.env.FAILED_TESTS).toContain(
-      'heartbeat check did not complete'
-    );
-    expect(intake.if).toBe(alarm.if);
-  });
-
-  it('alerts before preserving failure, using the existing backstop without a cron or flag', () => {
-    expect(observer.on.schedule).toBeUndefined();
-    expect(observer.on.workflow_run.workflows).toEqual([
-      'Production Continuity Guard',
-    ]);
-    expect(producer['run-name']).toContain('github.event.schedule');
-    const probe = steps.find(step => step.id === 'synthetic-heartbeat');
-    expect(probe.run).toBe('node scripts/synthetic-canary-liveness.mjs');
-    expect(probe['continue-on-error']).toBeUndefined();
-    expect(probe.if).toBe('${{ always() }}');
-    const preserve = steps.find(
-      step => step.name === 'Preserve synthetic dead-man failure'
-    );
-    expect(preserve.run).toContain('exit 1');
-    expect(steps.indexOf(preserve)).toBeGreaterThan(
-      steps.findIndex(
-        step => step.name === 'Send Slack Alert on Synthetic Silence'
-      )
-    );
-    expect(preserve.if).toContain('always()');
-  });
-
-  it('enforces behavior coverage in source and merge-group CI for every changed input', () => {
-    const guard = SOURCE_GUARDS.find(
-      item => item.id === 'synthetic-canary-liveness'
-    );
-    expect(guard.prOnly).toBe(false);
-    for (const file of [
-      '.github/workflows/automation-liveness.yml',
-      '.github/workflows/synthetic-monitoring.yml',
-      'scripts/synthetic-canary-liveness.mjs',
-      'scripts/lib/__tests__/synthetic-canary-liveness.test.mjs',
-    ]) {
-      expect(guard.inputs.test(file)).toBe(true);
-    }
-    expect(guard.command).toContain(
-      'lib/__tests__/synthetic-canary-liveness.test.mjs'
-    );
-    expect(guard.command).toContain('run --coverage');
-    expect(guard.command).toContain(
-      '--coverage.include=synthetic-canary-liveness.mjs'
-    );
-    expect(guard.command).toContain('--coverage.thresholds.lines=90');
   });
 });
