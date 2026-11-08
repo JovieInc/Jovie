@@ -26,8 +26,8 @@ export const ARTIST_LINK_ERROR =
 
 const SPEND_LABELS: Record<PromoSpendBand, string> = {
   none: 'Nothing yet',
-  under_50: `Under ${SPEND_BAND_LINE} a month`,
-  '50_plus': `${SPEND_BAND_LINE} or more a month`,
+  under_50: `Under ${SPEND_BAND_LINE}`,
+  '50_plus': `${SPEND_BAND_LINE} or more`,
 };
 
 /**
@@ -176,7 +176,7 @@ export function WaitlistQualifyingSteps({
               id={`${id}-spend-label`}
               className='text-sm font-medium text-primary-token'
             >
-              What do you pay for today to promote your music?
+              What do you pay each month to promote your music?
             </p>
             <RadioGroup
               aria-labelledby={`${id}-spend-label`}

@@ -92,7 +92,7 @@ describe('WaitlistRoleForm request-access questions', () => {
     expect(screen.getByTestId('waitlist-step-counter')).toHaveTextContent(
       'Step 4 of 4'
     );
-    fireEvent.click(screen.getByRole('radio', { name: 'Under $50 a month' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Under $50' }));
     fireEvent.click(screen.getByRole('button', { name: 'Request access' }));
 
     await waitFor(() =>
