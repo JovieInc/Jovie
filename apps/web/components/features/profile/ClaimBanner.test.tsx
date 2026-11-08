@@ -61,7 +61,7 @@ describe('ClaimBanner certificate', () => {
       </div>
     );
 
-    const copyRow = screen.getByText(/This profile is unclaimed/).parentElement;
+    const copyRow = screen.getByTestId('claim-banner-copy').closest('div');
     expect(copyRow).toHaveClass('sm:text-start');
     expect(copyRow).not.toHaveClass('sm:text-left');
   });
