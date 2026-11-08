@@ -92,7 +92,8 @@ const nextConfig = {
       // Blog catalog validation checks these assets with fs.access at request time.
       'public/images/blog/**/*',
       'lib/chat/knowledge/topics/**/*',
-      'public/fonts/{Satoshi-Bold,DMSans-Regular,Inter-Regular,Inter-SemiBold}.ttf',
+      'public/fonts/Satoshi-Bold.ttf',
+      'public/fonts/DMSans-Regular.ttf',
     ],
     '/api/ovie/certifications': ['runtime-data/docs/certification/**/*'],
     '/api/ovie/certifications/**': ['runtime-data/docs/certification/**/*'],

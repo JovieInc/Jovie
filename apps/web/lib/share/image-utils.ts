@@ -41,21 +41,6 @@ export async function loadSatoshiFont(): Promise<ArrayBuffer> {
   return loadFontBuffer('Satoshi-Bold.ttf');
 }
 
-/**
- * Inter, the body/UI face, as static TTF instances of Inter-Variable (Satori
- * cannot read woff2). Used by data images such as Summer's company charts.
- */
-export async function loadInterFonts(): Promise<{
-  readonly regular: ArrayBuffer;
-  readonly semibold: ArrayBuffer;
-}> {
-  const [regular, semibold] = await Promise.all([
-    loadFontBuffer('Inter-Regular.ttf'),
-    loadFontBuffer('Inter-SemiBold.ttf'),
-  ]);
-  return { regular, semibold };
-}
-
 export async function loadDMSansFont(): Promise<ArrayBuffer> {
   return loadFontBuffer('DMSans-Regular.ttf');
 }
