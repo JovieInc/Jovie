@@ -22,7 +22,7 @@ export function createProposeVideoRecordingTool(options: {
 }) {
   return tool({
     description:
-      'Propose recording a short talking-head video in the Jovie app. Use when Jovie has written a promo, thank-you, or behind-the-scenes script and the artist should record it. Shows Upload video and Record in app actions with an optional teleprompter showcase.',
+      'Propose recording a short talking-head video in the Jovie app. Use when Jovie has written a promo, thank-you, or behind-the-scenes script and the artist should record it. Shows Upload video and Record in app actions with an optional teleprompter showcase. Record in app opens a studio with a screen ring light, a voice-following script, and the optional questions between takes.',
     inputSchema: chatToolSchema({
       kind: z
         .enum(RECORDABLE_VIDEO_KINDS)
@@ -39,8 +39,15 @@ export function createProposeVideoRecordingTool(options: {
         .describe(
           'The teleprompter script Jovie wrote for the artist to read on camera.'
         ),
+      questions: z
+        .array(z.string().min(8).max(200))
+        .max(5)
+        .optional()
+        .describe(
+          'Up to 5 short interviewer questions, written from the script, that the artist answers on camera between takes. One idea per question.'
+        ),
     }),
-    execute: async ({ kind, title, script }) => {
+    execute: async ({ kind, title, script, questions }) => {
       const showcaseVariant = await getTeleprompterShowcaseVariant(
         options.clerkUserId
       );
@@ -51,6 +58,9 @@ export function createProposeVideoRecordingTool(options: {
         title: title.trim(),
         script: script.trim(),
         showcaseVariant,
+        ...(questions && questions.length > 0
+          ? { questions: questions.map(question => question.trim()) }
+          : {}),
       };
 
       return {
