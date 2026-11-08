@@ -6,7 +6,16 @@ const webRoot = path.resolve(__dirname, '../../..');
 const pagePath = 'app/(home)/page.tsx';
 const cssPath = 'app/(home)/home.css';
 const componentPath = 'components/homepage/HomepageEditorial.tsx';
-const componentCssPath = 'components/homepage/HomepageEditorial.css';
+const componentCssPaths = [
+  'components/homepage/v3/stage.css',
+  'components/homepage/v3/product-ui.css',
+  'components/homepage/v3/surfaces.css',
+  'components/homepage/v3/phone.css',
+  'components/homepage/v3/chapters.css',
+  'components/homepage/v3/specs.css',
+  'components/homepage/v3/form.css',
+  'components/homepage/v3/responsive.css',
+];
 
 const forbiddenPageChromePatterns = [
   /#[0-9a-fA-F]{3,8}/,
@@ -86,19 +95,21 @@ describe('mounted homepage grid spine System B source contract', () => {
   });
 
   it('aligns the homepage sections to the shared content column', () => {
-    const css = readFileSync(path.join(webRoot, componentCssPath), 'utf8');
+    const css = componentCssPaths
+      .map(cssFile => readFileSync(path.join(webRoot, cssFile), 'utf8'))
+      .join('\n');
     // The hero shares the section shell's container: one gutter, one width.
     const component = readFileSync(path.join(webRoot, componentPath), 'utf8');
-    // Canonical v1 (receipt home-canonical-v1) owns its sections: each root
-    // carries the Pen section marker the design-diff gate crops by.
+    // Approved v3 (receipt home-canonical-v3) owns its sections: each root
+    // carries the section marker the design-diff gate crops by.
     for (const section of ['hero', 'profile', 'releases', 'invite']) {
       expect(component).toContain(`data-pen-section='${section}'`);
     }
     expect(component).not.toContain('SHOW_HOMEPAGE_HERO_LIGHT');
     expect(css).not.toMatch(/--homepage-page-gutter|--ds-public-content-max/);
-    // The approved design draws the hero field fade and the proof-stage glow
-    // as token-colour gradients and lifts the phone with one soft shadow, so
-    // those two patterns are the only ones this file is allowed.
+    // The approved design lights its product stages with token-colour
+    // gradients and casts token-colour shadows under them, so those two
+    // patterns are the only ones these files are allowed.
     for (const pattern of forbiddenSpineCssPatterns.filter(
       pattern => !/gradient|box-shadow/.test(pattern.source)
     )) {

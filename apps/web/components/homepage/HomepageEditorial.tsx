@@ -21,6 +21,7 @@ import './v3/surfaces.css';
 import './v3/phone.css';
 import './v3/chapters.css';
 import './v3/specs.css';
+import './v3/form.css';
 import './v3/responsive.css';
 
 const OWNER = 'apps/web/components/homepage/HomepageEditorial.tsx';
@@ -83,11 +84,14 @@ export function HomepageStoryHero({
         arcRing={1}
       />
       <div className='hv3-hero__copy'>
-        <h1 id={headingId} className='hv3-display'>
+        <h1
+          id={headingId}
+          className='hv3-display marketing-hero-headline text-balance'
+        >
           {lines(HOMEPAGE_EDITORIAL_COPY.hero.headline)}
         </h1>
         <div className='hv3-hero__side'>
-          <p className='hv3-lede'>{copy.subhead}</p>
+          <p className='hv3-lede marketing-hero-subtitle'>{copy.subhead}</p>
           <div className='hv3-ctas'>
             <Link
               href={copy.primaryHref}
@@ -170,7 +174,7 @@ export function HomepageProfileChapter({
       <ChapterRule index='01' label={COPY.chapters[0]} />
       <div className='hv3-split'>
         <div className='hv3-reveal'>
-          <h2 className='hv3-statement'>{lines(copy.headline)}</h2>
+          <h2 className='hv3-statement text-balance'>{lines(copy.headline)}</h2>
           <p className='hv3-body'>{copy.body}</p>
           <dl className='hv3-rows'>
             {media.rows.map(row => (
@@ -233,7 +237,7 @@ export function HomepageReleasesChapter({
     >
       <ChapterRule index='02' label={COPY.chapters[1]} />
       <div className='hv3-centered hv3-reveal'>
-        <h2 className='hv3-statement'>{lines(copy.headline)}</h2>
+        <h2 className='hv3-statement text-balance'>{lines(copy.headline)}</h2>
         <p className='hv3-lede hv3-lede--center'>{copy.body}</p>
       </div>
       <div className='hv3-stage hv3-stage--releases hv3-frame'>
@@ -269,15 +273,15 @@ export function HomepageReleasesChapter({
       </div>
       <div className='hv3-captions hv3-reveal'>
         <div>
-          <h3>{captions.page.title}</h3>
+          <h3 className='text-balance'>{captions.page.title}</h3>
           <p>{captions.page.body}</p>
         </div>
         <div>
-          <h3>{captions.services.title}</h3>
+          <h3 className='text-balance'>{captions.services.title}</h3>
           <p>{captions.services.body(HOME_SPEC.listen)}</p>
         </div>
         <div>
-          <h3>{captions.catalog.title}</h3>
+          <h3 className='text-balance'>{captions.catalog.title}</h3>
           <p>{captions.catalog.body}</p>
         </div>
       </div>
@@ -305,7 +309,7 @@ export function HomepageInviteClose({
       <ChapterRule index='04' label={COPY.chapters[3]} />
       <div className='hv3-invite__inner'>
         <Orbit id='hv3-orbit-invite' rings={[760]} arc={[0, 360]} closed />
-        <h2 className='hv3-statement'>{lines(copy.headline)}</h2>
+        <h2 className='hv3-statement text-balance'>{lines(copy.headline)}</h2>
         <p className='hv3-lede hv3-lede--center'>{copy.subhead}</p>
         <div className='hv3-form'>
           <WaitlistRoleForm

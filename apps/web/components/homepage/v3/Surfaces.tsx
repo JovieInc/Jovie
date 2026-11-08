@@ -29,8 +29,8 @@ export function ReleasePage() {
       <span className='hv3-rp__art'>
         <Cover src={PAGE.src} size={300} />
       </span>
-      <h4 className='hv3-rp__title'>
-        <Anchor id='title' style={{ left: -6 }} />
+      <h4 className='hv3-rp__title text-balance'>
+        <Anchor id='title' className='hv3-anchor--before' />
         {PAGE.title}
       </h4>
       <p className='hv3-rp__artist'>{PAGE.artist}</p>
@@ -92,7 +92,7 @@ export function CommandPaletteCard() {
         <span className='hv3-palette__q' data-hv3-query>
           {PALETTE.placeholder}
         </span>
-        <kbd className='hv3-kbd'>Esc</kbd>
+        <kbd className='hv3-kbd'>{HOMEPAGE_PRODUCT_UI.escapeKey}</kbd>
       </div>
       <p className='hv3-palette__group'>{PALETTE.goToLabel}</p>
       <ul>

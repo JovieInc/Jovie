@@ -17,7 +17,7 @@ import {
   Users,
   Waypoints,
 } from 'lucide-react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ImageryStage } from '@/components/marketing/ImageryStage';
 import {
@@ -34,10 +34,14 @@ const FIELDS = HOMEPAGE_PRODUCT_UI.inspector.fields;
 /** A point inside the 3D rig that a callout or connector tracks. */
 export function Anchor({
   id,
-  style,
-}: Readonly<{ id: string; style: CSSProperties }>) {
+  className,
+}: Readonly<{ id: string; className: string }>) {
   return (
-    <i aria-hidden className='hv3-anchor' data-hv3-anchor={id} style={style} />
+    <i
+      aria-hidden
+      className={cn('hv3-anchor', className)}
+      data-hv3-anchor={id}
+    />
   );
 }
 
@@ -71,14 +75,8 @@ export function DspGlyph({
   size,
 }: Readonly<{ glyph: DspGlyphData; size: number }>) {
   return (
-    <svg
-      aria-hidden
-      viewBox={glyph.viewBox}
-      width={size}
-      height={size}
-      style={{ color: glyph.color }}
-    >
-      <path fill='currentColor' d={glyph.path} />
+    <svg aria-hidden viewBox={glyph.viewBox} width={size} height={size}>
+      <path fill={glyph.color} d={glyph.path} />
     </svg>
   );
 }
@@ -154,10 +152,10 @@ export function AppWindow() {
             ))}
           </div>
         </aside>
-        <section className='hv3-main'>
+        <div className='hv3-main'>
           <header className='hv3-main__head'>
             <b>{UI.releases}</b>
-            <span>{UI.releaseCount}</span>
+            <span className='tabular-nums'>{UI.releaseCount}</span>
             <div className='hv3-main__search'>
               {UI.searchCommand}
               <kbd className='hv3-kbd'>⌘K</kbd>
@@ -181,7 +179,7 @@ export function AppWindow() {
               <Ellipsis className='hv3-ui-i hv3-rrow__m' />
             </div>
           ))}
-        </section>
+        </div>
         <div className='hv3-app__slot' />
       </div>
     </div>
@@ -287,7 +285,7 @@ export function ReleaseInspector({
         >
           <dd className='hv3-upc'>
             {release.upc}
-            <Anchor id={anchor} style={{ right: -6 }} />
+            <Anchor id={anchor} className='hv3-anchor--after' />
           </dd>
         </InspectorRow>
       </dl>
@@ -298,10 +296,10 @@ export function ReleaseInspector({
 /** The Releases surface as a plate, cropped before the search field. */
 export function CatalogPlate() {
   return (
-    <section className='hv3-main hv3-main--plate'>
+    <div className='hv3-main hv3-main--plate'>
       <header className='hv3-main__head'>
         <b>{UI.releases}</b>
-        <span>{UI.releaseCount}</span>
+        <span className='tabular-nums'>{UI.releaseCount}</span>
       </header>
       <div className='hv3-main__cols hv3-main__cols--plate'>
         <span>{UI.columns.title}</span>
@@ -318,12 +316,12 @@ export function CatalogPlate() {
           <RowServices />
           {release.selected ? (
             <>
-              <Anchor id='rowR' style={{ right: 8 }} />
-              <Anchor id='row' style={{ left: 4 }} />
+              <Anchor id='rowR' className='hv3-anchor--row-end' />
+              <Anchor id='row' className='hv3-anchor--row-start' />
             </>
           ) : null}
         </div>
       ))}
-    </section>
+    </div>
   );
 }

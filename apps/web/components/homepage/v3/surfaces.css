@@ -4,70 +4,70 @@
 
 .hv3-rp {
   height: 100%;
-  padding: 20px 20px 24px;
+  padding: 1.25rem 1.25rem 1.5rem;
 }
 
 .hv3-rp__bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 36px;
-  padding: 0 12px;
+  height: 2.25rem;
+  padding: 0 0.75rem;
   color: var(--hv3-t2);
 }
 
 .hv3-rp__art {
   position: relative;
   display: block;
-  width: 300px;
-  margin-top: 30px;
+  width: 18.75rem;
+  margin-top: 1.875rem;
 }
 
 .hv3-rp__art img {
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
 }
 
 .hv3-rp__title {
   position: relative;
-  margin-top: 30px;
-  font-size: 30px;
+  margin-top: 1.875rem;
+  font-size: 1.875rem;
   font-weight: 400;
   letter-spacing: -0.01em;
-  line-height: 36px;
+  line-height: 2.25rem;
 }
 
 .hv3-rp__artist {
-  margin-top: 6px;
+  margin-top: 0.375rem;
   color: var(--hv3-t3);
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .hv3-rp__list {
-  margin-top: 18px;
+  margin-top: 1.125rem;
   list-style: none;
 }
 
 .hv3-rp__list li {
   display: flex;
   align-items: center;
-  gap: 14px;
-  height: 52px;
+  gap: 0.875rem;
+  height: 3.25rem;
   border-bottom: 1px solid var(--hv3-b1);
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .hv3-rp__list em {
   margin-left: auto;
   color: var(--hv3-t3);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-style: normal;
 }
 
 .hv3-rp__ico {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 1.5rem;
+  height: 1.5rem;
   border-radius: 50%;
   background: var(--hv3-elevated);
 }
@@ -75,24 +75,24 @@
 .hv3-rp__more {
   position: relative;
   display: inline-block;
-  margin-top: 18px;
+  margin-top: 1.125rem;
   color: var(--hv3-t3);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .hv3-rp__foot {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  margin-top: 46px;
+  gap: 0.5rem;
+  margin-top: 2.875rem;
   color: var(--hv3-t2);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .hv3-rp__foot svg {
-  width: 16px;
-  height: 16px;
+  width: 1rem;
+  height: 1rem;
   color: var(--hv3-t1);
 }
 
@@ -100,24 +100,25 @@
 
 .hv3-palette {
   position: absolute;
-  top: 56px;
-  left: 72px;
-  width: 640px;
-  border-radius: 14px;
+  top: 3.5rem;
+  left: 4.5rem;
+  width: 40rem;
+  border-radius: 0.875rem;
   background: color-mix(in srgb, var(--hv3-panel) 72%, transparent);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--hv3-light) 12%, transparent),
     0 0 0 1px var(--hv3-b2),
-    0 40px 80px -10px color-mix(in srgb, var(--hv3-shade) 90%, transparent);
-  font-size: 14px;
-  mask-image: linear-gradient(#000 70%, transparent 98%);
+    0 2.5rem 5rem -0.625rem
+    color-mix(in srgb, var(--hv3-shade) 90%, transparent);
+  font-size: 0.875rem;
+  mask-image: linear-gradient(var(--hv3-shade) 70%, transparent 98%);
   transform: var(--hv3-cam);
   transform-origin: 0 0;
 }
 
 @supports (backdrop-filter: blur(1px)) {
   .hv3-palette {
-    backdrop-filter: blur(24px) saturate(1.2);
+    backdrop-filter: blur(1.5rem) saturate(1.2);
   }
 }
 
@@ -129,8 +130,8 @@
 
 .hv3-pi {
   flex: none;
-  width: 18px;
-  height: 18px;
+  width: 1.125rem;
+  height: 1.125rem;
   color: var(--hv3-t3);
   stroke-width: 1.6;
 }
@@ -138,16 +139,16 @@
 .hv3-palette__search {
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: 56px;
-  padding: 0 18px;
+  gap: 0.75rem;
+  height: 3.5rem;
+  padding: 0 1.125rem;
   border-bottom: 1px solid var(--hv3-b1);
 }
 
 .hv3-palette__q {
   flex: 1;
   color: var(--hv3-t3);
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .hv3-palette__q[data-typing="true"] {
@@ -157,38 +158,38 @@
 .hv3-palette__q[data-typing="true"]::after {
   display: inline-block;
   width: 1px;
-  height: 16px;
+  height: 1rem;
   margin-left: 2px;
   background: var(--hv3-ion);
   content: "";
-  vertical-align: -3px;
+  vertical-align: -0.1875rem;
 }
 
 .hv3-palette .hv3-kbd {
-  padding: 5px 7px;
-  border-radius: 6px;
-  font-size: 12px;
+  padding: 0.3125rem 0.4375rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
 }
 
 .hv3-palette__group {
-  padding: 14px 18px 6px;
+  padding: 0.875rem 1.125rem 0.375rem;
   color: var(--hv3-t4);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
 }
 
 .hv3-palette ul {
-  padding: 0 8px;
+  padding: 0 0.5rem;
   list-style: none;
 }
 
 .hv3-palette li {
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: 44px;
-  padding: 0 10px;
-  border-radius: 8px;
+  gap: 0.75rem;
+  height: 2.75rem;
+  padding: 0 0.625rem;
+  border-radius: var(--radius-sm);
 }
 
 .hv3-palette li b {
@@ -216,43 +217,44 @@
 
 .hv3-keys {
   position: absolute;
-  right: 48px;
-  bottom: 40px;
+  right: 3rem;
+  bottom: 2.5rem;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 0.625rem;
 }
 
 .hv3-key {
   display: grid;
   place-items: center;
-  width: 76px;
-  height: 76px;
-  border-radius: 14px;
+  width: 4.75rem;
+  height: 4.75rem;
+  border-radius: 0.875rem;
   background: linear-gradient(180deg, var(--hv3-floating), var(--hv3-elevated));
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--hv3-light) 16%, transparent),
-    inset 0 -3px 0 color-mix(in srgb, var(--hv3-shade) 50%, transparent),
-    0 24px 40px -10px color-mix(in srgb, var(--hv3-shade) 95%, transparent),
+    inset 0 -0.1875rem 0 color-mix(in srgb, var(--hv3-shade) 50%, transparent),
+    0 1.5rem 2.5rem -0.625rem
+    color-mix(in srgb, var(--hv3-shade) 95%, transparent),
     0 0 0 1px color-mix(in srgb, var(--hv3-shade) 80%, transparent);
 }
 
 .hv3-key b {
-  margin-top: 10px;
+  margin-top: 0.625rem;
   color: var(--hv3-t1);
-  font-size: 24px;
+  font-size: 1.5rem;
   font-weight: 400;
   line-height: 1;
 }
 
 .hv3-key span {
-  margin-bottom: 4px;
+  margin-bottom: 0.25rem;
   color: var(--hv3-t3);
-  font-size: 10px;
+  font-size: 0.625rem;
   line-height: 1;
 }
 
 .hv3-plus {
   color: var(--hv3-t4);
-  font-size: 18px;
+  font-size: 1.125rem;
 }

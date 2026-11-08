@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -49,18 +48,11 @@ export function Orbit({
   const [x2, y2] = at(start + sweep);
   const [lx, ly] = at(start + sweep * 0.55);
   const d = `M${x1} ${y1} A${arcRadius} ${arcRadius} 0 0 1 ${x2} ${y2}`;
-  const style = {
-    width: size,
-    height: size,
-    '--hv3-lx': `${lx + PAD}px`,
-    '--hv3-ly': `${ly + PAD}px`,
-  } as CSSProperties;
 
   return (
     <div
       aria-hidden
       className={cn('hv3-orbit', closed && 'hv3-orbit--closed', className)}
-      style={style}
     >
       <svg
         aria-hidden
@@ -82,6 +74,11 @@ export function Orbit({
             <stop offset='0.55' stopOpacity='1' />
             <stop offset='1' stopOpacity='0' />
           </linearGradient>
+          <radialGradient id={`${id}-light`}>
+            <stop offset='0' stopOpacity='0.14' />
+            <stop offset='0.4' stopOpacity='0.08' />
+            <stop offset='1' stopOpacity='0' />
+          </radialGradient>
           <filter
             id={`${id}-blur`}
             x='-50%'
@@ -92,6 +89,15 @@ export function Orbit({
             <feGaussianBlur stdDeviation='7' />
           </filter>
         </defs>
+        {closed ? null : (
+          <circle
+            cx={lx}
+            cy={ly}
+            r={450}
+            fill={`url(#${id}-light)`}
+            className='hv3-orbit__light'
+          />
+        )}
         {rings.map((diameter, index) => (
           <circle
             key={diameter}

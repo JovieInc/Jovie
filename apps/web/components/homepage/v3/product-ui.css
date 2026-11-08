@@ -6,8 +6,8 @@
 
 .hv3-ui-i {
   flex: none;
-  width: 16px;
-  height: 16px;
+  width: 1rem;
+  height: 1rem;
   stroke-width: 1.5;
 }
 
@@ -21,7 +21,7 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--hv3-shell);
   box-shadow: var(--hv3-cast);
   transform-style: preserve-3d;
@@ -56,8 +56,8 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 640px;
-  height: 280px;
+  width: 40rem;
+  height: 17.5rem;
   background: radial-gradient(
     60% 70% at 0 0,
     color-mix(in srgb, var(--hv3-ion) 10%, transparent),
@@ -70,22 +70,22 @@
 .hv3-app__bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 40px;
-  padding-left: 16px;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding-left: 1rem;
   border-bottom: 1px solid var(--hv3-b1);
 }
 
 .hv3-app__bar i {
-  width: 12px;
-  height: 12px;
+  width: 0.75rem;
+  height: 0.75rem;
   border-radius: 50%;
   background: var(--hv3-floating);
 }
 
 .hv3-app__body {
   position: absolute;
-  top: 40px;
+  top: 2.5rem;
   right: 0;
   bottom: 0;
   left: 0;
@@ -93,36 +93,36 @@
 }
 
 .hv3-side {
-  width: 244px;
-  padding: 14px 8px;
+  width: 15.25rem;
+  padding: 0.875rem 0.5rem;
   border-right: 1px solid var(--hv3-b1);
   color: var(--hv3-t2);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .hv3-side__top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 28px;
-  padding: 4px 8px 0;
+  height: 1.75rem;
+  padding: 0.25rem 0.5rem 0;
 }
 
 .hv3-side__mark,
 .hv3-side__mark svg {
-  width: 22px;
-  height: 22px;
+  width: 1.375rem;
+  height: 1.375rem;
   color: var(--hv3-t1);
 }
 
 .hv3-side__search {
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 32px;
-  margin-top: 16px;
-  padding: 0 10px;
-  border-radius: 999px;
+  gap: 0.5rem;
+  height: 2rem;
+  margin-top: 1rem;
+  padding: 0 0.625rem;
+  border-radius: var(--radius-pill);
   background: var(--hv3-panel);
   box-shadow: inset 0 0 0 1px var(--hv3-b1);
   color: var(--hv3-t4);
@@ -131,10 +131,10 @@
 .hv3-side__inbox {
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 32px;
-  margin-top: 10px;
-  padding: 0 2px 0 10px;
+  gap: 0.5rem;
+  height: 2rem;
+  margin-top: 0.625rem;
+  padding: 0 2px 0 0.625rem;
 }
 
 .hv3-side__inbox > span {
@@ -150,20 +150,20 @@
 .hv3-side__count {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 1.375rem;
+  height: 1.375rem;
   border-radius: 50%;
   background: var(--hv3-ion);
   color: var(--hv3-canvas);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
 }
 
 .hv3-side__new {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 1.875rem;
+  height: 1.875rem;
   border-radius: 50%;
   background: var(--hv3-elevated);
   color: var(--hv3-t1);
@@ -172,16 +172,16 @@
 .hv3-side__nav {
   display: grid;
   gap: 2px;
-  margin-top: 20px;
+  margin-top: 1.25rem;
 }
 
 .hv3-side__nav span {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: 6px;
+  gap: 0.625rem;
+  height: 1.75rem;
+  padding: 0 0.625rem;
+  border-radius: 0.375rem;
 }
 
 .hv3-sheen {
@@ -189,7 +189,7 @@
   top: 0;
   bottom: 0;
   left: 0;
-  width: 244px;
+  width: 15.25rem;
   background: linear-gradient(
     125deg,
     color-mix(in srgb, var(--hv3-light) 7%, transparent),
@@ -199,75 +199,75 @@
 }
 
 .hv3-main {
-  width: 604px;
+  width: 37.75rem;
   background: var(--hv3-canvas);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .hv3-main__head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 52px;
-  padding: 0 12px;
+  gap: 0.5rem;
+  height: 3.25rem;
+  padding: 0 0.75rem;
   border-bottom: 1px solid var(--hv3-b1);
 }
 
 .hv3-main__head b {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
 }
 
 .hv3-main__head > span {
   color: var(--hv3-t3);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .hv3-main__search {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 28px;
+  gap: 0.625rem;
+  height: 1.75rem;
   margin-left: auto;
-  padding: 0 4px 0 10px;
-  border-radius: 7px;
+  padding: 0 0.25rem 0 0.625rem;
+  border-radius: 0.4375rem;
   box-shadow: inset 0 0 0 1px var(--hv3-b2);
   color: var(--hv3-t3);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .hv3-kbd {
-  padding: 4px 5px;
-  border-radius: 5px;
+  padding: 0.25rem 0.3125rem;
+  border-radius: 0.3125rem;
   background: var(--hv3-elevated);
   box-shadow: inset 0 0 0 1px var(--hv3-b1);
   color: var(--hv3-t3);
-  font: 500 10px / 1 var(--hv3-ui);
+  font: 500 0.625rem / 1 var(--hv3-ui);
 }
 
 .hv3-main__cols {
   display: grid;
-  grid-template-columns: 1fr 108px 72px 40px;
+  grid-template-columns: 1fr 6.75rem 4.5rem 2.5rem;
   align-items: center;
-  height: 36px;
-  padding: 0 12px;
+  height: 2.25rem;
+  padding: 0 0.75rem;
   border-bottom: 1px solid var(--hv3-b1);
   color: var(--hv3-t4);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .hv3-main__cols span:nth-child(3) {
-  padding-right: 4px;
+  padding-right: 0.25rem;
   text-align: right;
 }
 
 .hv3-rrow {
   position: relative;
   display: grid;
-  grid-template-columns: 52px 1fr 108px 72px 40px;
+  grid-template-columns: 3.25rem 1fr 6.75rem 4.5rem 2.5rem;
   align-items: center;
-  height: 64px;
-  padding: 0 12px;
+  height: 4rem;
+  padding: 0 0.75rem;
   border-bottom: 1px solid var(--hv3-b1);
 }
 
@@ -277,7 +277,7 @@
 
 .hv3-rrow__t b {
   display: block;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 400;
   letter-spacing: -0.005em;
 }
@@ -286,28 +286,28 @@
   display: block;
   margin-top: 2px;
   color: var(--hv3-t3);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .hv3-rrow__p {
   display: flex;
-  gap: 6px;
+  gap: 0.375rem;
 }
 
 .hv3-dsp {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 1.5rem;
+  height: 1.5rem;
   border-radius: 50%;
   background: var(--hv3-panel);
   box-shadow: inset 0 0 0 1px var(--hv3-b1);
 }
 
 .hv3-rrow__y {
-  padding-right: 4px;
+  padding-right: 0.25rem;
   color: var(--hv3-t2);
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-align: right;
 }
 
@@ -322,11 +322,11 @@
 }
 
 .hv3-rrow--plate {
-  grid-template-columns: 52px 1fr 100px;
+  grid-template-columns: 3.25rem 1fr 6.25rem;
 }
 
 .hv3-main__cols--plate {
-  grid-template-columns: 1fr 100px;
+  grid-template-columns: 1fr 6.25rem;
 }
 
 /* ── Inspector ────────────────────────────────────────────────────── */
@@ -334,7 +334,7 @@
 .hv3-insp {
   position: absolute;
   inset: 0;
-  padding: 16px 20px;
+  padding: 1rem 1.25rem;
   background: var(--hv3-elevated);
   color: var(--hv3-t1);
 }
@@ -342,27 +342,27 @@
 .hv3-insp__head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .hv3-insp__head b {
   display: block;
-  font-size: 17px;
+  font-size: 1.0625rem;
   font-weight: 400;
 }
 
 .hv3-insp__head span {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 4px;
+  gap: 0.375rem;
+  margin-top: 0.25rem;
   color: var(--hv3-t3);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .hv3-insp__ok {
-  width: 15px;
-  height: 15px;
+  width: 0.9375rem;
+  height: 0.9375rem;
   color: var(--color-success);
 }
 
@@ -374,21 +374,21 @@
 .hv3-insp__tabs {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  margin-top: 18px;
-  padding: 3px;
-  border-radius: 999px;
+  margin-top: 1.125rem;
+  padding: 0.1875rem;
+  border-radius: var(--radius-pill);
   background: var(--hv3-canvas);
   box-shadow: inset 0 0 0 1px var(--hv3-b1);
   color: var(--hv3-t2);
-  font-size: 14px;
+  font-size: 0.875rem;
   text-align: center;
 }
 
 .hv3-insp__tabs span {
   display: grid;
   place-items: center;
-  height: 32px;
-  border-radius: 999px;
+  height: 2rem;
+  border-radius: var(--radius-pill);
 }
 
 .hv3-insp__tabs [data-active="true"] {
@@ -398,28 +398,28 @@
 }
 
 .hv3-insp__rows {
-  margin-top: 18px;
-  font-size: 13px;
+  margin-top: 1.125rem;
+  font-size: 0.8125rem;
 }
 
 .hv3-insp__rows > div {
   display: grid;
-  grid-template-columns: 24px 112px 1fr;
+  grid-template-columns: 1.5rem 7rem 1fr;
   align-items: center;
-  height: 36px;
+  height: 2.25rem;
   color: var(--hv3-t3);
 }
 
 .hv3-insp__rows > div[data-gap="true"] {
-  margin-top: 12px;
+  margin-top: 0.75rem;
 }
 
 .hv3-insp__rows dd {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 0.375rem;
   color: var(--hv3-t2);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .hv3-insp__rows dd.hv3-upc {
@@ -431,15 +431,15 @@
 }
 
 .hv3-chip {
-  padding: 4px 10px;
-  border-radius: 999px;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-pill);
   background: var(--hv3-floating);
   color: var(--hv3-t2);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .hv3-chip--line {
-  border-radius: 7px;
+  border-radius: 0.4375rem;
   background: none;
   box-shadow: inset 0 0 0 1px var(--hv3-b2);
 }
@@ -449,20 +449,21 @@
   background: var(--hv3-canvas);
   box-shadow:
     inset 0 0 0 1px var(--hv3-b1),
-    inset 12px 16px 40px color-mix(in srgb, var(--hv3-shade) 90%, transparent);
+    inset 0.75rem 1rem 2.5rem
+    color-mix(in srgb, var(--hv3-shade) 90%, transparent);
 }
 
 /* Covers keep the square: contain, never crop (DESIGN.md art rules). */
 .hv3 .hv3-cover {
-  border-radius: 5px;
+  border-radius: 0.3125rem;
   object-fit: contain;
 }
 
 .hv3 .hv3-insp__head .hv3-cover,
 .hv3 .hv3-pp__art .hv3-cover {
-  border-radius: 6px;
+  border-radius: 0.375rem;
 }
 
 .hv3 .hv3-rp__art .hv3-cover {
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
 }

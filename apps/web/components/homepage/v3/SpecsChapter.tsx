@@ -8,7 +8,6 @@ import { ReleaseInspector } from './ProductUi';
 import { Callout, CommandPaletteCard } from './Surfaces';
 
 const SPECS = HOMEPAGE_EDITORIAL_COPY.specs;
-const OWNER = 'apps/web/components/homepage/v3/SpecsChapter.tsx';
 
 interface SheetCell {
   readonly value: string;
@@ -43,10 +42,7 @@ function Meter() {
     (_, index) => index
   );
   return (
-    <div
-      className='hv3-meter'
-      style={{ '--hv3-meter-n': HOME_SPEC.recognised } as React.CSSProperties}
-    >
+    <div className='hv3-meter'>
       {segments.map(index => (
         <i
           key={index}
@@ -57,27 +53,30 @@ function Meter() {
   );
 }
 
-/** 03 specs: the tech-specs sheet, then the ⌘K and inspector moments. */
+/**
+ * 03 specs: the tech-specs sheet, then the ⌘K and inspector moments. It
+ * renders with the releases chapter (the product-gallery binding) and has no
+ * copy slots: its numbers derive from the DSP registry.
+ */
 export function SpecsChapter() {
   const services = SPECS.services;
   return (
     <section
       id='specs'
       data-pen-section='specs'
-      data-testid='marketing-section-specs'
-      data-marketing-owner={OWNER}
+      data-accent='ion'
       className='hv3 hv3-chapter hv3-specs'
     >
       <div className='hv3-rule'>
-        <span className='hv3-mono'>03 · specs</span>
+        <span className='hv3-mono'>{HOMEPAGE_EDITORIAL_COPY.specsRule}</span>
       </div>
       <div className='hv3-specs__head hv3-reveal'>
-        <h2 className='hv3-statement'>{SPECS.headline}</h2>
+        <h2 className='hv3-statement text-balance'>{SPECS.headline}</h2>
         <p className='hv3-body'>{SPECS.body}</p>
       </div>
       <div className='hv3-sheet hv3-reveal'>
         <div className='hv3-sheet__row'>
-          <h3 className='hv3-sheet__label'>{services.label}</h3>
+          <h3 className='hv3-sheet__label text-balance'>{services.label}</h3>
           <Cell
             large
             cell={{ value: String(HOME_SPEC.listen), ...services.listen }}
@@ -98,7 +97,7 @@ export function SpecsChapter() {
         </div>
         {SPECS.rows.map(row => (
           <div key={row.label} className='hv3-sheet__row'>
-            <h3 className='hv3-sheet__label'>{row.label}</h3>
+            <h3 className='hv3-sheet__label text-balance'>{row.label}</h3>
             {row.cells.map(cell => (
               <Cell key={cell.title} cell={cell} />
             ))}

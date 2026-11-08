@@ -39,9 +39,11 @@ export const HOMEPAGE_EDITORIAL_COPY = {
     secondaryHref: TIM_WHITE_PROFILE.publicProfilePath,
     note: 'jovie opens by invitation',
     windowLabel:
-      'Jovie for Mac: Tim White’s releases with Supernova Girl open in the inspector',
+      'Jovie for Mac: the Releases list with Supernova Girl open in the inspector',
     upcCallout: 'per release',
   },
+  /** Chapter rule shown at the top of the specs chapter. */
+  specsRule: '03 · specs',
   /** Chapter index (mono, lowercase, as approved). */
   chapters: ['profile', 'releases', 'specs', 'invitation'],
   chaptersLabel: 'On this page',
@@ -331,6 +333,7 @@ export const HOMEPAGE_PRODUCT_UI = {
     ],
   },
   keys: { command: 'command' },
+  escapeKey: 'Esc',
 } as const;
 
 export const HOMEPAGE_HEADLINE_BREAKS: Readonly<

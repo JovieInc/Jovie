@@ -76,7 +76,16 @@ const HOMEPAGE_SOURCES = [
   'components/homepage/HomepageSpecSections.tsx',
 ] as const;
 
-const HOMEPAGE_STYLES = ['components/homepage/HomepageEditorial.css'] as const;
+const HOMEPAGE_STYLES = [
+  'components/homepage/v3/stage.css',
+  'components/homepage/v3/product-ui.css',
+  'components/homepage/v3/surfaces.css',
+  'components/homepage/v3/phone.css',
+  'components/homepage/v3/chapters.css',
+  'components/homepage/v3/specs.css',
+  'components/homepage/v3/form.css',
+  'components/homepage/v3/responsive.css',
+] as const;
 
 const PRICE_TEXT = /\$\s?\d|\d+\s?\/\s?mo\b|\bper month\b|\b\d+-day\b/i;
 
@@ -133,6 +142,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     ).toEqual([
       copy.profile.headline,
       copy.releases.headline,
+      copy.specs.headline,
       copy.invite.headline,
     ]);
   });
@@ -196,18 +206,21 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     const sources = [...container.querySelectorAll('section img')].map(image =>
       (image.getAttribute('src') ?? '').replace(/\?v=\w+$/, '')
     );
-    // Canonical v1 (receipt home-canonical-v1): the matte signal field, Tim
-    // White's own profile photo and the featured release in the phone, then
-    // his four real release covers. No stock or generated person.
-    expect(sources).toEqual([
-      '/assets/generated/homepage-hero-signal-grain-v1.webp',
+    // Approved v3 (receipt home-canonical-v3): Tim White's own profile photo
+    // and his real release covers inside the live product UI. Nothing else,
+    // and the only person shown is Tim (his avatar and Never Say A Word).
+    const allowed = [
       '/images/avatars/tim-white-profile.jpg',
       '/img/releases/never-say-a-word.jpg',
-      '/img/releases/never-say-a-word.jpg',
       '/img/releases/take-me-over-remix.jpg',
-      '/img/releases/the-deep-end-art.jpg',
+      '/img/releases/doge-to-mars.jpg',
       '/img/releases/tomorrow-sounds.jpg',
-    ]);
+      '/img/releases/supernova-girl.jpg',
+      '/img/releases/this-is-love.jpg',
+    ];
+    expect(sources.length).toBeGreaterThan(0);
+    expect(sources.filter(src => !allowed.includes(src))).toEqual([]);
+    expect([...new Set(sources)].sort()).toEqual([...allowed].sort());
     expect(copy.profile.alt).toBeTruthy();
   });
 

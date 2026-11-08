@@ -8,9 +8,10 @@ import { useEffect } from 'react';
  * 1. Callouts and the catalog connector follow anchors inside the 3D rigs, so
  *    they are placed from projected geometry after layout, on resize and once
  *    fonts load. They move by transform and fade in, never by layout.
- * 2. Motion (skipped under prefers-reduced-motion): fade-ups for sections
- *    below the fold, the hero inspector's scroll parallax, the Orbit light
- *    sweep, and ⌘K typing "releases" then selecting the Releases row.
+ * 2. Motion (skipped under prefers-reduced-motion): the hero inspector's
+ *    scroll parallax, the Orbit light sweep (CSS, enabled by a class), and ⌘K
+ *    typing "releases" then selecting the Releases row. Fade-ups are CSS
+ *    scroll-driven animations in stage.css and need no script.
  */
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -79,28 +80,6 @@ function drawConnectors() {
   }
 }
 
-function startReveals(): () => void {
-  const pending = [
-    ...document.querySelectorAll<HTMLElement>('.hv3-reveal'),
-  ].filter(element => element.getBoundingClientRect().top > innerHeight);
-  for (const element of document.querySelectorAll('.hv3-reveal')) {
-    if (!pending.includes(element as HTMLElement))
-      element.classList.add('hv3-in');
-  }
-  const observer = new IntersectionObserver(
-    entries => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        entry.target.classList.add('hv3-in');
-        observer.unobserve(entry.target);
-      }
-    },
-    { threshold: 0.15 }
-  );
-  for (const element of pending) observer.observe(element);
-  return () => observer.disconnect();
-}
-
 function startParallax(): () => void {
   const lift = document.querySelector<HTMLElement>('[data-hv3-parallax]');
   if (!lift) return () => undefined;
@@ -120,35 +99,42 @@ function startParallax(): () => void {
 }
 
 function startPaletteTyping(word: string, target: string): () => void {
-  const palette = document.querySelector<HTMLElement>('[data-hv3-palette]');
-  const query = palette?.querySelector<HTMLElement>('[data-hv3-query]');
-  if (!palette || !query) return () => undefined;
+  const host = document.querySelector<HTMLElement>('[data-hv3-palette]');
+  const field = host?.querySelector<HTMLElement>('[data-hv3-query]');
+  if (!host || !field) return () => undefined;
+  const palette: HTMLElement = host;
+  const query: HTMLElement = field;
   const timers: number[] = [];
   const observer = new IntersectionObserver(
     entries => {
       if (!entries[0]?.isIntersecting) return;
       observer.disconnect();
-      let typed = 0;
-      query.dataset.typing = 'true';
-      query.textContent = '';
-      const tick = window.setInterval(() => {
-        typed += 1;
-        query.textContent = word.slice(0, typed);
-        if (typed < word.length) return;
-        window.clearInterval(tick);
-        timers.push(
-          window.setTimeout(() => {
-            for (const row of palette.querySelectorAll<HTMLElement>('li')) {
-              row.dataset.selected =
-                row.dataset.hv3Row === target ? 'true' : 'false';
-            }
-          }, 260)
-        );
-      }, 120);
-      timers.push(tick);
+      // A beat after the palette settles in view, so the reader sees the
+      // resting state before the query types.
+      timers.push(window.setTimeout(typeQuery, 900));
     },
     { threshold: 0.6 }
   );
+  function typeQuery() {
+    let typed = 0;
+    query.dataset.typing = 'true';
+    query.textContent = '';
+    const tick = window.setInterval(() => {
+      typed += 1;
+      query.textContent = word.slice(0, typed);
+      if (typed < word.length) return;
+      window.clearInterval(tick);
+      timers.push(
+        window.setTimeout(() => {
+          for (const row of palette.querySelectorAll<HTMLElement>('li')) {
+            row.dataset.selected =
+              row.dataset.hv3Row === target ? 'true' : 'false';
+          }
+        }, 260)
+      );
+    }, 120);
+    timers.push(tick);
+  }
   observer.observe(palette);
   return () => {
     observer.disconnect();
@@ -179,7 +165,6 @@ export function StageMotion({
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
       document.documentElement.classList.add('hv3-motion');
       cleanups.push(
-        startReveals(),
         startParallax(),
         startPaletteTyping(paletteQuery, paletteTarget),
         () => document.documentElement.classList.remove('hv3-motion')

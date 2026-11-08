@@ -56,16 +56,16 @@ export function HomepageProfilePhone({
         </span>
         <p className='hv3-pp__name'>
           {TIM_WHITE_PROFILE.name}
-          <Anchor id='name' style={{ right: -4 }} />
+          <Anchor id='name' className='hv3-anchor--after-tight' />
         </p>
         <p className='hv3-pp__handle'>
           {TIM_WHITE_PROFILE.publicProfileDisplay}
-          <Anchor id='handle' style={{ right: -6 }} />
+          <Anchor id='handle' className='hv3-anchor--after' />
         </p>
       </div>
       <div className='hv3-pp__acts' aria-hidden>
         <span className='hv3-pp__upd'>
-          <Anchor id='updates' style={{ left: -2 }} />
+          <Anchor id='updates' className='hv3-anchor--start' />
           <Bell className='hv3-ui-i' />
           {PHONE_COPY.getUpdates}
         </span>
