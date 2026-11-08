@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { expect, type Page, type TestInfo, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 // Screenshot and e2e configs have separate testDirs; retain the H1 checks in both.
 import '../e2e/marketing-headings-visual.spec';
 import { MARKETING_EXACT_PUBLIC_ROUTE_TARGETS } from '@/data/marketing';
@@ -14,158 +14,42 @@ import { installPublicRouteMocks } from '../e2e/utils/public-surface-helpers';
 import {
   inspectRouteDom,
   installLayoutShiftObserver,
-  MARKETING_TASTE_FINDING_KINDS,
   measureLayoutShift,
   ROUTE_DOM_CERTIFICATION_SCHEMA,
-  type RouteDomFindingKind,
 } from '../e2e/utils/route-dom-detector';
 import { inspectShellMaterial } from '../e2e/utils/shell-material-detector';
 import { waitForHydration } from '../e2e/utils/smoke-test-utils';
 import {
   isExternalBaseUrl,
   primeOriginBoundVercelBypass,
-  requireExactNavigationOrigin,
 } from '../helpers/vercel-preview';
+import {
+  axisSection,
+  busyImg,
+  certificationScope,
+  deploymentId,
+  exactBaseUrl,
+  expectDeliberateRed,
+  flatImg,
+  isTasteKind,
+  outputRoot,
+  prepareProfileState,
+  profileRoute,
+  profileStates,
+  profileViewports,
+  safeName,
+  sourceGitSha,
+  tasteBaseline,
+  tasteBaselinePath,
+  updateTasteBaseline,
+  writeSnapshot,
+} from './route-dom-certification-support';
 
 // Invariant consumer: JOV-INV-019.
 // Canon evidence: certifies marketing routes and public-profile open states against the rendered DOM.
 // Deliberate red: rejects overlap, text dumps, duplicate heroes, semantic duplicates, narrow sheets, clipped content, raw controls, and low image-aware contrast behind glyphs and header controls.
 
-const profileRoute = '/unfazed';
-const outputRoot = path.resolve(
-  process.env.ROUTE_DOM_CERTIFICATION_OUTPUT_DIR ??
-    'test-results/route-dom-certification'
-);
-const sourceGitSha =
-  process.env.EXPECTED_COMMIT_SHA ??
-  process.env.GITHUB_SHA ??
-  'local-uncommitted';
-const deploymentId = process.env.EXPECTED_PRODUCTION_DEPLOYMENT_ID ?? null;
-const certificationScope = process.env.ROUTE_DOM_CERTIFICATION_SCOPE ?? 'all';
-
 test.describe.configure({ retries: 0 });
-
-// Marketing taste kinds are ratcheted: existing routes may not exceed their
-// recorded count per route/viewport/kind, and new routes start at zero.
-// Regenerate after fixes with UPDATE_ROUTE_DOM_TASTE_BASELINE=1.
-const tasteBaselinePath = path.resolve(
-  'tests/product-screenshots/route-dom-marketing-baseline.json'
-);
-const tasteBaseline: Record<string, number> = JSON.parse(
-  readFileSync(tasteBaselinePath, 'utf8')
-);
-const updateTasteBaseline = process.env.UPDATE_ROUTE_DOM_TASTE_BASELINE === '1';
-const isTasteKind = (kind: string): boolean =>
-  (MARKETING_TASTE_FINDING_KINDS as readonly string[]).includes(kind);
-
-const profileViewports = [
-  { width: 390, height: 844 },
-  { width: 768, height: 1024 },
-  { width: 1440, height: 900 },
-  { width: 1920, height: 1080 },
-] as const;
-
-const profileStates = [
-  { id: 'menu', kind: 'drawer', trigger: 'Menu' },
-  { id: 'share', kind: 'drawer-menuitem', trigger: 'Share Profile' },
-  { id: 'pay', kind: 'drawer-menuitem', trigger: 'Pay' },
-  { id: 'contact', kind: 'drawer-menuitem', trigger: 'Contact' },
-  { id: 'credits', kind: 'drawer-menuitem', trigger: 'Release credits' },
-  { id: 'tab-home', kind: 'tab', trigger: 'Home' },
-  { id: 'tab-music', kind: 'tab', trigger: 'Music' },
-  { id: 'tab-events', kind: 'tab', trigger: 'Events' },
-  { id: 'tab-about', kind: 'tab', trigger: 'About' },
-] as const;
-
-function safeName(value: string): string {
-  return value.replace(/^\/+/, '').replace(/[^a-z0-9]+/gi, '-') || 'home';
-}
-
-async function writeSnapshot(
-  relativePath: string,
-  payload: unknown
-): Promise<void> {
-  const outputPath = path.join(outputRoot, relativePath);
-  await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
-}
-
-function exactBaseUrl(testInfo: TestInfo): string {
-  const baseURL = testInfo.project.use.baseURL;
-  if (typeof baseURL !== 'string') {
-    throw new Error('Route DOM certification requires an exact baseURL.');
-  }
-  return requireExactNavigationOrigin(baseURL);
-}
-
-// Vaul hardcodes `transition: transform .5s cubic-bezier(...)` on
-// [data-vaul-drawer] regardless of prefers-reduced-motion (emulateMedia
-// above has no effect on it: it's a plain CSS transition the library sets
-// itself, not one gated behind a media query). A `waitForTimeout` shorter
-// than that leaves the sheet mid-slide when a screenshot-based check runs,
-// and a slide is a real, uncomposited-color-shifting transform: the
-// contrast detector's pixel sampling picked up a genuinely different,
-// run-to-run-varying frame instead of the settled one. Poll the drawer's
-// own transform until two consecutive reads agree instead of guessing a
-// fixed delay.
-async function waitForDrawerToSettle(page: Page): Promise<void> {
-  const drawer = page.locator('[data-vaul-drawer]').first();
-  if ((await drawer.count()) === 0) return;
-  let previous: string | null = null;
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const current = await drawer.evaluate(el => getComputedStyle(el).transform);
-    if (current === previous) return;
-    previous = current;
-    await page.waitForTimeout(50);
-  }
-  // Retry budget exhausted without two consecutive matching reads: surface
-  // it instead of silently proceeding on a transform that may still be
-  // moving, so a future flake here points straight at this wait rather than
-  // back through the same false-positive investigation that added it.
-  console.warn(
-    `waitForDrawerToSettle: transform did not stabilize after 1s (last read: ${previous})`
-  );
-}
-
-async function prepareProfileState(
-  page: Page,
-  state: (typeof profileStates)[number]
-): Promise<void> {
-  if (state.kind === 'tab') {
-    const tab = page.getByRole('button', { name: state.trigger, exact: true });
-    await tab.click();
-    await expect(tab).toHaveAttribute('aria-current', 'page');
-    return;
-  }
-
-  const menu = page.getByRole('button', { name: 'Menu', exact: true });
-  await menu.click();
-  await expect(page.getByTestId('profile-menu-drawer')).toBeVisible();
-  await waitForDrawerToSettle(page);
-  if (state.kind === 'drawer') return;
-
-  await page
-    .getByRole('menuitem', { name: state.trigger, exact: true })
-    .click();
-  if (state.id === 'credits') {
-    await expect(page.getByRole('dialog', { name: 'Credits' })).toBeVisible();
-    return;
-  }
-  await expect(page.getByTestId('profile-menu-drawer')).toBeVisible();
-  // The secondary panel (e.g. Pay) is taller than the root menu list, so
-  // Vaul re-measures and re-transitions the drawer's own height/transform a
-  // second time here, independent of the settle-wait above.
-  await waitForDrawerToSettle(page);
-}
-
-async function expectDeliberateRed(
-  page: Page,
-  surface: 'marketing' | 'public-profile',
-  kind: RouteDomFindingKind
-): Promise<void> {
-  const snapshot = await inspectRouteDom(page, { surface });
-  expect(snapshot.findings.map(finding => finding.kind)).toContain(kind);
-}
 
 test.describe('Route DOM detector deliberate-red fixtures', () => {
   // JOV-7710 / AM-017: one semantic level reads as one material.
@@ -404,6 +288,119 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
       '<main><section><h1>Card</h1><figure><p>Your name</p></figure></section></main>'
     );
     await expectDeliberateRed(page, 'marketing', 'placeholder-copy');
+  });
+
+  const kindsOf = async (html: string): Promise<string[]> => {
+    await page_ref.setContent(html);
+    return (
+      await inspectRouteDom(page_ref, { surface: 'marketing' })
+    ).findings.map(finding => finding.kind);
+  };
+  let page_ref: Page;
+  test.beforeEach(({ page }) => {
+    page_ref = page;
+  });
+
+  test('blank-media: flags a near-uniform image in a designed section', async () => {
+    expect(
+      await kindsOf(
+        `<main><section data-pen-section="hero"><h1>Product</h1><img src="${flatImg}" width="600" height="400" alt="Dashboard"></section></main>`
+      )
+    ).toContain('blank-media');
+  });
+
+  test('blank-media: ignores a busy image and a data-decorative image', async () => {
+    expect(
+      await kindsOf(
+        `<main><section data-pen-section="hero"><h1>Product</h1><img src="${busyImg}" width="600" height="400" alt="Dashboard"></section></main>`
+      )
+    ).not.toContain('blank-media');
+    expect(
+      await kindsOf(
+        `<main><section data-pen-section="hero"><h1>Product</h1><img data-decorative src="${flatImg}" width="600" height="400" alt=""></section></main>`
+      )
+    ).not.toContain('blank-media');
+  });
+
+  test('placeholder-copy: flags common placeholders in text, alt and aria', async () => {
+    for (const html of [
+      '<p>Your Name</p>',
+      '<p>Lorem ipsum dolor sit amet</p>',
+      '<p>Your profile lives at jov.ie/you today.</p>',
+      '<p>Posted by John Doe</p>',
+      '<span class="avatar">YN</span>',
+      '<h3>Untitled</h3>',
+      '<p>TBD</p>',
+      '<img alt="Your Name" width="200" height="200" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">',
+      '<div role="img" aria-label="John Doe profile" style="width:40px;height:40px"></div>',
+    ]) {
+      expect(
+        await kindsOf(`<main><section><h1>Card</h1>${html}</section></main>`),
+        html
+      ).toContain('placeholder-copy');
+    }
+  });
+
+  test('placeholder-copy: leaves real copy alone (word boundaries)', async () => {
+    for (const html of [
+      '<p>Claim your name before someone else does.</p>',
+      '<p>Your profile lives at jov.ie/yourname today.</p>',
+      '<h3>Untitled Goose Game soundtrack</h3>',
+      '<span>YN</span>',
+      '<p>Stubborn tbdx and Doe the deer.</p>',
+      '<img alt="Tim White on stage" width="200" height="200" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">',
+    ]) {
+      expect(
+        await kindsOf(`<main><section><h1>Card</h1>${html}</section></main>`),
+        html
+      ).not.toContain('placeholder-copy');
+    }
+  });
+
+  test('axis-mixing: flags centre, left, centre and a centred hero over left chapters', async () => {
+    expect(
+      await kindsOf(
+        `<main>${axisSection('center')}${axisSection('left')}${axisSection('center')}</main>`
+      )
+    ).toContain('axis-mixing');
+    expect(
+      await kindsOf(
+        `<main>${axisSection('center')}${axisSection('left')}${axisSection('left')}</main>`
+      )
+    ).toContain('axis-mixing');
+  });
+
+  test('axis-mixing: allows one axis, a lone closing switch, and a declared data-axis', async () => {
+    expect(
+      await kindsOf(
+        `<main>${axisSection('left')}${axisSection('left')}${axisSection('left')}</main>`
+      )
+    ).not.toContain('axis-mixing');
+    expect(
+      await kindsOf(
+        `<main>${axisSection('left')}${axisSection('left')}${axisSection('center')}</main>`
+      )
+    ).not.toContain('axis-mixing');
+    expect(
+      await kindsOf(
+        `<main>${axisSection('center', 'data-axis="center"')}${axisSection('left')}${axisSection('center', 'data-axis="center"')}${axisSection('left')}</main>`
+      )
+    ).not.toContain('axis-mixing');
+  });
+
+  test('overlay-on-proof: flags a consent banner over section media, not one clear of it', async () => {
+    const media = `<section data-pen-section="proof"><h2>Proof</h2><img src="${busyImg}" width="600" height="400" alt="Product" style="display:block"></section>`;
+    const banner = (pos: string) =>
+      `<aside style="position:fixed;${pos};width:500px;height:220px;background:#222">Cookies</aside>`;
+    await page_ref.setViewportSize({ width: 1000, height: 600 });
+    expect(
+      await kindsOf(`<main>${media}</main>${banner('left:0;bottom:0')}`)
+    ).toContain('overlay-on-proof');
+    expect(
+      await kindsOf(
+        `<main>${media}</main>${banner('left:0;bottom:0').replace('bottom:0', 'top:2000px')}`
+      )
+    ).not.toContain('overlay-on-proof');
   });
 
   test('rejects a one-word last line in a headline', async ({ page }) => {

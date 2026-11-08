@@ -3,8 +3,8 @@
 import { ChatEntityPanelProvider } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import type { BandsintownConnectionStatus } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { TourDatesManager } from '@/components/features/dashboard/organisms/tour-dates';
-import { PageShell } from '@/components/organisms/PageShell';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
+import { TourDatesPageFrame } from './TourDatesPageFrame';
 
 interface TourDatesPageClientProps {
   readonly profileId: string;
@@ -20,13 +20,7 @@ export function TourDatesPageClient({
 }: Readonly<TourDatesPageClientProps>) {
   return (
     <ChatEntityPanelProvider resetKey={profileId}>
-      <PageShell
-        frame='none'
-        contentPadding='none'
-        surfaceMode='table'
-        data-testid='tour-dates-page'
-        contentClassName='min-h-0'
-      >
+      <TourDatesPageFrame testId='tour-dates-page'>
         <h1 className='sr-only'>Tour Dates</h1>
         <TourDatesManager
           key={profileId}
@@ -34,7 +28,7 @@ export function TourDatesPageClient({
           initialTourDates={initialTourDates}
           connectionStatus={connectionStatus}
         />
-      </PageShell>
+      </TourDatesPageFrame>
     </ChatEntityPanelProvider>
   );
 }

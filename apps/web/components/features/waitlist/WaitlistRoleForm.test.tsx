@@ -281,4 +281,32 @@ describe('WaitlistRoleForm', () => {
       'person@example.com'
     );
   });
+
+  it('chips presentation preselects Artist and maps Producer and Songwriter to one role', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ state: 'joined' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <WaitlistRoleForm
+        presentation='chips'
+        headingLevel={2}
+        title='Jovie opens by invitation.'
+        submitLabel='Request invite'
+        note='One email when your invite is ready. Nothing else.'
+      />
+    );
+    expect(screen.getByRole('radio', { name: 'Artist' })).toBeChecked();
+    fireEvent.click(screen.getByRole('radio', { name: 'Songwriter' }));
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'tim@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Request invite' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).role).toBe(
+      'producer_songwriter'
+    );
+    vi.unstubAllGlobals();
+  });
 });

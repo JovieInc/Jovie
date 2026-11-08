@@ -1,55 +1,159 @@
 // @coverage-via apps/web/tests/unit/home/homepage-contract.test.tsx
+import { ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+import { Fragment, type ReactNode } from 'react';
 import { WaitlistRoleForm } from '@/components/features/waitlist/WaitlistRoleForm';
-import { ArtistProfileSectionShell } from '@/components/marketing/artist-profile/ArtistProfileSectionShell';
-import { MarketingHero } from '@/components/marketing/MarketingHero';
-import { MarketingPhoneImage } from '@/components/marketing/MarketingPhoneImage';
-import { MarketingScreenshot } from '@/components/marketing/MarketingScreenshot';
+import { HomepageProfilePhone } from '@/components/homepage/HomepageProfilePhone';
 import {
   HOMEPAGE_EDITORIAL_COPY,
+  HOMEPAGE_HEADLINE_BREAKS,
   HOMEPAGE_INVITE_ANCHOR,
 } from '@/data/homepageEditorialCopy';
+import { HOMEPAGE_LATEST_RELEASE } from '@/data/homepageProductUi';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
-import './HomepageEditorial.css';
+import { HOME_SPEC } from './v3/home-spec';
+import { Orbit } from './v3/Orbit';
+import { AppWindow, CatalogPlate, ReleaseInspector } from './v3/ProductUi';
+import { Callout, ReleasePage } from './v3/Surfaces';
+import './v3/stage.css';
+import './v3/product-ui.css';
+import './v3/surfaces.css';
+import './v3/phone.css';
+import './v3/chapters.css';
+import './v3/specs.css';
+import './v3/form.css';
+import './v3/responsive.css';
+import './v3/cinema.css';
 
 const OWNER = 'apps/web/components/homepage/HomepageEditorial.tsx';
+const COPY = HOMEPAGE_EDITORIAL_COPY;
+const CHAPTER_ANCHORS = [
+  'feature-split',
+  'product-gallery',
+  'specs',
+  HOMEPAGE_INVITE_ANCHOR,
+];
 
 type HeroCopy = {
   readonly [K in keyof typeof HOMEPAGE_EDITORIAL_COPY.hero]: string;
 };
 
+/** The design's line breaks for a default headline; others wrap naturally. */
+function lines(text: string): ReactNode {
+  const parts = HOMEPAGE_HEADLINE_BREAKS[text] ?? [text];
+  return parts.map((line, index) => (
+    <Fragment key={line}>
+      <span className='hv3-line'>{line}</span>
+      {index < parts.length - 1 ? ' ' : null}
+    </Fragment>
+  ));
+}
+
+function ChapterRule({
+  index,
+  label,
+}: Readonly<{ index: string; label: string }>) {
+  return (
+    <div className='hv3-rule'>
+      <span className='hv3-mono'>{`${index} · ${label}`}</span>
+    </div>
+  );
+}
+
 /**
- * Hero: the locked line, one support sentence, one primary action that
- * scrolls to the on-page invitation form, and one quiet link to a real
- * profile. No signup link while public signup is closed.
+ * Hero: the locked line beside the lede and actions, then Jovie for Mac under
+ * the one camera, its inspector lifted out of the window, lit by the Orbit.
  */
 export function HomepageStoryHero({
   copy = HOMEPAGE_EDITORIAL_COPY.hero,
   headingId = 'home-hero-heading',
 }: Readonly<{ copy?: HeroCopy; headingId?: string }>) {
   return (
-    <MarketingHero
-      headline={HOMEPAGE_EDITORIAL_COPY.hero.headline}
-      subtitle={copy.subhead}
-      headingId={headingId}
-      testId='marketing-section-hero'
-      sectionVariant='centered-none'
-      sectionOwner={OWNER}
-      align='center'
-      headlineMaxLines={3}
-      className='homepage-editorial-hero'
-      primaryCta={{
-        label: copy.primaryAction,
-        href: copy.primaryHref,
-        testId: 'homepage-primary-cta',
-        prefetch: false,
-      }}
-      secondaryCta={{
-        label: copy.secondaryAction,
-        href: copy.secondaryHref,
-        testId: 'homepage-hero-live-profile',
-        prefetch: false,
-      }}
-    />
+    <section
+      data-pen-section='hero'
+      data-testid='marketing-section-hero'
+      data-marketing-variant='left-none'
+      data-accent='ion'
+      data-marketing-owner={OWNER}
+      aria-labelledby={headingId}
+      className='hv3 hv3-hero marketing-hero-dock'
+    >
+      <Orbit
+        id='hv3-orbit-hero'
+        rings={[1800, 1400, 1000]}
+        arc={[282, 34]}
+        arcRing={1}
+      />
+      <div className='hv3-hero__copy'>
+        <h1
+          id={headingId}
+          className='hv3-display marketing-hero-headline text-balance'
+        >
+          {lines(HOMEPAGE_EDITORIAL_COPY.hero.headline)}
+        </h1>
+        <div className='hv3-hero__side'>
+          <p className='hv3-lede marketing-hero-subtitle'>{copy.subhead}</p>
+          <div className='hv3-ctas'>
+            <Link
+              href={copy.primaryHref}
+              prefetch={false}
+              className='hv3-btn hv3-btn--primary'
+              data-testid='homepage-primary-cta'
+              data-primary-action='true'
+            >
+              {copy.primaryAction}
+            </Link>
+            <Link
+              href={copy.secondaryHref}
+              prefetch={false}
+              className='hv3-btn hv3-btn--ghost'
+              data-testid='homepage-hero-live-profile'
+            >
+              {copy.secondaryAction}
+              <ArrowRight className='size-4' aria-hidden />
+            </Link>
+          </div>
+          <p className='hv3-mono hv3-hero__note'>{COPY.hero.note}</p>
+        </div>
+      </div>
+      {/* Product mockups under the 3D camera: their boxes overlap by projection,
+          not by layout, so the DOM layout detectors skip them. */}
+      <div
+        className='hv3-stage hv3-stage--hero'
+        data-dom-certification='ignore'
+      >
+        <div className='hv3-bounce' />
+        <div
+          className='hv3-rig hv3-rig--hero'
+          role='img'
+          aria-label={COPY.hero.windowLabel}
+        >
+          <div className='hv3-window hv3-edge'>
+            <AppWindow />
+            <div className='hv3-sheen' />
+          </div>
+          <div
+            className='hv3-lift hv3-lift--inspector hv3-edge'
+            data-hv3-parallax
+          >
+            <ReleaseInspector anchor='upc' eager />
+          </div>
+        </div>
+        <Callout anchor='upc' label={COPY.hero.upcCallout} />
+      </div>
+      <nav className='hv3-index' aria-label={COPY.chaptersLabel}>
+        {COPY.chapters.map((label, index) => (
+          <a
+            key={label}
+            href={`#${CHAPTER_ANCHORS[index]}`}
+            className='hv3-mono'
+          >
+            <b>{`0${index + 1}`}</b>
+            {label}
+          </a>
+        ))}
+      </nav>
+    </section>
   );
 }
 
@@ -58,111 +162,187 @@ interface ChapterCopy {
   readonly body: string;
 }
 
-/** jov.ie/you: the profile, shown as the real template capture. */
+/** 01 profile: the featured artist's profile, with what it does in three rows. */
 export function HomepageProfileChapter({
   copy = HOMEPAGE_EDITORIAL_COPY.profile,
 }: Readonly<{ copy?: ChapterCopy }>) {
-  const media = HOMEPAGE_EDITORIAL_COPY.profile;
+  const media = COPY.profile;
   return (
-    <ArtistProfileSectionShell
-      className='homepage-editorial-chapter homepage-editorial-chapter--profile'
-      containerClassName='homepage-editorial-split'
-      sectionId='feature-split'
-      sectionVariant='phone-right'
-      sectionOwner={OWNER}
-      penContractId={MARKETING_PEN_CONTRACT_IDS.section.featureSplit}
+    <section
+      id='feature-split'
+      data-pen-section='profile'
+      data-testid='marketing-section-feature-split'
+      data-marketing-variant='phone-right'
+      data-marketing-owner={OWNER}
+      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.featureSplit}
+      className='hv3 hv3-chapter hv3-profile'
     >
-      <div className='homepage-editorial-copy'>
-        <h2 className='marketing-type-section text-balance text-primary-token'>
-          {copy.headline}
-        </h2>
-        <p className='marketing-type-lede text-pretty text-secondary-token homepage-editorial-lede'>
-          {copy.body}
-        </p>
+      <ChapterRule index='01' label={COPY.chapters[0]} />
+      <div className='hv3-split'>
+        <div className='hv3-reveal'>
+          <h2 className='hv3-statement text-balance'>{lines(copy.headline)}</h2>
+          <p className='hv3-body'>{copy.body}</p>
+          <dl className='hv3-rows'>
+            {media.rows.map(row => (
+              <div key={row.label}>
+                <dt>{row.label}</dt>
+                <dd>{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+        <div
+          className='hv3-stage hv3-stage--profile'
+          data-dom-certification='ignore'
+        >
+          <Orbit
+            id='hv3-orbit-profile'
+            rings={[380, 300, 220]}
+            arc={[38, 44]}
+          />
+          <div className='hv3-bounce' />
+          <div className='hv3-rig hv3-rig--profile'>
+            <div className='hv3-phone hv3-edge'>
+              <HomepageProfilePhone
+                alt={media.alt}
+                release={HOMEPAGE_LATEST_RELEASE}
+              />
+            </div>
+          </div>
+          <Callout
+            anchor='handle'
+            label={media.handleCallout}
+            className='hv3-callout--handle'
+          />
+          <Callout
+            anchor='updates'
+            side='left'
+            label={media.updatesCallout}
+            className='hv3-callout--updates'
+          />
+        </div>
       </div>
-      <div className='homepage-editorial-stage homepage-editorial-stage--phone'>
-        <MarketingPhoneImage
-          scenarioId={media.scenarioId}
-          altOverride={media.alt}
-          sizes='(min-width: 1024px) 340px, 72vw'
-          className='homepage-editorial-phone'
-        />
-      </div>
-    </ArtistProfileSectionShell>
+    </section>
   );
 }
 
-/**
- * Releases: the real releases workspace, with the profile's featured
- * release layered in front of it. The release card leads on phones, where
- * the wide workspace would be too small to read.
- */
+/** 02 releases: the catalog row and the release page it becomes. */
 export function HomepageReleasesChapter({
   copy = HOMEPAGE_EDITORIAL_COPY.releases,
 }: Readonly<{ copy?: ChapterCopy }>) {
-  const media = HOMEPAGE_EDITORIAL_COPY.releases;
+  const media = COPY.releases;
+  const captions = media.captions;
   return (
-    <ArtistProfileSectionShell
-      className='homepage-editorial-chapter'
-      sectionId='product-gallery'
-      sectionVariant='release-rail'
-      sectionOwner={OWNER}
-      penContractId={
+    <section
+      id='product-gallery'
+      data-pen-section='releases'
+      data-testid='marketing-section-product-gallery'
+      data-marketing-variant='release-rail'
+      data-marketing-owner={OWNER}
+      data-pen-contract={
         MARKETING_PEN_CONTRACT_IDS.section.productGalleryReleaseRail
       }
+      className='hv3 hv3-chapter hv3-releases'
     >
-      <div className='homepage-editorial-copy homepage-editorial-copy--wide'>
-        <h2 className='marketing-type-section text-balance text-primary-token'>
-          {copy.headline}
-        </h2>
-        <p className='marketing-type-lede text-pretty text-secondary-token homepage-editorial-lede'>
-          {copy.body}
-        </p>
+      <ChapterRule index='02' label={COPY.chapters[1]} />
+      <div className='hv3-centered hv3-reveal'>
+        <h2 className='hv3-statement text-balance'>{lines(copy.headline)}</h2>
+        <p className='hv3-lede hv3-lede--center'>{copy.body}</p>
       </div>
-      {/* One section accent (Ultra), matched to the featured release art. */}
-      <div className='homepage-editorial-layers' data-accent='ultra'>
-        <div className='homepage-editorial-workspace'>
-          <MarketingScreenshot
-            scenarioId={media.workspace.scenarioId}
-            altOverride={media.workspace.alt}
-            sizes='(min-width: 1024px) 1120px, 100vw'
-          />
+      <div
+        className='hv3-stage hv3-stage--releases hv3-frame'
+        data-dom-certification='ignore'
+      >
+        <Orbit id='hv3-orbit-releases' rings={[620, 500]} arc={[345, 36]} />
+        <div className='hv3-bounce' />
+        <div className='hv3-rig hv3-rig--releases'>
+          <div
+            className='hv3-plate hv3-edge'
+            role='img'
+            aria-label={media.catalogLabel}
+          >
+            <CatalogPlate />
+          </div>
+          <div
+            className='hv3-phone hv3-phone--release hv3-edge'
+            role='img'
+            aria-label={media.releasePageLabel}
+          >
+            <ReleasePage />
+          </div>
         </div>
-        <MarketingPhoneImage
-          scenarioId={media.release.scenarioId}
-          altOverride={media.release.alt}
-          sizes='(min-width: 1024px) 320px, 88vw'
-          className='homepage-editorial-release'
+        <Callout
+          anchor='row'
+          side='left'
+          label={media.rowCallout}
+          className='hv3-callout--row'
+        />
+        <svg
+          aria-hidden
+          className='hv3-connector'
+          data-hv3-connector='rowR>title'
         />
       </div>
-    </ArtistProfileSectionShell>
+      <div className='hv3-captions hv3-reveal'>
+        <div>
+          <h3 className='text-balance'>{captions.page.title}</h3>
+          <p>{captions.page.body}</p>
+        </div>
+        <div>
+          <h3 className='text-balance'>{captions.services.title}</h3>
+          <p>{captions.services.body(HOME_SPEC.listen)}</p>
+        </div>
+        <div>
+          <h3 className='text-balance'>{captions.catalog.title}</h3>
+          <p>{captions.catalog.body}</p>
+        </div>
+      </div>
+    </section>
   );
 }
 
-/** Close: the role waitlist form, the page's one conversion. */
+/** 04 invitation: the role waitlist form, the page's one conversion. */
 export function HomepageInviteClose({
   copy = HOMEPAGE_EDITORIAL_COPY.invite,
 }: Readonly<{
   copy?: { readonly headline: string; readonly subhead: string };
 }>) {
+  const invite = COPY.invite;
   return (
-    <ArtistProfileSectionShell
+    <section
       id={HOMEPAGE_INVITE_ANCHOR}
-      className='homepage-editorial-chapter homepage-editorial-invite'
-      sectionId='cta'
-      sectionVariant='final-single-claim'
-      sectionOwner={OWNER}
-      penContractId={MARKETING_PEN_CONTRACT_IDS.section.cta}
+      data-pen-section='invite'
+      data-testid='marketing-section-cta'
+      data-marketing-variant='final-single-claim'
+      data-marketing-owner={OWNER}
+      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.cta}
+      className='hv3 hv3-chapter hv3-invite'
     >
-      <div className='homepage-editorial-invite__inner'>
-        <WaitlistRoleForm
-          headingLevel={2}
-          title={copy.headline}
-          description={copy.subhead}
-          headingClassName='marketing-type-section'
-          align='start'
-        />
+      <ChapterRule index='04' label={COPY.chapters[3]} />
+      <div className='hv3-invite__inner'>
+        <Orbit id='hv3-orbit-invite' rings={[760]} arc={[0, 360]} closed />
+        <h2 className='hv3-statement text-balance'>{lines(copy.headline)}</h2>
+        <p className='hv3-lede hv3-lede--center'>{copy.subhead}</p>
+        <div className='hv3-form'>
+          <WaitlistRoleForm
+            presentation='chips'
+            align='center'
+            headingLevel={2}
+            title={copy.headline}
+            roleLabel={invite.roleLabel}
+            submitLabel={invite.action}
+          />
+        </div>
+        <ol className='hv3-steps hv3-reveal'>
+          {invite.steps.map((step, index) => (
+            <li key={step.title}>
+              <span className='hv3-mono'>{`0${index + 1}`}</span>
+              <b>{step.title}</b>
+              <span>{step.body}</span>
+            </li>
+          ))}
+        </ol>
       </div>
-    </ArtistProfileSectionShell>
+    </section>
   );
 }

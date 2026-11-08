@@ -21,11 +21,13 @@ import {
   readFileSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 export const PEN_CLI_VERSION = '0.3.14';
+export const PEN_MAX_FAILED_CALLS = 20;
 export const BRIEFS_DIR = 'docs/design-system/pen-briefs';
+export const MANIFEST = 'docs/pen-stills/golden-path/manifest.json';
 
 /** Split a brief into its front matter (frame, route) and prompt body. */
 export function parseBrief(source, file = 'brief') {
@@ -68,8 +70,12 @@ export function penArgs(brief, { input, outDir }) {
     join(outDir, `${brief.frame}.png`),
     '--usage',
     join(outDir, `${brief.frame}.usage.json`),
+    // The agent only sees why a Pen call failed with --verbose-mcp; without
+    // it, 3 of 4 drafts on Nov 8 hit the failure cap retrying blind, and the
+    // one that finished needed 7 failed calls on this large file.
+    '--verbose-mcp',
     '--max-failed-calls',
-    '8',
+    String(PEN_MAX_FAILED_CALLS),
   ];
 }
 
@@ -114,12 +120,48 @@ export function draftProblem(before, after, frame) {
   return null;
 }
 
+/**
+ * Write the canonical download into workDir and return the .pen to draft from.
+ * The URL serves either a .pen (JSON) or a .tar.gz of the workspace folder so
+ * fonts and images resolve; the archive is unpacked and its `wanted` file
+ * (else its first .pen) is used. Anything else, such as an expired link's
+ * HTML, is named instead of being handed to pen as a document.
+ */
+export function writeCanonical(bytes, workDir, wanted) {
+  mkdirSync(workDir, { recursive: true });
+  if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
+    const archive = join(workDir, 'workspace.tar.gz');
+    writeFileSync(archive, bytes);
+    execFileSync('tar', ['-xzf', archive, '-C', workDir]);
+    const pens = [];
+    const walk = dir => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, e.name);
+        if (e.isDirectory()) walk(path);
+        else if (e.name.endsWith('.pen')) pens.push(path);
+      }
+    };
+    walk(workDir);
+    const pen = pens.find(p => basename(p) === wanted) ?? pens[0];
+    if (!pen) throw new Error('the canonical Pen archive holds no .pen file');
+    return pen;
+  }
+  if (!bytes.toString('utf8', 0, 64).trimStart().startsWith('{'))
+    throw new Error(
+      `canonical Pen download is neither a .pen file nor a .tar.gz (${bytes.length} bytes)`
+    );
+  const pen = join(workDir, 'canonical.pen');
+  writeFileSync(pen, bytes);
+  return pen;
+}
+
 async function main() {
   const { values } = parseArgs({
     options: { out: { type: 'string' }, only: { type: 'string' } },
   });
   if (!values.out) throw new Error('--out DIR is required');
-  const outDir = values.out;
+  // Absolute: pen runs from the workspace folder so its assets resolve.
+  const outDir = resolve(values.out);
   mkdirSync(outDir, { recursive: true });
   const only = values.only
     ?.split(',')
@@ -152,10 +194,16 @@ async function main() {
     return;
   }
 
-  const input = join(outDir, 'canonical.pen');
   const res = await fetch(process.env.PEN_GOLDEN_PATH_FILE_URL);
   if (!res.ok) throw new Error(`canonical Pen file: HTTP ${res.status}`);
-  writeFileSync(input, Buffer.from(await res.arrayBuffer()));
+  const wanted = JSON.parse(readFileSync(MANIFEST, 'utf8')).penFile?.name;
+  // Unpacked beside outDir's drafts, not among them, so the upload carries
+  // only the drafted frames.
+  const input = writeCanonical(
+    Buffer.from(await res.arrayBuffer()),
+    join(outDir, 'workspace'),
+    wanted
+  );
 
   for (const brief of briefs) {
     const row = { frame: brief.frame, route: brief.route };
@@ -163,6 +211,8 @@ async function main() {
       execFileSync('npx', penArgs(brief, { input, outDir }), {
         stdio: ['ignore', 'inherit', 'inherit'],
         timeout: 15 * 60_000,
+        // Workspace fonts and images resolve relative to the .pen file.
+        cwd: dirname(input),
         env: { ...process.env, NODE_OPTIONS: PEN_NODE_OPTIONS },
       });
       const missing = missingOutputs(brief, outDir);

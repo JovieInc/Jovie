@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import { describe, expect, it } from 'vitest';
-
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ContentSurfaceCard } from './ContentSurfaceCard';
 
 describe('ContentSurfaceCard', () => {
@@ -121,5 +121,16 @@ describe('ContentSurfaceCard', () => {
     const mod = await import('./ContentSurfaceCard');
     const retired = ['CONTENT_SURFACE_CARD', 'CLASSNAME'].join('_');
     expect(retired in mod).toBe(false);
+  });
+
+  it('has no axe violations as a plain, labelled section or nested surface', async () => {
+    const { container } = render(
+      <ContentSurfaceCard as='section' aria-label='Plan summary'>
+        <p>Artist Presence</p>
+        <ContentSurfaceCard surface='nested'>Nested content</ContentSurfaceCard>
+      </ContentSurfaceCard>
+    );
+    expect(screen.getByRole('region', { name: 'Plan summary' })).toBeVisible();
+    await expectNoA11yViolations(container);
   });
 });

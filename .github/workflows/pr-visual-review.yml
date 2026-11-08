@@ -189,7 +189,7 @@ jobs:
           ROUTE_DOM_CERTIFICATION_OUTPUT_DIR: ${{ github.workspace }}/pr-visual-artifacts/route-dom-certification
         run: |
           set -euo pipefail
-          marketing_surface='^(apps/web/(app/\((marketing|home)\)/|components/(marketing|site|homepage)/|data/marketing/|styles/|tests/e2e/utils/route-dom-detector\.ts|tests/product-screenshots/route-dom-)|packages/ui/)'
+          marketing_surface='^(apps/web/(app/\((marketing|home)\)/|components/(marketing|site|homepage)/|data/marketing/|styles/|tests/e2e/utils/route-dom-[a-z-]+\.ts|tests/product-screenshots/route-dom-)|packages/ui/)'
           # JOV-7710: the composed shell main plane must read as one material.
           shell_surface='^(apps/web/(app/demo/|components/(organisms|molecules|atoms|features|shell)/|styles/|tests/e2e/utils/shell-material-detector\.ts|tests/product-screenshots/(route-dom-|shell-material-))|packages/ui/)'
           tests=
