@@ -48,6 +48,7 @@ import {
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
 import { STRUCTURAL_PYTEST_FILES } from './lib/ci-structural-pytest-files.mjs';
+import { scriptContractNodeArgs } from './lib/script-contract-node-args.mjs';
 import { testsAffectedBy } from './lib/test-file-dependencies.mjs';
 import { TEST_PLANNER_CONTRACT_TESTS } from './lib/test-planner-contract-tests.mjs';
 
@@ -727,7 +728,7 @@ const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
 const structuralPythonRegression = body =>
   `if python3 -c "import coverage, pytest, xdist" 2>/dev/null; then ${body}; elif [ "\${CI:-}" = "true" ]; then echo "::error::pytest/coverage/xdist missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage/xdist not installed — skip local structural regressions"; fi`;
 
-export { STRUCTURAL_PYTEST_FILES };
+export { STRUCTURAL_PYTEST_FILES, scriptContractNodeArgs };
 
 /**
  * The structural pytest suite (420 tests, 132s of one hosted run) was the
@@ -779,7 +780,7 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 
 /** Files of the lanes coverage suite (one coverage map, sharded below). */
 export const LANES_PYTEST_FILES = Object.freeze(
-  'scripts/tests/test_factory_signals.py scripts/tests/test_factory_intake.py scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_board_intake.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_cloud_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_conftest_host_isolation.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_health_checks.py scripts/tests/test_main_health.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_cli.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_families.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_pr_events_repair_evidence.py scripts/tests/test_priority_admission.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
+  'scripts/tests/test_factory_signals.py scripts/tests/test_factory_intake.py scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_board_intake.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_cloud_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_conftest_host_isolation.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_health_checks.py scripts/tests/test_main_health.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_cli.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_families.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_pr_events_repair_evidence.py scripts/tests/test_priority_admission.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_repair_order.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
     ' '
   )
 );
@@ -1103,29 +1104,6 @@ export const ASSURANCE_MATRIX_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/invariants/assurance-matrix.mjs --test-coverage-lines=90 --test-coverage-branches=55 --test-coverage-functions=100 scripts/invariants/assurance-matrix.test.mjs';
 export const PR_OPEN_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/pr-open.mjs --test-coverage-lines=90 --test-coverage-branches=75 --test-coverage-functions=90 scripts/pr-open.test.mjs';
-
-const PREFLIGHT_COVERAGE_TESTS = [
-  'scripts/preflight.test.mjs',
-  'scripts/verify-workflow-references.test.mjs',
-];
-const PREFLIGHT_COVERAGE_ARGS = [
-  '--test',
-  '--experimental-test-coverage',
-  '--test-coverage-include=scripts/preflight.mjs',
-  '--test-coverage-include=scripts/lib/source-guard-action-snapshot.mjs',
-];
-
-/** Keep unrelated scanners outside V8 instrumentation; run every selection once.
- * @param {readonly string[]} tests @returns {string[][]}
- */
-export function scriptContractNodeArgs(tests) {
-  const focused = tests.filter(test => PREFLIGHT_COVERAGE_TESTS.includes(test));
-  const plain = tests.filter(test => !PREFLIGHT_COVERAGE_TESTS.includes(test));
-  const batches = [];
-  if (focused.length) batches.push([...PREFLIGHT_COVERAGE_ARGS, ...focused]);
-  if (plain.length) batches.push(['--test', ...plain]);
-  return batches;
-}
 
 export const SCRIPT_CONTRACT_NODE_COMMAND = `${PR_OPEN_COVERAGE_COMMAND} && ${DEPRECATION_COVERAGE_COMMAND} && ${CODEX_BOOTSTRAP_COVERAGE_COMMAND} && ${ASSURANCE_MATRIX_COVERAGE_COMMAND} && node --import tsx --test --test-isolation=none scripts/content-os/project.test.mts scripts/lib/__tests__/lesson-analysis.test.mjs && pnpm --filter @jovie/copy exec vitest run --config vitest.config.mts transport.test.ts judge.test.ts && ${scriptContractNodeArgs(
   SCRIPT_CONTRACT_NODE_TESTS.filter(
@@ -2504,9 +2482,7 @@ function runGuardrails() {
   for (const cmd of parts) {
     const result = shell(cmd);
     combined += result.output;
-    if (result.code !== 0) {
-      return { code: result.code, output: combined };
-    }
+    if (result.code !== 0) return { code: result.code, output: combined };
   }
   return { code: 0, output: combined };
 }
@@ -3495,9 +3471,7 @@ async function main() {
   writeSummary(results, laneGroup, timingTables);
   writeLaneResults(results, laneGroup, setupError);
 
-  if (setupError) {
-    process.exit(1);
-  }
+  if (setupError) process.exit(1);
 
   const failed = results.filter(r => r.status === 'failure');
   if (failed.length > 0) {

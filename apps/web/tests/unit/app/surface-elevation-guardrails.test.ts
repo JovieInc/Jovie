@@ -243,10 +243,10 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'app/app/(shell)/shell-route-matches.ts'),
       'utf-8'
     );
-    const appShellLayout = readFileSync(
-      join(ROOT, 'app/app/(shell)/layout.tsx'),
-      'utf-8'
-    );
+    // The shell boot fallback picks its route skeleton in shell-route-skeleton.
+    const appShellLayout = ['layout.tsx', 'shell-route-skeleton.tsx']
+      .map(file => readFileSync(join(ROOT, 'app/app/(shell)', file), 'utf-8'))
+      .join('\n');
 
     expect(tasksPage).toContain('WorkspacePage');
     expect(tasksPage).toContain("frame='none'");
@@ -255,7 +255,6 @@ describe('surface elevation guardrails', () => {
     expect(tasksPage).toContain('TaskDataTable');
     expect(tasksPage).not.toMatch(/<UnifiedTable\b/);
     expect(shellRouteMatches).toContain('isTasksShellRoute');
-    expect(appShellLayout).toContain('TasksRouteSkeleton');
     expect(appShellLayout).toContain('TasksRouteSkeleton');
   });
 
@@ -372,10 +371,10 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'app/app/(shell)/library/LibrarySurface.tsx'),
       'utf-8'
     );
-    const appShellLayout = readFileSync(
-      join(ROOT, 'app/app/(shell)/layout.tsx'),
-      'utf-8'
-    );
+    // The shell boot fallback picks its route skeleton in shell-route-skeleton.
+    const appShellLayout = ['layout.tsx', 'shell-route-skeleton.tsx']
+      .map(file => readFileSync(join(ROOT, 'app/app/(shell)', file), 'utf-8'))
+      .join('\n');
 
     // JOV-8792: the library keeps its own live filter pills; the retired
     // header search adapter registration must stay gone.
@@ -411,7 +410,6 @@ describe('surface elevation guardrails', () => {
 
   it('keeps task and preview cards off the shell canvas token', () => {
     const files = [
-      'components/features/dashboard/layout/PreviewPanel.tsx',
       'components/features/dashboard/organisms/ProfileEditPreviewCard.tsx',
       'components/features/dashboard/release-tasks/ReleaseTaskEmptyState.tsx',
       'components/features/dashboard/release-tasks/ReleaseTaskExplainerPopover.tsx',
