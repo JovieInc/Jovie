@@ -75,4 +75,37 @@ describe('workers inventory', () => {
     });
     expect(names).toEqual(['summer-store']);
   });
+  it('lists Workers through the shared Cloudflare client and records its request', async () => {
+    const store = new MemoryLedgerStore();
+    const calls = [];
+    const workers = await fetchDeployedWorkers({
+      accountId: 'account',
+      token: 'secret',
+      store,
+      fetchImpl: async (url, init) => {
+        calls.push([
+          String(url),
+          new Headers(init.headers).get('authorization'),
+        ]);
+        return new Response(
+          JSON.stringify({ success: true, result: [{ id: 'worker' }] })
+        );
+      },
+    });
+    expect(workers).toEqual(['worker']);
+    expect(calls).toEqual([
+      [
+        'https://api.cloudflare.com/client/v4/accounts/account/workers/scripts',
+        'Bearer secret',
+      ],
+    ]);
+    const credentials = Object.values(
+      (await store.read('cloudflare')).credentials
+    );
+    expect(credentials).toHaveLength(1);
+    expect(Object.values(credentials[0].usage)[0].repair).toMatchObject({
+      attempts: 1,
+      ok: 1,
+    });
+  });
 });
