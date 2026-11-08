@@ -918,7 +918,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/hostops/pen-golden-path-sync.test.mjs',
-  'workers/pen-files/src/index.test.mjs',
+  'scripts/hostops/pen-files-worker/src/index.test.mjs',
   'scripts/runner-pool-routing.test.mjs',
   'scripts/sentry-build-config.test.mjs',
   'scripts/next-telemetry.test.mjs',
