@@ -51,7 +51,7 @@ vi.mock('@/lib/error-tracking', async () => {
 
 vi.mock(
   '@/lib/billing/price-lock.server',
-  () => import('@/tests/helpers/price-lock-list-mock')
+  () => import('@/tests/fixtures/price-lock-list-mock')
 );
 vi.mock('@/lib/stripe/client', () => ({
   createCheckoutSession: mockCreateCheckoutSession,

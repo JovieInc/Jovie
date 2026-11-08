@@ -1,4 +1,6 @@
-/** Database schema: named re-exports of the domain modules (tree-shakable). */
+/**
+ * Database Schema - Explicit Named Re-exports
+ */
 
 // Pixel Tracking (Events, Creator Configs)
 export {

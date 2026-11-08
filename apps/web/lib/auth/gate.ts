@@ -49,11 +49,6 @@ export {
 /**
  * Result of resolving user state. Contains all information needed
  * to make auth gating decisions and redirect users appropriately.
- *
- * `clerkUserId` is preserved as the field name for churn reduction; after
- * the Clerk → Better Auth cutover it holds the Better Auth user id
- * (resolved from `auth.api.getSession`). `dbUserId` remains the app
- * `users.id` UUID.
  */
 export interface AuthGateResult {
   state: CanonicalUserState;
@@ -70,11 +65,15 @@ export interface AuthGateResult {
 }
 
 /**
- * PR visual review (JOV-5387) signals this lane via NEXT_PUBLIC_E2E_MODE. The
- * screen-certification producer (JOV-7126) authenticates a server-only
- * synthetic persona instead, without flipping a client-inlined flag;
- * `isVisualCaptureSyntheticAuthEnabled()` already scopes this "no reachable
- * DB" contract for admin/roles.ts and auth/ban-check.ts, so it counts too.
+ * PR visual review (JOV-5387) signals this lane via the build-time
+ * NEXT_PUBLIC_E2E_MODE flag. The screen-certification producer job
+ * (JOV-7126) is a second secretless-capture caller that authenticates a
+ * server-only synthetic persona instead — it must not need to flip a
+ * client-inlined flag (which would also change the marketing screenshot
+ * catalog's rendered bytes) just to unblock its own admin-gated routes.
+ * `isVisualCaptureSyntheticAuthEnabled()` is server-only and already scopes
+ * exactly this "no reachable DB" contract for admin/roles.ts and
+ * auth/ban-check.ts, so it is accepted here as an equivalent signal.
  */
 function canUseE2ETestAuthFallback(): boolean {
   if (
@@ -294,6 +293,7 @@ async function upsertUser(
       .returning({ id: users.id });
 
     if (createdUser?.id) {
+      // Price lock: the price they sign up at is recorded now (idempotent).
       await ensurePriceLockForUserSafely(createdUser.id, 'signup');
       return createdUser.id;
     }
