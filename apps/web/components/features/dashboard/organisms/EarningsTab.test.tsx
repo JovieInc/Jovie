@@ -4,6 +4,9 @@ import { MoneyVisibilityProvider } from '@/lib/workspace-lock/money-visibility';
 import { EarningsTab } from './EarningsTab';
 
 const queryState = vi.hoisted(() => ({ loading: false, empty: false }));
+const tableProps = vi.hoisted(() => ({
+  last: null as null | Record<string, unknown>,
+}));
 
 vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => <img alt='' {...props} />,
@@ -30,9 +33,14 @@ vi.mock('@/lib/utils/qr-code', () => ({
 }));
 
 vi.mock('@/components/organisms/table', () => ({
-  UnifiedTable: ({ emptyState }: { readonly emptyState?: React.ReactNode }) => (
-    <div data-testid='tippers-table'>{emptyState}</div>
-  ),
+  UnifiedTable: (props: Record<string, unknown>) => {
+    tableProps.last = props;
+    return (
+      <div data-testid='tippers-table'>
+        {props.emptyState as React.ReactNode}
+      </div>
+    );
+  },
   TableEmptyState: ({
     heading,
     description,
@@ -126,5 +134,12 @@ describe('EarningsTab', () => {
     expect(screen.getAllByText('$0.00')).toHaveLength(2);
     expect(screen.getByText('0')).toBeInTheDocument();
     expect(screen.getAllByRole('term')).toHaveLength(3);
+  });
+
+  it('hands tippers to the shared table in the dense people row', () => {
+    renderTab();
+    expect(screen.getByTestId('tippers-table')).toBeInTheDocument();
+    expect(tableProps.last?.rowMode).toBe('dense');
+    expect(tableProps.last?.caption).toBe('Tips');
   });
 });
