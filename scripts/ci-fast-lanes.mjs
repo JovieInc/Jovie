@@ -2505,9 +2505,7 @@ function runGuardrails() {
   for (const cmd of parts) {
     const result = shell(cmd);
     combined += result.output;
-    if (result.code !== 0) {
-      return { code: result.code, output: combined };
-    }
+    if (result.code !== 0) return { code: result.code, output: combined };
   }
   return { code: 0, output: combined };
 }
@@ -3496,9 +3494,7 @@ async function main() {
   writeSummary(results, laneGroup, timingTables);
   writeLaneResults(results, laneGroup, setupError);
 
-  if (setupError) {
-    process.exit(1);
-  }
+  if (setupError) process.exit(1);
 
   const failed = results.filter(r => r.status === 'failure');
   if (failed.length > 0) {
