@@ -442,6 +442,13 @@ describe('homepage contract', { timeout: 60_000 }, () => {
         )
       );
     }
+    // The hero rig scales from its top-left corner, so the 390 crop keeps the
+    // approved window region (the list, not the inspector) only with the
+    // offset recomputed for that origin.
+    expect(chapters).toMatch(/\.hv3-rig--hero\s*\{[^}]*transform-origin: 0 0;/);
+    expect(v3[5]).toMatch(
+      /\.hv3-rig--hero\s*\{[^}]*left: calc\(-9\.705rem - var\(--hv3-gutter\)\);[^}]*scale\(0\.72\)/
+    );
     // The nav's backing runs edge to edge once scrolled.
     expect(strip('components/homepage/v3/form.css')).toMatch(
       /\.home-viewport \.header-nav--docked::before\s*\{\s*right: calc\(50% - 50vw\);\s*left: calc\(50% - 50vw\);/
