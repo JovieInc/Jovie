@@ -241,7 +241,8 @@ describe('WaitlistRoleForm', () => {
     render(<WaitlistRoleForm />);
     challenge.onStateChange = undefined;
     fireEvent.focus(screen.getByLabelText('Email address'));
-    const lateFailure = challenge.onStateChange;
+    // Read through a function: the assignment above narrows the property.
+    const lateFailure = (() => challenge.onStateChange)();
     expect(lateFailure).toBeTypeOf('function');
     fireEvent.click(screen.getByRole('radio', { name: 'Artist' }));
     fireEvent.change(screen.getByLabelText('Email address'), {
