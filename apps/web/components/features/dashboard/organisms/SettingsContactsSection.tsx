@@ -206,8 +206,8 @@ function ContactsListInner({
         {isEmpty ? (
           <EmptyState
             icon={<UserPlus className='h-5 w-5' aria-hidden />}
-            heading='No Contacts Yet'
-            description='Add bookings, management, and press contacts.'
+            heading='No contacts yet'
+            description='Add your first contact to get started.'
             className='py-6'
           />
         ) : (

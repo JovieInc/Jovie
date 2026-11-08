@@ -155,10 +155,9 @@ export function DspPresenceView({
         >
           <EmptyState
             testId='presence-empty-state'
-            presentation='workspace'
             icon={<Radio className='h-5 w-5' aria-hidden='true' />}
-            heading='No Streaming Profiles Yet'
-            description='Jovie finds your artist profiles on streaming services, and you can add any it missed.'
+            heading='No DSP Profiles Found'
+            description='We automatically find your profiles on streaming platforms. You can also add them manually.'
             action={{
               label: 'Add Platform',
               onClick: openAddPlatformDialog,
