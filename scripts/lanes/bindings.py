@@ -43,7 +43,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
-from atomic_state import atomic_write_text  # noqa: E402
+from atomic_state import append_json_object, atomic_write_text  # noqa: E402
 
 POLICY = Path(__file__).resolve().parent / "routing.json"
 REPAIR_STATES = frozenset({"BEHIND", "DIRTY"})
@@ -845,8 +845,7 @@ def run(lane, host, binding: Binding, name: str, spec: dict, *, issue=None, pr=N
         finally:
             cleanup(lane, binding, worktree, branch if pr is None else None, receipt)
     receipt["endedAt"] = lane.now_iso()
-    with open(runs / "ledger.jsonl", "a") as ledger:
-        ledger.write(json.dumps(receipt) + "\n")
+    append_json_object(runs / "ledger.jsonl", receipt)
     return receipt
 
 

@@ -102,6 +102,17 @@
       "ttlHours": 2,
       "cleanupTrigger": "Neon branch TTL (expires_in_hours=2); explicit delete step at job end; on-limit cleanup in neon-create-branch-with-retry",
       "costBudget": "One Neon branch with at most 2h of endpoint compute per staging deploy or daily dispatch (concurrency cancels superseded runs)"
+    },
+    {
+      "id": "surface-recertify-neon",
+      "kind": "neon-branch",
+      "policy": "event-driven (main push with stale certified surfaces) or manual-dispatch",
+      "owner": "gem-lanes / surface recertification",
+      "surface": "Isolated database for Surface Recertify browser evidence",
+      "evidencePurpose": "Browser captures of the exact main SHA at 1440 and 390 pixels with authenticated route and layout checks.",
+      "ttlHours": 3,
+      "cleanupTrigger": "Neon branch TTL (expires_in_hours=3); on-limit cleanup in neon-create-branch-with-retry",
+      "costBudget": "One Neon branch with at most 3h of endpoint compute per selected main push or dispatch; workflow concurrency serializes runs"
     }
   ],
   "activeExceptions": []

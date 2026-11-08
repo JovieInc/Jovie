@@ -12,6 +12,24 @@ import { normalizeObservation } from '../idea-radar/idea-radar.mjs';
 export const ROUTE_MIN = 4;
 export const COST_MIN = 3;
 
+/**
+ * @typedef {object} WatchItem
+ * @property {string} id
+ * @property {string} title
+ * @property {string} source
+ * @property {string} url
+ * @property {string} first_seen_at
+ * @property {string | null} [published_at]
+ * @property {string | null} [summary]
+ * @property {string | null} [why]
+ * @property {string | null} [surfaces]
+ * @property {string} [route_status]
+ * @property {string} [kind]
+ * @property {number} [relevance]
+ * @property {number} [cost_saving]
+ * @property {number} [adoptable_now]
+ */
+
 export function decideRoute(item) {
   const rel = item.relevance ?? 0;
   if (item.route_status && item.route_status !== 'new')
@@ -169,12 +187,14 @@ async function main() {
   const mark = process.argv.includes('--mark');
   const withResearch = process.argv.includes('--research');
   const headers = { authorization: `Bearer ${token}` };
-  const { items } = await (
-    await fetch(
-      `${base}/items?route_status=new&min_relevance=${COST_MIN}&limit=100`,
-      { headers }
-    )
-  ).json();
+  const { items } = /** @type {{ items: WatchItem[] }} */ (
+    await (
+      await fetch(
+        `${base}/items?route_status=new&min_relevance=${COST_MIN}&limit=100`,
+        { headers }
+      )
+    ).json()
+  );
   const out = [];
   for (const item of items) {
     const decision = decideRoute(item);
@@ -186,10 +206,10 @@ async function main() {
       source: item.source,
       ...decision,
       research,
+      ...(decision.destination === 'idea-radar'
+        ? { evidence: toObservation(item, research) }
+        : { linear: linearPayload(item, decision) }),
     };
-    if (decision.destination === 'idea-radar')
-      entry.evidence = toObservation(item, research);
-    else entry.linear = linearPayload(item, decision);
     out.push(entry);
   }
   // Emit the routing decisions first: an item is marked routed only after its

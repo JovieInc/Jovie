@@ -5,6 +5,7 @@ import {
   createRecoveryOverride,
   evaluatePromotion,
 } from '../promotion-journey-evidence.mjs';
+import { gradeReleaseRange } from '../release-range-risk.mjs';
 
 const SHA = 'a'.repeat(40);
 const OTHER = 'b'.repeat(40);
@@ -18,7 +19,19 @@ const range = (affects = {}, extra = {}) => ({
   candidateSha: SHA,
   unknown: false,
   paths: [],
-  affects: { auth: false, billing: false, unknown: false, ...affects },
+  affects: {
+    auth: false,
+    billing: false,
+    publicUi: false,
+    proxy: false,
+    database: false,
+    config: false,
+    automation: false,
+    ci: false,
+    agent: false,
+    unknown: false,
+    ...affects,
+  },
   ...extra,
 });
 const good = journey => ({
@@ -55,6 +68,15 @@ describe('promotion journey gate: valid evidence passes', () => {
     expect(r.decision).toBe('pass');
     expect(r.required).toBe(false);
   });
+  it.each(['ci', 'agent'])(
+    'valid %s-only risk does not inherit auth/billing journeys',
+    surface => {
+      expect(run([], range({ [surface]: true }))).toMatchObject({
+        decision: 'pass',
+        required: false,
+      });
+    }
+  );
 });
 
 describe('current evidence cannot be replaced by an older green receipt', () => {
@@ -162,7 +184,7 @@ describe('promotion journey gate: deliberate-red failures', () => {
     expect(run([], range({}, { unknown: true })).decision).toBe('blocked');
     expect(run([], range({ auth: true })).decision).toBe('blocked');
   });
-  it.each(['publicUi', 'proxy', 'database'])(
+  it.each(['publicUi', 'proxy', 'database', 'config', 'automation'])(
     'blocks a %s range without exact-SHA journey evidence (golden path is a promotion input)',
     surface => {
       expect(run([], range({ [surface]: true })).decision).toBe('blocked');
@@ -262,5 +284,49 @@ describe('repairs (a)-(d) stay fixed', () => {
     expect(fn.indexOf('pressSequentially')).toBeLessThan(
       fn.indexOf("waitForLoadState('load'")
     );
+  });
+});
+
+const gradeScope = paths =>
+  gradeReleaseRange({
+    baseDeployedSha: 'a'.repeat(40),
+    candidateSha: 'b'.repeat(40),
+    paths,
+  });
+
+describe('auth and billing journeys block only releases that can reach them', () => {
+  it.each([
+    [['apps/web/app/(marketing)/compare/page.tsx']],
+    [['apps/web/app/(marketing)/blog/page.tsx']],
+    [
+      [
+        'apps/web/app/(marketing)/about/page.tsx',
+        'apps/web/app/(marketing)/support/page.tsx',
+      ],
+    ],
+  ])('leaf pages ship without journeys: %j', paths => {
+    expect(evaluatePromotion({ range: gradeScope(paths) })).toMatchObject({
+      required: false,
+      decision: 'pass',
+    });
+  });
+
+  it.each([
+    // Ordinary names that render or build claim state: names alone can't protect these.
+    'apps/web/app/(marketing)/product/ProductLanding.tsx',
+    'apps/web/components/features/profile/templates/PublicProfileLayoutShell.tsx',
+    'apps/web/app/[username]/page.tsx',
+    'apps/web/lib/images/validate-magic-bytes.ts',
+    'apps/web/app/(marketing)/start/page.tsx',
+    'apps/web/app/(marketing)/waitlist/page.tsx',
+    'apps/web/app/(marketing)/compare/layout.tsx',
+    'apps/web/app/(marketing)/blog/SignupBanner.tsx',
+    'apps/web/styles/globals.css',
+    'packages/ui/src/button.tsx',
+  ])('%s can reach a protected flow, so journeys stay required', path => {
+    expect(evaluatePromotion({ range: gradeScope([path]) })).toMatchObject({
+      required: true,
+      decision: 'blocked',
+    });
   });
 });

@@ -5,10 +5,7 @@ import {
   type AcquisitionCertificationPorts,
   AcquisitionCertificationStore,
 } from '@/lib/acquisition/certification-store';
-import {
-  buildCertificationDecisionDigest,
-  type CertificationEvidenceReceipt,
-} from '@/lib/agent-os/certification';
+import { buildCertificationDecisionDigest } from '@/lib/agent-os/certification';
 import { MarketingCertificationStore } from '@/lib/agent-os/certification-adapter';
 import type { CertificationRecordBackend } from '@/lib/agent-os/certification-cas';
 import { projectOvieInbox } from '@/lib/ovie/inbox';
@@ -19,6 +16,7 @@ import {
   fixtureReceipt,
   memoryCertificationBackend,
 } from './fixtures';
+import { CUSTOMER_SHA, customerProof } from './inventory.fixtures';
 import {
   type CustomerCertificationCandidateRef,
   MARKETING_ASSURANCE_GATE,
@@ -388,22 +386,7 @@ describe('recordOvieCertificationDecision', () => {
 });
 
 const CUSTOMER_SUBJECT = 'acquisition:premade-artist-profile:lead1:run1';
-const CUSTOMER_SHA = 'a'.repeat(40);
 const CUSTOMER_NOW = '2026-09-12T22:00:00.000Z';
-
-function customerProof(
-  tier: CertificationEvidenceReceipt['tier']
-): CertificationEvidenceReceipt {
-  return {
-    id: tier,
-    tier,
-    status: 'passed',
-    sourceSha: CUSTOMER_SHA,
-    ref: `fixture:${tier}`,
-    digest: `fixture-digest:${tier}`,
-    summary: 'Synthetic test evidence only',
-  };
-}
 
 function customerCandidate(): AcquisitionCertificationCandidate {
   return {
@@ -438,7 +421,9 @@ function customerCandidate(): AcquisitionCertificationCandidate {
       canonicalReferences: [customerProof('canonical_references')],
       invariantEvaluation: [customerProof('invariant_evaluation')],
       testsCoverage: [customerProof('tests_coverage')],
-      visualProof: [customerProof('visual_proof')],
+      visualProof: [
+        { ...customerProof('visual_proof'), id: 'dogfood-judge:customer' },
+      ],
       requiredVariants: [
         {
           id: 'profile',

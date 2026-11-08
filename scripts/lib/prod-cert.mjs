@@ -10,6 +10,17 @@
  * never silently passed.
  */
 
+// Cone probe bodies and the shared HTTP helpers live in prod-cert-probes.mjs
+// (company-guards size baseline); this module keeps the receipt logic.
+import {
+  checkoutConeChecks,
+  coneClaimChecks,
+  coneLandingChecks,
+  EXPECTED_BROWSER_CHECKS,
+  expectOk,
+  get,
+} from './prod-cert-probes.mjs';
+
 export const RECEIPT_SCHEMA = 'jovie.prod-golden-path-receipt/v1';
 
 /** Launch order. screenIds come from the JOV-INV-018 screen registry. */
@@ -34,9 +45,6 @@ export const SURFACES = Object.freeze({
 });
 
 export const SURFACE_IDS = Object.keys(SURFACES);
-
-const ERROR_TEXT =
-  /application error|something went wrong|internal server error|this page could not be found/i;
 
 export function statusFromChecks(checks) {
   if (checks.some(c => c.status === 'failed')) return 'failed';
@@ -124,23 +132,6 @@ export async function runCheck(id, fn, now = () => new Date().toISOString()) {
   }
 }
 
-async function get(origin, path, fetchImpl, init = {}) {
-  const response = await fetchImpl(new URL(path, origin), {
-    redirect: 'follow',
-    headers: { 'user-agent': 'jovie-prod-cert/1 (+synthetic)' },
-    ...init,
-  });
-  const body = await response.text();
-  return { response, body };
-}
-
-function expectOk({ response, body }, what) {
-  if (response.status !== 200)
-    throw new Error(`${what}: HTTP ${response.status}`);
-  if (ERROR_TEXT.test(body.slice(0, 200_000)))
-    throw new Error(`${what}: error text rendered`);
-}
-
 async function ogImageCheck(origin, html, fetchImpl, what) {
   const match = html.match(
     /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i
@@ -162,7 +153,14 @@ async function ogImageCheck(origin, html, fetchImpl, what) {
 
 /**
  * Anonymous HTTP checks per surface, in launch order.
- * @param {{ origin: string, fetchImpl?: typeof fetch, now?: any, profileHandle?: string, env?: Record<string, string | undefined> }} options
+ * @param {{
+ *   origin: string,
+ *   fetchImpl?: typeof fetch,
+ *   now?: any,
+ *   profileHandle?: string,
+ *   env?: Record<string, string | undefined>,
+ *   coneCases?: boolean,
+ * }} options
  */
 export function anonymousChecks({
   origin,
@@ -170,9 +168,17 @@ export function anonymousChecks({
   now,
   profileHandle = 'tim',
   env = {},
+  /** JOV-6920 cone checks; off keeps the legacy check set byte-identical. */
+  coneCases = false,
 }) {
   const run = (id, fn) => runCheck(id, fn, now);
   const takenHandle = env.PROD_CERT_TAKEN_HANDLE || profileHandle;
+  const coneLanding = coneCases
+    ? coneLandingChecks({ origin, fetchImpl, run })
+    : [];
+  const coneClaim = coneCases
+    ? coneClaimChecks({ origin, fetchImpl, run })
+    : [];
   return {
     landing: () => [
       run('landing-renders', async () => {
@@ -181,6 +187,7 @@ export function anonymousChecks({
         if (!/<title>[^<]{3,}/i.test(page.body))
           throw new Error('GET /: empty title');
       }),
+      ...coneLanding,
     ],
     'signup-signin': () => [
       run('signin-form-renders', async () => {
@@ -206,6 +213,7 @@ export function anonymousChecks({
       run('start-renders', async () => {
         expectOk(await get(origin, '/start', fetchImpl), 'GET /start');
       }),
+      ...coneClaim,
       run('taken-handle-rejected', async () => {
         const { response, body } = await get(
           origin,
@@ -293,6 +301,9 @@ export function anonymousChecks({
         };
       }),
     ],
+    ...(coneCases
+      ? { checkout: () => checkoutConeChecks({ origin, fetchImpl, run }) }
+      : {}),
   };
 }
 
@@ -373,23 +384,9 @@ export function stepChecks(
   };
 }
 
-/** The browser-owned checks every surface is expected to carry. */
-export const EXPECTED_BROWSER_CHECKS = Object.freeze({
-  'signup-signin': ['returning-user-email-otp', 'new-user-email-otp'],
-  claim: [
-    'claimed-profile-owned',
-    'start-chat-first-reply',
-    'golden-path-preview-has-release',
-  ],
-  onboarding: ['dashboard-first-value', 'fresh-user-onboarding-first-value'],
-  chat: ['composer-ready', 'first-reply'],
-  'public-profile': [
-    'owned-profile-renders-publicly',
-    'profile-edit-save-readback',
-  ],
-  smartlink: ['click-analytics-capture'],
-  checkout: ['checkout-entry-renders'],
-});
+// The browser-check contract moved to prod-cert-probes.mjs together with the
+// JOV-6920 cone probes; re-exported so consumer import paths are unchanged.
+export { EXPECTED_BROWSER_CHECKS };
 
 export function missingBrowserChecks({ surface, present, authStatus, now }) {
   const expected = EXPECTED_BROWSER_CHECKS[surface] ?? [];
@@ -432,6 +429,8 @@ export async function runProductionCertification({
   expectedSha = null,
   profileHandle = 'tim',
   env = {},
+  /** JOV-6920 full-cone checks; the runner enables them, legacy callers keep the legacy set. */
+  coneCases = false,
 } = {}) {
   const served = await readServedBuild(origin, fetchImpl);
   const stepState = stepChecks(steps, authStatus, now);
@@ -441,6 +440,7 @@ export async function runProductionCertification({
     now,
     profileHandle,
     env,
+    coneCases,
   });
   const receipts = [];
   for (const surface of SURFACE_IDS) {

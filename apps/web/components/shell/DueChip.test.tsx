@@ -68,7 +68,7 @@ describe('DueChip', () => {
       <DueChip dueIso='2026-04-20T12:00:00Z' now={NOW} />
     );
     expect((recent.firstElementChild as HTMLElement).className).toContain(
-      'text-error'
+      'text-primary-token'
     );
 
     const { container: stale } = render(

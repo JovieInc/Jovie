@@ -62,9 +62,12 @@ export interface MaterializeClaimedOnboardingProfileInput {
   readonly ipAddress: string | null;
   readonly userAgent: string | null;
   /**
-   * 'public' (default) publishes a claimed, live profile. 'reserved' holds the
-   * handle on a hidden, unclaimed profile so a pending waitlist decision still
-   * protects jov.ie/<handle> until approval flips it public.
+   * 'unproven' (default) claims the profile but keeps it private until the
+   * claimant proves they control the artist identity (Tim, 2026-11-02); with
+   * no artist identity there is nothing to prove and the page is ordinary.
+   * 'public' is only for claims an operator already vouched for. 'reserved'
+   * holds the handle on a hidden, unclaimed profile so a pending waitlist
+   * decision still protects jov.ie/<handle> until approval flips it public.
    */
   readonly visibility?: 'public' | 'reserved' | 'unproven';
   /** Durable waitlist receipt this reservation belongs to (reserved mode). */
@@ -517,7 +520,7 @@ async function materializeProfile({
   conversationId,
   ipAddress,
   userAgent,
-  visibility = 'public',
+  visibility = 'unproven',
   waitlistEntryId = null,
 }: MaterializeClaimedOnboardingProfileInput): Promise<MaterializeClaimedOnboardingProfileResult> {
   const reserved = visibility === 'reserved';

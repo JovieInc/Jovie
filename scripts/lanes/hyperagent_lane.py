@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import capacity_registry  # noqa: E402
+import capacity_registry, hyperagent_network as network  # noqa: E402
 
 REPO = "JovieInc/Jovie"
 PROOF_SOURCES = ("hyperagent-settings-readback", "hyperagent-identity+owner-attestation")
@@ -234,6 +234,8 @@ def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
                 if type(payload.get("isRunning")) is not bool or type(payload.get("awaitingApproval")) is not bool:
                     return held("remote-status-unverified", thread)
                 if payload["awaitingApproval"]:
+                    if network.grant_registry_access(call, thread, issue, path.parent, clock):
+                        pause(1); continue  # exact registries granted; the agent retries its install
                     record_approval(call, thread, issue, path.parent, clock)
                     return held("remote-approval-required", thread)
                 if payload["isRunning"]:
@@ -246,7 +248,7 @@ def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
                                  and m.get("role") == "assistant" and isinstance(m.get("content"), str))
                 urls = set(re.findall(r"https://github\.com/[^\s/]+/[^\s/]+/pull/\d+", text))
                 if len(urls) != 1:
-                    return held("remote-pr-ambiguous" if urls else "remote-pr-missing", thread)
+                    return held("remote-pr-ambiguous" if urls else network.missing_pr_reason(text), thread)
                 url = urls.pop()
                 if not re.fullmatch(r"https://github\.com/JovieInc/Jovie/pull/\d+", url):
                     return held("remote-pr-attribution-mismatch", thread)

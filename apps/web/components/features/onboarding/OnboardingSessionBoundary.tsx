@@ -56,6 +56,8 @@ export function OnboardingSessionBoundary({
   const [failure, setFailure] = useState<{
     identity: string;
     revision: number;
+    /** Diagnostic code for the nightly stall annotation (JOV-7653). */
+    code: string;
   } | null>(null);
   // Read by the restore effect only to skip a server-seeded first load, so
   // the effect depends on identity and revision alone.
@@ -82,12 +84,19 @@ export function OnboardingSessionBoundary({
     const timeout = setTimeout(() => controller.abort(), 10_000);
     let cancelled = false;
     void (async () => {
+      // Distinct failure codes feed data-restore-error so the nightly
+      // auth.setup stall annotation (JOV-7653) can distinguish an HTTP
+      // failure (status:<n>), an identity/snapshot mismatch, a body parse
+      // failure, and a network/abort path without server log access.
+      const fail = (code: string) => {
+        if (!cancelled) setFailure({ identity, revision, code });
+      };
       try {
         const response = await fetch('/api/onboarding/conversation', {
           cache: 'no-store',
           signal: controller.signal,
         });
-        if (!response.ok) throw new Error('restore failed');
+        if (!response.ok) throw new Error(`restore-status:${response.status}`);
         const snapshot: Snapshot = await response.json();
         if (
           (snapshot.identityId ?? 'anonymous') !== identity ||
@@ -96,7 +105,7 @@ export function OnboardingSessionBoundary({
           (snapshot.conversationId !== null &&
             typeof snapshot.conversationId !== 'string')
         )
-          throw new Error('invalid restore');
+          throw new Error('restore-invalid-restore');
         if (!cancelled)
           setLoaded({
             identity,
@@ -107,8 +116,18 @@ export function OnboardingSessionBoundary({
               snapshot.messages.length === 0 &&
               initialIdentity.current === identity,
           });
-      } catch {
-        if (!cancelled) setFailure({ identity, revision });
+      } catch (error) {
+        if (cancelled) return;
+        const code =
+          error instanceof DOMException && error.name === 'AbortError'
+            ? 'restore-abort'
+            : error instanceof TypeError
+              ? 'restore-network'
+              : error instanceof Error &&
+                  /^restore-(status:.+|invalid-restore)$/.test(error.message)
+                ? error.message.slice('restore-'.length)
+                : 'restore-body';
+        fail(code);
       } finally {
         clearTimeout(timeout);
       }
@@ -123,20 +142,42 @@ export function OnboardingSessionBoundary({
   const runAction = async (action: 'restart' | 'logout') => {
     if (actionPending || chatBusy || !identity) return;
     const owner = identity;
-    setActionPending(true);
-    setActionError(null);
-    try {
-      const response = await fetch('/api/onboarding/conversation', {
+    const postAction = (conversationId: string | null) =>
+      fetch('/api/onboarding/conversation', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           action,
           identityId: userId,
-          conversationId: loaded?.snapshot.conversationId ?? null,
+          conversationId,
         }),
         signal: AbortSignal.timeout(10_000),
       });
-      if (!response.ok) throw new Error('action failed');
+    setActionPending(true);
+    setActionError(null);
+    try {
+      const response = await postAction(
+        loaded?.snapshot.conversationId ?? null
+      );
+      // JOV-10170: the boundary's snapshot conversation id is frozen at page
+      // load. A conversation the chat created after that (a fresh visitor's
+      // first message mints one server-side) made the restart 409 instead of
+      // resetting, so Start Over only worked after a manual reload plus a
+      // second click. Refresh the snapshot once and retry with the live id.
+      let actionResponse = response;
+      if (action === 'restart' && response.status === 409) {
+        const refreshed = await fetch('/api/onboarding/conversation', {
+          cache: 'no-store',
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (refreshed.ok) {
+          const fresh: Snapshot = await refreshed.json();
+          if ((fresh.identityId ?? 'anonymous') !== identity)
+            throw new Error('action failed');
+          actionResponse = await postAction(fresh.conversationId ?? null);
+        }
+      }
+      if (!actionResponse.ok) throw new Error('action failed');
       if (actionIdentity.current !== owner) return;
       if (action === 'logout') await signOut({ redirectUrl: APP_ROUTES.START });
       else {
@@ -163,6 +204,7 @@ export function OnboardingSessionBoundary({
   ) {
     const failed =
       failure?.identity === identity && failure.revision === revision;
+    const failureCode = failed ? failure.code : null;
     // Sign-up inside this tab (anonymous -> account): keep the conversation
     // the visitor is looking at, frozen, while the linked copy loads. It is
     // the same person's in-tab history, so nothing new is exposed; unmounting
@@ -201,6 +243,10 @@ export function OnboardingSessionBoundary({
         aria-live='polite'
         data-testid='onboarding-session-boundary'
         data-restore-state={failed ? 'failed' : 'restoring'}
+        data-restore-error={failureCode ?? undefined}
+        data-auth-state={
+          isLoaded ? (userId ? 'signed-in' : 'anonymous') : 'loading'
+        }
       >
         <h1 className='m-0 text-balance text-base font-normal leading-normal'>
           {failed

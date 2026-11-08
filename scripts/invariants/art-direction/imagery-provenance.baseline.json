@@ -11,7 +11,6 @@
     "apps/web/app/(marketing)/solutions/[audience]/sections.tsx#next-image",
     "apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailPasteForm.tsx#next-image",
     "apps/web/components/homepage/HomepageCertifiedSections.tsx#next-image",
-    "apps/web/components/marketing/MarketingEditorialHeroPhoto.tsx#next-image",
     "apps/web/components/marketing/MarketingPhoneImage.tsx#next-image",
     "apps/web/components/marketing/MarketingPlatformSpecBento.tsx#next-image",
     "apps/web/components/marketing/MarketingSurfaceCard.tsx#next-image",

@@ -112,6 +112,15 @@
   --system-b-chat-user-bubble-shadow: none;
 }
 
+/* A streamed starter response can stop at the dock's opening tag. Its
+   padding-only box must not paint before the instruction and input arrive.
+   The trailing HTML marker releases paint without waiting for hydration;
+   the heading stays visible and the original controls keep their identity. */
+.system-b-onboarding-chat[data-starter-handoff="true"]
+[data-dock="bottom"]:not(:has([data-onboarding-composer-complete])) {
+  visibility: hidden;
+}
+
 /* Specificity (not :where) so this beats the shared pill/rectangle shapes. */
 .system-b-onboarding-chat .system-b-chat-user-bubble {
   border-radius: calc(var(--radius-xl) + var(--space-0-5));
@@ -888,26 +897,15 @@
   }
 }
 
+/* Sticky table headers paint a fully opaque app-shell content surface (the
+   same surface as the sticky group header). A translucent surface plus
+   backdrop-filter is WebKit-unstable on sticky table cells: WebKit composites
+   the filter against the wrong backdrop, so scrolled rows bleed through and
+   overlap the column labels (JOV-9079). */
 :where(.system-b-table-sticky-header) {
-  background: color-mix(
-    in oklab,
-    var(--system-b-app-content-surface) 92%,
-    transparent
-  );
+  background: var(--system-b-app-content-surface);
   box-shadow: inset 0 -1px 0
     color-mix(in oklab, var(--system-b-app-shell-border) 74%, transparent);
-}
-
-@supports (backdrop-filter: blur(1px)) {
-  :where(.system-b-table-sticky-header) {
-    backdrop-filter: blur(14px);
-  }
-}
-
-@supports (-webkit-backdrop-filter: blur(1px)) {
-  :where(.system-b-table-sticky-header) {
-    -webkit-backdrop-filter: blur(14px);
-  }
 }
 
 :where(.system-b-table-sticky-group-header) {
