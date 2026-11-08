@@ -12,7 +12,14 @@
  * Without PEN_CLI_KEY or the file URL it inspects nothing and says so.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -92,7 +99,8 @@ function penFiles(dir) {
     for (const entry of readdirSync(d, { withFileTypes: true })) {
       const path = join(d, entry.name);
       if (entry.isDirectory()) walk(path);
-      else if (entry.name.endsWith('.pen')) all.push(path);
+      else if (entry.name.endsWith('.pen') && !entry.name.startsWith('._'))
+        all.push(path);
     }
   };
   walk(dir);
@@ -100,11 +108,36 @@ function penFiles(dir) {
 }
 
 /**
- * @param {{ out: string, query: string, env?: NodeJS.ProcessEnv, fetchImpl?: typeof fetch, run?: (cmd: string, args: string[], opts?: object) => Buffer | string, log?: (line: string) => void }} options
+ * @param {{ out: string, query: string, logPng?: string | null, env?: NodeJS.ProcessEnv, fetchImpl?: typeof fetch, run?: (cmd: string, args: string[], opts?: object) => Buffer | string, log?: (line: string) => void }} options
  */
+/** Where artifacts can't be downloaded, print chosen frames into the log. */
+export function echoFrames({ parsed, pngDir, pattern, log, chunk = 6000 }) {
+  const re = new RegExp(pattern, 'i');
+  const names = existsSync(pngDir) ? readdirSync(pngDir) : [];
+  const emit = (tag, id, text) => {
+    const parts = Math.ceil(text.length / chunk) || 1;
+    for (let i = 0; i < parts; i += 1)
+      log(
+        `${tag} ${id} ${i + 1}/${parts} ${text.slice(i * chunk, (i + 1) * chunk)}`
+      );
+  };
+  for (const hit of parsed.hits.filter(h => re.test(h.name ?? ''))) {
+    const tree = parsed.trees.find(t => t.id === hit.id);
+    if (tree) emit('PEN_TREE_JSON', hit.id, JSON.stringify(tree));
+    const png = names.find(n => n.endsWith('.png') && n.includes(hit.id));
+    if (png)
+      emit(
+        'PEN_PNG_B64',
+        hit.id,
+        readFileSync(join(pngDir, png)).toString('base64')
+      );
+  }
+}
+
 export async function runInspect({
   out,
   query,
+  logPng = null,
   env = process.env,
   fetchImpl = fetch,
   run = (cmd, args, opts) =>
@@ -178,6 +211,10 @@ export async function runInspect({
     log(
       `${basename(pen)}: ${parsed.top.length} top frames, ${parsed.hits.length} matches`
     );
+    for (const f of parsed.top.filter(t => t.depth === 0))
+      log(`top ${f.id} ${f.w}x${f.h} ${f.name}`);
+    for (const h of parsed.hits) log(`match ${h.id} ${h.w}x${h.h} ${h.name}`);
+    if (logPng) echoFrames({ parsed, pngDir, pattern: logPng, log });
   }
   rmSync(work, { recursive: true, force: true });
   writeFileSync(
@@ -189,14 +226,22 @@ export async function runInspect({
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { values } = parseArgs({
-    options: { out: { type: 'string' }, query: { type: 'string' } },
+    options: {
+      out: { type: 'string' },
+      query: { type: 'string' },
+      'log-png': { type: 'string' },
+    },
   });
   if (!values.out || !values.query) {
     process.stderr.write('usage: pen-inspect.mjs --out DIR --query REGEX\n');
     process.exit(64);
   }
   try {
-    await runInspect({ out: resolve(values.out), query: values.query });
+    await runInspect({
+      out: resolve(values.out),
+      query: values.query,
+      logPng: values['log-png'] ?? null,
+    });
   } catch (error) {
     process.stderr.write(`${error?.message ?? error}\n`);
     process.exit(1);

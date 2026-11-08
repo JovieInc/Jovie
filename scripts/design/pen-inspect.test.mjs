@@ -99,3 +99,30 @@ test('without secrets it inspects nothing and says so', async () => {
     []
   );
 });
+
+test('echoFrames prints chosen frames in chunks', async () => {
+  const { echoFrames } = await import('./pen-inspect.mjs');
+  const { mkdtempSync: mk, writeFileSync } = await import('node:fs');
+  const dir = mk(join(tmpdir(), 'pen-echo-'));
+  writeFileSync(join(dir, 'A.png'), Buffer.alloc(30, 1));
+  const lines = [];
+  echoFrames({
+    parsed: {
+      hits: [
+        { id: 'A', name: 'Sign in' },
+        { id: 'B', name: 'Pricing' },
+      ],
+      trees: [{ id: 'A', rows: [] }],
+    },
+    pngDir: dir,
+    pattern: 'sign',
+    chunk: 16,
+    log: l => {
+      lines.push(l);
+    },
+  });
+  assert.ok(lines.some(l => l.startsWith('PEN_TREE_JSON A 1/')));
+  const png = lines.filter(l => l.startsWith('PEN_PNG_B64 A '));
+  assert.equal(png.length, 3);
+  assert.ok(!lines.some(l => l.includes(' B ')));
+});

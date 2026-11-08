@@ -11,6 +11,10 @@ on:
         description: 'Case-insensitive regex matched against frame names'
         required: true
         default: 'auth|sign ?in|sign ?up|log ?in|otp|verif|code'
+      log_png:
+        description: 'Regex of matched frame names to print into the log as base64 PNG and tree JSON (for agents that cannot download artifacts)'
+        required: false
+        default: ''
   pull_request:
     types: [opened, reopened, synchronize]
     paths:
@@ -52,7 +56,12 @@ jobs:
           PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
           PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
           QUERY: ${{ inputs.query || 'auth|sign ?in|sign ?up|log ?in|otp|verif|code' }}
-        run: node scripts/design/pen-inspect.mjs --out "$RUNNER_TEMP/pen-inspect" --query "$QUERY"
+          LOG_PNG: ${{ inputs.log_png || '' }}
+        run: |
+          set -euo pipefail
+          args=(--out "$RUNNER_TEMP/pen-inspect" --query "$QUERY")
+          if [ -n "$LOG_PNG" ]; then args+=(--log-png "$LOG_PNG"); fi
+          node scripts/design/pen-inspect.mjs "${args[@]}"
 
       - name: Upload frames
         if: always()
