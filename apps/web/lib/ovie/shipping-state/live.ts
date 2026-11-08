@@ -1090,7 +1090,7 @@ export async function readLanesStatus(io: LiveIo): Promise<AuthorityRead> {
   };
 }
 
-async function githubGraphql(
+export async function githubGraphql(
   io: LiveIo,
   sourceId: ShippingSourceId,
   query: string,
@@ -1133,7 +1133,7 @@ async function githubGraphql(
   return body.data;
 }
 
-function isAuthorityRead(value: unknown): value is AuthorityRead {
+export function isAuthorityRead(value: unknown): value is AuthorityRead {
   return (
     isRecord(value) && typeof value.status === 'string' && 'sourceId' in value
   );
@@ -1380,7 +1380,7 @@ function recentMerged(
     .slice(0, 12);
 }
 
-function issueCount(data: Record<string, unknown>, alias: string) {
+export function issueCount(data: Record<string, unknown>, alias: string) {
   const search = data[alias];
   return isRecord(search) &&
     Number.isSafeInteger(search.issueCount) &&
@@ -1460,63 +1460,6 @@ export async function readMerges(io: LiveIo): Promise<AuthorityRead> {
     };
   } catch (error) {
     return unreachable(sourceId, error);
-  }
-}
-
-const SEARCH_COUNT_ALIAS_RE = /^[a-z][a-z0-9_]{0,40}$/;
-export const SEARCH_COUNTS_MAX_ALIASES = 60;
-
-export type SearchCountsRead =
-  | {
-      readonly status: 'ok';
-      readonly counts: Readonly<Record<string, number>>;
-    }
-  | { readonly status: 'unavailable'; readonly reason: string };
-
-/**
- * Exact GitHub search `issueCount` for each aliased query, in one GraphQL
- * request through the same token, timeout and rate-limit backoff as the
- * shipping readers. Company history uses it to fill daily counts; it is never
- * on a read path.
- */
-export async function readSearchCounts(
-  io: LiveIo,
-  queries: Readonly<Record<string, string>>
-): Promise<SearchCountsRead> {
-  const aliases = Object.keys(queries);
-  if (
-    aliases.length === 0 ||
-    aliases.length > SEARCH_COUNTS_MAX_ALIASES ||
-    aliases.some(alias => !SEARCH_COUNT_ALIAS_RE.test(alias))
-  ) {
-    return { status: 'unavailable', reason: 'invalid-search-aliases' };
-  }
-  const variables = aliases.map(alias => `$${alias}:String!`).join(',');
-  const fields = aliases
-    .map(
-      alias => `${alias}:search(type:ISSUE,query:$${alias},first:1){issueCount}`
-    )
-    .join('');
-  try {
-    const data = await githubGraphql(
-      io,
-      'github-merges',
-      `query CompanyHistoryCounts(${variables}){${fields}}`,
-      queries
-    );
-    if (isAuthorityRead(data)) {
-      return { status: 'unavailable', reason: 'github-unavailable' };
-    }
-    const counts: Record<string, number> = {};
-    for (const alias of aliases) {
-      const count = issueCount(data, alias);
-      if (count === null)
-        return { status: 'unavailable', reason: 'malformed-search-count' };
-      counts[alias] = count;
-    }
-    return { status: 'ok', counts };
-  } catch {
-    return { status: 'unavailable', reason: 'github-unavailable' };
   }
 }
 

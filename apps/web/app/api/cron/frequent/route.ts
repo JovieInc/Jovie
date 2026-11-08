@@ -12,7 +12,6 @@
  * - Redis write/read operability canary: hourly
  * - Daily acquisition-canary receipt freshness alarm: hourly
  * - Summer company-state reconciliation: every invocation
- * - Company history (daily merged-PR counts): hourly
  * - Proof stats (public counts) refresh + freshness withdrawal: hourly
  *
  * Each sub-job runs in an independent try-catch so one failure
@@ -63,7 +62,7 @@ import { processOutreachBatch } from '@/lib/leads/outreach-batch';
 import { pipelineWarn } from '@/lib/leads/pipeline-logger';
 import { processLeadBatch } from '@/lib/leads/process-batch';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
-import { syncConfiguredCompanyHistory } from '@/lib/ovie/company-history/configured.server';
+import { companyHistoryCronJob } from '@/lib/ovie/company-history/configured.server';
 import { refreshCompanyStateCache } from '@/lib/ovie/company-state.server';
 import { applySummerCardDefaults } from '@/lib/ovie/summer-cards.server';
 import { refreshProofStats } from '@/lib/proof-stats/publish.server';
@@ -224,15 +223,7 @@ export async function GET(request: Request) {
     };
   });
 
-  // Company history: daily merged-PR counts per Pacific day, hourly slot.
-  // At most two aliased GitHub search requests; final days are never refetched,
-  // so Summer's 7/30-day answers and charts are cache reads (zero provider calls).
-  results.companyHistory =
-    minute < 15
-      ? await runSubJob('companyHistory', async () => ({
-          ...(await syncConfiguredCompanyHistory(new Date())),
-        }))
-      : { success: true, skipped: true };
+  results.companyHistory = await companyHistoryCronJob(minute, runSubJob);
 
   // Default-plus-deadline contract: an overdue founder ask records its
   // declared default (approve or reject) so nothing waits on Tim forever.

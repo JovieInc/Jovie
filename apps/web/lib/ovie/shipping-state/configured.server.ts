@@ -4,17 +4,14 @@ import { env } from '@/lib/env-server';
 import { resolveHudGithubToken } from '@/lib/github/hud-token.server';
 import type { ShippingClock, ShippingStateProjection } from './contract';
 import { systemClock } from './envelope';
-import {
-  createLiveShippingStateReaders,
-  defaultLiveIo,
-  readSearchCounts,
-} from './live';
+import { createLiveShippingStateReaders, defaultLiveIo } from './live';
 import { ageShippingStateProjection, unknownProjection } from './project';
 import {
   getLastKnownShippingState,
   type PublishShippingStateInput,
   publishShippingState,
 } from './publisher';
+import { readSearchCounts } from './search-counts';
 
 export const CONFIGURED_SHIPPING_STATE_MAX_AGE_MS = 6_000;
 
