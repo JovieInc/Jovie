@@ -944,7 +944,9 @@ jobs:
             echo "run_public_lighthouse=false" >> "$GITHUB_OUTPUT"
           fi
 
-          DASHBOARD_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.dashboard\.pr\.json|apps/web/scripts/lighthouse-dashboard-auth\.cjs)$'
+          # The dashboard gate also runs chat and onboarding Lighthouse, so their
+          # configs must turn its measuring steps on too.
+          DASHBOARD_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.(dashboard|chat|onboarding)\.pr\.json|apps/web/scripts/lighthouse-dashboard-auth\.cjs)$'
           if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$DASHBOARD_LIGHTHOUSE_PATTERN"; then
             echo "run_dashboard_lighthouse=true" >> "$GITHUB_OUTPUT"
           else

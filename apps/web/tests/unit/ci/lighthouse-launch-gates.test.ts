@@ -124,6 +124,27 @@ describe('Lighthouse identity admission', () => {
     expect(job['continue-on-error']).toBeUndefined();
   });
 
+  it('dashboard: a change to any Lighthouse config it runs turns its measuring steps on', () => {
+    // run_full_ci (from run_dashboard_lighthouse) gates every probe step, so a
+    // PR touching only one of these must not skip the measurement and pass.
+    const source = readFileSync(
+      join(REPO_ROOT, '.github/workflows/ci.yml'),
+      'utf8'
+    );
+    const match = source.match(/DASHBOARD_LIGHTHOUSE_PATTERN='([^']+)'/);
+    expect(match).not.toBeNull();
+    const pattern = new RegExp(match?.[1] ?? '$^');
+    for (const path of [
+      'apps/web/.lighthouserc.dashboard.pr.json',
+      'apps/web/.lighthouserc.chat.pr.json',
+      'apps/web/.lighthouserc.onboarding.pr.json',
+      'apps/web/scripts/lighthouse-dashboard-auth.cjs',
+    ]) {
+      expect(pattern.test(path), path).toBe(true);
+    }
+    expect(pattern.test('apps/web/.lighthouserc.admin.pr.json')).toBe(false);
+  });
+
   for (const surface of ['onboarding'] as const) {
     const job = workflow.jobs[`ci-lighthouse-${surface}-pr`];
     it(`${surface}: missing identity succeeds before any checkout, provisioning or build`, () => {
