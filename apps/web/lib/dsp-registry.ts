@@ -15,12 +15,7 @@
  *  (visual)     (type)       _PROVIDER    DOMAINS      _DSP_MAPPINGS
  */
 
-import {
-  buildGlyphLogo,
-  type CompactDspInput,
-  compactDsp,
-  dsp,
-} from './dsp-registry-builders';
+import { type CompactDspInput, compactDsp, dsp } from './dsp-registry-builders';
 import type {
   DSPConfig,
   DspCategory,
@@ -153,7 +148,7 @@ const URL_ONLY_STREAMING_DSP_INPUTS: readonly CompactDspInput[] =
     `#${d.hex}`,
     [...d.domains],
     d.searchUrlTemplate ?? null,
-    { aliases: d.aliases ? [...d.aliases] : undefined, iconKey: d.iconKey },
+    { aliases: d.aliases ? [...d.aliases] : undefined },
   ]);
 
 // ============================================================================
@@ -217,7 +212,6 @@ export const DSP_REGISTRY: readonly DspRegistryEntry[] = [
     name: 'Deezer',
     musicfetchService: 'deezer',
     color: '#2F9AFF',
-    logoSvg: buildGlyphLogo('Deezer', 'deezer'),
     domains: ['deezer.com', 'www.deezer.com', 'deezer.page.link'],
     searchUrlTemplate: 'https://www.deezer.com/search/{query}',
   }),
@@ -226,7 +220,6 @@ export const DSP_REGISTRY: readonly DspRegistryEntry[] = [
     name: 'Tidal',
     musicfetchService: 'tidal',
     color: '#111111',
-    logoSvg: buildGlyphLogo('Tidal', 'tidal'),
     domains: ['tidal.com', 'listen.tidal.com'],
     searchUrlTemplate: 'https://tidal.com/search?q={query}',
   }),
@@ -235,7 +228,6 @@ export const DSP_REGISTRY: readonly DspRegistryEntry[] = [
     name: 'Amazon Music',
     musicfetchService: 'amazonMusic',
     color: '#146EB4',
-    logoSvg: buildGlyphLogo('Amazon Music', 'amazonmusic'),
     domains: ['music.amazon.com'],
     searchUrlTemplate: 'https://music.amazon.com/search/{query}',
     aliases: ['amazonmusic'],

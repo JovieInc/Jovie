@@ -6,6 +6,7 @@ import {
   getRegistryEntry,
   PROVIDER_DOMAINS,
 } from '@/lib/dsp-registry';
+import { SOCIAL_ICON_DATA } from '@/lib/social-icons/icon-data';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 
 type Store = {
@@ -58,17 +59,11 @@ describe('AWAL / Orchard distributor store coverage', () => {
     }
   });
 
-  it('streaming services with a published brand glyph never use a monogram', () => {
-    const glyphKeys = [
-      'deezer',
-      'tidal',
-      'amazon_music',
-      'vk_music',
-      'traxsource',
-    ];
-    for (const key of glyphKeys) {
-      const logo = getRegistryEntry(key)?.logoSvg ?? '';
-      expect(logo, key).not.toContain('<text');
+  it('services with a published brand glyph have it in the social icon data', () => {
+    // The registry keeps monogram logos (inlining paths costs every client
+    // bundle ~4 KB gz); ProviderIcon draws these glyphs from SOCIAL_ICON_DATA.
+    for (const key of ['deezer', 'tidal', 'amazonmusic', 'vk', 'traxsource']) {
+      expect(SOCIAL_ICON_DATA[key]?.path, key).toBeTruthy();
     }
   });
 });

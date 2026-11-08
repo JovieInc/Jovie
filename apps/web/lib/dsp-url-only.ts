@@ -18,7 +18,8 @@ export interface UrlOnlyDsp {
   readonly domains: readonly string[];
   readonly aliases?: readonly string[];
   readonly searchUrlTemplate?: string;
-  /** DSP_GLYPH_DATA key for a real brand glyph (omit = monogram). */
+  /** Brand glyph key. ProviderIcon draws it; the registry keeps a monogram
+   * because inlining the path would add ~4 KB gz to every registry client. */
   readonly iconKey?: 'vk' | 'traxsource';
 }
 
