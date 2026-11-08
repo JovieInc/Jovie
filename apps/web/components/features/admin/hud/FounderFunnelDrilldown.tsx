@@ -1,10 +1,10 @@
 'use client';
 
 import { EmptyCell } from '@/components/atoms/EmptyCell';
+import { AdminDataTable } from '@/components/features/admin/table/AdminDataTable';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PersonCell } from '@/components/organisms/table/atoms/PersonCell';
 import { TableEmptyState } from '@/components/organisms/table/atoms/TableEmptyState';
-import { UnifiedTable } from '@/components/organisms/table/organisms/UnifiedTable';
 import { buildAdminGrowthHref } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import type { FounderFunnelStageRows } from '@/lib/admin/types';
@@ -72,13 +72,13 @@ function FounderFunnelDrilldownTable({
   stageLabel: string;
 }>) {
   return (
-    <UnifiedTable
+    <AdminDataTable
       data={rows}
       columns={FOUNDER_FUNNEL_COLUMNS}
       rowMode='dense'
+      enableVirtualization={false}
       getRowId={row => row.id}
       minWidth='0'
-      className='text-app'
       caption={`${stageLabel} records`}
     />
   );
