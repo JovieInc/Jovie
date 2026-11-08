@@ -128,13 +128,6 @@
   height: 1.75rem;
 }
 
-.hv3-footer.marketing-footer-premium .mf-eyebrow {
-  margin-bottom: 1rem;
-  color: var(--hv3-t4);
-  font-size: 0.8125rem;
-  line-height: 1rem;
-}
-
 .hv3-footer nav[aria-label="Footer"] ul {
   gap: 0.625rem;
 }
@@ -147,12 +140,6 @@
   color: var(--hv3-t2);
   font-size: 0.875rem;
   line-height: 1.0625rem;
-}
-
-.hv3-footer .mf-baseband {
-  margin-top: 4.5rem;
-  padding-top: 0;
-  border-top: 0;
 }
 
 .hv3-footer.marketing-footer-premium .mf-copyright,
@@ -201,13 +188,6 @@
   .hv3-footer .public-container > div:first-child > nav {
     display: contents;
   }
-
-  .hv3-footer .mf-baseband {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-    margin-top: 3rem;
-  }
 }
 
 /* ── Page container (header and footer share the v3 page margins) ── */
@@ -215,10 +195,6 @@
 .home-viewport .public-container {
   /* container-width-allow: home-canonical-v3 header and footer sit on the approved 96px page margins (1248px content at 1440), like every v3 section */
   width: min(100% - 12rem, 78rem);
-}
-
-.home-viewport .marketing-glass-header__nav {
-  column-gap: 2.5rem;
 }
 
 /* The docked header owns its own gutter (the shared public gutter). On the
@@ -245,17 +221,6 @@
   opacity: 1;
   clip-path: none;
   translate: none;
-}
-
-.home-viewport .marketing-glass-header .marketing-glass-header__nav-link,
-.home-viewport .marketing-glass-header .marketing-glass-header__text-link {
-  padding-inline: 0;
-  font-size: 0.875rem;
-  font-weight: 400;
-}
-
-.home-viewport .marketing-glass-header .marketing-glass-header__text-link {
-  color: var(--color-text-primary-token);
 }
 
 @media (max-width: 79.9375rem) {
