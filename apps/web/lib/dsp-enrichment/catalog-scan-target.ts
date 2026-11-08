@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import type { DbOrTransaction } from '@/lib/db';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { resolveSpotifyArtistIdentity } from '@/lib/spotify/artist-id';
 
 const validArtistId = (id: string | null | undefined): id is string =>
   typeof id === 'string' && /^[a-zA-Z0-9]{22}$/.test(id);
@@ -14,7 +15,10 @@ export async function getBoundSpotifyArtistId(
   creatorProfileId: string
 ): Promise<string | null> {
   const [profile] = await tx
-    .select({ spotifyId: creatorProfiles.spotifyId })
+    .select({
+      spotifyId: creatorProfiles.spotifyId,
+      spotifyUrl: creatorProfiles.spotifyUrl,
+    })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.id, creatorProfileId))
     .limit(1);
@@ -34,7 +38,16 @@ export async function getBoundSpotifyArtistId(
     )
     .limit(1);
 
-  const canonical = validArtistId(profile.spotifyId) ? profile.spotifyId : null;
+  // Legacy profiles keep only spotify_url. Resolve the exact ID from either
+  // structured field; conflicting IDs fail closed (no scan authority).
+  const identity = resolveSpotifyArtistIdentity([
+    profile.spotifyId,
+    profile.spotifyUrl,
+  ]);
+  if (identity.status === 'conflict') return null;
+  const canonical = validArtistId(identity.spotifyArtistId)
+    ? identity.spotifyArtistId
+    : null;
   if (
     match?.status === 'rejected' &&
     (!canonical || match.externalArtistId === canonical)
