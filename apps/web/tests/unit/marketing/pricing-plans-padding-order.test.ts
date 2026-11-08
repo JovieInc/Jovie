@@ -44,6 +44,6 @@ describe('pricing plans joined panel', () => {
     // The panel's 1px gap is the divider and its radius clips the outer corners.
     expect(panel).toMatch(/gap: var\(--space-px\)/);
     expect(panel).toMatch(/overflow: hidden/);
-    expect(card).toMatch(/border-radius: 0;/);
+    expect(card).toMatch(/border-radius: var\(--radius-none\);/);
   });
 });

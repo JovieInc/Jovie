@@ -1677,8 +1677,9 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
   border: 0;
   /* The plans render as one joined panel: the 1px grid gap is the divider and
      the panel's own radius clips the outer corners. Rounding each card here
-     let the divider colour show through as notches at every join. */
-  border-radius: 0;
+     let the divider colour show through as notches at every join; the panel
+     is the rounded card here. */
+  border-radius: var(--radius-none);
   background: var(--system-b-bg-surface-0);
   box-shadow: none;
   padding: var(--space-6);
