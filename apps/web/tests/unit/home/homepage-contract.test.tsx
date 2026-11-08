@@ -366,6 +366,12 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     expect(css).toMatch(
       /@supports \(animation-timeline: view\(\)\)\s*\{\s*\.hv3-hero,\s*\.hv3-chapter\s*\{\s*overflow: clip;\s*\}/
     );
+    // The horizon line paints above the chapter rule's hairline, which would
+    // otherwise cover it; the glow stays behind the copy.
+    expect(css).toMatch(
+      /\.hv3-chapter::after\s*\{[^}]*z-index:\s*1;[^}]*height:\s*1px;/
+    );
+    expect(css).toMatch(/\.hv3-chapter::before\s*\{[^}]*z-index:\s*-1;/);
     // Keyframes touch only compositor properties, and never fade to nothing.
     for (const [, body] of css.matchAll(
       /@keyframes [\w-]+\s*\{([\s\S]*?\})\s*\}/g
