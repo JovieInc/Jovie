@@ -94,6 +94,10 @@ async function sidebarDestinations(page: Page): Promise<string[]> {
 }
 
 function onRoute(pathname: string, target: string): boolean {
+  // Every shell path sits under the /app home, so home only counts as
+  // reached on an exact match. Other links own their child paths, so
+  // /app/settings counts on /app/settings/account after its redirect.
+  if (target === APP_ROUTES.DASHBOARD) return pathname === target;
   return pathname === target || pathname.startsWith(`${target}/`);
 }
 
