@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -9,6 +10,7 @@ import {
   evaluateScreenGates,
   isCustomerUi,
   owedCriteria,
+  readBaseScreens,
   screenComponents,
   screenIssues,
 } from '../component-cert-screens.mjs';
@@ -99,8 +101,36 @@ describe('import closure', () => {
       "import type { A } from './a';\nexport { B as C } from './b';\nexport const D = 1;"
     );
     assert.deepEqual(mod.imports, []);
-    assert.deepEqual(mod.reexports, [{ spec: './b', names: ['B'] }]);
+    assert.deepEqual(mod.reexports, [
+      { spec: './b', names: ['C'], sources: { C: 'B' } },
+    ]);
     assert.ok(mod.localExports.has('D'));
+  });
+});
+
+describe('import closure edge cases', () => {
+  it('does not read a side-effect import as the next import clause', () => {
+    const mod = parseModule(
+      "import './globals.css';\nimport { Button } from '@jovie/ui';"
+    );
+    assert.deepEqual(mod.imports, [
+      { spec: '@jovie/ui', names: ['Button'] },
+      { spec: './globals.css', names: null },
+    ]);
+  });
+
+  it('follows an aliased re-export to the source name', () => {
+    file('apps/web/components/alias/Real.tsx', 'export function Real() {}\n');
+    file(
+      'apps/web/components/alias/index.ts',
+      "export { Real as Shown } from './Real';\n"
+    );
+    file(
+      'apps/web/app/alias/page.tsx',
+      "import { Shown } from '@/components/alias';\n"
+    );
+    const { components } = importClosure(root, ['apps/web/app/alias/page.tsx']);
+    assert.ok(components.includes('apps/web/components/alias/Real.tsx'));
   });
 });
 
@@ -118,7 +148,14 @@ describe('screen gate', () => {
     );
     assert.equal(result.ok, true);
     assert.deepEqual(result.perScreen, [
-      { id: 'claim/claim', components: 4, passing: 4 },
+      {
+        id: 'claim/claim',
+        route: null,
+        stage: null,
+        components: 4,
+        passing: 4,
+        gate: 'must-pass',
+      },
     ]);
   });
 
@@ -143,6 +180,25 @@ describe('screen gate', () => {
     const report = { certificates: passing.slice(1) };
     const result = evaluateScreenGates(report, registry(), byScreen);
     assert.deepEqual(result.failures[0].criteria, ['tests', 'a11y']);
+  });
+
+  it('fails a screen whose page is missing, and an unknown stage', () => {
+    const missing = {
+      ...registry(),
+      screens: {
+        'claim/claim': { page: 'apps/web/app/claim/page.tsx', stage: 'claim' },
+        'typo/page': { page: 'apps/web/app/nope/page.tsx', stage: 'paid' },
+        'odd/stage': { page: 'apps/web/app/claim/page.tsx', stage: 'later' },
+      },
+    };
+    const map = screenComponents(root, missing);
+    assert.deepEqual(map.get('typo/page'), []);
+    const result = evaluateScreenGates({ certificates: passing }, missing, map);
+    assert.equal(result.ok, false);
+    assert.ok(
+      result.errors.some(e => /typo\/page: page .* is missing/.test(e))
+    );
+    assert.ok(result.errors.some(e => /odd\/stage: stage must be/.test(e)));
   });
 
   it('flags debt that is paid or no longer rendered', () => {
@@ -220,6 +276,42 @@ describe('screen gate', () => {
   });
 });
 
+describe('base registry', () => {
+  it('reads debt at the merge base, so debt paid on main later is not growth', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'cert-screens-git-'));
+    try {
+      const git = (...args) =>
+        execFileSync(
+          'git',
+          ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args],
+          {
+            cwd: repo,
+            stdio: 'pipe',
+          }
+        );
+      const rel = 'cert-screens.json';
+      const write = debt =>
+        writeFileSync(join(repo, rel), JSON.stringify({ debt }));
+      git('init', '-q', '-b', 'main');
+      write({ A: 'a11y,tests' });
+      git('add', '.');
+      git('commit', '-qm', 'base');
+      git('checkout', '-qb', 'feature');
+      git('checkout', '-q', 'main');
+      write({ A: 'tests' });
+      git('commit', '-qam', 'paid on main');
+      git('checkout', '-q', 'feature');
+      assert.deepEqual(readBaseScreens(repo, rel, 'main').debt, {
+        A: 'a11y,tests',
+      });
+      assert.equal(readBaseScreens(repo, rel, 'missing-ref'), null);
+      assert.equal(readBaseScreens(repo, rel, null), null);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('customer UI scope', () => {
   it('counts drawn components and leaves out providers, pixels and dev tools', () => {
     assert.equal(
@@ -244,5 +336,29 @@ describe('customer UI scope', () => {
       false
     );
     assert.equal(isCustomerUi('apps/web/lib/brand/primitives.tsx'), false);
+    assert.equal(
+      isCustomerUi('apps/web/components/providers/GoogleAnalytics.tsx'),
+      false
+    );
+    assert.equal(
+      isCustomerUi('apps/web/components/providers/ErrorBoundary.tsx'),
+      true
+    );
+  });
+
+  it('drops a context file only when it creates a context', () => {
+    const rel = 'apps/web/components/shell/HeaderSearchSurfaceFromContext.tsx';
+    assert.equal(
+      isCustomerUi(rel, 'export function X() { return <div />; }'),
+      true
+    );
+    assert.equal(
+      isCustomerUi(
+        'apps/web/components/organisms/PendingShellContext.tsx',
+        'const Ctx = createContext<Value | null>(null);'
+      ),
+      false
+    );
+    assert.equal(isCustomerUi(rel), true);
   });
 });

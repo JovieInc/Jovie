@@ -6,12 +6,18 @@
  *   node scripts/component-cert-screens.mjs --issues out.json
  *        ranked failing components for an agent loop (most screens first)
  *   node scripts/component-cert-screens.mjs --refresh       shrink debt to what still fails
- *   node scripts/component-cert-screens.mjs --enroll <id> --page apps/web/app/x/page.tsx [--route /x]
+ *   node scripts/component-cert-screens.mjs --enroll <id> --page apps/web/app/x/page.tsx [--route /x] [--stage reach]
  *        add a screen; its current failures become debt, everything new must pass
  * The merge gate itself runs inside `pnpm component-certificate:gate`.
  */
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -22,6 +28,7 @@ import {
   evaluateScreenGates,
   owedCriteria,
   readScreens,
+  SCREEN_STAGES,
   screenComponents,
   screenIssues,
 } from './lib/component-cert-screens.mjs';
@@ -39,6 +46,7 @@ const { values } = parseArgs({
     enroll: { type: 'string' },
     page: { type: 'string' },
     route: { type: 'string' },
+    stage: { type: 'string' },
     'mutation-state': { type: 'string' },
     a11y: { type: 'string' },
     visual: { type: 'string' },
@@ -62,9 +70,21 @@ if (values.enroll) {
     console.error(`screen ${values.enroll} is already enrolled`);
     process.exit(2);
   }
+  if (
+    !/^apps\/web\/app\/.*page\.tsx$/.test(values.page) ||
+    !existsSync(join(root, values.page))
+  ) {
+    console.error(`--page ${values.page} is not an App Router page.tsx`);
+    process.exit(2);
+  }
+  if (values.stage && !SCREEN_STAGES.includes(values.stage)) {
+    console.error(`--stage must be one of ${SCREEN_STAGES.join(', ')}`);
+    process.exit(2);
+  }
   screens.screens[values.enroll] = {
     page: values.page,
     ...(values.route ? { route: values.route } : {}),
+    ...(values.stage ? { stage: values.stage } : {}),
   };
 }
 

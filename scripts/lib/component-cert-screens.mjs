@@ -51,19 +51,41 @@ export const SCREEN_COMPONENT_ROOTS = Object.freeze([
   'packages/ui/',
 ]);
 
-/**
- * Files a screen imports that draw nothing a customer sees: context providers,
- * analytics and pixel loaders, and dev-only tools. They stay out of the screen
- * count so its debt is UI a customer can see.
- */
-const NOT_CUSTOMER_UI =
-  /(^|\/)(providers|dev)\/|(Provider|Context|Pixel|Analytics)\.tsx$/;
+/** Stages a screen can sit at in the funnel, nearest revenue last. */
+export const SCREEN_STAGES = Object.freeze([
+  'internal',
+  'reach',
+  'waitlist',
+  'start',
+  'chat',
+  'claim',
+  'paid',
+]);
 
-export function isCustomerUi(rel) {
-  return (
-    SCREEN_COMPONENT_ROOTS.some(r => rel.startsWith(r)) &&
-    !NOT_CUSTOMER_UI.test(rel)
-  );
+/**
+ * Files a screen imports that draw nothing a customer sees stay out of the
+ * screen count, so its debt is UI a customer can see: dev-only tools, context
+ * providers, pixel loaders, the analytics loaders under providers/, and
+ * `*Context.tsx` files that create a React context. A name alone is not
+ * enough for a context file (HeaderSearchSurfaceFromContext draws a surface),
+ * so pass the file's source; without it the file counts as UI.
+ */
+const DEV_ONLY = /(^|\/)dev\//;
+const PROVIDER_OR_PIXEL = /(Provider|Providers|Pixel)\.tsx$/;
+const ANALYTICS_LOADER = /(^|\/)providers\/\w*Analytics\.tsx$/;
+const CONTEXT_FILE = /Context\.tsx$/;
+
+export function isCustomerUi(rel, source) {
+  if (!SCREEN_COMPONENT_ROOTS.some(r => rel.startsWith(r))) return false;
+  if (DEV_ONLY.test(rel) || PROVIDER_OR_PIXEL.test(rel)) return false;
+  if (ANALYTICS_LOADER.test(rel)) return false;
+  if (
+    CONTEXT_FILE.test(rel) &&
+    typeof source === 'string' &&
+    /\bcreateContext\s*[<(]/.test(source)
+  )
+    return false;
+  return true;
 }
 
 export function readScreens(
@@ -76,19 +98,26 @@ export function readScreens(
 }
 
 /**
- * The registry as the base ref has it, so the gate can refuse debt growth.
+ * The registry at the merge base with the base ref, so the gate can refuse debt growth.
  * Null when the ref or the file is not there (a shallow checkout, or the
  * registry's first PR), which skips only the growth check.
  */
 export function readBaseScreens(root, rel, ref) {
   if (!ref) return null;
-  try {
-    const text = execFileSync('git', ['show', `${ref}:${rel}`], {
+  const git = args =>
+    execFileSync('git', args, {
       cwd: root,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
-    });
-    return JSON.parse(text);
+    }).trim();
+  // Compare with the commit this branch grew from, so debt paid on main after
+  // the branch point is not read as this branch growing it back.
+  let base = ref;
+  try {
+    base = git(['merge-base', ref, 'HEAD']) || ref;
+  } catch {}
+  try {
+    return JSON.parse(git(['show', `${base}:${rel}`]));
   } catch {
     return null;
   }
@@ -97,9 +126,24 @@ export function readBaseScreens(root, rel, ref) {
 /** @returns {Map<string, string[]>} screen id -> component paths it renders */
 export function screenComponents(root, screens) {
   const out = new Map();
+  const source = rel => {
+    try {
+      return readFileSync(join(root, rel), 'utf8');
+    } catch {
+      return undefined;
+    }
+  };
   for (const [id, screen] of Object.entries(screens.screens ?? {})) {
+    // A screen whose page is gone renders nothing; the gate reports it.
+    if (!screen.page || !existsSync(join(root, screen.page))) {
+      out.set(id, []);
+      continue;
+    }
     const { components } = importClosure(root, routeEntries(root, screen.page));
-    out.set(id, components.filter(isCustomerUi));
+    out.set(
+      id,
+      components.filter(rel => isCustomerUi(rel, source(rel)))
+    );
   }
   return out;
 }
@@ -130,8 +174,16 @@ export function evaluateScreenGates(report, screens, byScreen, base = null) {
   const certs = new Map(report.certificates.map(c => [c.component, c]));
   const debt = screens.debt ?? {};
   const rendered = new Map(); // component -> screens
+  for (const [id, screen] of Object.entries(screens.screens ?? {}))
+    if (screen.stage && !SCREEN_STAGES.includes(screen.stage))
+      errors.push(
+        `screen ${id}: stage must be one of ${SCREEN_STAGES.join(', ')}`
+      );
   for (const [id, list] of byScreen) {
-    if (!list.length) errors.push(`screen ${id}: page renders no component`);
+    if (!list.length)
+      errors.push(
+        `screen ${id}: page ${screens.screens?.[id]?.page ?? '(none)'} is missing or renders no component`
+      );
     for (const c of list) rendered.set(c, [...(rendered.get(c) ?? []), id]);
   }
   for (const [component, ids] of rendered) {
@@ -172,7 +224,15 @@ export function evaluateScreenGates(report, screens, byScreen, base = null) {
     const owing = list.filter(
       c => failingCriteria(certs.get(c), criteria).length
     );
-    return { id, components: list.length, passing: list.length - owing.length };
+    const screen = screens.screens?.[id] ?? {};
+    return {
+      id,
+      route: screen.route ?? null,
+      stage: screen.stage ?? null,
+      components: list.length,
+      passing: list.length - owing.length,
+      gate: owing.length ? 'debt' : 'must-pass',
+    };
   });
   return {
     ok: !errors.length && !failures.length && !stale.length,

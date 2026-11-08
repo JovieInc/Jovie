@@ -80,7 +80,7 @@ const STRIP_COMMENTS = /\/\*[\s\S]*?\*\/|(^|[^:\\'"`])\/\/[^\n]*/g;
 
 /**
  * Parse the module edges of one file.
- * @returns {{imports: {spec: string, names: string[] | null}[], reexports: {spec: string, names: string[] | null}[], localExports: Set<string>}}
+ * @returns {{imports: {spec: string, names: string[] | null}[], reexports: {spec: string, names: string[] | null, sources?: Record<string, string>}[], localExports: Set<string>}}
  * `names: null` means the whole module (namespace, side-effect, `export *`, dynamic import).
  */
 export function parseModule(text) {
@@ -88,15 +88,24 @@ export function parseModule(text) {
   const imports = [];
   const reexports = [];
   const localExports = new Set();
-  const named = list =>
-    list
-      .split(',')
-      .map(part => part.trim().replace(/^type\s+/, ''))
-      .filter(Boolean)
-      .map(part => part.split(/\s+as\s+/)[0].trim());
+  // `export { A as B } from './a'`: callers ask for B, the source module has A.
+  const named = list => {
+    const map = {};
+    for (const raw of list.split(',')) {
+      const part = raw.trim();
+      if (!part || part.startsWith('type ')) continue;
+      const [source, exported = source] = part
+        .split(/\s+as\s+/)
+        .map(x => x.trim());
+      map[exported] = source;
+    }
+    return map;
+  };
 
+  // The clause holds no quote or semicolon, so a side-effect import
+  // (`import './x.css'`) before a named import is never read as its clause.
   for (const m of src.matchAll(
-    /\bimport\s+(type\s+)?([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/g
+    /\bimport\s+(type\s+)?([^'"`;]*?)\s+from\s+['"]([^'"]+)['"]/g
   )) {
     if (m[1]) continue; // type-only imports render nothing
     const clause = m[2];
@@ -122,7 +131,10 @@ export function parseModule(text) {
   for (const m of src.matchAll(
     /\bexport\s+(type\s+)?\{([^}]*)\}\s*from\s+['"]([^'"]+)['"]/g
   ))
-    if (!m[1]) reexports.push({ spec: m[3], names: named(m[2]) });
+    if (!m[1]) {
+      const map = named(m[2]);
+      reexports.push({ spec: m[3], names: Object.keys(map), sources: map });
+    }
   for (const m of src.matchAll(
     /\bexport\s+\*\s+(?:as\s+\w+\s+)?from\s+['"]([^'"]+)['"]/g
   ))
@@ -208,13 +220,21 @@ export function importClosure(
     for (const re of mod.reexports)
       for (const n of re.names ?? []) claimed.add(n);
     for (const re of mod.reexports) {
-      if (names === null) reach(resolve(re.spec), re.names);
+      if (names === null)
+        reach(
+          resolve(re.spec),
+          re.names && re.sources ? Object.values(re.sources) : re.names
+        );
       else if (re.names === null) {
         const rest = names.filter(n => !claimed.has(n));
         if (rest.length) reach(resolve(re.spec), rest);
       } else {
         const hits = names.filter(n => re.names.includes(n));
-        if (hits.length) reach(resolve(re.spec), hits);
+        if (hits.length)
+          reach(
+            resolve(re.spec),
+            hits.map(n => re.sources?.[n] ?? n)
+          );
       }
     }
   }
