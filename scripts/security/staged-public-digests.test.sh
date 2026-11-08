@@ -9,9 +9,14 @@ trap 'rm -rf "$tmp_dir"' EXIT
 git -C "$tmp_dir" init -q
 mkdir -p "$tmp_dir/scripts/security"
 cp "$root/scripts/security/scan-secrets.sh" "$tmp_dir/scripts/security/"
-# scan-secrets.sh sources these helpers. The temp repo must contain them.
-cp "$root/scripts/security/scan-secrets-sonar-pin.sh" "$tmp_dir/scripts/security/"
-cp "$root/scripts/security/scan-secrets-release-fetch.sh" "$tmp_dir/scripts/security/"
+# Copy every helper scan-secrets.sh sources. A fixed list misses the next one.
+while IFS= read -r helper; do
+  cp "$root/$helper" "$tmp_dir/$helper"
+done < <(
+  grep -E '^\. "\$REPO_ROOT/scripts/security/[^"]+"' \
+    "$root/scripts/security/scan-secrets.sh" |
+    sed -E 's/.*"\$REPO_ROOT\/([^"]+)".*/\1/'
+)
 cp "$root/scripts/security/gitleaks-staged-public-digests.b64" "$tmp_dir/scripts/security/"
 cp "$root/.gitleaks.toml" "$tmp_dir/.gitleaks.toml"
 mkdir -p "$tmp_dir/scripts/invariants/art-direction"
