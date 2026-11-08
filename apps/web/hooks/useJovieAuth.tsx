@@ -15,6 +15,10 @@ import {
   type JovieUser,
   toJovieUser,
 } from '@/lib/auth/jovie-user';
+import {
+  isDesktopShellUserAgent,
+  resolveDesktopSignOutRedirect,
+} from '@/lib/desktop/desktop-marketing-guard';
 import { applyCacheScope } from '@/lib/queries/cache-isolation';
 
 // ============================================================================
@@ -101,10 +105,21 @@ export async function signOut(options?: JovieSignOutOptions): Promise<void> {
   await authClient.signOut().catch(() => undefined);
   clearLegacyClerkSessionMarker();
 
-  const redirectUrl = options?.redirectUrl ?? '/signin';
+  const redirectUrl = resolveDesktopSignOutRedirect(
+    options?.redirectUrl ?? '/signin',
+    isDesktopShell()
+  );
   if (typeof globalThis.location?.assign === 'function') {
     globalThis.location.assign(redirectUrl);
   }
+}
+
+/** The Mac app marks its document and user agent before any sign-out. */
+function isDesktopShell(): boolean {
+  return (
+    isDesktopShellUserAgent(globalThis.navigator?.userAgent) ||
+    globalThis.document?.documentElement?.dataset.desktopRuntime === 'electron'
+  );
 }
 
 /**
