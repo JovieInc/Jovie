@@ -18,6 +18,14 @@ on:
       - 'docs/design-system/pen-briefs/**'
       - 'scripts/design/pen-draft.mjs'
       - '.github/workflows/pen-draft.yml'
+  # A brief change drafts on its own PR too, so the frames are in review
+  # before merge and nobody has to start a run by hand.
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - 'docs/design-system/pen-briefs/**'
+      - 'scripts/design/pen-draft.mjs'
+      - '.github/workflows/pen-draft.yml'
   workflow_dispatch:
     inputs:
       only:
@@ -28,12 +36,14 @@ on:
 permissions: {}
 
 concurrency:
-  group: pen-draft-${{ github.ref }}
+  group: pen-draft-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
   draft:
     name: Draft Pen frames
+    # Fork PRs get no secrets; skip them rather than fail on a missing key.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     permissions:
