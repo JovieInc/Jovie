@@ -20,7 +20,7 @@ export const LINKS_TABLE_HEADERS = [
   { name: 'Destination', align: 'left', bar: 'w-40' },
   { name: 'Clicks', align: 'right', bar: 'ml-auto w-8' },
   { name: 'Campaign', align: 'left', bar: 'w-24' },
-  { name: 'Jovie link', align: 'right', bar: 'w-36' },
+  { name: 'Jovie Link', align: 'right', bar: 'w-36' },
 ] as const;
 
 const LINKS_SKELETON_ROW_KEYS = [
