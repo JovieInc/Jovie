@@ -93,6 +93,14 @@ async function sidebarDestinations(page: Page): Promise<string[]> {
   return paths;
 }
 
+function onRoute(pathname: string, target: string): boolean {
+  return pathname === target || pathname.startsWith(`${target}/`);
+}
+
+function message(error: unknown): string {
+  return (error instanceof Error ? error.message : String(error)).slice(0, 400);
+}
+
 async function routeProblems(page: Page, label: string): Promise<string[]> {
   const problems: string[] = [];
   const frameVisible = await page
@@ -126,10 +134,16 @@ test.describe('signed-in shell route health', () => {
       // Full document loads: server render plus hydration.
       for (const href of destinations) {
         const before = snapshot(monitor);
-        const response = await page.goto(href, {
-          waitUntil: 'domcontentloaded',
-          timeout: ROUTE_TIMEOUT_MS,
-        });
+        const response = await page
+          .goto(href, {
+            waitUntil: 'domcontentloaded',
+            timeout: ROUTE_TIMEOUT_MS,
+          })
+          .catch((error: unknown) => {
+            problems.push(`load ${href}: navigation failed: ${message(error)}`);
+            return undefined;
+          });
+        if (response === undefined) continue;
         const status = response?.status() ?? 0;
         if (status >= 500) problems.push(`load ${href}: HTTP ${status}`);
         await page
@@ -147,9 +161,26 @@ test.describe('signed-in shell route health', () => {
       await expect(page.locator(SHELL_FRAME)).toBeVisible({
         timeout: ROUTE_TIMEOUT_MS,
       });
-      for (const href of destinations) {
+      // Clicking the link for the page already open proves nothing, so any
+      // destination that is current right now is clicked last instead.
+      const current = new URL(page.url()).pathname;
+      const clickOrder = [
+        ...destinations.filter(
+          href => !onRoute(current, new URL(href, page.url()).pathname)
+        ),
+        ...destinations.filter(href =>
+          onRoute(current, new URL(href, page.url()).pathname)
+        ),
+      ];
+      for (const href of clickOrder) {
         const before = snapshot(monitor);
         const target = new URL(href, page.url()).pathname;
+        if (onRoute(new URL(page.url()).pathname, target)) {
+          problems.push(
+            `click ${href}: still on this route, cannot prove a transition`
+          );
+          continue;
+        }
         const link = page.locator(`a[data-navigation-item-id][href="${href}"]`);
         const clicked = await link
           .first()
@@ -161,7 +192,7 @@ test.describe('signed-in shell route health', () => {
           continue;
         }
         const moved = await page
-          .waitForURL(url => url.pathname.startsWith(target), {
+          .waitForURL(url => onRoute(url.pathname, target), {
             timeout: ROUTE_TIMEOUT_MS,
           })
           .then(() => true)
@@ -180,6 +211,10 @@ test.describe('signed-in shell route health', () => {
           problems.push(`click ${href}: ${error}`);
         }
       }
+    } catch (error) {
+      // Keep everything collected so far: a hard failure mid-run should
+      // still report the earlier routes' problems.
+      problems.push(`aborted: ${message(error)}`);
     } finally {
       monitor.cleanup();
     }
