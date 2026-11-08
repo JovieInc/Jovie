@@ -15,8 +15,10 @@ export const THRESHOLDS = Object.freeze({
   loadMs: 5000,
 });
 
+// Sentence-start capitals count; TODO and NaN stay exact so "Todo list" or
+// "Nan" (a name) aren't flagged. [object Object] has no word edges.
 export const PLACEHOLDER =
-  /\b(lorem ipsum|TODO|FIXME|undefined|NaN|\[object Object\]|placeholder text)\b/;
+  /\b(?:[Ll]orem ipsum|TODO|FIXME|undefined|NaN|[Pp]laceholder text)\b|\[object Object\]/;
 
 export const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 // Frames whose own console output is not the product's: Cloudflare's
@@ -52,6 +54,9 @@ export function isClosedInProduction(route, closed) {
   );
 }
 
+// What the claim banner says on an unclaimed profile.
+export const CLAIM_BANNER = /profile is unclaimed|claim (this|your) profile/i;
+
 export const IDENTITIES = Object.freeze(['stranger', 'signed-in']);
 
 /**
@@ -59,7 +64,8 @@ export const IDENTITIES = Object.freeze(['stranger', 'signed-in']);
  *   error?: string, authGated?: boolean, cls?: number, lcpMs?: number,
  *   longestTaskMs?: number, loadMs?: number, consoleErrors?: string[],
  *   failedRequests?: string[], placeholder?: string|null,
- *   horizontalOverflow?: boolean }} page
+ *   horizontalOverflow?: boolean, url?: string, expectClaimBanner?: boolean,
+ *   claimBanner?: boolean }} page
  * @returns {{ route: string, identity: string, viewport: string, kind: string, detail: string }[]}
  */
 export function pageFindings(page, closed = []) {
@@ -79,11 +85,19 @@ export function pageFindings(page, closed = []) {
             `HTTP ${page.status}; listed as closed in production`
           ),
         ];
-  if (page.authGated) return [];
+  // Signed in, a sign-in wall means the session was lost: that is jank.
+  if (page.authGated)
+    return page.identity === 'signed-in'
+      ? [f('session-lost', 'sent to sign in while signed in')]
+      : [];
   const out = [];
   if (page.status >= 500) out.push(f('server-error', `HTTP ${page.status}`));
   else if (page.status >= 400)
     out.push(f('broken-route', `HTTP ${page.status}`));
+  if (page.expectClaimBanner && page.claimBanner === false)
+    out.push(
+      f('claim-banner-missing', `no claim banner on ${page.url ?? page.route}`)
+    );
   if ((page.cls ?? 0) > THRESHOLDS.cls)
     out.push(
       f('layout-shift', `CLS ${page.cls.toFixed(3)} > ${THRESHOLDS.cls}`)
@@ -156,6 +170,8 @@ const ORDER = [
   'unreachable',
   'server-error',
   'broken-route',
+  'session-lost',
+  'claim-banner-missing',
   'closed-route-open',
   'frozen-frame',
   'layout-shift',

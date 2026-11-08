@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  CLAIM_BANNER,
   fromThirdPartyFrame,
   isClosedInProduction,
+  PLACEHOLDER,
   pageFindings,
   productReady,
   rankFindings,
@@ -156,4 +158,50 @@ test('a reviewed closed-in-production route must keep answering 404', () => {
     'closed-route-open'
   );
   assert.equal(pageFindings({ ...page, status: 404 })[0].kind, 'broken-route');
+});
+
+test('signed in, a sign-in wall is lost session; an unclaimed profile needs its banner', () => {
+  const at = {
+    route: '/app',
+    viewport: 'desktop',
+    status: 200,
+    authGated: true,
+  };
+  assert.deepEqual(pageFindings({ ...at, identity: 'stranger' }), []);
+  assert.equal(
+    pageFindings({ ...at, identity: 'signed-in' })[0].kind,
+    'session-lost'
+  );
+  const profile = {
+    route: '/[username]',
+    url: '/testartist',
+    identity: 'stranger',
+    viewport: 'phone',
+    status: 200,
+    expectClaimBanner: true,
+  };
+  assert.deepEqual(pageFindings({ ...profile, claimBanner: true }), []);
+  assert.equal(
+    pageFindings({ ...profile, claimBanner: false })[0].kind,
+    'claim-banner-missing'
+  );
+  assert.equal(
+    CLAIM_BANNER.test(
+      'This profile is unclaimed. Verified ownership is required'
+    ),
+    true
+  );
+});
+
+test('placeholder text is caught at sentence start and around [object Object]', () => {
+  for (const text of [
+    'Lorem ipsum dolor',
+    'Price: [object Object]',
+    '[object Object]',
+    'Placeholder text here',
+    'Total: NaN',
+  ])
+    assert.match(text, PLACEHOLDER, text);
+  for (const text of ['My todo list', 'Nan and Pop', 'An undefinedness'])
+    assert.doesNotMatch(text, PLACEHOLDER, text);
 });
