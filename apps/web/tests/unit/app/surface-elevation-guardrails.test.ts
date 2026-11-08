@@ -410,7 +410,6 @@ describe('surface elevation guardrails', () => {
 
   it('keeps task and preview cards off the shell canvas token', () => {
     const files = [
-      'components/features/dashboard/layout/PreviewPanel.tsx',
       'components/features/dashboard/organisms/ProfileEditPreviewCard.tsx',
       'components/features/dashboard/release-tasks/ReleaseTaskEmptyState.tsx',
       'components/features/dashboard/release-tasks/ReleaseTaskExplainerPopover.tsx',

@@ -48,6 +48,7 @@ import {
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
 import { STRUCTURAL_PYTEST_FILES } from './lib/ci-structural-pytest-files.mjs';
+import { scriptContractNodeArgs } from './lib/script-contract-node-args.mjs';
 import { testsAffectedBy } from './lib/test-file-dependencies.mjs';
 import { TEST_PLANNER_CONTRACT_TESTS } from './lib/test-planner-contract-tests.mjs';
 
@@ -727,7 +728,7 @@ const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
 const structuralPythonRegression = body =>
   `if python3 -c "import coverage, pytest, xdist" 2>/dev/null; then ${body}; elif [ "\${CI:-}" = "true" ]; then echo "::error::pytest/coverage/xdist missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage/xdist not installed — skip local structural regressions"; fi`;
 
-export { STRUCTURAL_PYTEST_FILES };
+export { STRUCTURAL_PYTEST_FILES, scriptContractNodeArgs };
 
 /**
  * The structural pytest suite (420 tests, 132s of one hosted run) was the
@@ -1104,29 +1105,6 @@ export const ASSURANCE_MATRIX_COVERAGE_COMMAND =
 export const PR_OPEN_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/pr-open.mjs --test-coverage-lines=90 --test-coverage-branches=75 --test-coverage-functions=90 scripts/pr-open.test.mjs';
 
-const PREFLIGHT_COVERAGE_TESTS = [
-  'scripts/preflight.test.mjs',
-  'scripts/verify-workflow-references.test.mjs',
-];
-const PREFLIGHT_COVERAGE_ARGS = [
-  '--test',
-  '--experimental-test-coverage',
-  '--test-coverage-include=scripts/preflight.mjs',
-  '--test-coverage-include=scripts/lib/source-guard-action-snapshot.mjs',
-];
-
-/** Keep unrelated scanners outside V8 instrumentation; run every selection once.
- * @param {readonly string[]} tests @returns {string[][]}
- */
-export function scriptContractNodeArgs(tests) {
-  const focused = tests.filter(test => PREFLIGHT_COVERAGE_TESTS.includes(test));
-  const plain = tests.filter(test => !PREFLIGHT_COVERAGE_TESTS.includes(test));
-  const batches = [];
-  if (focused.length) batches.push([...PREFLIGHT_COVERAGE_ARGS, ...focused]);
-  if (plain.length) batches.push(['--test', ...plain]);
-  return batches;
-}
-
 export const SCRIPT_CONTRACT_NODE_COMMAND = `${PR_OPEN_COVERAGE_COMMAND} && ${DEPRECATION_COVERAGE_COMMAND} && ${CODEX_BOOTSTRAP_COVERAGE_COMMAND} && ${ASSURANCE_MATRIX_COVERAGE_COMMAND} && node --import tsx --test --test-isolation=none scripts/content-os/project.test.mts scripts/lib/__tests__/lesson-analysis.test.mjs && pnpm --filter @jovie/copy exec vitest run --config vitest.config.mts transport.test.ts judge.test.ts && ${scriptContractNodeArgs(
   SCRIPT_CONTRACT_NODE_TESTS.filter(
     test => test !== 'scripts/invariants/assurance-matrix.test.mjs'
@@ -1211,6 +1189,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/github-installation-quota.test.mjs',
   'scripts/lib/__tests__/main-red-eject-quota-failover.test.mjs',
   'scripts/lib/__tests__/github-rate-limit.test.mjs',
+  'scripts/lib/__tests__/github-release-asset.test.mjs',
   'scripts/lib/__tests__/help-center-recertification-workflow.test.mjs',
   'scripts/lib/__tests__/isolated-ui-docs-policy.test.mjs',
   'scripts/lib/__tests__/learning-evidence.test.mjs',

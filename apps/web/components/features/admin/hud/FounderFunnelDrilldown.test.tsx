@@ -92,6 +92,52 @@ describe('FounderFunnelDrilldown', () => {
     expect(screen.getByText('grace@example.com')).toBeInTheDocument();
   });
 
+  it('falls back to the email when the display name is blank', () => {
+    render(
+      <FounderFunnelDrilldown
+        result={{
+          ...baseResult,
+          rows: [
+            {
+              id: 'u4',
+              displayName: '   ',
+              email: 'blank@example.com',
+              enteredAt: null,
+            },
+          ],
+        }}
+      />
+    );
+
+    // The email is the primary name, not a quiet line under a blank name.
+    expect(screen.getByText('blank@example.com')).toHaveClass('font-medium');
+  });
+
+  it('formats the signup date in UTC, whatever the runtime time zone', () => {
+    const previousTz = process.env.TZ;
+    process.env.TZ = 'America/Los_Angeles';
+    try {
+      render(
+        <FounderFunnelDrilldown
+          result={{
+            ...baseResult,
+            rows: [
+              {
+                id: 'u5',
+                displayName: 'Late Signup',
+                email: 'late@example.com',
+                enteredAt: '2026-09-21T02:30:00.000Z',
+              },
+            ],
+          }}
+        />
+      );
+      expect(screen.getByText('Sep 21, 2026')).toBeInTheDocument();
+    } finally {
+      process.env.TZ = previousTz;
+    }
+  });
+
   it('notes when the row list is truncated by the limit', () => {
     render(
       <FounderFunnelDrilldown

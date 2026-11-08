@@ -1143,7 +1143,7 @@ jobs:
           else
             echo "run_homepage_visual=false" >> "$GITHUB_OUTPUT"
           fi
-          MARKETING_DOM_PATTERN='^(\.github/workflows/ci\.yml|apps/web/app/\((marketing|home)\)/|apps/web/app/(globals\.css|layout\.tsx)|apps/web/components/(marketing|site|homepage|features/home|molecules/PhoneFrame)|apps/web/data/|apps/web/styles/|apps/web/public/(product-screenshots|device-bezels)/|apps/web/tests/e2e/utils/(route-dom|image-contrast)-detector\.ts|apps/web/tests/product-screenshots/route-dom-|apps/web/playwright\.config\.screenshots\.ts|packages/ui/)'
+          MARKETING_DOM_PATTERN='^(\.github/workflows/ci\.yml|apps/web/app/\((marketing|home)\)/|apps/web/app/(globals\.css|layout\.tsx)|apps/web/components/(marketing|site|homepage|features/home|molecules/PhoneFrame)|apps/web/data/|apps/web/styles/|apps/web/public/(product-screenshots|device-bezels)/|apps/web/tests/e2e/utils/(route-dom-[a-z-]+|image-contrast-detector)\.ts|apps/web/tests/product-screenshots/route-dom-|apps/web/playwright\.config\.screenshots\.ts|packages/ui/)'
           if grep -q -E "$MARKETING_DOM_PATTERN" "$CHANGED_PATHS"; then
             echo "run_marketing_dom=true" >> "$GITHUB_OUTPUT"
           else
@@ -1605,6 +1605,8 @@ jobs:
           # Keep Git-valid but shell-significant branch characters out of the
           # generated run script; GitHub transports this value as environment.
           PULL_REQUEST_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          # Read-only token for the release-download fallback.
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -2244,6 +2246,9 @@ jobs:
           go-version: '1.26.10'
           cache: false
       - name: Run actionlint
+        env:
+          # Read-only token for the release-download fallback.
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         run: bash .github/scripts/run-actionlint.sh
       - name: Fetch base-branch history
         # Await the background fetch. Fails closed on a non-zero fetch exit,
