@@ -495,20 +495,22 @@ describe('CheckoutSuccessPage — analytics and shell', () => {
     });
   });
 
-  it('skips confetti when reduced motion is enabled', () => {
-    useReducedMotionMock.mockReturnValue(true);
+  it('settles in place on verified paid success: no confetti, a status pill and the billing link', () => {
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
     expect(screen.queryByTestId('confetti-overlay')).not.toBeInTheDocument();
-  });
-
-  it('renders viewport confetti when motion is allowed and paid success is verified', () => {
-    mockBilling('pro');
-    render(<CheckoutSuccessPage />);
-    expect(screen.getByTestId('confetti-overlay')).toHaveAttribute(
-      'data-viewport',
-      'true'
+    expect(screen.getByTestId('checkout-success-status')).toHaveTextContent(
+      'Payment confirmed'
     );
+    expect(screen.getByRole('link', { name: 'Billing page' })).toHaveAttribute(
+      'href',
+      '/billing'
+    );
+    expect(
+      screen
+        .getByTestId('checkout-success-paid')
+        .querySelector('.translate-y-6')
+    ).toBeNull();
   });
 
   it('does not declare paid success when checkout-session fetch fails', async () => {
