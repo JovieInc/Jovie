@@ -17,6 +17,7 @@ import {
   certStep,
   certStepBlocked,
   createSurfaceTelemetry,
+  recordCertCapabilities,
 } from './utils/prod-cert-steps';
 
 /**
@@ -53,6 +54,15 @@ import {
  */
 
 test.use({ storageState: { cookies: [], origins: [] } });
+
+// JOV-9854: declare the browser checks this spec wraps (including ids that
+// can only block at runtime, like a missing passage key) so the producer
+// attributes a missing check on an older served build to deploy skew instead
+// of a silent smoke skip. Blocked status is unchanged either way.
+recordCertCapabilities({
+  claim: ['start-chat-first-reply', 'golden-path-preview-has-release'],
+  smartlink: ['click-analytics-capture'],
+});
 
 const ORIGIN = process.env.PROD_CERT_START_ORIGIN ?? 'https://jov.ie';
 

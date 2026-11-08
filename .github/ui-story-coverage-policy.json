@@ -210,10 +210,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/DashboardFeedbackModal.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/dsp-matches/ConfirmMatchDialog.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -259,10 +255,6 @@
     },
     {
       "path": "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileContactHeader.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileSmartLinkAnalytics.tsx",
       "linearIssue": "JOV-8847"
     },
     {
@@ -326,10 +318,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/SettingsPaySection.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/SettingsTouringSection.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -347,10 +335,6 @@
     },
     {
       "path": "apps/web/components/features/dashboard/organisms/tour-dates/tour-date-actions.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/features/dashboard/organisms/tour-dates/TourDatesManager.tsx",
       "linearIssue": "JOV-8847"
     },
     {

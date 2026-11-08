@@ -326,7 +326,7 @@ describe('ReleaseTable', () => {
   it('shows an actionable empty state when there are no releases', () => {
     render(<ReleaseTable {...commonProps} releases={[]} showTracks={false} />);
 
-    expect(screen.getByText('No releases found')).toBeInTheDocument();
+    expect(screen.getByText('No Releases Found')).toBeInTheDocument();
     expect(
       screen.getByText(
         'Use the toolbar to create a release, sync from Spotify, or clear filters.'
