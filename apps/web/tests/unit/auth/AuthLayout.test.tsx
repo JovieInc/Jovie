@@ -75,7 +75,6 @@ vi.mock('@/components/molecules/LoadingSkeleton', () => ({
 import AuthRouteLayout from '@/app/(auth)/layout';
 import ErrorPageLoading from '@/app/error/user-creation-failed/loading';
 import UserCreationFailedPage from '@/app/error/user-creation-failed/page';
-import OnboardingCheckoutLoading from '@/app/onboarding/checkout/loading';
 import WaitlistRouteLayout from '@/app/waitlist/layout';
 import { AuthLayout } from '@/components/features/auth/AuthLayout';
 
@@ -139,11 +138,10 @@ describe('AuthLayout', () => {
     expect(screen.getByRole('main')).toHaveTextContent('Account setup error');
   });
 
-  it.each([
-    ['account recovery', ErrorPageLoading],
-    ['onboarding checkout', OnboardingCheckoutLoading],
-  ])('keeps one main landmark while standalone %s loads', (_, Loading) => {
-    render(<Loading />);
+  // The onboarding checkout loads inside its own app-shell frame now, not
+  // the auth page skeleton; tests/unit/onboarding covers that state.
+  it('keeps one main landmark while standalone account recovery loads', () => {
+    render(<ErrorPageLoading />);
 
     expect(screen.getAllByRole('main')).toHaveLength(1);
     expect(screen.getByRole('main')).toHaveTextContent('Loading auth form');
