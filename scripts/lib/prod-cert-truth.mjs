@@ -165,8 +165,12 @@ export function jankChecks(observations = [], at = new Date().toISOString()) {
 /** Golden Path Pen frames (Tim, 2026-11-08: every screen has a Pen design first). */
 export const GOLDEN_PATH_PEN_MANIFEST =
   'docs/pen-stills/golden-path/manifest.json';
-const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url));
-const fromRepo = path => (isAbsolute(path) ? path : join(REPO_ROOT, path));
+// Lazy: bundlers and jsdom load this module with a non-file import.meta.url.
+const repoRoot = () => {
+  const url = new URL('../..', import.meta.url);
+  return url.protocol === 'file:' ? fileURLToPath(url) : process.cwd();
+};
+const fromRepo = path => (isAbsolute(path) ? path : join(repoRoot(), path));
 
 function readJson(path) {
   try {
