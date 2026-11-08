@@ -21,6 +21,7 @@ import {
   type ChatHistoryRow,
   chatHistoryRowMatches,
   getChatHistoryEmptyMessage,
+  getChatThreadIdFromPath,
   NEW_CHAT_LABEL,
 } from './chat-history-switcher';
 
@@ -93,6 +94,12 @@ export function ChatHistorySwitcher({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [readAtById, setReadAtById] = useState<Record<string, string>>({});
+  // A chat started in place updates the URL without a navigation, so the
+  // prop can lag behind; read the id from the address bar when the menu opens.
+  const [urlConversationId, setUrlConversationId] = useState<string | null>(
+    null
+  );
+  const activeId = activeConversationId ?? urlConversationId;
   // Fetch on first intent (hover, focus or open), not on every chat render;
   // the sidebar usually has this cached already under the same key.
   const [hasIntent, setHasIntent] = useState(false);
@@ -113,6 +120,9 @@ export function ChatHistorySwitcher({
     if (nextOpen) {
       setHasIntent(true);
       setReadAtById(readThreadReadState());
+      setUrlConversationId(
+        getChatThreadIdFromPath(globalThis.location?.pathname)
+      );
     }
     setOpen(nextOpen);
   }, []);
@@ -149,7 +159,7 @@ export function ChatHistorySwitcher({
     }
 
     return buildChatHistoryRows(conversations ?? [], {
-      activeId: activeConversationId,
+      activeId,
       readAtById,
     }).map(row => ({
       id: row.id,
@@ -159,14 +169,7 @@ export function ChatHistorySwitcher({
       content: <ChatHistoryRowContent row={row} />,
       onClick: () => handleSelect(row),
     }));
-  }, [
-    activeConversationId,
-    conversations,
-    handleSelect,
-    readAtById,
-    showError,
-    refetch,
-  ]);
+  }, [activeId, conversations, handleSelect, readAtById, showError, refetch]);
 
   return (
     <CommonDropdown

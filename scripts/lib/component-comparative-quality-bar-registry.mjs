@@ -71,9 +71,9 @@ export const QUALITY_BAR_REFERENCES = deepFreeze({
 export const ATOM_MOLECULE_INVENTORY_RATCHET = deepFreeze([
   {
     root: 'packages/ui/atoms',
-    total: 41,
+    total: 42,
     sourceSetSha256:
-      'fafa4586e3f254203ca1c1d8415407eb78c0413dc55b1f9254589b1749af317c',
+      'd90315c58f055d079b99a9b0ef2be4a79dcca7b8b2dd02ac8c42832235ff1553',
   },
   {
     root: 'apps/web/components/**/atoms',

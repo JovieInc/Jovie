@@ -188,6 +188,21 @@ describe('ChatHistorySwitcher', () => {
     expect(push).not.toHaveBeenCalled();
   });
 
+  it('marks a chat started in place as open, from the address bar', async () => {
+    // The page writes the new id into the URL without a navigation.
+    window.history.replaceState(null, '', '/app/chat/c1');
+    const user = userEvent.setup({ delay: null });
+    render(<ChatHistorySwitcher title='Release' activeConversationId={null} />);
+    await user.click(screen.getByTestId('chat-history-trigger'));
+    const row = await screen.findByRole('menuitem', {
+      name: 'Release Plan For Spring',
+    });
+    expect(row).toHaveAttribute('data-selected', 'true');
+    await user.click(row);
+    expect(push).not.toHaveBeenCalled();
+    window.history.replaceState(null, '', '/');
+  });
+
   it('dots unread replies once a read baseline exists, and clears on open', async () => {
     localStorage.setItem(
       'jovie:sidebar-thread-read-at',

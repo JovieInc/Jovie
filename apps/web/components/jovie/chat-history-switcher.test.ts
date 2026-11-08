@@ -7,6 +7,7 @@ import {
   CHAT_HISTORY_NO_MATCH,
   chatHistoryRowMatches,
   getChatHistoryEmptyMessage,
+  getChatThreadIdFromPath,
 } from './chat-history-switcher';
 
 const NOW = Date.parse('2026-11-08T20:00:00Z');
@@ -140,5 +141,20 @@ describe('getChatHistoryEmptyMessage', () => {
     expect(getChatHistoryEmptyMessage({ query: 'tour', isError: true })).toBe(
       CHAT_HISTORY_ERROR
     );
+  });
+});
+
+describe('getChatThreadIdFromPath', () => {
+  it.each([
+    ['/app/chat/abc-123', 'abc-123'],
+    ['/app/chat/a%20b', 'a b'],
+    ['/app/chat/abc/extra', 'abc'],
+    ['/app/chat', null],
+    ['/app/chat/', null],
+    ['/app/settings/abc', null],
+    ['/app/chat/%E0%A4%A', null],
+    [undefined, null],
+  ])('%s gives %j', (path, expected) => {
+    expect(getChatThreadIdFromPath(path)).toBe(expected);
   });
 });

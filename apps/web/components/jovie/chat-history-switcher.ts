@@ -1,4 +1,5 @@
 import { toSidebarThread } from '@/components/shell/SidebarThreadsSection';
+import { APP_ROUTES } from '@/constants/routes';
 import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import type { ChatConversation } from '@/lib/queries/useChatConversationsQuery';
 import { formatTimeAgoCompact } from '@/lib/utils/date-formatting';
@@ -74,4 +75,23 @@ export function getChatHistoryEmptyMessage({
 }): string {
   if (isError) return CHAT_HISTORY_ERROR;
   return query.trim() ? CHAT_HISTORY_NO_MATCH : CHAT_HISTORY_EMPTY;
+}
+
+/**
+ * Conversation id in a chat thread path (`/app/chat/{id}`), or null. A chat
+ * created in place writes its id into the address bar without a Next.js
+ * navigation, so the page's own prop can still be empty; the URL is the truth.
+ */
+export function getChatThreadIdFromPath(
+  pathname: string | null | undefined
+): string | null {
+  const prefix = `${APP_ROUTES.CHAT}/`;
+  if (!pathname?.startsWith(prefix)) return null;
+  const segment = pathname.slice(prefix.length).split('/')[0];
+  if (!segment) return null;
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return null;
+  }
 }
