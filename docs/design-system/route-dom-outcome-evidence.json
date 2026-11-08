@@ -26,7 +26,7 @@
     "/developers": "no findings at 1440 or 390",
     "/legal/privacy": "no findings at 1440 or 390"
   },
-  "routeSweep": "34 marketing routes x 2 viewports; counts recorded in route-dom-marketing-baseline.json except '/'",
-  "precision": "unproven. blank-media fires on dark product screenshots on /artist-profiles and /solutions/artists (63-79% flat cells); all four kinds stay calibrating (ratcheted, homepage unbaselined) until calibrate.mjs labels reach the promotion floors",
+  "routeSweep": "34 marketing routes x 2 viewports on the live site; recorded in route-dom-marketing-baseline.json, raised to the merge-queue count (CI run 42424205763, standalone build) wherever CI measured more, '/' included; counts can only fall from here",
+  "precision": "unproven. blank-media fires on dark product screenshots on /artist-profiles and /solutions/artists (63-79% flat cells); all four kinds stay calibrating (ratcheted; '/' starts at today's CI counts and must ratchet to 0) until calibrate.mjs labels reach the promotion floors",
   "limits": "public-profile and other golden-path surfaces are not covered yet; only the marketing surface runs these detectors"
 }
