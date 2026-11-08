@@ -47,7 +47,9 @@ function resolveCollectUrls(baseUrl) {
         .split(',')
         .map(value => value.trim())
         .filter(Boolean)
-    : ['/app', '/app/releases'];
+    : // /app/releases redirects to the library's releases view, so the gate
+      // measures the page users land on.
+      ['/app', '/app/library?view=releases'];
   return paths.map(routePath => new URL(routePath, `${baseUrl}/`).toString());
 }
 
