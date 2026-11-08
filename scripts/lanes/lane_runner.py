@@ -6443,10 +6443,8 @@ def resolve_narrowed_preflight_conflict(worktree: Path, branch: str, log, *, gua
 
 def resolve_and_chain_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
     """Union shell && chains, or port an inlined fetcher into its sourced helper.
-
-    Base order, then head-only prefixes. node --test and vitest paths follow the
-    same rule. A hunk the union cannot read aborts and leaves the PR to the model.
-    The push is a fast-forward of the PR branch; this never rebases or force-pushes."""
+    Base order, then head-only prefixes; node --test and vitest paths union too.
+    Unknown hunks abort. The push fast-forwards; this never rebases or force-pushes."""
     guard()
     merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
     if merged.returncode != 0:

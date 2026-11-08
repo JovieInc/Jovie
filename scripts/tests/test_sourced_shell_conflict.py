@@ -1,6 +1,8 @@
 """Sourced helper versus an inlined copy must keep the source and port the retry."""
 
 import sys
+import subprocess
+from unittest.mock import patch
 import tempfile
 import unittest
 from pathlib import Path
@@ -185,6 +187,39 @@ class SourcedShellConflictTest(unittest.TestCase):
         self.assertIsNone(resolved)
         self.assertEqual(extras, [])
         self.assertEqual(helper, existing)
+
+    def test_unknown_later_conflict_does_not_leave_a_helper_upgrade_after_abort(self):
+        import lane_runner as lane
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        caller = root / "scripts/a-caller.sh"
+        caller.parent.mkdir(parents=True, exist_ok=True)
+        caller.write_text(_hunk(SOURCE, INLINE))
+        helper = root / REL
+        helper.parent.mkdir(parents=True, exist_ok=True)
+        helper.write_text(HELPER)
+        unknown = root / "z-unknown.txt"
+        unknown.write_text(_hunk("unknown head\n", "unknown main\n"))
+        calls = []
+        def shell(args, **kwargs):
+            calls.append(args)
+            output = "scripts/a-caller.sh\nz-unknown.txt\n" if args[:2] == ["git", "diff"] else ""
+            code = 1 if args == ["git", "merge", "--no-edit", "origin/main"] else 0
+            return subprocess.CompletedProcess(args, code, output, "")
+        with patch.object(lane, "sh", side_effect=shell):
+            self.assertFalse(lane.resolve_and_chain_conflict(root, "feature", None))
+        self.assertIn(["git", "merge", "--abort"], calls)
+        self.assertEqual(helper.read_text(), HELPER)
+        self.assertEqual(caller.read_text(), _hunk(SOURCE, INLINE))
+        self.assertFalse(any(args[:2] == ["git", "push"] for args in calls))
+        unknown.write_text(_hunk("run: node --test a.test.mjs && pnpm ownership:check\n",
+                                 "run: node --test b.test.mjs && pnpm ownership:check\n"))
+        with patch.object(lane, "sh", side_effect=shell):
+            self.assertTrue(lane.resolve_and_chain_conflict(root, "feature", None))
+        self.assertIn("--speed-time 30", helper.read_text())
+        self.assertNotIn("<<<<<<<", caller.read_text())
+        self.assertTrue(any(args[:2] == ["git", "push"] for args in calls))
 
     def test_and_chain_still_resolves_without_writing_a_helper(self):
         ours = ("pnpm --filter @jovie/extension test && node --experimental-strip-types "

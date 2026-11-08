@@ -13564,37 +13564,6 @@ class NoHumanHoldTest(unittest.TestCase):
         self.assertNotEqual(after, before)
         self.assertEqual(git("merge-base", "--is-ancestor", before, after).returncode, 0)
 
-    def test_unknown_later_conflict_does_not_leave_a_helper_upgrade_after_abort(self):
-        from scripts.tests.test_sourced_shell_conflict import HELPER, INLINE, REL, SOURCE, _hunk
-        root = Path(self.tmp.name)
-        caller = root / "scripts/a-caller.sh"
-        caller.parent.mkdir(parents=True, exist_ok=True)
-        caller.write_text(_hunk(SOURCE, INLINE))
-        helper = root / REL
-        helper.parent.mkdir(parents=True, exist_ok=True)
-        helper.write_text(HELPER)
-        unknown = root / "z-unknown.txt"
-        unknown.write_text(_hunk("unknown head\n", "unknown main\n"))
-        calls = []
-        def shell(args, **kwargs):
-            calls.append(args)
-            output = "scripts/a-caller.sh\nz-unknown.txt\n" if args[:2] == ["git", "diff"] else ""
-            code = 1 if args == ["git", "merge", "--no-edit", "origin/main"] else 0
-            return subprocess.CompletedProcess(args, code, output, "")
-        with patch.object(lane, "sh", side_effect=shell):
-            self.assertFalse(lane.resolve_and_chain_conflict(root, "feature", None))
-        self.assertIn(["git", "merge", "--abort"], calls)
-        self.assertEqual(helper.read_text(), HELPER)
-        self.assertEqual(caller.read_text(), _hunk(SOURCE, INLINE))
-        self.assertFalse(any(args[:2] == ["git", "push"] for args in calls))
-        unknown.write_text(_hunk("run: node --test a.test.mjs && pnpm ownership:check\n",
-                                 "run: node --test b.test.mjs && pnpm ownership:check\n"))
-        with patch.object(lane, "sh", side_effect=shell):
-            self.assertTrue(lane.resolve_and_chain_conflict(root, "feature", None))
-        self.assertIn("--speed-time 30", helper.read_text())
-        self.assertNotIn("<<<<<<<", caller.read_text())
-        self.assertTrue(any(args[:2] == ["git", "push"] for args in calls))
-
     def test_and_chain_conflict_unions_node_test_paths_and_fast_forwards(self):
         root = Path(self.tmp.name)
         origin = root / "origin.git"
