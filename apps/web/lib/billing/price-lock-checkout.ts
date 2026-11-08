@@ -1,3 +1,4 @@
+/** JOV-INV-048 consumer: checkout and plan-change price resolution. */
 import {
   type PriceInterval,
   type PriceLockSnapshot,

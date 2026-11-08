@@ -26,6 +26,7 @@ describe('Source Validation manifest parity', () => {
     expect(guard?.command).toContain(
       'node scripts/invariants/offer-claims/check.mjs'
     );
+    expect(guard?.command).toContain('node scripts/invariants/validate.mjs');
   });
 
   it.each([
