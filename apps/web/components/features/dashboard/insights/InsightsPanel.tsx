@@ -93,7 +93,7 @@ function InsightsLoadingRows() {
             <div className='h-7 w-7 shrink-0 rounded-lg skeleton motion-reduce:animate-none' />
             <div className='min-w-0 flex-1'>
               <div className='flex items-center justify-between gap-2'>
-                <div className='h-4 w-48 max-w-[60%] rounded-sm skeleton motion-reduce:animate-none' />
+                <div className='h-4 w-48 max-w-full rounded-sm skeleton motion-reduce:animate-none' />
                 <div className='h-4 w-16 rounded-md skeleton motion-reduce:animate-none' />
               </div>
               <div className='mt-2 h-3 w-full rounded-sm skeleton motion-reduce:animate-none' />
