@@ -13,6 +13,7 @@ import { getAeoMeasurementDisclosure } from '@/lib/aeo/citation-monitor';
 import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import { useAiCrawlerAnalyticsQuery } from '@/lib/queries/useAiCrawlerAnalyticsQuery';
 import { cn } from '@/lib/utils';
+import { formatShortDateUTC } from '@/lib/utils/date-formatting';
 import type { AiCrawlerStat } from '@/types/ai-crawler-analytics';
 
 const ACCENT_COLORS = [
@@ -242,7 +243,7 @@ export function AiCrawlerDetailPanel({
         />
         {data?.syncedAt ? (
           <p className='mt-3 text-3xs text-tertiary-token'>
-            Updated {new Date(data.syncedAt).toLocaleString()}
+            Updated {formatShortDateUTC(data.syncedAt)}
           </p>
         ) : (
           <p className='mt-3 text-3xs text-tertiary-token'>
