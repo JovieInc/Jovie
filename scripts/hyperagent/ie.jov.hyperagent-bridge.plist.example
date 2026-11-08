@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>ie.jov.hyperagent-bridge</string>
+<key>ProgramArguments</key><array>
+<string>/opt/homebrew/bin/doppler</string><string>run</string>
+<string>--project</string><string>agent-mesh</string><string>--config</string><string>prd</string>
+<string>--no-fallback</string><string>--</string><string>/usr/bin/python3</string>
+<string>__HOME__/.jovie/mesh/hyperagent-bridge/hyperagent-bridge.py</string>
+</array>
+<key>EnvironmentVariables</key><dict>
+<key>HYPERAGENT_BIN</key><string>__HOME__/.local/bin/hyperagent</string>
+<key>HYPERAGENT_MODEL</key><string>fable-5.1</string>
+<key>HYPERAGENT_RUNS_PER_DAY</key><string>24</string>
+<key>PATH</key><string>/opt/homebrew/bin:/usr/bin:/bin</string>
+</dict>
+<key>KeepAlive</key><true/><key>RunAtLoad</key><true/>
+<key>ThrottleInterval</key><integer>10</integer>
+<key>StandardErrorPath</key><string>__HOME__/.jovie/mesh/hyperagent-bridge/bridge.err</string>
+</dict></plist>
