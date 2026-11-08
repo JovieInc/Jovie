@@ -86,7 +86,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/component-certificate"
           nice -n 19 node scripts/component-certificate.mjs --all --sha "$CERT_SHA" \
             --out "$RUNNER_TEMP/component-certificate/report.json" \
-            "${evidence_args[@]}"
+            ${evidence_args[@]+"${evidence_args[@]}"}
           node scripts/lib/component-certificate-summary.mjs \
             "$RUNNER_TEMP/component-certificate/report.json" >> "$GITHUB_STEP_SUMMARY"
       - name: Locate certificate report
