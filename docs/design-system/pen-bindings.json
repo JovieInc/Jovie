@@ -1,0 +1,415 @@
+{
+  "schema": "jovie.pen-binding/v1",
+  "$schema": "./pen-bindings.schema.json",
+  "_comment": "One source of truth binding approved Pen frames to routes. A route without \"approved\" is UNBOUND: no approved design exists, and the Pen diff gate fails a PR that changes its sources. Written by pnpm design:pen-export (stills) and pnpm design:pen-export approve (taste receipt). Never hand-edit sha256.",
+  "routes": {
+    "/": {
+      "scope": "marketing",
+      "enforce": true,
+      "sources": [
+        "apps/web/app/(home)/**",
+        "apps/web/components/features/home/**",
+        "apps/web/components/homepage/**"
+      ],
+      "viewports": {
+        "390": [
+          {
+            "section": "hero",
+            "penFile": "home-canonical-v3/index.html",
+            "nodeId": "data-section=hero",
+            "still": "docs/pen-stills/home/390/hero.png",
+            "sha256": "b4ddfb89fc4050fbd6b5a8fc706586c6f34578011bd22ce4910de05c86c58c7e"
+          },
+          {
+            "section": "profile",
+            "penFile": "home-canonical-v3/index.html",
+            "nodeId": "data-section=profile",
+            "still": "docs/pen-stills/home/390/profile.png",
+            "sha256": "dea200badf1c38ed88dfd418da867b2693d192bff8b8b4b2e86f87ee4b1ace85"
+          },
+          {
+            "section": "releases",
+            "penFile": "home-canonical-v3/index.html",
+            "nodeId": "data-section=releases",
+            "still": "docs/pen-stills/home/390/releases.png",
+            "sha256": "5440df7eec51ff63ed17ae9ac535e73d0680e92a0c27e3faaa98813c44c647a8"
+          },
+          {
+            "section": "specs",
+            "penFile": "home-canonical-v3/index.html",
+            "nodeId": "data-section=specs",
+            "still": "docs/pen-stills/home/390/specs.png",
+            "sha256": "1d03fe9cbf9ec05cd5cc629544485b9a4617909d0e88d15641a8d1dbca608d78"
+          },
+          {
+            "section": "invite",
+            "penFile": "home-canonical-v3/index.html",
+            "nodeId": "data-section=invite",
+            "still": "docs/pen-stills/home/390/invite.png",
+            "sha256": "34fe65d6f1bbe7b399f5398a365397d79edcbdb243b759269128759a362df13c"
+          },
+          {
+            "section": "footer",
+            "penFile": "home-canonical-v3/index.html",
+            "nodeId": "data-section=footer",
+            "still": "docs/pen-stills/home/390/footer.png",
+            "sha256": "ee1983e63a10fa9ebb69a3ee208143ce328b5573dfb1febc94bbe5ab4c1f807c"
+          }
+        ],
+        "1440": [
+          {
+            "section": "hero",
+            "penFile": "home-canonical-v3/index.html",
+            "nodeId": "data-section=hero",
+            "still": "docs/pen-stills/home/1440/hero.png",
+            "sha256": "e13c705ca91da3c2a9ca52f48cafa80aedd1dbfe0ca07740f99639c983d8f358"
+          },
+          {
+            "section": "profile",
+            "penFile": "home-canonical-v3/index.html",
+            "nodeId": "data-section=profile",
+            "still": "docs/pen-stills/home/1440/profile.png",
+            "sha256": "c069e513ec19c2648f5bb9d6e01f28185502bd8fcdc804bba44efa2244910deb"
+          },
+          {
+            "section": "releases",
+            "penFile": "home-canonical-v3/index.html",
+            "nodeId": "data-section=releases",
+            "still": "docs/pen-stills/home/1440/releases.png",
+            "sha256": "27c62d914908cbed8ebb3441b29ebc3464514e2c4bc5f0bd9ffc5c60c298364b"
+          },
+          {
+            "section": "specs",
+            "penFile": "home-canonical-v3/index.html",
+            "nodeId": "data-section=specs",
+            "still": "docs/pen-stills/home/1440/specs.png",
+            "sha256": "ced461f6b609705305f7853e0d9aabf94433b0e71efe7e274b757c899d80e464"
+          },
+          {
+            "section": "invite",
+            "penFile": "home-canonical-v3/index.html",
+            "nodeId": "data-section=invite",
+            "still": "docs/pen-stills/home/1440/invite.png",
+            "sha256": "e9f088c57fb6489638a8a014958740cef3f359288c752a1ebb875a52424ec911"
+          },
+          {
+            "section": "footer",
+            "penFile": "home-canonical-v3/index.html",
+            "nodeId": "data-section=footer",
+            "still": "docs/pen-stills/home/1440/footer.png",
+            "sha256": "3f86e9494a37339e4def72df364d7d0548eedaea67e1534037db95c08af3af0e"
+          }
+        ]
+      },
+      "approved": {
+        "by": "tim",
+        "at": "2026-11-08T01:43:00.000Z",
+        "receipt": "home-canonical-v3 (design-approvals https://claude.ai/artifact/Qa74KaxkV4eRWMbuwUVdQq)"
+      }
+    },
+    "/about": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/about/*"],
+      "viewports": {}
+    },
+    "/ai": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/ai/*"],
+      "viewports": {}
+    },
+    "/alternatives": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/alternatives/*"],
+      "viewports": {}
+    },
+    "/alternatives/[slug]": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/alternatives/[slug]/*"],
+      "viewports": {}
+    },
+    "/api-versioning": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/api-versioning/*"],
+      "viewports": {}
+    },
+    "/artist-notifications": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/artist-notifications/*"],
+      "viewports": {}
+    },
+    "/artist-profile": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/artist-profile/*"],
+      "viewports": {}
+    },
+    "/artist-profiles": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/artist-profiles/*"],
+      "viewports": {}
+    },
+    "/blog": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/blog/*"],
+      "viewports": {}
+    },
+    "/blog/[slug]": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/blog/[slug]/*"],
+      "viewports": {}
+    },
+    "/card": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/card/*"],
+      "viewports": {}
+    },
+    "/changelog": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/changelog/*"],
+      "viewports": {}
+    },
+    "/cli": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/cli/*"],
+      "viewports": {}
+    },
+    "/compare": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/compare/*"],
+      "viewports": {}
+    },
+    "/compare/[slug]": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/compare/[slug]/*"],
+      "viewports": {}
+    },
+    "/developers": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/developers/*"],
+      "viewports": {}
+    },
+    "/developers/agents": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/developers/agents/*"],
+      "viewports": {}
+    },
+    "/download": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/download/*"],
+      "viewports": {}
+    },
+    "/engineering": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/engineering/*"],
+      "viewports": {}
+    },
+    "/instant-merch": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/instant-merch/*"],
+      "viewports": {}
+    },
+    "/integrations": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/integrations/*"],
+      "viewports": {}
+    },
+    "/launch": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/launch/*"],
+      "viewports": {}
+    },
+    "/new": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/new/*"],
+      "viewports": {}
+    },
+    "/pay": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": [
+        "apps/web/app/(marketing)/pay/*",
+        "apps/web/components/features/pay/**"
+      ],
+      "viewports": {}
+    },
+    "/pricing": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": [
+        "apps/web/app/(marketing)/pricing/*",
+        "apps/web/components/features/pricing/**"
+      ],
+      "viewports": {}
+    },
+    "/product": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/product/*"],
+      "viewports": {}
+    },
+    "/product/command-palette": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/product/command-palette/*"],
+      "viewports": {}
+    },
+    "/product/dsp-links": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/product/dsp-links/*"],
+      "viewports": {}
+    },
+    "/product/isrc": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/product/isrc/*"],
+      "viewports": {}
+    },
+    "/product/link-analytics": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/product/link-analytics/*"],
+      "viewports": {}
+    },
+    "/product/pre-save": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/product/pre-save/*"],
+      "viewports": {}
+    },
+    "/product/release-scheduling": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/product/release-scheduling/*"],
+      "viewports": {}
+    },
+    "/product/utm-links": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/product/utm-links/*"],
+      "viewports": {}
+    },
+    "/smart-links": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/smart-links/*"],
+      "viewports": {}
+    },
+    "/solutions/[audience]": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/solutions/[audience]/*"],
+      "viewports": {}
+    },
+    "/support": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/support/*"],
+      "viewports": {}
+    },
+    "/voice": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": [
+        "apps/web/app/(marketing)/voice/*",
+        "apps/web/components/features/landing/**"
+      ],
+      "viewports": {}
+    },
+    "/youtube-thumbnails": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/(marketing)/youtube-thumbnails/*"],
+      "viewports": {}
+    },
+    "/waitlist": {
+      "scope": "marketing",
+      "enforce": false,
+      "sources": ["apps/web/app/waitlist/*"],
+      "viewports": {}
+    },
+    "/signin": {
+      "scope": "golden-path",
+      "enforce": false,
+      "sources": ["apps/web/app/(auth)/signin/*"],
+      "viewports": {}
+    },
+    "/signup": {
+      "scope": "golden-path",
+      "enforce": false,
+      "sources": ["apps/web/app/(auth)/signup/*"],
+      "viewports": {}
+    },
+    "/claim": {
+      "scope": "golden-path",
+      "enforce": false,
+      "sources": [
+        "apps/web/app/claim/*",
+        "apps/web/components/features/home/claim-handle/**"
+      ],
+      "viewports": {}
+    },
+    "/onboarding": {
+      "scope": "golden-path",
+      "enforce": false,
+      "sources": [
+        "apps/web/app/onboarding/*",
+        "apps/web/components/features/onboarding/**"
+      ],
+      "viewports": {}
+    },
+    "/onboarding/checkout": {
+      "scope": "golden-path",
+      "enforce": false,
+      "sources": ["apps/web/app/onboarding/checkout/*"],
+      "viewports": {}
+    },
+    "/billing/success": {
+      "scope": "golden-path",
+      "enforce": false,
+      "sources": ["apps/web/app/billing/success/*"],
+      "viewports": {}
+    },
+    "/app/dashboard": {
+      "scope": "golden-path",
+      "enforce": false,
+      "sources": [
+        "apps/web/app/app/(shell)/dashboard/*",
+        "apps/web/components/features/dashboard/**"
+      ],
+      "viewports": {}
+    },
+    "/[username]": {
+      "scope": "golden-path",
+      "enforce": false,
+      "sources": [
+        "apps/web/app/[username]/*",
+        "apps/web/app/[username]/_components/**",
+        "apps/web/components/features/profile/**"
+      ],
+      "viewports": {}
+    }
+  }
+}

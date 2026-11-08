@@ -187,7 +187,7 @@ describe('the hero ships ungated and the viewport ships with it', () => {
 
   it('mounts the hero light with no feature flag and no conditional gate', () => {
     const component = readFileSync(
-      join(webRoot, 'components/homepage/HomepageArtistProfile.tsx'),
+      join(webRoot, 'app/(marketing)/product/ProductLanding.tsx'),
       'utf8'
     );
     const canvas = readFileSync(

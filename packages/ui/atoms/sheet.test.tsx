@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import {
   Sheet,
@@ -387,5 +388,32 @@ describe('Sheet overlay layer contract', () => {
     const scrim = document.querySelector('[data-state="open"].fixed.inset-0');
     expect(scrim?.className).toContain('z-sheet');
     expect(scrim?.className).not.toContain('z-modal');
+  });
+});
+
+describe('Sheet accessibility', () => {
+  it('has no axe violations when open on each side', async () => {
+    const { rerender } = render(<TestSheet open side='right' />);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await expectNoA11yViolations(document.body);
+
+    rerender(<TestSheet open side='left' />);
+    await expectNoA11yViolations(document.body);
+  });
+
+  it('has no axe violations with long right-to-left copy', async () => {
+    render(
+      <Sheet open>
+        <SheetContent side='left' dir='rtl'>
+          <SheetHeader>
+            <SheetTitle>تفاصيل الجمهور حسب الدولة والمنصة</SheetTitle>
+            <SheetDescription>
+              راجع عدد المستمعين العائدين والمشتركين الجدد دون أن تفقد مكانك.
+            </SheetDescription>
+          </SheetHeader>
+        </SheetContent>
+      </Sheet>
+    );
+    await expectNoA11yViolations(document.body);
   });
 });

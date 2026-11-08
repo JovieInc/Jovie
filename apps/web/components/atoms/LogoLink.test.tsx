@@ -24,6 +24,27 @@ function cssBlock(source: string, marker: string): string {
 }
 
 describe('LogoLink', () => {
+  it('uses the marketing mark size without changing the ordinary chrome default', () => {
+    const view = render(
+      <LogoLink variant='icon' logoMarkSize='marketing' reveal />
+    );
+    const link = screen.getByRole('link', { name: 'Jovie' });
+    expect(link.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '28'
+    );
+    expect(link.querySelector('svg')).toHaveAttribute('width', '28');
+    expect(link.querySelector('svg')).toHaveAttribute('height', '28');
+
+    view.rerender(<LogoLink variant='icon' reveal />);
+    expect(link.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '20'
+    );
+    expect(link.querySelector('svg')).toHaveAttribute('width', '20');
+    expect(link.querySelector('svg')).toHaveAttribute('height', '20');
+  });
+
   it('exposes the destination, label, and nested logo at the requested size', () => {
     render(
       <LogoLink

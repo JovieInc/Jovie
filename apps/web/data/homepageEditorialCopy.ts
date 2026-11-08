@@ -1,0 +1,123 @@
+import { HOMEPAGE_INVITE_ANCHOR } from '@/data/homepageInviteAnchor';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
+
+/**
+ * Homepage copy for `/` (Tim, 2026-11-03: "Music line wins" for the root
+ * route only; gbrain decisions/homepage-music-line-scope-2026-11-03-0420).
+ *
+ * Invite-only go-to-market (decisions/close-public-signup-waitlist-2026-11-02):
+ * the page is an editorial story that ends in the role waitlist form. While
+ * `PUBLIC_SIGNUP_CLOSED` is on, nothing here links to public signup; the one
+ * primary action scrolls to the on-page form.
+ *
+ * These are the code defaults. The published `marketing-page/home` content
+ * record fills the open slots (`lib/content-records/marketing-page.ts`); the
+ * headline is locked and has no slot. No prices, plan names or trial terms
+ * here: those come from offer truth only. Spec numbers are not copy: they
+ * derive from the DSP registry (`components/homepage/v3/home-spec.ts`).
+ */
+
+export { HOMEPAGE_INVITE_ANCHOR };
+
+/**
+ * Approved homepage "v3" (Tim, 2026-11-08 01:43Z, design-approvals receipt
+ * home-canonical-v3). Headlines are single lines (the content record requires
+ * it); `HOMEPAGE_HEADLINE_BREAKS` carries where the design breaks each default
+ * headline. A published headline that differs wraps naturally.
+ */
+export const HOMEPAGE_EDITORIAL_COPY = {
+  seo: {
+    title: 'Jovie | Move your music forward',
+  },
+  hero: {
+    headline: 'Move your music forward.',
+    subhead:
+      'Your profile, every release and the people who follow your work, in one quiet workspace.',
+    primaryAction: 'Request an invite',
+    primaryHref: `#${HOMEPAGE_INVITE_ANCHOR}`,
+    secondaryAction: 'See a live profile',
+    secondaryHref: TIM_WHITE_PROFILE.publicProfilePath,
+    note: 'jovie opens by invitation',
+    windowLabel:
+      'Jovie for Mac: the Releases list with Supernova Girl open in the inspector',
+    upcCallout: 'per release',
+  },
+  /** Chapter index (mono, lowercase, as approved). */
+  chapters: ['profile', 'releases', 'specs', 'invitation'],
+  chaptersLabel: 'On this page',
+  profile: {
+    headline: 'One name. Found everywhere.',
+    body: 'Your profile at jov.ie leads with what matters now: your latest release, your links, and a way for listeners to get updates.',
+    rows: [
+      { label: 'Leads with now', value: 'Your newest release, first' },
+      { label: 'Every service', value: 'One link to wherever they listen' },
+      { label: 'Stay close', value: 'Updates only for people who ask' },
+    ],
+    alt: 'Tim White’s Jovie profile, Listen mode, with Never Say A Word.',
+    handleCallout: 'jov.ie/tim · one handle',
+    updatesCallout: 'get updates · opt-in only',
+    phone: {
+      getUpdates: 'Get Updates',
+      listen: 'Listen',
+      listenNow: 'Listen now',
+    },
+  },
+  releases: {
+    headline: 'Every release, ready on day one.',
+    body: 'Your catalog comes in once. Each release gets its own page with listen links for every service, and your profile always leads with the newest one.',
+    catalogLabel: 'Tim White’s release catalog in Jovie',
+    releasePageLabel: 'The Supernova Girl release page',
+    rowCallout: 'catalog row → its own page',
+    captions: {
+      page: {
+        title: 'One page per release.',
+        body: 'Cover, title and artists up top, the way the release looks everywhere else.',
+      },
+      services: {
+        title: 'Every service, one tap.',
+        body: (listen: number) =>
+          `Spotify, Apple Music and YouTube Music up top, then the rest of the ${listen} supported streaming services.`,
+      },
+      catalog: {
+        title: 'Made from your catalog.',
+        body: 'Your catalog comes in once, and every release gets its own page.',
+      },
+    },
+  },
+  invite: {
+    headline: 'Jovie opens by invitation.',
+    subhead:
+      'Tell us your role and where to reach you. We’ll email you when your spot opens.',
+    roleLabel: 'I’m a',
+    action: 'Request invite',
+    steps: [
+      {
+        title: 'Tell us who you are',
+        body: 'Your role and one email. Under a minute.',
+      },
+      {
+        title: 'We review each request',
+        body: 'Jovie opens to a small group at a time.',
+      },
+      {
+        title: 'Your invite arrives',
+        body: 'A link to claim your name and bring in your catalog.',
+      },
+    ],
+  },
+} as const;
+
+export const HOMEPAGE_HEADLINE_BREAKS: Readonly<
+  Record<string, readonly string[]>
+> = {
+  [HOMEPAGE_EDITORIAL_COPY.hero.headline]: ['Move your', 'music forward.'],
+  [HOMEPAGE_EDITORIAL_COPY.profile.headline]: [
+    'One name.',
+    'Found everywhere.',
+  ],
+  [HOMEPAGE_EDITORIAL_COPY.releases.headline]: [
+    'Every release,',
+    'ready on day one.',
+  ],
+  [HOMEPAGE_EDITORIAL_COPY.invite.headline]: ['Jovie opens', 'by invitation.'],
+};

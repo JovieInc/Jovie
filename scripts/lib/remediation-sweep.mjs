@@ -33,6 +33,7 @@ const MODES = new Set([
   'drift',
   'exhausted',
   'holds',
+  'proof',
   'summer',
   'summer-config',
   'swift-arch',
@@ -260,6 +261,20 @@ export function planExhaustedConflicts(pulls, nowMs) {
   for (const pull of pulls ?? []) {
     if (!labelNames(pull).some(name => name.toLowerCase() === EXHAUSTED_LABEL))
       continue;
+    // A hold parks the PR: no lane may repair or sync it while the hold
+    // stands, so its exhausted marker is not actionable at any age and
+    // planIdleHolds owns the disposition. PR #22809 carried lane-fix-exhausted
+    // under tim-hold and the sweep kept filing conflict cards no lane could
+    // discharge (JOV-9100).
+    const holds = labelNames(pull).filter(name =>
+      HOLD_LABELS.has(name.toLowerCase())
+    );
+    if (holds.length > 0) {
+      warnings.push(
+        `#${pull.number} carries ${EXHAUSTED_LABEL} but is held (${holds.join(', ')}); the hold nag owns its disposition; not filing`
+      );
+      continue;
+    }
     const age = ageMs(pull.exhaustedSince, nowMs);
     if (age == null) {
       warnings.push(
@@ -519,6 +534,7 @@ export async function fileRemediationPlans(plans, { dryRun, upsert, apiKey }) {
  * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadCredentials]
  * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadDrift]
  * @param {() => { generatedAt: string, total: number, byRule: Record<string, number>, topFiles: { rule: string, file: string, count: number }[] } | Promise<{ generatedAt: string, total: number, byRule: Record<string, number>, topFiles: { rule: string, file: string, count: number }[] }>} [options.loadSwiftArch]
+ * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadProof]
  * @param {boolean} [options.vercelTokenPresent]
  * @param {(args: any) => Promise<any>} [options.upsert]
  * @param {string} [options.apiKey]
@@ -535,6 +551,7 @@ export async function runRemediationSweep({
   loadCredentials,
   loadDrift,
   loadSwiftArch,
+  loadProof,
   vercelTokenPresent = false,
   upsert,
   apiKey,
@@ -601,29 +618,18 @@ export async function runRemediationSweep({
       if (plan) plans.push(plan);
     }
   }
-  if (includesMode(mode, 'credentials')) {
-    // Credentials and spend registry (ops/registry/): expiry 7d/1d, runway
-    // under 14 days, 50/80/100% of a cap, unowned or unconsumed secrets.
-    // Summer was down 2026-10-18..20 when an unwatched grant expired.
-    if (!loadCredentials) {
-      warnings.push('Credentials registry loader not wired; not judged');
+  const collect = async (name, load, label) => {
+    if (!includesMode(mode, name)) return;
+    if (!load) {
+      warnings.push(`${label} loader not wired; not judged`);
     } else {
-      const credentials = await loadCredentials();
-      warnings.push(...(credentials.warnings ?? []));
-      plans.push(...credentials.plans);
+      const result = await load();
+      warnings.push(...(result.warnings ?? []));
+      plans.push(...result.plans);
     }
-  }
-  if (includesMode(mode, 'drift')) {
-    // Source-of-truth drift (canon/sources-of-truth.json liveChecks): Stripe
-    // prices, email DNS, production build against their owners.
-    if (!loadDrift) {
-      warnings.push('Source drift loader not wired; not judged');
-    } else {
-      const drift = await loadDrift();
-      warnings.push(...(drift.warnings ?? []));
-      plans.push(...drift.plans);
-    }
-  }
+  };
+  await collect('credentials', loadCredentials, 'Credentials registry');
+  await collect('drift', loadDrift, 'Source drift');
   if (includesMode(mode, 'swift-arch')) {
     if (!loadSwiftArch) {
       warnings.push('Swift architecture guard loader not wired; not judged');
@@ -631,6 +637,7 @@ export async function runRemediationSweep({
       plans.push(...planSwiftArchDebt(await loadSwiftArch()));
     }
   }
+  await collect('proof', loadProof, 'Proof-stat loop');
   const issues = await fileRemediationPlans(plans, { dryRun, upsert, apiKey });
   return { mode, dryRun, warnings, issues };
 }

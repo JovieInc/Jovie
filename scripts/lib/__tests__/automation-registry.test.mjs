@@ -1,8 +1,10 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { runLiveness } from '../../automation-liveness.mjs';
 import {
   checkRegistryCoverage,
   discoverScheduledAutomations,
@@ -25,6 +27,38 @@ const registry = loadRegistry(repoRoot);
 const NOW = Date.parse('2026-10-20T19:35:00Z');
 const iso = minutesAgo => new Date(NOW - minutesAgo * 60_000).toISOString();
 describe('automation registry', () => {
+  it('keeps every hosted gist heartbeat root in the bounded public feed', () => {
+    // This checkout contract belongs here: immutable lanes release bundles do
+    // not include the automation registry (JOV-9115).
+    const keys = JSON.parse(
+      execFileSync(
+        'python3',
+        [
+          '-c',
+          [
+            'import ast,json,pathlib',
+            'tree=ast.parse(pathlib.Path("scripts/lanes/doctor.py").read_text())',
+            'value=next(n.value for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=="HEARTBEAT_FEED_KEYS" for t in n.targets))',
+            'print(json.dumps(ast.literal_eval(value)))',
+          ].join('; '),
+        ],
+        { cwd: repoRoot, encoding: 'utf8' }
+      )
+    );
+    const roots = registry.entries
+      .filter(
+        entry =>
+          entry.status === 'live' &&
+          entry.receipt?.kind === 'json-timestamp' &&
+          entry.receipt?.url?.includes('gist')
+      )
+      .map(entry => entry.receipt.path.split('.')[0]);
+    expect(roots.length).toBeGreaterThan(0);
+    expect([...new Set(roots)].filter(root => !keys.includes(root))).toEqual(
+      []
+    );
+  });
+
   it('validates the committed registry', () => {
     expect(registry.schema).toBe(REGISTRY_SCHEMA);
     expect(validateRegistry(registry)).toEqual([]);
@@ -328,4 +362,137 @@ describe('shared scheduling', () => {
     expect(runsPerDay('17 */6 * * *; 47 7 * * *')).toBe(5);
     expect(runsPerDay('continuous')).toBeNull();
   });
+});
+
+describe('post-handoff Summer receiver detection', () => {
+  const now = Date.parse('2026-11-05T16:46:00Z');
+  const at = new Date(now).toISOString();
+  const id = 'summer:receiver-outcomes';
+  const selected = {
+    ...registry,
+    entries: registry.entries.filter(row =>
+      [id, 'summer:heartbeat'].includes(row.id)
+    ),
+  };
+  async function observe(slot, status = 200) {
+    return runLiveness({
+      registry: selected,
+      nowMs: now,
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            status: 'up',
+            availability: 'up',
+            receiptFreshness: {
+              heartbeat: { status: 'verified', observedAt: at },
+              meshDelivery: slot,
+            },
+          }),
+          { status }
+        ),
+    });
+  }
+  const receiver = report => report.results.find(row => row.id === id);
+
+  it('registers the receiver scope alongside the existing hub alarm', () => {
+    expect(selected.entries.map(row => row.id).sort()).toEqual(
+      [id, 'summer:heartbeat'].sort()
+    );
+    expect(
+      registry.entries.some(
+        row => row.id === 'cloudflare:mesh-hub-stale-mail-alarm'
+      )
+    ).toBe(true);
+    expect(
+      registry.entries.some(row => row.id === 'summer:mesh-delivery-dwell')
+    ).toBe(false);
+    expect(selected.entries.find(row => row.id === id).critical).toBe(false);
+  });
+
+  it.each([
+    ['failed', null, 'mesh-undelivered-over-10m:49+'],
+    ['unknown', null, 'mesh-pending-unreadable'],
+    ['partial', at, 'mesh-pending-partial'],
+  ])(
+    'retains %s producer evidence while the process heartbeat is healthy',
+    async (status, observedAt, code) => {
+      const { report } = await observe({
+        status,
+        observedAt,
+        code,
+        pending: null,
+        oldestAgeMinutes: null,
+      });
+      expect(
+        report.results.find(row => row.id === 'summer:heartbeat').status
+      ).toBe('fresh');
+      expect(receiver(report).status).not.toBe('fresh');
+      expect(receiver(report).reason).toContain(`=${status}; ${code}`);
+      expect(report.status).toBe('degraded');
+      expect(livenessDecisions(report, {})).toEqual([]);
+    }
+  );
+
+  it('does not turn an absent receiver slot into a healthy heartbeat', async () => {
+    const { report } = await observe(undefined);
+    expect(receiver(report)).toMatchObject({
+      status: 'missing',
+      reason: 'heartbeat-source-missing:receiptFreshness.meshDelivery.status',
+    });
+  });
+
+  it('requires a timestamp even when the producer says verified', async () => {
+    const { report } = await observe({ status: 'verified', observedAt: null });
+    expect(receiver(report)).toMatchObject({
+      status: 'missing',
+      reason:
+        'heartbeat-source-missing:receiptFreshness.meshDelivery.observedAt',
+    });
+  });
+
+  it('keeps old verified evidence stale', async () => {
+    const { report } = await observe({
+      status: 'verified',
+      observedAt: new Date(now - 31 * 60_000).toISOString(),
+    });
+    expect(receiver(report)).toMatchObject({ status: 'stale', ageMinutes: 31 });
+  });
+
+  it('accepts fresh verified receiver evidence without an outbound decision', async () => {
+    const { report } = await observe({
+      status: 'verified',
+      observedAt: at,
+      code: null,
+      pending: 0,
+    });
+    expect(receiver(report)).toMatchObject({ status: 'fresh', reason: null });
+    expect(report.status).toBe('healthy');
+    expect(
+      livenessDecisions(report, {
+        'automation-liveness-summer-receiver-outcomes': 'red',
+      })
+    ).toEqual([]);
+  });
+
+  it('keeps an unreadable source unknown without a retry', async () => {
+    const { report } = await observe(null, 503);
+    expect(receiver(report)).toMatchObject({
+      status: 'unknown',
+      reason: 'json-http-503',
+    });
+  });
+
+  it.each([{ private: 'content' }, 'private content\nmore', 'a'.repeat(161)])(
+    'does not copy arbitrary diagnostic content into detector output (%j)',
+    async code => {
+      const { report } = await observe({
+        status: 'failed',
+        observedAt: null,
+        code,
+      });
+      expect(receiver(report).reason).toBe(
+        'heartbeat-not-ok:receiptFreshness.meshDelivery.status=failed'
+      );
+    }
+  );
 });

@@ -5,7 +5,9 @@ import { verifyPreviewToken } from '@/lib/content-records/access.server';
 import { experimentArmBody } from '@/lib/content-records/experiment';
 import { validateContentRecord } from '@/lib/content-records/kind';
 import { MARKETING_PAGE_KIND } from '@/lib/content-records/marketing-page';
+import { contentReviewIdentity } from '@/lib/content-records/publication';
 import { getContentVersion } from '@/lib/content-records/store.server';
+import { getDeployedBuildInfo } from '@/lib/observability/build-info';
 import { HomepageQueryProvider } from '../../(home)/homepage-query-provider';
 
 /**
@@ -26,20 +28,28 @@ export default async function ContentPreviewPage({
   searchParams,
 }: Readonly<{
   params: Promise<{ versionId: string }>;
-  searchParams: Promise<{ token?: string; arm?: string }>;
+  searchParams: Promise<{
+    token?: string;
+    arm?: string;
+    digest?: string;
+    live?: string;
+  }>;
 }>) {
-  const [{ versionId }, { token, arm }] = await Promise.all([
+  const [{ versionId }, { token, arm, digest, live }] = await Promise.all([
     params,
     searchParams,
   ]);
   if (!/^[0-9a-f-]{36}$/.test(versionId)) notFound();
-  if (!verifyPreviewToken(versionId, token)) notFound();
+  if (!digest || !/^[a-f0-9]{64}$/.test(digest)) notFound();
+  if (!verifyPreviewToken({ reviewDigest: digest }, token)) notFound();
+  if (live !== 'none' && !/^[a-f0-9-]{36}$/.test(live ?? '')) notFound();
 
   const version = await getContentVersion(versionId);
   if (
     !version ||
     version.kind !== MARKETING_PAGE_KIND.kind ||
-    version.key !== 'home'
+    version.key !== 'home' ||
+    version.schemaVersion !== MARKETING_PAGE_KIND.schemaVersion
   ) {
     notFound();
   }
@@ -49,6 +59,13 @@ export default async function ContentPreviewPage({
     version.data
   );
   if (!validated.ok) notFound();
+  const identity = contentReviewIdentity(
+    version,
+    await getDeployedBuildInfo(),
+    live === 'none' ? null : live!,
+    arm ?? null
+  );
+  if (!identity || identity.reviewDigest !== digest) notFound();
 
   const sections = experimentArmBody(
     validated.data.sections,
@@ -57,6 +74,7 @@ export default async function ContentPreviewPage({
   );
   return (
     <HomepageQueryProvider>
+      <meta name='jovie-content-review' content={identity.reviewDigest} />
       <HomepageSpecSections sections={sections} />
     </HomepageQueryProvider>
   );

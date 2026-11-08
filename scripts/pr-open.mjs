@@ -14,6 +14,8 @@ import {
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { proseOnly } from './lib/pr-prose.mjs';
+import { wipGate } from './lib/pr-wip-gate.mjs';
 import { isRepairPr, lintPrBody } from './lib/preflight-changed.mjs';
 import { requiresWin } from './lib/wins-ledger.mjs';
 import {
@@ -26,30 +28,6 @@ const PR_URL_PLACEHOLDER = '<PR URL, set after open>';
 export const CUSTOMER_MARKER =
   '<!-- customer-changelog/v1 {"releaseWorthy":false} -->';
 const REPOSITORY = 'JovieInc/Jovie';
-
-export function proseOnly(body) {
-  let fence = '';
-  return body
-    .split('\n')
-    .map(line => {
-      const marker = line.match(/^ {0,3}(`{3,}|~{3,})/);
-      if (fence) {
-        if (
-          marker &&
-          marker[1][0] === fence[0] &&
-          marker[1].length >= fence.length
-        )
-          fence = '';
-        return '';
-      }
-      if (marker) {
-        fence = marker[1];
-        return '';
-      }
-      return line.replace(/(`+)([\s\S]*?)\1(?!`)/g, '');
-    })
-    .join('\n');
-}
 
 export function commonDirectories(paths) {
   let dirs = [...new Set(paths.map(p => path.posix.dirname(p)))].sort();
@@ -411,6 +389,7 @@ function parse(argv) {
     else if (f === '--customer-visible') a.customerVisible = v();
     else if (f === '--body-file') a.bodyFile = v();
     else if (f === '--draft') a.draft = true;
+    else if (f === '--wip-override') a.wipOverride = v();
     else if (f === '--dry-run') a.dryRun = true;
     else if (f === '--no-push') a.noPush = true;
     else if (!f.startsWith('--')) a.number = f;
@@ -579,11 +558,20 @@ export async function refreshBodyChecks(
       );
   };
   try {
-    // The second event carries the exact final body; no commits, pushes or reruns.
-    edit(
-      `${body.trimEnd()}\n\n<!-- pr-open-refresh: ${Date.now()}-${process.pid} -->\n`
-    );
-    edit(body);
+    // A body or title change emits its own edited event carrying the exact
+    // final body, so one PATCH is one fresh flight. The marker round-trip is
+    // kept only for a byte-identical update, where GitHub emits no event at
+    // all and a forced mutation is the only way to request fresh checks
+    // (JOV-10354: the unconditional double PATCH doubled every update's
+    // Source Validation flights).
+    if (body === pr.body && title === pr.title) {
+      edit(
+        `${body.trimEnd()}\n\n<!-- pr-open-refresh: ${Date.now()}-${process.pid} -->\n`
+      );
+      edit(body);
+    } else {
+      edit(body);
+    }
     for (let attempt = 0; attempt < 5; attempt++) {
       const fresh = runs().filter(
         r =>
@@ -690,7 +678,7 @@ export async function main(
       }
     } else {
       const { changedFiles } = await import('./preflight-changed.mjs');
-      files = changedFiles(a.repo, a.base).files;
+      files = changedFiles(a.repo, baseRef).files;
       subjects = git(['log', '--format=%s', `origin/${a.base}..HEAD`])
         .stdout.trim()
         .split('\n')
@@ -797,19 +785,65 @@ export async function main(
       await refreshBodyChecks(a.repo, pr, body, title, { github, pause, log });
       return 0;
     }
+    const wip = wipGate(a, git(['branch', '--show-current']).stdout.trim(), {
+      execute,
+      log,
+      record,
+    });
+    if (wip.refused) return 3;
+    if (wip.override) labels.push('wip-override');
     const dir = mkdtempSync(path.join(tmpdir(), 'pr-open-create-'));
     try {
       const bodyFile = path.join(dir, 'body.md');
       writeFileSync(bodyFile, body);
+      const branchResult = git(['branch', '--show-current']);
+      const branch = branchResult.stdout.trim();
+      const local = git(['rev-parse', 'HEAD']);
+      const expectedHead = local.stdout.trim();
+      if (
+        branchResult.status !== 0 ||
+        !branch ||
+        local.status !== 0 ||
+        !/^[0-9a-f]{40}$/.test(expectedHead)
+      )
+        throw new Error(
+          'publication-head: cannot resolve the intended branch and commit'
+        );
       if (!a.noPush) {
         const push = git(['push', '-u', 'origin', 'HEAD'], {
           stdio: 'inherit',
         });
         if (push.status !== 0) return push.status ?? 1;
       }
+      // A narrow origin.fetch may not map this branch to @{upstream}, even
+      // after a successful push. Prove the intended remote head, then name it
+      // explicitly; never recover by pushing again or bypassing publication gates.
+      const remoteRef = `refs/heads/${branch}`;
+      const published = git(
+        ['ls-remote', '--exit-code', '--heads', 'origin', remoteRef],
+        { timeout: 30_000 }
+      );
+      if (published.status !== 0)
+        throw new Error(
+          `publication-head: remote head unavailable for ${branch}`
+        );
+      const refs = published.stdout
+        .trim()
+        .split(/\r?\n/)
+        .map(line => line.trim().split(/\s+/));
+      if (
+        refs.length !== 1 ||
+        refs[0][0] !== expectedHead ||
+        refs[0][1] !== remoteRef
+      )
+        throw new Error(
+          `publication-head: remote head does not match the intended commit for ${branch}`
+        );
       const made = github(a.repo, [
         'pr',
         'create',
+        '--head',
+        branch,
         '--repo',
         REPOSITORY,
         '--base',

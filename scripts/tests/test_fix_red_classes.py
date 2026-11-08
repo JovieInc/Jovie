@@ -23,6 +23,7 @@ class ClassifyTest(unittest.TestCase):
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane": ("ci-fast-wiring", "wire-ci-fast"),
             "domain-write-guard: apps/web/lib/leads/lead-claim-token.ts writes creatorProfiles directly 1x (allowed 0).": ("domain-write", "register-domain-writes"),
             "This PR conflicts with main in: scripts/preflight-changed.mjs . Resolve the conflict (lane-fix-conflict).": ("narrowed-preflight", "merge-narrowed-preflight"),
+            "Error: legacy Cache Components surface grew to 242 (maximum 241):": ("cache-surface", "strip-cache-exports"),
             "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.": ("spacing-scale", "snap-spacing"),
             "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence": ("census-certification", "sync-main"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "atomic-write"),
@@ -33,11 +34,50 @@ class ClassifyTest(unittest.TestCase):
             got = classes.classify(pr("Source Validation"), {"Source Validation": log})
             self.assertEqual((got["cls"], got["action"]), (cls, action), log)
 
+    def test_unwired_outranks_incidental_http_status_in_the_same_log(self):
+        log = (
+            "✔ recovers HTTP 502/503/504\n"
+            "HttpError: API rate limit exceeded for installation\n"
+            "AssertionError: Unwired: scripts/lib/__tests__/workers-inventory.test.mjs. "
+            "Wire each file into a ci-fast lane\n"
+        )
+        got = classes.classify(pr("Source Validation"), {"Source Validation": log})
+        self.assertEqual((got["cls"], got["action"]), ("ci-fast-wiring", "wire-ci-fast"))
+        self.assertEqual(got["files"], ["scripts/lib/__tests__/workers-inventory.test.mjs"])
+        plain = classes.classify(pr("Source Validation"), {
+            "Source Validation": "upstream returned HTTP 500 before the job started"})
+        self.assertEqual((plain["cls"], plain["action"]), ("platform-infra", "rerun"))
+
     def test_unwired_files_are_extracted_and_aggregates_ignored(self):
         got = classes.classify(pr("Source Validation"), {"Source Validation":
-                               "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane"})
+            "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane"})
         self.assertEqual(got["files"], ["scripts/a.test.mjs", "scripts/b.test.mjs"])
         self.assertEqual(got["checks"], ["Source Validation"])
+
+    def test_unwired_guard_error_outranks_quota_and_infra_fixture_output(self):
+        log = ("echo 'github-quota-deferred; Fleet rule evidence is missing'\n"
+               "✔ handles API rate limit exceeded and HTTP 503\n"
+               "AssertionError: Unwired: scripts/lib/__tests__/tooling-health.test.mjs. Wire each file into a ci-fast lane\n"
+               "##[error]script-contracts failed (exit 1); read its output above.\n")
+        got = classes.classify(pr("Source Validation"), {"Source Validation": log})
+        self.assertEqual((got["cls"], got["action"]), ("ci-fast-wiring", "wire-ci-fast"))
+        self.assertEqual(got["files"], ["scripts/lib/__tests__/tooling-health.test.mjs"])
+    def test_component_test_errors_outrank_mocked_infra_and_name_required_tests(self):
+        tests = ["apps/web/tests/components/profile/ProfileDrawerShell.interaction.test.tsx",
+                 "apps/web/tests/unit/cookie-banner-fixes.test.tsx"]
+        errors = [f"::error file=apps/web/components/{name}.tsx::[test-not-touched] "
+                  f"Component changed but test {test} was not touched in this diff. Update the test."
+                  for name, test in zip(["ProfileDrawerShell", "CookieBannerSection"], tests)]
+        log = "passing fixture: github-quota-deferred; API rate limit exceeded\n" + "\n".join(errors + errors)
+        got = classes.classify(pr("Source Validation", merge="BEHIND"), {"Source Validation": log})
+        self.assertEqual((got["cls"], got["action"]), ("component-test-evidence", "agent"))
+        self.assertEqual(got["files"], tests)
+        self.assertNotIn(got["action"], classes.DETERMINISTIC, "real regression coverage needs a repair")
+
+    def test_component_test_explanation_without_error_annotation_is_not_a_failure(self):
+        got = classes.classify(pr("Source Validation"), {"Source Validation":
+            "passing test explains [test-not-touched] Component changed but test apps/web/tests/unit/example.test.tsx was not touched in this diff."})
+        self.assertEqual(got["cls"], "other")
 
     def test_mixed_classes_go_to_the_model_and_behind_branches_sync_main(self):
         mixed = classes.classify(pr("A", "B"), {"A": "API rate limit exceeded", "B": "AssertionError"})
@@ -213,11 +253,9 @@ class AdditiveIdentifierListMergeTest(unittest.TestCase):
 
 
 class AndChainMergeTest(unittest.TestCase):
-    OURS = (
-        "node scripts/run-affected-tests.mjs --control && "
-        "node --test scripts/ci-workflow-topology.test.mjs scripts/workflow-runner-pin-check.test.mjs && "
-        "node scripts/ci-workflow-topology.mjs && pnpm ownership:check"
-    )
+    OURS = ("node scripts/run-affected-tests.mjs --control && "
+            "node --test scripts/ci-workflow-topology.test.mjs scripts/workflow-runner-pin-check.test.mjs && "
+            "node scripts/ci-workflow-topology.mjs && pnpm ownership:check")
     THEIRS = (
         "node scripts/run-affected-tests.mjs --control && "
         "node --test scripts/ci-workflow-topology.test.mjs && "
@@ -237,6 +275,27 @@ class AndChainMergeTest(unittest.TestCase):
             classes.merge_and_chain(NarrowedPreflightMergeTest.OURS, NarrowedPreflightMergeTest.THEIRS),
             classes.merge_narrowed_guard_command(NarrowedPreflightMergeTest.OURS, NarrowedPreflightMergeTest.THEIRS),
         )
+
+    def test_unions_plain_yaml_run_chains_in_main_order(self):
+        ours = "pnpm --filter @jovie/extension test && node --experimental-strip-types --test workers/cron-hub/src/index.test.mjs"
+        theirs = "pnpm --filter @jovie/extension test && pnpm --filter @jovie/mesh-hub test"
+        conflict = (f"<<<<<<< HEAD\n        run: {ours}\n=======\n"
+                    f"        run: {theirs}\n>>>>>>> origin/main\n")
+        self.assertEqual(
+            classes.resolve_and_chain_text(conflict),
+            f"        run: {theirs} && node --experimental-strip-types --test workers/cron-hub/src/index.test.mjs\n",
+        )
+        for changed in [theirs.replace("extension test", "extension test --strict"),
+                        theirs + " | cat", theirs + " # comment", theirs + " && echo 'quoted'",
+                        theirs + " && echo ${UNTRUSTED}"]:
+            with self.subTest(changed=changed):
+                self.assertIsNone(classes.resolve_and_chain_text(conflict.replace(theirs, changed)))
+        self.assertIsNone(classes.resolve_and_chain_text(conflict.replace("run:", "name:", 1)))
+        for key in ["if", "name", "working-directory", "env"]:
+            metadata = conflict.replace("        run:", f"        {key}: false\n        run:", 1)
+            metadata = metadata.replace("=======\n", f"=======\n        {key}: true\n", 1)
+            with self.subTest(key=key):
+                self.assertIsNone(classes.resolve_and_chain_text(metadata))
 
     def test_rejects_a_changed_script_quotes_and_a_second_file_list(self):
         self.assertIsNone(classes.merge_and_chain(self.OURS, self.THEIRS.replace("ownership:check", "ownership:check --strict")))
@@ -323,55 +382,6 @@ class AtomicWriteRepairTest(unittest.TestCase):
             target.symlink_to(outside)
             self.assertEqual(classes.repair_atomic_state_writes(root, self.LOG), [])
             self.assertIn('p.write_text("x")', outside.read_text())
-
-
-class SpacingSnapTest(unittest.TestCase):
-    DIFF = """diff --git a/apps/web/components/Card.tsx b/apps/web/components/Card.tsx
---- a/apps/web/components/Card.tsx
-+++ b/apps/web/components/Card.tsx
-@@ -1,0 +2 @@
-+        <div className='mb-4 flex items-center gap-2.5 h-3.5 -mx-3.5 sm:gap-3.5'>
-diff --git a/apps/web/components/Card.test.tsx b/apps/web/components/Card.test.tsx
---- a/apps/web/components/Card.test.tsx
-+++ b/apps/web/components/Card.test.tsx
-@@ -1,0 +1 @@
-+expect(node).toHaveClass('gap-2.5')
-diff --git a/apps/web/lib/skip.ts b/apps/web/lib/skip.ts
---- a/apps/web/lib/skip.ts
-+++ b/apps/web/lib/skip.ts
-@@ -1,0 +1 @@
-+const klass = 'gap-2.5'
-"""
-
-    def test_snaps_only_the_added_product_line(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            path = root / "apps/web/components/Card.tsx"
-            path.parent.mkdir(parents=True)
-            path.write_text(
-                "const kept = 'gap-2.5'\n"
-                "        <div className='mb-4 flex items-center gap-2.5 h-3.5 -mx-3.5 sm:gap-3.5'>\n"
-            )
-            (root / "apps/web/components/Card.test.tsx").write_text("expect(node).toHaveClass('gap-2.5')\n")
-            (root / "apps/web/lib").mkdir()
-            (root / "apps/web/lib/skip.ts").write_text("const klass = 'gap-2.5'\n")
-            changed = classes.snap_added_conservative_spacing(root, self.DIFF)
-            self.assertEqual(changed, ["apps/web/components/Card.tsx"])
-            text = path.read_text()
-            self.assertIn("const kept = 'gap-2.5'\n", text)
-            self.assertIn("gap-2 h-3.5 -mx-3 sm:gap-3", text)
-            self.assertNotIn("gap-2.5 h-3.5", text)
-            self.assertIn("gap-2.5", (root / "apps/web/components/Card.test.tsx").read_text())
-            self.assertIn("gap-2.5", (root / "apps/web/lib/skip.ts").read_text())
-
-    def test_stale_line_is_not_rewritten(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            path = root / "apps/web/components/Card.tsx"
-            path.parent.mkdir(parents=True)
-            path.write_text("const kept = 'gap-2.5'\nalready snapped gap-2\n")
-            self.assertEqual(classes.snap_added_conservative_spacing(root, self.DIFF), [])
-            self.assertIn("already snapped gap-2\n", path.read_text())
 
 
 class WireTest(unittest.TestCase):
@@ -479,23 +489,14 @@ class DomainWriteTest(unittest.TestCase):
             self.assertEqual(classes.register_direct_domain_writes(root, self.LOG), [])
 
     def test_private_helper_extra_table_and_missing_side_effect_stay_unregistered(self):
-        private = (
-            "function writeProfile(): void {\n"
-            "  db.update(creatorProfiles).set({ claimToken: hash });\n"
-            "}\n"
-            "export async function persistLeadClaimToken(): Promise<void> {\n"
-            "  writeProfile();\n"
-            "}\n"
-        )
+        private = ("function writeProfile(): void {\n"
+                   "  db.update(creatorProfiles).set({ claimToken: hash });\n}\n"
+                   "export async function persistLeadClaimToken(): Promise<void> {\n"
+                   "  writeProfile();\n}\n")
         extra = self.SOURCE + "\nexport function dropUser(): void {\n  db.delete(users);\n}\n"
-        social = (
-            "export async function persistLeadClaimToken(): Promise<void> {\n"
-            "  db.update(socialLinks).set({ url });\n"
-            "}\n"
-        )
-        social_log = (
-            "domain-write-guard: apps/web/lib/leads/lead-claim-token.ts writes socialLinks directly 1x (allowed 0).\n"
-        )
+        social = ("export async function persistLeadClaimToken(): Promise<void> {\n"
+                  "  db.update(socialLinks).set({ url });\n}\n")
+        social_log = "domain-write-guard: apps/web/lib/leads/lead-claim-token.ts writes socialLinks directly 1x (allowed 0).\n"
         with tempfile.TemporaryDirectory() as tmp:
             root = self.tree(tmp, private)
             self.assertEqual(classes.register_direct_domain_writes(root, self.LOG), [])

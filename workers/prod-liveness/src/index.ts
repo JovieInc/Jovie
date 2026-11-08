@@ -9,6 +9,7 @@ type Env = {
   TARGETS?: string;
   FAILURES_TO_PAGE?: string;
   PAGE_URLS?: string;
+  CRON_HUB_SECRET?: string;
 };
 type KVNamespace = {
   get(k: string): Promise<string | null>;
@@ -166,12 +167,12 @@ export async function run(
     now,
     Number(env.FAILURES_TO_PAGE) || 2
   );
-  if (env.STATE) await env.STATE.put('state', JSON.stringify(state));
-  if (env.STATE)
-    await env.STATE.put(
-      'last',
-      JSON.stringify({ at: new Date(now).toISOString(), results, state })
-    );
+  // KV allows one write per key per second. Hold `pagedAt` until a channel
+  // accepts the page, then write `state` once. A second put in the same
+  // second 429s and leaves the quiet window armed with no delivery log.
+  let persisted = state;
+  if (page && page !== 'recovered')
+    persisted = { ...state, pagedAt: prev.pagedAt ?? null };
   const urls = (env.PAGE_URLS ?? '')
     .split(',')
     .map(s => s.trim())
@@ -224,6 +225,7 @@ export async function run(
         : []),
     ]);
     delivered = sent.filter(s => s.status === 'fulfilled' && s.value.ok).length;
+    if (delivered > 0) persisted = state;
     if (delivered === 0)
       console.error(
         JSON.stringify({
@@ -233,6 +235,17 @@ export async function run(
           text,
         })
       );
+  }
+  if (env.STATE) {
+    await env.STATE.put('state', JSON.stringify(persisted));
+    await env.STATE.put(
+      'last',
+      JSON.stringify({
+        at: new Date(now).toISOString(),
+        results,
+        state: persisted,
+      })
+    );
   }
   return {
     results,
@@ -248,6 +261,16 @@ export default {
     await run(env);
   },
   async fetch(req: Request, env: Env) {
+    // Cron-hub dispatch (workers/cron-hub): same run as the cron trigger, authenticated.
+    if (req.method === 'POST' && new URL(req.url).pathname === '/__cron') {
+      const secret = env.CRON_HUB_SECRET;
+      if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`)
+        return new Response('unauthorized', { status: 401 });
+      const out = await run(env);
+      return new Response(JSON.stringify({ ok: true, page: out.page }), {
+        headers: { 'content-type': 'application/json' },
+      });
+    }
     if (req.method === 'POST' && new URL(req.url).pathname === '/test-page') {
       const ok =
         env.SUMMER_LIVENESS_SECRET &&

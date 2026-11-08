@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { Checkbox } from './checkbox';
 
@@ -335,5 +336,27 @@ describe('Checkbox', () => {
       fireEvent.click(checkbox);
       expect(onCheckedChange).toHaveBeenCalledWith(true);
     });
+  });
+});
+
+describe('Checkbox certificate evidence', () => {
+  it('has no axe violations across unchecked, checked, indeterminate, and disabled states', async () => {
+    const { container } = render(
+      <div>
+        <Checkbox id='cb-a11y-off' />
+        <label htmlFor='cb-a11y-off'>Subscribe</label>
+        <Checkbox id='cb-a11y-on' defaultChecked />
+        <label htmlFor='cb-a11y-on'>Subscribed</label>
+        <Checkbox id='cb-a11y-mixed' checked='indeterminate' />
+        <label htmlFor='cb-a11y-mixed'>Some tracks selected</label>
+        <Checkbox id='cb-a11y-disabled' disabled />
+        <label htmlFor='cb-a11y-disabled'>Unavailable</label>
+      </div>
+    );
+    await expectNoA11yViolations(container);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Subscribe' }));
+    expect(screen.getByRole('checkbox', { name: 'Subscribe' })).toBeChecked();
+    await expectNoA11yViolations(container);
   });
 });

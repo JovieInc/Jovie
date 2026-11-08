@@ -63,6 +63,7 @@ describe('golden-path lock test files', () => {
     expect(GOLDEN_PATH_LOCK_SELF_TEST_FILES).toEqual([
       'lib/__tests__/golden-path-lock.test.mjs',
       'lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
+      'lib/__tests__/golden-path-source-scope.test.mjs',
     ]);
   });
 });

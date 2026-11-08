@@ -160,6 +160,46 @@ test('audience routes are exempt and general routes are scanned', () => {
   }
 });
 
+test('the music line is permitted on `/` only (Tim, 2026-11-03)', () => {
+  // Positive: the homepage's own sections and copy may use music language.
+  const homepage = [
+    'apps/web/components/homepage/HomepageEditorial.tsx',
+    'apps/web/data/homepageEditorialCopy.ts',
+  ];
+  for (const file of homepage) {
+    assert.equal(isExemptPath(file, config), true, file);
+    assert.deepEqual(
+      violationsInSource(
+        "export const line = 'Jovie helps you move your music forward.';",
+        file,
+        config
+      ).ids,
+      []
+    );
+  }
+  // Negative: every other general route and the shared marketing layers are
+  // still scanned and still reject the same line.
+  for (const file of [
+    'apps/web/app/(home)/page.tsx',
+    'apps/web/app/(marketing)/pricing/page.tsx',
+    'apps/web/app/(marketing)/about/page.tsx',
+    'apps/web/components/marketing/MarketingHero.tsx',
+    'apps/web/components/homepage/HomepageSpecSections.tsx',
+    'apps/web/data/companyIdentity.ts',
+  ]) {
+    assert.equal(isExemptPath(file, config), false, file);
+    assert.deepEqual(
+      violationsInSource(
+        "export const line = 'Jovie helps you move your music forward.';",
+        file,
+        config
+      ).ids.map(id => id.split(':')[0]),
+      ['music'],
+      file
+    );
+  }
+});
+
 test('the baseline ratchet rejects new ids and refuses to grow', () => {
   const added = evaluateRatchet({
     current: ['artist:new.ts:abc'],

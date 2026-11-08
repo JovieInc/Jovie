@@ -48,7 +48,10 @@ function renderLogoMark(
   if (mark === 'text') {
     return (
       <>
-        <span>Powered by</span>
+        {/* Explicit trailing space: the two spans concatenate in the
+            accessible text, and the label-in-name contract needs the
+            visible text verbatim inside the link's name. */}
+        <span>{'Powered by '}</span>
         <span className='font-semibold'>Jovie</span>
       </>
     );
@@ -74,8 +77,10 @@ const LOGO_HIT_AREA_CLASS =
 function getLogoLinkClass(mark: string, isLinear: boolean): string {
   if (mark === 'brand') {
     // Same brand line as the smart-link footer: 14px medium, quiet token
-    // color, invisible 44px hit container.
-    return 'relative inline-flex items-center gap-2 rounded-md text-sm font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token focus-ring-themed before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-full before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2';
+    // color. Real 44px box via padding; negative margins hand the extra box
+    // back to layout (pseudo-element hit areas are invisible to axe's
+    // target-size rule).
+    return 'relative inline-flex min-h-11 items-center gap-2 rounded-md py-3 -my-3 text-sm font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token focus-ring-themed';
   }
   if (mark === 'text') {
     return 'inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-2 -mx-2 -my-3 focus-ring-themed text-3xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-white/70 dark:hover:text-white';
@@ -124,7 +129,7 @@ export function FooterBranding({
       <Link
         href={logoHref}
         prefetch={false}
-        aria-label={mark === 'brand' ? undefined : 'Jovie Home'}
+        aria-label={mark === 'brand' ? undefined : 'Powered by Jovie Home'}
         className={logoLinkClass}
       >
         {renderLogoMark(mark, size, isLinear, logoClass)}

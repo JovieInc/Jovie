@@ -41,6 +41,14 @@ vi.mock('@/features/auth', async () => {
   };
 });
 
+vi.mock('./WaitlistRoleForm', async () => {
+  const reactModule = await import('react');
+  return {
+    WaitlistRoleForm: () =>
+      reactModule.createElement('div', { 'data-testid': 'role-form' }),
+  };
+});
+
 import { APP_ROUTES } from '@/constants/routes';
 import { WAITLIST_FRONT_DOOR_VARIANT_ID } from '@/data/homepageFrontDoorCta';
 import { WaitlistPublicLanding } from './WaitlistPublicLanding';
@@ -87,6 +95,22 @@ describe('WaitlistPublicLanding', () => {
       'waitlist_front_door_cta_exposed',
       expect.objectContaining({
         variantIdentity: WAITLIST_FRONT_DOOR_VARIANT_ID,
+      })
+    );
+  });
+
+  it('shows the role waitlist form and a sign-in path when signup is closed', () => {
+    authLayoutMock.mockClear();
+    authShellMock.mockClear();
+    render(<WaitlistPublicLanding signupClosed />);
+
+    expect(screen.getByTestId('role-form')).toBeInTheDocument();
+    expect(screen.queryByTestId('auth-shell')).not.toBeInTheDocument();
+    expect(authShellMock).not.toHaveBeenCalled();
+    expect(authLayoutMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        showFooterPrompt: true,
+        footerLinkHref: APP_ROUTES.SIGNIN,
       })
     );
   });

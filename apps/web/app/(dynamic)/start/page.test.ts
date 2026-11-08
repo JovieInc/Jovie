@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   resolveUserState: vi.fn().mockResolvedValue({
@@ -64,6 +64,12 @@ vi.mock('@/lib/waitlist/settings', () => ({
 import StartPage from './page';
 
 describe('StartPage', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  beforeEach(() => {
+    // These entry-property fixtures exercise explicit reopening; closure is covered separately.
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'false');
+  });
   it('renders the onboarding shell without minting a server-component cookie', async () => {
     const result = await StartPage({ searchParams: Promise.resolve({}) });
 

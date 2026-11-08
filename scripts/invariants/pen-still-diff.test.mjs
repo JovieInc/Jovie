@@ -5,8 +5,9 @@ import { tmpdir } from 'node:os'; import { join } from 'node:path'; import { tes
 compareImages, evaluateManifest, formatComment, frameCaptureUrl, parseManifest,
 selectFrames, syntheticComparison, validateManifest, } from './pen-still-diff.mjs';
 import { decodePng, encodePng, measureImage, ssim, stretchedPair, syntheticPair } from './pen-still-diff-lib.mjs';
-const manifest = JSON.parse(readFileSync(join(import.meta.dirname, '../../docs/pen-stills/homepage/manifest.json'), 'utf8'));
-test('homepage manifest is valid, dark-first, and drops parked and fork frames', () => {
+// Inline fixture: the legacy homepage manifest was folded into docs/design-system/pen-bindings.json.
+const manifest = JSON.parse(`{"schema": "pen-still-manifest/v1", "surface": "homepage", "primaryMode": "dark", "penFile": {"name": "Jovie Homepage Profiles Claim \u2014 review copy 2026-10-01.pen", "sha256": null, "note": "The live Pen file is on the design machine and is not in this repo. Fill sha256 when canonical stills are exported."}, "frames": [{"sectionId": "hero", "penNodeId": "pending-canonical-hero", "fileHash": null, "stillPath": "docs/pen-stills/homepage/hero.dark.1440.png", "viewport": 1440, "mode": "dark", "status": "active", "route": "/", "story": "homepage--hero", "sectionSelector": "[data-pen-section='hero']", "mockupSelector": "[data-pen-mockup]"}, {"sectionId": "hero", "penNodeId": "pending-canonical-hero", "fileHash": null, "stillPath": "docs/pen-stills/homepage/hero.dark.390.png", "viewport": 390, "mode": "dark", "status": "active", "route": "/", "story": "homepage--hero", "sectionSelector": "[data-pen-section='hero']", "mockupSelector": "[data-pen-mockup]"}, {"sectionId": "hero", "penNodeId": "pending-canonical-hero", "fileHash": null, "stillPath": "docs/pen-stills/homepage/hero.light.1440.png", "viewport": 1440, "mode": "light", "status": "active", "route": "/", "story": "homepage--hero", "sectionSelector": "[data-pen-section='hero']", "mockupSelector": "[data-pen-mockup]"}, {"sectionId": "parked-exploration", "penNodeId": "parked-example", "fileHash": null, "stillPath": "docs/pen-stills/homepage/parked.dark.1440.png", "viewport": 1440, "mode": "dark", "status": "parked"}, {"sectionId": "taste-fork", "penNodeId": "fork-example", "fileHash": null, "stillPath": "docs/pen-stills/homepage/fork.dark.1440.png", "viewport": 1440, "mode": "dark", "status": "fork"}]}`);
+test('legacy frame manifest is valid, dark-first, and drops parked and fork frames', () => {
 const validated = validateManifest(manifest); assert.equal(validated.ok, true); if (!validated.ok) return;
 assert.equal(validated.manifest.primaryMode, 'dark'); const selected = selectFrames(validated.manifest);
 assert.deepEqual(selected.excluded.map(frame => frame.status).sort(), ['fork', 'parked']);
@@ -45,7 +46,7 @@ assert.ok(receipt.frames.every(frame => frame.verdict === 'waiting'));
 assert.equal(receipt.sample.kind, 'synthetic'); assert.equal(receipt.excluded.length, 2);
 const comment = formatComment({ ...receipt, sample: { ...receipt.sample, triptych: undefined }, triptychs: [] });
 assert.match(comment, /pen-still-diff/); assert.match(comment, /synthetic sample/);
-assert.match(comment, /!\[Pen, render, and diff\]\(triptych\.png\)/); });
+assert.doesNotMatch(comment, /!\[/); /* No links before artifacts have been written. */ });
 test('a hash mismatch fails the frame without reading a capture', async () => {
 const dir = mkdtempSync(join(tmpdir(), 'pen-still-'));
 writeFileSync(join(dir, 'hero.png'), encodePng(syntheticPair().pen)); const receipt = await evaluateManifest({
@@ -55,3 +56,194 @@ viewport: 1440, mode: 'dark', status: 'active', route: '/', }],
 }, { root: dir, baseUrl: 'http://127.0.0.1:9', capture: async () => { throw new Error('capture should not run'); } });
 assert.equal(receipt.frames[0].verdict, 'fail'); assert.equal(receipt.frames[0].reason, 'file-hash-mismatch');
 assert.equal(receipt.pass, false); });
+
+// CLI regressions use only generated fixtures; no native Pen or app evidence.
+import { spawnSync } from 'node:child_process';
+import { existsSync, rmSync } from 'node:fs';
+import { basename } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const cliModule = new URL('./pen-still-diff.mjs', import.meta.url).href;
+function fixture(t, ids = ['hero']) {
+  const root = mkdtempSync(join(tmpdir(), 'pen-diff-regression-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const frames = ids.map((sectionId, index) => {
+    const { pen } = syntheticPair();
+    pen.data[0] ^= index * 31;
+    const stillPath = `${index}.png`;
+    writeFileSync(join(root, stillPath), encodePng(pen));
+    return { sectionId, penNodeId: `node-${index}`, stillPath, renderPath: stillPath, captureError: false,
+      fileHash: /** @type {string | null} */ (null),
+      viewport: 1440, mode: 'dark', status: 'active', route: '/' };
+  });
+  return { root, manifest: { schema: 'pen-still-manifest/v1', frames } };
+}
+function runFixtureCli({ root, manifest }, strict = true, out = 'out') {
+  const manifestPath = join(root, 'manifest.json');
+  writeFileSync(manifestPath, JSON.stringify(manifest));
+  const script = `import { main } from ${JSON.stringify(cliModule)};
+    import { readFileSync } from 'node:fs'; import { join } from 'node:path';
+    await main(process.argv.slice(1), { root: ${JSON.stringify(root)},
+      capture: async frame => { if (frame.captureError) throw new Error('fixture capture unavailable');
+        return { png: readFileSync(join(${JSON.stringify(root)}, frame.renderPath)) }; } });`;
+  const outDir = join(root, out);
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', script, '--',
+    '--manifest', manifestPath, '--out', outDir, '--base-url', 'http://fixture.invalid',
+    ...(strict ? ['--strict'] : [])], { encoding: 'utf8', timeout: 30_000 });
+  assert.equal(result.error, undefined);
+  const receipt = existsSync(join(outDir, 'receipt.json'))
+    ? JSON.parse(readFileSync(join(outDir, 'receipt.json'), 'utf8')) : null;
+  return { ...result, outDir, receipt };
+}
+for (const mixed of [false, true]) test(`strict rejects ${mixed ? 'mixed pass/waiting' : 'all-waiting'} frames`, t => {
+  const input = fixture(t, mixed ? ['ready', 'missing'] : ['missing']);
+  input.manifest.frames.at(-1).stillPath = 'absent.png';
+  const result = runFixtureCli(input);
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.receipt.pass, false);
+  assert.equal(result.receipt.advisory, false);
+  assert.equal(result.receipt.frames.at(-1).verdict === 'waiting' || result.receipt.frames[0].verdict === 'waiting', true);
+  assert.equal(result.receipt.sample?.kind ?? null, mixed ? null : 'synthetic');
+  const advisory = runFixtureCli(input, false);
+  assert.equal(advisory.status, 0, advisory.stderr);
+  assert.equal(advisory.receipt.advisory, true);
+});
+test('strict rejects an empty active set and never promotes the sample to evidence', t => {
+  const input = fixture(t);
+  input.manifest.frames[0].status = 'parked';
+  const result = runFixtureCli(input);
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.receipt.pass, false);
+  assert.equal(result.receipt.frames.length, 0);
+  assert.equal(result.receipt.triptychs.length, 0);
+  assert.equal(result.receipt.sample.kind, 'synthetic');
+  assert.equal(result.receipt.sample.pass, true);
+});
+test('strict rejects an empty manifest', t => {
+  const input = fixture(t, []);
+  const result = runFixtureCli(input);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /non-empty/);
+});
+for (const missing of ['route', 'capture']) test(`strict cannot qualify missing ${missing}`, async t => {
+  const input = fixture(t);
+  const options = { root: input.root, strict: true, baseUrl: 'http://fixture.invalid',
+    capture: async () => ({ png: readFileSync(join(input.root, '0.png')) }) };
+  if (missing === 'route') delete input.manifest.frames[0].route;
+  else delete options.capture;
+  const receipt = await evaluateManifest(input.manifest, options);
+  assert.equal(receipt.frames[0].reason, 'capture-target-missing');
+  assert.equal(receipt.pass, false);
+});
+for (const kind of ['capture', 'png']) test(`strict records unavailable ${kind} and keeps other results`, t => {
+  const input = fixture(t, ['available', 'unavailable']);
+  if (kind === 'capture') input.manifest.frames[1].captureError = true;
+  else writeFileSync(join(input.root, '1.png'), 'not a PNG');
+  const result = runFixtureCli(input);
+  assert.equal(result.status, 1);
+  assert.ok(result.receipt, result.stderr);
+  assert.equal(result.receipt.frames[0].verdict, 'pass');
+  assert.equal(result.receipt.frames[1].verdict, 'fail');
+  assert.equal(result.receipt.pass, false);
+});
+test('strict accepts complete passing comparisons and still rejects visual failures', t => {
+  const input = fixture(t);
+  let result = runFixtureCli(input);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.receipt.pass, true);
+  assert.equal(result.receipt.advisory, false);
+  writeFileSync(join(input.root, 'render.png'), encodePng(stretchedPair().render));
+  input.manifest.frames[0].renderPath = 'render.png';
+  result = runFixtureCli(input);
+  assert.equal(result.status, 1);
+  assert.equal(result.receipt.frames[0].verdict, 'fail');
+  assert.equal(result.receipt.sample, null);
+  assert.equal(runFixtureCli(input, false).status, 0);
+});
+test('multi-frame receipt and comment point to each distinct image, with safe stable names', t => {
+  const ids = ['a/b', 'a\\b', 'a?b', 'A/B', '../triptych', '☃', 'x'.repeat(300)];
+  const input = fixture(t, ids);
+  const result = runFixtureCli(input);
+  assert.equal(result.status, 0, result.stderr);
+  const artifacts = result.receipt.triptychs;
+  assert.equal(new Set(artifacts.map(item => item.file.toLowerCase())).size, ids.length);
+  const comment = readFileSync(join(result.outDir, 'comment.md'), 'utf8');
+  const imageLinks = [...comment.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map(match => match[1]);
+  assert.deepEqual(imageLinks.sort(), artifacts.map(item => item.file).sort());
+  assert.equal(existsSync(join(result.outDir, 'triptych.png')), false);
+  for (const artifact of artifacts) {
+    assert.equal(basename(artifact.file), artifact.file);
+    assert.match(artifact.file, /^[a-z0-9-]+\.png$/);
+    assert.ok(artifact.file.length < 150);
+    const frame = input.manifest.frames.find(frame => frame.sectionId === artifact.sectionId);
+    const png = decodePng(readFileSync(join(input.root, frame.stillPath)));
+    const expected = encodePng(compareImages(png, png).triptych);
+    assert.deepEqual(readFileSync(join(result.outDir, artifact.file)), expected);
+  }
+  assert.equal(new Set(artifacts.map(item => readFileSync(join(result.outDir, item.file)).toString('base64'))).size, ids.length);
+  input.manifest.frames.reverse();
+  const again = runFixtureCli(input, true, 'again');
+  assert.deepEqual(again.receipt.triptychs, artifacts);
+});
+test('single frame legacy alias is exact and removed when the directory becomes multi-frame', t => {
+  const input = fixture(t, ['one', 'two']);
+  const second = input.manifest.frames.pop();
+  const single = runFixtureCli(input);
+  assert.equal(single.status, 0, single.stderr);
+  assert.equal(single.receipt.triptychs.length, 1);
+  assert.deepEqual(readFileSync(join(single.outDir, 'triptych.png')),
+    readFileSync(join(single.outDir, single.receipt.triptychs[0].file)));
+  input.manifest.frames.push(second);
+  const multi = runFixtureCli(input);
+  assert.equal(multi.status, 0, multi.stderr);
+  assert.equal(existsSync(join(multi.outDir, 'triptych.png')), false);
+});
+test('sample artifacts are explicitly synthetic and never frame references', t => {
+  const input = fixture(t);
+  input.manifest.frames[0].stillPath = 'missing.png';
+  const result = runFixtureCli(input);
+  assert.equal(result.receipt.triptychs.length, 0);
+  assert.equal(result.receipt.sample.file, 'synthetic-triptych.png');
+  assert.deepEqual(readFileSync(join(result.outDir, result.receipt.sample.file)), encodePng(syntheticComparison().triptych));
+  const comment = readFileSync(join(result.outDir, 'comment.md'), 'utf8');
+  assert.match(comment, /!\[Synthetic sample[^\]]*\]\(synthetic-triptych\.png\)/);
+  assert.doesNotMatch(comment, /This job does not block merge/);
+  assert.match(comment, /strict/i);
+});
+
+test('real CLI strict exit rejects a missing still without injected capture', t => {
+  const input = fixture(t);
+  input.manifest.frames[0].stillPath = join(input.root, 'missing.png');
+  const manifestPath = join(input.root, 'missing.json');
+  const out = join(input.root, 'real-cli');
+  writeFileSync(manifestPath, JSON.stringify(input.manifest));
+  const result = spawnSync(process.execPath, [fileURLToPath(cliModule),
+    '--manifest', manifestPath, '--out', out, '--strict'], { encoding: 'utf8', timeout: 30_000 });
+  assert.equal(result.status, 1, result.stderr);
+  const receipt = JSON.parse(readFileSync(join(out, 'receipt.json'), 'utf8'));
+  assert.equal(receipt.pass, false);
+  assert.equal(receipt.frames[0].verdict, 'waiting');
+  assert.equal(receipt.frames[0].reason, 'canonical-still-missing');
+  assert.equal(receipt.sample.kind, 'synthetic');
+});
+test('hash failures with no comparable frames cannot qualify using a passing sample', t => {
+  const input = fixture(t);
+  input.manifest.frames[0].fileHash = 'sha256:deadbeef';
+  const result = runFixtureCli(input);
+  assert.equal(result.status, 1);
+  assert.equal(result.receipt.pass, false);
+  assert.equal(result.receipt.frames[0].reason, 'file-hash-mismatch');
+  assert.equal(result.receipt.triptychs.length, 0);
+  assert.equal(result.receipt.sample.pass, true);
+});
+
+test('pen-bindings.json adapts to frames: unbound routes yield none, bound routes yield dark active frames', async () => {
+const { bindingsToStillFrames } = await import('../design/pen-bindings-lib.mjs');
+const doc = JSON.parse(readFileSync(join(import.meta.dirname, '../../docs/design-system/pen-bindings.json'), 'utf8'));
+const live = bindingsToStillFrames(doc); // `/` is bound to the 12 approved homepage v3 stills (home-canonical-v3)
+assert.deepEqual(live.map(f => f.stillPath).sort(), ['1440', '390'].flatMap(v => ['footer', 'hero', 'invite', 'profile', 'releases', 'specs'].map(s => `docs/pen-stills/home/${v}/${s}.png`)).sort());
+assert.ok(live.every(f => f.mode === 'dark' && /^sha256:[0-9a-f]{64}$/.test(f.fileHash)));
+const bound = { routes: { '/': { approved: { by: 'tim', at: '2026-11-07T00:00:00Z', receipt: 'r' }, viewports: { 1440: [{ section: 'hero', nodeId: 'N1', still: 'docs/pen-stills/home/1440/hero.png', sha256: 'a'.repeat(64) }], 390: [] } } } };
+const frames = bindingsToStillFrames(bound);
+assert.equal(frames.length, 1); assert.equal(frames[0].sectionSelector, "[data-pen-section='hero']");
+assert.equal(frames[0].fileHash, `sha256:${'a'.repeat(64)}`); assert.equal(frames[0].mode, 'dark');
+assert.equal(validateManifest({ schema: 'pen-still-manifest/v1', frames }).ok, true); });

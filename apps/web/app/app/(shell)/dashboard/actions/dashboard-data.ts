@@ -25,7 +25,6 @@ import {
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import type { DbOrTransaction } from '@/lib/db';
 import { DB_CONFIG, isRetryableError } from '@/lib/db/client/retry';
-import { getDeepErrorMessage, unwrapPgError } from '@/lib/db/errors';
 import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
 import {
   dashboardQuery,
@@ -78,6 +77,10 @@ import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { executeWithRetry } from '@/lib/resilience/primitives';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { isMissingTourDatesConfirmationStatusError } from '@/lib/tour-dates/queries';
+import {
+  degradeAvatarQualityRead,
+  isIdleTransactionTermination,
+} from './avatar-quality-degrade';
 import { mapSocialLinkExistence } from './social-link-utils';
 
 const { logger } = Sentry;
@@ -223,15 +226,6 @@ const BIO_LINK_ACTIVATION_EVENT_TYPES = [
 
 type BioLinkActivationEventType =
   (typeof BIO_LINK_ACTIVATION_EVENT_TYPES)[number];
-
-function isIdleTransactionTermination(error: unknown): boolean {
-  const { code } = unwrapPgError(error);
-  return code
-    ? code === '25P03'
-    : /terminating connection due to idle-in-transaction timeout/i.test(
-        getDeepErrorMessage(error)
-      );
-}
 
 async function buildBioLinkActivation(
   clerkUserId: string,
@@ -1029,16 +1023,7 @@ async function fetchDashboardCoreWithSession(
     const avatarQuality = await fetchAvatarQualityWithSession(
       clerkUserId,
       selected.id
-    ).catch((error: unknown) => {
-      Sentry.captureException(error, {
-        level: 'warning',
-        tags: {
-          query: 'avatar_quality',
-          context: 'dashboard_data_settled',
-        },
-      });
-      return UNKNOWN_AVATAR_QUALITY;
-    });
+    ).catch((error: unknown) => degradeAvatarQualityRead(error, selected.id));
 
     const tippingStats = await withDbSessionTx(
       async tx => fetchTippingStatsWithSession(tx, selected.id),
