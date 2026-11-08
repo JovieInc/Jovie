@@ -11,12 +11,13 @@ import {
 import { shouldSuppressCookieBannerForPathname } from '@/lib/cookies/banner-visibility';
 import type { Consent } from '@/lib/cookies/consent';
 import { isCookieBannerRequiredFromCookieString } from '@/lib/cookies/consent-regions';
-import {
-  GPC_CONFIRMATION,
-  PRIVACY_CHOICES_HREF,
-} from '@/lib/cookies/consent-state';
-import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 import { isGPCEnabled, setConsentState } from '@/lib/tracking/consent';
+
+type PrivacyHostComponent = ComponentType<{
+  readonly open: boolean;
+  readonly onOpen: () => void;
+  readonly onClose: () => void;
+}>;
 
 type CookieModalComponent = ComponentType<{
   readonly open: boolean;
@@ -54,13 +55,15 @@ export function CookieBannerMount() {
   const [Banner, setBanner] = useState<ComponentType | null>(null);
   const [Modal, setModal] = useState<CookieModalComponent | null>(null);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
-  const [Privacy, setPrivacy] = useState<ComponentType<{
-    onClose: () => void;
-  }> | null>(null);
+  const [Host, setHost] = useState<PrivacyHostComponent | null>(null);
   const [privacyOpen, setPrivacyOpen] = useState(false);
-  const [gpc, setGpc] = useState(false);
-  const pathname = usePublicPathname();
   const listenersRef = useRef(new Set<(v: unknown) => void>());
+
+  const openPrivacy = useCallback(() => {
+    setPreferencesOpen(false);
+    setPrivacyOpen(true);
+  }, []);
+  const closePrivacy = useCallback(() => setPrivacyOpen(false), []);
 
   const openPreferences = useCallback(() => {
     void import('@/components/organisms/CookieModal').then(mod => {
@@ -71,39 +74,11 @@ export function CookieBannerMount() {
   }, []);
 
   useEffect(() => {
-    setGpc(isGPCEnabled());
-    const openPrivacy = () => {
-      void import('@/components/organisms/PrivacyChoices').then(mod => {
-        setPrivacy(() => mod.PrivacyChoices);
-        setPreferencesOpen(false);
-        setPrivacyOpen(true);
-      });
-    };
-    const onHash = () => {
-      if (globalThis.location.hash === '#privacy-choices') openPrivacy();
-    };
-    const onClick = (event: MouseEvent) => {
-      if (
-        event.button !== 0 ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.shiftKey ||
-        event.altKey
-      )
-        return;
-      const link =
-        event.target instanceof Element ? event.target.closest('a') : null;
-      if (link?.getAttribute('href') !== PRIVACY_CHOICES_HREF) return;
-      event.preventDefault();
-      openPrivacy();
-    };
-    onHash();
-    document.addEventListener('click', onClick, true);
-    globalThis.addEventListener('hashchange', onHash);
-    return () => {
-      document.removeEventListener('click', onClick, true);
-      globalThis.removeEventListener('hashchange', onHash);
-    };
+    // Privacy choices (footer/menu opener, GPC card, dialog) load as their own
+    // chunk so they stay out of every route's first-load JS.
+    void import('@/components/organisms/PrivacyChoices').then(mod => {
+      setHost(() => mod.PrivacyChoicesHost);
+    });
   }, []);
 
   useEffect(() => {
@@ -160,18 +135,8 @@ export function CookieBannerMount() {
 
   return (
     <>
-      {gpc &&
-      !privacyOpen &&
-      !shouldSuppressCookieBannerForPathname(pathname) ? (
-        <aside
-          aria-label='Privacy Signal'
-          className='fixed bottom-24 left-4 right-4 z-banner max-w-85 sm:left-auto rounded-xl border border-subtle bg-surface-1 px-4 py-3 text-xs text-secondary-token shadow-card'
-        >
-          <p role='status'>{GPC_CONFIRMATION}</p>
-        </aside>
-      ) : null}
-      {Privacy && privacyOpen ? (
-        <Privacy onClose={() => setPrivacyOpen(false)} />
+      {Host ? (
+        <Host open={privacyOpen} onOpen={openPrivacy} onClose={closePrivacy} />
       ) : null}
       {Banner && !privacyOpen ? <Banner /> : null}
       {Modal ? (

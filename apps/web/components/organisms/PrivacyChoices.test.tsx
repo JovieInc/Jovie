@@ -34,14 +34,19 @@ vi.mock('next/script', () => ({
   ),
 }));
 
-function surface() {
-  return render(
+/** Renders the surface and waits for the lazily loaded privacy host. */
+async function surface() {
+  const view = render(
     <>
       <Link href='/legal/privacy#privacy-choices'>Your Privacy Choices</Link>
       <CookieBannerMount />
       <MetaPixel pixelIds={['123']} />
     </>
   );
+  await act(async () => {
+    await import('./PrivacyChoices');
+  });
+  return view;
 }
 
 beforeEach(() => {
@@ -73,7 +78,7 @@ afterEach(() => {
 
 describe('Your Privacy Choices', () => {
   it('negative control: loads the pixel by default without GPC or an opt-out', async () => {
-    surface();
+    await surface();
     expect(await screen.findByTestId('ad-pixel')).toHaveAttribute(
       'src',
       'https://connect.facebook.net/en_US/fbevents.js'
@@ -83,9 +88,9 @@ describe('Your Privacy Choices', () => {
     ).toBeNull();
   });
 
-  it('never loads the pixel for an existing first-party opt-out', () => {
+  it('never loads the pixel for an existing first-party opt-out', async () => {
     document.cookie = 'jv_tracking_consent=rejected; path=/';
-    surface();
+    await surface();
     expect(screen.queryByTestId('ad-pixel')).toBeNull();
     expect((window as Window & { fbq?: unknown }).fbq).toBeUndefined();
   });
@@ -100,7 +105,7 @@ describe('Your Privacy Choices', () => {
       'jv_cc',
       JSON.stringify({ essential: true, analytics: true, marketing: true })
     );
-    surface();
+    await surface();
     expect(
       await screen.findByText("Your browser's privacy signal is honored")
     ).toBeVisible();
@@ -115,7 +120,7 @@ describe('Your Privacy Choices', () => {
   });
 
   it('persists an opt-out and suppresses pixels immediately and after remount', async () => {
-    const first = surface();
+    const first = await surface();
     await screen.findByTestId('ad-pixel');
     fireEvent.click(screen.getByRole('link', { name: 'Your Privacy Choices' }));
     const toggle = await screen.findByRole('switch', {}, { timeout: 5000 });
@@ -133,7 +138,7 @@ describe('Your Privacy Choices', () => {
     expect(document.cookie).toContain('jv_tracking_consent=rejected');
     first.unmount();
     Object.assign(window, { fbq: undefined, _fbq: undefined });
-    surface();
+    await surface();
     expect(screen.queryByTestId('ad-pixel')).toBeNull();
     expect((window as Window & { fbq?: unknown }).fbq).toBeUndefined();
   });
@@ -143,7 +148,7 @@ describe('Your Privacy Choices', () => {
       'jv_cc',
       JSON.stringify({ essential: true, analytics: false, marketing: true })
     );
-    surface();
+    await surface();
     fireEvent.click(screen.getByRole('link', { name: 'Your Privacy Choices' }));
     fireEvent.click(await screen.findByRole('switch', {}, { timeout: 5000 }));
     await waitFor(() =>
@@ -160,7 +165,7 @@ describe('Your Privacy Choices', () => {
       configurable: true,
       value: '1',
     });
-    surface();
+    await surface();
     fireEvent.click(screen.getByRole('link', { name: 'Your Privacy Choices' }));
     const toggle = await screen.findByRole('switch', {}, { timeout: 5000 });
     expect(toggle).toBeChecked();
@@ -175,7 +180,7 @@ describe('Your Privacy Choices', () => {
       value: true,
     });
     pathname.value = '/app';
-    surface();
+    await surface();
     await waitFor(() => expect(globalThis.JVConsent).toBeDefined());
     expect(
       screen.queryByText("Your browser's privacy signal is honored")
@@ -184,7 +189,7 @@ describe('Your Privacy Choices', () => {
 
   it('keeps the local opt-out when the server save fails', async () => {
     saveConsent.mockRejectedValue(new Error('offline'));
-    surface();
+    await surface();
     fireEvent.click(screen.getByRole('link', { name: 'Your Privacy Choices' }));
     fireEvent.click(await screen.findByRole('switch', {}, { timeout: 5000 }));
     expect(await screen.findByRole('alert')).toBeVisible();
@@ -192,7 +197,7 @@ describe('Your Privacy Choices', () => {
     expect(document.cookie).toContain('jv_tracking_consent=rejected');
   });
   it('falls back to the consent cookie when localStorage is unavailable', async () => {
-    surface();
+    await surface();
     fireEvent.click(screen.getByRole('link', { name: 'Your Privacy Choices' }));
     const toggle = await screen.findByRole('switch', {}, { timeout: 5000 });
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
@@ -206,7 +211,7 @@ describe('Your Privacy Choices', () => {
 
   it('re-enables advertising only after the visitor turns opt-out off', async () => {
     document.cookie = 'jv_tracking_consent=rejected; path=/';
-    surface();
+    await surface();
     fireEvent.click(screen.getByRole('link', { name: 'Your Privacy Choices' }));
     fireEvent.click(await screen.findByRole('switch', {}, { timeout: 5000 }));
     await waitFor(() =>
@@ -220,7 +225,7 @@ describe('Your Privacy Choices', () => {
   });
 
   it('revokes an already loaded pixel when another tab opts out', async () => {
-    surface();
+    await surface();
     await screen.findByTestId('ad-pixel');
     const fbq = vi.fn();
     Object.assign(window, { fbq });
@@ -239,7 +244,7 @@ describe('Your Privacy Choices', () => {
 
   it('keeps the EU/UK consent bar and blocks pixels until a choice is made', async () => {
     document.cookie = 'jv_cc_required=1; path=/';
-    surface();
+    await surface();
     expect(
       await screen.findByTestId('cookie-banner', {}, { timeout: 5000 })
     ).toBeVisible();
