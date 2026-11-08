@@ -432,8 +432,8 @@ PATH="$DL_BIN:/usr/bin:/bin" TMPDIR="$TEST_ROOT/dl-tmp2" \
   bash "$SCAN_SCRIPT" pre-commit >"$TEST_ROOT/download-fail.output" 2>&1 \
   || status=$?
 [[ $status -ne 0 ]] || fail 'exhausted download retries must fail the scan'
-[[ "$(cat "$CURL_COUNT")" -eq 3 ]] \
-  || fail 'download must stop after exactly 3 attempts'
+[[ "$(cat "$CURL_COUNT")" -eq 5 ]] \
+  || fail 'download must stop after exactly 5 attempts'
 grep -q 'Secret scanner download failed' "$TEST_ROOT/download-fail.output" \
   || fail 'download failure must emit an explicit CI classification'
 
