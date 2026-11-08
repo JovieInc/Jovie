@@ -8089,11 +8089,11 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                            "model": spec.get("model"), "tool": "fix_red_pr", "accountPool": name},
                                           {"attempts": MAX_FIX_ATTEMPTS, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FIX_ATTEMPTS,
                                            "spend": MAX_FIX_ATTEMPTS,
-                                           "mutations": max(MAX_FIX_ATTEMPTS * 2, len(conflict_resolvers()) + 1),
+                                           "mutations": MAX_FIX_ATTEMPTS * (len(conflict_resolvers()) + 1),  # each attempt: resolvers + dispatch
                                            "leaseSeconds": host.agent_timeout + 900, "version": "lanes-v1"},
                                           {"triggerId": run_id, "correlationId": f"pr-{pr['number']}",
                                            "causationId": pr["headRefOid"]}, coordination=coordination,
-                                          min_reservation={"spend": 1, "mutations": 1})
+                                          min_reservation={"spend": 1, "mutations": 1 + (len(conflict_resolvers()) if pr.get("mergeStateStatus") == "DIRTY" else 0)})
     except Exception as error:
         # Same contract as run_issue (JOV-7191): a claim failure must leave a ledger
         # receipt instead of a worker exit the doctor can only see as spawn-exit.
