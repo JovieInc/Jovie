@@ -3,6 +3,8 @@ import {
   BOTTLENECK_FINGERPRINT,
   bottleneckIssue,
   fileBottleneckIssue,
+  PAID_PATH,
+  paidPathOrder,
   topBottleneck,
 } from '../cert-bottleneck.mjs';
 import { SURFACE_IDS } from '../prod-cert.mjs';
@@ -137,5 +139,21 @@ describe('filing the bottleneck issue', () => {
     expect(d.close).toHaveBeenCalledWith(
       expect.objectContaining({ fingerprint: BOTTLENECK_FINGERPRINT })
     );
+  });
+
+  it('works the paid path first: homepage, request access, claim, checkout', () => {
+    const order = paidPathOrder(SURFACE_IDS);
+    expect(order.slice(0, 4)).toEqual([...PAID_PATH]);
+    expect([...order].sort()).toEqual([...SURFACE_IDS].sort());
+    // Checkout red outranks onboarding red once the earlier paid steps pass.
+    const receipts = SURFACE_IDS.map(surface => ({
+      surface,
+      status: ['onboarding', 'checkout'].includes(surface)
+        ? 'failed'
+        : 'passed',
+      checks: [{ id: `${surface}-check`, status: 'failed' }],
+    }));
+    expect(topBottleneck(receipts, order)?.surface).toBe('checkout');
+    expect(topBottleneck(receipts, SURFACE_IDS)?.surface).toBe('onboarding');
   });
 });

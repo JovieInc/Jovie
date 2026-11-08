@@ -14,7 +14,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import { fileBottleneckIssue } from './lib/cert-bottleneck.mjs';
+import { fileBottleneckIssue, paidPathOrder } from './lib/cert-bottleneck.mjs';
 import {
   closeLinearIssueByFingerprint,
   remediationTriggersEnabled,
@@ -275,7 +275,7 @@ async function main() {
       JSON.stringify(
         await fileBottleneckIssue(receipts, {
           servedSha: served.sha,
-          surfaceOrder: SURFACE_IDS,
+          surfaceOrder: paidPathOrder(SURFACE_IDS),
           runUrl,
         })
       )

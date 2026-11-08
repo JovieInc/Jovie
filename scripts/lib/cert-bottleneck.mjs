@@ -3,8 +3,8 @@
  * "summer should throw agents at the top most bottleneck to certification
  * til its certified").
  *
- * The binding bottleneck is the first surface, in launch order (the order a
- * stranger walks it), that is not green. Within it, the bottleneck is the
+ * The binding bottleneck is the first surface that is not green, in paid-path
+ * order (homepage, request access, claim, checkout), then launch order. Within it, the bottleneck is the
  * first failed check, or the first blocked check when none failed. One owned
  * Linear issue carries it as Urgent, `agent-ready` and `dispatch-next`, which
  * the lane runner admits ahead of every other Urgent issue
@@ -23,6 +23,24 @@ import {
 
 export const BOTTLENECK_FINGERPRINT = 'prod-cert-bottleneck';
 export const DISPATCH_LABELS = Object.freeze(['agent-ready', 'dispatch-next']);
+
+/**
+ * The paid path (Tim, 2026-11-08: "main goal right now is driving homepage to
+ * first paid signup"). These surfaces are worked first, in this order; the
+ * rest of the Golden Path follows in launch order.
+ */
+export const PAID_PATH = Object.freeze([
+  'landing',
+  'signup-signin',
+  'claim',
+  'checkout',
+]);
+
+/** @param {readonly string[]} surfaceOrder launch order (SURFACE_IDS) */
+export function paidPathOrder(surfaceOrder) {
+  const first = PAID_PATH.filter(s => surfaceOrder.includes(s));
+  return [...first, ...surfaceOrder.filter(s => !first.includes(s))];
+}
 
 /**
  * @param {{ surface: string, status: string, checks?: { id: string, status: string, summary?: string }[] }[]} receipts
@@ -65,7 +83,7 @@ export function bottleneckIssue(bottleneck, { servedSha, runUrl = null }) {
 Served build \`${servedSha}\`. This issue is rewritten by every production certification run, so it always names the current bottleneck.
 
 ## Why it goes first
-Nothing after \`${surface}\` can certify while a stranger stops here. Tim, 2026-11-07: put the agents on the topmost bottleneck to certification until it is certified.
+Nothing after \`${surface}\` can certify while a stranger stops here. Tim, 2026-11-07: put the agents on the topmost bottleneck to certification until it is certified. Tim, 2026-11-08: the main goal is the homepage to a first paid signup, so the paid path (${PAID_PATH.join(', ')}) is worked before the rest.
 
 ## Behind it (fix after this one)
 ${behind.length ? behind.map(s => `- \`${s}\``).join('\n') : '- nothing: this is the last surface left'}
