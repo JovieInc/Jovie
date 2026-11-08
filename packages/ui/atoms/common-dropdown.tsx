@@ -261,6 +261,15 @@ export function CommonDropdown(props: CommonDropdownProps) {
     const input = rootSearchInputRef.current;
     if (!input || event.target === input) return;
     if (event.metaKey || event.ctrlKey || event.altKey) return;
+    // React bubbles keys out of portaled submenus and custom fields; only
+    // this menu's own rows hand typing to the search.
+    const target = event.target as HTMLElement;
+    if (target.closest('[role="menu"]') !== event.currentTarget) return;
+    if (
+      target.isContentEditable ||
+      target.closest('input, textarea, select, [contenteditable="true"]')
+    )
+      return;
     const isPrintable = event.key.length === 1 && event.key !== ' ';
     if (!isPrintable && event.key !== 'Backspace') return;
     event.preventDefault();

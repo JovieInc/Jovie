@@ -292,6 +292,38 @@ describe('CommonDropdown type to filter', () => {
     expect(input).toHaveValue('cha');
   });
 
+  it('leaves keys from a nested menu or a field inside a row alone', () => {
+    render(
+      <CommonDropdown
+        items={[
+          {
+            type: 'custom',
+            id: 'fields',
+            render: () => (
+              <div>
+                <input aria-label='Rename' />
+                <div role='menu' aria-label='Nested'>
+                  <div role='menuitem' tabIndex={-1}>
+                    Nested Row
+                  </div>
+                </div>
+              </div>
+            ),
+          },
+        ]}
+        open
+        searchable
+      />
+    );
+    const search = screen.getByPlaceholderText('Search...');
+
+    fireEvent.keyDown(screen.getByLabelText('Rename'), { key: 'a' });
+    fireEvent.keyDown(screen.getByText('Nested Row'), { key: 'b' });
+
+    expect(search).toHaveValue('');
+    expect(search).not.toHaveFocus();
+  });
+
   it('leaves modified shortcuts and Space alone', async () => {
     const onSelect = vi.fn();
     const user = userEvent.setup({ delay: null });
