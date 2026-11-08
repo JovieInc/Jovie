@@ -40,9 +40,7 @@ const PLAN_HIERARCHY: Record<PlanType, number> = {
   max: 2,
 };
 
-/**
- * Result of a proration preview
- */
+/** Result of a proration preview */
 export interface ProrationPreview {
   /** Amount to be charged/credited immediately (in cents) */
   immediateAmount: number;
@@ -74,9 +72,7 @@ export interface ProrationPreview {
   }>;
 }
 
-/**
- * Options for previewing a plan change
- */
+/** Options for previewing a plan change */
 export interface PreviewPlanChangeOptions {
   /** Stripe customer ID */
   customerId: string;
@@ -86,9 +82,7 @@ export interface PreviewPlanChangeOptions {
   lockedPrice?: LockedCheckoutExpectation;
 }
 
-/**
- * Options for executing a plan change
- */
+/** Options for executing a plan change */
 export interface ExecutePlanChangeOptions {
   /** Stripe subscription ID */
   subscriptionId: string;
@@ -100,9 +94,7 @@ export interface ExecutePlanChangeOptions {
   prorate?: boolean;
 }
 
-/**
- * Result of executing a plan change
- */
+/** Result of executing a plan change */
 export interface PlanChangeResult {
   success: boolean;
   subscription?: Stripe.Subscription;
@@ -147,9 +139,7 @@ function withSubscriptionPeriod(
   };
 }
 
-/**
- * Get the active subscription for a customer
- */
+/** Get the active subscription for a customer */
 export async function getActiveSubscription(
   customerId: string
 ): Promise<SubscriptionWithPeriod | null> {

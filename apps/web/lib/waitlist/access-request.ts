@@ -79,9 +79,8 @@ export interface WaitlistAccessRequestInput {
   readonly data: WaitlistRequestPayload;
   readonly source?: string;
   /**
-   * Free-text answers from the qualifying onboarding interview. When
-   * provided, they are scored deterministically; admission still requires
-   * the server-derived golden-path decision and an atomic capacity slot.
+   * Interview answers, scored deterministically; admission still requires the
+   * server-derived golden-path decision and an atomic capacity slot.
    */
   readonly interviewResponses?: InterviewResponses;
   /**
@@ -727,14 +726,9 @@ export async function submitWaitlistAccessRequest(
   if (result.approval) {
     await finalizeWaitlistApproval(result.approval);
   } else if (result.outcome === 'already_accepted' && statusActuallyChanged) {
-    // The DB already reflects approval (entry status is claimed/invited and
-    // userStatus is now waitlist_approved), but the proxy-state Redis cache
-    // may still be holding a stale waitlist_pending entry from a prior
-    // /waitlist visit. Mirror the normal-approval invalidation so middleware
-    // doesn't keep redirecting the user back to /waitlist.
-    //
-    // Only bust the cache when the userStatus row actually changed; otherwise
-    // we'd thrash the cache on every idempotent re-assert.
+    // The DB reflects approval, but the proxy-state Redis cache may hold a
+    // stale waitlist_pending entry; bust it (only when userStatus changed) so
+    // middleware stops redirecting the user back to /waitlist.
     await invalidateProxyUserStateCache(input.appUserId).catch(error => {
       logger.warn(
         '[waitlist] Failed to invalidate proxy state on already_accepted',
@@ -770,8 +764,7 @@ export async function submitWaitlistAccessRequest(
     });
   }
 
-  // Price lock: joining the waitlist locks the price they are shown (a no-op
-  // when sign-up already locked it). Never fails the join.
+  // Price lock on waitlist join (no-op if sign-up locked it; never fails it).
   if (input.appUserId && !suppressCanaryCommunications) {
     await ensurePriceLockForUserSafely(input.appUserId, 'waitlist');
   }

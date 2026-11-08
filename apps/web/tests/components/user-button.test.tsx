@@ -110,8 +110,7 @@ const mockUsePathname = vi.mocked(usePathname);
 const mockUseDesktopUpdateContext = vi.mocked(useDesktopUpdateContext);
 
 const originalLocation = window.location;
-// No list-price fallback: the CTA carries no price until the person's own
-// (possibly locked) price has loaded.
+// No list-price fallback: no price until the person's own price loads.
 const UPGRADE_CTA = 'Get Verified';
 
 describe('UserButton billing actions', () => {

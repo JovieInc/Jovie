@@ -1,7 +1,5 @@
 /**
- * TanStack Query hooks and utilities.
- *
- * This module provides centralized query hooks for data fetching with:
+ * TanStack Query hooks and utilities: centralized query hooks with:
  * - Automatic caching and background refetching
  * - Request deduplication
  * - Optimistic updates support

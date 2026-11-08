@@ -1,9 +1,4 @@
-/**
- * Database Schema - Explicit Named Re-exports
- *
- * This file re-exports all schema definitions from domain-focused modules
- * using explicit named exports for deterministic tree-shaking.
- */
+/** Database schema: named re-exports of the domain modules (tree-shakable). */
 
 // Pixel Tracking (Events, Creator Configs)
 export {
