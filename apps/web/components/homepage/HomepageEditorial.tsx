@@ -23,6 +23,7 @@ import './v3/chapters.css';
 import './v3/specs.css';
 import './v3/form.css';
 import './v3/responsive.css';
+import './v3/cinema.css';
 
 const OWNER = 'apps/web/components/homepage/HomepageEditorial.tsx';
 const COPY = HOMEPAGE_EDITORIAL_COPY;
