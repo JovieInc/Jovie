@@ -30,7 +30,15 @@ const {
   mockRefreshProofStats,
   mockRunReleaseEmailCanary,
   mockGetReleaseEmailCanaryStatus,
+  mockProcessLeadBatch,
+  mockRunDiscovery,
+  mockLeadSettingsRows,
+  mockUnqualifiedLeadRows,
 } = vi.hoisted(() => ({
+  mockProcessLeadBatch: vi.fn(),
+  mockRunDiscovery: vi.fn(),
+  mockLeadSettingsRows: { current: [] as Record<string, unknown>[] },
+  mockUnqualifiedLeadRows: { current: [] as { id: string }[] },
   mockRunReleaseEmailCanary: vi.fn(),
   mockGetReleaseEmailCanaryStatus: vi.fn(),
   mockDbExecute: vi.fn(),
@@ -159,7 +167,7 @@ vi.mock('@/lib/leads/outreach-batch', () => ({
 
 vi.mock('@/lib/leads/discovery', () => ({
   resetBudgetIfNeeded: mockResetBudgetIfNeeded,
-  runDiscovery: vi.fn(),
+  runDiscovery: mockRunDiscovery,
 }));
 
 vi.mock('@/lib/leads/pipeline-logger', () => ({
@@ -167,7 +175,7 @@ vi.mock('@/lib/leads/pipeline-logger', () => ({
 }));
 
 vi.mock('@/lib/leads/process-batch', () => ({
-  processLeadBatch: vi.fn(),
+  processLeadBatch: mockProcessLeadBatch,
 }));
 
 vi.mock('@/lib/notifications/suppression', () => ({
@@ -215,17 +223,33 @@ describe('GET /api/cron/frequent', () => {
     vi.setSystemTime(new Date('2026-03-24T10:15:00.000Z'));
 
     mockDbExecute.mockResolvedValue(undefined);
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
+    mockLeadSettingsRows.current = [
+      {
+        enabled: true,
+        discoveryEnabled: false,
+      },
+    ];
+    mockUnqualifiedLeadRows.current = [];
+    // The `leads` table mock is the only one with a `status` column; every
+    // other select in the route reads the pipeline settings row.
+    mockDbSelect.mockImplementation(() => ({
+      from: vi.fn((table: unknown) => ({
         where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([
-            {
-              enabled: true,
-              discoveryEnabled: false,
-            },
-          ]),
+          limit: vi
+            .fn()
+            .mockImplementation(async () =>
+              typeof table === 'object' && table !== null && 'status' in table
+                ? mockUnqualifiedLeadRows.current
+                : mockLeadSettingsRows.current
+            ),
         }),
-      }),
+      })),
+    }));
+    mockProcessLeadBatch.mockResolvedValue({
+      total: 0,
+      qualified: 0,
+      disqualified: 0,
+      error: 0,
     });
     mockDbInsert.mockReturnValue({
       values: vi.fn().mockReturnValue({
@@ -426,6 +450,83 @@ describe('GET /api/cron/frequent', () => {
       undefined,
       { includeExecution: false }
     );
+  });
+
+  it('qualifies admin-added leads while discovery is off', async () => {
+    mockUnqualifiedLeadRows.current = [{ id: 'lead-manual-1' }];
+    mockProcessLeadBatch.mockResolvedValue({
+      total: 1,
+      qualified: 1,
+      disqualified: 0,
+      error: 0,
+    });
+    const { GET } = await import('@/app/api/cron/frequent/route');
+
+    const response = await GET(
+      new Request('http://localhost/api/cron/frequent', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    // Discovery (SerpAPI spend) stays behind its own flag.
+    expect(mockRunDiscovery).not.toHaveBeenCalled();
+    expect(mockResetBudgetIfNeeded).not.toHaveBeenCalled();
+    expect(mockProcessLeadBatch).toHaveBeenCalledWith(['lead-manual-1']);
+    // Auto-approve still applies its own caps (daily limit, fit threshold).
+    expect(mockRunAutoApprove).toHaveBeenCalledWith(
+      expect.objectContaining({ enabled: true, discoveryEnabled: false })
+    );
+    expect(data.results.leadDiscovery).toMatchObject({
+      success: true,
+      data: {
+        discovery: { skipped: true, reason: 'discovery_disabled' },
+        qualification: { total: 1, qualified: 1 },
+      },
+    });
+  });
+
+  it('qualifies leftover leads even when discovery finds nothing new', async () => {
+    mockLeadSettingsRows.current = [{ enabled: true, discoveryEnabled: true }];
+    mockRunDiscovery.mockResolvedValue({
+      queriesUsed: 1,
+      newLeadsFound: 0,
+      candidatesProcessed: 3,
+      budgetRemaining: 9,
+    });
+    mockUnqualifiedLeadRows.current = [{ id: 'lead-retry-1' }];
+    const { GET } = await import('@/app/api/cron/frequent/route');
+
+    await GET(
+      new Request('http://localhost/api/cron/frequent', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+
+    expect(mockRunDiscovery).toHaveBeenCalledOnce();
+    expect(mockProcessLeadBatch).toHaveBeenCalledWith(['lead-retry-1']);
+  });
+
+  it('does not qualify or auto-approve while the lead pipeline is disabled', async () => {
+    mockLeadSettingsRows.current = [{ enabled: false, discoveryEnabled: true }];
+    mockUnqualifiedLeadRows.current = [{ id: 'lead-manual-1' }];
+    const { GET } = await import('@/app/api/cron/frequent/route');
+
+    const response = await GET(
+      new Request('http://localhost/api/cron/frequent', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+    const data = await response.json();
+
+    expect(mockRunDiscovery).not.toHaveBeenCalled();
+    expect(mockProcessLeadBatch).not.toHaveBeenCalled();
+    expect(mockRunAutoApprove).not.toHaveBeenCalled();
+    expect(data.results.leadDiscovery).toEqual({
+      success: true,
+      data: { skipped: true, reason: 'pipeline_disabled' },
+    });
   });
 
   it('runs notification scheduling and sending on every 15-minute invocation', async () => {
