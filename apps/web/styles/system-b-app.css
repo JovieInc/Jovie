@@ -832,11 +832,12 @@
     color-mix(in oklab, var(--color-focus-ring) 35%, transparent);
 }
 
+/* Selection is a quiet fill, never a box: an inset ring on every selected
+ * row read as a hard bordered rectangle (Linear-precision bar, founder
+ * 2026-11-08). The ring is reserved for keyboard focus above. */
 :where(.system-b-table-row-selected),
 :where(.system-b-table-selection-selected) {
   background: var(--color-row-selected);
-  box-shadow: inset 0 0 0 1px
-    color-mix(in oklab, var(--color-focus-ring) 24%, transparent);
 }
 
 :where(.system-b-table-row-selected):hover,

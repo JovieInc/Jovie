@@ -713,7 +713,11 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(
       within(toolbar).getByRole('button', { name: 'Add Profile Or Site' })
     ).toBeInTheDocument();
-    expect(within(toolbar).getByText('Profiles')).toBeInTheDocument();
+    // The shell header names the page; the toolbar never repeats the title.
+    expect(within(toolbar).queryByText('Profiles')).not.toBeInTheDocument();
+    expect(
+      within(toolbar).getByTestId('profiles-workspace-count')
+    ).toHaveTextContent(/^\d+ profiles?$/);
     expect(
       screen.getByTestId('registered-header-actions')
     ).toBeEmptyDOMElement();

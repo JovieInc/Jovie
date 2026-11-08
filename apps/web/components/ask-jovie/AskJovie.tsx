@@ -217,7 +217,10 @@ export function AskJovieMark({ variant = 'jovie' }: AskJovieMarkProps) {
           aria-label='Ask Jovie'
           data-testid='ask-jovie-trigger'
           className={cn(
-            'ask-jovie-mark group flex h-7 items-center gap-1.5 rounded-md px-1',
+            // -ml-1 cancels px-1 so the mark's left edge sits on the 12px
+            // sidebar icon column, like the admin workspace switcher.
+            'ask-jovie-mark group -ml-1 flex h-7 items-center gap-1.5 rounded-md px-1',
+            'group-data-[collapsible=icon]:ml-0',
             'text-sidebar-item-foreground opacity-60',
             'transition-opacity duration-subtle hover:opacity-100 focus-visible:opacity-100',
             'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30'

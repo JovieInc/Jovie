@@ -53,9 +53,42 @@ describe('PresenceIdentityPhoto', () => {
     const photo = getByTestId('presence-identity-photo');
     expect(photo).toHaveAttribute('data-photo-kind', 'generic');
     expect(photo.querySelector('img')).toBeNull();
+    // No artist monogram stands in for the platform on a compact row.
+    expect(getByTestId('presence-identity-platform-mark')).toBeInTheDocument();
+    expect(photo).not.toHaveTextContent('T');
     expect(photo).toHaveAttribute(
       'aria-label',
       'No profile photo for Tim on Tidal'
     );
+  });
+
+  it('keeps a verified portrait on the compact row', () => {
+    const { getByTestId, queryByTestId } = render(
+      <PresenceIdentityPhoto
+        size='sm'
+        artistName='Tim White'
+        subject={{
+          kind: 'dsp',
+          platform: 'spotify',
+          label: 'Spotify',
+          handle: null,
+          url: 'https://open.spotify.com/artist/1',
+          monitoringState: 'active',
+          identityPhoto: {
+            url: 'https://i.scdn.co/image/portrait.jpg',
+            source: 'connector',
+            kind: 'profile',
+            verified: true,
+            observedAt: null,
+            freshness: 'unknown',
+          },
+        }}
+      />
+    );
+    expect(getByTestId('presence-identity-photo')).toHaveAttribute(
+      'data-photo-kind',
+      'profile'
+    );
+    expect(queryByTestId('presence-identity-platform-mark')).toBeNull();
   });
 });

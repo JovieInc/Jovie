@@ -65,18 +65,37 @@ for (const theme of ['dark', 'light']) {
     await expect(nav.locator('[data-sidebar-history-header]')).toContainText(
       'Today'
     );
+    // The header owns the bell and search here, so New Chat is a labeled
+    // 28px row in the create section, never a lone "+" in an empty slot.
+    await expect(nav.locator('[data-sidebar-search-slot]')).toHaveCount(0);
     await expect(
-      nav.locator('[data-sidebar-search-slot] [aria-label="New Chat"]')
-    ).toHaveCount(1);
-    await expect(
-      nav.locator('[data-sidebar-search-slot] [aria-label="New Chat"]')
+      nav.locator('[data-nav-section="create"]').getByRole('link', {
+        name: 'New Chat',
+      })
     ).toHaveCount(1);
     await expect(
       nav.getByRole('button', { name: 'Filter Unread Chats' })
     ).toHaveCount(0);
     const box = await create.boundingBox();
-    expect(box!.width).toBe(24);
-    expect(box!.height).toBe(24);
+    expect(box!.height).toBe(28);
+    // One optical column: the brand mark, New Chat and every nav icon share
+    // the 12px sidebar inset (Pen shell, docs/design-system/shell-ia.md).
+    const column = await page.evaluate(() => {
+      const left = (el: Element | null | undefined) =>
+        el ? Math.round(el.getBoundingClientRect().left) : null;
+      const rail = document.querySelector('[data-shell-rail-motion="left"]');
+      const railLeft = left(rail) ?? 0;
+      const brand = document.querySelector('[data-sidebar-brand-row] svg');
+      const icons = Array.from(
+        document.querySelectorAll(
+          'nav[aria-label="Dashboard Navigation"] a[data-navigation-item-id]'
+        )
+      ).map(row => (left(row.querySelector('svg')) ?? 0) - railLeft);
+      return { brand: (left(brand) ?? 0) - railLeft, icons };
+    });
+    expect(column.icons.length).toBeGreaterThan(0);
+    for (const icon of column.icons) expect(icon).toBe(12);
+    expect(column.brand).toBe(12);
     await create.focus();
     await expect(create).toBeFocused();
     expect(await footer.boundingBox()).toEqual(before);
@@ -412,12 +431,15 @@ for (const history of ['composed-history', 'composed-empty-history']) {
         element.dataset.mountReceipt = 'original';
       });
       const expanded = await readSidebarAnchors(page);
+      // Shell canon: the header row owns the bell and search, so New Chat
+      // is the one labeled row in the create section, in both rail modes.
       const headingAction = nav.locator(
-        '[data-sidebar-search-slot] [aria-label="New Chat"]'
+        '[data-nav-section="create"] [data-navigation-item-id="chat"]'
       );
       await expect(headingAction).toHaveCount(1);
       await expect(create).toHaveCount(1);
-      await expect(nav.getByText('New Chat', { exact: true })).toHaveCount(0);
+      await expect(create).toContainText('New Chat');
+      await expect(nav.locator('[data-sidebar-search-slot]')).toHaveCount(0);
       await expect(
         nav.getByRole('button', { name: 'Filter Unread Chats' })
       ).toHaveCount(0);
@@ -425,8 +447,7 @@ for (const history of ['composed-history', 'composed-empty-history']) {
         history === 'composed-history' ? 1 : 0
       );
       const box = await create.boundingBox();
-      expect(box!.width).toBe(24);
-      expect(box!.height).toBe(24);
+      expect(box!.height).toBe(28);
       await page.screenshot({
         path: testInfo.outputPath(`${history}-${theme}-expanded.png`),
       });
@@ -437,7 +458,11 @@ for (const history of ['composed-history', 'composed-empty-history']) {
         element.addEventListener(
           'click',
           event => {
-            if ((event.target as Element).closest('[aria-label="New Chat"]')) {
+            if (
+              (event.target as Element).closest(
+                '[data-navigation-item-id="chat"]'
+              )
+            ) {
               event.preventDefault();
               element.dataset.creationCount = String(
                 Number(element.dataset.creationCount) + 1
@@ -457,9 +482,7 @@ for (const history of ['composed-history', 'composed-empty-history']) {
           .getByRole('button', { name: 'Collapse sidebar', exact: true })
           .click();
         await expect(create).toHaveCount(1);
-        await expect(
-          nav.locator('[data-sidebar-search-slot] [aria-label="New Chat"]')
-        ).toHaveCount(1);
+        await expect(headingAction).toHaveCount(1);
         expectStableSidebar(expanded, await readSidebarAnchors(page));
         if (cycle === 0)
           await page.screenshot({
@@ -508,9 +531,7 @@ for (const history of ['composed-history', 'composed-empty-history']) {
       await expect(
         page.getByRole('button', { name: 'Expand sidebar', exact: true })
       ).toBeVisible();
-      await expect(
-        nav.locator('[data-sidebar-search-slot] [aria-label="New Chat"]')
-      ).toHaveCount(1);
+      await expect(headingAction).toHaveCount(1);
       await expect(draft).toHaveValue('Preserve this campaign draft');
     });
   }
@@ -529,7 +550,7 @@ test('mobile history keeps direct creation access in a short drawer', async ({
   await expect(create).toHaveCount(1);
   await expect(create).toHaveAttribute('href', '/app/chat');
   await expect(
-    nav.locator('[data-sidebar-search-slot] [aria-label="New Chat"]')
+    nav.locator('[data-nav-section="create"] [data-navigation-item-id="chat"]')
   ).toHaveCount(1);
   await create.focus();
   await expect(create).toBeFocused();

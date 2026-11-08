@@ -62,6 +62,10 @@ export function PresenceIdentityPhoto({
       : photo
   );
   const showVerified = photo.verified && photo.kind === 'profile';
+  // A compact row with no portrait shows where the profile lives, not the
+  // artist's initials: every row of one artist would otherwise read as the
+  // same "TW" monogram (Pen OMrP0: each row carries its platform mark).
+  const compactPlatformMark = size === 'sm' && photo.kind !== 'profile';
 
   return (
     <span
@@ -74,15 +78,31 @@ export function PresenceIdentityPhoto({
       data-photo-verified={showVerified ? 'true' : 'false'}
       data-photo-freshness={photo.freshness}
     >
-      <Avatar
-        key={`${photo.url ?? 'missing'}:${photo.observedAt ?? ''}`}
-        src={size !== 'sm' || photo.kind === 'profile' ? photo.url : null}
-        alt='' // The source-aware outer frame owns the accessible identity.
-        name={entityName}
-        size={size}
-        shape={size === 'sm' || photo.kind !== 'generic' ? 'person' : 'artwork'}
-        verified={false}
-      />
+      {compactPlatformMark ? (
+        <span
+          aria-hidden
+          data-testid='presence-identity-platform-mark'
+          className='inline-flex h-5 w-5 items-center justify-center rounded-full bg-surface-2 text-secondary-token'
+        >
+          <SocialIcon
+            platform={subject.platform}
+            className='h-3 w-3'
+            aria-hidden
+          />
+        </span>
+      ) : (
+        <Avatar
+          key={`${photo.url ?? 'missing'}:${photo.observedAt ?? ''}`}
+          src={size !== 'sm' || photo.kind === 'profile' ? photo.url : null}
+          alt='' // The source-aware outer frame owns the accessible identity.
+          name={entityName}
+          size={size}
+          shape={
+            size === 'sm' || photo.kind !== 'generic' ? 'person' : 'artwork'
+          }
+          verified={false}
+        />
+      )}
       {size !== 'sm' ? (
         <ProviderBadge platform={subject.platform} label={platformLabel} />
       ) : null}
