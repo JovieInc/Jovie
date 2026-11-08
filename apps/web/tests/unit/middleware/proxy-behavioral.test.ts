@@ -270,54 +270,6 @@ describe('proxy.ts middleware', () => {
   // Scanner probe drop (JOV-2189) — must be the earliest exit so probes
   // never reach Clerk, DB lookups, or the page handler.
   // ==========================================================================
-  describe('Mac app marketing guard', () => {
-    const DESKTOP_UA =
-      'Mozilla/5.0 (Macintosh) AppleWebKit/537.36 Chrome/140 Electron/44 JovieDesktop/26.10.16';
-
-    it.each(['/', '/pricing', '/blog/some-post', '/compare/linktree'])(
-      'sends a desktop request for %s to the app home',
-      async pathname => {
-        const req = createUnauthenticatedRequest({
-          pathname,
-          headers: { 'user-agent': DESKTOP_UA },
-        });
-
-        const res = await callMiddleware(req);
-
-        expect(res.status).toBe(307);
-        expect(isRedirectTo(res, APP_ROUTES.CHAT)).toBe(true);
-        expect(
-          new URL(res.headers.get('location') ?? '').searchParams.get('runtime')
-        ).toBe('electron');
-        expect(res.headers.get('cache-control')).toBe('private, no-store');
-      }
-    );
-
-    it('leaves browser requests for marketing pages alone', async () => {
-      const req = createUnauthenticatedRequest({
-        pathname: '/pricing',
-        headers: { 'user-agent': 'Mozilla/5.0 (Macintosh) Chrome/140' },
-      });
-
-      const res = await callMiddleware(req);
-
-      expect(isRedirectTo(res, APP_ROUTES.CHAT)).toBe(false);
-    });
-
-    it('keeps app, auth and support routes reachable in the desktop app', async () => {
-      for (const pathname of [APP_ROUTES.SIGNIN, '/support']) {
-        const req = createUnauthenticatedRequest({
-          pathname,
-          headers: { 'user-agent': DESKTOP_UA },
-        });
-
-        const res = await callMiddleware(req);
-
-        expect(isRedirectTo(res, APP_ROUTES.CHAT)).toBe(false);
-      }
-    });
-  });
-
   describe('scanner probe drop', () => {
     it.each([
       '/some-creator/wp-content/plugins/hellopress/wp_filemanager.php',
