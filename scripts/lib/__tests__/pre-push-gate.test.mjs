@@ -15,6 +15,18 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { buildAffectedTestPlan } from '../../run-affected-tests.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
+
+function sourcedSecurityHelpers() {
+  const scanner = readFileSync(
+    resolve(repoRoot, 'scripts/security/scan-secrets.sh'),
+    'utf8'
+  );
+  return [
+    ...scanner.matchAll(
+      /^(?:\.|source) "\$REPO_ROOT\/(scripts\/security\/[^"]+)"/gm
+    ),
+  ].map(match => match[1]);
+}
 const resolverPath = resolve(repoRoot, 'scripts/hooks/resolve-repo-node.sh');
 const pinnedVersion = readFileSync(resolve(repoRoot, '.nvmrc'), 'utf8').trim();
 const gate = readFileSync(
@@ -77,6 +89,7 @@ describe('resolve-repo-node.sh', () => {
         PATH: `${nodeBin}:/usr/bin:/bin`,
         NVM_DIR: nvmRoot,
         HOME: nvmRoot,
+        JOVIE_NODE_AUTOFETCH: '0',
       },
     });
     return { nvmRoot, result };
@@ -265,7 +278,7 @@ describe('publication range failures', () => {
       'scripts/hooks/resolve-repo-node.sh',
       'scripts/hooks/biome-pre-push.sh',
       'scripts/security/scan-secrets.sh',
-      'scripts/security/fetch-scanner.sh',
+      ...sourcedSecurityHelpers(),
       'scripts/security/scanner-pins.txt',
       'biome.json',
       '.nvmrc',
@@ -377,6 +390,9 @@ describe('publication range failures', () => {
     expect(f.scanLog()).toContain('trufflehog');
     expect(f.scanLog()).toContain('candidate.txt');
     expect(f.scanLog()).not.toContain('seed.txt');
+    expect(sourcedSecurityHelpers()).toContain(
+      'scripts/security/fetch-scanner.sh'
+    );
   });
 
   it('accepts a verified empty range without confusing it with failed enumeration', () => {

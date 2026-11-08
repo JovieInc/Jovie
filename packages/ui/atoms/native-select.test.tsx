@@ -143,4 +143,25 @@ describe('NativeSelect certificate evidence', () => {
     });
     expect(screen.getByLabelText('Bare status')).toHaveValue('live');
   });
+
+  it('announces the error once and puts the asterisk at the inline end', () => {
+    const { container } = render(
+      <NativeSelect
+        options={OPTIONS}
+        label='Release status'
+        error='Choose a status'
+        required
+      />
+    );
+
+    const errorSlot = container.querySelector(
+      '[data-slot="native-select-error-slot"]'
+    );
+    // Deliberate-red: an aria-live wrapper around role=alert announced twice.
+    expect(errorSlot).not.toHaveAttribute('aria-live');
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    const asterisk = container.querySelector('label [aria-hidden="true"]');
+    expect(asterisk?.className).toContain('ms-1');
+    expect(asterisk?.className).not.toContain('ml-1');
+  });
 });

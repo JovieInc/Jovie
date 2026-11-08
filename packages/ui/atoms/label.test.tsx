@@ -162,6 +162,19 @@ describe('Label', () => {
       expect(label).toHaveAttribute('data-custom', 'value');
     });
   });
+
+  it('places the required asterisk with a logical margin for RTL', () => {
+    render(
+      <Label required data-testid='label'>
+        Email
+      </Label>
+    );
+    const asterisk = screen
+      .getByTestId('label')
+      .querySelector('span[aria-hidden]');
+    expect(asterisk).toHaveClass('ms-1');
+    expect(asterisk).not.toHaveClass('ml-1');
+  });
 });
 
 describe('Label certificate evidence', () => {

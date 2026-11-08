@@ -124,8 +124,9 @@ describe('WaitlistRoleForm', () => {
       email: 'person@example.com',
     });
     expect(
-      screen.getByRole('heading', { level: 3, name: 'Request received' })
+      screen.getByRole('heading', { level: 3, name: "You're on the list" })
     ).toBeVisible();
+    expect(confirmation).toHaveTextContent('person@example.com');
   });
 
   it('requires a useful name on the general form before sending a join', async () => {
@@ -221,7 +222,11 @@ describe('WaitlistRoleForm', () => {
       target: { value: 'person@example.com' },
     });
     fireEvent.submit(screen.getByTestId('waitlist-role-form'));
-    expect(screen.getByRole('button')).toBeDisabled();
+    // Submitting keeps the button and email field focusable (aria-disabled,
+    // readOnly) instead of native disabled, so focus is not dropped.
+    expect(screen.getByRole('button')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button')).not.toBeDisabled();
+    expect(screen.getByLabelText('Email address')).toHaveAttribute('readonly');
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15_000);
     });
@@ -276,6 +281,19 @@ describe('WaitlistRoleForm', () => {
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.queryByTestId('turnstile-mock')).toBeNull();
     expect(screen.getByTestId('waitlist-role-form')).toHaveAttribute('inert');
+  });
+
+  it('asks for a full email instead of sending one without a domain', () => {
+    render(<WaitlistRoleForm />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Artist' }));
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'person@gmail' },
+    });
+    fireEvent.submit(screen.getByTestId('waitlist-role-form'));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Enter a full email address, like name@example.com.'
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('keeps the input and shows the server error on failure', async () => {

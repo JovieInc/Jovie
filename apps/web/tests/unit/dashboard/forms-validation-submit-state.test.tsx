@@ -141,7 +141,9 @@ describe('dashboard form validation consolidation', () => {
     const submitButton = container.querySelector('button[type="submit"]');
     expect(submitButton).toHaveAttribute('data-state', 'loading');
     expect(submitButton).toHaveAttribute('aria-busy', 'true');
-    expect(submitButton).toBeDisabled();
+    // Loading keeps focus: aria-disabled blocks the submit, not native disabled.
+    expect(submitButton).toHaveAttribute('aria-disabled', 'true');
+    expect(submitButton).not.toBeDisabled();
     expect(screen.getByText('Update Profile')).toBeInTheDocument();
   });
 

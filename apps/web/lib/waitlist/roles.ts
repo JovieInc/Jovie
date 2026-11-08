@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 /**
  * Roles the closed-signup waitlist form asks for (canon/PRODUCT.md,
  * 2026-11-02). Stored on `waitlist_entries.qualification_inputs.role`, so no
@@ -31,12 +29,6 @@ export type WaitlistRole = (typeof ALL_WAITLIST_ROLES)[number]['value'];
 export const WAITLIST_ROLE_VALUES = [
   ...new Set(ALL_WAITLIST_ROLES.map(role => role.value)),
 ] as [WaitlistRole, ...WaitlistRole[]];
-
-export const waitlistRoleSchema = z.enum(WAITLIST_ROLE_VALUES);
-
-export function isWaitlistRole(value: unknown): value is WaitlistRole {
-  return waitlistRoleSchema.safeParse(value).success;
-}
 
 export function getWaitlistRoleLabel(role: string): string {
   return (

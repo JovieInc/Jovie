@@ -103,6 +103,8 @@
   },
   "waivers": {
     "packages/ui/atoms/avatar.tsx": {
+      "loading": "While a composed AvatarImage loads, the avatar shows its AvatarFallback in the same frame, which the Default and ImageFailure stories show; a static story cannot hold an image request in flight, so avatar.composed.test.tsx covers the loading swap.",
+      "offline": "Avatar never fetches or mutates; lost connectivity reaches it only as an image that fails to load, which the ImageFailure story shows.",
       "permission-denied": "Avatar only renders an identity image or initials and has no gated action or permission input; the detector matched role='img' on the fallback and presence dot."
     },
     "packages/ui/atoms/button.tsx": {
@@ -201,6 +203,39 @@
     },
     "apps/web/components/features/auth/AuthOfferSummary.tsx": {
       "permission-denied": "The recap has no permission input or gated action; the detector matched the pricing plan. Sign-in for an existing subscriber is shown by SignInContinue."
+    },
+    "apps/web/components/atoms/BrandLogo.tsx": {
+      "permission-denied": "BrandLogo only draws the brand mark and has no permission input or gated action; the detector matched role='img' on the svg."
+    },
+    "apps/web/components/features/tracking/AcquisitionCapture.tsx": {
+      "error": "AcquisitionCapture renders no markup; a failed acquisition request or blocked storage is swallowed by design and shows nothing, which AcquisitionCapture.test.tsx covers."
+    },
+    "apps/web/components/molecules/CookieActions.tsx": {
+      "empty": "CookieActions always renders the same three consent buttons (Reject all, Accept all, Customize) and takes no collection; the detector matched the items-center class.",
+      "partial": "Its three handlers are required and its optional props (className, disabled, compact) are presentation flags with defaults, so there is no partially present data; Compact, Standard and Disabled show them.",
+      "long-content": "The three button labels are fixed consent copy with no props or caller text, so the content cannot grow; the detector matched text in the --linear-text-primary token and a layout comment."
+    },
+    "apps/web/components/organisms/CookieBannerSection.tsx": {
+      "partial": "The card always shows the same fixed consent message and three actions; its two optional props are a test-only pathname override and the server-resolved visibility flag, so no content can be partially present.",
+      "long-content": "The consent message, Privacy link and action labels are fixed copy with no props or user text, so the card's content cannot grow; the detector matched the aria-label and the text-* utility classes."
+    },
+    "apps/web/components/organisms/CookieModal.tsx": {
+      "empty": "The dialog maps over the fixed COOKIE_CATEGORIES constant (Essential, Analytics, Marketing), which is never empty, so there is no empty-data state.",
+      "long-content": "Every category label, description and button in the dialog is fixed copy from module constants with no props or user text, so its content cannot grow."
+    },
+    "apps/web/components/feedback/Banner.tsx": {
+      "permission-denied": "Banner only renders caller-supplied status copy with an optional action and dismiss, and has no gated action or permission input; the detector matched role='alert' and role='status' on its live region."
+    },
+    "apps/web/components/atoms/VerifiedBadge.tsx": {
+      "partial": "VerifiedBadge takes no data; its only optional props are size and className, both styling with defaults, and its glyph and accessible name are fixed, so nothing can be partially present.",
+      "permission-denied": "VerifiedBadge is a static verification mark with no gated action or permission input; the detector matched role='img' on its wrapper."
+    },
+    "apps/web/components/atoms/SocialIcon.tsx": {
+      "long-content": "SocialIcon draws one fixed 24x24 glyph and lays out no text; its only string input, aria-label, is announced rather than rendered, so there is no content to overflow.",
+      "permission-denied": "SocialIcon only draws a platform glyph and has no gated action or permission input; the detector matched role='img' on the labelled svg."
+    },
+    "apps/web/components/shell/Tooltip.tsx": {
+      "empty": "The shell Tooltip wraps exactly one trigger with a required label and takes no collection; the detector matched the word rows in comments about sidebar nav rows."
     }
   }
 }

@@ -117,6 +117,11 @@ describe('WaitlistRoleForm request-access questions', () => {
       expect(screen.getByTestId('waitlist-role-form-joined')).toBeVisible()
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('waitlist-role-form-joined')).toHaveTextContent(
+      "You're on the list" +
+        "We'll email maya@example.com when your invite is ready." +
+        'Your request is for Maya Vale.'
+    );
     expect(sentBody()).toMatchObject({
       email: 'maya@example.com',
       role: 'artist',
@@ -139,6 +144,9 @@ describe('WaitlistRoleForm request-access questions', () => {
     await waitFor(() =>
       expect(screen.getByTestId('waitlist-role-form-joined')).toBeVisible()
     );
+    expect(
+      screen.queryByTestId('waitlist-role-form-joined-artist')
+    ).not.toBeInTheDocument();
     const body = sentBody();
     expect(body).toMatchObject({ email: 'maya@example.com', role: 'artist' });
     expect(body).not.toHaveProperty('spotifyArtistId');
@@ -256,5 +264,41 @@ describe('WaitlistRoleForm request-access questions', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Challenge expired.');
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Challenge expired.');
+  });
+  it('stops on an email without a full domain before the questions start', () => {
+    render(<WaitlistRoleForm qualify />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Artist' }));
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'maya@gmail' },
+    });
+    submit();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Enter a full email address, like name@example.com.'
+    );
+    expect(screen.getByTestId('waitlist-step-counter')).toHaveTextContent(
+      'Step 1 of 4'
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('returns to the email step when the server rejects the request', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: 'Choose a role and enter a valid email.' }),
+        { status: 400 }
+      )
+    );
+    startAsArtist();
+    submit();
+    await screen.findByTestId('waitlist-qualifying-step');
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Choose a role and enter a valid email.'
+    );
+    expect(screen.getByLabelText('Email address')).toHaveValue(
+      'maya@example.com'
+    );
   });
 });

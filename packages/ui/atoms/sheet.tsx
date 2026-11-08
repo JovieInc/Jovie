@@ -60,10 +60,20 @@ const sheetVariants = cva(
           'inset-y-0 right-0 h-full w-104 max-w-sheet-viewport border-l',
           'data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right',
         ].join(' '),
+        // Logical sides follow the document direction (start is left in LTR,
+        // right in RTL).
+        start: [
+          'inset-y-0 start-0 h-full w-104 max-w-sheet-viewport border-e',
+          'data-[state=closed]:slide-out-to-start data-[state=open]:slide-in-from-start',
+        ].join(' '),
+        end: [
+          'inset-y-0 end-0 h-full w-104 max-w-sheet-viewport border-s',
+          'data-[state=closed]:slide-out-to-end data-[state=open]:slide-in-from-end',
+        ].join(' '),
       },
     },
     defaultVariants: {
-      side: 'right',
+      side: 'end',
     },
   }
 );
@@ -96,7 +106,7 @@ export const SheetContent = React.forwardRef<
 >(
   (
     {
-      side = 'right',
+      side = 'end',
       className,
       children,
       hideClose = false,

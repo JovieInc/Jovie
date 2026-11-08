@@ -8,8 +8,11 @@
   padding: 10rem var(--hv3-side) 5rem;
 }
 
+/* No optical pull here: the T's bar already starts at its own origin, so
+   the -0.05em that squares a stem (M, F) set "The details." past the guide
+   that its "03 · specs" label sits on. */
 .hv3-specs__head .hv3-statement {
-  margin-left: -0.05em;
+  margin-left: 0;
 }
 
 .hv3-specs__head .hv3-body {
@@ -112,7 +115,6 @@
   position: relative;
   height: 32.5rem;
   overflow: hidden;
-  perspective: 125rem;
 }
 
 .hv3-moment__cap {

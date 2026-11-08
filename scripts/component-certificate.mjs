@@ -56,6 +56,12 @@ const { values } = parseArgs({
     sha: { type: 'string', default: 'unknown' },
     guards: { type: 'boolean', default: false },
     gate: { type: 'boolean', default: false },
+    screens: {
+      type: 'string',
+      default: 'docs/design-system/cert-screens.json',
+    },
+    // Base ref whose cert-screens.json debt may not grow (CI: origin/main).
+    'screens-base': { type: 'string', default: 'origin/main' },
     'guard-registry': {
       type: 'string',
       default: 'docs/design-system/defect-guard-registry.json',
@@ -153,7 +159,29 @@ const gatedFiles = values.gate
       k => k.endsWith('.tsx') && existsSync(join(root, k))
     )
   : [];
-for (const rel of [...(values.component ?? []), ...gatedFiles])
+// Every component an enrolled screen renders is certified too, so the screen
+// gate below judges app-route components outside the coverage roots.
+const screenRegistry = values.gate
+  ? (await import('./lib/component-cert-screens.mjs')).readScreens(
+      root,
+      values.screens
+    )
+  : null;
+const byScreen = screenRegistry
+  ? (await import('./lib/component-cert-screens.mjs')).screenComponents(
+      root,
+      screenRegistry
+    )
+  : new Map();
+const screenFiles = [...new Set([...byScreen.values()].flat())];
+// The prefix gates keep judging exactly what they judged before screens
+// existed; a file only a screen brings in is judged by the screen gate.
+const prefixGateScope = new Set([
+  ...seen,
+  ...(values.component ?? []),
+  ...gatedFiles,
+]);
+for (const rel of [...(values.component ?? []), ...gatedFiles, ...screenFiles])
   if (!seen.has(rel) && seen.add(rel))
     list.push({
       sourceRel: rel,
@@ -210,9 +238,30 @@ if (values.gate) {
   const { evaluateCertificateGates, formatGateResult } = await import(
     './lib/component-certificate-gate.mjs'
   );
-  const result = evaluateCertificateGates(report, registry.gates ?? {});
+  const result = evaluateCertificateGates(
+    {
+      ...report,
+      certificates: report.certificates.filter(c =>
+        prefixGateScope.has(c.component)
+      ),
+    },
+    registry.gates ?? {}
+  );
   console.log(formatGateResult(result));
-  process.exit(result.ok ? 0 : 1);
+  let screensOk = true;
+  if (screenRegistry) {
+    const { evaluateScreenGates, formatScreenGate, readBaseScreens } =
+      await import('./lib/component-cert-screens.mjs');
+    const screenResult = evaluateScreenGates(
+      report,
+      screenRegistry,
+      byScreen,
+      readBaseScreens(root, values.screens, values['screens-base'])
+    );
+    console.log(formatScreenGate(screenResult));
+    screensOk = screenResult.ok;
+  }
+  process.exit(result.ok && screensOk ? 0 : 1);
 }
 if (values.out)
   writeFileSync(values.out, `${JSON.stringify(report, null, 1)}\n`);

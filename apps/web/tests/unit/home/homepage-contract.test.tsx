@@ -386,4 +386,87 @@ describe('homepage contract', { timeout: 60_000 }, () => {
       expect(body).not.toMatch(/opacity:\s*0(?:\.0+)?\s*;/);
     }
   });
+
+  it('holds the premium bar: one grid, exact radii, no rings around the form', async () => {
+    const strip = (path: string) => read(path).replace(/\/\*[\s\S]*?\*\//g, '');
+    const cinema = strip('components/homepage/v3/cinema.css');
+    // Frame guides on both content edges, drawn as hard stops on the box.
+    expect(cinema).toMatch(
+      /\.hv3-hero,\s*\.hv3-chapter\s*\{\s*background-image: linear-gradient\([^;]*var\(--hv3-side\)[^;]*calc\(100% - var\(--hv3-side\)\)/
+    );
+    // A registration cross where each chapter rule meets a guide.
+    expect(cinema).toMatch(
+      /\.hv3-chapter > \.hv3-rule::before,\s*\.hv3-chapter > \.hv3-rule::after/
+    );
+    // The chapter clips its overflow, so the cross is kept inside its box.
+    expect(cinema).toMatch(
+      /\.hv3-chapter\s*\{\s*padding-top: calc\(var\(--hv3-mark-size\) \/ 2\);/
+    );
+    // The ion light stays on the rule it lights.
+    expect(cinema).toMatch(
+      /\.hv3-chapter::before,\s*\.hv3-chapter::after\s*\{\s*top: calc\(var\(--hv3-mark-size\) \/ 2\);/
+    );
+    // Clipped headline ink has room for ascenders and descenders.
+    expect(cinema).toMatch(
+      /background-clip: text;[^}]*padding-block: 0\.12em;\s*margin-block: -0\.12em;/
+    );
+    // One box: the camera is square to the page and no stage has depth, so
+    // every mockup's edges can sit on the frame guides.
+    const v3 = [
+      'stage',
+      'chapters',
+      'specs',
+      'surfaces',
+      'product-ui',
+      'responsive',
+    ].map(name => strip(`components/homepage/v3/${name}.css`));
+    expect(v3[0]).toMatch(/--hv3-cam: rotate\(0deg\);/);
+    expect(v3[0]).toMatch(/--hv3-box: 78rem;/);
+    for (const css of v3) {
+      expect(css).not.toMatch(
+        /perspective|translateZ|translate3d|rotate[XY]\(/
+      );
+    }
+    // Stages span exactly the content box, at every zoom.
+    const chapters = v3[1];
+    expect(chapters).toMatch(
+      /\.hv3-frame\s*\{\s*margin-inline: calc\(var\(--hv3-side\) \/ var\(--hv3-z\)\);/
+    );
+    expect(chapters).toMatch(
+      /\.hv3-stage--hero\s*\{[^}]*right: calc\(var\(--hv3-side\) \/ var\(--hv3-z\)\);\s*left: calc\(var\(--hv3-side\) \/ var\(--hv3-z\)\);/
+    );
+    for (const rig of ['hero', 'releases']) {
+      expect(chapters).toMatch(
+        new RegExp(
+          `\\.hv3-rig--${rig}\\s*\\{[^}]*left: 0;\\s*width: var\\(--hv3-box\\);`
+        )
+      );
+    }
+    // The hero rig scales from its top-left corner, so the 390 crop keeps the
+    // approved window region (the list, not the inspector) only with the
+    // offset recomputed for that origin.
+    expect(chapters).toMatch(/\.hv3-rig--hero\s*\{[^}]*transform-origin: 0 0;/);
+    expect(v3[5]).toMatch(
+      /\.hv3-rig--hero\s*\{[^}]*left: calc\(-9\.705rem - var\(--hv3-gutter\)\);[^}]*scale\(0\.72\)/
+    );
+    // The nav's backing runs edge to edge once scrolled.
+    expect(strip('components/homepage/v3/form.css')).toMatch(
+      /\.home-viewport \.header-nav--docked::before\s*\{\s*right: calc\(50% - 50vw\);\s*left: calc\(50% - 50vw\);/
+    );
+    // Controls are exact, never pills.
+    for (const path of [
+      'components/homepage/v3/chapters.css',
+      'components/homepage/v3/form.css',
+    ]) {
+      const css = strip(path);
+      for (const block of css.match(
+        /\.hv3-btn\s*\{[^}]*\}|waitlist-chip\s*\{[^}]*\}|inline-subscribe"\][^{]*\{[^}]*\}/g
+      ) ?? []) {
+        expect(block, path).not.toMatch(/radius-pill/);
+      }
+    }
+    // The invitation has no ring around its form.
+    const { container } = await renderHomePage();
+    expect(container.querySelector('.hv3-invite .hv3-orbit')).toBeNull();
+  });
 });

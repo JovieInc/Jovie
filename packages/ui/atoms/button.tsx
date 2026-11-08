@@ -322,14 +322,14 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     // In asChild mode, Radix Slot owns the single-child validation.
     // Do NOT render additional wrappers/spinner here; apply styles/props to the child.
+    const preventDisabledActivation = (event: React.SyntheticEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
     if (asChild) {
       // Next's server renderer can pass an opaque lazy child across the RSC
       // boundary. Radix Slot resolves that representation itself, while
       // React.Children.only rejects it before Slot gets the chance.
-      const preventDisabledActivation = (event: React.SyntheticEvent) => {
-        event.preventDefault();
-        event.stopPropagation();
-      };
       const disabledChildProps = isDisabled
         ? {
             'aria-disabled': true,
@@ -361,12 +361,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       );
     }
 
-    // Normal button rendering with optional loading spinner
+    // Loading stays focusable (aria-disabled) and cancels activation instead.
     const buttonProps = {
-      disabled: isDisabled,
-      type:
-        (props as React.ButtonHTMLAttributes<HTMLButtonElement>).type ??
-        'button',
+      disabled,
+      type: props.type ?? 'button',
+      ...(loading &&
+        !disabled && { onClickCapture: preventDisabledActivation }),
     };
 
     return (

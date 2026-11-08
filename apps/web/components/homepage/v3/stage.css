@@ -30,7 +30,20 @@
   --hv3-display: var(--font-display);
   --hv3-ui: var(--font-sans);
   --hv3-mono: var(--font-geist-mono, var(--font-mono));
-  --hv3-cam: rotateX(18deg) rotateY(-14deg) rotateZ(2deg);
+  /*
+   * The camera is square to the page: every mockup is a flat pane whose
+   * edges sit on the content box, so its rows, type and frame are exact.
+   * Depth comes from light, shadow and layering, never from a tilt.
+   */
+  --hv3-cam: rotate(0deg);
+  /* Stage zoom: the 1248px design frame scaled to the content box. 1 from
+     1440 up; StageMotion sets the exact value below that. */
+  --hv3-z: 1;
+  /* The approved 1440 design frame of every stage: the content box. */
+  --hv3-box: 78rem;
+  /* The three-column caption grid of that box: 25rem columns, 1.5rem gaps. */
+  --hv3-col1: calc((var(--hv3-box) - 3rem) / 3);
+  --hv3-col2: calc(var(--hv3-col1) * 2 + 1.5rem);
   --hv3-cast:
     0 3.75rem 7.5rem -1.25rem
     color-mix(in srgb, var(--hv3-shade) 85%, transparent),
@@ -128,12 +141,14 @@
 
 .hv3-orbit__ring {
   fill: none;
-  stroke: var(--hv3-b1);
+  /* The rings recede to a trace so the lit arc carries the light alone
+     (Tim, 2026-11-08: "premium not consumer"). */
+  stroke: color-mix(in srgb, var(--hv3-b1) 55%, transparent);
   stroke-width: 1;
 }
 
 .hv3-orbit__ring--outer {
-  stroke: var(--hv3-b2);
+  stroke: var(--hv3-b1);
 }
 
 .hv3-orbit__arc {
@@ -173,7 +188,6 @@
 
 .hv3-stage {
   position: relative;
-  perspective: 150rem;
 }
 
 .hv3-rig {

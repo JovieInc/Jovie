@@ -9,13 +9,21 @@ name: Pen draft missing frames
 # before code. This drafts one frame per brief in docs/design-system/pen-briefs
 # from the canonical workspace and uploads the drafts for review. A push
 # drafts only the briefs it changed (every brief when the drafter changed),
-# one job per frame, so no frame waits on another's 15-minute budget. It never
+# one job per frame, so no frame waits on another's retry budget. It never
 # writes back to the canonical file or approves anything in pen-bindings.json.
 # A run without the Pen secrets fails and says which one is missing.
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'docs/design-system/pen-briefs/**'
+      - 'scripts/design/pen-draft.mjs'
+      - '.github/workflows/pen-draft.yml'
+  # A brief change drafts on its own PR too, so the frames are in review
+  # before merge and nobody has to start a run by hand.
+  pull_request:
+    types: [opened, reopened, synchronize]
     paths:
       - 'docs/design-system/pen-briefs/**'
       - 'scripts/design/pen-draft.mjs'
@@ -31,13 +39,16 @@ permissions: {}
 
 # One group per commit: a push drafts only the briefs its own commit changed,
 # so a shared group would let GitHub drop a queued run and those briefs with it.
+# PRs share their own group; each PR plan includes every brief.
 concurrency:
-  group: pen-draft-${{ github.event_name }}-${{ github.sha }}
+  group: pen-draft-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: false
 
 jobs:
   plan:
     name: Plan Pen frames
+    # Fork PRs get no secrets; skip planning and its dependent draft jobs.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -88,13 +99,22 @@ jobs:
     needs: plan
     if: ${{ needs.plan.outputs.frames != '[]' }}
     runs-on: ubuntu-24.04
-    # pen-draft.mjs gives each frame 15 minutes; the rest is setup and upload.
+    # pen-draft.mjs budgets 20 minutes for bounded retries; reserve five for setup and upload.
     timeout-minutes: 25
+    # Share the editor lease across PRs, main pushes and manual runs. Native
+    # queueing retains up to 100 pending jobs instead of replacing the oldest.
+    concurrency:
+      group: pen-draft-canonical-editor
+      cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
     strategy:
       fail-fast: false
-      max-parallel: 4
+      # One at a time: the Pen editor behind one PEN_CLI_KEY serves one
+      # document. With 4 in parallel on Nov 8, 19 of 20 drafts got only
+      # "Timeout waiting for document"; one after another, 4 of 8 drew.
+      max-parallel: 1
       matrix:
         frame: ${{ fromJSON(needs.plan.outputs.frames) }}
     steps:

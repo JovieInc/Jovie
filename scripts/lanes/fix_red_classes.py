@@ -28,7 +28,10 @@ from pathlib import Path
 import migration_renumber
 import remediation
 from atomic_state import atomic_write_text
-from fix_red_source_edits import snap_added_conservative_spacing, strip_added_legacy_cache_exports  # noqa: F401
+from fix_red_source_edits import (  # noqa: F401
+    snap_added_conservative_spacing, strip_added_legacy_cache_exports,
+    resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict,
+)
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
