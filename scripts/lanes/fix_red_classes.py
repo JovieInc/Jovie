@@ -264,6 +264,8 @@ def _file_list_prefix_and_files(segment: str) -> tuple[str, list[str]] | None:
 def _opaque_command_key(segment: str) -> tuple[str, ...]:
     """Identity of one && segment. Flags-only commands key on the executable."""
     tokens = segment.split()
+    if len(tokens) >= 4 and tokens[:2] == ["pnpm", "--filter"] and not tokens[3].startswith("-"):
+        return tuple(tokens[:4])
     if len(tokens) >= 2 and not tokens[1].startswith("-"):
         return tokens[0], tokens[1]
     return (tokens[0],)
@@ -303,9 +305,7 @@ def merge_and_chain(ours: str, theirs: str) -> str | None:
         return None
     ours_lists, ours_opaque = ours_split
     theirs_lists, theirs_opaque = theirs_split
-    if len(ours_lists) != len(theirs_lists):
-        return None
-    if ours_lists and ours_lists[0][0] != theirs_lists[0][0]:
+    if ours_lists and theirs_lists and ours_lists[0][0] != theirs_lists[0][0]:
         return None
     theirs_by = {_opaque_command_key(part): part for part in theirs_opaque}
     ours_by = {_opaque_command_key(part): part for part in ours_opaque}
@@ -314,14 +314,16 @@ def merge_and_chain(ours: str, theirs: str) -> str | None:
             return None
     files: list[str] = []
     merged_list = None
-    if theirs_lists:
-        for name in theirs_lists[0][1] + ours_lists[0][1]:
+    if theirs_lists or ours_lists:
+        for name in (theirs_lists[0][1] if theirs_lists else []) + (ours_lists[0][1] if ours_lists else []):
             if name not in files:
                 files.append(name)
-        merged_list = f"{theirs_lists[0][0]} {' '.join(files)}"
+        merged_list = f"{(theirs_lists or ours_lists)[0][0]} {' '.join(files)}"
     result: list[str] = []
     for segment in theirs_parts:
         result.append(merged_list if _file_list_prefix_and_files(segment) else segment)
+    if merged_list and not theirs_lists:
+        result.append(merged_list)
     list_at = next((index for index, segment in enumerate(ours_parts) if _file_list_prefix_and_files(segment)), None)
     for index, segment in enumerate(ours_parts):
         if _file_list_prefix_and_files(segment) or segment in result:

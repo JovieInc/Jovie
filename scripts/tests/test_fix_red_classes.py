@@ -262,6 +262,20 @@ class AndChainMergeTest(unittest.TestCase):
             classes.merge_narrowed_guard_command(NarrowedPreflightMergeTest.OURS, NarrowedPreflightMergeTest.THEIRS),
         )
 
+    def test_unions_filtered_workspace_checks_and_one_sided_test_runner(self):
+        common = "pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test"
+        head_only = "pnpm --filter @jovie/watch typecheck && node --test scripts/watch.test.mjs"
+        base_only = "pnpm --filter @jovie/mesh typecheck"
+        for ours, theirs, expected in [
+            (common + " && " + head_only, common + " && " + base_only,
+             common + " && " + base_only + " && " + head_only),
+            (common + " && " + base_only, common + " && " + head_only,
+             common + " && " + head_only + " && " + base_only),
+        ]:
+            with self.subTest(ours=ours):
+                self.assertEqual(classes.merge_and_chain(ours, theirs), expected)
+        self.assertIsNone(classes.merge_and_chain(common, common.replace(" typecheck", " typecheck --strict")))
+
     def test_rejects_a_changed_script_quotes_and_a_second_file_list(self):
         self.assertIsNone(classes.merge_and_chain(self.OURS, self.THEIRS.replace("ownership:check", "ownership:check --strict")))
         self.assertIsNone(classes.merge_and_chain(self.OURS + " && echo 'x'", self.THEIRS))
