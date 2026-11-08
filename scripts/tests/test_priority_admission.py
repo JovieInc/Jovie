@@ -109,37 +109,6 @@ class Rank(unittest.TestCase):
             self.assertEqual(pa.summer_ranks(d, NOW), {})
 
 
-class UrgentSla(unittest.TestCase):
-    def test_breach_only_for_unclaimed_urgent_past_sla(self):
-        fresh = row(1, "Todo", priority=1, created="2026-10-24T03:30:00.000Z")  # NOW is 2026-10-25T...
-        rows = [row(2, "Todo", priority=1, created="2026-09-01T00:00:00.000Z"), row(3, "Todo", priority=2, created="2026-09-01T00:00:00.000Z"),
-                dict(fresh, createdAt=pa.time.strftime("%Y-%m-%dT%H:%M:%S.000Z", pa.time.gmtime(NOW - 60)))]
-        got = pa.urgent_sla_breaches(rows, NOW)
-        self.assertEqual([b["id"] for b in got], ["JOV-2"])
-        self.assertGreater(got[0]["waitingS"], pa.URGENT_SLA_S)
-
-    def test_production_breakage_is_urgent_only(self):
-        self.assertTrue(pa.production_breakage("Prod synthetic: sign-up AuthShell never ready", 1))
-        self.assertTrue(pa.production_breakage("[ci] Production Controller abc failing", 1))
-        self.assertFalse(pa.production_breakage("Prod synthetic: flaky banner", 2))
-        self.assertFalse(pa.production_breakage("Tidy the production copy", 1))
-
-    def test_run_records_breach_stage_timestamp_once_and_raises_alert(self):
-        with tempfile.TemporaryDirectory() as d:
-            state = Path(d)
-            path = ls.mirror_path(state, "JOV")
-            path.parent.mkdir(parents=True)
-            old = row(5, "Todo", priority=1, created="2026-10-01T00:00:00.000Z")
-            path.write_text(json.dumps({"schema": ls.MIRROR, "syncedAt": NOW, "issues": {old["id"]: old}}))
-            host = SimpleNamespace(state=str(state))
-            for _ in range(2):
-                pa.run(FakeLane, host, "JOV", FakeClient(), now=NOW)
-            logged = [json.loads(line) for line in (state / "urgent-sla.jsonl").read_text().splitlines()]
-            self.assertEqual([entry["id"] for entry in logged], ["JOV-5"])
-            self.assertEqual(logged[0]["breachedAt"], NOW)
-            self.assertIn("urgent-sla-breach", ls.alerts(ls.status(state, NOW)))
-
-
 class FakeLane:
     @staticmethod
     def issue_hits_red_line(issue):

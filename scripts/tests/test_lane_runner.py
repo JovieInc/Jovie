@@ -195,18 +195,6 @@ class SelectionTest(unittest.TestCase):
         target.labels.remove("dispatch-next")
         self.assertIs(lane.pick_issue([old, ci, target], {}, now=now), ci)
 
-    def test_fresh_urgent_production_breakage_outranks_older_urgent_pile(self):
-        # JOV-11615: 158 Urgent rows sat in Todo and FIFO among Urgent left a fresh prod-synthetic red unclaimed ~6h.
-        now = datetime(2026, 11, 8, 12, tzinfo=timezone.utc).timestamp()
-        pile = [issue(f"JOV-{n}", priority=1, created="2026-10-01T00:00:00Z") for n in range(5)]
-        outage = issue("JOV-11615", priority=1, created="2026-11-08T05:38:00Z")
-        outage.title = "Prod synthetic: sign-up AuthShell never ready"
-        self.assertIs(lane.pick_issue([*pile, outage], {}, now=now), outage)
-        # the same words on a non-Urgent row never jump the queue
-        soft = issue("JOV-11616", priority=2, created="2026-11-08T05:38:00Z")
-        soft.title = "Prod synthetic: flaky banner"
-        self.assertIsNot(lane.pick_issue([*pile, soft], {}, now=now), soft)
-
     def test_marketing_priority_is_reversible_and_keeps_urgent_and_eligibility(self):
         now = datetime(2026, 10, 16, tzinfo=timezone.utc).timestamp()
         marketing = issue("JOV-MKT", priority=4, created="2026-10-15T23:00:00Z",

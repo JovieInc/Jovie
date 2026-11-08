@@ -71,7 +71,7 @@ import machine_gap  # noqa: E402
 import slot_yield  # noqa: E402  (slot ceilings from measured merged-per-dollar)  (abstraction gate: build the machine on the 3rd repeat or a costly task)
 import update_drain  # noqa: E402  (drain gate admission while an update waits)
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
-import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
+import linear_sync, urgent_sla  # noqa: E402  (local issue mirror, claim ledger, write outbox; Urgent SLA rank)
 import escalation_reconcile  # noqa: E402  (lane-fix-escalating is consumed, never parked)
 import board_intake  # noqa: E402  (mesh board work for codex, closed on verified outcomes)
 import ownership  # noqa: E402  (started-state live-owner invariant)
@@ -875,8 +875,7 @@ def admission_order(issue: Issue, now: float) -> tuple:
             else 0 if effective_priority == 1 or workstreams.compounding(stream) else 1)
     # Summer's signed rank comes first, then Urgent, marketing, tier, aged priority, age (JOV-7073).
     return (*priority_admission.claim_key(issue.identifier, priority_admission.summer_ranks(now=now)),
-            0 if priority == 1 else 1, not priority_admission.production_breakage(issue.title, priority),
-            not priority_admission.marketing_priority(issue.labels),
+            urgent_sla.rank(issue.title, priority), not priority_admission.marketing_priority(issue.labels),
             tier, effective_priority, workstreams.rank(stream),
             created_at if created_at is not None else float("inf"))
 

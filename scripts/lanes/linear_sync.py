@@ -555,9 +555,7 @@ def status(state: Path, now: float | None = None) -> dict:
         if row:
             backlog[team] = {key: row.get(key) for key in ("todo", "target", "backlog", "ready", "readyAgeDaysP50",
                                                            "readyAgeDaysP95", "deficitSince", "alarm", "at")}
-    sla = _read_loose(Path(state) / "urgent-sla.json")
     return {"mirror": mirrors, "backlog": backlog,
-            "urgentSla": {key: sla.get(key) for key in ("at", "slaS", "breaches", "worst")} if sla else {},
             "outbox": {"depth": len(entries), "oldestAgeS": round(now - oldest) if oldest else None,
                        "dead": len(outbox.get("dead") or [])},
             "claims": {"active": sum(1 for row in claims.values() if row.get("status") == "active"),
@@ -575,11 +573,6 @@ def alerts(view: dict) -> dict[str, str]:
         if row.get("alarm"):
             found[f"backlog-ready-idle:{team}"] = (f"{team}: {row.get('ready')} agent-ready in Backlog while Todo is "
                                                    f"{row.get('todo')} of {row.get('target')} since the deficit opened")
-    sla = view.get("urgentSla") or {}
-    if sla.get("breaches"):
-        worst = (sla.get("worst") or [{}])[0]
-        found["urgent-sla-breach"] = (f"{sla['breaches']} Urgent Todo issue(s) unclaimed past {int((sla.get('slaS') or 0) // 60)}m; "
-                                      f"worst {worst.get('id')} waiting {int((worst.get('waitingS') or 0) // 60)}m")
     outbox = view.get("outbox") or {}
     if (outbox.get("oldestAgeS") or 0) > OUTBOX_ALERT_S:
         found["linear-outbox-stale"] = (f"Linear outbox: {outbox['depth']} writes waiting, "
