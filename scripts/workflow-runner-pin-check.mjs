@@ -19,12 +19,38 @@ import { load as yamlLoad } from 'js-yaml';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const FLOATING = /(?<![\w-])ubuntu-latest(?![\w.-])/u;
 
-function usesPlaywright(job) {
-  return (job.steps ?? []).some(
-    step =>
-      /setup-playwright/u.test(String(step?.uses ?? '')) ||
-      /\bplaywright\b/u.test(String(step?.run ?? ''))
+const SCRIPT_REF =
+  /(?:\.github\/)?(?:scripts|apps\/web\/scripts)\/[\w./-]+\.(?:mjs|cjs|js|ts|sh)/gu;
+// Installs or launches a browser (not a mere mention of the word).
+const LAUNCHES_PLAYWRIGHT =
+  /playwright['"]?\s*,\s*['"]install|playwright install|from ['"]@?playwright[\w/-]*['"]|require\(['"]@?playwright[\w/-]*['"]\)|import\(['"]@?playwright[\w/-]*['"]\)|chromium\.launch/u;
+
+/**
+ * A job that only runs `node scripts/x.mjs` still fails when x itself runs
+ * `playwright install` (postdeploy-probes golden-path-cert, 2026-11-08). Only
+ * scripts the job names directly are read: following path strings further
+ * flags scripts that merely list other files.
+ */
+function scriptLaunchesPlaywright(rel, repoRoot) {
+  const file = path.join(repoRoot, rel);
+  return (
+    existsSync(file) && LAUNCHES_PLAYWRIGHT.test(readFileSync(file, 'utf8'))
   );
+}
+
+function usesPlaywright(job, repoRoot) {
+  return (job.steps ?? []).some(step => {
+    const run = String(step?.run ?? '');
+    return (
+      /setup-playwright/u.test(String(step?.uses ?? '')) ||
+      /\bplaywright\b/u.test(run) ||
+      [...run.matchAll(SCRIPT_REF)].some(
+        ref =>
+          !/\.test\./u.test(ref[0]) &&
+          scriptLaunchesPlaywright(ref[0], repoRoot)
+      )
+    );
+  });
 }
 
 function floats(job) {
@@ -33,7 +59,7 @@ function floats(job) {
 }
 
 /** @returns {{ key: string, playwright: boolean }[]} */
-export function findFloatingJobs(workflowsDir) {
+export function findFloatingJobs(workflowsDir, repoRoot = root) {
   const found = [];
   for (const file of readdirSync(workflowsDir).sort()) {
     if (!/\.ya?ml$/u.test(file)) continue;
@@ -41,7 +67,10 @@ export function findFloatingJobs(workflowsDir) {
     if (!doc || typeof doc !== 'object' || !('jobs' in doc)) continue;
     for (const [id, job] of Object.entries(doc.jobs ?? {})) {
       if (job && floats(job))
-        found.push({ key: `${file}#${id}`, playwright: usesPlaywright(job) });
+        found.push({
+          key: `${file}#${id}`,
+          playwright: usesPlaywright(job, repoRoot),
+        });
     }
   }
   return found;
@@ -50,13 +79,14 @@ export function findFloatingJobs(workflowsDir) {
 export function checkRunnerPins({
   workflowsDir = path.join(root, '.github/workflows'),
   allowlistPath = path.join(root, '.github/runner-pin-allowlist.json'),
+  repoRoot = root,
 } = {}) {
   const allowed = new Set(
     existsSync(allowlistPath)
       ? JSON.parse(readFileSync(allowlistPath, 'utf8')).jobs
       : []
   );
-  const found = findFloatingJobs(workflowsDir);
+  const found = findFloatingJobs(workflowsDir, repoRoot);
   const floatingKeys = new Set(found.map(job => job.key));
   const errors = [];
   for (const job of found) {

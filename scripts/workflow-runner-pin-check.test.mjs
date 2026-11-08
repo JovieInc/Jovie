@@ -97,6 +97,30 @@ describe('workflow runner pins', () => {
     );
     assert.match(errors[0], /runs Playwright on floating ubuntu-latest/);
   });
+  it('flags a floating job whose script installs Playwright indirectly', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'pins-repo-'));
+    mkdirSync(path.join(dir, 'scripts'));
+    writeFileSync(
+      path.join(dir, 'scripts/inner.mjs'),
+      "run('pnpm', ['exec', 'playwright', 'install', 'chromium']);\n"
+    );
+    const files = fixture({
+      'a.yml':
+        'jobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node scripts/inner.mjs\n',
+    });
+    assert.match(
+      checkRunnerPins({ ...files, repoRoot: dir })[0],
+      /runs Playwright on floating ubuntu-latest/
+    );
+    writeFileSync(
+      path.join(dir, 'scripts/inner.mjs'),
+      '// playwright mention\n'
+    );
+    assert.match(
+      checkRunnerPins({ ...files, repoRoot: dir })[0],
+      /uses floating ubuntu-latest/
+    );
+  });
   it('does not match unrelated names', () => {
     assert.deepEqual(
       checkRunnerPins(

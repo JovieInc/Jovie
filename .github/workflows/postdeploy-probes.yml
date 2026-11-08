@@ -790,7 +790,8 @@ jobs:
     name: Golden Path Certification (Landed Production)
     needs: [resolve-target, auth-smoke]
     if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' }}
-    runs-on: ubuntu-latest
+    # Pinned: pen-golden-path.mjs runs `playwright install`, unsupported on 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
