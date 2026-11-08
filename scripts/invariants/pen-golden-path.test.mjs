@@ -132,3 +132,41 @@ test('exports headless, copies stills into place and runs the strict diff', asyn
   assert.ok(diff?.includes('https://jov.ie'));
   assert.equal(findExport(join(out, 'png'), 'nope'), null);
 });
+
+test('a frame with its own penFile exports from that file in the archive', async () => {
+  const root = fixtureRoot();
+  const manifestPath = join(root, MANIFEST);
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  manifest.frames[2].penFile = 'homepage.pen';
+  writeFileSync(manifestPath, JSON.stringify(manifest));
+  const out = join(root, 'out');
+  const opened = [];
+  const run = (cmd, args, opts = {}) => {
+    if (cmd === 'tar') {
+      const dir = args[args.indexOf('-C') + 1];
+      for (const name of ['canonical.lib.pen', 'homepage.pen'])
+        writeFileSync(join(dir, name), '{}');
+    }
+    if (args.includes('interactive')) {
+      opened.push([
+        args[args.indexOf('--in') + 1].split('/').pop(),
+        opts.input,
+      ]);
+    }
+    return Buffer.from('');
+  };
+  await runGoldenPathPen({
+    out,
+    root,
+    env: { PEN_CLI_KEY: 'k', PEN_GOLDEN_PATH_FILE_URL: 'https://r2.example/w' },
+    run,
+    fetchImpl: async () => new Response(new Uint8Array([0x1f, 0x8b, 0])),
+    log: () => {},
+  });
+  assert.deepEqual(
+    opened.map(([file]) => file),
+    ['canonical.lib.pen', 'homepage.pen']
+  );
+  assert.match(opened[0][1], /Export\(\["oaz9c"\]/u);
+  assert.match(opened[1][1], /Export\(\["hLRZB"\]/u);
+});

@@ -5,12 +5,12 @@
   "penFile": {
     "name": "Jovie Design Studio — canonical.lib.pen",
     "sha256": null,
-    "note": "Design first (Tim, 2026-11-08): every Golden Path screen needs a Pen frame before it can certify. penNodeId 'pending-no-design' means no Pen frame exists yet. Node ids come from scripts/pen-review/export-refs.mjs CANONICAL_SURFACES (PR #24239) and the approved Homepage canonical v1 (UfvR8); scripts/agent/pen-golden-path-export.mjs fails loudly on an id the file does not have. Stills are written by that exporter on the Pen machine, never by hand."
+    "note": "Design first (Tim, 2026-11-08): every Golden Path screen needs a Pen frame before it can certify. penNodeId 'pending-no-design' means no Pen frame exists yet. Node ids come from scripts/pen-review/export-refs.mjs CANONICAL_SURFACES (PR #24239) ; the homepage is pending because frame UfvR8 is in no saved .pen file and homepage v3 is an HTML build awaiting Tim's approval (2026-11-08). A frame may set penFile to export from another .pen in the archive; scripts/agent/pen-golden-path-export.mjs fails loudly on an id the file does not have. Stills are written by that exporter on the Pen machine, never by hand."
   },
   "frames": [
     {
       "sectionId": "landing/homepage",
-      "penNodeId": "UfvR8",
+      "penNodeId": "pending-no-design",
       "fileHash": null,
       "stillPath": "docs/pen-stills/golden-path/landing.homepage.dark.1440.png",
       "viewport": 1440,

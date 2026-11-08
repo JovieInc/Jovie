@@ -31,7 +31,8 @@ import {
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const PEN_CLI_VERSION = '0.3.10';
+// 0.3.10 rejects .pen format 2.21; 0.3.14 exports it (lead session, 2026-11-08).
+export const PEN_CLI_VERSION = '0.3.14';
 export const MANIFEST = 'docs/pen-stills/golden-path/manifest.json';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -110,27 +111,32 @@ export async function runGoldenPathPen({
   const download = join(work, isArchive ? 'workspace.tar.gz' : 'src.pen');
   writeFileSync(download, bytes);
   if (isArchive) run('tar', ['-xzf', download, '-C', work]);
-  const pen = isArchive ? locatePen(work, manifest.penFile?.name) : download;
-  if (!pen) throw new Error('the Pen download holds no .pen file');
-
+  // A frame may name its own .pen file; the rest use manifest.penFile.
+  const fileOf = f => f.penFile ?? manifest.penFile?.name;
   const pngDir = join(out, 'png');
   mkdirSync(pngDir, { recursive: true });
-  const ids = [...new Set(frames.map(f => f.penNodeId))];
-  const throwaway = join(out, 'throwaway.pen');
-  run(
-    'npx',
-    [
-      '-y',
-      `@pen.dev/cli@${PEN_CLI_VERSION}`,
-      'interactive',
-      '--in',
-      pen,
-      '--out',
-      throwaway,
-    ],
-    { cwd: dirname(pen), input: exportScript(ids, pngDir), env }
-  );
-  rmSync(throwaway, { force: true });
+  for (const name of [...new Set(frames.map(fileOf))]) {
+    const pen = isArchive ? locatePen(work, name) : download;
+    if (!pen) throw new Error('the Pen download holds no .pen file');
+    const ids = [
+      ...new Set(frames.filter(f => fileOf(f) === name).map(f => f.penNodeId)),
+    ];
+    const throwaway = join(out, 'throwaway.pen');
+    run(
+      'npx',
+      [
+        '-y',
+        `@pen.dev/cli@${PEN_CLI_VERSION}`,
+        'interactive',
+        '--in',
+        pen,
+        '--out',
+        throwaway,
+      ],
+      { cwd: dirname(pen), input: exportScript(ids, pngDir), env }
+    );
+    rmSync(throwaway, { force: true });
+  }
 
   const exported = [];
   for (const frame of frames) {
