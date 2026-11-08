@@ -990,7 +990,7 @@ jobs:
           fi
 
           # Launch-gate golden path (JOV-3758), mirroring docs/launch/LAUNCH_GATES.md.
-          LAUNCH_GATE_PATTERN='^(apps/web/app/onboarding/|apps/web/components/features/onboarding/|apps/web/lib/onboarding/|apps/web/app/\(auth\)/|apps/web/app/sign-?(in|up)/|apps/web/app/app/\(shell\)/|apps/web/components/features/dashboard/|apps/web/components/organisms/sidebar/|apps/web/lib/app-shell/|apps/web/tests/e2e/shell-(nav-click-through|route-health)\.spec\.ts|apps/web/(components/shell/|instrumentation-client\.ts|proxy\.ts|tests/e2e/(utils/)?dashboard-click-navigation)|apps/web/lib/releases/|apps/web/app/api/stripe/|apps/web/app/api/billing/|apps/web/app/api/checkout/|apps/web/lib/stripe/|apps/web/tests/e2e/golden-path\.spec\.ts|apps/web/tests/helpers/auth.ts|apps/web/tests/global-setup\.ts|apps/web/playwright\.config\.ts|\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.(dashboard|onboarding)\.pr\.json|docs/launch/LAUNCH_GATES\.md|apps/web/package.*\.json|package.*\.json)'
+          LAUNCH_GATE_PATTERN='^(apps/web/app/onboarding/|apps/web/components/features/onboarding/|apps/web/lib/onboarding/|apps/web/app/\(auth\)/|apps/web/app/sign-?(in|up)/|apps/web/app/app/\(shell\)/|apps/web/components/features/dashboard/|apps/web/components/organisms/sidebar/|apps/web/lib/app-shell/|apps/web/tests/e2e/(shell-(nav-click-through|route-health)|releases-first-paint-visual)\.spec\.ts|apps/web/(components/shell/|instrumentation-client\.ts|proxy\.ts|tests/e2e/(utils/)?dashboard-click-navigation)|apps/web/lib/releases/|apps/web/app/api/stripe/|apps/web/app/api/billing/|apps/web/app/api/checkout/|apps/web/lib/stripe/|apps/web/tests/e2e/golden-path\.spec\.ts|apps/web/tests/helpers/auth.ts|apps/web/tests/global-setup\.ts|apps/web/playwright\.config\.ts|\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.(dashboard|onboarding)\.pr\.json|docs/launch/LAUNCH_GATES\.md|apps/web/package.*\.json|package.*\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$LAUNCH_GATE_PATTERN"; then
             echo "run_golden_path=true" >> "$GITHUB_OUTPUT"
           else
@@ -5010,11 +5010,14 @@ jobs:
           # proves the shell still moves between dashboard pages client-side.
           # shell-route-health opens every sidebar destination both ways and
           # fails on console errors, uncaught exceptions and error boundaries.
+          # releases-first-paint-visual fails if the release list moves after
+          # it first paints.
           # Blocking, and run first so a nav break fails fast.
           node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
             pnpm exec playwright test tests/e2e/dashboard-click-navigation.spec.ts \
             tests/e2e/shell-nav-click-through.spec.ts \
             tests/e2e/shell-route-health.spec.ts \
+            tests/e2e/releases-first-paint-visual.spec.ts \
             --config=playwright.config.noauth.ts --project=chromium --reporter=line
 
           pnpm run test:lighthouse:dashboard:pr
