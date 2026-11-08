@@ -6,44 +6,18 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EntitySidebarShell } from '@/components/molecules/drawer';
 import { TableEmptyState } from '@/components/organisms/table/atoms/TableEmptyState';
-import {
-  TableBody,
-  TableHead,
-  TableRoot,
-} from '@/components/organisms/table/molecules/SemanticTable';
-import {
-  borders,
-  presets,
-  rowState,
-  typography,
-} from '@/components/organisms/table/table.styles';
+import { UnifiedTable } from '@/components/organisms/table/organisms/UnifiedTable';
+import { typography } from '@/components/organisms/table/table.styles';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
-import { cn } from '@/lib/utils';
+import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import {
+  buildLinksColumns,
+  LINKS_ROW_MODE,
+  LinkStatusBadge,
+  stripProtocol,
+} from './links-columns';
 import type { LinkRow } from './links-model';
-
-const STATUS_LABELS: Record<LinkRow['status'], string> = {
-  active: 'Active',
-  draft: 'Draft',
-  scheduled: 'Scheduled',
-  archived: 'Archived',
-};
-
-function StatusBadge({ status }: { readonly status: LinkRow['status'] }) {
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full px-2 py-0.5 text-xs',
-        status === 'active' && 'bg-surface-2 text-primary-token',
-        status === 'archived' && 'bg-surface-1 text-tertiary-token',
-        (status === 'draft' || status === 'scheduled') &&
-          'bg-surface-1 text-secondary-token'
-      )}
-    >
-      {STATUS_LABELS[status]}
-    </span>
-  );
-}
 
 function LinkInspector({
   row,
@@ -79,7 +53,7 @@ function LinkInspector({
               rel='noopener noreferrer'
               className='truncate text-primary-token underline-offset-2 hover:underline'
             >
-              {row.jovieUrl.replace(/^https?:\/\//u, '')}
+              {stripProtocol(row.jovieUrl)}
             </a>
             <Button
               type='button'
@@ -105,7 +79,7 @@ function LinkInspector({
           <div className='flex flex-col gap-0.5'>
             <dt className={typography.cellTertiary}>Status</dt>
             <dd>
-              <StatusBadge status={row.status} />
+              <LinkStatusBadge status={row.status} />
             </dd>
           </div>
           <div className='flex flex-col gap-0.5'>
@@ -159,6 +133,25 @@ export function LinksPageClient({ rows }: { readonly rows: LinkRow[] }) {
     setSelectedId(rowId);
   }, []);
 
+  const columns = useMemo(
+    () => buildLinksColumns({ onOpenInspector: openInspector }),
+    [openInspector]
+  );
+
+  const handleRowClick = useCallback(
+    (row: LinkRow) => openInspector(row.id),
+    [openInspector]
+  );
+
+  // Arrow keys move the open inspector with the focused row, as in Contacts.
+  const handleFocusedRowChange = useCallback(
+    (index: number) => {
+      const next = rows[index];
+      if (selectedId && next) setSelectedId(next.id);
+    },
+    [rows, selectedId]
+  );
+
   // The registered panel unmounts in a later context update. Restore focus
   // after that unmount, when its focused control has fallen back to <body>.
   // Never steal focus from a live control.
@@ -201,102 +194,20 @@ export function LinksPageClient({ rows }: { readonly rows: LinkRow[] }) {
       className='flex min-h-0 flex-1 flex-col lg:flex-row'
       data-testid='links-workspace'
     >
-      <div className='min-w-0 flex-1 overflow-auto'>
-        <TableRoot className='w-full border-collapse'>
-          <TableHead>
-            <tr className={presets.tableHeaderRow}>
-              <th className={cn(presets.tableHeaderCell, 'whitespace-nowrap')}>
-                Entity
-              </th>
-              <th className={cn(presets.tableHeaderCell, 'whitespace-nowrap')}>
-                Type
-              </th>
-              <th className={cn(presets.tableHeaderCell, 'whitespace-nowrap')}>
-                Status
-              </th>
-              <th className={cn(presets.tableHeaderCell, 'whitespace-nowrap')}>
-                Destination
-              </th>
-              <th
-                className={cn(
-                  presets.tableHeaderCell,
-                  'whitespace-nowrap text-right'
-                )}
-              >
-                Clicks
-              </th>
-              <th className={cn(presets.tableHeaderCell, 'whitespace-nowrap')}>
-                Campaign
-              </th>
-              <th
-                className={cn(
-                  presets.tableHeaderCell,
-                  'whitespace-nowrap text-right'
-                )}
-              >
-                Jovie link
-              </th>
-            </tr>
-          </TableHead>
-          <TableBody>
-            {rows.map(row => (
-              <tr
-                key={row.id}
-                className={cn(
-                  presets.tableRow,
-                  borders.cell,
-                  'cursor-pointer',
-                  selectedId === row.id && rowState.selected
-                )}
-                onClick={() => openInspector(row.id)}
-              >
-                <td className={presets.tableCell}>
-                  <span className='block max-w-48 truncate' title={row.title}>
-                    {row.title}
-                  </span>
-                </td>
-                <td className={presets.tableCell}>{row.type}</td>
-                <td className={presets.tableCell}>
-                  <StatusBadge status={row.status} />
-                </td>
-                <td className={presets.tableCell}>
-                  <span
-                    className='block max-w-56 truncate text-secondary-token'
-                    title={row.destination}
-                  >
-                    {row.destination.replace(/^https?:\/\//u, '')}
-                  </span>
-                </td>
-                <td
-                  className={cn(
-                    presets.tableCell,
-                    'whitespace-nowrap text-right tabular-nums'
-                  )}
-                >
-                  {row.clicks === null ? '—' : row.clicks}
-                </td>
-                <td className={presets.tableCell}>
-                  <span
-                    className='block max-w-40 truncate text-secondary-token'
-                    title={row.campaign ?? row.utmSummary ?? undefined}
-                  >
-                    {row.campaign ?? row.utmSummary ?? '—'}
-                  </span>
-                </td>
-                <td className={presets.tableCell}>
-                  <button
-                    type='button'
-                    className='max-w-56 truncate text-left text-primary-token'
-                    title={row.jovieUrl}
-                    onClick={() => openInspector(row.id)}
-                  >
-                    {row.jovieUrl.replace(/^https?:\/\//u, '')}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </TableBody>
-        </TableRoot>
+      <div className='flex min-h-0 min-w-0 flex-1 overflow-auto'>
+        <UnifiedTable
+          data={rows}
+          columns={columns}
+          rowMode={LINKS_ROW_MODE}
+          getRowId={row => row.id}
+          getRowTestId={row => `links-row-${row.id}`}
+          isRowSelected={row => row.id === selectedId}
+          onRowClick={handleRowClick}
+          onFocusedRowChange={handleFocusedRowChange}
+          minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
+          className='text-app'
+          caption='Links'
+        />
       </div>
     </div>
   );

@@ -132,9 +132,52 @@ describe('LinksPageClient', () => {
     expect(clicksHeader.className).toContain('text-right');
 
     const firstRow = within(table).getAllByRole('row')[1];
-    const clicksCell = within(firstRow).getByText('17');
-    expect(clicksCell.className).toContain('text-right');
-    expect(clicksCell.className).toContain('tabular-nums');
+    const clicksValue = within(firstRow).getByText('17');
+    expect(clicksValue.className).toContain('tabular-nums');
+    expect(clicksValue.closest('td')?.className).toContain('text-right');
+  });
+
+  it('renders through the shared UnifiedTable with dense shared rows', () => {
+    renderLinksWorkspace(
+      <LinksPageClient rows={[baseRow, { ...baseRow, id: 'row-2' }]} />
+    );
+
+    const table = screen.getByRole('table');
+    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+    const row = screen.getByTestId('links-row-row-1');
+    // Shared row shell owns height, hover and focus states; no local copies.
+    expect(row.className).toContain('system-b-table-row-shell');
+    expect(row.className).toContain('system-b-table-row-hover');
+    expect(row.className).toContain('system-b-table-row-focus-visible');
+  });
+
+  it('aligns every header with its column', () => {
+    renderLinksWorkspace(<LinksPageClient rows={[baseRow]} />);
+
+    const table = screen.getByRole('table');
+    const headers = within(table).getAllByRole('columnheader');
+    const cells = within(within(table).getAllByRole('row')[1]).getAllByRole(
+      'cell'
+    );
+    expect(cells).toHaveLength(headers.length);
+    headers.forEach((header, index) => {
+      const headerRight = header.className.includes('text-right');
+      const cellRight = cells[index].className.includes('text-right');
+      expect(cellRight, header.textContent ?? '').toBe(headerRight);
+    });
+  });
+
+  it('opens the inspector from a row click and marks the row selected', async () => {
+    const user = userEvent.setup();
+    renderLinksWorkspace(<LinksPageClient rows={[baseRow]} />);
+
+    const row = screen.getByTestId('links-row-row-1');
+    await user.click(within(row).getByText('Release'));
+
+    expect(screen.getByTestId('links-inspector')).toHaveTextContent(
+      'Midnight City'
+    );
+    expect(row).toHaveAttribute('aria-selected', 'true');
   });
 
   it('discloses truncated long values through title attributes', () => {

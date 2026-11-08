@@ -5,13 +5,12 @@ import { Badge, type BadgeProps, Button } from '@jovie/ui';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   type ContextMenuItemType,
   UnifiedTable,
 } from '@/components/organisms/table';
+import { TableEmptyState } from '@/components/organisms/table/atoms/TableEmptyState';
 import { convertContextMenuItems } from '@/components/organisms/table/molecules/TableContextMenu';
-import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import {
   type ColumnDef,
   createColumnHelper,
@@ -338,27 +337,22 @@ export function TourDatesTable({
       getContextMenuItems={getContextMenuItems}
       onRowClick={onEdit}
       getRowId={row => row.id}
-      getRowClassName={row => {
-        const past = isPastDate(new Date(row.startDate));
-        return cn('group hover:bg-white/[0.02]', past && 'opacity-60');
-      }}
+      getRowClassName={row =>
+        isPastDate(new Date(row.startDate)) ? 'opacity-60' : ''
+      }
       enableVirtualization={tourDates.length >= 20}
-      rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
+      // Date and start time stack in two lines; the two-line mode gives
+      // them a 48px content budget instead of clipping the time at 32px.
+      rowMode='two-line'
       className='text-app'
+      caption='Tour dates'
       emptyState={
-        <div className='px-4 py-8'>
-          <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-surface-0 px-3 py-6 text-center text-app text-secondary-token'>
-            <Icon name='Calendar' className='h-6 w-6 text-tertiary-token' />
-            <div>
-              <div className='font-caption text-primary-token'>
-                No tour dates
-              </div>
-              <div className='text-app'>
-                Add your first tour date to get started.
-              </div>
-            </div>
-          </ContentSurfaceCard>
-        </div>
+        <TableEmptyState
+          testId='tour-dates-table-empty'
+          icon={<Icon name='Calendar' className='size-5' aria-hidden='true' />}
+          heading='No tour dates'
+          description='Add your first tour date to get started.'
+        />
       }
     />
   );
