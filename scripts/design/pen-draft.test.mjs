@@ -25,6 +25,7 @@ test('every checked-in brief parses and names a unique frame', () => {
       'empty-states',
       'homepage',
       'insights',
+      'page-skeletons',
       'profile-analytics-card',
       'request-access',
       'workspace-table',
@@ -59,6 +60,17 @@ test('pen draws into its own file from the canonical input and keeps other frame
     /Leave every existing frame untouched/
   );
   assert.equal(args[args.indexOf('--export') + 1], 'o/claim.png');
+});
+
+test('the Pen agent sees why a tool call failed and has room to recover', () => {
+  // Run 42457693051: three drafts aborted at 8 failed calls with no error
+  // text; the one that finished needed 7.
+  const args = penArgs(
+    { frame: 'claim', prompt: 'P' },
+    { input: 'i.pen', outDir: 'o' }
+  );
+  assert.ok(args.includes('--verbose-mcp'));
+  assert.ok(Number(args[args.indexOf('--max-failed-calls') + 1]) >= 20);
 });
 
 test('missing secrets are named, so a blocked run never reads as done', () => {

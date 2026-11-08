@@ -26,6 +26,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { downloadReleaseAsset } from '../lib/github-release-asset.mjs';
+
 export const OASDIFF_SCHEMA = 'jovie.oasdiff-breaking-change/v1';
 
 /** Pinned release. The tarball sha256 is verified before the binary runs. */
@@ -201,28 +203,12 @@ export function ensureOasdiffBinary(options = {}) {
   return { code: 0, binary };
 }
 
-// -f: without it a 504 error page exits 0 and fails the sha pin as a fake
-// mismatch (#24564). curl's own backoff doubles from 1s over 6 retries (~63s),
-// and --retry-all-errors also covers connection resets; failure stays red.
-export const OASDIFF_CURL_ARGS = Object.freeze([
-  '-fsSL',
-  '--retry',
-  '6',
-  '--retry-all-errors',
-  '--connect-timeout',
-  '20',
-  '--max-time',
-  '120',
-]);
-
+// The shared helper fails on HTTP errors (a 504 page is never hashed as a
+// fake sha mismatch, #24564), downloads to a file instead of stdout (a retry
+// cannot append duplicate bytes), backs off, and falls back to the
+// authenticated releases API. The sha256 pin above still decides.
 function defaultFetchTarball(url) {
-  const result = spawnSync('curl', [...OASDIFF_CURL_ARGS, url], {
-    maxBuffer: 128 * 1024 * 1024,
-  });
-  if (result.status !== 0 || !result.stdout || result.stdout.length === 0) {
-    return { ok: false, error: `curl exit ${result.status}` };
-  }
-  return { ok: true, bytes: result.stdout };
+  return downloadReleaseAsset(url);
 }
 
 /**

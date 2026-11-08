@@ -29,7 +29,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import disk_guard  # noqa: E402
-import lifecycle, pr_wip  # noqa: E402  (pr_wip: per-producer WIP census for the lanes feed)
+import lifecycle, pr_wip, repair_order  # noqa: E402  (pr_wip: per-producer WIP census; repair_order: fair claims)
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -1720,7 +1720,7 @@ def record_attempt(attempts: dict, number: int, sha: str, lane_name: str, now: f
     record = attempts.get(str(number), {})
     rollover = record.get("count", 0) > 0 and not same_generation(record, sha)
     entry = {"sha": sha, "count": 1 if rollover else record.get("count", 0) + 1,
-             "lane": lane_name, "at": now}
+             "lane": lane_name, "at": now, "headClaims": repair_order.head_claims(record, sha) + 1}
     if not rollover and record.get("pushedHead"):
         entry["pushedHead"] = record["pushedHead"]  # self-pushes stay in the same generation
     if not rollover and record.get("reentry"):
@@ -1860,7 +1860,7 @@ def queue_failure(lane, number: int, limit: int = 4000) -> str:
 
 
 def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = None) -> dict | None:
-    """Under the claim lock: the first event-queued PR this lane may fix. Records the attempt,
+    """Under the claim lock: the event-queued PR this lane may fix, in repair_order. Records the attempt,
     posts the cross-host claim and retains repair labels until a fix pushes. Resolved or
     out-of-scope labels wait for bounded cleanup after productive selection declines. Spent
     and active heads retain their signals, so the PR shows why it is waiting and the relay
@@ -1873,7 +1873,7 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
     providers = lane.load_providers()
     order = cost_order(providers)
     disabled = set(providers) - set(order)
-    for pr in sorted(prs, key=lambda item: item["number"]):
+    for pr in sorted(prs, key=lambda item: repair_order.key(item, attempts)):
         if pr.get("isInMergeQueue") is True:
             continue  # Preserve events while native landing owns the target.
         record = attempts.get(str(pr["number"]), {})

@@ -189,7 +189,7 @@ test('rejects a squawk download that does not match the pinned sha256', async ()
       installSquawk({
         platform: 'linux',
         arch: 'x64',
-        fetchImpl: async () => new Response('not-the-release'),
+        download: () => ({ ok: true, bytes: Buffer.from('not-the-release') }),
       }),
     /Squawk checksum mismatch/
   );
@@ -200,49 +200,23 @@ test('rejects a squawk download that does not match the pinned sha256', async ()
   assert.match(SQUAWK_VERSION, /^2\.70\.0$/);
 });
 
-test('retries squawk 5xx and network errors with doubling jittered backoff', async () => {
-  const slept = [];
-  const sleep = async ms => {
-    slept.push(ms);
-  };
-  let calls = 0;
+test('a squawk release outage fails closed with the HTTP status', async () => {
+  const urls = [];
   await assert.rejects(
     () =>
       installSquawk({
         platform: 'linux',
         arch: 'x64',
-        sleep,
-        fetchImpl: async () => {
-          calls += 1;
-          if (calls === 1) throw new Error('fetch failed');
-          if (calls === 2) return new Response('gateway', { status: 504 });
-          return new Response('not-the-release');
+        download: url => {
+          urls.push(url);
+          return { ok: false, status: '504', error: 'release download exit 1' };
         },
       }),
-    /Squawk checksum mismatch/
+    /^Error: Squawk 2\.70\.0 download failed: 504 https:\/\/github\.com\/sbdchd\/squawk\/releases\/download\/v2\.70\.0\/squawk-linux-x64$/
   );
-  assert.equal(calls, 3);
-  calls = 0;
-  slept.length = 0;
-  await assert.rejects(
-    () =>
-      installSquawk({
-        platform: 'linux',
-        arch: 'x64',
-        sleep,
-        fetchImpl: async () => {
-          calls += 1;
-          return new Response('gateway', { status: 504 });
-        },
-      }),
-    /Squawk 2\.70\.0 download failed: 504 https:\/\/github\.com\/sbdchd\/squawk\//
-  );
-  assert.equal(calls, 6);
-  assert.equal(slept.length, 5);
-  slept.forEach((ms, i) => {
-    const base = 2000 * 2 ** i;
-    assert.ok(ms >= base && ms <= 2 * base, `sleep ${ms} outside ${base}`);
-  });
+  assert.deepEqual(urls, [
+    'https://github.com/sbdchd/squawk/releases/download/v2.70.0/squawk-linux-x64',
+  ]);
 });
 
 test('source validation blocks dependency and migration diffs', () => {

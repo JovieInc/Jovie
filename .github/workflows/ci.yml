@@ -174,7 +174,7 @@ jobs:
             --volume "$PWD:/repo:ro" \
             "$IMAGE_TAG" -lc '
               set -euo pipefail
-              test "$(node --version)" = v24.22.1
+              test "$(node --version)" = v24.22.2
               test "$(cd / && COREPACK_ENABLE_NETWORK=0 pnpm --version)" = 9.15.9
 
               dependency_status=$(JOVIE_RUNNER_REPO_ROOT=/repo \
@@ -315,7 +315,7 @@ jobs:
           assert_line 'pnpm store path' 'pnpm_store_path=/opt/jovie-pnpm-store' "$dependency_status"
           assert_line 'Playwright warm status' 'playwright_warm=true' "$playwright_status"
           assert_line 'Playwright browser path' 'playwright_browsers_path=/opt/ms-playwright' "$playwright_status"
-          assert_equal 'Node version' v24.22.1 "$(node --version)"
+          assert_equal 'Node version' v24.22.2 "$(node --version)"
           assert_equal 'pnpm version' 9.15.9 "$(pnpm --version)"
           assert_equal 'PLAYWRIGHT_BROWSERS_PATH' /opt/ms-playwright "$PLAYWRIGHT_BROWSERS_PATH"
           assert_executable 'Chromium' /opt/ms-playwright/chromium-1223/chrome-linux64/chrome
@@ -1143,7 +1143,7 @@ jobs:
           else
             echo "run_homepage_visual=false" >> "$GITHUB_OUTPUT"
           fi
-          MARKETING_DOM_PATTERN='^(\.github/workflows/ci\.yml|apps/web/app/\((marketing|home)\)/|apps/web/app/(globals\.css|layout\.tsx)|apps/web/components/(marketing|site|homepage|features/home|molecules/PhoneFrame)|apps/web/data/|apps/web/styles/|apps/web/public/(product-screenshots|device-bezels)/|apps/web/tests/e2e/utils/(route-dom|image-contrast)-detector\.ts|apps/web/tests/product-screenshots/route-dom-|apps/web/playwright\.config\.screenshots\.ts|packages/ui/)'
+          MARKETING_DOM_PATTERN='^(\.github/workflows/ci\.yml|apps/web/app/\((marketing|home)\)/|apps/web/app/(globals\.css|layout\.tsx)|apps/web/components/(marketing|site|homepage|features/home|molecules/PhoneFrame)|apps/web/data/|apps/web/styles/|apps/web/public/(product-screenshots|device-bezels)/|apps/web/tests/e2e/utils/(route-dom-[a-z-]+|image-contrast-detector)\.ts|apps/web/tests/product-screenshots/route-dom-|apps/web/playwright\.config\.screenshots\.ts|packages/ui/)'
           if grep -q -E "$MARKETING_DOM_PATTERN" "$CHANGED_PATHS"; then
             echo "run_marketing_dom=true" >> "$GITHUB_OUTPUT"
           else
@@ -1590,11 +1590,23 @@ jobs:
           # spend 5+ minutes in an effectively non-cancellable checkout. The
           # next step deepens only this event's exact base..head ancestry.
           fetch-depth: 1
+      - name: Restore pinned scanner binaries
+        # Warm cache never touches the network (JOV-11689). Contents are
+        # re-verified against scripts/security/scanner-pins.txt on every use.
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            /tmp/trufflehog-3.99.8
+            /tmp/gitleaks-8.21.2
+            /tmp/osv-scanner-2.5.1
+          key: scanner-bins-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/security/scanner-pins.txt') }}
       - name: Run secret scan
         env:
           # Keep Git-valid but shell-significant branch characters out of the
           # generated run script; GitHub transports this value as environment.
           PULL_REQUEST_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          # Read-only token for the release-download fallback.
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -2234,6 +2246,9 @@ jobs:
           go-version: '1.26.10'
           cache: false
       - name: Run actionlint
+        env:
+          # Read-only token for the release-download fallback.
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         run: bash .github/scripts/run-actionlint.sh
       - name: Fetch base-branch history
         # Await the background fetch. Fails closed on a non-zero fetch exit,
