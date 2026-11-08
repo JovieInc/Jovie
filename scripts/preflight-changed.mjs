@@ -60,6 +60,7 @@ import {
   recordRun,
   settleResult,
   takeSlot,
+  verdictLine,
 } from './lib/preflight-scope.mjs';
 
 export { baseRefCandidates, resolveBaseRef };
@@ -953,7 +954,7 @@ export async function main({
 
   const total = red.length + body.errors.length + companion.length;
   for (const line of failingItemLines({ red, body, companion })) log(line);
-  log(total ? `\n${total} item(s) to fix before pushing.` : '\nall clear.');
+  log(verdictLine(total, results));
 
   if (env.JOVIE_PREFLIGHT_LEDGER !== 'off') {
     try {
