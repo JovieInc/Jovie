@@ -1958,7 +1958,7 @@ describe('ProfileCompactTemplate', () => {
         render(profile());
 
         const expectClaimIntent = () => {
-          expect(screen.getByTestId('claim-banner')).toHaveTextContent(
+          expect(screen.getByTestId('claim-banner-copy')).toHaveTextContent(
             'Your profile is ready. Claim it to turn on release emails.'
           );
           expect(screen.getByTestId('claim-banner-cta')).toHaveAttribute(
@@ -2014,7 +2014,7 @@ describe('ProfileCompactTemplate', () => {
           `/test-artist?claim=${claim}&source=qr&token=private-token`
         );
         render(profile());
-        expect(screen.getByTestId('claim-banner')).toHaveTextContent(
+        expect(screen.getByTestId('claim-banner-copy')).toHaveTextContent(
           'This profile is unclaimed. Is it yours? Claim it with Spotify.'
         );
         fireEvent.click(

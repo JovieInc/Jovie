@@ -111,7 +111,7 @@ const SIDEBAR_NAV = [
   { label: 'Audience', Icon: Users },
 ] as const;
 
-/** Jovie for Mac: sidebar plus the Releases list, Supernova Girl selected. */
+/** Jovie for Mac: sidebar plus the Releases list, the inspected release selected. */
 export function AppWindow() {
   return (
     <div className='hv3-app'>
@@ -206,7 +206,7 @@ function InspectorRow({
   );
 }
 
-/** The release inspector (z7lmbm) for Supernova Girl, Details tab. */
+/** The release inspector (z7lmbm) for the inspected release, Details tab. */
 export function ReleaseInspector({
   anchor,
   eager = false,

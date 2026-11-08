@@ -1,0 +1,9 @@
+{
+  "schema": "jovie.marketing-image/v1",
+  "kind": "demo-artist-art",
+  "subject": "abstract",
+  "demo": true,
+  "source": "procedural",
+  "generator": "apps/web/scripts/demo-artists/render-demo-covers.py",
+  "note": "Invented demo artist imagery. No person, no text, resembles no real release."
+}

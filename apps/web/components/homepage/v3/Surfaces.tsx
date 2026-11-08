@@ -17,7 +17,7 @@ import { Anchor, Cover, DspGlyph } from './ProductUi';
 const PAGE = HOMEPAGE_PRODUCT_UI.releasePage;
 const PALETTE = HOMEPAGE_PRODUCT_UI.palette;
 
-/** The release page (VrRlg) for Supernova Girl; "+N more" follows the registry. */
+/** The release page (VrRlg) for the inspected release; "+N more" follows the registry. */
 export function ReleasePage() {
   const more = HOME_SPEC.listen - RELEASE_PAGE_SERVICES.length;
   return (

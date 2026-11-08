@@ -201,12 +201,24 @@ export function ensureOasdiffBinary(options = {}) {
   return { code: 0, binary };
 }
 
+// -f: without it a 504 error page exits 0 and fails the sha pin as a fake
+// mismatch (#24564). curl's own backoff doubles from 1s over 6 retries (~63s),
+// and --retry-all-errors also covers connection resets; failure stays red.
+export const OASDIFF_CURL_ARGS = Object.freeze([
+  '-fsSL',
+  '--retry',
+  '6',
+  '--retry-all-errors',
+  '--connect-timeout',
+  '20',
+  '--max-time',
+  '120',
+]);
+
 function defaultFetchTarball(url) {
-  const result = spawnSync(
-    'curl',
-    ['-sSL', '--retry', '3', '--max-time', '120', url],
-    { maxBuffer: 128 * 1024 * 1024 }
-  );
+  const result = spawnSync('curl', [...OASDIFF_CURL_ARGS, url], {
+    maxBuffer: 128 * 1024 * 1024,
+  });
   if (result.status !== 0 || !result.stdout || result.stdout.length === 0) {
     return { ok: false, error: `curl exit ${result.status}` };
   }
