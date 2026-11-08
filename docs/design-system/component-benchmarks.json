@@ -461,7 +461,7 @@
     },
     "packages/ui/atoms/searchable-submenu.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "bc3b9d298ae39871e653d518c59ce4215abc92feb9dd6c62784ef7409516ee15",
+      "sourceHash": "e7e85aeb85a570cfae30c4725ac0557ebd7e52e58a78934841223b1288becfef",
       "reference": "WAI-ARIA APG Combobox (listbox popup) inside APG Menu; Radix DropdownMenu.Sub",
       "checked": "combobox ARIA, activedescendant target, live regions, submenu keys, RTL search chrome",
       "gaps": [
@@ -480,8 +480,9 @@
         {
           "item": "two polite status regions announce loading at once (sr-only summary and the loading row)",
           "decision": "adapt",
-          "status": "open",
-          "reference": "WAI-ARIA live regions"
+          "status": "done",
+          "reference": "WAI-ARIA live regions",
+          "resolution": "the loading row is now visual only (its spinner aria-hidden); the one sr-only status region announces loading, results and empty"
         },
         {
           "item": "trigger row uses the physical MENU_ITEM_BASE padding (lib/dropdown-styles)",

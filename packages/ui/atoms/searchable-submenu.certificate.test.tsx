@@ -51,7 +51,7 @@ describe('SearchableSubmenu certificate coverage', () => {
     },
   ] satisfies SearchableSubmenuSection[];
 
-  function renderSubmenu(onSelect = vi.fn()) {
+  function renderSubmenu(onSelect = vi.fn(), isLoading = false) {
     return render(
       <DropdownMenuPrimitive.Root defaultOpen>
         <DropdownMenuPrimitive.Trigger>Actions</DropdownMenuPrimitive.Trigger>
@@ -61,6 +61,7 @@ describe('SearchableSubmenu certificate coverage', () => {
               triggerLabel='Choose platform'
               sections={sections}
               onSelect={onSelect}
+              isLoading={isLoading}
             />
           </DropdownMenuPrimitive.Content>
         </DropdownMenuPrimitive.Portal>
@@ -79,6 +80,23 @@ describe('SearchableSubmenu certificate coverage', () => {
     );
     expect(content).toBeInTheDocument();
     await expectNoA11yViolations(content as Element);
+  });
+
+  it('announces loading from one status region, not two', async () => {
+    const user = userEvent.setup({ delay: null });
+    renderSubmenu(vi.fn(), true);
+
+    await user.hover(screen.getByText('Choose platform'));
+    await screen.findByRole('combobox', { name: 'Search...' });
+    const content = document.querySelector(
+      '[data-slot="searchable-submenu-content"]'
+    ) as HTMLElement;
+    const regions = content.querySelectorAll('[role="status"], [aria-live]');
+    expect(regions).toHaveLength(1);
+    expect(regions[0]).toHaveTextContent('Loading results');
+    const spinner = content.querySelector('[data-slot="search-results"] svg');
+    expect(spinner).toHaveAttribute('aria-hidden', 'true');
+    await expectNoA11yViolations(content);
   });
 });
 
