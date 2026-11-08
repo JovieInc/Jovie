@@ -347,20 +347,31 @@ export function SegmentControl<T extends string = string>({
   );
 
   if (semantics === 'radio') {
+    // Same two layers as the tabs branch: the track (surface, padding) wraps
+    // the group, so the indicator's inset sits inside the track padding.
+    const {
+      value: groupValue,
+      onValueChange: onGroupValueChange,
+      ...trackProps
+    } = rootProps;
     return (
-      <RadixRadioGroup.Root
-        {...rootProps}
-        ref={listRef}
-        aria-label={ariaLabel}
-        className={cn(rootProps.className, listClass)}
-      >
-        {indicator}
-        {options.map(option => (
-          <RadixRadioGroup.Item key={option.value} {...triggerProps(option)}>
-            {triggerLabel(option)}
-          </RadixRadioGroup.Item>
-        ))}
-      </RadixRadioGroup.Root>
+      <div {...trackProps}>
+        <RadixRadioGroup.Root
+          ref={listRef}
+          dir={dir}
+          value={groupValue}
+          onValueChange={onGroupValueChange}
+          aria-label={ariaLabel}
+          className={listClass}
+        >
+          {indicator}
+          {options.map(option => (
+            <RadixRadioGroup.Item key={option.value} {...triggerProps(option)}>
+              {triggerLabel(option)}
+            </RadixRadioGroup.Item>
+          ))}
+        </RadixRadioGroup.Root>
+      </div>
     );
   }
 

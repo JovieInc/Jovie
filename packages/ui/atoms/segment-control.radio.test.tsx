@@ -22,7 +22,7 @@ describe('SegmentControl radio semantics', () => {
       />
     );
     const group = screen.getByRole('radiogroup', { name: 'Link category' });
-    expect(group).toHaveAttribute('data-semantics', 'radio');
+    expect(group.parentElement).toHaveAttribute('data-semantics', 'radio');
     expect(screen.getAllByRole('radio')).toHaveLength(3);
     expect(screen.getByRole('radio', { name: 'Music' })).toHaveAttribute(
       'aria-checked',
@@ -31,6 +31,37 @@ describe('SegmentControl radio semantics', () => {
     expect(screen.queryByRole('tab')).toBeNull();
     expect(screen.queryByRole('tabpanel', { hidden: true })).toBeNull();
     expect(document.querySelector('[aria-controls]')).toBeNull();
+  });
+
+  it('wraps the group in the same track layer as the tablist', () => {
+    const { unmount } = render(
+      <SegmentControl
+        variant='linear-pill'
+        value='links'
+        onValueChange={() => {}}
+        options={defaultOptions}
+        aria-label='Tabs'
+      />
+    );
+    const tablist = screen.getByRole('tablist', { name: 'Tabs' });
+    const tabsTrack = tablist.parentElement?.className;
+    const tabsList = tablist.className;
+    unmount();
+
+    render(
+      <SegmentControl
+        semantics='radio'
+        variant='linear-pill'
+        value='links'
+        onValueChange={() => {}}
+        options={defaultOptions}
+        aria-label='Radios'
+      />
+    );
+    const group = screen.getByRole('radiogroup', { name: 'Radios' });
+    expect(group.parentElement?.className).toBe(tabsTrack);
+    expect(group.className).toBe(tabsList);
+    expect(group.className).not.toContain('inline-flex');
   });
 
   it('styles the checked item like an active tab', () => {

@@ -490,7 +490,7 @@
     },
     "packages/ui/atoms/segment-control.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "f3c5f1df91ecedc6adf76bf2707afdc867b52ba6cdad0c24b25ccc4b107be13c",
+      "sourceHash": "e51cd7fe7241a604da6976613c526dedccb649a1d79e432e5d344425c13af87e",
       "reference": "WAI-ARIA APG Tabs (automatic activation); Radix Tabs; shadcn/ui Tabs",
       "checked": "tablist naming, arrow/Home/End keys, dir, disabled tabs, panel relationship, radio-group semantics",
       "gaps": [
