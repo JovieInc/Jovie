@@ -43,6 +43,17 @@ A passing a11y or visual record is a story-capture receipt
 captured in both `light` and `dark`. A pass without that proof is ignored (the
 CLI names it on stderr), so the criterion stays unknown; a `fail` always stands.
 
+`scripts/component-story-evidence.mjs` produces those receipts for every
+`packages/ui` component. The `component-story-evidence` job in
+`visual-a11y.yml` runs it on a GitHub-hosted runner (it refuses anything else,
+so Storybook never runs on gem). It renders each story in light and dark and
+fails on render or console errors, a theme that did not apply, or WCAG 2.2 AA
+axe violations. Only a screenshot hash is recorded, since there are no pixel
+baselines yet. The job saves `visual.json` and `a11y.json` to the
+`component-story-evidence-` cache, and `component-certificate.yml` restores
+them. Locally: start `storybook dev` in `apps/web`, then run
+`node scripts/component-story-evidence.mjs --local --component packages/ui/atoms/button.tsx`.
+
 Mutation records keep the canonical sweep format: `blob` is
 `moduleKey(source Git blob, same-stem test Git blobs)` and `sha` is the measured
 commit. The CLI recomputes the key from the current component and all tracked
