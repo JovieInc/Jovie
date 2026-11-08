@@ -12,6 +12,11 @@
  * receipt.json, so a missing secret reads as blocked, never as done.
  *
  *   node scripts/design/pen-draft.mjs --out DIR [--only claim,homepage]
+ *   node scripts/design/pen-draft.mjs --plan [--changed FILE] [--only ...]
+ *
+ * --plan prints the frames a run should draft as a JSON array. CI drafts
+ * each one in its own job, because ten briefs at up to 15 minutes each
+ * outran the 75-minute job on Nov 8 and lost every draft to the timeout.
  */
 import { execFileSync } from 'node:child_process';
 import {
@@ -50,8 +55,39 @@ export function loadBriefs(dir = BRIEFS_DIR, only = null) {
   return readdirSync(dir)
     .filter(f => f.endsWith('.md'))
     .sort()
-    .map(f => parseBrief(readFileSync(join(dir, f), 'utf8'), f))
+    .map(f => ({
+      ...parseBrief(readFileSync(join(dir, f), 'utf8'), f),
+      file: f,
+    }))
     .filter(b => !only || only.includes(b.frame));
+}
+
+/** Files whose change means every frame has to be drafted again. */
+export const DRAFTER_FILES = [
+  'scripts/design/pen-draft.mjs',
+  '.github/workflows/pen-draft.yml',
+];
+
+/**
+ * The frames a run drafts. A push drafts only the briefs it changed, so
+ * editing one brief doesn't redraw (and pay for) all of them; a change to
+ * the drafter itself, or no list of changed files, drafts every brief.
+ */
+export function planFrames({ briefs, changed = null, only = null }) {
+  if (only?.length) {
+    const unknown = only.filter(f => !briefs.some(b => b.frame === f));
+    if (unknown.length)
+      throw new Error(`no brief for --only ${unknown.join(', ')}`);
+    return briefs.filter(b => only.includes(b.frame)).map(b => b.frame);
+  }
+  if (!changed || changed.some(p => DRAFTER_FILES.includes(p)))
+    return briefs.map(b => b.frame);
+  const edited = new Set(
+    changed
+      .filter(p => dirname(p) === BRIEFS_DIR && p.endsWith('.md'))
+      .map(p => basename(p))
+  );
+  return briefs.filter(b => edited.has(b.file)).map(b => b.frame);
 }
 
 /** The pen arguments for one brief, drafting into its own output file. */
@@ -157,8 +193,29 @@ export function writeCanonical(bytes, workDir, wanted) {
 
 async function main() {
   const { values } = parseArgs({
-    options: { out: { type: 'string' }, only: { type: 'string' } },
+    options: {
+      out: { type: 'string' },
+      only: { type: 'string' },
+      plan: { type: 'boolean' },
+      changed: { type: 'string' },
+    },
   });
+  if (values.plan) {
+    const only = values.only
+      ?.split(',')
+      .map(f => f.trim())
+      .filter(Boolean);
+    const changed = values.changed
+      ? readFileSync(values.changed, 'utf8')
+          .split('\n')
+          .map(l => l.trim())
+          .filter(Boolean)
+      : null;
+    console.log(
+      JSON.stringify(planFrames({ briefs: loadBriefs(), changed, only }))
+    );
+    return;
+  }
   if (!values.out) throw new Error('--out DIR is required');
   // Absolute: pen runs from the workspace folder so its assets resolve.
   const outDir = resolve(values.out);

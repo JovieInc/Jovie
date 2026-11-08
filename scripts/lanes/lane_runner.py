@@ -6579,7 +6579,7 @@ def merge_narrowed_preflight_fix(host: Host, pr: dict, route: dict, worktree: Pa
     return types.SimpleNamespace(returncode=0)
 
 
-REPAIR_AUTHORITY_FIELDS = """number title body state mergedAt headRefName baseRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
+REPAIR_AUTHORITY_FIELDS = """number title body state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
 isCrossRepository isInMergeQueue labels(first:100){pageInfo{hasNextPage} nodes{name}}
 latestOpinionatedReviews(first:100,writersOnly:false){totalCount pageInfo{hasNextPage}
 nodes{id state body submittedAt updatedAt author{__typename login} commit{oid}}}
@@ -8166,7 +8166,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             def boundary(stage="repair-command", allow_local_push=False):
                 require_disk(host, stage)
                 verify_target(pr, stage, worktree=worktree if allow_local_push else None)
-            resolved_name = fix_red_classes.retarget_if_needed(pr, receipt, gh_call, REPO_SLUG)
+            resolved_name = None
             if pr.get("mergeStateStatus") == "DIRTY":
                 for boundary_id, resolver, resolution in conflict_resolvers():
                     execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],

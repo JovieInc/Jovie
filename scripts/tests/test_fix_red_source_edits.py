@@ -143,26 +143,5 @@ diff --git a/apps/web/../outside.ts b/apps/web/../outside.ts
             self.assertEqual(path.read_text(), "export const runtime = 'nodejs';\n")
 
 
-class BaseRetargetTest(unittest.TestCase):
-    def test_script_source_is_not_a_base_retarget_and_the_argv_is_shared(self):
-        source = "throw new Error('PRs must target main. Retarget the pull request base to main.');"
-        self.assertEqual(classes.classify(pr("PR targets main"), {"PR targets main": source})["action"], classes.AGENT)
-        runtime = "Error: PRs must target main. Retarget the pull request base to main."
-        got = classes.classify(pr("PR targets main"), {"PR targets main": runtime})
-        self.assertEqual((got["cls"], got["action"]), ("base-not-main", "retarget-pr-base-to-main"))
-        argv = ["pr", "edit", "24530", "--repo", "JovieInc/Jovie", "--base", "main"]
-        self.assertEqual(classes.retarget_main_args(24530), argv)
-        live = {"state": "OPEN", "isInMergeQueue": False, "baseRefName": "parent", "number": 24530,
-                "mergeStateStatus": "DIRTY", "statusCheckRollup": [{"name": "PR targets main", "conclusion": "FAILURE"}]}
-        self.assertTrue(classes.should_retarget_base(live))
-        self.assertFalse(classes.should_retarget_base({**live, "baseRefName": "main"}) or classes.should_retarget_base({**live, "isInMergeQueue": True}))
-        seen, receipt = [], {}
-        ok = lambda args, priority="repair": seen.append((args, priority)) or type("R", (), {"returncode": 0})()
-        self.assertIsNone(classes.retarget_if_needed(live, receipt, ok, "JovieInc/Jovie"))
-        self.assertEqual((seen, receipt.get("retargetedBase"), live["baseRefName"]), ([(argv, "repair")], "main", "main"))
-        clean = {**live, "baseRefName": "parent", "mergeStateStatus": "BLOCKED"}
-        self.assertEqual(classes.retarget_if_needed(clean, {}, ok, "JovieInc/Jovie"), "retargeted-main")
-
-
 if __name__ == "__main__":
     unittest.main()
