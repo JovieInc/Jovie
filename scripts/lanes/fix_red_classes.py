@@ -117,6 +117,11 @@ _QUOTED_LIST_ENTRY = re.compile(r"^[ \t]*'[^'\n]+',[ \t]*$")
 _IDENT_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9-]*")
 _AND_CHAIN_LINE = re.compile(
     r"""^(?P<indent>[ \t]*)(?P<prefix>(?:"[^"\n]+"\s*:\s*)?)(?P<q>['"])(?P<command>[^'"\n]*&&[^'"\n]*)(?P=q)(?P<suffix>,?)\s*$""")
+# Plain workflow run scalars use the same union. Limit their alphabet so YAML
+# comments, shell expansion, redirection and other operators remain unresolved.
+_YAML_AND_CHAIN_LINE = re.compile(
+    r"^(?P<indent>[ \t]*)(?P<prefix>run: )(?P<q>)"
+    r"(?P<command>[\w./@=:\t -]+(?:&&[\w./@=:\t -]+)+)(?P<suffix>)$")
 _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 
 # (class, pattern, action). First match wins per check; order is most specific first.
@@ -264,6 +269,8 @@ def _file_list_prefix_and_files(segment: str) -> tuple[str, list[str]] | None:
 def _opaque_command_key(segment: str) -> tuple[str, ...]:
     """Identity of one && segment. Flags-only commands key on the executable."""
     tokens = segment.split()
+    if len(tokens) >= 4 and tokens[:2] == ["pnpm", "--filter"]:
+        return tuple(tokens[:4])
     if len(tokens) >= 2 and not tokens[1].startswith("-"):
         return tokens[0], tokens[1]
     return (tokens[0],)
@@ -337,7 +344,7 @@ def _and_chain_commands(lines: list[str]) -> tuple[list[re.Match[str]], list[str
     found = []
     other = []
     for line in lines:
-        match = _AND_CHAIN_LINE.match(line)
+        match = _AND_CHAIN_LINE.match(line) or _YAML_AND_CHAIN_LINE.match(line)
         if match:
             found.append(match)
         else:
@@ -374,6 +381,8 @@ def _resolve_and_chain_hunk(ours: str, theirs: str) -> str | None:
             or ours_match.group("prefix") != theirs_match.group("prefix") \
             or ours_match.group("suffix") != theirs_match.group("suffix"):
         return None
+    if ours_match.group("q") == "" and ours_other != theirs_other:
+        return None
     if _json_key_conflicts(ours_other, theirs_other):
         return None
     merged = merge_and_chain(ours_match.group("command"), theirs_match.group("command"))
@@ -384,7 +393,7 @@ def _resolve_and_chain_hunk(ours: str, theirs: str) -> str | None:
         f"{theirs_match.group('q')}{merged}{theirs_match.group('q')}{theirs_match.group('suffix')}")
     lines = []
     for line in theirs.splitlines():
-        match = _AND_CHAIN_LINE.match(line)
+        match = _AND_CHAIN_LINE.match(line) or _YAML_AND_CHAIN_LINE.match(line)
         lines.append(command_line if match else line)
     for line in ours_other:
         if line not in lines:

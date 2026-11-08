@@ -1,8 +1,11 @@
+# Recovered from the deployed Worker (source map sourcesContent) 2026-10-31.
 name = "jovie-prod-liveness"
 main = "src/index.ts"
 compatibility_date = "2026-10-15"
 workers_dev = true
 preview_urls = false
+# Preserve dashboard-set variables and secrets when explicitly deployed.
+keep_vars = true
 
 [vars]
 TARGETS = "https://jov.ie/,https://summer.jov.ie/runtime/v1/health"
@@ -11,13 +14,12 @@ EMAIL_TO = "tim@jov.ie"
 SUMMER_PAGE_URL = "https://summer.jov.ie/summer/v1/events/liveness"
 
 [triggers]
+# Keep the minute probe until the hub task is enabled in the same deployment.
 crons = ["* * * * *"]
 
 [[kv_namespaces]]
 binding = "STATE"
 id = "0282eb9b15e8474da733c8d97736c047"
 
-# Secret: PAGE_URLS, comma-separated HTTPS endpoints that receive the JSON page (Slack incoming
-# webhook, Summer ingress). Runs on Cloudflare so a Vercel pause cannot silence it.
-
-# Page channels (secrets: RESEND_API_KEY, SUMMER_LIVENESS_SECRET; optional PAGE_URLS).
+# Page channels: secrets RESEND_API_KEY, SUMMER_LIVENESS_SECRET, optional PAGE_URLS.
+# CRON_HUB_SECRET authenticates the disabled-by-default hub dispatch adapter.

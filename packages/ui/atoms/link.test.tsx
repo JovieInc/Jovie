@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { Link } from './link';
 
@@ -278,5 +280,75 @@ describe('Link', () => {
     expect(link).toHaveAttribute('data-appearance', 'unstyled');
     expect(link.className).not.toContain('text-(--color-link-default)');
     expect(link.className).not.toContain('visited:text-(--color-link-visited)');
+  });
+});
+
+describe('Link interaction', () => {
+  it('activates on click and on Enter from the keyboard', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn(event => event.preventDefault());
+    render(
+      <Link href='/docs' onClick={onClick}>
+        Documentation
+      </Link>
+    );
+
+    const link = screen.getByRole('link', { name: 'Documentation' });
+    await user.click(link);
+    expect(onClick).toHaveBeenCalledTimes(1);
+
+    link.blur();
+    await user.tab();
+    expect(link).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(onClick).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores click and Enter while disabled', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(
+      <Link href='/off' disabled onClick={onClick}>
+        Unavailable destination
+      </Link>
+    );
+
+    const link = screen.getByRole('link', { name: 'Unavailable destination' });
+    await user.click(link);
+    link.focus();
+    await user.keyboard('{Enter}');
+    expect(onClick).not.toHaveBeenCalled();
+  });
+});
+
+describe('Link accessibility', () => {
+  it('has no axe violations across variants, states, reserved label and RTL', async () => {
+    const { container } = render(
+      <div>
+        <Link href='#default'>Default destination</Link>
+        <Link href='#subtle' variant='subtle'>
+          Subtle destination
+        </Link>
+        <Link href='#inline' variant='inline'>
+          Inline destination
+        </Link>
+        <Link href='#current' active aria-current='page'>
+          Current destination
+        </Link>
+        <Link href='#disabled' disabled>
+          Unavailable destination
+        </Link>
+        <Link
+          href='#sign-in'
+          variant='compact'
+          touchTarget
+          reserveLabel='Sign in'
+        />
+        <span dir='rtl'>
+          <Link href='#rtl'>اقرأ ملاحظات الإصدار الكاملة</Link>
+        </span>
+      </div>
+    );
+    await expectNoA11yViolations(container);
   });
 });

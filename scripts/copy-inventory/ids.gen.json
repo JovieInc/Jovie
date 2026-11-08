@@ -317,6 +317,7 @@
     "apps/web/app/claim/page.tsx#Artist Lookup Unavailable": "CLAIM-15",
     "apps/web/app/claim/page.tsx#Checkout Canceled": "CLAIM-12",
     "apps/web/app/claim/page.tsx#Claim Your Artist Profile": "CLAIM-17",
+    "apps/web/app/claim/page.tsx#Claim your artist profile": "CLAIM-45",
     "apps/web/app/claim/page.tsx#Claim your artist profile | {…}": "CLAIM-1",
     "apps/web/app/claim/page.tsx#Email Support": "CLAIM-8",
     "apps/web/app/claim/page.tsx#Find or create your artist profile and get {…} for {…}.": "CLAIM-2",

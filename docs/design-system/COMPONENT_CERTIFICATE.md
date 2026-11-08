@@ -7,6 +7,15 @@ persistent whole-tree ledger that says what each component still lacks.
 Run: `node scripts/component-certificate.mjs --all --out report.json --summary`
 or `--component <path> --spec` for the agent-ready work order.
 
+Gate: `node scripts/component-certificate.mjs --gate` (run by `pnpm
+component-ship-gate`) fails when any component under a `gates` prefix in
+`component-certification.json` has a gated criterion that is `fail` or
+`unknown`. The gate only ratchets up: add a prefix once a layer is clean, and
+add a criterion once its evidence producer exists. @jovie/ui is gated on
+ds-owner, tokens, states, tests, a11y and frontend-rules as each component is
+certified; mutation, visual and benchmark join once their producers record
+source-bound evidence.
+
 Fail-closed: a criterion with no evidence is `unknown` and counts as missing.
 Invalid JSON in an input file blocks report generation with a nonzero exit.
 

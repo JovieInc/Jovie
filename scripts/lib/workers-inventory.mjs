@@ -67,12 +67,14 @@ export function compareWorkers({ deployed, repoNames, canon }) {
   return errors;
 }
 
+/** @param {{accountId: string, token?: string, fetchImpl?: typeof fetch, store?: import('../../packages/api-client/store.ts').LedgerStore}} options */
 export async function fetchDeployedWorkers({
   accountId,
   token,
   fetchImpl = fetch,
   store = undefined,
 }) {
+  if (!token) throw new Error('workers-list-token-missing');
   const spec = providerSpec('cloudflare');
   const client = createApiClient({
     provider: 'cloudflare',
@@ -88,7 +90,7 @@ export async function fetchDeployedWorkers({
     res = await client.request({
       url: `https://${spec.hosts[0]}${spec.pathPrefix}accounts/${accountId}/workers/scripts`,
       method: 'GET',
-      priority: 'report',
+      priority: 'repair',
       write: false,
       idempotent: true,
       maxAttempts: 2,
