@@ -7,7 +7,6 @@
  */
 
 import { CircleHelp } from 'lucide-react';
-import type { CSSProperties } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
@@ -63,19 +62,17 @@ export function ProviderIcon({
   const providerConfig = PROVIDER_CONFIG[provider];
   const platform = PROVIDER_PLATFORM_MAP[provider];
   const brandColor = providerConfig?.accent ?? 'currentColor';
-  const style = {
-    '--provider-icon-light': getContrastSafeIconColor(brandColor, false),
-    '--provider-icon-dark': getContrastSafeIconColor(brandColor, true),
-  } as CSSProperties;
+  // light-dark() follows `.dark { color-scheme: dark }`, so no theme hook needed.
+  const color = `light-dark(${getContrastSafeIconColor(brandColor, false)}, ${getContrastSafeIconColor(brandColor, true)})`;
 
   if (!providerConfig || !platform) {
     return (
       <span
         className={cn(
-          'inline-flex shrink-0 items-center justify-center text-[var(--provider-icon-light)] dark:text-[var(--provider-icon-dark)]',
+          'inline-flex shrink-0 items-center justify-center',
           className
         )}
-        style={style}
+        style={{ color }}
       >
         <CircleHelp
           className='h-full w-full'
@@ -89,10 +86,10 @@ export function ProviderIcon({
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center justify-center text-[var(--provider-icon-light)] dark:text-[var(--provider-icon-dark)]',
+        'inline-flex shrink-0 items-center justify-center',
         className
       )}
-      style={style}
+      style={{ color }}
     >
       <SocialIcon
         platform={platform}
