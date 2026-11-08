@@ -221,7 +221,11 @@ describe('OnboardingProfileRail', () => {
     expect(portrait, 'portrait fell back to a placeholder').not.toBeNull();
     expect(portrait?.getAttribute('src')).toBe(portraitUrl);
     const artwork = within(phone).getByRole('img', { name: 'Vibe artwork' });
-    expect(artwork.getAttribute('src')).toBe(artworkUrl);
+    // Artwork still goes through the image optimizer; it must carry the
+    // real Spotify artwork URL, never a placeholder.
+    expect(decodeURIComponent(artwork.getAttribute('src') ?? '')).toContain(
+      artworkUrl
+    );
     // The artist keeps their own spelling; the UI never forces caps.
     expect(within(phone).getAllByText('UNMARKED').length).toBeGreaterThan(0);
   });
