@@ -9,15 +9,32 @@ import { APP_ROUTES } from '@/constants/routes';
 import { ProfilePaySurface } from '@/features/dashboard/molecules/ProfilePaySurface';
 import { useProfileMonetizationSummary } from '@/lib/queries';
 
+// Mirrors ProfilePaySurface's settings layout, including the 148px QR box
+// that stacks under the text below lg. Without it the loaded block grew by
+// the QR's height on phones and pushed the panels below down (CLS 0.206 on
+// /app/earnings, which lands on #pay).
 function LoadingState() {
   return (
-    <div className='space-y-3 px-4 py-4 sm:px-5'>
-      <div className='h-6 w-28 rounded-full skeleton' />
-      <div className='h-4 w-full max-w-md rounded skeleton' />
-      <div className='h-4 w-3/4 rounded skeleton' />
-      <div className='flex gap-2'>
-        <div className='h-8 w-28 rounded-md skeleton' />
-        <div className='h-8 w-28 rounded-md skeleton' />
+    <div
+      className='grid gap-4 px-4 py-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_148px] lg:items-start'
+      data-testid='settings-pay-loading'
+    >
+      <div className='min-w-0 space-y-3'>
+        <div className='h-5 w-28 rounded-full skeleton' />
+        <div className='space-y-1'>
+          <div className='h-[19px] w-full max-w-md rounded skeleton' />
+          <div className='h-[19px] w-3/4 rounded skeleton' />
+        </div>
+        <div className='flex gap-2'>
+          <div className='h-8 w-28 rounded-md skeleton' />
+          <div className='h-8 w-28 rounded-md skeleton' />
+        </div>
+      </div>
+      <div className='flex lg:justify-end'>
+        <div
+          className='h-37 w-37 shrink-0 rounded-2xl skeleton'
+          data-testid='settings-pay-loading-qr'
+        />
       </div>
     </div>
   );

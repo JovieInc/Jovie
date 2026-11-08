@@ -22,6 +22,9 @@ vi.mock('@/features/dashboard/organisms/SettingsNotificationsSection', () => ({
 
 vi.mock('./SessionManagementCard', () => ({
   SessionManagementCard: () => <div data-testid='session-management-card' />,
+  SessionManagementSkeleton: () => (
+    <div data-testid='session-management-skeleton' />
+  ),
 }));
 
 describe('AccountSettingsSection', () => {
@@ -103,6 +106,26 @@ describe('AccountSettingsSection', () => {
     expect(screen.getByTestId('account-identity-loading')).toHaveClass(
       'min-h-32'
     );
+  });
+
+  it('holds the Active Sessions panel in place until the session loads', () => {
+    // In production the page renders before the client session loads; the
+    // panel appearing later pushed everything below it down (phone CLS).
+    useUserSafe.mockReturnValue({
+      isLoaded: false,
+      isSignedIn: false,
+      user: null,
+    });
+    useSessionSafe.mockReturnValue({
+      isLoaded: false,
+      isSignedIn: false,
+      session: null,
+    });
+
+    render(<AccountSettingsSection />);
+    expect(screen.getByText('Active Sessions')).toBeTruthy();
+    expect(screen.getByTestId('session-management-skeleton')).toBeTruthy();
+    expect(screen.queryByTestId('session-management-card')).toBeNull();
   });
 
   it('preserves identity geometry when loading resolves signed out', () => {

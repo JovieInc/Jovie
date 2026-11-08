@@ -102,4 +102,23 @@ describe('SettingsPaySection', () => {
 
     expect(mockRefetch).toHaveBeenCalledTimes(1);
   });
+  it('holds the QR box and the loaded grid while the summary loads', () => {
+    // Below lg the loaded block stacks a 148px QR box under the text; a
+    // placeholder without it grew on load and shifted the page (phone CLS
+    // 0.206 on /app/earnings, Nov 8).
+    mockUseProfileMonetizationSummary.mockReturnValue({
+      data: undefined,
+      isError: false,
+      isLoading: true,
+      refetch: mockRefetch,
+    });
+
+    const { getByTestId } = fastRender(<SettingsPaySection />);
+
+    expect(getByTestId('settings-pay-loading')).toHaveClass(
+      'grid',
+      'lg:grid-cols-[minmax(0,1fr)_148px]'
+    );
+    expect(getByTestId('settings-pay-loading-qr')).toHaveClass('h-37', 'w-37');
+  });
 });
