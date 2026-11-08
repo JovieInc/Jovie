@@ -16,6 +16,8 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { compare, LIMIT, lineCount } from '../company-guards/size.mjs';
+
 const hooksDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(hooksDir, '../..');
 const gateScript = path.join(hooksDir, 'pre-push-gate.sh');
@@ -75,9 +77,44 @@ test('publication remains policy gated without running affected tests', () => {
   assert.match(publication, /git diff --check/);
   assert.match(publication, /scan-secrets\.sh publication origin\/main/);
   assert.match(publication, /policy-gate-liveness\.mjs/);
+  assert.match(publication, /node scripts\/company-guards\/size\.mjs/);
   assert.doesNotMatch(publication, /automation-verify|run_affected/);
   assert.match(publication, /bash scripts\/hooks\/biome-pre-push\.sh/);
   assert.doesNotMatch(publication, /typecheck|coverage|biome check \./);
+});
+
+test('affected pushes run the company size ratchet before heavier checks', () => {
+  const source = readFileSync(gateScript, 'utf8');
+  const affected = source.split('run_affected() {', 2)[1].split('\n}', 1)[0];
+  assert.match(affected, /node scripts\/company-guards\/size\.mjs/);
+  assert.match(
+    affected,
+    /node scripts\/company-guards\/size\.mjs[\s\S]*run_lint/
+  );
+});
+
+test('company size ratchet counts like Company Guards and rejects growth', () => {
+  assert.equal(lineCount('a\nb\n'), 2);
+  assert.equal(lineCount('a\nb'), 2);
+  assert.equal(LIMIT, 500);
+  const file = 'scripts/lib/credentials-registry.mjs';
+  assert.deepEqual(compare({ [file]: 688 }, { [file]: 687 }), [
+    `${file}: grew 687 -> 688`,
+  ]);
+  assert.deepEqual(compare({ [file]: 687 }, { [file]: 687 }), []);
+  assert.deepEqual(compare({ 'new/file.mjs': 501 }, {}), [
+    'new/file.mjs: 501 lines, over 500 and not baselined',
+  ]);
+});
+
+test('company size ratchet refuses to rewrite its baseline', () => {
+  const result = spawnSync(
+    process.execPath,
+    ['scripts/company-guards/size.mjs', '--update'],
+    { cwd: repoRoot, encoding: 'utf8' }
+  );
+  assert.equal(result.status, 2, result.stderr);
+  assert.match(result.stderr, /--update is refused/);
 });
 
 for (const linkedWorktree of [false, true]) {
@@ -231,6 +268,7 @@ test('publication rejects committed formatter drift and accepts the formatted re
     // Other publication checks are outside this formatting contract. Real Git,
     // the publication dispatcher and the installed Biome run without mocks.
     write('scripts/ci-branching-guard.mjs', 'export {};\n');
+    write('scripts/company-guards/size.mjs', 'export {};\n');
     write('scripts/component-ship-gate.mjs', 'export {};\n');
     write('scripts/lib/policy-gate-liveness.mjs', 'export {};\n');
     write('scripts/preflight-changed.mjs', 'export {};\n');
@@ -309,6 +347,7 @@ test('publication blocks missing component stories and tests before publishing',
       true
     );
     write('scripts/ci-branching-guard.mjs', '');
+    write('scripts/company-guards/size.mjs', 'export {};\n');
     write('scripts/security/scan-secrets.sh', 'exit 0\n');
     write(
       'scripts/lib/policy-gate-liveness.mjs',

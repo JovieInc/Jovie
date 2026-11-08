@@ -16,6 +16,10 @@
  * Pure functions only; live reads and filing live in the callers.
  */
 
+import * as registryRules from './credentials-registry-rules.mjs';
+
+export const lastUsedMonths = registryRules.lastUsedMonths;
+
 export const DAY_MS = 24 * 60 * 60 * 1000;
 export const CREDENTIALS_SCHEMA = 'jovie.credentials-registry/v1';
 export const SPEND_SCHEMA = 'jovie.spend-ledger/v1';
@@ -39,14 +43,6 @@ const VALID_STATUSES = new Set([
   'retired',
   'unused',
 ]);
-/**
- * Spend expiry statuses that no longer alert. A dated expiry whose deadline
- * passed (lapsed) or was consumed (redeemed, superseded) is registry history:
- * the data marks it resolved and the check skips it, mirroring retired
- * credential statuses, so a lapsed deadline never pages forever.
- */
-const RESOLVED_EXPIRY_STATUSES = new Set(['lapsed', 'redeemed', 'superseded']);
-const VALID_EXPIRY_STATUSES = new Set(['active', ...RESOLVED_EXPIRY_STATUSES]);
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low', 'info'];
 const PRIORITY_BY_SEVERITY = { critical: 1, high: 2, medium: 3, low: 4 };
 
@@ -155,15 +151,7 @@ export function validateSpendLedger(ledger) {
     ids.add(entry.id);
     if (entry.cap && !(entry.cap.amountUsd > 0))
       errors.push(`${entry.id}: cap.amountUsd must be positive`);
-    for (const dated of entry.expiries ?? []) {
-      if (
-        dated.status !== undefined &&
-        !VALID_EXPIRY_STATUSES.has(dated.status)
-      )
-        errors.push(
-          `${entry.id}: ${dated.id}: unknown expiry status ${dated.status}`
-        );
-    }
+    errors.push(...registryRules.spendExpiryStatusErrors(entry));
   }
   // funding says who pays: `cash`, or `credits` drawn from another entry (the credit pool).
   // Summer reads it to report net cash spend; an entry without it is reported as unknown.
@@ -477,7 +465,7 @@ export function evaluateSpend(ledger, nowMs, live = {}, thresholds = {}) {
       }
     }
     for (const dated of entry.expiries ?? []) {
-      if (RESOLVED_EXPIRY_STATUSES.has(dated.status)) continue;
+      if (registryRules.isResolvedSpendExpiry(dated)) continue;
       const expiry = expiryFinding({
         kind: 'spend',
         id: `${entry.id}:${dated.id}`,
@@ -620,17 +608,6 @@ export function planFindings(findings, { minSeverity = 'medium' } = {}) {
         reopenTerminal: true,
       };
     });
-}
-
-/** Months implied by GitHub's "Last used within the last N <unit>" text. */
-export function lastUsedMonths(text) {
-  if (!text) return null;
-  if (/never/i.test(text)) return Infinity;
-  const match = /(\d+)\s*(week|month|year)/i.exec(text);
-  if (!match) return null;
-  const n = Number(match[1]);
-  const unit = match[2].toLowerCase();
-  return unit === 'week' ? n / 4.35 : unit === 'year' ? n * 12 : n;
 }
 
 /**

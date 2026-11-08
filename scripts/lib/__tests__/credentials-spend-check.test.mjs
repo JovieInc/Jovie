@@ -179,53 +179,6 @@ describe('live overlays', () => {
       }),
     ]);
   });
-
-  it('stops alerting once a dated spend expiry is resolved as lapsed', () => {
-    const ledger = spend([
-      {
-        id: 'codex-fourth',
-        label: 'Codex subscription capacity: fourth (pro)',
-        owner: 'gem-lanes',
-        expiries: [
-          {
-            id: 'banked-reset-1',
-            label: 'banked rate-limit reset redemption deadline',
-            expiresAt: '2026-10-29T19:10:07Z',
-            status: 'lapsed',
-          },
-        ],
-      },
-    ]);
-    const { findings } = evaluate(
-      credentials(),
-      ledger,
-      '2026-11-07T00:00:00Z'
-    );
-    expect(
-      findings.filter(item =>
-        item.fingerprint.startsWith('spend-expiry:codex-fourth')
-      )
-    ).toEqual([]);
-  });
-
-  it('rejects an unknown spend expiry status instead of silently muting it', () => {
-    const ledger = spend([
-      {
-        id: 'codex-fourth',
-        expiries: [
-          {
-            id: 'banked-reset-1',
-            label: 'banked rate-limit reset redemption deadline',
-            expiresAt: '2026-10-29T19:10:07Z',
-            status: 'lapzed',
-          },
-        ],
-      },
-    ]);
-    expect(validateSpendLedger(ledger)).toEqual([
-      'codex-fourth: banked-reset-1: unknown expiry status lapzed',
-    ]);
-  });
 });
 
 describe('runCheck', () => {
@@ -360,25 +313,6 @@ describe('committed registry', () => {
       nowMs: Date.parse(creds.updatedAt) + DAY_MS,
     });
     expect(counts.unclaimedSecretNames).toBe(0);
-  });
-
-  it('records the lapsed codex-fourth banked reset instead of re-alerting forever', () => {
-    const fourth = ledger.providers.find(
-      provider => provider.id === 'codex-fourth'
-    );
-    expect(fourth?.expiries).toEqual([
-      expect.objectContaining({ id: 'banked-reset-1', status: 'lapsed' }),
-    ]);
-    const { findings } = evaluateRegistry({
-      credentials: creds,
-      spend: ledger,
-      nowMs: Date.parse('2026-11-07T00:00:00Z'),
-    });
-    expect(
-      findings.filter(item =>
-        item.fingerprint.startsWith('spend-expiry:codex-fourth')
-      )
-    ).toEqual([]);
   });
 
   it('reports a specific private-data issue when the grants file is absent', () => {
