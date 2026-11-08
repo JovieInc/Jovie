@@ -116,7 +116,9 @@ test.describe('Input atom Storybook conformance', () => {
       );
       await expect(page.getByLabel('Success')).toHaveClass(/border-success/);
       await expect(page.getByLabel('Disabled')).toBeDisabled();
-      await expect(page.getByLabel('Loading')).toBeDisabled();
+      // Loading keeps the field focusable: read-only, not natively disabled.
+      await expect(page.getByLabel('Loading')).not.toBeDisabled();
+      await expect(page.getByLabel('Loading')).toHaveAttribute('readonly', '');
       await expect(page.getByLabel('Loading')).toHaveAttribute(
         'aria-busy',
         'true'

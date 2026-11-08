@@ -222,7 +222,11 @@ describe('WaitlistRoleForm', () => {
       target: { value: 'person@example.com' },
     });
     fireEvent.submit(screen.getByTestId('waitlist-role-form'));
-    expect(screen.getByRole('button')).toBeDisabled();
+    // Submitting keeps the button and email field focusable (aria-disabled,
+    // readOnly) instead of native disabled, so focus is not dropped.
+    expect(screen.getByRole('button')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button')).not.toBeDisabled();
+    expect(screen.getByLabelText('Email address')).toHaveAttribute('readonly');
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15_000);
     });

@@ -302,6 +302,8 @@ describe('Textarea', () => {
       expect(container.querySelector('.min-h-5')).toBeInTheDocument();
       expect(screen.getByText('Tell fans about yourself.')).toBeInTheDocument();
       expect(screen.getByRole('alert')).toHaveTextContent('Bio is too short.');
+      // role=alert alone: an aria-live wrapper would announce it twice.
+      expect(screen.getByRole('alert').closest('[aria-live]')).toBeNull();
     });
   });
 
@@ -340,6 +342,13 @@ describe('Textarea', () => {
       const textarea = screen.getByLabelText('Description');
       expect(textarea).toHaveAttribute('id');
     });
+  });
+
+  it('places the required asterisk with a logical margin for RTL', () => {
+    const { container } = render(<Textarea label='Bio' required />);
+    const asterisk = container.querySelector('label span[aria-hidden]');
+    expect(asterisk).toHaveClass('ms-1');
+    expect(asterisk).not.toHaveClass('ml-1');
   });
 });
 

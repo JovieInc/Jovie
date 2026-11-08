@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -123,8 +123,11 @@ describe('OverflowMenuTrigger', () => {
     const trigger = screen.getByRole('button', {
       name: 'More tabs, current tab hidden',
     });
-    expect(trigger).toBeDisabled();
+    // Loading keeps the trigger focusable; activation is cancelled instead.
+    expect(trigger).not.toBeDisabled();
+    expect(trigger).toHaveAttribute('aria-disabled', 'true');
     expect(trigger).toHaveAttribute('aria-busy', 'true');
+    expect(fireEvent.click(trigger)).toBe(false);
   });
 
   it('forwards refs, custom classes, and click behavior', async () => {
