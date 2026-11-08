@@ -22,6 +22,8 @@ on:
       - 'docs/pen-stills/**'
       - 'docs/design-system/pen-bindings.json'
       - 'scripts/design/**'
+      - 'scripts/invariants/pen-golden-path.mjs'
+      - 'scripts/invariants/pen-golden-path.test.mjs'
       - '.github/scripts/pen-still-diff-comment.mjs'
       - '.github/scripts/pen-still-diff-comment.test.mjs'
       - '.github/workflows/pen-still-diff.yml'
@@ -54,7 +56,7 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Unit tests
-        run: node --test scripts/design/pen-bindings.test.mjs scripts/design/pen-export.test.mjs scripts/design/design-loop-ledger.test.mjs scripts/invariants/pen-still-diff.test.mjs scripts/invariants/clef-screenshot-evaluator.test.mjs .github/scripts/pen-still-diff-comment.test.mjs
+        run: node --test scripts/design/pen-draft.test.mjs scripts/design/pen-bindings.test.mjs scripts/design/pen-export.test.mjs scripts/design/design-loop-ledger.test.mjs scripts/invariants/pen-still-diff.test.mjs scripts/invariants/pen-golden-path.test.mjs scripts/invariants/clef-screenshot-evaluator.test.mjs .github/scripts/pen-still-diff-comment.test.mjs
 
       - name: Advisory diff
         run: node scripts/invariants/pen-still-diff.mjs --manifest docs/design-system/pen-bindings.json --out pen-still-out

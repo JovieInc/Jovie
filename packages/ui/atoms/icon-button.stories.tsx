@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { ChevronLeft, Ellipsis, RotateCcw, Share2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { expect, userEvent, waitFor } from 'storybook/test';
@@ -377,4 +378,86 @@ export const AllVariants: Story = {
       ))}
     </div>
   ),
+};
+
+// Certificate states
+
+export const ErrorState: Story = {
+  render: () => (
+    <div className='flex w-72 items-center gap-3 rounded-xl bg-surface-1 px-3 py-2'>
+      <p className='min-w-0 flex-1 truncate text-xs text-error-text'>
+        Upload failed: cover-art.png
+      </p>
+      <IconButton
+        ariaLabel='Retry upload'
+        variant='secondary'
+        size='md'
+        destructive
+      >
+        <RotateCcw aria-hidden='true' />
+      </IconButton>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Failed row: the destructive tone marks the retry control while the row text names what failed.',
+      },
+    },
+  },
+};
+
+export const LongContent: Story = {
+  render: () => (
+    <div className='flex w-60 items-center gap-1 rounded-xl bg-surface-1 px-3 py-2'>
+      <p className='min-w-0 flex-1 truncate text-xs text-primary-token'>
+        Midnight Sessions (Extended Club Mix) feat. The Late Night Collective
+      </p>
+      <IconButton
+        ariaLabel='Share Midnight Sessions (Extended Club Mix) feat. The Late Night Collective'
+        size='md'
+      >
+        <Share2 aria-hidden='true' />
+      </IconButton>
+      <IconButton ariaLabel='More actions for this release' size='md'>
+        <Ellipsis aria-hidden='true' />
+      </IconButton>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A long sibling title truncates and a long accessible name stays off-screen; the icon faces keep their fixed size in a narrow row.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div
+      dir='rtl'
+      className='flex w-60 items-center gap-1 rounded-xl bg-surface-1 px-3 py-2'
+    >
+      <IconButton ariaLabel='رجوع' size='md'>
+        <ChevronLeft className='rtl:rotate-180' aria-hidden='true' />
+      </IconButton>
+      <p className='min-w-0 flex-1 truncate text-xs text-primary-token'>
+        جلسات منتصف الليل مع فرقة السهرة الطويلة
+      </p>
+      <IconButton ariaLabel='مشاركة' size='md'>
+        <Share2 aria-hidden='true' />
+      </IconButton>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Right-to-left row: controls follow the inline direction, the back glyph mirrors, and the Arabic title truncates between them.',
+      },
+    },
+  },
 };

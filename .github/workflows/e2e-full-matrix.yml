@@ -94,6 +94,11 @@ jobs:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
       # Two workers per shard avoid exhausting a hosted runner.
       PLAYWRIGHT_WORKERS: '2'
+      # Closed public signup (on by default since 2026-11-02) redirects
+      # anonymous /signup and /start to /waitlist, which failed every signup
+      # and /start spec here (about 150 of 230 failures on 2026-11-07). The
+      # matrix proves the signup surface itself, as Golden Path does.
+      FEATURE_PUBLIC_SIGNUP_CLOSED: 'false'
     strategy:
       fail-fast: false
       # Each hosted job has its own isolated database and production-mode server.
@@ -276,8 +281,11 @@ jobs:
             # file path in production-release. This localhost matrix must not
             # invert every @production-smoke test. The authenticated prod chat
             # canary needs Doppler prd secrets and stays in synthetic-monitoring;
-            # the spec itself must not silent-skip.
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --ignore-snapshots --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/4 --grep-invert "@red|candidate-bound Better Auth OAuth runtime|Authenticated prod chat turn" --reporter=line 2>&1 | tee "$log"
+            # the spec itself must not silent-skip. This server runs with public
+            # signup open (see FEATURE_PUBLIC_SIGNUP_CLOSED below), so the
+            # closed-signup handoff test is inverted here; canary-health-gate
+            # still runs it against the deployed origin.
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --ignore-snapshots --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/4 --grep-invert "@red|candidate-bound Better Auth OAuth runtime|Authenticated prod chat turn|signup lands on the live waitlist role form while public signup is closed" --reporter=line 2>&1 | tee "$log"
           fi
         env:
           BASE_URL: ${{ (github.event_name == 'repository_dispatch' || github.event.inputs.test_filter == '') && 'http://127.0.0.1:3100' || '' }}

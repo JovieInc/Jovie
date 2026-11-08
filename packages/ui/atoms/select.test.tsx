@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import {
   Select,
@@ -271,5 +272,55 @@ describe('Select', () => {
       expect(option.className).toContain('min-h-8');
       expect(option.className).toContain('focus-visible:ring-inset');
     });
+  });
+});
+
+describe('Select certificate evidence', () => {
+  it('has no axe violations for the labelled trigger and the open listbox', async () => {
+    const user = userEvent.setup({ delay: null });
+    const { container } = render(
+      <div>
+        <label id='select-a11y-label' htmlFor='select-a11y-trigger'>
+          Favourite food
+        </label>
+        <Select>
+          <SelectTrigger
+            id='select-a11y-trigger'
+            aria-labelledby='select-a11y-label'
+          >
+            <SelectValue placeholder='Select an option' />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectLabel>Fruits</SelectLabel>
+              <SelectItem value='apple'>Apple</SelectItem>
+              <SelectItem value='banana'>Banana</SelectItem>
+            </SelectGroup>
+            <SelectSeparator />
+            <SelectGroup>
+              <SelectLabel>Vegetables</SelectLabel>
+              <SelectItem value='carrot' disabled>
+                Carrot
+              </SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </div>
+    );
+    await expectNoA11yViolations(container);
+
+    await user.click(screen.getByRole('combobox', { name: 'Favourite food' }));
+    const listbox = await screen.findByRole('listbox');
+    // The listbox is portalled to document.body, outside the render container,
+    // so audit the portalled popup itself (whole-body audits only add the
+    // page-level landmark rule, which a bare test fixture cannot satisfy).
+    const popup =
+      listbox.closest('[data-radix-popper-content-wrapper]') ?? listbox;
+    expect(container.contains(popup)).toBe(false);
+    await expectNoA11yViolations(popup);
+    // While open, Radix hides the rest of the page from assistive tech.
+    expect(
+      screen.getByRole('combobox', { name: 'Favourite food', hidden: true })
+    ).toHaveAttribute('aria-expanded', 'true');
   });
 });

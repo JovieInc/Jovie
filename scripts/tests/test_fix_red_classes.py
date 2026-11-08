@@ -34,6 +34,20 @@ class ClassifyTest(unittest.TestCase):
             got = classes.classify(pr("Source Validation"), {"Source Validation": log})
             self.assertEqual((got["cls"], got["action"]), (cls, action), log)
 
+    def test_unwired_outranks_incidental_http_status_in_the_same_log(self):
+        log = (
+            "✔ recovers HTTP 502/503/504\n"
+            "HttpError: API rate limit exceeded for installation\n"
+            "AssertionError: Unwired: scripts/lib/__tests__/workers-inventory.test.mjs. "
+            "Wire each file into a ci-fast lane\n"
+        )
+        got = classes.classify(pr("Source Validation"), {"Source Validation": log})
+        self.assertEqual((got["cls"], got["action"]), ("ci-fast-wiring", "wire-ci-fast"))
+        self.assertEqual(got["files"], ["scripts/lib/__tests__/workers-inventory.test.mjs"])
+        plain = classes.classify(pr("Source Validation"), {
+            "Source Validation": "upstream returned HTTP 500 before the job started"})
+        self.assertEqual((plain["cls"], plain["action"]), ("platform-infra", "rerun"))
+
     def test_unwired_files_are_extracted_and_aggregates_ignored(self):
         got = classes.classify(pr("Source Validation"), {"Source Validation":
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane"})
@@ -261,6 +275,27 @@ class AndChainMergeTest(unittest.TestCase):
             classes.merge_and_chain(NarrowedPreflightMergeTest.OURS, NarrowedPreflightMergeTest.THEIRS),
             classes.merge_narrowed_guard_command(NarrowedPreflightMergeTest.OURS, NarrowedPreflightMergeTest.THEIRS),
         )
+
+    def test_unions_plain_yaml_run_chains_in_main_order(self):
+        ours = "pnpm --filter @jovie/extension test && node --experimental-strip-types --test workers/cron-hub/src/index.test.mjs"
+        theirs = "pnpm --filter @jovie/extension test && pnpm --filter @jovie/mesh-hub test"
+        conflict = (f"<<<<<<< HEAD\n        run: {ours}\n=======\n"
+                    f"        run: {theirs}\n>>>>>>> origin/main\n")
+        self.assertEqual(
+            classes.resolve_and_chain_text(conflict),
+            f"        run: {theirs} && node --experimental-strip-types --test workers/cron-hub/src/index.test.mjs\n",
+        )
+        for changed in [theirs.replace("extension test", "extension test --strict"),
+                        theirs + " | cat", theirs + " # comment", theirs + " && echo 'quoted'",
+                        theirs + " && echo ${UNTRUSTED}"]:
+            with self.subTest(changed=changed):
+                self.assertIsNone(classes.resolve_and_chain_text(conflict.replace(theirs, changed)))
+        self.assertIsNone(classes.resolve_and_chain_text(conflict.replace("run:", "name:", 1)))
+        for key in ["if", "name", "working-directory", "env"]:
+            metadata = conflict.replace("        run:", f"        {key}: false\n        run:", 1)
+            metadata = metadata.replace("=======\n", f"=======\n        {key}: true\n", 1)
+            with self.subTest(key=key):
+                self.assertIsNone(classes.resolve_and_chain_text(metadata))
 
     def test_rejects_a_changed_script_quotes_and_a_second_file_list(self):
         self.assertIsNone(classes.merge_and_chain(self.OURS, self.THEIRS.replace("ownership:check", "ownership:check --strict")))
