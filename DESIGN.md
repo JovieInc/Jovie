@@ -37,10 +37,6 @@ Pen is a review and proposal surface, except for colors: Pen node **ZiaWI**
 canonical color source of truth. React tokens, OKLCH projections, and CSS
 emitters must match ZiaWI (ion `#11AFFF`, ultra/pulse/mint/orange/red, exactly
 5 elevations). Do not invent a parallel React-only color root.
-ZiaWI also locks two brand marks: `verified` (`#0084D1` light, `#00BCFF` dark;
-the verified badge, `text-verified`) and `on-media` (`#FFFFFF`; the white logo
-and marks on brand fills or media, `text-on-media`). Use them instead of raw
-`white` or `sky-*` classes.
 
 Other Pen components are not source-backed until their identity maps to the
 current source registry and the required save/readback evidence exists. Source
