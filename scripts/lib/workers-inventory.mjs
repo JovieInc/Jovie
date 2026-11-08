@@ -71,7 +71,7 @@ export async function fetchDeployedWorkers({
   accountId,
   token,
   fetchImpl = fetch,
-  store,
+  store = undefined,
 }) {
   const spec = providerSpec('cloudflare');
   const client = createApiClient({
@@ -98,9 +98,12 @@ export async function fetchDeployedWorkers({
     const status = error instanceof ApiError ? error.status : null;
     throw new Error(`workers-list-unreadable:${status ?? 'network'}`);
   }
+  /** @type {{ success?: boolean, result?: { id: string }[] } | null} */
   let body = null;
   try {
-    body = res.json();
+    body = /** @type {{ success?: boolean, result?: { id: string }[] }} */ (
+      res.json()
+    );
   } catch {
     body = null;
   }
