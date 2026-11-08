@@ -490,9 +490,9 @@
     },
     "packages/ui/atoms/segment-control.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "a697b4edc6981ea591718333ac770d3484507d55add801df06609a1f1b05ae28",
+      "sourceHash": "f3c5f1df91ecedc6adf76bf2707afdc867b52ba6cdad0c24b25ccc4b107be13c",
       "reference": "WAI-ARIA APG Tabs (automatic activation); Radix Tabs; shadcn/ui Tabs",
-      "checked": "tablist naming, arrow/Home/End keys, dir, disabled tabs, panel relationship",
+      "checked": "tablist naming, arrow/Home/End keys, dir, disabled tabs, panel relationship, radio-group semantics",
       "gaps": [
         {
           "item": "dir was not honored: arrow keys ran LTR in RTL; now a dir prop reaches Radix Tabs",
@@ -503,8 +503,15 @@
         {
           "item": "standalone use exposes tabs whose aria-controls target empty, aria-hidden panels; for a pure choice APG Radio Group (or toggle-group) semantics fit",
           "decision": "adapt",
+          "status": "done",
+          "reference": "APG Tabs",
+          "resolution": "semantics='radio' renders a named Radix radio group with no tabpanels and nothing pointing at one; keys, dir and styling match the tab form"
+        },
+        {
+          "item": "app callers that offer a pure choice (time range, filters, modes) still use the tab form; move each to semantics='radio'",
+          "decision": "adopt",
           "status": "open",
-          "reference": "APG Tabs"
+          "reference": "APG Radio Group"
         },
         {
           "item": "controlled only (no defaultValue)",
