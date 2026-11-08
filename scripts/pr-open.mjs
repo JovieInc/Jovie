@@ -247,19 +247,6 @@ export function missingEvidence(input) {
   return needs;
 }
 
-// A draft ships itself once green (auto-ready on-green opt-in) unless the
-// writer passes --hold to keep a WIP draft. Ready PRs need no marker.
-export const ON_GREEN_LINE = '<!-- jovie-auto-ready: on-green -->';
-export function withOnGreenOptIn(
-  body = '',
-  { draft = false, hold = false } = {}
-) {
-  const text = String(body ?? '');
-  if (!draft || hold || text.includes('jovie-auto-ready: on-green'))
-    return text;
-  return `${text.trimEnd()}\n\n${ON_GREEN_LINE}\n`;
-}
-
 export function gate({ title, body, labels = [], files, extra = [] }) {
   const lint = lintPrBody({ body, title, labels, files, evaluateFleetRules });
   const errors = [
@@ -402,7 +389,6 @@ function parse(argv) {
     else if (f === '--customer-visible') a.customerVisible = v();
     else if (f === '--body-file') a.bodyFile = v();
     else if (f === '--draft') a.draft = true;
-    else if (f === '--hold') a.hold = true;
     else if (f === '--wip-override') a.wipOverride = v();
     else if (f === '--dry-run') a.dryRun = true;
     else if (f === '--no-push') a.noPush = true;
@@ -626,7 +612,7 @@ export async function main(
     execute('git', args, { cwd: a.repo, ...options });
   if (!['draft', 'check', 'open', 'update'].includes(a.cmd)) {
     log(
-      'usage: pr-open <draft|check|open|update N> [flags]; --failing-log PATH reads Vitest red evidence; --draft ships on green unless --hold'
+      'usage: pr-open <draft|check|open|update N> [flags]; --failing-log PATH reads Vitest red evidence'
     );
     return 2;
   }
@@ -809,10 +795,7 @@ export async function main(
     const dir = mkdtempSync(path.join(tmpdir(), 'pr-open-create-'));
     try {
       const bodyFile = path.join(dir, 'body.md');
-      writeFileSync(
-        bodyFile,
-        withOnGreenOptIn(body, { draft: a.draft, hold: a.hold })
-      );
+      writeFileSync(bodyFile, body);
       const branchResult = git(['branch', '--show-current']);
       const branch = branchResult.stdout.trim();
       const local = git(['rev-parse', 'HEAD']);
@@ -875,13 +858,7 @@ export async function main(
       log((made.stdout || made.stderr).trim());
       const url = made.stdout.trim().split('\n').pop();
       if (made.status === 0 && body.includes(PR_URL_PLACEHOLDER)) {
-        writeFileSync(
-          bodyFile,
-          withOnGreenOptIn(body.replaceAll(PR_URL_PLACEHOLDER, url), {
-            draft: a.draft,
-            hold: a.hold,
-          })
-        );
+        writeFileSync(bodyFile, body.replaceAll(PR_URL_PLACEHOLDER, url));
         const edited = github(a.repo, [
           'pr',
           'edit',
