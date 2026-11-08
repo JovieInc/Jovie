@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { StaticAnalyticsSidebar } from './LazyAnalyticsSidebar';
+import { StaticAnalyticsSidebar } from './analytics-sidebar-lazy';
 
 const meta = {
   title: 'Dashboard/Organisms/LazyAnalyticsSidebar',

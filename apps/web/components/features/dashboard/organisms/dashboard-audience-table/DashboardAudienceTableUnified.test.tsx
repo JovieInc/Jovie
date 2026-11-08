@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -257,15 +257,18 @@ describe('DashboardAudienceTableUnified', () => {
     expect(text).not.toContain('••• 0001');
   });
 
-  it('loads the analytics rails on demand, off the workspace first-load JS', () => {
-    // /demo/audience sits at its first-load budget; the rails render only
-    // when the analytics panel opens, so they come from the lazy module.
+  it('keeps the analytics rail out of the first-load bundle', () => {
     const source = readFileSync(
-      join(__dirname, 'DashboardAudienceTableUnified.tsx'),
+      resolve(
+        process.cwd(),
+        'components/features/dashboard/organisms/dashboard-audience-table/DashboardAudienceTableUnified.tsx'
+      ),
       'utf8'
     );
+    // /demo/audience has a first-load JS budget; the rail renders only when
+    // its panel opens, so it comes through the next/dynamic wrapper.
     expect(source).toContain(
-      "from '@/features/dashboard/organisms/LazyAnalyticsSidebar'"
+      "from '@/features/dashboard/organisms/analytics-sidebar-lazy'"
     );
     expect(source).not.toContain(
       "from '@/features/dashboard/organisms/AnalyticsSidebar'"

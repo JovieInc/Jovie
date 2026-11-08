@@ -17,7 +17,7 @@ vi.mock('./AnalyticsSidebar', () => ({
 import {
   AnalyticsSidebar,
   StaticAnalyticsSidebar,
-} from './LazyAnalyticsSidebar';
+} from './analytics-sidebar-lazy';
 
 describe('LazyAnalyticsSidebar', () => {
   // Runs first: React.lazy only suspends until the chunk resolves once.

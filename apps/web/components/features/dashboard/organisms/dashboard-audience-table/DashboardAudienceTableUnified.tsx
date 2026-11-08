@@ -29,11 +29,11 @@ import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/Dashboard
 import { useAudiencePanel } from '@/features/dashboard/organisms/AudiencePanelContext';
 import { AiCrawlerDetailPanel } from '@/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel';
 import { AiCrawlerIntelligenceCard } from '@/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard';
-import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-member-sidebar';
 import {
   AnalyticsSidebar,
   StaticAnalyticsSidebar,
-} from '@/features/dashboard/organisms/LazyAnalyticsSidebar';
+} from '@/features/dashboard/organisms/analytics-sidebar-lazy';
+import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-member-sidebar';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
   canShareContactOut,
