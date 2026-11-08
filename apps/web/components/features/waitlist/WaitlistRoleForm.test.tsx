@@ -227,11 +227,20 @@ describe('WaitlistRoleForm', () => {
     ).toHaveFocus();
   });
 
+  it('loads the security check only once the visitor touches the form', () => {
+    render(<WaitlistRoleForm />);
+    expect(screen.queryByTestId('turnstile-mock')).toBeNull();
+    fireEvent.focus(screen.getByLabelText('Email address'));
+    expect(screen.getByTestId('turnstile-mock')).toBeInTheDocument();
+  });
+
   it('keeps the focused confirmation after a queued challenge failure arrives', async () => {
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify({ state: 'joined' }), { status: 201 })
     );
     render(<WaitlistRoleForm />);
+    challenge.onStateChange = undefined;
+    fireEvent.focus(screen.getByLabelText('Email address'));
     const lateFailure = challenge.onStateChange;
     expect(lateFailure).toBeTypeOf('function');
     fireEvent.click(screen.getByRole('radio', { name: 'Artist' }));
