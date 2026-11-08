@@ -29,8 +29,10 @@ on:
 
 permissions: {}
 
+# One group per commit: a push drafts only the briefs its own commit changed,
+# so a shared group would let GitHub drop a queued run and those briefs with it.
 concurrency:
-  group: pen-draft-${{ github.ref }}
+  group: pen-draft-${{ github.event_name }}-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
