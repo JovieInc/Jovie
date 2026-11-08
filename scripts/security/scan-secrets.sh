@@ -20,25 +20,34 @@ EXCLUDE_PATHS="$REPO_ROOT/.trufflehog-exclude.txt"
 # ubuntu-latest, JOV-6809); a single failed attempt must not fail the scan.
 # Download to a temp file before extracting so a restarted transfer never
 # streams a concatenated response into tar.
+# GitHub release downloads also return runs of HTTP 504 lasting several
+# seconds (2026-11-08: three 504s inside 4s parked PRs #24269 and #24488).
+# Retry with exponential backoff and jitter: the default 6 attempts wait
+# 2-4, 4-8, 8-16, 16-32 and 32-64s (62-124s total) before failing closed.
+# A stalled transfer aborts instead of hanging until the job timeout.
 SCAN_SECRETS_RETRY_DELAY="${SCAN_SECRETS_RETRY_DELAY:-2}"
+SCAN_SECRETS_DOWNLOAD_ATTEMPTS="${SCAN_SECRETS_DOWNLOAD_ATTEMPTS:-6}"
 fetch_release_tarball() {
   local url="$1" dest_dir="$2" member="$3"
-  local tmp attempt
+  local tmp attempt delay
   tmp="$(mktemp)"
-  for attempt in 1 2 3; do
-    if curl -sSfL -o "$tmp" "$url" \
+  delay="$SCAN_SECRETS_RETRY_DELAY"
+  for ((attempt = 1; attempt <= SCAN_SECRETS_DOWNLOAD_ATTEMPTS; attempt++)); do
+    if curl -sSfL --connect-timeout 20 --speed-limit 1024 --speed-time 30 \
+      -o "$tmp" "$url" \
       && tar -xzf "$tmp" -C "$dest_dir" "$member"; then
       chmod +x "$dest_dir/$member"
       rm -f "$tmp"
       return 0
     fi
-    if [[ $attempt -lt 3 ]]; then
+    if [[ $attempt -lt $SCAN_SECRETS_DOWNLOAD_ATTEMPTS ]]; then
       echo "scanner download attempt $attempt failed; retrying" >&2
-      sleep "$SCAN_SECRETS_RETRY_DELAY"
+      sleep "$((delay + RANDOM % (delay + 1)))"
+      delay=$((delay * 2))
     fi
   done
   rm -f "$tmp"
-  echo "::error title=Secret scanner download failed::Could not fetch $member after 3 attempts ($url)." >&2
+  echo "::error title=Secret scanner download failed::Could not fetch $member after $SCAN_SECRETS_DOWNLOAD_ATTEMPTS attempts ($url)." >&2
   return 1
 }
 
