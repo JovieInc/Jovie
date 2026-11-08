@@ -193,7 +193,6 @@ describe('OnboardingCheckoutClient', () => {
 
   it('puts the whole checkout in its own scroll box so the button stays reachable', () => {
     render(<OnboardingCheckoutClient {...defaultProps} />);
-
     const scroll = screen.getByTestId('onboarding-checkout-scroll');
     expect(scroll).toHaveClass('overflow-y-auto', 'min-h-0', 'flex-1');
     expect(scroll).toContainElement(
@@ -267,20 +266,15 @@ describe('OnboardingCheckoutClient', () => {
       screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
     );
 
-    expect(
-      await screen.findByRole('alert', {
-        name: '',
-      })
-    ).toHaveTextContent('Checkout is temporarily unavailable.');
+    const alert = await screen.findByRole('alert', { name: '' });
+    expect(alert).toHaveTextContent('Checkout is temporarily unavailable.');
     const cta = screen.getByRole('button', {
       name: 'Upgrade to Artist Presence',
     });
     expect(cta).toBeEnabled();
     // The alert lands below the button, so a failure never pushes it down.
-    expect(
-      cta.compareDocumentPosition(screen.getByRole('alert')) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+    const below = cta.compareDocumentPosition(alert);
+    expect(below & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(hrefState.current).toBe('http://localhost/onboarding/checkout');
   });
 
