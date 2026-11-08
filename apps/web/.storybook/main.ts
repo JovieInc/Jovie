@@ -170,10 +170,6 @@ const config: StorybookConfig = {
           replacement: require.resolve('./next-themes-mock.tsx'),
         },
         {
-          find: '@/app/app/(shell)/dashboard/DashboardLayoutClient',
-          replacement: require.resolve('./dashboard-layout-client-mock.tsx'),
-        },
-        {
           find: '@/components/organisms/AuthShellWrapper',
           replacement: require.resolve('./dashboard-layout-client-mock.tsx'),
           customResolver: resolvePrivacyBoundaryShellAlias,
@@ -193,8 +189,6 @@ const config: StorybookConfig = {
           replacement: require.resolve('./recent-releases-mock.ts'),
         },
         {
-          // lib/cookies/consent is a server action that writes the consent
-          // cookie; the mock lets cookie stories hold a save pending or fail.
           find: '@/lib/cookies/consent',
           replacement: require.resolve('./cookie-consent-mock.ts'),
         },
