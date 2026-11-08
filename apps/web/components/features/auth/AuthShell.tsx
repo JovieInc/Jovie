@@ -504,7 +504,7 @@ function AuthShellIdentity({
     >
       {back ? <AuthQuietBackLink href={back.href} label={back.label} /> : null}
       {/* Pen oaz9c: the O-mark is off; the heading alone opens the column. */}
-      <h1 className='max-w-full wrap-anywhere text-balance text-xl font-semibold leading-6 tracking-[-0.2px] text-primary-token'>
+      <h1 className='max-w-full wrap-anywhere text-balance text-xl font-semibold leading-6 tracking-tight text-primary-token'>
         {getAuthShellHeading(intent, claimHandle)}
       </h1>
     </div>
@@ -672,14 +672,14 @@ function AuthModeSwitchLink({
 }>) {
   const isSignUp = mode === 'sign-up';
   const className =
-    'auth-quiet-target focus-ring-themed rounded-sm text-[13px] font-[550] text-primary-token transition-opacity hover:opacity-80';
+    'auth-quiet-target focus-ring-themed rounded-sm text-app font-medium text-primary-token transition-opacity hover:opacity-80';
   const troubleHref = APP_ROUTES.SUPPORT;
 
   return (
     <div
       data-auth-mode-switch
       className={cn(
-        'mt-1 flex flex-col text-[13px] text-secondary-token',
+        'mt-1 flex flex-col text-app text-secondary-token',
         align === 'left' ? 'items-start text-left' : 'items-center text-center'
       )}
     >
@@ -723,7 +723,7 @@ function AuthLegalText({ mode }: Readonly<{ mode: AuthShellMode }>) {
   return (
     <p
       data-auth-legal-copy
-      className='mx-auto mt-6 max-w-sm text-center text-2xs leading-[1.5] text-tertiary-token'
+      className='mx-auto mt-6 max-w-sm text-center text-2xs leading-normal text-tertiary-token'
     >
       <span data-auth-legal-prefix className='block'>
         By {mode === 'sign-up' ? 'signing up' : 'continuing'}, you agree to our

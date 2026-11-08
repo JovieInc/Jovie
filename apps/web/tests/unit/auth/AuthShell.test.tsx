@@ -240,7 +240,7 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     expect(heading?.textContent).toBe('Log in to Jovie');
     expect(heading?.className).toContain('text-xl');
     expect(heading?.className).toContain('font-semibold');
-    expect(heading?.className).toContain('tracking-[-0.2px]');
+    expect(heading?.className).toContain('tracking-tight');
   });
 
   it('keeps intercepted modal and marketing captures centered without the card', () => {

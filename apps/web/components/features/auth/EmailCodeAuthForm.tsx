@@ -422,13 +422,13 @@ export function EmailCodeAuthForm({
           <button
             type='button'
             onClick={handleBackToEmail}
-            className='auth-quiet-target focus-ring-themed rounded-md text-[13px] font-[550] text-secondary-token transition-colors duration-subtle hover:text-primary-token'
+            className='auth-quiet-target focus-ring-themed rounded-md text-app font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token'
           >
             {AUTH_EMAIL_CHANGE_LABEL}
           </button>
           {resendCooldown > 0 ? (
             <span
-              className='auth-quiet-target text-[13px] font-[550] text-tertiary-token'
+              className='auth-quiet-target text-app font-medium text-tertiary-token'
               aria-live='polite'
             >
               Resend in {resendCooldown}s
@@ -439,7 +439,7 @@ export function EmailCodeAuthForm({
               onClick={handleResendCode}
               disabled={isPending}
               aria-label='Resend Verification Code'
-              className='auth-quiet-target focus-ring-themed rounded-md text-[13px] font-[550] text-secondary-token transition-colors duration-subtle hover:text-primary-token disabled:opacity-50'
+              className='auth-quiet-target focus-ring-themed rounded-md text-app font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token disabled:opacity-50'
             >
               Resend code
             </button>
