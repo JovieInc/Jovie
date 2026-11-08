@@ -140,4 +140,25 @@ describe('SettingsPaySection', () => {
     expect(lines).toHaveLength(2);
     for (const line of lines) expect(line).toHaveClass('h-[19px]');
   });
+
+  it('holds the status pill and the actions row margin of the loaded surface', () => {
+    // The pill is one text-2xs line plus py-0.5 and a 1px border; the loaded
+    // actions row keeps a space-y-2.5 margin above the sr-only status line.
+    mockUseProfileMonetizationSummary.mockReturnValue({
+      data: undefined,
+      isError: false,
+      isLoading: true,
+      refetch: mockRefetch,
+    });
+
+    const { getByTestId } = fastRender(<SettingsPaySection />);
+
+    expect(getByTestId('settings-pay-loading-pill')).toHaveClass(
+      'h-[calc(1lh+0.375rem)]'
+    );
+    expect(getByTestId('settings-pay-loading-pill').parentElement).toHaveClass(
+      'text-2xs'
+    );
+    expect(getByTestId('settings-pay-loading-actions')).toHaveClass('mb-2.5');
+  });
 });

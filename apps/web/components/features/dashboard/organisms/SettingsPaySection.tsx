@@ -20,7 +20,13 @@ function LoadingState() {
       data-testid='settings-pay-loading'
     >
       <div className='min-w-0 space-y-3'>
-        <div className='h-5 w-28 rounded-full skeleton' />
+        {/* The status pill: one text-2xs line, py-0.5 and a 1px border. */}
+        <div className='flex text-2xs'>
+          <div
+            className='h-[calc(1lh+0.375rem)] w-28 rounded-full skeleton'
+            data-testid='settings-pay-loading-pill'
+          />
+        </div>
         {/* Two 19px line boxes, the narrative's leading, with no gap. */}
         <div data-testid='settings-pay-loading-narrative'>
           <div className='flex h-[19px] items-center'>
@@ -30,7 +36,12 @@ function LoadingState() {
             <div className='h-3.5 w-3/4 rounded skeleton' />
           </div>
         </div>
-        <div className='flex gap-2'>
+        {/* mb-2.5: the loaded actions sit in a space-y-2.5 block whose last
+            child is the sr-only status line, so the row keeps that margin. */}
+        <div
+          className='mb-2.5 flex gap-2'
+          data-testid='settings-pay-loading-actions'
+        >
           <div className='h-8 w-28 rounded-md skeleton' />
           <div className='h-8 w-28 rounded-md skeleton' />
         </div>

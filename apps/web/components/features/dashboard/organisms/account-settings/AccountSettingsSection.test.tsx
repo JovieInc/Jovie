@@ -108,6 +108,27 @@ describe('AccountSettingsSection', () => {
     );
   });
 
+  it('sizes each identity skeleton line to one inherited text line', () => {
+    // text-app sets no line-height, so a fixed em height guessed the
+    // inherited one; 1lh is that line, whatever it is.
+    useUserSafe.mockReturnValue({
+      isLoaded: false,
+      isSignedIn: false,
+      user: null,
+    });
+    useSessionSafe.mockReturnValue({
+      isLoaded: false,
+      isSignedIn: false,
+      session: null,
+    });
+
+    render(<AccountSettingsSection />);
+    const loading = screen.getByTestId('account-identity-loading');
+    const lines = loading.querySelectorAll(':scope > div > div');
+    expect(lines).toHaveLength(6);
+    for (const line of lines) expect(line).toHaveClass('h-[1lh]');
+  });
+
   it('holds the Active Sessions panel in place until the session loads', () => {
     // In production the page renders before the client session loads; the
     // panel appearing later pushed everything below it down (phone CLS).

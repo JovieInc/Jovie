@@ -30,13 +30,13 @@ function AccountIdentitySummary() {
         data-testid='account-identity-loading'
       >
         {[0, 1, 2].map(index => (
-          // Each line box matches a loaded text-app line, so the summary
-          // keeps its height when the user arrives.
+          // Each line box is one inherited line (1lh) of text-app, the same
+          // line the loaded dt/dd take, so the summary keeps its height.
           <div key={index} className='space-y-1 text-app'>
-            <div className='flex h-[1.4em] items-center'>
+            <div className='flex h-[1lh] items-center'>
               <LoadingSkeleton height='h-3' width='w-16' />
             </div>
-            <div className='flex h-[1.4em] items-center'>
+            <div className='flex h-[1lh] items-center'>
               <LoadingSkeleton height='h-4' width='w-44' />
             </div>
           </div>
