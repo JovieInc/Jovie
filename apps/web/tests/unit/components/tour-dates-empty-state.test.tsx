@@ -24,14 +24,22 @@ vi.mock('@/components/feedback', () => ({
  */
 describe('TourDatesEmptyState', () => {
   describe('API key step', () => {
-    it('renders a lead icon inside the visual chip (not an empty square)', () => {
-      const { container } = render(
-        <TourDatesEmptyState profileId='profile-1' hasApiKey={false} />
-      );
+    it('uses the shared empty-state anatomy with a rendered lead icon', () => {
+      render(<TourDatesEmptyState profileId='profile-1' hasApiKey={false} />);
 
-      const chip = container.querySelector('.h-16.w-16');
-      expect(chip).not.toBeNull();
-      expect(chip?.querySelector('svg')).not.toBeNull();
+      const empty = screen.getByTestId('tour-dates-empty-state-api-key');
+      expect(empty).toHaveAttribute(
+        'data-empty-state-presentation',
+        'workspace'
+      );
+      expect(
+        screen.getByRole('heading', { name: 'Set Up Bandsintown Integration' })
+      ).toBeInTheDocument();
+      // JOV-4463: a missing Icon registry entry renders null.
+      expect(empty.querySelector('[aria-hidden="true"] svg')).not.toBeNull();
+      expect(
+        screen.getByRole('link', { name: 'artists.bandsintown.com' })
+      ).toHaveAttribute('href', 'https://artists.bandsintown.com');
     });
 
     it('preserves the secure-key disclosure', () => {
@@ -53,14 +61,21 @@ describe('TourDatesEmptyState', () => {
   });
 
   describe('artist connect step', () => {
-    it('renders a lead icon inside the visual chip (not an empty square)', () => {
-      const { container } = render(
-        <TourDatesEmptyState profileId='profile-1' hasApiKey />
-      );
+    it('uses the shared empty-state anatomy with a rendered lead icon', () => {
+      render(<TourDatesEmptyState profileId='profile-1' hasApiKey />);
 
-      const chip = container.querySelector('.h-16.w-16');
-      expect(chip).not.toBeNull();
-      expect(chip?.querySelector('svg')).not.toBeNull();
+      const empty = screen.getByTestId('tour-dates-empty-state-connect');
+      expect(empty).toHaveAttribute(
+        'data-empty-state-presentation',
+        'workspace'
+      );
+      expect(
+        screen.getByRole('heading', { name: 'Connect Your Tour Dates' })
+      ).toBeInTheDocument();
+      expect(empty.querySelector('[aria-hidden="true"] svg')).not.toBeNull();
+      expect(
+        screen.getByRole('textbox', { name: 'Bandsintown Artist Name' })
+      ).toBeInTheDocument();
     });
 
     it('has one primary action', () => {
