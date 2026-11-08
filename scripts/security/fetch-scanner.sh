@@ -98,8 +98,10 @@ fetch_scanner() { # tool version
     gitleaks)
       [[ "$arch" == amd64 ]] && rel_arch=x64
       url="https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_${os}_${rel_arch}.tar.gz"
-      image1="ghcr.io/gitleaks/gitleaks:v${version}"
-      image2="zricethezav/gitleaks:v${version}"
+      # The 8.21.2 image binary differs from the release binary, so it cannot
+      # satisfy the release-derived pin: no image fallback for gitleaks.
+      image1=""
+      image2=""
       inpath=/usr/bin/gitleaks ;;
     osv-scanner)
       url="https://github.com/google/osv-scanner/releases/download/v${version}/osv-scanner_${os}_${rel_arch}"
@@ -136,7 +138,7 @@ fetch_scanner() { # tool version
   else
     rm -f "$cand"; cand="$(mktemp "$cache_dir/.cand.XXXXXX")"
     echo "::warning title=Scanner release fetch failed::falling back to container image for $tool $version" >&2
-    if { _scanner_from_image "$image1" "$platform" "$inpath" "$cand" \
+    if [[ -n "$image1" ]] && { _scanner_from_image "$image1" "$platform" "$inpath" "$cand" \
          || _scanner_from_image "$image2" "$platform" "$inpath" "$cand"; } \
       && _scanner_verify "$cand" "$pin" "$tool (image)"; then
       :
