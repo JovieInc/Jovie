@@ -1,5 +1,3 @@
-/** Signup price versions; amounts from plan-prices, Stripe IDs snapshotted at lock time (JOV-9769). */
-
 import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
 
 export type PriceLockPlan = 'pro';
