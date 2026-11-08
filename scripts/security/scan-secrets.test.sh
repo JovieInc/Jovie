@@ -401,6 +401,8 @@ DL_TMP="$TEST_ROOT/dl-tmp"
 mkdir -p "$DL_BIN" "$DL_TMP"
 source "$REPO_ROOT/scripts/security/test-fixtures/scanner-download-runtime.sh"
 setup_scanner_download_fixture "$DL_BIN"
+write_scanner_download_pins "$TEST_ROOT/dl-pins.txt"
+export SCANNER_PINS_FILE="$TEST_ROOT/dl-pins.txt"
 
 export CURL_COUNT="$TEST_ROOT/download.curl-count"
 : >"$CURL_COUNT"

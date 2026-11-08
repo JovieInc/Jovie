@@ -72,9 +72,10 @@ tool_dir="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/actionlint-toolchain.XXXX
 trap 'rm -rf "$tool_dir"' EXIT
 
 # GitHub release downloads 504 in bursts longer than curl's default 3-retry
-# window (1+2+4s); one burst failed a merge group on 10-12. Six exponential
-# retries ride out about a minute of 5xx before failing closed. Release
-# assets use scripts/lib/github-release-asset.sh (authenticated fallback).
+# window (1+2+4s); one burst failed a merge group on 10-12, and a 65s burst
+# outlasted six retries on 11-08. Eight exponential retries ride out about
+# four minutes of 5xx before failing closed. Release assets use
+# scripts/lib/github-release-asset.sh (authenticated fallback).
 download() {
   local url="$1" out="$2" sha="$3"
   if [[ "$url" == https://github.com/*/releases/download/* ]]; then
@@ -82,7 +83,7 @@ download() {
       "$url" "$out" || fail "download failed: $url"
   else
     curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
-      --retry 6 --retry-all-errors --max-time 120 --output "$out" "$url" ||
+      --retry 8 --retry-all-errors --max-time 120 --output "$out" "$url" ||
       fail "download failed: $url"
   fi
   printf '%s  %s\n' "$sha" "$out" | sha256sum --check --status ||
