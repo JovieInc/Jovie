@@ -236,7 +236,7 @@ export function WaitlistSpotifySearch({
                 inputRef.current = el;
                 setInputRef(el);
               }}
-              type='url'
+              inputMode='url'
               id='spotifyUrl'
               value={spotifyUrl}
               onChange={handleUrlInputChange}
@@ -321,10 +321,7 @@ export function WaitlistSpotifySearch({
 
       {/* Dropdown results */}
       {shouldShowDropdown && (
-        <ContentSurfaceCard
-          className='absolute z-50 mt-2 w-full overflow-hidden p-1'
-          style={{ top: '100%' }}
-        >
+        <ContentSurfaceCard className='absolute top-full z-50 mt-2 w-full overflow-hidden p-1'>
           <select
             id='spotify-search-results'
             className='sr-only'

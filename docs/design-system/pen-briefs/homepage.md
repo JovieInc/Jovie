@@ -1,6 +1,7 @@
 ---
 frame: homepage
 route: /
+context: home, marketing, landing
 ---
 Design Jovie's homepage, desktop 1440 wide and mobile 390 wide, dark mode first.
 

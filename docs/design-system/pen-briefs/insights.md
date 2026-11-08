@@ -1,6 +1,7 @@
 ---
 frame: insights
 route: /app/insights
+context: insights, audience, analytics
 ---
 Design the Insights workspace an artist opens from the Audience area, desktop 1440 wide and mobile 390 wide, dark mode first.
 
