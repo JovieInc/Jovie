@@ -97,7 +97,7 @@ export const INFRASTRUCTURE_CONNECT_DOMAINS: readonly string[] = [
   '*.blob.vercel-storage.com',
   '*.public.blob.vercel-storage.com',
   // QR Code API — browser fetches the QR PNG as a blob for the
-  // "Download QR Code" actions (ProfileSidebarHeader, dashboard PreviewPanel)
+  // "Download QR Code" action (ProfileSidebarHeader)
   'api.qrserver.com',
 ];
 

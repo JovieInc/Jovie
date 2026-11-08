@@ -135,29 +135,10 @@ export const DspPresenceTable = memo(function DspPresenceTable({
     []
   );
 
-  const getRowClassName = useCallback(
-    (row: DspPresenceItem) => {
-      const isSelected = selectedMatchId === row.matchId;
-
-      if (isSelected) {
-        return [
-          'rounded-lg transition-[background-color,box-shadow] duration-subtle ease-subtle cursor-pointer',
-          'bg-[color-mix(in_oklab,var(--linear-row-selected)_24%,var(--linear-bg-surface-0))]',
-          'shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_14%,var(--app-shell-frame-seam))]',
-          'hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_28%,var(--linear-bg-surface-0))]',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base',
-        ].join(' ');
-      }
-
-      return [
-        'rounded-lg transition-[background-color,box-shadow] duration-subtle ease-subtle cursor-pointer',
-        'bg-transparent',
-        'hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)]',
-        'hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--app-shell-frame-seam)_72%,transparent)]',
-        '[&:hover_span]:text-primary-token',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base',
-      ].join(' ');
-    },
+  // Hover, focus ring and selected state come from the shared table row,
+  // like every other workspace table; no local row chrome.
+  const isRowSelected = useCallback(
+    (row: DspPresenceItem) => selectedMatchId === row.matchId,
     [selectedMatchId]
   );
 
@@ -168,10 +149,11 @@ export const DspPresenceTable = memo(function DspPresenceTable({
       onRowClick={onRowSelect}
       getRowId={getRowId}
       getRowTestId={getRowTestId}
-      getRowClassName={getRowClassName}
+      isRowSelected={isRowSelected}
       hideHeader
       enableVirtualization={false}
-      rowHeight={44}
+      // 24px provider face on one line: the 44px list mode.
+      rowMode='list'
       minWidth='720px'
       className='text-xs text-primary-token'
       containerClassName='h-full'

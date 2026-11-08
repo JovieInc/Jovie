@@ -23,6 +23,7 @@ import './v3/chapters.css';
 import './v3/specs.css';
 import './v3/form.css';
 import './v3/responsive.css';
+import './v3/cinema.css';
 
 const OWNER = 'apps/web/components/homepage/HomepageEditorial.tsx';
 const COPY = HOMEPAGE_EDITORIAL_COPY;
@@ -161,7 +162,7 @@ interface ChapterCopy {
   readonly body: string;
 }
 
-/** 01 profile: jov.ie/tim, Tim's real profile, with what it does in three rows. */
+/** 01 profile: the featured artist's profile, with what it does in three rows. */
 export function HomepageProfileChapter({
   copy = HOMEPAGE_EDITORIAL_COPY.profile,
 }: Readonly<{ copy?: ChapterCopy }>) {
