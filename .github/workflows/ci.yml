@@ -5017,14 +5017,17 @@ jobs:
             tests/e2e/shell-route-health.spec.ts \
             --config=playwright.config.noauth.ts --project=chromium --reporter=line
 
-          pnpm run test:lighthouse:dashboard:pr
-
           # Chat and onboarding Lighthouse reuse this signed-in server. Their
           # own jobs need an identity secret and skip green without it, so
           # these runs are what hold the pages to their budgets. Onboarding
           # needs the creator persona, which has not finished onboarding.
-          pnpm run test:lighthouse:chat:pr
-          LIGHTHOUSE_TEST_PERSONA=creator pnpm run test:lighthouse:onboarding:pr
+          # Every page runs so one miss still prints the others; any miss
+          # fails the step.
+          lh_failed=0
+          pnpm run test:lighthouse:dashboard:pr || lh_failed=1
+          pnpm run test:lighthouse:chat:pr || lh_failed=1
+          LIGHTHOUSE_TEST_PERSONA=creator pnpm run test:lighthouse:onboarding:pr || lh_failed=1
+          exit "$lh_failed"
         env:
           CI: true
           BASE_URL: http://localhost:3000
