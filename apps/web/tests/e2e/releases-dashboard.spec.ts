@@ -142,10 +142,8 @@ function extractSmartLinkHandle(url: string) {
 }
 
 /**
- * Pre-check helper for releases tests.
- * Waits until the seeded creator route shows its release rows or a known
- * fallback state, then fails unless rows are visible. A matrix that shows
- * neither rows nor a known state (a blank list) is a failure, never a pass.
+ * Pre-check: waits for release rows or a known fallback state, then fails
+ * unless rows are visible. A blank matrix (neither) is a failure, never a pass.
  */
 async function ensureReleasesVisible(
   page: Page
@@ -176,17 +174,12 @@ async function ensureReleasesVisible(
   ).toBeVisible({ timeout: TIMEOUTS.MATRIX_VISIBLE });
 
   const surface = await resolveReleasesSurface(page);
-  if (surface) {
-    return { matrix, surface };
-  }
+  if (surface) return { matrix, surface };
 
   const visibleStates: string[] = [];
   for (const [state, locator] of knownFallbackStates) {
-    if (await locator.isVisible().catch(() => false)) {
-      visibleStates.push(state);
-    }
+    if (await locator.isVisible().catch(() => false)) visibleStates.push(state);
   }
-
   throw new Error(
     `Expected populated seeded releases on ${RELEASES_ROUTE}, found ${visibleStates.join(', ') || 'neither rows nor a known empty state'}`
   );

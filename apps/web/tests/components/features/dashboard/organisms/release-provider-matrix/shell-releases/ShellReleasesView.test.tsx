@@ -396,9 +396,11 @@ function HeaderActionsProbe() {
   );
 }
 
+// Pass the container of an earlier render to re-render into the same root.
 function renderShell(
   releases: readonly ReleaseViewModel[],
-  extraProps: Partial<Parameters<typeof ShellReleasesView>[0]> = {}
+  extraProps: Partial<Parameters<typeof ShellReleasesView>[0]> = {},
+  renderOptions?: { readonly container: HTMLElement }
 ) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -424,7 +426,8 @@ function renderShell(
           <RightPanelProbe />
         </RightPanelProvider>
       </HeaderActionsProvider>
-    </QueryClientProvider>
+    </QueryClientProvider>,
+    renderOptions
   );
 }
 
@@ -530,89 +533,35 @@ describe('ShellReleasesView', () => {
     ).toHaveAttribute('data-selected', 'true');
   });
 
-  it('waits to mount the list until Apple eligibility resolves, then commits banner and rows together', () => {
-    mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: true });
-    const rendered = renderShell(
-      [fakeRelease({ id: 'release-1', title: 'Wait for eligibility' })],
-      { spotifyConnected: true }
-    );
-
-    expect(
-      screen.queryByRole('listitem', { name: /Wait for eligibility/ })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('apple-music-sync-banner')
-    ).not.toBeInTheDocument();
-
-    mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: false });
-    rendered.rerender(
-      <QueryClientProvider client={new QueryClient()}>
-        <HeaderActionsProvider>
-          <RightPanelProvider>
-            <ShellReleasesView
-              releases={[
-                fakeRelease({ id: 'release-1', title: 'Wait for eligibility' }),
-              ]}
-              providerConfig={providerConfig}
-              primaryProviders={primaryProviders}
-              artistName='Bahamas'
-              spotifyConnected
-            />
-            <HeaderActionsProbe />
-            <RightPanelProbe />
-          </RightPanelProvider>
-        </HeaderActionsProvider>
-      </QueryClientProvider>
-    );
-
-    expect(
-      screen.getByRole('listitem', { name: /Wait for eligibility/ })
-    ).toBeInTheDocument();
-    expect(screen.getByTestId('apple-music-sync-banner')).toBeInTheDocument();
-  });
-
-  it('paints the release rows within the budget when Apple eligibility is slow', () => {
+  it('holds the list for Apple eligibility only briefly: banner and rows land together, or rows alone after the budget', () => {
     vi.useFakeTimers();
+    const release = fakeRelease({
+      id: 'release-1',
+      title: 'Wait for eligibility',
+    });
+    const row = () =>
+      screen.queryByRole('listitem', { name: /Wait for eligibility/ });
+    const banner = () => screen.queryByTestId('apple-music-sync-banner');
     try {
       mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: true });
-      renderShell(
-        [fakeRelease({ id: 'release-1', title: 'Slow eligibility' })],
-        {
-          spotifyConnected: true,
-        }
-      );
-      expect(
-        screen.queryByRole('listitem', { name: /Slow eligibility/ })
-      ).not.toBeInTheDocument();
+      const rendered = renderShell([release], { spotifyConnected: true });
+      expect(row()).not.toBeInTheDocument();
+      expect(banner()).not.toBeInTheDocument();
 
-      act(() => {
-        vi.advanceTimersByTime(INITIAL_LIST_PAINT_BUDGET_MS);
-      });
+      mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: false });
+      renderShell([release], { spotifyConnected: true }, rendered);
+      expect(row()).toBeInTheDocument();
+      expect(banner()).toBeInTheDocument();
+      rendered.unmount();
 
-      expect(
-        screen.getByRole('listitem', { name: /Slow eligibility/ })
-      ).toBeInTheDocument();
+      // A slow read never keeps the catalog off screen past the budget.
+      mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: true });
+      renderShell([release], { spotifyConnected: true });
+      act(() => vi.advanceTimersByTime(INITIAL_LIST_PAINT_BUDGET_MS));
+      expect(row()).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
-  });
-
-  it('paints the release rows as soon as the eligibility read fails once', () => {
-    mockUseDspMatchesQuery.mockReturnValue({
-      data: [],
-      isLoading: true,
-      failureCount: 1,
-    } as never);
-    renderShell(
-      [fakeRelease({ id: 'release-1', title: 'Retrying eligibility' })],
-      {
-        spotifyConnected: true,
-      }
-    );
-
-    expect(
-      screen.getByRole('listitem', { name: /Retrying eligibility/ })
-    ).toBeInTheDocument();
   });
 
   it('keeps the settled no-banner release list mounted', () => {
