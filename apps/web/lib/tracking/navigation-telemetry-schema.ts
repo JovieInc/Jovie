@@ -22,7 +22,7 @@ const eventIdSchema = z
   .string()
   .min(16)
   .max(96)
-  .regex(/^[a-zA-Z0-9:_-]+$/);
+  .regex(/^[\w:-]+$/);
 
 /**
  * Strict allowlist. Raw paths, query strings, titles, content, identity,
