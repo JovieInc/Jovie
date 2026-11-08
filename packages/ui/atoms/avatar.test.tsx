@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import {
   AVATAR_PERSON_RADIUS_CLASSNAME,
@@ -298,5 +299,107 @@ describe('Avatar', () => {
 
     expect(atomSource.startsWith("'use client';")).toBe(true);
     expect(atomSource).toContain('React.createContext');
+  });
+});
+
+describe('AvatarImage layout stability', () => {
+  it.each(AVATAR_SIZE_NAMES)(
+    'reserves the %s frame with intrinsic width and height',
+    size => {
+      render(
+        <Avatar size={size}>
+          <AvatarImage src='/tim-white.png' alt='Tim White' />
+        </Avatar>
+      );
+
+      const image = screen.getByRole('img', { name: 'Tim White' });
+      const px = String(getAvatarSizePx(size));
+      expect(image).toHaveAttribute('width', px);
+      expect(image).toHaveAttribute('height', px);
+      expect(image).toHaveClass('h-full', 'w-full', 'rounded-full');
+    }
+  );
+
+  it('uses the explicit size prop outside an Avatar root', () => {
+    render(<AvatarImage src='/cover.png' alt='Cover' size='xl' />);
+
+    const image = screen.getByRole('img', { name: 'Cover' });
+    expect(image).toHaveAttribute('width', String(getAvatarSizePx('xl')));
+    expect(image).toHaveAttribute('height', String(getAvatarSizePx('xl')));
+  });
+
+  it('lets a caller override the intrinsic dimensions', () => {
+    render(
+      <Avatar size='md'>
+        <AvatarImage src='/tim-white.png' alt='Tim White' width={120} />
+      </Avatar>
+    );
+
+    expect(screen.getByRole('img', { name: 'Tim White' })).toHaveAttribute(
+      'width',
+      '120'
+    );
+  });
+});
+
+describe('Avatar state stories', () => {
+  it('shows a neutral fallback for an empty identity', () => {
+    render(<UserAvatar size='lg' />);
+
+    expect(screen.getByRole('img', { name: 'Avatar' })).toHaveTextContent('?');
+  });
+
+  it('shows initials for a name without an image (partial identity)', () => {
+    render(<UserAvatar name='Maya Okafor' size='lg' />);
+
+    expect(screen.getByRole('img', { name: 'Maya Okafor' })).toHaveTextContent(
+      'MO'
+    );
+  });
+
+  it('keeps a long name to two initials and the full name as its label', () => {
+    const longName =
+      'Maximiliana Alejandra Konstantinopoulou-Vanderbilt Featuring The Orchestra';
+    render(<UserAvatar name={longName} size='md' />);
+
+    const fallback = screen.getByRole('img', { name: longName });
+    expect(fallback).toHaveTextContent(/^MO$/);
+    expect(fallback.parentElement).toHaveStyle({
+      width: `${getAvatarSizePx('md')}px`,
+    });
+  });
+
+  it('derives initials from right-to-left names', () => {
+    render(
+      <div dir='rtl'>
+        <UserAvatar name='ليلى حداد' size='lg' />
+      </div>
+    );
+
+    expect(screen.getByRole('img', { name: 'ليلى حداد' })).toHaveTextContent(
+      'لح'
+    );
+  });
+});
+
+describe('Avatar accessibility', () => {
+  it('has no axe violations for image, fallback, failed, presence and RTL avatars', async () => {
+    const { container } = render(
+      <div>
+        <UserAvatar name='Tim White' src='/tim-white.png' size='lg' />
+        <UserAvatar name='Maya Okafor' size='lg' status='online' />
+        <UserAvatar size='md' />
+        <UserAvatar name='Alex Chen' src='/broken.png' size='md' ring />
+        <div dir='rtl'>
+          <UserAvatar name='ליאור כהן' size='lg' status='away' />
+        </div>
+        <Avatar size='xl' shape='artwork'>
+          <AvatarImage src='/cover.png' alt='Release artwork' />
+        </Avatar>
+      </div>
+    );
+    fireEvent.error(screen.getByRole('img', { name: 'Alex Chen' }));
+
+    await expectNoA11yViolations(container);
   });
 });

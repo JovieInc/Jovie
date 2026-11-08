@@ -2,10 +2,20 @@
 /**
  * Auto-ready authorization is author-owned proof, not a branch prefix.
  *
- * A draft may be promoted only when the PR body carries a complete
+ * A draft may be promoted when the PR body carries a complete
  * `jovie-writer-pr-proof/v1` receipt for the exact current head and PR
  * author. Bot/FX provenance remains useful diagnostic context, but branch
  * names and trusted automation authors never manufacture missing proof.
+ *
+ * The one other way in is the writer's own opt-in: a trusted writer (Tim's
+ * account, which every agent writer pushes as, or a Jovie App bot) puts
+ * `<!-- jovie-auto-ready: on-green -->` in the body to say "ship this when
+ * green". It replaces only the receipt. The caller still requires same-repo
+ * main base, exact head, PR Ready + required checks SUCCESS and mergeable
+ * CLEAN, and holds, parks and controlled-proof markers still win. A draft
+ * without the marker stays a draft, so a deliberate WIP draft is never
+ * shipped by accident. Tim, Nov 8 2026: "things should merge automatically
+ * they should not wait."
  */
 
 import { readFileSync } from 'node:fs';
@@ -35,6 +45,21 @@ export const FX_SOURCE_HEAD_TRAILER = 'FX-Source-Head';
 export const TRUSTED_FX_WORKFLOW_PATH =
   '.github/workflows/rolling-ci-dispatch.yml';
 export const TRUSTED_FX_WORKFLOW_NAME = 'Rolling CI Dispatch';
+
+export const ON_GREEN_MARKER = 'jovie-auto-ready: on-green';
+export const ON_GREEN_WRITERS = Object.freeze([
+  'itstimwhite',
+  ...TRUSTED_BOT_AUTHORS,
+]);
+const ON_GREEN_RE = /<!--\s*jovie-auto-ready:\s*on-green\s*-->/i;
+
+export function hasOnGreenOptIn(input = {}) {
+  const author = String(input.authorLogin ?? input.writerLogin ?? '').trim();
+  return (
+    ON_GREEN_WRITERS.includes(author) &&
+    ON_GREEN_RE.test(String(input.body ?? input.prBody ?? ''))
+  );
+}
 
 const SHA_RE = /^[0-9a-f]{40}$/;
 const TRAILER_RE = /^FX-Source-Head:\s*([0-9a-f]{40})\s*$/im;
@@ -203,10 +228,11 @@ export function classifyAutoReadyPromotion(input = {}) {
       prNumber: input.prNumber,
     }
   );
-  if (!proof.ok) {
-    return { eligible: false, reason: `writer-proof-${proof.reason}` };
+  if (proof.ok) return { eligible: true, reason: 'writer-proof-complete' };
+  if (hasOnGreenOptIn(input)) {
+    return { eligible: true, reason: 'writer-on-green-opt-in' };
   }
-  return { eligible: true, reason: 'writer-proof-complete' };
+  return { eligible: false, reason: `writer-proof-${proof.reason}` };
 }
 
 function readStdin() {

@@ -107,6 +107,44 @@ describe('green-source draft classifier', () => {
     });
   });
 
+  it('promotes a trusted writer that opted in to ship on green, with no receipt', () => {
+    const body = 'Ships when green.\n\n<!-- jovie-auto-ready: on-green -->';
+    expect(classifyGreenSourceDraft(draft({ body }))).toEqual({
+      eligible: true,
+      reason: 'green-source-clean',
+    });
+    expect(
+      classifyGreenSourceDraft(draft({ body, authorLogin: 'jovie-bot[bot]' }))
+    ).toEqual({ eligible: true, reason: 'green-source-clean' });
+  });
+
+  it('keeps every other gate when a draft opts in to ship on green', () => {
+    const body = '<!-- jovie-auto-ready: on-green -->';
+    const refused = (overrides, reason) =>
+      expect(classifyGreenSourceDraft(draft({ body, ...overrides }))).toEqual({
+        eligible: false,
+        reason,
+      });
+    refused({ authorLogin: 'a-stranger' }, 'writer-proof-proof-missing');
+    refused({ parkedDraft: true }, 'parked-draft');
+    refused({ labels: ['hold'] }, 'held');
+    refused({ baseRefName: 'feat/parent' }, 'base:feat/parent');
+    refused({ mergeStateStatus: 'BLOCKED' }, 'mergeStateStatus:BLOCKED');
+    refused({ mergeable: 'CONFLICTING' }, 'mergeable:CONFLICTING');
+    expect(
+      classifyGreenSourceDraft(
+        draft({
+          body,
+          checks: greenChecks().map(c =>
+            c.name === 'PR Ready'
+              ? { ...c, bucket: 'fail', state: 'FAILURE' }
+              : c
+          ),
+        })
+      ).eligible
+    ).toBe(false);
+  });
+
   it('promotes only an open main draft that is CLEAN with required checks SUCCESS', () => {
     expect(classifyGreenSourceDraft(draft())).toEqual({
       eligible: true,
