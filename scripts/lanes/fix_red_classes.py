@@ -44,7 +44,12 @@ DETERMINISTIC = frozenset({
 # design gate to a model (test_engineering_credential_removal_is_not_a_founder_gate).
 PLATFORM_TEXT = re.compile(
     remediation.INFRA_TEXT.pattern + r"|API rate limit exceeded|HTTP 408|you must provide a token|"
-    r"timed out fetching|lost communication with the server|ECONNRESET", re.IGNORECASE)
+    r"timed out fetching|lost communication with the server|ECONNRESET|"
+    r"Could not fetch gitleaks after \d+ attempts", re.IGNORECASE)
+# Dependency review fails an SPDX OR when any disjunct is denied, including a
+# bump whose license expression did not change. The repair is an election in
+# scripts/security/dual-license-elections.json. Never drop a deny-licenses id.
+DEPENDENCY_LICENSE = re.compile(r"Dependency review detected incompatible licenses")
 QUOTA_TEXT = re.compile(r"github-quota-deferred|Fleet rule evidence is (?:missing|deferred)", re.IGNORECASE)
 UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
@@ -69,6 +74,13 @@ CHANGELOG_QUOTA_READ = re.compile(r"github-quota-deferred: PR metadata read hit 
 # lines. A branch that already contains main fails update-branch and still
 # reaches a model, which is the only path that may renew a digest the PR owns.
 CENSUS_CERTIFICATION = re.compile(r"source changed; renew certification evidence")
+# The CLI compares source with origin/main as well as the committed baseline.
+# An inherited identity removed on main can fail a stale branch (#24406).
+# Match the failed-test summary, never passing-test titles or fixture API errors.
+# The existing sync route tries once per head, then falls back to the agent.
+DESIGN_SOURCE_CLI = re.compile(
+    r"\bFAIL\b[^\n]*lib/__tests__/design-system-source-ratchet\.test\.mjs[^\n]*"
+    r">[^\n]*exits zero from the CLI on the live tree")
 # Armed spacing ratchet (spacing-scale-ratchet.test.ts). The count grew because a
 # PR added a 10px/14px utility. Snap those added utilities; do not raise the floor.
 SPACING_RATCHET_TEXT = re.compile(
@@ -134,8 +146,11 @@ SIGNATURES = (
     ("cache-surface", CACHE_SURFACE_TEXT, STRIP_CACHE),
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
+    ("design-source-cli", DESIGN_SOURCE_CLI, SYNC_MAIN),
     # Inventory assertion outranks quota/infra noise echoed in the same log.
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
+    # The license error is the job failure. A passing fixture can echo quota text.
+    ("dependency-license", DEPENDENCY_LICENSE, AGENT),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),

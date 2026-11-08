@@ -20,6 +20,7 @@
       "express>path-to-regexp": "0.1.13",
       "esbuild": "0.28.2",
       "joi": "17.13.9",
+      "node-forge": "1.4.3",
       "js-yaml": "5.5.0",
       "protobufjs": "7.6.5",
       "@opentelemetry/core": "2.8.0",
