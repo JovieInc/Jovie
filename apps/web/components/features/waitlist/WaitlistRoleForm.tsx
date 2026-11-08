@@ -26,6 +26,7 @@ import {
   WAITLIST_ROLES,
   type WaitlistRole,
 } from '@/lib/waitlist/roles';
+import { WaitlistJoinedConfirmation } from './WaitlistJoinedConfirmation';
 import {
   clearQualifyingAnswer,
   EMPTY_QUALIFYING_ANSWERS,
@@ -290,23 +291,13 @@ export function WaitlistRoleForm({
   return (
     <div className='grid w-full'>
       {status === 'joined' ? (
-        <div
-          ref={confirmationRef}
-          tabIndex={-1}
-          data-testid='waitlist-role-form-joined'
-          role='status'
-          className={cn(
-            'col-start-1 row-start-1 flex w-full flex-col gap-2',
-            stackAlign
-          )}
-        >
-          <Heading className='text-balance text-xl font-medium tracking-tight text-primary-token'>
-            Request received
-          </Heading>
-          <p className='text-sm text-secondary-token'>
-            We&apos;ll email you an invite when your spot opens.
-          </p>
-        </div>
+        <WaitlistJoinedConfirmation
+          confirmationRef={confirmationRef}
+          email={email.trim()}
+          artistName={asksQuestions ? answers.artistName : null}
+          headingLevel={headingLevel}
+          className={cn('col-start-1 row-start-1', stackAlign)}
+        />
       ) : null}
       <form
         inert={status === 'joined'}

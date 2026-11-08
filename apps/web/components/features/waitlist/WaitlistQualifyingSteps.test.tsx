@@ -117,6 +117,11 @@ describe('WaitlistRoleForm request-access questions', () => {
       expect(screen.getByTestId('waitlist-role-form-joined')).toBeVisible()
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('waitlist-role-form-joined')).toHaveTextContent(
+      "You're on the list" +
+        "We'll email maya@example.com when your invite is ready." +
+        'Your request is for Maya Vale.'
+    );
     expect(sentBody()).toMatchObject({
       email: 'maya@example.com',
       role: 'artist',
@@ -139,6 +144,9 @@ describe('WaitlistRoleForm request-access questions', () => {
     await waitFor(() =>
       expect(screen.getByTestId('waitlist-role-form-joined')).toBeVisible()
     );
+    expect(
+      screen.queryByTestId('waitlist-role-form-joined-artist')
+    ).not.toBeInTheDocument();
     const body = sentBody();
     expect(body).toMatchObject({ email: 'maya@example.com', role: 'artist' });
     expect(body).not.toHaveProperty('spotifyArtistId');

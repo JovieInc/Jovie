@@ -124,8 +124,9 @@ describe('WaitlistRoleForm', () => {
       email: 'person@example.com',
     });
     expect(
-      screen.getByRole('heading', { level: 3, name: 'Request received' })
+      screen.getByRole('heading', { level: 3, name: "You're on the list" })
     ).toBeVisible();
+    expect(confirmation).toHaveTextContent('person@example.com');
   });
 
   it('requires a useful name on the general form before sending a join', async () => {
