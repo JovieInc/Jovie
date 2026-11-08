@@ -14,6 +14,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
+import { fileBottleneckIssue } from './lib/cert-bottleneck.mjs';
 import {
   closeLinearIssueByFingerprint,
   remediationTriggersEnabled,
@@ -22,6 +23,7 @@ import {
 import {
   certificationVerdict,
   runProductionCertification,
+  SURFACE_IDS,
 } from './lib/prod-cert.mjs';
 import {
   coneScoreboard as buildConeScoreboard,
@@ -266,6 +268,16 @@ async function main() {
     console.log(
       JSON.stringify(
         await fileOverallIssue(verdict, { runUrl, scoreboard: coneScoreboard })
+      )
+    );
+    // The one issue the fleet admits first: the topmost surface not green.
+    console.log(
+      JSON.stringify(
+        await fileBottleneckIssue(receipts, {
+          servedSha: served.sha,
+          surfaceOrder: SURFACE_IDS,
+          runUrl,
+        })
       )
     );
   }
