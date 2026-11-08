@@ -171,6 +171,22 @@ describe('dashboard form validation consolidation', () => {
     ).toHaveLength(2);
   });
 
+  it('confirms saves in plain copy without an exclamation mark', () => {
+    mockProfileFormState.success = true;
+    mockMusicLinksFormState.success = true;
+
+    render(
+      <>
+        <ProfileForm artist={artist} onUpdate={vi.fn()} />
+        <DashboardListenNowForm artist={artist} onUpdate={vi.fn()} />
+      </>
+    );
+
+    expect(screen.getByText('Profile updated')).toBeInTheDocument();
+    expect(screen.getByText('Music links saved')).toBeInTheDocument();
+    expect(screen.queryByText(/!$/)).toBeNull();
+  });
+
   it('renders ListenNowForm submit outcomes through Button loading and FormStatus', () => {
     mockMusicLinksFormState.loading = true;
     mockMusicLinksFormState.error = 'Failed to save music links';

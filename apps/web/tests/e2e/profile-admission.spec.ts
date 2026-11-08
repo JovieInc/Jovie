@@ -170,7 +170,7 @@ test.describe('public profile browser admission', () => {
     await waitForSettledProfileLayout(page, 'compact');
 
     const assertClaimIntent = async (mode: string) => {
-      await expect(page.getByTestId('claim-banner')).toContainText(
+      await expect(page.getByTestId('claim-banner-copy')).toContainText(
         'Your profile is ready. Claim it to turn on release emails.'
       );
       await expect(page.getByTestId('claim-banner-cta')).toHaveAttribute(
