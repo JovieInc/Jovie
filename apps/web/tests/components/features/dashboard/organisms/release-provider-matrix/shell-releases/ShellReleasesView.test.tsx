@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TableActionMenuProps } from '@/components/atoms/table-action-menu/types';
 import { useImportPolling } from '@/components/features/dashboard/organisms/release-provider-matrix/hooks/useImportPolling';
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
+import { INITIAL_LIST_PAINT_BUDGET_MS } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/useInitialListPaintGate';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import {
   HeaderActionsProvider,
@@ -568,6 +569,50 @@ describe('ShellReleasesView', () => {
       screen.getByRole('listitem', { name: /Wait for eligibility/ })
     ).toBeInTheDocument();
     expect(screen.getByTestId('apple-music-sync-banner')).toBeInTheDocument();
+  });
+
+  it('paints the release rows within the budget when Apple eligibility is slow', () => {
+    vi.useFakeTimers();
+    try {
+      mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: true });
+      renderShell(
+        [fakeRelease({ id: 'release-1', title: 'Slow eligibility' })],
+        {
+          spotifyConnected: true,
+        }
+      );
+      expect(
+        screen.queryByRole('listitem', { name: /Slow eligibility/ })
+      ).not.toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(INITIAL_LIST_PAINT_BUDGET_MS);
+      });
+
+      expect(
+        screen.getByRole('listitem', { name: /Slow eligibility/ })
+      ).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('paints the release rows as soon as the eligibility read fails once', () => {
+    mockUseDspMatchesQuery.mockReturnValue({
+      data: [],
+      isLoading: true,
+      failureCount: 1,
+    } as never);
+    renderShell(
+      [fakeRelease({ id: 'release-1', title: 'Retrying eligibility' })],
+      {
+        spotifyConnected: true,
+      }
+    );
+
+    expect(
+      screen.getByRole('listitem', { name: /Retrying eligibility/ })
+    ).toBeInTheDocument();
   });
 
   it('keeps the settled no-banner release list mounted', () => {
