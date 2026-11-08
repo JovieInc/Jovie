@@ -2,7 +2,7 @@
 
 import { Button, Textarea } from '@jovie/ui';
 import { RadioGroup, RadioGroupItem } from '@jovie/ui/atoms/radio-group';
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { formatAmountNoCents } from '@/lib/utils/format-number';
 import {
   PROMO_SPEND_BANDS,
@@ -12,6 +12,7 @@ import { WaitlistSpotifySearch } from './WaitlistSpotifySearch';
 import {
   type QualifyingAnswers,
   type QualifyingStep,
+  spotifyArtistIdFromUrl,
 } from './waitlist-qualifying';
 
 export const GROWTH_ANSWER_MAX = 600;
@@ -24,6 +25,60 @@ const SPEND_LABELS: Record<PromoSpendBand, string> = {
   under_50: `Under ${SPEND_BAND_LINE} a month`,
   '50_plus': `${SPEND_BAND_LINE} or more a month`,
 };
+
+/**
+ * The artist answer. Arriving back with an artist already picked shows that
+ * pick with Change; otherwise the search stays mounted while they type or
+ * paste, since the URL field updates the answer on every keystroke.
+ */
+function WaitlistArtistAnswer({
+  answers,
+  submitting,
+  onChange,
+}: Readonly<{
+  answers: QualifyingAnswers;
+  submitting: boolean;
+  onChange: (next: Partial<QualifyingAnswers>) => void;
+}>) {
+  const [showPick, setShowPick] = useState(
+    () => spotifyArtistIdFromUrl(answers.spotifyUrl) !== null
+  );
+  if (!showPick) {
+    return (
+      <WaitlistSpotifySearch
+        spotifyUrl={answers.spotifyUrl}
+        onUrlChange={url => onChange({ spotifyUrl: url })}
+        onArtistNameChange={name => onChange({ artistName: name })}
+        fieldErrors={{}}
+        isSubmitting={submitting}
+        isHydrating={false}
+        setInputRef={() => undefined}
+      />
+    );
+  }
+  return (
+    <div
+      className='flex min-h-11 items-center justify-between gap-3 rounded-lg border border-subtle px-3'
+      data-testid='waitlist-chosen-artist'
+    >
+      <span className='truncate text-sm text-primary-token'>
+        {answers.artistName ?? answers.spotifyUrl}
+      </span>
+      <Button
+        type='button'
+        variant='ghost'
+        size='sm'
+        disabled={submitting}
+        onClick={() => {
+          onChange({ spotifyUrl: '', artistName: null });
+          setShowPick(false);
+        }}
+      >
+        Change
+      </Button>
+    </div>
+  );
+}
 
 /**
  * The three skippable request-access questions (Pen `request-access`,
@@ -61,35 +116,11 @@ export function WaitlistQualifyingSteps({
             <p className='text-sm font-medium text-primary-token'>
               Which artist are you?
             </p>
-            {answers.spotifyUrl ? (
-              <div
-                className='flex min-h-11 items-center justify-between gap-3 rounded-lg border border-subtle px-3'
-                data-testid='waitlist-chosen-artist'
-              >
-                <span className='truncate text-sm text-primary-token'>
-                  {answers.artistName ?? answers.spotifyUrl}
-                </span>
-                <Button
-                  type='button'
-                  variant='ghost'
-                  size='sm'
-                  disabled={submitting}
-                  onClick={() => onChange({ spotifyUrl: '', artistName: null })}
-                >
-                  Change
-                </Button>
-              </div>
-            ) : (
-              <WaitlistSpotifySearch
-                spotifyUrl={answers.spotifyUrl}
-                onUrlChange={url => onChange({ spotifyUrl: url })}
-                onArtistNameChange={name => onChange({ artistName: name })}
-                fieldErrors={{}}
-                isSubmitting={submitting}
-                isHydrating={false}
-                setInputRef={() => undefined}
-              />
-            )}
+            <WaitlistArtistAnswer
+              answers={answers}
+              submitting={submitting}
+              onChange={onChange}
+            />
             <p className='text-xs text-tertiary-token'>
               Not on Spotify yet? Skip this one.
             </p>

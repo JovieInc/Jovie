@@ -169,4 +169,19 @@ describe('WaitlistRoleForm request-access questions', () => {
     expect(screen.queryByTestId('waitlist-chosen-artist')).toBeNull();
     expect(screen.getByLabelText(/search spotify/i)).toBeVisible();
   });
+
+  it('keeps the link field open while an artist types a Spotify link by hand', async () => {
+    startAsArtist();
+    submit();
+    await screen.findByTestId('waitlist-qualifying-step');
+    fireEvent.change(screen.getByLabelText(/search spotify/i), {
+      target: { value: 'Maya' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /manually add url/i }));
+    fireEvent.change(screen.getByLabelText('Spotify link'), {
+      target: { value: 'h' },
+    });
+    expect(screen.queryByTestId('waitlist-chosen-artist')).toBeNull();
+    expect(screen.getByLabelText('Spotify link')).toHaveValue('h');
+  });
 });
