@@ -158,7 +158,7 @@ export function storyUrl(baseUrl, storyId) {
  * Problems for one story × theme capture. `kind` is `visual` (it rendered,
  * cleanly, in the requested theme, and was screenshotted) or `a11y` (the
  * same, plus zero WCAG 2.2 AA violations).
- * @param {{ rendered?: boolean, appliedTheme?: string | null, errors?: string[], violations?: Array<{ id: string }>, screenshotSha256?: string | null }} result
+ * @param {{ rendered?: boolean, appliedTheme?: string | null, pinnedTheme?: string | null, errors?: string[], violations?: Array<{ id: string }>, screenshotSha256?: string | null }} result
  * @returns {string[]}
  */
 export function captureProblems(result, theme, kind) {
@@ -185,13 +185,25 @@ export function captureProblems(result, theme, kind) {
 
 const shorten = text => String(text).replace(/\s+/g, ' ').trim().slice(0, 160);
 
+/** The theme a story pins through its own globals, if any (either capture says). */
+function pinnedTheme(id, results) {
+  for (const theme of STORY_THEMES) {
+    const pinned = results.get(`${id}\u0000${theme}`)?.pinnedTheme;
+    if (STORY_THEMES.includes(pinned)) return pinned;
+  }
+  return null;
+}
+
 function receiptFor(kind, { sourceHash, storyIds }, results) {
   const stories = [];
   const failures = [];
   for (const id of storyIds) {
+    // A story that pins one theme (e.g. OperationsDark) can't prove both, so
+    // it is checked in its own theme only and left out of the light+dark list.
+    const pinned = pinnedTheme(id, results);
     const themes = [];
     const screenshots = {};
-    for (const theme of STORY_THEMES) {
+    for (const theme of pinned ? [pinned] : STORY_THEMES) {
       const result = results.get(`${id}\u0000${theme}`);
       const problems = captureProblems(result, theme, kind);
       if (problems.length)
@@ -201,6 +213,7 @@ function receiptFor(kind, { sourceHash, storyIds }, results) {
         if (kind === 'visual') screenshots[theme] = result.screenshotSha256;
       }
     }
+    if (pinned) continue;
     stories.push(
       kind === 'visual' ? { id, themes, screenshots } : { id, themes }
     );

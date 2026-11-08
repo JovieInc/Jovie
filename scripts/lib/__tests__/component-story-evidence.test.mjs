@@ -297,6 +297,35 @@ describe('receipt assembly', () => {
       'fail'
     );
   });
+  it('checks a pinned-theme story in its own theme only', () => {
+    const pin = { pinnedTheme: 'dark' };
+    const captures = [
+      ...both('b--a'),
+      clean('b--dark', 'light', { ...pin, appliedTheme: 'dark' }),
+      clean('b--dark', 'dark', pin),
+    ];
+    const { visual, a11y } = assembleEvidence(
+      one(path, ['b--a', 'b--dark']),
+      captures
+    );
+    for (const file of [visual, a11y]) {
+      assert.equal(file.components[path].status, 'pass');
+      assert.deepEqual(
+        file.components[path].stories.map(s => s.id),
+        ['b--a']
+      );
+      assert.deepEqual(acceptStoryReceipts(file.components).rejected, []);
+    }
+    captures[3] = clean('b--dark', 'dark', {
+      ...pin,
+      violations: [{ id: 'color-contrast' }],
+    });
+    const axe = assembleEvidence(one(path, ['b--a', 'b--dark']), captures);
+    assert.equal(
+      axe.a11y.components[path].detail,
+      'b--dark [dark]: axe color-contrast'
+    );
+  });
   it('caps the detail and fails a component with no stories', () => {
     const ids = ['a', 'b', 'c', 'd', 'e'];
     const { a11y } = assembleEvidence(one(path, ids), []);

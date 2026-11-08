@@ -203,7 +203,7 @@ function watchStory({ key, theme }) {
   try {
     globalThis.localStorage.setItem(key, theme);
   } catch {}
-  const state = { done: false, rendered: false, errors: [] };
+  const state = { done: false, rendered: false, errors: [], pinnedTheme: null };
   globalThis.__jovieStoryState = state;
   const fail = name => payload => {
     const text = payload?.message ?? payload?.title ?? payload?.description;
@@ -219,6 +219,11 @@ function watchStory({ key, theme }) {
     channel.on('storyRendered', () => {
       state.rendered = true;
       state.done = true;
+    });
+    // Story-level globals (globals: { theme }) force one theme over the seed.
+    channel.on('globalsUpdated', payload => {
+      const pinned = payload?.storyGlobals ?? {};
+      state.pinnedTheme = pinned.themes?.value ?? pinned.theme ?? null;
     });
     channel.on('storyFinished', payload => {
       if (payload?.status === 'error') fail('storyFinished')(payload);
@@ -268,6 +273,7 @@ async function captureOne(browser, { storyId, theme }) {
     theme,
     rendered: false,
     appliedTheme: null,
+    pinnedTheme: null,
     errors,
     violations: [],
     screenshotSha256: null,
@@ -286,6 +292,7 @@ async function captureOne(browser, { storyId, theme }) {
     const state = await waitForStory(page);
     for (const error of state.errors) record(error);
     result.rendered = state.rendered && !state.errors.length;
+    result.pinnedTheme = state.pinnedTheme ?? null;
     if (!result.rendered) return result;
     // Page-side callbacks (serialized, so no closures); scripts/ has no DOM lib.
     await page.evaluate(

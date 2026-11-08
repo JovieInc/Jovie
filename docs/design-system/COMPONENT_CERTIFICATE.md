@@ -48,7 +48,9 @@ CLI names it on stderr), so the criterion stays unknown; a `fail` always stands.
 `visual-a11y.yml` runs it on a GitHub-hosted runner (it refuses anything else,
 so Storybook never runs on gem). It renders each story in light and dark and
 fails on render or console errors, a theme that did not apply, or WCAG 2.2 AA
-axe violations. Only a screenshot hash is recorded, since there are no pixel
+axe violations. A story that pins its theme through story `globals` (such as
+`OperationsDark`) is checked in that theme only and is not listed as light and
+dark proof. Only a screenshot hash is recorded, since there are no pixel
 baselines yet. The job saves `visual.json` and `a11y.json` to the
 `component-story-evidence-` cache, and `component-certificate.yml` restores
 them. Locally: start `storybook dev` in `apps/web`, then run
