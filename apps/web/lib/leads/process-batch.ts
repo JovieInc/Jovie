@@ -23,6 +23,8 @@ export interface BatchResult {
   qualified: number;
   disqualified: number;
   error: number;
+  /** Leads skipped because HTML access is disabled for their platform. */
+  deferred: number;
 }
 
 /**
@@ -38,6 +40,7 @@ export async function processLeadBatch(
     qualified: 0,
     disqualified: 0,
     error: 0,
+    deferred: 0,
   };
 
   for (let i = 0; i < leadIds.length; i += concurrency) {
@@ -47,6 +50,7 @@ export async function processLeadBatch(
     for (const r of batchResults) {
       if (r === 'qualified') result.qualified++;
       else if (r === 'disqualified') result.disqualified++;
+      else if (r === 'deferred') result.deferred++;
       else result.error++;
     }
 
@@ -61,7 +65,7 @@ export async function processLeadBatch(
 
 async function processOneLead(
   leadId: string
-): Promise<'qualified' | 'disqualified' | 'error'> {
+): Promise<'qualified' | 'disqualified' | 'deferred' | 'error'> {
   try {
     const [lead] = await db
       .select({
@@ -148,12 +152,21 @@ async function processOneLead(
       error: error instanceof Error ? error.message : String(error),
     });
     // Disabled HTML access is not evidence about the lead and must not consume
-    // scrape attempts or automatically disqualify them.
+    // scrape attempts or automatically disqualify them. Touch updatedAt so the
+    // cron's oldest-first pick rotates past it instead of re-reading it forever.
     if (
       error instanceof ExtractionError &&
       error.code === 'SOCIAL_HTML_DISABLED'
     ) {
-      return 'error';
+      try {
+        await db
+          .update(leads)
+          .set({ updatedAt: new Date() })
+          .where(eq(leads.id, leadId));
+      } catch {
+        // Rotation is best-effort; the lead stays discovered either way.
+      }
+      return 'deferred';
     }
     await captureError('Lead qualification failed', error, {
       route: 'leads/process-batch',

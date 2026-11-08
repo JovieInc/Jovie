@@ -34,7 +34,9 @@ const {
   mockRunDiscovery,
   mockLeadSettingsRows,
   mockUnqualifiedLeadRows,
+  mockLeadsOrderBy,
 } = vi.hoisted(() => ({
+  mockLeadsOrderBy: vi.fn(),
   mockProcessLeadBatch: vi.fn(),
   mockRunDiscovery: vi.fn(),
   mockLeadSettingsRows: { current: [] as Record<string, unknown>[] },
@@ -124,6 +126,7 @@ vi.mock('@/lib/db/schema/leads', () => ({
   leads: {
     status: 'leads.status',
     id: 'leads.id',
+    updatedAt: 'leads.updatedAt',
   },
 }));
 
@@ -233,17 +236,21 @@ describe('GET /api/cron/frequent lead qualification', () => {
     // The `leads` table mock is the only one with a `status` column; every
     // other select in the route reads the pipeline settings row.
     mockDbSelect.mockImplementation(() => ({
-      from: vi.fn((table: unknown) => ({
-        where: vi.fn().mockReturnValue({
-          limit: vi
-            .fn()
-            .mockImplementation(async () =>
-              typeof table === 'object' && table !== null && 'status' in table
-                ? mockUnqualifiedLeadRows.current
-                : mockLeadSettingsRows.current
-            ),
-        }),
-      })),
+      from: vi.fn((table: unknown) => {
+        const limit = vi
+          .fn()
+          .mockImplementation(async () =>
+            typeof table === 'object' && table !== null && 'status' in table
+              ? mockUnqualifiedLeadRows.current
+              : mockLeadSettingsRows.current
+          );
+        return {
+          where: vi.fn().mockReturnValue({
+            limit,
+            orderBy: mockLeadsOrderBy.mockReturnValue({ limit }),
+          }),
+        };
+      }),
     }));
     mockProcessLeadBatch.mockResolvedValue({
       total: 0,
@@ -387,6 +394,22 @@ describe('GET /api/cron/frequent lead qualification', () => {
 
     expect(mockRunDiscovery).toHaveBeenCalledOnce();
     expect(mockProcessLeadBatch).toHaveBeenCalledWith(['lead-retry-1']);
+  });
+
+  it('picks the least recently touched leads first so deferred ones rotate', async () => {
+    mockUnqualifiedLeadRows.current = [{ id: 'lead-old-1' }];
+    const { GET } = await import('@/app/api/cron/frequent/route');
+
+    await GET(
+      new Request('http://localhost/api/cron/frequent', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+
+    // Without an order, the same 30 leads that HTML access can't read would
+    // be picked on every tick and starve the rest of the queue.
+    expect(mockLeadsOrderBy).toHaveBeenCalled();
+    expect(mockProcessLeadBatch).toHaveBeenCalledWith(['lead-old-1']);
   });
 
   it('does not qualify or auto-approve while the lead pipeline is disabled', async () => {

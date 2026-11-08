@@ -138,6 +138,8 @@ function nextStepTranscript(
   ];
 }
 
+const RAIL_TEST_ID = 'onboarding-profile-rail';
+await import('./OnboardingProfileRail'); // warm the lazy rail chunk
 const STARTED_CONVERSATION = [
   {
     id: 'm1',
@@ -365,7 +367,7 @@ describe('OnboardingShell status', () => {
     );
   });
 
-  it('shows the side profile preview for a non-artist with a public profile (JOV-3379)', () => {
+  it('shows the side profile preview for a non-artist with a public profile (JOV-3379)', async () => {
     builderState.current = {
       artist: null,
       artistConfirmed: false,
@@ -374,19 +376,17 @@ describe('OnboardingShell status', () => {
     };
     render(<OnboardingShell sessionLabel='pending' />);
     builderState.current = null;
-
-    expect(screen.getByTestId('onboarding-profile-rail')).toBeInTheDocument();
+    expect(await screen.findByTestId(RAIL_TEST_ID)).toBeInTheDocument();
   });
 
-  it('previews the prebuilt page behind /start?handle= before the chat knows anything (JOV-7753)', () => {
+  it('previews the prebuilt page behind /start?handle= before the chat knows anything (JOV-7753)', async () => {
     render(
       <OnboardingShell sessionLabel='pending' entryProfile={MEGARAN_ENTRY} />
     );
-
-    expect(screen.getByTestId('onboarding-profile-rail')).toBeInTheDocument();
+    expect(await screen.findByTestId(RAIL_TEST_ID)).toBeInTheDocument();
   });
 
-  it('shows the draft profile for an open handle from the first paint (Pen R6As7U)', () => {
+  it('shows the draft profile for an open handle from the first paint (Pen R6As7U)', async () => {
     render(
       <OnboardingShell
         sessionLabel='pending'
@@ -394,18 +394,18 @@ describe('OnboardingShell status', () => {
       />
     );
 
-    const rail = screen.getByTestId('onboarding-profile-rail');
+    const rail = await screen.findByTestId(RAIL_TEST_ID);
     expect(
       within(rail).getByRole('heading', { name: 'Your Draft Profile' })
     ).toBeInTheDocument();
     expect(within(rail).getByText('jov.ie/newartist')).toBeInTheDocument();
   });
 
-  it('keeps the profile preview in the chat main rather than the shell overlay', () => {
+  it('keeps the profile preview in the chat main rather than the shell overlay', async () => {
     render(
       <OnboardingShell sessionLabel='pending' entryProfile={MEGARAN_ENTRY} />
     );
-    const preview = screen.getByTestId('onboarding-profile-rail');
+    const preview = await screen.findByTestId(RAIL_TEST_ID);
     expect(screen.getByTestId('onboarding-shell-main')).toContainElement(
       preview
     );
