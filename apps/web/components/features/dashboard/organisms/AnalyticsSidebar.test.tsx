@@ -64,6 +64,7 @@ vi.mock('@/components/molecules/drawer', async () => ({
     tabbedCardTestId,
     tabbedSurfaceVariant = 'flat',
     testId,
+    hideTabbedCard = false,
   }: {
     children?: ReactNode;
     entityHeader?: ReactNode;
@@ -74,6 +75,7 @@ vi.mock('@/components/molecules/drawer', async () => ({
     tabbedCardTestId?: string;
     tabbedSurfaceVariant?: 'card' | 'flat';
     testId?: string;
+    hideTabbedCard?: boolean;
   }) => (
     <div
       data-testid={testId}
@@ -81,25 +83,27 @@ vi.mock('@/components/molecules/drawer', async () => ({
       data-close-handler={onClose ? 'present' : 'none'}
     >
       {entityHeader}
-      <div
-        data-testid={tabbedCardTestId}
-        data-surface-variant={tabbedSurfaceVariant}
-      >
-        <div role='tablist' aria-label='Analytics data tabs'>
-          {tabOptions.map(option => (
-            <button
-              key={option.value}
-              type='button'
-              role='tab'
-              aria-selected={activeTab === option.value}
-              onClick={() => onTabChange(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
+      {hideTabbedCard ? null : (
+        <div
+          data-testid={tabbedCardTestId}
+          data-surface-variant={tabbedSurfaceVariant}
+        >
+          <div role='tablist' aria-label='Analytics data tabs'>
+            {tabOptions.map(option => (
+              <button
+                key={option.value}
+                type='button'
+                role='tab'
+                aria-selected={activeTab === option.value}
+                onClick={() => onTabChange(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          {children}
         </div>
-        {children}
-      </div>
+      )}
     </div>
   ),
   ...(await import('@/components/molecules/drawer/StatTile')),
@@ -306,7 +310,7 @@ describe('AnalyticsSidebar ranked-list density (JOV densify pass)', () => {
     const source = readFileSync(
       resolve(
         webRoot,
-        'components/features/dashboard/organisms/AnalyticsSidebar.tsx'
+        'components/features/dashboard/organisms/AnalyticsRankedList.tsx'
       ),
       'utf8'
     );
@@ -315,5 +319,101 @@ describe('AnalyticsSidebar ranked-list density (JOV densify pass)', () => {
     expect(source).toContain(
       'flex h-8 items-center justify-between rounded-lg px-2.5'
     );
+  });
+});
+
+describe('AnalyticsSidebar first look (no visits in range)', () => {
+  const zeroData = {
+    profile_views: 0,
+    unique_users: 0,
+    subscribers: 0,
+    total_clicks: 0,
+    listen_clicks: 0,
+    tip_link_visits: 0,
+    top_cities: [],
+    top_countries: [],
+    top_referrers: [],
+    top_links: [],
+  };
+
+  function renderView(
+    overrides: Partial<Parameters<typeof AnalyticsSidebarView>[0]> = {}
+  ) {
+    return render(
+      <AnalyticsSidebarView
+        isOpen
+        onClose={vi.fn()}
+        data={zeroData}
+        loading={false}
+        range='7d'
+        onRangeChange={vi.fn()}
+        activeTab='cities'
+        onActiveTabChange={vi.fn()}
+        {...overrides}
+      />
+    );
+  }
+
+  it('replaces the zero funnel, zero tiles and empty tabs with one empty state', () => {
+    renderView();
+
+    const empty = screen.getByTestId('analytics-rail-empty-state');
+    expect(empty).toHaveTextContent('No Profile Visits Yet');
+    expect(empty).toHaveTextContent('in the last 7 days');
+    expect(
+      screen.getByRole('link', { name: 'Share Your Profile' })
+    ).toHaveAttribute('href', '/app/chat?panel=profile');
+    expect(screen.queryByText('Unique Visitors')).not.toBeInTheDocument();
+    expect(screen.queryByText('Link Clicks')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    // Title and range control stay so the artist can widen the window.
+    expect(screen.getByText('Audience funnel')).toBeInTheDocument();
+  });
+
+  it('never shows the empty state while loading, so the skeleton holds the loaded layout', () => {
+    renderView({ data: undefined, loading: true });
+
+    expect(
+      screen.queryByTestId('analytics-rail-empty-state')
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('stat-tile-value')).toHaveLength(2);
+    expect(screen.getByRole('tablist')).toBeInTheDocument();
+  });
+
+  it('shows the funnel once any count is above zero', () => {
+    renderView({ data: { ...zeroData, total_clicks: 1 } });
+
+    expect(
+      screen.queryByTestId('analytics-rail-empty-state')
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Link Clicks')).toBeInTheDocument();
+  });
+});
+
+describe('FunnelStage bar honesty', () => {
+  it('draws no bar for a zero stage and a visible stub for a tiny one', () => {
+    const { container: zero } = render(
+      <FunnelStage
+        label='Subscribers'
+        value={0}
+        rate={null}
+        barPercent={0}
+        barIndex={2}
+        loading={false}
+      />
+    );
+    const { container: tiny } = render(
+      <FunnelStage
+        label='Subscribers'
+        value={1}
+        rate={null}
+        barPercent={0.1}
+        barIndex={2}
+        loading={false}
+      />
+    );
+
+    expect(zero.querySelector<HTMLElement>('[style]')?.style.width).toBe('0%');
+    expect(tiny.querySelector<HTMLElement>('[style]')?.style.width).toBe('2%');
   });
 });
