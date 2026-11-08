@@ -445,6 +445,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/pr-visual-capture-path.test.mjs',
   'scripts/lib/__tests__/pr-visual-review.test.mjs',
   'scripts/lib/__tests__/ci-harness.test.mjs',
+  'scripts/lib/__tests__/ci-lighthouse-gates.test.mjs',
   'scripts/lib/__tests__/changed-test-coverage.test.mjs',
   'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
   'scripts/lib/__tests__/ci-branching-guard.test.mjs',
@@ -1465,6 +1466,7 @@ function planAffectedTests(
         'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
         ...AFFECTED_TEST_SELECTOR_TESTS,
         'scripts/lib/__tests__/ci-harness.test.mjs',
+        'scripts/lib/__tests__/ci-lighthouse-gates.test.mjs',
         'scripts/lib/__tests__/production-release-supersession.test.mjs',
       ],
     };
