@@ -120,8 +120,9 @@ describe('EarningsTab - Tippers Table', () => {
 
     renderWithProviders(<EarningsTab />);
 
+    expect(screen.getByText('No Tips Yet')).toBeInTheDocument();
     expect(
-      screen.getByText('Share your tip link to get started.')
+      screen.getByText('Fans who tip you through your profile show up here.')
     ).toBeInTheDocument();
   });
 

@@ -28,7 +28,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const SupernovaGirl: Story = {
+export const FeaturedRelease: Story = {
   render: () => (
     <div className='hv3-phone' style={{ width: 390, height: 860 }}>
       <ReleasePage />

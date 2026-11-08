@@ -1,24 +1,39 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { HOMEPAGE_FEATURED_ARTIST, isDemoArtist } from '@/data/demoArtists';
 import { HomepageProfilePhone } from './HomepageProfilePhone';
 
+const ARTIST = HOMEPAGE_FEATURED_ARTIST;
+const LATEST = ARTIST.releases[0];
+
 describe('HomepageProfilePhone', () => {
-  it('draws Tim White at jov.ie/tim with the latest release as the one thing', () => {
+  it('draws the featured artist with the latest release as the one thing', () => {
     render(
       <HomepageProfilePhone
-        alt='Tim White’s Jovie profile.'
-        release={{
-          title: 'Never Say A Word',
-          src: '/img/releases/never-say-a-word.jpg',
-        }}
+        alt='An example artist’s Jovie profile.'
+        release={{ title: LATEST.title, src: LATEST.src }}
       />
     );
     const phone = screen.getByRole('img', {
-      name: 'Tim White’s Jovie profile.',
+      name: 'An example artist’s Jovie profile.',
     });
-    expect(phone).toHaveTextContent('Tim White');
-    expect(phone).toHaveTextContent('jov.ie/tim');
-    expect(phone).toHaveTextContent('Never Say A Word');
+    expect(phone).toHaveTextContent(ARTIST.name);
+    expect(phone).toHaveTextContent(ARTIST.profileDisplay);
+    expect(phone).toHaveTextContent(LATEST.title);
     expect(phone).toHaveTextContent('Listen now');
+  });
+
+  it('never features Tim on the homepage while the slot is a demo artist', () => {
+    expect(isDemoArtist(ARTIST)).toBe(true);
+    render(
+      <HomepageProfilePhone
+        alt='An example artist’s Jovie profile.'
+        release={{ title: LATEST.title, src: LATEST.src }}
+      />
+    );
+    const phone = screen.getByRole('img');
+    expect(phone).not.toHaveTextContent('Tim White');
+    expect(phone).not.toHaveTextContent('jov.ie/tim');
+    expect(phone.innerHTML).not.toContain('tim-white');
   });
 });
