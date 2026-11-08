@@ -234,7 +234,7 @@ function BandsintownConnectionPill({
             </span>
             {lastSyncedAt && !hovered && !menuOpen && (
               <span className='ml-0.5 text-3xs text-tertiary-token'>
-                {new Date(lastSyncedAt).toLocaleDateString('en-US', {
+                {new Date(lastSyncedAt).toLocaleDateString(undefined, {
                   month: 'short',
                   day: 'numeric',
                 })}
