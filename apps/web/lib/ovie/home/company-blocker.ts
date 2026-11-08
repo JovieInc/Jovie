@@ -96,6 +96,15 @@ function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+function isUnmeasuredFunnelStep(
+  id: string | null,
+  funnel: CompanyStateSnapshot['funnel']
+): boolean {
+  if (!id?.startsWith('funnel:')) return false;
+  const step = id.slice('funnel:'.length);
+  return isFunnelStep(step) && funnel[step].value === null;
+}
+
 /**
  * An all-zero (or zero-from-the-start) funnel never registers as a drop in
  * `findConstraint`, but with no paid signup it is not clear. Name the first
@@ -143,7 +152,16 @@ export function companyBlocker(
   >,
   now: Date
 ): CompanyBlocker | null {
-  const active = snapshot.activeConstraint;
+  // A funnel step that was never instrumented (company-state hard-codes some
+  // as null) is a measurement gap, not today's blocker: it would otherwise
+  // sit on Home for good. Name the first measured zero instead, or nothing
+  // when revenue is flowing.
+  const active = isUnmeasuredFunnelStep(
+    snapshot.activeConstraint,
+    snapshot.funnel
+  )
+    ? null
+    : snapshot.activeConstraint;
   const fallback = active ? null : firstZeroStep(snapshot.funnel);
   const id = active ?? (fallback ? `funnel:${fallback}` : null);
   if (!id) return null;

@@ -4,7 +4,6 @@ import { authorizeSummerControl } from '@/lib/ovie/control';
 import { resolveOviePrincipal } from '@/lib/ovie/mcp/principal';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 const headers = { 'Cache-Control': 'private, no-store' } as const;
 

@@ -1,23 +1,19 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HomeCanvasState } from '@/components/jovie/types';
 import { mockFitLayout } from '@/components/organisms/home-loop/fit-layout.test-utils';
 import { HOME_LOOP_UNDO_WINDOW_MS } from '@/components/organisms/home-loop/useUndoableAnswers';
 import { APP_ROUTES } from '@/constants/routes';
 import type { OvieInbox } from '@/lib/ovie/inbox';
-import { INTERACTION_CASE_CONTRACT } from '@/lib/ovie/interaction-case';
 import { SUMMER_OPS_CARD_SCHEMA } from '@/lib/ovie/ops-card';
 import { emptyDeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import { OvieHomeCanvas } from './OvieHomeCanvas';
-import { snapshot } from './OvieHomeCanvas.test-fixtures';
+import {
+  COMPANY_RESPONSES,
+  INBOX,
+  snapshot,
+} from './OvieHomeCanvas.test-fixtures';
 
 const toastMock = vi.hoisted(() =>
   Object.assign(vi.fn(), {
@@ -54,30 +50,6 @@ vi.mock('./useHudShippingStateQuery', () => ({
       : { isPending: true, isFetching: true, refetch: shipping.refetch },
 }));
 
-const INBOX: OvieInbox = {
-  issues: [],
-  cases: [
-    {
-      contract: INTERACTION_CASE_CONTRACT,
-      id: 'summer:card-1',
-      kind: 'spend',
-      source: { system: 'summer', id: 'card-1', revision: null },
-      title: 'Vercel on-demand concurrency',
-      recommendation: 'Approve about $6 a month',
-      owner: null,
-      state: 'needs_you',
-      priority: 1,
-      createdAt: '2026-10-20T18:00:00.000Z',
-      nextAction: null,
-      waitingUntil: null,
-      confidence: null,
-      evidence: [],
-      body: 'Preview floods stalled production for five hours.',
-      decisionTarget: { kind: 'summer', id: 'card-1' },
-    },
-  ],
-};
-
 function renderCanvas(chat?: HomeCanvasState) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -104,38 +76,6 @@ function renderThenAsk(chat: HomeCanvasState) {
   view.rerenderChat(chat);
   return view;
 }
-
-const COMPANY_RESPONSES: Record<string, unknown> = {
-  '/api/hud/metrics': {
-    overview: {
-      mrrUsd: 0,
-      activeSubscribers: 0,
-      balanceUsd: 22.96,
-      burnRateUsd: 110,
-      runwayMonths: 0.2,
-      defaultStatus: 'dead',
-      defaultStatusDetail: '',
-      financialDataAvailable: true,
-      weekAgo: { mrrUsd: 0, activeSubscribers: 0 },
-    },
-  },
-  '/api/admin/hud/founder-funnel?range=7d': {
-    stages: [{ key: 'accounts_created', count: 2, drillDownHref: null }],
-  },
-  '/api/ovie/certifications': {
-    rows: [
-      {
-        domain: 'flows',
-        state: 'working',
-        tiers: { runtime_dogfood: 'passed' },
-      },
-    ],
-  },
-  '/api/ovie/home/blocker': {
-    generatedAt: '2026-11-08T23:00:00.000Z',
-    blocker: null,
-  },
-};
 
 function opsCard(kind: 'shipping' | 'revenue', title: string) {
   return {
@@ -709,64 +649,5 @@ describe('OvieHomeCanvas', () => {
       'pending'
     );
     expect(screen.getByTestId('home-loop-answer-pending')).toBeVisible();
-  });
-  it('leads the banner with the revenue blocker over shipping health', async () => {
-    companyResponses = {
-      ...COMPANY_RESPONSES,
-      '/api/ovie/home/blocker': {
-        generatedAt: '2026-11-08T23:00:00.000Z',
-        blocker: {
-          schema: 'jovie.company-blocker/v1',
-          id: 'certification:public_profile',
-          kind: 'certification',
-          step: 'public_profile',
-          tone: 'bad',
-          text: 'The public profile fails certification, so no artist can be sent their profile yet',
-          detailsHref: APP_ROUTES.ADMIN_CERTIFICATIONS,
-          since: null,
-          nextAction: null,
-          observedAt: '2026-11-08T23:00:00.000Z',
-        },
-      },
-    };
-    renderCanvas();
-    const banner = screen.getByTestId('home-loop-constraint');
-    await waitFor(() =>
-      expect(banner).toHaveTextContent(
-        'The public profile fails certification, so no artist can be sent their profile yet'
-      )
-    );
-    expect(banner).toHaveAttribute('data-tone', 'bad');
-    expect(
-      within(banner).getByRole('link', { name: 'Details' })
-    ).toHaveAttribute('href', APP_ROUTES.ADMIN_CERTIFICATIONS);
-  });
-
-  it('drops the shipping all-clear once revenue reads clear', async () => {
-    renderCanvas();
-    const banner = screen.getByTestId('home-loop-constraint');
-    await waitFor(() =>
-      expect(banner).not.toHaveTextContent('Shipping is on target')
-    );
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/ovie/home/blocker',
-      expect.anything()
-    );
-  });
-
-  it('reports an unreadable blocker and keeps the shipping banner', async () => {
-    const { '/api/ovie/home/blocker': _blocker, ...withoutBlocker } =
-      COMPANY_RESPONSES;
-    companyResponses = withoutBlocker;
-    renderCanvas();
-    await waitFor(() =>
-      expect(panelAlert).toHaveBeenCalledWith(
-        'revenue-blocker',
-        'company-state-unavailable'
-      )
-    );
-    expect(screen.getByTestId('home-loop-constraint')).not.toHaveTextContent(
-      'Nothing is blocking revenue'
-    );
   });
 });

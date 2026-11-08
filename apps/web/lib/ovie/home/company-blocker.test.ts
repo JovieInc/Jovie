@@ -113,18 +113,30 @@ describe('companyBlocker', () => {
     });
   });
 
-  it('says a step is unmeasured rather than calling it zero', () => {
+  it('names the first measured zero, not a step that was never instrumented', () => {
     const blocker = companyBlocker(
       snapshot({
-        activeConstraint: 'funnel:checkout_shown',
-        funnel: { checkout_shown: null },
+        activeConstraint: 'funnel:claim_shown',
+        funnel: { claim_shown: null, checkout_started: 0, paid: 0 },
       }),
       NOW
     );
-    expect(blocker?.tone).toBe('warn');
-    expect(blocker?.text).toBe(
-      "Checkout views aren't measured yet, so the funnel can't say where it stops"
-    );
+    expect(blocker).toMatchObject({
+      id: 'funnel:checkout_started',
+      text: '5 checkout views this week, but no checkout starts',
+    });
+  });
+
+  it('leaves Home to shipping health when only an unmeasured step stands and revenue is flowing', () => {
+    expect(
+      companyBlocker(
+        snapshot({
+          activeConstraint: 'funnel:claim_shown',
+          funnel: { claim_shown: null, paid: 2 },
+        }),
+        NOW
+      )
+    ).toBeNull();
   });
 
   it('does not read an all-zero funnel with nothing paid as clear', () => {
