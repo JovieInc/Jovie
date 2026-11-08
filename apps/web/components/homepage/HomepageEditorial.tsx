@@ -144,7 +144,7 @@ export function HomepageStoryHero({
             </div>
           </div>
         </div>
-        <Callout anchor='htitle' label={COPY.hero.pageCallout} />
+        <Callout anchor='htitle' side='left' label={COPY.hero.pageCallout} />
       </div>
       <nav className='hv3-index' aria-label={COPY.chaptersLabel}>
         {COPY.chapters.map((label, index) => (

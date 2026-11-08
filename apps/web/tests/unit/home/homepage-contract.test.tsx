@@ -205,6 +205,13 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     expect(hero?.querySelector('.hv3-callout')?.textContent ?? '').toContain(
       copy.hero.pageCallout
     );
+    // Its anchor sits before the title, so the label reads outward, not
+    // across the title.
+    expect(hero?.querySelector('.hv3-callout--l')).not.toBeNull();
+    // The masked lift drops outer shadows, so the page keeps an inner edge.
+    expect(read('components/homepage/v3/chapters.css')).toMatch(
+      /\.hv3-phone\.hv3-phone--hero\s*\{[^}]*box-shadow: inset 0 0 0 1px var\(--hv3-b2\);/
+    );
     // One anchor per id, so each connector finds its own phone.
     const ids = [...container.querySelectorAll('[data-hv3-anchor]')].map(node =>
       node.getAttribute('data-hv3-anchor')
