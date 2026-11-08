@@ -10,7 +10,12 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
-import { PLACEHOLDER, productReady, rankFindings } from './ready-gate.mjs';
+import {
+  fromThirdPartyFrame,
+  PLACEHOLDER,
+  productReady,
+  rankFindings,
+} from './ready-gate.mjs';
 
 const { values: args } = parseArgs({
   options: {
@@ -27,6 +32,9 @@ const VIEWPORTS = {
 };
 const SIGN_IN = /^\/(sign-?in|sign-?up|login|signin)(\/|$)/;
 
+const closedInProduction = JSON.parse(
+  await readFile('scripts/product-crawl/closed-in-production.json', 'utf8')
+).routes;
 const inventory = JSON.parse(
   await readFile('docs/product/generated/artist-launch-inventory.json', 'utf8')
 );
@@ -66,8 +74,15 @@ async function visit(route, viewport) {
   const page = await ctx.newPage();
   const consoleErrors = [];
   const failedRequests = [];
+  let thirdPartyConsole = 0;
   page.on('console', m => {
-    if (m.type() === 'error') consoleErrors.push(m.text().slice(0, 200));
+    if (m.type() !== 'error') return;
+    // A visitor never sees what Cloudflare's challenge frame logs to itself.
+    if (fromThirdPartyFrame(m.location()?.url)) {
+      thirdPartyConsole += 1;
+      return;
+    }
+    consoleErrors.push(m.text().slice(0, 200));
   });
   page.on('pageerror', e => consoleErrors.push(String(e).slice(0, 200)));
   page.on('response', r => {
@@ -98,6 +113,7 @@ async function visit(route, viewport) {
     row.placeholder = m.text.match(PLACEHOLDER)?.[0] ?? null;
     row.horizontalOverflow = m.overflow;
     row.consoleErrors = [...new Set(consoleErrors)];
+    row.thirdPartyConsole = thirdPartyConsole;
     row.failedRequests = [...new Set(failedRequests)];
   } catch (e) {
     row.error = String(e.message || e)
@@ -127,6 +143,7 @@ const receipt = {
   at: new Date().toISOString(),
   routes,
   uncovered,
+  closedInProduction,
   pages,
 };
 const verdict = productReady(receipt);

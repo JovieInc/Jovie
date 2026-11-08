@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { pageFindings, productReady, rankFindings } from './ready-gate.mjs';
+import {
+  fromThirdPartyFrame,
+  isClosedInProduction,
+  pageFindings,
+  productReady,
+  rankFindings,
+} from './ready-gate.mjs';
 
 const now = Date.parse('2026-11-08T03:00:00Z');
 const clean = (route, identity) => ({
@@ -109,4 +115,45 @@ test('findings rank broken first', () => {
     { kind: 'layout-shift' },
   ]).map(f => f.kind);
   assert.deepEqual(ranked, ['server-error', 'layout-shift', 'overflow']);
+});
+
+test('ignores console output only from the challenge frame itself', () => {
+  assert.equal(
+    fromThirdPartyFrame('https://challenges.cloudflare.com/cdn-cgi/x'),
+    true
+  );
+  assert.equal(
+    fromThirdPartyFrame('https://hagen.challenges.cloudflare.com/a'),
+    true
+  );
+  assert.equal(fromThirdPartyFrame('https://jov.ie/start'), false);
+  assert.equal(
+    fromThirdPartyFrame('https://evilchallenges.cloudflare.com.example/a'),
+    false
+  );
+  assert.equal(fromThirdPartyFrame(undefined), false);
+  assert.equal(fromThirdPartyFrame('not a url'), false);
+});
+
+test('a reviewed closed-in-production route must keep answering 404', () => {
+  const closed = [{ prefix: '/demo', reason: 'internal demo' }];
+  assert.equal(isClosedInProduction('/demo/audience', closed), true);
+  assert.equal(isClosedInProduction('/demolition', closed), false);
+  const index = [{ prefix: '/demo', exact: true, reason: 'index only' }];
+  assert.equal(isClosedInProduction('/demo', index), true);
+  assert.equal(isClosedInProduction('/demo/video', index), false);
+  assert.equal(
+    isClosedInProduction('/demo', [{ prefix: '/demo', reason: '' }]),
+    false
+  );
+  const page = { route: '/demo', identity: 'stranger', viewport: 'phone' };
+  assert.deepEqual(
+    pageFindings({ ...page, status: 404, consoleErrors: ['x'] }, closed),
+    []
+  );
+  assert.equal(
+    pageFindings({ ...page, status: 200 }, closed)[0].kind,
+    'closed-route-open'
+  );
+  assert.equal(pageFindings({ ...page, status: 404 })[0].kind, 'broken-route');
 });

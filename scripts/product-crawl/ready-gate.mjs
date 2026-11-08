@@ -19,6 +19,39 @@ export const PLACEHOLDER =
   /\b(lorem ipsum|TODO|FIXME|undefined|NaN|\[object Object\]|placeholder text)\b/;
 
 export const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+// Frames whose own console output is not the product's: Cloudflare's
+// challenge iframe logs CSP probes and devtools noise to itself.
+export const THIRD_PARTY_FRAME_HOSTS = Object.freeze([
+  'challenges.cloudflare.com',
+]);
+
+/** @param {string | undefined} url */
+export function fromThirdPartyFrame(url) {
+  if (!url) return false;
+  let host;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return false;
+  }
+  return THIRD_PARTY_FRAME_HOSTS.some(
+    h => host === h || host.endsWith(`.${h}`)
+  );
+}
+
+/**
+ * True when a reviewed list says the route is meant to 404 in production.
+ * @param {string} route
+ * @param {{ prefix: string, reason: string, exact?: boolean }[]} closed
+ */
+export function isClosedInProduction(route, closed) {
+  return closed.some(
+    c =>
+      c.reason &&
+      (route === c.prefix || (!c.exact && route.startsWith(`${c.prefix}/`)))
+  );
+}
+
 export const IDENTITIES = Object.freeze(['stranger', 'signed-in']);
 
 /**
@@ -29,7 +62,7 @@ export const IDENTITIES = Object.freeze(['stranger', 'signed-in']);
  *   horizontalOverflow?: boolean }} page
  * @returns {{ route: string, identity: string, viewport: string, kind: string, detail: string }[]}
  */
-export function pageFindings(page) {
+export function pageFindings(page, closed = []) {
   const at = {
     route: page.route,
     identity: page.identity,
@@ -37,6 +70,15 @@ export function pageFindings(page) {
   };
   const f = (kind, detail) => ({ ...at, kind, detail });
   if (page.error) return [f('unreachable', page.error)];
+  if (isClosedInProduction(page.route, closed))
+    return page.status === 404
+      ? []
+      : [
+          f(
+            'closed-route-open',
+            `HTTP ${page.status}; listed as closed in production`
+          ),
+        ];
   if (page.authGated) return [];
   const out = [];
   if (page.status >= 500) out.push(f('server-error', `HTTP ${page.status}`));
@@ -75,13 +117,15 @@ export function pageFindings(page) {
 /**
  * @param {{ origin: string, sha?: string, at: string, routes: string[],
  *   uncovered?: { route: string, reason: string, accepted?: boolean }[],
+ *   closedInProduction?: { prefix: string, reason: string, exact?: boolean }[],
  *   pages: Parameters<typeof pageFindings>[0][] }} receipt
  * @param {{ now?: number, deployedSha?: string }} [opts]
  */
 export function productReady(receipt, opts = {}) {
   const now = opts.now ?? Date.now();
   const reasons = [];
-  const findings = (receipt?.pages ?? []).flatMap(pageFindings);
+  const closed = receipt?.closedInProduction ?? [];
+  const findings = (receipt?.pages ?? []).flatMap(p => pageFindings(p, closed));
   if (!receipt?.pages?.length) reasons.push('no crawl');
   else {
     const age = now - Date.parse(receipt.at);
@@ -112,6 +156,7 @@ const ORDER = [
   'unreachable',
   'server-error',
   'broken-route',
+  'closed-route-open',
   'frozen-frame',
   'layout-shift',
   'slow-paint',
