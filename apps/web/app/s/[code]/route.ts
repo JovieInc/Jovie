@@ -15,6 +15,7 @@ import {
   CONSENT_COOKIE_NAME,
   hasServerMarketingConsent,
   parseConsentCookieValue,
+  TRACKING_CONSENT_COOKIE_NAME,
 } from '@/lib/cookies/consent-state';
 import { db } from '@/lib/db';
 import {
@@ -226,6 +227,8 @@ export async function GET(
       consent,
       requiresCookieConsent,
       secGpc: request.headers.get('sec-gpc'),
+      trackingConsent: request.cookies?.get(TRACKING_CONSENT_COOKIE_NAME)
+        ?.value,
     });
 
     // Analytics must never sit on the redirect critical path (time to

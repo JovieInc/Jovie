@@ -315,12 +315,21 @@ describe('GET /s/[code]', () => {
   it.each([
     ['absent consent cookie', 'jv_cc_required=1'],
     ['malformed consent cookie', 'jv_cc_required=1; jv_cc=not-json'],
+    [
+      'pending advertising opt-out',
+      'jv_cc_required=0; jv_tracking_consent=rejected',
+    ],
+    [
+      'advertising opt-out with stale server consent',
+      'jv_cc_required=0; jv_tracking_consent=rejected; jv_cc={"essential":true,"analytics":true,"marketing":true}',
+    ],
   ])(
-    'skips audience recording in consent-required regions with %s',
+    'skips audience recording when consent is withheld: %s',
     async (_caseName, cookieHeader) => {
       const request = new NextRequest('http://localhost/s/abc123', {
         headers: {
           Cookie: cookieHeader,
+          'x-vercel-ip-country': 'US',
         },
       });
 

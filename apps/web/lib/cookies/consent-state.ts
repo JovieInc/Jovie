@@ -5,6 +5,7 @@ export type ConsentPreferences = {
 };
 
 export const CONSENT_COOKIE_NAME = 'jv_cc';
+export const TRACKING_CONSENT_COOKIE_NAME = 'jv_tracking_consent';
 
 export function parseConsentCookieValue(
   cookieValue: string | undefined
@@ -43,12 +44,15 @@ export function hasServerMarketingConsent({
   consent,
   requiresCookieConsent,
   secGpc,
+  trackingConsent,
 }: {
   readonly consent: ConsentPreferences | null;
   readonly requiresCookieConsent: boolean;
   readonly secGpc: string | null;
+  readonly trackingConsent?: string | null;
 }): boolean {
-  if (secGpc === '1') return false;
+  // Browser withdrawal applies before the httpOnly granular cookie is saved.
+  if (secGpc === '1' || trackingConsent === 'rejected') return false;
   if (consent) return consent.marketing === true;
   return !requiresCookieConsent;
 }

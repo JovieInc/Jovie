@@ -232,8 +232,16 @@ describe('POST /api/track', () => {
   it.each([
     ['absent consent cookie', 'jv_cc_required=1'],
     ['invalid consent cookie', 'jv_cc_required=1; jv_cc=not-json'],
+    [
+      'pending advertising opt-out',
+      'jv_cc_required=0; jv_tracking_consent=rejected',
+    ],
+    [
+      'advertising opt-out with stale server consent',
+      'jv_cc_required=0; jv_tracking_consent=rejected; jv_cc={"essential":true,"analytics":true,"marketing":true}',
+    ],
   ])(
-    'anonymizes clicks and skips audience members for consent-required visitors with %s',
+    'anonymizes clicks and skips audience members when consent is withheld: %s',
     async (_label, cookieHeader) => {
       const insertMock = vi.fn();
       const valuesMock = vi.fn().mockReturnValue({
@@ -256,6 +264,7 @@ describe('POST /api/track', () => {
         headers: {
           'Content-Type': 'application/json',
           Cookie: cookieHeader,
+          'x-vercel-ip-country': 'US',
         },
         body: JSON.stringify({
           handle: 'artist123',

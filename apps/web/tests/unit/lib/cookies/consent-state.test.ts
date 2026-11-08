@@ -42,6 +42,34 @@ describe('hasServerMarketingConsent', () => {
     ).toBe(false);
   });
 
+  it.each([null, optIn, optOut])(
+    'honors immediate browser withdrawal before server consent is saved: %j',
+    consent => {
+      expect(
+        hasServerMarketingConsent({
+          consent,
+          requiresCookieConsent: false,
+          secGpc: null,
+          trackingConsent: 'rejected',
+        })
+      ).toBe(false);
+    }
+  );
+
+  it.each(['accepted', 'invalid', null])(
+    'does not let a legacy value grant marketing consent in a required region: %j',
+    trackingConsent => {
+      expect(
+        hasServerMarketingConsent({
+          consent: null,
+          requiresCookieConsent: true,
+          secGpc: null,
+          trackingConsent,
+        })
+      ).toBe(false);
+    }
+  );
+
   it.each([
     [null, false],
     [optIn, false],

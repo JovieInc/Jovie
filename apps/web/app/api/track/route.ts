@@ -16,6 +16,7 @@ import {
   CONSENT_COOKIE_NAME,
   hasServerMarketingConsent,
   parseConsentCookieValue,
+  TRACKING_CONSENT_COOKIE_NAME,
 } from '@/lib/cookies/consent-state';
 import { db, doesTableExist } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
@@ -404,6 +405,8 @@ export async function POST(request: NextRequest) {
       ),
       requiresCookieConsent,
       secGpc: request.headers.get('sec-gpc'),
+      trackingConsent: request.cookies?.get(TRACKING_CONSENT_COOKIE_NAME)
+        ?.value,
     });
 
     // Without marketing consent: anonymize IP and use generic fingerprint.

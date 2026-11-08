@@ -8,8 +8,19 @@ import {
 } from '@testing-library/react';
 import Link from 'next/link';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AcquisitionCapture } from '@/components/features/tracking/AcquisitionCapture';
 import { MetaPixel } from '@/components/features/tracking/MetaPixel';
 import { ProfileNavButton } from '@/components/molecules/ProfileNavButton';
+import {
+  getOrCreateAcquisitionId,
+  isAnalyticsAllowed,
+  isMarketingAllowed,
+} from '@/lib/tracking/consent';
+import {
+  resetNavigationTelemetryForTests,
+  trackNavigationImpressions,
+} from '@/lib/tracking/navigation-telemetry';
+import { trackPacClientEvent } from '@/lib/tracking/pac-events';
 import { useMarketingConsent } from '@/lib/tracking/use-marketing-consent';
 import { CookieBannerMount } from './CookieBannerMount';
 
@@ -28,6 +39,8 @@ const saveConsent = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@/lib/cookies/consent', () => ({ saveConsent }));
 vi.mock('@/lib/env-client', () => ({ env: { IS_TEST: false, IS_E2E: false } }));
 vi.mock('@/lib/demo-recording', () => ({ isDemoRecordingClient: () => false }));
+vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
+vi.mock('@/lib/tracking/json-beacon', () => ({ postJsonBeacon: vi.fn() }));
 vi.mock('next/script', () => ({
   default: ({ src }: { src: string }) => (
     <script defer src={src} data-testid='ad-pixel' />
@@ -41,6 +54,7 @@ async function surface() {
       <Link href='/legal/privacy#privacy-choices'>Your Privacy Choices</Link>
       <CookieBannerMount />
       <MetaPixel pixelIds={['123']} />
+      <AcquisitionCapture />
     </>
   );
   await act(async () => {
@@ -69,6 +83,10 @@ beforeEach(() => {
     __jovieMetaPixelInited: undefined,
   });
   saveConsent.mockReset().mockResolvedValue(undefined);
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    new Response(JSON.stringify({}), { status: 200 })
+  );
+  resetNavigationTelemetryForTests();
 });
 afterEach(() => {
   cleanup();
@@ -143,21 +161,72 @@ describe('Your Privacy Choices', () => {
     expect((window as Window & { fbq?: unknown }).fbq).toBeUndefined();
   });
 
-  it('keeps an existing analytics choice when only advertising changes', async () => {
-    localStorage.setItem(
-      'jv_cc',
-      JSON.stringify({ essential: true, analytics: false, marketing: true })
-    );
-    await surface();
-    fireEvent.click(screen.getByRole('link', { name: 'Your Privacy Choices' }));
-    fireEvent.click(await screen.findByRole('switch', {}, { timeout: 5000 }));
-    await waitFor(() =>
-      expect(saveConsent).toHaveBeenCalledWith({
-        essential: true,
-        analytics: false,
-        marketing: false,
-      })
-    );
+  describe.each([false, true])('analytics choice: %s', analytics => {
+    describe.each([false, true])('consent required: %s', required => {
+      it.each([false, true])(
+        'preserves effective analytics through advertising opt-out, remount and opt-in (save fails: %s)',
+        async saveFails => {
+          document.cookie = `jv_cc_required=${Number(required)}; path=/`;
+          localStorage.setItem(
+            'jv_cc',
+            JSON.stringify({ essential: true, analytics, marketing: true })
+          );
+          if (saveFails) saveConsent.mockRejectedValue(new Error('offline'));
+          const acquisitionId = getOrCreateAcquisitionId();
+          const first = await surface();
+          fireEvent.click(
+            screen.getByRole('link', { name: 'Your Privacy Choices' })
+          );
+          fireEvent.click(
+            await screen.findByRole('switch', {}, { timeout: 5000 })
+          );
+          await waitFor(() => expect(screen.getByRole('switch')).toBeEnabled());
+          expect(saveConsent).toHaveBeenLastCalledWith({
+            essential: true,
+            analytics,
+            marketing: false,
+          });
+          expect(isMarketingAllowed()).toBe(false);
+          expect(isAnalyticsAllowed()).toBe(analytics);
+          expect(localStorage.getItem('jovie_acquisition_id') ?? '').toBe(
+            acquisitionId
+          );
+          expect(getOrCreateAcquisitionId()).toBe(acquisitionId);
+          expect(
+            trackPacClientEvent('pac_exposure', {
+              profileId: '3f9c2f6a-8f1e-4b6a-9a44-1c2d3e4f5a6b',
+              variantId:
+                'copy:default|trigger:30s|s2:merch|tab:visible|dismiss:text',
+              pacState: 'idle',
+            })?.consent
+          ).toBe(analytics ? 'accepted' : 'rejected');
+          expect(
+            trackNavigationImpressions(['inbox'], '/app', {
+              isElectron: false,
+              isMobile: false,
+              navVariant: 'canonical_customer_ia_v1',
+            })
+          ).toHaveLength(analytics ? 1 : 0);
+
+          first.unmount();
+          await surface();
+          expect(isMarketingAllowed()).toBe(false);
+          expect(isAnalyticsAllowed()).toBe(analytics);
+          expect(getOrCreateAcquisitionId()).toBe(acquisitionId);
+
+          fireEvent.click(
+            screen.getByRole('link', { name: 'Your Privacy Choices' })
+          );
+          fireEvent.click(
+            await screen.findByRole('switch', {}, { timeout: 5000 })
+          );
+          await waitFor(() => expect(screen.getByRole('switch')).toBeEnabled());
+          expect(isMarketingAllowed()).toBe(true);
+          expect(isAnalyticsAllowed()).toBe(analytics);
+          expect(getOrCreateAcquisitionId()).toBe(acquisitionId);
+        }
+      );
+    });
   });
 
   it('shows Do Not Track as a locked, honored signal instead of an enabled toggle', async () => {
