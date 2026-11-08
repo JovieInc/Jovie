@@ -5041,13 +5041,14 @@ jobs:
 
       - name: Summarize dashboard Lighthouse reports
         if: (always() && steps.check_changes.outputs.run_full_ci == 'true')
-        working-directory: apps/web
         # The reports also go to an artifact, but agents often cannot
         # download it; this prints each page's metrics, document size,
         # render-blocking requests and layout-shift elements to the log.
         run: |
-          node scripts/lighthouse-report-summary.mjs \
-            .lighthouseci/dashboard-pr .lighthouseci/chat-pr .lighthouseci/onboarding-pr
+          node apps/web/scripts/lighthouse-report-summary.mjs \
+            apps/web/.lighthouseci/dashboard-pr \
+            apps/web/.lighthouseci/chat-pr \
+            apps/web/.lighthouseci/onboarding-pr
 
       - name: Upload dashboard Lighthouse artifacts
         if: (always() && steps.check_changes.outputs.run_full_ci == 'true')
