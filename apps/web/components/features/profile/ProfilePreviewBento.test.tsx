@@ -86,7 +86,8 @@ describe('ProfilePreviewBento', () => {
       footer: <div data-testid='bento-footer'>footer</div>,
     });
 
-    expect(screen.getByText('Live')).toBeInTheDocument();
+    // ASR-022: the badge reads "Live" as written, never forced into caps.
+    expect(screen.getByText('Live')).not.toHaveClass('uppercase');
     expect(screen.getByText('Your live profile')).toBeInTheDocument();
     expect(screen.getByTestId('bento-footer')).toBeInTheDocument();
   });
