@@ -188,7 +188,7 @@ function producerJobs(jobs, runId, attempt, headSha) {
   );
 }
 /**
- * @returns {'accept' | 'wait' | 'reject'}
+ * @returns {{ decision: 'accept' | 'wait' | 'reject', failed: string[] }}
  */
 function classifyProducerAttempt({
   artifact,
@@ -210,26 +210,42 @@ function classifyProducerAttempt({
     workflowRun.status === 'in_progress' &&
     workflowRun.conclusion == null;
   const job = producerJobs(jobs, runId, attempt, context.headSha);
-  const identityTrusted =
-    validId(runId) &&
-    validId(attempt) &&
-    artifact.id === artifactId &&
-    trustedName &&
-    !artifact.expired &&
-    workflowRun.repository?.full_name === PRODUCER.repository &&
-    workflowRun.head_branch === 'main' &&
-    workflowRun.head_sha?.toLowerCase() === context.headSha.toLowerCase() &&
-    workflowRun.path === PRODUCER.workflow &&
-    ['push', 'workflow_dispatch'].includes(workflowRun.event);
-  if (
-    identityTrusted &&
-    digestReady &&
-    (completedRun || downstreamCertificationRun) &&
-    job.length === 1 &&
-    validId(job[0].id) &&
-    job[0].conclusion === 'success'
-  ) {
-    return 'accept';
+  // Each named check is reported when the attempt is rejected, so a red
+  // certification says which trust condition failed instead of a generic line.
+  const identityChecks = {
+    'run id': validId(runId),
+    'run attempt': validId(attempt),
+    'artifact id': artifact.id === artifactId,
+    'artifact name': Boolean(trustedName),
+    'artifact unexpired': !artifact.expired,
+    repository: workflowRun.repository?.full_name === PRODUCER.repository,
+    'branch main': workflowRun.head_branch === 'main',
+    'head sha':
+      workflowRun.head_sha?.toLowerCase() === context.headSha.toLowerCase(),
+    'workflow path': workflowRun.path === PRODUCER.workflow,
+    'trigger event': ['push', 'workflow_dispatch'].includes(workflowRun.event),
+  };
+  const identityTrusted = Object.values(identityChecks).every(Boolean);
+  const attemptChecks = {
+    ...identityChecks,
+    'artifact digest': digestReady,
+    'run state': completedRun || downstreamCertificationRun,
+    'one producer job': job.length === 1,
+    'producer job id': job.length === 1 && validId(job[0].id),
+    'producer job success': job.length === 1 && job[0].conclusion === 'success',
+  };
+  const sameRun = runId === currentRunId && attempt === currentAttempt;
+  const failed = Object.entries(attemptChecks)
+    .filter(([, passed]) => !passed)
+    .map(([name]) =>
+      name === 'run state'
+        ? `run state (${String(workflowRun.status)} ${String(
+            workflowRun.conclusion ?? 'unfinished'
+          )}, same run ${sameRun})`
+        : name
+    );
+  if (failed.length === 0) {
+    return { decision: 'accept', failed };
   }
   const named = (jobs?.jobs || []).filter(
     item => item?.name === PRODUCER.job && item.run_id === runId
@@ -245,9 +261,9 @@ function classifyProducerAttempt({
     !terminalProducer &&
     (!digestReady || job.length !== 1 || job[0].conclusion !== 'success')
   ) {
-    return 'wait';
+    return { decision: 'wait', failed };
   }
-  return 'reject';
+  return { decision: 'reject', failed };
 }
 function bundleDigest(files) {
   const hash = createHash('sha256');
@@ -503,7 +519,7 @@ export function resolveTrustedScreenProof({
       const trustedName =
         artifact.name === marketingName ||
         artifact.name === screenProofArtifactName(context.screenId);
-      const decision = classifyProducerAttempt({
+      const { decision, failed } = classifyProducerAttempt({
         artifact,
         workflowRun: loaded.workflowRun,
         jobs: loaded.jobs,
@@ -519,7 +535,9 @@ export function resolveTrustedScreenProof({
       }
       if (decision === 'reject' || index === delays.length - 1) {
         return fail(
-          'artifact run, workflow, or exact producer attempt is not trusted'
+          `artifact run, workflow, or exact producer attempt is not trusted${
+            failed.length ? `; failed checks ${failed.join(', ')}` : ''
+          }`
         );
       }
     }

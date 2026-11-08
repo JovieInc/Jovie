@@ -2131,6 +2131,10 @@ if (p.endsWith('/zip')) {
         wrongName.receipt.issues.join('\n'),
         /artifact run, workflow, or exact producer attempt is not trusted/
       );
+      assert.match(
+        wrongName.receipt.issues.join('\n'),
+        /failed checks artifact name/
+      );
     } finally {
       process.env.PATH = priorPath;
       if (priorDiffBase === undefined) delete process.env.SCREEN_CERT_DIFF_BASE;
