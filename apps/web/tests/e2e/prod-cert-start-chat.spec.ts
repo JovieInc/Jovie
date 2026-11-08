@@ -14,6 +14,10 @@ import { newProdcertUserEmail } from '@/lib/synthetic/prodcert-identities';
 import { fillControlledInputUntilEnabled } from '../helpers/auth';
 import { recordPlaywrightSensitiveValues } from '../helpers/vercel-preview';
 import {
+  expectNoForcedCaps,
+  expectPreviewMediaPainted,
+} from './helpers/preview-media-quality';
+import {
   certStep,
   certStepBlocked,
   createSurfaceTelemetry,
@@ -230,10 +234,13 @@ test('anonymous /start reaches a real catalog preview on production', async ({
         .locator('a[href^="/onboarding/checkout"]')
         .count();
       expect(checkoutLinks, 'pricing rendered before the preview').toBe(0);
+      // Truthful preview: real painted portrait and artwork, no forced caps.
+      await expectPreviewMediaPainted(rail);
+      await expectNoForcedCaps(page.locator('main'));
       return releases;
     },
     releases =>
-      `preview shows ${releases} real releases for the test artist, no pricing step`
+      `preview shows ${releases} real releases with painted portrait and artwork, no forced caps, no pricing step`
   );
 
   telemetry.record('claim');
