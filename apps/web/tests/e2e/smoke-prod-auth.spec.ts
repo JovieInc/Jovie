@@ -555,7 +555,7 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     if (typeof baseUrl !== 'string') {
       throw new Error('Production auth smoke requires an exact baseURL.');
     }
-    await primeOriginBoundVercelBypass(context, baseUrl);
+    if (baseUrl.includes(".vercel.app")) await primeOriginBoundVercelBypass(context, baseUrl);
   });
 
   test('sign-in works and dashboard loads', async ({ page }, testInfo) => {

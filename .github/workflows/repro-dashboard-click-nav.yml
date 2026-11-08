@@ -14,7 +14,7 @@ jobs:
       max-parallel: 1
       fail-fast: false
       matrix:
-        base: ['https://jovie-2ezpfot2p-jovie.vercel.app', 'https://jov.ie']
+        base: ['https://jov.ie']
     timeout-minutes: 20
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
