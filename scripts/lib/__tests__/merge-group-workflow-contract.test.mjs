@@ -375,7 +375,6 @@ describe('merge_group workflow contract', () => {
     expect(CI_WORKFLOW).not.toContain('ready_for_review');
     expect(SIZE_GUARD_WORKFLOW).not.toContain('ready_for_review');
     expect(FORK_GATE_WORKFLOW).not.toContain('ready_for_review');
-    expect(CI_WORKFLOW).toMatch(/merge_group:\n\s+types: \[checks_requested\]/);
     expect(SIZE_GUARD_WORKFLOW).toMatch(
       /merge_group:\n\s+types: \[checks_requested\]/
     );
@@ -875,6 +874,19 @@ describe('merge_group workflow contract', () => {
       );
       expect(header).not.toContain("github.event_name == 'pull_request'");
     }
+  });
+
+  it('emits an explicit full_web_units merge suite scope after PR Ready (JOV-10687)', () => {
+    const scope = getJobBlock(CI_WORKFLOW, 'ci-merge-suite-scope');
+    expect(scope).toContain('name: Merge Suite Scope / full_web_units');
+    expect(scope).toContain('ci-merge-group-ready');
+    expect(scope).toContain("needs.ci-merge-group-ready.result == 'success'");
+    expect(scope).toContain('full_web_units');
+    expect(scope).toContain(
+      'Cannot claim full_web_units without successful Unit Tests'
+    );
+    expect(scope).toContain('runs-on: ubuntu-24.04');
+    expect(CI_WORKFLOW).toContain('ordinary_admission');
   });
 
   it('fans real combined-head checks into PR Ready without PR metadata or deploy evidence', () => {
@@ -2016,8 +2028,8 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain(
       "run_web: ${{ steps.detect.outputs.run_web || 'false' }}"
     );
-    expect(pathChanges).toContain(
-      "run_macos: ${{ steps.detect.outputs.run_macos || 'false' }}"
+    expect(pathChanges).toMatch(
+      /run_ios: \$\{\{ github\.event_name == 'merge_group' && 'false' \|\| steps\.detect\.outputs\.run_ios \|\| 'false' \}\}[\s\S]*run_macos: \$\{\{ github\.event_name == 'merge_group' && 'false' \|\| steps\.detect\.outputs\.run_macos \|\| 'false' \}\}[\s\S]*Drop hosted macOS lanes from the merge-queue receipt[\s\S]*del\(\.ios, \.mac\)/
     );
     expect(pathChanges).toContain(
       "run_cross_product: ${{ steps.detect.outputs.run_cross_product || 'false' }}"
@@ -3550,6 +3562,7 @@ ${selectedGateScript}`,
       .sort();
     expect(mergeGroupWorkflows).toEqual([
       'ci.yml',
+      'company-guards.yml',
       'pr-fleet-rules.yml',
       'pr-size-guard.yml',
       'pr-targets-main.yml',

@@ -224,7 +224,7 @@ class SweepTest(unittest.TestCase):
         with patch.dict(os.environ, {"LANES_SWEEP_ARCHIVE_GH": sys.executable}):
             report = self.sweep(run=run)
         self.assertEqual(self.remote_snapshots(), [], "operational snapshots never go to public origin")
-        self.assertTrue(note.exists() and (path / "node_modules").exists())
+        self.assertTrue(note.exists())  # held state stays; the regenerable install may go
         self.assertFalse(any("push" in args for args in calls), "reject privacy before any push")
         self.assertEqual(report["removed"], [])
 
@@ -264,7 +264,6 @@ class SweepTest(unittest.TestCase):
                     return no_processes(args, **kw)
                 self.assertEqual(self.sweep(run=unavailable)["removed"], [])
         self.assertFalse(any("push" in args for args in calls))
-        self.assertTrue((path / "node_modules").exists())
         self.assertEqual((path / "a.txt").read_text(), "unsaved\n")
         self.assertEqual(self.remote_snapshots(), [])
 
@@ -335,10 +334,10 @@ class SweepTest(unittest.TestCase):
                 report = self.sweep(run=run)
                 self.assertTrue(pushed)
                 self.assertEqual(report["removed"], [])
-                self.assertEqual(report["stripped"], [])
+                # Held work stays byte-for-byte; regenerable installs are never part of it.
                 self.assertEqual(index.read_bytes(), before)
                 self.assertEqual((path / "a.txt").read_text(), "unstaged\n")
-                self.assertTrue((path / "new.txt").exists() and (path / "node_modules").exists())
+                self.assertTrue((path / "new.txt").exists())
                 # Keep earlier subcases outside subsequent sweeps.
                 (path / ".sweep-keep").write_text("")
 
@@ -689,6 +688,23 @@ class SweepTest(unittest.TestCase):
         self.assertNotIn(sweeper.PRESERVED_REPAIR, files)
 
 
+    def test_kept_preserved_repair_sheds_node_modules_once_idle(self):
+        idle = self.worktree("idle-repair")
+        fresh = self.worktree("fresh-repair")
+        for path in (idle, fresh):
+            (path / sweeper.PRESERVED_REPAIR).write_text(json.dumps({"pr": 1}))
+            (path / "a.txt").write_text("repair in progress\n")
+            (path / "node_modules").mkdir()
+        old = self.now - 2 * 3600
+        os.utime(idle / "a.txt", (old, old))
+        os.utime(idle / sweeper.PRESERVED_REPAIR, (old, old))
+        os.utime(fresh / "a.txt", (self.now, self.now))
+        report = self.sweep()
+        self.assertTrue(idle.exists() and (idle / "a.txt").exists())
+        self.assertFalse((idle / "node_modules").exists())
+        self.assertTrue((fresh / "node_modules").exists(), "a recently active checkout keeps its install")
+        self.assertEqual(report["stripped"], [str(idle)])
+
     def test_cleanup_preserved_clean_checkout_frees_its_branch(self):
         # 2026-10-11 on Gem: cleanup preserved checkouts whose only "changes" were harness files,
         # which locked their PR branches; every repair failed "already used by worktree".
@@ -764,11 +780,15 @@ class SnapshotHoldTest(SweepTest):
         path = self.worktree("leaky")
         (path / "a.txt").write_text("edit with a secret\n")
         (path / "node_modules").mkdir()
+        old = self.now - 2 * DAY
+        os.utime(path / "a.txt", (old, old))
         self.scan.stop()
         with patch.object(sweeper, "scan_snapshot", return_value="secret-finding:trufflehog"):
             report = self.sweep()
         self.scan.start()
-        self.assertTrue((path / "a.txt").exists() and (path / "node_modules").exists())
+        # Source stays exactly as it is; only regenerable build dirs are dropped (Gem disk, 2026-11-07).
+        self.assertTrue((path / "a.txt").exists() and not (path / "node_modules").exists())
+        self.assertEqual(report["stripped"], [str(path)])
         self.assertEqual(report["secretHeld"], [{"name": "leaky", "path": str(path),
                                                  "reason": "secret-finding:trufflehog"}])
         self.assertEqual(self.remote_snapshots(), [])

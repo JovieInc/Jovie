@@ -57,9 +57,10 @@ import {
 } from '../../ci-fast-lanes.mjs';
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
 import { buildWebVitestFastArgs } from '../ci-web-vitest-fast-args.mjs';
+import { defineStorybookBrowserSelectionTests } from './ci-storybook-browser-selection.cases.mjs';
+import { assertProfileClaimProof } from './profile-claim-proof.support.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
-
 // JOV-6837: the structural control paths are data, one ERE alternative per line.
 const STRUCTURAL_CONTROL_PATHS = readFileSync(
   resolve(REPO_ROOT, '.github/ci-harness/structural-control-paths.ere'),
@@ -82,7 +83,6 @@ const CI_FAST_SOURCE = readFileSync(
 const PACKAGE_JSON = JSON.parse(
   readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8')
 );
-
 const HOSTED_GROUP_JOBS = [
   {
     jobId: 'ci-fast-typecheck',
@@ -140,6 +140,8 @@ function assertActionlintCompiler(steps) {
 }
 
 describe('ci-fast bounded parallel workflow', () => {
+  defineStorybookBrowserSelectionTests(jobBlock);
+
   it('selects both critical and interaction files for non-main manual units', () => {
     const unitJob = jobBlock('ci-unit-tests', 'ci-exact-head-coverage-shard');
     const command = unitJob
@@ -379,6 +381,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/tests/test_signal_watch.py',
       'scripts/tests/test_x_grok.py',
       'scripts/tests/test_pr_remediation_swarm.py',
+      'scripts/tests/test_codex_launcher.py',
+      'scripts/tests/test_loose_exec_guard.py',
     ]);
     const shards = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command => {
       const [, keyword, files] = /-k "([^"]+)" (.+)$/u.exec(command) ?? [];
@@ -445,7 +449,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(36);
+    expect(LANES_PYTEST_FILES).toHaveLength(38);
     expect(whole).toContain('scripts/tests/test_board_intake.py');
     expect(whole).toContain('scripts/tests/test_priority_admission.py');
     expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS.join(' ')).toContain(
@@ -670,112 +674,6 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
-  it('selects the crawler state proof through the maintained Storybook browser path', () => {
-    const remaining = jobBlock(
-      'ci-fast-remaining',
-      'ci-profile-admission-browser'
-    );
-    const pattern = remaining.match(/CRAWLER_STORYBOOK_PATTERN='([^']+)'/)?.[1];
-    expect(pattern).toBeTruthy();
-    for (const path of [
-      'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.tsx',
-      'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.stories.tsx',
-      'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard.tsx',
-      'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard.stories.tsx',
-      'apps/web/tests/e2e/storybook-ai-crawler.spec.ts',
-    ]) {
-      expect(
-        spawnSync('grep', ['-qE', pattern], {
-          input: `${path}\n`,
-          encoding: 'utf8',
-        }).status,
-        path
-      ).toBe(0);
-    }
-    expect(
-      spawnSync('grep', ['-qE', pattern], {
-        input:
-          'apps/web/components/features/dashboard/organisms/OtherDialog.tsx\n',
-        encoding: 'utf8',
-      }).status
-    ).not.toBe(0);
-
-    const selector = remaining
-      .split('id: storybook-browser\n')[1]
-      .split('      - name: Start ci-fast lanes')[0];
-    const command = selector
-      .split('run: |\n')[1]
-      .replaceAll('${{ github.event_name }}', 'pull_request')
-      .replaceAll('${{ github.base_ref }}', 'main');
-    const root = mkdtempSync(join(tmpdir(), 'crawler-storybook-selection-'));
-    try {
-      const output = join(root, 'output');
-      const result = spawnSync(
-        'bash',
-        ['-c', 'git() { printf "%s\\n" "$CHANGED_PATHS"; }\n' + command],
-        {
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            CHANGED_PATHS:
-              'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.stories.tsx',
-            RUNNER_TEMP: root,
-            GITHUB_OUTPUT: output,
-          },
-        }
-      );
-      expect(result.status, result.stderr).toBe(0);
-      expect(
-        Object.fromEntries(
-          readFileSync(output, 'utf8')
-            .trim()
-            .split('\n')
-            .map(line => line.split('='))
-        )
-      ).toEqual({
-        run: 'true',
-        spotify: 'false',
-        kbd: 'false',
-        crawler: 'true',
-        desktop_update: 'false',
-        dsp: 'false',
-        overlay: 'false',
-        privacy: 'false',
-        tasks: 'false',
-      });
-
-      const runner = remaining
-        .split('id: storybook-browser-test')[1]
-        .split('      - name: Upload Storybook browser evidence')[0];
-      const selection = runner.slice(
-        runner.indexOf('          specs=()'),
-        runner.indexOf('          pnpm exec storybook dev')
-      );
-      const chosen = spawnSync(
-        'bash',
-        ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
-        {
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            RUN_SPOTIFY: 'false',
-            RUN_KBD: 'false',
-            RUN_CRAWLER: 'true',
-            RUN_OVERLAY: 'false',
-            RUN_TASKS: 'false',
-            RUN_PRIVACY: 'false',
-          },
-        }
-      );
-      expect(chosen.status, chosen.stderr).toBe(0);
-      expect(chosen.stdout.trim().split('\n')).toEqual([
-        'tests/e2e/storybook-ai-crawler.spec.ts',
-      ]);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-
   it('selects the overlay collision proof when overlay primitives change', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
@@ -985,118 +883,7 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('selects the Tasks row geometry proof for its shared cell and feature surfaces', () => {
-    const remaining = jobBlock(
-      'ci-fast-remaining',
-      'ci-profile-admission-browser'
-    );
-    const pattern = remaining.match(/TASKS_STORYBOOK_PATTERN='([^']+)'/)?.[1];
-    expect(pattern).toBeTruthy();
-    for (const path of [
-      'apps/web/components/features/dashboard/tasks/TaskDataTable.tsx',
-      'apps/web/components/features/dashboard/tasks/TaskDataTable.stories.tsx',
-      'apps/web/components/features/dashboard/tasks/TaskListRow.tsx',
-      'apps/web/components/features/dashboard/tasks/TasksPageClient.tsx',
-      'apps/web/components/organisms/table/atoms/TableCell.tsx',
-      'apps/web/components/organisms/table/table.types.ts',
-      'apps/web/components/organisms/table/organisms/VirtualizedTableRow.tsx',
-      'apps/web/components/organisms/table/molecules/TaskProjectionListRow.tsx',
-      'apps/web/tests/e2e/storybook-task-row-geometry.spec.ts',
-    ]) {
-      expect(
-        spawnSync('grep', ['-qE', pattern], {
-          input: `${path}\n`,
-          encoding: 'utf8',
-        }).status,
-        path
-      ).toBe(0);
-    }
-    expect(
-      spawnSync('grep', ['-qE', pattern], {
-        input:
-          'apps/web/components/features/dashboard/releases/ReleaseList.tsx\n',
-        encoding: 'utf8',
-      }).status
-    ).not.toBe(0);
-
-    const selector = remaining
-      .split('id: storybook-browser\n')[1]
-      .split('      - name: Start ci-fast lanes')[0];
-    const command = selector
-      .split('run: |\n')[1]
-      .replaceAll('${{ github.event_name }}', 'pull_request')
-      .replaceAll('${{ github.base_ref }}', 'main');
-    const root = mkdtempSync(join(tmpdir(), 'tasks-storybook-selection-'));
-    try {
-      const output = join(root, 'output');
-      const result = spawnSync(
-        'bash',
-        ['-c', 'git() { printf "%s\\n" "$CHANGED_PATHS"; }\n' + command],
-        {
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            CHANGED_PATHS:
-              'apps/web/components/organisms/table/organisms/VirtualizedTableRow.tsx',
-            RUNNER_TEMP: root,
-            GITHUB_OUTPUT: output,
-          },
-        }
-      );
-      expect(result.status, result.stderr).toBe(0);
-      expect(
-        Object.fromEntries(
-          readFileSync(output, 'utf8')
-            .trim()
-            .split('\n')
-            .map(line => line.split('='))
-        )
-      ).toEqual({
-        run: 'true',
-        spotify: 'false',
-        kbd: 'false',
-        crawler: 'false',
-        overlay: 'false',
-        tasks: 'true',
-        desktop_update: 'false',
-        dsp: 'false',
-        privacy: 'false',
-      });
-
-      const runner = remaining
-        .split('id: storybook-browser-test')[1]
-        .split('      - name: Upload Storybook browser evidence')[0];
-      const selection = runner.slice(
-        runner.indexOf('          specs=()'),
-        runner.indexOf('          pnpm exec storybook dev')
-      );
-      const chosen = spawnSync(
-        'bash',
-        ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
-        {
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            RUN_SPOTIFY: 'false',
-            RUN_KBD: 'false',
-            RUN_CRAWLER: 'false',
-            RUN_OVERLAY: 'false',
-            RUN_TASKS: 'true',
-            RUN_PRIVACY: 'false',
-          },
-        }
-      );
-      expect(chosen.status, chosen.stderr).toBe(0);
-      expect(chosen.stdout.trim().split('\n')).toEqual([
-        'tests/e2e/storybook-task-row-geometry.spec.ts',
-      ]);
-      expect(
-        jobBlock('ci-storybook-surfaces', 'ci-cross-product-integration')
-      ).toContain('tests/e2e/storybook-task-row-geometry.spec.ts');
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
+  it('registers mobile claim proof in web CI', assertProfileClaimProof);
 
   it('selects real Ovie privacy browser proof for its boundary and keeps combined coverage', () => {
     const remaining = jobBlock(

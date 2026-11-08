@@ -29,10 +29,11 @@ from pathlib import Path
 from urllib.parse import urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import disk_guard  # noqa: E402
-import lifecycle  # noqa: E402
+import lifecycle, pr_wip  # noqa: E402  (pr_wip: per-producer WIP census for the lanes feed)
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+from atomic_state import append_json_object
 import remediation  # noqa: E402  (classifier + non-PR intake; no lane_runner import)
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
@@ -2256,8 +2257,7 @@ def sync_failure_reason(result) -> str:
 
 def ledger(host, receipt: dict) -> None:
     (host.state / "runs").mkdir(parents=True, exist_ok=True)
-    with open(host.state / "runs" / "ledger.jsonl", "a") as handle:
-        handle.write(json.dumps(receipt) + "\n")
+    append_json_object(host.state / "runs" / "ledger.jsonl", receipt)
 
 
 OPEN_PRS_QUERY = """query($owner:String!,$name:String!,$cursor:String){repository(owner:$owner,name:$name){nameWithOwner
@@ -2645,7 +2645,7 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
         settling = age < ORPHAN_GRACE_S or pr.get("rollup") in ("PENDING", "EXPECTED")
         if not (explicitly_held or queued or settling):
             plan["orphans"].append(number)
-    plan["counts"] = counts
+    plan["counts"] = {**counts, "wip": pr_wip.census(prs, now)}
     plan["dispositions"] = dispositions(prs, plan, attempts, max_attempts, now, held)
     return plan
 

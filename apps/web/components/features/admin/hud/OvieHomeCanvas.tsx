@@ -41,6 +41,7 @@ import { useOvieHomeReadyTiming } from './useOvieHomeReadyTiming';
 
 const OVIE_HOME_COPY: HomeLoopCopy = {
   constraintClear: 'Shipping is on target',
+  constraintUnknown: 'Shipping status is unknown',
   asksTitle: 'Needs you',
   asksEmpty: 'Nothing needs your decision.',
   asksError: 'Decisions could not load.',

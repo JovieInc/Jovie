@@ -511,7 +511,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.queryByRole('textbox', { name: 'Notes' })).toBeNull();
   });
 
-  it('renders the inbox feed when cards are present', () => {
+  it('renders the inbox feed when cards are present (JOV-8873)', () => {
     render(
       <OpportunityInboxPageClient
         inbox={{

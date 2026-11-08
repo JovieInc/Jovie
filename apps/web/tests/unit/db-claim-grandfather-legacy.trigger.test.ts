@@ -42,6 +42,49 @@ function sqlFile(tag: string): string {
   );
 }
 
+/** Preserve journal order; never sort malformed history into a passing fixture. */
+function splitGrandfatherJournal(journal: unknown): {
+  before: string[];
+  after: string[];
+} {
+  if (
+    !journal ||
+    typeof journal !== 'object' ||
+    !('version' in journal) ||
+    journal.version !== '7' ||
+    !('dialect' in journal) ||
+    journal.dialect !== 'postgresql' ||
+    !('entries' in journal) ||
+    !Array.isArray(journal.entries)
+  )
+    throw new Error('Invalid migration journal');
+  const tags: string[] = [];
+  let previousWhen = -Infinity;
+  for (const [index, entry] of journal.entries.entries()) {
+    if (
+      !entry ||
+      typeof entry !== 'object' ||
+      entry.idx !== index ||
+      typeof entry.when !== 'number' ||
+      !Number.isFinite(entry.when) ||
+      entry.when < previousWhen ||
+      typeof entry.tag !== 'string' ||
+      !/^(?:\d{4}|\d{12})_[^/\\\r\n]+$/.test(entry.tag) ||
+      tags.includes(entry.tag)
+    )
+      throw new Error('Invalid migration journal entry');
+    previousWhen = entry.when;
+    tags.push(entry.tag);
+  }
+  const targetIndex = tags.indexOf(MIGRATION_TAG);
+  if (targetIndex < 0)
+    throw new Error('Grandfather migration missing from journal');
+  return {
+    before: tags.slice(0, targetIndex),
+    after: tags.slice(targetIndex + 1),
+  };
+}
+
 async function insertProfile(input: {
   handle: string;
   isClaimed: boolean;
@@ -80,13 +123,12 @@ async function read(handle: string) {
 }
 
 beforeAll(async () => {
-  client = new PGlite();
-  const journal = JSON.parse(
+  const journal: unknown = JSON.parse(
     readFileSync(path.join(dir, 'meta', '_journal.json'), 'utf8')
-  ) as { entries: { tag: string }[] };
-  const tags = journal.entries.map(entry => entry.tag);
-  expect(tags.at(-1)).toBe(MIGRATION_TAG);
-  for (const tag of tags.slice(0, -1)) await client.exec(sqlFile(tag));
+  );
+  const { before, after } = splitGrandfatherJournal(journal);
+  client = new PGlite();
+  for (const tag of before) await client.exec(sqlFile(tag));
 
   await insertProfile({
     handle: 'small',
@@ -142,10 +184,11 @@ beforeAll(async () => {
   });
 
   await client.exec(sqlFile(MIGRATION_TAG));
+  for (const tag of after) await client.exec(sqlFile(tag));
   holder.db = drizzle(client);
 }, 280_000);
 
-afterAll(async () => client.close());
+afterAll(async () => client?.close());
 
 describe('grandfather migration', () => {
   it('records claimed public Spotify-linked profiles as legacy-verified and keeps them public', async () => {
@@ -247,6 +290,68 @@ describe('legacy sweep', () => {
       });
     } finally {
       vi.unstubAllEnvs();
+    }
+  });
+});
+
+describe('grandfather migration journal boundary', () => {
+  const journal = () => ({
+    version: '7',
+    dialect: 'postgresql',
+    entries: [
+      { idx: 0, when: 1, tag: '0163_taken_down_never_public' },
+      { idx: 1, when: 2, tag: MIGRATION_TAG },
+      { idx: 2, when: 3, tag: '0177_track_daily_snapshots' },
+    ],
+  });
+
+  it('keeps both sides of the exact target in order when valid later migrations exist', () => {
+    const later = journal();
+    later.entries.push({ idx: 3, when: 4, tag: '202611052130_follow-up' });
+    expect(splitGrandfatherJournal(later)).toEqual({
+      before: ['0163_taken_down_never_public'],
+      after: ['0177_track_daily_snapshots', '202611052130_follow-up'],
+    });
+  });
+
+  it('rejects a missing target or a different migration with the same number', () => {
+    const missing = journal();
+    missing.entries = [missing.entries[0]];
+    expect(() => splitGrandfatherJournal(missing)).toThrow(
+      'Grandfather migration missing'
+    );
+    const wrong = journal();
+    wrong.entries[1].tag = '0164_unrelated_migration';
+    expect(() => splitGrandfatherJournal(wrong)).toThrow(
+      'Grandfather migration missing'
+    );
+  });
+
+  it('rejects malformed, duplicate and out-of-order journal history, including after the target', () => {
+    const duplicate = journal();
+    duplicate.entries[2].tag = MIGRATION_TAG;
+    const indexGap = journal();
+    indexGap.entries[2].idx = 4;
+    const reversed = journal();
+    reversed.entries.reverse();
+    const earlierTimestamp = journal();
+    earlierTimestamp.entries[2].when = 1;
+    const invalidTimestamp = journal();
+    invalidTimestamp.entries[1].when = NaN;
+    for (const invalid of [
+      null,
+      {},
+      { ...journal(), entries: {} },
+      { ...journal(), dialect: 'sqlite' },
+      duplicate,
+      indexGap,
+      reversed,
+      earlierTimestamp,
+      invalidTimestamp,
+    ]) {
+      expect(() => splitGrandfatherJournal(invalid)).toThrow(
+        'Invalid migration journal'
+      );
     }
   });
 });

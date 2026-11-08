@@ -13,7 +13,7 @@ cd "$REPO_ROOT"
 MODE="${1:-pre-commit}"
 BASE_REF="${2:-origin/main}"
 GITLEAKS_VERSION="${GITLEAKS_VERSION:-8.21.2}"
-TRUFFLEHOG_VERSION="${TRUFFLEHOG_VERSION:-3.95.5}"
+TRUFFLEHOG_VERSION="${TRUFFLEHOG_VERSION:-3.99.8}"
 EXCLUDE_PATHS="$REPO_ROOT/.trufflehog-exclude.txt"
 
 # Release downloads hit transient network resets (curl 35 connection resets on
@@ -256,7 +256,7 @@ trufflehog_filesystem_scan() {
   local out log status=0 filtered_status=0
   out="$(mktemp)"
   log="$(mktemp)"
-  "$TRUFFLEHOG_BIN" filesystem "$@" --no-verification --json --fail >"$out" 2>"$log" || status=$?
+  "$TRUFFLEHOG_BIN" filesystem "$@" --no-update --no-verification --json --fail >"$out" 2>"$log" || status=$?
   cat "$log" >&2
   if grep -q 'encountered errors during scan' "$log"; then
     echo '::error title=Secret scan incomplete::TruffleHog aborted its filesystem scan; failing closed.' >&2
@@ -418,7 +418,7 @@ run_trufflehog_git() {
   out="$(mktemp)"
   status=0
   # shellcheck disable=SC2046
-  "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) --json \
+  "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) --no-update --json \
     >"$out" 2>"$log" || status=$?
   if [[ $status -ne 0 ]] && grep -qiE "$CLONE_CORRUPTION_SIGNATURE" "$log"; then
     echo "::error title=Secret scan checkout corruption::TruffleHog could not read the runner's Git object store; repairing the checkout and retrying once." >&2
@@ -434,7 +434,7 @@ run_trufflehog_git() {
     : >"$log"
     : >"$out"
     # shellcheck disable=SC2046
-    "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) --json \
+    "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) --no-update --json \
       >"$out" 2>"$log" || status=$?
   fi
   cat "$log"

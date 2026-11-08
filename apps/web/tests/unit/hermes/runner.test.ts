@@ -1,3 +1,5 @@
+import { type SpawnSyncReturns, spawn, spawnSync } from 'node:child_process';
+import { once } from 'node:events';
 import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -33,9 +35,75 @@ const basePayload: HermesDispatchPayload = {
   requestedAt: '2026-05-07T12:00:00.000Z',
 };
 
+type ProcessObservation = Pick<
+  SpawnSyncReturns<string>,
+  'error' | 'status' | 'stdout' | 'stderr'
+>;
+
+function expectNoLiveProcess(
+  pid: number,
+  inspect: (pid: number) => ProcessObservation = target =>
+    spawnSync('ps', ['-p', String(target), '-o', 'stat='], {
+      encoding: 'utf8',
+    })
+): void {
+  const result = inspect(pid);
+  const state = result.stdout.trim();
+  if (result.error || result.stderr.trim()) {
+    throw new Error('Unable to inspect fixture process');
+  }
+  if (result.status === 1 && state === '') return;
+  // A terminated orphan can remain a zombie until its adopting parent reaps it.
+  // Match the worker's live-process contract without accepting a running child.
+  if (result.status !== 0 || !/^Z[<NLsl+]*$/u.test(state)) {
+    throw new Error('Fixture process was not observed terminated');
+  }
+}
+
 describe('Hermes CLI worker runner', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('rejects a live fixture child and accepts it only after exit and reaping', async ({
+    skip,
+  }) => {
+    if (process.platform === 'win32') skip();
+    const child = spawn(
+      process.execPath,
+      ['-e', 'setInterval(() => {}, 1000)'],
+      {
+        stdio: 'ignore',
+      }
+    );
+    const exited = once(child, 'exit');
+    await once(child, 'spawn');
+    const pid = child.pid!;
+    try {
+      expect(() => expectNoLiveProcess(pid)).toThrow(
+        'Fixture process was not observed terminated'
+      );
+    } finally {
+      child.kill('SIGTERM');
+      await exited;
+    }
+    expectNoLiveProcess(pid);
+  });
+
+  it.each<ProcessObservation>([
+    {
+      status: null,
+      stdout: '',
+      stderr: '',
+      error: new Error('ps unavailable'),
+    },
+    { status: 2, stdout: '', stderr: '' },
+    { status: 1, stdout: '', stderr: 'inspection denied' },
+    { status: 1, stdout: 'Z', stderr: '' },
+    { status: 0, stdout: '?', stderr: '' },
+    { status: 0, stdout: '', stderr: '' },
+  ])('rejects unknown or failed process inspection %#', observation => {
+    expect(() => expectNoLiveProcess(123, () => observation)).toThrow();
   });
 
   it('builds prompts with profile and gstack skills', () => {
@@ -270,7 +338,7 @@ describe('Hermes CLI worker runner', () => {
       expect(groupSignals).not.toContain('SIGKILL');
       const grandchildPid = Number(await readFile(pidPath, 'utf8'));
       await new Promise(resolve => setTimeout(resolve, 100));
-      expect(() => process.kill(grandchildPid, 0)).toThrow();
+      expectNoLiveProcess(grandchildPid);
     } finally {
       await rm(workspace, { recursive: true, force: true });
     }
@@ -405,7 +473,7 @@ describe('Hermes CLI worker runner', () => {
       expect(status).toBe(78);
       const backgroundPid = Number(await readFile(pidPath, 'utf8'));
       await new Promise(resolve => setTimeout(resolve, 100));
-      expect(() => process.kill(backgroundPid, 0)).toThrow();
+      expectNoLiveProcess(backgroundPid);
     } finally {
       await rm(workspace, { recursive: true, force: true });
     }

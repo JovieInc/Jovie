@@ -407,7 +407,7 @@ describe('CommandPalette', () => {
       )
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+    fireEvent.click(screen.getByRole('button', { name: /Search Jovie$/ }));
     await screen.findByTestId('cmdk-main-plane');
 
     expect(screen.getByTestId('cmdk-main-plane')).toBeInTheDocument();
@@ -424,7 +424,7 @@ describe('CommandPalette', () => {
       )
     );
 
-    const trigger = screen.getByRole('button', { name: 'Search Jovie' });
+    const trigger = screen.getByRole('button', { name: /Search Jovie$/ });
     fireEvent.click(trigger);
     await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByTestId('cmdk-main-plane')).toBeInTheDocument();
@@ -444,7 +444,7 @@ describe('CommandPalette', () => {
       )
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+    fireEvent.click(screen.getByRole('button', { name: /Search Jovie$/ }));
     await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByTestId('cmdk-main-plane')).toBeInTheDocument();
 
@@ -463,7 +463,7 @@ describe('CommandPalette', () => {
       )
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+    fireEvent.click(screen.getByRole('button', { name: /Search Jovie$/ }));
     await screen.findByTestId('cmdk-main-plane');
     const input = screen.getByLabelText('Command Palette Search');
     fireEvent.change(input, { target: { value: 'Calendar' } });

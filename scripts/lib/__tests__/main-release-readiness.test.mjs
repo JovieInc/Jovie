@@ -15,9 +15,13 @@ import {
   findExactQueueProof,
   hasExactSuccessfulMergeGroupProof,
   MAX_REST_HOLD_MS,
+  MERGE_SUITE_SCOPE_FULL,
+  MERGE_SUITE_SCOPE_ORDINARY,
+  mergeSuiteScopeJobName,
   PROVENANCE_JOB_TIMEOUT_MINUTES,
   planGitHubRestHold,
   resolveMainSha,
+  resolveMergeSuiteScope,
   restHoldBudgetMs,
 } from '../../../.github/scripts/verify-main-release-readiness.mjs';
 
@@ -114,6 +118,98 @@ describe('main release readiness', () => {
           [
             run.id,
             [{ name: 'PR Ready', status: 'completed', conclusion: 'failure' }],
+          ],
+        ]),
+      })
+    ).toBe(false);
+  });
+
+  it('keeps legacy unscoped PR Ready as full-suite proof', () => {
+    const run = exactSuccessfulRun();
+    expect(
+      resolveMergeSuiteScope([
+        { name: 'PR Ready', status: 'completed', conclusion: 'success' },
+      ])
+    ).toBe('legacy_unscoped');
+    expect(
+      hasExactSuccessfulMergeGroupProof({
+        sha: SHA,
+        runs: [run],
+        jobsByRun: new Map([
+          [
+            run.id,
+            [{ name: 'PR Ready', status: 'completed', conclusion: 'success' }],
+          ],
+        ]),
+      })
+    ).toBe(true);
+  });
+
+  it('accepts explicit full_web_units scope with PR Ready', () => {
+    const run = exactSuccessfulRun();
+    const jobs = [
+      { name: 'PR Ready', status: 'completed', conclusion: 'success' },
+      {
+        name: mergeSuiteScopeJobName(MERGE_SUITE_SCOPE_FULL),
+        status: 'completed',
+        conclusion: 'success',
+      },
+    ];
+    expect(resolveMergeSuiteScope(jobs)).toBe(MERGE_SUITE_SCOPE_FULL);
+    expect(
+      hasExactSuccessfulMergeGroupProof({
+        sha: SHA,
+        runs: [run],
+        jobsByRun: new Map([[run.id, jobs]]),
+      })
+    ).toBe(true);
+  });
+
+  it('rejects ordinary_admission scope for full-suite main skip', () => {
+    const run = exactSuccessfulRun();
+    const jobs = [
+      { name: 'PR Ready', status: 'completed', conclusion: 'success' },
+      {
+        name: mergeSuiteScopeJobName(MERGE_SUITE_SCOPE_ORDINARY),
+        status: 'completed',
+        conclusion: 'success',
+      },
+    ];
+    expect(resolveMergeSuiteScope(jobs)).toBe(MERGE_SUITE_SCOPE_ORDINARY);
+    expect(
+      hasExactSuccessfulMergeGroupProof({
+        sha: SHA,
+        runs: [run],
+        jobsByRun: new Map([[run.id, jobs]]),
+      })
+    ).toBe(false);
+    expect(
+      hasExactSuccessfulMergeGroupProof({
+        sha: SHA,
+        runs: [run],
+        jobsByRun: new Map([[run.id, jobs]]),
+        requiredScope: MERGE_SUITE_SCOPE_ORDINARY,
+      })
+    ).toBe(true);
+  });
+
+  it('rejects a failed or missing successful scope claim when a scope job exists', () => {
+    const run = exactSuccessfulRun();
+    expect(
+      hasExactSuccessfulMergeGroupProof({
+        sha: SHA,
+        runs: [run],
+        jobsByRun: new Map([
+          [
+            run.id,
+            [
+              { name: 'PR Ready', status: 'completed', conclusion: 'success' },
+              {
+                name: mergeSuiteScopeJobName(MERGE_SUITE_SCOPE_FULL),
+                status: 'completed',
+                conclusion: 'failure',
+              },
+            ],
           ],
         ]),
       })
@@ -655,7 +751,7 @@ esac
     const described = describeProvenance(result, tipSha);
     expect(described.level).toBe('info');
     expect(described.line).toContain(
-      `Exact merge-group provenance found for ${tipSha} (run ${proofRunId}).`
+      `Exact merge-group provenance found for ${tipSha} (run ${proofRunId}; suite scope full_web_units or legacy).`
     );
     expect(described.line).not.toContain('rate-limit-hold');
   });

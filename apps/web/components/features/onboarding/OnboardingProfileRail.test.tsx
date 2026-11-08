@@ -17,12 +17,15 @@ import { deriveProfileBuilderState } from './onboardingChatHelpers';
 vi.mock('@/features/profile/templates/ProfileCompactSurface', () => ({
   ProfileCompactSurface: ({
     dataTestId,
+    artist,
     releases = [],
   }: {
     dataTestId?: string;
+    artist: { tagline?: string };
     releases?: readonly { id: string; title: string }[];
   }) => (
     <div data-testid={dataTestId ?? 'profile-compact-surface'}>
+      {artist.tagline}
       {releases.map(release => (
         <span key={release.id} data-testid='preview-release'>
           {release.title}
@@ -215,8 +218,14 @@ describe('OnboardingProfileRail', () => {
     // Geometry (clear of Listen now at 1280x720 and 390x844) is asserted by
     // tests/e2e/storybook-onboarding-dsp-strip-clearance.spec.ts.
     expect(rail).toContainElement(strip);
+    expect(rail).toHaveTextContent('12.3K Spotify followers');
+    expect(rail).not.toHaveTextContent('source: enrichment');
     expect(phonePreview).not.toContainElement(strip);
-    expect(screen.getByText(/12\.3K Spotify followers/)).toBeVisible();
+    // The compact-surface double also prints the tagline. The caption under
+    // the phone is the visible follower line.
+    expect(
+      screen.getByText(/12\.3K Spotify followers/, { selector: 'p' })
+    ).toBeVisible();
     // No pipeline words in the preview (2026-10-31 golden-path walk).
     expect(screen.queryByText(/enrichment|\(source:/i)).toBeNull();
   });
@@ -240,6 +249,14 @@ describe('OnboardingProfileRail', () => {
     expect(
       screen.getByRole('complementary', { name: 'Profile Preview' })
     ).toHaveFocus();
+  });
+
+  it('keeps the side-rail badge readable over light imagery (AA)', () => {
+    render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
+
+    const badge = document.querySelector('[class*="bg-black/60"]');
+    expect(badge).not.toBeNull();
+    expect(badge?.className).not.toContain('bg-black/50');
   });
 
   it('does not add a container tab stop to the inline preview', async () => {
@@ -349,11 +366,14 @@ describe('OnboardingProfileRail keyboard scrolling (JOV-7973)', () => {
       value: 720,
     });
 
-    await user.type(rail, '{End}');
+    await user.tab();
+    expect(rail).toHaveFocus();
+    await user.keyboard('{End}');
     expect(scrollTo).toHaveBeenLastCalledWith({
       top: 34,
       behavior: 'auto',
     });
+    expect(rail).toHaveFocus();
   });
 
   it('lets every other key scroll natively (no preventDefault)', async () => {

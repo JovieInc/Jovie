@@ -71,7 +71,9 @@ export const Copied: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      canvas.getByRole('button', { name: 'Show Provider Availability Details' })
+      canvas.getByRole('button', {
+        name: /^Show provider availability details:/i,
+      })
     );
     const page = within(canvasElement.ownerDocument.body);
     await userEvent.click(

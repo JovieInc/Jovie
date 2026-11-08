@@ -198,7 +198,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
-    jobCount: 66
+    jobCount: 67
   - name: Claim Checkout Dogfood
     path: .github/workflows/claim-checkout-dogfood.yml
     active: true
@@ -267,6 +267,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - merge_group
       - pull_request
       - push
     terminalReceipt: job:company-guards
@@ -424,7 +425,7 @@ nodes:
     allowedConsumers:
       - Test Flakiness Report
     triggeringStateTransition:
-      - push
+      - repository_dispatch
       - workflow_dispatch
     terminalReceipt: job:notify
     jobCount: 3
@@ -725,6 +726,19 @@ nodes:
       - workflow_call
     terminalReceipt: job:build
     jobCount: 2
+  - name: Main Health
+    path: .github/workflows/main-health.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers:
+      - Main Red Eject
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:health
+    jobCount: 1
   - name: Main Red Eject
     path: .github/workflows/main-red-eject.yml
     active: true
@@ -848,7 +862,7 @@ nodes:
       - Lane Fix Relay
       - Test Flakiness Report
     triggeringStateTransition:
-      - push
+      - repository_dispatch
       - workflow_dispatch
     terminalReceipt: job:notify
     jobCount: 4
@@ -1048,6 +1062,17 @@ nodes:
       - pull_request
     terminalReceipt: job:capture
     jobCount: 1
+  - name: Preflight Remote
+    path: .github/workflows/preflight-remote.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:gate
+    jobCount: 1
   - name: Private Data Guard
     path: .github/workflows/private-data-guard.yml
     active: true
@@ -1107,7 +1132,7 @@ nodes:
     triggeringStateTransition:
       - workflow_run
     terminalReceipt: job:heal-interrupted-marker
-    jobCount: 15
+    jobCount: 16
   - name: Production Marker Recovery
     path: .github/workflows/production-marker-recovery.yml
     active: true
@@ -1130,7 +1155,7 @@ nodes:
     triggeringStateTransition:
       - workflow_call
     terminalReceipt: job:release-result
-    jobCount: 16
+    jobCount: 15
   - name: Public App Certification
     path: .github/workflows/public-app-certification.yml
     active: true
@@ -1444,6 +1469,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:check
     jobCount: 2
+  - name: Surface Recertify
+    path: .github/workflows/surface-recertify.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:recertify
+    jobCount: 2
   - name: Production Synthetic Monitoring
     path: .github/workflows/synthetic-monitoring.yml
     active: true
@@ -1465,7 +1502,7 @@ nodes:
     allowedConsumers:
       - SonarCloud
     triggeringStateTransition:
-      - push
+      - repository_dispatch
       - workflow_dispatch
     terminalReceipt: job:audit
     jobCount: 1
@@ -1702,6 +1739,9 @@ edges:
     to: Mac Lane Route
     type: workflow_call
   - from: CI
+    to: Main Red Eject
+    type: workflow_run
+  - from: Main Health
     to: Main Red Eject
     type: workflow_run
   - from: Merge Queue Green Enroll

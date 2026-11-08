@@ -1,4 +1,5 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { once } from 'node:events';
 import {
   existsSync,
   mkdirSync,
@@ -12,8 +13,11 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as parseYaml } from 'js-yaml';
-import ts from 'typescript';
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+  getPageScopedLocatorCalls,
+  getScreenshotArguments,
+} from './visual-workflow-ast';
 
 // JOV-7707: workflow contracts here read parsed YAML and execute the shipped
 // step shell with stubbed tools; PR/merge-group gate aggregation is covered by
@@ -120,85 +124,18 @@ function runStep(
   return { ...result, calls, root };
 }
 
-function getPageScopedLocatorCalls(source: string): string[] {
-  const sourceFile = ts.createSourceFile(
-    'chat-visual.spec.ts',
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS
-  );
-  const calls: string[] = [];
-
-  function getPageMethod(expression: ts.LeftHandSideExpression): string | null {
-    if (
-      ts.isPropertyAccessExpression(expression) &&
-      ts.isIdentifier(expression.expression) &&
-      expression.expression.text === 'page'
-    ) {
-      return expression.name.text;
-    }
-
-    if (
-      ts.isElementAccessExpression(expression) &&
-      ts.isIdentifier(expression.expression) &&
-      expression.expression.text === 'page'
-    ) {
-      return expression.argumentExpression &&
-        ts.isStringLiteralLike(expression.argumentExpression)
-        ? expression.argumentExpression.text
-        : '<computed>';
-    }
-
-    return null;
+async function withLiveServer(
+  run: (pid: string, exited: Promise<unknown[]>) => Promise<void>
+) {
+  const child = spawn('sleep', ['30'], { stdio: 'ignore' });
+  const exited = once(child, 'exit');
+  try {
+    await once(child, 'spawn');
+    await run(String(child.pid), exited);
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) child.kill();
+    await exited;
   }
-
-  function visit(node: ts.Node): void {
-    if (ts.isCallExpression(node)) {
-      const method = getPageMethod(node.expression);
-
-      if (
-        method === '<computed>' ||
-        method === 'locator' ||
-        method?.startsWith('getBy') ||
-        (method !== null && /^\$\$?$/.test(method))
-      ) {
-        const firstArgument = node.arguments[0]?.getText(sourceFile) ?? '';
-        calls.push(`${method}:${firstArgument}`);
-      }
-    }
-
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
-  return calls;
-}
-
-function getScreenshotArguments(source: string): string[] {
-  const sourceFile = ts.createSourceFile(
-    'visual-spec.ts',
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS
-  );
-  const argumentsFound: string[] = [];
-
-  function visit(node: ts.Node): void {
-    if (
-      ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
-      node.expression.name.text === 'toHaveScreenshot'
-    ) {
-      argumentsFound.push(node.arguments[0]?.getText(sourceFile) ?? '');
-    }
-
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
-  return argumentsFound;
 }
 
 describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
@@ -238,7 +175,7 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(config).toContain('workers: isCI ? 1 : undefined');
   });
 
-  it('boots Storybook ahead of setup, then gates the matrix on a live server', () => {
+  it('boots Storybook ahead of setup, then gates the matrix on a live server', async () => {
     const storybook = job('ci-storybook-surfaces');
     const start = step(storybook, 'Start Storybook dev server');
     const checks = step(storybook, 'Check extension and observability ingest');
@@ -255,7 +192,8 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(matrix.step.env?.JOVIE_STORYBOOK_MANUAL_AXE).toBe('1');
 
     // Start: the server is detached, logged to a file, and its pid exported.
-    const started = runStep(String(start.step.run), {
+    // Reap the short-lived stub after running the shipped start step verbatim.
+    const started = runStep(`${start.step.run}\nwait`, {
       pnpm: 'echo storybook-output; sleep 0',
     });
     expect(started.status, started.stderr).toBe(0);
@@ -278,40 +216,33 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(dead.stdout).toContain('::error::Storybook dev server died');
     expect(dead.calls).not.toContain('node ');
 
-    const live = spawnSync(
-      'bash',
-      ['-c', 'sleep 30 >/dev/null 2>&1 & echo $!'],
-      {
-        encoding: 'utf8',
-      }
-    );
-    const pid = live.stdout.trim();
-    const ready = runStep(matrixRun, stubs, {
-      STORYBOOK_PID: pid,
-      STORYBOOK_SHARD: '2/2',
+    await withLiveServer(async (pid, exited) => {
+      const ready = runStep(matrixRun, stubs, {
+        STORYBOOK_PID: pid,
+        STORYBOOK_SHARD: '2/2',
+      });
+      expect(ready.status, ready.stderr).toBe(0);
+      expect(ready.calls).toMatch(
+        /node .*guard-playwright-artifacts\.mjs --run -- pnpm exec playwright test/
+      );
+      expect(ready.calls).toContain('--shard=2/2');
+      // The EXIT trap terminates the owned child; await reaping before kill -0.
+      expect((await exited)[1]).toBe('SIGTERM');
+      expect(spawnSync('kill', ['-0', pid]).status).not.toBe(0);
+      expect(ready.stdout).toContain('Storybook dev server log');
     });
-    expect(ready.status, ready.stderr).toBe(0);
-    expect(ready.calls).toMatch(
-      /node .*guard-playwright-artifacts\.mjs --run -- pnpm exec playwright test/
-    );
-    expect(ready.calls).toContain('--shard=2/2');
-    // The EXIT trap stops the server and prints its log.
-    expect(spawnSync('kill', ['-0', pid]).status).not.toBe(0);
-    expect(ready.stdout).toContain('Storybook dev server log');
 
-    const neverReady = runStep(
-      matrixRun,
-      { ...stubs, curl: 'exit 7' },
-      {
-        STORYBOOK_PID: spawnSync(
-          'bash',
-          ['-c', 'sleep 30 >/dev/null 2>&1 & echo $!'],
-          { encoding: 'utf8' }
-        ).stdout.trim(),
-      }
-    );
-    expect(neverReady.status).toBe(1);
-    expect(neverReady.stdout).toContain('failed to start within 300s');
+    await withLiveServer(async (pid, exited) => {
+      const neverReady = runStep(
+        matrixRun,
+        { ...stubs, curl: 'exit 7' },
+        { STORYBOOK_PID: pid }
+      );
+      expect(neverReady.status).toBe(1);
+      expect(neverReady.stdout).toContain('failed to start within 300s');
+      expect((await exited)[1]).toBe('SIGTERM');
+      expect(spawnSync('kill', ['-0', pid]).status).not.toBe(0);
+    });
     // Spawns the shipped shell with stub tools several times.
   }, 60_000);
 
@@ -492,6 +423,52 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     const runs = authed.steps.map(entry => entry.run ?? '').join('\n');
     expect(runs).not.toContain('--reporter=line ');
     expect(runs).not.toContain('playwright-report');
+  });
+
+  it('serves development-only axe fixtures on the isolated local server', () => {
+    const audit = step(
+      job('ci-a11y'),
+      'Run axe a11y audit (public routes)'
+    ).step;
+    const stubs = {
+      node: `if [ "$1" = .next/standalone/apps/web/server.js ]; then
+        echo "server PORT=$PORT HOSTNAME=$HOSTNAME VERCEL_ENV=$VERCEL_ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL" >> calls.log
+        touch server-started
+        exec /bin/sleep 30
+      fi
+      exit "\${AUDIT_EXIT_CODE:-0}"`,
+      curl: 'for _ in $(seq 1 200); do [ -f server-started ] && exit "${READINESS_EXIT_CODE:-0}"; /bin/sleep 0.01; done; exit 7',
+      sleep: 'exit 0',
+    };
+    const prepared = (env: Record<string, string> = {}) =>
+      runStep(
+        `mkdir -p apps/web/.next/standalone/apps/web/.next && touch apps/web/.next/standalone/apps/web/server.js apps/web/.next/standalone/apps/web/.next/BUILD_ID\n${audit.run}`,
+        stubs,
+        { NODE_ENV: 'production', VERCEL_ENV: 'production', ...env }
+      );
+
+    const served = prepared();
+    expect(served.status, served.stderr).toBe(0);
+    expect(
+      readFileSync(join(served.root, 'apps/web/calls.log'), 'utf8')
+    ).toContain(
+      'server PORT=3220 HOSTNAME=localhost VERCEL_ENV=development NEXT_PUBLIC_APP_URL=http://localhost:3220'
+    );
+    expect(served.calls).toContain('curl -sf http://localhost:3220');
+    expect(served.calls).toContain(
+      'guard-playwright-artifacts.mjs --run -- pnpm exec playwright test tests/e2e/axe-audit.spec.ts --config=playwright.config.ts --project=chromium --reporter=line,json'
+    );
+
+    const failed = prepared({ AUDIT_EXIT_CODE: '43' });
+    expect(failed.status, failed.stderr).toBe(43);
+
+    const unready = prepared({ READINESS_EXIT_CODE: '7' });
+    expect(unready.status, unready.stderr).toBe(1);
+    expect(unready.calls).not.toContain('playwright test');
+
+    const missing = runStep(String(audit.run), stubs);
+    expect(missing.status, missing.stderr).toBe(1);
+    expect(missing.calls).not.toContain('playwright test');
   });
 
   it('stages only structured public axe JSON without masking failures', () => {

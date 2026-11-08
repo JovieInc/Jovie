@@ -3239,11 +3239,11 @@ class SearchPopulationCoverageTest(unittest.TestCase):
             fetch_page=lambda lo, hi: {"issueCount": len(rows), "nodes": rows})
 
     def test_sparse_origin_emitter_does_not_import_the_merge_reader(self):
-        # Existing automation checkouts copy only these two files. Reporting's
-        # optional merge reader must not expand the origin emitter dependency set.
+        # The receipt writer is in the sparse emitter. The merge reader must stay out of that set.
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            for relative in ("scripts/shipping_origin.py", "scripts/lanes/shipping_attribution.py"):
+            for relative in ("scripts/shipping_origin.py", "scripts/lanes/shipping_attribution.py",
+                             "scripts/lanes/atomic_state.py"):
                 target = root / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes((ROOT / relative).read_bytes())
@@ -3270,9 +3270,7 @@ class SearchPopulationCoverageTest(unittest.TestCase):
                 mock.patch.object(doctor, "open_pr_numbers", return_value=None), \
                 mock.patch.object(doctor, "automation_observation", return_value={}), \
                 mock.patch.object(doctor.fleet_ledger, "record_ready"), \
-                mock.patch.object(doctor.deploy_health, "sample", return_value=(None, None)), \
-                mock.patch.object(doctor.release_evidence, "sample", return_value=(None, None)), \
-                mock.patch.object(doctor.release_gates, "sample", return_value=(None, None)), \
+                mock.patch.object(doctor.health_checks, "observe", return_value={}), \
                 mock.patch.object(doctor.throughput_sentinel, "observe", return_value={}):
             host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "absent")
             observed = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=self.END)
