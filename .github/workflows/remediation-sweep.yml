@@ -101,6 +101,9 @@ jobs:
           STRIPE_READONLY_KEY: ${{ secrets.STRIPE_READONLY_KEY }}
           DRIFT_RUN_RECEIPT: ${{ runner.temp }}/source-drift-run.json
           SWIFT_ARCH_METRICS_OUT: ${{ runner.temp }}/swift-arch-metrics.json
+          # Proof-stat loop: production feed (content writer secret; absent, the feed-based stages are skipped with a warning).
+          CONTENT_PUBLISH_SECRET: ${{ secrets.CONTENT_PUBLISH_SECRET }}
+          PROOF_LOOP_RUN_RECEIPT: ${{ runner.temp }}/proof-loop-run.json
           DRY_RUN: ${{ steps.mode.outputs.dry_run }}
           EVENT_NAME: ${{ github.event_name }}
           SCHEDULE: ${{ github.event.schedule }}
@@ -127,6 +130,7 @@ jobs:
             run_mode domains
             run_mode credentials
             run_mode drift
+            run_mode proof
           fi
 
       # Measure-everything: each credentials/spend run's stage timestamps.
@@ -157,6 +161,17 @@ jobs:
         with:
           name: swift-arch-metrics
           path: ${{ runner.temp }}/swift-arch-metrics.json
+          if-no-files-found: ignore
+          retention-days: 90
+
+      # Proof-stat loop: stage timestamps, published/stale/bound-share
+      # metrics, ranked ideas, founder approval cards and win texts for Summer.
+      - name: Upload proof loop run record
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: proof-loop-run
+          path: ${{ runner.temp }}/proof-loop-run.json
           if-no-files-found: ignore
           retention-days: 90
 

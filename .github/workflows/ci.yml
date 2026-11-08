@@ -3735,7 +3735,7 @@ jobs:
       # Web-independent checks ride here, off the Build + Layout tail.
       - name: Check extension and observability ingest
         if: matrix.shard == 1
-        run: pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test && pnpm --filter @jovie/canary-otp typecheck && pnpm --filter @jovie/canary-otp test && pnpm --filter @jovie/mesh-hub typecheck && pnpm --filter @jovie/mesh-hub test
+        run: pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test && pnpm --filter @jovie/canary-otp typecheck && pnpm --filter @jovie/canary-otp test && pnpm --filter @jovie/mesh-hub typecheck && pnpm --filter @jovie/mesh-hub test && node --experimental-strip-types --test workers/prod-liveness/src/index.test.mjs workers/cron-hub/src/index.test.mjs
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
       # Surface-elevation matrix (JOV-2156): screenshot every allowed/banned
@@ -6704,6 +6704,10 @@ jobs:
       # the active test-mode USD 1200/month price. The assertion stays
       # fail-closed; true reports a contract breach instead of a missing secret.
       FEATURE_STRIPE_TEST_PRICE_CONFIGURED: 'true'
+      # This job proves the admitted journey from /start to billing. Closed public
+      # signup redirects anonymous /start to /waitlist, and that handoff has its
+      # own proof in auth-public-ready.spec.ts.
+      FEATURE_PUBLIC_SIGNUP_CLOSED: 'false'
     # Scope pending replacement to one PR. GitHub replaces the older pending job in
     # a constant concurrency group even when cancel-in-progress is false, which can
     # cancel a required check before it obtains a runner. Golden-path cleanup only

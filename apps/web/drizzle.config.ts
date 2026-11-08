@@ -8,6 +8,7 @@ const url = databaseUrl.replace(/^postgres(ql)?\+neon:\/\//, 'postgres$1://');
 export default defineConfig({
   schema: [
     './lib/db/schema/index.ts',
+    './lib/db/schema/signup-replays.ts',
     './lib/db/schema/track-daily-snapshots.ts',
   ],
   out: './drizzle/migrations',

@@ -130,6 +130,25 @@ class RenumberTest(unittest.TestCase):
                 mr.normalize_generated(root, lambda *a: git(root, *a), "main", 5, {})
             self.assertEqual((root / META / "_journal.json").read_text(), before)
 
+    def test_regeneration_preparation_preserves_main_and_refuses_local_artifact_edits(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.build(root)
+            original = (root / MIG / "0148_mine.sql").read_text()
+            (root / MIG / "0148_mine.sql").write_text("local edit")
+            with self.assertRaises(mr.Unmergeable):
+                mr.prepare_regeneration(root, lambda *a: git(root, *a), "main")
+            self.assertTrue((root / META / "0148_snapshot.json").exists())
+            (root / MIG / "0148_mine.sql").write_text(original)
+            git(root, "merge", "--no-commit", "-s", "ours", "main")
+            journal = root / META / "_journal.json"
+            journal.write_text("<<<<<<< HEAD\nconflicted generated journal\n")
+            changed = mr.prepare_regeneration(root, lambda *a: git(root, *a), "main")
+            self.assertIn(f"{MIG}/0148_mine.sql", changed)
+            self.assertFalse((root / MIG / "0148_mine.sql").exists())
+            self.assertEqual(journal.read_text(), git(root, "show", f"main:{META}/_journal.json"))
+            self.assertEqual((root / META / "0148_snapshot.json").read_text(), git(root, "show", f"main:{META}/0148_snapshot.json"))
+
 
 class LaneFixTest(RenumberTest):
     def test_the_lane_fix_renumbers_merges_main_and_pushes_without_a_model(self):

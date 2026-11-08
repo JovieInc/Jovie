@@ -34,6 +34,22 @@ class GateTest(unittest.TestCase):
         self.assertEqual(pair, "fix-red-6c3efaf400")
         self.assertNotEqual(solo, pair)
 
+    def test_an_advisory_sibling_does_not_define_a_second_fix_red_class(self):
+        import pr_events
+        self.assertEqual(gap.ADVISORY_CHECKS, pr_events.NON_REQUIRED_CHECKS)
+        advisory = {"statusCheckRollup": [
+            {"name": "Source Validation", "conclusion": "FAILURE"},
+            {"name": "Tently", "conclusion": "FAILURE"},
+            {"name": "PR Ready", "conclusion": "FAILURE"},
+        ]}
+        solo = gap.check_fingerprint({"statusCheckRollup": [
+            {"name": "Source Validation", "conclusion": "FAILURE"},
+        ]})
+        self.assertEqual(gap.check_fingerprint(advisory), solo)
+        self.assertEqual(solo, "fix-red-" + hashlib.sha256(b"Source Validation").hexdigest()[:10])
+        self.assertNotEqual(
+            solo, "fix-red-" + hashlib.sha256(b"Source Validation|Tently").hexdigest()[:10])
+
     def test_fingerprint_ignores_ids_and_numbers_and_honours_explicit_labels(self):
         a = gap.fingerprint("fix: JOV-9001 sentry error 42 in profile page", [])
         b = gap.fingerprint("Fix Sentry error 77 in profile page (JOV-9100)", [])
