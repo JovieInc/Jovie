@@ -93,6 +93,27 @@ export function missingOutputs(brief, outDir, exists = existsSync) {
   );
 }
 
+const readJsonFile = path => {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Why a draft doesn't count, or null when it does: the output must parse and
+ * gain a top-level frame named for the brief that the input didn't have. A
+ * save that exits 0 with nothing added is not a draft.
+ */
+export function draftProblem(before, after, frame) {
+  if (!Array.isArray(after?.children)) return 'pen output is not a Pen file';
+  const named = doc =>
+    (doc?.children ?? []).filter(n => n?.name === frame).length;
+  if (named(after) <= named(before)) return `no new top-level frame ${frame}`;
+  return null;
+}
+
 async function main() {
   const { values } = parseArgs({
     options: { out: { type: 'string' }, only: { type: 'string' } },
@@ -145,8 +166,15 @@ async function main() {
         env: { ...process.env, NODE_OPTIONS: PEN_NODE_OPTIONS },
       });
       const missing = missingOutputs(brief, outDir);
-      row.status = missing.length ? 'failed' : 'drafted';
-      if (missing.length) row.error = `pen wrote no ${missing.join(' or ')}`;
+      const problem = missing.length
+        ? `pen wrote no ${missing.join(' or ')}`
+        : draftProblem(
+            readJsonFile(input),
+            readJsonFile(join(outDir, `${brief.frame}.pen`)),
+            brief.frame
+          );
+      row.status = problem ? 'failed' : 'drafted';
+      if (problem) row.error = problem;
     } catch (e) {
       row.status = 'failed';
       row.error = String(e.message || e)

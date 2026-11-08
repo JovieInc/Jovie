@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  draftProblem,
   loadBriefs,
   missingOutputs,
   missingSecrets,
@@ -65,5 +66,19 @@ test('a frame without its .pen or preview is not drafted', () => {
   assert.deepEqual(
     missingOutputs(b, 'o', p => String(p).endsWith('.pen')),
     ['claim.png']
+  );
+});
+
+test('a draft counts only when it adds the named top-level frame', () => {
+  const before = { children: [{ id: 'a', name: 'pricing' }] };
+  const added = { children: [...before.children, { id: 'b', name: 'claim' }] };
+  assert.equal(draftProblem(before, added, 'claim'), null);
+  assert.equal(
+    draftProblem(before, before, 'claim'),
+    'no new top-level frame claim'
+  );
+  assert.equal(
+    draftProblem(before, null, 'claim'),
+    'pen output is not a Pen file'
   );
 });
