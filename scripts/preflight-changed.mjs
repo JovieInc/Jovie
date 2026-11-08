@@ -37,7 +37,6 @@ import {
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { stripVTControlCharacters } from 'node:util';
 import { load as yamlLoad } from 'js-yaml';
 import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
 import {
@@ -47,7 +46,21 @@ import {
   PR_BODY_SKELETON,
   parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
+import {
+  failureSummaryLines,
+  failureTestPaths,
+} from './lib/preflight-failure-summary.mjs';
+
+export { failureSummaryLines, failureTestPaths };
+
 import { guardNested, withPreflightDepth } from './lib/preflight-depth.mjs';
+import {
+  failingItemLines,
+  NARROWED_LOCAL,
+  recordRun,
+  settleResult,
+  takeSlot,
+} from './lib/preflight-scope.mjs';
 
 export { baseRefCandidates, resolveBaseRef };
 
@@ -144,35 +157,6 @@ export function downgradeHostRed(check, result, platform = process.platform) {
   return result;
 }
 
-/** Preserve a failure's name and nearby cause within the existing display bound. */
-export function failureSummaryLines(out) {
-  const lines = stripVTControlCharacters(String(out))
-    .split('\n')
-    .filter(line => line.trim());
-  const anchors = [
-    /^\s*test at .+:\d+(?::\d+)?$/,
-    /^\s*FAIL(?:\s|\|)/,
-    /^\s*not ok \d+\b/,
-    /^\s*[✖✗×]\s+(?!failing tests:)/,
-    /^\s*(?:\w*Error(?:\s*\[[^\]]+\])?:|(?:.+(?::\d+(?::\d+)?|\(\d+,\d+\)):\s*)?error TS\d+:)/,
-  ];
-  for (const anchor of anchors) {
-    const start = lines.findIndex(
-      line => !/^\s*(?:[✓✔]|ok \d+\b|PASS\b)/.test(line) && anchor.test(line)
-    );
-    if (start !== -1) {
-      return [
-        '[first recognized failure context; output is bounded]',
-        ...lines.slice(start, start + 13),
-      ].map(line => line.slice(0, 220));
-    }
-  }
-  return [
-    '[no explicit failure header in retained output; showing tail]',
-    ...lines.slice(-13),
-  ].map(line => line.slice(0, 220));
-}
-
 export function parseArgs(argv) {
   const a = {
     base: 'main',
@@ -184,6 +168,7 @@ export function parseArgs(argv) {
     hook: false,
     list: false,
     json: false,
+    lock: true,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const f = argv[i];
@@ -202,6 +187,8 @@ export function parseArgs(argv) {
     else if (f === '--hook') a.hook = true;
     else if (f === '--list') a.list = true;
     else if (f === '--json') a.json = true;
+    else if (f === '--timings-file') a.timingsFile = argv[++i];
+    else if (f === '--no-lock') a.lock = false;
     else throw new Error(`unknown argument ${f}`);
   }
   return a;
@@ -289,27 +276,6 @@ function untrackCommand(record) {
   if (activeCommandGroups.size === 0 && !cancelledCommandCode) {
     removeCommandHandlers();
   }
-}
-
-const FAILURE_LINE = /(?:^|\b)(?:not ok\b|FAIL\b|location:|✖|×)/u;
-const TEST_PATH = /((?:[\w.@/-]+\/)?[\w.@-]+\.test\.[cm]?[jt]sx?)/u;
-
-/** Test files named by failure lines. The output tail is not a substitute:
- * preflight keeps only the last 200KB, which dropped the names and left
- * "8 failing tests" with nothing to fix. */
-export function failureTestPaths(text) {
-  const found = new Set();
-  for (const line of String(text).split('\n')) {
-    if (!FAILURE_LINE.test(line)) continue;
-    const match = TEST_PATH.exec(line);
-    if (!match) continue;
-    const raw = match[1];
-    const at = raw.lastIndexOf('scripts/');
-    const app = raw.lastIndexOf('apps/');
-    const rel = at >= 0 ? raw.slice(at) : app >= 0 ? raw.slice(app) : raw;
-    found.add(rel);
-  }
-  return [...found];
 }
 
 export function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
@@ -713,7 +679,9 @@ export async function main({
       deferred.push(guard.id);
       continue;
     }
-    const narrow = !args.thorough && NARROWED[guard.id];
+    const narrow =
+      !args.thorough && (NARROWED[guard.id] ?? NARROWED_LOCAL[guard.id]);
+    if (narrow?.deferredToCi) deferred.push(narrow.deferredToCi);
     cmd(
       `guard:${guard.id}`,
       `source guard ${guard.id}${narrow ? ` [${narrow.note}]` : ''}`,
@@ -884,18 +852,30 @@ export async function main({
 
   if (args.list) {
     for (const c of checks) log(`run  ${c.id}  ${c.name}`);
-    for (const d of deferred) log(`defer  guard:${d}  (heavy; --thorough)`);
+    for (const d of deferred) log(`deferred to CI  ${d}  (--thorough runs it)`);
     return 0;
   }
 
   // Run phases in order; within a phase, a bounded pool.
   const results = [];
+  const slot = await takeSlot({
+    args,
+    env,
+    cwd,
+    log,
+    sha: git(cwd, ['rev-parse', '--short', 'HEAD']),
+  });
+  const runStarted = Date.now();
   for (const phase of [0, 1, 2]) {
     const queue = checks.filter(c => c.phase === phase);
     const worker = async () => {
       while (queue.length) {
         const c = queue.shift();
-        const r = downgradeHostRed(c, await c.run());
+        const r = await settleResult(c, downgradeHostRed(c, await c.run()), {
+          env,
+          paths,
+          cwd,
+        });
         const status = r.skip
           ? 'skip'
           : r.warn
@@ -933,6 +913,7 @@ export async function main({
     }
   }
 
+  slot.release();
   // PR body.
   let body = { errors: [], warnings: [], template: '' };
   if (bodyInfo) {
@@ -966,9 +947,12 @@ export async function main({
     log(`\n[ ] companion edit (${c.trigger}): ${c.item}\n      ${c.hint}`);
   if (body.template) log(`\nPaste into the PR body:\n\n${body.template}\n`);
   for (const d of deferred)
-    log(`  deferred  guard:${d} (heavy; rerun with --thorough)`);
+    log(
+      `  deferred to CI  ${d} (heavy or full-suite; --thorough runs it locally)`
+    );
 
   const total = red.length + body.errors.length + companion.length;
+  for (const line of failingItemLines({ red, body, companion })) log(line);
   log(total ? `\n${total} item(s) to fix before pushing.` : '\nall clear.');
 
   if (env.JOVIE_PREFLIGHT_LEDGER !== 'off') {
@@ -977,6 +961,19 @@ export async function main({
         env.JOVIE_PREFLIGHT_LEDGER_DIR ||
         path.join(homedir(), '.local', 'state', 'jovie-lanes');
       mkdirSync(dir, { recursive: true });
+      recordRun({
+        dir,
+        args,
+        cwd,
+        env,
+        head: git(cwd, ['rev-parse', 'HEAD']),
+        paths,
+        runStarted,
+        slot,
+        total,
+        results,
+        deferred,
+      });
       appendFileSync(
         path.join(dir, 'preflight-changed.jsonl'),
         `${JSON.stringify({

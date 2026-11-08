@@ -93,7 +93,7 @@ import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
 import qualification_guard  # noqa: E402
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
 import binding_turns, bindings, issue_turns, ledger_read  # noqa: E401,E402  (extra Linear team -> repo bindings, e.g. LYB)
-import binding_refill  # noqa: E402  (Backlog -> Todo refill per extra binding)
+import binding_refill, pr_wip  # noqa: E401,E402  (Backlog -> Todo refill per extra binding; per-producer PR WIP cap)
 import priority_admission  # noqa: E402  (Urgent/Summer-ranked admission, Todo WIP sanity, claim rank; JOV-7073)
 import macos_pool  # noqa: E402  (shared hosted-macOS pool: measure, record, gate LYB iOS intake)
 import decompose_pass  # noqa: E402  (standing epic decomposition when Todo < half target)
@@ -156,7 +156,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_worktree_pool.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
-              "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py",
+              "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py", "scripts/tests/test_pr_wip.py",
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
@@ -8792,22 +8792,22 @@ def pr_is_terminal(pr: dict) -> bool:
 
 
 def new_issue_budget(name: str, slots: int, inventory: list[dict] | None = None) -> dict:
-    """A lane's new-issue admission. Tim 2026-10-12: no PR-count ceilings (the JOV-6833
-    `slots x 2` active and JOV-7514 `slots x 4` terminal caps are gone); only real limits
-    (compute, credits, quotas) bound a lane, and those live in autoscale. Repair of existing
-    PRs never consulted this. `inventory` is reported for visibility only."""
+    """A lane's new-issue admission: its producer's WIP cap (pr-wip-policy.json, same rule as pr-open;
+    the retired JOV-6833/JOV-7514 slot caps stay gone). Repairs never consult it; unknown inventory admits."""
     if slots <= 0:
         return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": None, "terminal": 0, "terminalCap": None}
     dated = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
     own = [pr for pr in inventory or [] if dated.match(pr.get("headRefName") or "")]
-    return {"allowed": True, "reason": "within-budget",
+    wip = pr_wip.admit(inventory, name)
+    return {"allowed": wip["allowed"], "reason": "within-budget" if wip["allowed"] else "wip-cap",
             "used": None if inventory is None else sum(not is_green(pr) and not pr_is_terminal(pr) for pr in own),
-            "cap": None, "terminal": None if inventory is None else sum(pr_is_terminal(pr) for pr in own), "terminalCap": None}
+            "cap": None, "terminal": None if inventory is None else sum(pr_is_terminal(pr) for pr in own), "terminalCap": None, "wip": wip["used"], "wipCap": wip["cap"]}
 
 
 def read_new_issue_budget(name: str, slots: int) -> dict:
-    """No GitHub read: with no PR ceiling there is nothing to count before claiming."""
-    return {**new_issue_budget(name, slots), "observedAt": now_iso(), "error": None}
+    """The WIP count reads the shared open-PR summary (60 s cache); an unreadable one admits."""
+    inventory = pr_wip.safe_inventory(open_prs_summary) if slots > 0 else None
+    return {**new_issue_budget(name, slots, inventory), "observedAt": now_iso(), "error": None}
 
 
 def last_pushes() -> dict[int, float]:
