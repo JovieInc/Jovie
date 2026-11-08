@@ -30,7 +30,11 @@ export const TREE_PREFIX = 'PEN_INSPECT_TREE ';
 export const LIST_PREFIX = 'PEN_INSPECT_TOP ';
 
 /** The `execute` program: list top frames, find matches, dump and export them. */
-export function inspectProgram(query, pngDir, { maxHits = 24 } = {}) {
+export function inspectProgram(
+  query,
+  pngDir,
+  { maxHits = 24, maxRows = 1500 } = {}
+) {
   // The query becomes a RegExp inside Pen; JSON keeps it a safe literal.
   const q = JSON.stringify(String(query));
   const dir = JSON.stringify(pngDir);
@@ -41,7 +45,7 @@ const r = v => (typeof v === 'number' ? Math.round(v) : v);
 Get((n, c) => {
   if (c.depth <= 1 && n.type === 'frame')
     Print(${JSON.stringify(LIST_PREFIX)} + JSON.stringify({ id: n.id, name: n.name, depth: c.depth, w: r(c.bounds.width), h: r(c.bounds.height) }));
-  if (hits.length < ${Number(maxHits)} && n.type === 'frame' && re.test(n.name || '') && c.bounds.width >= 280) {
+  if (hits.length < ${Number(maxHits)} && n.type === 'frame' && (re.test(n.name || '') || re.test(n.id)) && c.bounds.width >= 280) {
     hits.push(n.id);
     Print(${JSON.stringify(HIT_PREFIX)} + JSON.stringify({ id: n.id, name: n.name, depth: c.depth, w: r(c.bounds.width), h: r(c.bounds.height) }));
     c.skipChildren();
@@ -50,6 +54,7 @@ Get((n, c) => {
 for (const id of hits) {
   const rows = [];
   Get(id, (n, c) => {
+    if (rows.length >= ${Number(maxRows)}) return c.skipChildren();
     rows.push({
       d: c.depth, id: n.id, type: n.type, name: n.name,
       x: r(c.bounds.x), y: r(c.bounds.y), w: r(c.bounds.width), h: r(c.bounds.height),
