@@ -13,6 +13,7 @@
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TAB_BAR_INTERNAL_SAFE_AREA_PADDING } from '@/lib/profile/nav-constants';
 import type { BottomTabBarProps } from './BottomTabBar';
@@ -329,6 +330,16 @@ describe('BottomTabBar — liquid glass lens', () => {
     const lens = screen.getByTestId('profile-bottom-nav-indicator');
     expect(lens).toHaveAttribute('data-active-index', '3');
     expect(lens.style.transform).toContain('translateX(300%)');
+  });
+
+  it('server-renders the lens in place before its deferred renderer loads', () => {
+    // JOV-11623: the lens's motion features load after mount, so the server
+    // markup alone must already place and size it (no shift on hydration).
+    const html = renderToString(
+      <BottomTabBar {...makeProps({ activeTab: 'tour' })} />
+    );
+    expect(html).toContain('data-testid="profile-bottom-nav-indicator"');
+    expect(html).toMatch(/width:25%;transform:translateX\(200%\)/u);
   });
 
   it('moves the same indicator when the active tab changes', async () => {

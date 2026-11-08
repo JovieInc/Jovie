@@ -92,7 +92,10 @@ vi.mock('next/dynamic', () => ({
     if (source.includes('ProfileInlineNotificationsCTA')) {
       return (props: unknown) => mockProfileInlineNotificationsCTA(props);
     }
-
+    // The flagged desktop surface is split out of first-load JS (JOV-11623).
+    if (source.includes('ProfileDesktopSurface')) {
+      return MockProfileDesktopSurface;
+    }
     return () => null;
   },
 }));

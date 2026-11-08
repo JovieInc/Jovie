@@ -36,7 +36,8 @@ import {
   Music2,
   UserRound,
 } from 'lucide-react';
-import { motion, useSpring, useTransform, useVelocity } from 'motion/react';
+import { LazyMotion, useSpring, useTransform, useVelocity } from 'motion/react';
+import * as m from 'motion/react-m';
 import { type ReactNode, useEffect, useLayoutEffect, useRef } from 'react';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { TAB_BAR_INTERNAL_SAFE_AREA_PADDING } from '@/lib/profile/nav-constants';
@@ -74,6 +75,15 @@ export const LENS_SPRING = Object.freeze({
 const LENS_STRETCH_VELOCITY = 2400;
 const LENS_MAX_STRETCH_X = 1.14;
 const LENS_MIN_SQUASH_Y = 0.92;
+
+/**
+ * The lens renderer loads after mount (JOV-11623). `motion.span` puts motion's
+ * whole animation, gesture and layout engine in the public profile's
+ * hydration task; `m.span` renders the same server markup from the motion
+ * values' current values, and LazyMotion binds them once this lands.
+ */
+const loadLensFeatures = () =>
+  import('./bottom-tab-bar-lens-features').then(mod => mod.default);
 
 // ---------------------------------------------------------------------------
 // Lens indicator
@@ -126,19 +136,21 @@ function LiquidGlassLens({
   }, [activeIndex, isVisible, position, reducedMotion]);
 
   return (
-    <motion.span
-      aria-hidden='true'
-      className='profile-liquid-glass-nav__lens'
-      data-testid='profile-bottom-nav-indicator'
-      data-active-index={isVisible ? activeIndex : undefined}
-      data-visible={isVisible ? 'true' : 'false'}
-      style={{
-        width: `${100 / columnCount}%`,
-        x,
-        scaleX: reducedMotion ? 1 : scaleX,
-        scaleY: reducedMotion ? 1 : scaleY,
-      }}
-    />
+    <LazyMotion features={loadLensFeatures}>
+      <m.span
+        aria-hidden='true'
+        className='profile-liquid-glass-nav__lens'
+        data-testid='profile-bottom-nav-indicator'
+        data-active-index={isVisible ? activeIndex : undefined}
+        data-visible={isVisible ? 'true' : 'false'}
+        style={{
+          width: `${100 / columnCount}%`,
+          x,
+          scaleX: reducedMotion ? 1 : scaleX,
+          scaleY: reducedMotion ? 1 : scaleY,
+        }}
+      />
+    </LazyMotion>
   );
 }
 

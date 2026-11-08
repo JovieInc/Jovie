@@ -66,8 +66,8 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
-import { ProfileDesktopSurface } from './ProfileDesktopSurface';
 import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
+import { ProfileDesktopSurface } from './profile-desktop-surface-lazy';
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
