@@ -15,7 +15,6 @@
  *  (visual)     (type)       _PROVIDER    DOMAINS      _DSP_MAPPINGS
  */
 
-import { DSP_GLYPH_DATA } from '@/lib/social-icons/dsp-glyph-data';
 import {
   buildGlyphLogo,
   type CompactDspInput,
@@ -27,6 +26,7 @@ import type {
   DspCategory,
   DspRegistryEntry,
 } from './dsp-registry-types';
+import { URL_ONLY_DSPS } from './dsp-url-only';
 
 export type { DSPConfig, DspCategory, DspRegistryEntry };
 
@@ -143,54 +143,18 @@ const INTERNATIONAL_STREAMING_DSP_INPUTS: readonly CompactDspInput[] = [
   ],
 ] as const;
 
-/**
- * URL-only streaming services named in AWAL / The Orchard delivery lists.
- * We recognise their URLs and render listen links; MusicFetch resolution is
- * off (musicfetchService null) until a service name is verified.
- * Source of truth for coverage: lib/dsp-coverage/distributor-stores.json.
- */
-// Brand colors for services without a published brand hex use a neutral grey
-// rather than an invented color.
-const URL_ONLY_STREAMING_DSP_INPUTS: readonly CompactDspInput[] = [
-  [
-    'vk_music',
-    'VK Music',
+// URL-only services (no MusicFetch name yet) come from lib/dsp-url-only.ts so
+// client code can read them without importing this whole registry.
+const URL_ONLY_STREAMING_DSP_INPUTS: readonly CompactDspInput[] =
+  URL_ONLY_DSPS.map(d => [
+    d.key,
+    d.name,
     null,
-    `#${DSP_GLYPH_DATA.vk.hex}`,
-    ['vk.com', 'www.vk.com', 'vk.ru', 'music.vk.com'],
-    null,
-    { aliases: ['vkmusic', 'vk', 'vkontakte'], iconKey: 'vk' },
-  ],
-  [
-    'traxsource',
-    'Traxsource',
-    null,
-    `#${DSP_GLYPH_DATA.traxsource.hex}`,
-    ['traxsource.com', 'www.traxsource.com'],
-    'https://www.traxsource.com/search?term={query}',
-    { iconKey: 'traxsource' },
-  ],
-  [
-    'bugs',
-    'Bugs',
-    null,
-    '#666666',
-    ['bugs.co.kr', 'music.bugs.co.kr'],
-    null,
-    { aliases: ['bugsmusic'] },
-  ],
-  ['fizy', 'fizy', null, '#666666', ['fizy.com', 'www.fizy.com'], null],
-  [
-    'juno_download',
-    'Juno Download',
-    null,
-    '#666666',
-    ['junodownload.com', 'www.junodownload.com'],
-    'https://www.junodownload.com/search/?q%5Ball%5D%5B%5D={query}',
-    { aliases: ['juno', 'junorecords'] },
-  ],
-  ['emusic', 'eMusic', null, '#666666', ['emusic.com', 'www.emusic.com'], null],
-] as const;
+    `#${d.hex}`,
+    [...d.domains],
+    d.searchUrlTemplate ?? null,
+    { aliases: d.aliases ? [...d.aliases] : undefined, iconKey: d.iconKey },
+  ]);
 
 // ============================================================================
 // Registry

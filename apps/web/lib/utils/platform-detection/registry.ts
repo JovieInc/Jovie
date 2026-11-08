@@ -11,7 +11,7 @@ import {
   type PlatformMetadata,
 } from '@/constants/platforms';
 
-import { DSP_REGISTRY } from '@/lib/dsp-registry';
+import { DETECTION_ONLY_DSPS, URL_ONLY_DSPS } from '@/lib/dsp-url-only';
 
 import type { DetectionCategory, DomainPattern, PlatformInfo } from './types';
 
@@ -78,21 +78,16 @@ function escapeDomain(domain: string): string {
   return domain.replaceAll('.', String.raw`\.`);
 }
 
-// Registry DSPs missing from the table below, derived so URLs cannot drift.
+const DETECTION_DSPS = [...URL_ONLY_DSPS, ...DETECTION_ONLY_DSPS];
+
+// URL-only DSPs the hand-written table below does not list (lib/dsp-url-only.ts).
 const REGISTRY_DSP_PLATFORMS: Record<string, PlatformInfo> = Object.fromEntries(
-  DSP_REGISTRY.filter(
-    e =>
-      e.category === 'streaming' &&
-      e.domains.length > 0 &&
-      e.key !== 'qq_music' &&
-      e.key !== 'youtube' &&
-      e.key !== 'amazon'
-  ).map(e => [
-    e.key,
-    createPlatformInfo(e.key, `https://${e.domains[0]}/...`, {
-      name: e.name,
+  DETECTION_DSPS.map(d => [
+    d.key,
+    createPlatformInfo(d.key, `https://${d.domains[0]}/...`, {
+      name: d.name,
       category: 'dsp',
-      color: e.color.replace('#', ''),
+      color: d.hex,
     }),
   ])
 );
@@ -290,20 +285,13 @@ export const PLATFORMS: Record<string, PlatformInfo> = {
  * Uses canonical platform IDs from constants/platforms.ts (snake_case format)
  */
 function buildRegistryDomainPatterns(): DomainPattern[] {
-  return Object.values(REGISTRY_DSP_PLATFORMS).flatMap(platform => {
-    const entry = DSP_REGISTRY.find(e => e.key === platform.id);
-    if (!entry) return [];
-    const hosts = entry.domains.map(escapeDomain).join('|');
-    return [
-      {
-        pattern: new RegExp(
-          String.raw`(?:^|[/.])(?:${hosts})(?:[/:?#]|$)`,
-          'i'
-        ),
-        platformId: platform.id,
-      },
-    ];
-  });
+  return DETECTION_DSPS.map(d => ({
+    pattern: new RegExp(
+      String.raw`(?:^|[/.])(?:${d.domains.map(escapeDomain).join('|')})(?:[/:?#]|$)`,
+      'i'
+    ),
+    platformId: d.key,
+  }));
 }
 
 export const DOMAIN_PATTERNS: DomainPattern[] = [

@@ -1,4 +1,4 @@
-import { getRegistryEntry } from '@/lib/dsp-registry';
+import { URL_ONLY_DSPS } from '@/lib/dsp-url-only';
 import type { ProviderKey, ReleaseTemplate } from './types';
 
 export const PROVIDER_CONFIG: Record<
@@ -38,18 +38,10 @@ export const PROVIDER_CONFIG: Record<
   amazon: { label: 'Amazon', accent: '#FF9900' },
 };
 
-// URL-only services take label and accent from the DSP registry so brand
-// data keeps a single source of truth.
-for (const key of [
-  'vk_music',
-  'traxsource',
-  'bugs',
-  'fizy',
-  'juno_download',
-  'emusic',
-]) {
-  const entry = getRegistryEntry(key);
-  if (entry) PROVIDER_CONFIG[key] = { label: entry.name, accent: entry.color };
+// URL-only services take label and accent from lib/dsp-url-only.ts so brand
+// data keeps a single source of truth without importing the DSP registry.
+for (const d of URL_ONLY_DSPS) {
+  PROVIDER_CONFIG[d.key] = { label: d.name, accent: `#${d.hex}` };
 }
 
 export const PRIMARY_PROVIDER_KEYS: ProviderKey[] = [
