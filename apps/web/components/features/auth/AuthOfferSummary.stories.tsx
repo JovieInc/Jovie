@@ -45,3 +45,26 @@ export const SignInContinue: Story = {
     },
   },
 };
+
+/** Long content: the Max recap carries the longest note and wraps inside the card. */
+export const LongMaxOfferNote: Story = {
+  args: { mode: 'sign-up', enabled: true },
+  parameters: {
+    nextjs: {
+      appDirectory: true,
+      navigation: { pathname: '/signup', query: { plan: 'max' } },
+    },
+  },
+};
+
+/** RTL: the centred recap follows a right-to-left auth shell. */
+export const RtlSignUpProTrial: Story = {
+  args: { mode: 'sign-up', enabled: true },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

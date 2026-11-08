@@ -19,6 +19,9 @@ class ClassifyTest(unittest.TestCase):
         cases = {
             "github-quota-deferred; fleet evidence retry": ("quota-deferred", "rerun"),
             "HttpError: API rate limit exceeded for installation": ("platform-infra", "rerun"),
+            "Could not fetch gitleaks after 3 attempts (https://example.invalid/gitleaks.tar.gz).": ("platform-infra", "rerun"),
+            "##[error]Dependency review detected incompatible licenses.": ("dependency-license", "agent"),
+            "github-quota-deferred\n##[error]Dependency review detected incompatible licenses.": ("dependency-license", "agent"),
             "upstream returned HTTP 500 before the job started": ("platform-infra", "rerun"),
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane": ("ci-fast-wiring", "wire-ci-fast"),
             "domain-write-guard: apps/web/lib/leads/lead-claim-token.ts writes creatorProfiles directly 1x (allowed 0).": ("domain-write", "register-domain-writes"),
@@ -33,6 +36,20 @@ class ClassifyTest(unittest.TestCase):
         for log, (cls, action) in cases.items():
             got = classes.classify(pr("Source Validation"), {"Source Validation": log})
             self.assertEqual((got["cls"], got["action"]), (cls, action), log)
+
+    def test_failed_live_design_cli_syncs_main_before_retrying_fixture_infra(self):
+        summary = (" FAIL  workspace-scripts lib/__tests__/design-system-source-ratchet.test.mjs"
+                   " > design-system source identity ratchet (JOV-5301)"
+                   " > exits zero from the CLI on the live tree\n")
+        noise = "passing fixture: github-quota-deferred; API rate limit exceeded; HTTP 503\n"
+        for log in (summary, noise + summary, noise + "\x1b[31m" + summary + "\x1b[0m"):
+            got = classes.classify(pr("Source Validation"), {"Source Validation": log})
+            self.assertEqual((got["cls"], got["action"]), ("design-source-cli", "sync-main"))
+        for passing in (summary.replace("FAIL", "PASS"),
+                        summary.replace("design-system-source-ratchet.test.mjs", "other.test.mjs"),
+                        summary.replace("exits zero from the CLI on the live tree", "another test")):
+            got = classes.classify(pr("Source Validation"), {"Source Validation": noise + passing})
+            self.assertEqual((got["cls"], got["action"]), ("quota-deferred", "rerun"))
 
     def test_unwired_outranks_incidental_http_status_in_the_same_log(self):
         log = (
@@ -222,6 +239,50 @@ class AdditiveQuotedListMergeTest(unittest.TestCase):
 
 
 class AdditiveIdentifierListMergeTest(unittest.TestCase):
+    BASE_IMPORTS = (
+        "import { mkdtempSync, readFileSync } from 'node:fs';\n"
+        "import { join } from 'node:path';\n"
+    )
+    IMPORT_CONFLICT = (
+        "<<<<<<< HEAD\n"
+        "import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';\n"
+        "import { join } from 'node:path';\n"
+        "=======\n"
+        "import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';\n"
+        "import { basename, join, resolve } from 'node:path';\n"
+        ">>>>>>> origin/main\n"
+    )
+
+    def test_unions_named_node_imports_only_with_additive_base_evidence(self):
+        self.assertEqual(
+            classes.resolve_additive_identifier_list_text(self.IMPORT_CONFLICT, base=self.BASE_IMPORTS),
+            "import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';\n"
+            "import { basename, join, resolve } from 'node:path';\n",
+        )
+        self.assertIsNone(classes.resolve_additive_identifier_list_text(self.IMPORT_CONFLICT))
+
+    def test_unions_imports_added_independently_to_a_module_absent_from_base(self):
+        resolved = classes.resolve_additive_identifier_list_text(self.IMPORT_CONFLICT, base="// no imports yet\n")
+        self.assertIn("{ mkdirSync, mkdtempSync, readFileSync, writeFileSync }", resolved)
+        self.assertIsNone(classes.resolve_additive_identifier_list_text(
+            self.IMPORT_CONFLICT, base="import fs from 'node:fs';\n"))
+        self.assertIsNone(classes.resolve_additive_identifier_list_text(
+            self.IMPORT_CONFLICT.replace("basename, join, resolve", "readFileSync, join, resolve"),
+            base=self.BASE_IMPORTS))
+
+    def test_import_removals_aliases_module_changes_and_unknown_hunks_stay_unresolved(self):
+        for conflict, base in (
+            (self.IMPORT_CONFLICT.replace("mkdirSync, mkdtempSync, readFileSync", "mkdirSync, mkdtempSync"), self.BASE_IMPORTS),
+            (self.IMPORT_CONFLICT.replace("writeFileSync", "writeFileSync as write"), self.BASE_IMPORTS),
+            (self.IMPORT_CONFLICT.replace("'node:fs'", "'other'", 1), self.BASE_IMPORTS),
+            (self.IMPORT_CONFLICT.replace("import { join } from 'node:path';", "doSomething();"), self.BASE_IMPORTS),
+            (self.IMPORT_CONFLICT, self.BASE_IMPORTS + self.BASE_IMPORTS),
+            (self.IMPORT_CONFLICT, ""),
+            (self.IMPORT_CONFLICT + "<<<<<<< HEAD\nunknown();\n=======\nother();\n>>>>>>> origin/main\n", self.BASE_IMPORTS),
+        ):
+            with self.subTest(conflict=conflict, base=base):
+                self.assertIsNone(classes.resolve_additive_identifier_list_text(conflict, base=base))
+
     def test_unions_slug_lines_and_rejects_unknown_hunks(self):
         text = (
             "Other scoped rules: ci-branching, event-driven, infra, linear, motion,\n"

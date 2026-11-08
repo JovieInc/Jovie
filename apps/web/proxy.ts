@@ -15,6 +15,7 @@ import {
   isTestAuthBypassEnabled,
   resolveTestBypassUserId,
 } from '@/lib/auth/test-mode';
+import { resolveDesktopMarketingRedirect } from '@/lib/desktop/desktop-marketing-guard';
 import { gateProfilePublicationAtEdge } from '@/lib/routing/profile-publication-edge';
 import { analyzeHost } from '@/lib/routing/proxy-routing';
 import {
@@ -186,6 +187,26 @@ export default async function middleware(
     const targetUrl = new URL(APP_ROUTES.SUPPORT, BASE_URL);
     targetUrl.search = req.nextUrl.search;
     return NextResponse.redirect(targetUrl, 308);
+  }
+
+  // ========================================================================
+  // The Mac app is a product surface. A desktop-shell request for a
+  // marketing page (document load, Next client navigation or prefetch) goes
+  // to the app home instead; signed-out visitors continue to sign-in from
+  // there. Browsers never carry the JovieDesktop/ user-agent token.
+  // ========================================================================
+  const desktopMarketingRedirect = resolveDesktopMarketingRedirect({
+    method: req.method,
+    pathname: req.nextUrl.pathname,
+    userAgent: req.headers.get('user-agent'),
+  });
+  if (desktopMarketingRedirect) {
+    const response = NextResponse.redirect(
+      new URL(desktopMarketingRedirect, req.url),
+      307
+    );
+    response.headers.set('Cache-Control', 'private, no-store');
+    return response;
   }
 
   // ========================================================================

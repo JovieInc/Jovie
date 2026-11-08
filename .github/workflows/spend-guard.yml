@@ -54,7 +54,9 @@ jobs:
           SPEND_GUARD_AUDIT: ${{ runner.temp }}/spend-guard-audit.jsonl
         run: |
           set -euo pipefail
-          test -n "$VERCEL_TOKEN" || { echo "::warning::VERCEL_READONLY_TOKEN is unavailable; spend guard cannot read usage."; exit 0; }
+          # A guard that cannot read usage must fail red, not pass green: it ran
+          # blind from 2026-10-31 to the 2026-11-08 budget pause without one alert.
+          test -n "$VERCEL_TOKEN" || { echo "::error::VERCEL_READONLY_TOKEN is unavailable; spend guard cannot read usage, so no 50/75/90 percent alert can fire before Vercel pauses the team."; exit 1; }
           node scripts/spend-guard.mjs > spend-report.json
           echo "alert=$(jq -r .alert spend-report.json)" >> "$GITHUB_OUTPUT"
           echo "message=$(jq -r .message spend-report.json)" >> "$GITHUB_OUTPUT"

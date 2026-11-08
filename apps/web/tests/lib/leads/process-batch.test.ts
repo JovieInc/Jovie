@@ -76,9 +76,28 @@ describe('processLeadBatch — scrape retry', () => {
 
     const result = await processLeadBatch(['lead-1'], 1);
 
-    expect(result.error).toBe(1);
-    expect(mockDb.update).not.toHaveBeenCalled();
+    expect(result.error).toBe(0);
+    expect(result.deferred).toBe(1);
+    // Only updatedAt moves, so the cron rotates past the lead; no attempt is
+    // spent and it is never disqualified for it.
+    expect(mockDb._updateSet).toHaveBeenCalledTimes(1);
+    expect(mockDb._updateSet).toHaveBeenCalledWith({
+      updatedAt: expect.any(Date),
+    });
+    expect(mockCaptureError).not.toHaveBeenCalled();
     expect(mockPipelineWarn).not.toHaveBeenCalled();
+  });
+
+  it('still defers the lead when touching updatedAt fails', async () => {
+    mockQualifyLead.mockRejectedValueOnce(
+      new ExtractionError('Disabled', 'SOCIAL_HTML_DISABLED')
+    );
+    mockDb._updateWhere.mockRejectedValueOnce(new Error('db down'));
+
+    const result = await processLeadBatch(['lead-1'], 1);
+
+    expect(result.deferred).toBe(1);
+    expect(result.error).toBe(0);
   });
 
   it('increments scrapeAttempts on qualification failure', async () => {

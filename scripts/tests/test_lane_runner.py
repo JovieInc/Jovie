@@ -13621,6 +13621,22 @@ class NoHumanHoldTest(unittest.TestCase):
         self.assertEqual(git("merge-base", "--is-ancestor", before, after).returncode, 0)
 
     def test_identifier_list_conflict_unions_slugs_and_fast_forwards(self):
+        base = "Other scoped rules: ci-branching,\npr-stacking, swarm.\n"
+        self._identifier_list_conflict(
+            "CLAUDE.md", base,
+            base.replace("pr-stacking, swarm.", "pr-stacking, swarm, rate-limits."),
+            base.replace("pr-stacking, swarm.", "pr-stacking, swarm, anti-slop."),
+            "Other scoped rules: ci-branching,\npr-stacking, swarm, anti-slop, rate-limits.\n")
+
+    def test_identifier_list_conflict_unions_named_node_imports_and_fast_forwards(self):
+        base = "// both branches add their own subprocess fixture\n"
+        self._identifier_list_conflict(
+            "fixture.mjs", base,
+            "import { spawnSync } from 'node:child_process';\n" + base,
+            "import { execFileSync } from 'node:child_process';\n" + base,
+            "import { execFileSync, spawnSync } from 'node:child_process';\n" + base)
+
+    def _identifier_list_conflict(self, filename, base, head, main, expected):
         root = Path(self.tmp.name)
         origin = root / "origin.git"
         work = root / "work"
@@ -13637,26 +13653,25 @@ class NoHumanHoldTest(unittest.TestCase):
                            ("core.hooksPath", str(hooks))):
             git("config", key, value)
         git("remote", "add", "origin", str(origin))
-        path = work / "CLAUDE.md"
-        base = "Other scoped rules: ci-branching,\npr-stacking, swarm.\n"
+        path = work / filename
         path.write_text(base)
-        git("add", "CLAUDE.md")
+        git("add", filename)
         git("commit", "-qm", "base")
         git("branch", "feature")
         git("push", "-q", "origin", "HEAD:refs/heads/main")
         git("checkout", "-q", "feature")
-        path.write_text(base.replace("pr-stacking, swarm.", "pr-stacking, swarm, rate-limits."))
-        git("commit", "-qam", "head adds rate-limits")
+        path.write_text(head)
+        git("commit", "-qam", "head adds identifiers")
         git("push", "-q", "origin", "HEAD:refs/heads/feature")
         git("checkout", "-q", "main")
-        path.write_text(base.replace("pr-stacking, swarm.", "pr-stacking, swarm, anti-slop."))
-        git("commit", "-qam", "main adds anti-slop")
+        path.write_text(main)
+        git("commit", "-qam", "main adds identifiers")
         git("push", "-q", "origin", "HEAD:refs/heads/main")
         git("checkout", "-q", "feature")
         before = git("rev-parse", "HEAD").stdout.strip()
         self.assertTrue(lane.resolve_identifier_list_conflict(work, "feature", None))
         text = path.read_text()
-        self.assertEqual(text, "Other scoped rules: ci-branching,\npr-stacking, swarm, anti-slop, rate-limits.\n")
+        self.assertEqual(text, expected)
         self.assertNotIn("<<<<<<<", text)
         after = git("rev-parse", "HEAD").stdout.strip()
         self.assertEqual(after, git("rev-parse", "origin/feature").stdout.strip())

@@ -24,6 +24,21 @@ const DEAD_END_COPY =
 
 async function startChat(page: Page) {
   await page.goto('/start', { waitUntil: 'domcontentloaded' });
+  // Invite-only GTM (PUBLIC_SIGNUP_CLOSED, canon/PRODUCT.md 2026-11-02):
+  // anonymous visitors are sent to /waitlist on purpose, so there is no chat
+  // to start. The guard then proves the closed state is a working waitlist
+  // form with no dead end. Chat start itself stays covered by the production
+  // certification canary (verified passage token) and runs here whenever
+  // signup is open.
+  await page.waitForURL(/\/(start|waitlist)(\?|$)/, { timeout: 15_000 });
+  if (new URL(page.url()).pathname === '/waitlist') {
+    await expect(
+      page.getByTestId('waitlist-role-form'),
+      'Closed signup must land on a visible waitlist form'
+    ).toBeVisible();
+    await expect(page.getByText(DEAD_END_COPY)).toHaveCount(0);
+    return;
+  }
   const composer = page.getByRole('textbox').first();
   await expect(composer).toBeVisible();
   // The server renders the composer before React attaches its handlers, and an

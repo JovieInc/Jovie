@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation';
-import { PipelineBottleneckBanner } from '@/components/features/home/PipelineBottleneckBanner';
 import { OpportunityInboxPageClient } from '@/components/features/opportunity-inbox/OpportunityInboxPageClient';
 import { APP_ROUTES } from '@/constants/routes';
 import { checkIsAdmin } from '@/lib/admin/middleware';
@@ -17,6 +16,7 @@ import {
   getProfileSocialLinks,
   type ProfileSocialLink,
 } from './dashboard/actions';
+import { PipelineBottleneckBannerLazy } from './PipelineBottleneckBannerLazy';
 
 /**
  * Resolve the selected profile plus the data needed to hydrate the profile
@@ -128,7 +128,7 @@ export async function OpportunityInboxRoute({
     <>
       {isAdmin ? (
         <div className='h-24 shrink-0 px-6 py-2'>
-          <PipelineBottleneckBanner isAdmin={isAdmin} />
+          <PipelineBottleneckBannerLazy isAdmin={isAdmin} />
         </div>
       ) : null}
       <OpportunityInboxPageClient

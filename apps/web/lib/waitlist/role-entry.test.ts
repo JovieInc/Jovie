@@ -68,6 +68,39 @@ describe('role waitlist persistence', () => {
       })
     ).toEqual({ created: false });
   });
+  it('stores request-access qualification and never overwrites an earlier one', async () => {
+    const now = new Date('2026-11-08T05:00:00Z');
+    await joinWaitlistWithRole({
+      email: 'artist@example.com',
+      role: 'artist',
+      now,
+      qualification: {
+        spotifyArtistId: '4Z8W4fKeB5YxbusRsdQVPb',
+        spotifyArtistName: 'Example Artist',
+        admissionScore: null,
+        momTest: {
+          promoSpend: 'none',
+          variant: 'request-access/v1',
+          capturedAt: now.toISOString(),
+        },
+      },
+    });
+    const values = mocks.values.mock.calls[0][0];
+    expect(values.spotifyArtistName).toBe('Example Artist');
+    expect(values.qualificationInputs).toMatchObject({
+      role: 'artist',
+      spotifyArtistId: '4Z8W4fKeB5YxbusRsdQVPb',
+      momTest: { promoSpend: 'none' },
+    });
+    expect(values.qualificationInputs).not.toHaveProperty('admissionScore');
+    const dialect = new PgDialect();
+    const conflict = mocks.conflict.mock.calls[0][0];
+    const set = dialect.sqlToQuery(conflict.set.qualificationInputs);
+    expect(set.sql).toContain(`->'admissionScore' is null`);
+    expect(set.sql).toContain(`->'momTest' is null`);
+    const where = dialect.sqlToQuery(conflict.setWhere);
+    expect(where.sql).toContain(`->'momTest' IS NULL`);
+  });
   it('propagates persistence failure and rejects an unusable email', async () => {
     mocks.returning.mockRejectedValue(new Error('storage unavailable'));
     await expect(

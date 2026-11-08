@@ -24,6 +24,7 @@ import {
   statesCovered,
   summarizeGuards,
 } from '../component-certificate.mjs';
+import { storyReceipt } from '../component-evidence.mjs';
 import { moduleKey } from '../mutation-sweep.mjs';
 
 const sourceHash = source => createHash('sha256').update(source).digest('hex');
@@ -33,18 +34,13 @@ const gitBlob = source =>
     .update(source)
     .digest('hex');
 
-const stories = [
-  'Loading',
-  'Empty',
-  'Error',
-  'Partial',
-  'LongContent',
-  'Offline',
-  'PermissionDenied',
-  'Rtl',
-]
-  .map(name => `export const ${name}={};`)
-  .join('\n');
+const stories =
+  'Loading Empty Error Partial LongContent Offline PermissionDenied Rtl'
+    .split(' ')
+    .map(name => `export const ${name}={};`)
+    .join('\n');
+// A reviewed benchmark judgment names its reference (component-benchmark-review).
+const reviewed = { reference: 'WAI-ARIA APG Button', gaps: [] };
 const criterion = (cert, id) => cert.criteria.find(row => row.id === id);
 function assertCriteria(cert, expected) {
   for (const [id, status] of Object.entries(expected)) {
@@ -70,7 +66,6 @@ const mutationReceipt = (source, tests = []) => ({
 
 describe('component certificate', () => {
   const clean = `export function Card({ title }: { title: string }) { return <div className="bg-surface-1 text-primary-token">{title}</div>; }`;
-
   it.each([
     `const a = "bg-blue-500 text-white"; const b = '#fff'; const c = "rgb(1,2,3)";`,
     `const A = () => <div className="bg-blue-500 text-white" data-hex="#fff" data-rgb="rgb(1,2,3)" />;`,
@@ -95,7 +90,6 @@ describe('component certificate', () => {
       ['button', 'input']
     );
   });
-
   it('jank: inline component, autoFocus, unstable key, img, reset-on-open effect', () => {
     const src = `
 export function Drawer({ open }) {
@@ -116,7 +110,6 @@ export function Drawer({ open }) {
     ]);
     assert.deepEqual(findJank(clean, 'a.tsx'), []);
   });
-
   it('state stories are matched by export name', () => {
     const c = statesCovered(
       'export const Loading = {}; export const EmptyState = {}; export const RtlLong = {};'
@@ -322,7 +315,6 @@ describe('component certificate CLI evidence freshness', () => {
   const original = 'export function Card() { return <div />; }\n';
   const changed =
     'export function Card() { return <div title="updated" />; }\n';
-
   let f;
   beforeEach(() => {
     const root = mkdtempSync(join(tmpdir(), 'component-certificate-cli-'));
@@ -362,9 +354,13 @@ describe('component certificate CLI evidence freshness', () => {
           git(['hash-object', additionalTest]),
         ]),
       };
-      records.visual = { status: 'pass', captured: 1, sourceHash: binding };
-      records.a11y = { status: 'pass', sourceHash: binding };
-      records.benchmark = { libraryVersion: 1, sourceHash: binding, gaps: [] };
+      records.visual = storyReceipt(binding);
+      records.a11y = storyReceipt(binding);
+      records.benchmark = {
+        ...reviewed,
+        libraryVersion: 1,
+        sourceHash: binding,
+      };
       save();
     };
     const invoke = (entry = cli) => {
@@ -412,7 +408,11 @@ describe('component certificate CLI evidence freshness', () => {
       'scripts/component-certificate.mjs',
       'scripts/component-ship-policy.mjs',
       'scripts/lib/component-certificate.mjs',
+      'scripts/lib/component-benchmark-review.mjs',
+      'scripts/lib/component-certificate-mutation.mjs',
+      'scripts/lib/component-evidence.mjs',
       'scripts/lib/mutation-sweep.mjs',
+      'scripts/lib/mutation-sweep-root.mjs',
       'scripts/lib/mutation-diff.mjs',
     ]) {
       mkdirSync(dirname(join(f.root, path)), { recursive: true });

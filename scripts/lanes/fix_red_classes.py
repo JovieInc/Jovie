@@ -28,7 +28,10 @@ from pathlib import Path
 import migration_renumber
 import remediation
 from atomic_state import atomic_write_text
-from fix_red_source_edits import snap_added_conservative_spacing, strip_added_legacy_cache_exports  # noqa: F401
+from fix_red_source_edits import (  # noqa: F401
+    snap_added_conservative_spacing, strip_added_legacy_cache_exports,
+    resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict,
+)
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
@@ -44,7 +47,12 @@ DETERMINISTIC = frozenset({
 # design gate to a model (test_engineering_credential_removal_is_not_a_founder_gate).
 PLATFORM_TEXT = re.compile(
     remediation.INFRA_TEXT.pattern + r"|API rate limit exceeded|HTTP 408|you must provide a token|"
-    r"timed out fetching|lost communication with the server|ECONNRESET", re.IGNORECASE)
+    r"timed out fetching|lost communication with the server|ECONNRESET|"
+    r"Could not fetch gitleaks after \d+ attempts", re.IGNORECASE)
+# Dependency review fails an SPDX OR when any disjunct is denied, including a
+# bump whose license expression did not change. The repair is an election in
+# scripts/security/dual-license-elections.json. Never drop a deny-licenses id.
+DEPENDENCY_LICENSE = re.compile(r"Dependency review detected incompatible licenses")
 QUOTA_TEXT = re.compile(r"github-quota-deferred|Fleet rule evidence is (?:missing|deferred)", re.IGNORECASE)
 UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
@@ -69,6 +77,13 @@ CHANGELOG_QUOTA_READ = re.compile(r"github-quota-deferred: PR metadata read hit 
 # lines. A branch that already contains main fails update-branch and still
 # reaches a model, which is the only path that may renew a digest the PR owns.
 CENSUS_CERTIFICATION = re.compile(r"source changed; renew certification evidence")
+# The CLI compares source with origin/main as well as the committed baseline.
+# An inherited identity removed on main can fail a stale branch (#24406).
+# Match the failed-test summary, never passing-test titles or fixture API errors.
+# The existing sync route tries once per head, then falls back to the agent.
+DESIGN_SOURCE_CLI = re.compile(
+    r"\bFAIL\b[^\n]*lib/__tests__/design-system-source-ratchet\.test\.mjs[^\n]*"
+    r">[^\n]*exits zero from the CLI on the live tree")
 # Armed spacing ratchet (spacing-scale-ratchet.test.ts). The count grew because a
 # PR added a 10px/14px utility. Snap those added utilities; do not raise the floor.
 SPACING_RATCHET_TEXT = re.compile(
@@ -134,8 +149,11 @@ SIGNATURES = (
     ("cache-surface", CACHE_SURFACE_TEXT, STRIP_CACHE),
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
+    ("design-source-cli", DESIGN_SOURCE_CLI, SYNC_MAIN),
     # Inventory assertion outranks quota/infra noise echoed in the same log.
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
+    # The license error is the job failure. A passing fixture can echo quota text.
+    ("dependency-license", DEPENDENCY_LICENSE, AGENT),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
@@ -639,9 +657,49 @@ def merge_additive_identifier_list(ours: str, theirs: str) -> str | None:
     return text + "\n"
 
 
-def resolve_additive_identifier_list_text(text: str) -> str | None:
-    """Replace conflict hunks that are only a one-line identifier list. None when any
-    hunk has another shape, so the caller leaves that merge to a model."""
+def _merge_additive_node_imports(ours: str, theirs: str, base: str) -> str | None:
+    """Union named Node imports only when both sides retain every base binding.
+
+    No aliases, default imports, module changes or duplicate local bindings.
+    The caller supplies Git's stage-1 source, never an inferred ancestor."""
+    pattern = re.compile(r"import \{ ([A-Za-z][A-Za-z0-9]*(?:, [A-Za-z][A-Za-z0-9]*)*) \} from '(node:[a-z_]+)';")
+
+    def parse(side):
+        if not side.endswith("\n"):
+            return None
+        matches = [pattern.fullmatch(line) for line in side.splitlines()]
+        if not matches or any(match is None for match in matches):
+            return None
+        rows = [(match[2], match[1]) for match in matches]
+        return None if len({module for module, _ in rows}) != len(rows) else rows
+
+    head, main = parse(ours), parse(theirs)
+    if not head or not main or [row[0] for row in head] != [row[0] for row in main]:
+        return None
+    merged = []
+    bindings = set()
+    for (module, head_names), (_, main_names) in zip(head, main):
+        ancestor = [match[1] for line in base.splitlines()
+                    if (match := pattern.fullmatch(line)) and match[2] == module]
+        if len(ancestor) > 1 or (not ancestor and module in base):
+            return None
+        original = ancestor[0].split(", ") if ancestor else []
+        if any(not set(original).issubset(names.split(", ")) for names in (head_names, main_names)):
+            return None
+        names = merge_additive_identifier_list(head_names + "\n", main_names + "\n")
+        if names is None:
+            return None
+        tokens = names.strip().split(", ")
+        if bindings.intersection(tokens):
+            return None
+        bindings.update(tokens)
+        merged.append(f"import {{ {names.strip()} }} from '{module}';\n")
+    return "".join(merged)
+
+
+def resolve_additive_identifier_list_text(text: str, *, base: str = "") -> str | None:
+    """Replace identifier lists or base-proven additive named Node imports.
+    None when any hunk has another shape, leaving that merge to a model."""
     if "<<<<<<<" not in str(text or ""):
         return None
     hunks = list(_NARROWED_HUNK.finditer(text))
@@ -653,6 +711,8 @@ def resolve_additive_identifier_list_text(text: str) -> str | None:
     last = 0
     for hunk in hunks:
         merged = merge_additive_identifier_list(hunk.group("ours"), hunk.group("theirs"))
+        if merged is None and base:
+            merged = _merge_additive_node_imports(hunk.group("ours"), hunk.group("theirs"), base)
         if merged is None:
             return None
         pieces.append(text[last:hunk.start()])

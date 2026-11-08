@@ -680,8 +680,13 @@ jobs:
                       --grep "sign-in works and dashboard loads"
           ) || echo "::warning::Signed-in session not established; crawling as a stranger only."
           if [ -s "$auth_state" ]; then state_args=(--storage-state "$auth_state"); fi
-          node scripts/product-crawl/crawl.mjs --origin "$PRODUCTION_BASE_URL" \
-            --out product-crawl-receipt "${state_args[@]}"
+          # This job uploads only from the guard's producer stage, so the
+          # crawl writes its receipt under the guard too. Run outside it, the
+          # receipt never reached the stage and every upload was refused.
+          PLAYWRIGHT_ARTIFACT_PATHS='product-crawl-receipt/*.json' \
+            node .github/scripts/guard-playwright-artifacts.mjs --run -- \
+              node scripts/product-crawl/crawl.mjs --origin "$PRODUCTION_BASE_URL" \
+                --out product-crawl-receipt "${state_args[@]}"
           cat product-crawl-receipt/summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload crawl receipt
         if: ${{ always() && steps.has-crawl.outputs.skip != 'true' && hashFiles('product-crawl-receipt/*.json') != '' }}
@@ -790,7 +795,7 @@ jobs:
     name: Golden Path Certification (Landed Production)
     needs: [resolve-target, auth-smoke]
     if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # Playwright (pen-golden-path.mjs) has no ubuntu 26.04 build
     timeout-minutes: 10
     permissions:
       contents: read
@@ -816,8 +821,23 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: node .github/scripts/resolve-synthetic-secrets.mjs --name CRON_SECRET
 
-      - name: Certify the golden path on production
+      # Design first (Tim, 2026-11-08): export every Golden Path Pen frame with
+      # the headless Pen CLI and diff it against production. Without
+      # PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL it exports nothing, and the
+      # certification below reports those frames as not exported. --record
+      # exits 0 once a receipt is written; certification fails on its verdict.
+      # If the Pen tooling itself fails first, certification still runs and
+      # reports those frames as not exported, so no verdict is skipped.
+      - name: Export Golden Path Pen frames and compare with production
         env:
+          PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
+          PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
+        run: node scripts/invariants/pen-golden-path.mjs --record --out "${RUNNER_TEMP}/pen-golden-path" --base-url https://jov.ie
+
+      - name: Certify the golden path on production
+        if: ${{ !cancelled() }}
+        env:
+          PROD_CERT_PEN_DIFF_RECEIPT: ${{ runner.temp }}/pen-golden-path/receipt.json
           AUTH_SMOKE_STATUS: ${{ needs.auth-smoke.outputs.auth_smoke_status || (needs.auth-smoke.result == 'success' && 'passed') || 'failed' }}
           EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}

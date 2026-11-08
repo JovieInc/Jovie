@@ -241,7 +241,7 @@ describe('OnboardingShell status', () => {
     expect(alert).toHaveTextContent('Sign in with the original account');
     fireEvent.click(screen.getByRole('button', { name: 'Profile Conflict' }));
     expect(
-      screen.getByRole('link', { name: 'Sign in with original account' })
+      screen.getByRole('link', { name: 'Sign In with Original Account' })
     ).toHaveAttribute('href', '/signin');
     expect(
       alert.closest('[data-testid=onboarding-identity-recovery-slot]')
@@ -282,11 +282,11 @@ describe('OnboardingShell status', () => {
     rerender(<OnboardingShell sessionLabel='stable' />);
     expect(screen.getByTestId('onboarding-identity-recovery-slot')).toBe(slot);
     expect(
-      screen.queryByRole('link', { name: 'Sign in with original account' })
+      screen.queryByRole('link', { name: 'Sign In with Original Account' })
     ).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Profile Conflict' }));
     expect(
-      screen.getByRole('link', { name: 'Sign in with original account' })
+      screen.getByRole('link', { name: 'Sign In with Original Account' })
     ).toBeVisible();
   });
 
