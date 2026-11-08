@@ -91,10 +91,10 @@ async function readPaneGeometry(page: Page) {
     const column = box(elements.column[0]);
     const field = box(elements.field[0]);
     const rail = box(elements.rail[0]);
-    // The overlay's painted/hit-test allocation is independent of the route
-    // pane marker. A narrowed empty marker cannot certify an overflowing form.
+    // The rail column's allocation is independent of the route pane marker.
+    // A narrowed empty marker cannot certify an overflowing form.
     const railMount = elements.rail[0].closest<HTMLElement>(
-      '.shell-inspector-overlay'
+      '[data-testid="app-shell-right-rail"]'
     );
     if (!railMount) return { counts, geometry: null };
     const occupiedRail = box(railMount);
@@ -117,9 +117,14 @@ async function readPaneGeometry(page: Page) {
           routeContainsPane: elements.route[0].contains(elements.pane[0]),
           paneContainsColumn: elements.pane[0].contains(elements.column[0]),
           columnContainsField: elements.column[0].contains(elements.field[0]),
+          // The rail is a sibling column of the route in one main plane, so
+          // it pushes the route instead of laying on top of it.
           sameShell:
-            railMount.closest('[data-app-shell-main-content="true"]') ===
-            elements.route[0].closest('[data-app-shell-main-content="true"]'),
+            railMount.parentElement ===
+              elements.route[0].closest('[data-app-shell-main-plane="true"]') &&
+            !railMount.parentElement
+              ?.querySelector('[data-app-shell-main-content="true"]')
+              ?.contains(railMount),
           fieldHit:
             hit === elements.field[0] || elements.field[0].contains(hit),
         },
@@ -261,6 +266,10 @@ async function assertOpenPane(page: Page, testInfo: TestInfo, name: string) {
   expect(geometry.occupiedRail.right).toBeGreaterThanOrEqual(
     geometry.route.right
   );
+  expect(
+    geometry.route.right,
+    'the open rail pushes the route; it never lays on top of it'
+  ).toBeLessThanOrEqual(geometry.rail.left + 1);
   expect(
     geometry.pane.right,
     'pane ends before occupied rail bounds'

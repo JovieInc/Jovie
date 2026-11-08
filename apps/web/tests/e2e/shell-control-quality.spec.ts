@@ -265,6 +265,20 @@ for (const side of ['right'] as const) {
     await page.mouse.move(700, 450);
     await page.waitForTimeout(SHELL_RAIL_PREVIEW_GRACE_MS + 30);
     await expect(controls(page, side)).toHaveAttribute('aria-expanded', 'true');
+    // Founder call (2026-11-08): the preview floats, but a pinned rail is a
+    // column that pushes the route and never lays on top of it.
+    await expect(inspector).toHaveAttribute('data-rail-phase', 'open');
+    await expect(inspector).toHaveAttribute('data-rail-presentation', 'push');
+    await expect
+      .poll(async () => {
+        const [route, rail] = await Promise.all([
+          plane.boundingBox(),
+          inspector.boundingBox(),
+        ]);
+        return route && rail ? rail.x - (route.x + route.width) : -1;
+      })
+      .toBeGreaterThanOrEqual(-0.5);
+    expect((await plane.boundingBox())!.width).toBeLessThan(initial!.width);
     await testInfo.attach(`${side}-preview-after`, {
       body: await page.screenshot(),
       contentType: 'image/png',

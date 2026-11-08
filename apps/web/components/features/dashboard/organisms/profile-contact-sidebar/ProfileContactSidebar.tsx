@@ -260,7 +260,11 @@ function getConflictVersion(error: unknown): number | undefined {
  * + copy URL, and an Edit profile button that flips the rail into edit mode.
  */
 export function ProfileContactSidebar() {
-  const { isOpen, close } = usePreviewPanelState();
+  const { isOpen, isFloating, close } = usePreviewPanelState();
+  // A hover/focus preview floats over the route; an open or pinned rail
+  // pushes it. Placement outlives the preview's visibility so its exit stays
+  // an overlay too; pinning clears it and the route yields in step.
+  const presentation = isFloating ? 'overlay' : 'push';
   const { previewData, setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
 
@@ -1174,6 +1178,7 @@ export function ProfileContactSidebar() {
         id='shell-artist-profile-rail'
         onClose={close}
         isOpen={isOpen}
+        presentation={presentation}
         ariaLabel='Profile Contact'
         data-testid='profile-contact-sidebar-skeleton'
         workspaceSurface='raised'
@@ -1244,6 +1249,7 @@ export function ProfileContactSidebar() {
         id='shell-artist-profile-rail'
         onClose={close}
         isOpen={isOpen}
+        presentation={presentation}
         ariaLabel='Profile Preview'
         data-testid='profile-contact-sidebar'
         workspaceSurface='raised'
@@ -1268,6 +1274,7 @@ export function ProfileContactSidebar() {
       id='shell-artist-profile-rail'
       onClose={close}
       isOpen={isOpen}
+      presentation={presentation}
       ariaLabel='Profile Contact'
       data-testid='profile-contact-sidebar'
       workspaceSurface='raised'
