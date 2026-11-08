@@ -1,127 +1,19 @@
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   type DiscoveryKeyword,
   discoveryKeywords,
   type LeadPipelineSettings,
   leadPipelineSettings,
-  leadSearchResults,
-  leads,
 } from '@/lib/db/schema/leads';
-import { sqlArray } from '@/lib/db/sql-helpers';
 import { captureError } from '@/lib/error-tracking';
+import { SEARCH_QUERY_COST_USD } from './constants';
 import {
-  extractLinktreeHandle,
-  isLinktreeUrl,
-} from '@/lib/ingestion/strategies/linktree';
-import { recordLeadFunnelEvent } from './funnel-events';
-import {
-  type SearchOutcome,
-  type SearchStatus,
-  searchWebWithStatus,
-} from './google-cse';
+  insertScreenedCandidates,
+  screenSearchResults,
+} from './discovery-candidates';
+import { type SearchStatus, searchWebWithStatus } from './google-cse';
 import { pipelineLog, pipelineWarn } from './pipeline-logger';
-
-interface DiscoveryCandidate {
-  linktreeHandle: string;
-  linktreeUrl: string;
-  discoverySource: 'google_cse';
-  discoveryQuery: string;
-  sourcePlatform: 'linktree';
-  sourceHandle: string;
-  sourceUrl: string;
-}
-
-function isMissingLeadInsertColumnError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  const normalized = message.toLowerCase();
-
-  return /^column "[a-z_]+" of relation "leads" does not exist$/m.test(
-    normalized
-  );
-}
-
-async function insertCandidatesWithLegacyFallback(
-  candidates: DiscoveryCandidate[],
-  result: DiscoveryResult
-): Promise<void> {
-  const insertedIds: string[] = [];
-
-  for (const candidate of candidates) {
-    const insertResult = await db.execute<{ id: string }>(drizzleSql`
-      insert into "leads" (
-        "linktree_handle",
-        "linktree_url",
-        "discovery_source",
-        "discovery_query",
-        "music_tools_detected"
-      ) values (
-        ${candidate.linktreeHandle},
-        ${candidate.linktreeUrl},
-        ${candidate.discoverySource},
-        ${candidate.discoveryQuery},
-        ${sqlArray([])}
-      )
-      on conflict ("linktree_handle") do nothing
-      returning "id"
-    `);
-
-    if (insertResult.rows[0]?.id) {
-      insertedIds.push(insertResult.rows[0].id);
-    }
-  }
-
-  result.newLeadsFound += insertedIds.length;
-  result.duplicatesSkipped += candidates.length - insertedIds.length;
-
-  await Promise.all(
-    insertedIds.map(leadId =>
-      recordLeadFunnelEvent(
-        {
-          leadId,
-          eventType: 'discovered',
-          metadata: { discoverySource: 'google_cse' },
-        },
-        { idempotent: false }
-      )
-    )
-  );
-}
-
-async function insertCandidates(
-  candidates: DiscoveryCandidate[],
-  result: DiscoveryResult
-): Promise<void> {
-  if (candidates.length === 0) return;
-  try {
-    const insertedRows = await db
-      .insert(leads)
-      .values(candidates)
-      .onConflictDoNothing({ target: leads.linktreeHandle })
-      .returning({ id: leads.id });
-    result.newLeadsFound += insertedRows.length;
-    result.duplicatesSkipped += candidates.length - insertedRows.length;
-
-    await Promise.all(
-      insertedRows.map(({ id }) =>
-        recordLeadFunnelEvent(
-          {
-            leadId: id,
-            eventType: 'discovered',
-            metadata: { discoverySource: 'google_cse' },
-          },
-          { idempotent: false }
-        )
-      )
-    );
-  } catch (error) {
-    if (!isMissingLeadInsertColumnError(error)) {
-      throw error;
-    }
-
-    await insertCandidatesWithLegacyFallback(candidates, result);
-  }
-}
 
 /**
  * Search providers support startIndex 1..91 (pages 1-10, 10 results each).
@@ -177,6 +69,9 @@ export interface KeywordDiagnostic {
   query: string;
   rawResultCount: number;
   linktreeUrlsFound: number;
+  /** Candidates the free buyer pre-screen passed / failed for this query. */
+  prescreenPassed: number;
+  prescreenFailed: number;
   newLeadsInserted: number;
   duplicatesSkipped: number;
   error: string | null;
@@ -191,128 +86,17 @@ export interface DiscoveryResult {
   newLeadsFound: number;
   duplicatesSkipped: number;
   diagnostics: KeywordDiagnostic[];
+  /** Fail reasons from the free pre-screen; failures never reach paid steps. */
+  prescreenFailReasons: Record<string, number>;
+  /** Spend counter for the run log: paid queries over pre-screen passes. */
+  cost: {
+    estimatedQueryUsd: number;
+    passedLeads: number;
+    usdPerPassedLead: number | null;
+  };
   budgetRemaining: number;
   keywordRotationIndex: number;
   totalEnabledKeywords: number;
-}
-
-const SEARCH_RESULT_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
-
-function normalizeSearchResultUrl(rawUrl: string): string | null {
-  try {
-    const parsed = new URL(rawUrl);
-    parsed.hash = '';
-    parsed.search = '';
-    let normalizedPath = parsed.pathname;
-    while (normalizedPath.length > 1 && normalizedPath.endsWith('/')) {
-      normalizedPath = normalizedPath.slice(0, -1);
-    }
-    parsed.pathname = normalizedPath || '/';
-    return parsed.toString();
-  } catch {
-    return null;
-  }
-}
-
-async function shouldSkipSeenSearchResult(
-  query: string,
-  rawUrl: string,
-  rank: number
-): Promise<boolean> {
-  if (typeof db.select !== 'function') {
-    return false;
-  }
-
-  const normalizedResultUrl = normalizeSearchResultUrl(rawUrl);
-  if (!normalizedResultUrl) {
-    return true;
-  }
-
-  try {
-    const now = new Date();
-    const recentCutoff = new Date(now.getTime() - SEARCH_RESULT_COOLDOWN_MS);
-    const [existing] = await db
-      .select({
-        id: leadSearchResults.id,
-        lastSeenAt: leadSearchResults.lastSeenAt,
-        timesSeen: leadSearchResults.timesSeen,
-      })
-      .from(leadSearchResults)
-      .where(
-        drizzleSql`${leadSearchResults.query} = ${query} and ${leadSearchResults.normalizedResultUrl} = ${normalizedResultUrl}`
-      )
-      .limit(1);
-
-    if (existing) {
-      await db
-        .update(leadSearchResults)
-        .set({
-          lastSeenAt: now,
-          timesSeen: existing.timesSeen + 1,
-          lastRank: rank,
-          updatedAt: now,
-        })
-        .where(eq(leadSearchResults.id, existing.id));
-
-      return existing.lastSeenAt >= recentCutoff;
-    }
-
-    await db.insert(leadSearchResults).values({
-      query,
-      normalizedResultUrl,
-      sourcePlatform: 'linktree',
-      firstSeenAt: now,
-      lastSeenAt: now,
-      timesSeen: 1,
-      lastRank: rank,
-      updatedAt: now,
-    });
-  } catch {
-    return false;
-  }
-
-  return false;
-}
-
-async function deduplicateSearchResults(
-  results: SearchOutcome['results'],
-  query: string,
-  currentOffset: number
-): Promise<{ candidates: DiscoveryCandidate[]; duplicatesSkipped: number }> {
-  let duplicatesSkipped = 0;
-  const candidatesByHandle = new Map<string, DiscoveryCandidate>();
-
-  for (const [index, item] of results.entries()) {
-    if (!isLinktreeUrl(item.link)) continue;
-
-    const handle = extractLinktreeHandle(item.link);
-    if (!handle) continue;
-
-    const skipSeen = await shouldSkipSeenSearchResult(
-      query,
-      item.link,
-      currentOffset + index
-    );
-    if (skipSeen) {
-      duplicatesSkipped++;
-      continue;
-    }
-
-    candidatesByHandle.set(handle, {
-      linktreeHandle: handle,
-      linktreeUrl: `https://linktr.ee/${handle}`,
-      discoverySource: 'google_cse',
-      discoveryQuery: query,
-      sourcePlatform: 'linktree',
-      sourceHandle: handle,
-      sourceUrl: `https://linktr.ee/${handle}`,
-    });
-  }
-
-  return {
-    candidates: Array.from(candidatesByHandle.values()),
-    duplicatesSkipped,
-  };
 }
 
 /**
@@ -332,6 +116,8 @@ export async function runDiscovery(
     newLeadsFound: 0,
     duplicatesSkipped: 0,
     diagnostics: [],
+    prescreenFailReasons: {},
+    cost: { estimatedQueryUsd: 0, passedLeads: 0, usdPerPassedLead: null },
     budgetRemaining: remainingBudget,
     keywordRotationIndex: settings.lastDiscoveryQueryIndex,
     totalEnabledKeywords: enabledKeywords.length,
@@ -381,6 +167,8 @@ export async function runDiscovery(
       query: keyword.query,
       rawResultCount: 0,
       linktreeUrlsFound: 0,
+      prescreenPassed: 0,
+      prescreenFailed: 0,
       newLeadsInserted: 0,
       duplicatesSkipped: 0,
       error: null,
@@ -390,9 +178,11 @@ export async function runDiscovery(
     };
     const queryStart = Date.now();
     let stopRun = false;
+    let lastQueryCostUsd = 0;
 
     try {
       const outcome = await searchWebWithStatus(keyword.query, currentOffset);
+      lastQueryCostUsd = SEARCH_QUERY_COST_USD[outcome.provider] ?? 0;
       const results = outcome.results;
       diagnostic.providerStatus = outcome.status;
       diagnostic.rawResultCount = results.length;
@@ -430,18 +220,36 @@ export async function runDiscovery(
           outcome.status === 'quota_exceeded' ||
           outcome.status === 'unauthorized';
       } else {
-        const { candidates, duplicatesSkipped } =
-          await deduplicateSearchResults(results, keyword.query, currentOffset);
+        const { screened, duplicatesSkipped } = await screenSearchResults(
+          results,
+          keyword.query,
+          currentOffset
+        );
+        const passed = screened.filter(c => c.prescreen.decision === 'pass');
+        for (const failed of screened) {
+          if (failed.prescreen.decision === 'pass') continue;
+          const reason = failed.prescreen.hardStop ?? 'no_spend_signal';
+          result.prescreenFailReasons[reason] =
+            (result.prescreenFailReasons[reason] ?? 0) + 1;
+        }
         result.duplicatesSkipped += duplicatesSkipped;
-        diagnostic.linktreeUrlsFound = candidates.length;
-        result.candidatesProcessed += candidates.length;
+        diagnostic.linktreeUrlsFound = screened.length;
+        diagnostic.prescreenPassed = passed.length;
+        diagnostic.prescreenFailed = screened.length - passed.length;
+        result.candidatesProcessed += screened.length;
+        result.cost.passedLeads += passed.length;
 
-        // Track per-keyword insert stats separately
-        const beforeNew = result.newLeadsFound;
-        const beforeDups = result.duplicatesSkipped;
-        await insertCandidates(candidates, result);
-        diagnostic.newLeadsInserted = result.newLeadsFound - beforeNew;
-        diagnostic.duplicatesSkipped = result.duplicatesSkipped - beforeDups;
+        // Only pre-screen passes become leads, so qualification, Spotify
+        // enrichment and approval never run on a candidate the free check
+        // already rejected.
+        const counts = await insertScreenedCandidates(
+          passed,
+          passed.length > 0 ? lastQueryCostUsd / passed.length : 0
+        );
+        result.newLeadsFound += counts.inserted;
+        result.duplicatesSkipped += counts.duplicates;
+        diagnostic.newLeadsInserted = counts.inserted;
+        diagnostic.duplicatesSkipped = counts.duplicates;
 
         // Advance search offset for next run. If we got fewer than 10 results
         // or exceeded max, reset to page 1.
@@ -499,12 +307,21 @@ export async function runDiscovery(
     // actually executed — 'not_configured' makes no billable call.
     if (diagnostic.providerStatus !== 'not_configured') {
       result.queriesUsed++;
+      result.cost.estimatedQueryUsd += lastQueryCostUsd;
     }
     queryIndex = (queryIndex + 1) % enabledKeywords.length;
     if (stopRun) break;
   }
 
   result.budgetRemaining = remainingBudget - result.queriesUsed;
+  result.cost.estimatedQueryUsd =
+    Math.round(result.cost.estimatedQueryUsd * 10_000) / 10_000;
+  result.cost.usdPerPassedLead =
+    result.cost.passedLeads > 0
+      ? Math.round(
+          (result.cost.estimatedQueryUsd / result.cost.passedLeads) * 10_000
+        ) / 10_000
+      : null;
   result.keywordRotationIndex = queryIndex;
 
   pipelineLog('discovery', 'Discovery cycle complete', {
@@ -512,6 +329,8 @@ export async function runDiscovery(
     candidatesProcessed: result.candidatesProcessed,
     newLeadsFound: result.newLeadsFound,
     duplicatesSkipped: result.duplicatesSkipped,
+    prescreenFailReasons: result.prescreenFailReasons,
+    cost: result.cost,
     budgetRemaining: result.budgetRemaining,
     nextKeywordIndex: queryIndex,
   });
