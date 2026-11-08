@@ -1,5 +1,4 @@
 // Diff-scoped mutation testing for high-risk apps/web source.
-//
 // Stryker's vitest runner (10.0.0) loses results for tests nested in
 // `describe` blocks under vitest 5, so every killed mutant there scores as
 // Survived. This lane uses Stryker's command runner instead: each mutant runs
@@ -22,6 +21,8 @@ export const HIGH_RISK_PREFIXES = Object.freeze([
   'app/api/billing/',
   'app/api/stripe/',
   'app/api/webhooks/',
+  'components/features/dashboard/dashboard-nav/',
+  'lib/app-shell/',
   'lib/auth/',
   'lib/billing/',
   'lib/claim/',
@@ -67,8 +68,7 @@ const ALIASES = Object.freeze([
  * @param {string[]} changedPaths repo-relative paths
  * @param {(path: string) => string | null} [readModule] apps/web-relative reader
  * @param {{ prefixes?: readonly string[] | null }} [options] `prefixes: null`
- *   widens selection from the high-risk prefixes to every apps/web source
- *   (the rolling sweep; see scripts/mutation-sweep.mjs).
+ *   widens selection to every apps/web source (scripts/mutation-sweep.mjs).
  * @returns {string[]} apps/web-relative source paths
  */
 export function selectHighRiskSources(
