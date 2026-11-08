@@ -2,11 +2,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
 
 const mockMobile = vi.hoisted(() => ({ value: false }));
 
-const mockSaveConsent = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const mockSaveConsent = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@/lib/cookies/consent', () => ({
   saveConsent: mockSaveConsent,
@@ -75,21 +74,6 @@ describe('CookieBannerSection consent sync', () => {
 
     expect(screen.getByTestId('cookie-banner')).toHaveClass('z-banner');
     expect(screen.getByRole('button', { name: 'Accept all' })).toBeVisible();
-  });
-
-  it('suppresses the consent question when GPC already opts out', async () => {
-    Object.defineProperty(navigator, 'globalPrivacyControl', {
-      configurable: true,
-      value: true,
-    });
-    const mod = await import('@/components/organisms/CookieBannerSection');
-    setCookie('jv_cc_required=1');
-    render(<mod.CookieBannerSection initialVisible />);
-    expect(screen.queryByTestId('cookie-banner')).toBeNull();
-    Object.defineProperty(navigator, 'globalPrivacyControl', {
-      configurable: true,
-      value: false,
-    });
   });
 
   it('uses the E2E-only pathname override to clear the public profile dock', async () => {
@@ -770,6 +754,9 @@ describe('CookieBannerMount global preferences controller', () => {
     setCookie('jv_cc_required=1');
     const { CookieBannerMount } = await import(
       '@/components/organisms/CookieBannerMount'
+    );
+    const { CookieBannerSection } = await import(
+      '@/components/organisms/CookieBannerSection'
     );
 
     render(

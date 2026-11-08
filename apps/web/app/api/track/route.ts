@@ -14,6 +14,7 @@ import {
 } from '@/lib/cookies/consent-regions';
 import {
   CONSENT_COOKIE_NAME,
+  hasServerMarketingConsent,
   parseConsentCookieValue,
 } from '@/lib/cookies/consent-state';
 import { db, doesTableExist } from '@/lib/db';
@@ -393,18 +394,17 @@ export async function POST(request: NextRequest) {
       request.headers.get('x-vercel-ip-country-region') ?? undefined;
     const audienceDeviceType = inferAudienceDeviceType(userAgent);
 
-    // Determine marketing consent from jv_cc cookie.
-    // Non-regulated jurisdictions remain default-allow when no banner was
-    // required, but consent-required visitors need a valid marketing opt-in.
+    // Determine marketing consent from jv_cc cookie, region and Sec-GPC.
     const requiresCookieConsent =
       request.cookies?.get(COOKIE_BANNER_REQUIRED_COOKIE)?.value === '1' ||
       isCookieBannerRequired(geoCountry ?? null, geoRegion ?? null);
-    const consent = parseConsentCookieValue(
-      request.cookies?.get(CONSENT_COOKIE_NAME)?.value
-    );
-    const hasMarketingConsent =
-      consent?.marketing === true ||
-      (consent === null && !requiresCookieConsent);
+    const hasMarketingConsent = hasServerMarketingConsent({
+      consent: parseConsentCookieValue(
+        request.cookies?.get(CONSENT_COOKIE_NAME)?.value
+      ),
+      requiresCookieConsent,
+      secGpc: request.headers.get('sec-gpc'),
+    });
 
     // Without marketing consent: anonymize IP and use generic fingerprint.
     // With consent: full behavior (store real IP, create audience members).

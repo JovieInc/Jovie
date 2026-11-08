@@ -263,6 +263,10 @@ describe('tracking consent', () => {
 
   describe('isTrackingAllowed', () => {
     it('returns true only when consent state is "accepted"', () => {
+      // Opt-out region: accepted consent with no granular advertising
+      // rejection allows tracking. Consent-required regions also need
+      // an affirmative marketing choice (covered above).
+      setCookie('jv_cc_required=0');
       localStorage.setItem('jovie_tracking_consent', 'accepted');
       expect(isTrackingAllowed()).toBe(true);
     });

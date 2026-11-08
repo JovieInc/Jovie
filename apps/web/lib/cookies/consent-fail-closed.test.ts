@@ -20,8 +20,8 @@ describe('consent geo fail-closed', () => {
     ['LI', true],
     ['BR', true],
     ['KR', true],
-    ['US', true], // region unknown inside a region-gated country
-    ['CA', true],
+    ['US', false], // US uses opt-out privacy choices; GPC still overrides
+    ['CA', true], // region unknown inside a region-gated country (Quebec)
     ['JP', false],
     ['AU', false],
     ['in', false],

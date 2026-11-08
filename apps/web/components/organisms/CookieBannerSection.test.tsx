@@ -51,23 +51,27 @@ describe('CookieBannerSection uncertain region flags', () => {
     }
   );
 
-  it('renders no consent actions when GPC already opts out', async () => {
-    Object.defineProperty(navigator, 'globalPrivacyControl', {
-      configurable: true,
-      value: true,
-    });
-    try {
-      const mod = await import('@/components/organisms/CookieBannerSection');
-      setCookie('jv_cc_required=1');
-      render(<mod.CookieBannerSection />);
-      expect(
-        screen.queryByRole('button', { name: 'Accept all' })
-      ).not.toBeInTheDocument();
-    } finally {
+  it.each([false, true])(
+    'renders no consent actions when GPC already opts out (initialVisible=%s)',
+    async initialVisible => {
       Object.defineProperty(navigator, 'globalPrivacyControl', {
         configurable: true,
-        value: false,
+        value: true,
       });
+      try {
+        const mod = await import('@/components/organisms/CookieBannerSection');
+        setCookie('jv_cc_required=1');
+        render(<mod.CookieBannerSection initialVisible={initialVisible} />);
+        expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole('button', { name: 'Accept all' })
+        ).not.toBeInTheDocument();
+      } finally {
+        Object.defineProperty(navigator, 'globalPrivacyControl', {
+          configurable: true,
+          value: false,
+        });
+      }
     }
-  });
+  );
 });

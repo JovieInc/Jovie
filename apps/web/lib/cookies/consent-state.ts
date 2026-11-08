@@ -33,6 +33,26 @@ export function hasAnalyticsConsent(cookieValue: string | undefined): boolean {
   return consent?.analytics === true;
 }
 
+/**
+ * Server-side advertising consent for a request. Opt-out regions default-allow
+ * without a saved choice, consent-required regions need an affirmative opt-in,
+ * and a Global Privacy Control signal (Sec-GPC: 1) always opts out, matching
+ * the browser-side gate.
+ */
+export function hasServerMarketingConsent({
+  consent,
+  requiresCookieConsent,
+  secGpc,
+}: {
+  readonly consent: ConsentPreferences | null;
+  readonly requiresCookieConsent: boolean;
+  readonly secGpc: string | null;
+}): boolean {
+  if (secGpc === '1') return false;
+  if (consent) return consent.marketing === true;
+  return !requiresCookieConsent;
+}
+
 export const PRIVACY_CHOICES_HREF = '/legal/privacy#privacy-choices';
 export const PRIVACY_CHOICES_LABEL =
   'Do Not Sell or Share My Personal Information';

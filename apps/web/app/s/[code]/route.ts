@@ -13,6 +13,7 @@ import {
 } from '@/lib/cookies/consent-regions';
 import {
   CONSENT_COOKIE_NAME,
+  hasServerMarketingConsent,
   parseConsentCookieValue,
 } from '@/lib/cookies/consent-state';
 import { db } from '@/lib/db';
@@ -220,11 +221,12 @@ export async function GET(
     const consent = parseConsentCookieValue(
       request.cookies?.get(CONSENT_COOKIE_NAME)?.value
     );
-    // Match /api/track semantics: non-regulated visits remain default-allow,
-    // but consent-required visits need a valid marketing opt-in.
-    const hasMarketingConsent =
-      consent?.marketing === true ||
-      (consent === null && !requiresCookieConsent);
+    // Same semantics as /api/track (see hasServerMarketingConsent).
+    const hasMarketingConsent = hasServerMarketingConsent({
+      consent,
+      requiresCookieConsent,
+      secGpc: request.headers.get('sec-gpc'),
+    });
 
     // Analytics must never sit on the redirect critical path (time to
     // destination); run it after the 302 is flushed.

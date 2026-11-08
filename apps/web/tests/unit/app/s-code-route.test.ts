@@ -356,4 +356,28 @@ describe('GET /s/[code]', () => {
     expect(mocks.txInsertMock).not.toHaveBeenCalled();
     expect(recordAudienceEvent).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['records', '0', true],
+    ['skips', '1', false],
+  ] as const)(
+    '%s audience recording for a US/CA visitor with Sec-GPC: %s',
+    async (_verb, secGpc, recorded) => {
+      const request = new NextRequest('http://localhost/s/abc123', {
+        headers: {
+          'Sec-GPC': secGpc,
+          'x-vercel-ip-country': 'US',
+          'x-vercel-ip-country-region': 'CA',
+        },
+      });
+
+      const response = await callRoute(request, {
+        params: Promise.resolve({ code: 'abc123' }),
+      });
+
+      expect(response.status).toBe(302);
+      expect(recordAudienceEvent).toHaveBeenCalledTimes(recorded ? 1 : 0);
+      expect(mocks.txInsertMock).toHaveBeenCalledTimes(recorded ? 1 : 0);
+    }
+  );
 });
