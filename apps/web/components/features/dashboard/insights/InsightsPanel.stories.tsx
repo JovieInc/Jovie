@@ -39,3 +39,15 @@ export const ErrorState: Story = {
 export const EmptyNarrow: Story = {
   parameters: { viewport: { defaultViewport: 'mobile1' } },
 };
+
+export const NotEnoughActivity: Story = {
+  args: { lastRun: { insightsGenerated: 0, dataPointsAnalyzed: 6 } },
+};
+
+export const NothingNew: Story = {
+  args: { lastRun: { insightsGenerated: 0, dataPointsAnalyzed: 1240 } },
+};
+
+export const GenerateFailed: Story = {
+  args: { generateFailed: true },
+};

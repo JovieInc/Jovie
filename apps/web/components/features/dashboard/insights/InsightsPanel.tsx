@@ -4,7 +4,6 @@ import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
@@ -13,9 +12,17 @@ import {
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
+import {
+  getInsightsEmptyCopy,
+  type InsightsEmptyCopy,
+} from '@/lib/insights/empty-state-copy';
 import { useGenerateInsightsMutation, useInsightsQuery } from '@/lib/queries';
 import { getAccentCssVars } from '@/lib/ui/accent-palette';
-import type { InsightCategory, InsightResponse } from '@/types/insights';
+import type {
+  InsightCategory,
+  InsightGenerateResponse,
+  InsightResponse,
+} from '@/types/insights';
 import { InsightCard } from './InsightCard';
 
 interface PrioritySectionProps {
@@ -61,6 +68,52 @@ interface InsightsPanelContentProps {
   readonly onGenerate: () => void;
   readonly onRetry: () => void;
   readonly isGenerating: boolean;
+  readonly emptyCopy: InsightsEmptyCopy;
+}
+
+const SKELETON_ROW_KEYS = ['row-1', 'row-2', 'row-3'] as const;
+
+/**
+ * Loading rows drawn in InsightCard's own geometry (flat rows, 28px icon
+ * chip, title + badge, two description lines, footer rule) under one
+ * section label, so the list does not jump when insights arrive.
+ */
+function InsightsLoadingRows() {
+  return (
+    <section aria-hidden='true' data-testid='insights-loading-rows'>
+      <div className='mb-3 flex h-5 items-center'>
+        <div className='h-3 w-24 rounded-sm skeleton motion-reduce:animate-none' />
+      </div>
+      {SKELETON_ROW_KEYS.map(key => (
+        <div
+          key={key}
+          className='border-b border-subtle px-1 py-3.5 last:border-b-0'
+        >
+          <div className='flex items-start gap-3'>
+            <div className='h-7 w-7 shrink-0 rounded-lg skeleton motion-reduce:animate-none' />
+            <div className='min-w-0 flex-1'>
+              <div className='flex items-center justify-between gap-2'>
+                <div className='h-4 w-48 max-w-[60%] rounded-sm skeleton motion-reduce:animate-none' />
+                <div className='h-4 w-16 rounded-md skeleton motion-reduce:animate-none' />
+              </div>
+              <div className='mt-2 h-3 w-full rounded-sm skeleton motion-reduce:animate-none' />
+              <div className='mt-1.5 h-3 w-4/5 rounded-sm skeleton motion-reduce:animate-none' />
+              <div className='mt-3 flex items-center justify-between border-t border-subtle pt-3'>
+                <div className='h-3 w-28 rounded-sm skeleton motion-reduce:animate-none' />
+                <div className='h-7 w-32 rounded-lg skeleton motion-reduce:animate-none' />
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function generateLabel(copy: InsightsEmptyCopy): string {
+  if (copy.mode === 'failed') return 'Try Again';
+  if (copy.mode === 'nothing-new') return 'Generate Again';
+  return 'Generate Insights';
 }
 
 function InsightsPanelContent({
@@ -71,25 +124,10 @@ function InsightsPanelContent({
   onGenerate,
   onRetry,
   isGenerating,
+  emptyCopy,
 }: InsightsPanelContentProps) {
   if (isLoading) {
-    return (
-      <div className='space-y-3' aria-hidden='true'>
-        {['high', 'medium', 'low'].map(key => (
-          <ContentSurfaceCard
-            key={key}
-            className='flex items-start gap-3 p-4 sm:p-5'
-          >
-            <div className='h-8 w-8 rounded-lg skeleton motion-reduce:animate-none' />
-            <div className='min-w-0 flex-1 space-y-2'>
-              <div className='h-4 w-40 rounded-sm skeleton motion-reduce:animate-none' />
-              <div className='h-3 w-full rounded-sm skeleton motion-reduce:animate-none' />
-              <div className='h-3 w-4/5 rounded-sm skeleton motion-reduce:animate-none' />
-            </div>
-          </ContentSurfaceCard>
-        ))}
-      </div>
-    );
+    return <InsightsLoadingRows />;
   }
 
   if (error) {
@@ -107,17 +145,28 @@ function InsightsPanelContent({
   if (insights.length === 0) {
     return (
       <EmptyState
-        heading='No Insights Yet'
-        description='Generate your first set of AI-powered insights to discover actionable trends in your analytics.'
-        action={{
-          label: isGenerating ? 'Generating...' : 'Generate Insights',
-          onClick: onGenerate,
-          disabled: isGenerating,
-        }}
-        secondaryAction={{
-          label: 'Share Profile',
-          href: APP_ROUTES.CHAT_PROFILE_PANEL,
-        }}
+        heading={emptyCopy.heading}
+        description={emptyCopy.description}
+        {...(emptyCopy.mode === 'needs-activity'
+          ? {
+              action: {
+                label: 'Share Your Profile',
+                href: APP_ROUTES.CHAT_PROFILE_PANEL,
+              },
+            }
+          : {
+              action: {
+                label: isGenerating
+                  ? 'Generating...'
+                  : generateLabel(emptyCopy),
+                onClick: onGenerate,
+                disabled: isGenerating,
+              },
+              secondaryAction: {
+                label: 'Share Your Profile',
+                href: APP_ROUTES.CHAT_PROFILE_PANEL,
+              },
+            })}
         presentation='workspace'
         testId='insights-empty-state'
       />
@@ -166,6 +215,12 @@ export interface InsightsPanelViewProps {
   readonly onGenerate: () => void;
   readonly onRetry: () => void;
   readonly isGenerating: boolean;
+  /** Result of the last Generate press, so a short run can say why. */
+  readonly lastRun?: Pick<
+    InsightGenerateResponse,
+    'insightsGenerated' | 'dataPointsAnalyzed'
+  > | null;
+  readonly generateFailed?: boolean;
   readonly testId?: string;
 }
 
@@ -178,8 +233,11 @@ export function InsightsPanelView({
   onGenerate,
   onRetry,
   isGenerating,
+  lastRun = null,
+  generateFailed = false,
   testId = 'dashboard-insights-workspace',
 }: Readonly<InsightsPanelViewProps>) {
+  const emptyCopy = getInsightsEmptyCopy({ lastRun, generateFailed });
   const grouped = useMemo(() => {
     const high = insights.filter(i => i.priority === 'high');
     const medium = insights.filter(i => i.priority === 'medium');
@@ -233,6 +291,7 @@ export function InsightsPanelView({
             onGenerate={onGenerate}
             onRetry={onRetry}
             isGenerating={isGenerating}
+            emptyCopy={emptyCopy}
           />
         </div>
       </div>
@@ -255,8 +314,12 @@ export function InsightsPanel() {
     limit: 50,
   });
 
-  const { mutate: generate, isPending: isGenerating } =
-    useGenerateInsightsMutation();
+  const {
+    mutate: generate,
+    isPending: isGenerating,
+    data: lastRun,
+    isError: generateFailed,
+  } = useGenerateInsightsMutation();
 
   const insights = useMemo(() => data?.insights ?? [], [data?.insights]);
 
@@ -272,6 +335,30 @@ export function InsightsPanel() {
         void refetch();
       }}
       isGenerating={isGenerating}
+      lastRun={lastRun ?? null}
+      generateFailed={generateFailed}
+    />
+  );
+}
+
+const noop = () => undefined;
+
+/**
+ * Route-level loading state for /app/insights: the same workspace (toolbar,
+ * category filters, list rows) the panel renders while its query loads, so
+ * the hand-off from route skeleton to panel skeleton to data never shifts.
+ */
+export function InsightsPanelLoading() {
+  return (
+    <InsightsPanelView
+      insights={[]}
+      isLoading
+      error={null}
+      selectedCategory='all'
+      onCategoryChange={noop}
+      onGenerate={noop}
+      onRetry={noop}
+      isGenerating={false}
     />
   );
 }

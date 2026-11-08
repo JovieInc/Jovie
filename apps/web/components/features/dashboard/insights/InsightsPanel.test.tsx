@@ -16,7 +16,11 @@ vi.mock('@/lib/queries', () => ({
   useUpdateInsightMutation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
-import { InsightsPanel, InsightsPanelView } from './InsightsPanel';
+import {
+  InsightsPanel,
+  InsightsPanelLoading,
+  InsightsPanelView,
+} from './InsightsPanel';
 
 describe('InsightsPanelView', () => {
   beforeEach(() => {
@@ -181,5 +185,100 @@ describe('InsightsPanelView', () => {
 
     await user.click(screen.getByRole('button', { name: 'Generate Insights' }));
     expect(generateMock).toHaveBeenCalledOnce();
+  });
+
+  it('names the click threshold up front instead of vague AI copy', () => {
+    render(
+      <TooltipProvider>
+        <InsightsPanelView
+          insights={[]}
+          isLoading={false}
+          error={null}
+          selectedCategory='all'
+          onCategoryChange={vi.fn()}
+          onGenerate={vi.fn()}
+          onRetry={vi.fn()}
+          isGenerating={false}
+        />
+      </TooltipProvider>
+    );
+
+    const empty = screen.getByTestId('insights-empty-state');
+    expect(empty).toHaveTextContent('at least 20 link clicks');
+    expect(empty).not.toHaveTextContent(/AI-powered|actionable trends/i);
+    expect(
+      screen.getByRole('link', { name: 'Share Your Profile' })
+    ).toHaveAttribute('href', '/app/chat?panel=profile');
+  });
+
+  it('explains a generate run that came back short of data, with the real count', () => {
+    const onGenerate = vi.fn();
+    render(
+      <TooltipProvider>
+        <InsightsPanelView
+          insights={[]}
+          isLoading={false}
+          error={null}
+          selectedCategory='all'
+          onCategoryChange={vi.fn()}
+          onGenerate={onGenerate}
+          onRetry={vi.fn()}
+          isGenerating={false}
+          lastRun={{ insightsGenerated: 0, dataPointsAnalyzed: 6 }}
+        />
+      </TooltipProvider>
+    );
+
+    expect(screen.getByText('Not Enough Activity Yet')).toBeVisible();
+    expect(screen.getByTestId('insights-empty-state')).toHaveTextContent(
+      'your profile has 6 link clicks so far'
+    );
+    // The one next step is sharing, not pressing Generate again.
+    expect(
+      screen.getByRole('link', { name: 'Share Your Profile' })
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Generate Insights' })
+    ).toBeNull();
+  });
+
+  it('offers a retry when generation failed', async () => {
+    const user = userEvent.setup();
+    const onGenerate = vi.fn();
+    render(
+      <TooltipProvider>
+        <InsightsPanelView
+          insights={[]}
+          isLoading={false}
+          error={null}
+          selectedCategory='all'
+          onCategoryChange={vi.fn()}
+          onGenerate={onGenerate}
+          onRetry={vi.fn()}
+          isGenerating={false}
+          generateFailed
+        />
+      </TooltipProvider>
+    );
+
+    expect(screen.getByText('Insights Did Not Generate')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Try Again' }));
+    expect(onGenerate).toHaveBeenCalledOnce();
+  });
+
+  it('loads in the same rows as a loaded insight card, under the same filters', () => {
+    const { container } = render(
+      <TooltipProvider>
+        <InsightsPanelLoading />
+      </TooltipProvider>
+    );
+
+    expect(screen.getAllByRole('tab')).toHaveLength(9);
+    const rows = screen.getByTestId('insights-loading-rows');
+    const firstRow = rows.querySelector('.border-b');
+    expect(firstRow).toHaveClass('px-1', 'py-3.5');
+    expect(rows.querySelector('.h-7.w-7')).not.toBeNull();
+    expect(container.querySelector('.p-4')).toBeNull();
+    expect(screen.queryByTestId('insights-empty-state')).toBeNull();
   });
 });
