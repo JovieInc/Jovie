@@ -253,6 +253,17 @@ for (const pathname of ['/signin', '/signup']) {
         const controls = startControls(page);
         for (const control of Object.values(controls))
           await expect(control).toBeVisible();
+        // Pen sizes: 28px pill face inside a 44px tap target.
+        const faceBox = await page
+          .locator('[data-auth-provider-face]')
+          .first()
+          .boundingBox();
+        expect(Math.round(faceBox?.height ?? 0)).toBe(28);
+        const hitBox = await page
+          .locator('.auth-provider-button')
+          .first()
+          .boundingBox();
+        expect(hitBox?.height ?? 0).toBeGreaterThanOrEqual(44);
 
         if (viewport.desktop) await expectClearOnFirstView(controls, overlays);
         await expectReachable(controls);
