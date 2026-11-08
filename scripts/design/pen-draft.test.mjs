@@ -5,7 +5,10 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { test } from 'node:test';
 import {
+  ATTEMPTS,
+  attemptTimeout,
   draftProblem,
+  LOAD_NOTE,
   loadBriefs,
   missingOutputs,
   missingSecrets,
@@ -49,6 +52,25 @@ test('pen draws into its own file from the canonical input and keeps other frame
     /Leave every existing frame untouched/
   );
   assert.equal(args[args.indexOf('--export') + 1], 'o/claim.png');
+});
+
+test('the agent is told the editor loads slowly and may retry timed-out calls', () => {
+  const args = penArgs(
+    { frame: 'claim', route: '/x', prompt: 'P' },
+    { input: 'c.pen', outDir: 'o' }
+  );
+  const prompt = args[args.indexOf('--prompt') + 1];
+  assert.ok(prompt.includes(LOAD_NOTE));
+  assert.ok(prompt.endsWith('P'));
+  // 8 allowed failures ended 3 of 4 drafts before the 25 MB file loaded.
+  assert.ok(Number(args[args.indexOf('--max-failed-calls') + 1]) >= 24);
+  assert.ok(ATTEMPTS >= 2);
+});
+
+test('attempts stop in time for the 75-minute job to upload its drafts', () => {
+  assert.equal(attemptTimeout(0), 15 * 60_000);
+  assert.equal(attemptTimeout(60 * 60_000), 10 * 60_000);
+  assert.equal(attemptTimeout(66 * 60_000), 0);
 });
 
 test('missing secrets are named, so a blocked run never reads as done', () => {

@@ -53,6 +53,25 @@ export function loadBriefs(dir = BRIEFS_DIR, only = null) {
     .filter(b => !only || only.includes(b.frame));
 }
 
+// The canonical document is about 25 MB, so the editor takes a minute or two
+// to load it and early canvas calls time out. With 8 allowed failures the
+// agent gave up on 3 of 4 briefs before the editor was ready (run 42457693051).
+export const MAX_FAILED_CALLS = 30;
+export const LOAD_NOTE =
+  'The document is large and the editor can take a few minutes to load it. Work in the open editor (leave the file path empty), and when a canvas call times out, wait and retry it rather than giving up.';
+/** Attempts per brief: a second try starts with the editor cache warm. */
+export const ATTEMPTS = 2;
+// The job has 75 minutes; stop starting attempts in time to upload drafts.
+export const BUDGET_MS = 70 * 60_000;
+const ATTEMPT_MS = 15 * 60_000;
+const MIN_ATTEMPT_MS = 5 * 60_000;
+
+/** How long the next attempt may run, or 0 when the budget can't fit one. */
+export function attemptTimeout(elapsedMs, budgetMs = BUDGET_MS) {
+  const left = budgetMs - elapsedMs;
+  return left < MIN_ATTEMPT_MS ? 0 : Math.min(ATTEMPT_MS, left);
+}
+
 /** The pen arguments for one brief, drafting into its own output file. */
 export function penArgs(brief, { input, outDir }) {
   return [
@@ -62,7 +81,7 @@ export function penArgs(brief, { input, outDir }) {
     '--out',
     join(outDir, `${brief.frame}.pen`),
     '--prompt',
-    `Add a new top-level frame named "${brief.frame}" (route ${brief.route ?? 'n/a'}). Leave every existing frame untouched.\n\n${brief.prompt}`,
+    `Add a new top-level frame named "${brief.frame}" (route ${brief.route ?? 'n/a'}). Leave every existing frame untouched.\n\n${LOAD_NOTE}\n\n${brief.prompt}`,
     '--agent',
     'claude',
     '--export',
@@ -70,7 +89,7 @@ export function penArgs(brief, { input, outDir }) {
     '--usage',
     join(outDir, `${brief.frame}.usage.json`),
     '--max-failed-calls',
-    '8',
+    String(MAX_FAILED_CALLS),
   ];
 }
 
@@ -151,6 +170,7 @@ export function writeCanonical(bytes, workDir, wanted) {
 }
 
 async function main() {
+  const startedAt = Date.now();
   const { values } = parseArgs({
     options: { out: { type: 'string' }, only: { type: 'string' } },
   });
@@ -202,29 +222,40 @@ async function main() {
 
   for (const brief of briefs) {
     const row = { frame: brief.frame, route: brief.route };
-    try {
-      execFileSync('npx', penArgs(brief, { input, outDir }), {
-        stdio: ['ignore', 'inherit', 'inherit'],
-        timeout: 15 * 60_000,
-        // Workspace fonts and images resolve relative to the .pen file.
-        cwd: dirname(input),
-        env: { ...process.env, NODE_OPTIONS: PEN_NODE_OPTIONS },
-      });
-      const missing = missingOutputs(brief, outDir);
-      const problem = missing.length
-        ? `pen wrote no ${missing.join(' or ')}`
-        : draftProblem(
-            readJsonFile(input),
-            readJsonFile(join(outDir, `${brief.frame}.pen`)),
-            brief.frame
-          );
-      row.status = problem ? 'failed' : 'drafted';
-      if (problem) row.error = problem;
-    } catch (e) {
-      row.status = 'failed';
-      row.error = String(e.message || e)
-        .split('\n')[0]
-        .slice(0, 200);
+    for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+      const timeout = attemptTimeout(Date.now() - startedAt);
+      if (!timeout) {
+        row.status ??= 'failed';
+        row.error ??= 'no time left in the job for an attempt';
+        break;
+      }
+      row.attempts = attempt;
+      delete row.error;
+      try {
+        execFileSync('npx', penArgs(brief, { input, outDir }), {
+          stdio: ['ignore', 'inherit', 'inherit'],
+          timeout,
+          // Workspace fonts and images resolve relative to the .pen file.
+          cwd: dirname(input),
+          env: { ...process.env, NODE_OPTIONS: PEN_NODE_OPTIONS },
+        });
+        const missing = missingOutputs(brief, outDir);
+        const problem = missing.length
+          ? `pen wrote no ${missing.join(' or ')}`
+          : draftProblem(
+              readJsonFile(input),
+              readJsonFile(join(outDir, `${brief.frame}.pen`)),
+              brief.frame
+            );
+        row.status = problem ? 'failed' : 'drafted';
+        if (problem) row.error = problem;
+      } catch (e) {
+        row.status = 'failed';
+        row.error = String(e.message || e)
+          .split('\n')[0]
+          .slice(0, 200);
+      }
+      if (row.status === 'drafted') break;
     }
     receipt.drafts.push(row);
     write();
