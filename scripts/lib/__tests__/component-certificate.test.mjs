@@ -34,18 +34,13 @@ const gitBlob = source =>
     .update(source)
     .digest('hex');
 
-const stories = [
-  'Loading',
-  'Empty',
-  'Error',
-  'Partial',
-  'LongContent',
-  'Offline',
-  'PermissionDenied',
-  'Rtl',
-]
-  .map(name => `export const ${name}={};`)
-  .join('\n');
+const stories =
+  'Loading Empty Error Partial LongContent Offline PermissionDenied Rtl'
+    .split(' ')
+    .map(name => `export const ${name}={};`)
+    .join('\n');
+// A reviewed benchmark judgment names its reference (component-benchmark-review).
+const reviewed = { reference: 'WAI-ARIA APG Button', gaps: [] };
 const criterion = (cert, id) => cert.criteria.find(row => row.id === id);
 function assertCriteria(cert, expected) {
   for (const [id, status] of Object.entries(expected)) {
@@ -361,7 +356,11 @@ describe('component certificate CLI evidence freshness', () => {
       };
       records.visual = storyReceipt(binding);
       records.a11y = storyReceipt(binding);
-      records.benchmark = { libraryVersion: 1, sourceHash: binding, gaps: [] };
+      records.benchmark = {
+        ...reviewed,
+        libraryVersion: 1,
+        sourceHash: binding,
+      };
       save();
     };
     const invoke = (entry = cli) => {
@@ -409,6 +408,7 @@ describe('component certificate CLI evidence freshness', () => {
       'scripts/component-certificate.mjs',
       'scripts/component-ship-policy.mjs',
       'scripts/lib/component-certificate.mjs',
+      'scripts/lib/component-benchmark-review.mjs',
       'scripts/lib/component-certificate-mutation.mjs',
       'scripts/lib/component-evidence.mjs',
       'scripts/lib/mutation-sweep.mjs',
