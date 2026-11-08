@@ -38,3 +38,6 @@
 # Offer-claims baseline (offer-truth): the ratchet only shrinks; changes need billing review.
 /scripts/invariants/offer-claims/ @itstimwhite
 /apps/web/lib/billing/offer/ @itstimwhite
+
+# Anti-slop guard config and baseline can only be changed with owner review.
+/config/slop-guard/ @itstimwhite

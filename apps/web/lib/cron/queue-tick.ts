@@ -5,7 +5,7 @@ import 'server-only';
  * polling on the same schedule become one job running N tasks. Each handler is
  * the existing cron route's GET, unchanged, so auth, limits and behavior stay
  * with the route; this only fans out. Enqueue sites kick a single queue
- * through `kickQueue` (event-driven); the 5-minute cron is the fail-safe.
+ * through `kickQueue` (event-driven); the 30-minute cron is the fail-safe.
  */
 export const QUEUE_HANDLERS = [
   {
@@ -56,7 +56,7 @@ export async function runQueueTick(
       const response = await route.GET(request);
       return {
         name: handler.name,
-        ok: response.status < 500,
+        ok: response.ok,
         status: response.status,
         durationMs: now() - startedAt,
       } satisfies QueueResult;

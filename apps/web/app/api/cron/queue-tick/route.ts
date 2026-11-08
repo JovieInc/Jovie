@@ -1,5 +1,5 @@
 /**
- * Cron: /api/cron/queue-tick (every 5 minutes, fail-safe) and event kicks.
+ * Cron: /api/cron/queue-tick (every 30 minutes, fail-safe) and event kicks.
  *
  * Replaces the separate crons for summarize-interviews, process-ingestion-jobs,
  * process-workflow-runs and process-merch-fulfillment (the voice-pipeline cron

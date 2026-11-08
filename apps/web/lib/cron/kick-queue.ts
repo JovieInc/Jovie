@@ -9,7 +9,7 @@ export const KICK_TIMEOUT_MS = 5000;
 
 /**
  * Event-driven trigger: run one queue now, right after a row was enqueued,
- * instead of waiting for the 5-minute fail-safe tick. Best effort and never
+ * instead of waiting for the 30-minute fail-safe tick. Best effort and never
  * throws; if the kick is lost the cron still drains the queue.
  */
 export function kickQueue(

@@ -76,6 +76,44 @@ def free_pct(path: Path) -> float | None:
     return round(100 * usage.free / usage.total, 1) if usage.total else None
 
 
+def lanes_mounts(state: Path) -> list[Path]:
+    """One representative path per filesystem the lanes write to (JOV-10233).
+
+    The state directory is not one disk: on Gem `runs/`, `worktrees/` and `bindings/*/worktrees`
+    are bind mounts of /srv/worktrees (sdb1) while the state root sits on `/`. Measuring only the
+    state root read 22% free while the mount holding every worktree was at 0 bytes (2026-11-01).
+    Filesystems are told apart by st_dev, so a plain directory costs nothing extra."""
+    candidates = [state, state / "runs", state / "worktrees", state / "cache", state / "releases",
+                  state / "bindings", *sorted(state.glob("bindings/*")), *sorted(state.glob("bindings/*/worktrees"))]
+    seen, found = set(), []
+    for path in candidates:
+        try:
+            device = path.stat().st_dev
+        except OSError:
+            continue
+        if device not in seen:
+            seen.add(device)
+            found.append(path)
+    return found
+
+
+def lanes_free(state: Path) -> tuple[float | None, list[dict]]:
+    """(lowest free % across every lanes mount, per-mount rows). Unknown when the state root is
+    unreadable; an unreadable secondary mount is skipped, never read as free space."""
+    rows = []
+    for path in lanes_mounts(state):
+        pct = free_pct(path)
+        if pct is not None:
+            rows.append({"path": str(path), "freePct": pct})
+    if free_pct(state) is None or not rows:
+        return None, rows
+    return min(row["freePct"] for row in rows), rows
+
+
+def lanes_free_pct(state: Path) -> float | None:
+    return lanes_free(state)[0]
+
+
 def recently_touched(path: Path, idle_s: float, now: float) -> bool:
     """Any entry inside newer than the cutoff counts the tree as active; the walk stops there."""
     cutoff = now - idle_s
@@ -486,8 +524,9 @@ def check(host, *, run=subprocess.run, now: float | None = None, sweep: bool = F
     explicit admission result even when another worker owns cleanup.
     """
     now = time.time() if now is None else now
-    pct = free_pct(host.state)
-    report = {"at": now_iso(), "freePct": pct, "low": False, "critical": False, "actions": [], "errors": []}
+    pct, mounts = lanes_free(host.state)
+    report = {"at": now_iso(), "freePct": pct, "low": False, "critical": False, "actions": [], "errors": [],
+              "mounts": mounts}
     report["low"] = pct is not None and pct <= LOW_PCT
     if sweep and pct is not None and CRITICAL_PCT < pct <= LOW_PCT:
         try:
@@ -506,7 +545,7 @@ def check(host, *, run=subprocess.run, now: float | None = None, sweep: bool = F
                                  lambda: sweep_old_logs(host, now, report),
                                  lambda: sweep_host_tools(run, report)):
                         # Pressure can change between steps; never keep sweeping critically low disk.
-                        current = free_pct(host.state)
+                        current = lanes_free_pct(host.state)
                         if current is None or current <= CRITICAL_PCT:
                             break
                         try:
@@ -515,7 +554,7 @@ def check(host, *, run=subprocess.run, now: float | None = None, sweep: bool = F
                             report["errors"].append(f"{type(error).__name__}: {error}"[:200])
         except OSError as error:
             report["errors"].append(f"cleanup-lock:{error}"[:200])
-        pct = free_pct(host.state)
+        pct, report["mounts"] = lanes_free(host.state)
     report["freePctAfter"] = pct
     # An observation-only check never flattens the last real sweep's record: a
     # fresh receipt without its own sweep carries the last sweep's actions and

@@ -24,11 +24,6 @@
       "disposition": "Source not recoverable (no source map). Import or delete."
     },
     {
-      "name": "jovie-mesh-hub",
-      "modifiedOn": "2026-10-31",
-      "disposition": "Source is in open PRs #23955/#23965 (workers/mesh-hub); remove when they merge."
-    },
-    {
       "name": "jovie-turbo-cache",
       "modifiedOn": "2026-10-28",
       "disposition": "Turborepo remote cache. Source not recoverable (no source map)."

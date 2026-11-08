@@ -118,7 +118,7 @@ function generatedActionReferences(root, relativeWorkflow, source) {
   try {
     const document = contractMap(contractLines(source));
     const jobs = contractChildren(document.get('jobs'));
-    const job = contractChildren(jobs.get('deterministic'));
+    const job = contractChildren(jobs.get('unit'));
     // Defaults and merged mappings need broader YAML semantics; this one
     // generated contract deliberately has neither.
     if (document.has('defaults') || job.has('defaults')) return valid;
@@ -129,7 +129,7 @@ function generatedActionReferences(root, relativeWorkflow, source) {
         contractSteps(contractChildren(entry).get('steps'), anchors),
       ])
     );
-    const steps = allSteps.get('deterministic');
+    const steps = allSteps.get('unit');
     const field = (step, key) =>
       step.fields.has(key) ? contractScalar(step.fields.get(key)) : undefined;
     const ids = steps.map(step => field(step, 'id')).filter(Boolean);
@@ -141,8 +141,8 @@ function generatedActionReferences(root, relativeWorkflow, source) {
     const mergeIndex = steps.findIndex(
       step => field(step, 'id') === 'source_guard_merge'
     );
-    const condition =
-      "steps.source_guard_merge.outputs.dependency_changed == 'true'";
+    const shard = "matrix.shard == '4/4'";
+    const condition = `${shard} && (steps.source_guard_merge.outputs.dependency_changed == 'true')`;
     const helper = 'scripts/lib/source-guard-action-snapshot.mjs';
     if (
       !producer ||
@@ -150,6 +150,7 @@ function generatedActionReferences(root, relativeWorkflow, source) {
       mergeIndex < 0 ||
       mergeIndex >= producerIndex ||
       steps[mergeIndex].anchor ||
+      field(steps[mergeIndex], 'if') !== shard ||
       [...producer.fields.keys()].some(
         key => !['name', 'id', 'if', 'run'].includes(key)
       ) ||
@@ -180,7 +181,7 @@ function generatedActionReferences(root, relativeWorkflow, source) {
     // step or containing map may be anchored or borrow another job's producer.
     for (const [id, otherSteps] of allSteps) {
       if (
-        id !== 'deterministic' &&
+        id !== 'unit' &&
         otherSteps.some(step => valid.has(field(step, 'uses')))
       )
         return new Set();
@@ -292,13 +293,14 @@ export function validateWorkflowReferences(root = process.cwd()) {
       ];
       for (const command of pnpmCommands) {
         for (const match of command[0].matchAll(FILTER_PATTERN)) {
-          const filter = match[1].replace(/[),`]+$/, '');
-          if (
-            filter.startsWith('!') ||
-            filter.includes('*') ||
-            filter.includes('${')
-          )
-            continue;
+          const rawFilter = match[1].replace(/[),`]+$/, '');
+          // Shell quotes protect Turbo/pnpm's exclusion selector. An exact
+          // excluded package must resolve just like an included package.
+          const selector = /^(['"])(.*)\1$/.exec(rawFilter)?.[2] ?? rawFilter;
+          const filter = selector.startsWith('!')
+            ? selector.slice(1)
+            : selector;
+          if (filter.includes('*') || filter.includes('${')) continue;
           if (!workspaceNames.has(filter)) {
             errors.push(
               `${relativeWorkflow}:${index + 1}: pnpm workspace filter does not resolve: ${filter}`

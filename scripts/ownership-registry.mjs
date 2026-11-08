@@ -31,6 +31,35 @@ export const IDENTITY_SCHEMA = 'jovie-agent-identity-registry/v1';
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = path.resolve(here, '..');
 
+// Source Validation merges the base, installs, then `git reset --hard` back to
+// the PR head. pnpm leaves node_modules (and other install caches) in a
+// base-only worker; that directory is not a service this commit runs.
+const WORKER_INSTALL_DIRS = new Set([
+  'node_modules',
+  '.turbo',
+  '.wrangler',
+  '.cache',
+]);
+
+function workerDirectoryHasSource(dir) {
+  if (!fs.existsSync(dir)) return false;
+  const stack = [dir];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!fs.existsSync(current)) continue;
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (!WORKER_INSTALL_DIRS.has(entry.name)) {
+          stack.push(path.join(current, entry.name));
+        }
+        continue;
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
 const ASSET_KINDS = new Set([
   'repo',
   'service',
@@ -113,6 +142,7 @@ export function discoverAssets(root = DEFAULT_ROOT) {
     found.push({ id: `service:app:${app}`, kind: 'service' });
   }
   for (const worker of listDir(root, 'workers', entry => entry.isDirectory())) {
+    if (!workerDirectoryHasSource(path.join(root, 'workers', worker))) continue;
     found.push({ id: `service:worker:${worker}`, kind: 'service' });
   }
   for (const doc of listDir(root, 'canon', entry =>

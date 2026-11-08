@@ -62,11 +62,19 @@ LOCKFILES = frozenset({"pnpm-lock.yaml"})
 # Conflicts confined to machine-derived files resolve without a model: take main's copy,
 # run the file's canonical regenerator, push. JOV-6837 covered the lockfile; JOV-7594
 # extends the same deterministic rung to the generated workflow topology so Symphony PRs
-# stop hand-merging `.gen.` output.
+# stop hand-merging `.gen.` output. rule-scopes.json hashes are derived from
+# .claude/rules; --write rebuilds them from the merged rule files.
 GENERATED_RESOLVERS = {
+    "canon/SOURCES_OF_TRUTH.md": ("node", "scripts/sources-of-truth.mjs", "--write"),
     ".github/workflow-topology.gen.yml": ("pnpm", "ci:topology:write"),
     "pnpm-lock.yaml": ("pnpm", "install", "--lockfile-only", "--ignore-scripts"),
+    # Integrity record of the scoped rule files: recomputed from the merged rule bodies.
+    "scripts/agent-context/rule-scopes.json": ("node", "scripts/agent-context/rule-scopes.mjs", "--write"),
 }
+# Append-only registries: both sides' added lines are the merge (git merge-file --union), so a
+# conflict is never a model's call.
+UNION_MERGE_FILES = frozenset({"canon/automation-registry.jsonl"})
+RESOLVABLE_CONFLICT_FILES = frozenset(GENERATED_RESOLVERS) | UNION_MERGE_FILES
 # Only a secret-like file is a human call; an oversize diff is split by a repair lane and a
 # lockfile without its manifest is fixed by one (Tim 2026-10-12: no dead-end holds).
 DIFF_POLICY = frozenset({"secret-file"})
@@ -80,7 +88,7 @@ RED_CONCLUSIONS = FLAKY_CONCLUSIONS | {"FAILURE"}
 PENDING_STATUS = frozenset({"IN_PROGRESS", "QUEUED", "PENDING", "WAITING", "REQUESTED"})
 INFRA_TEXT = re.compile(
     r"runner has (?:been )?lost|The runner has received a shutdown|ETIMEDOUT|i/o timeout|"
-    r"\bOOM\b|out of memory|Killed process|ENOMEM|\b5\d\d\b",
+    r"\bOOM\b|out of memory|Killed process|ENOMEM|\b(?:HTTP(?:/\d(?:\.\d)?)?(?:[ \t]*Error)?[ \t:]+|(?:status|response)(?:[ _-]?code)?[ \t:=]+|requested URL returned error:[ \t]*)5\d\d\b",
     re.IGNORECASE,
 )
 STRATEGY_TEXT = re.compile(
@@ -130,6 +138,28 @@ _CREDENTIAL_ASSURANCE = re.compile(
     r"|\b(?:could\s+not|cannot|can\s+not)\s+be\s+(?:verified|certified)\s+"
     r"(?:with\s+the\s+available|without)\s+(?P<unavailable>credentials?)\b"
     r"|\bscreenshot/(?P<testref>credentials?)\s+tests?\b",
+    re.IGNORECASE,
+)
+# An absent secret disabling delivery describes a runtime boundary, not an ask
+# to supply it. Require both the non-action and the missing-input condition.
+_CREDENTIAL_AVAILABILITY = re.compile(
+    r"\b(?:skips?|(?:is|are)\s+skipped|(?:is|are|remains?)\s+disabled)\s+"
+    r"(?:when|if)\s+(?:the\s+)?(?P<credential>credentials?)"
+    r"(?:\s+or\s+(?:the\s+)?(?:route|endpoint))?\s+(?:is|are)\s+"
+    r"(?:absent|missing|unavailable|not\s+configured)"
+    r"(?=\s*(?:$|[,;.!?]|(?:and|but)\b))",
+    re.IGNORECASE,
+)
+# Keep the noun when a request could refer back to it ("rotate them"), even
+# across title/body or sentence boundaries. This conservative veto applies only
+# to the new availability assurance; independent credential mentions stay input.
+_CREDENTIAL_AVAILABILITY_REQUEST = re.compile(
+    r"\b(?:please|rotat(?:e[sd]?|ing|ion)|grant(?:s|ed|ing)?|approv(?:e[sd]?|ing|al))\b"
+    r"|\b(?:creat(?:e[sd]?|ing)|generat(?:e[sd]?|ing)|issu(?:e[sd]?|ing)|"
+    r"elevat(?:e[sd]?|ing)|expand(?:s|ed|ing)?|increas(?:e[sd]?|ing)|add(?:s|ed|ing)?|"
+    r"enabl(?:e[sd]?|ing)|install(?:s|ed|ing)?|set(?:s|ting)?|stor(?:e[sd]?|ing)|"
+    r"writ(?:e[sd]?|ing)|chang(?:e[sd]?|ing)|updat(?:e[sd]?|ing)|replac(?:e[sd]?|ing)|"
+    r"authori[sz](?:e[sd]?|ing))\b[^.!?;,\n]*\b(?:it|them|these|those|their|its|access|permissions?|scopes?)\b",
     re.IGNORECASE,
 )
 # URL validation rejects embedded authentication; it does not request access to
@@ -279,7 +309,7 @@ def _actionable(text: str) -> bool:
     return bool(text and ACTIONABLE_FIX.search(text))
 
 
-def _strip_negated_policy(text: str) -> str:
+def _strip_negated_policy(text: str, *, allow_availability: bool) -> str:
     """Remove assurance-only credential mentions, one sentence at a time."""
     text = _TASTE_EVIDENCE_HEADING.sub(r"\1", text)
     pieces = re.split(r"([.!\n])", text)
@@ -293,6 +323,9 @@ def _strip_negated_policy(text: str) -> str:
             piece = _BARE_LIST_CREDENTIAL.sub("", piece)
         piece = _CREDENTIAL_ASSURANCE.sub(
             lambda match: match[0].replace(match[match.lastgroup], "", 1), piece)
+        if allow_availability:
+            piece = _CREDENTIAL_AVAILABILITY.sub(
+                lambda match: match[0].replace(match["credential"], "", 1), piece)
         piece = _URL_CREDENTIAL_REJECTION.sub(
             lambda match: match[0][:match.start("credential") - match.start()], piece)
         stripped.append(piece)
@@ -313,8 +346,10 @@ def _strategy(pr: dict) -> bool:
         return True
     # Remove only the negated credential mention. A pricing/taste/strategy ask
     # in the same sentence or a separate title still requires authority.
-    return any(STRATEGY_TEXT.search(_strip_negated_policy(text))
-               for text in (pr.get("title") or "", pr.get("body") or ""))
+    texts = (pr.get("title") or "", pr.get("body") or "")
+    allow_availability = not _CREDENTIAL_AVAILABILITY_REQUEST.search("\n".join(texts))
+    return any(STRATEGY_TEXT.search(_strip_negated_policy(text, allow_availability=allow_availability))
+               for text in texts)
 
 
 def _held_reason(pr: dict, held: dict | None) -> str | None:

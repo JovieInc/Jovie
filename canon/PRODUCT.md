@@ -215,6 +215,23 @@ possible in terms of DS and IA."
   One-click answers execute immediately with a five-second undo. Ovie Home is
   dashboard-dense on a MacBook Pro.
 
+### One Ovie: web, shared shell, no native Ovie (founder decision, 2026-10-28)
+
+**EVENT:** Tim White, 2026-10-28: "The native Ovie Mac app shouldn't exist. That
+was a failure of agents creating multiple versions of Ovie. Just as Jovie runs
+my closed-loop creator career, Ovie should run my closed-loop company, with
+Jovie also run from Ovie, with as much parity as possible."
+
+- Exactly one Ovie exists: the web Ovie in the Jovie monorepo at `/app/ov`, on
+  the shared Jovie/Ovie shell. Packaged doors (Electron) and the office wall
+  (a Chrome kiosk window) only load that URL.
+- No native Ovie: no Swift, SwiftUI, AppKit or separate-repo Ovie. The
+  `JovieInc/ovie` repository is archived and removed from the Symphony and
+  gem registries. Unique capabilities move into web Ovie via issues, never a
+  second implementation.
+- Guard: `canon/product-surfaces.json` and `pnpm run surfaces:check` (see
+  `canon/ENGINEERING.md`, "One surface per product").
+
 ### Dogfood Jovie with the founder's own careers (founder decision, 2026-10-28)
 
 **EVENT:** Tim White, 2026-10-28: Ovie is the closed-loop company OS and Jovie is
@@ -260,6 +277,23 @@ ultrawide."
 
 Canon boundaries still hold: Ovie is presentation, not an agent; Summer and
 Jovie remain the two agents. JOV-5959 owns the Ovie Home implementation.
+
+### Public signup closes behind the waitlist (founder decision, 2026-11-02)
+
+Tim White approved the plan on 2026-11-02: close public signup and admit
+people by invite from a role-qualifying waitlist.
+
+- **Ship now:** the `PUBLIC_SIGNUP_CLOSED` code flag
+  (`apps/web/lib/flags/code-flags.ts`, closed by default). With the flag on,
+  `/signup` and anonymous `/start` go to the `/waitlist` role form (role and
+  email, Turnstile-gated, no account). Sign-in and waitlist invite links still
+  create accounts and enter the golden path. A missing env override keeps signup closed;
+  `FEATURE_PUBLIC_SIGNUP_CLOSED=false` is the explicit reopen override.
+- **Re-evaluate when:** the golden path is certified and the first paying
+  artists are live. Admin People → Waitlist shows submissions by role and
+  invite conversion (sent, opened, account created, golden path entered).
+- **Then:** reopen signup with `FEATURE_PUBLIC_SIGNUP_CLOSED=false`, and delete the flag
+  once the reopened funnel is stable.
 
 ---
 

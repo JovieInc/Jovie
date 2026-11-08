@@ -93,6 +93,15 @@ for (const viewport of VIEWPORTS) {
         ctaBox.y + ctaBox.height,
         `Listen now is cut off by the phone at ${viewport.id}`
       ).toBeLessThanOrEqual(screenBox.y + screenBox.height + 1);
+      const railBox = await readBox(
+        page.getByTestId('onboarding-profile-rail')
+      );
+      expect(
+        ctaBox.y + ctaBox.height,
+        'Listen now is cut off by the visible desktop preview'
+      ).toBeLessThanOrEqual(
+        Math.min(railBox.y + railBox.height, viewport.height) + 1
+      );
     } else {
       // The inline phone is shorter than the home card; bring the CTA into
       // the phone before measuring.
@@ -133,9 +142,7 @@ for (const viewport of [
       { waitUntil: 'domcontentloaded' }
     );
     const rail = page.getByTestId('onboarding-profile-rail');
-    const followers = rail.getByText(
-      '12.3K Spotify followers (source: enrichment)'
-    );
+    const followers = rail.getByText('12.3K Spotify followers');
     await expect(followers).toBeVisible();
     await page.evaluate(fontSize => {
       document.documentElement.style.fontSize = `${fontSize}px`;

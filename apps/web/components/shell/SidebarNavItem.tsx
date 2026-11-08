@@ -137,6 +137,10 @@ export function SidebarNavItem({
     <button
       type='button'
       onClick={item.onActivate}
+      // Collapsed mode renders icon-only: the aria-label supplies the
+      // accessible name (axe button-name). When the label is visible it is
+      // identical, so label-in-name (WCAG 2.5.3) still holds.
+      aria-label={item.label}
       aria-pressed={item.active || undefined}
       className={getSidebarNavRowClassName({
         active: item.active,

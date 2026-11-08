@@ -14,7 +14,7 @@ import { parseVerifiedMergeEvent } from './prompt';
  * registry in scripts/fleet-gate/closure_health.py):
  * - JovieInc/Jovie        — product `jovie` (web, ios, electron apps)
  * - JovieInc/LogYourBody  — product `logyourbody`
- * - JovieInc/ovie         — product `ovie`
+ * (Ovie is web inside JovieInc/Jovie: `/app/ov`. No separate Ovie repository.)
  */
 export interface SourceRepositoryAdapter {
   /** Canonical `owner/name` the adapter accepts; other slugs never match. */
@@ -64,11 +64,6 @@ export const SOURCE_REPOSITORY_ADAPTERS: readonly SourceRepositoryAdapter[] = [
   sourceRepositoryAdapter({
     repository: 'JovieInc/LogYourBody',
     product: 'logyourbody',
-    defaultApp: 'web',
-  }),
-  sourceRepositoryAdapter({
-    repository: 'JovieInc/ovie',
-    product: 'ovie',
     defaultApp: 'web',
   }),
 ];

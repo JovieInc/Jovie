@@ -6,8 +6,11 @@ const handlers = vi.hoisted(() => ({
   workflows: vi.fn(),
   merch: vi.fn(),
 }));
+const cronAuth = vi.hoisted(() => vi.fn());
 
 vi.mock('server-only', () => ({}));
+vi.mock('@/lib/cron/auth', () => ({ verifyCronRequest: cronAuth }));
+vi.mock('@/lib/utils/logger', () => ({ logger: { info: vi.fn() } }));
 vi.mock('@/app/api/cron/summarize-interviews/route', () => ({
   GET: handlers.interviews,
 }));
@@ -21,12 +24,14 @@ vi.mock('@/app/api/cron/process-merch-fulfillment/route', () => ({
   GET: handlers.merch,
 }));
 
+import { GET } from '@/app/api/cron/queue-tick/route';
 import { runQueueTick, selectQueues } from '@/lib/cron/queue-tick';
 
 const request = new Request('https://jov.ie/api/cron/queue-tick');
 
 describe('queue tick', () => {
   beforeEach(() => {
+    cronAuth.mockReset().mockReturnValue(null);
     for (const handler of Object.values(handlers))
       handler
         .mockReset()
@@ -62,5 +67,41 @@ describe('queue tick', () => {
       workflows: false,
       merch: true,
     });
+  });
+
+  it.each([401, 403, 404, 429])(
+    'reports a rejected queue as failed (%s)',
+    async status => {
+      handlers.workflows.mockResolvedValue(new Response('{}', { status }));
+      const results = await runQueueTick(request, null);
+      expect(results.find(result => result.name === 'workflows')).toMatchObject(
+        {
+          ok: false,
+          status,
+        }
+      );
+      expect(results.filter(result => result.ok)).toHaveLength(3);
+      const response = await GET(request);
+      expect(response.status).toBe(500);
+      expect((await response.json()).ok).toBe(false);
+    }
+  );
+
+  it('rejects unauthorized ticks before loading any queues', async () => {
+    cronAuth.mockReturnValue(new Response('unauthorized', { status: 401 }));
+    expect((await GET(request)).status).toBe(401);
+    for (const handler of Object.values(handlers))
+      expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('serves a successful named queue kick without caching the result', async () => {
+    const response = await GET(new Request(`${request.url}?only=merch`));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toContain('no-store');
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      results: [{ name: 'merch', ok: true, status: 200 }],
+    });
+    expect(handlers.ingestion).not.toHaveBeenCalled();
   });
 });

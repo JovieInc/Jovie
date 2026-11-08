@@ -537,9 +537,9 @@ const HOME_ROUTE = {
   warmupStrategy: 'public-route',
   measureMode: 'interactive-shell',
   readySelectors: {
-    // HomepageIdentityHero renders the primary claim form with this input id.
+    // The editorial hero renders the headline and the invite action.
     shell: ['#home-hero-heading'],
-    content: ['#home-hero-heading', 'input#homepage-claim-handle'],
+    content: ['#home-hero-heading', '[data-testid="homepage-primary-cta"]'],
   },
   timings: [
     { metric: 'first-contentful-paint', budget: 2000 },
