@@ -25,6 +25,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 export const PEN_CLI_VERSION = '0.3.14';
+export const PEN_MAX_FAILED_CALLS = 20;
 export const BRIEFS_DIR = 'docs/design-system/pen-briefs';
 export const MANIFEST = 'docs/pen-stills/golden-path/manifest.json';
 
@@ -69,8 +70,12 @@ export function penArgs(brief, { input, outDir }) {
     join(outDir, `${brief.frame}.png`),
     '--usage',
     join(outDir, `${brief.frame}.usage.json`),
+    // The agent only sees why a Pen call failed with --verbose-mcp; without
+    // it, 3 of 4 drafts on Nov 8 hit the failure cap retrying blind, and the
+    // one that finished needed 7 failed calls on this large file.
+    '--verbose-mcp',
     '--max-failed-calls',
-    '8',
+    String(PEN_MAX_FAILED_CALLS),
   ];
 }
 
