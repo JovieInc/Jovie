@@ -31,3 +31,19 @@ describe('pricing plans section padding', () => {
     expect(plansRule).toBeGreaterThan(Math.max(...sectionRules));
   });
 });
+
+describe('pricing plans joined panel', () => {
+  it('keeps plan cards square inside the rounded panel so joins show no notches', () => {
+    const panel = css.match(
+      /:where\(\.system-b-pricing-page \.marketing-pricing-plans\) \{([^}]*)\}/
+    )?.[1];
+    const card = css.match(
+      /:where\(\.system-b-pricing-page \.marketing-pricing-plan-card\) \{([^}]*)\}/
+    )?.[1];
+
+    // The panel's 1px gap is the divider and its radius clips the outer corners.
+    expect(panel).toMatch(/gap: var\(--space-px\)/);
+    expect(panel).toMatch(/overflow: hidden/);
+    expect(card).toMatch(/border-radius: 0;/);
+  });
+});
