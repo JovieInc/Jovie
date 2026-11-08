@@ -529,7 +529,7 @@
     },
     "packages/ui/atoms/sheet.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "8cd2180732bc8403ea4386a69ce353d1d75e1277f4e952809a6d7baac52b1373",
+      "sourceHash": "7117575e46f0db7711a35f89f28e7e6a0e5b1a59151af5e72c78394065a86342",
       "reference": "WAI-ARIA APG Dialog (Modal); Radix Dialog; shadcn/ui Sheet; library form-in-drawer",
       "checked": "focus trap and return, Escape, title/description wiring, side variants, RTL close",
       "gaps": [
@@ -542,8 +542,9 @@
         {
           "item": "side variants are physical only; the default right side does not resolve to the inline end in RTL",
           "decision": "adapt",
-          "status": "open",
-          "reference": "shadcn/ui Sheet"
+          "status": "done",
+          "reference": "shadcn/ui Sheet",
+          "resolution": "adds logical start and end sides (start-0/end-0, border-e/border-s, slide-in-from-start/end) and defaults to end, which is the right side in LTR and the left in RTL; explicit left/right stay physical"
         }
       ]
     },
