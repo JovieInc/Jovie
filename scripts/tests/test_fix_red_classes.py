@@ -29,10 +29,26 @@ class ClassifyTest(unittest.TestCase):
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "atomic-write"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
             "AssertionError: expected 1": ("other", "agent"),
+            "Error: PRs must target main. Retarget the pull request base to main.": ("base-not-main", "retarget-pr-base-to-main"),
         }
         for log, (cls, action) in cases.items():
             got = classes.classify(pr("Source Validation"), {"Source Validation": log})
             self.assertEqual((got["cls"], got["action"]), (cls, action), log)
+
+    def test_script_source_is_not_a_base_retarget_and_the_argv_is_shared(self):
+        source = "throw new Error('PRs must target main. Retarget the pull request base to main.');"
+        self.assertEqual(classes.classify(pr("PR targets main"), {"PR targets main": source})["action"], classes.AGENT)
+        self.assertEqual(classes.retarget_main_args(24530), ["pr", "edit", "24530", "--repo", "JovieInc/Jovie", "--base", "main"])
+        live = {"state": "OPEN", "isInMergeQueue": False, "baseRefName": "parent", "number": 24530,
+                "mergeStateStatus": "DIRTY", "statusCheckRollup": [{"name": "PR targets main", "conclusion": "FAILURE"}]}
+        self.assertTrue(classes.should_retarget_base(live))
+        self.assertFalse(classes.should_retarget_base({**live, "baseRefName": "main"}) or classes.should_retarget_base({**live, "isInMergeQueue": True}))
+        seen = []
+        ok = lambda args, priority="repair": seen.append((args, priority)) or type("R", (), {"returncode": 0})()
+        receipt = {}
+        self.assertIsNone(classes.retarget_if_needed(live, receipt, ok, "JovieInc/Jovie"))
+        self.assertEqual((seen, receipt.get("retargetedBase"), live["baseRefName"]), ([(classes.retarget_main_args(24530), "repair")], "main", "main"))
+        self.assertEqual(classes.retarget_if_needed({**live, "baseRefName": "parent", "mergeStateStatus": "BLOCKED"}, {}, ok, "JovieInc/Jovie"), "retargeted-main")
 
     def test_unwired_outranks_incidental_http_status_in_the_same_log(self):
         log = (

@@ -32,12 +32,13 @@ from fix_red_source_edits import snap_added_conservative_spacing, strip_added_le
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, RETARGET_MAIN, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent")
+    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write",
+    "retarget-pr-base-to-main", "agent")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE})
+    REGISTER_DOMAIN, ATOMIC_WRITE, RETARGET_MAIN})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -124,6 +125,8 @@ _YAML_AND_CHAIN_LINE = re.compile(
     r"(?P<command>[\w./@=:\t -]+(?:&&[\w./@=:\t -]+)+)(?P<suffix>)$")
 _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 
+# Runtime github-script line only. The dumped source is `throw new Error('PRs must target main`.
+BASE_NOT_MAIN_LOG = re.compile(r"(?:^|\s)Error: PRs must target main\b")
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
     ("component-test-evidence", COMPONENT_TEST_TEXT, AGENT),
@@ -136,6 +139,7 @@ SIGNATURES = (
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
     # Inventory assertion outranks quota/infra noise echoed in the same log.
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
+    ("base-not-main", BASE_NOT_MAIN_LOG, RETARGET_MAIN),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
@@ -171,6 +175,46 @@ def fingerprint_key(cls: str, names: list[str], signature: str = "") -> str:
     if cls in {"other", "mixed"}:
         parts.append(signature)
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:12]
+
+
+def retarget_main_args(number: int, repo: str = "JovieInc/Jovie") -> list[str]:
+    """gh argv that points one pull request at main. The lane performs the call."""
+    if type(number) is not int or number < 1:
+        raise ValueError("retarget requires a positive pull request number")
+    owner, _, name = str(repo).partition("/")
+    if not owner or not name or "/" in name:
+        raise ValueError("retarget requires an owner/name repository")
+    return ["pr", "edit", str(number), "--repo", repo, "--base", "main"]
+
+
+def should_retarget_base(pr: dict) -> bool:
+    """Open, unqueued, and the required main-base check is red. Already-main stays put."""
+    if not isinstance(pr, dict) or str(pr.get("state", "OPEN")).upper() != "OPEN":
+        return False
+    if pr.get("isInMergeQueue") is not False or pr.get("baseRefName") == "main":
+        return False
+    names = {str(check.get("name") or check.get("context") or "") for check in real_failures(pr)}
+    return "PR targets main" in names
+
+
+def retarget_if_needed(pr: dict, receipt: dict, call, repo: str) -> str | None:
+    """Retarget, then let a dirty main merge or any other red check continue.
+
+    Returns `retargeted-main` only when that check was the sole failure and the
+    branch is not dirty, so the lane does not spend a model on a base edit.
+    """
+    number = pr.get("number") if isinstance(pr, dict) else None
+    if type(number) is not int or not should_retarget_base(pr):
+        return None
+    edited = call(retarget_main_args(number, repo), priority="repair")
+    if getattr(edited, "returncode", 1) != 0:
+        return None
+    pr["baseRefName"] = "main"
+    receipt["retargetedBase"] = "main"
+    names = {str(check.get("name") or check.get("context") or "") for check in real_failures(pr)}
+    if pr.get("mergeStateStatus") == "DIRTY" or names != {"PR targets main"}:
+        return None
+    return "retargeted-main"
 
 
 def stamp_internal_changelog(body) -> str | None:
