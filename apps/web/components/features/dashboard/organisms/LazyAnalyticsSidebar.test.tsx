@@ -24,7 +24,12 @@ describe('LazyAnalyticsSidebar', () => {
       <StaticAnalyticsSidebar
         isOpen
         onClose={vi.fn()}
-        data={{ profile_views: 1 }}
+        data={{
+          profile_views: 1,
+          top_cities: [],
+          top_countries: [],
+          top_referrers: [],
+        }}
         testId='demo-rail'
       />
     );
