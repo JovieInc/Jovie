@@ -34,6 +34,20 @@ class ClassifyTest(unittest.TestCase):
             got = classes.classify(pr("Source Validation"), {"Source Validation": log})
             self.assertEqual((got["cls"], got["action"]), (cls, action), log)
 
+    def test_unwired_outranks_incidental_http_status_in_the_same_log(self):
+        log = (
+            "✔ recovers HTTP 502/503/504\n"
+            "HttpError: API rate limit exceeded for installation\n"
+            "AssertionError: Unwired: scripts/lib/__tests__/workers-inventory.test.mjs. "
+            "Wire each file into a ci-fast lane\n"
+        )
+        got = classes.classify(pr("Source Validation"), {"Source Validation": log})
+        self.assertEqual((got["cls"], got["action"]), ("ci-fast-wiring", "wire-ci-fast"))
+        self.assertEqual(got["files"], ["scripts/lib/__tests__/workers-inventory.test.mjs"])
+        plain = classes.classify(pr("Source Validation"), {
+            "Source Validation": "upstream returned HTTP 500 before the job started"})
+        self.assertEqual((plain["cls"], plain["action"]), ("platform-infra", "rerun"))
+
     def test_unwired_files_are_extracted_and_aggregates_ignored(self):
         got = classes.classify(pr("Source Validation"), {"Source Validation":
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane"})

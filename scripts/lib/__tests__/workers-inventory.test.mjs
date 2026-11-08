@@ -54,11 +54,27 @@ describe('workers inventory', () => {
         token: 't',
         store: new MemoryLedgerStore(),
         fetchImpl: async () =>
-          new Response(JSON.stringify({ success: false }), { status: 403 }),
+          new Response(JSON.stringify({ success: false }), {
+            status: 403,
+            headers: { 'content-type': 'application/json' },
+          }),
       })
-    ).rejects.toThrow(/workers-list-unreadable/);
+    ).rejects.toThrow(/workers-list-unreadable:403/);
   });
 
+  it('reads Worker ids from a successful account listing', async () => {
+    const names = await fetchDeployedWorkers({
+      accountId: 'a',
+      token: 't',
+      store: new MemoryLedgerStore(),
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({ success: true, result: [{ id: 'summer-store' }] }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        ),
+    });
+    expect(names).toEqual(['summer-store']);
+  });
   it('lists Workers through the shared Cloudflare client and records its request', async () => {
     const store = new MemoryLedgerStore();
     const calls = [];

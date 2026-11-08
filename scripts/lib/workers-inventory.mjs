@@ -2,10 +2,11 @@
 // A Worker deployed to the account must be declared by a committed
 // workers/**/wrangler*.toml|json(c) `name`, or be listed in
 // canon/deployed-workers.json as unversioned debt (the list only shrinks).
-// api-budget: cloudflare-api 1/hr - one read-only Worker listing per manual pre-deploy inventory; no retries or polling
+//
+// api-budget: cloudflare-api 1/hr - offline inventory is the default; one live account listing per hour
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createApiClient } from '../../packages/api-client/client.ts';
+import { ApiError, createApiClient } from '../../packages/api-client/client.ts';
 import { providerSpec } from '../../packages/api-client/contract.ts';
 import { hashCredential } from '../../packages/api-client/store.ts';
 
@@ -74,31 +75,48 @@ export async function fetchDeployedWorkers({
   store = undefined,
 }) {
   if (!token) throw new Error('workers-list-token-missing');
+  const spec = providerSpec('cloudflare');
   const client = createApiClient({
     provider: 'cloudflare',
-    credential: hashCredential('cloudflare', token),
+    credential: hashCredential('cloudflare', token ?? ''),
+    authorize: headers => {
+      headers.set('authorization', `Bearer ${token}`);
+    },
     fetch: fetchImpl,
-    store,
+    ...(store ? { store } : {}),
   });
-  const res = await client.request({
-    url: `https://${providerSpec('cloudflare').hosts[0]}/client/v4/accounts/${accountId}/workers/scripts`,
-    headers: { authorization: `Bearer ${token}` },
-    priority: 'repair',
-    timeoutMs: 15_000,
-    maxAttempts: 1,
-  });
-  const body =
-    /** @type {{success?: boolean, result?: Array<{id: string}>}} */ (
+  let res;
+  try {
+    res = await client.request({
+      url: `https://${spec.hosts[0]}${spec.pathPrefix}accounts/${accountId}/workers/scripts`,
+      method: 'GET',
+      priority: 'repair',
+      write: false,
+      idempotent: true,
+      maxAttempts: 2,
+      timeoutMs: 15_000,
+    });
+  } catch (error) {
+    const status = error instanceof ApiError ? error.status : null;
+    throw new Error(`workers-list-unreadable:${status ?? 'network'}`);
+  }
+  /** @type {{ success?: boolean, result?: { id: string }[] } | null} */
+  let body = null;
+  try {
+    body = /** @type {{ success?: boolean, result?: { id: string }[] }} */ (
       res.json()
     );
+  } catch {
+    body = null;
+  }
   if (
     res.status < 200 ||
     res.status >= 300 ||
-    !body.success ||
+    !body?.success ||
     !Array.isArray(body.result)
   )
     throw new Error(`workers-list-unreadable:${res.status}`); // unreadable is red, never green
-  return body.result.map(s => s.id);
+  return body.result.map(script => script.id);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

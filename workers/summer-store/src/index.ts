@@ -141,8 +141,11 @@ export function d1Backend(
       await db.prepare('DELETE FROM objects WHERE pathname = ?1').bind(p).run();
     },
     async list(prefix, after, limit) {
-      const lo = after && after > prefix ? after : prefix;
-      const op = after && after > prefix ? '>' : '>=';
+      // A cursor inside the prefix range is exclusive, even when it equals the
+      // prefix itself (an object stored at exactly `prefix`).
+      const useCursor = after != null && after >= prefix;
+      const lo = useCursor ? after : prefix;
+      const op = useCursor ? '>' : '>=';
       const { results } = await db
         .prepare(
           `${sel} WHERE pathname ${op} ?1 AND pathname < ?2 ORDER BY pathname LIMIT ?3`
