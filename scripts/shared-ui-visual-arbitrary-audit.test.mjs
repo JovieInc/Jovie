@@ -160,11 +160,7 @@ test('repo shared-UI visual arbitrary findings match the shrink-only baseline', 
   assert.deepEqual(result.findings, []);
   assert.equal(result.scannedFiles.length, 73);
   for (const relativePath of COVERED_PRODUCTION_SOURCES) {
-    assert.equal(
-      result.scannedFiles.includes(relativePath),
-      true,
-      relativePath
-    );
+    assert.ok(result.scannedFiles.includes(relativePath), relativePath);
   }
   for (const relativePath of EXCLUDED_NON_PRODUCTION_SOURCES) {
     assert.equal(
