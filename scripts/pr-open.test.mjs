@@ -24,6 +24,7 @@ import {
   main,
   redOutput,
   refreshBodyChecks,
+  withOnGreenOptIn,
 } from './pr-open.mjs';
 
 const file = (filename, status = 'modified') => ({
@@ -943,3 +944,12 @@ for (const mode of ['unknown', 'mismatch', 'detached']) {
     }
   });
 }
+
+test('a draft opts in to ship on green unless the writer holds it', () => {
+  const marker = '<!-- jovie-auto-ready: on-green -->';
+  assert.ok(withOnGreenOptIn('Body', { draft: true }).endsWith(`${marker}\n`));
+  assert.equal(withOnGreenOptIn('Body', { draft: true, hold: true }), 'Body');
+  assert.equal(withOnGreenOptIn('Body', { draft: false }), 'Body');
+  const once = withOnGreenOptIn('Body', { draft: true });
+  assert.equal(withOnGreenOptIn(once, { draft: true }), once);
+});
