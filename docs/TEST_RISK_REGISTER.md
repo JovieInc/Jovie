@@ -233,7 +233,7 @@ surfaces:
     reversibility: 2
     visibility: 5
     target_coverage: 80
-    target_e2e: 2
+    target_e2e: 3
     owner: '@itstimwhite'
     last_incident: 2026-11-08
     lessons_ref: null
@@ -242,8 +242,11 @@ surfaces:
       pre-merge check green: unit tests mock next/link, and the only
       signed-in browser specs ran on manual dispatch. The blocking proof is
       the merge-group Lighthouse (dashboard gate) job, which runs
-      tests/e2e/dashboard-click-navigation.spec.ts (desktop sidebar) and
-      tests/e2e/shell-nav-click-through.spec.ts (mobile tabs).
+      tests/e2e/dashboard-click-navigation.spec.ts (desktop sidebar),
+      tests/e2e/shell-nav-click-through.spec.ts (mobile tabs) and
+      tests/e2e/shell-route-health.spec.ts (every sidebar destination by
+      full load and by click, failing on console errors and error
+      boundaries).
     last_reviewed: 2026-11-08
 ---
 

@@ -123,6 +123,16 @@ describe('Dialog', () => {
       expect(screen.getByTestId('dialog-header')).toBeInTheDocument();
     });
 
+    it('mirrors the header gutter and close control in RTL (logical insets)', () => {
+      render(<TestDialog open={true} />);
+      const header = screen.getByTestId('dialog-header');
+      expect(header).toHaveClass('pe-10', 'text-start');
+      expect(header).not.toHaveClass('pr-10', 'text-left');
+      const close = screen.getByTestId('dialog-close-button');
+      expect(close).toHaveClass('end-4');
+      expect(close).not.toHaveClass('right-4');
+    });
+
     it('contains title and description', () => {
       render(
         <TestDialog

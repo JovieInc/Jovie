@@ -168,6 +168,16 @@ describe('Sheet', () => {
       expect(screen.getByTestId('sheet-header')).toBeInTheDocument();
     });
 
+    it('mirrors the header gutter and close control in RTL (logical insets)', () => {
+      render(<TestSheet open={true} />);
+      const header = screen.getByTestId('sheet-header');
+      expect(header).toHaveClass('pe-10', 'text-start');
+      expect(header).not.toHaveClass('pr-10', 'text-left');
+      const close = screen.getByTestId('sheet-close-button');
+      expect(close).toHaveClass('end-4');
+      expect(close).not.toHaveClass('right-4');
+    });
+
     it('contains title and description', () => {
       render(
         <TestSheet
