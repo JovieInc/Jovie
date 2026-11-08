@@ -15,6 +15,7 @@
 # Six attempts with doubling, jittered backoff (2-4 ... 32-64s, 62-124s in
 # total), then exit 1 with a classified error. This verifies nothing itself:
 # every caller keeps its own sha256 pins and checks the bytes afterwards.
+# api-budget: github-actions-token 120/hr - zero while anonymous downloads work; in an outage two REST reads (release by tag, asset) per failed attempt, at most 12 per calling step, ~10 failing steps an hour
 set -euo pipefail
 
 url="${1:-}"

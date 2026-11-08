@@ -96,7 +96,7 @@ export async function installSquawk(options = {}) {
   // API (anonymous 504s for hours, #23770) and fails closed; the sha256 pin
   // below still decides.
   const fetched = (options.download ?? downloadReleaseAsset)(url);
-  if (!fetched.ok) {
+  if (fetched.ok === false) {
     throw new Error(
       `Squawk ${SQUAWK_VERSION} download failed: ${fetched.status} ${url}`
     );
@@ -146,7 +146,7 @@ export function readMigrationDiff(repoRoot, base, head, run = spawnSync) {
  *   nameStatus?: string,
  *   squawkBin?: string,
  *   run?: RunCommand,
- *   fetchImpl?: typeof fetch,
+ *   download?: typeof downloadReleaseAsset,
  *   platform?: string,
  *   arch?: string,
  *   stdio?: 'inherit' | 'pipe',
@@ -169,7 +169,7 @@ export async function lintChangedMigrations(options) {
     options.squawkBin ??
     process.env.SQUAWK_BIN ??
     (await installSquawk({
-      fetchImpl: options.fetchImpl,
+      download: options.download,
       platform: options.platform,
       arch: options.arch,
     }));
