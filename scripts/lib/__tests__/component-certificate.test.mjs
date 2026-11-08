@@ -95,7 +95,6 @@ describe('component certificate', () => {
       ['button', 'input']
     );
   });
-
   it('jank: inline component, autoFocus, unstable key, img, reset-on-open effect', () => {
     const src = `
 export function Drawer({ open }) {
@@ -116,7 +115,6 @@ export function Drawer({ open }) {
     ]);
     assert.deepEqual(findJank(clean, 'a.tsx'), []);
   });
-
   it('state stories are matched by export name', () => {
     const c = statesCovered(
       'export const Loading = {}; export const EmptyState = {}; export const RtlLong = {};'
@@ -411,8 +409,10 @@ describe('component certificate CLI evidence freshness', () => {
       'scripts/component-certificate.mjs',
       'scripts/component-ship-policy.mjs',
       'scripts/lib/component-certificate.mjs',
+      'scripts/lib/component-certificate-mutation.mjs',
       'scripts/lib/component-evidence.mjs',
       'scripts/lib/mutation-sweep.mjs',
+      'scripts/lib/mutation-sweep-root.mjs',
       'scripts/lib/mutation-diff.mjs',
     ]) {
       mkdirSync(dirname(join(f.root, path)), { recursive: true });

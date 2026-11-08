@@ -22,6 +22,7 @@ name: Mutation Diff
 # cache (restore the newest, save a run-unique key) instead of the runner's HOME.
 # No cron (JOV-INV-042): the rolling sweep (job `sweep`) starts on
 # every main CI completion and chains itself while modules remain. It walks every tested apps/web module
+# (and, on a fixed 10-minute slice per run, every tested @jovie/ui module)
 # over days, persists per-module score + tested SHA on the runner, and turns
 # surviving mutants into bounded "strengthen test" tasks. It checks out
 # `main` only, holds no secrets, and skips when gem is short on RAM, disk or
@@ -229,10 +230,21 @@ jobs:
           node scripts/test-quality-loop.mjs rank --out "$RUNNER_TEMP/ranked.json" --top 0
           [ -f "$state_dir/sweep-state.json" ] && node scripts/test-quality-loop.mjs model-check \
             --state "$state_dir/sweep-state.json" --ranked "$RUNNER_TEMP/ranked.json" || true
+          # @jovie/ui first, on a fixed slice carved out of the apps/web budget (90 -> 75):
+          # worst case 10 + 5 (one module's timeout) + 75 + 25 matches the old 90 + 25, inside
+          # timeout-minutes. Same state file, keyed packages/ui/<path>, which the component
+          # certificate reads. No --github-output: only the apps/web sweep drives chaining.
+          ui_status=0
+          nice -n 19 node scripts/mutation-sweep.mjs --include packages/ui/ \
+            --state "$state_dir/sweep-state.json" \
+            --mode "$MODE" --max-files "$MAX_FILES" --max-minutes 10 --file-timeout-minutes 5 \
+            --summary "$GITHUB_STEP_SUMMARY" || ui_status=$?
+          # Stryker mutates in place; a killed module must not leave a mutant for apps/web tests.
+          git checkout --quiet -- packages/ui
           nice -n 19 node scripts/mutation-sweep.mjs \
             --touch-file "$RUNNER_TEMP/ranked.json" \
             --state "$state_dir/sweep-state.json" \
-            --mode "$MODE" --max-files "$MAX_FILES" --max-minutes 90 \
+            --mode "$MODE" --max-files "$MAX_FILES" --max-minutes 75 \
             --summary "$GITHUB_STEP_SUMMARY" \
             --github-output "$GITHUB_OUTPUT" \
             --propose-baseline "$RUNNER_TEMP/baseline-proposal.json"
@@ -246,6 +258,7 @@ jobs:
           cp "$state_dir/sweep-state.json" "$state_dir/sweep-state.json.runs.jsonl" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
           cp -r "$state_dir/survivor-tasks" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
           cp "$RUNNER_TEMP/baseline-proposal.json" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
+          [ "$ui_status" -eq 0 ] || { echo "::error::packages/ui mutation sweep exited $ui_status"; exit "$ui_status"; }
 
       # The only step that sees a secret. It reads the task JSON the sweep wrote
       # and never runs Stryker or repo tests.
@@ -287,4 +300,4 @@ jobs:
       # Stryker sandbox, reports and per-module coverage must not accumulate.
       - name: Clean sweep scratch
         if: always()
-        run: rm -rf apps/web/reports/mutation apps/web/.stryker-tmp "$RUNNER_TEMP/sweep-out"
+        run: rm -rf apps/web/reports/mutation apps/web/.stryker-tmp packages/ui/reports/mutation packages/ui/.stryker-tmp "$RUNNER_TEMP/sweep-out"

@@ -127,6 +127,25 @@ describe('Kbd', () => {
       );
     });
 
+    it('treats a whitespace-padded Shift glyph as Shift', () => {
+      render(<Kbd data-testid='kbd'>{' ⇧ '}</Kbd>);
+      const kbd = screen.getByTestId('kbd');
+      expect(kbd).toHaveAttribute('data-key', 'shift');
+      expect(kbd.querySelector('[data-kbd-shift-icon="true"]')).not.toBeNull();
+    });
+
+    it('renders element children unchanged, without the Shift mark', () => {
+      render(
+        <Kbd data-testid='kbd'>
+          <span data-testid='inner'>⇧</span>
+        </Kbd>
+      );
+      const kbd = screen.getByTestId('kbd');
+      expect(kbd).not.toHaveAttribute('data-key');
+      expect(screen.getByTestId('inner')).toHaveTextContent('⇧');
+      expect(kbd.querySelector('[data-kbd-shift-icon="true"]')).toBeNull();
+    });
+
     it('renders single key', () => {
       render(<Kbd>K</Kbd>);
       expect(screen.getByText('K')).toBeInTheDocument();
