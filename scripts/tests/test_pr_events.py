@@ -1476,7 +1476,7 @@ class ClaimTest(unittest.TestCase):
         runner.record_held(self.host, 5, "h1", ["check-failed:x", "boom"])
         claimed = events.claim_event_pr(self.host, lane, "devin", [pr(kinds=["red"], checks=[RED_CHECK])], NOW)
         self.assertEqual((claimed["number"], claimed["gateEvidence"][1]), (5, "boom"))
-        self.assertEqual(self.attempts()["5"], {"sha": "h1", "count": 1, "lane": "devin", "at": NOW})
+        self.assertEqual(self.attempts()["5"], {"sha": "h1", "count": 1, "lane": "devin", "at": NOW, "headClaims": 1})
         self.assertEqual(lane.posted, [5])
         self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [],
                          "the repair signal remains until the worker publishes a new head")
@@ -2550,7 +2550,7 @@ class NativeQueueClaimTest(unittest.TestCase):
             self.assertIsNotNone(selected);self.assertEqual(selected["number"], 105)
             self.assertEqual(events.label_names(backend[5]), ["lane-fix-red"], "native queued row remains preserved")
             self.assertEqual(json.loads((host.state / "fix-attempts.json").read_text()),
-                             {"105": {"sha": "h1", "count": 1, "lane": "devin", "at": NOW + cycle * 60}})
+                             {"105": {"sha": "h1", "count": 1, "lane": "devin", "at": NOW + cycle * 60, "headClaims": 1}})
 
     def test_cleanup_cached_false_never_overrides_live_queue_or_preservation(self):
         for change in ("queued", "spent", "active", "held", "new-head", "now-red", "exhaustion-label"):
