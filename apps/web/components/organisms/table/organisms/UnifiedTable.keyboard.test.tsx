@@ -154,7 +154,7 @@ describe('UnifiedTable keyboard interaction', () => {
     await waitFor(() => expect(second).toHaveAttribute('tabindex', '0'));
     expect(first).toHaveAttribute('tabindex', '-1');
     expect(document.activeElement).toBe(second);
-    expect(onFocusedRowChange).toHaveBeenCalledWith(1);
+    expect(onFocusedRowChange).toHaveBeenCalledWith(1, data[1]);
   });
 
   it('exposes consumer-owned selection through the shared selected row state', () => {
