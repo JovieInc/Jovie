@@ -28,8 +28,8 @@ import {
   requireExactNavigationOrigin,
 } from '../helpers/vercel-preview';
 import { deleteSyntheticChats } from './helpers/synthetic-chat-cleanup';
-import { primeOriginBoundVercelBypass } from './utils/prime-vercel-bypass';
 import { assertSidebarClickNavigation } from './utils/dashboard-click-navigation';
+import { primeOriginBoundVercelBypass } from './utils/prime-vercel-bypass';
 import { assertChatResponseOk } from './utils/prod-cert-chat-response';
 import {
   certStep,
