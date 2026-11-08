@@ -1115,6 +1115,10 @@ importers:
         version: 5.9.3
 
   workers/mesh-hub:
+    dependencies:
+      otpauth:
+        specifier: 9.6.0
+        version: 9.6.0
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^5.20261016.1
@@ -13680,6 +13684,9 @@ packages:
   os-tmpdir@1.0.2:
     resolution: {integrity: sha512-D2FR03Vir7FIu45XBY20mTb+/ZSWB00sjU9jdQXt83gDrI4Ztz5Fs7/yy74g2N5SVQY4xY1qDr4rNddwYRVX0g==}
     engines: {node: '>=0.10.0'}
+
+  otpauth@9.6.0:
+    resolution: {integrity: sha512-qQXHTxcXohDhQjF1ZEbUVEpTIssFL2rd+2kHfw/McIVCbTLD6qAsbTCQxpXRLyeyUw6Ipjpykw4dWZL/zfIVqA==}
 
   outvariant@1.4.3:
     resolution: {integrity: sha512-+Sl2UErvtsoajRDKCE5/dBz4DIvHXQQnAxtQTF04OJxY0+DyZXSo5P5Bb7XYWOh81syohlYL24hbDwxedPUJCA==}
@@ -31270,6 +31277,10 @@ snapshots:
 
   os-tmpdir@1.0.2:
     optional: true
+
+  otpauth@9.6.0:
+    dependencies:
+      '@noble/hashes': 2.4.0
 
   outvariant@1.4.3:
     optional: true
