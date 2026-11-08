@@ -26,6 +26,7 @@ import { parseArgs } from 'node:util';
 
 export const PEN_CLI_VERSION = '0.3.14';
 export const BRIEFS_DIR = 'docs/design-system/pen-briefs';
+export const MANIFEST = 'docs/pen-stills/golden-path/manifest.json';
 
 /** Split a brief into its front matter (frame, route) and prompt body. */
 export function parseBrief(source, file = 'brief') {
@@ -73,43 +74,6 @@ export function penArgs(brief, { input, outDir }) {
   ];
 }
 
-/**
- * What the canonical download is. The golden-path exporter accepts a single
- * .pen or a .tar.gz of the workspace (so fonts and images resolve); a share
- * page or sign-in page comes back as HTML and Pen cannot open it.
- */
-export function canonicalKind(bytes) {
-  if (bytes[0] === 0x1f && bytes[1] === 0x8b) return 'archive';
-  const head = bytes.subarray(0, 512).toString('utf8').trimStart();
-  if (head.startsWith('{')) return 'pen';
-  if (/^<(!doctype|html|\?xml)/i.test(head)) return 'html';
-  return 'unknown';
-}
-
-/** The workspace's .pen to draft from: the manifest's file, else the first. */
-export function locatePen(dir, wanted, list = readdirSync) {
-  const all = [];
-  const walk = d => {
-    for (const entry of list(d, { withFileTypes: true })) {
-      const path = join(d, entry.name);
-      if (entry.isDirectory()) walk(path);
-      else if (entry.name.endsWith('.pen')) all.push(path);
-    }
-  };
-  walk(dir);
-  return all.find(path => basename(path) === wanted) ?? all[0] ?? null;
-}
-
-const CANONICAL_MANIFEST = 'docs/pen-stills/golden-path/manifest.json';
-
-function canonicalPenName() {
-  try {
-    return JSON.parse(readFileSync(CANONICAL_MANIFEST, 'utf8')).penFile?.name;
-  } catch {
-    return undefined;
-  }
-}
-
 export function missingSecrets(env) {
   return ['PEN_CLI_KEY', 'PEN_GOLDEN_PATH_FILE_URL'].filter(k => !env[k]);
 }
@@ -151,12 +115,47 @@ export function draftProblem(before, after, frame) {
   return null;
 }
 
+/**
+ * Write the canonical download into workDir and return the .pen to draft from.
+ * The URL serves either a .pen (JSON) or a .tar.gz of the workspace folder so
+ * fonts and images resolve; the archive is unpacked and its `wanted` file
+ * (else its first .pen) is used. Anything else, such as an expired link's
+ * HTML, is named instead of being handed to pen as a document.
+ */
+export function writeCanonical(bytes, workDir, wanted) {
+  mkdirSync(workDir, { recursive: true });
+  if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
+    const archive = join(workDir, 'workspace.tar.gz');
+    writeFileSync(archive, bytes);
+    execFileSync('tar', ['-xzf', archive, '-C', workDir]);
+    const pens = [];
+    const walk = dir => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, e.name);
+        if (e.isDirectory()) walk(path);
+        else if (e.name.endsWith('.pen')) pens.push(path);
+      }
+    };
+    walk(workDir);
+    const pen = pens.find(p => basename(p) === wanted) ?? pens[0];
+    if (!pen) throw new Error('the canonical Pen archive holds no .pen file');
+    return pen;
+  }
+  if (!bytes.toString('utf8', 0, 64).trimStart().startsWith('{'))
+    throw new Error(
+      `canonical Pen download is neither a .pen file nor a .tar.gz (${bytes.length} bytes)`
+    );
+  const pen = join(workDir, 'canonical.pen');
+  writeFileSync(pen, bytes);
+  return pen;
+}
+
 async function main() {
   const { values } = parseArgs({
     options: { out: { type: 'string' }, only: { type: 'string' } },
   });
   if (!values.out) throw new Error('--out DIR is required');
-  // Absolute, because pen runs from the canonical file's own folder.
+  // Absolute: pen runs from the workspace folder so its assets resolve.
   const outDir = resolve(values.out);
   mkdirSync(outDir, { recursive: true });
   const only = values.only
@@ -192,31 +191,14 @@ async function main() {
 
   const res = await fetch(process.env.PEN_GOLDEN_PATH_FILE_URL);
   if (!res.ok) throw new Error(`canonical Pen file: HTTP ${res.status}`);
-  const bytes = Buffer.from(await res.arrayBuffer());
-  const kind = canonicalKind(bytes);
-  // Name the shape, never the contents: the URL and file are private.
-  console.log(
-    `pen-draft: canonical download is ${kind}, ${bytes.length} bytes`
+  const wanted = JSON.parse(readFileSync(MANIFEST, 'utf8')).penFile?.name;
+  // Unpacked beside outDir's drafts, not among them, so the upload carries
+  // only the drafted frames.
+  const input = writeCanonical(
+    Buffer.from(await res.arrayBuffer()),
+    join(outDir, 'workspace'),
+    wanted
   );
-  receipt.canonical = { kind, bytes: bytes.length };
-  let input = join(outDir, 'canonical.pen');
-  if (kind === 'archive') {
-    const work = join(outDir, 'workspace');
-    mkdirSync(work, { recursive: true });
-    const archive = join(work, 'workspace.tar.gz');
-    writeFileSync(archive, bytes);
-    execFileSync('tar', ['-xzf', archive, '-C', work]);
-    input = locatePen(work, canonicalPenName());
-    if (!input) throw new Error('the Pen workspace archive holds no .pen file');
-  } else if (kind === 'pen') {
-    writeFileSync(input, bytes);
-  } else {
-    receipt.blocked = `PEN_GOLDEN_PATH_FILE_URL returned ${kind}, not a .pen file or workspace .tar.gz`;
-    write();
-    console.log(`pen-draft: blocked, ${receipt.blocked}`);
-    process.exitCode = 1;
-    return;
-  }
 
   for (const brief of briefs) {
     const row = { frame: brief.frame, route: brief.route };
@@ -224,7 +206,7 @@ async function main() {
       execFileSync('npx', penArgs(brief, { input, outDir }), {
         stdio: ['ignore', 'inherit', 'inherit'],
         timeout: 15 * 60_000,
-        // Run beside the .pen so a workspace's fonts and images resolve.
+        // Workspace fonts and images resolve relative to the .pen file.
         cwd: dirname(input),
         env: { ...process.env, NODE_OPTIONS: PEN_NODE_OPTIONS },
       });

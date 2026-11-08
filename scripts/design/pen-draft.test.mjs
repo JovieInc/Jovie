@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, join } from 'node:path';
 import { test } from 'node:test';
 import {
-  canonicalKind,
   draftProblem,
   loadBriefs,
-  locatePen,
   missingOutputs,
   missingSecrets,
   parseBrief,
   penArgs,
+  writeCanonical,
 } from './pen-draft.mjs';
 
 test('every checked-in brief parses and names a unique frame', () => {
@@ -85,27 +88,28 @@ test('a draft counts only when it adds the named top-level frame', () => {
   );
 });
 
-test('the canonical download is named by its shape, so a web page never reaches pen', () => {
-  assert.equal(canonicalKind(Buffer.from([0x1f, 0x8b, 8, 0])), 'archive');
-  assert.equal(canonicalKind(Buffer.from('  {"children":[]}')), 'pen');
-  assert.equal(canonicalKind(Buffer.from('<!DOCTYPE html><html>')), 'html');
-  assert.equal(canonicalKind(Buffer.from('<html lang="en">')), 'html');
-  assert.equal(canonicalKind(Buffer.from('PK\u0003\u0004')), 'unknown');
+test('a .tar.gz workspace is unpacked and its named .pen is the input', () => {
+  // The canonical URL serves the workspace folder as a .tar.gz so fonts and
+  // images resolve. Written raw as canonical.pen, pen failed every frame with
+  // "Failed to open document" (run 42457207487).
+  const src = mkdtempSync(join(tmpdir(), 'pen-src-'));
+  mkdirSync(join(src, 'ws', 'fonts'), { recursive: true });
+  writeFileSync(join(src, 'ws', 'other.pen'), '{"children":[]}');
+  writeFileSync(join(src, 'ws', 'canonical.lib.pen'), '{"children":[1]}');
+  const tgz = join(src, 'ws.tar.gz');
+  execFileSync('tar', ['-czf', tgz, '-C', src, 'ws']);
+  const work = mkdtempSync(join(tmpdir(), 'pen-work-'));
+  const pen = writeCanonical(readFileSync(tgz), work, 'canonical.lib.pen');
+  assert.equal(basename(pen), 'canonical.lib.pen');
+  assert.equal(readFileSync(pen, 'utf8'), '{"children":[1]}');
 });
 
-test('a workspace archive drafts from the manifest .pen, else the first', () => {
-  const tree = {
-    w: [
-      { name: 'other.pen', isDirectory: () => false },
-      { name: 'fonts', isDirectory: () => true },
-    ],
-    'w/fonts': [{ name: 'canonical.lib.pen', isDirectory: () => false }],
-  };
-  const list = d => tree[d] ?? [];
-  assert.equal(
-    locatePen('w', 'canonical.lib.pen', list),
-    'w/fonts/canonical.lib.pen'
+test('a plain .pen is used as is, and anything else is named, not drafted', () => {
+  const work = mkdtempSync(join(tmpdir(), 'pen-work-'));
+  const pen = writeCanonical(Buffer.from(' {"children":[]}'), work, 'x.pen');
+  assert.equal(readFileSync(pen, 'utf8'), ' {"children":[]}');
+  assert.throws(
+    () => writeCanonical(Buffer.from('<html>expired</html>'), work, 'x.pen'),
+    /neither a \.pen file nor a \.tar\.gz/
   );
-  assert.equal(locatePen('w', 'missing.pen', list), 'w/other.pen');
-  assert.equal(locatePen('empty', 'x.pen', list), null);
 });

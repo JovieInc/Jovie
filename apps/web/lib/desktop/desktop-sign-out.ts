@@ -19,5 +19,7 @@ export function resolveDesktopSignOutRedirect(
   redirectUrl: string,
   isDesktopShell: boolean
 ): string {
-  return isDesktopShell ? '/signin' : redirectUrl;
+  if (!isDesktopShell) return redirectUrl;
+  // A sign-in target (with its return path) is already in-app; keep it.
+  return /^\/signin(?:[/?#]|$)/.test(redirectUrl) ? redirectUrl : '/signin';
 }
