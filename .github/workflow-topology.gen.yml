@@ -198,7 +198,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
-    jobCount: 67
+    jobCount: 68
   - name: Claim Checkout Dogfood
     path: .github/workflows/claim-checkout-dogfood.yml
     active: true
@@ -1602,7 +1602,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:report-scheduled-failure
-    jobCount: 3
+    jobCount: 4
   - name: Visual Regression
     path: .github/workflows/visual-regression.yml
     active: true

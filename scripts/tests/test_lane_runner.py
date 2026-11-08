@@ -13464,6 +13464,58 @@ class TerminalPublicationTest(unittest.TestCase):
                     self.assertFalse(any(c[0] == 'gh' for c in self.calls))
 
 
+class AdditiveNodeTestFileTest(unittest.TestCase):
+    def test_real_git_conflict_preserves_and_executes_both_sides(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            work, origin = root / "work", root / "origin.git"
+            subprocess.run(["git", "init", "-q", "-b", "main", str(work)], check=True)
+            subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+            def git(*args):
+                return subprocess.run(["git", *args], cwd=work, check=True, capture_output=True, text=True)
+            hooks = root / "hooks"
+            hooks.mkdir()
+            for key, value in (("user.name", "t"), ("user.email", "t@example.test"),
+                               ("commit.gpgsign", "false"), ("core.hooksPath", str(hooks))):
+                git("config", key, value)
+            git("remote", "add", "origin", str(origin))
+            path = work / "draft.test.mjs"
+            base = "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\n"
+            path.write_text(base)
+            git("add", ".")
+            git("commit", "-qm", "base")
+            git("branch", "feature")
+            git("checkout", "-q", "feature")
+            ours = "test('head retry budget', () => {\n  assert.equal(1 + 1, 2);\n});\n\n"
+            path.write_text(base + ours)
+            git("commit", "-qam", "head test")
+            git("push", "-q", "origin", "HEAD:refs/heads/feature")
+            before = git("rev-parse", "HEAD").stdout.strip()
+            git("checkout", "-q", "main")
+            theirs = "test('main verbose errors', () => {\n  assert.ok(true);\n});\n\n"
+            path.write_text(base + theirs)
+            git("commit", "-qam", "main test")
+            git("push", "-q", "origin", "HEAD:refs/heads/main")
+            git("checkout", "-q", "feature")
+            self.assertTrue(lane.resolve_additive_list_conflict(work, "feature", None))
+            self.assertEqual(path.read_text(), base + theirs + ours)
+            after = git("rev-parse", "HEAD").stdout.strip()
+            self.assertNotEqual(after, before)
+            self.assertEqual(after, git("rev-parse", "origin/feature").stdout.strip())
+            git("merge-base", "--is-ancestor", before, after)
+            result = subprocess.run(["node", "--test", str(path)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("# pass 2", result.stdout.replace("ℹ", "#"))
+
+    def test_unknown_files_missing_stages_and_merge_errors_fail_closed(self):
+        for rel, replies in (("code.mjs", []),
+                             ("draft.test.mjs", [SimpleNamespace(returncode=1)]),
+                             ("draft.test.mjs", [SimpleNamespace(returncode=0, stdout="")]*3
+                              + [SimpleNamespace(returncode=2, stdout="")])):
+            with self.subTest(rel=rel, replies=replies), patch.object(lane, "sh", side_effect=replies):
+                self.assertIsNone(lane.resolve_additive_node_test_file(Path("."), rel, None))
+
+
 class NoHumanHoldTest(unittest.TestCase):
     """EVENT 2026-10-28: nothing in the lanes waits on a human. The retired human-hold labels are
     inert, a needs-human-decision disposition is a non-blocking Ovie ask, and a repair that rewrites

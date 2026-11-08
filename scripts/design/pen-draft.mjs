@@ -25,6 +25,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 export const PEN_CLI_VERSION = '0.3.14';
+export const PEN_MAX_FAILED_CALLS = 30;
 export const BRIEFS_DIR = 'docs/design-system/pen-briefs';
 export const MANIFEST = 'docs/pen-stills/golden-path/manifest.json';
 
@@ -56,7 +57,6 @@ export function loadBriefs(dir = BRIEFS_DIR, only = null) {
 // The canonical document is about 25 MB, so the editor takes a minute or two
 // to load it and early canvas calls time out. With 8 allowed failures the
 // agent gave up on 3 of 4 briefs before the editor was ready (run 42457693051).
-export const MAX_FAILED_CALLS = 30;
 export const LOAD_NOTE =
   'The document is large and the editor can take a few minutes to load it. Work in the open editor (leave the file path empty), and when a canvas call times out, wait and retry it rather than giving up.';
 /** Attempts per brief: a second try starts with the editor cache warm. */
@@ -88,8 +88,12 @@ export function penArgs(brief, { input, outDir }) {
     join(outDir, `${brief.frame}.png`),
     '--usage',
     join(outDir, `${brief.frame}.usage.json`),
+    // The agent only sees why a Pen call failed with --verbose-mcp; without
+    // it, 3 of 4 drafts on Nov 8 hit the failure cap retrying blind, and the
+    // one that finished needed 7 failed calls on this large file.
+    '--verbose-mcp',
     '--max-failed-calls',
-    String(MAX_FAILED_CALLS),
+    String(PEN_MAX_FAILED_CALLS),
   ];
 }
 
