@@ -69,7 +69,17 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
  * @production-smoke
  */
 
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({
+  storageState: { cookies: [], origins: [] },
+  ...(process.env.REPRO_HUMAN_UA ? { userAgent: process.env.REPRO_HUMAN_UA } : {}),
+});
+test.beforeEach(async ({ context }) => {
+  if (process.env.REPRO_HUMAN_UA) {
+    await context.addInitScript(() => {
+      Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false });
+    });
+  }
+});
 
 /** Saved signed-in session for the chat cert test (serial same-worker). */
 let signedInStatePath: string | null = null;

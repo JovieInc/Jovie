@@ -10,6 +10,11 @@ permissions:
 jobs:
   repro:
     runs-on: ubuntu-24.04
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        base: ['https://jovie-2ezpfot2p-jovie.vercel.app', 'https://jov.ie']
     timeout-minutes: 20
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
@@ -22,7 +27,8 @@ jobs:
       - uses: ./.github/actions/setup-playwright
       - name: Click dashboard sidebar on landed production
         env:
-          PRODUCTION_BASE_URL: https://jovie-2ezpfot2p-jovie.vercel.app
+          PRODUCTION_BASE_URL: ${{ matrix.base }}
+          REPRO_HUMAN_UA: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36'
           EXPECTED_COMMIT_SHA: 028d34780640d6da0333b4a9e4674208d8ef98d4
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
@@ -39,6 +45,7 @@ jobs:
               BASE_URL="$PRODUCTION_BASE_URL" \
               EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$PRODUCTION_BASE_URL" \
               EXPECTED_VERCEL_ENVIRONMENT=production \
+              REPRO_HUMAN_UA="$REPRO_HUMAN_UA" \
               PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
                 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
                   pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line \
