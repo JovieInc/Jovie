@@ -7,6 +7,15 @@ persistent whole-tree ledger that says what each component still lacks.
 Run: `node scripts/component-certificate.mjs --all --out report.json --summary`
 or `--component <path> --spec` for the agent-ready work order.
 
+Gate: `node scripts/component-certificate.mjs --gate` (run by `pnpm
+component-ship-gate`) fails when any component under a `gates` prefix in
+`component-certification.json` has a gated criterion that is `fail` or
+`unknown`. The gate only ratchets up: add a prefix once a layer is clean, and
+add a criterion once its evidence producer exists. @jovie/ui is gated on
+ds-owner, tokens, states, tests, a11y and frontend-rules as each component is
+certified; mutation, visual and benchmark join once their producers record
+source-bound evidence.
+
 Fail-closed: a criterion with no evidence is `unknown` and counts as missing.
 Invalid JSON in an input file blocks report generation with a nonzero exit.
 
@@ -27,6 +36,12 @@ The certificate computes its binding from the component's actual source bytes.
 CI a11y, visual, and benchmark records must carry that SHA-256 `sourceHash`;
 stale or unbound records remain `unknown`. Current unit-axe assertions remain
 an independent source of a11y evidence.
+
+A passing a11y or visual record is a story-capture receipt
+(`jovie.component-story-evidence/v1`, `scripts/lib/component-evidence.mjs`):
+`sourceHash`, `captured`, and `stories: [{ id, themes }]` where every story was
+captured in both `light` and `dark`. A pass without that proof is ignored (the
+CLI names it on stderr), so the criterion stays unknown; a `fail` always stands.
 
 Mutation records keep the canonical sweep format: `blob` is
 `moduleKey(source Git blob, same-stem test Git blobs)` and `sha` is the measured

@@ -115,7 +115,16 @@ export async function POST(request: NextRequest) {
         appUserId,
       }),
     // Never a request-derived value (legacy-transaction.ts actor contract).
-    { actorId: ANONYMOUS_ACTOR_ID, system: true, retry: 'never' }
+    // Read committed: parallel tabs share one acquisition id, and serializable
+    // turned every concurrent upsert after the first into a 40001 and a 500.
+    // Row locks keep each statement safe; the user_id unique index still
+    // refuses a second journey for one user.
+    {
+      actorId: ANONYMOUS_ACTOR_ID,
+      system: true,
+      retry: 'never',
+      isolationLevel: 'read committed',
+    }
   );
 
   const funnelStage = stageForFunnelPath(parsed.data.currentPath);

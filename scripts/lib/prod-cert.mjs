@@ -5,13 +5,11 @@
  * steps (returning sign-in, new-user signup, onboarding, chat, checkout entry)
  * come from the post-deploy Playwright run as a steps file and are folded in
  * here, so one receipt per surface is built from every kind of evidence.
- * Receipts are SHA-bound to /api/health/build-info and carry per-check
- * timestamps. A surface that was not exercised is `blocked` with a reason,
- * never silently passed.
+ * Receipts are SHA-bound to /api/health/build-info with per-check times; a
+ * surface that was not exercised is `blocked` with a reason, never passed.
  */
 
-// Cone probe bodies and the shared HTTP helpers live in prod-cert-probes.mjs
-// (company-guards size baseline); this module keeps the receipt logic.
+// Cone probes and HTTP helpers live in prod-cert-probes.mjs (size baseline).
 import {
   checkoutConeChecks,
   coneClaimChecks,
@@ -22,6 +20,11 @@ import {
   missingBrowserChecks,
   readServedBuild,
 } from './prod-cert-probes.mjs';
+import {
+  loadPenInputs,
+  strangerChecks,
+  truthChecks,
+} from './prod-cert-truth.mjs';
 
 export const RECEIPT_SCHEMA = 'jovie.prod-golden-path-receipt/v1';
 
@@ -181,6 +184,7 @@ export function anonymousChecks({
   const coneClaim = coneCases
     ? coneClaimChecks({ origin, fetchImpl, run })
     : [];
+  const stranger = strangerChecks({ origin, fetchImpl, run });
   return {
     landing: () => [
       run('landing-renders', async () => {
@@ -190,6 +194,7 @@ export function anonymousChecks({
           throw new Error('GET /: empty title');
       }),
       ...coneLanding,
+      ...stranger.landing(),
     ],
     'signup-signin': () => [
       run('signin-form-renders', async () => {
@@ -198,9 +203,7 @@ export function anonymousChecks({
         if (!/type="email"|name="email"/i.test(page.body))
           throw new Error('GET /signin: no email field');
       }),
-      run('signup-renders', async () => {
-        expectOk(await get(origin, '/signup', fetchImpl), 'GET /signup');
-      }),
+      stranger.signup(),
     ],
     claim: () => [
       run('claim-renders', async () => {
@@ -212,9 +215,7 @@ export function anonymousChecks({
           'GET /claim?claim=1'
         );
       }),
-      run('start-renders', async () => {
-        expectOk(await get(origin, '/start', fetchImpl), 'GET /start');
-      }),
+      stranger.start(),
       ...coneClaim,
       run('taken-handle-rejected', async () => {
         const { response, body } = await get(
@@ -303,9 +304,10 @@ export function anonymousChecks({
         };
       }),
     ],
-    ...(coneCases
-      ? { checkout: () => checkoutConeChecks({ origin, fetchImpl, run }) }
-      : {}),
+    checkout: () => [
+      ...(coneCases ? checkoutConeChecks({ origin, fetchImpl, run }) : []),
+      ...stranger.checkout(),
+    ],
   };
 }
 
@@ -314,9 +316,8 @@ export function anonymousChecks({
  * { surface, id, status, startedAt, endedAt, summary } written by the
  * post-deploy Playwright run; `authStatus` covers the case where the run was
  * skipped (no credentials) or never produced steps. A `capabilities` step
- * (JOV-9854) declares which checks the SERVED build's smoke implements, so a
- * missing check on an older production build reads as deploy skew, not as a
- * silent smoke skip.
+ * (JOV-9854) declares the checks the SERVED build's smoke implements, so a
+ * missing check on an older build reads as deploy skew, not a smoke skip.
  */
 export function stepChecks(
   steps,
@@ -360,8 +361,7 @@ export function stepChecks(
         Array.isArray(step.ids) &&
         step.ids.every(id => typeof id === 'string')
       ) {
-        // Two specs can declare the same surface (claim) from different
-        // workers — union so neither declaration is lost to write order.
+        // Specs on different workers may declare one surface (claim): union.
         const declared = (capabilitiesBySurface[step.surface] ??= new Set());
         for (const id of step.ids) declared.add(id);
       }
@@ -377,9 +377,8 @@ export function stepChecks(
     }
     // A malformed non-check step must never become a check with a missing id.
     if (typeof step.id !== 'string' || step.id.length === 0) continue;
-    // A Playwright retry re-records the same check. The latest attempt is
-    // the verdict, so one failed attempt followed by a pass is one passed
-    // check, not a failed surface (JOV-9822).
+    // A Playwright retry re-records the check; the latest attempt is the
+    // verdict, so a fail then a pass is one passed check (JOV-9822).
     const checks = (bySurface[step.surface] ??= []);
     const record = {
       id: step.id,
@@ -406,10 +405,10 @@ export function stepChecks(
   };
 }
 
-// The browser-check contract moved to prod-cert-probes.mjs together with the
-// JOV-6920 cone probes; re-exported so consumer import paths are unchanged.
+// Browser-check contract lives in prod-cert-probes.mjs; re-exported for consumers.
 export { EXPECTED_BROWSER_CHECKS, missingBrowserChecks, readServedBuild };
 
+/** Build one receipt per surface in launch order. */
 export async function runProductionCertification({
   origin = 'https://jov.ie',
   fetchImpl = fetch,
@@ -425,6 +424,7 @@ export async function runProductionCertification({
   coneCases = false,
 } = {}) {
   const served = await readServedBuild(origin, fetchImpl);
+  const pen = await loadPenInputs();
   const stepState = stepChecks(steps, authStatus, now);
   const probes = anonymousChecks({
     origin,
@@ -453,8 +453,9 @@ export async function runProductionCertification({
       if (probes[surface])
         checks.push(...(await Promise.all(probes[surface]())));
       const present = stepState.bySurface[surface] ?? [];
-      checks.push(...present);
       checks.push(
+        ...present,
+        ...truthChecks(surface, stepState.observationsBySurface[surface], pen),
         ...missingBrowserChecks({
           surface,
           present,

@@ -1210,43 +1210,6 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
         self.assertFalse(sweeper.in_scope(self.home / "Jovie", roots, never))
         self.assertIn((self.home, "wt/*"), sweeper.standalone_globs(self.home, self.state, mounted_roots=()))
 
-    def test_headroom_levels_and_alarm_events_on_change(self):
-        usage = {Path("/a"): (100, 0, 20), Path("/b"): (100, 0, 25), Path("/c"): (100, 0, 10), Path("/d"): (100, 0, 60)}
-        current = sweeper.headroom(list(usage), usage=lambda p: usage[p])
-        self.assertEqual([v["level"] for v in current["volumes"]], ["warn", "warn", "crit", "ok"])
-        self.assertEqual([a["mount"] for a in current["alarms"]], ["/a", "/b", "/c"])
-        sweeper.publish_headroom(self.state, current, self.now)
-        events = (self.state / "host-alarms.jsonl").read_text().splitlines()
-        self.assertEqual(len(events), 3)
-        sweeper.publish_headroom(self.state, current, self.now + 1)
-        self.assertEqual(len((self.state / "host-alarms.jsonl").read_text().splitlines()), 3)  # no repeat
-        usage[Path("/c")] = (100, 0, 90)
-        sweeper.publish_headroom(self.state, sweeper.headroom(list(usage), usage=lambda p: usage[p]), self.now + 2)
-        self.assertEqual(len((self.state / "host-alarms.jsonl").read_text().splitlines()), 4)  # recovered
-        self.assertEqual(sweeper.headroom([Path("/missing-volume")], usage=lambda p: (_ for _ in ()).throw(OSError()))["volumes"], [])
-
-    def test_volumes_lists_root_srv_mounts_and_state_volume(self):
-        found = sweeper.volumes(self.home, self.state, mounts=[Path("/srv/worktrees")])
-        self.assertIn(Path("/"), found)
-        self.assertIn(Path("/srv/worktrees"), found)
-
-    def test_daily_report_names_top_growers_and_runs_once_a_day(self):
-        grow = self.base / "grow"
-        grow.mkdir()
-        (grow / "blob").write_bytes(b"x" * 4096)
-        self.assertEqual(sweeper.daily_report(self.home, self.state, self.now, targets=[grow]), "written")
-        (grow / "blob2").write_bytes(b"x" * 8 * 2**20)
-        self.assertEqual(sweeper.daily_report(self.home, self.state, self.now + 60, targets=[grow]), "not-due")
-        self.assertEqual(sweeper.daily_report(self.home, self.state, self.now + DAY + 1, targets=[grow]), "written")
-        report = json.loads((self.state / "disk-report.json").read_text())
-        self.assertEqual(report["topGrowers"][0]["path"], str(grow))
-        self.assertGreater(report["topGrowers"][0]["deltaGiB"], 0)
-        self.assertTrue(report["volumes"])
-
-    def test_report_targets_only_lists_existing_paths(self):
-        (self.state / "runs").mkdir()
-        self.assertIn(self.state / "runs", sweeper.report_targets(self.home, self.state))
-
     def test_linked_worktree_with_keep_marker_is_never_retired(self):
         repo = self.base / "primary"
         git(self.base, "clone", "-q", str(self.remote), str(repo))

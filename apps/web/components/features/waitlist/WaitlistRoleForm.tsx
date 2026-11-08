@@ -78,6 +78,10 @@ export function WaitlistRoleForm({
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
   const [turnstileFailed, setTurnstileFailed] = useState(false);
+  // Load Cloudflare's check only once the visitor touches the form: on load
+  // it put a CSP-blocked probe and vendor console errors on every homepage
+  // view (product crawl, 2026-11-08).
+  const [securityCheckArmed, setSecurityCheckArmed] = useState(false);
   const turnstileRequired =
     isTurnstileClientConfigured() && !isTurnstileClientBypassed();
 
@@ -198,6 +202,8 @@ export function WaitlistRoleForm({
         inert={status === 'joined'}
         aria-hidden={status === 'joined' || undefined}
         onSubmit={handleSubmit}
+        onFocusCapture={() => setSecurityCheckArmed(true)}
+        onPointerDownCapture={() => setSecurityCheckArmed(true)}
         data-testid='waitlist-role-form'
         aria-labelledby={`${formId}-heading`}
         className={cn(
@@ -294,7 +300,7 @@ export function WaitlistRoleForm({
           invalid={status === 'error' && !turnstileFailed}
           describedBy={`${formId}-error`}
         />
-        {status !== 'joined' ? (
+        {status !== 'joined' && securityCheckArmed ? (
           <InvisibleTurnstile
             onToken={setTurnstileToken}
             onStateChange={handleTurnstileStateChange}
