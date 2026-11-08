@@ -14,7 +14,7 @@
  */
 
 import { access, readFile } from 'node:fs/promises';
-import { isAbsolute, join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** A real desktop browser, no `+synthetic` marker: what a stranger sends. */
@@ -166,9 +166,12 @@ export function jankChecks(observations = [], at = new Date().toISOString()) {
 export const GOLDEN_PATH_PEN_MANIFEST =
   'docs/pen-stills/golden-path/manifest.json';
 // Lazy: bundlers and jsdom load this module with a non-file import.meta.url.
+// No new URL(literal, import.meta.url): Turbopack resolves that as an asset
+// when an app route bundles this module, and '../..' is not a file.
 const repoRoot = () => {
-  const url = new URL('../..', import.meta.url);
-  return url.protocol === 'file:' ? fileURLToPath(url) : process.cwd();
+  const here = import.meta.url;
+  if (!here.startsWith('file:')) return process.cwd();
+  return dirname(dirname(dirname(fileURLToPath(here)))); // scripts/lib/x.mjs
 };
 const fromRepo = path => (isAbsolute(path) ? path : join(repoRoot(), path));
 
