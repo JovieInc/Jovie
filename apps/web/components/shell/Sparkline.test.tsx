@@ -16,13 +16,13 @@ describe('Sparkline', () => {
     const { container } = render(<Sparkline points={[1, 2, 3]} trend='up' />);
     const lines = container.querySelectorAll('path');
     // Second path is the line stroke
-    expect(lines[1]?.getAttribute('stroke')).toContain('165,243,252');
+    expect(lines[1]?.getAttribute('stroke')).toBe('var(--color-accent-green)');
   });
 
   it('uses the down palette for a down trend', () => {
     const { container } = render(<Sparkline points={[3, 2, 1]} trend='down' />);
     const lines = container.querySelectorAll('path');
-    expect(lines[1]?.getAttribute('stroke')).toContain('253,164,175');
+    expect(lines[1]?.getAttribute('stroke')).toBe('var(--color-accent-red)');
   });
 
   it('renders a playhead when hoverIdx is provided', () => {
@@ -50,5 +50,20 @@ describe('Sparkline', () => {
     if (!svg) throw new Error('svg missing');
     fireEvent.mouseLeave(svg);
     expect(onHover).toHaveBeenCalledWith(null);
+  });
+
+  it('paints only from design tokens so it reads in light and dark', () => {
+    const { container } = render(
+      <Sparkline points={[2, 1, 2]} trend='flat' hoverIdx={1} />
+    );
+    const painted = [...container.querySelectorAll('path, line, circle')]
+      .flatMap(node => [node.getAttribute('fill'), node.getAttribute('stroke')])
+      .filter((value): value is string => Boolean(value) && value !== 'none');
+
+    expect(painted.length).toBeGreaterThan(0);
+    for (const value of painted) {
+      expect(value).not.toMatch(/rgba?\(|#[0-9a-f]{3,8}/i);
+      expect(value).toMatch(/var\(--/);
+    }
   });
 });
