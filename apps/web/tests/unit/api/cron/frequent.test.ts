@@ -167,7 +167,7 @@ vi.mock('@/lib/leads/pipeline-logger', () => ({
 }));
 
 vi.mock('@/lib/leads/process-batch', () => ({
-  processLeadBatch: vi.fn(),
+  processLeadBatch: vi.fn(async () => ({ total: 0, error: 0 })),
 }));
 
 vi.mock('@/lib/notifications/suppression', () => ({
