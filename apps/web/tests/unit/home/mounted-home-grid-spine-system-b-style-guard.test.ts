@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest';
 const webRoot = path.resolve(__dirname, '../../..');
 const pagePath = 'app/(home)/page.tsx';
 const cssPath = 'app/(home)/home.css';
-const componentPath = 'components/homepage/HomepageArtistProfile.tsx';
+const componentPath = 'components/homepage/HomepageEditorial.tsx';
+const componentCssPath = 'components/homepage/HomepageEditorial.css';
 
 const forbiddenPageChromePatterns = [
   /#[0-9a-fA-F]{3,8}/,
@@ -69,9 +70,10 @@ describe('mounted homepage grid spine System B source contract', () => {
     );
 
     for (const mount of [
-      '<HomepageArtistHero',
-      '<HomepageFanStates',
-      '<HomepageOfferClose',
+      '<HomepageStoryHero',
+      '<HomepageProfileChapter',
+      '<HomepageReleasesChapter',
+      '<HomepageInviteClose',
     ]) {
       expect(
         countOccurrences(rendererSource, mount),
@@ -84,13 +86,11 @@ describe('mounted homepage grid spine System B source contract', () => {
   });
 
   it('aligns the homepage sections to the shared content column', () => {
-    const css = readFileSync(
-      path.join(webRoot, 'components/homepage/HomepageArtistProfile.css'),
-      'utf8'
-    );
+    const css = readFileSync(path.join(webRoot, componentCssPath), 'utf8');
     // The hero shares the section shell's container: one gutter, one width.
     const component = readFileSync(path.join(webRoot, componentPath), 'utf8');
-    expect(component).toContain('<HomepageHeroCanvas');
+    expect(component).toContain('<MarketingHero');
+    expect(component).toContain('<ArtistProfileSectionShell');
     expect(component).not.toContain('SHOW_HOMEPAGE_HERO_LIGHT');
     expect(css).not.toMatch(/--homepage-page-gutter|--ds-public-content-max/);
     for (const pattern of forbiddenSpineCssPatterns) {

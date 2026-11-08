@@ -317,6 +317,7 @@ describe('SpotifyConnectDialog', () => {
           expect(screen.getByRole('alert')).toHaveTextContent(
             "Couldn't reach Spotify. Try again."
           );
+          expect(screen.getByRole('alert')).toHaveClass('text-error-text');
           const retry = get('retry');
           await user.tab();
           expect(retry).toHaveFocus();

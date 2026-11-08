@@ -281,9 +281,9 @@ const SECTION_RESOLUTIONS = {
         rootBinding: "sectionVariant='centered-none'",
       },
       {
-        variantId: 'split-claim-card',
-        componentPath: 'apps/web/components/homepage/HomepageArtistProfile.tsx',
-        rootBinding: "sectionVariant='split-claim-card'",
+        variantId: 'centered-none',
+        componentPath: 'apps/web/components/homepage/HomepageEditorial.tsx',
+        rootBinding: "sectionVariant='centered-none'",
       },
       {
         variantId: 'left-none',
@@ -381,6 +381,11 @@ const SECTION_RESOLUTIONS = {
         variantId: 'phone-right',
         componentPath:
           'apps/web/components/marketing/artist-profile/ArtistProfileOpinionatedSection.tsx',
+        rootBinding: "sectionVariant='phone-right'",
+      },
+      {
+        variantId: 'phone-right',
+        componentPath: 'apps/web/components/homepage/HomepageEditorial.tsx',
         rootBinding: "sectionVariant='phone-right'",
       },
       {
@@ -528,7 +533,7 @@ const SECTION_RESOLUTIONS = {
       },
       {
         variantId: 'final-single-claim',
-        componentPath: 'apps/web/components/homepage/HomepageArtistProfile.tsx',
+        componentPath: 'apps/web/components/homepage/HomepageEditorial.tsx',
         rootBinding: "sectionVariant='final-single-claim'",
       },
       {
@@ -567,9 +572,9 @@ const SECTION_RESOLUTIONS = {
         rootBinding: "sectionVariant='profile-grid'",
       },
       {
-        variantId: 'profile-grid',
-        componentPath: 'apps/web/components/homepage/HomepageArtistProfile.tsx',
-        rootBinding: "sectionVariant='profile-grid'",
+        variantId: 'release-rail',
+        componentPath: 'apps/web/components/homepage/HomepageEditorial.tsx',
+        rootBinding: "sectionVariant='release-rail'",
       },
       {
         variantId: 'release-rail',
@@ -726,18 +731,12 @@ const RECIPE_RESOLUTIONS = {
     resolvedSource: 'apps/web/app/(home)/page.tsx',
     exportName: 'HomePage',
     // oPZHQ remains the legacy HomepageV2Route contract. Do not transfer its
-    // native identity to the artist-profile homepage without owner proof.
+    // native identity to the editorial homepage without owner proof.
     penRootId: null,
     penRootIds: [],
     penIdentityReason:
-      'The artist-profile / assembly (EVENT 2026-10-20) has no verified native mapping. The legacy HomepageV2Route contract is not its Pen owner; native reference resolution remains with the existing certification owner.',
+      'The editorial / assembly (Tim, 2026-11-03) has no verified native mapping. The legacy HomepageV2Route contract is not its Pen owner; native reference resolution remains with the existing certification owner.',
     rootProofs: [
-      {
-        source: 'apps/web/app/(home)/page.tsx',
-        binding: '<HomepageQueryProvider>',
-        occurrences: 1,
-        kind: 'source',
-      },
       {
         source: 'apps/web/app/(home)/page.tsx',
         binding: '<HomepageSpecSections',
@@ -748,7 +747,7 @@ const RECIPE_RESOLUTIONS = {
         // The page renders the published marketing-page/home spec; the
         // spec renderer mounts each registered section once.
         source: 'apps/web/components/homepage/HomepageSpecSections.tsx',
-        binding: '<HomepageFanStates',
+        binding: '<HomepageReleasesChapter',
         occurrences: 1,
         kind: 'source',
       },

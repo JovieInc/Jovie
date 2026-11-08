@@ -53,7 +53,7 @@ read_state() {  # read_state <num>
   local name="${REPO#*/}"
   [[ -n "$owner" && -n "$name" && "$owner" != "$name" ]]
   gh_retry api graphql \
-    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){isDraft headRefOid headRefName baseRefName body title author{login} state mergeable mergeStateStatus labels(first:100){nodes{name}} timelineItems(last:50,itemTypes:[CONVERT_TO_DRAFT_EVENT,PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT]){nodes{__typename ... on ConvertToDraftEvent{createdAt} ... on PullRequestCommit{commit{committedDate}} ... on HeadRefForcePushedEvent{createdAt}}}}}}' \
+    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){isDraft headRefOid headRefName baseRefName body title author{__typename login} state mergeable mergeStateStatus labels(first:100){nodes{name}} timelineItems(last:50,itemTypes:[CONVERT_TO_DRAFT_EVENT,PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT]){nodes{__typename ... on ConvertToDraftEvent{createdAt} ... on PullRequestCommit{commit{committedDate}} ... on HeadRefForcePushedEvent{createdAt}}}}}}' \
     -f owner="$owner" \
     -f name="$name" \
     -F number="$n" \
@@ -63,7 +63,13 @@ read_state() {  # read_state <num>
       branch: .headRefName,
       base: .baseRefName,
       body: (.body // ""),
-      authorLogin: .author.login,
+      # GraphQL Bot.login omits the REST suffix; User identities stay literal.
+      authorLogin: (
+        .author as $author
+        | if $author.__typename == "Bot" and ($author.login | type) == "string"
+          then ($author.login | if (test("\\S") | not) or (ascii_downcase | endswith("[bot]")) then . else . + "[bot]" end)
+          else $author.login end
+      ),
       title: (.title // ""),
       labels: [.labels.nodes[].name],
       state: .state,

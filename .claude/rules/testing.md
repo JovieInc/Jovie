@@ -163,6 +163,10 @@ Tests must be written **at feature creation time**, not retroactively. Apply cov
 | Homepage copy | No | Marketing, iterates fast |
 | Feedback submission flow | Yes | Deterministic workflow |
 
+## Hash-bound lane fixtures
+
+A change to `scripts/tests/test_disk_guard.py` must register its reviewed SHA-256 in `REVIEWED_FIXTURE_SHA256` in `scripts/lanes/qualification_guard.py` in the same change. Preserve the existing safety floor and prior approved hashes. Before a full lane qualification run, check this binding with `python3 -m pytest scripts/tests/test_qualification_guard.py::GuardContractTest::test_the_repo_fixture_is_a_reviewed_version -q`. This early contract check supplements the normal test and coverage gates.
+
 ## Verify Before Marking Done
 
 Never mark a task complete without confirming the fix works:

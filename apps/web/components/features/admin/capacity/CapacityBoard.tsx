@@ -23,7 +23,7 @@ import {
 const TONE_TEXT: Record<Tone, string> = {
   success: 'text-success',
   warning: 'text-warning',
-  danger: 'text-error',
+  danger: 'text-error-text',
   neutral: 'text-tertiary-token',
 };
 
@@ -408,7 +408,6 @@ function seatNote(
           : 'no pace';
   return `${account}: ${copy}`;
 }
-
 function PathsCard({ view }: Readonly<{ view: CapacityView }>) {
   if (view.paths.length === 0) return null;
   const models = [...new Set(view.paths.map(p => p.model))];
@@ -497,16 +496,17 @@ function AlertBanner({
       {alerts.map(alert => (
         <li
           key={alert.id}
-          role={alert.severity === 'alarm' ? 'alert' : undefined}
           className={cn(
             'rounded-lg border border-subtle bg-surface-0 p-3 text-app',
             alert.severity === 'alarm' ? 'text-error' : 'text-secondary-token'
           )}
         >
-          <span className='mr-2 text-2xs font-semibold uppercase'>
-            {alert.severity === 'alarm' ? 'Alarm' : 'Note'}
-          </span>
-          {alert.message}
+          <div role={alert.severity === 'alarm' ? 'alert' : undefined}>
+            <span className='mr-2 text-2xs font-semibold uppercase'>
+              {alert.severity === 'alarm' ? 'Alarm' : 'Note'}
+            </span>
+            {alert.message}
+          </div>
         </li>
       ))}
     </ul>

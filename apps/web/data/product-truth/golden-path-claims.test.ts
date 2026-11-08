@@ -1,8 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { HOMEPAGE_COPY } from '@/data/homepageCopy';
-import { HOMEPAGE_FAN_STATES_COPY } from '@/data/homepageFanStatesCopy';
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import { MARKETING_PRICING_PLANS } from '@/data/marketingPricingPlans';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import { collectStrings, isClaimBearing, resolvesToClaim } from './claim-audit';
@@ -274,8 +273,7 @@ describe('golden-path claim inventory', () => {
     const inventoried = GOLDEN_PATH_CLAIMS.map(claim => claim.copy);
     const registryClaims = listProductTruthClaims();
     const strings = collectStrings({
-      homepage: HOMEPAGE_COPY,
-      homepageFanStates: HOMEPAGE_FAN_STATES_COPY,
+      homepage: HOMEPAGE_EDITORIAL_COPY,
       pricing: MARKETING_PRICING_PLANS,
       taglines: [
         ENTITLEMENT_REGISTRY.free.marketing.tagline,

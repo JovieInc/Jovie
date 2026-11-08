@@ -100,7 +100,7 @@ describe('SortableLinkItem', () => {
   });
 
   describe('rendering', () => {
-    it('should render the link pill with platform name', () => {
+    it('should render the link pill with platform name (JOV-8873)', () => {
       renderWithProviders(<SortableLinkItem {...defaultProps} />);
 
       // buildPillLabel should be called

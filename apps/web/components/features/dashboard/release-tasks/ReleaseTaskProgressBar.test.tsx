@@ -17,6 +17,14 @@ describe('ReleaseTaskProgressBar', () => {
     expect(screen.queryByText(/overdue/)).toBeNull();
   });
 
+  it('names the progressbar for assistive technology (aria-progressbar-name)', () => {
+    render(<ReleaseTaskProgressBar done={2} total={5} />);
+
+    expect(
+      screen.getByRole('progressbar', { name: '2 of 5 tasks done' })
+    ).toBeInTheDocument();
+  });
+
   it('renders nothing when there are no tasks', () => {
     const { container } = render(<ReleaseTaskProgressBar done={0} total={0} />);
 

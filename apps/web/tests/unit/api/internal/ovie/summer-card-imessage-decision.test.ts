@@ -4,6 +4,7 @@ const hoisted = vi.hoisted(() => ({
   verify: vi.fn(),
   decide: vi.fn(),
   getCard: vi.fn(),
+  supersede: vi.fn(),
   captureError: vi.fn(),
 }));
 
@@ -13,6 +14,7 @@ vi.mock('@/lib/ovie/summer-oidc.server', () => ({
 vi.mock('@/lib/ovie/summer-cards.server', () => ({
   decideSummerCard: hoisted.decide,
   getSummerCard: hoisted.getCard,
+  supersedeSummerCard: hoisted.supersede,
 }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: hoisted.captureError }));
 vi.mock('@/lib/claim/claim-verification-review.server', () => ({
@@ -144,9 +146,9 @@ describe('iMessage decision route', () => {
 });
 
 describe('fleet supersede route', () => {
-  it('closes a card with the fleet reason as a reject by default', async () => {
-    hoisted.decide.mockResolvedValue({
-      outcome: 'decided',
+  it('closes a card with the fleet reason as a system reject by default', async () => {
+    hoisted.supersede.mockResolvedValue({
+      outcome: 'superseded',
       card: card('rejected'),
     });
     const res = await supersede.POST(
@@ -155,14 +157,11 @@ describe('fleet supersede route', () => {
     );
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ outcome: 'superseded' });
-    expect(hoisted.decide).toHaveBeenCalledWith(
-      expect.objectContaining({
-        decision: 'reject',
-        decidedBy: 'summer:fleet',
-        resolution: 'default',
-        comment: 'fleet: premise gone: PR merged',
-      })
-    );
+    expect(hoisted.supersede).toHaveBeenCalledWith({
+      id: ID,
+      reason: 'premise gone: PR merged',
+    });
+    expect(hoisted.decide).not.toHaveBeenCalled();
   });
 
   it('never lets the fleet approve spend or outbound cards', async () => {
@@ -181,6 +180,7 @@ describe('fleet supersede route', () => {
       ).toBe(403);
     }
     expect(hoisted.decide).not.toHaveBeenCalled();
+    expect(hoisted.supersede).not.toHaveBeenCalled();
   });
 
   it('lets the fleet approve a decision card by its default', async () => {
@@ -200,6 +200,16 @@ describe('fleet supersede route', () => {
         )
       ).status
     ).toBe(200);
+    expect(hoisted.decide).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: ID,
+        decision: 'approve',
+        comment: 'fleet: registry default',
+        decidedBy: 'summer:fleet',
+        resolution: 'default',
+      })
+    );
+    expect(hoisted.supersede).not.toHaveBeenCalled();
   });
 });
 
@@ -232,5 +242,6 @@ describe('claim-verification cards stay with Ovie', () => {
       expect(res.status).toBe(409);
     }
     expect(hoisted.decide).not.toHaveBeenCalled();
+    expect(hoisted.supersede).not.toHaveBeenCalled();
   });
 });

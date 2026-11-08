@@ -3,7 +3,15 @@
 // @coverage-via apps/web/tests/components/profile/ProfileDrawerShell.interaction.test.tsx
 
 import { ChevronLeft, X } from 'lucide-react';
-import { useCallback, useId, useRef } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Drawer } from 'vaul';
 import type { ProfileSurfacePresentation } from '@/features/profile/contracts';
 import { useModalFocusBoundary } from '@/lib/a11y/modal-focus-boundary';
@@ -56,16 +64,43 @@ export function ProfileDrawerShell({
   floating = false,
 }: ProfileDrawerShellProps) {
   const titleId = useId();
-  const modalRef = useRef<HTMLElement | null>(null);
+  const [modalNode, attachModalRef] = useState<HTMLElement | null>(null);
+  // Vaul attaches its portal after the opening effect. Node identity must
+  // activate the same boundary that synchronous embedded dialogs already use.
+  const modalRef = useMemo(() => ({ current: modalNode }), [modalNode]);
+  const openerRef = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (open) {
+      openerRef.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+    }
+  }, [open]);
+  const restoreOpenerFocus = useCallback(() => {
+    const opener = openerRef.current;
+    if (opener?.isConnected && !opener.closest('[inert]')) {
+      opener.focus({ preventScroll: true });
+    }
+  }, []);
+  // Keep the original opener across presentation changes. A Vaul portal
+  // restores after its exit animation; embedded dialogs unmount immediately.
+  useEffect(() => {
+    if (!open && !modalNode?.isConnected) restoreOpenerFocus();
+  }, [modalNode, open, restoreOpenerFocus]);
+  const handleCloseAutoFocus = useCallback(
+    (event: Event) => {
+      event.preventDefault();
+      if (!open) restoreOpenerFocus();
+    },
+    [open, restoreOpenerFocus]
+  );
   const subtitleId = useId();
   const accessibleDescriptionId = useId();
   const accessibleDescription = subtitle ?? 'Profile menu and actions.';
   const isSecondaryHeader = navigationLevel === 'secondary' && Boolean(onBack);
   const isDirectHeader = navigationLevel === 'direct';
   const handleDismiss = useCallback(() => onOpenChange(false), [onOpenChange]);
-  const attachModalRef = useCallback((node: HTMLElement | null) => {
-    modalRef.current = node;
-  }, []);
   useModalFocusBoundary(modalRef, open, {
     restoreFocus: true,
     onDismiss: handleDismiss,
@@ -311,17 +346,18 @@ export function ProfileDrawerShell({
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
       <Drawer.Portal>
         <Drawer.Overlay
-          className={`fixed inset-0 ${PROFILE_Z.DRAWER_BACKDROP} bg-black/60 backdrop-blur-sm`}
+          className={`fixed inset-0 ${PROFILE_Z.MODAL_DRAWER_BACKDROP} bg-black/60 backdrop-blur-sm`}
           onClick={handleDismiss}
           data-modal-backdrop
           tabIndex={-1}
           data-testid='profile-drawer-overlay'
         />
         <div
-          className={`fixed inset-x-0 bottom-0 ${PROFILE_Z.DRAWER_CONTENT} flex justify-center`}
+          className={`fixed inset-x-0 bottom-0 ${PROFILE_Z.MODAL_DRAWER_CONTENT} flex justify-center`}
         >
           <Drawer.Content
             ref={attachModalRef}
+            onCloseAutoFocus={handleCloseAutoFocus}
             className={contentClasses}
             style={drawerHeightStyle}
             data-testid={dataTestId}

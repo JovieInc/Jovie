@@ -35,4 +35,27 @@ describe('DrawerPropertyRow', () => {
     fireEvent.click(property);
     expect(onClick).toHaveBeenCalledOnce();
   });
+
+  it('adds no horizontal inset so rows share the drawer content edge', () => {
+    const { container } = render(
+      <DrawerPropertyRow label='Type' value='Single' />
+    );
+    expect(container.firstElementChild?.className).toContain('px-0');
+  });
+});
+
+describe('DrawerPropertyRow definition list semantics (JOV-8873)', () => {
+  it('renders dt/dd pairs only when definitionList is set', () => {
+    const { rerender } = render(
+      <dl>
+        <DrawerPropertyRow label='Status' value='Ready' definitionList />
+      </dl>
+    );
+    expect(screen.getByText('Status').tagName).toBe('DT');
+    expect(screen.getByText('Ready').tagName).toBe('DD');
+
+    rerender(<DrawerPropertyRow label='Status' value='Ready' />);
+    expect(screen.getByText('Status').tagName).toBe('SPAN');
+    expect(screen.getByText('Ready').tagName).toBe('SPAN');
+  });
 });

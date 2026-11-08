@@ -18,6 +18,12 @@ export interface WithheldMarketingRoute {
 
 export const WITHHELD_MARKETING_ROUTES: readonly WithheldMarketingRoute[] = [
   {
+    route: '/voice',
+    reason: 'Demo cannot play a voice sample and has no voice UI capture.',
+    returnsWhen: 'a real voice sample or voice UI capture exists',
+    note: 'Restore /voice to nav, footer, and sitemap when real voice evidence ships.',
+  },
+  {
     route: '/card',
     reason: 'Product is not available yet; the page only collects interest.',
     returnsWhen: 'Jovie Card ships and can be ordered or used.',

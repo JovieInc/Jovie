@@ -2,6 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { productionUpstashCredentials } from '@/lib/redis-store';
+import { issueGoldenPathInvitation } from '@/lib/testing/golden-path-invitation-fixture';
 import {
   ensureSignedInUser,
   fillControlledInputUntilEnabled,
@@ -23,7 +24,6 @@ import {
   watchKeyframeErrors,
 } from './helpers/golden-path-keyframes';
 import { interceptGoldenPathTrackingCalls } from './helpers/golden-path-tracking';
-import { ratchetGeometry } from './utils/ratchet-geometry';
 import {
   installRuntimeAutomationBypass,
   resetAuthStatePreservingOnboardingSession,
@@ -181,18 +181,15 @@ async function verifyHomeWelcome(page: Page) {
           `[data-testid="chat-composer-surface"] button[aria-label=${JSON.stringify(name)}]`
         );
     }
-    // ratchet: JOV-9612
-    await ratchetGeometry('home composer essentials', async () => {
-      expect(
-        await inspectEssentialViewport(page, [
-          ...selectors,
-          '[data-testid="chat-empty-state-greeting-text"]',
-          '[data-testid="chat-empty-state-next-step"]',
-          '[data-testid="chat-composer-surface"]',
-          '[aria-label="Chat message input" i]',
-        ])
-      ).toEqual({ supported: true, findings: [] });
-    });
+    expect(
+      await inspectEssentialViewport(page, [
+        ...selectors,
+        '[data-testid="chat-empty-state-greeting-text"]',
+        '[data-testid="chat-empty-state-next-step"]',
+        '[data-testid="chat-composer-surface"]',
+        '[aria-label="Chat message input" i]',
+      ])
+    ).toEqual({ supported: true, findings: [] });
     const centering = await measureCenter();
     expect(centering).not.toBeNull();
     if (centering)
@@ -231,10 +228,7 @@ async function verifyHomeWelcome(page: Page) {
       expect(before).not.toBeNull();
       expect(after).not.toBeNull();
       if (before && after) {
-        // ratchet: JOV-9612
-        await ratchetGeometry('home composer y shift', () => {
-          expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1);
-        });
+        expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1);
       }
       await assertGeometry();
       if (viewport.width === 1440) {
@@ -498,16 +492,14 @@ async function exerciseGoogleProviderRecovery(page: Page): Promise<void> {
   });
 }
 
-/**
- * Create a brand-new Better Auth test user through the visible email-OTP
- * signup surface. E2E_TEST_MODE supplies the deterministic 424242 code only
- * for canonical +e2e test addresses.
- */
+/** Issued invitation, then visible email-OTP sign-in. E2E mode supplies 424242 for +e2e addresses. */
 async function createFreshUserOnce(page: import('@playwright/test').Page) {
   const email = `gp-${Date.now().toString(36)}+e2e@test.jovie.com`;
+  const sql = neon(process.env.DATABASE_URL!);
+  await issueGoldenPathInvitation(async (q, p) => sql.query(q, p), email);
   const preparedAuth = await prepareBetterAuthEmailOtp(page, {
     email,
-    entryPath: '/signup',
+    entryPath: `${APP_ROUTES.SIGNIN}?redirect_url=${encodeURIComponent(APP_ROUTES.START)}`,
     recovery: {
       initialEmail: email.replace('gp-', 'gp-abandoned-'),
       resendCode: true,

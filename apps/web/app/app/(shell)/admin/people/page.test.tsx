@@ -97,6 +97,9 @@ vi.mock('@/lib/admin/waitlist', () => ({
   getWaitlistIntegritySummary: vi.fn(),
   getWaitlistMetrics: vi.fn(),
 }));
+vi.mock('@/lib/admin/waitlist-gate-funnel', () => ({
+  getWaitlistGateFunnel: vi.fn(),
+}));
 vi.mock('@/lib/feedback', () => ({
   getAdminFeedbackItemsResult: vi.fn(),
 }));
