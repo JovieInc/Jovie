@@ -31,14 +31,14 @@ export interface ChatHistorySwitcherProps {
   readonly activeConversationId: string | null;
 }
 
-// The trigger keeps the old title's left seam: the pill's inset padding is
-// pulled back with a matching negative margin, so opening never moves text.
+// The header title truncates (overflow hidden), so the pill stays inside its
+// box and the focus ring is drawn inset rather than outside the edges.
 const TRIGGER_CLASS = cn(
-  '-mx-1.5 inline-flex h-7 min-w-0 max-w-full items-center gap-1 rounded-lg px-1.5',
+  'inline-flex h-7 min-w-0 max-w-full items-center gap-1 rounded-lg px-1.5',
   'text-primary-token',
   'transition-colors duration-subtle ease-subtle',
   'hover:bg-surface-1 aria-expanded:bg-surface-1',
-  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/35'
+  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus/35'
 );
 
 const MAX_LIST_HEIGHT = 'min(30rem, calc(100dvh - 6rem))';
@@ -50,6 +50,10 @@ const matchTitle: NonNullable<CommonDropdownProps['filterItem']> = (
   'label' in item && typeof item.label === 'string'
     ? chatHistoryRowMatches(item.label, query)
     : true;
+
+// The load-error panel (message + Retry) must survive a typed search.
+const keepEveryItem: NonNullable<CommonDropdownProps['filterItem']> = () =>
+  true;
 
 function ChatHistoryRowContent({ row }: { readonly row: ChatHistoryRow }) {
   return (
@@ -102,6 +106,7 @@ export function ChatHistorySwitcher({
   } = useChatConversationsQuery({ limit: 50, enabled: hasIntent || open });
 
   const label = title?.trim() || NEW_CHAT_LABEL;
+  const showError = isError && !conversations;
 
   const handleOpenChange = useCallback((nextOpen: boolean) => {
     // Read state is browser-only; read it when the panel opens, not on render.
@@ -124,7 +129,7 @@ export function ChatHistorySwitcher({
   );
 
   const items = useMemo<CommonDropdownItem[]>(() => {
-    if (isError && !conversations) {
+    if (showError) {
       return [
         {
           id: 'chat-history-error',
@@ -158,8 +163,8 @@ export function ChatHistorySwitcher({
     activeConversationId,
     conversations,
     handleSelect,
-    isError,
     readAtById,
+    showError,
     refetch,
   ]);
 
@@ -173,9 +178,9 @@ export function ChatHistorySwitcher({
       searchable
       searchPlaceholder={CHAT_HISTORY_SEARCH_PLACEHOLDER}
       onSearchChange={setQuery}
-      filterItem={matchTitle}
+      filterItem={showError ? keepEveryItem : matchTitle}
       isLoading={isLoading && !conversations}
-      emptyMessage={getChatHistoryEmptyMessage({ query, isError: false })}
+      emptyMessage={getChatHistoryEmptyMessage({ query, isError: showError })}
       scrollBody
       motion='anchored'
       maxHeight={MAX_LIST_HEIGHT}

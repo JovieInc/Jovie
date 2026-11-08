@@ -252,6 +252,24 @@ describe('ChatHistorySwitcher', () => {
     expect(screen.getByRole('menu')).toBeInTheDocument();
   });
 
+  it('keeps the load error and Retry visible while a search is typed', async () => {
+    setQuery({ data: undefined, isError: true });
+    const { user, menu } = await openSwitcher();
+    await user.type(screen.getByPlaceholderText('Chat History'), 'tour');
+    expect(menu).toHaveTextContent("Couldn't Load Chats");
+    expect(within(menu).getByRole('menuitem', { name: 'Retry' })).toBeVisible();
+    expect(menu).not.toHaveTextContent('No Matching Chats');
+  });
+
+  it('keeps the title pill and its focus ring inside the truncating header', () => {
+    render(
+      <ChatHistorySwitcher title='Tour Budget' activeConversationId='c2' />
+    );
+    const trigger = screen.getByTestId('chat-history-trigger');
+    expect(trigger.className).not.toMatch(/(^|\s)-m[xl]-/);
+    expect(trigger.className).toContain('focus-visible:ring-inset');
+  });
+
   it('has no axe violations open (besides the tracked in-menu search gap)', async () => {
     const { menu } = await openSwitcher();
     const { violations } = await axeRun(menu, {
