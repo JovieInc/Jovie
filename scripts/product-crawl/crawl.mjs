@@ -174,4 +174,11 @@ const lines = [
 ];
 await writeFile(join(args.out, 'summary.md'), lines.join('\n'));
 console.log(lines.join('\n'));
+// Every finding, one JSON line each, so the full list survives in the job log.
+for (const f of rankFindings(verdict.findings))
+  console.log(`crawl-finding ${JSON.stringify(f)}`);
+for (const p of pages.filter(x => !x.error && !x.authGated))
+  console.log(
+    `crawl-page ${JSON.stringify({ route: p.route, viewport: p.viewport, status: p.status, cls: p.cls, lcpMs: p.lcpMs, longestTaskMs: p.longestTaskMs, loadMs: p.loadMs })}`
+  );
 // The crawl reports; ready-gate.mjs decides. Exit 0 so the receipt uploads.
