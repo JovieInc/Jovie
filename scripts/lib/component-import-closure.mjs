@@ -86,10 +86,12 @@ const STRIP_COMMENTS = /\/\*[\s\S]*?\*\/|(^|[^:\\'"`])\/\/[^\n]*/g;
 export function parseModule(text) {
   const src = text.replace(STRIP_COMMENTS, '$1');
   const imports = [];
+  /** @type {{spec: string, names: string[] | null, sources?: Record<string, string>}[]} */
   const reexports = [];
   const localExports = new Set();
   // `export { A as B } from './a'`: callers ask for B, the source module has A.
   const named = list => {
+    /** @type {Record<string, string>} */
     const map = {};
     for (const raw of list.split(',')) {
       const part = raw.trim();
