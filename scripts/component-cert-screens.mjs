@@ -18,7 +18,9 @@ import { parseArgs } from 'node:util';
 import { REPO_ROOT } from './component-ship-policy.mjs';
 import {
   currentDebt,
+  debtEntry,
   evaluateScreenGates,
+  owedCriteria,
   readScreens,
   screenComponents,
   screenIssues,
@@ -113,13 +115,14 @@ if (values.enroll || values.refresh) {
     ? new Set(byScreen.get(values.enroll))
     : new Set();
   // Refresh only ever shrinks an entry; enrollment may add the new screen's.
-  for (const [component, failing] of Object.entries(fresh)) {
-    const owed = screens.debt?.[component];
+  for (const [component, entry] of Object.entries(fresh)) {
+    const failing = owedCriteria(entry);
+    const owed = owedCriteria(screens.debt?.[component]);
     if (enrolled.has(component))
-      next[component] = [...new Set([...(owed ?? []), ...failing])].sort();
-    else if (owed) {
+      next[component] = debtEntry([...owed, ...failing]);
+    else if (owed.length) {
       const kept = owed.filter(id => failing.includes(id));
-      if (kept.length) next[component] = kept;
+      if (kept.length) next[component] = debtEntry(kept);
     }
   }
   screens.debt = Object.fromEntries(

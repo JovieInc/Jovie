@@ -5,8 +5,10 @@ import { dirname, join } from 'node:path';
 import { afterAll as after, describe, it } from 'vitest';
 import {
   currentDebt,
+  debtEntry,
   evaluateScreenGates,
   isCustomerUi,
+  owedCriteria,
   screenComponents,
   screenIssues,
 } from '../component-cert-screens.mjs';
@@ -201,9 +203,20 @@ describe('screen gate', () => {
       /--component apps\/web\/components\/ClaimCard.tsx --spec$/
     );
     assert.deepEqual(currentDebt(report, registry(), byScreen), {
-      'apps/web/components/ClaimCard.tsx': ['tests'],
-      'apps/web/components/Shell.tsx': ['tests', 'a11y'],
+      'apps/web/components/ClaimCard.tsx': 'tests',
+      'apps/web/components/Shell.tsx': 'a11y,tests',
     });
+  });
+
+  it('reads debt as a comma string or an array, and writes it sorted', () => {
+    assert.deepEqual(owedCriteria('a11y, states,tests'), [
+      'a11y',
+      'states',
+      'tests',
+    ]);
+    assert.deepEqual(owedCriteria(['tests']), ['tests']);
+    assert.deepEqual(owedCriteria(undefined), []);
+    assert.equal(debtEntry(['tests', 'a11y', 'tests']), 'a11y,tests');
   });
 });
 

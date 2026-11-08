@@ -26,6 +26,24 @@ import { importClosure, routeEntries } from './component-import-closure.mjs';
 export const SCREENS_SCHEMA = 'jovie.cert-screens/v1';
 const CLEAR = new Set(['pass', 'na']);
 
+/**
+ * A debt entry is the criteria a component still owes, written as one
+ * comma-separated string ("a11y,states,tests") so the registry stays one line
+ * per component. Arrays are read too.
+ */
+export function owedCriteria(entry) {
+  if (Array.isArray(entry)) return entry;
+  if (typeof entry !== 'string') return [];
+  return entry
+    .split(',')
+    .map(id => id.trim())
+    .filter(Boolean);
+}
+
+export function debtEntry(criteria) {
+  return [...new Set(criteria)].sort().join(',');
+}
+
 /** Roots whose .tsx files the certificate can judge as components. */
 export const SCREEN_COMPONENT_ROOTS = Object.freeze([
   'apps/web/components/',
@@ -118,12 +136,13 @@ export function evaluateScreenGates(report, screens, byScreen, base = null) {
   }
   for (const [component, ids] of rendered) {
     const failing = failingCriteria(certs.get(component), criteria);
-    const allowed = new Set(debt[component] ?? []);
+    const allowed = new Set(owedCriteria(debt[component]));
     const fresh = failing.filter(id => !allowed.has(id));
     if (fresh.length)
       failures.push({ component, screens: ids, criteria: fresh });
   }
-  for (const [component, owed] of Object.entries(debt)) {
+  for (const [component, entry] of Object.entries(debt)) {
+    const owed = owedCriteria(entry);
     if (!rendered.has(component)) {
       stale.push({ component, reason: 'no enrolled screen renders it' });
       continue;
@@ -140,9 +159,9 @@ export function evaluateScreenGates(report, screens, byScreen, base = null) {
     const newScreenComponents = new Set(
       [...enrolledNow].flatMap(id => byScreen.get(id) ?? [])
     );
-    for (const [component, owed] of Object.entries(debt)) {
-      const before = new Set(base.debt[component] ?? []);
-      const added = owed.filter(id => !before.has(id));
+    for (const [component, entry] of Object.entries(debt)) {
+      const before = new Set(owedCriteria(base.debt[component]));
+      const added = owedCriteria(entry).filter(id => !before.has(id));
       if (added.length && !newScreenComponents.has(component))
         errors.push(
           `debt for ${component} grew (${added.join(', ')}); debt only shrinks, except for a screen being enrolled`
@@ -233,7 +252,7 @@ export function screenIssues(report, screens, byScreen) {
 export function currentDebt(report, screens, byScreen) {
   const debt = {};
   for (const row of screenIssues(report, screens, byScreen))
-    debt[row.component] = row.criteria;
+    debt[row.component] = debtEntry(row.criteria);
   return Object.fromEntries(
     Object.entries(debt).sort(([a], [b]) => a.localeCompare(b))
   );

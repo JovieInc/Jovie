@@ -107,7 +107,8 @@ the registry's `criteria`. `pnpm component-certificate:gate` enforces it:
 
 - a component on an enrolled screen that fails a criterion it does not owe blocks
   the merge, so a new component must be certified before it ships on the screen;
-- `debt` lists what failed when a screen was enrolled and may only shrink: an entry
+- `debt` maps each component to the criteria it failed when its screen was
+  enrolled, as one comma-separated string per line. It may only shrink: an entry
   that now passes, or that no screen renders, must be removed in the same PR
   (`pnpm component-cert:screens --refresh`), and debt may not grow except for a
   screen being enrolled;
