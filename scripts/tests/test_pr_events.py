@@ -1320,6 +1320,28 @@ class QuotaRelayTest(unittest.TestCase):
         self.assertEqual(events.classify_github_failure(self.QUOTA_LOG), "primary-rate-limit")
         self.assertEqual(events.classify_github_failure(self.REAL_LOG), "none")
 
+    @staticmethod
+    def release_log(last, error="download failed: https://github.com/koalaman/shellcheck/releases/download/v0.10.0/s.tar.xz"):
+        # scripts/lib/github-release-asset.sh, called by .github/scripts/run-actionlint.sh.
+        url = "https://github.com/koalaman/shellcheck/releases/download/v0.10.0/s.tar.xz"
+        return ("##[group]Run bash .github/scripts/run-actionlint.sh\n"
+                f"curl: (22) The requested URL returned error: {last}\n"
+                f"release download: anonymous HTTP {last} for {url}\n"
+                "release download attempt 5 failed; retrying\n"
+                f"release download failed after 6 attempts (last HTTP {last}): {url}\n"
+                f"##[error]{error}\n"
+                "##[error]Process completed with exit code 1.\n")
+
+    @unittest.skipUnless(events.RATE_LIMIT_HELPER.exists(), "shared classifier lands separately")
+    def test_an_exhausted_release_download_is_infra_but_a_bad_pin_is_not(self):
+        """2026-11-08: release downloads answered 504 for hours; the helper's exhausted 5xx is
+        re-run, while a 4xx (bad pin) or a sha256 mismatch stays repair work."""
+        self.assertEqual(events.quota_failure(self.RUN, self.shell([self.release_log("504")])),
+                         "transient-server")
+        for log in (self.release_log("404"),
+                    self.release_log("504", "sha256 mismatch: https://github.com/koalaman/shellcheck/releases/download/v0.10.0/s.tar.xz")):
+            self.assertIsNone(events.quota_failure(self.RUN, self.shell([log])), log)
+
     def test_failed_step_text_is_the_failing_steps_slice(self):
         log = ("##[group]Run earlier step\nHTTP 502 recovered\n##[endgroup]\n" + self.REAL_LOG)
         step = events.failed_step_text(log)
