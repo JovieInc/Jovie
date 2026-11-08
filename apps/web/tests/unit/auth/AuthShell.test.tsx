@@ -293,6 +293,16 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     });
   });
 
+  it('leaves One Tap off in the sign-in dialog when the browser has no FedCM', async () => {
+    oneTapConfiguredState.value = true;
+    Reflect.deleteProperty(globalThis.window, 'IdentityCredential');
+    render(<AuthShell mode='sign-in' compact />);
+
+    await waitFor(() => {
+      expect(oneTapMock).not.toHaveBeenCalled();
+    });
+  });
+
   it('does not call One Tap in managed account-less browser audits', async () => {
     document.documentElement.dataset.e2eMode = '1';
 
