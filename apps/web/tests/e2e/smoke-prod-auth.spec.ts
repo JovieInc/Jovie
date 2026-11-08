@@ -29,6 +29,7 @@ import {
 } from '../helpers/vercel-preview';
 import { deleteSyntheticChats } from './helpers/synthetic-chat-cleanup';
 import { primeOriginBoundVercelBypass } from './utils/prime-vercel-bypass';
+import { assertSidebarClickNavigation } from './utils/dashboard-click-navigation';
 import { assertChatResponseOk } from './utils/prod-cert-chat-response';
 import {
   certStep,
@@ -641,6 +642,10 @@ test.describe('Production Auth Smoke @production-smoke', () => {
 
     telemetry.record('onboarding');
     await telemetry.capture(page, 'onboarding');
+
+    // Click the sidebar, not page.goto: only a click proves the shell's
+    // client-side navigation still moves between dashboard pages.
+    await assertSidebarClickNavigation(page, expectedOrigin);
 
     await verifyProductionIosOAuthTokenFlow(
       page.context().request,
