@@ -75,14 +75,60 @@ export async function expectNoForcedCaps(scope: Locator): Promise<void> {
   expect(shouting, 'UI text is forced into all caps').toEqual([]);
 }
 
+const SKELETON_SELECTOR =
+  '[aria-busy="true"], [data-skeleton], .animate-pulse, [class*="skeleton" i]';
+
+async function visibleText(locator: Locator): Promise<string> {
+  if ((await locator.count()) === 0) return '';
+  const first = locator.first();
+  if (!(await first.isVisible())) return '';
+  return ((await first.textContent()) ?? '').trim();
+}
+
+/**
+ * The draft profile's required fields are filled once the media has loaded:
+ * the artist name, the profile handle and the featured release's title all
+ * render real text, and nothing in the preview is still a loading skeleton.
+ * The release title is read from the artwork's own alt text, so a release the
+ * card knows about can never render with an empty title.
+ */
+export async function expectRequiredFieldsPainted(
+  rail: Locator
+): Promise<void> {
+  const name = await visibleText(rail.getByTestId('profile-identity-link'));
+  expect(name, 'Preview artist name rendered empty').not.toBe('');
+
+  const handle = await visibleText(rail.getByTestId('profile-identity-handle'));
+  expect(
+    handle.split('/').pop()?.trim() ?? '',
+    `Preview handle rendered without a handle ("${handle}")`
+  ).not.toBe('');
+
+  const alt =
+    (await rail.locator('img[alt$=" artwork"]').first().getAttribute('alt')) ??
+    '';
+  const releaseTitle = alt.replace(/ artwork$/, '').trim();
+  expect(releaseTitle, 'Preview release has no title').not.toBe('');
+  await expect(
+    rail.getByText(releaseTitle).filter({ visible: true }),
+    `Preview release title "${releaseTitle}" did not render as text`
+  ).not.toHaveCount(0);
+
+  await expect(
+    rail.locator(SKELETON_SELECTOR).filter({ visible: true }),
+    'Preview still shows a loading skeleton after its media painted'
+  ).toHaveCount(0, { timeout: MEDIA_TIMEOUT_MS });
+}
+
 /**
  * The Golden Path preview bar beyond its release count: a painted portrait
- * and artwork, and no UI text forced into caps.
+ * and artwork, filled required fields, and no UI text forced into caps.
  */
 export async function expectPreviewIsReal(
   scope: Locator,
   rail: Locator
 ): Promise<void> {
   await expectPreviewMediaPainted(rail);
+  await expectRequiredFieldsPainted(rail);
   await expectNoForcedCaps(scope);
 }
