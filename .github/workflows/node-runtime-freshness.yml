@@ -1,4 +1,8 @@
 name: Node Runtime Freshness
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Summer
+# necessary-trust-boundary: Node.js publishes releases outside the repo, so this daily job is the only hop that reads nodejs.org and Docker Hub, rewrites the exact pin files and opens one jovie-bot PR; that PR merges only through the normal required checks and never deploys or publishes.
+# removal-trigger: Remove the bump job when Renovate or Dependabot can move every exact pin file, tarball checksum and image digest in one PR that passes the pin contract tests.
 # clock-class: upstream-advisory
 on:
   schedule:
