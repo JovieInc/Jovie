@@ -12,11 +12,13 @@ import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 
 type FounderFunnelStageRow = FounderFunnelStageRows['rows'][number];
 
+// Pinned to UTC so the server render and the browser show the same day.
 function formatSignupDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
+    timeZone: 'UTC',
   });
 }
 
@@ -35,12 +37,14 @@ const FOUNDER_FUNNEL_COLUMNS = [
     minSize: 240,
     cell: ({ row }) => {
       const { displayName, email } = row.original;
-      const name = displayName ?? email;
+      // A blank display name falls back to the email, like a missing one.
+      const shownName = displayName?.trim() || null;
+      const name = shownName ?? email;
       if (!name) return <EmptyCell />;
       return (
         <PersonCell
           name={name}
-          secondary={displayName && email ? email : undefined}
+          secondary={shownName && email ? email : undefined}
         />
       );
     },
