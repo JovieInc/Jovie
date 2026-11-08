@@ -4,7 +4,7 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  border-radius: 2rem;
+  border-radius: calc(var(--radius-3xl) + var(--radius-sm));
   background: var(--hv3-shell);
   box-shadow:
     var(--hv3-cast),
@@ -134,7 +134,7 @@
 }
 
 .hv3-pp__art img {
-  border-radius: 0.375rem;
+  border-radius: calc(var(--radius-sm) - var(--radius-xs));
 }
 
 .hv3-pp__title {

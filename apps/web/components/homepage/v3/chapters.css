@@ -320,7 +320,7 @@
   left: 35rem;
   width: 24.375rem;
   height: 53.75rem;
-  border-radius: 2.25rem;
+  border-radius: calc(var(--radius-3xl) + var(--radius-lg));
   background: var(--hv3-canvas);
   transform: translateZ(7.5rem) scale(0.86);
   transform-origin: 0 0;

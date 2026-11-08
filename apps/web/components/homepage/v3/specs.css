@@ -82,7 +82,7 @@
 
 .hv3-meter i {
   height: 1.75rem;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--hv3-floating);
 }
 
