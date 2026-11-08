@@ -54,7 +54,9 @@ describe('PresenceIdentityPhoto', () => {
     expect(photo).toHaveAttribute('data-photo-kind', 'generic');
     expect(photo.querySelector('img')).toBeNull();
     // No artist monogram stands in for the platform on a compact row.
-    expect(getByTestId('presence-identity-platform-mark')).toBeInTheDocument();
+    const mark = getByTestId('presence-identity-platform-mark');
+    // A bare icon, never a filled or bordered tile (design-noise icon-tile).
+    expect(mark.className).not.toMatch(/\b(bg-|border|ring)/);
     expect(photo).not.toHaveTextContent('T');
     expect(photo).toHaveAttribute(
       'aria-label',

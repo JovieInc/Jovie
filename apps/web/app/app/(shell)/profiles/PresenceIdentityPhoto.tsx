@@ -82,7 +82,7 @@ export function PresenceIdentityPhoto({
         <span
           aria-hidden
           data-testid='presence-identity-platform-mark'
-          className='inline-flex h-5 w-5 items-center justify-center rounded-full bg-surface-2 text-secondary-token'
+          className='inline-flex h-5 w-5 items-center justify-center text-secondary-token'
         >
           <SocialIcon
             platform={subject.platform}
