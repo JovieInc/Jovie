@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { startTeleprompterRecording } from '@/lib/teleprompter/recorder';
 import type { VideoRecordingProposalPayload } from '@/lib/teleprompter/types';
 import { uploadRecordableVideo } from '@/lib/teleprompter/upload-video';
 import { fastRender } from '@/tests/utils/fast-render';
@@ -86,5 +87,19 @@ describe('ChatVideoRecordingProposalCard', () => {
       ).toBeInTheDocument()
     );
     expect(screen.getByText('Video uploaded to Work')).toBeInTheDocument();
+  });
+
+  it('passes the interview questions to Record In App', () => {
+    fastRender(
+      <ChatVideoRecordingProposalCard
+        profileId='profile_story'
+        payload={{ ...payload, questions: ['Where did you write it?'] }}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('chat-video-recording-record-in-app'));
+    expect(startTeleprompterRecording).toHaveBeenCalledWith(
+      expect.objectContaining({ questions: ['Where did you write it?'] })
+    );
   });
 });
