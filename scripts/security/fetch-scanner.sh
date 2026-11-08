@@ -144,7 +144,7 @@ fetch_scanner() { # tool version
       :
     else
       rm -f "$cand"
-      echo "::error title=Secret scanner download failed::Could not fetch a verified $tool $version from release ($url) or container images." >&2
+      echo "::error title=Secret scanner download failed::Could not fetch $tool after $max_attempts attempts ($url) and no verified container fallback." >&2
       return 1
     fi
   fi
