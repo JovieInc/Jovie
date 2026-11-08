@@ -74,14 +74,6 @@
   padding: var(--space-3) var(--space-3) var(--space-4);
 }
 
-:where(.system-b-onboarding-draft-eyebrow) {
-  color: var(--color-text-secondary-token);
-  font-size: var(--text-3xs);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-}
-
 :where(.system-b-onboarding-draft-title) {
   color: var(--color-text-primary-token);
   font-size: var(--text-3xl);

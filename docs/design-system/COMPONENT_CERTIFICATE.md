@@ -67,6 +67,17 @@ and a nonnegative integer `valid` count; this adds no minimum-mutant floor.
 Mutation sweep default scope is `lib/,app/api/`; pass
 `--include components/...` to score components.
 
+## Empty data (one rule)
+
+A field is empty only when its source is empty. When the source has no value,
+the component shows its Empty state, and that state needs a story (or a written
+waiver) under `states`. When the source has a value, the field must paint it:
+never a blank name, a blank handle, a title missing next to its artwork, or a
+loading skeleton left after the data arrived. The rendered check is
+`expectRequiredFieldsPainted` in `apps/web/tests/e2e/helpers/preview-media-quality.ts`,
+which the Golden Path runs through `expectPreviewIsReal`; reuse it rather than
+writing a second check.
+
 ## Benchmark library
 
 `benchmark-library.json` maps a job to the best-in-class behavior and to the
@@ -97,3 +108,29 @@ the criterion failing until the fix lands; editing the component makes the
 record stale (`unknown`) until it is re-judged and re-hashed. Fixes in shared
 `packages/ui/lib` styles do not change a component hash, so re-judge the
 consumers when those change.
+
+## Screen gate (Golden Path first)
+
+`docs/design-system/cert-screens.json` lists the screens a customer sees, each by
+its App Router page. Every component the page can render (the static import
+closure of the page and the layouts above it, barrels followed by name) must pass
+the registry's `criteria`. `pnpm component-certificate:gate` enforces it:
+
+- a component on an enrolled screen that fails a criterion it does not owe blocks
+  the merge, so a new component must be certified before it ships on the screen;
+- `debt` maps each component to the criteria it failed when its screen was
+  enrolled, as one comma-separated string per line. It may only shrink: an entry
+  that now passes, or that no screen renders, must be removed in the same PR
+  (`pnpm component-cert:screens --refresh`), and debt may not grow except for a
+  screen being enrolled;
+- a screen with no debt left is must-pass.
+
+Machine-driven expansion, for an agent loop:
+
+- `pnpm component-cert:screens` prints coverage per screen;
+- `pnpm component-cert:screens --issues out.json` writes the ranked work list
+  (`jovie.cert-screens-report/v1`): one row per failing component with its
+  screens, failing criteria, details and the `--spec` command that says what to
+  fix, components on the most screens first, then the fewest failing criteria;
+- `pnpm component-cert:screens --enroll <id> --page apps/web/app/.../page.tsx`
+  enrolls a screen; never edit `screens` or `debt` by hand.

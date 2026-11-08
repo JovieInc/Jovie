@@ -123,6 +123,10 @@ const defaultSettings: LeadPipelineSettings = {
   updatedAt: new Date(),
 };
 
+// Made-up snippet showing a paid smart-link footprint, so the free buyer
+// pre-screen passes the candidate.
+const buyer = { title: 'Fixture | Linktree', snippet: 'Spotify ffm.to/new' };
+
 const defaultKeyword = {
   id: 'keyword-1',
   query: 'indie pop artist linktree',
@@ -166,9 +170,9 @@ describe('runDiscovery', () => {
 
     searchWebMock.mockResolvedValue(
       okOutcome([
-        { link: 'https://linktr.ee/artist-one' },
-        { link: 'https://linktr.ee/artist-one' },
-        { link: 'https://linktr.ee/artist-two' },
+        { link: 'https://linktr.ee/artist-one', ...buyer },
+        { link: 'https://linktr.ee/artist-one', ...buyer },
+        { link: 'https://linktr.ee/artist-two', ...buyer },
         { link: 'https://example.com/not-linktree' },
       ])
     );
@@ -252,8 +256,8 @@ describe('runDiscovery', () => {
 
     searchWebMock.mockResolvedValue(
       okOutcome([
-        { link: 'https://linktr.ee/artist-three' },
-        { link: 'https://linktr.ee/artist-four' },
+        { link: 'https://linktr.ee/artist-three', ...buyer },
+        { link: 'https://linktr.ee/artist-four', ...buyer },
       ])
     );
 

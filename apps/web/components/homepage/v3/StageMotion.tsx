@@ -5,6 +5,8 @@ import { useEffect } from 'react';
 /**
  * The homepage v3 client layer. It renders nothing.
  *
+ * 0. Between 1024 and 1439 every stage keeps its 1248px design frame and is
+ *    zoomed to fit the content box exactly (CSS carries stepped floors).
  * 1. Callouts and the catalog connector follow anchors inside the 3D rigs, so
  *    they are placed from projected geometry after layout, on resize and once
  *    fonts load. They move by transform and fade in, never by layout, and a
@@ -39,6 +41,36 @@ function guidesFor(
   if (!Number.isFinite(side)) return null;
   const box = section.getBoundingClientRect();
   return { left: box.left + side, right: box.right - side };
+}
+
+/** The approved design frame of every stage, the content box, in rem. */
+const BOX_REM = 78;
+
+/**
+ * Fit each homepage's stage zoom to its content box, so every mockup's edges
+ * land on the frame guides at any width from 1024 to 1439. Outside that range
+ * the CSS value stands (1 at 1440 and up; stages flow at their own size below
+ * 1024).
+ */
+function fitStages() {
+  const zoomed = matchMedia(
+    '(min-width: 64rem) and (max-width: 89.9375rem)'
+  ).matches;
+  for (const root of document.querySelectorAll<HTMLElement>('.hv3')) {
+    const rule = root.querySelector<HTMLElement>('.hv3-rule');
+    const side = rule
+      ? Number.parseFloat(getComputedStyle(rule).paddingLeft)
+      : NaN;
+    const rem = Number.parseFloat(
+      getComputedStyle(document.documentElement).fontSize
+    );
+    if (!zoomed || !Number.isFinite(side) || !(rem > 0)) {
+      root.style.removeProperty('--hv3-z');
+      continue;
+    }
+    const fit = (root.clientWidth - side * 2) / (BOX_REM * rem);
+    root.style.setProperty('--hv3-z', String(Math.min(1, Math.max(0.5, fit))));
+  }
 }
 
 function placeCallouts() {
@@ -198,6 +230,7 @@ export function StageMotion({
 }: Readonly<{ paletteQuery: string; paletteTarget: string }>) {
   useEffect(() => {
     const layout = () => {
+      fitStages();
       placeCallouts();
       drawConnectors();
     };

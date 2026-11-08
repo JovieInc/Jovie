@@ -38,7 +38,7 @@ export const HOMEPAGE_EDITORIAL_COPY = {
     primaryHref: `#${HOMEPAGE_INVITE_ANCHOR}`,
     secondaryAction: 'See a live profile',
     secondaryHref: TIM_WHITE_PROFILE.publicProfilePath,
-    note: 'jovie opens by invitation',
+    note: 'two fields · we email when your spot opens',
     windowLabel: `Jovie for Mac: an example artist's Releases list with ${HOMEPAGE_FEATURED_ARTIST.inspected.title} open in the inspector`,
     upcCallout: 'per release',
   },
@@ -81,7 +81,7 @@ export const HOMEPAGE_EDITORIAL_COPY = {
       },
       catalog: {
         title: 'Made from your catalog.',
-        body: 'Your catalog comes in once, and every release gets its own page.',
+        body: 'Title, artwork and UPC carry over from your catalog, so every page matches the release.',
       },
     },
   },
@@ -90,11 +90,11 @@ export const HOMEPAGE_EDITORIAL_COPY = {
     subhead:
       'Tell us your role and where to reach you. We’ll email you when your spot opens.',
     roleLabel: 'I’m a',
-    action: 'Request invite',
+    action: 'Request an invite',
     steps: [
       {
         title: 'Tell us who you are',
-        body: 'Your role and one email. Under a minute.',
+        body: 'Under a minute.',
       },
       {
         title: 'We review each request',

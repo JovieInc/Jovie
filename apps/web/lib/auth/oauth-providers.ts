@@ -37,9 +37,10 @@ export type PrimaryAuthOAuthProvider = Extract<
   'apple' | 'google'
 >;
 
+// Pen oaz9c lists Google first, then Apple.
 export const AUTH_OAUTH_PROVIDER_ORDER = [
-  'apple',
   'google',
+  'apple',
 ] as const satisfies readonly PrimaryAuthOAuthProvider[];
 
 export const AUTH_OAUTH_PROVIDER_LABELS = {

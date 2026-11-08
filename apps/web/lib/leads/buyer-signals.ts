@@ -17,10 +17,12 @@
 import {
   BUYER_SIGNAL_WEIGHTS,
   type BuyerSignalCategory,
-  DSP_HOSTS,
+  DSP_PROVIDERS,
   DSP_TEXT_PATTERN,
   HOST_RULES,
   JOVIE_HOSTS,
+  PERFORMER_PATTERN,
+  SERVICE_BUSINESS_PATTERN,
   TEXT_RULES,
   type WeightId,
 } from './buyer-signal-rules';
@@ -59,6 +61,8 @@ export interface BuyerPrescreenResult {
   readonly decision: 'pass' | 'fail';
   readonly score: number;
   readonly hardStop: PrescreenHardStop | null;
+  /** A replaced tool or enough budget evidence; false on any hard stop. */
+  readonly hasSpend: boolean;
   readonly signals: readonly BuyerSignal[];
   /** Human-readable, one line per signal or stop, strongest first. */
   readonly reasons: readonly string[];
@@ -70,6 +74,11 @@ export interface BuyerPrescreenOptions {
   /** Handles never to treat as buyers (founder, staff, test pages). */
   readonly excludedHandles?: readonly string[];
   readonly passScore?: number;
+  /**
+   * False when only part of the page was seen (a search snippet): a missing
+   * streaming link is then unknown, not absent, so no_music_presence is off.
+   */
+  readonly pageSeenInFull?: boolean;
 }
 
 /** Minimum total score for a pass (spend evidence is also required). */
@@ -121,6 +130,7 @@ export function prescreenBuyer(
     decision: 'fail',
     score: 0,
     hardStop,
+    hasSpend: false,
     signals: [],
     reasons: [reason],
     replacedTools: [],
@@ -141,8 +151,15 @@ export function prescreenBuyer(
     displayName: page.displayName,
     bio: page.bio,
   });
-  if (nonArtist)
+  // "Curator, DJ, producer" is an artist who also curates, not a curator page.
+  const performer = PERFORMER_PATTERN.test(
+    [page.displayName, page.bio].filter(Boolean).join(' ')
+  );
+  if (nonArtist && !(nonArtist === 'curator' && performer))
     return stop('non_artist', `not an independent artist (${nonArtist})`);
+  const service = text.match(SERVICE_BUSINESS_PATTERN);
+  if (service)
+    return stop('non_artist', `music service business ("${service[0]}")`);
 
   const signals: BuyerSignal[] = [];
   const add = (
@@ -175,13 +192,14 @@ export function prescreenBuyer(
     }
   }
   const dspHosts = new Set(
-    parsed
-      .filter(p => matchesHost(p.host, DSP_HOSTS))
-      .map(p =>
-        p.host.replace(/^(open|music)\./, '').replace('youtu.be', 'youtube.com')
-      )
+    parsed.flatMap(p =>
+      Object.entries(DSP_PROVIDERS)
+        .filter(([, hosts]) => matchesHost(p.host, hosts))
+        .map(([provider]) => provider)
+    )
   );
   if (
+    options.pageSeenInFull !== false &&
     dspHosts.size === 0 &&
     releaseLinks.size === 0 &&
     !DSP_TEXT_PATTERN.test(text)
@@ -246,8 +264,17 @@ export function prescreenBuyer(
     decision: passes ? 'pass' : 'fail',
     score,
     hardStop: null,
+    hasSpend,
     signals,
     reasons,
     replacedTools,
   };
+}
+
+/** Run-log label for a failed pre-screen: hard stop, low score, or no spend. */
+export function prescreenFailReason(
+  prescreen: BuyerPrescreenResult
+): PrescreenHardStop | 'score_below_threshold' | 'no_spend_signal' {
+  if (prescreen.hardStop) return prescreen.hardStop;
+  return prescreen.hasSpend ? 'score_below_threshold' : 'no_spend_signal';
 }

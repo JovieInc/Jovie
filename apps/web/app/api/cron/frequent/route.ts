@@ -20,7 +20,7 @@
  * Schedule: every 15 minutes (configured in vercel.json)
  */
 
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { asc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { describeAcquisitionBlock } from '@/lib/acquisition/eligibility';
 import { getAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
@@ -320,6 +320,7 @@ export async function GET(request: Request) {
       .select({ id: leads.id })
       .from(leads)
       .where(eq(leads.status, 'discovered'))
+      .orderBy(asc(leads.updatedAt))
       .limit(30);
     if (unqualifiedLeads.length > 0) {
       qualificationResult = await processLeadBatch(

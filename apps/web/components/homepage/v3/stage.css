@@ -31,11 +31,19 @@
   --hv3-ui: var(--font-sans);
   --hv3-mono: var(--font-geist-mono, var(--font-mono));
   /*
-   * Yaw then pitch, never roll. CSS applies the rightmost turn first, so the
-   * pitch turns every row about its own axis and rows and type stay level;
-   * pitch first would tip rows by about 4.4 degrees.
+   * The camera is square to the page: every mockup is a flat pane whose
+   * edges sit on the content box, so its rows, type and frame are exact.
+   * Depth comes from light, shadow and layering, never from a tilt.
    */
-  --hv3-cam: rotateY(-14deg) rotateX(18deg);
+  --hv3-cam: rotate(0deg);
+  /* Stage zoom: the 1248px design frame scaled to the content box. 1 from
+     1440 up; StageMotion sets the exact value below that. */
+  --hv3-z: 1;
+  /* The approved 1440 design frame of every stage: the content box. */
+  --hv3-box: 78rem;
+  /* The three-column caption grid of that box: 25rem columns, 1.5rem gaps. */
+  --hv3-col1: calc((var(--hv3-box) - 3rem) / 3);
+  --hv3-col2: calc(var(--hv3-col1) * 2 + 1.5rem);
   --hv3-cast:
     0 3.75rem 7.5rem -1.25rem
     color-mix(in srgb, var(--hv3-shade) 85%, transparent),
@@ -180,7 +188,6 @@
 
 .hv3-stage {
   position: relative;
-  perspective: 150rem;
 }
 
 .hv3-rig {
