@@ -55,7 +55,7 @@ jobs:
         env:
           PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
           PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
-          QUERY: ${{ inputs.query || '^oaz9c$|^Route /signin|^STAGING · Auth column|^CANONICAL · Mac sign-in|^Cinematic — Jovie window · macOS auth|^EVIDENCE / Jovie for Mac / Auth' }}
+          QUERY: ${{ inputs.query || '^(Canonical / App Sidebar Flyout|Canonical / Presence Surface / Runtime v3|App / Contacts / Wide · selected row|App / Chat / New Chat — greeting|Presence / Clear hierarchy|PROPOSAL / Sidebar header)' }}
           LOG_PNG: ${{ inputs.log_png || '.' }}
         run: |
           set -euo pipefail
