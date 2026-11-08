@@ -103,9 +103,12 @@
     height: 35rem;
   }
 
+  /* The rig now scales from its top-left corner, so the offset that kept the
+     approved 390 crop (sidebar edge into the list) when it scaled from its
+     top centre gains 39rem x (1 - 0.72) = 10.92rem. */
   .hv3-rig--hero {
     top: 0.625rem;
-    left: calc(-20.625rem - var(--hv3-gutter));
+    left: calc(-9.705rem - var(--hv3-gutter));
     transform: var(--hv3-cam) scale(0.72);
   }
 
