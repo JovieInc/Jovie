@@ -123,3 +123,41 @@ export const TooltipLongKey: Story = {
     </Tooltip>
   ),
 };
+
+export const LongContent: Story = {
+  render: () => (
+    <div className='flex w-40 items-center gap-1.5 text-sm text-secondary-token'>
+      <Kbd>Ctrl Alt Shift ArrowRight</Kbd>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A long key name in a narrow container stays within max-w-full and wraps inside the keycap instead of overflowing it.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div
+      dir='rtl'
+      className='flex w-56 flex-wrap items-center gap-1.5 text-sm text-secondary-token'
+    >
+      <span>افتح لوحة الأوامر</span>
+      <Kbd>⌘</Kbd>
+      <Kbd>⇧</Kbd>
+      <Kbd>P</Kbd>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Right-to-left label with a shortcut sequence: keycaps follow the inline direction and the Shift icon stays legible.',
+      },
+    },
+  },
+};

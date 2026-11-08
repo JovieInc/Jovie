@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import {
   AlertDialog,
@@ -411,5 +412,35 @@ describe('AlertDialog overlay layer contract', () => {
     expect(screen.getByTestId('alert-dialog-content').className).toContain(
       'z-modal'
     );
+  });
+});
+
+describe('AlertDialog accessibility', () => {
+  it('has no axe violations when open', async () => {
+    render(<TestAlertDialog open />);
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    await expectNoA11yViolations(document.body);
+  });
+
+  it('has no axe violations with long right-to-left copy', async () => {
+    render(
+      <AlertDialog open>
+        <AlertDialogContent dir='rtl'>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              هل تريد حذف هذا الإصدار نهائيًا من مكتبتك الموسيقية؟
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              ستتوقف الروابط العامة التي شاركتها مع جمهورك عن العمل فورًا.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction variant='destructive'>حذف</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+    await expectNoA11yViolations(document.body);
   });
 });

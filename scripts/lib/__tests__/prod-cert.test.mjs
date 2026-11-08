@@ -14,6 +14,7 @@ import {
   SURFACE_IDS,
   statusFromChecks,
 } from '../prod-cert.mjs';
+import { PEN_IDS } from './fixtures/pen-green-env.mjs';
 
 const SHA = 'a'.repeat(40);
 const T = '2026-10-28T20:00:00.000Z';
@@ -60,7 +61,9 @@ function fakeFetch({ failPath, sha = SHA } = {}) {
     }
     if (u.pathname === '/signin')
       return html('<title>Sign in</title><input type="email">');
-    return html('<title>Jovie page</title>');
+    return html(
+      '<title>Jovie</title><a href="/signup">s</a><a href="/claim?plan=pro">p</a>'
+    );
   };
 }
 
@@ -129,6 +132,7 @@ describe('runProductionCertification', () => {
     ).toEqual([
       'release-link-resolves',
       'release-og-image',
+      ...PEN_IDS,
       'click-analytics-capture',
     ]);
   });
@@ -234,16 +238,10 @@ describe('fileSurfaceIssues', () => {
       fetchImpl: fakeFetch({ failPath: '/claim' }),
     });
     await fileSurfaceIssues(receipts, { deps: { upsert, close } });
-    expect(upsert.mock.calls.map(c => c[0].fingerprint)).toEqual([
-      'prod-cert-claim',
-    ]);
-    expect(upsert.mock.calls[0][0]).toMatchObject({
-      fingerprint: 'prod-cert-claim',
-      labelKey: 'prod-cert-claim',
-    });
-    expect(close.mock.calls.map(c => c[0].fingerprint)).toEqual([
-      'prod-cert-landing',
-    ]);
+    const fp = calls => calls.map(c => c[0].fingerprint).join();
+    expect(fp(upsert.mock.calls)).toBe('prod-cert-claim,prod-cert-checkout');
+    expect(upsert.mock.calls[0][0].labelKey).toBe('prod-cert-claim');
+    expect(fp(close.mock.calls)).toBe('prod-cert-landing');
   });
 });
 
@@ -277,7 +275,9 @@ describe('JOV-9822 retries, full green and the overall verdict', () => {
     });
     const checkout = receipts.find(r => r.surface === 'checkout');
     expect(checkout.status).toBe('passed');
-    expect(checkout.checks).toHaveLength(1);
+    expect(
+      checkout.checks.filter(c => c.id === 'checkout-entry-renders')
+    ).toHaveLength(1);
   });
 
   it('a pass followed by a failed retry stays failed', async () => {

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { NativeSelect } from './native-select';
 
@@ -113,5 +114,33 @@ describe('NativeSelect', () => {
     expect(select.className).toContain(
       'focus-visible:border-(--linear-border-focus)'
     );
+  });
+});
+
+describe('NativeSelect certificate evidence', () => {
+  it('has no axe violations across labelled, invalid, bare, and disabled selects', async () => {
+    const { container } = render(
+      <div>
+        <NativeSelect options={OPTIONS} label='Release status' required />
+        <NativeSelect
+          options={OPTIONS}
+          label='Visibility'
+          error='Choose a visibility'
+        />
+        <NativeSelect options={OPTIONS} aria-label='Bare status' />
+        <NativeSelect
+          options={OPTIONS}
+          label='Locked status'
+          disabled
+          defaultValue='live'
+        />
+      </div>
+    );
+    await expectNoA11yViolations(container);
+
+    fireEvent.change(screen.getByLabelText('Bare status'), {
+      target: { value: 'live' },
+    });
+    expect(screen.getByLabelText('Bare status')).toHaveValue('live');
   });
 });
