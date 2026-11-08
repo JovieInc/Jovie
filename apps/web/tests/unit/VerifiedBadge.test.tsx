@@ -98,8 +98,7 @@ describe('VerifiedBadge', () => {
       expect(badge?.className).toContain('inline-flex');
       expect(badge?.className).toContain('align-middle');
       expect(badge?.className).toContain('rounded-full');
-      expect(badge?.className).toContain('bg-white');
-      expect(badge?.className).toContain('dark:bg-base');
+      expect(badge?.className).toContain('bg-verified-backing');
       expect(badge?.className).toContain('p-0.5');
     });
 
@@ -107,8 +106,7 @@ describe('VerifiedBadge', () => {
       const { container } = render(<VerifiedBadge />);
       const badge = container.querySelector('span');
 
-      expect(badge?.className).toContain('text-sky-600');
-      expect(badge?.className).toContain('dark:text-sky-400');
+      expect(badge?.className).toContain('text-verified');
     });
 
     it('icon has fill and stroke properties', () => {
@@ -116,7 +114,7 @@ describe('VerifiedBadge', () => {
       const icon = container.querySelector('svg');
 
       expect(icon).toHaveAttribute('fill', 'currentColor');
-      expect(icon).toHaveAttribute('stroke', 'white');
+      expect(icon).toHaveAttribute('stroke', 'var(--color-on-media)');
       expect(icon).toHaveAttribute('stroke-width', '2');
     });
   });
