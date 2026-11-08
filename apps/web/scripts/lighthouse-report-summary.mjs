@@ -70,6 +70,46 @@ export function summarizeReport(report) {
     );
   }
 
+  // lcp-breakdown-insight's details are a list: a table of the LCP's
+  // subparts, then the LCP element itself.
+  const lcpParts = report.audits?.['lcp-breakdown-insight']?.details?.items;
+  if (Array.isArray(lcpParts)) {
+    const element = lcpParts.find(part => part?.type === 'node');
+    if (element) {
+      lines.push(
+        `  LCP element: ${clip(element.snippet ?? element.selector ?? 'unknown element')}`
+      );
+    }
+    const subparts = lcpParts.find(part => part?.type === 'table')?.items;
+    if (Array.isArray(subparts) && subparts.length > 0) {
+      lines.push(
+        `  LCP breakdown: ${subparts
+          .map(
+            part =>
+              `${clip(part.label ?? part.subpart)} ${formatMs(
+                typeof part.duration === 'number' ? part.duration : null
+              )}`
+          )
+          .join(', ')}`
+      );
+    }
+  }
+
+  const scripts = tableItems(report, 'bootup-time')
+    .slice()
+    .sort((a, b) => (b.scripting ?? 0) - (a.scripting ?? 0))
+    .slice(0, MAX_ROWS);
+  if (scripts.length > 0) {
+    lines.push('  Main-thread script time:');
+    for (const item of scripts) {
+      lines.push(
+        `    ${stripOrigin(item.url)} ${formatMs(item.scripting ?? null)} running, ${formatMs(
+          item.scriptParseCompile ?? null
+        )} parsing`
+      );
+    }
+  }
+
   const blocking = tableItems(report, 'render-blocking-insight')
     .slice()
     .sort((a, b) => (b.wastedMs ?? 0) - (a.wastedMs ?? 0))
