@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+<<<<<<< HEAD
 // Crawl every page route the app ships, as a stranger and (given a saved
 // session) signed in, and write a receipt that ready-gate.mjs judges. Usage:
 //   node scripts/product-crawl/crawl.mjs --origin https://jov.ie --out <dir>
@@ -8,12 +9,24 @@
 // requests, placeholder text and sideways scroll. The public profile is also
 // crawled on an unclaimed test profile, where the claim banner must show.
 // The crawl only loads pages: it never clicks, submits or pays.
+=======
+// Crawl every page route the app ships, as a stranger, and write a receipt
+// that ready-gate.mjs judges. Usage:
+//   node scripts/product-crawl/crawl.mjs --origin https://jov.ie --out <dir>
+// Desktop (1440x900) and phone (390x844). Measures layout shift, LCP, the
+// longest main-thread stall, load time, console errors, failed same-origin
+// requests, placeholder text and sideways scroll. Signed-in pages are
+// recorded as behind the sign-in wall; a signed-in crawl is a later slice.
+>>>>>>> origin/main
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
 import {
+<<<<<<< HEAD
   CLAIM_BANNER,
+=======
+>>>>>>> origin/main
   fromThirdPartyFrame,
   PLACEHOLDER,
   productReady,
@@ -25,8 +38,11 @@ const { values: args } = parseArgs({
     origin: { type: 'string', default: 'https://jov.ie' },
     out: { type: 'string', default: 'product-crawl' },
     handle: { type: 'string', default: 'tim' },
+<<<<<<< HEAD
     'unclaimed-handle': { type: 'string', default: 'testartist' },
     'storage-state': { type: 'string', default: '' },
+=======
+>>>>>>> origin/main
     sha: { type: 'string', default: process.env.EXPECTED_COMMIT_SHA || '' },
   },
 });
@@ -36,6 +52,7 @@ const VIEWPORTS = {
   phone: { width: 390, height: 844 },
 };
 const SIGN_IN = /^\/(sign-?in|sign-?up|login|signin)(\/|$)/;
+<<<<<<< HEAD
 // Pages a signed-in load could change the test account from, or that
 // would end the session; the stranger crawl still covers them.
 const SIGNED_IN_SKIP = /delete|sign-?out|logout|cancel|remove|unsubscribe/;
@@ -46,6 +63,8 @@ const SIGNED_IN_TARGET = {
 };
 // Sent only to the crawled origin, never to third parties.
 const BYPASS = process.env.PLAYWRIGHT_VERCEL_BYPASS_SECRET || '';
+=======
+>>>>>>> origin/main
 
 const closedInProduction = JSON.parse(
   await readFile('scripts/product-crawl/closed-in-production.json', 'utf8')
@@ -82,6 +101,7 @@ const pages = [];
 const uncovered = [];
 const host = new URL(args.origin).host;
 
+<<<<<<< HEAD
 async function visit({ route, target, viewport, identity, fixture }) {
   const ctx = await browser.newContext({
     viewport: VIEWPORTS[viewport],
@@ -101,6 +121,12 @@ async function visit({ route, target, viewport, identity, fixture }) {
           },
         })
     );
+=======
+async function visit(route, viewport) {
+  const target = concrete(route);
+  const ctx = await browser.newContext({ viewport: VIEWPORTS[viewport] });
+  await ctx.addInitScript(OBSERVE);
+>>>>>>> origin/main
   const page = await ctx.newPage();
   const consoleErrors = [];
   const failedRequests = [];
@@ -124,8 +150,12 @@ async function visit({ route, target, viewport, identity, fixture }) {
     )
       failedRequests.push(`${r.status()} ${u.pathname}`);
   });
+<<<<<<< HEAD
   const row = { route, url: target, identity, viewport };
   if (fixture === 'unclaimed') row.expectClaimBanner = true;
+=======
+  const row = { route, url: target, identity: 'stranger', viewport };
+>>>>>>> origin/main
   const t0 = Date.now();
   try {
     const res = await page.goto(new URL(target, args.origin).href, {
@@ -143,7 +173,10 @@ async function visit({ route, target, viewport, identity, fixture }) {
     row.longestTaskMs = Math.round(m.longest);
     row.placeholder = m.text.match(PLACEHOLDER)?.[0] ?? null;
     row.horizontalOverflow = m.overflow;
+<<<<<<< HEAD
     if (row.expectClaimBanner) row.claimBanner = CLAIM_BANNER.test(m.text);
+=======
+>>>>>>> origin/main
     row.consoleErrors = [...new Set(consoleErrors)];
     row.thirdPartyConsole = thirdPartyConsole;
     row.failedRequests = [...new Set(failedRequests)];
@@ -157,6 +190,7 @@ async function visit({ route, target, viewport, identity, fixture }) {
 }
 
 const todo = [];
+<<<<<<< HEAD
 const signedIn = Boolean(args['storage-state']);
 for (const route of routes) {
   const target = concrete(route);
@@ -185,6 +219,17 @@ for (const route of routes) {
 }
 for (let i = 0; i < todo.length; i += 4)
   await Promise.all(todo.slice(i, i + 4).map(visit));
+=======
+for (const route of routes) {
+  if (!concrete(route)) {
+    uncovered.push({ route, reason: 'needs sample data for its parameters' });
+    continue;
+  }
+  for (const viewport of Object.keys(VIEWPORTS)) todo.push([route, viewport]);
+}
+for (let i = 0; i < todo.length; i += 4)
+  await Promise.all(todo.slice(i, i + 4).map(([r, v]) => visit(r, v)));
+>>>>>>> origin/main
 await browser.close();
 
 const receipt = {
@@ -213,7 +258,11 @@ for (const f of verdict.findings) byKind[f.kind] = (byKind[f.kind] ?? 0) + 1;
 const lines = [
   `## Product crawl: ${verdict.ready ? 'ready' : 'not ready'}`,
   '',
+<<<<<<< HEAD
   `${routes.length} page routes; ${pages.filter(p => p.identity === 'stranger').length} page loads as a stranger, ${pages.filter(p => p.identity === 'signed-in').length} signed in; ${uncovered.length} routes need sample data; ${pages.filter(p => p.authGated).length} loads hit the sign-in wall.`,
+=======
+  `${routes.length} page routes; ${pages.length} page loads as a stranger; ${uncovered.length} routes need sample data; ${pages.filter(p => p.authGated).length} loads hit the sign-in wall.`,
+>>>>>>> origin/main
   '',
   `Not ready because: ${verdict.reasons.join('; ') || 'nothing'}`,
   '',
@@ -247,6 +296,10 @@ for (const f of rankFindings(verdict.findings))
   console.log(`crawl-finding ${JSON.stringify(f)}`);
 for (const p of pages.filter(x => !x.error && !x.authGated))
   console.log(
+<<<<<<< HEAD
     `crawl-page ${JSON.stringify({ route: p.route, url: p.url, identity: p.identity, viewport: p.viewport, status: p.status, cls: p.cls, lcpMs: p.lcpMs, longestTaskMs: p.longestTaskMs, loadMs: p.loadMs })}`
+=======
+    `crawl-page ${JSON.stringify({ route: p.route, viewport: p.viewport, status: p.status, cls: p.cls, lcpMs: p.lcpMs, longestTaskMs: p.longestTaskMs, loadMs: p.loadMs })}`
+>>>>>>> origin/main
   );
 // The crawl reports; ready-gate.mjs decides. Exit 0 so the receipt uploads.

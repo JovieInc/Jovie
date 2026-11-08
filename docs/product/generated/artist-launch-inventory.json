@@ -3505,6 +3505,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/summer-company/funnel-benchmarks/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-company/funnel-benchmarks",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/summer-company/funnel/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/funnel",

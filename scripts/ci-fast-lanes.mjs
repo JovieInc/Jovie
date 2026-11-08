@@ -47,6 +47,7 @@ import {
   affectsWebTestTypecheck,
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
+import { STRUCTURAL_PYTEST_FILES } from './lib/ci-structural-pytest-files.mjs';
 import { testsAffectedBy } from './lib/test-file-dependencies.mjs';
 import { TEST_PLANNER_CONTRACT_TESTS } from './lib/test-planner-contract-tests.mjs';
 
@@ -262,8 +263,7 @@ export const SOURCE_GUARDS = Object.freeze([
   Object.freeze({
     // The repo-wide design-system, metrics-layer and locked Pen chrome guards (~42s) ran only in ci-fast, i.e. merge groups: group pr-21458
     // (2026-10-13) was ejected because a PR added text-destructive to
-    // OutboundRail.tsx and tripped destructive-red-drift-ratchet. They read
-    // web source from disk, so any web change can trip them.
+    // OutboundRail.tsx and tripped destructive-red-drift-ratchet. Any web change can trip them.
     id: 'merge-group-unit-guards',
     command: MERGE_GROUP_GUARDS_COMMAND,
     inputs: /^(?:apps\/web\/(?!tests\/e2e\/)|packages\/ui\/)/u,
@@ -727,21 +727,7 @@ const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
 const structuralPythonRegression = body =>
   `if python3 -c "import coverage, pytest, xdist" 2>/dev/null; then ${body}; elif [ "\${CI:-}" = "true" ]; then echo "::error::pytest/coverage/xdist missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage/xdist not installed — skip local structural regressions"; fi`;
 
-/** Files of the structural pytest suite (one collection, sharded below). */
-export const STRUCTURAL_PYTEST_FILES = Object.freeze([
-  'scripts/prod-errors/test_prod_errors.py',
-  'scripts/tests/test_gh_retry.py',
-  'scripts/tests/test_vercel_prebuilt_deploy.py',
-  'scripts/tests/test_brand_scrub.py',
-  'scripts/tests/test_agent_workflow_hygiene.py',
-  'scripts/tests/test_fleet_audit.py',
-  'scripts/tests/test_runner_routing.py',
-  'scripts/tests/test_signal_watch.py',
-  'scripts/tests/test_x_grok.py',
-  'scripts/tests/test_pr_remediation_swarm.py',
-  'scripts/tests/test_codex_launcher.py',
-  'scripts/tests/test_loose_exec_guard.py',
-]);
+export { STRUCTURAL_PYTEST_FILES };
 
 /**
  * The structural pytest suite (420 tests, 132s of one hosted run) was the
@@ -929,6 +915,8 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/hostops/pen-golden-path-sync.test.mjs',
+  'scripts/hostops/pen-files-worker/src/index.test.mjs',
   'scripts/runner-pool-routing.test.mjs',
   'scripts/sentry-build-config.test.mjs',
   'scripts/next-telemetry.test.mjs',
@@ -1149,6 +1137,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/gh-api-hold-retry.test.mjs',
   'scripts/lib/__tests__/prod-cert.test.mjs',
   'scripts/lib/__tests__/prod-cone-cases.test.mjs',
+  'scripts/lib/__tests__/cert-bottleneck.test.mjs',
   'scripts/lib/__tests__/self-hosted-workspace-reset-contract.test.mjs',
   'scripts/lib/__tests__/ci-timing-collector.test.mjs',
   'scripts/lib/__tests__/turbo-cache-stats.test.mjs',
@@ -1322,6 +1311,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/tooling-health.test.mjs',
   'scripts/lib/__tests__/merge-queue-speed.test.mjs',
   'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
+  'scripts/lib/__tests__/workers-inventory.test.mjs',
 ]);
 export const MESH_HOST_ACK_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-host-ack.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-host-ack.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-host-ack-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=99 --coverage.thresholds.statements=99 --coverage.thresholds.branches=90 --coverage.thresholds.functions=100';
