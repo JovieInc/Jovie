@@ -261,11 +261,9 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
-    // The repo-wide design-system, metrics-layer and locked Pen chrome
-    // guards (~42s) ran only in ci-fast, i.e. merge groups: group pr-21458
+    // The repo-wide design-system, metrics-layer and locked Pen chrome guards (~42s) ran only in ci-fast, i.e. merge groups: group pr-21458
     // (2026-10-13) was ejected because a PR added text-destructive to
-    // OutboundRail.tsx and tripped destructive-red-drift-ratchet. They read
-    // web source from disk, so any web change can trip them.
+    // OutboundRail.tsx and tripped destructive-red-drift-ratchet. Any web change can trip them.
     id: 'merge-group-unit-guards',
     command: MERGE_GROUP_GUARDS_COMMAND,
     inputs: /^(?:apps\/web\/(?!tests\/e2e\/)|packages\/ui\/)/u,
@@ -993,6 +991,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/queue-dequeue.test.mjs',
   'scripts/fleet-audit/import-github-audit.test.mjs',
   'scripts/golden-path-walk/latency-gate.test.mjs',
+  'scripts/product-crawl/ready-gate.test.mjs',
   'scripts/positioning/positioning.test.mjs',
   'scripts/funnel-judge/preview-gate.test.mjs',
   'scripts/funnel-judge/proof-gate.test.mjs',
@@ -1138,6 +1137,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/gh-api-hold-retry.test.mjs',
   'scripts/lib/__tests__/prod-cert.test.mjs',
   'scripts/lib/__tests__/prod-cone-cases.test.mjs',
+  'scripts/lib/__tests__/cert-bottleneck.test.mjs',
   'scripts/lib/__tests__/self-hosted-workspace-reset-contract.test.mjs',
   'scripts/lib/__tests__/ci-timing-collector.test.mjs',
   'scripts/lib/__tests__/turbo-cache-stats.test.mjs',
