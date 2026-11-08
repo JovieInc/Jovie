@@ -7,7 +7,6 @@
  * Optional evidence inputs (absent evidence = `unknown`, which counts as missing):
  *   --mutation-state sweep-state.json  --a11y a11y.json  --visual visual.json  --journeys journeys.json
  */
-import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -16,6 +15,7 @@ import {
   listComponentsInRoot,
   REPO_ROOT,
 } from './component-ship-policy.mjs';
+import { applyBenchmarkReview } from './lib/component-benchmark-review.mjs';
 import {
   buildReport,
   certifyComponent,
@@ -23,6 +23,11 @@ import {
   renderAgentSpec,
   summarizeGuards,
 } from './lib/component-certificate.mjs';
+import {
+  loadMutationInventory,
+  mutationStateKey,
+  mutationTestsFor,
+} from './lib/component-certificate-mutation.mjs';
 import { acceptStoryReceipts } from './lib/component-evidence.mjs';
 
 const { values } = parseArgs({
@@ -123,32 +128,13 @@ const journeyMap = readJson(values.journeys, { components: {}, journeys: {} });
 const benchmarks =
   readJson(values.benchmarks, { components: {} }).components ?? {};
 
-// Match mutation-sweep's same-stem test inventory, but hash the bytes being
-// certified rather than index blobs: local source/test edits must invalidate
-// an old run even before they are staged. Missing Git/input evidence stays
-// unknown; it must not fall back to a smaller test set with a different key.
-const mutationInventory = (() => {
-  if (!Object.keys(mutation).length) return null;
-  try {
-    const paths = execFileSync('git', ['ls-files', '-z', '--', 'apps/web'], {
-      cwd: root,
-      encoding: 'utf8',
-      maxBuffer: 16 * 1024 * 1024,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
-      .split('\0')
-      .filter(Boolean);
-    const tests = new Map();
-    for (const path of paths) {
-      const match = /([^/]+)\.test\.tsx?$/.exec(path);
-      if (!match) continue;
-      tests.set(match[1], [...(tests.get(match[1]) ?? []), read(path)]);
-    }
-    return { tracked: new Set(paths), tests };
-  } catch {
-    return null;
-  }
-})();
+// Match mutation-sweep's per-root same-stem test inventory (apps/web and
+// packages/ui), but hash the bytes being certified rather than index blobs:
+// local source/test edits must invalidate an old run even before they are
+// staged. Missing Git/input evidence stays unknown.
+const mutationInventory = Object.keys(mutation).length
+  ? loadMutationInventory(root, read)
+  : null;
 
 /** @type {any[]} */
 let list = [];
@@ -185,15 +171,7 @@ const certificates = list.map(c => {
   const storySource = c.storyRel
     ? readWithCompanions(c.storyRel, '.stories.tsx')
     : null;
-  const mutationTests = mutationInventory?.tracked.has(c.sourceRel)
-    ? (mutationInventory.tests.get(
-        c.sourceRel
-          .split('/')
-          .pop()
-          .replace(/\.tsx?$/, '')
-      ) ?? [])
-    : null;
-  const webRel = c.sourceRel.replace(/^apps\/web\//, '');
+  const mutationTests = mutationTestsFor(mutationInventory, c.sourceRel);
   const jm = journeyMap.components?.[c.sourceRel];
   const journeys = jm
     ? {
@@ -203,7 +181,7 @@ const certificates = list.map(c => {
         ),
       }
     : null;
-  return certifyComponent({
+  const cert = certifyComponent({
     path: c.sourceRel,
     source,
     testSource,
@@ -215,13 +193,15 @@ const certificates = list.map(c => {
     policy,
     packagesUi: c.sourceRel.startsWith('packages/ui/'),
     evidence: {
-      mutation: mutation[webRel],
+      mutation: mutation[mutationStateKey(c.sourceRel)],
       a11y: a11y[c.sourceRel],
       visual: visual[c.sourceRel],
       journeys,
       benchmark: benchmarks[c.sourceRel],
     },
   });
+  // A current judgment must also record what it was compared against.
+  return applyBenchmarkReview(cert, benchmarks[c.sourceRel]);
 });
 
 const report = buildReport({ certificates, headSha: values.sha });

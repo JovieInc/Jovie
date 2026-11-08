@@ -1,6 +1,7 @@
 ---
 frame: request-access
 route: /waitlist
+context: waitlist, access, sign in, auth
 ---
 Design the request-access screen for Jovie, desktop 1440 wide and mobile 390 wide, dark mode first.
 

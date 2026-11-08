@@ -142,38 +142,16 @@ describe('CommonDropdown', () => {
   });
 
   describe('Default Trigger', () => {
-    it('renders default button trigger', () => {
-      render(<CommonDropdown items={basicItems} />);
-      expect(
-        screen.getByRole('button', { name: 'More actions' })
-      ).toBeInTheDocument();
-    });
-
-    it('renders select-style trigger', () => {
-      render(<CommonDropdown items={basicItems} defaultTriggerType='select' />);
-      expect(
-        screen.getByRole('button', { name: 'Open dropdown' })
-      ).toBeInTheDocument();
-      expect(screen.getByText('Select...')).toBeInTheDocument();
-    });
-
-    it('uses custom aria-label', () => {
-      render(<CommonDropdown items={basicItems} aria-label='Custom actions' />);
-      expect(
-        screen.getByRole('button', { name: 'Custom actions' })
-      ).toBeInTheDocument();
-    });
-
-    it('renders custom trigger', () => {
-      render(
-        <CommonDropdown
-          items={basicItems}
-          trigger={<button type='button'>Custom</button>}
-        />
-      );
-      expect(
-        screen.getByRole('button', { name: 'Custom' })
-      ).toBeInTheDocument();
+    it.each([
+      ['default button', {}, 'More actions'],
+      ['select-style', { defaultTriggerType: 'select' }, 'Open dropdown'],
+      ['custom label', { 'aria-label': 'Custom actions' }, 'Custom actions'],
+      ['custom', { trigger: <button type='button'>Custom</button> }, 'Custom'],
+    ] as const)('renders the %s trigger', (_kind, props, name) => {
+      render(<CommonDropdown items={basicItems} {...props} />);
+      expect(screen.getByRole('button', { name })).toBeInTheDocument();
+      if ('defaultTriggerType' in props)
+        expect(screen.getByText('Select...')).toBeInTheDocument();
     });
   });
 
@@ -750,20 +728,32 @@ describe('CommonDropdown', () => {
   });
 
   describe('Empty State', () => {
-    it('shows empty message when no items', () => {
-      render(<CommonDropdown items={[]} open={true} />);
-      expect(screen.getByRole('status')).toHaveTextContent('No items found');
-    });
-
-    it('shows custom empty message', () => {
+    it.each([
+      [undefined, 'No items found'],
+      ['Nothing to see here', 'Nothing to see here'],
+    ])('shows the empty message (%s)', (emptyMessage, text) => {
       render(
-        <CommonDropdown
-          items={[]}
-          open={true}
-          emptyMessage='Nothing to see here'
-        />
+        <CommonDropdown items={[]} open={true} emptyMessage={emptyMessage} />
       );
-      expect(screen.getByText('Nothing to see here')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent(text);
+    });
+  });
+
+  describe('Direction', () => {
+    it('passes dir to the dropdown and context menu primitives', () => {
+      const { unmount } = render(
+        <CommonDropdown items={basicItems} open={true} dir='rtl' />
+      );
+      expect(screen.getByRole('menu')).toHaveAttribute('dir', 'rtl');
+      unmount();
+
+      render(
+        <CommonDropdown variant='context' items={basicItems} dir='rtl'>
+          <div>Row</div>
+        </CommonDropdown>
+      );
+      fireEvent.contextMenu(screen.getByText('Row'));
+      expect(screen.getByRole('menu')).toHaveAttribute('dir', 'rtl');
     });
   });
 

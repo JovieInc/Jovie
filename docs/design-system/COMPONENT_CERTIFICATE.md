@@ -30,7 +30,7 @@ Invalid JSON in an input file blocks report generation with a nonzero exit.
 | mutation | sweep score at least `policy.mutationMin` (80), matching the current source/test `blob` key with a recorded run `sha` | `jovie-mutation` sweep state |
 | visual | CI-captured baseline of the state stories with the current component `sourceHash` (never a Storybook build on gem) | CI artifact |
 | journeys | every golden-path journey touching the component has a browser spec | `component-journeys.json` |
-| benchmark | judgment recorded against the current `benchmark-library.json`, source unchanged, every adopt/adapt gap done, every skip has a reason | `component-benchmarks.json` |
+| benchmark | judgment recorded against the current `benchmark-library.json`, source unchanged, a named `reference` (or a written `noPatternReason`), every gap with item/decision/reference, every adopt/adapt gap done, every skip has a reason | `component-benchmarks.json` |
 
 The certificate computes its binding from the component's actual source bytes.
 CI a11y, visual, and benchmark records must carry that SHA-256 `sourceHash`;
@@ -74,3 +74,26 @@ Jovie primitive that expresses it. Peak moments come first: checkout success,
 profile claimed, first release live, first fan subscribed. Adopt the behavior,
 never the visual identity. Adopted gaps become acceptance criteria for the
 component.
+
+## Component benchmark judgments
+
+`benchmark-library.json` names product moments, and only a few of its patterns
+name a @jovie/ui primitive (form-in-drawer, loading-skeleton, offline-degraded,
+error-recovery, command-and-keyboard). It defines no per-component reference
+set, so each @jovie/ui record in `component-benchmarks.json` is judged against
+the WAI-ARIA APG pattern for the component plus the Radix/shadcn component it
+wraps, and cites a library pattern where one names the primitive. The judge
+compares props, keyboard, ARIA, states, RTL, controlled/uncontrolled, ref
+forwarding and asChild, and lists what was compared in `checked`.
+
+A record is one judgment: `libraryVersion`, the component's SHA-256
+`sourceHash`, `reference` (or `noPatternReason` when no pattern applies),
+`checked`, and `gaps`. Each gap has `item`, `decision` (adopt, adapt or skip),
+`reference`, a `status` of open or done for adopt/adapt, and a `reason` for a
+skip. `scripts/lib/component-benchmark-review.mjs` fails a current record that
+names no reference or has an incomplete gap, so an empty `gaps` list cannot
+pass without saying what it was compared against. Open adopt/adapt gaps keep
+the criterion failing until the fix lands; editing the component makes the
+record stale (`unknown`) until it is re-judged and re-hashed. Fixes in shared
+`packages/ui/lib` styles do not change a component hash, so re-judge the
+consumers when those change.
