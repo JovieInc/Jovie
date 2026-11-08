@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { closeButtonClassName } from './close-button';
 import {
@@ -347,5 +348,42 @@ describe('Dialog full-screen takeover', () => {
     expect(screen.queryByTestId('dialog-close-button')).not.toBeInTheDocument();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+});
+
+describe('Dialog accessibility', () => {
+  it('has no axe violations when open', async () => {
+    render(<TestDialog open />);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await expectNoA11yViolations(document.body);
+  });
+
+  it('has no axe violations with only the required title', async () => {
+    render(
+      <Dialog open>
+        <DialogContent aria-describedby={undefined}>
+          <DialogTitle>Rename playlist</DialogTitle>
+        </DialogContent>
+      </Dialog>
+    );
+    await expectNoA11yViolations(document.body);
+  });
+
+  it('has no axe violations with long right-to-left copy', async () => {
+    render(
+      <Dialog open>
+        <DialogContent dir='rtl'>
+          <DialogHeader>
+            <DialogTitle>
+              تعديل الملف الشخصي للفنان وروابط الإصدارات
+            </DialogTitle>
+            <DialogDescription>
+              تظهر هذه التغييرات فورًا على صفحتك العامة وعلى جميع الروابط.
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+    );
+    await expectNoA11yViolations(document.body);
   });
 });

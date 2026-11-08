@@ -330,6 +330,7 @@ jobs:
           ESLINT_CHANGED_BASE="origin/${{ github.base_ref }}" pnpm --filter @jovie/web run lint:eslint:changed
           pnpm --filter @jovie/web run lint:motion-css
           pnpm component-ship-gate
+          pnpm component-certificate:gate
           pnpm screen-registration-gate
           pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts
           pnpm ci:control:test
@@ -462,6 +463,17 @@ jobs:
       - &reused-setup
         if: steps.reuse.outputs.reuse != 'true'
         uses: ./.github/actions/setup-node-pnpm
+      - name: Restore pinned scanner binaries
+        # Warm cache never touches the network (JOV-11689). Contents are
+        # re-verified against scripts/security/scanner-pins.txt on every use.
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            /tmp/trufflehog-3.99.8
+            /tmp/gitleaks-8.21.2
+            /tmp/osv-scanner-2.5.1
+          key: scanner-bins-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/security/scanner-pins.txt') }}
       - name: Scan the exact source diff
         if: steps.reuse.outputs.reuse != 'true'
         env:

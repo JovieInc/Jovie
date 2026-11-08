@@ -200,6 +200,51 @@ test('rejects a squawk download that does not match the pinned sha256', async ()
   assert.match(SQUAWK_VERSION, /^2\.70\.0$/);
 });
 
+test('retries squawk 5xx and network errors with doubling jittered backoff', async () => {
+  const slept = [];
+  const sleep = async ms => {
+    slept.push(ms);
+  };
+  let calls = 0;
+  await assert.rejects(
+    () =>
+      installSquawk({
+        platform: 'linux',
+        arch: 'x64',
+        sleep,
+        fetchImpl: async () => {
+          calls += 1;
+          if (calls === 1) throw new Error('fetch failed');
+          if (calls === 2) return new Response('gateway', { status: 504 });
+          return new Response('not-the-release');
+        },
+      }),
+    /Squawk checksum mismatch/
+  );
+  assert.equal(calls, 3);
+  calls = 0;
+  slept.length = 0;
+  await assert.rejects(
+    () =>
+      installSquawk({
+        platform: 'linux',
+        arch: 'x64',
+        sleep,
+        fetchImpl: async () => {
+          calls += 1;
+          return new Response('gateway', { status: 504 });
+        },
+      }),
+    /Squawk 2\.70\.0 download failed: 504 https:\/\/github\.com\/sbdchd\/squawk\//
+  );
+  assert.equal(calls, 6);
+  assert.equal(slept.length, 5);
+  slept.forEach((ms, i) => {
+    const base = 2000 * 2 ** i;
+    assert.ok(ms >= base && ms <= 2 * base, `sleep ${ms} outside ${base}`);
+  });
+});
+
 test('source validation blocks dependency and migration diffs', () => {
   const workflow = read('.github/workflows/source-validation.yml');
   const config = read('.github/dependency-review-config.yml');

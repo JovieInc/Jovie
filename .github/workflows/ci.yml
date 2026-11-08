@@ -174,7 +174,7 @@ jobs:
             --volume "$PWD:/repo:ro" \
             "$IMAGE_TAG" -lc '
               set -euo pipefail
-              test "$(node --version)" = v24.22.1
+              test "$(node --version)" = v24.22.2
               test "$(cd / && COREPACK_ENABLE_NETWORK=0 pnpm --version)" = 9.15.9
 
               dependency_status=$(JOVIE_RUNNER_REPO_ROOT=/repo \
@@ -315,7 +315,7 @@ jobs:
           assert_line 'pnpm store path' 'pnpm_store_path=/opt/jovie-pnpm-store' "$dependency_status"
           assert_line 'Playwright warm status' 'playwright_warm=true' "$playwright_status"
           assert_line 'Playwright browser path' 'playwright_browsers_path=/opt/ms-playwright' "$playwright_status"
-          assert_equal 'Node version' v24.22.1 "$(node --version)"
+          assert_equal 'Node version' v24.22.2 "$(node --version)"
           assert_equal 'pnpm version' 9.15.9 "$(pnpm --version)"
           assert_equal 'PLAYWRIGHT_BROWSERS_PATH' /opt/ms-playwright "$PLAYWRIGHT_BROWSERS_PATH"
           assert_executable 'Chromium' /opt/ms-playwright/chromium-1223/chrome-linux64/chrome
@@ -569,6 +569,7 @@ jobs:
       # JOV-5960: selects the source-lane visual snapshot compare on homepage
       # PRs so a skipped compare can never read as green there.
       run_homepage_visual: ${{ steps.homepage-visual.outputs.run_homepage_visual || 'false' }}
+      run_pen_diff: ${{ steps.pen-diff-scope.outputs.run_pen_diff || 'false' }}
       # Marketing surfaces select the rendered DOM invariant certification
       # (route-dom-certification.spec.ts) in the same compare job.
       run_marketing_dom: ${{ steps.homepage-visual.outputs.run_marketing_dom || 'false' }}
@@ -989,7 +990,7 @@ jobs:
           fi
 
           # Launch-gate golden path (JOV-3758), mirroring docs/launch/LAUNCH_GATES.md.
-          LAUNCH_GATE_PATTERN='^(apps/web/app/onboarding/|apps/web/components/features/onboarding/|apps/web/components/features/dashboard/organisms/onboarding|apps/web/components/features/dashboard/organisms/apple-style-onboarding|apps/web/lib/onboarding/|apps/web/app/\(auth\)/|apps/web/app/signin/|apps/web/app/signup/|apps/web/app/sign-in/|apps/web/app/sign-up/|apps/web/app/app/\(shell\)/dashboard/|apps/web/app/app/\(shell\)/layout\.tsx|apps/web/components/features/dashboard/|apps/web/lib/releases/|apps/web/app/api/stripe/|apps/web/app/api/billing/|apps/web/app/api/checkout/|apps/web/lib/stripe/|apps/web/tests/e2e/golden-path\.spec\.ts|apps/web/tests/helpers/auth.ts|apps/web/tests/global-setup\.ts|apps/web/playwright\.config\.ts|\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.dashboard\.pr\.json|apps/web/\.lighthouserc\.onboarding\.pr\.json|docs/launch/LAUNCH_GATES\.md|apps/web/package.*\.json|package.*\.json)'
+          LAUNCH_GATE_PATTERN='^(apps/web/app/onboarding/|apps/web/components/features/onboarding/|apps/web/lib/onboarding/|apps/web/app/\(auth\)/|apps/web/app/sign-?(in|up)/|apps/web/app/app/\(shell\)/dashboard/|apps/web/app/app/\(shell\)/layout\.tsx|apps/web/components/features/dashboard/|apps/web/(components/shell/|instrumentation-client\.ts|proxy\.ts|tests/e2e/(utils/)?dashboard-click-navigation)|apps/web/lib/releases/|apps/web/app/api/stripe/|apps/web/app/api/billing/|apps/web/app/api/checkout/|apps/web/lib/stripe/|apps/web/tests/e2e/golden-path\.spec\.ts|apps/web/tests/helpers/auth.ts|apps/web/tests/global-setup\.ts|apps/web/playwright\.config\.ts|\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.(dashboard|onboarding)\.pr\.json|docs/launch/LAUNCH_GATES\.md|apps/web/package.*\.json|package.*\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$LAUNCH_GATE_PATTERN"; then
             echo "run_golden_path=true" >> "$GITHUB_OUTPUT"
           else
@@ -1148,6 +1149,15 @@ jobs:
           else
             echo "run_marketing_dom=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Select Pen diff gate (bound or scope route touched)
+        id: pen-diff-scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHANGED_PATHS="$RUNNER_TEMP/product-lane-classification/changed-paths.txt"
+          test -f "$CHANGED_PATHS"
+          echo "run_pen_diff=$(node scripts/invariants/pen-diff.mjs --scope-only --changed-files "$CHANGED_PATHS")" >> "$GITHUB_OUTPUT"
 
       - name: Preserve intake product-lane receipt
         if: ${{ github.event_name != 'workflow_dispatch' }}
@@ -1580,6 +1590,16 @@ jobs:
           # spend 5+ minutes in an effectively non-cancellable checkout. The
           # next step deepens only this event's exact base..head ancestry.
           fetch-depth: 1
+      - name: Restore pinned scanner binaries
+        # Warm cache never touches the network (JOV-11689). Contents are
+        # re-verified against scripts/security/scanner-pins.txt on every use.
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            /tmp/trufflehog-3.99.8
+            /tmp/gitleaks-8.21.2
+            /tmp/osv-scanner-2.5.1
+          key: scanner-bins-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/security/scanner-pins.txt') }}
       - name: Run secret scan
         env:
           # Keep Git-valid but shell-significant branch characters out of the
@@ -1673,6 +1693,86 @@ jobs:
             ${{ runner.temp }}/golden-path-lock-coverage/coverage-final.json
           if-no-files-found: ignore
           retention-days: 7
+
+  ci-pen-diff:
+    name: Pen Diff
+    # Pen-to-code merge gate: routes with enforce:true in pen-bindings.json must
+    # render like their committed, approved Pen stills (SSIM + layout box) and
+    # need an approved binding; enforce:false routes are diffed and reported
+    # (artifact + job log) without failing. Renders only the affected routes. Thresholds:
+    # scripts/invariants/pen-diff.config.json. The consent banner stays ON
+    # (no NEXT_DISABLE_TOOLBAR), unlike Visual Snapshot Compare.
+    needs: [ci-path-changes]
+    if: github.event_name == 'pull_request' && needs.ci-path-changes.outputs.run_pen_diff == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Unit tests (comparison, binding logic, adoption guard)
+        run: node --test scripts/invariants/pen-diff-lib.test.mjs scripts/visual-baseline-adopt.test.mjs
+      - name: Binding policy (unbound routes, stale approval)
+        id: policy
+        run: node scripts/invariants/pen-diff.mjs --policy-only --base "origin/${{ github.base_ref }}"
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.policy.outputs.needs_render == 'true'
+      - uses: ./.github/actions/setup-playwright
+        if: steps.policy.outputs.needs_render == 'true'
+      - name: Build web (consent banner enabled)
+        if: steps.policy.outputs.needs_render == 'true'
+        run: pnpm turbo build --filter=@jovie/web --force
+        env:
+          TURBO_ENGINE_READ_ONLY: '1'
+          NEXT_PUBLIC_APP_URL: http://localhost:3230
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
+          NEXT_PUBLIC_AUTH_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'
+          E2E_TEST_AUTH_PERSONA: creator-ready
+          E2E_CLERK_USER_ID: user_test
+      - name: Render bound routes and compare with Pen stills
+        if: steps.policy.outputs.needs_render == 'true'
+        run: |
+          set -euo pipefail
+          cleanup() { kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true; }
+          trap cleanup EXIT
+          test -f apps/web/.next/standalone/apps/web/server.js
+          (cd apps/web && HOSTNAME=localhost PORT=3230 node .next/standalone/apps/web/server.js > "$RUNNER_TEMP/pen-diff-server.log" 2>&1) &
+          SERVER_PID=$!
+          for _ in $(seq 1 30); do curl -sf http://localhost:3230 > /dev/null 2>&1 && break; sleep 1; done
+          curl -sf http://localhost:3230 > /dev/null || { cat "$RUNNER_TEMP/pen-diff-server.log"; exit 1; }
+          node scripts/invariants/pen-diff.mjs --base "origin/${{ github.base_ref }}" --base-url http://localhost:3230 --out pen-diff-out
+        env:
+          DATABASE_URL: postgresql://localhost/noop
+          NEXT_PUBLIC_APP_URL: http://localhost:3230
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_AUTH_MOCK: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'
+          E2E_TEST_AUTH_PERSONA: creator-ready
+          E2E_CLERK_USER_ID: user_test
+      - name: Upload per-section diffs
+        if: always() && hashFiles('pen-diff-out/**') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pen-diff-${{ github.run_id }}
+          path: pen-diff-out/
+          retention-days: 14
 
   ci-visual-snapshot-compare:
     name: Visual Snapshot Compare
@@ -3735,7 +3835,7 @@ jobs:
       # Web-independent checks ride here, off the Build + Layout tail.
       - name: Check extension and observability ingest
         if: matrix.shard == 1
-        run: pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test && pnpm --filter @jovie/canary-otp typecheck && pnpm --filter @jovie/canary-otp test && pnpm --filter @jovie/mesh-hub typecheck && pnpm --filter @jovie/mesh-hub test
+        run: pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test && pnpm --filter @jovie/canary-otp typecheck && pnpm --filter @jovie/canary-otp test && pnpm --filter @jovie/mesh-hub typecheck && pnpm --filter @jovie/mesh-hub test && node --experimental-strip-types --test workers/prod-liveness/src/index.test.mjs workers/cron-hub/src/index.test.mjs
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
       # Surface-elevation matrix (JOV-2156): screenshot every allowed/banned
@@ -4918,12 +5018,22 @@ jobs:
           fi
 
           pnpm run test:lighthouse:dashboard:pr
+
+          # Lighthouse and route specs load each page with a full document
+          # load. Click the sidebar too: only a click proves the shell still
+          # moves between dashboard pages client-side.
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+            pnpm exec playwright test tests/e2e/dashboard-click-navigation.spec.ts \
+            --config=playwright.config.noauth.ts --project=chromium --reporter=line
         env:
           CI: true
           BASE_URL: http://localhost:3000
           DATABASE_URL: ${{ env.DATABASE_URL }}
           URL_ENCRYPTION_KEY: lighthouse-dashboard-ci-url-encryption-key
           AI_GATEWAY_API_KEY: lighthouse-dashboard-ci
+          # Playwright writes error-context.md on a failed attempt; the
+          # artifact guard rejects markdown unless this is set.
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
@@ -8100,7 +8210,7 @@ jobs:
     # parallel with the fast lanes, while build/layout integration stays on the
     # merge-group head. Migration Guard, Fork PR Gate, and PR Size Guard remain
     # separately required ruleset contexts.
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-slop-guard]
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-pen-diff, ci-slop-guard]
     if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -8121,6 +8231,8 @@ jobs:
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
           RUN_HOMEPAGE_VISUAL="${{ needs.ci-path-changes.outputs.run_homepage_visual }}"
           VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"
+          RUN_PEN_DIFF="${{ needs.ci-path-changes.outputs.run_pen_diff }}"
+          PEN_DIFF_RESULT="${{ needs.ci-pen-diff.result }}"
           BLOG_CONTENT_ONLY="${{ needs.ci-path-changes.outputs.blog_content_only }}"
           RUN_MARKETING_DOM="${{ needs.ci-path-changes.outputs.run_marketing_dom }}"
 
@@ -8140,6 +8252,7 @@ jobs:
             echo "| Slop Guard (size, pass-through, dead code, duplication) | $SLOP_RESULT | \`node ../ci/actions/slop-guard/slop-guard.mjs --policy <ci>/policy/JovieInc__Jovie/policy.json\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
             echo "| Visual Snapshot Compare (homepage + marketing DOM PRs) | $VISUAL_COMPARE_RESULT | \`node scripts/visual-snapshot-compare.mjs compare\` |"
+            echo "| Pen Diff (bound or scope route PRs) | $PEN_DIFF_RESULT | \`node scripts/invariants/pen-diff.mjs --base origin/main --base-url <url>\` |"
             echo
             echo "Risk level: ${RISK_LEVEL:-low}; matched rules: ${RISK_RULES:-none}"
             echo "Heavy evidence is manual, scheduled, or event-driven and never starts from this source-PR gate."
@@ -8191,6 +8304,13 @@ jobs:
           fi
           if [[ "$RUN_MARKETING_DOM" == "true" && "$VISUAL_COMPARE_RESULT" != "success" ]]; then
             echo "❌ Marketing DOM invariant certification did not pass on a marketing PR; skipped is not green (result: $VISUAL_COMPARE_RESULT)"
+            exit 1
+          fi
+
+          # Pen-to-code gate: a PR touching a bound or scope route must render like
+          # its approved Pen still. Skipped is not green when the gate was selected.
+          if [[ "$RUN_PEN_DIFF" == "true" && "$PEN_DIFF_RESULT" != "success" ]]; then
+            echo "❌ Pen Diff did not pass on a bound/scope route PR (result: $PEN_DIFF_RESULT); see the pen-diff artifact for per-section diffs"
             exit 1
           fi
 

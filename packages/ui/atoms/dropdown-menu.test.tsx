@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import {
   DropdownMenu,
@@ -404,5 +405,49 @@ describe('DropdownMenu submenu viewport fit', () => {
       'max-width: var(--radix-dropdown-menu-content-available-width)'
     );
     expect(screen.getByTestId('fit-sub').className).toContain('z-popover');
+  });
+});
+
+describe('DropdownMenu accessibility', () => {
+  // The menu portals to document.body outside any page landmark, so axe runs
+  // on the trigger's container and on the opened menu element itself.
+  it('has no axe violations when open', async () => {
+    const { container } = render(<TestDropdownMenu open />);
+    await expectNoA11yViolations(container);
+    await expectNoA11yViolations(screen.getByRole('menu'));
+  });
+
+  it('has no axe violations for an empty menu', async () => {
+    const { container } = render(
+      <DropdownMenu open modal={false}>
+        <DropdownMenuTrigger asChild>
+          <button type='button'>Saved views</button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuLabel>Saved views</DropdownMenuLabel>
+          <DropdownMenuItem disabled>No saved views yet</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+    await expectNoA11yViolations(container);
+    await expectNoA11yViolations(screen.getByRole('menu'));
+  });
+
+  it('has no axe violations for long right-to-left items', async () => {
+    const { container } = render(
+      <DropdownMenu open modal={false} dir='rtl'>
+        <DropdownMenuTrigger asChild>
+          <button type='button'>الإجراءات</button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem>
+            نسخ الرابط الذكي لمشاركته مع الجمهور وقوائم التشغيل
+          </DropdownMenuItem>
+          <DropdownMenuItem variant='destructive'>حذف الإصدار</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+    await expectNoA11yViolations(container);
+    await expectNoA11yViolations(screen.getByRole('menu'));
   });
 });

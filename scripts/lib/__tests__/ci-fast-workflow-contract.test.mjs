@@ -381,6 +381,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/tests/test_signal_watch.py',
       'scripts/tests/test_x_grok.py',
       'scripts/tests/test_pr_remediation_swarm.py',
+      'scripts/tests/test_codex_launcher.py',
+      'scripts/tests/test_loose_exec_guard.py',
     ]);
     const shards = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command => {
       const [, keyword, files] = /-k "([^"]+)" (.+)$/u.exec(command) ?? [];
@@ -447,7 +449,8 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(38);
+    expect(LANES_PYTEST_FILES).toHaveLength(40);
+    expect(whole).toContain('scripts/tests/test_pr_events_repair_evidence.py');
     expect(whole).toContain('scripts/tests/test_board_intake.py');
     expect(whole).toContain('scripts/tests/test_priority_admission.py');
     expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS.join(' ')).toContain(
@@ -2490,8 +2493,8 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(script).toContain('upstream stdin regression did not cover the fix');
     expect(script).toContain("readonly SHELLCHECK_VERSION='0.11.0'");
     expect(script).toContain("readonly PYFLAKES_VERSION='3.4.0'");
-    // Release-download 5xx bursts outlast a 3-retry window (10-12 ejection).
-    expect(script).toMatch(/--retry 6 --retry-all-errors --max-time 120/);
+    // Release-download 5xx bursts outlast six retries (10-12, 11-08 outages).
+    expect(script).toMatch(/--retry 8 --retry-all-errors --max-time 120/);
     for (const name of [
       'ACTIONLINT_SOURCE_SHA256',
       'SHELLCHECK_TARBALL_SHA256',

@@ -78,7 +78,7 @@ export function assertSha256(bytes, expected) {
 }
 
 /**
- * @param {{ fetchImpl?: typeof fetch, arch?: string, platform?: string }} [options]
+ * @param {{ fetchImpl?: typeof fetch, arch?: string, platform?: string, sleep?: (ms: number) => Promise<void> }} [options]
  */
 export async function installSquawk(options = {}) {
   const platform = options.platform ?? process.platform;
@@ -91,13 +91,29 @@ export async function installSquawk(options = {}) {
   const asset = `squawk-linux-${arch}`;
   const url = `https://github.com/sbdchd/squawk/releases/download/v${SQUAWK_VERSION}/${asset}`;
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
-  const response = await fetchImpl(url);
-  if (!response.ok) {
+  const sleep = options.sleep ?? (ms => new Promise(r => setTimeout(r, ms)));
+  // Release downloads return runs of HTTP 504 (#23770, 2026-11-08). Back off
+  // with jitter over 6 attempts (62-124s of waiting), then fail closed.
+  let bytes;
+  let failure = '';
+  for (let attempt = 1, delay = 2000; !bytes && attempt <= 6; attempt += 1) {
+    try {
+      const response = await fetchImpl(url);
+      if (response.ok) bytes = Buffer.from(await response.arrayBuffer());
+      else failure = String(response.status);
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error);
+    }
+    if (!bytes && attempt < 6) {
+      await sleep(delay + Math.floor(Math.random() * (delay + 1)));
+      delay *= 2;
+    }
+  }
+  if (!bytes) {
     throw new Error(
-      `Squawk ${SQUAWK_VERSION} download failed: ${response.status} ${url}`
+      `Squawk ${SQUAWK_VERSION} download failed: ${failure} ${url}`
     );
   }
-  const bytes = Buffer.from(await response.arrayBuffer());
   assertSha256(bytes, SQUAWK_SHA256[arch]);
   const bin = join(mkdtempSync(join(tmpdir(), 'squawk-')), 'squawk');
   writeFileSync(bin, bytes);

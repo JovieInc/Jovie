@@ -4,13 +4,14 @@
 * Pen-still screenshot diff. Advisory until canonical stills exist.
 *
 *   node scripts/invariants/pen-still-diff.mjs \
-*     --manifest docs/pen-stills/homepage/manifest.json --out pen-still-out
+*     --manifest docs/design-system/pen-bindings.json [--route /] --out pen-still-out
 *
 * Advisory exits 0; strict requires at least one active frame and every active comparison to pass.
 * Parked and fork frames are excluded. Dark is the primary mode.
 * Capture reuses clef-screenshot-evaluator.mjs.
 */
 import { createHash } from 'node:crypto';
+import { BINDING_SCHEMA, bindingsToStillFrames } from '../design/pen-bindings-lib.mjs';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path'; import { fileURLToPath } from 'node:url'; import {
 composeTriptych, decodePng, diffImage, encodePng, judgePair, measureGeometry, measureImage,
@@ -119,8 +120,10 @@ if (next === undefined || next.startsWith('--'))
 args[token.slice(2)] = true; else { args[token.slice(2)] = next; i += 1; } } return args; }
 export async function main(argv = process.argv.slice(2), options = {}) { const args = parseArgs(argv); if (args.help || !args.manifest) {
 process.stdout.write(
-'usage: pen-still-diff.mjs --manifest <file> --out <dir> [--base-url URL] [--storybook-url URL] [--strict]\n' );
-process.exit(args.help ? 0 : 2); } const manifest = parseManifest(readFileSync(String(args.manifest), 'utf8'));
+'usage: pen-still-diff.mjs --manifest <file> [--route /] --out <dir> [--base-url URL] [--storybook-url URL] [--strict]\n' );
+process.exit(args.help ? 0 : 2); } const manifestText = readFileSync(String(args.manifest), 'utf8'); const manifest = JSON.parse(manifestText).schema === BINDING_SCHEMA
+? { schema: MANIFEST_SCHEMA, primaryMode: 'dark', frames: bindingsToStillFrames(JSON.parse(manifestText), typeof args.route === 'string' ? args.route : null) }
+: parseManifest(manifestText);
 const baseUrl = args['base-url'] || process.env.PEN_STILL_BASE_URL; const storybookUrl =
 args['storybook-url'] || process.env.PEN_STILL_STORYBOOK_URL; const capture = options.capture ?? (baseUrl || storybookUrl
 ? async (frame, url) => { const { captureSurfacePng, withCaptureBrowser } = await import(
