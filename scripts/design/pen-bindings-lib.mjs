@@ -203,8 +203,10 @@ export function validateBindings(doc, { root = null } = {}) {
           errors.push(`${f}: section must be kebab-case`);
         if (seen.has(frame?.section)) errors.push(`${f}: duplicate section`);
         seen.add(frame?.section);
-        if (!frame?.penFile?.endsWith('.pen'))
-          errors.push(`${f}: penFile must be a .pen file name`);
+        // A .pen file, or the HTML art-direction page Tim approved as live
+        // HTML (homepage v3); nodeId then names that page's section.
+        if (!/\.(pen|html)$/.test(String(frame?.penFile ?? '')))
+          errors.push(`${f}: penFile must be a .pen or approved .html file name`);
         if (!frame?.nodeId) errors.push(`${f}: nodeId is required`);
         if (frame?.still !== stillPathFor(route, vp, frame?.section))
           errors.push(
