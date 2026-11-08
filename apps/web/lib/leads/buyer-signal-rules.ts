@@ -149,6 +149,15 @@ export const HOST_RULES: readonly HostRule[] = [
       'tixr.com',
       'shotgun.live',
       'livenation.com',
+      'livenation.co.uk',
+      'ticketweb.com',
+      'eventim.us',
+      'eventim.de',
+      'prekindle.com',
+      'gigantic.com',
+      'alttickets.com',
+      'soundrink.com',
+      'residentadvisor.net',
     ],
   },
   {
@@ -198,20 +207,23 @@ export const HOST_RULES: readonly HostRule[] = [
   },
 ];
 
-export const DSP_HOSTS = [
-  'open.spotify.com',
-  'spotify.com',
-  'music.apple.com',
-  'soundcloud.com',
-  'youtube.com',
-  'music.youtube.com',
-  'youtu.be',
-  'tidal.com',
-  'deezer.com',
-  'music.amazon.com',
-  'beatport.com',
-  'audiomack.com',
-];
+/**
+ * Streaming services by canonical provider id. Subdomains match their root
+ * (open./artists.spotify.com, on.soundcloud.com, m./music.youtube.com), so a
+ * page counts each service once. Short links resolve to their provider.
+ */
+export const DSP_PROVIDERS: Readonly<Record<string, readonly string[]>> = {
+  spotify: ['spotify.com', 'spoti.fi', 'spotify.link'],
+  apple_music: ['music.apple.com', 'itunes.apple.com'],
+  soundcloud: ['soundcloud.com', 'snd.sc'],
+  youtube: ['youtube.com', 'youtu.be'],
+  bandcamp: ['bandcamp.com'],
+  tidal: ['tidal.com'],
+  deezer: ['deezer.com', 'deezer.page.link'],
+  amazon_music: ['music.amazon.com'],
+  beatport: ['beatport.com'],
+  audiomack: ['audiomack.com'],
+};
 export const JOVIE_HOSTS = ['jov.ie', 'jovie.com'];
 
 /** Streaming services named in visible text (link titles, snippets). */
@@ -249,3 +261,14 @@ export const TEXT_RULES: readonly {
       /\b(brand (deals|partnerships|inquiries|enquiries)|sponsorships?)\b/i,
   },
 ];
+
+/**
+ * Music-service businesses (PR firms, promo services, artist networks) that
+ * link many artists' releases and so look like heavy tool users.
+ */
+export const SERVICE_BUSINESS_PATTERN =
+  /\b(music pr|pr campaigns|pr (&|and) marketing|marketing agency|promotion services|for (indie )?artists|artist (network|collective))\b/i;
+
+/** Words that mark a page as a performing artist's own. */
+export const PERFORMER_PATTERN =
+  /\b(dj|producer|singer|songwriter|rapper|band|duo)\b/i;
