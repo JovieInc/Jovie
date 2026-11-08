@@ -3,7 +3,7 @@
 // @coverage-via apps/web/components/features/dashboard/organisms/AnalyticsSidebar.test.tsx
 
 import { Globe, Link2, MapPin } from 'lucide-react';
-import { type ComponentType, useState } from 'react';
+import { useState } from 'react';
 import {
   DrawerStatGrid,
   DrawerSurfaceCard,
@@ -13,6 +13,7 @@ import {
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { TimeRangeSelector } from '@/components/molecules/TimeRangeSelector';
+import { hasAudienceActivity } from '@/lib/analytics/audience-activity';
 import { CANONICAL_METRICS } from '@/lib/analytics/metrics';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -21,6 +22,8 @@ import type {
   AnalyticsRange,
   DashboardAnalyticsResponse,
 } from '@/types/analytics';
+import { AnalyticsRailEmptyState } from './AnalyticsRailEmptyState';
+import { AnalyticsRankedList as RankedList } from './AnalyticsRankedList';
 
 /**
  * Calculate conversion rate between two funnel stages.
@@ -63,14 +66,6 @@ const BAR_OPACITY = [
 ] as const;
 
 const TRACK_BG = 'bg-surface-2';
-
-function formatRankedLabel(label: string): string {
-  try {
-    return decodeURIComponent(label);
-  } catch {
-    return label;
-  }
-}
 
 /**
  * Shared outer + metric-row chrome for FunnelStage loading/loaded.
@@ -134,7 +129,7 @@ export function FunnelStage({
             'h-full rounded-full transition-[width] duration-cinematic ease-out',
             BAR_OPACITY[barIndex] ?? BAR_OPACITY.at(-1)
           )}
-          style={{ width: `${Math.max(barPercent, 2)}%` }}
+          style={{ width: `${value > 0 ? Math.max(barPercent, 2) : 0}%` }}
         />
       </div>
     </div>
@@ -180,76 +175,6 @@ function FunnelCard({
   );
 }
 
-interface RankedItem {
-  readonly key: string;
-  readonly label: string;
-  readonly value: string;
-}
-
-function RankedList({
-  icon: IconComponent,
-  items,
-  loading,
-  emptyMessage,
-}: {
-  readonly icon: ComponentType<{ className?: string }>;
-  readonly items: readonly RankedItem[];
-  readonly loading: boolean;
-  readonly emptyMessage: string;
-}) {
-  if (loading) {
-    return (
-      <ul className='min-h-49 space-y-1'>
-        {[1, 2, 3, 4, 5].map(i => (
-          <li
-            key={i}
-            className='flex h-8 items-center justify-between rounded-lg px-2.5'
-          >
-            <div className='flex items-center gap-2'>
-              <LoadingSkeleton height='h-3' width='w-3' rounded='sm' />
-              <LoadingSkeleton height='h-3' width='w-32' rounded='sm' />
-            </div>
-            <LoadingSkeleton height='h-3' width='w-8' rounded='sm' />
-          </li>
-        ))}
-      </ul>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <div className='flex min-h-49 flex-col items-center justify-center text-center'>
-        <IconComponent className='mb-1.5 h-4 w-4 text-quaternary-token' />
-        <p className='text-xs text-tertiary-token'>{emptyMessage}</p>
-      </div>
-    );
-  }
-
-  return (
-    <ul className='min-h-49 space-y-0.5'>
-      {items.map((item, index) => (
-        <li
-          key={item.key}
-          className='group flex h-8 items-center justify-between rounded-lg px-2.5 transition-colors hover:bg-surface-1'
-        >
-          <div className='flex min-w-0 flex-1 items-center gap-1.5'>
-            <span className='w-3 text-2xs font-caption text-tertiary-token tabular-nums'>
-              {index + 1}
-            </span>
-            <IconComponent className='h-3.5 w-3.5 text-tertiary-token' />
-            <span className='truncate text-app text-secondary-token transition-colors group-hover:text-primary-token'>
-              {formatRankedLabel(item.label)}
-            </span>
-          </div>
-          <span className='ml-2 text-app font-semibold text-primary-token tabular-nums'>
-            {item.value}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 export interface AnalyticsSidebarProps {
   readonly isOpen: boolean;
   readonly onClose: () => void;
@@ -283,6 +208,7 @@ export function AnalyticsSidebarView({
   tabbedCardTestId = 'analytics-sidebar-tabbed-card',
 }: AnalyticsSidebarViewProps) {
   const showTipLinkVisits = (data?.tip_link_visits ?? 0) > 0;
+  const isEmpty = !loading && !hasAudienceActivity(data);
   const stages = [
     {
       label: CANONICAL_METRICS.profile_views.label,
@@ -310,6 +236,7 @@ export function AnalyticsSidebarView({
       tabDistribution='fill'
       tabbedCardTestId={tabbedCardTestId}
       tabbedSurfaceVariant='card'
+      hideTabbedCard={isEmpty}
       sectionKind='details'
       contentClassName='pt-2'
       entityHeader={
@@ -353,41 +280,44 @@ export function AnalyticsSidebarView({
             )}
             data-right-rail-section='status'
           >
+            {isEmpty ? <AnalyticsRailEmptyState range={range} /> : null}
             {/* Funnel waterfall — vertical bars show dropoff at a glance */}
-            <FunnelCard stages={stages} loading={loading} />
+            {isEmpty ? null : <FunnelCard stages={stages} loading={loading} />}
 
             {/* Engagement — compact 2-col, secondary to the funnel */}
-            <DrawerStatGrid
-              variant='flush'
-              className={cn(
-                'gap-1 divide-x-0 border-t border-subtle pt-2',
-                showTipLinkVisits ? 'grid-cols-3' : 'grid-cols-2'
-              )}
-            >
-              <div className='rounded-lg px-2 py-2'>
-                <StatTile
-                  label='Link Clicks'
-                  state={loading ? 'loading' : undefined}
-                  value={formatMetricValue(loading, data?.total_clicks)}
-                />
-              </div>
-              <div className='rounded-lg px-2 py-2'>
-                <StatTile
-                  label='Listen Clicks'
-                  state={loading ? 'loading' : undefined}
-                  value={formatMetricValue(loading, data?.listen_clicks)}
-                />
-              </div>
-              {showTipLinkVisits ? (
+            {isEmpty ? null : (
+              <DrawerStatGrid
+                variant='flush'
+                className={cn(
+                  'gap-1 divide-x-0 border-t border-subtle pt-2',
+                  showTipLinkVisits ? 'grid-cols-3' : 'grid-cols-2'
+                )}
+              >
                 <div className='rounded-lg px-2 py-2'>
                   <StatTile
-                    label='Tip Link Visits'
+                    label='Link Clicks'
                     state={loading ? 'loading' : undefined}
-                    value={formatMetricValue(loading, data?.tip_link_visits)}
+                    value={formatMetricValue(loading, data?.total_clicks)}
                   />
                 </div>
-              ) : null}
-            </DrawerStatGrid>
+                <div className='rounded-lg px-2 py-2'>
+                  <StatTile
+                    label='Listen Clicks'
+                    state={loading ? 'loading' : undefined}
+                    value={formatMetricValue(loading, data?.listen_clicks)}
+                  />
+                </div>
+                {showTipLinkVisits ? (
+                  <div className='rounded-lg px-2 py-2'>
+                    <StatTile
+                      label='Tip Link Visits'
+                      state={loading ? 'loading' : undefined}
+                      value={formatMetricValue(loading, data?.tip_link_visits)}
+                    />
+                  </div>
+                ) : null}
+              </DrawerStatGrid>
+            )}
           </div>
         </div>
       }
