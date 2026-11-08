@@ -74,24 +74,17 @@ function createPlatformInfo(
  * Platform configuration registry
  * Uses canonical platform metadata from constants/platforms.ts with detection-specific placeholders
  */
-const LEGACY_DETECTION_IDS: Record<string, string> = {
-  qq_music: 'tencent_music',
-};
-
-/**
- * Streaming DSPs the registry knows but the hand-written table below does not
- * list. Derived so URL recognition cannot drift from DSP_REGISTRY.
- */
 function escapeDomain(domain: string): string {
   return domain.replaceAll('.', String.raw`\.`);
 }
 
+// Registry DSPs missing from the table below, derived so URLs cannot drift.
 const REGISTRY_DSP_PLATFORMS: Record<string, PlatformInfo> = Object.fromEntries(
   DSP_REGISTRY.filter(
     e =>
       e.category === 'streaming' &&
       e.domains.length > 0 &&
-      !LEGACY_DETECTION_IDS[e.key] &&
+      e.key !== 'qq_music' &&
       e.key !== 'youtube' &&
       e.key !== 'amazon'
   ).map(e => [
