@@ -4790,6 +4790,8 @@ printf '%s\\n' "$TURBO_SCM_BASE:$*" >> '${calls}'
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
+  });
+});
 
 describe('daily workflow qualification closure', () => {
   it('propagates a real selected web contract process failure', async () => {
