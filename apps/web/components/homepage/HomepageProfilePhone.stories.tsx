@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { HOMEPAGE_FEATURED_ARTIST } from '@/data/demoArtists';
 import { HomepageProfilePhone } from './HomepageProfilePhone';
 
-/** Tim White's real profile at the canonical 310px phone (Pen WyQJb). */
+/** The featured (demo) artist's profile at the canonical 310px phone (Pen WyQJb). */
 const meta = {
   title: 'Marketing/HomepageProfilePhone',
   component: HomepageProfilePhone,
@@ -11,12 +12,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const TimWhite: Story = {
+export const FeaturedArtist: Story = {
   args: {
-    alt: 'Tim White’s Jovie profile.',
+    alt: 'An example artist’s Jovie profile.',
     release: {
-      title: 'Never Say A Word',
-      src: '/img/releases/never-say-a-word.jpg',
+      title: HOMEPAGE_FEATURED_ARTIST.releases[0].title,
+      src: HOMEPAGE_FEATURED_ARTIST.releases[0].src,
     },
   },
 };
