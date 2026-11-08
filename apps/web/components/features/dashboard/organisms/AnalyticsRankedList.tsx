@@ -1,7 +1,17 @@
 'use client';
 
 import type { ComponentType } from 'react';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+
+/**
+ * Designed empty anatomy for a ranked tab: `emptyMessage` becomes the Title
+ * Case heading, with one line of copy and at most one quiet action.
+ */
+export interface AnalyticsRankedEmptyState {
+  readonly description: string;
+  readonly action?: { readonly label: string; readonly onClick: () => void };
+}
 
 export interface AnalyticsRankedItem {
   readonly key: string;
@@ -29,11 +39,13 @@ export function AnalyticsRankedList({
   items,
   loading,
   emptyMessage,
+  emptyState,
 }: {
   readonly icon: ComponentType<{ className?: string }>;
   readonly items: readonly AnalyticsRankedItem[];
   readonly loading: boolean;
   readonly emptyMessage: string;
+  readonly emptyState?: AnalyticsRankedEmptyState;
 }) {
   if (loading) {
     return (
@@ -51,6 +63,25 @@ export function AnalyticsRankedList({
           </li>
         ))}
       </ul>
+    );
+  }
+
+  if (items.length === 0 && emptyState) {
+    return (
+      <div className='flex min-h-49 flex-col'>
+        <EmptyState
+          icon={<IconComponent className='h-4 w-4 text-quaternary-token' />}
+          heading={emptyMessage}
+          description={emptyState.description}
+          action={
+            emptyState.action
+              ? { ...emptyState.action, variant: 'secondary' }
+              : undefined
+          }
+          className='py-4'
+          testId='analytics-ranked-empty-state'
+        />
+      </div>
     );
   }
 

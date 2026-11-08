@@ -348,7 +348,18 @@ export function AnalyticsSidebarView({
             label: city.city,
             value: numberFormatter.format(city.count),
           }))}
-          emptyMessage='No city data yet'
+          emptyMessage='No City Data Yet'
+          emptyState={{
+            description:
+              'Cities appear as visitors with a known location open your profile.',
+            action:
+              (data?.top_countries?.length ?? 0) > 0
+                ? {
+                    label: 'View Countries',
+                    onClick: () => onActiveTabChange('countries'),
+                  }
+                : undefined,
+          }}
         />
       )}
       {activeTab === 'countries' && (
