@@ -8,7 +8,7 @@ import { load as yamlLoad } from 'js-yaml';
 import { buildTopology, findCycle, syncTopology, validateTopology } from './ci-workflow-topology.mjs';
 
 test('Pen drafts share one editor across runs and retain pending frame jobs', () => {
-  const workflow = yamlLoad(fs.readFileSync('.github/workflows/pen-draft.yml', 'utf8'));
+  const workflow = /** @type {{jobs: {draft: {concurrency: unknown, strategy: {'max-parallel': number}}}, concurrency: {group: string}}} */ (yamlLoad(fs.readFileSync('.github/workflows/pen-draft.yml', 'utf8')));
   assert.deepEqual(workflow.jobs.draft.concurrency, {
     group: 'pen-draft-canonical-editor',
     'cancel-in-progress': false,
