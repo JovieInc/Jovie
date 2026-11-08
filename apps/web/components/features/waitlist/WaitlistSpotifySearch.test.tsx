@@ -94,6 +94,33 @@ describe('WaitlistSpotifySearch', () => {
     }
   );
 
+  it('accepts a Spotify link typed without https so the browser does not block the form', () => {
+    render(
+      <WaitlistSpotifySearch
+        spotifyUrl='open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb'
+        onUrlChange={vi.fn()}
+        onArtistNameChange={vi.fn()}
+        fieldErrors={{}}
+        isSubmitting={false}
+        isHydrating={false}
+        setInputRef={vi.fn()}
+      />
+    );
+    fireEvent.change(screen.getByRole('combobox'), {
+      target: { value: 'artist' },
+    });
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /Manually add URL Paste a Spotify artist link/,
+      })
+    );
+
+    const link = screen.getByLabelText('Spotify link') as HTMLInputElement;
+    expect(link).toHaveValue('open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb');
+    expect(link.checkValidity()).toBe(true);
+    expect(link).toHaveAttribute('inputmode', 'url');
+  });
+
   it('renders search-failure text with the error token, not raw red-* (JOV-6773)', () => {
     const source = readFileSync(
       resolve(

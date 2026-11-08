@@ -236,7 +236,8 @@ export function WaitlistSpotifySearch({
                 inputRef.current = el;
                 setInputRef(el);
               }}
-              type='url'
+              type='text'
+              inputMode='url'
               id='spotifyUrl'
               value={spotifyUrl}
               onChange={handleUrlInputChange}
