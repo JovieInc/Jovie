@@ -247,7 +247,7 @@ export const CHECKBOX_RADIO_ITEM_BASE =
  * Select item base — unified with MENU_ITEM_BASE hover/focus behavior
  */
 export const SELECT_ITEM_BASE =
-  `relative flex min-h-8 w-full cursor-default select-none items-center ${OVERLAY_ITEM_RADIUS} py-1.5 pl-8 pr-2 text-app font-normal leading-5 outline-none ` +
+  `relative flex min-h-8 w-full cursor-default select-none items-center ${OVERLAY_ITEM_RADIUS} py-1.5 ps-8 pe-2 text-app font-normal leading-5 outline-none ` +
   'transition-colors duration-fast ease-interactive ' +
   'text-secondary-token ' +
   `${OVERLAY_ITEM_FOCUS} focus-visible:text-primary-token ` +
@@ -326,13 +326,13 @@ export const MENU_BADGE_BASE =
 export const MENU_SEARCH_HEADER_BASE = 'border-b border-subtle px-2 py-2';
 
 export const MENU_SEARCH_ICON_BASE =
-  'pointer-events-none absolute inset-y-0 left-2.5 my-auto h-3.5 w-3.5 text-tertiary-token';
+  'pointer-events-none absolute inset-y-0 start-2.5 my-auto h-3.5 w-3.5 text-tertiary-token';
 
 export const MENU_SEARCH_INPUT_BASE =
-  'h-7 w-full rounded-full border border-subtle bg-surface-1 py-1 pl-7 pr-7 text-xs text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25';
+  'h-7 w-full rounded-full border border-subtle bg-surface-1 py-1 ps-7 pe-7 text-xs text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25';
 
 export const MENU_SEARCH_CLEAR_BUTTON_BASE =
-  'absolute inset-y-0 right-1.5 my-auto inline-flex h-4 w-4 items-center justify-center rounded-full text-tertiary-token transition-colors duration-fast ease-interactive hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-2 focus-visible:ring-1 focus-visible:ring-focus/35';
+  'absolute inset-y-0 end-1.5 my-auto inline-flex h-4 w-4 items-center justify-center rounded-full text-tertiary-token transition-colors duration-fast ease-interactive hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-2 focus-visible:ring-1 focus-visible:ring-focus/35';
 
 /**
  * Empty and loading states inside menu surfaces

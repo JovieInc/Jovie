@@ -256,9 +256,9 @@ export interface UnifiedTableProps<TData extends RowData> {
   readonly focusedRowIndex?: number;
 
   /**
-   * Callback when focused row changes via keyboard
+   * Callback when focused row changes via keyboard: the display index and that row.
    */
-  readonly onFocusedRowChange?: (index: number) => void;
+  readonly onFocusedRowChange?: (index: number, row: TData | undefined) => void;
 
   /**
    * Global filter value for client-side filtering
@@ -579,15 +579,7 @@ function UnifiedTableContent<TData extends RowData>({
   // focus actually reaches the table.
   const [internalFocusedIndex, setInternalFocusedIndex] = useState<number>(0);
 
-  // Use controlled or uncontrolled focus
   const requestedFocusedIndex = controlledFocusedIndex ?? internalFocusedIndex;
-  const setFocusedIndex = useCallback(
-    (index: number) => {
-      setInternalFocusedIndex(index);
-      onFocusedRowChange?.(index);
-    },
-    [onFocusedRowChange]
-  );
 
   // Auto-enable keyboard nav when onRowClick is provided
   const shouldEnableKeyboardNav =
@@ -649,6 +641,14 @@ function UnifiedTableContent<TData extends RowData>({
   });
 
   const { rows } = table.getRowModel();
+  // Resolve the row in display order, so a sorted table returns the focused row.
+  const setFocusedIndex = useCallback(
+    (index: number) => {
+      setInternalFocusedIndex(index);
+      onFocusedRowChange?.(index, rows[index]?.original);
+    },
+    [onFocusedRowChange, rows]
+  );
   const resolvedColumnVisibility = table.getState().columnVisibility;
 
   const focusedIndex = Math.max(

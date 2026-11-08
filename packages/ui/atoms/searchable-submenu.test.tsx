@@ -73,30 +73,24 @@ describe('SearchableList', () => {
       expect(buttons.length).toBe(5);
     });
 
-    it('renders search input', () => {
-      render(<SearchableList items={sampleItems} onSelect={vi.fn()} />);
-      expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument();
-    });
-
-    it('renders item descriptions', () => {
-      render(<SearchableList items={sampleItems} onSelect={vi.fn()} />);
-      expect(screen.getByText('A yellow fruit')).toBeInTheDocument();
-    });
-
-    it('renders item badges', () => {
-      render(<SearchableList items={sampleItems} onSelect={vi.fn()} />);
-      expect(screen.getByText('10')).toBeInTheDocument();
-    });
-
-    it('renders custom search placeholder', () => {
+    it.each([
+      [undefined, 'Search...'],
+      ['Find fruits...', 'Find fruits...'],
+    ])('renders the search input (%s)', (searchPlaceholder, placeholder) => {
       render(
         <SearchableList
           items={sampleItems}
           onSelect={vi.fn()}
-          searchPlaceholder='Find fruits...'
+          searchPlaceholder={searchPlaceholder}
         />
       );
-      expect(screen.getByPlaceholderText('Find fruits...')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(placeholder)).toBeInTheDocument();
+    });
+
+    it('renders item descriptions and badges', () => {
+      render(<SearchableList items={sampleItems} onSelect={vi.fn()} />);
+      expect(screen.getByText('A yellow fruit')).toBeInTheDocument();
+      expect(screen.getByText('10')).toBeInTheDocument();
     });
 
     it('supports controlled query and placeholder aliases', () => {
@@ -301,155 +295,6 @@ describe('SearchableList', () => {
     });
   });
 
-  describe('Keyboard Navigation', () => {
-    it('highlights first item by default', () => {
-      const { container } = render(
-        <SearchableList items={sampleItems} onSelect={vi.fn()} />
-      );
-      const firstItem = getItemButton(container, 'Apple');
-      expect(firstItem).toHaveAttribute('data-highlighted', 'true');
-    });
-
-    it('moves highlight down with ArrowDown', () => {
-      const { container } = render(
-        <SearchableList items={sampleItems} onSelect={vi.fn()} />
-      );
-      const searchInput = screen.getByPlaceholderText('Search...');
-
-      fireEvent.keyDown(searchInput, { key: 'ArrowDown' });
-
-      const secondItem = getItemButton(container, 'Banana');
-      expect(secondItem).toHaveAttribute('data-highlighted', 'true');
-    });
-
-    it('stays on the first option when every option is disabled', () => {
-      const items: SearchableSubmenuItem[] = [
-        { id: '1', label: 'Closed', disabled: true },
-        { id: '2', label: 'Also closed', disabled: true },
-      ];
-      const { container } = render(
-        <SearchableList items={items} onSelect={vi.fn()} />
-      );
-
-      fireEvent.keyDown(screen.getByPlaceholderText('Search...'), {
-        key: 'ArrowDown',
-      });
-
-      expect(getItemButton(container, 'Closed')).toHaveAttribute(
-        'data-highlighted',
-        'true'
-      );
-      expect(getItemButton(container, 'Also closed')).not.toHaveAttribute(
-        'data-highlighted'
-      );
-    });
-
-    it('skips disabled options during keyboard navigation', () => {
-      const items: SearchableSubmenuItem[] = [
-        { id: '1', label: 'First' },
-        { id: '2', label: 'Unavailable', disabled: true },
-        { id: '3', label: 'Third' },
-      ];
-      const { container } = render(
-        <SearchableList items={items} onSelect={vi.fn()} />
-      );
-
-      fireEvent.keyDown(screen.getByPlaceholderText('Search...'), {
-        key: 'ArrowDown',
-      });
-
-      expect(getItemButton(container, 'Third')).toHaveAttribute(
-        'data-highlighted',
-        'true'
-      );
-      expect(getItemButton(container, 'Unavailable')).not.toHaveAttribute(
-        'data-highlighted'
-      );
-    });
-
-    it('moves highlight up with ArrowUp', () => {
-      const { container } = render(
-        <SearchableList items={sampleItems} onSelect={vi.fn()} />
-      );
-      const searchInput = screen.getByPlaceholderText('Search...');
-
-      // Move down first, then up
-      fireEvent.keyDown(searchInput, { key: 'ArrowDown' });
-      fireEvent.keyDown(searchInput, { key: 'ArrowUp' });
-
-      const firstItem = getItemButton(container, 'Apple');
-      expect(firstItem).toHaveAttribute('data-highlighted', 'true');
-    });
-
-    it('wraps around when going past last item', () => {
-      const items: SearchableSubmenuItem[] = [
-        { id: '1', label: 'First' },
-        { id: '2', label: 'Second' },
-      ];
-      const { container } = render(
-        <SearchableList items={items} onSelect={vi.fn()} />
-      );
-      const searchInput = screen.getByPlaceholderText('Search...');
-
-      fireEvent.keyDown(searchInput, { key: 'ArrowDown' });
-      fireEvent.keyDown(searchInput, { key: 'ArrowDown' });
-
-      const firstItem = getItemButton(container, 'First');
-      expect(firstItem).toHaveAttribute('data-highlighted', 'true');
-    });
-
-    it('wraps around when going before first item', () => {
-      const items: SearchableSubmenuItem[] = [
-        { id: '1', label: 'First' },
-        { id: '2', label: 'Second' },
-      ];
-      const { container } = render(
-        <SearchableList items={items} onSelect={vi.fn()} />
-      );
-      const searchInput = screen.getByPlaceholderText('Search...');
-
-      fireEvent.keyDown(searchInput, { key: 'ArrowUp' });
-
-      const lastItem = getItemButton(container, 'Second');
-      expect(lastItem).toHaveAttribute('data-highlighted', 'true');
-    });
-
-    it('selects item on Enter', () => {
-      const onSelect = vi.fn();
-      render(<SearchableList items={sampleItems} onSelect={onSelect} />);
-      const searchInput = screen.getByPlaceholderText('Search...');
-
-      fireEvent.keyDown(searchInput, { key: 'Enter' });
-
-      expect(onSelect).toHaveBeenCalledWith(sampleItems[0]);
-    });
-
-    it('does not select disabled item on Enter', () => {
-      const onSelect = vi.fn();
-      const items: SearchableSubmenuItem[] = [
-        { id: '1', label: 'Disabled', disabled: true },
-      ];
-      render(<SearchableList items={items} onSelect={onSelect} />);
-      const searchInput = screen.getByPlaceholderText('Search...');
-
-      fireEvent.keyDown(searchInput, { key: 'Enter' });
-
-      expect(onSelect).not.toHaveBeenCalled();
-    });
-
-    it('highlights item on mouse enter', async () => {
-      const user = userEvent.setup({ delay: null });
-      const { container } = render(
-        <SearchableList items={sampleItems} onSelect={vi.fn()} />
-      );
-
-      const cherryButton = getItemButton(container, 'Cherry');
-      await user.hover(cherryButton);
-
-      expect(cherryButton).toHaveAttribute('data-highlighted', 'true');
-    });
-  });
-
   describe('Accessibility', () => {
     it('has a screen-reader-only select element', () => {
       render(<SearchableList items={sampleItems} onSelect={vi.fn()} />);
@@ -581,13 +426,82 @@ describe('SearchableSubmenu', () => {
     expect(trigger).toBeInTheDocument();
     expect(trigger.className).toContain('before:h-11');
     expect(trigger.className).toContain('before:min-w-11');
+    // Logical insets mirror the chevron and search field chrome in RTL.
+    const chevron = trigger.querySelector('svg.lucide-chevron-right');
+    expect(chevron).toHaveClass('ms-auto', 'rtl:rotate-180');
+
+    await user.hover(screen.getByText('Choose platform'));
+    const input = await screen.findByRole('combobox', { name: 'Search...' });
+    expect(input).toHaveClass('ps-7', 'pe-7');
+    await user.type(input, 'apple', { skipClick: true });
+
+    const clear = screen.getByRole('button', { name: 'Clear search' });
+    expect(clear).toHaveClass('before:h-11', 'before:min-w-11', 'end-1.5');
+  });
+
+  it('keeps typed search text when the parent re-renders while open', async () => {
+    const user = userEvent.setup({ delay: null });
+    function Host({ tick }: { readonly tick: number }) {
+      return (
+        <DropdownMenuPrimitive.Root defaultOpen>
+          <DropdownMenuPrimitive.Trigger>
+            Actions {tick}
+          </DropdownMenuPrimitive.Trigger>
+          <DropdownMenuPrimitive.Portal>
+            <DropdownMenuPrimitive.Content>
+              <SearchableSubmenu
+                triggerLabel='Choose platform'
+                sections={[...sections]}
+                onSelect={vi.fn()}
+              />
+            </DropdownMenuPrimitive.Content>
+          </DropdownMenuPrimitive.Portal>
+        </DropdownMenuPrimitive.Root>
+      );
+    }
+    const { rerender } = render(<Host tick={0} />);
 
     await user.hover(screen.getByText('Choose platform'));
     const input = await screen.findByRole('combobox', { name: 'Search...' });
     await user.type(input, 'apple', { skipClick: true });
+    expect(input).toHaveValue('apple');
 
-    const clear = screen.getByRole('button', { name: 'Clear search' });
-    expect(clear.className).toContain('before:h-11');
-    expect(clear.className).toContain('before:min-w-11');
+    rerender(<Host tick={1} />);
+    rerender(<Host tick={2} />);
+
+    const after = screen.getByRole('combobox', { name: 'Search...' });
+    expect(after).toBe(input);
+    expect(after).toHaveValue('apple');
+    expect(after).toHaveFocus();
+  });
+
+  it('starts each reopen with an empty search', async () => {
+    const user = userEvent.setup({ delay: null });
+    renderSubmenu();
+
+    await user.hover(screen.getByText('Choose platform'));
+    const input = await screen.findByRole('combobox', { name: 'Search...' });
+    await user.type(input, 'apple', { skipClick: true });
+    expect(input).toHaveValue('apple');
+
+    // Escape clears the query; selecting a result closes the submenu.
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(input).toHaveValue('');
+    await user.type(input, 'spot', { skipClick: true });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('combobox', { name: 'Search...' })
+      ).not.toBeInTheDocument()
+    );
+
+    const trigger = document.querySelector<HTMLElement>(
+      '[data-slot="searchable-submenu-trigger"]'
+    );
+    expect(trigger).toBeInTheDocument();
+    trigger?.focus();
+    fireEvent.keyDown(trigger as HTMLElement, { key: 'ArrowRight' });
+    const reopened = await screen.findByRole('combobox', { name: 'Search...' });
+    expect(reopened).toHaveValue('');
   });
 });

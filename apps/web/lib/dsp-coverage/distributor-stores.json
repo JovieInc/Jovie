@@ -1,0 +1,449 @@
+{
+  "accessed": "2026-11-07",
+  "note": "Neither AWAL nor The Orchard publishes a complete store list. AWAL states 100+ partners without naming them; The Orchard publishes a dated list (it still names defunct services). Rows with source jovie-target are services Tim listed that are not confirmed in either public document.",
+  "sources": {
+    "awal-faq": {
+      "url": "https://www.awal.com/faq",
+      "claim": "AWAL supplies more than 100 digital partners in nearly 200 territories, including all of the leading platforms (no names)."
+    },
+    "awal-blog": {
+      "url": "https://www.awal.com/?p=1576",
+      "claim": "Directly distributes to Apple Music, Spotify, Amazon, YouTube, Google Play, Pandora, etc.; Kobalt job listing adds Facebook, TikTok."
+    },
+    "awal-third-party": {
+      "url": "https://music.loop.fans/blog/awal-distribution",
+      "claim": "Third-party guide lists Tidal, YouTube Music (unconfirmed by AWAL)."
+    },
+    "orchard-store-list": {
+      "url": "https://helpcenter.theorchard.com/category/music-distribution/digital-audio-releases/",
+      "claim": "FAQ: What streaming stores does The Orchard distribute to? Official dated list of 43 names."
+    },
+    "jovie-target": {
+      "url": "https://claude.ai/code/session_01LYHpeZ924xa3sJL9RZHv2S",
+      "claim": "Tim 2026-11-07 ask: support every DSP AWAL/Orchard distribute to; listed services not confirmed in either public document."
+    }
+  },
+  "stores": [
+    {
+      "name": "Spotify",
+      "distributors": ["awal", "orchard"],
+      "class": "listen",
+      "registryKey": "spotify",
+      "sources": ["awal-blog", "orchard-store-list"]
+    },
+    {
+      "name": "Apple Music / iTunes",
+      "distributors": ["awal", "orchard"],
+      "class": "listen",
+      "registryKey": "apple_music",
+      "sources": ["awal-blog", "orchard-store-list"]
+    },
+    {
+      "name": "Amazon Music",
+      "distributors": ["awal", "orchard"],
+      "class": "listen",
+      "registryKey": "amazon_music",
+      "sources": ["awal-blog", "orchard-store-list"]
+    },
+    {
+      "name": "YouTube Music",
+      "distributors": ["awal"],
+      "class": "listen",
+      "registryKey": "youtube_music",
+      "sources": ["awal-blog"]
+    },
+    {
+      "name": "YouTube",
+      "distributors": ["awal"],
+      "class": "listen",
+      "registryKey": "youtube",
+      "sources": ["awal-blog"]
+    },
+    {
+      "name": "Pandora",
+      "distributors": ["awal", "orchard"],
+      "class": "listen",
+      "registryKey": "pandora",
+      "sources": ["awal-blog", "orchard-store-list"]
+    },
+    {
+      "name": "Tidal",
+      "distributors": ["awal", "orchard"],
+      "class": "listen",
+      "registryKey": "tidal",
+      "sources": ["orchard-store-list", "awal-third-party"]
+    },
+    {
+      "name": "Deezer",
+      "distributors": ["orchard"],
+      "class": "listen",
+      "registryKey": "deezer",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "SoundCloud",
+      "distributors": ["orchard"],
+      "class": "listen",
+      "registryKey": "soundcloud",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Napster",
+      "distributors": ["orchard"],
+      "class": "listen",
+      "registryKey": "napster",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Qobuz",
+      "distributors": ["orchard"],
+      "class": "listen",
+      "registryKey": "qobuz",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Beatport",
+      "distributors": ["orchard"],
+      "class": "listen",
+      "registryKey": "beatport",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "KKBOX",
+      "distributors": ["orchard"],
+      "class": "listen",
+      "registryKey": "kkbox",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "JioSaavn (listed as Saavn)",
+      "distributors": ["orchard"],
+      "class": "listen",
+      "registryKey": "jio_saavn",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "AWA",
+      "distributors": ["orchard"],
+      "class": "listen",
+      "registryKey": "awa",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Bugs",
+      "distributors": ["orchard"],
+      "class": "listen",
+      "registryKey": "bugs",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "fizy",
+      "distributors": ["orchard"],
+      "class": "listen",
+      "registryKey": "fizy",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Juno Download (listed as Juno Records)",
+      "distributors": ["orchard"],
+      "class": "listen",
+      "registryKey": "juno_download",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "eMusic",
+      "distributors": ["orchard"],
+      "class": "listen",
+      "registryKey": "emusic",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Audiomack",
+      "distributors": [],
+      "class": "listen",
+      "registryKey": "audiomack",
+      "sources": ["jovie-target"]
+    },
+    {
+      "name": "Anghami",
+      "distributors": [],
+      "class": "listen",
+      "registryKey": "anghami",
+      "sources": ["jovie-target"]
+    },
+    {
+      "name": "Boomplay",
+      "distributors": [],
+      "class": "listen",
+      "registryKey": "boomplay",
+      "sources": ["jovie-target"]
+    },
+    {
+      "name": "iHeartRadio",
+      "distributors": [],
+      "class": "listen",
+      "registryKey": "iheartradio",
+      "sources": ["jovie-target"]
+    },
+    {
+      "name": "Bandcamp",
+      "distributors": [],
+      "class": "listen",
+      "registryKey": "bandcamp",
+      "sources": ["jovie-target"]
+    },
+    {
+      "name": "NetEase Cloud Music",
+      "distributors": [],
+      "class": "listen",
+      "registryKey": "netease",
+      "sources": ["jovie-target"]
+    },
+    {
+      "name": "QQ Music (Tencent)",
+      "distributors": [],
+      "class": "listen",
+      "registryKey": "qq_music",
+      "sources": ["jovie-target"]
+    },
+    {
+      "name": "Yandex Music",
+      "distributors": [],
+      "class": "listen",
+      "registryKey": "yandex",
+      "sources": ["jovie-target"]
+    },
+    {
+      "name": "VK Music",
+      "distributors": [],
+      "class": "listen",
+      "registryKey": "vk_music",
+      "sources": ["jovie-target"]
+    },
+    {
+      "name": "Traxsource",
+      "distributors": [],
+      "class": "listen",
+      "registryKey": "traxsource",
+      "sources": ["jovie-target"]
+    },
+    {
+      "name": "TikTok",
+      "distributors": ["awal", "orchard"],
+      "class": "ugc",
+      "registryKey": "tiktok",
+      "sources": ["awal-blog"]
+    },
+    {
+      "name": "Instagram / Facebook",
+      "distributors": ["awal"],
+      "class": "ugc",
+      "registryKey": "instagram",
+      "sources": ["awal-blog"]
+    },
+    {
+      "name": "YouTube Shorts / Content ID",
+      "distributors": ["awal", "orchard"],
+      "class": "ugc",
+      "registryKey": "youtube_shorts",
+      "sources": ["awal-blog"]
+    },
+    {
+      "name": "Shazam",
+      "distributors": [],
+      "class": "ugc",
+      "registryKey": "shazam",
+      "sources": ["jovie-target"]
+    },
+    {
+      "name": "Snapchat",
+      "distributors": [],
+      "class": "ugc",
+      "reason": "UGC sound library; no public listen URL scheme",
+      "sources": ["jovie-target"]
+    },
+    {
+      "name": "7digital",
+      "distributors": ["orchard"],
+      "class": "b2b",
+      "registryKey": "seven_digital",
+      "reason": "B2B API aggregator; registry tracks it as metadata, not a fan listen destination",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Google Music",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "Service discontinued; nothing for a fan to play",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Xbox Music",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "Service discontinued; nothing for a fan to play",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Slacker",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "Service discontinued; nothing for a fan to play",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "InternetQ SA dba Akazoo",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "Service discontinued; nothing for a fan to play",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Flipagram",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "Service discontinued; nothing for a fan to play",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Simfy Africa",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "Service discontinued; nothing for a fan to play",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "24/7 Entertainment GmbH",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Altacom",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "AMI Entertainment",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "BounDEE (Space Shower)",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Grammofy",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "iMusica",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "MediaNet",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Mix&Burn",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Mondia Media",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "MONSTAR LAB, INC.",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Next Music (Pty) Limited",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "NMusic",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "PCM Technologies",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Psonar Limited",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Taihe Music Group",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Telecom Italia S.p.A",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "Touchtunes",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "TurkTelekom",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    },
+    {
+      "name": "UMA",
+      "distributors": ["orchard"],
+      "class": "unsupported",
+      "reason": "B2B aggregator, carrier, in-venue or small regional channel; no verified public artist/release URL scheme as of 2026-11-07",
+      "sources": ["orchard-store-list"]
+    }
+  ]
+}

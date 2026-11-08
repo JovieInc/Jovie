@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('@/hooks/useJovieAuth', () => ({ useJovieAuth: () => mocks.auth }));
 vi.mock('./OnboardingShell', () => ({
+  ONBOARDING_FRAME_CLASS: 'onboarding-frame',
   OnboardingShell: (props: OnboardingShellProps) => {
     mocks.shell(props);
     return (
@@ -171,6 +172,18 @@ describe('onboarding identity boundary', () => {
       })
     ).toBeVisible();
   });
+  it('restores inside the same shell panel the chat paints into', () => {
+    mocks.auth.isLoaded = false;
+    const { container } = render(
+      <OnboardingSessionBoundary sessionLabel='pending' />
+    );
+    const frame = container.querySelector('[data-app-shell-placeholder]');
+    expect(frame).not.toBeNull();
+    expect(
+      frame?.querySelector('main [data-testid="onboarding-session-boundary"]')
+    ).not.toBeNull();
+    expect(container.querySelector('#main-content')).toBeNull();
+  });
   it('keeps an actual empty anonymous entry available for a new homepage handoff', async () => {
     mocks.auth.userId = null;
     mocks.auth.isSignedIn = false;
@@ -290,6 +303,57 @@ describe('onboarding identity boundary', () => {
     expect(boundary).toHaveAttribute('data-restore-state', 'restoring');
     expect(await screen.findByRole('alert')).toBe(boundary);
     expect(boundary).toHaveAttribute('data-restore-state', 'failed');
+  });
+
+  it('exposes the restore-failure code and auth state for the nightly stall annotation (JOV-7653)', async () => {
+    const unmounts: Array<() => void> = [];
+    const renderStalled = async (
+      rejection: () => Promise<unknown>,
+      auth: Partial<typeof mocks.auth>
+    ) => {
+      unmounts.pop()?.();
+      mocks.fetch.mockReset();
+      mocks.fetch.mockImplementationOnce(rejection);
+      Object.assign(mocks.auth, auth);
+      const mounted = render(
+        <OnboardingSessionBoundary sessionLabel='pending' />
+      );
+      unmounts.push(() => mounted.unmount());
+      return await screen.findByRole('alert');
+    };
+
+    // HTTP failure surfaces the status.
+    let boundary = await renderStalled(
+      () => Promise.resolve(Response.json({ error: 'no' }, { status: 503 })),
+      { userId: 'account-a' }
+    );
+    expect(boundary).toHaveAttribute('data-restore-error', 'status:503');
+
+    // Identity mismatch (client anonymous vs server session) is distinct.
+    boundary = await renderStalled(
+      () =>
+        Promise.resolve(
+          Response.json({
+            identityId: 'account-a',
+            conversationId: null,
+            owned: false,
+            messages: [],
+          })
+        ),
+      { userId: null }
+    );
+    expect(boundary).toHaveAttribute('data-restore-error', 'invalid-restore');
+    expect(boundary).toHaveAttribute('data-auth-state', 'anonymous');
+
+    // Network failure is distinct from a parsed error response.
+    boundary = await renderStalled(
+      () => Promise.reject(new TypeError('fetch failed')),
+      { userId: 'account-a' }
+    );
+    expect(boundary).toHaveAttribute('data-restore-error', 'restore-network');
+    expect(boundary).toHaveAttribute('data-auth-state', 'signed-in');
+
+    unmounts.pop()?.();
   });
   it('offers restoration retry without fabricating a fresh onboarding flow', async () => {
     mocks.fetch

@@ -31,9 +31,9 @@ vi.mock('next/image', () => ({
   },
 }));
 
-const EDITORIAL_CSS = 'components/homepage/HomepageEditorial.css';
-const HEADLINE_SELECTOR = '.homepage-editorial-hero .marketing-hero-headline';
-const SUPPORT_SELECTOR = '.homepage-editorial-hero .marketing-hero-subtitle';
+const EDITORIAL_CSS = 'components/homepage/v3/chapters.css';
+const HEADLINE_SELECTOR = '.hv3-hero .marketing-hero-headline';
+const SUPPORT_SELECTOR = '.hv3-hero .marketing-hero-subtitle';
 // A minimum ratio, not the exact locked value (currently ~2.25x-3.2x): tight
 // enough that "nearly equal weight" fails closed, loose enough that routine
 // type-scale tuning does not make this brittle.
@@ -165,13 +165,9 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
       MIN_DOMINANCE_RATIO
     );
 
-    // Both roles read the one --ds-marketing-* ramp, never page clamps.
-    expect(cssBlock(source, HEADLINE_SELECTOR)).toContain(
-      'var(--ds-marketing-title-size)'
-    );
-    expect(cssBlock(source, SUPPORT_SELECTOR)).toContain(
-      'var(--ds-marketing-lede-size)'
-    );
+    // The approved v3 hero (Tim, receipt home-canonical-v3, 2026-11-08) sets
+    // its own display scale, larger than the shared --ds-marketing-* ramp;
+    // the dominance ratio above is the invariant this test guards.
   });
 
   it('keeps the headline at full ink weight while the support line recedes via a lighter ink token', () => {

@@ -81,6 +81,77 @@ describe('classifyGitHubFailure', () => {
     expect(classifyGitHubFailure({ status, message }).retryable).toBe(false);
   });
 
+  // Live failed-step wordings, 2026-11-08 (jobs 128679832845, 128680939625,
+  // 128685078954): GitHub release downloads returned HTTP 504 runs.
+  const GITLEAKS_EXHAUSTED =
+    '##[error]Could not fetch gitleaks after 3 attempts (https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz).';
+  it.each([
+    GITLEAKS_EXHAUSTED,
+    `curl: (22) The requested URL returned error: 504\nscanner download attempt 1 failed; retrying\n${GITLEAKS_EXHAUSTED}`,
+    '##[error]Could not fetch trufflehog after 6 attempts (https://github.com/trufflesecurity/trufflehog/releases/download/v3.99.8/trufflehog_3.99.8_linux_amd64.tar.gz).',
+    'Squawk 2.70.0 download failed: 504 https://github.com/sbdchd/squawk/releases/download/v2.70.0/squawk-linux-x64\n##[error]Process completed with exit code 1.',
+    'Squawk 2.70.0 download failed: fetch failed https://github.com/sbdchd/squawk/releases/download/v2.70.0/squawk-linux-arm64',
+  ])('reads an exhausted pinned release download as transient: %s', message => {
+    expect(kind({ message })).toBe(TRANSIENT);
+  });
+
+  it.each([
+    // A bad pin is a real failure, not an outage.
+    `curl: (22) The requested URL returned error: 404\n${GITLEAKS_EXHAUSTED}`,
+    'Squawk 2.70.0 download failed: 404 https://github.com/sbdchd/squawk/releases/download/v2.70.0/squawk-linux-x64',
+    'Squawk checksum mismatch: expected abc, got def',
+    'oasdiff-breaking-change: oasdiff tarball sha256 5fb7 does not match the pinned 7577',
+    // Real scan and test failures in the same jobs.
+    '##[error]Secret scan found 1 finding(s) in scripts/a.ts',
+    ' FAIL  apps/web/lib/a.test.ts > downloads > retries\nAssertionError: expected 3 to be 6\n##[error]Process completed with exit code 1.',
+    'Could not fetch gitleaks after 3 attempts (https://example.com/gitleaks.tar.gz).',
+  ])('keeps real download and test failures real: %s', message => {
+    expect(kind({ message })).toBe(NONE);
+  });
+
+  // scripts/lib/github-release-asset.sh and its .mjs adapter (#24577).
+  const RELEASE_URL =
+    'https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz';
+  const helperLog = (status, last = status) =>
+    [
+      `curl: (22) The requested URL returned error: ${status}`,
+      `release download: anonymous HTTP ${status} for ${RELEASE_URL}`,
+      'release download attempt 1 failed; retrying',
+      `release download failed after 6 attempts (last HTTP ${last}): ${RELEASE_URL}`,
+    ].join('\n');
+  it.each([
+    `release download failed after 6 attempts (last HTTP 504): ${RELEASE_URL}`,
+    `release download failed after 8 attempts (last HTTP 000): ${RELEASE_URL}`,
+    'release download exit 1 (last HTTP 503)',
+    'oasdiff 1.11.7 download failed: release download exit 1 (last HTTP 000)',
+    `${helperLog('504')}\n##[error]download failed: ${RELEASE_URL}`,
+    `curl: (28) Operation too slow\nrelease download: anonymous HTTP 000 for ${RELEASE_URL}\n${helperLog('000')}`,
+    `##[error]download failed: ${RELEASE_URL}`,
+    'Squawk 2.70.0 download failed: 000 https://github.com/sbdchd/squawk/releases/download/v2.70.0/squawk-linux-x64',
+    '##[error]Could not fetch osv-scanner after 3 attempts (https://github.com/google/osv-scanner/releases/download/v2.0.0/osv-scanner_linux_amd64) and no verified container fallback.',
+  ])(
+    'reads the release helper exhausted on 5xx/timeout as transient: %s',
+    message => {
+      expect(kind({ message })).toBe(TRANSIENT);
+    }
+  );
+
+  it.each([
+    `release download failed after 6 attempts (last HTTP 404): ${RELEASE_URL}`,
+    'release download exit 1 (last HTTP 404)',
+    'release download exit 2 (last HTTP unavailable)',
+    `${helperLog('404')}\n##[error]download failed: ${RELEASE_URL}`,
+    // An earlier 5xx attempt does not excuse a final 4xx.
+    `${helperLog('504', '403')}\n##[error]download failed: ${RELEASE_URL}`,
+    // A download that succeeded after a 5xx retry, then failed its pin.
+    `release download: anonymous HTTP 504 for ${RELEASE_URL}\nrelease download attempt 1 failed; retrying\n##[error]sha256 mismatch: ${RELEASE_URL}`,
+    'release download: anonymous HTTP 502 for x\nSquawk checksum mismatch: expected abc, got def',
+    'release download: anonymous HTTP 504 for x\ngitleaks (release) sha256 0a1b does not match pinned 2c3d',
+    '##[error]download failed: https://codeload.github.com/rhysd/actionlint/tar.gz/abc',
+  ])('keeps 4xx and sha-mismatch release failures real: %s', message => {
+    expect(kind({ message })).toBe(NONE);
+  });
+
   it('exposes a text predicate for log readers', () => {
     expect(
       isGitHubInfrastructureFailure(

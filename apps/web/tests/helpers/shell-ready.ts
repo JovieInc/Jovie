@@ -22,15 +22,22 @@ export async function describeShellReadyStall(
   chatComposer: Locator
 ): Promise<string> {
   const bits: string[] = [`url=${page.url()}`];
-  const restoreState = await page
+  const boundary = page
     .locator('[data-testid="onboarding-session-boundary"]')
-    .first()
-    .getAttribute('data-restore-state')
-    .catch(() => null);
+    .first();
+  const readAttr = async (name: string) =>
+    boundary.getAttribute(name).catch(() => null);
+  const [restoreState, restoreError, authState] = await Promise.all([
+    readAttr('data-restore-state'),
+    readAttr('data-restore-error'),
+    readAttr('data-auth-state'),
+  ]);
   bits.push(
     `main=${await main.isVisible().catch(() => 'unknown')}`,
     `composer=${await chatComposer.isVisible().catch(() => 'unknown')}`,
-    `boundary-restore-state=${restoreState ?? 'absent'}`
+    `boundary-restore-state=${restoreState ?? 'absent'}`,
+    `boundary-restore-error=${restoreError ?? 'absent'}`,
+    `boundary-auth-state=${authState ?? 'absent'}`
   );
   const bodyText = await page
     .locator('body')
@@ -47,15 +54,22 @@ export async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
   const chatComposer = page
     .locator('textarea, [contenteditable="true"], a[href="/app/chat"]')
     .first();
+  // The /start restore state draws inside the shell's own frame, so <main>
+  // is visible while it is still restoring or stuck on Try Again. Count main
+  // as ready only once that boundary has gone.
+  const restoreBoundary = page
+    .locator('[data-testid="onboarding-session-boundary"]')
+    .first();
   const isShellReady = async () =>
-    (await main.isVisible().catch(() => false)) ||
-    (await chatComposer.isVisible().catch(() => false));
+    (await chatComposer.isVisible().catch(() => false)) ||
+    ((await main.isVisible().catch(() => false)) &&
+      !(await restoreBoundary.isVisible().catch(() => false)));
 
   // The `creator` persona keeps onboarding incomplete by design, so the
   // post-bypass landing can be /start instead of /app. There, the
   // OnboardingSessionBoundary (JOV-7689) mounts the shell only after a
   // client-side conversation restore resolves; a failed restore leaves a
-  // static Try Again state with no <main>/composer — a reload is the same
+  // static Try Again state with no composer — a reload is the same
   // recovery the surface itself offers. Retry the navigation once mid-poll:
   // /app states always render <main> (shell skeleton included), so the
   // reload can only fire on a stuck /start boundary.

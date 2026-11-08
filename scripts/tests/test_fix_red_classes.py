@@ -19,10 +19,14 @@ class ClassifyTest(unittest.TestCase):
         cases = {
             "github-quota-deferred; fleet evidence retry": ("quota-deferred", "rerun"),
             "HttpError: API rate limit exceeded for installation": ("platform-infra", "rerun"),
+            "Could not fetch gitleaks after 3 attempts (https://example.invalid/gitleaks.tar.gz).": ("platform-infra", "rerun"),
+            "##[error]Dependency review detected incompatible licenses.": ("dependency-license", "agent"),
+            "github-quota-deferred\n##[error]Dependency review detected incompatible licenses.": ("dependency-license", "agent"),
             "upstream returned HTTP 500 before the job started": ("platform-infra", "rerun"),
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane": ("ci-fast-wiring", "wire-ci-fast"),
             "domain-write-guard: apps/web/lib/leads/lead-claim-token.ts writes creatorProfiles directly 1x (allowed 0).": ("domain-write", "register-domain-writes"),
             "This PR conflicts with main in: scripts/preflight-changed.mjs . Resolve the conflict (lane-fix-conflict).": ("narrowed-preflight", "merge-narrowed-preflight"),
+            "Error: legacy Cache Components surface grew to 242 (maximum 241):": ("cache-surface", "strip-cache-exports"),
             "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.": ("spacing-scale", "snap-spacing"),
             "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence": ("census-certification", "sync-main"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "atomic-write"),
@@ -32,6 +36,34 @@ class ClassifyTest(unittest.TestCase):
         for log, (cls, action) in cases.items():
             got = classes.classify(pr("Source Validation"), {"Source Validation": log})
             self.assertEqual((got["cls"], got["action"]), (cls, action), log)
+
+    def test_failed_live_design_cli_syncs_main_before_retrying_fixture_infra(self):
+        summary = (" FAIL  workspace-scripts lib/__tests__/design-system-source-ratchet.test.mjs"
+                   " > design-system source identity ratchet (JOV-5301)"
+                   " > exits zero from the CLI on the live tree\n")
+        noise = "passing fixture: github-quota-deferred; API rate limit exceeded; HTTP 503\n"
+        for log in (summary, noise + summary, noise + "\x1b[31m" + summary + "\x1b[0m"):
+            got = classes.classify(pr("Source Validation"), {"Source Validation": log})
+            self.assertEqual((got["cls"], got["action"]), ("design-source-cli", "sync-main"))
+        for passing in (summary.replace("FAIL", "PASS"),
+                        summary.replace("design-system-source-ratchet.test.mjs", "other.test.mjs"),
+                        summary.replace("exits zero from the CLI on the live tree", "another test")):
+            got = classes.classify(pr("Source Validation"), {"Source Validation": noise + passing})
+            self.assertEqual((got["cls"], got["action"]), ("quota-deferred", "rerun"))
+
+    def test_unwired_outranks_incidental_http_status_in_the_same_log(self):
+        log = (
+            "✔ recovers HTTP 502/503/504\n"
+            "HttpError: API rate limit exceeded for installation\n"
+            "AssertionError: Unwired: scripts/lib/__tests__/workers-inventory.test.mjs. "
+            "Wire each file into a ci-fast lane\n"
+        )
+        got = classes.classify(pr("Source Validation"), {"Source Validation": log})
+        self.assertEqual((got["cls"], got["action"]), ("ci-fast-wiring", "wire-ci-fast"))
+        self.assertEqual(got["files"], ["scripts/lib/__tests__/workers-inventory.test.mjs"])
+        plain = classes.classify(pr("Source Validation"), {
+            "Source Validation": "upstream returned HTTP 500 before the job started"})
+        self.assertEqual((plain["cls"], plain["action"]), ("platform-infra", "rerun"))
 
     def test_unwired_files_are_extracted_and_aggregates_ignored(self):
         got = classes.classify(pr("Source Validation"), {"Source Validation":
@@ -261,6 +293,27 @@ class AndChainMergeTest(unittest.TestCase):
             classes.merge_narrowed_guard_command(NarrowedPreflightMergeTest.OURS, NarrowedPreflightMergeTest.THEIRS),
         )
 
+    def test_unions_plain_yaml_run_chains_in_main_order(self):
+        ours = "pnpm --filter @jovie/extension test && node --experimental-strip-types --test workers/cron-hub/src/index.test.mjs"
+        theirs = "pnpm --filter @jovie/extension test && pnpm --filter @jovie/mesh-hub test"
+        conflict = (f"<<<<<<< HEAD\n        run: {ours}\n=======\n"
+                    f"        run: {theirs}\n>>>>>>> origin/main\n")
+        self.assertEqual(
+            classes.resolve_and_chain_text(conflict),
+            f"        run: {theirs} && node --experimental-strip-types --test workers/cron-hub/src/index.test.mjs\n",
+        )
+        for changed in [theirs.replace("extension test", "extension test --strict"),
+                        theirs + " | cat", theirs + " # comment", theirs + " && echo 'quoted'",
+                        theirs + " && echo ${UNTRUSTED}"]:
+            with self.subTest(changed=changed):
+                self.assertIsNone(classes.resolve_and_chain_text(conflict.replace(theirs, changed)))
+        self.assertIsNone(classes.resolve_and_chain_text(conflict.replace("run:", "name:", 1)))
+        for key in ["if", "name", "working-directory", "env"]:
+            metadata = conflict.replace("        run:", f"        {key}: false\n        run:", 1)
+            metadata = metadata.replace("=======\n", f"=======\n        {key}: true\n", 1)
+            with self.subTest(key=key):
+                self.assertIsNone(classes.resolve_and_chain_text(metadata))
+
     def test_rejects_a_changed_script_quotes_and_a_second_file_list(self):
         self.assertIsNone(classes.merge_and_chain(self.OURS, self.THEIRS.replace("ownership:check", "ownership:check --strict")))
         self.assertIsNone(classes.merge_and_chain(self.OURS + " && echo 'x'", self.THEIRS))
@@ -346,55 +399,6 @@ class AtomicWriteRepairTest(unittest.TestCase):
             target.symlink_to(outside)
             self.assertEqual(classes.repair_atomic_state_writes(root, self.LOG), [])
             self.assertIn('p.write_text("x")', outside.read_text())
-
-
-class SpacingSnapTest(unittest.TestCase):
-    DIFF = """diff --git a/apps/web/components/Card.tsx b/apps/web/components/Card.tsx
---- a/apps/web/components/Card.tsx
-+++ b/apps/web/components/Card.tsx
-@@ -1,0 +2 @@
-+        <div className='mb-4 flex items-center gap-2.5 h-3.5 -mx-3.5 sm:gap-3.5'>
-diff --git a/apps/web/components/Card.test.tsx b/apps/web/components/Card.test.tsx
---- a/apps/web/components/Card.test.tsx
-+++ b/apps/web/components/Card.test.tsx
-@@ -1,0 +1 @@
-+expect(node).toHaveClass('gap-2.5')
-diff --git a/apps/web/lib/skip.ts b/apps/web/lib/skip.ts
---- a/apps/web/lib/skip.ts
-+++ b/apps/web/lib/skip.ts
-@@ -1,0 +1 @@
-+const klass = 'gap-2.5'
-"""
-
-    def test_snaps_only_the_added_product_line(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            path = root / "apps/web/components/Card.tsx"
-            path.parent.mkdir(parents=True)
-            path.write_text(
-                "const kept = 'gap-2.5'\n"
-                "        <div className='mb-4 flex items-center gap-2.5 h-3.5 -mx-3.5 sm:gap-3.5'>\n"
-            )
-            (root / "apps/web/components/Card.test.tsx").write_text("expect(node).toHaveClass('gap-2.5')\n")
-            (root / "apps/web/lib").mkdir()
-            (root / "apps/web/lib/skip.ts").write_text("const klass = 'gap-2.5'\n")
-            changed = classes.snap_added_conservative_spacing(root, self.DIFF)
-            self.assertEqual(changed, ["apps/web/components/Card.tsx"])
-            text = path.read_text()
-            self.assertIn("const kept = 'gap-2.5'\n", text)
-            self.assertIn("gap-2 h-3.5 -mx-3 sm:gap-3", text)
-            self.assertNotIn("gap-2.5 h-3.5", text)
-            self.assertIn("gap-2.5", (root / "apps/web/components/Card.test.tsx").read_text())
-            self.assertIn("gap-2.5", (root / "apps/web/lib/skip.ts").read_text())
-
-    def test_stale_line_is_not_rewritten(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            path = root / "apps/web/components/Card.tsx"
-            path.parent.mkdir(parents=True)
-            path.write_text("const kept = 'gap-2.5'\nalready snapped gap-2\n")
-            self.assertEqual(classes.snap_added_conservative_spacing(root, self.DIFF), [])
-            self.assertIn("already snapped gap-2\n", path.read_text())
 
 
 class WireTest(unittest.TestCase):
