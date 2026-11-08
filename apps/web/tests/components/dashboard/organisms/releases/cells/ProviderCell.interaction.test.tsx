@@ -66,6 +66,8 @@ describe('ProviderCell actions', () => {
     );
 
     const [openButton, copyButton] = screen.getAllByRole('button');
+    expect(openButton).toHaveAttribute('aria-label', 'Open');
+    expect(copyButton).toHaveAttribute('aria-label', 'Copy');
     fireEvent.click(openButton);
     fireEvent.click(copyButton);
 

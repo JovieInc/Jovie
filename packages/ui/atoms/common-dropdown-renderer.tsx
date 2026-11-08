@@ -206,11 +206,15 @@ export function SearchableContent({
   );
 }
 
+// Loading and empty menus still own one item (APG Menu): a disabled row that
+// arrow keys skip, holding the polite status that announces the state.
 function LoadingState() {
   return (
     <div
-      role='status'
-      aria-live='polite'
+      role='menuitem'
+      aria-disabled='true'
+      data-disabled=''
+      tabIndex={-1}
       data-slot='common-dropdown-loading'
       className={MENU_LOADING_STATE_BASE}
     >
@@ -218,7 +222,9 @@ function LoadingState() {
         aria-hidden='true'
         className='h-4 w-4 animate-spin motion-reduce:animate-none'
       />
-      <span className='sr-only'>Loading menu items</span>
+      <span role='status' aria-live='polite' className='sr-only'>
+        Loading menu items
+      </span>
     </div>
   );
 }
@@ -226,12 +232,16 @@ function LoadingState() {
 function EmptyState({ message }: { readonly message: string }) {
   return (
     <div
-      role='status'
-      aria-live='polite'
+      role='menuitem'
+      aria-disabled='true'
+      data-disabled=''
+      tabIndex={-1}
       data-slot='common-dropdown-empty'
       className={MENU_EMPTY_STATE_BASE}
     >
-      {message}
+      <span role='status' aria-live='polite'>
+        {message}
+      </span>
     </div>
   );
 }

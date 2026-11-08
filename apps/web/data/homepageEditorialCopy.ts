@@ -81,7 +81,7 @@ export const HOMEPAGE_EDITORIAL_COPY = {
       },
       catalog: {
         title: 'Made from your catalog.',
-        body: 'Your catalog comes in once, and every release gets its own page.',
+        body: 'Title, artwork and UPC carry over from your catalog, so every page matches the release.',
       },
     },
   },
@@ -90,11 +90,11 @@ export const HOMEPAGE_EDITORIAL_COPY = {
     subhead:
       'Tell us your role and where to reach you. We’ll email you when your spot opens.',
     roleLabel: 'I’m a',
-    action: 'Request invite',
+    action: 'Request an invite',
     steps: [
       {
         title: 'Tell us who you are',
-        body: 'Your role and one email. Under a minute.',
+        body: 'Under a minute.',
       },
       {
         title: 'We review each request',
