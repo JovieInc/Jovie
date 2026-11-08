@@ -182,5 +182,24 @@ class AutoscaleWipGateTest(unittest.TestCase):
         self.assertIn("wip-cap", over["glm"]["intakeBlockers"])
 
 
+class CappedRepairOrderTest(unittest.TestCase):
+    """A producer at its WIP cap has its stuck PRs repaired before older PRs of other producers."""
+
+    def dirty(self, number, branch):
+        return {"number": number, "headRefName": branch, "headRefOid": f"{number:040d}", "isDraft": True,
+                "mergeStateStatus": "DIRTY", "labels": [], "statusCheckRollup": []}
+
+    def test_capped_producer_dirty_prs_go_before_older_prs(self):
+        import lane_runner as lane  # noqa: PLC0415
+        prs = [self.dirty(100, "opus/old"), self.dirty(200, "codex/a"), self.dirty(201, "codex/b")]
+        capped = pr_wip.capped_producers(prs, POLICY)
+        self.assertEqual(capped, frozenset({"codex"}))
+        self.assertEqual(lane.red_pr(prs, {}, {}, capped)["number"], 200)
+        self.assertEqual(lane.red_pr(prs, {}, {})["number"], 100, "no pressure keeps oldest first")
+
+    def test_unknown_inventory_has_no_capped_producers(self):
+        self.assertEqual(pr_wip.capped_producers(None, POLICY), frozenset())
+
+
 if __name__ == "__main__":
     unittest.main()
