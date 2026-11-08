@@ -7,7 +7,6 @@ import { parseHistoryWindows } from '@/lib/ovie/company-history/windows';
 import { verifySummerOidcRequest } from '@/lib/ovie/summer-oidc.server';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 const ROUTE = '/api/internal/ovie/summer-company/charts/shipping';
 
