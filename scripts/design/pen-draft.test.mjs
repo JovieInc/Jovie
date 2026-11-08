@@ -19,6 +19,7 @@ test('every checked-in brief parses and names a unique frame', () => {
   assert.deepEqual(
     briefs.map(b => b.frame),
     [
+      'audience-analytics',
       'billing-success',
       'claim',
       'homepage',

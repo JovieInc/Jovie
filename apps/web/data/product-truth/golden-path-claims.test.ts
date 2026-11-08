@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
+import { HOMEPAGE_SPECS_COPY } from '@/data/homepageProductUi';
 import { MARKETING_PRICING_PLANS } from '@/data/marketingPricingPlans';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import { collectStrings, isClaimBearing, resolvesToClaim } from './claim-audit';
@@ -274,6 +275,7 @@ describe('golden-path claim inventory', () => {
     const registryClaims = listProductTruthClaims();
     const strings = collectStrings({
       homepage: HOMEPAGE_EDITORIAL_COPY,
+      homepageSpecs: HOMEPAGE_SPECS_COPY,
       pricing: MARKETING_PRICING_PLANS,
       taglines: [
         ENTITLEMENT_REGISTRY.free.marketing.tagline,
