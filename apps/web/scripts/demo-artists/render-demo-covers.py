@@ -288,50 +288,57 @@ def film(img: V3, seed: int, exposure=0.95, streak=1.2, bloom=1.0, grain=0.018, 
 
 # ---------------------------------------------------------------- covers
 
-ION = vec(0.07, 0.69, 1.0)  # accent.ion, #11afff
+# Each record gets its own light, the way a real catalog would: an ember
+# sunset, a teal night with sodium lamps, a rose storm, an aqua morning,
+# violet star trails and a pastel dawn. The tints are light split-tones, not
+# one house grade, so the catalog reads as six records rather than one.
+EMBER = vec(1.0, 0.45, 0.18)
+TEAL = vec(0.10, 0.75, 0.70)
+VIOLET = vec(0.55, 0.35, 1.0)
+SODIUM = vec(1.0, 0.68, 0.32)
 COOL_LIGHT = vec(0.92, 0.97, 1.0)
 
 
 def low_sun() -> V3:
     s = Scene(
-        horizon=vec(0.15, 0.20, 0.32), zenith=vec(0.008, 0.012, 0.035), light=COOL_LIGHT,
-        sun=(6.0, 1.0), haze=0.3,
+        horizon=vec(0.62, 0.24, 0.10), zenith=vec(0.05, 0.02, 0.07), light=vec(1.0, 0.62, 0.30),
+        sun=(6.0, 1.0), haze=0.35,
         clouds={"seed": 11, "cover": 0.52},
         water={"seed": 7},
     )
-    return film(s.render(), 1, tint=(ION, 0.18))
+    return film(s.render(), 1, exposure=1.05, tint=(EMBER, 0.12))
 
 
 def night_ferry() -> V3:
     lights = [
-        {"at": (14.0 + i * 0.32, 0.28 + (0.06 if i in (3, 4) else 0.0)), "size": 0.0016, "power": 4.0, "color": COOL_LIGHT}
+        {"at": (14.0 + i * 0.32, 0.28 + (0.06 if i in (3, 4) else 0.0)), "size": 0.0016, "power": 7.0, "color": SODIUM}
         for i in range(9)
     ]
     s = Scene(
-        horizon=vec(0.05, 0.085, 0.15), zenith=vec(0.004, 0.006, 0.016), light=vec(0.7, 0.85, 1.0),
+        horizon=vec(0.03, 0.16, 0.17), zenith=vec(0.003, 0.012, 0.02), light=vec(1.0, 0.7, 0.35),
         sun=(-30.0, -8.0), sun_radius=0, glow=0.0, haze=0.9,
         stars={"power": 0.7},
         lights=lights,
         water={"seed": 19, "chop": 0.007, "glitter": 0.0},
         pitch=2.0,
     )
-    return film(s.render(), 2, exposure=1.25, streak=1.6, tint=(ION, 0.25))
+    return film(s.render(), 2, exposure=1.3, streak=1.6, tint=(TEAL, 0.14))
 
 
 def slow_weather() -> V3:
     s = Scene(
-        horizon=vec(0.20, 0.26, 0.34), zenith=vec(0.03, 0.04, 0.06), light=COOL_LIGHT,
+        horizon=vec(0.42, 0.22, 0.30), zenith=vec(0.05, 0.03, 0.06), light=vec(1.0, 0.72, 0.68),
         sun=(-12.0, 3.5), sun_radius=0, glow=0.8, haze=0.5,
-        clouds={"seed": 41, "cover": 0.38, "sharp": 5.0, "top": 0.9, "scale": 0.5, "sx": 0.5, "sz": 0.16, "lit": 1.6, "lining": 0.12, "opacity": 0.97, "base": vec(0.035, 0.045, 0.06)},
+        clouds={"seed": 41, "cover": 0.38, "sharp": 5.0, "top": 0.9, "scale": 0.5, "sx": 0.5, "sz": 0.16, "lit": 1.6, "lining": 0.12, "opacity": 0.97, "base": vec(0.06, 0.04, 0.06)},
         water={"seed": 23, "chop": 0.016, "length": 1.6},
         pitch=8.0,
     )
-    return film(s.render(), 3, exposure=1.0, streak=0.6, tint=(ION, 0.22))
+    return film(s.render(), 3, exposure=1.05, streak=0.6)
 
 
 def glass_coast() -> V3:
     s = Scene(
-        horizon=vec(0.30, 0.42, 0.55), zenith=vec(0.02, 0.05, 0.11), light=COOL_LIGHT,
+        horizon=vec(0.34, 0.62, 0.58), zenith=vec(0.02, 0.10, 0.16), light=vec(0.85, 1.0, 0.92),
         sun=(-8.0, -1.5), sun_radius=0, glow=1.1, haze=0.6,
         ridges=[
             {"base": 0.035, "amp": 0.03, "freq": 3.0, "seed": 5, "fog": 0.55, "rim": 0.3, "slope": 0.06},
@@ -340,45 +347,45 @@ def glass_coast() -> V3:
         water={"seed": 31, "chop": 0.0025, "glitter": 0.4},
         pitch=3.0,
     )
-    return film(s.render(), 4, exposure=1.0, streak=0.4, tint=(ION, 0.2))
+    return film(s.render(), 4, exposure=1.0, streak=0.4)
 
 
 def paper_satellites() -> V3:
     s = Scene(
-        horizon=vec(0.08, 0.13, 0.20), zenith=vec(0.008, 0.014, 0.03), light=COOL_LIGHT,
+        horizon=vec(0.16, 0.06, 0.26), zenith=vec(0.012, 0.006, 0.04), light=vec(0.9, 0.8, 1.0),
         sun=(0.0, -20.0), sun_radius=0, glow=0.0, haze=0.4,
         stars={"trails": True, "pole": (8.0, 34.0), "density": 520.0, "cut": 0.45, "span": 0.6, "power": 1.1},
         ridges=[{"base": 0.08, "amp": 0.05, "freq": 1.6, "seed": 13, "fog": 0.05, "over_water": False, "slope": -0.1}],
-        lights=[{"at": (-4.0, 40.0), "size": 0.0022, "power": 3.0, "color": COOL_LIGHT}],
+        lights=[{"at": (-4.0, 40.0), "size": 0.0022, "power": 3.0, "color": SODIUM}],
         pitch=26.0, fov=55,
     )
-    return film(s.render(), 5, exposure=1.2, streak=0.8, tint=(ION, 0.25))
+    return film(s.render(), 5, exposure=1.25, streak=0.8, tint=(VIOLET, 0.12))
 
 
 def first_frost() -> V3:
     s = Scene(
-        horizon=vec(0.62, 0.70, 0.78), zenith=vec(0.20, 0.30, 0.44), light=COOL_LIGHT,
+        horizon=vec(0.95, 0.58, 0.56), zenith=vec(0.26, 0.30, 0.58), light=vec(1.0, 0.86, 0.78),
         sun=(10.0, 4.0), sun_radius=0.012, sun_power=1.4, glow=0.55, haze=0.35,
         ridges=[
-            {"base": 0.045, "amp": 0.035, "freq": 2.0, "seed": 17, "fog": 0.85, "over_water": False, "color": vec(0.18, 0.22, 0.28)},
-            {"base": 0.02, "amp": 0.04, "freq": 2.6, "seed": 23, "fog": 0.65, "over_water": False, "offset": 2.0, "color": vec(0.10, 0.13, 0.18)},
-            {"base": -0.02, "amp": 0.05, "freq": 3.2, "seed": 29, "fog": 0.42, "over_water": False, "offset": 5.0, "color": vec(0.05, 0.07, 0.10)},
-            {"base": -0.075, "amp": 0.06, "freq": 4.0, "seed": 37, "fog": 0.15, "over_water": False, "offset": 9.0, "color": vec(0.02, 0.03, 0.05)},
+            {"base": 0.045, "amp": 0.035, "freq": 2.0, "seed": 17, "fog": 0.85, "over_water": False, "color": vec(0.36, 0.22, 0.36)},
+            {"base": 0.02, "amp": 0.04, "freq": 2.6, "seed": 23, "fog": 0.65, "over_water": False, "offset": 2.0, "color": vec(0.17, 0.14, 0.24)},
+            {"base": -0.02, "amp": 0.05, "freq": 3.2, "seed": 29, "fog": 0.42, "over_water": False, "offset": 5.0, "color": vec(0.08, 0.07, 0.13)},
+            {"base": -0.075, "amp": 0.06, "freq": 4.0, "seed": 37, "fog": 0.15, "over_water": False, "offset": 9.0, "color": vec(0.03, 0.025, 0.05)},
         ],
         pitch=2.0,
     )
-    return film(s.render(), 6, exposure=0.9, streak=0.3, vignette=0.3, tint=(ION, 0.15))
+    return film(s.render(), 6, exposure=0.9, streak=0.3, vignette=0.3)
 
 
 def avatar() -> V3:
     s = Scene(
-        horizon=vec(0.15, 0.20, 0.32), zenith=vec(0.008, 0.012, 0.035), light=COOL_LIGHT,
+        horizon=vec(0.62, 0.24, 0.10), zenith=vec(0.05, 0.02, 0.07), light=vec(1.0, 0.62, 0.30),
         sun=(0.0, 1.0), haze=0.3, sun_radius=0.02, sun_power=3.0,
         clouds={"seed": 11, "cover": 0.52},
         water={"seed": 7},
         fov=20, pitch=1.0,
     )
-    return film(s.render(), 7, exposure=0.8, bloom=0.5, streak=0.6, tint=(ION, 0.18))
+    return film(s.render(), 7, exposure=0.85, bloom=0.5, streak=0.6, tint=(EMBER, 0.12))
 
 
 COVERS = {
