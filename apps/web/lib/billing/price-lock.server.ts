@@ -78,12 +78,7 @@ export async function getPriceLockForUser(
   return row ? rowToSnapshot(row) : null;
 }
 
-/**
- * The lock for a user, created on first need: the existing lock, else the
- * current list version snapshotted. Idempotent and safe under races (unique
- * index on user_id), and the first write wins, so the price a person first
- * gets never moves.
- */
+/** Existing lock, else the current version snapshotted; idempotent, first write wins. */
 export async function ensurePriceLockForUser(
   userId: string,
   source: PriceLockSource,
@@ -107,11 +102,7 @@ export async function ensurePriceLockForUser(
   return created;
 }
 
-/**
- * Provisioning hooks use this: a lock failure must never fail sign-in or a
- * waitlist join. The checkout path re-ensures the lock and fails closed, and
- * the daily reconcile reports users who have none.
- */
+/** For provisioning hooks: never fails sign-in; checkout re-ensures and fails closed. */
 export async function ensurePriceLockForUserSafely(
   userId: string,
   source: PriceLockSource
@@ -150,13 +141,7 @@ export interface PriceLockBackfillResult {
   readonly unmapped: readonly string[];
 }
 
-/**
- * Backfills locks for paying subscribers from the price they pay today
- * (users.stripe_price_id). Grandfathered accounts keep the price they pay
- * because the lock copies their subscription price. People with no paid subscription are locked on
- * first need (signup hook, first price view, checkout), not retroactively.
- * Idempotent; the daily reconcile runs it so a missed hook self-heals.
- */
+/** Idempotent backfill: paying subscribers lock at the price they pay today. */
 export async function backfillSubscriberPriceLocks(
   client: DbOrTransaction = db,
   now = new Date(),
@@ -194,11 +179,7 @@ export async function backfillSubscriberPriceLocks(
   return { scanned: rows.length, created, unmapped };
 }
 
-/**
- * The one server entry for "which price is this person charged for the price
- * id the browser sent". Checkout, plan change and plan-change preview all call
- * it. Creates the lock on first need and fails closed if that cannot happen.
- */
+/** The price charged for a requested price id; creates the lock or fails closed. */
 export async function resolveCheckoutPriceForUser(
   userId: string,
   requestedPriceId: string

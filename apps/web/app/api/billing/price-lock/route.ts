@@ -1,11 +1,4 @@
-/**
- * Price lock quote API (Tim, 2026-10-29).
- *
- * The signed-in person's own price: the one every price surface, email and
- * agent/API quote for them must use instead of the current list price. The
- * lock is created on first need (source `first_view`), so a person who never
- * had one is locked to the list price they are shown now.
- */
+/** The signed-in person's own (locked) price; locks on first view if none. */
 
 import { NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';

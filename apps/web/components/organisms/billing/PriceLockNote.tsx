@@ -4,12 +4,7 @@ import {
 } from '@/lib/billing/price-lock-view';
 import type { PriceInterval } from '@/lib/billing/price-versions';
 
-/**
- * Discloses that the person's price is locked. Renders nothing without a lock,
- * so the sentence only ever appears when it is true. The copy comes from
- * `priceLockDisclosure` (lib/billing/price-versions.ts), which the copy lint
- * test covers.
- */
+/** Price lock disclosure; renders nothing without a lock. */
 export function PriceLockNote({
   lock,
   interval = 'month',

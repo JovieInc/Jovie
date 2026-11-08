@@ -11,11 +11,7 @@ export function getPreferredVerifiedPrice(
   return monthPrice ?? options[0];
 }
 
-/**
- * The price label for the option the person will actually be charged. There
- * is deliberately no list-price fallback: when no option is known the caller
- * shows no price (a list price would contradict a locked person's price).
- */
+/** Label of the price the person is charged; no list-price fallback. */
 export function formatVerifiedPriceLabel(
   option: PricingOption | undefined
 ): string | null {

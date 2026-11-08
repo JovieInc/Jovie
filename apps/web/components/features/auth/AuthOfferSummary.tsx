@@ -114,7 +114,7 @@ export function AuthOfferSummary({
         {getOfferHeading(mode, publicPlan)}
       </p>
       {priceLine ? (
-        <p className='mt-1 text-app leading-5 text-secondary-token'>
+        <p className='mt-1 text-app leading-5 tabular-nums text-secondary-token'>
           {priceLine}
         </p>
       ) : null}

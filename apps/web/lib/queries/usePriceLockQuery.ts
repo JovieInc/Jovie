@@ -9,7 +9,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { PriceLockView } from '@/lib/billing/price-lock-view';
 import { STABLE_CACHE } from './cache-strategies';
-import { FetchHttpError, fetchWithTimeout } from './fetch';
+import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 import { createClassifiedRetry } from './retry-policy';
 
@@ -33,7 +33,8 @@ export async function fetchPriceLock({
     // 401: signed out. 404: this deployment has no lock endpoint yet, and its
     // checkout has no lock either. Every other failure fails the query.
     if (
-      error instanceof FetchHttpError &&
+      error instanceof FetchError &&
+      error.kind === 'http' &&
       (error.status === 401 || error.status === 404)
     ) {
       return null;

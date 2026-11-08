@@ -1,14 +1,6 @@
 /**
- * JOV-INV-048 consumer: checkout and plan change price resolution.
- */
-/**
- * Checkout price resolution for a person with a price lock (pure).
- *
- * The browser may send any list price id; what it is charged is decided here.
- * A person whose lock covers the requested plan and interval is charged the
- * locked Stripe price, even when that price is retired from the list and no
- * longer active for new subscribers. Everyone else is untouched and goes
- * through the normal active-price validation.
+ * JOV-INV-048 consumer: checkout and plan change price resolution (pure). A
+ * lock covering the plan and interval charges the locked (maybe retired) price.
  */
 
 import {

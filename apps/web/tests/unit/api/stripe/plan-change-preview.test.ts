@@ -19,6 +19,18 @@ vi.mock('@/lib/stripe/customer-sync', () => ({
   ensureStripeCustomer: mockEnsureStripeCustomer,
 }));
 
+// Price lock resolution has its own suite; with no lock the requested
+// (list) price passes through unchanged.
+const mockResolveCheckoutPriceForUser = vi.hoisted(() =>
+  vi.fn(async (_userId: string, priceId: string) => ({
+    decision: { kind: 'list' as const, priceId },
+    lock: null,
+  }))
+);
+vi.mock('@/lib/billing/price-lock.server', () => ({
+  resolveCheckoutPriceForUser: mockResolveCheckoutPriceForUser,
+}));
+
 vi.mock('@/lib/stripe/plan-change', () => ({
   previewPlanChange: mockPreviewPlanChange,
 }));

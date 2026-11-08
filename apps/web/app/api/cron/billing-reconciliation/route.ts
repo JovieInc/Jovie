@@ -155,11 +155,7 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
   }
 }
 
-/**
- * Price lock reconcile (Tim, 2026-10-29): Stripe subscriptions against the
- * prices people locked, alarming Summer on mismatch. Isolated so a failure
- * here never masks the rest of the daily billing reconciliation.
- */
+/** Price lock reconcile, isolated so it never masks billing reconciliation. */
 async function reconcilePriceLocksSafely(errors: string[]): Promise<void> {
   try {
     const result = await runPriceLockReconcile({

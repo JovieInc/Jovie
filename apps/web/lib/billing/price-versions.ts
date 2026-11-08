@@ -1,22 +1,9 @@
 /**
- * Price versions and the price lock model (Tim, 2026-10-29).
- *
- * "Automate the price relationship with signups so they always get the price
- * they sign up at." Hard legal invariant: a person sees ONE consistent price
- * everywhere, and for a person with a lock that price is THEIR locked price.
- *
- * Reuses the existing pricing sources, adds no new price numbers:
- *   - amounts come from `lib/config/plan-prices.ts` (the list price today);
- *   - Stripe price ids come from `lib/stripe/price-ids.ts` env at lock time.
- *
- * This registry only NAMES each list price so a lock can point at it. When the
- * list price changes (JOV-9769) a new version is added
- * here and made current; every existing lock keeps pointing at its own
- * snapshot, so the change reaches new signups only. A test fails when the
- * current version stops matching the list price, so a list-price edit cannot
- * ship without registering a version.
- *
- * Pure and client-importable (no server-only, no env).
+ * Price versions (Tim, 2026-10-29): a person sees one price everywhere, their
+ * locked price. Names each list price (amounts from plan-prices.ts, Stripe ids
+ * from price-ids.ts at lock time) so a lock can point at it. A list-price
+ * change (JOV-9769) adds a version for new signups only; a test fails when the
+ * current version stops matching the list price. Pure and client-importable.
  */
 
 import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
@@ -147,11 +134,7 @@ export function buildPriceLockSnapshot(input: {
   };
 }
 
-/**
- * Builds a lock from a live subscription's price (backfill). The version is
- * the registered one with the same monthly amount, else a synthetic
- * `sub-price:<id>` so the lock still records exactly what the person pays.
- */
+/** Backfill lock from a live subscription price (matching version, else `sub-price:<id>`). */
 export function buildPriceLockFromSubscriptionPrice(input: {
   readonly stripePriceId: string;
   readonly plan: PriceLockPlan;
@@ -192,14 +175,7 @@ export interface ResolvedLockedPrice {
   readonly locked: boolean;
 }
 
-/**
- * The single answer to "what price does this person see and pay?" for a plan
- * and interval. A person with a lock that covers the interval gets the lock;
- * everyone else gets the current list version. Callers never read the list
- * price themselves for a person (guarded by price-lock-guard.test.ts).
- *
- * `listStripePriceIds` is the ids the list price checks out with now.
- */
+/** The price a person sees and pays: their lock for the interval, else the current list version. */
 export function resolveLockedPrice(input: {
   readonly lock: PriceLockSnapshot | null;
   readonly interval: PriceInterval;
@@ -254,12 +230,7 @@ export function formatLockedPrice(
   return `${formatted}/${price.interval === 'month' ? 'mo' : 'yr'}`;
 }
 
-/**
- * The disclosure shown where a locked price is relevant. Accurate by
- * construction: it states the person's own locked amount and nothing about
- * what happens beyond the lock (cancel and resubscribe is a new checkout that
- * still resolves through the lock, so it is not claimed as a reset).
- */
+/** Disclosure: states only the person's own locked amount. */
 export function priceLockDisclosure(
   price: Pick<ResolvedLockedPrice, 'amountCents' | 'interval' | 'currency'>
 ): string {

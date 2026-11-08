@@ -7,11 +7,7 @@ import { ACTIVE_PRICE_MAPPINGS } from './config';
 export async function assertCheckoutPriceContract(
   priceId: string,
   retrievePrice: (id: string) => Promise<Stripe.Price>,
-  /**
-   * A person's price lock (lib/billing/price-lock-checkout.ts). A locked price
-   * may be retired from the active list, so the expectation is the lock's own
-   * snapshot instead of the active mapping. Stripe must still agree with it.
-   */
+  /** A price lock's snapshot; Stripe must agree even if the price is retired. */
   locked?: LockedCheckoutExpectation
 ): Promise<void> {
   const expected = locked

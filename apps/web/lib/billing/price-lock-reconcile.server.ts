@@ -48,14 +48,8 @@ export interface PriceLockReconcileResult {
 }
 
 /**
- * JOV-INV-048 consumer: daily price lock reconcile.
- */
-/**
- * Daily: self-heal missing subscriber locks, then compare every paying
- * subscription in Stripe with its lock, stamp the verdict on the lock and
- * alarm Summer (revenue-spine `plan_mismatch`, the channel Summer watches) on
- * any mismatch. Runs inside the existing billing-reconciliation job, so it
- * adds no cron and one paged Stripe list (100 subscriptions per call).
+ * JOV-INV-048 consumer: daily price lock reconcile. Backfills, compares each
+ * paying subscription with its lock, stamps verdicts, alarms plan_mismatch.
  */
 export async function runPriceLockReconcile(deps: {
   readonly listSubscriptions: () => AsyncIterable<Stripe.Subscription>;

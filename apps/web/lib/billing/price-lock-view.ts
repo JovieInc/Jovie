@@ -1,7 +1,4 @@
-/**
- * Client-safe view of a person's price lock, and the helpers every client
- * price surface uses so it renders the locked price, never the list price.
- */
+/** Client-safe price lock view and helpers for client price surfaces. */
 
 import {
   formatLockedPrice,
@@ -55,12 +52,7 @@ export interface PricedOption {
   readonly plan?: string;
 }
 
-/**
- * Replaces the Pro list option for each interval the lock covers with the
- * locked price. When the lock covers an interval the list no longer offers
- * (a retired price), the locked option is added. Other plans and intervals
- * the lock does not cover are left alone.
- */
+/** Swaps (or adds, if retired) the Pro option for each interval the lock covers. */
 export function applyPriceLockToOptions<T extends PricedOption>(
   options: readonly T[],
   lock: PriceLockView | null

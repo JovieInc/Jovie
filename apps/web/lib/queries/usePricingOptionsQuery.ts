@@ -58,10 +58,7 @@ async function fetchPricingOptions({
 }: {
   signal?: AbortSignal;
 }): Promise<PricingOptionsResponse> {
-  // The lock is fetched with the list and applied here, so no consumer can
-  // render a list price for a person who has a lock. A lock that fails to
-  // load fails the whole query (the billing recovery banner), never a silent
-  // fall back to the list price.
+  // Apply the lock here; a lock read failure fails the query, never a list price.
   const [raw, priceLock] = await Promise.all([
     fetchPricingOptionsRaw({ signal }),
     fetchPriceLock({ signal }),

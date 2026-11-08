@@ -1,16 +1,6 @@
 /**
- * Price lock reconciliation (pure): compares what Stripe is charging each
- * subscriber with the price they locked.
- *
- * Verdicts, worst first:
- * - overcharged: Stripe charges more than the lock. Legal exposure, blocked.
- * - undercharged: Stripe charges less than the lock. Revenue leak, degraded.
- * - missing_lock: a paying subscriber has no lock. Self-heals by backfill, but
- *   a persisting one means a recording path is broken.
- * - unmapped_locked_price: the lock names a Stripe price the app cannot map to
- *   a plan, so a webhook for it would not grant the plan.
- * - ok: price id matches the lock, or a different price object has the same
- *   amount, currency and interval.
+ * Pure reconcile of Stripe charges against locks. Verdicts: overcharged
+ * (blocked), undercharged, missing_lock, unmapped_locked_price, ok.
  */
 
 import type { PriceInterval, PriceLockSnapshot } from './price-versions';

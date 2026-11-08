@@ -9,12 +9,7 @@ import {
 } from '@/lib/billing/price-lock-view';
 import { fetchPriceLock } from '@/lib/queries/usePriceLockQuery';
 
-/**
- * The paid plan's price on the static /pricing page. Everyone first gets the
- * list price (the page is static). A signed-in person with a price lock then
- * sees their own locked price and the disclosure, so the pricing page never
- * contradicts the checkout they will get.
- */
+/** Static list price on /pricing, replaced by a signed-in person's locked price. */
 export function LockedPlanPrice({
   price,
   cadence,

@@ -83,12 +83,8 @@ export const billingAuditLog = pgTable(
 );
 
 /**
- * Price lock (Tim, 2026-10-29): the price a person signed up at, recorded once
- * and honored on every surface and in checkout. One lock per user, written at
- * provisioning (signup), at waitlist join, or on first need. Amounts and
- * Stripe price ids are snapshots, so a later list-price change or a retired
- * price cannot change what this person pays. Rows are only ever updated to
- * record a reconcile verdict.
+ * Price lock (Tim, 2026-10-29): one snapshot per user of the price they signed
+ * up at; updated only to record a reconcile verdict.
  */
 export const priceLocks = pgTable(
   'price_locks',
