@@ -126,7 +126,7 @@ describe('AccountSettingsSection', () => {
     const loading = screen.getByTestId('account-identity-loading');
     const lines = loading.querySelectorAll(':scope > div > div');
     expect(lines).toHaveLength(6);
-    for (const line of lines) expect(line).toHaveClass('h-[1lh]');
+    for (const line of lines) expect(line).toHaveClass('h-lh');
   });
 
   it('holds the Active Sessions panel in place until the session loads', () => {

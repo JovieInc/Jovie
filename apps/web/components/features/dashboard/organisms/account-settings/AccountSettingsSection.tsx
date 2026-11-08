@@ -33,10 +33,10 @@ function AccountIdentitySummary() {
           // Each line box is one inherited line (1lh) of text-app, the same
           // line the loaded dt/dd take, so the summary keeps its height.
           <div key={index} className='space-y-1 text-app'>
-            <div className='flex h-[1lh] items-center'>
+            <div className='flex h-lh items-center'>
               <LoadingSkeleton height='h-3' width='w-16' />
             </div>
-            <div className='flex h-[1lh] items-center'>
+            <div className='flex h-lh items-center'>
               <LoadingSkeleton height='h-4' width='w-44' />
             </div>
           </div>

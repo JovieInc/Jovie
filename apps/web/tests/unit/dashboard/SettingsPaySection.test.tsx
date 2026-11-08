@@ -116,8 +116,9 @@ describe('SettingsPaySection', () => {
     const { getByTestId } = fastRender(<SettingsPaySection />);
 
     expect(getByTestId('settings-pay-loading')).toHaveClass(
-      'grid',
-      'lg:grid-cols-[minmax(0,1fr)_148px]'
+      'flex-col',
+      'gap-4',
+      'lg:flex-row'
     );
     expect(getByTestId('settings-pay-loading-qr')).toHaveClass('h-37', 'w-37');
   });
@@ -138,7 +139,7 @@ describe('SettingsPaySection', () => {
     expect(narrative.className).not.toMatch(/space-y|gap-/);
     const lines = Array.from(narrative.children);
     expect(lines).toHaveLength(2);
-    for (const line of lines) expect(line).toHaveClass('h-[19px]');
+    for (const line of lines) expect(line).toHaveClass('h-4.75');
   });
 
   it('holds the status pill and the actions row margin of the loaded surface', () => {
@@ -154,10 +155,9 @@ describe('SettingsPaySection', () => {
     const { getByTestId } = fastRender(<SettingsPaySection />);
 
     expect(getByTestId('settings-pay-loading-pill')).toHaveClass(
-      'h-[calc(1lh+0.375rem)]'
-    );
-    expect(getByTestId('settings-pay-loading-pill').parentElement).toHaveClass(
-      'text-2xs'
+      'text-2xs',
+      'py-0.5',
+      'border'
     );
     expect(getByTestId('settings-pay-loading-actions')).toHaveClass('mb-2.5');
   });
