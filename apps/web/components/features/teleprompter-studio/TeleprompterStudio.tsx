@@ -382,7 +382,7 @@ export function TeleprompterStudio({
       role='dialog'
       aria-modal='true'
       aria-label={`Record ${context.title}`}
-      className='fixed inset-0 z-50 overflow-hidden bg-base text-white/95'
+      className='fixed inset-0 z-modal overflow-hidden bg-base text-white/95'
       style={style}
       data-testid='teleprompter-studio'
       data-phase={phase}
