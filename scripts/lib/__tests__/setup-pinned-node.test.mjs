@@ -48,6 +48,7 @@ function makeToolStubs({ nodeVersion }) {
   return bin;
 }
 
+/** @param {string} script @param {{ env?: Record<string, string>, pathPrefix?: string }} [opts] */
 function runHelper(script, { env = {}, pathPrefix } = {}) {
   return spawnSync('bash', ['-c', script], {
     cwd: repoRoot,
