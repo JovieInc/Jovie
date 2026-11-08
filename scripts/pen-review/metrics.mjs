@@ -25,9 +25,9 @@ export function recordTiming(path, event) {
     enteredAt: event.startedAt,
     exitedAt: event.finishedAt,
     actor: 'pen-review',
-    outcome: ['fail', 'error'].includes(event.verdict ?? event.action)
-      ? 'failed'
-      : 'completed',
+    outcome: ['pass', 'fix', 'rejudge'].includes(event.verdict ?? event.action)
+      ? 'completed'
+      : 'failed',
     sourceReceipt: path,
   };
   const rows = [row];
