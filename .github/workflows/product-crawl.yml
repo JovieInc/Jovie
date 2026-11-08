@@ -1,0 +1,43 @@
+name: Product crawl
+
+# Crawls every page route of production as a stranger and judges the receipt
+# with scripts/product-crawl/ready-gate.mjs (Tim, 2026-11-08: crawl the whole
+# product and declare it ready; jank found means fix and repeat). Reports
+# only: the receipt and summary upload; nothing is written to production.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/product-crawl/**'
+      - '.github/workflows/product-crawl.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: product-crawl-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  crawl:
+    name: Product crawl
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-playwright
+      - name: Crawl production as a stranger
+        run: >-
+          node scripts/product-crawl/crawl.mjs --origin https://jov.ie
+          --out product-crawl-receipt
+          && cat product-crawl-receipt/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload receipt
+        if: ${{ always() && hashFiles('product-crawl-receipt/receipt.json') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: product-crawl-receipt
+          path: product-crawl-receipt/*
+          if-no-files-found: error

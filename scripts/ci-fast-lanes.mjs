@@ -260,8 +260,7 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
-    // The repo-wide design-system, metrics-layer and locked Pen chrome
-    // guards (~42s) ran only in ci-fast, i.e. merge groups: group pr-21458
+    // The repo-wide design-system, metrics-layer and locked Pen chrome guards (~42s) ran only in ci-fast, i.e. merge groups: group pr-21458
     // (2026-10-13) was ejected because a PR added text-destructive to
     // OutboundRail.tsx and tripped destructive-red-drift-ratchet. They read
     // web source from disk, so any web change can trip them.
@@ -1004,6 +1003,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/queue-dequeue.test.mjs',
   'scripts/fleet-audit/import-github-audit.test.mjs',
   'scripts/golden-path-walk/latency-gate.test.mjs',
+  'scripts/product-crawl/ready-gate.test.mjs',
   'scripts/positioning/positioning.test.mjs',
   'scripts/funnel-judge/preview-gate.test.mjs',
   'scripts/funnel-judge/proof-gate.test.mjs',
