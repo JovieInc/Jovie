@@ -3,6 +3,7 @@
 import { InlineSubscribe } from '@jovie/ui/atoms/inline-subscribe';
 import { Input } from '@jovie/ui/atoms/input';
 import { RadioGroup, RadioGroupItem } from '@jovie/ui/atoms/radio-group';
+import dynamic from 'next/dynamic';
 import {
   type FormEvent,
   Fragment,
@@ -20,20 +21,30 @@ import {
 } from '@/components/atoms/InvisibleTurnstile';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
-import type { MomTestAnswers } from '@/lib/waitlist/role-qualification';
 import {
   GENERAL_WAITLIST_ROLES,
   WAITLIST_ROLES,
   type WaitlistRole,
 } from '@/lib/waitlist/roles';
 import {
+  clearQualifyingAnswer,
+  EMPTY_QUALIFYING_ANSWERS,
+  nextQualifyingStep,
+  previousQualifyingStep,
   QUALIFYING_STEP_COUNT,
-  QUALIFYING_STEPS,
   type QualifyingAnswers,
-  type QualifyingStep,
-  spotifyArtistIdFromUrl,
-  WaitlistQualifyingSteps,
-} from './WaitlistQualifyingSteps';
+  type QualifyingPosition,
+  qualifyingAnsweredFlags,
+  qualifyingPayload,
+  qualifyingStepNumber,
+} from './waitlist-qualifying';
+
+// Loaded only when an artist starts the questions; the homepage never ships it.
+const WaitlistQualifyingSteps = dynamic(
+  () =>
+    import('./WaitlistQualifyingSteps').then(m => m.WaitlistQualifyingSteps),
+  { ssr: false, loading: () => <div className='min-h-64 w-full' /> }
+);
 
 type Status = 'idle' | 'submitting' | 'joined' | 'error';
 
@@ -46,30 +57,6 @@ const TURNSTILE_FAILURE_STATUSES = new Set([
 ]);
 
 export const WAITLIST_ROLE_FORM_ENDPOINT = '/api/waitlist/join';
-
-const EMPTY_ANSWERS: QualifyingAnswers = {
-  spotifyUrl: '',
-  artistName: null,
-  growth: '',
-  spend: '',
-};
-
-/** The answers the join route takes, leaving out every skipped question. */
-function qualifyingPayload(answers: QualifyingAnswers): {
-  spotifyArtistId?: string;
-  momTest?: MomTestAnswers;
-} {
-  const spotifyArtistId = spotifyArtistIdFromUrl(answers.spotifyUrl);
-  const growth = answers.growth.trim();
-  const momTest: MomTestAnswers = {
-    ...(growth ? { lastGrowthAttempt: growth } : {}),
-    ...(answers.spend ? { promoSpend: answers.spend } : {}),
-  };
-  return {
-    ...(spotifyArtistId ? { spotifyArtistId } : {}),
-    ...(Object.keys(momTest).length > 0 ? { momTest } : {}),
-  };
-}
 
 /**
  * Chip presentation (homepage v1): the design names Producer and Songwriter
@@ -146,8 +133,10 @@ export function WaitlistRoleForm({
   );
   const chips = presentation === 'chips';
   const [email, setEmail] = useState('');
-  const [step, setStep] = useState<'entry' | QualifyingStep>('entry');
-  const [answers, setAnswers] = useState<QualifyingAnswers>(EMPTY_ANSWERS);
+  const [step, setStep] = useState<QualifyingPosition>('entry');
+  const [answers, setAnswers] = useState<QualifyingAnswers>(
+    EMPTY_QUALIFYING_ANSWERS
+  );
   const asksQuestions =
     qualify && variant === 'artist' && !chips && role === 'artist';
   const [status, setStatus] = useState<Status>('idle');
@@ -213,37 +202,20 @@ export function WaitlistRoleForm({
     await sendRequest();
   }
 
-  function advance() {
+  function moveTo(next: (current: QualifyingPosition) => QualifyingPosition) {
     setStatus('idle');
     setErrorMessage('');
-    setStep(current =>
-      current === 'entry'
-        ? QUALIFYING_STEPS[0]
-        : (QUALIFYING_STEPS[QUALIFYING_STEPS.indexOf(current) + 1] ?? current)
-    );
+    setStep(next);
   }
-
-  function goBack() {
-    setStatus('idle');
-    setErrorMessage('');
-    setStep(current => {
-      if (current === 'entry') return current;
-      const index = QUALIFYING_STEPS.indexOf(current);
-      return index <= 0 ? 'entry' : QUALIFYING_STEPS[index - 1];
-    });
-  }
+  const advance = () => moveTo(nextQualifyingStep);
+  const goBack = () => moveTo(previousQualifyingStep);
 
   function skip() {
-    if (step === 'artist') {
-      setAnswers(current => ({ ...current, spotifyUrl: '', artistName: null }));
-    } else if (step === 'growth') {
-      setAnswers(current => ({ ...current, growth: '' }));
-    } else if (step === 'spend') {
-      setAnswers(current => ({ ...current, spend: '' }));
-      void sendRequest({ ...answers, spend: '' });
-      return;
-    }
-    advance();
+    if (step === 'entry') return;
+    const cleared = clearQualifyingAnswer(answers, step);
+    setAnswers(cleared);
+    if (step === 'spend') void sendRequest(cleared);
+    else advance();
   }
 
   async function sendRequest(finalAnswers: QualifyingAnswers = answers) {
@@ -280,15 +252,7 @@ export function WaitlistRoleForm({
       }
       track('waitlist_role_form_joined', {
         role,
-        ...(asksQuestions
-          ? {
-              answered_artist: Boolean(
-                spotifyArtistIdFromUrl(finalAnswers.spotifyUrl)
-              ),
-              answered_growth: finalAnswers.growth.trim().length > 0,
-              answered_spend: finalAnswers.spend !== '',
-            }
-          : {}),
+        ...(asksQuestions ? qualifyingAnsweredFlags(finalAnswers) : {}),
       });
       joinedRef.current = true;
       setStatus('joined');
@@ -396,8 +360,7 @@ export function WaitlistRoleForm({
             className='self-stretch text-left text-xs tabular-nums text-tertiary-token'
             data-testid='waitlist-step-counter'
           >
-            Step {step === 'entry' ? 1 : QUALIFYING_STEPS.indexOf(step) + 2} of{' '}
-            {QUALIFYING_STEP_COUNT}
+            Step {qualifyingStepNumber(step)} of {QUALIFYING_STEP_COUNT}
           </p>
         ) : null}
         {step !== 'entry' && asksQuestions ? (

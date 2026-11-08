@@ -9,12 +9,10 @@ import {
   type PromoSpendBand,
 } from '@/lib/waitlist/role-qualification';
 import { WaitlistSpotifySearch } from './WaitlistSpotifySearch';
-
-export const QUALIFYING_STEPS = ['artist', 'growth', 'spend'] as const;
-export type QualifyingStep = (typeof QUALIFYING_STEPS)[number];
-
-/** Request access is step 1; the three questions are steps 2 to 4. */
-export const QUALIFYING_STEP_COUNT = QUALIFYING_STEPS.length + 1;
+import {
+  type QualifyingAnswers,
+  type QualifyingStep,
+} from './waitlist-qualifying';
 
 export const GROWTH_ANSWER_MAX = 600;
 
@@ -26,21 +24,6 @@ const SPEND_LABELS: Record<PromoSpendBand, string> = {
   under_50: `Under ${SPEND_BAND_LINE} a month`,
   '50_plus': `${SPEND_BAND_LINE} or more a month`,
 };
-
-const SPOTIFY_ARTIST_URL =
-  /open\.spotify\.com\/(?:intl(?:-\w+)+\/)?artist\/([0-9A-Za-z]{22})/;
-
-/** The Spotify artist id in a pasted or picked artist URL, or null. */
-export function spotifyArtistIdFromUrl(url: string): string | null {
-  return SPOTIFY_ARTIST_URL.exec(url.trim())?.[1] ?? null;
-}
-
-export interface QualifyingAnswers {
-  readonly spotifyUrl: string;
-  readonly artistName: string | null;
-  readonly growth: string;
-  readonly spend: PromoSpendBand | '';
-}
 
 /**
  * The three skippable request-access questions (Pen `request-access`,
@@ -78,15 +61,35 @@ export function WaitlistQualifyingSteps({
             <p className='text-sm font-medium text-primary-token'>
               Which artist are you?
             </p>
-            <WaitlistSpotifySearch
-              spotifyUrl={answers.spotifyUrl}
-              onUrlChange={url => onChange({ spotifyUrl: url })}
-              onArtistNameChange={name => onChange({ artistName: name })}
-              fieldErrors={{}}
-              isSubmitting={submitting}
-              isHydrating={false}
-              setInputRef={() => undefined}
-            />
+            {answers.spotifyUrl ? (
+              <div
+                className='flex min-h-11 items-center justify-between gap-3 rounded-lg border border-subtle px-3'
+                data-testid='waitlist-chosen-artist'
+              >
+                <span className='truncate text-sm text-primary-token'>
+                  {answers.artistName ?? answers.spotifyUrl}
+                </span>
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='sm'
+                  disabled={submitting}
+                  onClick={() => onChange({ spotifyUrl: '', artistName: null })}
+                >
+                  Change
+                </Button>
+              </div>
+            ) : (
+              <WaitlistSpotifySearch
+                spotifyUrl={answers.spotifyUrl}
+                onUrlChange={url => onChange({ spotifyUrl: url })}
+                onArtistNameChange={name => onChange({ artistName: name })}
+                fieldErrors={{}}
+                isSubmitting={submitting}
+                isHydrating={false}
+                setInputRef={() => undefined}
+              />
+            )}
             <p className='text-xs text-tertiary-token'>
               Not on Spotify yet? Skip this one.
             </p>

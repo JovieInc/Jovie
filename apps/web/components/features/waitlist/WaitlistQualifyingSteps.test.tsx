@@ -1,6 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { spotifyArtistIdFromUrl } from './WaitlistQualifyingSteps';
 import { WaitlistRoleForm } from './WaitlistRoleForm';
 
 const ARTIST_ID = '4Z8W4fKeB5YxbusRsdQVPb';
@@ -70,6 +69,7 @@ describe('WaitlistRoleForm request-access questions', () => {
     );
     expect(screen.getByRole('button', { name: 'Continue' })).toBeVisible();
     submit();
+    await screen.findByTestId('waitlist-qualifying-step');
 
     expect(screen.getByTestId('waitlist-step-counter')).toHaveTextContent(
       'Step 2 of 4'
@@ -113,6 +113,7 @@ describe('WaitlistRoleForm request-access questions', () => {
   it('sends only email and role when every question is skipped', async () => {
     startAsArtist();
     submit();
+    await screen.findByTestId('waitlist-qualifying-step');
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
@@ -126,9 +127,10 @@ describe('WaitlistRoleForm request-access questions', () => {
     expect(body).not.toHaveProperty('momTest');
   });
 
-  it('goes back a step without losing the email', () => {
+  it('goes back a step without losing the email', async () => {
     startAsArtist();
     submit();
+    await screen.findByTestId('waitlist-qualifying-step');
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     expect(screen.getByTestId('waitlist-step-counter')).toHaveTextContent(
       'Step 1 of 4'
@@ -150,17 +152,21 @@ describe('WaitlistRoleForm request-access questions', () => {
     expect(sentBody()).not.toHaveProperty('momTest');
   });
 
-  it('reads the artist id from a Spotify artist link', () => {
-    expect(
-      spotifyArtistIdFromUrl(
-        `https://open.spotify.com/artist/${ARTIST_ID}?si=x`
-      )
-    ).toBe(ARTIST_ID);
-    expect(
-      spotifyArtistIdFromUrl(
-        `https://open.spotify.com/intl-de/artist/${ARTIST_ID}`
-      )
-    ).toBe(ARTIST_ID);
-    expect(spotifyArtistIdFromUrl('https://example.com/artist/abc')).toBeNull();
+  it('keeps the chosen artist when the artist goes back to that step', async () => {
+    startAsArtist();
+    submit();
+    await screen.findByTestId('waitlist-qualifying-step');
+    fireEvent.change(screen.getByLabelText(/search spotify/i), {
+      target: { value: 'Maya' },
+    });
+    fireEvent.click(screen.getByText('Maya Vale'));
+    submit();
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByTestId('waitlist-chosen-artist')).toHaveTextContent(
+      'Maya Vale'
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Change' }));
+    expect(screen.queryByTestId('waitlist-chosen-artist')).toBeNull();
+    expect(screen.getByLabelText(/search spotify/i)).toBeVisible();
   });
 });
