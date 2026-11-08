@@ -9,6 +9,8 @@ trap 'rm -rf "$tmp_dir"' EXIT
 git -C "$tmp_dir" init -q
 mkdir -p "$tmp_dir/scripts/security"
 cp "$root/scripts/security/scan-secrets.sh" "$tmp_dir/scripts/security/"
+# scan-secrets.sh sources this helper. The temp repo must contain it.
+cp "$root/scripts/security/scan-secrets-sonar-pin.sh" "$tmp_dir/scripts/security/"
 cp "$root/scripts/security/gitleaks-staged-public-digests.b64" "$tmp_dir/scripts/security/"
 cp "$root/.gitleaks.toml" "$tmp_dir/.gitleaks.toml"
 mkdir -p "$tmp_dir/scripts/invariants/art-direction"
@@ -19,7 +21,7 @@ printf '#!/bin/sh\nexit 0\n' >"$tmp_dir/fake-trufflehog"
 chmod 700 "$tmp_dir/fake-trufflehog"
 export GITLEAKS_BIN="$scanner" TRUFFLEHOG_BIN="$tmp_dir/fake-trufflehog"
 cd "$tmp_dir"
-git add .gitleaks.toml scripts/security/scan-secrets.sh scripts/security/gitleaks-staged-public-digests.b64 scripts/invariants/art-direction/vision-observations.jsonl docs
+git add .gitleaks.toml scripts/security/scan-secrets.sh scripts/security/scan-secrets-sonar-pin.sh scripts/security/gitleaks-staged-public-digests.b64 scripts/invariants/art-direction/vision-observations.jsonl docs
 bash scripts/security/scan-secrets.sh pre-commit >"$tmp_dir/known.log" 2>&1
 
 # Frame identifiers are data, but credentials beside them must still block.
