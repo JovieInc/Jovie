@@ -54,7 +54,10 @@ test('pen draws into its own file from the canonical input and keeps other frame
 test('the Pen agent sees why a tool call failed and has room to recover', () => {
   // Run 42457693051: three drafts aborted at 8 failed calls with no error
   // text; the one that finished needed 7.
-  const args = penArgs({ frame: 'claim', prompt: 'P' }, { outDir: 'o' });
+  const args = penArgs(
+    { frame: 'claim', prompt: 'P' },
+    { input: 'i.pen', outDir: 'o' }
+  );
   assert.ok(args.includes('--verbose-mcp'));
   assert.ok(Number(args[args.indexOf('--max-failed-calls') + 1]) >= 20);
 });
