@@ -3,6 +3,7 @@
 import { Button, Textarea } from '@jovie/ui';
 import { RadioGroup, RadioGroupItem } from '@jovie/ui/atoms/radio-group';
 import { useId } from 'react';
+import { formatAmountNoCents } from '@/lib/utils/format-number';
 import {
   PROMO_SPEND_BANDS,
   type PromoSpendBand,
@@ -17,10 +18,13 @@ export const QUALIFYING_STEP_COUNT = QUALIFYING_STEPS.length + 1;
 
 export const GROWTH_ANSWER_MAX = 600;
 
+/** The line between the two paid spend bands the join route stores. */
+const SPEND_BAND_LINE = formatAmountNoCents(5000);
+
 const SPEND_LABELS: Record<PromoSpendBand, string> = {
   none: 'Nothing yet',
-  under_50: 'Under $50 a month',
-  '50_plus': '$50 or more a month',
+  under_50: `Under ${SPEND_BAND_LINE} a month`,
+  '50_plus': `${SPEND_BAND_LINE} or more a month`,
 };
 
 const SPOTIFY_ARTIST_URL =
