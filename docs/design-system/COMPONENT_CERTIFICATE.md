@@ -27,6 +27,7 @@ Invalid JSON in an input file blocks report generation with a nonzero exit.
 | tests | colocated test with assertions and, for interactive components, user-event interaction | test file |
 | a11y | axe assertion in the current unit test, or passing CI evidence with the current component `sourceHash` | test file / CI |
 | frontend-rules | no inline components, autoFocus, unstable keys, dimensionless images, null-while-loading, reset-on-open effects; text inputs have an input-retention test | source + test |
+| forced-caps | no `uppercase` utility, `text-transform: uppercase` or inline `textTransform: 'uppercase'` (ASR-022); artist and release names keep their own spelling | source (static), rule in `scripts/lib/design-rules/forced-caps.mjs` |
 | mutation | sweep score at least `policy.mutationMin` (80), matching the current source/test `blob` key with a recorded run `sha` | `jovie-mutation` sweep state |
 | visual | CI-captured baseline of the state stories with the current component `sourceHash` (never a Storybook build on gem) | CI artifact |
 | journeys | every golden-path journey touching the component has a browser spec | `component-journeys.json` |
@@ -122,8 +123,17 @@ the registry's `criteria`. `pnpm component-certificate:gate` enforces it:
   enrolled, as one comma-separated string per line. It may only shrink: an entry
   that now passes, or that no screen renders, must be removed in the same PR
   (`pnpm component-cert:screens --refresh`), and debt may not grow except for a
-  screen being enrolled;
+  screen being enrolled or a criterion being added to `criteria` (its current
+  failures become debt in that PR, then only shrink); criteria are never removed;
 - a screen with no debt left is must-pass.
+
+One rule per concern, in `scripts/lib/design-rules/` (raw colours for `tokens`
+in `raw-colors.mjs`). The all-caps rule lives in
+`scripts/lib/design-rules/forced-caps.mjs` (`FORCED_CAPS_PATTERN`,
+`countForcedCaps`, `findForcedCaps`, `isForcedCapsElement`). The certificate
+reads it; the repo ratchet (`no-uppercase-ratchet.test.ts`) and the
+rendered-page check (`expectNoForcedCaps`) should import it too, so the three
+cannot drift.
 
 Machine-driven expansion, for an agent loop:
 
