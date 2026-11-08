@@ -123,14 +123,10 @@ function OperatorNavGroup({
 }>) {
   const queryClient = useQueryClient();
   const prefetchShipping = (item: NavItem) => {
-    if (item.href === APP_ROUTES.ADMIN_SHIPPING) {
-      // Loaded on hover so the shipping query and its zod schema stay out of
-      // the shell that every dashboard page downloads.
-      void import('@/lib/queries/shipping-state').then(
-        ({ shippingStateQueryOptions }) =>
-          queryClient.prefetchQuery(shippingStateQueryOptions)
-      );
-    }
+    if (item.href !== APP_ROUTES.ADMIN_SHIPPING) return;
+    void import('@/lib/queries/shipping-state').then(m =>
+      queryClient.prefetchQuery(m.shippingStateQueryOptions)
+    );
   };
   const [stored, setStored] = useState(false);
   useEffect(() => {
