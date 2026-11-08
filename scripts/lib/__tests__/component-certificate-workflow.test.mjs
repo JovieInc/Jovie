@@ -109,6 +109,36 @@ describe('certificate artifact retention with separate runner and checkout roots
 });
 
 describe('Component Certificate workflow contract', () => {
+  it('registers every root Source Validation command, including the certificate gate', () => {
+    const source = load(
+      readFileSync(
+        resolve(REPO_ROOT, '.github/workflows/source-validation.yml'),
+        'utf8'
+      )
+    );
+    const contract = source.jobs.deterministic.steps.find(
+      step => step.name === 'Run deterministic source contract'
+    ).run;
+    const commands = [
+      ...new Set(
+        [...contract.matchAll(/^\s*pnpm (?:run )?([a-z][\w:-]*)/gm)].map(
+          match => match[1]
+        )
+      ),
+    ];
+    expect(commands).toContain('component-certificate:gate');
+    const { scripts } = JSON.parse(
+      readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8')
+    );
+    const missing = registry =>
+      commands.filter(name => !registry[name]?.trim());
+    expect(missing(scripts)).toEqual([]);
+    for (const name of commands) {
+      const stale = { ...scripts };
+      delete stale[name];
+      expect(missing(stale)).toEqual([name]);
+    }
+  });
   it.each([false, true])(
     'checks main ancestry before executing checkout scripts (unmerged=%s)',
     unmerged => {
