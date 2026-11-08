@@ -706,7 +706,7 @@ jobs:
     needs: [resolve-target, auth-smoke]
     if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -734,13 +734,13 @@ jobs:
       # Design first (Tim, 2026-11-08): export every Golden Path Pen frame with
       # the headless Pen CLI and diff it against production. Without
       # PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL it exports nothing, and the
-      # certification below reports those frames as not exported.
+      # certification below reports those frames as not exported. --record
+      # exits 0 once a receipt is written; certification fails on its verdict.
       - name: Export Golden Path Pen frames and compare with production
-        continue-on-error: true
         env:
           PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
           PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
-        run: node scripts/invariants/pen-golden-path.mjs --out "${RUNNER_TEMP}/pen-golden-path" --base-url https://jov.ie
+        run: node scripts/invariants/pen-golden-path.mjs --record --out "${RUNNER_TEMP}/pen-golden-path" --base-url https://jov.ie
 
       - name: Certify the golden path on production
         env:

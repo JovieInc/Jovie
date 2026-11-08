@@ -187,8 +187,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     await runGoldenPathPen({ out: resolve(out), baseUrl: arg('base-url') });
   } catch (error) {
-    // A strict diff failure exits nonzero; the receipt it wrote is the result.
     process.stderr.write(`${error?.message ?? error}\n`);
-    process.exit(1);
+    // With --record, a diff that wrote its receipt exits 0: certification
+    // reads that receipt and fails the surface, so the verdict is not lost.
+    const recorded = existsSync(join(resolve(out), 'receipt.json'));
+    process.exit(argv.includes('--record') && recorded ? 0 : 1);
   }
 }
