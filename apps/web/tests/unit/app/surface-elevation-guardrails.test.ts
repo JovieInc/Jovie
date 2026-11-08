@@ -257,9 +257,14 @@ describe('surface elevation guardrails', () => {
     expect(tasksPage).toContain("data-testid='tasks-content-panel'");
     expect(tasksPage).toContain('TaskDataTable');
     expect(tasksPage).not.toMatch(/<UnifiedTable\b/);
+    const shellRouteSkeleton = readFileSync(
+      join(ROOT, 'app/app/(shell)/shell-route-skeleton.tsx'),
+      'utf-8'
+    );
     expect(shellRouteMatches).toContain('isTasksShellRoute');
-    expect(appShellLayout).toContain('TasksRouteSkeleton');
-    expect(appShellLayout).toContain('TasksRouteSkeleton');
+    expect(appShellLayout).toContain('resolveShellRouteSkeleton');
+    expect(shellRouteSkeleton).toContain('isTasksShellRoute');
+    expect(shellRouteSkeleton).toContain('TasksRouteSkeleton');
   });
 
   it('keeps presence and earnings inside framed content panels', () => {
@@ -386,8 +391,13 @@ describe('surface elevation guardrails', () => {
     expect(librarySurface).not.toContain("key: 'library'");
     expect(librarySurface).not.toContain('Filter Work');
     expect(librarySurface).not.toContain('OPEN_COMMAND_PALETTE_EVENT');
-    expect(appShellLayout).toContain('isLibraryShellRoute');
-    expect(appShellLayout).toContain('LibraryLoadingState');
+    const shellRouteSkeleton = readFileSync(
+      join(ROOT, 'app/app/(shell)/shell-route-skeleton.tsx'),
+      'utf-8'
+    );
+    expect(appShellLayout).toContain('resolveShellRouteSkeleton');
+    expect(shellRouteSkeleton).toContain('isLibraryShellRoute');
+    expect(shellRouteSkeleton).toContain('LibraryLoadingState');
   });
 
   it('routes task filters through the shared header search contract', () => {
