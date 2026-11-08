@@ -402,4 +402,20 @@ describe('Avatar accessibility', () => {
 
     await expectNoA11yViolations(container);
   });
+
+  it('has no axe violations for a composed avatar while loading and after failure', async () => {
+    const { container } = render(
+      <Avatar size='lg'>
+        <AvatarImage src='/tim-white.png' alt='Tim White' />
+        <AvatarFallback role='img' aria-label='Tim White'>
+          TW
+        </AvatarFallback>
+      </Avatar>
+    );
+    await expectNoA11yViolations(container);
+
+    fireEvent.error(container.querySelector('img') as HTMLImageElement);
+    expect(container.querySelector('img')).toHaveAttribute('hidden');
+    await expectNoA11yViolations(container);
+  });
 });

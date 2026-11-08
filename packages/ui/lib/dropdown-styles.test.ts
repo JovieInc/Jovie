@@ -246,8 +246,9 @@ describe('dropdown-styles', () => {
       expect(CHECKBOX_RADIO_ITEM_BASE).toContain('min-h-8');
     });
 
-    it('SELECT_ITEM_BASE has left padding for check indicator', () => {
-      expect(SELECT_ITEM_BASE).toContain('pl-8');
+    it('SELECT_ITEM_BASE has inline-start padding for check indicator', () => {
+      expect(SELECT_ITEM_BASE).toContain('ps-8');
+      expect(SELECT_ITEM_BASE).not.toContain('pl-8');
       expect(SELECT_ITEM_BASE).toContain('w-full');
       expect(SELECT_ITEM_BASE).toContain('min-h-8');
     });
