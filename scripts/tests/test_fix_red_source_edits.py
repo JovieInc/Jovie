@@ -1,10 +1,14 @@
 import sys
+import subprocess
+from types import SimpleNamespace
+from unittest.mock import patch
 import tempfile
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import fix_red_classes as classes  # noqa: E402
+import lane_runner as lane  # noqa: E402
 
 
 def pr(*names, merge="BLOCKED"):
@@ -141,6 +145,85 @@ diff --git a/apps/web/../outside.ts b/apps/web/../outside.ts
             path.write_text("export const runtime = 'nodejs';\n")
             self.assertEqual(classes.strip_added_legacy_cache_exports(root, self.DIFF), [])
             self.assertEqual(path.read_text(), "export const runtime = 'nodejs';\n")
+
+
+class AdditiveNodeTestMergeTest(unittest.TestCase):
+    @staticmethod
+    def block(name, assertion="  assert.ok(true);"):
+        return f"test('{name}', () => {{\n{assertion}\n}});\n\n"
+
+    def conflict(self, ours, theirs, base=""):
+        return f"<<<<<<< HEAD\n{ours}||||||| base\n{base}=======\n{theirs}>>>>>>> main\n"
+
+    def test_unions_complete_added_tests_in_main_order(self):
+        ours, theirs = self.block("head"), self.block("main")
+        merged = classes.resolve_additive_node_tests_text(self.conflict(ours, theirs))
+        self.assertEqual(merged, theirs + ours)
+        self.assertEqual(classes.resolve_additive_node_tests_text(
+            self.conflict(ours + theirs, theirs)), theirs + ours)
+
+    def test_unknown_hunks_and_changes_to_existing_tests_stay_unresolved(self):
+        ours, theirs = self.block("head"), self.block("main")
+        for value in (self.conflict(ours, theirs, self.block("old")),
+                      self.conflict(ours, "const x = 1;\n"),
+                      self.conflict(ours, self.block("head", "  assert.ok(false);")),
+                      self.conflict(ours + ours, theirs),
+                      self.conflict(ours, theirs).replace("||||||| base\n", ""),
+                      self.conflict(ours, theirs) + "<<<<<<< unknown\n"):
+            with self.subTest(value=value):
+                self.assertIsNone(classes.resolve_additive_node_tests_text(value))
+
+
+class AdditiveNodeTestFileTest(unittest.TestCase):
+    def test_real_git_conflict_preserves_and_executes_both_sides(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            work, origin = root / "work", root / "origin.git"
+            subprocess.run(["git", "init", "-q", "-b", "main", str(work)], check=True)
+            subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+            def git(*args):
+                return subprocess.run(["git", *args], cwd=work, check=True, capture_output=True, text=True)
+            hooks = root / "hooks"
+            hooks.mkdir()
+            for key, value in (("user.name", "t"), ("user.email", "t@example.test"),
+                               ("commit.gpgsign", "false"), ("core.hooksPath", str(hooks))):
+                git("config", key, value)
+            git("remote", "add", "origin", str(origin))
+            path = work / "draft.test.mjs"
+            base = "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\n"
+            path.write_text(base)
+            git("add", ".")
+            git("commit", "-qm", "base")
+            git("branch", "feature")
+            git("checkout", "-q", "feature")
+            ours = "test('head retry budget', () => {\n  assert.equal(1 + 1, 2);\n});\n\n"
+            path.write_text(base + ours)
+            git("commit", "-qam", "head test")
+            git("push", "-q", "origin", "HEAD:refs/heads/feature")
+            before = git("rev-parse", "HEAD").stdout.strip()
+            git("checkout", "-q", "main")
+            theirs = "test('main verbose errors', () => {\n  assert.ok(true);\n});\n\n"
+            path.write_text(base + theirs)
+            git("commit", "-qam", "main test")
+            git("push", "-q", "origin", "HEAD:refs/heads/main")
+            git("checkout", "-q", "feature")
+            self.assertTrue(lane.resolve_additive_list_conflict(work, "feature", None))
+            self.assertEqual(path.read_text(), base + theirs + ours)
+            after = git("rev-parse", "HEAD").stdout.strip()
+            self.assertNotEqual(after, before)
+            self.assertEqual(after, git("rev-parse", "origin/feature").stdout.strip())
+            git("merge-base", "--is-ancestor", before, after)
+            result = subprocess.run(["node", "--test", str(path)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("# pass 2", result.stdout.replace("ℹ", "#"))
+
+    def test_unknown_files_missing_stages_and_merge_errors_fail_closed(self):
+        for rel, replies in (("code.mjs", []),
+                             ("draft.test.mjs", [SimpleNamespace(returncode=1)]),
+                             ("draft.test.mjs", [SimpleNamespace(returncode=0, stdout="")]*3
+                              + [SimpleNamespace(returncode=2, stdout="")])):
+            with self.subTest(rel=rel, replies=replies), patch.object(lane, "sh", side_effect=replies):
+                self.assertIsNone(classes.resolve_additive_node_test_file(Path("."), rel, lane.sh))
 
 
 if __name__ == "__main__":

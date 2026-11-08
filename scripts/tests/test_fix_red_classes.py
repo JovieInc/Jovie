@@ -238,33 +238,6 @@ class AdditiveQuotedListMergeTest(unittest.TestCase):
         self.assertIsNone(classes.merge_additive_quoted_entries("", "  'scripts/a.test.mjs',\n"))
 
 
-class AdditiveNodeTestMergeTest(unittest.TestCase):
-    @staticmethod
-    def block(name, assertion="  assert.ok(true);"):
-        return f"test('{name}', () => {{\n{assertion}\n}});\n\n"
-
-    def conflict(self, ours, theirs, base=""):
-        return f"<<<<<<< HEAD\n{ours}||||||| base\n{base}=======\n{theirs}>>>>>>> main\n"
-
-    def test_unions_complete_added_tests_in_main_order(self):
-        ours, theirs = self.block("head"), self.block("main")
-        merged = classes.resolve_additive_node_tests_text(self.conflict(ours, theirs))
-        self.assertEqual(merged, theirs + ours)
-        self.assertEqual(classes.resolve_additive_node_tests_text(
-            self.conflict(ours + theirs, theirs)), theirs + ours)
-
-    def test_unknown_hunks_and_changes_to_existing_tests_stay_unresolved(self):
-        ours, theirs = self.block("head"), self.block("main")
-        for value in (self.conflict(ours, theirs, self.block("old")),
-                      self.conflict(ours, "const x = 1;\n"),
-                      self.conflict(ours, self.block("head", "  assert.ok(false);")),
-                      self.conflict(ours + ours, theirs),
-                      self.conflict(ours, theirs).replace("||||||| base\n", ""),
-                      self.conflict(ours, theirs) + "<<<<<<< unknown\n"):
-            with self.subTest(value=value):
-                self.assertIsNone(classes.resolve_additive_node_tests_text(value))
-
-
 class AdditiveIdentifierListMergeTest(unittest.TestCase):
     def test_unions_slug_lines_and_rejects_unknown_hunks(self):
         text = (

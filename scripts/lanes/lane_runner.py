@@ -6479,63 +6479,10 @@ def resolve_and_chain_conflict(worktree: Path, branch: str, log, *, guard=lambda
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
 
 
-def resolve_additive_node_test_file(worktree: Path, rel: str, log) -> str | None:
-    """Use Git's actual three stages to prove test conflicts are insertions only."""
-    if not re.fullmatch(r"[\w./-]+\.(?:test|spec)\.mjs", rel):
-        return None
-    with tempfile.TemporaryDirectory() as scratch:
-        paths = []
-        for stage in (2, 1, 3):  # merge-file expects ours, base, theirs
-            blob = sh(["git", "show", f":{stage}:{rel}"], cwd=worktree)
-            if blob.returncode:
-                return None
-            path = Path(scratch) / str(stage)
-            atomic_write_text(path, blob.stdout)
-            paths.append(str(path))
-        probe = sh(["git", "merge-file", "-p", "--diff3", *paths], cwd=worktree)
-        if probe.returncode != 1:
-            return None
-        return fix_red_classes.resolve_additive_node_tests_text(probe.stdout)
-
-
 def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
-    """Union quoted list entries or proven additive node:test blocks.
-
-    Main's order stays, then head-only lines. A prose hunk or any other shape aborts
-    and leaves the PR to the model. The push is a fast-forward of the PR branch."""
-    guard()
-    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
-    if merged.returncode != 0:
-        conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
-        if not conflicted:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-            return False
-        resolved: dict[str, str] = {}
-        for path in conflicted:
-            target = worktree / path
-            try:
-                text = fix_red_classes.resolve_additive_quoted_list_text(target.read_text())
-                if text is None:
-                    text = resolve_additive_node_test_file(worktree, path, log)
-            except OSError:
-                text = None
-            if text is None:
-                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-                return False
-            resolved[path] = text
-        try:
-            for path, text in resolved.items():
-                atomic_write_text(worktree / path, text)
-        except OSError:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-            return False
-        guard()
-        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
-                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-            return False
-    guard()
-    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+    return fix_red_classes.resolve_additive_list_conflict(
+        worktree, branch, log, sh=sh, guard=guard,
+        merge_entries=fix_red_classes.resolve_additive_quoted_list_text)
 
 
 def resolve_identifier_list_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:

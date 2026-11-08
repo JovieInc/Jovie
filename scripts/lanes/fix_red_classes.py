@@ -28,7 +28,10 @@ from pathlib import Path
 import migration_renumber
 import remediation
 from atomic_state import atomic_write_text
-from fix_red_source_edits import snap_added_conservative_spacing, strip_added_legacy_cache_exports  # noqa: F401
+from fix_red_source_edits import (  # noqa: F401
+    snap_added_conservative_spacing, strip_added_legacy_cache_exports,
+    resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict,
+)
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
@@ -604,46 +607,6 @@ def merge_additive_quoted_entries(ours: str, theirs: str) -> str | None:
         if line not in seen:
             seen.append(line)
     return "\n".join(seen) + "\n"
-
-
-def resolve_additive_node_tests_text(text: str) -> str | None:
-    """Union complete top-level node:test additions against an empty diff3 base.
-
-    Main order wins. Existing-test edits, shared names with different bodies,
-    partial statements and unknown hunks stay unresolved. This is deliberately
-    narrower than a JavaScript parser; it never rewrites assertions.
-    """
-    hunk = re.compile(
-        r"^<<<<<<<[^\n]*\n(?P<ours>.*?)^\|{7}[^\n]*\n(?P<base>.*?)"
-        r"^=======\n(?P<theirs>.*?)^>>>>>>>[^\n]*(?:\n|\Z)", re.M | re.S)
-    block = re.compile(
-        r"test\('(?P<name>[^'\n]+)', (?:async )?\(\) => \{\n"
-        r"(?:[ \t]+[^\n]*\n|\n)*?\}\);\n(?:\n)*")
-
-    def tests(side):
-        found, offset = {}, 0
-        for match in block.finditer(side):
-            name = match['name']
-            if match.start() != offset or name in found:
-                return None
-            found[name] = match[0]
-            offset = match.end()
-        return found if found and offset == len(side) else None
-
-    matches = list(hunk.finditer(text))
-    if not matches:
-        return None
-    for match in reversed(matches):
-        if match['base']:
-            return None
-        ours, theirs = tests(match['ours']), tests(match['theirs'])
-        if ours is None or theirs is None:
-            return None
-        if any(ours[name] != theirs[name] for name in ours.keys() & theirs.keys()):
-            return None
-        merged = ''.join(theirs.values()) + ''.join(value for name, value in ours.items() if name not in theirs)
-        text = text[:match.start()] + merged + text[match.end():]
-    return None if re.search(r"(?m)^(?:<{7}|\|{7}|={7}|>{7})", text) else text
 
 
 def merge_additive_identifier_list(ours: str, theirs: str) -> str | None:
