@@ -8,7 +8,7 @@ import {
 } from '@/lib/ingestion/strategies/linktree';
 import { type BuyerPrescreenResult, prescreenBuyer } from './buyer-signals';
 import { recordLeadFunnelEvent } from './funnel-events';
-import type { SearchOutcome } from './google-cse';
+import type { SearchOutcome, SearchProviderName } from './google-cse';
 
 export interface DiscoveryCandidate {
   linktreeHandle: string;
@@ -211,6 +211,22 @@ async function shouldSkipSeenSearchResult(
 }
 
 /**
+ * Domains a keyword quotes, e.g. `site:linktr.ee "ffm.to"`. Google (SerpAPI)
+ * returns only pages that contain a quoted term, so each result carries that
+ * footprint even when its snippet does not show it. Exa is semantic and does
+ * not honour quotes, so its results get no query-implied evidence.
+ */
+export function queryImpliedDomains(
+  query: string,
+  provider: SearchProviderName
+): string[] {
+  if (provider !== 'serpapi') return [];
+  return [...query.matchAll(/"([a-z0-9-]+(?:\.[a-z0-9-]+)+)"/gi)]
+    .map(match => match[1]!.toLowerCase())
+    .filter(domain => !/(^|\.)linktr\.ee$/.test(domain));
+}
+
+/**
  * Turns one page of search results into pre-screened, unseen Linktree
  * candidates. The pre-screen reads the title and snippet the paid query
  * already returned, so it costs nothing extra. Seen-checks run in parallel.
@@ -218,8 +234,10 @@ async function shouldSkipSeenSearchResult(
 export async function screenSearchResults(
   results: SearchOutcome['results'],
   query: string,
-  currentOffset: number
+  currentOffset: number,
+  provider: SearchProviderName
 ): Promise<{ screened: ScreenedCandidate[]; duplicatesSkipped: number }> {
+  const implied = queryImpliedDomains(query, provider).join(' ');
   const firstByHandle = new Map<
     string,
     { item: SearchOutcome['results'][number]; rank: number }
@@ -258,13 +276,18 @@ export async function screenSearchResults(
         sourceHandle: handle,
         sourceUrl: url,
       },
-      prescreen: prescreenBuyer({
-        handle,
-        displayName: null,
-        bio: null,
-        text: [item.title, item.snippet].filter(Boolean).join('\n'),
-        links: [],
-      }),
+      prescreen: prescreenBuyer(
+        {
+          handle,
+          displayName:
+            (item.title ?? '').replace(/\s*\|\s*linktree\s*$/i, '') || null,
+          bio: item.snippet ?? null,
+          text: implied,
+          links: [],
+        },
+        // A snippet is a partial view of the page.
+        { pageSeenInFull: false }
+      ),
     });
   });
 

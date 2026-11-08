@@ -39,7 +39,7 @@ const settings = {
 
 const keyword = {
   id: 'kw-1',
-  query: 'site:linktr.ee "ffm.to"',
+  query: 'site:linktr.ee indie artist',
   enabled: true,
   resultsFoundTotal: 0,
   searchOffset: 1,
@@ -137,5 +137,32 @@ describe('runDiscovery buyer pre-screen', () => {
       passedLeads: 0,
       usdPerPassedLead: null,
     });
+  });
+
+  it('credits a footprint the paid query quoted, on SerpAPI only', async () => {
+    const quoted = { ...keyword, query: 'site:linktr.ee "ffm.to"' };
+    const { runDiscovery } = await import('@/lib/leads/discovery');
+    const reachOnly = [results[1]];
+
+    searchMock.mockResolvedValue({
+      status: 'ok',
+      provider: 'serpapi',
+      results: reachOnly,
+      error: null,
+    });
+    returningMock.mockResolvedValue([
+      { id: 'lead-2', handle: 'fixture_reach_only' },
+    ]);
+    const serp = await runDiscovery(settings, [quoted]);
+    expect(serp.diagnostics[0]?.prescreenPassed).toBe(1);
+
+    searchMock.mockResolvedValue({
+      status: 'ok',
+      provider: 'exa',
+      results: reachOnly,
+      error: null,
+    });
+    const exa = await runDiscovery(settings, [quoted]);
+    expect(exa.diagnostics[0]?.prescreenPassed).toBe(0);
   });
 });

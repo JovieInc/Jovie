@@ -149,6 +149,15 @@ export const HOST_RULES: readonly HostRule[] = [
       'tixr.com',
       'shotgun.live',
       'livenation.com',
+      'livenation.co.uk',
+      'ticketweb.com',
+      'eventim.us',
+      'eventim.de',
+      'prekindle.com',
+      'gigantic.com',
+      'alttickets.com',
+      'soundrink.com',
+      'residentadvisor.net',
     ],
   },
   {
@@ -252,3 +261,14 @@ export const TEXT_RULES: readonly {
       /\b(brand (deals|partnerships|inquiries|enquiries)|sponsorships?)\b/i,
   },
 ];
+
+/**
+ * Music-service businesses (PR firms, promo services, artist networks) that
+ * link many artists' releases and so look like heavy tool users.
+ */
+export const SERVICE_BUSINESS_PATTERN =
+  /\b(music pr|pr campaigns|pr (&|and) marketing|marketing agency|promotion services|for (indie )?artists|artist (network|collective))\b/i;
+
+/** Words that mark a page as a performing artist's own. */
+export const PERFORMER_PATTERN =
+  /\b(dj|producer|singer|songwriter|rapper|band|duo)\b/i;

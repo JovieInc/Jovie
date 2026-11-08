@@ -251,6 +251,50 @@ describe('prescreenBuyer', () => {
     expect(twoServices.signals.map(s => s.id)).not.toContain('multi_dsp');
   });
 
+  it.each([
+    ['a PR firm', 'Music PR campaigns for indie artists'],
+    ['an artist network', 'An underground artist network since 1994'],
+  ])('hard-stops %s that links many releases', (_label, bio) => {
+    const result = prescreenBuyer(
+      page({
+        handle: 'fixture_service',
+        bio,
+        links: [
+          { url: 'https://lnk.to/one' },
+          { url: 'https://lnk.to/two' },
+          { url: 'https://ffm.to/three' },
+        ],
+      })
+    );
+    expect(result.hardStop).toBe('non_artist');
+  });
+
+  it('keeps a DJ who also calls themself a curator', () => {
+    const result = prescreenBuyer(
+      page({
+        displayName: 'Curator, DJ, producer',
+        links: [
+          { url: 'https://fixture.bandcamp.com/' },
+          { url: 'https://laylo.com/fixture' },
+        ],
+      })
+    );
+    expect(result.hardStop).toBeNull();
+    expect(prescreenBuyer(page({ handle: 'fixturecurator' })).hardStop).toBe(
+      'non_artist'
+    );
+  });
+
+  it('treats a missing streaming link as unknown on a partial view', () => {
+    const snippet = page({ links: [], text: 'Fixture | Linktree ffm.to/x' });
+    expect(prescreenBuyer(snippet).decision).toBe('pass');
+    const titleOnly = page({ links: [], text: 'Fixture | Linktree laylo.com' });
+    expect(prescreenBuyer(titleOnly).hardStop).toBe('no_music_presence');
+    expect(prescreenBuyer(titleOnly, { pageSeenInFull: false }).decision).toBe(
+      'pass'
+    );
+  });
+
   it('ignores lookalike hosts', () => {
     const result = prescreenBuyer(
       page({ links: [{ url: 'https://notffm.to.example.test/x' }] })

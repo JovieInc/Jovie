@@ -223,7 +223,8 @@ export async function runDiscovery(
         const { screened, duplicatesSkipped } = await screenSearchResults(
           results,
           keyword.query,
-          currentOffset
+          currentOffset,
+          outcome.provider
         );
         const passed = screened.filter(c => c.prescreen.decision === 'pass');
         for (const failed of screened) {
