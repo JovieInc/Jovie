@@ -193,6 +193,25 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     }
   });
 
+  it('leads the hero with what listeners open, not the back office', async () => {
+    const { HOMEPAGE_EDITORIAL_COPY: copy } = await loadCopy();
+    const { container } = await renderHomePage();
+    const hero = container.querySelector('.hv3-hero');
+    // The lifted panel is the release page a listener opens; the metadata
+    // inspector stays in 03 specs.
+    expect(hero?.querySelector('.hv3-lift--page .hv3-rp')).not.toBeNull();
+    expect(hero?.querySelector('.hv3-insp')).toBeNull();
+    expect(container.querySelector('#specs .hv3-insp')).not.toBeNull();
+    expect(hero?.querySelector('.hv3-callout')?.textContent ?? '').toContain(
+      copy.hero.pageCallout
+    );
+    // One anchor per id, so each connector finds its own phone.
+    const ids = [...container.querySelectorAll('[data-hv3-anchor]')].map(node =>
+      node.getAttribute('data-hv3-anchor')
+    );
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
   it('shows no prices on the page', async () => {
     const { container } = await renderHomePage();
     const main = [...container.querySelectorAll('section')]

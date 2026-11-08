@@ -13,7 +13,7 @@ import { HOMEPAGE_LATEST_RELEASE } from '@/data/homepageProductUi';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { HOME_SPEC } from './v3/home-spec';
 import { Orbit } from './v3/Orbit';
-import { AppWindow, CatalogPlate, ReleaseInspector } from './v3/ProductUi';
+import { AppWindow, CatalogPlate } from './v3/ProductUi';
 import { Callout, ReleasePage } from './v3/Surfaces';
 import './v3/stage.css';
 import './v3/product-ui.css';
@@ -132,14 +132,19 @@ export function HomepageStoryHero({
             <AppWindow />
             <div className='hv3-sheen' />
           </div>
+          {/* What a listener gets from the selected row: its release page,
+              on the third column, cropped at the window's foot. */}
           <div
-            className='hv3-lift hv3-lift--inspector hv3-edge'
+            aria-hidden
+            className='hv3-lift hv3-lift--page hv3-edge'
             data-hv3-parallax
           >
-            <ReleaseInspector anchor='upc' eager />
+            <div className='hv3-phone hv3-phone--hero'>
+              <ReleasePage titleAnchor='htitle' eager />
+            </div>
           </div>
         </div>
-        <Callout anchor='upc' label={COPY.hero.upcCallout} />
+        <Callout anchor='htitle' label={COPY.hero.pageCallout} />
       </div>
       <nav className='hv3-index' aria-label={COPY.chaptersLabel}>
         {COPY.chapters.map((label, index) => (

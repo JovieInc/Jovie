@@ -28,6 +28,19 @@ describe('homepage v3 surfaces', () => {
     expect(container).not.toHaveTextContent('Tim White');
   });
 
+  it('lets a second release page take its own title anchor', () => {
+    const { container } = render(
+      <>
+        <ReleasePage titleAnchor='htitle' />
+        <ReleasePage />
+      </>
+    );
+    const anchors = [...container.querySelectorAll('[data-hv3-anchor]')].map(
+      node => node.getAttribute('data-hv3-anchor')
+    );
+    expect(anchors).toEqual(['htitle', 'title']);
+  });
+
   it('renders a hidden-until-placed callout bound to its anchor', () => {
     const { container } = render(
       <Callout anchor='upc' side='left' label='per release' />

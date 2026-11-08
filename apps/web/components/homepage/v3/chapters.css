@@ -154,15 +154,27 @@
   transform-origin: 0 0;
 }
 
-/* The inspector sits on the third column of the box, its right edge on the
-   window's, lifted by shadow alone. Its height ends below the UPC row. */
-.hv3-lift--inspector {
-  top: 2.5rem;
+/* The release page sits on the third column of the box, its right edge on
+   the window's, lifted by shadow alone. It is the 390 phone scaled to the
+   column and cropped above the window's foot, fading out the way a page
+   keeps going below the fold. */
+.hv3-lift--page {
+  top: 1.75rem;
   left: calc(var(--hv3-col2) + 1.5rem);
   width: var(--hv3-col1);
-  height: 29rem;
-  border-radius: var(--radius-md);
+  height: 33.25rem;
+  border-radius: calc(var(--radius-3xl) + var(--radius-sm));
+  mask-image: linear-gradient(var(--hv3-shade) 72%, transparent);
   transform: translateY(var(--hv3-par, 0px));
+}
+
+.hv3-phone.hv3-phone--hero {
+  inset: 0 auto auto 0;
+  width: 24.375rem;
+  height: 53.75rem;
+  box-shadow: none;
+  transform: scale(1.0256);
+  transform-origin: 0 0;
 }
 
 .hv3-index {
