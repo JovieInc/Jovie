@@ -88,5 +88,14 @@ describe('TourDatesTable', () => {
 
     expect(html).not.toContain('opacity-60');
     expect(html).not.toContain('>Past<');
+    // The status badge is held, not shown as on sale, until the clock mounts.
+    expect(html).toContain('class="invisible"');
+  });
+
+  it('shows the Past badge once the client clock mounts', () => {
+    renderTable([{ ...baseTourDate, startDate: '2001-01-01T00:00:00.000Z' }]);
+
+    const past = screen.getByText('Past');
+    expect(past.closest('.invisible')).toBeNull();
   });
 });

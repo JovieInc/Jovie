@@ -167,6 +167,56 @@ describe('LinksPageClient', () => {
     });
   });
 
+  it('fixes column widths so long values truncate instead of widening columns', () => {
+    renderLinksWorkspace(<LinksPageClient rows={[baseRow]} />);
+
+    const table = screen.getByRole('table');
+    expect(table).toHaveClass('table-fixed');
+    expect(table.querySelectorAll('colgroup col')).toHaveLength(
+      within(table).getAllByRole('columnheader').length
+    );
+  });
+
+  it('moves the open inspector to the focused row after a sort', async () => {
+    const user = userEvent.setup();
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    renderLinksWorkspace(
+      <LinksPageClient
+        rows={[
+          { ...baseRow, id: 'row-a', title: 'Midnight City', clicks: 5 },
+          { ...baseRow, id: 'row-b', title: 'Neon Sky', clicks: 50 },
+          { ...baseRow, id: 'row-c', title: 'Afterglow', clicks: 20 },
+        ]}
+      />
+    );
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Clicks: not sorted, activate to sort',
+      })
+    );
+    const bodyRows = within(screen.getByRole('table'))
+      .getAllByRole('row')
+      .slice(1);
+    const order = bodyRows.map(row => row.getAttribute('data-testid'));
+    expect(order).not.toEqual([
+      'links-row-row-a',
+      'links-row-row-b',
+      'links-row-row-c',
+    ]);
+
+    // Open the first displayed row, then arrow to the second displayed row.
+    await user.click(within(bodyRows[0]).getAllByRole('cell')[1]);
+    const expectedNext = bodyRows[1];
+    bodyRows[0].focus();
+    await user.keyboard('{ArrowDown}');
+
+    const nextTitle =
+      within(expectedNext).getAllByRole('cell')[0].textContent ?? '';
+    expect(screen.getByTestId('links-inspector')).toHaveTextContent(nextTitle);
+    expect(expectedNext).toHaveAttribute('aria-selected', 'true');
+  });
+
   it('opens the inspector from a row click and marks the row selected', async () => {
     const user = userEvent.setup();
     renderLinksWorkspace(<LinksPageClient rows={[baseRow]} />);

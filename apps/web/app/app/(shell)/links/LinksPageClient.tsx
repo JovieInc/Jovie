@@ -138,13 +138,13 @@ export function LinksPageClient({ rows }: { readonly rows: LinkRow[] }) {
     [openInspector]
   );
 
-  // Arrow keys move the open inspector with the focused row, as in Contacts.
+  // Arrow keys move the open inspector with the focused row. The table hands
+  // back that row in display order, so this holds after a sort.
   const handleFocusedRowChange = useCallback(
-    (index: number) => {
-      const next = rows[index];
+    (_index: number, next: LinkRow | undefined) => {
       if (selectedId && next) setSelectedId(next.id);
     },
-    [rows, selectedId]
+    [selectedId]
   );
 
   // The registered panel unmounts in a later context update. Restore focus
@@ -194,6 +194,7 @@ export function LinksPageClient({ rows }: { readonly rows: LinkRow[] }) {
           data={rows}
           columns={LINKS_COLUMNS}
           rowMode={LINKS_ROW_MODE}
+          columnSizing='schema'
           getRowId={row => row.id}
           getRowTestId={row => `links-row-${row.id}`}
           isRowSelected={row => row.id === selectedId}

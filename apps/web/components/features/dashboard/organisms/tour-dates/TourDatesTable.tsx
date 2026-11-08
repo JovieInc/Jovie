@@ -127,8 +127,15 @@ const StatusCell = memo(function StatusCell({
   startDate: string;
   nowMs: number | null;
 }) {
-  const past = isPastDate(startDate, nowMs);
-  return <StatusBadge status={ticketStatus} isPastDate={past} />;
+  const badge = (
+    <StatusBadge
+      status={ticketStatus}
+      isPastDate={isPastDate(startDate, nowMs)}
+    />
+  );
+  // Hold the badge (keeping its width) until the clock mounts, so a past show
+  // never reads as on sale on first paint and then flips to Past.
+  return nowMs === null ? <span className='invisible'>{badge}</span> : badge;
 });
 
 const TicketsCell = memo(function TicketsCell({
