@@ -71,7 +71,7 @@ export function StudioLightPanel({
       }}
       data-testid='teleprompter-studio-light'
     >
-      <h2 className='text-sm font-semibold'>Light</h2>
+      <h2 className='text-sm font-semibold text-balance'>Light</h2>
       <SegmentControl<RingLightMode>
         aria-label='Light Mode'
         size='sm'
