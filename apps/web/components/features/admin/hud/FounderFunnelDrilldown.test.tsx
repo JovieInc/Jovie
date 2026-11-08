@@ -60,7 +60,7 @@ describe('FounderFunnelDrilldown', () => {
     const headers = within(table)
       .getAllByRole('columnheader')
       .map(header => header.textContent);
-    expect(headers).toEqual(['Person', 'Signed up']);
+    expect(headers).toEqual(['Person', 'Signed Up']);
     const [, firstRow] = within(table).getAllByRole('row');
     expect(firstRow.className).toContain('system-b-table-row-shell');
     expect(
@@ -109,7 +109,7 @@ describe('FounderFunnelDrilldown', () => {
 
     expect(
       screen.getByTestId('founder-funnel-drilldown-empty')
-    ).toHaveTextContent('No records in this stage for the selected window.');
+    ).toHaveTextContent('No Records in This Stage');
   });
 
   it('surfaces query errors instead of the table', () => {

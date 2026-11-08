@@ -58,7 +58,8 @@ export function FounderFunnelDrilldown({
       ) : result.rows.length === 0 ? (
         <TableEmptyState
           testId='founder-funnel-drilldown-empty'
-          heading='No records in this stage for the selected window.'
+          heading='No Records in This Stage'
+          description='Nothing in this stage for the selected window.'
         />
       ) : (
         <div className='overflow-x-auto pb-3 pt-2'>

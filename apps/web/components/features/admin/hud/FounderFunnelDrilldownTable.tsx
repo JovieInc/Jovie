@@ -43,7 +43,7 @@ const FOUNDER_FUNNEL_COLUMNS = [
   }),
   columnHelper.accessor('enteredAt', {
     id: 'enteredAt',
-    header: 'Signed up',
+    header: 'Signed Up',
     size: 140,
     minSize: 120,
     meta: { align: 'right' },
