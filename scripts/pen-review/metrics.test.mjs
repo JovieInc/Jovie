@@ -37,4 +37,10 @@ test('round and frame observations produce canonical events and p50/p95/n; inval
     assert.ok(stats.p50 >= 1.9 && stats.p95 <= 2.1);
   }
   assert.equal(snapshot.rejected, 0);
+  for (const verdict of ['render-untrusted', 'needs-fix', undefined]) {
+    const failedPath = join(dir, String(verdict), 'ledger.jsonl');
+    recordTiming(failedPath, { ...event, stage: 'pen-review-frame', verdict });
+    const failed = JSON.parse(readFileSync(failedPath, 'utf8').split('\n')[0]);
+    assert.equal(failed.outcome, 'failed', String(verdict));
+  }
 });
