@@ -142,6 +142,12 @@
   );
 }
 
+/* Each chapter clips its overflow, so its rule drops half a mark below the
+   top edge and the cross sits whole inside the chapter, not cut to a T. */
+.hv3-chapter {
+  padding-top: calc(var(--hv3-mark-size) / 2);
+}
+
 .hv3-chapter > .hv3-rule {
   position: relative;
 }
@@ -180,6 +186,11 @@
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+  /* The ink is painted inside the box, and the leading is tighter than the
+     glyphs, so the box grows past ascenders and descenders and the margin
+     takes the growth back: the layout is unchanged and no glyph is cut. */
+  padding-block: 0.12em;
+  margin-block: -0.12em;
 }
 
 /* Forced colours paint text in the system ink; drop the clip so it shows. */

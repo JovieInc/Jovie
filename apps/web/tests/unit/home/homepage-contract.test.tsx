@@ -398,6 +398,14 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     expect(cinema).toMatch(
       /\.hv3-chapter > \.hv3-rule::before,\s*\.hv3-chapter > \.hv3-rule::after/
     );
+    // The chapter clips its overflow, so the cross is kept inside its box.
+    expect(cinema).toMatch(
+      /\.hv3-chapter\s*\{\s*padding-top: calc\(var\(--hv3-mark-size\) \/ 2\);/
+    );
+    // Clipped headline ink has room for ascenders and descenders.
+    expect(cinema).toMatch(
+      /background-clip: text;[^}]*padding-block: 0\.12em;\s*margin-block: -0\.12em;/
+    );
     // Controls are exact, never pills.
     for (const path of [
       'components/homepage/v3/chapters.css',
