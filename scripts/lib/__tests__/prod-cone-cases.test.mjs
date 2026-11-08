@@ -321,6 +321,18 @@ describe('truthful certification: a stranger, no token, no canary', () => {
     expect(start).toMatchObject({ id: 'start-renders', status: 'failed' });
   });
 
+  it('fails /signup and /start when a 200 page renders error text', async () => {
+    const broken = {
+      body: '<h2>Application error: a client-side exception</h2>',
+    };
+    const fetchImpl = strangerFetch({ '/signup': broken, '/start': broken });
+    const [signup] = await runAll(fetchImpl, 'signup');
+    const [start] = await runAll(fetchImpl, 'start');
+    expect(signup).toMatchObject({ id: 'signup-renders', status: 'failed' });
+    expect(signup.summary).toContain('error text rendered');
+    expect(start).toMatchObject({ id: 'start-renders', status: 'failed' });
+  });
+
   it('passes when signup is open, and sends no synthetic or passage header', async () => {
     const seen = [];
     const [signup] = await runAll(strangerFetch({}, seen), 'signup');

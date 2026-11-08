@@ -16,6 +16,7 @@
 import { access, readFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { expectOk } from './prod-cert-probes.mjs';
 
 /** A real desktop browser, no `+synthetic` marker: what a stranger sends. */
 export const STRANGER_USER_AGENT =
@@ -56,12 +57,14 @@ export function finalPath(response) {
 
 /**
  * Throws when a stranger requesting `path` cannot start an account there:
- * an error status, or a redirect onto the waitlist.
+ * an error status, an error page served as 200, or a redirect onto the
+ * waitlist.
  */
 export async function assertStrangerCanStart(origin, path, fetchImpl) {
   const page = await strangerGet(origin, path, fetchImpl);
-  if (page.response.status !== 200)
-    throw new Error(`stranger GET ${path}: HTTP ${page.response.status}`);
+  // Status and the error-page text scan: a 200 that renders "Application
+  // error" is not a page a stranger can start from.
+  expectOk(page, `stranger GET ${path}`);
   const landed = finalPath(page.response);
   if (landed === WAITLIST_PATH) {
     throw new Error(
