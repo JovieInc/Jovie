@@ -63,6 +63,7 @@ import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
 import hyperagent_repair  # noqa: E402
 import migration_renumber  # noqa: E402  (no-model fix for migration number collisions)
+import fix_red_rewrite  # noqa: E402
 import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
 import machine_gap  # noqa: E402
@@ -144,7 +145,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -4601,10 +4602,13 @@ def record_held(host: Host, number: int, head: str, evidence: list[str]) -> None
     update_json(path, lambda held: held.update({str(number): pr_events.held_record(head, evidence)}))
 
 
-def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | None:
+def red_pr(prs: list[dict], attempts: dict, held: dict | None = None, capped=frozenset()) -> dict | None:
     """A lane PR that is stuck at a head we have not tried twice: checks settled red, or
-    merge conflicts with main (GitHub drops auto-merge on those, so nothing else frees them)."""
-    for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
+    merge conflicts with main (GitHub drops auto-merge on those, so nothing else frees them).
+    Oldest first, except PRs of a producer at its WIP cap go first: they block that producer's
+    intake (2026-11-08: codex sat at 8/8 with 6 DIRTY PRs queued behind ~120 older ones)."""
+    for pr in sorted(best_per_issue(prs), key=lambda item: (pr_wip.producer_of(item.get("headRefName")) not in capped,
+                                                           item["number"])):
         if pr.get("isInMergeQueue") is True:
             continue  # Native landing owns this head; cached absence still needs a fresh claim read.
         if (pr.get("headRefName") or "").startswith("dependabot/"):
@@ -7150,41 +7154,18 @@ def wire_ci_fast_fix(host: Host, pr: dict, route: dict, worktree: Path, log, rec
 def snap_spacing_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
     """The no-model fix for a grown spacing ratchet: snap added 10px/14px utilities onto the
     4px grid, commit and push. Returns a finished-agent stand-in, or None when nothing applies."""
-    diff = sh(["git", "diff", "-U0", "origin/main...HEAD", "--", "apps/web", "packages/ui"],
-              cwd=worktree, log=log, timeout=300)
-    if diff.returncode:
-        return None
-    changed = fix_red_classes.snap_added_conservative_spacing(worktree, diff.stdout or "")
-    if not changed:
-        return None
-    steps = [["git", "add", "--", *changed],
-             ["git", "commit", "-q", "-m", "fix(ui): snap added off-grid spacing onto the 4px scale"],
-             ["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"]]
-    for step in steps:
-        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
-            return None
-    receipt.update(resolution="snapped-spacing", snappedFiles=changed)
-    return types.SimpleNamespace(returncode=0)
+    return fix_red_rewrite.rewrite_commit_push(
+        sh, pr, worktree, log, receipt, ("apps/web", "packages/ui"), fix_red_classes.snap_added_conservative_spacing,
+        "fix(ui): snap added off-grid spacing onto the 4px scale", "snapped-spacing", "snappedFiles")
 
 
 def strip_cache_exports_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
     """The no-model fix for a grown Cache Components ratchet: delete added
     dynamic/fetchCache/revalidate exports, commit and push. Never raise the ceiling."""
-    diff = sh(["git", "diff", "-U0", "origin/main...HEAD", "--", "apps/web"],
-              cwd=worktree, log=log, timeout=300)
-    if diff.returncode:
-        return None
-    changed = fix_red_classes.strip_added_legacy_cache_exports(worktree, diff.stdout or "")
-    if not changed:
-        return None
-    steps = [["git", "add", "--", *changed],
-             ["git", "commit", "-q", "-m", "fix(ci): drop added legacy cache segment exports"],
-             ["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"]]
-    for step in steps:
-        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
-            return None
-    receipt.update(resolution="stripped-cache-exports", strippedFiles=changed)
-    return types.SimpleNamespace(returncode=0)
+    return fix_red_rewrite.rewrite_commit_push(
+        sh, pr, worktree, log, receipt, ("apps/web",), fix_red_classes.strip_added_legacy_cache_exports,
+        "fix(ci): drop added legacy cache segment exports", "stripped-cache-exports", "strippedFiles")
+
 
 
 def claim_route(host: Host, pr: dict, action: str) -> bool:
@@ -9097,6 +9078,7 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     providers = load_providers()
     order, now = pr_events.cost_order(providers), time.time()
     disabled = set(providers) - set(order)
+    capped = pr_wip.capped_producers(prs)  # counted before any filter: every open PR holds a cap slot
     prs = [pr for pr in prs if not pr_recovery_held(host, pr, now) and not pr_breaker_open(host, pr["number"], now, pr.get("headRefOid"))
            and pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
     settled = []
@@ -9106,7 +9088,7 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
             note_owner_settle(host, pr, left, now)  # only a PR a repair would take is a deferral
             settled.append(pr["number"])
     prs = [pr for pr in prs if pr["number"] not in settled]
-    pr = red_pr(prs, attempts, held)
+    pr = red_pr(prs, attempts, held, capped)
     # A head another host is fixing is skipped (no attempt charged); the next red PR is ours.
     while pr:
         live = None if claimed_elsewhere(pr["number"], pr["headRefOid"], "fix") else \
@@ -9126,7 +9108,7 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
             held = {str(pr["number"]): entry}
             break
         prs = [other for other in prs if other["number"] != pr["number"]]
-        pr = red_pr(prs, attempts, held)
+        pr = red_pr(prs, attempts, held, capped)
     if pr:
         entry = held.get(str(pr["number"]), {})
         if entry.get("sha") == pr["headRefOid"]:

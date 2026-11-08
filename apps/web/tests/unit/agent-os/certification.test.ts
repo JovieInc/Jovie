@@ -1,91 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCertificationDecisionDigest,
-  type CertificationEvidenceReceipt,
   type CertificationReviewPacket,
   type CertificationState,
-  DOGFOOD_JUDGE_VISUAL_PROOF_PREFIX,
   evaluateCertificationAdmission,
   recordFounderCertificationDecision,
   shouldEmitTasteInboxCard,
 } from '@/lib/agent-os/certification';
 
-const SOURCE_SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-const CHANGED_SHA = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
-function receipt(
-  tier: CertificationEvidenceReceipt['tier'],
-  id: string = tier,
-  sourceSha: string | null = SOURCE_SHA
-): CertificationEvidenceReceipt {
-  return {
-    digest: `sha256:${id.padEnd(64, '0').slice(0, 64)}`,
-    id,
-    ref: `github:JovieInc/Jovie/${id}`,
-    sourceSha,
-    status: 'passed',
-    summary: `${tier} passed`,
-    tier,
-  };
-}
-function reviewPacket(
-  overrides: Partial<CertificationReviewPacket> = {}
-): CertificationReviewPacket {
-  return {
-    canonicalReferences: [
-      receipt('canonical_references', 'design-canon-reference'),
-    ],
-    contract: 'jovie.certification/v1',
-    invariantEvaluation: [
-      receipt('invariant_evaluation', 'invariant-evaluation'),
-    ],
-    itemMedia: [
-      {
-        digest:
-          'sha256:media00000000000000000000000000000000000000000000000000000',
-        id: 'variant-a-proof-video',
-        itemId: 'feature-proof-library-row',
-        ref: 'github:JovieInc/Jovie/actions/runs/visual-proof',
-        sourceSha: SOURCE_SHA,
-        status: 'passed',
-        summary: 'Variant A proof video captured the item-specific state.',
-        variantId: 'variant-a',
-      },
-    ],
-    operational: {},
-    requiredVariants: [
-      {
-        id: 'variant-a',
-        label: 'Registry card with proof video',
-        proof: receipt('required_variants', 'variant-a-proof'),
-        requiredMediaIds: ['variant-a-proof-video'],
-        sourceSha: SOURCE_SHA,
-      },
-    ],
-    source: {
-      digest:
-        'sha256:source0000000000000000000000000000000000000000000000000000',
-      expectedSha: SOURCE_SHA,
-      paths: ['apps/web/lib/agent-os/certification.ts'],
-      ref: 'refs/heads/tim/jov-5753',
-      repository: 'JovieInc/Jovie',
-      sha: SOURCE_SHA,
-    },
-    subject: {
-      id: 'feature-proof-library',
-      kind: 'ovie-registry-projection',
-      title: 'Feature Proof Library',
-    },
-    testsCoverage: [receipt('tests_coverage', 'focused-vitest-coverage')],
-    visualProof: [
-      receipt('visual_proof', 'item-specific-visual-proof'),
-      receipt(
-        'visual_proof',
-        `${DOGFOOD_JUDGE_VISUAL_PROOF_PREFIX}feature-proof-library`
-      ),
-    ],
-    ...overrides,
-  };
-}
+import {
+  CHANGED_SHA,
+  receipt,
+  reviewPacket,
+  SOURCE_SHA,
+} from './certification-fixtures';
+
 function approve(packet: CertificationReviewPacket) {
   const recorded = recordFounderCertificationDecision({
     decision: {
@@ -296,37 +225,6 @@ describe('certification admission kernel', () => {
       ])
     );
   });
-
-  describe('dogfood judge receipt', () => {
-    const judge = (status: 'passed' | 'failed' = 'passed') => ({
-      ...receipt(
-        'visual_proof',
-        `${DOGFOOD_JUDGE_VISUAL_PROOF_PREFIX}feature-proof-library`
-      ),
-      status,
-    });
-    const codes = (visualProof: CertificationReviewPacket['visualProof']) =>
-      evaluateCertificationAdmission({
-        packet: reviewPacket({ visualProof }),
-      }).blockers.map(item => item.code);
-
-    it('blocks visual proof that has no judge receipt', () => {
-      expect(codes([receipt('visual_proof', 'screenshot')])).toContain(
-        'visual_proof_judge_missing'
-      );
-    });
-
-    it('blocks a failed judge receipt', () => {
-      expect(codes([judge('failed')])).toContain('visual_proof_failed');
-    });
-
-    it('admits a passing judge receipt', () => {
-      const result = codes([receipt('visual_proof', 'screenshot'), judge()]);
-      expect(result).not.toContain('visual_proof_judge_missing');
-      expect(result).not.toContain('visual_proof_failed');
-    });
-  });
-
   it('does not accept operational receipts as taste evidence', () => {
     const admission = evaluateCertificationAdmission({
       packet: reviewPacket({
