@@ -21,8 +21,12 @@
 set -euo pipefail
 
 readonly ACTIONLINT_COMMIT='fd33e9f582a01a02885c93ae3775e1190cf63653'
-readonly ACTIONLINT_VERSION='1.7.12+fd33e9f582a0'
+readonly ACTIONLINT_VERSION='1.7.12+fd33e9f582a0.queue644076a59742'
 readonly ACTIONLINT_SOURCE_SHA256='475da14da4ed169c493d4f988f2cd6e4f15434752635ad809e5613cc3cde6fcc'
+# Unmerged contributor patch in upstream PR #654 validates GitHub's queue enum.
+# Retain the pinned stdin fix until upstream releases both fixes together.
+readonly ACTIONLINT_QUEUE_COMMIT='644076a59742c2d1540ebd4686eab3c308f0e562'
+readonly ACTIONLINT_QUEUE_PATCH_SHA256='0378db3d77631edba189ecb92159417b0f5ed607d4ca41d370b4bfe1d4eee68f'
 readonly SHELLCHECK_VERSION='0.11.0'
 readonly SHELLCHECK_TARBALL_SHA256='8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198'
 readonly SHELLCHECK_BINARY_SHA256='4da528ddb3a4d1b7b24a59d4e16eb2f5fd960f4bd9a3708a15baddbdf1d5a55b'
@@ -95,9 +99,13 @@ download \
   "$tool_dir/actionlint-source.tar.gz" "$ACTIONLINT_SOURCE_SHA256"
 mkdir "$tool_dir/actionlint-source"
 tar -xzf "$tool_dir/actionlint-source.tar.gz" -C "$tool_dir/actionlint-source" --strip-components=1
+download \
+  "https://github.com/rhysd/actionlint/commit/${ACTIONLINT_QUEUE_COMMIT}.patch" \
+  "$tool_dir/actionlint-queue.patch" "$ACTIONLINT_QUEUE_PATCH_SHA256"
 command -v go >/dev/null || fail 'Go is required to build the source-pinned actionlint (see its verified go.mod)'
 (
   cd "$tool_dir/actionlint-source"
+  patch --batch --forward --fuzz=0 -p1 < "$tool_dir/actionlint-queue.patch" || fail 'upstream queue patch failed'
   # Do not download an implicit compiler or use a caller's workspace/build flags.
   # Go's existing build cache avoids recompiling unchanged public dependencies.
   export GOTOOLCHAIN=local GOWORK=off GOFLAGS='' CGO_ENABLED=0
@@ -106,6 +114,14 @@ command -v go >/dev/null || fail 'Go is required to build the source-pinned acti
   go test -p=1 -mod=readonly -count=1 -timeout=20s \
     -run '^TestProcessConcurrentStdinDoesNotDeadlock$' \
     -coverprofile="$tool_dir/actionlint-pipe.coverage" . || fail 'upstream stdin regression failed'
+  queue_tests="$tool_dir/actionlint-queue-tests.log"
+  go test -p=1 -mod=readonly -count=1 -timeout=20s -v \
+    -run '^TestLinterLintOK$/^concurrency_queue[.]yaml$' . > "$queue_tests" || fail 'upstream valid queue regression failed'
+  go test -p=1 -mod=readonly -count=1 -timeout=20s -v \
+    -run '^TestLinterLintError$/^err$/^concurrency_queue$' . >> "$queue_tests" || fail 'upstream invalid queue regression failed'
+  cat "$queue_tests"
+  grep -Fq -- '--- PASS: TestLinterLintOK/concurrency_queue.yaml ' "$queue_tests" || fail 'valid queue regression did not run'
+  grep -Fq -- '--- PASS: TestLinterLintError/err/concurrency_queue ' "$queue_tests" || fail 'invalid queue regression did not run'
   fixed_line="$(awk '/cmd.Stdin = strings.NewReader/ { print NR }' process.go)"
   [[ "$fixed_line" =~ ^[0-9]+$ ]] || fail 'upstream stdin fix is missing'
   awk -v line="$fixed_line" '
@@ -117,7 +133,7 @@ command -v go >/dev/null || fail 'Go is required to build the source-pinned acti
     END { exit !covered }
   ' "$tool_dir/actionlint-pipe.coverage" || fail 'upstream stdin regression did not cover the fix'
   go build -p=1 -mod=readonly -trimpath -buildvcs=false \
-      -ldflags "-s -w -X github.com/rhysd/actionlint.version=${ACTIONLINT_VERSION} -X github.com/rhysd/actionlint.installedFrom=verified-upstream-source-${ACTIONLINT_COMMIT}" \
+      -ldflags "-s -w -X github.com/rhysd/actionlint.version=${ACTIONLINT_VERSION} -X github.com/rhysd/actionlint.installedFrom=verified-upstream-source-${ACTIONLINT_COMMIT}-queue-${ACTIONLINT_QUEUE_COMMIT}" \
       -o "$tool_dir/actionlint" ./cmd/actionlint
 ) || fail 'source-pinned actionlint build failed'
 

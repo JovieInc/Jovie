@@ -2,10 +2,13 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { test } from 'node:test';
 import {
+  ATTEMPTS,
+  attemptTimeout,
   draftProblem,
+  LOAD_NOTE,
   loadBriefs,
   missingOutputs,
   missingSecrets,
@@ -77,6 +80,114 @@ test('the Pen agent sees why a tool call failed and has room to recover', () => 
   );
   assert.ok(args.includes('--verbose-mcp'));
   assert.ok(Number(args[args.indexOf('--max-failed-calls') + 1]) >= 20);
+});
+
+test('the agent is told the editor loads slowly and may retry timed-out calls', () => {
+  const args = penArgs(
+    { frame: 'claim', route: '/x', prompt: 'P' },
+    { input: 'c.pen', outDir: 'o' }
+  );
+  const prompt = args[args.indexOf('--prompt') + 1];
+  assert.ok(prompt.includes(LOAD_NOTE));
+  assert.ok(prompt.endsWith('P'));
+  // 8 allowed failures ended 3 of 4 drafts before the 25 MB file loaded.
+  assert.ok(Number(args[args.indexOf('--max-failed-calls') + 1]) >= 24);
+  assert.ok(ATTEMPTS >= 2);
+});
+
+test('attempts leave upload time in each 25-minute frame job', () => {
+  assert.equal(attemptTimeout(0), 14 * 60_000);
+  assert.equal(attemptTimeout(10 * 60_000), 10 * 60_000);
+  assert.equal(attemptTimeout(15 * 60_000), 5 * 60_000);
+  assert.equal(attemptTimeout(15 * 60_000 + 1), 0);
+  const first = attemptTimeout(2000);
+  assert.ok(attemptTimeout(2000 + first + 10, undefined, 2) >= 5 * 60_000);
+  assert.equal(attemptTimeout(0, undefined, 2), 15 * 60_000);
+  assert.equal(attemptTimeout(0, 4 * 60_000), 0);
+});
+
+test('the CLI retries a timed-out draft after setup and process cleanup, including opt-in trimming', () => {
+  const work = mkdtempSync(join(tmpdir(), 'pen-retry-'));
+  const preload = join(work, 'timeout.mjs');
+  // Exercise the real CLI and receipt writer. Only the provider boundary and
+  // clock are replaced: no paid Pen calls or fifteen-minute sleeps in CI.
+  writeFileSync(
+    preload,
+    `
+    import cp from 'node:child_process';
+    import fs from 'node:fs';
+    import { syncBuiltinESMExports } from 'node:module';
+    let now = 0, calls = 0;
+    Date.now = () => now;
+    const fetch = globalThis.fetch;
+    globalThis.fetch = async (...args) => {
+      const response = await fetch(...args);
+      now += 2000;
+      return response;
+    };
+    cp.execFileSync = (command, args, options) => {
+      if (command !== 'npx') throw new Error('unexpected command');
+      calls++;
+      if (calls % 2 === 1) {
+        now += options.timeout + 10;
+        throw new Error('spawnSync npx ETIMEDOUT');
+      }
+      const arg = flag => args[args.indexOf(flag) + 1];
+      const doc = JSON.parse(fs.readFileSync(arg('--in'), 'utf8'));
+      const name = arg('--out').split('/').pop().replace('.pen', '');
+      doc.children.push({type: 'frame', id: 'draft', name});
+      fs.writeFileSync(arg('--out'), JSON.stringify(doc));
+      fs.writeFileSync(arg('--export'), 'fixture preview');
+    };
+    syncBuiltinESMExports();
+  `
+  );
+  const canonical = {
+    children: [
+      { type: 'frame', id: 'old', name: 'unrelated', x: 100, width: 100 },
+    ],
+  };
+  for (const trim of ['0', '1']) {
+    const out = join(work, trim);
+    execFileSync(
+      process.execPath,
+      [
+        '--import',
+        preload,
+        resolve('scripts/design/pen-draft.mjs'),
+        '--out',
+        out,
+        '--only',
+        'claim,homepage',
+      ],
+      {
+        env: {
+          ...process.env,
+          PEN_CLI_KEY: 'fixture',
+          PEN_DRAFT_TRIM: trim,
+          PEN_GOLDEN_PATH_FILE_URL: `data:application/json,${encodeURIComponent(JSON.stringify(canonical))}`,
+        },
+      }
+    );
+    const { drafts } = JSON.parse(
+      readFileSync(join(out, 'receipt.json'), 'utf8')
+    );
+    assert.deepEqual(
+      drafts.map(d => d.frame),
+      ['claim', 'homepage']
+    );
+    for (const draft of drafts) {
+      assert.equal(draft.status, 'drafted');
+      assert.equal(draft.attempts, 2);
+      assert.equal(draft.error, undefined);
+      const doc = JSON.parse(
+        readFileSync(join(out, `${draft.frame}.pen`), 'utf8')
+      );
+      assert.deepEqual(doc.children[0], canonical.children[0]);
+      assert.equal(doc.children[1].name, draft.frame);
+      if (trim === '1') assert.equal(doc.children[1].x, 600);
+    }
+  }
 });
 
 test('missing secrets are named, so a blocked run never reads as done', () => {
