@@ -20,11 +20,20 @@ import {
 } from '@/components/atoms/InvisibleTurnstile';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
+import type { MomTestAnswers } from '@/lib/waitlist/role-qualification';
 import {
   GENERAL_WAITLIST_ROLES,
   WAITLIST_ROLES,
   type WaitlistRole,
 } from '@/lib/waitlist/roles';
+import {
+  QUALIFYING_STEP_COUNT,
+  QUALIFYING_STEPS,
+  type QualifyingAnswers,
+  type QualifyingStep,
+  spotifyArtistIdFromUrl,
+  WaitlistQualifyingSteps,
+} from './WaitlistQualifyingSteps';
 
 type Status = 'idle' | 'submitting' | 'joined' | 'error';
 
@@ -37,6 +46,30 @@ const TURNSTILE_FAILURE_STATUSES = new Set([
 ]);
 
 export const WAITLIST_ROLE_FORM_ENDPOINT = '/api/waitlist/join';
+
+const EMPTY_ANSWERS: QualifyingAnswers = {
+  spotifyUrl: '',
+  artistName: null,
+  growth: '',
+  spend: '',
+};
+
+/** The answers the join route takes, leaving out every skipped question. */
+function qualifyingPayload(answers: QualifyingAnswers): {
+  spotifyArtistId?: string;
+  momTest?: MomTestAnswers;
+} {
+  const spotifyArtistId = spotifyArtistIdFromUrl(answers.spotifyUrl);
+  const growth = answers.growth.trim();
+  const momTest: MomTestAnswers = {
+    ...(growth ? { lastGrowthAttempt: growth } : {}),
+    ...(answers.spend ? { promoSpend: answers.spend } : {}),
+  };
+  return {
+    ...(spotifyArtistId ? { spotifyArtistId } : {}),
+    ...(Object.keys(momTest).length > 0 ? { momTest } : {}),
+  };
+}
 
 /**
  * Chip presentation (homepage v1): the design names Producer and Songwriter
@@ -71,8 +104,14 @@ export function WaitlistRoleForm({
   roleLabel = 'I’m a',
   submitLabel = 'Join',
   note,
+  qualify = false,
 }: Readonly<{
   variant?: 'artist' | 'general';
+  /**
+   * Ask artists the three skippable request-access questions (which artist,
+   * last growth attempt, promo spend) before the request is sent.
+   */
+  qualify?: boolean;
   /** `chips` renders role chips and a labelled submit; the host owns the heading. */
   presentation?: 'stack' | 'chips';
   roleLabel?: string;
@@ -107,6 +146,10 @@ export function WaitlistRoleForm({
   );
   const chips = presentation === 'chips';
   const [email, setEmail] = useState('');
+  const [step, setStep] = useState<'entry' | QualifyingStep>('entry');
+  const [answers, setAnswers] = useState<QualifyingAnswers>(EMPTY_ANSWERS);
+  const asksQuestions =
+    qualify && variant === 'artist' && !chips && role === 'artist';
   const [status, setStatus] = useState<Status>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
@@ -163,6 +206,48 @@ export function WaitlistRoleForm({
       inputRef.current?.focus({ preventScroll: true });
       return;
     }
+    if (asksQuestions && step !== 'spend') {
+      advance();
+      return;
+    }
+    await sendRequest();
+  }
+
+  function advance() {
+    setStatus('idle');
+    setErrorMessage('');
+    setStep(current =>
+      current === 'entry'
+        ? QUALIFYING_STEPS[0]
+        : (QUALIFYING_STEPS[QUALIFYING_STEPS.indexOf(current) + 1] ?? current)
+    );
+  }
+
+  function goBack() {
+    setStatus('idle');
+    setErrorMessage('');
+    setStep(current => {
+      if (current === 'entry') return current;
+      const index = QUALIFYING_STEPS.indexOf(current);
+      return index <= 0 ? 'entry' : QUALIFYING_STEPS[index - 1];
+    });
+  }
+
+  function skip() {
+    if (step === 'artist') {
+      setAnswers(current => ({ ...current, spotifyUrl: '', artistName: null }));
+    } else if (step === 'growth') {
+      setAnswers(current => ({ ...current, growth: '' }));
+    } else if (step === 'spend') {
+      setAnswers(current => ({ ...current, spend: '' }));
+      void sendRequest({ ...answers, spend: '' });
+      return;
+    }
+    advance();
+  }
+
+  async function sendRequest(finalAnswers: QualifyingAnswers = answers) {
+    if (status === 'submitting' || status === 'joined') return;
     if (turnstileRequired && !turnstileToken) {
       setStatus('error');
       setErrorMessage('Security check is still loading. Please try again.');
@@ -181,6 +266,7 @@ export function WaitlistRoleForm({
           role,
           turnstileToken,
           ...(variant === 'general' ? { name: name.trim() } : {}),
+          ...(asksQuestions ? qualifyingPayload(finalAnswers) : {}),
         }),
       });
       const data = (await response.json().catch(() => ({}))) as {
@@ -192,7 +278,18 @@ export function WaitlistRoleForm({
           data.error || 'Something went wrong. Please try again.'
         );
       }
-      track('waitlist_role_form_joined', { role });
+      track('waitlist_role_form_joined', {
+        role,
+        ...(asksQuestions
+          ? {
+              answered_artist: Boolean(
+                spotifyArtistIdFromUrl(finalAnswers.spotifyUrl)
+              ),
+              answered_growth: finalAnswers.growth.trim().length > 0,
+              answered_spend: finalAnswers.spend !== '',
+            }
+          : {}),
+      });
       joinedRef.current = true;
       setStatus('joined');
     } catch (error) {
@@ -294,92 +391,126 @@ export function WaitlistRoleForm({
             />
           </label>
         ) : null}
-        {chips ? (
-          <div className='waitlist-chips'>
-            <p id={`${formId}-role-label`} className='waitlist-chips__label'>
-              {roleLabel}
-            </p>
-            <fieldset
-              aria-labelledby={`${formId}-role-label`}
-              className='waitlist-chips__row'
-            >
-              {ROLE_CHIPS.map((chip, index) => (
-                <Fragment key={chip.key}>
-                  {index === 3 ? (
-                    <span aria-hidden className='waitlist-chips__break' />
-                  ) : null}
-                  <label
-                    className='waitlist-chip'
-                    data-selected={chipKey === chip.key ? 'true' : undefined}
-                  >
-                    <input
-                      type='radio'
-                      name={`${formId}-role`}
-                      value={chip.key}
-                      checked={chipKey === chip.key}
-                      className='sr-only'
-                      onChange={() => {
-                        setChipKey(chip.key);
-                        setRole(chip.role);
-                        if (status === 'error' && !turnstileFailed) {
-                          setStatus('idle');
-                          setErrorMessage('');
-                        }
-                      }}
-                    />
-                    {chip.label}
-                  </label>
-                </Fragment>
-              ))}
-            </fieldset>
-          </div>
-        ) : (
-          <RadioGroup
-            aria-label='Role'
-            value={role}
-            onValueChange={value => {
-              setRole(value as WaitlistRole);
+        {asksQuestions ? (
+          <p
+            className='self-stretch text-left text-xs tabular-nums text-tertiary-token'
+            data-testid='waitlist-step-counter'
+          >
+            Step {step === 'entry' ? 1 : QUALIFYING_STEPS.indexOf(step) + 2} of{' '}
+            {QUALIFYING_STEP_COUNT}
+          </p>
+        ) : null}
+        {step !== 'entry' && asksQuestions ? (
+          <WaitlistQualifyingSteps
+            step={step}
+            answers={answers}
+            submitting={status === 'submitting'}
+            onChange={next => {
+              setAnswers(current => ({ ...current, ...next }));
               if (status === 'error' && !turnstileFailed) {
                 setStatus('idle');
                 setErrorMessage('');
               }
             }}
-          >
-            {roles.map(option => (
-              <label
-                key={option.value}
-                htmlFor={`${formId}-${option.value}`}
-                className='flex min-h-11 cursor-pointer items-center gap-3 text-sm text-primary-token'
+            onBack={goBack}
+            onSkip={skip}
+          />
+        ) : null}
+        {step === 'entry' || !asksQuestions ? (
+          <>
+            {chips ? (
+              <div className='waitlist-chips'>
+                <p
+                  id={`${formId}-role-label`}
+                  className='waitlist-chips__label'
+                >
+                  {roleLabel}
+                </p>
+                <fieldset
+                  aria-labelledby={`${formId}-role-label`}
+                  className='waitlist-chips__row'
+                >
+                  {ROLE_CHIPS.map((chip, index) => (
+                    <Fragment key={chip.key}>
+                      {index === 3 ? (
+                        <span aria-hidden className='waitlist-chips__break' />
+                      ) : null}
+                      <label
+                        className='waitlist-chip'
+                        data-selected={
+                          chipKey === chip.key ? 'true' : undefined
+                        }
+                      >
+                        <input
+                          type='radio'
+                          name={`${formId}-role`}
+                          value={chip.key}
+                          checked={chipKey === chip.key}
+                          className='sr-only'
+                          onChange={() => {
+                            setChipKey(chip.key);
+                            setRole(chip.role);
+                            if (status === 'error' && !turnstileFailed) {
+                              setStatus('idle');
+                              setErrorMessage('');
+                            }
+                          }}
+                        />
+                        {chip.label}
+                      </label>
+                    </Fragment>
+                  ))}
+                </fieldset>
+              </div>
+            ) : (
+              <RadioGroup
+                aria-label='Role'
+                value={role}
+                onValueChange={value => {
+                  setRole(value as WaitlistRole);
+                  if (status === 'error' && !turnstileFailed) {
+                    setStatus('idle');
+                    setErrorMessage('');
+                  }
+                }}
               >
-                <RadioGroupItem
-                  id={`${formId}-${option.value}`}
-                  value={option.value}
-                />
-                {option.label}
-              </label>
-            ))}
-          </RadioGroup>
-        )}
-        <InlineSubscribe
-          className='w-full'
-          inputId={`${formId}-email`}
-          inputRef={inputRef}
-          ariaLabel='Email address'
-          buttonLabel={submitLabel}
-          value={email}
-          onValueChange={value => {
-            setEmail(value);
-            if (status === 'error' && !turnstileFailed) {
-              setStatus('idle');
-              setErrorMessage('');
-            }
-          }}
-          loading={status === 'submitting'}
-          pending={status === 'submitting'}
-          unavailable={turnstileFailed}
-          invalid={status === 'error' && !turnstileFailed}
-          describedBy={`${formId}-error`}
-        />
+                {roles.map(option => (
+                  <label
+                    key={option.value}
+                    htmlFor={`${formId}-${option.value}`}
+                    className='flex min-h-11 cursor-pointer items-center gap-3 text-sm text-primary-token'
+                  >
+                    <RadioGroupItem
+                      id={`${formId}-${option.value}`}
+                      value={option.value}
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </RadioGroup>
+            )}
+            <InlineSubscribe
+              className='w-full'
+              inputId={`${formId}-email`}
+              inputRef={inputRef}
+              ariaLabel='Email address'
+              buttonLabel={asksQuestions ? 'Continue' : submitLabel}
+              value={email}
+              onValueChange={value => {
+                setEmail(value);
+                if (status === 'error' && !turnstileFailed) {
+                  setStatus('idle');
+                  setErrorMessage('');
+                }
+              }}
+              loading={status === 'submitting'}
+              pending={status === 'submitting'}
+              unavailable={turnstileFailed}
+              invalid={status === 'error' && !turnstileFailed}
+              describedBy={`${formId}-error`}
+            />
+          </>
+        ) : null}
         {status !== 'joined' && securityCheckArmed ? (
           <InvisibleTurnstile
             onToken={setTurnstileToken}
