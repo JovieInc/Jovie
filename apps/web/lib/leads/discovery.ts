@@ -7,9 +7,11 @@ import {
   leadPipelineSettings,
 } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
+import { prescreenFailReason } from './buyer-signals';
 import { SEARCH_QUERY_COST_USD } from './constants';
 import {
   insertScreenedCandidates,
+  mergeEvidenceIntoExistingLeads,
   screenSearchResults,
 } from './discovery-candidates';
 import { type SearchStatus, searchWebWithStatus } from './google-cse';
@@ -229,7 +231,7 @@ export async function runDiscovery(
         const passed = screened.filter(c => c.prescreen.decision === 'pass');
         for (const failed of screened) {
           if (failed.prescreen.decision === 'pass') continue;
-          const reason = failed.prescreen.hardStop ?? 'no_spend_signal';
+          const reason = prescreenFailReason(failed.prescreen);
           result.prescreenFailReasons[reason] =
             (result.prescreenFailReasons[reason] ?? 0) + 1;
         }
@@ -246,6 +248,11 @@ export async function runDiscovery(
         const counts = await insertScreenedCandidates(
           passed,
           passed.length > 0 ? lastQueryCostUsd / passed.length : 0
+        );
+        // A failed candidate may already be a lead (found by another tool
+        // query); its evidence still counts toward that lead's score.
+        await mergeEvidenceIntoExistingLeads(
+          screened.filter(c => c.prescreen.decision !== 'pass')
         );
         result.newLeadsFound += counts.inserted;
         result.duplicatesSkipped += counts.duplicates;
