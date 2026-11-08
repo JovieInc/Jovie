@@ -33,6 +33,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { reportBlockedRun } from './pen-draft-annotation.mjs';
 
 export const PEN_CLI_VERSION = '0.3.14';
 export const PEN_MAX_FAILED_CALLS = 30;
@@ -158,11 +159,6 @@ export function useTrimmedInput(env) {
 
 export function missingSecrets(env) {
   return ['PEN_CLI_KEY', 'PEN_GOLDEN_PATH_FILE_URL'].filter(k => !env[k]);
-}
-
-/** The CI annotation for a blocked run: names the missing secrets. */
-export function blockedAnnotation(missing) {
-  return `::error title=pen-draft blocked::pen-draft: blocked, missing ${missing.join(' and ')}`;
 }
 
 // As in scripts/agent/pen-par: without it Node can fail to fetch fonts under
@@ -402,13 +398,7 @@ async function main() {
   if (missing.length) {
     receipt.blocked = `missing ${missing.join(' and ')}`;
     write();
-    console.log(`pen-draft: blocked, ${receipt.blocked}`);
-    // The blocked reason must also reach the check-run annotation: the job
-    // log is admin-gated, so without this a blocked run reads as a bare
-    // exit 1 and triage cannot tell a missing secret from a real failure
-    // (same annotation convention as scripts/ci-fast-lanes.mjs).
-    if (process.env.GITHUB_ACTIONS === 'true')
-      console.log(blockedAnnotation(missing));
+    reportBlockedRun(receipt.blocked);
     process.exitCode = 1;
     return;
   }

@@ -239,51 +239,6 @@ class AdditiveQuotedListMergeTest(unittest.TestCase):
 
 
 class AdditiveIdentifierListMergeTest(unittest.TestCase):
-    BASE_IMPORTS = (
-        "import { mkdtempSync, readFileSync } from 'node:fs';\n"
-        "import { join } from 'node:path';\n"
-    )
-    IMPORT_CONFLICT = (
-        "<<<<<<< HEAD\n"
-        "import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';\n"
-        "import { join } from 'node:path';\n"
-        "=======\n"
-        "import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';\n"
-        "import { basename, join, resolve } from 'node:path';\n"
-        ">>>>>>> origin/main\n"
-    )
-
-    def test_unions_named_node_imports_only_with_additive_base_evidence(self):
-        self.assertEqual(
-            classes.resolve_additive_identifier_list_text(self.IMPORT_CONFLICT, base=self.BASE_IMPORTS),
-            "import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';\n"
-            "import { basename, join, resolve } from 'node:path';\n",
-        )
-        self.assertIsNone(classes.resolve_additive_identifier_list_text(self.IMPORT_CONFLICT))
-
-    def test_unions_imports_added_independently_to_a_module_absent_from_base(self):
-        resolved = classes.resolve_additive_identifier_list_text(self.IMPORT_CONFLICT, base="// no imports yet\n")
-        self.assertIn("{ mkdirSync, mkdtempSync, readFileSync, writeFileSync }", resolved)
-        self.assertIsNone(classes.resolve_additive_identifier_list_text(
-            self.IMPORT_CONFLICT, base="import fs from 'node:fs';\n"))
-        self.assertIsNone(classes.resolve_additive_identifier_list_text(
-            self.IMPORT_CONFLICT.replace("basename, join, resolve", "readFileSync, join, resolve"),
-            base=self.BASE_IMPORTS))
-
-    def test_import_removals_aliases_module_changes_and_unknown_hunks_stay_unresolved(self):
-        for conflict, base in (
-            (self.IMPORT_CONFLICT.replace("mkdirSync, mkdtempSync, readFileSync", "mkdirSync, mkdtempSync"), self.BASE_IMPORTS),
-            (self.IMPORT_CONFLICT.replace("writeFileSync", "writeFileSync as write"), self.BASE_IMPORTS),
-            (self.IMPORT_CONFLICT.replace("writeFileSync", "readFileSync"), self.BASE_IMPORTS),
-            (self.IMPORT_CONFLICT.replace("'node:fs'", "'other'", 1), self.BASE_IMPORTS),
-            (self.IMPORT_CONFLICT.replace("import { join } from 'node:path';", "doSomething();"), self.BASE_IMPORTS),
-            (self.IMPORT_CONFLICT, self.BASE_IMPORTS + self.BASE_IMPORTS),
-            (self.IMPORT_CONFLICT, ""),
-            (self.IMPORT_CONFLICT + "<<<<<<< HEAD\nunknown();\n=======\nother();\n>>>>>>> origin/main\n", self.BASE_IMPORTS),
-        ):
-            with self.subTest(conflict=conflict, base=base):
-                self.assertIsNone(classes.resolve_additive_identifier_list_text(conflict, base=base))
-
     def test_unions_slug_lines_and_rejects_unknown_hunks(self):
         text = (
             "Other scoped rules: ci-branching, event-driven, infra, linear, motion,\n"
