@@ -1,8 +1,6 @@
 import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
-
 export type PriceLockPlan = 'pro';
 export type PriceInterval = 'month' | 'year';
-
 export interface PriceVersion {
   readonly id: string;
   readonly plan: PriceLockPlan;
@@ -26,7 +24,6 @@ export const PRICE_VERSIONS: readonly PriceVersion[] = [
 ];
 /** The version new signups lock to. Must match the list price (tested). */
 export const CURRENT_PRICE_VERSION_ID = 'pro-2026-10-20-m12';
-
 export const PRICE_LOCK_SOURCES = [
   'signup',
   'waitlist',
@@ -49,11 +46,9 @@ export interface PriceLockSnapshot {
   /** ISO timestamp. */
   readonly lockedAt: string;
 }
-
 export function usdToCents(dollars: number): number {
   return Math.round(dollars * 100);
 }
-
 export function assertPriceVersionsValid(
   versions: readonly PriceVersion[] = PRICE_VERSIONS,
   currentId: string = CURRENT_PRICE_VERSION_ID,
@@ -78,11 +73,10 @@ export function assertPriceVersionsValid(
   }
   if (current.monthlyUsd !== listMonthlyUsd) {
     throw new Error(
-      `price version mismatch: current version ${currentId} is ${current.monthlyUsd} USD per month, list price is ${listMonthlyUsd} USD per month (a new version must be registered and made current)`
+      `price version mismatch: current version ${currentId} is ${current.monthlyUsd} USD (interval=month), list price is ${listMonthlyUsd} USD (interval=month) (a new version must be registered and made current)`
     );
   }
 }
-
 export function getCurrentPriceVersion(
   versions: readonly PriceVersion[] = PRICE_VERSIONS,
   currentId: string = CURRENT_PRICE_VERSION_ID
@@ -93,7 +87,6 @@ export function getCurrentPriceVersion(
   }
   return current;
 }
-
 export interface StripePriceIdSnapshot {
   readonly monthly: string | null;
   readonly yearly: string | null;

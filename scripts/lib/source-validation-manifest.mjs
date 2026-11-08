@@ -100,8 +100,9 @@ export const SOURCE_VALIDATION_GUARDS = Object.freeze([
   {
     id: 'duplicate-literals',
     name: 'no copied owner values (prices, names, retention, limits)',
-    command: 'node scripts/invariants/duplicate-literals.mjs',
-    when: /^apps\/(?:web|docs)\/(?:app|components|data|content|lib)\//,
+    command:
+      'node scripts/invariants/duplicate-literals.mjs && node scripts/invariants/offer-claims/check.mjs',
+    when: /^apps\/(?:web|docs)\/(?:app|components|data|content|lib)\/|^scripts\/invariants\/offer-claims\//,
     covers: ['scripts/invariants/duplicate-literals.mjs'],
   },
   {

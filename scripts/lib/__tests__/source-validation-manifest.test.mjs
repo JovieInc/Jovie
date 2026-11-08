@@ -19,6 +19,15 @@ const runs = deriveSteps(read(WORKFLOW_PATH))
 const commands = workflowCommands(runs, pkg.scripts, coveredBy);
 
 describe('Source Validation manifest parity', () => {
+  it('checks offer prose when a new billing helper has no direct guard import', () => {
+    const guard = selectManifestGuards([
+      'apps/web/lib/billing/price-versions.ts',
+    ]).find(g => g.id === 'duplicate-literals');
+    expect(guard?.command).toContain(
+      'node scripts/invariants/offer-claims/check.mjs'
+    );
+  });
+
   it.each([
     'apps/web/components/features/auth/AuthOfferSummary.tsx',
     'apps/web/components/features/auth/AuthOfferSummary.stories.tsx',

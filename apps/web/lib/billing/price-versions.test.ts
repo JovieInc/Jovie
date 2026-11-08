@@ -44,7 +44,7 @@ describe('price version registry', () => {
     expect(() =>
       assertPriceVersionsValid([V12], V12.id, 19)
     ).toThrowErrorMatchingInlineSnapshot(
-      `[Error: price version mismatch: current version pro-v1-12 is 12 USD per month, list price is 19 USD per month (a new version must be registered and made current)]`
+      `[Error: price version mismatch: current version pro-v1-12 is 12 USD (interval=month), list price is 19 USD (interval=month) (a new version must be registered and made current)]`
     );
   });
 
