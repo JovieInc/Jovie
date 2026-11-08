@@ -12,10 +12,14 @@ import {
   parseBrief,
   penArgs,
   planFrames,
+  spliceDraft,
+  trimCanonical,
   writeCanonical,
 } from './pen-draft.mjs';
 
 test('every checked-in brief parses and names a unique frame', () => {
+  for (const b of loadBriefs())
+    assert.ok(b.context.length, `${b.file} names the screens it builds on`);
   const briefs = loadBriefs();
   assert.deepEqual(
     briefs.map(b => b.frame),
@@ -169,4 +173,90 @@ test('a drafter change, a manual run or --only picks the right frames', () => {
   assert.deepEqual(planFrames({ briefs }), ['claim', 'homepage']);
   assert.deepEqual(planFrames({ briefs, only: ['homepage'] }), ['homepage']);
   assert.throws(() => planFrames({ briefs, only: ['hompage'] }), /hompage/);
+});
+
+const frame = (id, name, extra = {}) => ({
+  type: 'frame',
+  id,
+  name,
+  x: 0,
+  width: 100,
+  children: [],
+  ...extra,
+});
+
+test('a draft starts from components, related screens and what they use, not the whole file', () => {
+  const doc = {
+    version: '2',
+    variables: { '--bg': { type: 'color', value: '#000' } },
+    themes: { mode: ['dark'] },
+    children: [
+      frame('LIB', 'Components', {
+        children: [{ type: 'frame', id: 'Btn', reusable: true, children: [] }],
+      }),
+      frame('PRO', 'Public profile, desktop', {
+        children: [{ type: 'ref', id: 'r1', ref: 'Shell' }],
+      }),
+      frame('SHL', 'Layouts', {
+        children: [{ type: 'frame', id: 'Shell', children: [] }],
+      }),
+      frame('BIL', 'Billing settings'),
+      frame('OLD', 'Archive 2025'),
+    ],
+  };
+  const bare = trimCanonical(doc, { frame: 'claim', route: '/[username]' });
+  assert.deepEqual(
+    bare.children.map(c => c.id),
+    ['LIB'],
+    'components, and no screen the brief does not name'
+  );
+  const claim = trimCanonical(doc, {
+    frame: 'claim',
+    context: ['profile', 'sign in'],
+  });
+  assert.deepEqual(
+    claim.children.map(c => c.id),
+    ['LIB', 'PRO', 'SHL'],
+    'the screens a brief builds on come with the frames they use'
+  );
+  assert.deepEqual(
+    trimCanonical(
+      { children: [frame('D', 'Design tokens')] },
+      {
+        frame: 'x',
+        context: ['sign in', 'sign'],
+      }
+    ).children,
+    [],
+    'terms match whole words only'
+  );
+  const profile = trimCanonical(doc, { frame: 'profile-analytics-card' });
+  assert.deepEqual(
+    profile.children.map(c => c.id),
+    ['LIB', 'PRO', 'SHL'],
+    'a word of the frame name counts too'
+  );
+  assert.deepEqual(profile.variables, doc.variables);
+  assert.deepEqual(profile.themes, doc.themes);
+  assert.equal(doc.children.length, 5, 'the canonical document is not changed');
+});
+
+test('a drafted frame lands in the whole file, clear of every existing frame', () => {
+  const full = {
+    variables: { a: 1 },
+    children: [frame('A', 'A'), frame('B', 'B', { x: 500, width: 300 })],
+  };
+  const trimmed = { variables: { a: 1 }, children: [frame('A', 'A')] };
+  const drafted = {
+    variables: { a: 2, b: 3 },
+    children: [frame('A', 'A'), frame('N', 'claim', { x: 200, width: 1440 })],
+  };
+  const out = spliceDraft(full, trimmed, drafted);
+  assert.deepEqual(
+    out.children.map(c => c.id),
+    ['A', 'B', 'N']
+  );
+  assert.equal(out.children[2].x, 1200, 'placed 400 right of the last frame');
+  assert.deepEqual(out.children.slice(0, 2), full.children);
+  assert.deepEqual(out.variables, { a: 1, b: 3 }, 'existing values win');
 });
