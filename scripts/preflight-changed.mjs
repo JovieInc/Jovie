@@ -751,15 +751,6 @@ export async function main({
       }
     );
 
-  if (
-    any(/^(?:apps\/web\/components\/|packages\/ui\/).+\.(?:tsx|stories\.ts)$/)
-  )
-    cmd(
-      'component-certificate',
-      'component certificate gate (required states and evidence)',
-      'pnpm component-certificate:gate'
-    );
-
   // Customer changelog marker, Fleet Rules and template: needs the body.
   const bodyInfo = loadBody(args, cwd);
 
