@@ -71,6 +71,13 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         "Result": "Main: 2; head: 3; head without hold block: 2.",
     }
 
+    def test_repair_refuses_ambiguous_customer_decisions_before_publication(self):
+        decision = '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'
+        for duplicate in [decision, '<!-- customer-changelog/v1 {"releaseWorthy":true} -->']:
+            with self.assertRaisesRegex(ValueError, "exactly one customer changelog decision"):
+                events.repair_evidence_body(self.PR, decision + "\n" + duplicate,
+                                            customer_decision={"releaseWorthy": False})
+
     def test_explicit_premise_repairs_body_and_passes_canonical_policy(self):
         body = events.red_before_green_block(self.PR)
         updated = events.repair_evidence_body(self.PR, body, premise=self.PREMISE)

@@ -60,14 +60,14 @@
     },
     "packages/ui/atoms/button.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "5a035da36e7a34f38893fb94b9e25a47e207949eda251e473875952cf2176a53",
+      "sourceHash": "0998119e1adcfaef3b634d899872a30d581bb620a048d19227243812a53f66fc",
       "reference": "WAI-ARIA APG Button; Radix Slot (asChild); shadcn/ui Button; library checkout-success",
       "checked": "native button type, asChild Slot, aria-disabled/aria-busy, loading focus, 44px target, forwardRef",
       "gaps": [
         {
           "item": "Default loading path sets native disabled, so a focused button loses focus and leaves the tab order mid-action; reference keeps it focusable with aria-disabled + aria-busy (only the opt-in morph path does)",
           "decision": "adapt",
-          "status": "open",
+          "status": "done",
           "reference": "library checkout-success"
         }
       ]
@@ -160,14 +160,14 @@
     },
     "packages/ui/atoms/composite-field.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "81dd4ff4d7419e3e8bc87f22c1b1f9eeb75ece13aa8c10b8b33fdc1df73c4293",
+      "sourceHash": "43c22ffd0691fb51930e7cca7f62c3955dd5398635c3f3eb9ded10875d7353e8",
       "reference": "shadcn/ui InputGroup (field container; no APG widget pattern)",
       "checked": "focus ring on :has(:focus-visible), forwardRef, RTL padding",
       "gaps": [
         {
           "item": "RTL: md size pads with physical pr-2 pl-4, so the prefix/submit gutters do not mirror",
           "decision": "adopt",
-          "status": "open",
+          "status": "done",
           "reference": "shadcn/ui InputGroup"
         }
       ]
@@ -284,40 +284,41 @@
     },
     "packages/ui/atoms/inline-subscribe.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "931762bc22a39ed53d50aa97928e6e77414156342fd746c5199fc71509062402",
+      "sourceHash": "59d9007dd679b3fe0a3e2fd1d5f63390778cead87339f9997ed3379d91177b8d",
       "reference": "WAI-ARIA forms; library error-recovery and form-in-drawer (input retention)",
       "checked": "aria-label, aria-invalid, aria-describedby, autocomplete email, pending focus",
       "gaps": [
         {
           "item": "pending sets native disabled on the email input, which drops focus and hides the value from AT mid-submit; reference keeps it focusable (readOnly + aria-busy)",
           "decision": "adapt",
-          "status": "open",
+          "status": "done",
           "reference": "library error-recovery"
         }
       ]
     },
     "packages/ui/atoms/input.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "b421e8633f9b81876c5b40f6a7d00899a8f5cbad471bb8e86cf787b827c71daf",
+      "sourceHash": "0e8ea660176287b54377e7d16a12a7efe006e21da7fae8b45f87e27d4b611965",
       "reference": "WAI-ARIA forms (label, aria-describedby, aria-invalid); shadcn/ui Input; library error-recovery",
       "checked": "label htmlFor, aria-describedby, aria-invalid, aria-busy, loading focus, RTL trailing slot, live regions",
       "gaps": [
         {
           "item": "loading sets native disabled: focus and the submitted value are lost while validating",
           "decision": "adapt",
-          "status": "open",
-          "reference": "library error-recovery"
+          "status": "done",
+          "reference": "library error-recovery",
+          "resolution": "loading keeps focus and value: readOnly + aria-busy, never native disabled"
         },
         {
           "item": "RTL: trailing slot uses physical pr-*/right-* and the required asterisk ml-1",
           "decision": "adopt",
-          "status": "open",
+          "status": "done",
           "reference": "shadcn/ui Input"
         },
         {
           "item": "error role=alert sits inside an aria-live=polite wrapper, so the error can be announced twice",
           "decision": "adapt",
-          "status": "open",
+          "status": "done",
           "reference": "WAI-ARIA live regions"
         }
       ]
@@ -338,28 +339,29 @@
     },
     "packages/ui/atoms/kbd.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "e25d99a4ebbe6c401fb9c780d640c18c1a2172b40d0a02f7d69bb54f0e2abb03",
+      "sourceHash": "bbbb6936333a7687dfed078070f77806e1682ab1880a4abfd386198ceede644f",
       "reference": "shadcn/ui Kbd; HTML kbd semantics (no APG widget pattern)",
       "checked": "kbd element, Shift spoken name, other modifier glyph names, forwardRef",
       "gaps": [
         {
           "item": "Only Shift gets a spoken name; Command, Option and Control glyphs are read as raw symbols or skipped",
           "decision": "adapt",
-          "status": "open",
-          "reference": "shadcn/ui Kbd"
+          "status": "done",
+          "reference": "shadcn/ui Kbd",
+          "resolution": "glyph keycaps keep the visible glyphs aria-hidden and add sr-only names (Command, Option, Control, Shift)"
         }
       ]
     },
     "packages/ui/atoms/label.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "ac939a8adbded5adb3c15295015107ec9cb1960c951b24c408f87abeeb5ed04c",
+      "sourceHash": "e4ca3d36e8f71990f8a617e7a89f328c678d3672fcf86c93c0f07ba6c9c4767a",
       "reference": "Radix Label; shadcn/ui Label",
       "checked": "Radix Label htmlFor, required spoken text, disabled state, forwardRef, RTL asterisk",
       "gaps": [
         {
           "item": "RTL: required asterisk uses physical ml-1",
           "decision": "adopt",
-          "status": "open",
+          "status": "done",
           "reference": "shadcn/ui Label"
         }
       ]
@@ -616,20 +618,20 @@
     },
     "packages/ui/atoms/textarea.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "4627afd75a4b2b9119811071fdebcf23134df7f264e05824d194580a1c34127f",
+      "sourceHash": "a7867fc959aee5281d2fb3bb749f2b9a2a1b4cce72708d0763ad398f2defeaab",
       "reference": "WAI-ARIA forms; shadcn/ui Textarea; library error-recovery",
       "checked": "label htmlFor, aria-describedby, aria-invalid, aria-busy, RTL asterisk, live regions, forwardRef",
       "gaps": [
         {
           "item": "RTL: required asterisk uses physical ml-1",
           "decision": "adopt",
-          "status": "open",
+          "status": "done",
           "reference": "shadcn/ui Textarea"
         },
         {
           "item": "error role=alert sits inside an aria-live=polite wrapper, so the error can be announced twice",
           "decision": "adapt",
-          "status": "open",
+          "status": "done",
           "reference": "WAI-ARIA live regions"
         }
       ]
@@ -663,7 +665,7 @@
     },
     "packages/ui/confirm-dialog.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "8caa3c382c814b8a9e35b15d4f1958379788fa0253d7a9f0cfaaa4c9902e3033",
+      "sourceHash": "4244ad0fe087bf5263bc7a73ebd96615d15e501f2aace3697a897512187c972b",
       "reference": "WAI-ARIA APG Alert Dialog; Radix AlertDialog; shadcn/ui AlertDialog",
       "checked": "focus trap, initial focus on Cancel, Escape/overlay cancel, pending blocks dismissal, aria-describedby, role",
       "gaps": [
@@ -676,8 +678,9 @@
         {
           "item": "built on Dialog, so it exposes role=dialog and closes on overlay press; APG Alert Dialog uses role=alertdialog",
           "decision": "adapt",
-          "status": "open",
-          "reference": "APG Alert Dialog"
+          "status": "done",
+          "reference": "APG Alert Dialog",
+          "resolution": "role=alertdialog as Radix AlertDialog passes it; overlay press and Escape stay as Cancel (the safe action) and pending blocks both"
         }
       ]
     }

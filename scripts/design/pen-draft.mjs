@@ -14,9 +14,10 @@
  *   node scripts/design/pen-draft.mjs --out DIR [--only claim,homepage]
  *   node scripts/design/pen-draft.mjs --plan [--changed FILE] [--only ...]
  *
- * Each draft starts from a cut-down copy of the canonical file (components,
- * related screens, variables), because the Pen editor timed out loading the
- * whole file; the new frame is then spliced back into the full file.
+ * With PEN_DRAFT_TRIM=1 a draft starts from a cut-down copy of the canonical
+ * file (components, related screens, variables) and the new frame is spliced
+ * back into the full file. It is off by default: it did not stop the Pen
+ * editor's "Timeout waiting for document" on Nov 8.
  *
  * --plan prints the frames a run should draft as a JSON array. CI drafts
  * each one in its own job, because ten briefs at up to 15 minutes each
@@ -102,7 +103,7 @@ export function planFrames({ briefs, changed = null, only = null }) {
 }
 
 /** The pen arguments for one brief, drafting into its own output file. */
-export function penArgs(brief, { input, outDir }) {
+export function penArgs(brief, { input, outDir, trim = false }) {
   return [
     '-y',
     `@pen.dev/cli@${PEN_CLI_VERSION}`,
@@ -110,7 +111,7 @@ export function penArgs(brief, { input, outDir }) {
     '--out',
     join(outDir, `${brief.frame}.pen`),
     '--prompt',
-    `Add a new top-level frame named "${brief.frame}" (route ${brief.route ?? 'n/a'}). Leave every existing frame untouched. This file holds the design system's components and the screens this frame builds on, not every screen.\n\n${brief.prompt}`,
+    `Add a new top-level frame named "${brief.frame}" (route ${brief.route ?? 'n/a'}). Leave every existing frame untouched.${trim ? " This file holds the design system's components and the screens this frame builds on, not every screen." : ''}\n\n${brief.prompt}`,
     '--agent',
     'claude',
     '--export',
@@ -124,6 +125,11 @@ export function penArgs(brief, { input, outDir }) {
     '--max-failed-calls',
     String(PEN_MAX_FAILED_CALLS),
   ];
+}
+
+/** The cut-down input is opt-in, with PEN_DRAFT_TRIM=1. */
+export function useTrimmedInput(env) {
+  return env.PEN_DRAFT_TRIM === '1';
 }
 
 export function missingSecrets(env) {
@@ -388,23 +394,31 @@ async function main() {
     throw new Error('the canonical Pen file is not a Pen document');
   const fullBytes = readFileSync(input).length;
 
+  // Off by default: on Nov 8, 0 of 13 drafts from the cut-down copy drew a
+  // frame, against 5 of 18 from the whole file, so the copy is opt-in.
+  const trim = useTrimmedInput(process.env);
+
   for (const brief of briefs) {
     const row = { frame: brief.frame, route: brief.route };
-    // Beside the canonical file, so its fonts and images still resolve.
-    const trimmedPath = join(dirname(input), `${brief.frame}.trimmed.pen`);
-    const trimmed = trimCanonical(canonical, brief);
-    writeFileSync(trimmedPath, JSON.stringify(trimmed));
-    row.trimmed = {
-      frames: trimmed.children.length,
-      of: canonical.children.length,
-      bytes: readFileSync(trimmedPath).length,
-      ofBytes: fullBytes,
-    };
-    console.log(
-      `pen-draft: ${brief.frame} starts from ${row.trimmed.frames} of ${row.trimmed.of} frames (${(row.trimmed.bytes / 1e6).toFixed(1)} of ${(fullBytes / 1e6).toFixed(1)} MB)`
-    );
+    let before = canonical;
+    let from = input;
+    if (trim) {
+      // Beside the canonical file, so its fonts and images still resolve.
+      from = join(dirname(input), `${brief.frame}.trimmed.pen`);
+      before = trimCanonical(canonical, brief);
+      writeFileSync(from, JSON.stringify(before));
+      row.trimmed = {
+        frames: before.children.length,
+        of: canonical.children.length,
+        bytes: readFileSync(from).length,
+        ofBytes: fullBytes,
+      };
+      console.log(
+        `pen-draft: ${brief.frame} starts from ${row.trimmed.frames} of ${row.trimmed.of} frames (${(row.trimmed.bytes / 1e6).toFixed(1)} of ${(fullBytes / 1e6).toFixed(1)} MB)`
+      );
+    }
     try {
-      execFileSync('npx', penArgs(brief, { input: trimmedPath, outDir }), {
+      execFileSync('npx', penArgs(brief, { input: from, outDir, trim }), {
         stdio: ['ignore', 'inherit', 'inherit'],
         timeout: 15 * 60_000,
         // Workspace fonts and images resolve relative to the .pen file.
@@ -415,19 +429,19 @@ async function main() {
       const problem = missing.length
         ? `pen wrote no ${missing.join(' or ')}`
         : draftProblem(
-            trimmed,
+            before,
             readJsonFile(join(outDir, `${brief.frame}.pen`)),
             brief.frame
           );
       row.status = problem ? 'failed' : 'drafted';
       if (problem) row.error = problem;
-      else {
+      else if (trim) {
         // Reviewers get the whole canonical file with the new frame in it,
-        // as before, not the cut-down copy the agent worked in.
+        // not the cut-down copy the agent worked in.
         const out = join(outDir, `${brief.frame}.pen`);
         writeFileSync(
           out,
-          JSON.stringify(spliceDraft(canonical, trimmed, readJsonFile(out)))
+          JSON.stringify(spliceDraft(canonical, before, readJsonFile(out)))
         );
       }
     } catch (e) {

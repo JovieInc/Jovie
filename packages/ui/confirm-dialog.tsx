@@ -93,7 +93,10 @@ export function ConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
+      {/* APG Alert Dialog role (as Radix AlertDialog passes it). Overlay press
+          and Escape stay as Cancel, the safe choice, and pending blocks both. */}
       <DialogContent
+        role='alertdialog'
         hideClose
         overlayProps={{ onClick: closeAsCancel }}
         onEscapeKeyDown={event => {

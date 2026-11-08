@@ -1102,12 +1102,11 @@ def with_red_section(body: str, block: str) -> str:
 def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
                          locking_pr: int | None = None, win_section: str | None = None,
                          premise: dict | None = None) -> str:
-    """Complete repair metadata without replacing existing evidence or customer decisions.
-
-    The caller supplies the customer outcome, locking PR provenance, measured wins and premise
-    evidence (its actual falsifying test and observation); never infer any from a failed check.
-    Existing locked-area decisions are kept; canonical Fleet/changelog guards validate the body.
+    """Complete caller-supplied evidence without inventing outcomes or provenance.
+    Preserve existing proof and decisions; Fleet/changelog guards validate the result.
     """
+    if len(re.findall(r"<!--\s*customer-changelog/v1\b[\s\S]*?-->", body)) > 1:
+        raise ValueError("repair requires exactly one customer changelog decision")
     updated = body
     if not red_section_complete(updated):
         block = red_before_green_block(pr, excerpt)
