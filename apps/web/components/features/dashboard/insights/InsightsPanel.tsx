@@ -108,7 +108,7 @@ function InsightsPanelContent({
     return (
       <EmptyState
         heading='No Insights Yet'
-        description='Jovie reads your analytics and points out what changed.'
+        description='Generate your first set of AI-powered insights to discover actionable trends in your analytics.'
         action={{
           label: isGenerating ? 'Generating...' : 'Generate Insights',
           onClick: onGenerate,

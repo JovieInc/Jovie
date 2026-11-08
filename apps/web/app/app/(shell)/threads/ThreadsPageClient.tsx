@@ -173,7 +173,6 @@ export function ChatsPageClient() {
               placeholder='Search chats'
               ariaLabel='Search Chats'
               className='max-w-2xl flex-1'
-              inputClassName='text-app'
             />
           }
           end={
