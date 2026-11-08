@@ -135,7 +135,7 @@ describe('ChatHistorySwitcher', () => {
 
     await user.clear(input);
     await user.type(input, 'zzz');
-    expect(within(menu).queryAllByRole('menuitem')).toHaveLength(0);
+    expect(within(menu).queryAllByTestId('chat-history-row')).toHaveLength(0);
     expect(menu).toHaveTextContent('No Matching Chats');
   });
 
