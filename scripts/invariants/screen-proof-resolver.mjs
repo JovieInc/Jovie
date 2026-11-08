@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { validPlaywrightPng } from '../lib/playwright-png.mjs';
+import { producerAttemptChecks } from './screen-proof-attempt-checks.mjs';
 import { finalPathMatches } from './screen-proof-final-paths.mjs';
 
 export const PRODUCER = Object.freeze({
@@ -210,43 +211,14 @@ function classifyProducerAttempt({
     workflowRun.status === 'in_progress' &&
     workflowRun.conclusion == null;
   const job = producerJobs(jobs, runId, attempt, context.headSha);
-  // Each named check is reported when the attempt is rejected, so a red
-  // certification says which trust condition failed instead of a generic line.
-  const identityChecks = {
-    'run id': validId(runId),
-    'run attempt': validId(attempt),
-    'artifact id': artifact.id === artifactId,
-    'artifact name': Boolean(trustedName),
-    'artifact unexpired': !artifact.expired,
-    repository: workflowRun.repository?.full_name === PRODUCER.repository,
-    'branch main': workflowRun.head_branch === 'main',
-    'head sha':
-      workflowRun.head_sha?.toLowerCase() === context.headSha.toLowerCase(),
-    'workflow path': workflowRun.path === PRODUCER.workflow,
-    'trigger event': ['push', 'workflow_dispatch'].includes(workflowRun.event),
-  };
-  const identityTrusted = Object.values(identityChecks).every(Boolean);
-  const attemptChecks = {
-    ...identityChecks,
-    'artifact digest': digestReady,
-    'run state': completedRun || downstreamCertificationRun,
-    'one producer job': job.length === 1,
-    'producer job id': job.length === 1 && validId(job[0].id),
-    'producer job success': job.length === 1 && job[0].conclusion === 'success',
-  };
-  const sameRun = runId === currentRunId && attempt === currentAttempt;
-  const failed = Object.entries(attemptChecks)
-    .filter(([, passed]) => !passed)
-    .map(([name]) =>
-      name === 'run state'
-        ? `run state (${String(workflowRun.status)} ${String(
-            workflowRun.conclusion ?? 'unfinished'
-          )}, same run ${sameRun})`
-        : name
-    );
-  if (failed.length === 0) {
-    return { decision: 'accept', failed };
-  }
+  const { identityTrusted, failed } = producerAttemptChecks({
+    ...{ artifact, workflowRun, runId, attempt, artifactId, trustedName, job },
+    ...{ digestReady, completedRun, downstreamCertificationRun, validId },
+    sameRun: runId === currentRunId && attempt === currentAttempt,
+    headSha: context.headSha,
+    producer: PRODUCER,
+  });
+  if (failed.length === 0) return { decision: 'accept', failed };
   const named = (jobs?.jobs || []).filter(
     item => item?.name === PRODUCER.job && item.run_id === runId
   );
@@ -535,9 +507,7 @@ export function resolveTrustedScreenProof({
       }
       if (decision === 'reject' || index === delays.length - 1) {
         return fail(
-          `artifact run, workflow, or exact producer attempt is not trusted${
-            failed.length ? `; failed checks ${failed.join(', ')}` : ''
-          }`
+          `artifact run, workflow, or exact producer attempt is not trusted; failed checks ${failed.join(', ')}`
         );
       }
     }

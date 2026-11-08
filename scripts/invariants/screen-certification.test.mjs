@@ -2129,11 +2129,7 @@ if (p.endsWith('/zip')) {
       assert.equal(wrongName.receipt.certified, false);
       assert.match(
         wrongName.receipt.issues.join('\n'),
-        /artifact run, workflow, or exact producer attempt is not trusted/
-      );
-      assert.match(
-        wrongName.receipt.issues.join('\n'),
-        /failed checks artifact name/
+        /exact producer attempt is not trusted; failed checks artifact name/
       );
     } finally {
       process.env.PATH = priorPath;
