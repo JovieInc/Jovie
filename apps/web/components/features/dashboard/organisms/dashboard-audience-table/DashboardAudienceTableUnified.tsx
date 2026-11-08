@@ -26,14 +26,14 @@ import {
   DashboardHeaderActionButton,
 } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
-import {
-  AnalyticsSidebar,
-  StaticAnalyticsSidebar,
-} from '@/features/dashboard/organisms/LazyAnalyticsSidebar';
 import { useAudiencePanel } from '@/features/dashboard/organisms/AudiencePanelContext';
 import { AiCrawlerDetailPanel } from '@/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel';
 import { AiCrawlerIntelligenceCard } from '@/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard';
 import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-member-sidebar';
+import {
+  AnalyticsSidebar,
+  StaticAnalyticsSidebar,
+} from '@/features/dashboard/organisms/LazyAnalyticsSidebar';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
   canShareContactOut,
