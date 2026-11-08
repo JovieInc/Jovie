@@ -142,10 +142,17 @@
           "reference": "Radix DropdownMenu"
         },
         {
-          "item": "aria-required-children: the search header (textbox + clear button) and the loading/empty role=status nodes render as direct children of role=menu, so a loading or empty menu owns no menuitem (renderer)",
+          "item": "aria-required-children: the loading/empty role=status nodes render as direct children of role=menu, so a loading or empty menu owns no menuitem (renderer)",
+          "decision": "adopt",
+          "status": "done",
+          "reference": "APG Menu",
+          "resolution": "loading and empty rows are disabled menuitems that arrow keys skip, each holding the polite status; common-dropdown.children.test.tsx checks owned roles and axe"
+        },
+        {
+          "item": "aria-required-children: the search header (textbox + clear button) renders inside role=menu, which may own only items, groups and separators, and axe also rejects it inside a group; in-menu search needs the APG Combobox shape (field outside a listbox) (renderer)",
           "decision": "adopt",
           "status": "open",
-          "reference": "APG Menu"
+          "reference": "APG Combobox"
         },
         {
           "item": "RTL: menu rows, inset labels, item indicators and the submenu chevron use physical pl-/pr-/left-/ml-auto (here and in lib/dropdown-styles MENU_ITEM_BASE); the chevron does not mirror (common-dropdown-renderer, item renderers)",
