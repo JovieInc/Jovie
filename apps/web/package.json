@@ -360,7 +360,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
-    "@biomejs/biome": "^2.6.4",
+    "@biomejs/biome": "^2.5.14",
     "@electric-sql/pglite": "^0.5.14",
     "@lhci/cli": "^0.15.1",
     "@next/bundle-analyzer": "^16.4.3",
