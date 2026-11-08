@@ -444,6 +444,14 @@ for (const file of batch) {
   rmSync(`${reportFile}.tests.json`, { force: true });
   rmSync(`${reportFile}.coverage`, { recursive: true, force: true });
   rmSync(join(rootDir, '.stryker-tmp'), { recursive: true, force: true });
+  // The timeout's SIGKILL reaches only the harness; its Stryker child can keep
+  // mutating sources in place (inPlace: true), so a timed-out module ends the batch.
+  if (run.signal === 'SIGKILL') {
+    console.log(
+      `${file} timed out; stopping so its Stryker run cannot overlap the next module.`
+    );
+    break;
+  }
 }
 
 writeOutputs(batch.length);
