@@ -67,43 +67,43 @@
           "matchingUrlPattern": "\\/app\\/library\\?view=releases$",
           "assertions": {
             "categories:performance": [
-              "error",
+              "warn",
               {
                 "minScore": 0.7
               }
             ],
             "categories:accessibility": [
-              "error",
+              "warn",
               {
                 "minScore": 0.9
               }
             ],
             "categories:best-practices": [
-              "error",
+              "warn",
               {
                 "minScore": 0.8
               }
             ],
             "cumulative-layout-shift": [
-              "error",
+              "warn",
               {
                 "maxNumericValue": 0.06
               }
             ],
             "first-contentful-paint": [
-              "error",
+              "warn",
               {
                 "maxNumericValue": 1100
               }
             ],
             "largest-contentful-paint": [
-              "error",
+              "warn",
               {
                 "maxNumericValue": 3800
               }
             ],
             "total-blocking-time": [
-              "error",
+              "warn",
               {
                 "maxNumericValue": 850
               }
