@@ -7,6 +7,7 @@ import {
   getClientIP,
   waitlistJoinLimiter,
 } from '@/lib/rate-limit';
+import { spotifyClient } from '@/lib/spotify/client';
 import {
   classifyTurnstileFailure,
   isTurnstileConfigured,
@@ -15,6 +16,12 @@ import {
 import { logger } from '@/lib/utils/logger';
 import { isPublicSignupClosed } from '@/lib/waitlist/public-signup-gate';
 import { joinWaitlistWithRole } from '@/lib/waitlist/role-entry';
+import {
+  momTestAnswersSchema,
+  qualifyRoleEntrant,
+  type SpotifyArtistReader,
+  spotifyArtistIdSchema,
+} from '@/lib/waitlist/role-qualification';
 import { waitlistRoleSchema } from '@/lib/waitlist/roles';
 
 /**
@@ -32,7 +39,45 @@ const joinSchema = z.object({
   role: waitlistRoleSchema,
   name: z.string().trim().min(1).max(120).optional(),
   turnstileToken: z.string().max(4096).optional(),
+  // Request-access qualification (docs/ONBOARDING_QUALIFICATION_SYSTEM.md).
+  // Optional, so today's form keeps working unchanged.
+  spotifyArtistId: spotifyArtistIdSchema.optional(),
+  momTest: momTestAnswersSchema.optional(),
 });
+
+/**
+ * The server's own read of the picked artist. The batch endpoint returns no
+ * row for an unknown id (scored as unresolved) and throws when Spotify is
+ * unreachable (left unscored), so the two never blur.
+ */
+/**
+ * The client's own timeout and retries can outlast the function, so the join
+ * waits at most this long for Spotify and then saves the entrant unscored.
+ */
+const SPOTIFY_QUALIFY_DEADLINE_MS = 3_000;
+
+const readSpotifyArtist: SpotifyArtistReader = async artistId => {
+  if (!spotifyClient.isAvailable()) throw new Error('Spotify unavailable');
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error('Spotify read timed out')),
+      SPOTIFY_QUALIFY_DEADLINE_MS
+    );
+  });
+  const [artist] = await Promise.race([
+    spotifyClient.getArtists([artistId]),
+    deadline,
+  ]).finally(() => clearTimeout(timer));
+  return artist
+    ? {
+        id: artist.spotifyId,
+        name: artist.name,
+        followers: artist.followerCount,
+        popularity: artist.popularity,
+      }
+    : null;
+};
 
 function json(body: Record<string, unknown>, status: number, headers = {}) {
   return NextResponse.json(body, {
@@ -112,11 +157,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const qualification = await qualifyRoleEntrant(
+    {
+      spotifyArtistId: parsed.data.spotifyArtistId ?? null,
+      momTest: parsed.data.momTest ?? null,
+    },
+    readSpotifyArtist
+  );
+
   try {
     await joinWaitlistWithRole({
       email: parsed.data.email,
       role: parsed.data.role,
       ...(parsed.data.name ? { name: parsed.data.name } : {}),
+      ...(qualification ? { qualification } : {}),
     });
   } catch (error) {
     logger.error('[api/waitlist/join] join failed', error);

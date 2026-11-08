@@ -15,9 +15,12 @@ import { chromium } from 'playwright';
 import {
   CLAIM_BANNER,
   fromThirdPartyFrame,
+  median,
   PLACEHOLDER,
   productReady,
   rankFindings,
+  TIMING_SAMPLES,
+  timingSuspect,
 } from './ready-gate.mjs';
 
 const { values: args } = parseArgs({
@@ -124,6 +127,7 @@ async function visit({ route, target, viewport, identity, fixture }) {
     )
       failedRequests.push(`${r.status()} ${u.pathname}`);
   });
+  /** @type {any} */
   const row = { route, url: target, identity, viewport };
   if (fixture === 'unclaimed') row.expectClaimBanner = true;
   const t0 = Date.now();
@@ -152,8 +156,8 @@ async function visit({ route, target, viewport, identity, fixture }) {
       .split('\n')[0]
       .slice(0, 200);
   }
-  pages.push(row);
   await ctx.close();
+  return row;
 }
 
 const todo = [];
@@ -189,16 +193,38 @@ for (const route of routes) {
   }
 }
 // A context that fails to open still gets a row, so the receipt is written.
+/** @type {(job: any) => Promise<any>} */
 const safeVisit = job =>
   visit(job).catch(e => {
     const { route, target, viewport, identity } = job;
     const error = String(e?.message || e)
       .split('\n')[0]
       .slice(0, 200);
-    pages.push({ route, url: target, identity, viewport, error });
+    return { route, url: target, identity, viewport, error };
   });
-for (let i = 0; i < todo.length; i += 4)
-  await Promise.all(todo.slice(i, i + 4).map(safeVisit));
+const jobs = new Map();
+for (let i = 0; i < todo.length; i += 4) {
+  const batch = todo.slice(i, i + 4);
+  const rows = await Promise.all(batch.map(safeVisit));
+  rows.forEach((row, k) => jobs.set(row, batch[k]));
+  pages.push(...rows);
+}
+// A page that trips a timing threshold is loaded again, one at a time so the
+// other pages' work doesn't count against it, and judged on the median.
+for (const row of pages.filter(timingSuspect)) {
+  const again = [];
+  for (let n = 1; n < TIMING_SAMPLES; n += 1) {
+    const r = await safeVisit(jobs.get(row));
+    if (!r.error) again.push(r);
+  }
+  if (again.length < TIMING_SAMPLES - 1) continue; // keep the first load's numbers
+  const all = [row, ...again];
+  row.timingSamples = all.length;
+  row.lcpSamplesMs = all.map(r => r.lcpMs);
+  row.longestTaskSamplesMs = all.map(r => r.longestTaskMs);
+  row.lcpMs = median(row.lcpSamplesMs);
+  row.longestTaskMs = median(row.longestTaskSamplesMs);
+}
 await browser.close();
 
 const receipt = {

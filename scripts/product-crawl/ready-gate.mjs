@@ -20,6 +20,27 @@ export const THRESHOLDS = Object.freeze({
 export const PLACEHOLDER =
   /\b(?:[Ll]orem ipsum|TODO|FIXME|undefined|NaN|[Pp]laceholder text)\b|\[object Object\]/;
 
+// Timing on a shared CI runner is noisy: across three crawls on Nov 8 only
+// one of 13 frozen frames came back on the same page. A page that trips a
+// timing threshold is loaded twice more and judged on the median of three.
+// Layout shift, errors and broken routes are judged on the first load.
+export const TIMING_SAMPLES = 3;
+
+/** @param {{ error?: string, lcpMs?: number, longestTaskMs?: number }} page */
+export function timingSuspect(page) {
+  return (
+    !page.error &&
+    ((page.lcpMs ?? 0) > THRESHOLDS.lcpMs ||
+      (page.longestTaskMs ?? 0) > THRESHOLDS.longTaskMs)
+  );
+}
+
+/** Median of the samples; the lower middle for an even count. */
+export function median(xs) {
+  const s = [...xs].sort((a, b) => a - b);
+  return s[Math.floor((s.length - 1) / 2)];
+}
+
 export const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 // Frames whose own console output is not the product's: Cloudflare's
 // challenge iframe logs CSP probes and devtools noise to itself.
@@ -59,13 +80,16 @@ export const CLAIM_BANNER = /profile is unclaimed|claim (this|your) profile/i;
 
 export const IDENTITIES = Object.freeze(['stranger', 'signed-in']);
 
+const ofSamples = page =>
+  page.timingSamples > 1 ? ` (median of ${page.timingSamples} loads)` : '';
+
 /**
  * @param {{ route: string, identity: string, viewport: string, status?: number,
  *   error?: string, authGated?: boolean, cls?: number, lcpMs?: number,
  *   longestTaskMs?: number, loadMs?: number, consoleErrors?: string[],
  *   failedRequests?: string[], placeholder?: string|null,
  *   horizontalOverflow?: boolean, url?: string, expectClaimBanner?: boolean,
- *   claimBanner?: boolean }} page
+ *   claimBanner?: boolean, timingSamples?: number }} page
  * @returns {{ route: string, identity: string, viewport: string, kind: string, detail: string }[]}
  */
 export function pageFindings(page, closed = []) {
@@ -104,13 +128,16 @@ export function pageFindings(page, closed = []) {
     );
   if ((page.lcpMs ?? 0) > THRESHOLDS.lcpMs)
     out.push(
-      f('slow-paint', `LCP ${Math.round(page.lcpMs)}ms > ${THRESHOLDS.lcpMs}ms`)
+      f(
+        'slow-paint',
+        `LCP ${Math.round(page.lcpMs)}ms > ${THRESHOLDS.lcpMs}ms${ofSamples(page)}`
+      )
     );
   if ((page.longestTaskMs ?? 0) > THRESHOLDS.longTaskMs)
     out.push(
       f(
         'frozen-frame',
-        `main thread blocked ${Math.round(page.longestTaskMs)}ms`
+        `main thread blocked ${Math.round(page.longestTaskMs)}ms${ofSamples(page)}`
       )
     );
   if ((page.loadMs ?? 0) > THRESHOLDS.loadMs)
