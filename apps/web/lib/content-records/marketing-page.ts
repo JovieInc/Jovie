@@ -40,7 +40,7 @@ const line = (max: number) =>
 const HeroSection = z
   .object({
     section: z.literal('hero'),
-    variant: z.literal('centered-none'),
+    variant: z.literal('left-none'),
     copy: z
       .object({
         subhead: line(220),
@@ -120,7 +120,7 @@ function homeEntry(
 }
 
 export const SPEC_SECTION_REGISTRY: readonly SpecSectionRegistryEntry[] = [
-  homeEntry('hero', 'centered-none', 'HomepageStoryHero'),
+  homeEntry('hero', 'left-none', 'HomepageStoryHero'),
   homeEntry('feature-split', 'phone-right', 'HomepageProfileChapter'),
   homeEntry('product-gallery', 'release-rail', 'HomepageReleasesChapter'),
   homeEntry('cta', 'final-single-claim', 'HomepageInviteClose'),
@@ -155,7 +155,7 @@ export const DEFAULT_HOME_SPEC: MarketingPageSpec = {
   sections: [
     {
       section: 'hero',
-      variant: 'centered-none',
+      variant: 'left-none',
       copy: {
         subhead: HOMEPAGE_EDITORIAL_COPY.hero.subhead,
         primaryAction: HOMEPAGE_EDITORIAL_COPY.hero.primaryAction,
