@@ -613,6 +613,13 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
     )
     .filter({ visible: true })
     .first();
+  await expect
+    .poll(
+      async () =>
+        Number((await previewRail.getAttribute('data-catalog-releases')) ?? 0),
+      { message: 'Preview showed no real catalog release', timeout: 60_000 }
+    )
+    .toBeGreaterThanOrEqual(1);
   await expectPreviewIsReal(page.locator('main'), previewRail);
   expect(
     await page.locator('a[href^="/onboarding/checkout"]').count(),
