@@ -81,6 +81,34 @@ describe('classifyGitHubFailure', () => {
     expect(classifyGitHubFailure({ status, message }).retryable).toBe(false);
   });
 
+  // Live failed-step wordings, 2026-11-08 (jobs 128679832845, 128680939625,
+  // 128685078954): GitHub release downloads returned HTTP 504 runs.
+  const GITLEAKS_EXHAUSTED =
+    '##[error]Could not fetch gitleaks after 3 attempts (https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz).';
+  it.each([
+    GITLEAKS_EXHAUSTED,
+    `curl: (22) The requested URL returned error: 504\nscanner download attempt 1 failed; retrying\n${GITLEAKS_EXHAUSTED}`,
+    '##[error]Could not fetch trufflehog after 6 attempts (https://github.com/trufflesecurity/trufflehog/releases/download/v3.99.8/trufflehog_3.99.8_linux_amd64.tar.gz).',
+    'Squawk 2.70.0 download failed: 504 https://github.com/sbdchd/squawk/releases/download/v2.70.0/squawk-linux-x64\n##[error]Process completed with exit code 1.',
+    'Squawk 2.70.0 download failed: fetch failed https://github.com/sbdchd/squawk/releases/download/v2.70.0/squawk-linux-arm64',
+  ])('reads an exhausted pinned release download as transient: %s', message => {
+    expect(kind({ message })).toBe(TRANSIENT);
+  });
+
+  it.each([
+    // A bad pin is a real failure, not an outage.
+    `curl: (22) The requested URL returned error: 404\n${GITLEAKS_EXHAUSTED}`,
+    'Squawk 2.70.0 download failed: 404 https://github.com/sbdchd/squawk/releases/download/v2.70.0/squawk-linux-x64',
+    'Squawk checksum mismatch: expected abc, got def',
+    'oasdiff-breaking-change: oasdiff tarball sha256 5fb7 does not match the pinned 7577',
+    // Real scan and test failures in the same jobs.
+    '##[error]Secret scan found 1 finding(s) in scripts/a.ts',
+    ' FAIL  apps/web/lib/a.test.ts > downloads > retries\nAssertionError: expected 3 to be 6\n##[error]Process completed with exit code 1.',
+    'Could not fetch gitleaks after 3 attempts (https://example.com/gitleaks.tar.gz).',
+  ])('keeps real download and test failures real: %s', message => {
+    expect(kind({ message })).toBe(NONE);
+  });
+
   it('exposes a text predicate for log readers', () => {
     expect(
       isGitHubInfrastructureFailure(

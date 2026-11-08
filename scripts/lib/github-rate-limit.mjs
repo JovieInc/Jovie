@@ -56,6 +56,16 @@ const TRANSIENT_TEXT = [
   /\bstream error: stream ID \d+; (?:CANCEL|INTERNAL_ERROR)\b/,
   /\bThe operation was aborted due to timeout\b/,
 ];
+// A pinned scanner/linter release download that exhausted its retries on
+// GitHub's release CDN (HTTP 504 runs on 2026-11-08: jobs 128679832845,
+// 128680939625, 128685078954). Exact guard messages only; a curl 4xx in the
+// same step is a bad pin, not an outage, and stays a real failure.
+const RELEASE_DOWNLOAD_TEXT = [
+  /\bCould not fetch (?:gitleaks|trufflehog) after \d+ attempts \(https:\/\/github\.com\/(?:gitleaks\/gitleaks|trufflesecurity\/trufflehog)\/releases\/download\//,
+  /\bSquawk \d+\.\d+\.\d+ download failed: (?:50[0234]|fetch failed) https:\/\/github\.com\/sbdchd\/squawk\/releases\/download\//,
+];
+const RELEASE_DOWNLOAD_CLIENT_ERROR =
+  /\bThe requested URL returned error: 4(?!08|29)\d\d\b/;
 
 function header(headers, name) {
   if (!headers) return null;
@@ -111,6 +121,12 @@ export function classifyGitHubFailure({
   }
   if ([500, 502, 503, 504].includes(Number(status))) return result(TRANSIENT);
   if (TRANSIENT_TEXT.some(re => re.test(text))) return result(TRANSIENT);
+  if (
+    RELEASE_DOWNLOAD_TEXT.some(re => re.test(text)) &&
+    !RELEASE_DOWNLOAD_CLIENT_ERROR.test(text)
+  ) {
+    return result(TRANSIENT);
+  }
   return result(NONE);
 }
 
