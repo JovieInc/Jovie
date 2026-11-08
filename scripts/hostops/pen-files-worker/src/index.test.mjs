@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import worker from './index.ts';
+import workerModule from './index.ts';
+
+// tsc models this .ts default import as the module namespace; at runtime it is the worker.
+const worker =
+  /** @type {{ fetch: (req: Request, env: object) => Promise<Response> }} */ (
+    /** @type {unknown} */ (workerModule)
+  );
 
 const KEY = 'abc123/workspace.tar.gz';
 const bucket = {
@@ -9,6 +15,7 @@ const bucket = {
       ? { body: new Blob(['bytes']).stream(), size: 5, httpEtag: '"e"' }
       : null,
 };
+/** @param {{ PEN_FILES: typeof bucket, OBJECT_KEY?: string }} [env] */
 const call = (
   path,
   env = { PEN_FILES: bucket, OBJECT_KEY: KEY },

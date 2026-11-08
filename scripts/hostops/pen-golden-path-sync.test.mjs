@@ -34,6 +34,7 @@ function runner(calls) {
   return (cmd, args) => {
     calls.push([cmd, ...args]);
     if (cmd === 'tar') writeFileSync(args[1], 'archive-bytes');
+    return Buffer.alloc(0);
   };
 }
 
