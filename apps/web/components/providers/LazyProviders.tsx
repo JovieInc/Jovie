@@ -1,10 +1,18 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import React from 'react';
 import { FeedbackProvider } from '@/components/feedback';
 import { env } from '@/lib/env-client';
-import { DeferredAnalytics } from './DeferredAnalytics';
 import { JovieAnalytics } from './JovieAnalytics';
+
+const Analytics = dynamic(
+  () => import('./Analytics').then(mod => ({ default: mod.Analytics })),
+  {
+    ssr: false,
+    loading: () => null,
+  }
+);
 
 export interface LazyProvidersProps {
   readonly children: React.ReactNode;
@@ -31,7 +39,7 @@ export function LazyProviders({
     <FeedbackProvider>
       {children}
       {isPassiveRuntime ? null : <JovieAnalytics />}
-      {showAnalytics ? <DeferredAnalytics /> : null}
+      {showAnalytics ? <Analytics /> : null}
     </FeedbackProvider>
   );
 }

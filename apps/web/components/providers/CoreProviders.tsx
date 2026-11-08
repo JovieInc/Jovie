@@ -234,7 +234,7 @@ function CoreProvidersInner({
  * either page sent no pageview at all, so Web Analytics showed the homepage
  * with a handful of visitors (only those who arrived via a client-side
  * navigation from another tracked page) while /artist-profiles showed
- * hundreds. `CoreProviders.analytics.test.tsx` guards this.
+ * hundreds. The route-gate cases in CoreProviders.test.tsx guard this.
  */
 const MARKETING_PREFIXES = [
   '/artist-notifications',
