@@ -97,3 +97,28 @@ the criterion failing until the fix lands; editing the component makes the
 record stale (`unknown`) until it is re-judged and re-hashed. Fixes in shared
 `packages/ui/lib` styles do not change a component hash, so re-judge the
 consumers when those change.
+
+## Screen gate (Golden Path first)
+
+`docs/design-system/cert-screens.json` lists the screens a customer sees, each by
+its App Router page. Every component the page can render (the static import
+closure of the page and the layouts above it, barrels followed by name) must pass
+the registry's `criteria`. `pnpm component-certificate:gate` enforces it:
+
+- a component on an enrolled screen that fails a criterion it does not owe blocks
+  the merge, so a new component must be certified before it ships on the screen;
+- `debt` lists what failed when a screen was enrolled and may only shrink: an entry
+  that now passes, or that no screen renders, must be removed in the same PR
+  (`pnpm component-cert:screens --refresh`), and debt may not grow except for a
+  screen being enrolled;
+- a screen with no debt left is must-pass.
+
+Machine-driven expansion, for an agent loop:
+
+- `pnpm component-cert:screens` prints coverage per screen;
+- `pnpm component-cert:screens --issues out.json` writes the ranked work list
+  (`jovie.cert-screens-report/v1`): one row per failing component with its
+  screens, failing criteria, details and the `--spec` command that says what to
+  fix, components on the most screens first, then the fewest failing criteria;
+- `pnpm component-cert:screens --enroll <id> --page apps/web/app/.../page.tsx`
+  enrolls a screen; never edit `screens` or `debt` by hand.
