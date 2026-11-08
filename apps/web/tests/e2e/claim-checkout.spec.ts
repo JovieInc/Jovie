@@ -51,7 +51,8 @@ async function expectStableLayout(page: Page, screen: string): Promise<void> {
   test
     .info()
     .annotations.push({ type: 'cls', description: `${screen} ${cls}` });
-  expect(cls, `${screen} layout shift`).toBeLessThan(0.1);
+  // Soft, so a shift is reported without hiding the payment checks after it.
+  expect.soft(cls, `${screen} layout shift`).toBeLessThan(0.1);
 }
 
 test.describe('Self-serve artist profile checkout', () => {
