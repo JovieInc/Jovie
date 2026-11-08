@@ -707,6 +707,7 @@ export {
   insertInvestorUpdateFinalApprovalSchema,
   insertInvestorViewSchema,
   investorLinks,
+  investorPortalContent,
   investorSettings,
   investorStageEnum,
   investorStakeholderRecords,

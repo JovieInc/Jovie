@@ -1,16 +1,10 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/components/features/waitlist/WaitlistOutcomeView.test.tsx
-
 import { Button } from '@jovie/ui';
 import { ArrowRight, CheckCircle2, Clock3, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
-import { PriceLockNote } from '@/components/organisms/billing/PriceLockNote';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
-import { track } from '@/lib/analytics';
-import { lockedMonthlyLabel } from '@/lib/billing/price-lock-view';
-import { useCheckoutMutation, usePriceLockQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
 
@@ -30,12 +24,6 @@ interface WaitlistOutcomeViewProps {
    * only claims the handle is reserved when this is non-null.
    */
   readonly reservedHandle?: string | null;
-  /**
-   * Stripe price for the self-serve Pro offer. When present, waiting visitors
-   * can buy now: a verified payment admits them, then /billing/success sends
-   * them on to claim their link.
-   */
-  readonly proCheckoutPriceId?: string | null;
 }
 
 type OutcomeCopy = {
@@ -171,66 +159,11 @@ function PrimaryCtaLink({
   );
 }
 
-export const WAITLIST_START_PRO_TEST_ID = 'waitlist-start-pro-checkout';
-
-/**
- * Opens the default checkout (no onboarding source), so success lands on
- * /billing/success, which routes a buyer without a claimed link to /start.
- */
-function StartProCheckoutButton({ priceId }: { readonly priceId: string }) {
-  const checkout = useCheckoutMutation();
-  // The person's own (locked) price; no price shown until it has loaded.
-  const priceLock = usePriceLockQuery();
-  const lockedPrice = lockedMonthlyLabel(priceLock.data ?? null);
-
-  return (
-    <div className='flex flex-col gap-2'>
-      <Button
-        type='button'
-        variant='primary'
-        size='lg'
-        disabled={checkout.isPending}
-        data-testid={WAITLIST_START_PRO_TEST_ID}
-        onClick={() => {
-          track('checkout_initiated', {
-            flow_type: 'waitlist_receipt',
-            price_id: priceId,
-          });
-          checkout.mutate(
-            { priceId },
-            {
-              onSuccess: data => {
-                globalThis.location.href = data.url;
-              },
-            }
-          );
-        }}
-      >
-        {checkout.isPending
-          ? 'Opening Checkout...'
-          : lockedPrice
-            ? `Start Pro (${lockedPrice})`
-            : 'Start Pro'}
-      </Button>
-      <PriceLockNote
-        lock={priceLock.data}
-        className='text-xs leading-5 text-white/62'
-      />
-      {checkout.isError ? (
-        <p className='text-sm text-error' role='alert'>
-          {"Checkout didn't open. Try again in a moment."}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
 export function WaitlistOutcomeView({
   outcome,
   onRetry,
   email,
   reservedHandle,
-  proCheckoutPriceId,
 }: Readonly<WaitlistOutcomeViewProps>) {
   const copy = OUTCOME_COPY[outcome];
   const Icon = copy.icon;
@@ -242,7 +175,6 @@ export function WaitlistOutcomeView({
   const primaryHref = copy.actionHref;
   const primaryLabel = copy.actionLabel;
   const showResumeCta = Boolean(copy.showNextSteps && !primaryHref);
-  const showStartPro = Boolean(copy.showNextSteps && proCheckoutPriceId);
 
   return (
     <section className='w-full rounded-2xl border border-white/[0.08] bg-(--color-bg-surface-0) px-5 py-6 text-primary-token shadow-[0_24px_90px_rgba(0,0,0,0.38)] sm:px-6'>
@@ -261,15 +193,12 @@ export function WaitlistOutcomeView({
         {primaryHref && primaryLabel ? (
           <PrimaryCtaLink href={primaryHref} label={primaryLabel} />
         ) : null}
-        {showStartPro && proCheckoutPriceId ? (
-          <StartProCheckoutButton priceId={proCheckoutPriceId} />
-        ) : null}
         {showResumeCta ? (
           <PrimaryCtaLink
             href={APP_ROUTES.START}
             label='Resume At Start'
             testId='waitlist-resume-start'
-            variant={showStartPro ? 'secondary' : 'primary'}
+            variant='primary'
           />
         ) : null}
         {canRetry ? (

@@ -7,7 +7,10 @@ import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { toast } from '@/components/feedback';
 import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
-import { formatCompactReleaseArtistLine } from '@/lib/discography/formatting';
+import {
+  formatCompactReleaseArtistLine,
+  formatReleaseArtistLine,
+} from '@/lib/discography/formatting';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
@@ -70,6 +73,16 @@ export const ReleaseCell = memo(function ReleaseCell({
     release.artistNames,
     artistName
   );
+  // ds-cert:credit-format - the truncated row line (A, B and N more) keeps
+  // the full credit list reachable via title.
+  const fullArtistLine = formatReleaseArtistLine(
+    release.artistNames,
+    artistName
+  );
+  const artistLineTitle =
+    artistLine && fullArtistLine && artistLine !== fullArtistLine
+      ? fullArtistLine
+      : undefined;
 
   const handleSelect = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -89,7 +102,7 @@ export const ReleaseCell = memo(function ReleaseCell({
             className={cn(
               'h-4 w-4 rounded-xs p-0 transition-opacity duration-subtle focus-visible:opacity-100',
               isPlaying
-                ? 'text-(--linear-accent) opacity-100'
+                ? 'text-(--color-accent-purple-text) opacity-100'
                 : 'text-quaternary-token opacity-0 group-hover:opacity-100 aria-[pressed=true]:opacity-100'
             )}
             aria-label={
@@ -124,9 +137,9 @@ export const ReleaseCell = memo(function ReleaseCell({
           type='button'
           onClick={handleSelect}
           className='min-w-0 flex-1 text-left focus-visible:outline-none'
-          aria-label={`Open ${release.title}`}
           data-testid={`release-open-${release.id}`}
         >
+          <span className='sr-only'>Open </span>
           <div className='flex min-w-0 items-center gap-1.5 leading-none'>
             <TruncatedText
               lines={1}
@@ -147,7 +160,10 @@ export const ReleaseCell = memo(function ReleaseCell({
               </span>
             )}
             {artistPlacement === 'inline' && artistLine ? (
-              <span className='inline-flex min-w-0 max-w-[45%] shrink items-center gap-1'>
+              <span
+                className='inline-flex min-w-0 max-w-[45%] shrink items-center gap-1'
+                title={artistLineTitle}
+              >
                 <span
                   aria-hidden='true'
                   className='shrink-0 text-2xs text-quaternary-token'
@@ -167,6 +183,7 @@ export const ReleaseCell = memo(function ReleaseCell({
             <TruncatedText
               lines={1}
               className='mt-px text-2xs font-normal leading-[1.2] tracking-[-0.005em] text-secondary-token'
+              title={artistLineTitle}
             >
               {artistLine}
             </TruncatedText>
@@ -194,7 +211,10 @@ export const ReleaseCell = memo(function ReleaseCell({
               </span>
             )}
             {artistPlacement === 'inline' && artistLine ? (
-              <span className='inline-flex min-w-0 max-w-[45%] shrink items-center gap-1'>
+              <span
+                className='inline-flex min-w-0 max-w-[45%] shrink items-center gap-1'
+                title={artistLineTitle}
+              >
                 <span
                   aria-hidden='true'
                   className='shrink-0 text-2xs text-quaternary-token'
@@ -214,6 +234,7 @@ export const ReleaseCell = memo(function ReleaseCell({
             <TruncatedText
               lines={1}
               className='mt-px text-2xs font-normal leading-[1.2] tracking-[-0.005em] text-secondary-token'
+              title={artistLineTitle}
             >
               {artistLine}
             </TruncatedText>

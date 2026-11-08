@@ -5,6 +5,10 @@ const mocks = vi.hoisted(() => ({
   record: vi.fn(),
   contact: vi.fn(),
   inspection: vi.fn(),
+  judge: vi.fn(),
+}));
+vi.mock('@/lib/agent-os/dogfood-judge-runtime-store', () => ({
+  getDogfoodJudgeLedger: () => ({ read: mocks.judge }),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -51,6 +55,24 @@ const INPUT = {
   actorUserId: 'tim',
 };
 
+function passingJudgeLedger() {
+  return {
+    schema: 'jovie.dogfood-judge-ledger/v1',
+    currentFingerprint: 'fp',
+    requiredSurfaces: ['outbound-review-cards'],
+    surfaces: {
+      'outbound-review-cards': {
+        verdict: 'pass',
+        sourceSha: null,
+        fingerprint: 'fp',
+        judgedAt: new Date().toISOString(),
+        nothingWrong: true,
+        signatureVerified: true,
+      },
+    },
+  };
+}
+
 describe('outbound decisions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -58,6 +80,7 @@ describe('outbound decisions', () => {
     mocks.record.mockResolvedValue({ ok: true, revision: 'r' });
     mocks.contact.mockResolvedValue({ dedupeKey: 'email:ada@example.com' });
     mocks.inspection.mockResolvedValue({ status: 'certified_for_outreach' });
+    mocks.judge.mockResolvedValue(passingJudgeLedger());
   });
 
   it('looks up the canonical contact by email, then handle', async () => {
@@ -84,6 +107,23 @@ describe('outbound decisions', () => {
       },
     ]);
     expect(mocks.record.mock.calls[0][0].actorUserId).toBe('tim');
+  });
+
+  it('refuses approval, with reasons, when the judge has no passing receipt', async () => {
+    mocks.judge.mockResolvedValue(null);
+    await expect(approveOutbound(INPUT)).resolves.toEqual({
+      ok: false,
+      reason: 'judge_denied',
+      judgeReasons: ['no-ledger'],
+    });
+    expect(mocks.record).not.toHaveBeenCalled();
+  });
+
+  it('refuses approval when the judge ledger is unreadable', async () => {
+    mocks.judge.mockRejectedValue(new Error('db down'));
+    const result = await approveOutbound(INPUT);
+    expect(result).toMatchObject({ ok: false, reason: 'judge_denied' });
+    expect(mocks.record).not.toHaveBeenCalled();
   });
 
   it('refuses approval before the facts are certified', async () => {

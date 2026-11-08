@@ -62,6 +62,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_API_HOLD_BUDGET_SECONDS: '480'
+          GH_API_RETRY_ATTEMPTS: '3'
+          GH_API_RETRY_SECONDS: '2'
           EVENT_NAME: ${{ github.event_name }}
           MANUAL_SHA: ${{ github.sha }}
           REPOSITORY: ${{ github.repository }}

@@ -48,7 +48,7 @@ export interface PriceLockReconcileResult {
 }
 
 /**
- * JOV-INV-047 consumer: daily price lock reconcile.
+ * JOV-INV-048 consumer: daily price lock reconcile.
  */
 /**
  * Daily: self-heal missing subscriber locks, then compare every paying

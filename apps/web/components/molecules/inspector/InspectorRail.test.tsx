@@ -27,6 +27,21 @@ vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
 }));
 
 describe('InspectorShell', () => {
+  it('renders definition metadata with paired terms and descriptions', async () => {
+    const { container } = render(
+      <dl>
+        <InspectorRow definitionList label='Lifecycle' value='Released' />
+      </dl>
+    );
+    expect(container.querySelector('dl > div > dt')).toHaveTextContent(
+      'Lifecycle'
+    );
+    expect(container.querySelector('dl > div > dd')).toHaveTextContent(
+      'Released'
+    );
+    await expectNoA11yViolations(container);
+  });
+
   it.each([false, true])(
     'hands focused content to its tab and respects subsequent focus movement (%s)',
     moved => {
@@ -119,9 +134,9 @@ describe('InspectorShell', () => {
 
     const selected = screen.getByRole('tab', { name: 'Details' });
     expect(selected).toHaveAttribute('aria-selected', 'true');
-    expect(selected.className).toContain('border-accent');
-    expect(selected.className).toContain('bg-surface-0/80');
-    expect(selected.className).not.toContain('rounded-full');
+    expect(selected.className).toContain('rounded-full');
+    expect(selected.className).toContain('bg-surface-3');
+    expect(selected.className).not.toContain('border-b-2');
 
     expect(screen.getByRole('tab', { name: 'Assets' })).toHaveAttribute(
       'aria-selected',
@@ -137,7 +152,7 @@ describe('InspectorShell', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('moves selection with arrow keys and does not use pill chrome', () => {
+  it('moves selection with arrow keys and uses the canonical pill chrome', () => {
     const onTabChange = vi.fn();
     render(
       <>
@@ -167,7 +182,7 @@ describe('InspectorShell', () => {
     fireEvent.keyDown(tablist, { key: 'End' });
     expect(onTabChange).toHaveBeenCalledWith('rights');
 
-    expect(tablist.className).not.toContain('rounded-full');
+    expect(tablist.className).toContain('rounded-full');
   });
 
   it('renders standardized empty and loading states', () => {

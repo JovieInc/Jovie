@@ -1,4 +1,4 @@
-// JOV-INV-047 consumer.
+// JOV-INV-048 consumer.
 // Price lock guard (Tim, 2026-10-29): a person with a lock sees and pays ONE
 // price everywhere, their locked price. Hard legal invariant.
 //

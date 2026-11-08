@@ -75,7 +75,7 @@ describe('Tabs pending state', () => {
     );
   });
 
-  it('retains the explicit raw primitive escape hatch', () => {
+  it('retains the explicit raw primitive escape hatch (JOV-8873)', () => {
     expect(Tabs.Root).toBe(TabsPrimitive.Root);
     expect(Tabs.List).toBe(TabsPrimitive.List);
     expect(Tabs.Content).toBe(TabsPrimitive.Content);

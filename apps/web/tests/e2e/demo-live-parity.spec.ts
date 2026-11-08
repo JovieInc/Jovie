@@ -161,7 +161,7 @@ async function collectAudienceShape(
         .isVisible(),
       filter: await page.getByRole('button', { name: 'Filter' }).isVisible(),
       export: await page
-        .getByRole('button', { name: 'Export data to CSV file' })
+        .getByRole('button', { name: /Export data to CSV file$/ })
         .isVisible(),
     },
     contentSurface,

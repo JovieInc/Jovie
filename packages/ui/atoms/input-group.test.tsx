@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 import { Input } from './input';
 import { InputGroup } from './input-group';
 
@@ -233,5 +235,76 @@ describe('InputGroup', () => {
       const group = screen.getByTestId('input-group');
       expect(group).toHaveAttribute('id', 'custom-id');
     });
+  });
+});
+
+describe('InputGroup certificate evidence', () => {
+  it('keeps typed input and focus across a parent rerender, Escape, and blur', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <InputGroup>
+        <MockIcon />
+        <Input aria-label='Search creators' />
+      </InputGroup>
+    );
+    const input = screen.getByRole('textbox', { name: 'Search creators' });
+
+    await user.click(input);
+    await user.type(input, 'hello');
+    expect(input).toHaveValue('hello');
+
+    // Same children; a size change from the parent restyles without remounting.
+    rerender(
+      <InputGroup size='lg'>
+        <MockIcon />
+        <Input aria-label='Search creators' />
+      </InputGroup>
+    );
+    expect(screen.getByRole('textbox', { name: 'Search creators' })).toBe(
+      input
+    );
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue('hello');
+
+    await user.keyboard('{Escape}');
+    expect(input).toHaveValue('hello');
+    expect(input).toHaveFocus();
+
+    await user.tab();
+    expect(input).not.toHaveFocus();
+    expect(input).toHaveValue('hello');
+  });
+
+  it('focuses the wrapped input on click while icons stay decorative', async () => {
+    const user = userEvent.setup();
+    render(
+      <InputGroup data-testid='input-group'>
+        <MockIcon data-testid='leading-icon' />
+        <Input aria-label='Handle' />
+      </InputGroup>
+    );
+    await user.click(screen.getByRole('textbox', { name: 'Handle' }));
+    expect(screen.getByRole('textbox', { name: 'Handle' })).toHaveFocus();
+    expect(screen.getByTestId('leading-icon')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+  });
+
+  it('has no axe violations with leading and trailing icons', async () => {
+    const { container } = render(
+      <div>
+        <InputGroup>
+          <MockIcon />
+          <Input aria-label='Search creators' placeholder='Search creators' />
+          <MockIcon />
+        </InputGroup>
+        <InputGroup size='sm'>
+          <MockIcon />
+          <Input id='ig-handle' label='Profile handle' />
+        </InputGroup>
+      </div>
+    );
+    await expectNoA11yViolations(container);
   });
 });

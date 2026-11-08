@@ -1,5 +1,5 @@
 /**
- * JOV-INV-047 consumer: checkout and plan change price resolution.
+ * JOV-INV-048 consumer: checkout and plan change price resolution.
  */
 /**
  * Checkout price resolution for a person with a price lock (pure).

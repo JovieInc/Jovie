@@ -35,6 +35,12 @@ the only workflow that puts PRs into the merge queue. It admits an
 already-green head and skips drafts. That event does not start another source
 CI flight.
 
+A draft reaches ready on its own (Auto-Ready green-source) when its exact head
+is CLEAN with PR Ready and required checks SUCCESS, and its body carries either
+a complete writer-proof receipt or a trusted writer's on-green opt-in,
+`<!-- jovie-auto-ready: on-green -->`. Leave it off to keep a WIP draft
+parked. Holds, parks and controlled-proof markers still win.
+
 Missing ownership, stale/changed heads, failed checks, lost or duplicate events,
 and expired holds remain bounded repair/evidence outcomes. The policy digest is
 included in delivery receipts so a runtime can reject a mismatched contract.
@@ -183,8 +189,8 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 to ten green entries per merge push (`max_entries_to_merge=10`). Each entry
 still builds its own synthetic head on the entry ahead, and the changed-path
 classifier selects the Web, Mac, iOS, operations/tooling, and shared-contract
-lanes per member. The checked-in `max_entries_to_build=8` matches live (synced
-2026-10-29, see the tuning log in `.github/MERGE_QUEUE.md`); any lower live
+lanes per member. The checked-in `max_entries_to_build=4` matches live (synced
+2026-10-31, see the tuning log in `.github/MERGE_QUEUE.md`); any lower live
 count remains a supported runner-capacity brake.
 
 On 2026-09-23 the 20-minute response deadline proved shorter than required

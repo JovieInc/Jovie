@@ -13,7 +13,16 @@ echo "  Jovie Development Environment Setup"
 echo "=============================================="
 echo ""
 
-# 0. CRITICAL: Verify Node.js version FIRST
+# 0. Put the repo's pinned Node first on PATH, fetching it when the session
+# started on another one, so no check runs on the wrong Node.
+if [ -f "$PROJECT_DIR/scripts/lib/setup-worktree-health.sh" ]; then
+  . "$PROJECT_DIR/scripts/lib/setup-worktree-health.sh"
+  if ! jovie_setup_ensure_pinned_node "$PROJECT_DIR"; then
+    echo "ERROR: could not fetch Node $(cat "$PROJECT_DIR/.nvmrc") from nodejs.org."
+  fi
+fi
+
+# 0.1. Verify Node.js version
 REQUIRED_NODE_MAJOR=$(cat "$PROJECT_DIR/.nvmrc" 2>/dev/null | cut -d. -f1)
 REQUIRED_NODE_MAJOR="${REQUIRED_NODE_MAJOR:-24}"
 CURRENT_NODE_VERSION=$(node --version 2>/dev/null || echo "not found")
@@ -29,7 +38,7 @@ if [ "$CURRENT_NODE_VERSION" = "not found" ]; then
 fi
 
 if [ "$CURRENT_NODE_MAJOR" -lt "$REQUIRED_NODE_MAJOR" ] 2>/dev/null; then
-  echo "WARNING: Wrong Node.js version detected!"
+  echo "ERROR: Wrong Node.js version detected! Checks run on it will not match CI."
   echo ""
   echo "  Current:  $CURRENT_NODE_VERSION"
   echo "  Required: v${REQUIRED_NODE_MAJOR}.x"

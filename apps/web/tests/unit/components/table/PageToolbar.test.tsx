@@ -4,6 +4,7 @@ import { render, screen, within } from '@testing-library/react';
 import { Search } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import * as pageToolbarClasses from '@/components/molecules/page-toolbar-classes';
 import {
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
   PAGE_TOOLBAR_BACK_LINK_CLASS,
@@ -362,5 +363,14 @@ describe('PageToolbar primary CTA guard', () => {
     ];
 
     expect(findPageToolbarPrimaryCtaViolations(files)).toEqual([]);
+  });
+});
+
+describe('PageToolbar class re-exports (JOV-8873)', () => {
+  it('re-exports the shared molecule toolbar classes unchanged', () => {
+    expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toBe(
+      pageToolbarClasses.PAGE_TOOLBAR_ACTION_BUTTON_CLASS
+    );
+    expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain('h-7');
   });
 });

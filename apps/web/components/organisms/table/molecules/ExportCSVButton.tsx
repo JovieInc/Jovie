@@ -245,7 +245,11 @@ export function ExportCSVButton<T extends object>({
           : APP_CONTROL_BUTTON_CLASS,
         className
       )}
-      aria-label={ariaLabel}
+      aria-label={
+        iconOnly
+          ? ariaLabel
+          : `${isExporting ? 'Exporting...' : label} — ${ariaLabel}`
+      }
       aria-busy={isExporting}
     >
       {isExporting ? (

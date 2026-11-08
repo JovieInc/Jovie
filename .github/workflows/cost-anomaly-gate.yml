@@ -370,3 +370,47 @@ jobs:
           echo "| Threshold multiplier | ${THRESHOLD_MULTIPLIER}x |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Absolute floor | $ABSOLUTE_FLOOR |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Reason | $REASON |" >> "$GITHUB_STEP_SUMMARY"
+
+  ai-routing-drift:
+    # Documented AI routing (apps/web/lib/ai/routing.json) vs live Gateway
+    # spend. A workers-first caller that silently runs on the Gateway goes over
+    # its declared $/day ceiling and turns this job red (Tim 2026-10-31: "what
+    # is eating vercel credits?"). Low credit runway is reported, not failed:
+    # credit failover already moves traffic to Workers AI.
+    name: AI Routing Drift
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            .node-version
+            .github/actions/prime-node-toolcache/
+            apps/web/lib/ai/routing.json
+            scripts/
+            packages/api-client/
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        uses: ./.github/actions/prime-node-toolcache
+        with:
+          node-version-file: .node-version
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
+        with:
+          node-version-file: .node-version
+      - name: Compare routing with live Gateway spend
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+        run: |
+          set -euo pipefail
+          node --experimental-strip-types scripts/ai-routing-check.mjs --days 2 --json > routing-check.json || true
+          jq -e '.schema == "jovie.ai-routing-check/v1"' routing-check.json >/dev/null
+          jq -r '.findings[] | "- [\(.severity)] \(.message)"' routing-check.json >> "$GITHUB_STEP_SUMMARY"
+          drift="$(jq '[.findings[] | select(.type != "gateway-runway" and (.severity == "high" or .severity == "critical"))] | length' routing-check.json)"
+          if [ "$drift" -gt 0 ]; then
+            jq -r '.findings[] | select(.type != "gateway-runway") | "::error title=AI routing drift::\(.message)"' routing-check.json
+            exit 1
+          fi
+          echo "AI routing matches routing.json (Gateway \$$(jq -r .gatewayUsdPerDay routing-check.json)/day)."

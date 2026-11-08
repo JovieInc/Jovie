@@ -1,4 +1,5 @@
 import { appendFileSync } from 'node:fs';
+import type { Page } from '@playwright/test';
 
 /**
  * Production golden-path certification steps (JOV-9625). Each wrapped step is
@@ -18,7 +19,41 @@ export interface ProdCertStep {
   readonly summary: string;
 }
 
-function write(step: ProdCertStep): void {
+/**
+ * Every JSON-line shape the steps file carries: browser checks, per-surface
+ * telemetry/screenshot evidence, quality-contract observations and the
+ * admin inventory readback (JOV-9625 outcome rework).
+ */
+export type ProdCertStepRecord =
+  | ProdCertStep
+  | {
+      readonly kind: 'telemetry';
+      readonly surface: string;
+      readonly consoleErrors: number;
+      readonly networkErrors: number;
+    }
+  | {
+      readonly kind: 'screenshot';
+      readonly surface: string;
+      readonly format: 'jpeg';
+      readonly dataUrl: string;
+    }
+  | {
+      readonly kind: 'observation';
+      readonly surface: string;
+      readonly contractId: string;
+      readonly dimension: string;
+      readonly value: number;
+      readonly unit: string;
+      readonly sampleSize?: number;
+    }
+  | {
+      readonly kind: 'readback';
+      readonly status: 'passed' | 'blocked' | 'failed';
+      readonly detail: string;
+    };
+
+function write(step: ProdCertStepRecord): void {
   const file = process.env.PROD_CERT_STEPS_FILE;
   if (!file) return;
   try {
@@ -75,6 +110,181 @@ export function certStepBlocked(
     endedAt: at,
     summary,
   });
+}
+
+/**
+ * Per-surface browser evidence (JOV-9625 outcome receipt):
+ *   - telemetry: how many console errors and failed/error network responses
+ *     the page emitted while the surface was exercised;
+ *   - screenshot: one JPEG frame of the surface, base64 data-URL encoded, so
+ *     every receipt carries visual proof a human can open.
+ * Folded into the surface receipt by scripts/prod-cert.mjs. Both are
+ * best-effort evidence: they never fail a step, and they are recorded as
+ * null on the receipt when the surface was not browser-exercised.
+ */
+export interface SurfaceTelemetryCollector {
+  /** Write the telemetry delta accumulated since the previous record call. */
+  readonly record: (surface: string) => void;
+  /** Capture the current page as the surface's JPEG evidence frame. */
+  readonly capture: (page: Page, surface: string) => Promise<void>;
+}
+
+export function createSurfaceTelemetry(page: Page): SurfaceTelemetryCollector {
+  let consoleErrors = 0;
+  let networkErrors = 0;
+  let reportedConsole = 0;
+  let reportedNetwork = 0;
+  const onConsole = (message: { type(): string }): void => {
+    if (message.type() === 'error') consoleErrors += 1;
+  };
+  const onResponse = (response: { status(): number }): void => {
+    if (response.status() >= 400) networkErrors += 1;
+  };
+  const onRequestFailed = (): void => {
+    networkErrors += 1;
+  };
+  page.on('console', onConsole);
+  page.on('response', onResponse);
+  page.on('requestfailed', onRequestFailed);
+  return {
+    record(surface) {
+      const telemetry = {
+        kind: 'telemetry' as const,
+        surface,
+        consoleErrors: consoleErrors - reportedConsole,
+        networkErrors: networkErrors - reportedNetwork,
+      };
+      reportedConsole = consoleErrors;
+      reportedNetwork = networkErrors;
+      write(telemetry);
+    },
+    async capture(currentPage, surface) {
+      await recordJank(currentPage, surface);
+      // The ledger route caps each data URL (JOV-9625): fall back to a lower
+      // quality once, then record nothing rather than reject the whole POST.
+      for (const quality of [40, 20]) {
+        try {
+          const buffer = await currentPage.screenshot({
+            type: 'jpeg',
+            quality,
+            fullPage: false,
+          });
+          const dataUrl = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+          if (dataUrl.length > 350_000) continue;
+          write({
+            kind: 'screenshot' as const,
+            surface,
+            format: 'jpeg' as const,
+            dataUrl,
+          });
+          return;
+        } catch {
+          // Evidence is best-effort; the test result is authoritative.
+          return;
+        }
+      }
+    },
+  };
+}
+
+/**
+ * Jank evidence (truthful certification, 2026-11-08). Reads the current
+ * document's layout shifts and long animation frames since it loaded
+ * (buffered observers, so it works even when telemetry started after
+ * navigation) and records them as `jank.*` observations. scripts/prod-cert.mjs
+ * fails the surface past CLS 0.1 or a frame blocked over 200 ms
+ * (scripts/lib/prod-cert-truth.mjs JANK_LIMITS). CLS here is the plain sum of
+ * unexpected shifts, stricter than the session-window CLS of Web Vitals.
+ */
+async function recordJank(currentPage: Page, surface: string): Promise<void> {
+  if (!process.env.PROD_CERT_STEPS_FILE) return;
+  try {
+    const jank = await currentPage.evaluate(
+      () =>
+        new Promise<{ cls: number; worstFrameMs: number; frames: boolean }>(
+          resolve => {
+            const types = PerformanceObserver.supportedEntryTypes ?? [];
+            const out = {
+              cls: 0,
+              worstFrameMs: 0,
+              frames: types.includes('long-animation-frame'),
+            };
+            let pending = 2;
+            const done = () => {
+              pending -= 1;
+              if (pending === 0) resolve(out);
+            };
+            const watch = (
+              type: string,
+              take: (entry: PerformanceEntry) => void
+            ) => {
+              if (!types.includes(type)) return done();
+              const observer = new PerformanceObserver(list =>
+                list.getEntries().forEach(take)
+              );
+              observer.observe({ type, buffered: true });
+              setTimeout(() => {
+                observer.takeRecords().forEach(take);
+                observer.disconnect();
+                done();
+              }, 50);
+            };
+            watch('layout-shift', entry => {
+              const shift = entry as PerformanceEntry & {
+                value: number;
+                hadRecentInput: boolean;
+              };
+              if (!shift.hadRecentInput) out.cls += shift.value;
+            });
+            watch('long-animation-frame', entry => {
+              out.worstFrameMs = Math.max(out.worstFrameMs, entry.duration);
+            });
+          }
+        )
+    );
+    // The contract ledger keys on contract and dimension, so the dimension
+    // names the surface: one surface's jank must not overwrite another's.
+    recordCertObservation({
+      surface,
+      contractId: 'jank.cls',
+      dimension: `stability:${surface}`,
+      value: jank.cls,
+      unit: 'score',
+    });
+    if (!jank.frames) return;
+    recordCertObservation({
+      surface,
+      contractId: 'jank.worst-frame-ms',
+      dimension: `responsiveness:${surface}`,
+      value: jank.worstFrameMs,
+      unit: 'ms',
+    });
+  } catch {
+    // Best-effort evidence: a page that cannot be evaluated records nothing.
+  }
+}
+
+/**
+ * Admin certifications-inventory readback (JOV-9625 outcome rework). One
+ * attempt per run: sign in as the documented admin fixture and read
+ * `GET /api/ovie/certifications`. Folded into the landing receipt as
+ * evidence — never a check — so a not-viable fixture records the exact
+ * blocker without turning any golden-path surface red.
+ */
+export function recordAdminReadback(result: {
+  readonly status: 'passed' | 'blocked' | 'failed';
+  readonly detail: string;
+}): void {
+  const file = process.env.PROD_CERT_STEPS_FILE;
+  if (!file) return;
+  try {
+    appendFileSync(
+      file,
+      `${JSON.stringify({ kind: 'readback', ...result })}\n`
+    );
+  } catch {
+    // Evidence is best-effort; the test result is authoritative.
+  }
 }
 
 /**

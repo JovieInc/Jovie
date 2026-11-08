@@ -558,6 +558,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/changelog/rss.xml/route.ts",
+      "kind": "handler",
+      "route": "/changelog/rss.xml",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/changelog/whats-new.json/route.ts",
       "kind": "handler",
       "route": "/changelog/whats-new.json",
@@ -785,6 +793,14 @@
       "source": "apps/web/app/(marketing)/product/utm-links/page.tsx",
       "kind": "page",
       "route": "/product/utm-links",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/(marketing)/proof/methodology/page.tsx",
+      "kind": "page",
+      "route": "/proof/methodology",
       "methods": [],
       "surface": "deferred",
       "classification": "C"
@@ -1665,6 +1681,30 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/admin/reference-review/intake/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/reference-review/intake",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/admin/reference-review/preview/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/reference-review/preview",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/admin/reference-review/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/reference-review",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/admin/releases/route.ts",
       "kind": "handler",
       "route": "/api/admin/releases",
@@ -2457,6 +2497,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/cron/queue-tick/route.ts",
+      "kind": "handler",
+      "route": "/api/cron/queue-tick",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/cron/schedule-release-notifications/route.ts",
       "kind": "handler",
       "route": "/api/cron/schedule-release-notifications",
@@ -2492,6 +2540,14 @@
       "source": "apps/web/app/api/cron/sync-ai-crawler-analytics/route.ts",
       "kind": "handler",
       "route": "/api/cron/sync-ai-crawler-analytics",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/cron/track-daily-snapshots/route.ts",
+      "kind": "handler",
+      "route": "/api/cron/track-daily-snapshots",
       "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
@@ -3289,6 +3345,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/canary/reset/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/canary/reset",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/certification-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/certification-evidence",
@@ -3297,9 +3361,25 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/customer-voice/[id]/reply/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/customer-voice/[id]/reply",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/design-ci-judge-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/design-ci-judge-evidence",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/dogfood-judge-evidence/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/dogfood-judge-evidence",
       "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
@@ -3316,7 +3396,7 @@
       "source": "apps/web/app/api/internal/ovie/golden-path-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/golden-path-evidence",
-      "methods": ["POST"],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3377,6 +3457,22 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/summer-cards/[id]/decision/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-cards/[id]/decision",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/summer-cards/[id]/supersede/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-cards/[id]/supersede",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/summer-cards/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-cards",
@@ -3425,9 +3521,25 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/summer-company/funnel-benchmarks/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-company/funnel-benchmarks",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/summer-company/funnel/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/funnel",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/summer-company/golden-path/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-company/golden-path",
       "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
@@ -3449,9 +3561,25 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/summer-company/stuck-signups/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-company/stuck-signups",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/summer-shadow/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-shadow",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/proof-stats/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/proof-stats",
       "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
@@ -3961,6 +4089,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/onboarding/replay/route.ts",
+      "kind": "handler",
+      "route": "/api/onboarding/replay",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/onboarding/welcome-chat/route.ts",
       "kind": "handler",
       "route": "/api/onboarding/welcome-chat",
@@ -4045,6 +4181,14 @@
       "kind": "handler",
       "route": "/api/ovie/mcp",
       "methods": ["GET", "OPTIONS", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/ovie/music-resolver/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/music-resolver",
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4185,6 +4329,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/profile-publication/route.ts",
+      "kind": "handler",
+      "route": "/api/profile-publication",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/profile-surfaces/[id]/qualification/route.ts",
       "kind": "handler",
       "route": "/api/profile-surfaces/[id]/qualification",
@@ -4229,6 +4381,14 @@
       "kind": "handler",
       "route": "/api/profile/pac-event",
       "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/profile/search/route.ts",
+      "kind": "handler",
+      "route": "/api/profile/search",
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4725,6 +4885,14 @@
       "kind": "handler",
       "route": "/api/visibility-audit/offer",
       "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/waitlist/join/route.ts",
+      "kind": "handler",
+      "route": "/api/waitlist/join",
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },

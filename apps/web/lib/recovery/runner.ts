@@ -28,7 +28,9 @@ export interface RunnerDeps {
   send(
     email: RecoveryEmail,
     to: string,
-    idempotencyKey: string
+    idempotencyKey: string,
+    /** Idempotency key of the approving Ovie card; the gateway re-checks it. */
+    approvalKey: string | null
   ): Promise<{ ok: boolean }>;
   cardStatus(idempotencyKey: string): Promise<CardStatus>;
   fileCard(card: SummerCardInput): Promise<void>;
@@ -111,6 +113,9 @@ export async function runRecovery(deps: RunnerDeps): Promise<RunResult> {
     const readyUrl = user.readyUrl as string;
 
     let approved = await deps.ledger.isTemplateApproved(fix.templateClass);
+    let approvalKey = approved
+      ? await deps.ledger.templateApprovalKey(fix.templateClass)
+      : null;
     if (!approved) {
       const key = cardKey(fix.id, user.userId);
       const status = await deps.cardStatus(key);
@@ -128,7 +133,8 @@ export async function runRecovery(deps: RunnerDeps): Promise<RunResult> {
         skip('rejected');
         continue;
       }
-      await deps.ledger.approveTemplate(fix.templateClass, deps.now);
+      await deps.ledger.approveTemplate(fix.templateClass, deps.now, key);
+      approvalKey = key;
       approved = true;
     }
 
@@ -153,7 +159,7 @@ export async function runRecovery(deps: RunnerDeps): Promise<RunResult> {
         recordId: record.id,
         mailingAddress: deps.mailingAddress,
       });
-      const result = await deps.send(email, user.email, record.id);
+      const result = await deps.send(email, user.email, record.id, approvalKey);
       if (!result.ok) {
         skip('send_failed');
         continue;

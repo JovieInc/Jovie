@@ -29,10 +29,11 @@ from pathlib import Path
 from urllib.parse import urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import disk_guard  # noqa: E402
-import lifecycle  # noqa: E402
+import lifecycle, pr_wip  # noqa: E402  (pr_wip: per-producer WIP census for the lanes feed)
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+from atomic_state import append_json_object
 import remediation  # noqa: E402  (classifier + non-PR intake; no lane_runner import)
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
@@ -437,14 +438,22 @@ HEAD_CHECKS_QUERY = """query($owner:String!,$name:String!,$number:Int!){reposito
 pullRequest(number:$number){commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100){nodes{__typename
 ... on CheckRun{name conclusion startedAt completedAt} ... on StatusContext{context state createdAt}}}}}}}}}}"""
 RED_CHECK_STATES = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR"})
+# Advisory checks that never gate a merge: their red (Tently's provider was down all night on
+# 2026-11-01, ~100 PRs got lane-fix-red) is no repair signal.
+NON_REQUIRED_CHECKS = frozenset({"tently"})
+
+
+def read_head_rollup(number: int, sh=run):
+    """One GraphQL read of the head check rollup. Callers own True, False, and None."""
+    owner, name = REPO.split("/", 1)
+    return sh(["gh", "api", "graphql", "-f", f"query={HEAD_CHECKS_QUERY}", "-F", f"owner={owner}",
+               "-F", f"name={name}", "-F", f"number={number}"])
 
 
 def head_red(number: int, sh=run) -> bool | None:
     """True only when the latest run of some check on the head failed. GitHub's rollup counts
     a CANCELLED (superseded) run as FAILURE even after its replacement passed. None: unreadable."""
-    owner, name = REPO.split("/", 1)
-    read = sh(["gh", "api", "graphql", "-f", f"query={HEAD_CHECKS_QUERY}", "-F", f"owner={owner}",
-               "-F", f"name={name}", "-F", f"number={number}"])
+    read = read_head_rollup(number, sh)
     try:
         commits = json.loads(read.stdout)["data"]["repository"]["pullRequest"]["commits"]["nodes"]
         nodes = ((commits[0]["commit"].get("statusCheckRollup") or {}).get("contexts") or {})["nodes"]
@@ -457,9 +466,52 @@ def head_red(number: int, sh=run) -> bool | None:
         key = node.get("name") or node.get("context")
         at = node.get("completedAt") or node.get("startedAt") or node.get("createdAt") or ""
         state = str(node.get("conclusion") or node.get("state") or "").upper()
+        if key and key.lower() in NON_REQUIRED_CHECKS:
+            continue
         if key and (key not in latest or at >= latest[key][0]):
             latest[key] = (at, state)
     return any(state in RED_CHECK_STATES for _, state in latest.values())
+
+
+def head_settled_green(number: int, sh=run) -> bool:
+    """True only when every required check on this head has completed success.
+
+    Pending, failed, cancelled, or unreadable is not green. The next check
+    completion is the event that asks again; this does not sleep or poll.
+    """
+    read = read_head_rollup(number, sh)
+    try:
+        commits = json.loads(read.stdout)["data"]["repository"]["pullRequest"]["commits"]["nodes"]
+        nodes = ((commits[0]["commit"].get("statusCheckRollup") or {}).get("contexts") or {})["nodes"]
+    except (ValueError, KeyError, IndexError, TypeError):
+        return False
+    if read.returncode or not isinstance(nodes, list) or not nodes:
+        return False
+    latest: dict = {}
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        key = node.get("name") or node.get("context")
+        at = node.get("completedAt") or node.get("startedAt") or node.get("createdAt") or ""
+        state = str(node.get("conclusion") or node.get("state") or "").upper()
+        if key and str(key).lower() in NON_REQUIRED_CHECKS:
+            continue
+        if key and (key not in latest or at >= latest[key][0]):
+            latest[key] = (at, state)
+    return bool(latest) and all(state == "SUCCESS" for _, state in latest.values())
+
+
+def red_label_justified(number: int, pr: dict, sh=run) -> bool:
+    """May `lane-fix-red` go on this head? Only after a completed failure.
+
+    2026-11-01: #24141 had every required check green and Source Validation merely re-running
+    when this label landed on it; Green Enroll treated the label as a hold and dequeued it
+    (queue position lost for 2h+). A required-green merge state (CLEAN, HAS_HOOKS, UNSTABLE) or a
+    head whose latest run of every check is not a failure (pending re-run, passed) is not red.
+    An unreadable check list keeps the old behaviour: a real red must not be dropped."""
+    if pr.get("mergeStateStatus") in REQUIRED_GREEN:
+        return False
+    return head_red(number, sh) is not False
 
 
 def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
@@ -474,7 +526,10 @@ def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
         return False
     if LANE_FIX_RED not in {label.lower() for label in label_names(pr)}:
         return False
-    if pr.get("mergeStateStatus") not in REQUIRED_GREEN:
+    # Merge state lags the check rollup (a success wake sees BLOCKED). The
+    # rollup is the event's evidence. A pending or failed check keeps the label
+    # until that check's own completion.
+    if pr.get("mergeStateStatus") not in REQUIRED_GREEN and not head_settled_green(number, sh):
         return False
     deleted = sh(["gh", "api", "-X", "DELETE",
                   f"repos/{REPO}/issues/{number}/labels/{LANE_FIX_RED}"])
@@ -957,13 +1012,33 @@ JOB_URL = re.compile(r"^(https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\
 RED_RUN_URL = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*(?:/attempts/[1-9]\d*)?")
 
 
+def red_section_bounds(lines: list[str], heading=RED_HEADING) -> tuple[int, int] | None:
+    """Match Fleet's section boundaries: headings inside code fences are log text."""
+    # Ignore hidden Markdown while retaining source line indexes for replacement.
+    visible = re.sub(r"<!--[\s\S]*?-->", lambda match: "\n" * match.group().count("\n"), "\n".join(lines))
+    fenced = False
+    start = None
+    for index, line in enumerate(visible.split("\n")):
+        if re.match(r"^\s*(?:```|~~~)", line):
+            fenced = not fenced
+            continue
+        if fenced:
+            continue
+        if start is None:
+            if heading.match(line.strip()):
+                start = index
+        elif ANY_HEADING.match(line):
+            return start, index
+    return (start, len(lines)) if start is not None else None
+
+
 def red_section_complete(body: str) -> bool:
     """Mirror of scripts/pr-fleet-rules.mjs: a Failing command plus a red-output fence or run URL."""
     lines = re.sub(r"<!--[\s\S]*?-->", "", body or "").split("\n")
-    start = next((i for i, line in enumerate(lines) if RED_HEADING.match(line.strip())), None)
-    if start is None:
+    bounds = red_section_bounds(lines)
+    if bounds is None:
         return False
-    end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
+    start, end = bounds
     section = "\n".join(lines[start + 1:end])
     command = re.search(r"^\s*(?:-\s*)?Failing command:\s*(.+)$", section, re.I | re.M)
     run_url = re.search(r"^\s*(?:-\s*)?Failing run \(before fix\):\s*`?(https://\S+?)`?\s*$", section, re.I | re.M)
@@ -980,7 +1055,8 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
     the failed jobs' error lines the fixer is shown. Preserve a command that exits nonzero
     for the failed run: `gh run view --log-failed` only displays logs and exits successfully.
     Repair PRs require this evidence; agents forget it (45 of 138 Fleet Rules failures on
-    2026-10-25) and the lane already has it. None when no red check names a run."""
+    2026-10-25) and the lane already has it. Conflict-only repairs use observed git merge
+    failure output instead. None without a red run or an observed merge failure."""
     for check in pr.get("statusCheckRollup") or []:
         if str(check.get("conclusion") or "").lower() not in RED_CONCLUSIONS:
             continue
@@ -998,23 +1074,40 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
             f"- Failing command: `gh run watch {run_url.rsplit('/', 1)[-1]} --repo {REPO} --exit-status`",
             f"- Failing run (before fix): {run_url}", "",
             "```text", *lines, "```", "", RED_BLOCK_MARKER])
+    # Conflict-only repairs have no failed CI run. Require both the observed
+    # git merge failure and a conflicting PR state; a label alone is not red proof.
+    observed = str(excerpt or "").splitlines()
+    conflicts = [line for line in observed if re.fullmatch(r"CONFLICT \([^)]+\): .+", line)]
+    if (pr.get("mergeable") == "CONFLICTING" or pr.get("mergeStateStatus") == "DIRTY") and conflicts and (
+            "Automatic merge failed; fix conflicts and then commit the result." in observed):
+        return "\n".join([
+            "## Red-before-green", "",
+            "- Failing command: `git merge origin/main --no-edit`", "",
+            "```text", *conflicts[:25],
+            "Automatic merge failed; fix conflicts and then commit the result.",
+            "```", "", RED_BLOCK_MARKER])
     return None
 
 
 def with_red_section(body: str, block: str) -> str:
     """Replace an empty/placeholder Red-before-green section with the block, or append one."""
     lines = (body or "").split("\n")
-    start = next((i for i, line in enumerate(lines) if RED_HEADING.match(line.strip())), None)
-    if start is None:
+    bounds = red_section_bounds(lines)
+    if bounds is None:
         return (body or "").rstrip("\n") + "\n\n" + block + "\n"
-    end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
+    start, end = bounds
     return "\n".join(lines[:start] + block.split("\n") + [""] + lines[end:])
 
 
-def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None) -> str:
+def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
+                         locking_pr: int | None = None, win_section: str | None = None,
+                         premise: dict | None = None) -> str:
     """Complete repair metadata without replacing existing evidence or customer decisions.
 
-    The caller chooses the customer outcome; never infer it from a failed check.
+    The caller chooses the customer outcome and supplies any locking PR provenance;
+    never infer either from a failed check. Existing locked-area decisions are preserved.
+    Measured wins must be supplied by the caller, never inferred from a red check.
+    Premise evidence must describe the caller's actual falsifying test and observation.
     The canonical Fleet/changelog guards still validate the resulting body.
     """
     updated = body
@@ -1031,6 +1124,26 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         else:
             note = json.dumps(customer_decision, separators=(",", ":")).replace("<", "\\u003c").replace(">", "\\u003e")
             updated = updated.rstrip("\n") + "\n<!-- customer-changelog/v1 " + note + " -->\n"
+    if locking_pr is not None:
+        if type(locking_pr) is not int or locking_pr < 1:
+            raise ValueError("locking PR requires an explicit positive PR number")
+        visible = re.sub(r"<!--[\s\S]*?-->", "", updated)
+        if not re.search(r"^#{1,6}\s+Locked areas\s*$", visible, re.I | re.M):
+            updated = updated.rstrip("\n") + f"\n\n## Locked areas\n\nLocking PR: #{locking_pr}\n"
+    if win_section is not None and win_section != "":
+        if not isinstance(win_section, str) or not re.match(r"\A## Win\s*\n", win_section):
+            raise ValueError("measured win requires a complete ## Win section")
+        if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Win\s*$", re.I)) is None:
+            updated = updated.rstrip("\n") + "\n\n" + win_section.rstrip("\n") + "\n"
+    if premise is not None:
+        fields = ("Assumption", "Falsifying test", "Result")
+        if not isinstance(premise, dict) or any(
+                not isinstance(premise.get(field), str) or not premise[field].strip()
+                or "\n" in premise[field] or "\r" in premise[field] for field in fields):
+            raise ValueError("premise requires explicit single-line Assumption, Falsifying test and Result")
+        if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Premise check\s*$", re.I)) is None:
+            block = "## Premise check\n\n" + "\n".join(f"- {field}: {premise[field]}" for field in fields)
+            updated = updated.rstrip("\n") + "\n\n" + block + "\n"
     return updated
 
 
@@ -1044,16 +1157,20 @@ def api_gh(args, **_):
     return subprocess.CompletedProcess(args, done["code"], done["stdout"], done["stderr"])
 
 
-def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None) -> bool:
+def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None,
+                            locking_pr: int | None = None, win_section: str | None = None,
+                            premise: dict | None = None) -> bool:
     """Complete repair evidence and an optional caller-selected customer decision."""
     if not isinstance(pr.get("number"), int) or (
-            customer_decision is None and red_before_green_block(pr, excerpt) is None):
+            customer_decision is None and locking_pr is None and win_section is None and premise is None
+            and red_before_green_block(pr, excerpt) is None):
         return False
     viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
     if viewed.returncode != 0:
         return False
     body = viewed.stdout or ""
-    updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision)
+    updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision, locking_pr=locking_pr,
+                                   win_section=win_section, premise=premise)
     if updated == body:
         return False
     with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:
@@ -1142,6 +1259,8 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
         if kind == "dequeued" and mark_poison(number, pr, time.time(), sh):
             added.append((number, POISON_LABEL))
         if PREFIX + kind in label_names(pr):
+            continue
+        if kind == "red" and not red_label_justified(number, pr, sh):
             continue
         if in_scope(pr, kind, disabled) and add_label(number, kind, sh):
             added.append((number, kind))
@@ -2138,8 +2257,7 @@ def sync_failure_reason(result) -> str:
 
 def ledger(host, receipt: dict) -> None:
     (host.state / "runs").mkdir(parents=True, exist_ok=True)
-    with open(host.state / "runs" / "ledger.jsonl", "a") as handle:
-        handle.write(json.dumps(receipt) + "\n")
+    append_json_object(host.state / "runs" / "ledger.jsonl", receipt)
 
 
 OPEN_PRS_QUERY = """query($owner:String!,$name:String!,$cursor:String){repository(owner:$owner,name:$name){nameWithOwner
@@ -2527,7 +2645,7 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
         settling = age < ORPHAN_GRACE_S or pr.get("rollup") in ("PENDING", "EXPECTED")
         if not (explicitly_held or queued or settling):
             plan["orphans"].append(number)
-    plan["counts"] = counts
+    plan["counts"] = {**counts, "wip": pr_wip.census(prs, now)}
     plan["dispositions"] = dispositions(prs, plan, attempts, max_attempts, now, held)
     return plan
 
@@ -2557,8 +2675,9 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
         if kind == "conflict" and claim_active(
                 number, by_number[number].get("headRefOid"), lane.sh, now):
             continue
-        if kind == "red" and head_red(number, lane.sh) is not True:
-            continue  # a cancelled/superseded run reddens the rollup; unknown waits a pass
+        if kind == "red" and (by_number[number].get("mergeStateStatus") in REQUIRED_GREEN
+                              or head_red(number, lane.sh) is not True):
+            continue  # a cancelled/superseded run or a non-required red; unknown waits a pass
         if add_label(number, kind, lane.sh):
             labeled.append((number, kind))
     for number, kind in plan["unlabel"]:
@@ -2756,15 +2875,31 @@ def write_wake_file(state, *, pr, sha, run_id, run_attempt, red_at):
 
 
 def wake(argv: list[str]) -> int:
-    """Gem-side wake job: for each red PR in --prs, write a wake file from the
-    workflow_run event (red_at = updated_at). Local state only; no secret, no
-    GitHub writes — fix-now (and only fix-now) does everything after that."""
+    """Gem-side wake job: write a wake file from the workflow_run event
+    (red_at = updated_at). Local state only; no secret, no GitHub writes.
+    fix-now (and only fix-now) does everything after that.
+
+    The check completion is the event. With no --prs, the PRs on that event
+    are the targets. A success or an unrelated event writes nothing.
+    """
+    explicit = "--prs" in argv
     prs = []
-    if "--prs" in argv:
+    if explicit:
         for token in argv[argv.index("--prs") + 1].split(","):
             token = token.strip()
             if token.isdigit():
                 prs.append(int(token))
+    event_path = os.environ.get("GITHUB_EVENT_PATH")
+    payload = json.loads(Path(event_path).read_text()) if event_path and Path(event_path).exists() else {}
+    run = payload.get("workflow_run") or {}
+    if not explicit and run.get("conclusion") not in RED_CONCLUSIONS:
+        print("wake: not a red check")
+        return 0
+    if not prs:
+        for item in run.get("pull_requests") or []:
+            number = item.get("number") if isinstance(item, dict) else None
+            if isinstance(number, int) and number > 0:
+                prs.append(number)
     if not prs:
         print("wake: no red PRs")
         return 0
@@ -2772,9 +2907,6 @@ def wake(argv: list[str]) -> int:
     if state is None:
         print("wake: no lane state dir configured; nothing written")
         return 0
-    event_path = os.environ.get("GITHUB_EVENT_PATH")
-    payload = json.loads(Path(event_path).read_text()) if event_path and Path(event_path).exists() else {}
-    run = payload.get("workflow_run") or {}
     sha = run.get("head_sha")
     if not re.fullmatch(r"[0-9a-f]{40}", sha or ""):
         print("wake: event carries no pull-request head sha; nothing written")

@@ -73,6 +73,24 @@ test('wilsonLower is conservative for small n', () => {
   assert.ok(wilsonLower(90, 100) < 0.9);
 });
 
+test('frame IDs retain label joins and the same calibration as legacy keys', () => {
+  const legacy = [
+    ...frames(40, 'unpolished', 'd'),
+    ...frames(40, 'polished', 'c'),
+  ];
+  const labels = legacy.map((o, i) => ({
+    key: o.key,
+    judge: 'polish',
+    truth: i < 40 ? 'defect' : 'ok',
+  }));
+  const observations = legacy.map(({ key, ...o }) => ({ frameId: key, ...o }));
+  assert.deepEqual(measure(observations, labels), measure(legacy, labels));
+  assert.equal(
+    verdict(measure(observations, labels).polish, FLOORS).mayBlock,
+    true
+  );
+});
+
 test('taste labels from Tim verdicts feed calibration and wait for a judge run', () => {
   const labels = tasteJudgeLabels(process.cwd());
   assert.ok(

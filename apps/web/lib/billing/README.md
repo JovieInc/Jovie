@@ -45,7 +45,7 @@ Edit `lib/entitlements/registry.ts`:
 
 ## Price lock (Tim, 2026-10-29)
 
-A person always gets the price they signed up at. One consistent price everywhere is a legal invariant (JOV-INV-047).
+A person always gets the price they signed up at. One consistent price everywhere is a legal invariant (JOV-INV-048).
 
 - **Registry:** `price-versions.ts` names each list price (`PRICE_VERSIONS`, `CURRENT_PRICE_VERSION_ID`). A test fails when the list price in `lib/config/plan-prices.ts` moves without a new version. To change the price (JOV-9769): append a version, make it current, then change the list price and Stripe env. Existing locks keep their own snapshot, so the change reaches new signups only. Live Stripe price changes need Tim's yes through an Ovie card.
 - **Record:** `price_locks` (one row per user: version id, amounts, Stripe price ids, timestamp, source). Written at sign-up (`lib/auth/provision.ts`, `lib/auth/gate.ts`), waitlist join/redeem, or first need (`ensurePriceLockForUser`). First write wins. Paying subscribers are backfilled from the price they pay (`backfillSubscriberPriceLocks`, run by the daily reconcile); unpaid existing users lock on first need at the list price they are then shown.

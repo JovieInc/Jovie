@@ -8,18 +8,19 @@ are never origin evidence.
 from __future__ import annotations
 
 import argparse
+import io
 from collections import Counter
 from datetime import datetime, timezone
-import fcntl
 import json
 import math
-import os
 from pathlib import Path
 import re
 import subprocess
 import sys
 import time
 from urllib.parse import quote
+
+from atomic_state import append_json_object
 
 ATTRIBUTION_SCHEMA = "jovie-company-shipping-attribution/v1"
 ORIGIN_RECEIPT_SCHEMA = "jovie-shipping-origin/v1"
@@ -281,7 +282,7 @@ def attribute_pr(pr: dict, receipts: list[dict], repository: str) -> dict:
 
 
 def project_report(project: dict, evidence: dict, ledger: dict, generated_at: float) -> dict:
-    # Origin emitters use a sparse two-file checkout; only reporting needs the reader.
+    # Origin emitters use a minimal receipt checkout; only reporting needs the reader.
     import merge_evidence
 
     repository, instrumented = project["repository"], project["instrumented"]
@@ -401,29 +402,32 @@ def resolve_origin_head(repository: str, number: int, expected_head: str, *, fet
 def append_origin_receipt(path: Path, receipt: dict) -> None:
     """Append a manual/external origin receipt without changing execution authority."""
     validate_origin_receipt(receipt)
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    with Path(path).open("a+") as handle:
-        fcntl.flock(handle, fcntl.LOCK_EX)
-        handle.seek(0)
-        for raw in handle:
-            if not raw.strip():
-                continue
-            try:
-                row = json.loads(raw)
-            except ValueError:
-                raise OSError("origin-ledger-corrupt") from None
-            if not isinstance(row, dict):
-                raise OSError("origin-ledger-corrupt")
-            if (row.get("schema") == ORIGIN_RECEIPT_SCHEMA and
-                    (row.get("repository"), row.get("pr"), row.get("headSha")) ==
-                    (receipt["repository"], receipt["pr"], receipt["headSha"])):
-                fields = ("method", "initiator", "provider", "model", "linearIssue")
-                if any(row.get(key) != receipt.get(key) for key in fields):
-                    raise ValueError("conflicting-origin-receipt")
-                raise ValueError("duplicate-origin-receipt")
-        handle.write(json.dumps(receipt, separators=(",", ":")) + "\n")
-        handle.flush()
-        os.fsync(handle.fileno())
+
+    def check_existing(handle, candidate):
+        # Preserve the original UTF-8/universal-newline/Unicode-blank reader.
+        reader = io.TextIOWrapper(handle, encoding="utf-8")
+        try:
+            for raw in reader:
+                if not raw.strip():
+                    continue
+                try:
+                    row = json.loads(raw)
+                except ValueError:
+                    raise OSError("origin-ledger-corrupt") from None
+                if not isinstance(row, dict):
+                    raise OSError("origin-ledger-corrupt")
+                if (row.get("schema") == ORIGIN_RECEIPT_SCHEMA and
+                        (row.get("repository"), row.get("pr"), row.get("headSha")) ==
+                        (candidate["repository"], candidate["pr"], candidate["headSha"])):
+                    fields = ("method", "initiator", "provider", "model", "linearIssue")
+                    if any(row.get(key) != candidate.get(key) for key in fields):
+                        raise ValueError("conflicting-origin-receipt")
+                    raise ValueError("duplicate-origin-receipt")
+        except UnicodeError:
+            raise OSError("origin-ledger-corrupt") from None
+        finally:
+            reader.detach()  # the helper owns the still-locked binary descriptor
+    append_json_object(path, receipt, before_append=check_existing)
 
 
 def main(argv=None) -> int:

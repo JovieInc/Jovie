@@ -86,6 +86,13 @@
           "source": "github-pr"
         },
         {
+          "id": "prepush-preflight",
+          "meaning": "pre-push preflight:changed run on the exact head (slot wait excluded; per-guard wall times in preflight-timings.jsonl)",
+          "producer": "preflight-changed.mjs",
+          "status": "pushed",
+          "source": "preflight-stages.jsonl"
+        },
+        {
           "id": "gate-seat",
           "meaning": "lane gate waiting for a host gate seat (admission deferrals exit as abandoned)",
           "producer": "lanes",
@@ -396,6 +403,48 @@
         }
       ]
     },
+    "detector-issue": {
+      "entityId": "Linear issue identifier and detector cycle (JOV-10167#1; a reopen starts cycle 2)",
+      "description": "One detector-filed issue (lanes doctor or capacity collector, title `Symphony doctor: <key> (<host>)`) from filing to the detector's own clear reading. Routed model-free by summer-config detector-loop.ts; SLA by class severity (P0 1h own / 4h fix, P1 4h / 24h, P2 24h / 7d). Per-class p50/p95 and the unowned and aged counts (target 0) are at https://summer.jov.ie/runtime/v1/detector-loop.json. actor = detector:<class>.",
+      "endToEnd": [["filed", "verified"], ["filed", "owned"]],
+      "stages": [
+        {
+          "id": "filed",
+          "meaning": "filed by a detector until an owner holds it (board claim, lane start, or a founder card for reserved items)",
+          "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        },
+        {
+          "id": "owned",
+          "meaning": "owner holds it until a PR is in review, or until the fix is applied when no PR is needed",
+          "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        },
+        {
+          "id": "pr",
+          "meaning": "PR in review or merging until it merges",
+          "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        },
+        {
+          "id": "fixed",
+          "meaning": "fix merged or applied until the detector confirms the condition cleared (Validating; Done only on the detector's clear)",
+          "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        },
+        {
+          "id": "verified",
+          "meaning": "terminal: completed when the detector closed it with its cleared receipt",
+          "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        }
+      ]
+    },
     "summer-turn": {
       "entityId": "<hashed conversation>:<hashed turn> (summer-config hashes both)",
       "description": "One Summer turn from triggering event to measured outcome.",
@@ -551,9 +600,160 @@
           "owner": "apps/web/lib/content-records/stage-events.ts"
         }
       ]
+    },
+    "incident": {
+      "entityId": "<host>:<doctor condition key>#<generation> (gem:probe-red:gem:jovie-research#1)",
+      "description": "One lanes doctor condition generation from the last proof of life to the doctor's own clear reading. undetected = time to detect, unfiled = time to file, open = time to fix and verify. The board claim / PR / merge split of the same Linear issue is the detector-issue entity (summer-config). Journal: runs/incidents.jsonl on Gem.",
+      "endToEnd": [
+        ["undetected", "cleared"],
+        ["unfiled", "cleared"],
+        ["open", "cleared"]
+      ],
+      "stages": [
+        {
+          "id": "undetected",
+          "meaning": "last proof of life (passing probe or fresh registry receipt) until the doctor raised the condition",
+          "producer": "lanes",
+          "status": "pushed",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "unfiled",
+          "meaning": "condition raised until its Linear issue was filed or reopened",
+          "producer": "lanes",
+          "status": "pushed",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "open",
+          "meaning": "issue filed (or condition raised, when never filed) until the doctor read the condition cleared",
+          "producer": "lanes",
+          "status": "pushed",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "cleared",
+          "meaning": "terminal: the doctor read it cleared and closed the issue with its cleared comment",
+          "producer": "lanes",
+          "status": "pushed",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        }
+      ]
+    },
+    "design-loop": {
+      "entityId": "design loop id, one per ask: <route-slug>-<yyyymmdd>[-n]",
+      "description": "One Pen-to-code taste round trip, from the ask to a preview Tim can judge and the review. Dwell SLO 30 min for brief to preview (.claude/rules/event-driven.md). Rows are appended by scripts/design/design-loop-ledger.mjs to docs/metrics/design-loop-ledger.ndjson; pen-export appends export and approved.",
+      "sloSeconds": 1800,
+      "endToEnd": [["brief", "preview"], ["brief", "review"]],
+      "stages": [
+        {
+          "id": "brief",
+          "meaning": "ask received until the art-director brief (mission, audience, references) is written",
+          "producer": "design-loop-ledger",
+          "status": "pushed",
+          "source": "design-loop-ledger",
+          "owner": "Tim ask, or Summer on his behalf"
+        },
+        {
+          "id": "variants",
+          "meaning": "brief until Pen variants are generated in a side .pen file and finalists are presented",
+          "producer": "design-loop-ledger",
+          "status": "pushed",
+          "source": "design-loop-ledger",
+          "owner": "art director (Opus)"
+        },
+        {
+          "id": "approved",
+          "meaning": "finalists presented until Tim's taste receipt (or the default shipped at its deadline) is recorded in pen-bindings.json",
+          "producer": "design-loop-ledger",
+          "status": "pushed",
+          "source": "design-loop-ledger",
+          "owner": "founder taste"
+        },
+        {
+          "id": "export",
+          "meaning": "approved frames until stills and sha256 are committed to the manifest (pnpm design:pen-export)",
+          "producer": "design-loop-ledger",
+          "status": "pushed",
+          "source": "design-loop-ledger",
+          "owner": "pen-export"
+        },
+        {
+          "id": "codegen",
+          "meaning": "stills committed until the React section is generated with data-pen-section markers",
+          "producer": "design-loop-ledger",
+          "status": "pushed",
+          "source": "design-loop-ledger",
+          "owner": "pen-codegen"
+        },
+        {
+          "id": "preview",
+          "meaning": "code generated until a preview URL is live for the route",
+          "producer": "design-loop-ledger",
+          "status": "pushed",
+          "source": "design-loop-ledger",
+          "owner": "CI preview"
+        },
+        {
+          "id": "diff",
+          "meaning": "preview live until the Pen diff gate returns pass or fail",
+          "producer": "design-loop-ledger",
+          "status": "pushed",
+          "source": "design-loop-ledger",
+          "owner": "pen-diff gate"
+        },
+        {
+          "id": "review",
+          "meaning": "gate result until the taste round trip is closed: Tim judged the preview, or the default shipped",
+          "producer": "design-loop-ledger",
+          "status": "pushed",
+          "source": "design-loop-ledger",
+          "owner": "founder taste"
+        }
+      ]
+    },
+    "board-task": {
+      "entityId": "mesh hub board task id claimed by the lanes (stall-..., jov-123-c1)",
+      "description": "One mesh board task the Gem lanes claimed through scripts/lanes/board_intake.py, from posting to its verified close. posted = claim latency, running = run time; the terminal stage's failRate is 1 - success rate. Journal: runs/board-intake.jsonl on Gem.",
+      "endToEnd": [["posted", "closed"], ["running", "closed"]],
+      "stages": [
+        {
+          "id": "posted",
+          "meaning": "posted on the hub board until the lanes claimed it",
+          "producer": "lanes",
+          "status": "pushed",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "running",
+          "meaning": "claimed until closed done (completed) or failed",
+          "producer": "lanes",
+          "status": "pushed",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "closed",
+          "meaning": "terminal: done (completed) or failed",
+          "producer": "lanes",
+          "status": "pushed",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        }
+      ]
     }
   },
   "sources": {
+    "preflight-stages.jsonl": {
+      "kind": "events",
+      "url": null,
+      "owner": "scripts/lib/preflight-timing.mjs (~/.local/state/jovie-lanes/preflight-stages.jsonl)"
+    },
     "content-record-events": {
       "kind": "events",
       "url": "https://jov.ie/api/content-records/stage-events",
@@ -627,6 +827,11 @@
       "url": null,
       "artifact": "stage-events.ndjson next to the watcher state (rolling 28 d, written by scripts/signals/signal_watch.py)",
       "owner": "signals; published through the lanes status feed once the Gem tick is live"
+    },
+    "design-loop-ledger": {
+      "kind": "events",
+      "url": null,
+      "owner": "scripts/design/design-loop-ledger.mjs (docs/metrics/design-loop-ledger.ndjson)"
     }
   },
   "producers": {
@@ -658,6 +863,7 @@
       "runner-autoscaler-canary.yml": "runner health probe, not a delivery stage",
       "m2-revenue-path-canary.yml": "synthetic revenue probe; gap tracked in the stage gap audit",
       "ovie-summer-canary.yml": "synthetic Summer fast-chat probe, not a delivery stage",
+      "vs-linktree-claims.yml": "weekly claim re-measure of public pages, not a delivery stage",
       "production-controller-health.yml": "controller liveness monitor; measures the controller, not a stage",
       "postdeploy-probes.yml": "manual re-run of production probes; production-controller.yml owns the stage",
       "desktop-release.yml": "desktop app release; gap tracked in the stage gap audit",
