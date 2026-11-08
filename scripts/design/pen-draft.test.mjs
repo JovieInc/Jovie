@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   draftProblem,
   loadBriefs,
@@ -66,6 +71,28 @@ test('a frame without its .pen or preview is not drafted', () => {
   assert.deepEqual(
     missingOutputs(b, 'o', p => String(p).endsWith('.pen')),
     ['claim.png']
+  );
+});
+
+test('a blocked run names the missing secrets as a CI annotation', () => {
+  const out = mkdtempSync(join(tmpdir(), 'pen-draft-blocked-'));
+  const res = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL('./pen-draft.mjs', import.meta.url)), '--out', out],
+    {
+      encoding: 'utf8',
+      cwd: fileURLToPath(new URL('../..', import.meta.url)),
+      env: { PATH: process.env.PATH, GITHUB_ACTIONS: 'true' },
+    }
+  );
+  assert.equal(res.status, 1);
+  assert.match(
+    res.stdout,
+    /^::error title=pen-draft blocked::pen-draft: blocked, missing PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL$/m
+  );
+  assert.equal(
+    JSON.parse(readFileSync(join(out, 'receipt.json'), 'utf8')).blocked,
+    'missing PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL'
   );
 });
 
