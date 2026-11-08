@@ -36,7 +36,7 @@ export function SettingsRouteSkeleton() {
             {SETTINGS_FIELD_ROW_KEYS.map(key => (
               <div
                 key={key}
-                className='flex items-center justify-between gap-4 rounded-xl bg-surface-0 px-3 py-2.5'
+                className='flex items-center justify-between gap-4 rounded-xl bg-surface-0 px-3 py-(--space-2-5)'
               >
                 <div className='min-w-0 flex-1 space-y-1.5'>
                   <div className='skeleton h-4 w-40 max-w-full rounded-sm' />

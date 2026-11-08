@@ -81,7 +81,7 @@ export function LinksRouteSkeleton() {
                       <span
                         aria-hidden='true'
                         className={cn(
-                          'skeleton block h-3.5 rounded-sm motion-reduce:animate-none',
+                          'skeleton block h-(--space-3-5) rounded-sm motion-reduce:animate-none',
                           header.bar
                         )}
                       />
