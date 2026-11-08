@@ -75,6 +75,10 @@ export async function assertSidebarClickNavigation(
 
   const results: ClickNavigationResult[] = [];
   try {
+    // Start from a full document load of the dashboard, the way a returning
+    // creator opens it, so the client runtime (router, monitoring SDK) boots
+    // on a dashboard route rather than on the sign-in page.
+    await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(
       page.locator(SIDEBAR_LINK).first(),
       'Dashboard sidebar links should render'
