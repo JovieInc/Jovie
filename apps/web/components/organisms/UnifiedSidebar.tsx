@@ -124,9 +124,9 @@ function OperatorNavGroup({
   const queryClient = useQueryClient();
   const prefetchShipping = (item: NavItem) => {
     if (item.href !== APP_ROUTES.ADMIN_SHIPPING) return;
-    void import('@/lib/queries/shipping-state').then(m =>
-      queryClient.prefetchQuery(m.shippingStateQueryOptions)
-    );
+    void import('@/lib/queries/shipping-state')
+      .then(m => queryClient.prefetchQuery(m.shippingStateQueryOptions))
+      .catch(() => undefined); // A missed prefetch must not reload the page.
   };
   const [stored, setStored] = useState(false);
   useEffect(() => {
