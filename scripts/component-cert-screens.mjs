@@ -6,6 +6,7 @@
  *   node scripts/component-cert-screens.mjs --issues out.json
  *        ranked failing components for an agent loop (most screens first)
  *   node scripts/component-cert-screens.mjs --refresh       shrink debt to what still fails
+ *        (a criterion the base registry lacks starts as debt for whatever fails it)
  *   node scripts/component-cert-screens.mjs --enroll <id> --page apps/web/app/x/page.tsx [--route /x] [--stage reach]
  *        add a screen; its current failures become debt, everything new must pass
  * The merge gate itself runs inside `pnpm component-certificate:gate`.
@@ -27,6 +28,7 @@ import {
   debtEntry,
   evaluateScreenGates,
   owedCriteria,
+  readBaseScreens,
   readScreens,
   SCREEN_STAGES,
   screenComponents,
@@ -47,6 +49,7 @@ const { values } = parseArgs({
     page: { type: 'string' },
     route: { type: 'string' },
     stage: { type: 'string' },
+    base: { type: 'string', default: 'origin/main' },
     'mutation-state': { type: 'string' },
     a11y: { type: 'string' },
     visual: { type: 'string' },
@@ -134,14 +137,24 @@ if (values.enroll || values.refresh) {
   const enrolled = values.enroll
     ? new Set(byScreen.get(values.enroll))
     : new Set();
-  // Refresh only ever shrinks an entry; enrollment may add the new screen's.
+  // Refresh only ever shrinks an entry; enrollment may add the new screen's,
+  // and a criterion new against the base registry adds what fails it.
+  const base = readBaseScreens(root, values.registry, values.base);
+  const added = new Set(
+    base
+      ? screens.criteria.filter(id => !(base.criteria ?? []).includes(id))
+      : []
+  );
   for (const [component, entry] of Object.entries(fresh)) {
     const failing = owedCriteria(entry);
     const owed = owedCriteria(screens.debt?.[component]);
     if (enrolled.has(component))
       next[component] = debtEntry([...owed, ...failing]);
-    else if (owed.length) {
-      const kept = owed.filter(id => failing.includes(id));
+    else {
+      const kept = [
+        ...owed.filter(id => failing.includes(id)),
+        ...failing.filter(id => added.has(id)),
+      ];
       if (kept.length) next[component] = debtEntry(kept);
     }
   }
