@@ -193,6 +193,12 @@ const config: StorybookConfig = {
           replacement: require.resolve('./recent-releases-mock.ts'),
         },
         {
+          // lib/cookies/consent is a server action that writes the consent
+          // cookie; the mock lets cookie stories hold a save pending or fail.
+          find: '@/lib/cookies/consent',
+          replacement: require.resolve('./cookie-consent-mock.ts'),
+        },
+        {
           // lib/observability/revenue-spine imports node:crypto at module
           // scope and is reachable from auth/session/entitlement modules that
           // stories render; the externalized import blanks those stories.

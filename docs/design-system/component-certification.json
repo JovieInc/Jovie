@@ -209,6 +209,19 @@
     },
     "apps/web/components/features/tracking/AcquisitionCapture.tsx": {
       "error": "AcquisitionCapture renders no markup; a failed acquisition request or blocked storage is swallowed by design and shows nothing, which AcquisitionCapture.test.tsx covers."
+    },
+    "apps/web/components/molecules/CookieActions.tsx": {
+      "empty": "CookieActions always renders the same three consent buttons (Reject all, Accept all, Customize) and takes no collection; the detector matched the items-center class.",
+      "partial": "Its three handlers are required and its optional props (className, disabled, compact) are presentation flags with defaults, so there is no partially present data; Compact, Standard and Disabled show them.",
+      "long-content": "The three button labels are fixed consent copy with no props or caller text, so the content cannot grow; the detector matched text in the --linear-text-primary token and a layout comment."
+    },
+    "apps/web/components/organisms/CookieBannerSection.tsx": {
+      "partial": "The card always shows the same fixed consent message and three actions; its two optional props are a test-only pathname override and the server-resolved visibility flag, so no content can be partially present.",
+      "long-content": "The consent message, Privacy link and action labels are fixed copy with no props or user text, so the card's content cannot grow; the detector matched the aria-label and the text-* utility classes."
+    },
+    "apps/web/components/organisms/CookieModal.tsx": {
+      "empty": "The dialog maps over the fixed COOKIE_CATEGORIES constant (Essential, Analytics, Marketing), which is never empty, so there is no empty-data state.",
+      "long-content": "Every category label, description and button in the dialog is fixed copy from module constants with no props or user text, so its content cannot grow."
     }
   }
 }
