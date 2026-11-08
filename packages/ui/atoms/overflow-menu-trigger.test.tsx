@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { OverflowMenuTrigger } from './overflow-menu-trigger';
 
@@ -143,5 +144,25 @@ describe('OverflowMenuTrigger', () => {
     expect(trigger).toHaveClass('custom-trigger');
     await user.click(trigger);
     expect(onClick).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('OverflowMenuTrigger accessibility', () => {
+  it('has no axe violations across default, active, disabled and RTL states', async () => {
+    const { container } = render(
+      <div>
+        <OverflowMenuTrigger />
+        <OverflowMenuTrigger hasActiveOverflow aria-label='More actions' />
+        <OverflowMenuTrigger disabled aria-label='More actions' />
+        <div dir='rtl'>
+          <OverflowMenuTrigger
+            hasActiveOverflow
+            aria-label='المزيد من علامات التبويب، علامة التبويب الحالية مخفية'
+          />
+        </div>
+      </div>
+    );
+    expect(screen.getAllByRole('button')).toHaveLength(4);
+    await expectNoA11yViolations(container);
   });
 });

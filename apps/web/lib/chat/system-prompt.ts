@@ -1,27 +1,11 @@
 import { getProfileUrl } from '@/constants/domains';
 import { buildPromptSecuritySection } from '@/lib/chat/prompt-disclosure-guard';
+import { spotifyConnectionLine } from '@/lib/chat/spotify-connection-line';
 import { buildSegmentPromptSection } from '@/lib/creator/segment-registry';
 import { inferSegment, type ResolvedSegment } from '@/lib/creator/segments';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { PITCH_GRILL_PROCEDURE } from '@/lib/services/pitch/curator-checklist';
 import { formatAmount } from '@/lib/utils/format-number';
-
-interface ArtistContextSpotify {
-  readonly spotifyUrl?: string | null;
-  readonly spotifyFollowers: number | null;
-  readonly spotifyPopularity: number | null;
-}
-
-/** Connection state is its own fact: a null follower count is not "Not connected". */
-function spotifyConnectionLine(context: ArtistContextSpotify): string {
-  const connected =
-    Boolean(context.spotifyUrl) ||
-    context.spotifyFollowers !== null ||
-    context.spotifyPopularity !== null;
-  return connected
-    ? `Connected${context.spotifyUrl ? ` (${context.spotifyUrl})` : ''}`
-    : 'Not connected';
-}
 
 interface ArtistContext {
   readonly displayName: string;

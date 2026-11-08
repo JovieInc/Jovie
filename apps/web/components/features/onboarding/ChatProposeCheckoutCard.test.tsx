@@ -57,14 +57,44 @@ describe('ChatProposeCheckoutCard', () => {
 
     expect(screen.getByRole('link', { name: /continue/i })).toHaveAttribute(
       'href',
-      '/onboarding/checkout?plan=pro'
+      '/onboarding/checkout?plan=pro&source=intent'
     );
   });
+
+  // An artist pressing Continue mid-interview, before their page is live, must
+  // reach checkout. Without source=intent the checkout page reads the visit as
+  // an organic upsell and redirects them back to /start.
+  it.each([
+    ['/onboarding/checkout', '/onboarding/checkout?source=intent'],
+    [
+      '/onboarding/checkout?plan=pro',
+      '/onboarding/checkout?plan=pro&source=intent',
+    ],
+    [
+      '/onboarding/checkout?plan=pro&source=upsell',
+      '/onboarding/checkout?plan=pro&source=intent',
+    ],
+  ])(
+    'marks the handoff %s as artist-initiated checkout',
+    (handoffUrl, href) => {
+      render(
+        <ChatProposeCheckoutCard
+          payload={{ action: 'propose_checkout', plan: 'pro', handoffUrl }}
+        />
+      );
+
+      expect(screen.getByRole('link', { name: /continue/i })).toHaveAttribute(
+        'href',
+        href
+      );
+    }
+  );
 
   it.each([
     'https://evil.example/onboarding/checkout',
     '/pricing',
     '/onboarding/settings',
+    '/onboarding/checkout-elsewhere',
   ])('ignores an out-of-family handoffUrl %s', handoffUrl => {
     render(
       <ChatProposeCheckoutCard
@@ -74,7 +104,7 @@ describe('ChatProposeCheckoutCard', () => {
 
     expect(screen.getByRole('link', { name: /continue/i })).toHaveAttribute(
       'href',
-      '/onboarding/checkout'
+      '/onboarding/checkout?source=intent'
     );
   });
 });
