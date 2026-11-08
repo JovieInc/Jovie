@@ -5,15 +5,26 @@ import {
   readConfiguredSearchCounts,
 } from '@/lib/ovie/shipping-state/configured.server';
 import { getRedis } from '@/lib/redis';
+import { syncCompanyMetrics } from './daily-metrics.server';
+import { configuredMetricSources } from './metric-sources.server';
 import { syncCompanyHistory } from './store.server';
 
-/** The hourly fill, with the configured HUD GitHub token and the shared Redis. */
-export function syncConfiguredCompanyHistory(now = new Date()) {
-  return syncCompanyHistory(now, {
-    redis: getRedis(),
-    owner: configuredGithubOwner(),
-    searchCounts: readConfiguredSearchCounts,
-  });
+/**
+ * The hourly fill: merged PRs through the configured HUD GitHub token, and
+ * the daily metrics (funnel, AI spend, CI, Linear) beside it, into the
+ * shared Redis. A failing source never blocks the others.
+ */
+export async function syncConfiguredCompanyHistory(now = new Date()) {
+  const redis = getRedis();
+  const [history, metrics] = await Promise.all([
+    syncCompanyHistory(now, {
+      redis,
+      owner: configuredGithubOwner(),
+      searchCounts: readConfiguredSearchCounts,
+    }),
+    syncCompanyMetrics(now, { redis, sources: configuredMetricSources() }),
+  ]);
+  return { ...history, metrics };
 }
 
 type SubJobRunner<T> = (
