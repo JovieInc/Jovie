@@ -21,7 +21,9 @@ import {
   readServedBuild,
 } from './prod-cert-probes.mjs';
 import {
+  forReceipt,
   loadPenInputs,
+  observationFrom,
   strangerChecks,
   truthChecks,
 } from './prod-cert-truth.mjs';
@@ -332,13 +334,7 @@ export function stepChecks(
   let readback = null;
   for (const step of steps ?? []) {
     if (step.kind === 'observation') {
-      const { contractId, dimension, value, unit, sampleSize, samples } = step;
-      const measured = { contractId, dimension, value, unit };
-      (observationsBySurface[step.surface] ??= []).push({
-        ...measured,
-        sampleSize: sampleSize ?? 1,
-        ...(Array.isArray(samples) ? { samples } : {}),
-      });
+      (observationsBySurface[step.surface] ??= []).push(observationFrom(step));
       continue;
     }
     if (step.kind === 'telemetry') {
@@ -475,7 +471,7 @@ export async function runProductionCertification({
         runUrl,
         startedAt,
         endedAt: now(),
-        observations: stepState.observationsBySurface[surface] ?? [],
+        observations: forReceipt(stepState.observationsBySurface[surface]),
         consoleErrorCount:
           stepState.telemetryBySurface[surface]?.consoleErrorCount ?? null,
         networkErrorCount:

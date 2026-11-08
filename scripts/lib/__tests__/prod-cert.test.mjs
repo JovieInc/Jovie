@@ -180,7 +180,7 @@ describe('quality observations', () => {
     );
   });
 
-  it('keeps every load of a frame judged on several loads', async () => {
+  it('names the worst load in the check and posts the receipt without samples', async () => {
     const steps = [
       {
         kind: 'observation',
@@ -198,16 +198,20 @@ describe('quality observations', () => {
       steps,
       authStatus: 'passed',
     });
-    expect(receipts.find(r => r.surface === 'landing').observations).toEqual([
+    const landing = receipts.find(r => r.surface === 'landing');
+    // The evidence route's observation schema is strict: no samples field.
+    expect(landing.observations).toEqual([
       {
         contractId: 'jank.worst-frame-ms',
         dimension: 'responsiveness:landing',
         value: 176,
         unit: 'ms',
         sampleSize: 3,
-        samples: [376.6, 106, 176],
       },
     ]);
+    expect(
+      landing.checks.find(c => c.id === 'jank.worst-frame-ms').summary
+    ).toContain('middle of 3 loads; worst 376.6');
   });
 });
 

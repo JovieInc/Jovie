@@ -141,6 +141,32 @@ export function strangerChecks({ origin, fetchImpl, run }) {
 }
 
 /**
+ * A browser-run observation row as the checks read it. `samples` (every load
+ * of a frame judged on several) feeds the check summary only.
+ */
+export function observationFrom(step) {
+  const { contractId, dimension, value, unit, sampleSize, samples } = step;
+  return {
+    contractId,
+    dimension,
+    value,
+    unit,
+    sampleSize: sampleSize ?? 1,
+    ...(Array.isArray(samples) ? { samples } : {}),
+  };
+}
+
+/**
+ * Observations as the evidence route takes them: its schema is strict and has
+ * no `samples`, and the check summary already names the worst load.
+ */
+export function forReceipt(observations = []) {
+  return observations.map(
+    ({ samples: _samples, ...observation }) => observation
+  );
+}
+
+/**
  * Turn jank observations into checks. Unknown contracts are ignored; a
  * missing measurement is not a pass, but it is also not a jank failure, so
  * nothing is emitted for it here. A frame measured on several loads is judged
