@@ -216,32 +216,31 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     ).not.toBeNull();
   });
 
-  it('renders the full-page shell as one hairline focal card with left-aligned identity', () => {
+  it('renders the full-page shell as the Pen oaz9c column: no card, centered identity', () => {
     const { container } = render(<AuthShell mode='sign-in' />);
     const card = container.querySelector('[data-auth-surface-card]');
     expect(card).not.toBeNull();
-    expect(card).toHaveClass('rounded-lg');
-    expect(card).toHaveClass('border-subtle');
-    expect(card).toHaveClass('bg-surface-1');
+    expect(card).not.toHaveClass('bg-surface-1');
+    expect(card).not.toHaveClass('border');
     const identity = container.querySelector('[data-auth-shell-identity]');
-    expect(identity).toHaveClass('items-start');
-    expect(identity).toHaveClass('text-left');
+    expect(identity).toHaveClass('items-center');
+    expect(identity).toHaveClass('text-center');
+    expect(container.querySelector('[aria-label="Go to homepage"]')).toBeNull();
     const divider = container.querySelector('[data-auth-method-divider]');
     expect(divider?.textContent).toContain('or use email');
     expect(divider?.textContent).toBe('or use email');
   });
 
-  it('renders the page-surface headline at the quiet Pen scale (glm/auth-focal-polish)', () => {
+  it('renders the page-surface headline at the Pen oaz9c scale', () => {
     const { container } = render(<AuthShell mode='sign-in' />);
     const heading = container.querySelector(
       '[data-auth-shell-identity] h1'
     ) as HTMLElement | null;
     expect(heading).not.toBeNull();
     expect(heading?.textContent).toBe('Log in to Jovie');
-    expect(heading?.className).toContain('text-app');
-    expect(heading?.className).toContain('font-medium');
-    expect(heading?.className).not.toContain('text-xl');
-    expect(heading?.className).not.toContain('font-semibold');
+    expect(heading?.className).toContain('text-xl');
+    expect(heading?.className).toContain('font-semibold');
+    expect(heading?.className).toContain('tracking-tight');
   });
 
   it('keeps intercepted modal and marketing captures centered without the card', () => {
@@ -539,7 +538,6 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     expect(
       screen.getByRole('heading', { name: 'Log in to Jovie' })
     ).toBeInTheDocument();
-    expect(screen.getByLabelText('Go to homepage')).toBeInTheDocument();
     expect(screen.getByText('or use email')).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Trouble signing in?' })
