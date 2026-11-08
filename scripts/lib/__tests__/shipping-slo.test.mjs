@@ -189,11 +189,9 @@ describe('shipping SLO workflow credentials', () => {
       'BRANCH="bot/shipping-slo-snapshot-${{ github.run_id }}-${{ github.run_attempt }}"'
     );
     expect(WORKFLOW).toContain('git push -u origin "$BRANCH"');
-    expect(WORKFLOW).toContain(
-      'gh pr create --repo "${{ github.repository }}" --base main --head "$BRANCH"'
+    expect(WORKFLOW).toMatch(
+      /if \[ "\$snapshot_lines" -gt 1500 \]; then[\s\S]*?label_args\+=\(--label big-pr\)[\s\S]*?gh pr create --repo "\$\{\{ github\.repository \}\}" --base main --head "\$BRANCH"/
     );
-    expect(WORKFLOW).toContain('label_args+=(--label big-pr)');
-    expect(WORKFLOW).toContain('if [ "$snapshot_lines" -gt 1500 ]; then');
     expect(WORKFLOW).not.toContain('git push origin HEAD:main');
   });
 });
