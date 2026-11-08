@@ -36,6 +36,7 @@ import {
   certStepBlocked,
   createSurfaceTelemetry,
   recordAdminReadback,
+  recordCertCapabilities,
   recordCertObservation,
 } from './utils/prod-cert-steps';
 import { resolveProductionAuthCredentials } from './utils/production-auth-credentials';
@@ -71,6 +72,20 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
+// JOV-9854: declare the browser checks this spec wraps so the producer can
+// attribute a missing check on an older served build to deploy skew instead
+// of a silent smoke skip. Blocked status is unchanged either way.
+recordCertCapabilities({
+  'signup-signin': ['returning-user-email-otp', 'new-user-email-otp'],
+  onboarding: ['dashboard-first-value', 'fresh-user-onboarding-first-value'],
+  claim: ['claimed-profile-owned'],
+  'public-profile': [
+    'owned-profile-renders-publicly',
+    'profile-edit-save-readback',
+  ],
+  chat: ['composer-ready', 'first-reply'],
+  checkout: ['checkout-entry-renders'],
+});
 /** Saved signed-in session for the chat cert test (serial same-worker). */
 let signedInStatePath: string | null = null;
 
