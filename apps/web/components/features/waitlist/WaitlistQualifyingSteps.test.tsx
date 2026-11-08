@@ -1,11 +1,29 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WaitlistRoleForm } from './WaitlistRoleForm';
 
 const ARTIST_ID = '4Z8W4fKeB5YxbusRsdQVPb';
 
+const challenge = vi.hoisted(() => ({
+  fail: undefined as
+    | ((state: { status: 'expired'; message: string }) => void)
+    | undefined,
+}));
 vi.mock('@/components/atoms/InvisibleTurnstile', () => ({
-  InvisibleTurnstile: () => <span hidden data-testid='turnstile-mock' />,
+  InvisibleTurnstile: ({
+    onStateChange,
+  }: {
+    onStateChange: (state: { status: 'expired'; message: string }) => void;
+  }) => {
+    challenge.fail = onStateChange;
+    return <span hidden data-testid='turnstile-mock' />;
+  },
   isTurnstileClientBypassed: () => true,
   isTurnstileClientConfigured: () => false,
 }));
@@ -227,5 +245,16 @@ describe('WaitlistRoleForm request-access questions', () => {
       'data-step',
       'growth'
     );
+  });
+  it('keeps a failed security check on screen while the artist moves between questions', async () => {
+    startAsArtist();
+    submit();
+    await screen.findByTestId('waitlist-qualifying-step');
+    act(() =>
+      challenge.fail?.({ status: 'expired', message: 'Challenge expired.' })
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Challenge expired.');
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Challenge expired.');
   });
 });

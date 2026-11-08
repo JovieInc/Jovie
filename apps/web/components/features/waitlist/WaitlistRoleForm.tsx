@@ -202,9 +202,14 @@ export function WaitlistRoleForm({
     await sendRequest();
   }
 
-  function moveTo(next: (current: QualifyingPosition) => QualifyingPosition) {
+  /** Clears a field error; a failed security check stays on screen. */
+  function clearError() {
+    if (status !== 'error' || turnstileFailed) return;
     setStatus('idle');
     setErrorMessage('');
+  }
+  function moveTo(next: (current: QualifyingPosition) => QualifyingPosition) {
+    clearError();
     setStep(next);
   }
   const advance = () => moveTo(nextQualifyingStep);
@@ -222,7 +227,12 @@ export function WaitlistRoleForm({
     if (status === 'submitting' || status === 'joined') return;
     if (turnstileRequired && !turnstileToken) {
       setStatus('error');
-      setErrorMessage('Security check is still loading. Please try again.');
+      // A failed check keeps its own message and runs again.
+      if (turnstileFailed) {
+        setTurnstileResetSignal(signal => signal + 1);
+      } else {
+        setErrorMessage('Security check is still loading. Please try again.');
+      }
       return;
     }
 
@@ -347,10 +357,7 @@ export function WaitlistRoleForm({
               value={name}
               onChange={event => {
                 setName(event.target.value);
-                if (status === 'error' && !turnstileFailed) {
-                  setStatus('idle');
-                  setErrorMessage('');
-                }
+                clearError();
               }}
             />
           </label>
@@ -370,10 +377,7 @@ export function WaitlistRoleForm({
             submitting={status === 'submitting'}
             onChange={next => {
               setAnswers(current => ({ ...current, ...next }));
-              if (status === 'error' && !turnstileFailed) {
-                setStatus('idle');
-                setErrorMessage('');
-              }
+              clearError();
             }}
             onBack={goBack}
             onSkip={skip}
@@ -413,10 +417,7 @@ export function WaitlistRoleForm({
                           onChange={() => {
                             setChipKey(chip.key);
                             setRole(chip.role);
-                            if (status === 'error' && !turnstileFailed) {
-                              setStatus('idle');
-                              setErrorMessage('');
-                            }
+                            clearError();
                           }}
                         />
                         {chip.label}
@@ -431,10 +432,7 @@ export function WaitlistRoleForm({
                 value={role}
                 onValueChange={value => {
                   setRole(value as WaitlistRole);
-                  if (status === 'error' && !turnstileFailed) {
-                    setStatus('idle');
-                    setErrorMessage('');
-                  }
+                  clearError();
                 }}
               >
                 {roles.map(option => (
@@ -461,10 +459,7 @@ export function WaitlistRoleForm({
               value={email}
               onValueChange={value => {
                 setEmail(value);
-                if (status === 'error' && !turnstileFailed) {
-                  setStatus('idle');
-                  setErrorMessage('');
-                }
+                clearError();
               }}
               loading={status === 'submitting'}
               pending={status === 'submitting'}
