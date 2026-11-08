@@ -5039,6 +5039,17 @@ jobs:
           path: apps/web/test-results/
           retention-days: 3
 
+      - name: Summarize dashboard Lighthouse reports
+        if: (always() && steps.check_changes.outputs.run_full_ci == 'true')
+        # The reports also go to an artifact, but agents often cannot
+        # download it; this prints each page's metrics, document size,
+        # render-blocking requests and layout-shift elements to the log.
+        run: |
+          node apps/web/scripts/lighthouse-report-summary.mjs \
+            apps/web/.lighthouseci/dashboard-pr \
+            apps/web/.lighthouseci/chat-pr \
+            apps/web/.lighthouseci/onboarding-pr
+
       - name: Upload dashboard Lighthouse artifacts
         if: (always() && steps.check_changes.outputs.run_full_ci == 'true')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
