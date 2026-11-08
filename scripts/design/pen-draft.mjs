@@ -77,6 +77,15 @@ export function missingSecrets(env) {
   return ['PEN_CLI_KEY', 'PEN_GOLDEN_PATH_FILE_URL'].filter(k => !env[k]);
 }
 
+// As in scripts/agent/pen-par: without it Node can fail to fetch fonts under
+// load, so text renders blank and frames reflow.
+export const PEN_NODE_OPTIONS = [
+  process.env.NODE_OPTIONS,
+  '--network-family-autoselection-attempt-timeout=2000',
+]
+  .filter(Boolean)
+  .join(' ');
+
 /** A frame counts as drafted only when pen wrote both its file and preview. */
 export function missingOutputs(brief, outDir, exists = existsSync) {
   return [`${brief.frame}.pen`, `${brief.frame}.png`].filter(
@@ -133,6 +142,7 @@ async function main() {
       execFileSync('npx', penArgs(brief, { input, outDir }), {
         stdio: ['ignore', 'inherit', 'inherit'],
         timeout: 15 * 60_000,
+        env: { ...process.env, NODE_OPTIONS: PEN_NODE_OPTIONS },
       });
       const missing = missingOutputs(brief, outDir);
       row.status = missing.length ? 'failed' : 'drafted';
