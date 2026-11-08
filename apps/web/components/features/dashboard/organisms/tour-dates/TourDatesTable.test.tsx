@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { TourDatesTable } from './TourDatesTable';
@@ -73,6 +74,19 @@ describe('TourDatesTable', () => {
     renderTable([]);
 
     const empty = screen.getByTestId('tour-dates-table-empty');
-    expect(within(empty).getByText('No tour dates')).toBeInTheDocument();
+    expect(within(empty).getByText('No Tour Dates')).toBeInTheDocument();
+  });
+
+  it('renders no row as past on the server, so hydration cannot flip it', () => {
+    const html = renderToString(
+      <TourDatesTable
+        tourDates={[{ ...baseTourDate, startDate: '2001-01-01T00:00:00.000Z' }]}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    );
+
+    expect(html).not.toContain('opacity-60');
+    expect(html).not.toContain('>Past<');
   });
 });

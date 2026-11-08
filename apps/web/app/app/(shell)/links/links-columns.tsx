@@ -71,96 +71,90 @@ function TruncatedText({
 
 const columnHelper = createColumnHelper<LinkRow>();
 
-export function buildLinksColumns({
-  onOpenInspector,
-}: {
-  readonly onOpenInspector: (rowId: string) => void;
-}): ColumnDef<LinkRow, unknown>[] {
-  return [
-    columnHelper.accessor('title', {
-      id: 'entity',
-      header: 'Entity',
-      size: 220,
-      minSize: 160,
-      cell: ({ getValue }) => <TruncatedText value={getValue()} />,
-    }),
-    columnHelper.accessor('type', {
-      id: 'type',
-      header: 'Type',
-      size: 110,
-      minSize: 96,
-      cell: ({ getValue }) => (
-        <TruncatedText value={getValue()} tone='secondary' />
-      ),
-    }),
-    columnHelper.accessor('status', {
-      id: 'status',
-      header: 'Status',
-      size: 110,
-      minSize: 96,
-      cell: ({ getValue }) => <LinkStatusBadge status={getValue()} />,
-    }),
-    columnHelper.accessor('destination', {
-      id: 'destination',
-      header: 'Destination',
-      size: 240,
-      minSize: 160,
-      cell: ({ getValue }) => (
-        <TruncatedText
-          value={stripProtocol(getValue())}
-          title={getValue()}
-          tone='secondary'
-        />
-      ),
-    }),
-    columnHelper.accessor('clicks', {
-      id: 'clicks',
-      header: 'Clicks',
-      size: 88,
-      minSize: 72,
-      meta: { align: 'right' },
-      cell: ({ getValue }) => {
-        const clicks = getValue();
-        return clicks === null ? (
-          <EmptyCell />
-        ) : (
-          <span className='tabular-nums'>{clicks}</span>
-        );
-      },
-    }),
-    columnHelper.display({
-      id: 'campaign',
-      header: 'Campaign',
-      size: 160,
-      minSize: 120,
-      cell: ({ row }) => {
-        const value = row.original.campaign ?? row.original.utmSummary;
-        return value ? (
-          <TruncatedText value={value} tone='secondary' />
-        ) : (
-          <EmptyCell />
-        );
-      },
-    }),
-    columnHelper.accessor('jovieUrl', {
-      id: 'jovieUrl',
-      header: 'Jovie link',
-      size: 220,
-      minSize: 160,
-      cell: ({ row, getValue }) => (
-        <button
-          type='button'
-          className='block w-full min-w-0 truncate rounded-sm text-left text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
-          title={getValue()}
-          onClick={event => {
-            // The row click opens the same inspector; one open per press.
-            event.stopPropagation();
-            onOpenInspector(row.original.id);
-          }}
-        >
-          {stripProtocol(getValue())}
-        </button>
-      ),
-    }),
-  ] as ColumnDef<LinkRow, unknown>[];
-}
+/**
+ * Static column set. The Jovie link is a real button so the row has a tab
+ * stop; its click bubbles to the shared row, whose onRowClick opens the
+ * inspector, so there is one open path for pointer and keyboard.
+ */
+export const LINKS_COLUMNS: ColumnDef<LinkRow, unknown>[] = [
+  columnHelper.accessor('title', {
+    id: 'entity',
+    header: 'Entity',
+    size: 220,
+    minSize: 160,
+    cell: ({ getValue }) => <TruncatedText value={getValue()} />,
+  }),
+  columnHelper.accessor('type', {
+    id: 'type',
+    header: 'Type',
+    size: 110,
+    minSize: 96,
+    cell: ({ getValue }) => (
+      <TruncatedText value={getValue()} tone='secondary' />
+    ),
+  }),
+  columnHelper.accessor('status', {
+    id: 'status',
+    header: 'Status',
+    size: 110,
+    minSize: 96,
+    cell: ({ getValue }) => <LinkStatusBadge status={getValue()} />,
+  }),
+  columnHelper.accessor('destination', {
+    id: 'destination',
+    header: 'Destination',
+    size: 240,
+    minSize: 160,
+    cell: ({ getValue }) => (
+      <TruncatedText
+        value={stripProtocol(getValue())}
+        title={getValue()}
+        tone='secondary'
+      />
+    ),
+  }),
+  columnHelper.accessor('clicks', {
+    id: 'clicks',
+    header: 'Clicks',
+    size: 88,
+    minSize: 72,
+    meta: { align: 'right' },
+    cell: ({ getValue }) => {
+      const clicks = getValue();
+      return clicks === null ? (
+        <EmptyCell />
+      ) : (
+        <span className='tabular-nums'>{clicks}</span>
+      );
+    },
+  }),
+  columnHelper.display({
+    id: 'campaign',
+    header: 'Campaign',
+    size: 160,
+    minSize: 120,
+    cell: ({ row }) => {
+      const value = row.original.campaign ?? row.original.utmSummary;
+      return value ? (
+        <TruncatedText value={value} tone='secondary' />
+      ) : (
+        <EmptyCell />
+      );
+    },
+  }),
+  columnHelper.accessor('jovieUrl', {
+    id: 'jovieUrl',
+    header: 'Jovie Link',
+    size: 220,
+    minSize: 160,
+    cell: ({ getValue }) => (
+      <button
+        type='button'
+        className='block w-full min-w-0 truncate rounded-sm text-left text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+        title={getValue()}
+      >
+        {stripProtocol(getValue())}
+      </button>
+    ),
+  }),
+] as ColumnDef<LinkRow, unknown>[];

@@ -2,7 +2,7 @@
 // @coverage-via apps/web/tests/unit/app/surface-elevation-guardrails.test.ts
 
 import { Badge, type BadgeProps, Button } from '@jovie/ui';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
@@ -21,9 +21,22 @@ import { cn } from '@/lib/utils';
 import { formatShortDate } from '@/lib/utils/date-formatting';
 import { buildTourDateActions } from './tour-date-actions';
 
-/** Check if a date is in the past */
-function isPastDate(date: Date): boolean {
-  return date.getTime() < Date.now();
+/**
+ * Whether a show has happened, against a clock read after mount. Before the
+ * clock is known (server render and first client paint) nothing is past, so
+ * server and client HTML match and rows never flip during hydration.
+ */
+function isPastDate(startDate: string, nowMs: number | null): boolean {
+  return nowMs !== null && new Date(startDate).getTime() < nowMs;
+}
+
+/** Wall clock read once after mount; null during SSR and hydration. */
+function useMountedNowMs(): number | null {
+  const [nowMs, setNowMs] = useState<number | null>(null);
+  useEffect(() => {
+    setNowMs(Date.now());
+  }, []);
+  return nowMs;
 }
 
 interface TourDatesTableProps {
@@ -108,11 +121,13 @@ const LocationCell = memo(function LocationCell({
 const StatusCell = memo(function StatusCell({
   ticketStatus,
   startDate,
+  nowMs,
 }: {
   ticketStatus: TourDateViewModel['ticketStatus'];
   startDate: string;
+  nowMs: number | null;
 }) {
-  const past = isPastDate(new Date(startDate));
+  const past = isPastDate(startDate, nowMs);
   return <StatusBadge status={ticketStatus} isPastDate={past} />;
 });
 
@@ -238,6 +253,7 @@ function ActionsCellRenderer({
 function buildTourDateColumns(deps: {
   onSync?: () => void;
   isSyncing?: boolean;
+  nowMs: number | null;
   getContextMenuItems: (tourDate: TourDateViewModel) => ContextMenuItemType[];
 }) {
   return [
@@ -273,6 +289,7 @@ function buildTourDateColumns(deps: {
         <StatusCell
           ticketStatus={info.getValue()}
           startDate={info.row.original.startDate}
+          nowMs={deps.nowMs}
         />
       ),
       size: 100,
@@ -323,9 +340,12 @@ export function TourDatesTable({
     [onEdit, onDelete]
   );
 
+  const nowMs = useMountedNowMs();
+
   const columns = useMemo(
-    () => buildTourDateColumns({ onSync, isSyncing, getContextMenuItems }),
-    [onSync, isSyncing, getContextMenuItems]
+    () =>
+      buildTourDateColumns({ onSync, isSyncing, nowMs, getContextMenuItems }),
+    [onSync, isSyncing, nowMs, getContextMenuItems]
   );
 
   return (
@@ -338,7 +358,7 @@ export function TourDatesTable({
       onRowClick={onEdit}
       getRowId={row => row.id}
       getRowClassName={row =>
-        isPastDate(new Date(row.startDate)) ? 'opacity-60' : ''
+        isPastDate(row.startDate, nowMs) ? 'opacity-60' : ''
       }
       enableVirtualization={tourDates.length >= 20}
       // Date and start time stack in two lines; the two-line mode gives
@@ -350,7 +370,7 @@ export function TourDatesTable({
         <TableEmptyState
           testId='tour-dates-table-empty'
           icon={<Icon name='Calendar' className='size-5' aria-hidden='true' />}
-          heading='No tour dates'
+          heading='No Tour Dates'
           description='Add your first tour date to get started.'
         />
       }

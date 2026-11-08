@@ -12,7 +12,7 @@ import { copyToClipboard } from '@/hooks/useClipboard';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import {
-  buildLinksColumns,
+  LINKS_COLUMNS,
   LINKS_ROW_MODE,
   LinkStatusBadge,
   stripProtocol,
@@ -133,11 +133,6 @@ export function LinksPageClient({ rows }: { readonly rows: LinkRow[] }) {
     setSelectedId(rowId);
   }, []);
 
-  const columns = useMemo(
-    () => buildLinksColumns({ onOpenInspector: openInspector }),
-    [openInspector]
-  );
-
   const handleRowClick = useCallback(
     (row: LinkRow) => openInspector(row.id),
     [openInspector]
@@ -197,7 +192,7 @@ export function LinksPageClient({ rows }: { readonly rows: LinkRow[] }) {
       <div className='flex min-h-0 min-w-0 flex-1 overflow-auto'>
         <UnifiedTable
           data={rows}
-          columns={columns}
+          columns={LINKS_COLUMNS}
           rowMode={LINKS_ROW_MODE}
           getRowId={row => row.id}
           getRowTestId={row => `links-row-${row.id}`}

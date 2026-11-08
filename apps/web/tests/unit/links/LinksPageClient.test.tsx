@@ -121,7 +121,7 @@ describe('LinksPageClient', () => {
       'Destination',
       'Clicks',
       'Campaign',
-      'Jovie link',
+      'Jovie Link',
     ]);
 
     // Numeric alignment matches the shared table idiom: right-aligned header

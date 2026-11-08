@@ -410,7 +410,7 @@ function CatalogHealthSectionContent({
                 {scan?.coveragePct}% coverage · {scan?.tracksScanned} tracks
                 checked
                 {scan?.completedAt &&
-                  ` · ${new Date(scan.completedAt).toLocaleDateString()}`}
+                  ` · ${new Date(scan.completedAt).toLocaleDateString('en-US')}`}
               </p>
               <Button
                 variant='ghost'
