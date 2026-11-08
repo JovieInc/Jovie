@@ -4601,10 +4601,13 @@ def record_held(host: Host, number: int, head: str, evidence: list[str]) -> None
     update_json(path, lambda held: held.update({str(number): pr_events.held_record(head, evidence)}))
 
 
-def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | None:
+def red_pr(prs: list[dict], attempts: dict, held: dict | None = None, capped=frozenset()) -> dict | None:
     """A lane PR that is stuck at a head we have not tried twice: checks settled red, or
-    merge conflicts with main (GitHub drops auto-merge on those, so nothing else frees them)."""
-    for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
+    merge conflicts with main (GitHub drops auto-merge on those, so nothing else frees them).
+    Oldest first, except PRs of a producer at its WIP cap go first: they block that producer's
+    intake (2026-11-08: codex sat at 8/8 with 6 DIRTY PRs queued behind ~120 older ones)."""
+    for pr in sorted(best_per_issue(prs), key=lambda item: (pr_wip.producer_of(item.get("headRefName")) not in capped,
+                                                           item["number"])):
         if pr.get("isInMergeQueue") is True:
             continue  # Native landing owns this head; cached absence still needs a fresh claim read.
         if (pr.get("headRefName") or "").startswith("dependabot/"):
@@ -9097,6 +9100,7 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     providers = load_providers()
     order, now = pr_events.cost_order(providers), time.time()
     disabled = set(providers) - set(order)
+    capped = pr_wip.capped_producers(prs)  # counted before any filter: every open PR holds a cap slot
     prs = [pr for pr in prs if not pr_recovery_held(host, pr, now) and not pr_breaker_open(host, pr["number"], now, pr.get("headRefOid"))
            and pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
     settled = []
@@ -9106,7 +9110,7 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
             note_owner_settle(host, pr, left, now)  # only a PR a repair would take is a deferral
             settled.append(pr["number"])
     prs = [pr for pr in prs if pr["number"] not in settled]
-    pr = red_pr(prs, attempts, held)
+    pr = red_pr(prs, attempts, held, capped)
     # A head another host is fixing is skipped (no attempt charged); the next red PR is ours.
     while pr:
         live = None if claimed_elsewhere(pr["number"], pr["headRefOid"], "fix") else \
@@ -9126,7 +9130,7 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
             held = {str(pr["number"]): entry}
             break
         prs = [other for other in prs if other["number"] != pr["number"]]
-        pr = red_pr(prs, attempts, held)
+        pr = red_pr(prs, attempts, held, capped)
     if pr:
         entry = held.get(str(pr["number"]), {})
         if entry.get("sha") == pr["headRefOid"]:

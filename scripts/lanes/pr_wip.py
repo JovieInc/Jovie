@@ -109,6 +109,16 @@ def admit(prs: list[dict] | None, producer: str, policy: dict | None = None) -> 
             "producer": producer, "used": used, "cap": cap}
 
 
+def capped_producers(prs: list[dict] | None, policy: dict | None = None) -> frozenset[str]:
+    """Producers whose open, unheld PRs already fill their WIP cap. Every one of those PRs
+    (bound to a Linear issue or not) holds an intake slot, so repairing them frees the cap."""
+    if not prs:
+        return frozenset()
+    policy = load_policy() if policy is None else policy
+    return frozenset(producer for producer in {producer_of(pr.get("headRefName")) for pr in prs}
+                     if not admit(prs, producer, policy)["allowed"])
+
+
 def live_producers(prs: list[dict], now: float, policy: dict) -> set[str]:
     """A producer is live when any of its open PRs moved inside liveWindowHours."""
     window = float(policy.get("liveWindowHours", 48)) * 3600
