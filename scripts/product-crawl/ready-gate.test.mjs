@@ -4,10 +4,12 @@ import {
   CLAIM_BANNER,
   fromThirdPartyFrame,
   isClosedInProduction,
+  median,
   PLACEHOLDER,
   pageFindings,
   productReady,
   rankFindings,
+  timingSuspect,
 } from './ready-gate.mjs';
 
 const now = Date.parse('2026-11-08T03:00:00Z');
@@ -204,4 +206,23 @@ test('placeholder text is caught at sentence start and around [object Object]', 
     assert.match(text, PLACEHOLDER, text);
   for (const text of ['My todo list', 'Nan and Pop', 'An undefinedness'])
     assert.doesNotMatch(text, PLACEHOLDER, text);
+});
+
+test('a timing finding is judged on the median of repeat loads', () => {
+  assert.equal(median([382, 120, 140]), 140);
+  assert.equal(median([210, 90]), 90);
+  assert.ok(timingSuspect({ longestTaskMs: 234 }));
+  assert.ok(timingSuspect({ lcpMs: 2600 }));
+  assert.ok(!timingSuspect({ longestTaskMs: 150, lcpMs: 1800 }));
+  assert.ok(!timingSuspect({ error: 'timeout', longestTaskMs: 900 }));
+  const at = {
+    route: '/pricing',
+    identity: 'stranger',
+    viewport: 'phone',
+    status: 200,
+  };
+  const kinds = p => pageFindings(p).map(f => f.kind);
+  assert.deepEqual(kinds({ ...at, longestTaskMs: 140, timingSamples: 3 }), []);
+  const [still] = pageFindings({ ...at, longestTaskMs: 260, timingSamples: 3 });
+  assert.equal(still.detail, 'main thread blocked 260ms (median of 3 loads)');
 });
