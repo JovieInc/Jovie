@@ -36,6 +36,49 @@ const releasesReport = {
         ],
       },
     },
+    'lcp-breakdown-insight': {
+      details: {
+        type: 'list',
+        items: [
+          {
+            type: 'table',
+            items: [
+              {
+                subpart: 'timeToFirstByte',
+                label: 'Time to first byte',
+                duration: 20.4,
+              },
+              {
+                subpart: 'elementRenderDelay',
+                label: 'Element render delay',
+                duration: 2310.6,
+              },
+            ],
+          },
+          {
+            type: 'node',
+            selector: 'main > h1',
+            snippet: '<h1 class="title">',
+          },
+        ],
+      },
+    },
+    'bootup-time': {
+      details: {
+        items: [
+          {
+            url: 'http://localhost:3000/_next/static/chunks/small.js',
+            scripting: 30,
+            scriptParseCompile: 4,
+          },
+          {
+            url: 'http://localhost:3000/_next/static/chunks/app.js',
+            scripting: 412.2,
+            scriptParseCompile: 80.4,
+          },
+        ],
+      },
+    },
     'render-blocking-insight': {
       details: {
         items: [
@@ -82,6 +125,11 @@ describe('Lighthouse report summary', () => {
       'Page /app/library?view=releases',
       '  FCP 1211 ms, LCP 2400 ms, TBT 310 ms, CLS 0.075, server response 412 ms',
       '  Document 60.0 KiB transferred, 400.0 KiB uncompressed',
+      '  LCP element: <h1 class="title">',
+      '  LCP breakdown: Time to first byte 20 ms, Element render delay 2311 ms',
+      '  Main-thread script time:',
+      '    /_next/static/chunks/app.js 412 ms running, 80 ms parsing',
+      '    /_next/static/chunks/small.js 30 ms running, 4 ms parsing',
       '  Render-blocking requests:',
       '    /_next/static/css/app.css 40.0 KiB 310 ms',
       '    /_next/static/css/small.css 2.0 KiB 40 ms',
