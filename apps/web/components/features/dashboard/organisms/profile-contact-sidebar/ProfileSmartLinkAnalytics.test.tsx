@@ -1,16 +1,15 @@
 import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardAnalyticsResponse } from '@/types/analytics';
 
+const { useDashboardAnalyticsQueryMock } = vi.hoisted(() => ({
+  useDashboardAnalyticsQueryMock: vi.fn(),
+}));
+
 vi.mock('@/lib/queries', () => ({
-  useDashboardAnalyticsQuery: () => ({
-    data: { ...loaded },
-    isLoading: false,
-    isFetching: false,
-    isError: false,
-  }),
+  useDashboardAnalyticsQuery: useDashboardAnalyticsQueryMock,
 }));
 
 import {
@@ -28,6 +27,16 @@ const loaded: DashboardAnalyticsResponse = {
 };
 
 const PROFILE_URL = 'https://jov.ie/timwhite';
+
+beforeEach(() => {
+  useDashboardAnalyticsQueryMock.mockReturnValue({
+    data: { ...loaded },
+    isPending: false,
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+  });
+});
 
 function wrap(node: ReactNode) {
   return render(<TooltipProvider>{node}</TooltipProvider>);
@@ -141,5 +150,23 @@ describe('ProfileSmartLinkAnalyticsView', () => {
       </TooltipProvider>
     );
     expect(screen.getByText('Analytics unavailable')).toBeInTheDocument();
+  });
+
+  it('shows loading, not "no visits", while a paused query has no data', () => {
+    // Offline with no cache: pending but paused, so isLoading is false.
+    useDashboardAnalyticsQueryMock.mockReturnValue({
+      data: undefined,
+      isPending: true,
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+    });
+    wrap(<ProfileSmartLinkAnalytics profileUrl={PROFILE_URL} />);
+
+    expect(screen.getByTestId('profile-smart-link-analytics')).toHaveAttribute(
+      'aria-busy',
+      'true'
+    );
+    expect(screen.queryByText(/No visits in the/)).toBeNull();
   });
 });

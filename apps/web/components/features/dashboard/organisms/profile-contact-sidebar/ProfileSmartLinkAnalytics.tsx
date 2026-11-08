@@ -126,7 +126,7 @@ export function ProfileSmartLinkAnalytics({
   variant = 'card',
 }: ProfileSmartLinkAnalyticsProps) {
   const [range] = useState<AnalyticsRange>('30d');
-  const { data, isLoading, isFetching, isError } = useDashboardAnalyticsQuery({
+  const { data, isPending, isFetching, isError } = useDashboardAnalyticsQuery({
     range,
     view: 'traffic',
   });
@@ -137,7 +137,9 @@ export function ProfileSmartLinkAnalytics({
       variant={variant}
       data={data}
       range={range}
-      loading={isLoading}
+      // isPending, not isLoading: offline with no cache the query is paused
+      // (isLoading false), and "no visits" would claim zero during the wait.
+      loading={isPending}
       isFetching={isFetching}
       isError={isError}
     />
