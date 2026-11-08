@@ -47,6 +47,19 @@
   transform: translateX(-50%);
 }
 
+/* ── Timeline scope ───────────────────────────────────────────────── */
+
+/* view() binds to the nearest scroll container. overflow: hidden makes the
+   hero and each chapter one (with no scroll range), which would leave the
+   dolly and the copy reveals idle. overflow: clip clips the same edges
+   without creating a scroll container, so the timelines follow the page. */
+@supports (animation-timeline: view()) {
+  .hv3-hero,
+  .hv3-chapter {
+    overflow: clip;
+  }
+}
+
 /* ── Dolly (motion only) ──────────────────────────────────────────── */
 
 @supports (animation-timeline: view()) {

@@ -361,6 +361,11 @@ describe('homepage contract', { timeout: 60_000 }, () => {
       /@supports \(animation-timeline: view\(\)\)\s*\{\s*@media \(prefers-reduced-motion: no-preference\)/
     );
     expect(css).not.toMatch(/addEventListener|position:\s*(?:fixed|sticky)/);
+    // view() binds to the nearest scroll container, so the hero and chapters
+    // clip without becoming one (overflow: hidden would idle every timeline).
+    expect(css).toMatch(
+      /@supports \(animation-timeline: view\(\)\)\s*\{\s*\.hv3-hero,\s*\.hv3-chapter\s*\{\s*overflow: clip;\s*\}/
+    );
     // Keyframes touch only compositor properties, and never fade to nothing.
     for (const [, body] of css.matchAll(
       /@keyframes [\w-]+\s*\{([\s\S]*?\})\s*\}/g
