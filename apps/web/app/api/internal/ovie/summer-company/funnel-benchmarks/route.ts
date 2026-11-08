@@ -7,7 +7,6 @@ import { readCompanyStateCache } from '@/lib/ovie/company-state.server';
 import { verifySummerOidcRequest } from '@/lib/ovie/summer-oidc.server';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 /**
  * The artist signup funnel's 7-day stage rates against published industry
