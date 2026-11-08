@@ -75,6 +75,16 @@
         "/smart-links",
         "/pricing"
       ]
+    },
+    {
+      "path": "apps/web/public/images/avatars/tim-white-profile.jpg",
+      "person": "tim-white",
+      "routes": ["/"]
+    },
+    {
+      "path": "apps/web/public/img/releases/never-say-a-word.jpg",
+      "person": "tim-white",
+      "routes": ["/"]
     }
   ],
   "routeRule": "An image may render only on the routes listed for it. / is never listed: no real person on the homepage (Tim, 2026-10-26)."

@@ -15,6 +15,10 @@ import {
   type JovieUser,
   toJovieUser,
 } from '@/lib/auth/jovie-user';
+import {
+  isDesktopShellDocument,
+  resolveDesktopSignOutRedirect,
+} from '@/lib/desktop/desktop-sign-out';
 import { applyCacheScope } from '@/lib/queries/cache-isolation';
 
 // ============================================================================
@@ -101,7 +105,10 @@ export async function signOut(options?: JovieSignOutOptions): Promise<void> {
   await authClient.signOut().catch(() => undefined);
   clearLegacyClerkSessionMarker();
 
-  const redirectUrl = options?.redirectUrl ?? '/signin';
+  const redirectUrl = resolveDesktopSignOutRedirect(
+    options?.redirectUrl ?? '/signin',
+    isDesktopShellDocument()
+  );
   if (typeof globalThis.location?.assign === 'function') {
     globalThis.location.assign(redirectUrl);
   }

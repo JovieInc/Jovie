@@ -255,8 +255,13 @@ export function ReleasePlanWizard({
           Checking whether this workspace can generate a release plan.
         </DialogDescription>
         <DialogActions>
-          <Button type='button' size='sm' disabled>
-            Loading...
+          <Button
+            type='button'
+            variant='secondary'
+            size='sm'
+            onClick={handleClose}
+          >
+            Cancel
           </Button>
         </DialogActions>
       </Dialog>

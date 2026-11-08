@@ -989,7 +989,7 @@ jobs:
           fi
 
           # Launch-gate golden path (JOV-3758), mirroring docs/launch/LAUNCH_GATES.md.
-          LAUNCH_GATE_PATTERN='^(apps/web/app/onboarding/|apps/web/components/features/onboarding/|apps/web/components/features/dashboard/organisms/onboarding|apps/web/components/features/dashboard/organisms/apple-style-onboarding|apps/web/lib/onboarding/|apps/web/app/\(auth\)/|apps/web/app/signin/|apps/web/app/signup/|apps/web/app/sign-in/|apps/web/app/sign-up/|apps/web/app/app/\(shell\)/dashboard/|apps/web/app/app/\(shell\)/layout\.tsx|apps/web/components/features/dashboard/|apps/web/lib/releases/|apps/web/app/api/stripe/|apps/web/app/api/billing/|apps/web/app/api/checkout/|apps/web/lib/stripe/|apps/web/tests/e2e/golden-path\.spec\.ts|apps/web/tests/helpers/auth.ts|apps/web/tests/global-setup\.ts|apps/web/playwright\.config\.ts|\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.dashboard\.pr\.json|apps/web/\.lighthouserc\.onboarding\.pr\.json|docs/launch/LAUNCH_GATES\.md|apps/web/package.*\.json|package.*\.json)'
+          LAUNCH_GATE_PATTERN='^(apps/web/app/onboarding/|apps/web/components/features/onboarding/|apps/web/lib/onboarding/|apps/web/app/\(auth\)/|apps/web/app/sign-?(in|up)/|apps/web/app/app/\(shell\)/dashboard/|apps/web/app/app/\(shell\)/layout\.tsx|apps/web/components/features/dashboard/|apps/web/(components/shell/|instrumentation-client\.ts|proxy\.ts|tests/e2e/(utils/)?dashboard-click-navigation)|apps/web/lib/releases/|apps/web/app/api/stripe/|apps/web/app/api/billing/|apps/web/app/api/checkout/|apps/web/lib/stripe/|apps/web/tests/e2e/golden-path\.spec\.ts|apps/web/tests/helpers/auth.ts|apps/web/tests/global-setup\.ts|apps/web/playwright\.config\.ts|\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.(dashboard|onboarding)\.pr\.json|docs/launch/LAUNCH_GATES\.md|apps/web/package.*\.json|package.*\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$LAUNCH_GATE_PATTERN"; then
             echo "run_golden_path=true" >> "$GITHUB_OUTPUT"
           else
@@ -4918,12 +4918,22 @@ jobs:
           fi
 
           pnpm run test:lighthouse:dashboard:pr
+
+          # Lighthouse and route specs load each page with a full document
+          # load. Click the sidebar too: only a click proves the shell still
+          # moves between dashboard pages client-side.
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+            pnpm exec playwright test tests/e2e/dashboard-click-navigation.spec.ts \
+            --config=playwright.config.noauth.ts --project=chromium --reporter=line
         env:
           CI: true
           BASE_URL: http://localhost:3000
           DATABASE_URL: ${{ env.DATABASE_URL }}
           URL_ENCRYPTION_KEY: lighthouse-dashboard-ci-url-encryption-key
           AI_GATEWAY_API_KEY: lighthouse-dashboard-ci
+          # Playwright writes error-context.md on a failed attempt; the
+          # artifact guard rejects markdown unless this is set.
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}

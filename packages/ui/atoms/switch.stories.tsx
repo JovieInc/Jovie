@@ -176,3 +176,76 @@ export const ConformanceMatrix: Story = {
     },
   },
 };
+
+export const ErrorState: Story = {
+  render: () => (
+    <div className='grid w-72 gap-1'>
+      <div className='flex min-h-11 items-center gap-2'>
+        <Switch
+          id='sw-error'
+          aria-invalid='true'
+          aria-describedby='sw-error-message'
+        />
+        <Label htmlFor='sw-error'>Accept the distribution terms</Label>
+      </div>
+      <p id='sw-error-message' className='text-xs text-error' role='alert'>
+        Turn this on to publish the release.
+      </p>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Invalid switch: aria-invalid paints the error border without moving the thumb, and the message is linked with aria-describedby.',
+      },
+    },
+  },
+};
+
+export const LongContent: Story = {
+  render: () => (
+    <div className='flex w-56 items-start gap-2'>
+      <Switch id='sw-long' className='mt-0.5' defaultChecked />
+      <Label htmlFor='sw-long' className='leading-snug'>
+        Notify me whenever a fan presaves, follows, or shares one of my upcoming
+        releases
+      </Label>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A long label in a narrow column wraps beside the switch, which keeps its 28×16 track and stays aligned to the first line.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl' className='grid w-56 gap-3'>
+      <div className='flex items-start gap-2'>
+        <Switch id='sw-rtl-on' className='mt-0.5' defaultChecked />
+        <Label htmlFor='sw-rtl-on' className='leading-snug'>
+          أبلغني عندما يحفظ أحد المعجبين إصداري القادم أو يشاركه مع أصدقائه
+        </Label>
+      </div>
+      <div className='flex items-start gap-2'>
+        <Switch id='sw-rtl-off' className='mt-0.5' />
+        <Label htmlFor='sw-rtl-off' className='leading-snug'>
+          الإشعارات الأسبوعية
+        </Label>
+      </div>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Arabic labels in a narrow right-to-left column: the checked thumb travels toward the start edge and long labels wrap beside the track.',
+      },
+    },
+  },
+};
