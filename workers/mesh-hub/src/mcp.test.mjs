@@ -416,3 +416,32 @@ test('MCP 2025-06-18 refuses JSON-RPC batches without executing tools', async ()
   assert.equal((await res.json()).error.code, -32600);
   assert.equal(r.calls.length, 0);
 });
+
+test('one owner guessing budget survives client churn; consent locks preserve existing grants and expire', async () => {
+  const r = rig();
+  const active = await connect(r, 'mesh:read');
+  const attacker = await register(r);
+  const pending = await requestIdFrom(await startAuthorize(r, attacker));
+  for (let i = 0; i < OAUTH.consentFailsShort; i++)
+    await approve(r, pending, 'invalid');
+  const another = await register(r);
+  const next = await requestIdFrom(await startAuthorize(r, another));
+  assert.equal(
+    (await approve(r, next, 'invalid')).status,
+    429,
+    'DCR cannot multiply guesses against the same owner secret'
+  );
+  assert.equal((await rpc(r, active.body.access_token, 'ping')).status, 200);
+  const list = await (
+    await rpc(r, active.body.access_token, 'tools/list')
+  ).json();
+  assert.ok(list.result.tools.length > 0);
+  assert.ok(list.result.tools.every(tool => tool.annotations.readOnlyHint));
+  r.clock.now += OAUTH.consentShortMs + 1;
+  const fresh = await requestIdFrom(await startAuthorize(r, another));
+  assert.equal(
+    (await approve(r, fresh, await currentCode(r.clock.now), 'mesh:read'))
+      .status,
+    303
+  );
+});
