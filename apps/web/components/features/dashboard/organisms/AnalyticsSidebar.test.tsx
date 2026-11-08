@@ -30,7 +30,7 @@ vi.mock('@/lib/queries', () => ({
       top_referrers: [{ referrer: 'Instagram', count: 6 }],
       top_links: [{ id: 'spotify', url: 'Spotify', clicks: 5 }],
     },
-    isLoading: false,
+    isPending: false,
     isFetching: false,
   }),
 }));

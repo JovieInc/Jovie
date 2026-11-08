@@ -411,7 +411,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
   const [range, setRange] = useState<AnalyticsRange>('30d');
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('cities');
 
-  const { data, isLoading, isFetching, isError, refetch } =
+  const { data, isPending, isFetching, isError, refetch } =
     useDashboardAnalyticsQuery({
       range,
       view: 'full',
@@ -423,7 +423,9 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
       isOpen={isOpen}
       onClose={onClose}
       data={data}
-      loading={isLoading}
+      // isPending, not isLoading: a fetch paused offline has no data and must
+      // show the skeleton, not zeros. Disabled queries never reach this rail.
+      loading={isPending}
       isFetching={isFetching}
       onRetry={isError ? refetch : undefined}
       range={range}
