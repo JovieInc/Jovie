@@ -29,7 +29,7 @@ import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/Dashboard
 import {
   AnalyticsSidebar,
   StaticAnalyticsSidebar,
-} from '@/features/dashboard/organisms/AnalyticsSidebar';
+} from '@/features/dashboard/organisms/LazyAnalyticsSidebar';
 import { useAudiencePanel } from '@/features/dashboard/organisms/AudiencePanelContext';
 import { AiCrawlerDetailPanel } from '@/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel';
 import { AiCrawlerIntelligenceCard } from '@/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard';
