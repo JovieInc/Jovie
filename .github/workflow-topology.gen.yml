@@ -963,7 +963,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:notify-failure
-    jobCount: 7
+    jobCount: 8
   - name: PR Conflict Handler
     path: .github/workflows/pr-conflict-handler.yml
     active: false

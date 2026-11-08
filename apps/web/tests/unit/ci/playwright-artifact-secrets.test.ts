@@ -1564,6 +1564,7 @@ ${fixtureCheckout}
   it('requires step-scoped Markdown allowance for every production smoke producer', () => {
     const expected = [
       'postdeploy-probes.yml:auth-smoke:Run production auth smoke tests',
+      'postdeploy-probes.yml:product-crawl:Crawl as a stranger and signed in',
       'production-controller.yml:ci-post-deploy-auth-smoke:Run production auth smoke tests',
       'production-release.yml:promote-production:Prove canonical navigation budgets on exact staged build',
     ];
