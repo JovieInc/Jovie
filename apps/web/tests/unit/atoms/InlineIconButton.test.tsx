@@ -113,4 +113,20 @@ describe('InlineIconButton', () => {
 
     await expectNoA11yViolations(container);
   });
+
+  it('names a link from aria-labelledby', () => {
+    render(
+      <>
+        <span id='inline-link-name'>Open release</span>
+        <InlineIconButton href='/releases/1' aria-labelledby='inline-link-name'>
+          <svg aria-hidden='true' />
+        </InlineIconButton>
+      </>
+    );
+
+    expect(screen.getByRole('link', { name: 'Open release' })).toHaveAttribute(
+      'aria-labelledby',
+      'inline-link-name'
+    );
+  });
 });
