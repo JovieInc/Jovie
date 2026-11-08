@@ -5,15 +5,8 @@ import { useEffect, useRef } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ProfileIdentityHeader } from '@/features/profile/ProfileIdentityHeader';
 import { ProfilePreviewBento } from '@/features/profile/ProfilePreviewBento';
-import {
-  type CanonicalArtistMetrics,
-  getDisplaySpotifyFollowers,
-} from '@/lib/onboarding/canonical-metrics';
-import {
-  type OnboardingCatalogPreview,
-  toPreviewPublicReleases,
-} from '@/lib/onboarding/catalog-preview';
-import type { OnboardingProfileDraft } from '@/lib/onboarding/profile-draft';
+import { getDisplaySpotifyFollowers } from '@/lib/onboarding/canonical-metrics';
+import { toPreviewPublicReleases } from '@/lib/onboarding/catalog-preview';
 import { cn } from '@/lib/utils';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import {
@@ -22,41 +15,18 @@ import {
   getSafeSpotifyArtistUrl,
   type OnboardingDspMatch,
 } from './OnboardingToolArtifacts';
+import {
+  type OnboardingProfileArtist,
+  type OnboardingProfileBuilderState,
+  resolvePreviewArtist,
+} from './onboardingProfileRailState';
 
-export interface OnboardingProfileArtist {
-  readonly tagline?: string | null;
-  readonly id: string;
-  readonly name: string;
-  readonly url: string;
-  readonly imageUrl?: string | null;
-  /**
-   * Display follower count — always `metrics.spotifyFollowers` when metrics
-   * are present. Kept as a convenience mirror; never store monthly listeners here.
-   */
-  readonly followers?: number | null;
-  readonly metrics?: CanonicalArtistMetrics | null;
-  readonly popularity?: number | null;
-  readonly genres?: readonly string[];
-  readonly dspMatches?: readonly OnboardingDspMatch[];
-  /** JOV-9758: the artist's real catalog, rendered before any pricing step. */
-  readonly catalog?: OnboardingCatalogPreview | null;
-}
-
-export interface OnboardingProfileBuilderState {
-  readonly profileDraft?: OnboardingProfileDraft | null;
-  readonly artist: OnboardingProfileArtist | null;
-  readonly artistConfirmed: boolean;
-  readonly handle: string | null;
-  readonly socialLinks: readonly string[];
-}
-
-export const EMPTY_ONBOARDING_PROFILE_BUILDER_STATE: OnboardingProfileBuilderState =
-  {
-    artist: null,
-    artistConfirmed: false,
-    handle: null,
-    socialLinks: [],
-  };
+export {
+  EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
+  type OnboardingProfileArtist,
+  type OnboardingProfileBuilderState,
+  resolvePreviewArtist,
+} from './onboardingProfileRailState';
 
 function readSafeHttpsUrl(url: string | null | undefined): string | null {
   if (!url) return null;
@@ -308,44 +278,8 @@ function DspMatchStrip({
 }
 
 /**
- * Non-artists (JOV-3379) have no Spotify match; once they pick a handle and
- * share a public profile, preview jov.ie/<handle> from those alone.
- */
-export function resolvePreviewArtist(
-  state: OnboardingProfileBuilderState
-): OnboardingProfileArtist | null {
-  const draft = state.profileDraft;
-  if (draft && draft.activeRole !== 'artist') {
-    const source = draft.selectedSource;
-    if (!source || !draft.activeRole) return null;
-    return {
-      id: `source-${source.url}`,
-      name:
-        source.status === 'available' && source.title
-          ? source.title
-          : new URL(source.url).hostname,
-      url: '',
-      tagline: draft.outcome,
-    };
-  }
-  if (state.artist) {
-    // JOV-10169: the artist preview must never render a fabricated
-    // jov.ie/your-handle identity. Between the artist pick and a known
-    // handle, the rail stays empty (the shell falls back to the entry
-    // preview) instead of flashing the placeholder URL and /your-handle
-    // links.
-    if (!state.handle) return null;
-    return state.artist;
-  }
-  // Pen R6As7U: the draft profile is present as soon as a handle is known,
-  // before any artist or link is attached.
-  if (!state.handle) return null;
-  return { id: `handle-${state.handle}`, name: state.handle, url: '' };
-}
-
-/**
  * Pen R6As7U `SDt0M`: names the panel so the phone reads as the visitor's own
- * draft. Pen sets the eyebrow in its canonical uppercase eyebrow style.
+ * draft. No all-caps eyebrow: banned UI text (ASR-022, no-uppercase-ratchet).
  */
 function OnboardingDraftProfileHeader() {
   return (
@@ -353,9 +287,6 @@ function OnboardingDraftProfileHeader() {
       className='system-b-onboarding-draft-header'
       data-testid='onboarding-draft-profile-header'
     >
-      <p className='system-b-onboarding-draft-eyebrow'>
-        Your profile, taking shape
-      </p>
       <h2 className='system-b-onboarding-draft-title text-balance'>
         Your Draft Profile
       </h2>
@@ -493,6 +424,7 @@ export function OnboardingProfileRail({
             isSubscribed={false}
             // Never show Live — ownership is unverified during onboarding.
             showLiveBadge={false}
+            directDspImages
             dataTestId='onboarding-profile-bento'
             phonePreviewTestId='onboarding-phone-preview'
             surfaceTestId='onboarding-profile-compact-surface'
@@ -506,7 +438,7 @@ export function OnboardingProfileRail({
             phoneFrameClassName={isInline ? 'w-50 sm:w-57' : 'w-71'}
             topRight={
               <span
-                className='inline-flex h-6 items-center rounded-full border border-white/12 bg-black/60 px-2.5 text-3xs font-semibold uppercase tracking-wider text-white backdrop-blur-md dark:text-white'
+                className='inline-flex h-6 items-center rounded-full border border-white/12 bg-black/60 px-2.5 text-2xs font-medium text-white backdrop-blur-md dark:text-white'
                 data-testid='onboarding-profile-preview-badge'
               >
                 Preview
