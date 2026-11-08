@@ -22,6 +22,7 @@ test('every checked-in brief parses and names a unique frame', () => {
       'audience-analytics',
       'billing-success',
       'claim',
+      'empty-states',
       'homepage',
       'insights',
       'profile-analytics-card',
