@@ -216,7 +216,7 @@ export const HOMEPAGE_SPECS_COPY = {
         {
           /** Resolved from the public API contract's active version. */
           value: 'apiVersion',
-          title: 'REST API',
+          title: 'Public API',
           detail: 'apiSpec',
           mono: true,
           derived: true,
