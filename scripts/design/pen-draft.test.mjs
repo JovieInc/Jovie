@@ -18,7 +18,14 @@ test('every checked-in brief parses and names a unique frame', () => {
   const briefs = loadBriefs();
   assert.deepEqual(
     briefs.map(b => b.frame),
-    ['billing-success', 'claim', 'homepage', 'request-access']
+    [
+      'audience-analytics',
+      'billing-success',
+      'claim',
+      'homepage',
+      'insights',
+      'request-access',
+    ]
   );
   for (const b of briefs) assert.ok(b.prompt.length > 100, b.frame);
 });
