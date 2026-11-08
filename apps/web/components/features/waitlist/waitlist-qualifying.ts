@@ -1,3 +1,4 @@
+import { getNotificationCaptureError } from '@/lib/notifications/capture-validation';
 import type {
   MomTestAnswers,
   PromoSpendBand,
@@ -87,4 +88,16 @@ export function qualifyingAnsweredFlags(answers: QualifyingAnswers) {
     answered_growth: answers.growth.trim().length > 0,
     answered_spend: answers.spend !== '',
   };
+}
+
+/**
+ * The form's own email check, run before the first question. Past that step
+ * the email field is gone, so an address the server rejects (a browser
+ * accepts `name@gmail`) would leave the artist nothing to fix.
+ */
+export function waitlistEmailError(email: string): string | null {
+  if (!email.trim()) return null;
+  return getNotificationCaptureError({ channel: 'email', value: email })
+    ? 'Enter a full email address, like name@example.com.'
+    : null;
 }

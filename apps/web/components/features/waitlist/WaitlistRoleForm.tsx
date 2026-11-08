@@ -37,6 +37,7 @@ import {
   qualifyingAnsweredFlags,
   qualifyingPayload,
   qualifyingStepNumber,
+  waitlistEmailError,
 } from './waitlist-qualifying';
 
 // Loaded only when an artist starts the questions; the homepage never ships it.
@@ -175,24 +176,28 @@ export function WaitlistRoleForm({
     []
   );
 
+  function fail(message: string) {
+    setStatus('error');
+    setErrorMessage(message);
+  }
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (status === 'submitting' || status === 'joined') return;
 
     if (variant === 'general' && !name.trim()) {
       nameRef.current?.focus({ preventScroll: true });
-      setStatus('error');
-      setErrorMessage('Enter your name.');
+      fail('Enter your name.');
       return;
     }
 
     if (!role) {
-      setStatus('error');
-      setErrorMessage('Choose the role that fits you best.');
+      fail('Choose the role that fits you best.');
       return;
     }
-    if (!email.trim()) {
+    const emailError = waitlistEmailError(email);
+    if (!email.trim() || emailError) {
       inputRef.current?.focus({ preventScroll: true });
+      if (emailError) fail(emailError);
       return;
     }
     if (asksQuestions && step !== 'spend') {
@@ -256,6 +261,7 @@ export function WaitlistRoleForm({
         error?: string;
       };
       if (!response.ok || data.state !== 'joined') {
+        if (response.status === 400) setStep('entry'); // email and role show there
         throw new Error(
           data.error || 'Something went wrong. Please try again.'
         );
@@ -267,8 +273,7 @@ export function WaitlistRoleForm({
       joinedRef.current = true;
       setStatus('joined');
     } catch (error) {
-      setStatus('error');
-      setErrorMessage(
+      fail(
         (error instanceof DOMException || error instanceof Error) &&
           error.name === 'TimeoutError'
           ? 'Request timed out. Please try again.'
