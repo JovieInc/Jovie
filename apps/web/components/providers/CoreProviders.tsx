@@ -12,6 +12,7 @@ import { isThemeRoute } from '@/lib/theme/route-policy';
 import { isFormElement } from '@/lib/utils/keyboard';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
+import { DeferredAnalytics } from './DeferredAnalytics';
 import { LazyProviders } from './LazyProviders';
 import { NuqsProvider } from './NuqsProvider';
 import { QueryProvider } from './QueryProvider';
@@ -225,14 +226,22 @@ function CoreProvidersInner({
   );
 }
 
-/** Marketing route prefixes where analytics are disabled */
+/**
+ * Marketing route prefixes where Vercel Web Analytics is not mounted.
+ *
+ * The homepage ("/") and "/pricing" are deliberately absent: they are the top
+ * of the signup funnel. When they were listed here, a visitor who landed on
+ * either page sent no pageview at all, so Web Analytics showed the homepage
+ * with a handful of visitors (only those who arrived via a client-side
+ * navigation from another tracked page) while /artist-profiles showed
+ * hundreds. `CoreProviders.analytics.test.tsx` guards this.
+ */
 const MARKETING_PREFIXES = [
   '/artist-notifications',
   '/blog',
   '/changelog',
   '/engagement-engine',
   '/investors',
-  '/pricing',
   '/support',
   '/waitlist',
 ] as const;
@@ -299,7 +308,6 @@ export function CoreProviders({
     () =>
       !isTestRuntime &&
       !isElectronRuntimeApp &&
-      pathname !== '/' &&
       !MARKETING_PREFIXES.some(prefix => pathname.startsWith(prefix)),
     [isElectronRuntimeApp, isTestRuntime, pathname]
   );
@@ -308,8 +316,16 @@ export function CoreProviders({
   // shell. It now opts into the shared theme policy so the footer preference
   // control can resolve system/light/dark on the declared marketing surface.
   // Other public routes keep their existing provider boundaries.
+  // With theme switching off (production), the homepage skips the provider
+  // tree, so it mounts Web Analytics itself; otherwise no homepage landing
+  // would ever be counted.
   if (isHomepageVariant && !themeEnabled) {
-    return <>{children}</>;
+    return (
+      <>
+        {children}
+        {enableAnalytics ? <DeferredAnalytics /> : null}
+      </>
+    );
   }
 
   const providers = (
