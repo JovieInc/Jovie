@@ -432,17 +432,12 @@ describe('AnalyticsSidebar failed fetch (regression: Sentry on #24521)', () => {
   it('shows the error state, not "No Profile Visits Yet", when the fetch fails', () => {
     const onRetry = vi.fn();
     render(
-      <AnalyticsSidebarView
-        {...baseProps}
-        data={undefined}
-        isError
-        onRetry={onRetry}
-      />
+      <AnalyticsSidebarView {...baseProps} data={undefined} onRetry={onRetry} />
     );
 
     const error = screen.getByTestId('analytics-rail-error-state');
     expect(error).toHaveAttribute('data-content-state', 'error');
-    expect(error).toHaveTextContent('Analytics Unavailable');
+    expect(error).toHaveTextContent('Analytics Did Not Load');
     expect(
       screen.queryByTestId('analytics-rail-empty-state')
     ).not.toBeInTheDocument();
@@ -468,7 +463,7 @@ describe('AnalyticsSidebar failed fetch (regression: Sentry on #24521)', () => {
           top_countries: [],
           top_referrers: [],
         }}
-        isError
+        onRetry={vi.fn()}
       />
     );
 
@@ -478,18 +473,13 @@ describe('AnalyticsSidebar failed fetch (regression: Sentry on #24521)', () => {
     expect(screen.getByText('Unique Visitors')).toBeInTheDocument();
   });
 
-  it('never claims zero visits without data', () => {
-    render(<AnalyticsSidebarView {...baseProps} data={undefined} />);
-
-    expect(
-      screen.queryByTestId('analytics-rail-empty-state')
-    ).not.toBeInTheDocument();
-  });
-
-  it('renders the range control only when a range handler is given', () => {
+  it('never claims zero visits without data; range control needs a handler', () => {
     const { rerender } = render(
       <AnalyticsSidebarView {...baseProps} data={undefined} />
     );
+    expect(
+      screen.queryByTestId('analytics-rail-empty-state')
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '7D' })).toBeInTheDocument();
 
     rerender(

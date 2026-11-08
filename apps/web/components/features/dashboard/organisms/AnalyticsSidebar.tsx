@@ -33,12 +33,7 @@ import { AnalyticsRankedList as RankedList } from './AnalyticsRankedList';
  * Calculate conversion rate between two funnel stages.
  * Suppresses misleading percents on small bases — see formatAnalyticsStageRate.
  */
-export function calculateConversionRate(
-  current: number,
-  previous: number
-): string | null {
-  return formatAnalyticsStageRate(current, previous);
-}
+export const calculateConversionRate = formatAnalyticsStageRate;
 
 const RANGE_VALUES: readonly AnalyticsRange[] = ['7d', '30d'];
 
@@ -191,8 +186,7 @@ export interface AnalyticsSidebarViewProps extends AnalyticsSidebarProps {
   readonly range: AnalyticsRange;
   /** Omit to hide the range control (static demo rails have one window). */
   readonly onRangeChange?: (range: AnalyticsRange) => void;
-  /** The fetch failed and there is no data to show. */
-  readonly isError?: boolean;
+  /** Set only when the fetch failed; with no data the rail shows the error state. */
   readonly onRetry?: () => void;
   readonly activeTab: AnalyticsTab;
   readonly onActiveTabChange: (tab: AnalyticsTab) => void;
@@ -208,7 +202,6 @@ export function AnalyticsSidebarView({
   isFetching = false,
   range,
   onRangeChange,
-  isError = false,
   onRetry,
   activeTab,
   onActiveTabChange,
@@ -217,7 +210,7 @@ export function AnalyticsSidebarView({
 }: AnalyticsSidebarViewProps) {
   const showTipLinkVisits = (data?.tip_link_visits ?? 0) > 0;
   // A failed fetch has no data, so it must never read as "no visits yet".
-  const showError = !loading && isError && data == null;
+  const showError = !loading && onRetry != null && data == null;
   const isEmpty = !loading && data != null && !hasAudienceActivity(data);
   const hideMetrics = showError || isEmpty;
   const stages = [
@@ -291,30 +284,32 @@ export function AnalyticsSidebarView({
             )}
             data-right-rail-section='status'
           >
-            {showError ? (
+            {/* A failed fetch must never read as "no visits yet"; a first
+                look shows one empty state instead of a funnel of zeros. */}
+            {hideMetrics ? (
               <EmptyState
-                variant='error'
-                heading='Analytics Unavailable'
-                description='Your analytics did not load. Nothing is lost; try again in a moment.'
+                variant={showError ? 'error' : undefined}
+                icon={
+                  showError ? undefined : (
+                    <ChartColumn className='h-5 w-5' strokeWidth={1.75} />
+                  )
+                }
+                heading={
+                  showError ? 'Analytics Did Not Load' : 'No Profile Visits Yet'
+                }
+                description={
+                  showError ? undefined : describeNoAudienceActivity(range)
+                }
                 action={
-                  onRetry ? { label: 'Retry', onClick: onRetry } : undefined
+                  showError
+                    ? { label: 'Retry', onClick: onRetry }
+                    : {
+                        label: 'Share Your Profile',
+                        href: APP_ROUTES.CHAT_PROFILE_PANEL,
+                      }
                 }
                 className='min-h-80'
-                testId='analytics-rail-error-state'
-              />
-            ) : null}
-            {/* First look: one empty state instead of a funnel of zeros */}
-            {isEmpty ? (
-              <EmptyState
-                icon={<ChartColumn className='h-5 w-5' strokeWidth={1.75} />}
-                heading='No Profile Visits Yet'
-                description={describeNoAudienceActivity(range)}
-                action={{
-                  label: 'Share Your Profile',
-                  href: APP_ROUTES.CHAT_PROFILE_PANEL,
-                }}
-                className='min-h-80'
-                testId='analytics-rail-empty-state'
+                testId={`analytics-rail-${showError ? 'error' : 'empty'}-state`}
               />
             ) : null}
             {/* Funnel waterfall — vertical bars show dropoff at a glance */}
@@ -430,10 +425,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
       data={data}
       loading={isLoading}
       isFetching={isFetching}
-      isError={isError}
-      onRetry={() => {
-        void refetch();
-      }}
+      onRetry={isError ? refetch : undefined}
       range={range}
       onRangeChange={setRange}
       activeTab={activeTab}

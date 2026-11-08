@@ -69,10 +69,9 @@ export const NoVisitsYet: Story = {
   },
 };
 
-export const Unavailable: Story = {
+export const DidNotLoad: Story = {
   args: {
     data: undefined,
-    isError: true,
     onRetry: () => {},
   },
 };
