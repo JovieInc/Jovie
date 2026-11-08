@@ -204,27 +204,30 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     }
   });
 
-  it('shows only real product captures, with no person but Tim White', async () => {
+  it('shows no real person: only the featured demo artist inside the product UI', async () => {
     const { HOMEPAGE_EDITORIAL_COPY: copy } = await loadCopy();
+    const { HOMEPAGE_FEATURED_ARTIST: artist } = await import(
+      '@/data/demoArtists'
+    );
     const { container } = await renderHomePage();
     const sources = [...container.querySelectorAll('section img')].map(image =>
       (image.getAttribute('src') ?? '').replace(/\?v=\w+$/, '')
     );
-    // Approved v3 (receipt home-canonical-v3): Tim White's own profile photo
-    // and his real release covers inside the live product UI. Nothing else,
-    // and the only person shown is Tim (his avatar and Never Say A Word).
+    // Tim, 2026-11-08: the homepage does not feature him. The live product UI
+    // shows an invented demo artist (procedural art, no people) until real
+    // artists opt in to be featured. No real person renders on `/`.
     const allowed = [
-      '/images/avatars/tim-white-profile.jpg',
-      '/img/releases/never-say-a-word.jpg',
-      '/img/releases/take-me-over-remix.jpg',
-      '/img/releases/doge-to-mars.jpg',
-      '/img/releases/tomorrow-sounds.jpg',
-      '/img/releases/supernova-girl.jpg',
-      '/img/releases/this-is-love.jpg',
+      artist.avatarSrc,
+      ...artist.releases.map(release => release.src),
     ];
+    expect(artist.demo).toBe(true);
     expect(sources.length).toBeGreaterThan(0);
     expect(sources.filter(src => !allowed.includes(src))).toEqual([]);
-    expect([...new Set(sources)].sort()).toEqual([...allowed].sort());
+    expect([...new Set(sources)].sort()).toEqual([...new Set(allowed)].sort());
+    expect(sources.some(src => /tim-white|img\/releases\//.test(src))).toBe(
+      false
+    );
+    expect(container.textContent).not.toContain('Tim White');
     expect(copy.profile.alt).toBeTruthy();
   });
 
@@ -366,6 +369,12 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     expect(css).toMatch(
       /@supports \(animation-timeline: view\(\)\)\s*\{\s*\.hv3-hero,\s*\.hv3-chapter\s*\{\s*overflow: clip;\s*\}/
     );
+    // The horizon line paints above the chapter rule's hairline, which would
+    // otherwise cover it; the glow stays behind the copy.
+    expect(css).toMatch(
+      /\.hv3-chapter::after\s*\{[^}]*z-index:\s*1;[^}]*height:\s*1px;/
+    );
+    expect(css).toMatch(/\.hv3-chapter::before\s*\{[^}]*z-index:\s*-1;/);
     // Keyframes touch only compositor properties, and never fade to nothing.
     for (const [, body] of css.matchAll(
       /@keyframes [\w-]+\s*\{([\s\S]*?\})\s*\}/g
