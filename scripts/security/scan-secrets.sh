@@ -9,6 +9,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
+# shellcheck source=scripts/security/scan-secrets-sonar-pin.sh
+. "$REPO_ROOT/scripts/security/scan-secrets-sonar-pin.sh"
 
 MODE="${1:-pre-commit}"
 BASE_REF="${2:-origin/main}"
@@ -16,10 +18,7 @@ GITLEAKS_VERSION="${GITLEAKS_VERSION:-8.21.2}"
 TRUFFLEHOG_VERSION="${TRUFFLEHOG_VERSION:-3.95.5}"
 EXCLUDE_PATHS="$REPO_ROOT/.trufflehog-exclude.txt"
 
-# Release downloads hit transient network resets (curl 35 connection resets on
-# ubuntu-latest, JOV-6809); a single failed attempt must not fail the scan.
-# Download to a temp file before extracting so a restarted transfer never
-# streams a concatenated response into tar.
+# Retry release downloads after curl 35 resets (JOV-6809) via a temp file.
 SCAN_SECRETS_RETRY_DELAY="${SCAN_SECRETS_RETRY_DELAY:-2}"
 fetch_release_tarball() {
   local url="$1" dest_dir="$2" member="$3"
@@ -183,23 +182,6 @@ is_trufflehog_excluded() {
   return 1
 }
 
-# A 40-hex SonarCloud hit with no file is the commit message. Dependabot
-# compare URLs repeat the previous action pin, and path excludes cannot
-# suppress commit messages. Accept it only when this commit or its first
-# parent still records that exact value as a uses: pin. Any other
-# SonarCloud match, including one with a file path, still fails the scan.
-is_recorded_workflow_pin() {
-  local rev="$1" raw="$2" path line
-  local pin_re="uses:[[:space:]]+[[:alnum:]_.-]+/[[:alnum:]_./-]+@${raw}([[:space:]]|#|$)"
-  [[ "$raw" =~ ^[0-9a-f]{40}$ ]] || return 1
-  for path in .github/workflows .github/actions; do
-    while IFS= read -r line; do
-      [[ "$line" =~ $pin_re ]] && return 0
-    done < <(git grep -F -h -e "@${raw}" "$rev" -- "$path" 2>/dev/null || true)
-  done
-  return 1
-}
-
 # Filter known false positives inside an action SHA.
 # Git findings must use the attributed commit's source, never the current file.
 # Keep the Commit lines consumed by the existing exact-range classifiers.
@@ -241,12 +223,7 @@ filter_trufflehog_findings() {
         fi
       fi
     fi
-    if [[ "$source" == Git && -z "$file" && "$raw" =~ ^[0-9a-f]{40}$ ]] \
-      && jq -e '.Verified == false and .DetectorName == "SonarCloud"' <<<"$finding" >/dev/null \
-      && { is_recorded_workflow_pin "$commit" "$raw" \
-        || is_recorded_workflow_pin "${commit}^" "$raw"; }; then
-      continue
-    fi
+    skip_recorded_sonar_pin "$source" "$file" "$raw" "$commit" "$finding" && continue
     kept=$((kept + 1))
     printf 'Found result: %q:%q (detector %q)\n' "$file" "$line" "$(jq -r '.DetectorName' <<<"$finding")"
     [[ -z "$commit" ]] || printf 'Commit: %s\n' "$commit"
