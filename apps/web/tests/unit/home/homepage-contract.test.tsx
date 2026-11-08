@@ -85,6 +85,7 @@ const HOMEPAGE_STYLES = [
   'components/homepage/v3/specs.css',
   'components/homepage/v3/form.css',
   'components/homepage/v3/responsive.css',
+  'components/homepage/v3/cinema.css',
 ] as const;
 
 const PRICE_TEXT = /\$\s?\d|\d+\s?\/\s?mo\b|\bper month\b|\b\d+-day\b/i;
@@ -347,6 +348,28 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     }
     for (const path of HOMEPAGE_SOURCES) {
       expect(read(path), `${path}: uppercase`).not.toMatch(/\buppercase\b/);
+    }
+  });
+
+  it('moves the cinema layer by transform and opacity only, behind reduced motion', () => {
+    const css = read('components/homepage/v3/cinema.css').replace(
+      /\/\*[\s\S]*?\*\//g,
+      ''
+    );
+    // Scroll-driven only, and only where the user has not asked for less motion.
+    expect(css).toMatch(
+      /@supports \(animation-timeline: view\(\)\)\s*\{\s*@media \(prefers-reduced-motion: no-preference\)/
+    );
+    expect(css).not.toMatch(/addEventListener|position:\s*(?:fixed|sticky)/);
+    // Keyframes touch only compositor properties, and never fade to nothing.
+    for (const [, body] of css.matchAll(
+      /@keyframes [\w-]+\s*\{([\s\S]*?\})\s*\}/g
+    )) {
+      const props = [...body.matchAll(/([a-z-]+)\s*:/g)].map(
+        ([, prop]) => prop
+      );
+      expect(new Set(props)).toEqual(new Set(['opacity', 'transform']));
+      expect(body).not.toMatch(/opacity:\s*0(?:\.0+)?\s*;/);
     }
   });
 });
