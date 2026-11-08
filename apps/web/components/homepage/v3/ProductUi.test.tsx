@@ -16,12 +16,13 @@ vi.mock('next/image', () => ({
 }));
 
 describe('homepage v3 product UI', () => {
-  it('lists Tim White’s catalog with Supernova Girl selected', () => {
+  it('lists the featured artist’s catalog with the inspected release selected', () => {
     const { container } = render(<AppWindow />);
     const rows = container.querySelectorAll('.hv3-rrow');
     expect(rows).toHaveLength(HOMEPAGE_CATALOG.length);
     const selected = container.querySelector('.hv3-rrow[data-selected="true"]');
-    expect(selected).toHaveTextContent('Supernova Girl');
+    expect(selected).toHaveTextContent(HOMEPAGE_PRODUCT_UI.inspector.title);
+    expect(container).not.toHaveTextContent('Tim White');
     // Three registry glyphs per row, in the registry's brand colours.
     expect(rows[0]?.querySelectorAll('.hv3-dsp svg')).toHaveLength(3);
   });
@@ -45,7 +46,7 @@ describe('homepage v3 product UI', () => {
       [...anchors].map(anchor => anchor.getAttribute('data-hv3-anchor'))
     ).toEqual(['rowR', 'row']);
     expect(anchors[0]?.closest('.hv3-rrow')).toHaveTextContent(
-      'Supernova Girl'
+      HOMEPAGE_PRODUCT_UI.inspector.title
     );
   });
 });

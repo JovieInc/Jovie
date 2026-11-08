@@ -1,3 +1,4 @@
+import { HOMEPAGE_FEATURED_ARTIST } from '@/data/demoArtists';
 import { HOMEPAGE_INVITE_ANCHOR } from '@/data/homepageInviteAnchor';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
@@ -38,8 +39,7 @@ export const HOMEPAGE_EDITORIAL_COPY = {
     secondaryAction: 'See a live profile',
     secondaryHref: TIM_WHITE_PROFILE.publicProfilePath,
     note: 'jovie opens by invitation',
-    windowLabel:
-      'Jovie for Mac: the Releases list with Supernova Girl open in the inspector',
+    windowLabel: `Jovie for Mac: an example artist's Releases list with ${HOMEPAGE_FEATURED_ARTIST.inspected.title} open in the inspector`,
     upcCallout: 'per release',
   },
   /** Chapter index (mono, lowercase, as approved). */
@@ -53,8 +53,8 @@ export const HOMEPAGE_EDITORIAL_COPY = {
       { label: 'Every service', value: 'One link to wherever they listen' },
       { label: 'Stay close', value: 'Updates only for people who ask' },
     ],
-    alt: 'Tim White’s Jovie profile, Listen mode, with Never Say A Word.',
-    handleCallout: 'jov.ie/tim · one handle',
+    alt: `An example artist’s Jovie profile, Listen mode, with ${HOMEPAGE_FEATURED_ARTIST.releases[0].title}.`,
+    handleCallout: `${HOMEPAGE_FEATURED_ARTIST.profileDisplay} · one handle`,
     updatesCallout: 'get updates · opt-in only',
     phone: {
       getUpdates: 'Get Updates',
@@ -65,8 +65,8 @@ export const HOMEPAGE_EDITORIAL_COPY = {
   releases: {
     headline: 'Every release, ready on day one.',
     body: 'Your catalog comes in once. Each release gets its own page with listen links for every service, and your profile always leads with the newest one.',
-    catalogLabel: 'Tim White’s release catalog in Jovie',
-    releasePageLabel: 'The Supernova Girl release page',
+    catalogLabel: 'An example artist’s release catalog in Jovie',
+    releasePageLabel: `The ${HOMEPAGE_FEATURED_ARTIST.inspected.title} release page`,
     rowCallout: 'catalog row → its own page',
     captions: {
       page: {
