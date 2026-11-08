@@ -13,7 +13,7 @@
  * a surface that jumps or freezes is not certified either.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { access, readFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -172,12 +172,36 @@ const repoRoot = () => {
 };
 const fromRepo = path => (isAbsolute(path) ? path : join(repoRoot(), path));
 
-function readJson(path) {
+async function readJson(path) {
   try {
-    return path ? JSON.parse(readFileSync(fromRepo(path), 'utf8')) : null;
+    return path ? JSON.parse(await readFile(fromRepo(path), 'utf8')) : null;
   } catch {
     return null;
   }
+}
+
+/**
+ * Reads the Pen manifest, the pen-still-diff receipt and which stills exist,
+ * once per run and without blocking the event loop (this module is also
+ * imported by apps/web through prod-cert.mjs).
+ * PROD_CERT_PEN_MANIFEST and PROD_CERT_PEN_DIFF_RECEIPT override the paths.
+ */
+export async function loadPenInputs(env = process.env) {
+  const manifest = (await readJson(
+    env.PROD_CERT_PEN_MANIFEST || GOLDEN_PATH_PEN_MANIFEST
+  )) ?? { frames: [] };
+  const receipt = await readJson(env.PROD_CERT_PEN_DIFF_RECEIPT);
+  const stills = (manifest.frames ?? []).map(f => f.stillPath).filter(Boolean);
+  const found = new Set();
+  await Promise.all(
+    stills.map(path =>
+      access(fromRepo(path)).then(
+        () => found.add(path),
+        () => {}
+      )
+    )
+  );
+  return { manifest, receipt, exists: path => found.has(path) };
 }
 
 /**
@@ -186,19 +210,15 @@ function readJson(path) {
  * `pen.matches-production` follows the pen-still-diff receipt for those
  * frames (scripts/invariants/pen-still-diff.mjs): pass passes, fail fails,
  * anything else is blocked, so a design alone never certifies a surface.
- * PROD_CERT_PEN_MANIFEST and PROD_CERT_PEN_DIFF_RECEIPT override the paths.
+ * Inputs come from loadPenInputs; with none, every screen reads unlisted.
  * @param {string} surface
- * @param {{ manifest?: any, receipt?: any, exists?: (path: string) => boolean, at?: string, env?: Record<string, string | undefined> }} [deps]
+ * @param {{ manifest?: any, receipt?: any, exists?: (path: string) => boolean, at?: string }} [deps]
  */
 export function penDesignChecks(surface, deps = {}) {
-  const env = deps.env ?? process.env;
   const at = deps.at ?? new Date().toISOString();
-  const exists = deps.exists ?? (path => existsSync(fromRepo(path)));
-  const manifest = deps.manifest ??
-    readJson(env.PROD_CERT_PEN_MANIFEST || GOLDEN_PATH_PEN_MANIFEST) ?? {
-      frames: [],
-    };
-  const receipt = deps.receipt ?? readJson(env.PROD_CERT_PEN_DIFF_RECEIPT);
+  const exists = deps.exists ?? (() => false);
+  const manifest = deps.manifest ?? { frames: [] };
+  const receipt = deps.receipt ?? null;
   const check = (id, status, summary) => ({
     id,
     status,
@@ -274,6 +294,6 @@ export function penDesignChecks(surface, deps = {}) {
 }
 
 /** Jank and design-first checks for one surface's browser run. */
-export function truthChecks(surface, observations) {
-  return [...jankChecks(observations), ...penDesignChecks(surface)];
+export function truthChecks(surface, observations, pen) {
+  return [...jankChecks(observations), ...penDesignChecks(surface, pen)];
 }

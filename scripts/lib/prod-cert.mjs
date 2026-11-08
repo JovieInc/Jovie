@@ -5,13 +5,11 @@
  * steps (returning sign-in, new-user signup, onboarding, chat, checkout entry)
  * come from the post-deploy Playwright run as a steps file and are folded in
  * here, so one receipt per surface is built from every kind of evidence.
- * Receipts are SHA-bound to /api/health/build-info and carry per-check
- * timestamps. A surface that was not exercised is `blocked` with a reason,
- * never silently passed.
+ * Receipts are SHA-bound to /api/health/build-info with per-check times; a
+ * surface that was not exercised is `blocked` with a reason, never passed.
  */
 
-// Cone probe bodies and the shared HTTP helpers live in prod-cert-probes.mjs
-// (company-guards size baseline); this module keeps the receipt logic.
+// Cone probes and HTTP helpers live in prod-cert-probes.mjs (size baseline).
 import {
   checkoutConeChecks,
   coneClaimChecks,
@@ -20,7 +18,11 @@ import {
   expectOk,
   get,
 } from './prod-cert-probes.mjs';
-import { strangerChecks, truthChecks } from './prod-cert-truth.mjs';
+import {
+  loadPenInputs,
+  strangerChecks,
+  truthChecks,
+} from './prod-cert-truth.mjs';
 
 export const RECEIPT_SCHEMA = 'jovie.prod-golden-path-receipt/v1';
 
@@ -356,9 +358,8 @@ export function stepChecks(
       };
       continue;
     }
-    // A Playwright retry re-records the same check. The latest attempt is
-    // the verdict, so one failed attempt followed by a pass is one passed
-    // check, not a failed surface (JOV-9822).
+    // A Playwright retry re-records the check; the latest attempt is the
+    // verdict, so a fail then a pass is one passed check (JOV-9822).
     const checks = (bySurface[step.surface] ??= []);
     const record = {
       id: step.id,
@@ -415,9 +416,7 @@ export async function readServedBuild(origin, fetchImpl = fetch) {
   return { sha: json.commitSha, deploymentId: json.deploymentId ?? null };
 }
 
-/**
- * Build one receipt per surface in launch order.
- */
+/** Build one receipt per surface in launch order. */
 export async function runProductionCertification({
   origin = 'https://jov.ie',
   fetchImpl = fetch,
@@ -432,6 +431,7 @@ export async function runProductionCertification({
   coneCases = false,
 } = {}) {
   const served = await readServedBuild(origin, fetchImpl);
+  const pen = await loadPenInputs();
   const stepState = stepChecks(steps, authStatus, now);
   const probes = anonymousChecks({
     origin,
@@ -462,7 +462,7 @@ export async function runProductionCertification({
       const present = stepState.bySurface[surface] ?? [];
       checks.push(
         ...present,
-        ...truthChecks(surface, stepState.observationsBySurface[surface]),
+        ...truthChecks(surface, stepState.observationsBySurface[surface], pen),
         ...missingBrowserChecks({ surface, present, authStatus, now })
       );
     }
