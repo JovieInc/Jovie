@@ -1,0 +1,10 @@
+# sha256 of the extracted scanner BINARY, per tool, version and platform
+# (JOV-11689). fetch-scanner.sh verifies this on every source: cache hit,
+# GitHub release tarball and container-image fallback. Add a row when bumping
+# a scanner version; an unpinned tool/version/platform fails closed.
+# tool version platform sha256
+trufflehog 3.99.8 linux/amd64 0f1dff85dbf3d4bcc55594e187ecc0a5fe1eea8810a37eb1845f2c263566fb40
+trufflehog 3.99.8 linux/arm64 92136e058307d1f6dab56d350f569ca1031f39c31b2e3aea6a53b991f03d8c91
+gitleaks 8.21.2 linux/amd64 464510f25086c73de22c7ea21649a67e398a1afe8def9be884955042ccb6f8e9
+gitleaks 8.21.2 linux/arm64 0065e9fcf7ab80783f372c333ecefbf7a1f94ccd46f27765a942f1ad2d59cd73
+osv-scanner 2.5.1 linux/amd64 f9f25499a2c8cc367b3af45df2ea7eeca7fbccceab9c35079968f4b3652194be

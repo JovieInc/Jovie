@@ -1580,6 +1580,16 @@ jobs:
           # spend 5+ minutes in an effectively non-cancellable checkout. The
           # next step deepens only this event's exact base..head ancestry.
           fetch-depth: 1
+      - name: Restore pinned scanner binaries
+        # Warm cache never touches the network (JOV-11689). Contents are
+        # re-verified against scripts/security/scanner-pins.txt on every use.
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            /tmp/trufflehog-3.99.8
+            /tmp/gitleaks-8.21.2
+            /tmp/osv-scanner-2.5.1
+          key: scanner-bins-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/security/scanner-pins.txt') }}
       - name: Run secret scan
         env:
           # Keep Git-valid but shell-significant branch characters out of the
