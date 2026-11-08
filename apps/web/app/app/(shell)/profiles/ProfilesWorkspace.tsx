@@ -1871,13 +1871,8 @@ function ProfilesWorkspaceContent({
       toolbar={
         <PageToolbar
           data-testid='connections-workspace-toolbar'
-          // The shell header already names the page "Profiles"; the toolbar
-          // never repeats it (shell-ia.md). It carries the inventory count.
           start={
-            <span
-              className='text-app tabular-nums text-secondary-token'
-              data-testid='profiles-workspace-count'
-            >
+            <span className='text-app tabular-nums text-secondary-token'>
               {rows.length === 1 ? '1 profile' : `${rows.length} profiles`}
             </span>
           }
