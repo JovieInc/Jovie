@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Route, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { ensureSignedInUser, hasClerkCredentials } from '../helpers/auth';
 
@@ -162,25 +162,18 @@ test.describe('API failure resilience', () => {
     // list data endpoint (/api/dashboard/audience/** used by
     // useAudienceInfiniteQuery) both fail — the page must show error UI, not
     // a blank surface (JOV-8791).
-    // Counts requests the 500 mocks answered: zero means the page never
-    // reached the failure path and the blank has another cause.
+    // routedRequests 0 in a red receipt: the failure path never ran.
     let routedRequests = 0;
-    await page.route('**/api/audience/**', route => {
+    const fail500 = (route: Route) => {
       routedRequests += 1;
-      route.fulfill({
+      return route.fulfill({
         status: 500,
         contentType: 'application/json',
         body: JSON.stringify({ error: 'Service unavailable' }),
       });
-    });
-    await page.route('**/api/dashboard/audience/**', route => {
-      routedRequests += 1;
-      route.fulfill({
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({ error: 'Service unavailable' }),
-      });
-    });
+    };
+    await page.route('**/api/audience/**', fail500);
+    await page.route('**/api/dashboard/audience/**', fail500);
 
     const response = await gotoWithRetry(page, APP_ROUTES.AUDIENCE, {
       waitUntil: 'domcontentloaded',
