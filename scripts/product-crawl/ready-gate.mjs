@@ -74,7 +74,7 @@ export function pageFindings(page) {
 
 /**
  * @param {{ origin: string, sha?: string, at: string, routes: string[],
- *   uncovered?: { route: string, reason: string }[],
+ *   uncovered?: { route: string, reason: string, accepted?: boolean }[],
  *   pages: Parameters<typeof pageFindings>[0][] }} receipt
  * @param {{ now?: number, deployedSha?: string }} [opts]
  */

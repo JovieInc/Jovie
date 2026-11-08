@@ -43,21 +43,16 @@ function concrete(route) {
   return simple.includes('[') ? null : simple;
 }
 
-const OBSERVE = () => {
+// Runs in the page, so it is a string: these scripts type-check as Node.
+const OBSERVE = `
   window.__crawl = { cls: 0, lcp: 0, longest: 0 };
-  new PerformanceObserver(l => {
-    for (const e of l.getEntries())
-      if (!e.hadRecentInput) window.__crawl.cls += e.value;
-  }).observe({ type: 'layout-shift', buffered: true });
-  new PerformanceObserver(l => {
-    for (const e of l.getEntries())
-      window.__crawl.lcp = Math.max(window.__crawl.lcp, e.startTime);
-  }).observe({ type: 'largest-contentful-paint', buffered: true });
-  new PerformanceObserver(l => {
-    for (const e of l.getEntries())
-      window.__crawl.longest = Math.max(window.__crawl.longest, e.duration);
-  }).observe({ type: 'longtask', buffered: true });
-};
+  const watch = (type, fn) => new PerformanceObserver(l => l.getEntries().forEach(fn)).observe({ type, buffered: true });
+  watch('layout-shift', e => { if (!e.hadRecentInput) window.__crawl.cls += e.value; });
+  watch('largest-contentful-paint', e => { window.__crawl.lcp = Math.max(window.__crawl.lcp, e.startTime); });
+  watch('longtask', e => { window.__crawl.longest = Math.max(window.__crawl.longest, e.duration); });
+`;
+const MEASURE = `({ ...window.__crawl, text: document.body?.innerText ?? '',
+  overflow: document.documentElement.scrollWidth > window.innerWidth + 1 })`;
 
 const browser = await chromium.launch();
 const pages = [];
@@ -96,11 +91,7 @@ async function visit(route, viewport) {
     row.status = res?.status() ?? 0;
     const finalPath = new URL(page.url()).pathname;
     row.authGated = SIGN_IN.test(finalPath) && !SIGN_IN.test(target);
-    const m = await page.evaluate(() => ({
-      ...window.__crawl,
-      text: document.body?.innerText ?? '',
-      overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
-    }));
+    const m = await page.evaluate(MEASURE);
     row.cls = Number(m.cls.toFixed(4));
     row.lcpMs = Math.round(m.lcp);
     row.longestTaskMs = Math.round(m.longest);
