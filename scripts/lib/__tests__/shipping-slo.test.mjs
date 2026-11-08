@@ -192,6 +192,8 @@ describe('shipping SLO workflow credentials', () => {
     expect(WORKFLOW).toContain(
       'gh pr create --repo "${{ github.repository }}" --base main --head "$BRANCH"'
     );
+    expect(WORKFLOW).toContain('label_args+=(--label big-pr)');
+    expect(WORKFLOW).toContain('if [ "$snapshot_lines" -gt 1500 ]; then');
     expect(WORKFLOW).not.toContain('git push origin HEAD:main');
   });
 });
