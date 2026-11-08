@@ -39,5 +39,5 @@ jobs:
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: product-crawl-receipt
-          path: product-crawl-receipt/*
+          path: product-crawl-receipt/*.json
           if-no-files-found: error

@@ -155,14 +155,22 @@ const lines = [
       .join(', ') || 'none'
   }`,
   '',
-  '| kind | route | viewport | detail |',
-  '| --- | --- | --- | --- |',
-  ...rankFindings(verdict.findings)
-    .slice(0, 60)
-    .map(
-      f =>
-        `| ${f.kind} | ${f.route} | ${f.viewport} | ${f.detail.replaceAll('|', '/')} |`
-    ),
+  ...Object.keys(byKind).flatMap(kind => {
+    const rows = rankFindings(verdict.findings).filter(f => f.kind === kind);
+    return [
+      '',
+      `### ${kind} (${rows.length})`,
+      '',
+      '| route | viewport | detail |',
+      '| --- | --- | --- |',
+      ...rows
+        .slice(0, 25)
+        .map(
+          f =>
+            `| ${f.route} | ${f.viewport} | ${f.detail.replaceAll('|', '/').replaceAll('\n', ' ')} |`
+        ),
+    ];
+  }),
 ];
 await writeFile(join(args.out, 'summary.md'), lines.join('\n'));
 console.log(lines.join('\n'));
