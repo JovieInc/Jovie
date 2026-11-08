@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  canonicalKind,
   draftProblem,
   loadBriefs,
+  locatePen,
   missingOutputs,
   missingSecrets,
   parseBrief,
@@ -81,4 +83,29 @@ test('a draft counts only when it adds the named top-level frame', () => {
     draftProblem(before, null, 'claim'),
     'pen output is not a Pen file'
   );
+});
+
+test('the canonical download is named by its shape, so a web page never reaches pen', () => {
+  assert.equal(canonicalKind(Buffer.from([0x1f, 0x8b, 8, 0])), 'archive');
+  assert.equal(canonicalKind(Buffer.from('  {"children":[]}')), 'pen');
+  assert.equal(canonicalKind(Buffer.from('<!DOCTYPE html><html>')), 'html');
+  assert.equal(canonicalKind(Buffer.from('<html lang="en">')), 'html');
+  assert.equal(canonicalKind(Buffer.from('PK\u0003\u0004')), 'unknown');
+});
+
+test('a workspace archive drafts from the manifest .pen, else the first', () => {
+  const tree = {
+    w: [
+      { name: 'other.pen', isDirectory: () => false },
+      { name: 'fonts', isDirectory: () => true },
+    ],
+    'w/fonts': [{ name: 'canonical.lib.pen', isDirectory: () => false }],
+  };
+  const list = d => tree[d] ?? [];
+  assert.equal(
+    locatePen('w', 'canonical.lib.pen', list),
+    'w/fonts/canonical.lib.pen'
+  );
+  assert.equal(locatePen('w', 'missing.pen', list), 'w/other.pen');
+  assert.equal(locatePen('empty', 'x.pen', list), null);
 });
