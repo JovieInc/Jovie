@@ -9,7 +9,6 @@
  */
 
 import { and, eq } from 'drizzle-orm';
-import { Resend } from 'resend';
 import { db } from '@/lib/db';
 import {
   emailThreads,
@@ -17,7 +16,7 @@ import {
   outboundReplies,
 } from '@/lib/db/schema/inbox';
 import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
-import { env } from '@/lib/env-server';
+import { sendStreamEmail } from '@/lib/email/gateway';
 import { logger } from '@/lib/utils/logger';
 import {
   CATEGORY_TO_CONTACT_ROLE,
@@ -142,17 +141,26 @@ export async function confirmAndRoute(
   const bodyText = `Thanks for reaching out! I'm connecting you with ${contactLabel} who handles ${roleLabel} for ${artistName}. They'll be in touch.\n\nBest,\n${artistName} via Jovie`;
 
   try {
-    const resend = new Resend(env.RESEND_API_KEY ?? '');
-    const sent = await resend.emails.send({
-      from: `${artistName} via Jovie <${artistEmail}>`,
-      to: [firstEmail[0].fromEmail],
+    // Inbox stream: a reply to the person who emailed the artist's inbox.
+    const sent = await sendStreamEmail({
+      stream: 'inbox',
+      purpose: 'inbox-routing-reply',
+      consent: { basis: 'inbound-reply' },
+      fromName: `${artistName} via Jovie`,
+      fromLocalPart: profile[0]?.username ?? '',
+      to: firstEmail[0].fromEmail,
       cc: [matchedContact.email, artistEmail],
       subject: `Re: ${firstEmail[0].subject ?? '(no subject)'}`,
       text: bodyText,
-      headers: firstEmail[0].messageId
-        ? { 'In-Reply-To': firstEmail[0].messageId }
-        : undefined,
+      ...(firstEmail[0].messageId && {
+        headers: { 'In-Reply-To': firstEmail[0].messageId },
+      }),
     });
+    if (sent.status !== 'sent') {
+      throw new Error(
+        sent.status === 'error' ? sent.error : `${sent.code}: ${sent.detail}`
+      );
+    }
 
     // 8. Record the outbound reply
     await db.insert(outboundReplies).values({
@@ -164,7 +172,7 @@ export async function confirmAndRoute(
       subject: `Re: ${firstEmail[0].subject ?? '(no subject)'}`,
       bodyText,
       sentBy: 'jovie_routing',
-      resendMessageId: sent.data?.id ?? null,
+      resendMessageId: sent.messageId,
     });
 
     // 9. Update thread status

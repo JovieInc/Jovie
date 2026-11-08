@@ -43,6 +43,9 @@ export const ServerEnvSchema = z.object({
   NEXT_PUBLIC_BUILD_SHA: z.string().optional(),
   NEXT_PUBLIC_SENTRY_RELEASE: z.string().optional(),
   VERCEL_GIT_COMMIT_SHA: z.string().optional(),
+  // Present on every GitHub Actions step; lets standalone CI servers answer
+  // /api/health/build-info with the exact commit (JOV-1958 receipt).
+  GITHUB_SHA: z.string().optional(),
   VERCEL_DEPLOYMENT_ID: z.string().optional(),
   VERCEL_DEPLOYMENT_TIME: z.string().optional(),
   VERCEL_URL: z
@@ -104,6 +107,12 @@ export const ServerEnvSchema = z.object({
   RESEND_REPLY_TO_EMAIL: z.string().email().optional(),
   RESEND_WEBHOOK_SECRET: z.string().optional(),
   RESEND_INBOUND_WEBHOOK_SECRET: z.string().optional(),
+  // Read-capable key for received-email bodies (RESEND_API_KEY is send-only).
+  RESEND_RECEIVING_API_KEY: z.string().optional(),
+  // JOV-9779 release-email canary: the only scope the audience-delivery
+  // carve-out admits. Both unset (or invalid) keeps every send denied.
+  RELEASE_EMAIL_CANARY_PROFILE_ID: z.string().uuid().optional(),
+  RELEASE_EMAIL_CANARY_INBOX: z.string().email().optional(),
 
   // Slack notifications (admin alerts for claims, signups, upgrades, waitlist)
   SLACK_WEBHOOK_URL: z.string().url().optional(),
@@ -182,6 +191,9 @@ export const ServerEnvSchema = z.object({
   // Stripe server-side configuration
   STRIPE_SECRET_KEY: z.string().optional(),
   REVENUECAT_LYB_SECRET_API_KEY: z.string().optional(),
+  // Fleet audit trail read side (workers/observability-ingest, jovie-fleet-audit worker).
+  FLEET_AUDIT_READ_TOKEN: z.string().optional(),
+  FLEET_AUDIT_URL: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_CONNECT_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_WEBHOOK_SECRET_TIPS: z.string().optional(),
@@ -232,6 +244,8 @@ export const ServerEnvSchema = z.object({
 
   // Cron job authentication
   CRON_SECRET: z.string().optional(),
+  // HMAC-SHA256 key the dogfood judge signs admission records with.
+  DOGFOOD_JUDGE_SIGNING_KEY: z.string().optional(),
   // Optional allowlist of additional hosts (comma-separated) whose
   // `x-forwarded-host` should be treated as trusted for cron routes.
   // Used for Jovie-owned preview aliases. Never trusts `*.vercel.app`.
@@ -364,6 +378,9 @@ export const ServerEnvSchema = z.object({
   HELICONE_GATEWAY_BASE_URL: z.string().url().optional(),
   /** Helicone API key sent as `Helicone-Auth` when routing through the proxy. */
   HELICONE_API_KEY: z.string().optional(),
+  /** Cloudflare Workers AI (second model provider, paid from Cloudflare credits). Off when unset. */
+  WORKERS_AI_TOKEN: z.string().optional(),
+  WORKERS_AI_BASE_URL: z.string().url().optional(),
   // Hermes HUD events ingest authentication
   HERMES_HUD_API_KEY: z.string().optional(),
   HUD_AGENT_RUNS_FIXTURES: z
@@ -542,6 +559,7 @@ export const ENV_KEYS = [
   'NEXT_PUBLIC_BUILD_SHA',
   'NEXT_PUBLIC_SENTRY_RELEASE',
   'VERCEL_GIT_COMMIT_SHA',
+  'GITHUB_SHA',
   'VERCEL_DEPLOYMENT_ID',
   'VERCEL_DEPLOYMENT_TIME',
   'VERCEL_URL',
@@ -565,6 +583,9 @@ export const ENV_KEYS = [
   'RESEND_REPLY_TO_EMAIL',
   'RESEND_WEBHOOK_SECRET',
   'RESEND_INBOUND_WEBHOOK_SECRET',
+  'RESEND_RECEIVING_API_KEY',
+  'RELEASE_EMAIL_CANARY_PROFILE_ID',
+  'RELEASE_EMAIL_CANARY_INBOX',
   'SLACK_WEBHOOK_URL',
   'DATABASE_URL',
   'DB_POOL_MAX',
@@ -602,6 +623,7 @@ export const ENV_KEYS = [
   'TELEGRAM_WEBHOOK_SECRET',
   'STRIPE_SECRET_KEY',
   'REVENUECAT_LYB_SECRET_API_KEY',
+  'FLEET_AUDIT_READ_TOKEN',
   'STRIPE_WEBHOOK_SECRET',
   'STRIPE_CONNECT_WEBHOOK_SECRET',
   'STRIPE_WEBHOOK_SECRET_TIPS',
@@ -626,6 +648,7 @@ export const ENV_KEYS = [
   'LEAD_ATTRIBUTION_SECRET',
   'URL_ENCRYPTION_KEY',
   'CRON_SECRET',
+  'DOGFOOD_JUDGE_SIGNING_KEY',
   'CRON_TRUSTED_HOSTS',
   'METADATA_HASH_KEY',
   'PII_ENCRYPTION_KEY',
@@ -705,6 +728,8 @@ export const ENV_KEYS = [
   'AI_GATEWAY_API_KEY',
   'HELICONE_GATEWAY_BASE_URL',
   'HELICONE_API_KEY',
+  'WORKERS_AI_TOKEN',
+  'WORKERS_AI_BASE_URL',
   'HERMES_HUD_API_KEY',
   'HUD_AGENT_RUNS_FIXTURES',
   'OPENAI_API_KEY',

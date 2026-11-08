@@ -62,6 +62,18 @@ describe('content stage events', () => {
     ).toEqual([3]);
   });
 
+  it('does not count an approval receipt as publication or delivery', () => {
+    const out = buildContentStageEvents(versions, [
+      { ...events[0]!, action: 'approve' },
+    ]);
+    expect(
+      out.every(
+        event => event.stage === 'data-edit' && event.outcome === 'open'
+      )
+    ).toBe(true);
+    expect(editToLiveSeconds(out)).toEqual([]);
+  });
+
   it('computes the data share of marketing changes', () => {
     expect(dataShare(3, 1)).toBe(0.75);
     expect(dataShare(0, 0)).toBeNull();

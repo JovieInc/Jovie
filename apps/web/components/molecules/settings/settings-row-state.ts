@@ -33,7 +33,7 @@ export function getSettingsRowIconClassName({
       : state === 'gated'
         ? 'border-subtle bg-surface-0 text-tertiary-token'
         : tone === 'destructive'
-          ? 'border-error/20 bg-error-subtle text-error'
+          ? 'border-error/20 bg-error-subtle text-error-text'
           : 'border-subtle bg-surface-0 text-secondary-token',
     className
   );
@@ -51,7 +51,7 @@ export function getSettingsRowTitleClassName({
       : state === 'gated'
         ? 'text-tertiary-token'
         : tone === 'destructive'
-          ? 'text-error'
+          ? 'text-error-text'
           : 'text-primary-token',
     className
   );

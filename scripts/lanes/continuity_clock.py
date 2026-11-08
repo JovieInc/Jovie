@@ -79,6 +79,19 @@ CLOCKS = (
     # applies unless client_payload.apply is false; the bot token cannot send workflow_dispatch.
     Clock("staleBranchSweep", "stale-branch-sweep.yml", "clock_stale_branch_sweep", 7 * 86400,
           "stale-branch-sweep-clock.json", github_cron=False),
+    # Daily deep evidence on main HEAD (waste audit 2026-10-29): these ran on every main
+    # push and were mostly cancelled or always red. One run a day is the same evidence.
+    # Historical push runs stay visible in GitHub's recent page after the trigger moves
+    # to repository_dispatch; ignore them so they neither refresh nor invalidate cadence.
+    Clock("nightlyTests", "nightly-tests.yml", "clock_nightly_tests", 86400,
+          "nightly-tests-clock.json", github_cron=False,
+          ignored_events=frozenset({"push"})),
+    Clock("e2eFullMatrix", "e2e-full-matrix.yml", "clock_e2e_full_matrix", 86400,
+          "e2e-full-matrix-clock.json", github_cron=False,
+          ignored_events=frozenset({"push"})),
+    Clock("testCoverageAudit", "test-coverage-audit.yml", "clock_test_coverage_audit", 86400,
+          "test-coverage-audit-clock.json", github_cron=False,
+          ignored_events=frozenset({"push"})),
     # Dependabot advisories reach no workflow event; the loop files/closes Linear work and
     # fails its ratchet step when an advisory ages past its SLA. Clock is its only backstop.
     Clock("securityAdvisory", "security-advisory-loop.yml", "clock_security_advisory_loop", 4 * 3600,
@@ -86,12 +99,18 @@ CLOCKS = (
     # Hourly stateless probe of Summer's fast chat path through production (P0 2026-10-25).
     Clock("summerCanary", "ovie-summer-canary.yml", "clock_summer_canary", 3600,
           "summer-canary-clock.json", github_cron=False),
+    # Weekly re-measure of the published jov.ie vs Linktree claims; flags any that stopped being true.
+    Clock("vsLinktreeClaims", "vs-linktree-claims.yml", "clock_vs_linktree_claims", 7 * 86400,
+          "vs-linktree-claims-clock.json", github_cron=False),
     # Production golden-path certification freshness (JOV-9822): consumers need all eight
     # surfaces green on the served SHA within 24 h. Promotions certify on workflow_run; this
     # 12 h clock covers quiet days. workflow_run runs are mostly neutral, so they never count.
     Clock("prodGoldenPathCert", "postdeploy-probes.yml", "clock_prod_golden_path_cert", 12 * 3600,
           "prod-golden-path-cert-clock.json", github_cron=False,
           ignored_events=frozenset({"workflow_run"})),
+    # Hourly Vercel budget forecast and runtime-log signatures (2026-10-29 pause went unwarned ~1 h).
+    Clock("spendGuard", "spend-guard.yml", "clock_spend_guard", 3600,
+          "spend-guard-clock.json", github_cron=False),
 )
 CONTINUITY = CLOCKS[0]
 

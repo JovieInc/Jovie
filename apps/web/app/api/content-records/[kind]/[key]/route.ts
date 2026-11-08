@@ -26,12 +26,18 @@ import {
   signPreviewToken,
 } from '@/lib/content-records/access.server';
 import { gateContentRecord } from '@/lib/content-records/kind';
+import type { ContentReviewIdentity } from '@/lib/content-records/publication';
 import { getContentKind } from '@/lib/content-records/registry';
 import {
+  approveContentVersion,
+  ContentAuthorizationError,
   ContentConflictError,
+  type ContentPointerMove,
+  ContentPublicationUncertainError,
   ContentValidationError,
   createContentVersion,
   getContentHistory,
+  getContentReviewIdentity,
   publishContentVersion,
   rollbackContent,
 } from '@/lib/content-records/store.server';
@@ -44,6 +50,11 @@ const NO_STORE = { 'Cache-Control': 'no-store' } as const;
 const MAX_BODY_BYTES = 64 * 1024;
 
 const reason = z.string().trim().max(500).optional();
+const publication = {
+  expectedLiveVersionId: z.uuid().nullable(),
+  operationId: z.uuid(),
+  approvalId: z.uuid().optional(),
+};
 const RequestSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('validate'), data: z.unknown() }).strict(),
   z
@@ -55,8 +66,18 @@ const RequestSchema = z.discriminatedUnion('action', [
     .strict(),
   z
     .object({
+      action: z.literal('approve'),
+      versionId: z.uuid(),
+      decisionId: z.uuid(),
+      reviewDigest: z.string().regex(/^[a-f0-9]{64}$/),
+      expectedLiveVersionId: z.uuid().nullable(),
+    })
+    .strict(),
+  z
+    .object({
       action: z.literal('publish'),
       versionId: z.uuid(),
+      ...publication,
       reason,
     })
     .strict(),
@@ -64,6 +85,7 @@ const RequestSchema = z.discriminatedUnion('action', [
     .object({
       action: z.literal('rollback'),
       toVersionId: z.uuid().optional(),
+      ...publication,
       reason,
     })
     .strict(),
@@ -75,10 +97,29 @@ function json(body: unknown, status = 200) {
   return NextResponse.json(body, { status, headers: NO_STORE });
 }
 
-function previewUrl(kind: string, key: string, versionId: string) {
-  const token = signPreviewToken(versionId);
-  if (!token || kind !== 'marketing-page' || key !== 'home') return null;
-  return `${BASE_URL}${APP_ROUTES.CONTENT_PREVIEW}/${versionId}?token=${token}`;
+function publicationResponse(move: ContentPointerMove) {
+  const observed =
+    move.cacheInvalidation === 'complete' &&
+    move.readback.source === 'live' &&
+    move.readback.versionId === move.toVersionId;
+  return json(move, observed ? 200 : 202);
+}
+
+function previewUrl(identity: ContentReviewIdentity | null) {
+  if (
+    !identity ||
+    identity.kind !== 'marketing-page' ||
+    identity.key !== 'home'
+  )
+    return null;
+  const token = signPreviewToken(identity);
+  if (!token) return null;
+  const query = new URLSearchParams({
+    token,
+    digest: identity.reviewDigest,
+    live: identity.expectedLiveVersionId ?? 'none',
+  });
+  return `${BASE_URL}${APP_ROUTES.CONTENT_PREVIEW}/${identity.versionId}?${query}`;
 }
 
 async function resolve(request: Request, context: RouteContext) {
@@ -131,6 +172,14 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
   const input = parsed.data;
+  if (definition.apiWritable === false && input.action !== 'rollback') {
+    return json(
+      {
+        error: `${kind} is written only by its producer; the API can read history and roll back`,
+      },
+      403
+    );
+  }
 
   try {
     switch (input.action) {
@@ -149,27 +198,43 @@ export async function POST(request: Request, context: RouteContext) {
           note: input.note,
         });
         const { data: _data, ...summary } = version;
+        const review = await getContentReviewIdentity(
+          definition,
+          key,
+          version.id
+        );
         return json(
-          { version: summary, previewUrl: previewUrl(kind, key, version.id) },
+          { version: summary, review, previewUrl: previewUrl(review) },
           201
         );
       }
-      case 'publish':
+      case 'approve':
         return json(
+          await approveContentVersion(definition, { ...input, key }, request),
+          201
+        );
+      case 'publish':
+        return publicationResponse(
           await publishContentVersion(definition, {
             key,
             versionId: input.versionId,
             actor: writer.actor,
             reason: input.reason,
+            expectedLiveVersionId: input.expectedLiveVersionId,
+            operationId: input.operationId,
+            approvalId: input.approvalId,
           })
         );
       case 'rollback':
-        return json(
+        return publicationResponse(
           await rollbackContent(definition, {
             key,
             toVersionId: input.toVersionId,
             actor: writer.actor,
             reason: input.reason,
+            expectedLiveVersionId: input.expectedLiveVersionId,
+            operationId: input.operationId,
+            approvalId: input.approvalId,
           })
         );
       default: {
@@ -178,6 +243,12 @@ export async function POST(request: Request, context: RouteContext) {
       }
     }
   } catch (error) {
+    if (error instanceof ContentAuthorizationError) {
+      return json({ error: error.message }, error.status);
+    }
+    if (error instanceof ContentPublicationUncertainError) {
+      return json({ state: 'uncertain', operationId: error.operationId }, 503);
+    }
     if (error instanceof ContentValidationError) {
       return json({ ok: false, errors: error.errors }, 422);
     }

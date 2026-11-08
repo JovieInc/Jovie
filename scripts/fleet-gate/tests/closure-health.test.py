@@ -672,9 +672,11 @@ class ClosureClassificationTests(unittest.TestCase):
         )
         # The checked-in ruleset and the guard's lock must agree on every
         # tunable queue field; the tuned values themselves live in one place.
-        for source in (ruleset, guard):
-            self.assertRegex(source, r"check_response_timeout_minutes:\s*20")
-        for field in ("max_entries_to_build", "max_entries_to_merge"):
+        for field in (
+            "check_response_timeout_minutes",
+            "max_entries_to_build",
+            "max_entries_to_merge",
+        ):
             pattern = rf"{field}:\s*(\d+)"
             ruleset_value = re.search(pattern, ruleset)
             guard_value = re.search(pattern, guard)
@@ -1755,13 +1757,12 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         self.assertTrue(
             MODULE.product_intake_allowed(jovie_empty_red, "logyourbody")
         )
-        self.assertTrue(MODULE.product_intake_allowed(jovie_unmergeable_red, "ovie"))
+        self.assertTrue(MODULE.product_intake_allowed(jovie_unmergeable_red, "logyourbody"))
         self.assertTrue(MODULE.product_intake_allowed(jovie_empty_red, "jovie"))
 
         products = MODULE.build_product_closure_health(jovie_empty_red)
         self.assertTrue(products["jovie"]["newIssueIntakeAllowed"])
         self.assertTrue(products["logyourbody"]["newIssueIntakeAllowed"])
-        self.assertTrue(products["ovie"]["newIssueIntakeAllowed"])
         self.assertTrue(products["logyourbody"]["remediationContinues"])
 
         systems_down = {
@@ -1772,7 +1773,7 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         }
         self.assertFalse(MODULE.product_intake_allowed(systems_down, "logyourbody"))
         self.assertFalse(
-            MODULE.build_product_closure_health(systems_down)["ovie"]["newIssueIntakeAllowed"]
+            MODULE.build_product_closure_health(systems_down)["logyourbody"]["newIssueIntakeAllowed"]
         )
 
     def test_previous_closure_history_is_scoped_to_repository(self):

@@ -44,7 +44,7 @@ describe('OnboardingHandleStep keyboard focus', () => {
     expect(input).toHaveClass('focus-ring-themed');
 
     await user.tab();
-    const submit = screen.getByTestId('onboarding-handle-submit');
+    const submit = screen.getByRole('button', { name: 'Continue' });
     expect(submit).toHaveFocus();
     expect(submit).toHaveClass('focus-ring-themed');
     await user.keyboard('{Enter}');
@@ -65,7 +65,7 @@ describe('OnboardingHandleStep keyboard focus', () => {
     expect(screen.getByTestId('handle-unavailable')).toHaveTextContent(
       'That handle is unavailable'
     );
-    const submit = screen.getByTestId('onboarding-handle-submit');
+    const submit = screen.getByRole('button', { name: 'Continue' });
     expect(submit).toBeDisabled();
     expect(submit).toHaveAccessibleDescription('Choose another handle');
     await user.tab();
@@ -75,12 +75,28 @@ describe('OnboardingHandleStep keyboard focus', () => {
 
   it('shows the button spinner while submitting and prevents another submission', async () => {
     const { onSubmit } = renderStep({ isSubmitting: true });
-    const submit = screen.getByTestId('onboarding-handle-submit');
+    const submit = screen.getByRole('button', { name: 'Continue' });
     const spinner = screen.getByRole('status', { name: 'Loading' });
     expect(submit).toContainElement(spinner);
     expect(spinner).toHaveAttribute('data-tone', 'inverse');
     expect(submit).toBeDisabled();
     await userEvent.click(submit);
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+});
+
+describe('OnboardingHandleStep handle URL', () => {
+  it('groups the jov.ie/ prefix with the input so the URL reads as one string', () => {
+    renderStep();
+    const input = screen.getByRole('textbox', { name: 'Claim Your Handle' });
+    const group = input.parentElement;
+
+    // Prefix and handle share a gapless group; the submit button keeps the
+    // outer row's gap. A gap here rendered as "jov.ie/ sashawaves".
+    expect(group?.firstElementChild).toHaveTextContent('jov.ie/');
+    expect(group?.className).not.toMatch(/\bgap-/);
+    expect(
+      group?.contains(screen.getByTestId('onboarding-handle-submit'))
+    ).toBe(false);
   });
 });

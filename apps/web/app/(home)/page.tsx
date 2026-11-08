@@ -4,7 +4,7 @@ import { HomepageSpecSections } from '@/components/homepage/HomepageSpecSections
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
-import { HOMEPAGE_COPY } from '@/data/homepageCopy';
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import {
   buildOrganizationSchema,
@@ -14,13 +14,12 @@ import {
 import { MARKETING_PAGE_KIND } from '@/lib/content-records/marketing-page';
 import { getLiveContent } from '@/lib/content-records/store.server';
 import { publicEnv } from '@/lib/env-public';
-import { HomepageQueryProvider } from './homepage-query-provider';
 
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = {
-    absolute: HOMEPAGE_COPY.seo.title,
+    absolute: HOMEPAGE_EDITORIAL_COPY.seo.title,
   };
   const description = COMPANY_IDENTITY.seoDescription;
   const keywords = [
@@ -72,7 +71,7 @@ export async function generateMetadata(): Promise<Metadata> {
           secureUrl: `${BASE_URL}/og/default.png`,
           width: 1200,
           height: 630,
-          alt: HOMEPAGE_COPY.seo.title,
+          alt: HOMEPAGE_EDITORIAL_COPY.seo.title,
           type: 'image/png',
         },
       ],
@@ -84,7 +83,7 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: `${BASE_URL}/og/default.png`,
-          alt: HOMEPAGE_COPY.seo.title,
+          alt: HOMEPAGE_EDITORIAL_COPY.seo.title,
           width: 1200,
           height: 630,
         },
@@ -174,25 +173,24 @@ function HomePageShell({ children }: { readonly children: React.ReactNode }) {
 }
 
 /**
- * The homepage sells the artist profile (EVENT 2026-10-20, Tim): the claim
- * and the live profile, three real fan states, then the free offer and the
- * same claim. The ORGANIZATION schema and page metadata keep the general
- * company identity; the WebSite and SoftwareApplication schemas speak with
- * the approved artist-profile launch (JOV-8565).
+ * The homepage leads with "Jovie helps you move your music forward." (Tim,
+ * 2026-11-03, `/` only) and tells one editorial story: the profile at
+ * jov.ie/you, the releases workspace, then the role waitlist form. Signup is
+ * invite-only (`PUBLIC_SIGNUP_CLOSED`), so the page has no signup link; the
+ * hero action scrolls to the on-page form. The ORGANIZATION schema keeps the
+ * general company identity.
  *
  * Section order and copy slots come from the published `marketing-page/home`
  * content record, so copy changes go live without a code deploy. The page
  * stays static: the record is read at prerender and on publish-triggered
  * regeneration only (publish expires its cache tag), never per request, and
- * it falls back to the code default when nothing is published.
+ * it falls back to the code default when nothing valid is published.
  */
 export default async function HomePage() {
   const spec = await getLiveContent(MARKETING_PAGE_KIND, 'home');
   return (
     <HomePageShell>
-      <HomepageQueryProvider>
-        <HomepageSpecSections sections={spec.data.sections} />
-      </HomepageQueryProvider>
+      <HomepageSpecSections sections={spec.data.sections} />
     </HomePageShell>
   );
 }

@@ -32,6 +32,10 @@ export interface HomeLoopTile<Key extends string = string> {
   readonly was: string | null;
   readonly tone: HomeLoopTone;
   readonly measured: boolean;
+  /** The goal the value is judged against ("Target ≤ 10%"); tone is the state. */
+  readonly target?: string | null;
+  /** Drill-down for the number. */
+  readonly href?: string | null;
 }
 
 /** Why a row needs attention; `null` when it is moving normally. */
@@ -175,6 +179,8 @@ export interface HomeLoopCopy {
   readonly doneTitle: string;
   readonly doneEmpty: string;
   readonly approveLabel?: string;
+  /** Banner copy while the read is ready but no metric is measured. */
+  readonly constraintUnknown?: string;
   readonly latencyTitle?: string;
   readonly latencyEmpty?: string;
 }

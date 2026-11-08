@@ -60,6 +60,7 @@ export function ChatVideoRecordingProposalCard({
       script: payload.script,
       showcaseVariant: payload.showcaseVariant,
       source: 'chat_proposal' as const,
+      ...(payload.questions ? { questions: payload.questions } : {}),
     }),
     [profileId, payload]
   );

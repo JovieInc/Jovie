@@ -23,6 +23,10 @@ import {
   certificationVerdict,
   runProductionCertification,
 } from './lib/prod-cert.mjs';
+import {
+  coneScoreboard as buildConeScoreboard,
+  formatConeScoreboardLine,
+} from './lib/prod-cone-cases.mjs';
 
 export function surfaceFingerprint(surface) {
   return `prod-cert-${surface}`;
@@ -91,9 +95,12 @@ export const OVERALL_FINGERPRINT = 'prod-cert-overall';
  * surface is not green on the served SHA, closed when all eight are. Summer
  * picks it up from the Launch project; per-surface issues carry the detail.
  * @param {ReturnType<typeof certificationVerdict>} verdict
- * @param {{ runUrl?: string | null, deps?: { upsert?: Function, close?: Function } }} [options]
+ * @param {{ runUrl?: string | null, deps?: { upsert?: Function, close?: Function }, scoreboard?: ReturnType<typeof buildConeScoreboard> | null }} [options]
  */
-export async function fileOverallIssue(verdict, { runUrl, deps = {} } = {}) {
+export async function fileOverallIssue(
+  verdict,
+  { runUrl, deps = {}, scoreboard = null } = {}
+) {
   const upsert = deps.upsert ?? upsertLinearIssueByTitleFingerprint;
   const close = deps.close ?? closeLinearIssueByFingerprint;
   const sha = verdict.servedSha.slice(0, 8);
@@ -105,6 +112,12 @@ export async function fileOverallIssue(verdict, { runUrl, deps = {} } = {}) {
       runId: process.env.GITHUB_RUN_ID,
     });
   }
+  // JOV-6920: the cone scoreboard's uncovered cases ride the overall issue so
+  // the missing producers are visible in the same owned thread as the reds.
+  const uncovered = (scoreboard?.cases ?? [])
+    .filter(c => c.status === 'uncovered')
+    .map(c => `- \`${c.id}\`: ${c.summary}`)
+    .join('\n');
   return upsert({
     fingerprint: OVERALL_FINGERPRINT,
     labelKey: OVERALL_FINGERPRINT,
@@ -114,7 +127,7 @@ Production golden-path certification (JOV-9822), served build \`${verdict.served
 
 ## Not green
 ${verdict.notGreen.map(n => `- \`${n.surface}\`: ${n.why}`).join('\n')}
-
+${uncovered ? `\n## Uncovered JOV-6920 cone cases (fixed 31-case denominator; not run — no producer, never passed silently)\n${uncovered}\n` : ''}
 ## Why it matters
 The recovery email gate, agent-marketplace readiness and launch certification all require every surface to pass on the current production SHA within 24h.
 
@@ -127,26 +140,65 @@ Run: ${runUrl ?? 'n/a'}`,
   });
 }
 
-async function postReceipts(receipts, origin) {
+// Evidence-only receipt fields (JOV-9625): verdict-neutral extras that a
+// ledger predating the field rejects under its strict zod schema. Stripping
+// them on a schema-skew repost never changes a surface verdict, and the full
+// receipts (readback included) stay in the --out file.
+export const EVIDENCE_ONLY_RECEIPT_KEYS = Object.freeze([
+  'adminInventoryReadback',
+]);
+
+export function stripEvidenceOnlyKeys(
+  receipts,
+  keys = EVIDENCE_ONLY_RECEIPT_KEYS
+) {
+  return receipts.map(receipt => {
+    const copy = { ...receipt };
+    for (const key of keys) delete copy[key];
+    return copy;
+  });
+}
+
+export async function postReceipts(receipts, origin) {
   const secret = process.env.CRON_SECRET;
   if (!secret) throw new Error('CRON_SECRET is not set; cannot post receipts');
-  const response = await fetch(
-    new URL('/api/internal/ovie/golden-path-evidence', origin),
-    {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${secret}`,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ receipts }),
-    }
-  );
-  const text = await response.text();
-  if (!response.ok)
-    throw new Error(
-      `ledger POST HTTP ${response.status}: ${text.slice(0, 300)}`
+  const send = async body => {
+    const response = await fetch(
+      new URL('/api/internal/ovie/golden-path-evidence', origin),
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${secret}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ receipts: body }),
+      }
     );
-  return JSON.parse(text);
+    const text = await response.text();
+    return { ok: response.ok, status: response.status, text };
+  };
+  let result = await send(receipts);
+  // Deploy skew (JOV-9822 producer vs a frozen promotion): the served build's
+  // ledger schema can predate an evidence-only field, which its strict schema
+  // rejects. Repost once without that field — verdict-bearing receipts are
+  // byte-identical, and the readback stays in the receipts file for the run
+  // log. Anything else still fails loudly with the original body.
+  if (
+    !result.ok &&
+    result.status === 400 &&
+    result.text.includes('invalid_receipts') &&
+    EVIDENCE_ONLY_RECEIPT_KEYS.some(key => result.text.includes(key))
+  ) {
+    console.error(
+      `ledger on the served build predates evidence-only receipt keys (${EVIDENCE_ONLY_RECEIPT_KEYS.join(', ')}); reposting without them — surface verdicts unchanged, the field stays in the receipts file`
+    );
+    result = await send(stripEvidenceOnlyKeys(receipts));
+  }
+  if (!result.ok)
+    throw new Error(
+      `ledger POST HTTP ${result.status}: ${result.text.slice(0, 300)}`
+    );
+  return JSON.parse(result.text);
 }
 
 async function main() {
@@ -177,11 +229,21 @@ async function main() {
     expectedSha: process.env.EXPECTED_COMMIT_SHA || null,
     profileHandle: process.env.PROD_CERT_PROFILE_HANDLE || 'tim',
     runUrl,
+    // JOV-6920: the runner always certifies the full cone registry.
+    coneCases: true,
   });
+  // JOV-6920 fixed-denominator cone scoreboard (31 cases; uncovered is
+  // reported, never passed).
+  const coneScoreboard = buildConeScoreboard(receipts);
   writeFileSync(
     values.out,
-    `${JSON.stringify({ servedSha: served.sha, receipts }, null, 2)}\n`
+    `${JSON.stringify(
+      { servedSha: served.sha, coneScoreboard, receipts },
+      null,
+      2
+    )}\n`
   );
+  console.log(formatConeScoreboardLine(coneScoreboard));
   for (const r of receipts) {
     console.log(
       `${r.status.padEnd(7)} ${r.surface.padEnd(15)} ${r.sha.slice(0, 8)}  ${
@@ -201,7 +263,11 @@ async function main() {
   );
   if (values['file-issues'] && remediationTriggersEnabled()) {
     console.log(JSON.stringify(await fileSurfaceIssues(receipts, { runUrl })));
-    console.log(JSON.stringify(await fileOverallIssue(verdict, { runUrl })));
+    console.log(
+      JSON.stringify(
+        await fileOverallIssue(verdict, { runUrl, scoreboard: coneScoreboard })
+      )
+    );
   }
   if (values.post)
     console.log(JSON.stringify(await postReceipts(receipts, values.origin)));

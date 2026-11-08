@@ -8,7 +8,9 @@ import { runCli } from '../../../../../../packages/jovie-cli/src/cli';
 import { COMMANDS } from '../../../../../../packages/jovie-cli/src/commands';
 import { handleMcpMessage } from '../../../../../../packages/jovie-cli/src/mcp';
 
-const publicCommands = COMMANDS.filter(command => !command.internal);
+const publicCommands = COMMANDS.filter(
+  command => !command.internal && !command.operator
+);
 const schemas = ARTIST_OPENAPI_DOCUMENT.components.schemas;
 
 function operationFor(pathname: string, method: string) {

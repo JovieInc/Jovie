@@ -7,6 +7,7 @@
  *
  *   node scripts/time-bomb/scan.mjs run --suite web --shard 1/8 [--days 7] --out findings.json [-- <vitest args>]
  *   node scripts/time-bomb/scan.mjs run --suite scripts --out findings.json
+ *   node scripts/time-bomb/scan.mjs run --suite research --out findings.json
  *   node scripts/time-bomb/scan.mjs file findings-*.json [--dry-run]
  *
  * A finding is a test file that fails with the clock moved ahead twice and
@@ -25,6 +26,15 @@ const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const SHIM = fileURLToPath(new URL('./shift-clock.mjs', import.meta.url));
 export const DEFAULT_DAYS = 7;
 const DAY_MS = 86_400_000;
+// Explicit suite ownership: use each package's maintained Vitest config.
+const VITEST_SUITES = {
+  web: { directory: 'apps/web', confirmArgs: ['--passWithNoTests'] },
+  research: {
+    directory: 'packages/research',
+    // Confirmation reruns the suite: outcome.ts coverage spans multiple tests.
+    confirmSuite: true,
+  },
+};
 
 /** Environment for a child process whose clock runs `days` ahead. */
 export function shiftedEnv(days, env = process.env) {
@@ -83,10 +93,11 @@ function repoPath(file) {
     : file;
 }
 
-function runWeb({ days, shard, extra }) {
+function runVitest({ suite, days, shard, extra }) {
+  const config = VITEST_SUITES[suite];
   const dir = mkdtempSync(join(tmpdir(), 'time-bomb-'));
   const report = join(dir, 'vitest.json');
-  const web = join(ROOT, 'apps/web');
+  const directory = join(ROOT, config.directory);
   const vitest = (args, shiftDays) =>
     spawnSync(
       'pnpm',
@@ -96,41 +107,64 @@ function runWeb({ days, shard, extra }) {
         'run',
         '--config=vitest.config.mts',
         '--pool=forks',
+        ...(suite === 'research'
+          ? [
+              '--maxWorkers=1',
+              `--coverage.reportsDirectory=${join(dir, 'coverage')}`,
+            ]
+          : []),
         ...args,
       ],
       {
-        cwd: web,
+        cwd: directory,
         env: shiftedEnv(shiftDays),
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
       }
     );
-  try {
-    vitest(
-      [
-        ...(shard ? [`--shard=${shard}`] : []),
-        '--reporter=json',
-        `--outputFile=${report}`,
-        ...extra,
-      ],
-      days
+  const runReport = (args, shiftDays) => {
+    rmSync(report, { force: true });
+    const child = vitest(
+      ['--reporter=json', `--outputFile=${report}`, ...args],
+      shiftDays
     );
-    let failing;
+    let result;
     try {
-      failing = failuresFromVitestReport(
-        JSON.parse(readFileSync(report, 'utf8'))
-      );
+      result = JSON.parse(readFileSync(report, 'utf8'));
     } catch {
       throw new Error('the shifted Vitest run wrote no JSON report');
     }
+    const failing = failuresFromVitestReport(result);
+    if (suite === 'research') {
+      if (!(result.numTotalTests > 0))
+        throw new Error('the shifted research run selected no tests');
+      if (child.status !== 0 && failing.size === 0)
+        throw new Error(
+          'the shifted research run failed without test failures'
+        );
+    }
+    return { result, failing };
+  };
+  try {
+    const { failing } = runReport(
+      [...(shard ? [`--shard=${shard}`] : []), ...extra],
+      days
+    );
     const bombs = confirmTimeBombs([...failing.keys()], {
       days,
-      passes: (file, shiftDays) =>
-        vitest(['--passWithNoTests', file], shiftDays).status === 0,
+      passes: (file, shiftDays) => {
+        if (!config.confirmSuite)
+          return vitest([...config.confirmArgs, file], shiftDays).status === 0;
+        const { result } = runReport([], shiftDays);
+        const target = result.testResults.find(item => item.name === file);
+        if (!target)
+          throw new Error(`the research confirmation did not select ${file}`);
+        return target.status === 'passed';
+      },
     });
     return bombs.map(bomb => ({
       ...bomb,
-      suite: 'web',
+      suite,
       file: repoPath(bomb.file),
       tests: failing.get(bomb.file) ?? [],
     }));
@@ -210,8 +244,12 @@ export function parseArgs(argv) {
   }
   if (!['run', 'file'].includes(command))
     throw new Error('command must be run or file');
-  if (command === 'run' && !['web', 'scripts'].includes(options.suite)) {
-    throw new Error('--suite must be web or scripts');
+  if (
+    command === 'run' &&
+    options.suite !== 'scripts' &&
+    !Object.hasOwn(VITEST_SUITES, options.suite ?? '')
+  ) {
+    throw new Error('--suite must be web, scripts or research');
   }
   if (!Number.isInteger(options.days) || options.days < 1) {
     throw new Error('--days must be a positive whole number');
@@ -253,7 +291,9 @@ async function main(argv) {
   const options = parseArgs(argv);
   if (options.command === 'run') {
     const findings =
-      options.suite === 'web' ? runWeb(options) : await runScripts(options);
+      options.suite === 'scripts'
+        ? await runScripts(options)
+        : runVitest(options);
     const body = `${JSON.stringify({ findings }, null, 2)}\n`;
     if (options.out) writeFileSync(options.out, body);
     process.stdout.write(body);

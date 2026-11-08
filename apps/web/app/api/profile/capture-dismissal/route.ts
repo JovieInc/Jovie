@@ -6,7 +6,7 @@ import { createRateLimitedResponse } from '@/app/api/notifications/route-helpers
 import { AUDIENCE_ANON_COOKIE } from '@/constants/app';
 import { db } from '@/lib/db';
 import { publicProfileCaptureDismissals } from '@/lib/db/schema/analytics';
-import { isSecureEnv } from '@/lib/env-server';
+import { env, isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import {
   getClientIP,
@@ -84,11 +84,19 @@ function setAudienceCookie(response: NextResponse, audienceId: string) {
 
 export async function GET(request: NextRequest) {
   const clientIp = getClientIP(request);
+  // The E2E matrix serves every parallel test on a shard from one
+  // 127.0.0.1 bucket; the anonymous per-IP budget 429s under shard load on a
+  // healthy app (public-profile-smoke, run 41153386766). Test mode skips the
+  // bucket — the same allowance the auth OTP rules already honor
+  // (lib/auth/rate-limit-rules.ts).
   const rateLimitResult =
-    await publicProfileCaptureDismissalLimiter.limit(clientIp);
+    env.E2E_TEST_MODE === '1'
+      ? null
+      : await publicProfileCaptureDismissalLimiter.limit(clientIp);
 
-  const backendDegraded = isRateLimitBackendDegraded(rateLimitResult);
-  if (!rateLimitResult.success && !backendDegraded) {
+  const backendDegraded =
+    rateLimitResult !== null && isRateLimitBackendDegraded(rateLimitResult);
+  if (rateLimitResult && !rateLimitResult.success && !backendDegraded) {
     return createRateLimitedResponse(rateLimitResult);
   }
 
@@ -175,11 +183,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const clientIp = getClientIP(request);
+  // See GET: the E2E matrix shares one IP bucket across parallel tests.
   const rateLimitResult =
-    await publicProfileCaptureDismissalLimiter.limit(clientIp);
+    env.E2E_TEST_MODE === '1'
+      ? null
+      : await publicProfileCaptureDismissalLimiter.limit(clientIp);
 
-  const backendDegraded = isRateLimitBackendDegraded(rateLimitResult);
-  if (!rateLimitResult.success && !backendDegraded) {
+  const backendDegraded =
+    rateLimitResult !== null && isRateLimitBackendDegraded(rateLimitResult);
+  if (rateLimitResult && !rateLimitResult.success && !backendDegraded) {
     return createRateLimitedResponse(rateLimitResult);
   }
 

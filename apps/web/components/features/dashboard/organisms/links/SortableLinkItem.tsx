@@ -112,22 +112,17 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
   isLastAdded,
   buildPillLabel,
 }: SortableLinkItemProps<T>) {
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({
-      id,
-      disabled: !draggable,
-    });
-
-  // Reserved for future drag handle pointer down handler
-
-  const _handleDragHandlePointerDown = React.useCallback(
-    (e: React.PointerEvent<HTMLButtonElement>) => {
-      if (listeners?.onPointerDown) {
-        listeners.onPointerDown(e);
-      }
-    },
-    [listeners]
-  );
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+  } = useSortable({
+    id,
+    disabled: !draggable,
+  });
 
   const cardStyle: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -202,10 +197,13 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
   return (
     <div
       ref={setNodeRef}
-      {...attributes}
       className={cn('relative')}
       style={cardStyle}
-      {...listeners}
+      onPointerDown={
+        listeners?.onPointerDown as
+          | React.PointerEventHandler<HTMLDivElement>
+          | undefined
+      }
     >
       <SwipeToReveal
         itemId={id}
@@ -231,6 +229,21 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
 
       {/* Screen reader accessible URL display */}
       <div className='sr-only'>{urlDisplay}</div>
+      {draggable && (
+        <button
+          type='button'
+          ref={setActivatorNodeRef}
+          {...attributes}
+          onKeyDown={
+            listeners?.onKeyDown as
+              | React.KeyboardEventHandler<HTMLButtonElement>
+              | undefined
+          }
+          className='sr-only focus:not-sr-only focus:absolute focus:top-0 focus:z-10 focus:rounded-md focus:bg-surface-1 focus:p-2'
+        >
+          Drag to reorder {primaryLabel}
+        </button>
+      )}
     </div>
   );
 }) as <T extends DetectedLink = DetectedLink>(

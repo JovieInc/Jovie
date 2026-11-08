@@ -43,7 +43,7 @@ describe('canonical web surface drift guard', () => {
     expect(codes()).toEqual([]);
 
     expect(getCanonicalSurface('homepage').sourceComponent).toContain(
-      'HomepageArtistHero'
+      'HomepageStoryHero'
     );
     expect(getCanonicalSurface('homepage').routeOwner).toContain(
       'PublicPageShell'
@@ -71,8 +71,8 @@ describe('canonical web surface drift guard', () => {
       'apps/web/app/app/(shell)/dashboard/releases/ReleaseCatalogPageClient.tsx'
     );
 
-    expect(homepage).toContain('HomepageArtistHero');
-    expect(homepage).toContain('HomepageOfferClose');
+    expect(homepage).toContain('HomepageStoryHero');
+    expect(homepage).toContain('HomepageInviteClose');
     expect(homepage).not.toContain('HomePageNarrative');
     expect(releases).toContain('LibraryLoadingState');
     expect(releases).toContain('PageErrorState');

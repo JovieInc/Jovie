@@ -101,7 +101,12 @@ function buildRequest(
   return new NextRequest('http://localhost/api/profile/pac-event', {
     method: 'POST',
     body: typeof body === 'string' ? body : JSON.stringify(body),
-    headers: { 'Content-Type': 'application/json', ...headers },
+    headers: {
+      'Content-Type': 'application/json',
+      // Known non-consent geography; a missing geo header fails closed.
+      'x-vercel-ip-country': 'JP',
+      ...headers,
+    },
   });
 }
 
@@ -201,6 +206,14 @@ describe('POST /api/profile/pac-event', () => {
         [COOKIE_BANNER_REQUIRED_COOKIE]: '0',
       },
       headers: { 'x-vercel-ip-country': 'DE' },
+    },
+    {
+      name: 'missing geo header (fail closed)',
+      cookies: {
+        [AUDIENCE_ANON_COOKIE]: JV_AID,
+        [COOKIE_BANNER_REQUIRED_COOKIE]: '0',
+      },
+      headers: { 'x-vercel-ip-country': '' },
     },
     {
       name: 'Global Privacy Control',
@@ -358,6 +371,24 @@ describe('POST /api/profile/pac-event', () => {
       '127.0.0.1'
     );
     expect(mockLogStatsigEvent).not.toHaveBeenCalled();
+  });
+
+  it('skips the anonymous per-IP bucket in E2E test mode', async () => {
+    // Matrix shards share one 127.0.0.1 bucket across parallel tests; the
+    // anonymous budget 429s a healthy app (public-profile-smoke, run
+    // 41153386766). Test mode skips the bucket (same allowance as auth OTP).
+    vi.stubEnv('E2E_TEST_MODE', '1');
+    mockPublicProfilePacEventLimiterLimit.mockResolvedValue({
+      success: false,
+      degraded: false,
+      unavailable: false,
+    });
+
+    const response = await POST(buildRequest(buildPayload()));
+
+    expect(response.status).not.toBe(429);
+    expect(mockPublicProfilePacEventLimiterLimit).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
   });
 
   it.each([

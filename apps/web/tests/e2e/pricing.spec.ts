@@ -213,14 +213,14 @@ test.describe('Pricing Page', () => {
           ).toContainText('$0');
           await expect(
             table
-              .getByRole('rowheader', { name: 'Fan email capture' })
+              .getByRole('rowheader', { name: 'Audience email capture' })
               .locator('..')
               .getByRole('cell')
           ).toHaveText('Unlimited');
           await expect(
             table
               .getByRole('rowheader', {
-                name: 'Release notifications (email to fans)',
+                name: 'Release notifications (email to your audience)',
               })
               .locator('..')
               .getByRole('cell')
@@ -235,22 +235,27 @@ test.describe('Pricing Page', () => {
           ).toContainText('$12/mo');
           await expect(
             table
-              .getByRole('rowheader', { name: 'Fan email capture' })
+              .getByRole('rowheader', { name: 'Audience email capture' })
               .locator('..')
               .getByRole('cell')
           ).toHaveText('Unlimited');
           await expect(
             table
               .getByRole('rowheader', {
-                name: 'Release notifications (email to fans)',
+                name: 'Release notifications (email to your audience)',
               })
               .locator('..')
               .getByRole('cell')
           ).toHaveText('Included');
           await assertReadableCells();
           await selector.press('Tab');
-          await expect(page.locator(':focus')).toHaveText(
-            'Claim my free profile'
+          const closingAction = page
+            .getByTestId('marketing-section-cta')
+            .getByRole('link', { name: 'Start Artist Presence, $12/mo' });
+          await expect(closingAction).toBeFocused();
+          await expect(closingAction).toHaveAttribute(
+            'href',
+            '/claim?plan=pro'
           );
           await page.keyboard.press('Shift+Tab');
           await expect(selector).toBeFocused();
@@ -262,22 +267,24 @@ test.describe('Pricing Page', () => {
           ).toContainText('$0');
           await expect(
             table
-              .getByRole('rowheader', { name: 'Fan email capture' })
+              .getByRole('rowheader', { name: 'Audience email capture' })
               .locator('..')
               .getByRole('cell')
           ).toHaveText('Unlimited');
           await expect(
             table
               .getByRole('rowheader', {
-                name: 'Release notifications (email to fans)',
+                name: 'Release notifications (email to your audience)',
               })
               .locator('..')
               .getByRole('cell')
           ).toHaveText('Not included');
           await assertReadableCells();
           await selector.press('Tab');
-          await expect(page.locator(':focus')).toHaveText(
-            'Claim my free profile'
+          await expect(closingAction).toBeFocused();
+          await expect(closingAction).toHaveAttribute(
+            'href',
+            '/claim?plan=pro'
           );
           await page.keyboard.press('Shift+Tab');
           await expect(selector).toBeFocused();
@@ -289,22 +296,24 @@ test.describe('Pricing Page', () => {
           ).toContainText('$12/mo');
           await expect(
             table
-              .getByRole('rowheader', { name: 'Fan email capture' })
+              .getByRole('rowheader', { name: 'Audience email capture' })
               .locator('..')
               .getByRole('cell')
           ).toHaveText('Unlimited');
           await expect(
             table
               .getByRole('rowheader', {
-                name: 'Release notifications (email to fans)',
+                name: 'Release notifications (email to your audience)',
               })
               .locator('..')
               .getByRole('cell')
           ).toHaveText('Included');
           await selector.press('Tab');
           await expect(selector).not.toBeFocused();
-          await expect(page.locator(':focus')).toHaveText(
-            'Claim my free profile'
+          await expect(closingAction).toBeFocused();
+          await expect(closingAction).toHaveAttribute(
+            'href',
+            '/claim?plan=pro'
           );
         } else {
           await expect(chart.getByRole('combobox')).toHaveCount(0);

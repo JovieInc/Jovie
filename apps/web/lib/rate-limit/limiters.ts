@@ -9,6 +9,10 @@ import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-server';
 import { RATE_LIMITERS } from './config';
 import { createPlanAwareRateLimiter } from './plan-aware-limiter';
+import {
+  changelogSubscribeLimiter,
+  waitlistJoinLimiter,
+} from './public-submission-limiters';
 import { createRateLimiter, RateLimiter } from './rate-limiter';
 import type { PlanAwareRateLimiter, RateLimitResult } from './types';
 import {
@@ -141,6 +145,18 @@ export const anonymousOnboardingChatSessionLimiter = createRateLimiter(
  */
 export const anonymousOnboardingChatFirstTouchLimiter = createRateLimiter(
   RATE_LIMITERS.anonymousOnboardingChatFirstTouch
+);
+
+/** Fail-open /start unverified budgets. Redis only: an outage denies. */
+export const anonymousOnboardingChatUnverifiedIpLimiter = createRateLimiter(
+  RATE_LIMITERS.anonymousOnboardingChatUnverifiedIp,
+  { requireRedis: true }
+);
+export const anonymousOnboardingChatUnverifiedGlobalLimiter = createRateLimiter(
+  RATE_LIMITERS.anonymousOnboardingChatUnverifiedGlobal,
+  {
+    requireRedis: true,
+  }
 );
 
 /** Canary passage tokens for the /start bot check (JOV-9625). Redis only. */
@@ -483,16 +499,10 @@ export const generalLimiter = createRateLimiter(RATE_LIMITERS.general, {
   requireRedis: true,
 });
 
-/**
- * Changelog subscribe limiter
- * Limit: 1 request per 10 seconds per IP
- */
-export const changelogSubscribeLimiter = createRateLimiter(
-  RATE_LIMITERS.changelogSubscribe,
-  {
-    requireRedis: true,
-  }
-);
+export {
+  changelogSubscribeLimiter,
+  waitlistJoinLimiter,
+} from './public-submission-limiters';
 
 // ============================================================================
 // Convenience Functions
@@ -862,7 +872,8 @@ export async function checkAiChatRateLimit(
  */
 export async function checkAiChatRateLimitForPlan(
   userId: string,
-  plan: string | null
+  plan: string | null,
+  options: { readonly skipWeeklyQuota?: boolean } = {}
 ): Promise<RateLimitResult> {
   try {
     // 1. Check hourly burst limiter (applies to all plans)
@@ -879,6 +890,12 @@ export async function checkAiChatRateLimitForPlan(
     if (!burstAllowed.success) {
       return burstAllowed;
     }
+
+    // The dedicated production chat-health canary (see
+    // `isWeeklyQuotaExemptCanaryEmail`) skips only the weekly quota so deploy probes
+    // cannot exhaust any account's allowance; the hourly burst limiter above
+    // still caps its spend.
+    if (options.skipWeeklyQuota === true) return burstAllowed;
 
     // 2. Weekly plan quota is mandatory distributed coordination. A Redis
     // outage must not fail-open into unbounded model spend.
@@ -1346,6 +1363,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     health: healthLimiter,
     general: generalLimiter,
     changelogSubscribe: changelogSubscribeLimiter,
+    waitlistJoin: waitlistJoinLimiter,
     spotifySearch: spotifySearchLimiter,
     spotifySearchApi: spotifySearchApiLimiter,
     spotifyClaim: spotifyClaimLimiter,

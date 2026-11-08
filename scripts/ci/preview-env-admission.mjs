@@ -19,16 +19,20 @@
  *     [--work-id <id>] [--sha <40-hex>] [--out <path>]
  */
 
-import { appendFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 
 import {
   buildPreviewEnvAdmission,
   buildPreviewEnvCleanupReceipt,
   PREVIEW_ENV_ADMISSION_SCHEMA,
   PREVIEW_ENV_CLEANUP_SCHEMA,
+  PREVIEW_ENV_PROJECTION_PATH,
+  PREVIEW_ENV_REGISTRY_PATH,
+  projectPreviewEnvRegistry,
 } from '../lib/preview-env-contract.mjs';
 
 const USAGE = `Usage:
+  preview-env-admission.mjs sync-projection --write|--check
   preview-env-admission.mjs emit-admission --kind <neon-branch|vercel-preview> \\
     --work-id <JOV-1234> --sha <40-hex> --policy <policy> --reason <text> \\
     --evidence <text> --owner <owner> --surface <surface> \\
@@ -38,7 +42,7 @@ const USAGE = `Usage:
     --environment <name> --cleanup-trigger <trigger> --proof <text> \\
     --cleaned-by <workflow> [--work-id <id>] [--sha <40-hex>] [--out <path>]
 
-Both subcommands print the record JSON to stdout, write it to --out when
+Receipt subcommands print the record JSON to stdout, write it to --out when
 given, and append a Markdown section to $GITHUB_STEP_SUMMARY when set.
 Exit codes: 0 success, 1 contract violation, 2 usage error.`;
 
@@ -158,6 +162,29 @@ async function main() {
   if (!command || command === '--help' || command === '-h') {
     console.error(USAGE);
     process.exitCode = command ? 0 : 2;
+    return;
+  }
+
+  if (command === 'sync-projection') {
+    if (rest.length !== 1 || !['--write', '--check'].includes(rest[0])) {
+      console.error('sync-projection requires --write or --check');
+      process.exitCode = 2;
+      return;
+    }
+    const registry = JSON.parse(
+      readFileSync(PREVIEW_ENV_REGISTRY_PATH, 'utf8')
+    );
+    const previous = readFileSync(PREVIEW_ENV_PROJECTION_PATH, 'utf8');
+    const json = `${JSON.stringify(projectPreviewEnvRegistry(registry, JSON.parse(previous)), null, 2)}\n`;
+    if (rest[0] === '--write') writeFileSync(PREVIEW_ENV_PROJECTION_PATH, json);
+    else if (previous !== json) {
+      console.error(
+        'preview-env projection is stale; run node scripts/ci/preview-env-admission.mjs sync-projection --write'
+      );
+      process.exitCode = 1;
+      return;
+    }
+    console.log('preview-env projection current');
     return;
   }
 

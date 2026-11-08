@@ -16,6 +16,7 @@ import {
 } from './feedback-linkage.mjs';
 import {
   buildHarnessReceipt,
+  evaluateHarnessContract,
   HARNESS_CONTRACT_INVARIANT_ID,
   HARNESS_RECEIPT_SCHEMA,
   validateHarnessContract,
@@ -194,9 +195,22 @@ describe('JOV-INV-024 harness contract', () => {
   it('deliberate red: an expired exception fails closed and a live one passes', () => {
     const expired = clone();
     harnessPrinciple(expired, 'H-02').exception.expires = '2026-08-01';
-    const errors = validateHarnessContract(expired, passFs());
+    const gate = harnessPrinciple(expired, 'H-02').gate.path;
+    const errors = validateHarnessContract(
+      expired,
+      passFs({ changedPaths: [gate] })
+    );
     assert.ok(
       errors.some(error => error.includes('harness-exception-expired:H-02'))
+    );
+    const viaContract = validateHarnessContract(
+      expired,
+      passFs({ changedPaths: ['scripts/invariants/harness-contract.mjs'] })
+    );
+    assert.ok(
+      viaContract.some(error =>
+        error.includes('harness-exception-expired:H-02')
+      )
     );
 
     const live = clone();
@@ -415,5 +429,49 @@ describe('H-06 repeated-feedback linkage', () => {
         /unclosed/
       );
     }
+  });
+
+  it('an expired exception warns, not blocks, outside its scope (2026-11-01 queue outage)', () => {
+    const expired = clone();
+    harnessPrinciple(expired, 'H-02').exception.expires = '2026-08-01';
+    for (const changedPaths of [['apps/web/app/page.tsx'], [], undefined]) {
+      const { errors, warnings } = evaluateHarnessContract(
+        expired,
+        passFs({ changedPaths })
+      );
+      assert.deepEqual(errors, []);
+      assert.ok(
+        warnings.some(warning =>
+          warning.includes('harness-exception-expired-out-of-scope:H-02')
+        )
+      );
+    }
+  });
+
+  it('warns inside the 72h expiry window and stays quiet before it', () => {
+    const soon = clone();
+    harnessPrinciple(soon, 'H-02').exception.expires = '2026-09-05';
+    const near = evaluateHarnessContract(soon, passFs());
+    assert.deepEqual(near.errors, []);
+    assert.ok(
+      near.warnings.some(warning =>
+        warning.includes('harness-exception-expiring:H-02')
+      )
+    );
+    const sameDay = clone();
+    harnessPrinciple(sameDay, 'H-02').exception.expires = NOW;
+    assert.ok(
+      evaluateHarnessContract(sameDay, passFs()).warnings.some(warning =>
+        warning.includes('harness-exception-expiring:H-02')
+      )
+    );
+    const later = clone();
+    harnessPrinciple(later, 'H-02').exception.expires = '2026-09-06';
+    assert.deepEqual(
+      evaluateHarnessContract(later, passFs()).warnings.filter(warning =>
+        warning.includes(':H-02:')
+      ),
+      []
+    );
   });
 });
