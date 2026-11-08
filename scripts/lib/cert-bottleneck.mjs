@@ -25,14 +25,14 @@ export const BOTTLENECK_FINGERPRINT = 'prod-cert-bottleneck';
 export const DISPATCH_LABELS = Object.freeze(['agent-ready', 'dispatch-next']);
 
 /**
- * The paid path (Tim, 2026-11-08: "main goal right now is driving homepage to
- * first paid signup"). These surfaces are worked first, in this order; the
- * rest of the Golden Path follows in launch order.
+ * The paid path (Tim, 2026-11-08): first paid signup, where each artist is
+ * sent their own profile with a claim banner. Worked first, in this order;
+ * the general editorial homepage and the rest follow in launch order.
  */
 export const PAID_PATH = Object.freeze([
-  'landing',
-  'signup-signin',
+  'public-profile',
   'claim',
+  'signup-signin',
   'checkout',
 ]);
 
@@ -83,7 +83,7 @@ export function bottleneckIssue(bottleneck, { servedSha, runUrl = null }) {
 Served build \`${servedSha}\`. This issue is rewritten by every production certification run, so it always names the current bottleneck.
 
 ## Why it goes first
-Nothing after \`${surface}\` can certify while a stranger stops here. Tim, 2026-11-07: put the agents on the topmost bottleneck to certification until it is certified. Tim, 2026-11-08: the main goal is the homepage to a first paid signup, so the paid path (${PAID_PATH.join(', ')}) is worked before the rest.
+Nothing after \`${surface}\` can certify while a stranger stops here. Tim, 2026-11-07: put the agents on the topmost bottleneck to certification until it is certified. Tim, 2026-11-08: the main goal is a first paid signup from an artist sent their own profile with a claim banner, so the paid path (${PAID_PATH.join(', ')}) is worked before the rest.
 
 ## Behind it (fix after this one)
 ${behind.length ? behind.map(s => `- \`${s}\``).join('\n') : '- nothing: this is the last surface left'}

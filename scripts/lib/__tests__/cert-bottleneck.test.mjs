@@ -141,10 +141,12 @@ describe('filing the bottleneck issue', () => {
     );
   });
 
-  it('works the paid path first: homepage, request access, claim, checkout', () => {
+  it('works the paid path first: own profile with claim banner, claim, sign up, checkout', () => {
     const order = paidPathOrder(SURFACE_IDS);
     expect(order.slice(0, 4)).toEqual([...PAID_PATH]);
     expect([...order].sort()).toEqual([...SURFACE_IDS].sort());
+    // The general homepage comes after the paid path.
+    expect(order.indexOf('landing')).toBeGreaterThan(3);
     // Checkout red outranks onboarding red once the earlier paid steps pass.
     const receipts = SURFACE_IDS.map(surface => ({
       surface,
