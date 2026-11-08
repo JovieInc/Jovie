@@ -132,6 +132,33 @@ test('emails once per incident (down and recovery, not re-pages) and pages Summe
   );
 });
 
+test('a failed page writes the state key once and does not arm the quiet window', async () => {
+  const puts = [];
+  const store = new Map();
+  const STATE = {
+    get: async k => store.get(k) ?? null,
+    put: async (k, v) => {
+      puts.push(k);
+      store.set(k, v);
+    },
+  };
+  const failing = async (_url, init) =>
+    init?.method === 'POST' ? res(500) : res(503);
+  const first = await run(
+    {
+      STATE,
+      TARGETS: 'https://jov.ie/',
+      FAILURES_TO_PAGE: '1',
+      PAGE_URLS: 'https://a.example/h',
+    },
+    1000,
+    failing
+  );
+  assert.equal(first.delivered, 0);
+  assert.equal(puts.filter(key => key === 'state').length, 1);
+  assert.equal(JSON.parse(store.get('state')).pagedAt, null);
+});
+
 test('a page that reaches no channel does not start the re-page quiet window', async () => {
   const store = new Map();
   const STATE = {

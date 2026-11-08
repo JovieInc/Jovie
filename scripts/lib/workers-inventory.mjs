@@ -2,8 +2,13 @@
 // A Worker deployed to the account must be declared by a committed
 // workers/**/wrangler*.toml|json(c) `name`, or be listed in
 // canon/deployed-workers.json as unversioned debt (the list only shrinks).
+//
+// api-budget: cloudflare-api 1/hr - offline inventory is the default; one live account listing per hour
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { ApiError, createApiClient } from '../../packages/api-client/client.ts';
+import { providerSpec } from '../../packages/api-client/contract.ts';
+import { hashCredential } from '../../packages/api-client/store.ts';
 
 export const DEPLOYED_PATH = 'canon/deployed-workers.json';
 
@@ -66,18 +71,47 @@ export async function fetchDeployedWorkers({
   accountId,
   token,
   fetchImpl = fetch,
+  store,
 }) {
-  const res = await fetchImpl(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts`,
-    {
-      headers: { authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(15_000),
-    }
-  );
-  const body = await res.json();
-  if (!res.ok || !body.success || !Array.isArray(body.result))
+  const spec = providerSpec('cloudflare');
+  const client = createApiClient({
+    provider: 'cloudflare',
+    credential: hashCredential('cloudflare', token ?? ''),
+    authorize: headers => {
+      headers.set('authorization', `Bearer ${token}`);
+    },
+    fetch: fetchImpl,
+    ...(store ? { store } : {}),
+  });
+  let res;
+  try {
+    res = await client.request({
+      url: `https://${spec.hosts[0]}${spec.pathPrefix}accounts/${accountId}/workers/scripts`,
+      method: 'GET',
+      priority: 'report',
+      write: false,
+      idempotent: true,
+      maxAttempts: 2,
+      timeoutMs: 15_000,
+    });
+  } catch (error) {
+    const status = error instanceof ApiError ? error.status : null;
+    throw new Error(`workers-list-unreadable:${status ?? 'network'}`);
+  }
+  let body = null;
+  try {
+    body = res.json();
+  } catch {
+    body = null;
+  }
+  if (
+    res.status < 200 ||
+    res.status >= 300 ||
+    !body?.success ||
+    !Array.isArray(body.result)
+  )
     throw new Error(`workers-list-unreadable:${res.status}`); // unreadable is red, never green
-  return body.result.map(s => s.id);
+  return body.result.map(script => script.id);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

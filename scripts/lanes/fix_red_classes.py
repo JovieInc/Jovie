@@ -130,9 +130,11 @@ SIGNATURES = (
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
     ("quota-deferred", QUOTA_TEXT, RERUN),
+    # Before platform-infra: a Source Validation log carries passing-test
+    # "HTTP 502" lines, and `\b5\d\d\b` would hide the Unwired assertion.
+    ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
-    ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     ("atomic-write", ATOMIC_TEXT, ATOMIC_WRITE),
     ("pr-body", BODY_TEXT, AGENT),
 )
