@@ -4,7 +4,20 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { load as yamlLoad } from 'js-yaml';
 import { buildTopology, findCycle, syncTopology, validateTopology } from './ci-workflow-topology.mjs';
+
+test('Pen drafts share one editor across runs and retain pending frame jobs', () => {
+  const workflow = yamlLoad(fs.readFileSync('.github/workflows/pen-draft.yml', 'utf8'));
+  assert.deepEqual(workflow.jobs.draft.concurrency, {
+    group: 'pen-draft-canonical-editor',
+    'cancel-in-progress': false,
+    queue: 'max',
+  });
+  assert.equal(workflow.jobs.draft.strategy['max-parallel'], 1);
+  assert.match(workflow.concurrency.group, /github\.event\.pull_request\.number/);
+  assert.match(workflow.concurrency.group, /github\.sha/);
+});
 
 test('repository workflows satisfy the topology and fan-out contract', () => {
   const { policy, nodes, edges } = buildTopology();

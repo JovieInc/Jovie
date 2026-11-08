@@ -343,7 +343,6 @@ export function writeCanonical(bytes, workDir, wanted) {
 }
 
 async function main() {
-  const startedAt = Date.now();
   const { values } = parseArgs({
     options: {
       out: { type: 'string' },
@@ -424,6 +423,7 @@ async function main() {
   const trim = useTrimmedInput(process.env);
 
   for (const brief of briefs) {
+    const startedAt = Date.now();
     const row = { frame: brief.frame, route: brief.route };
     let before = canonical;
     let from = input;

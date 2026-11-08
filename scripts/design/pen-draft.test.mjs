@@ -128,13 +128,14 @@ test('the CLI retries a timed-out draft after setup and process cleanup, includi
     cp.execFileSync = (command, args, options) => {
       if (command !== 'npx') throw new Error('unexpected command');
       calls++;
-      if (calls === 1) {
+      if (calls % 2 === 1) {
         now += options.timeout + 10;
         throw new Error('spawnSync npx ETIMEDOUT');
       }
       const arg = flag => args[args.indexOf(flag) + 1];
       const doc = JSON.parse(fs.readFileSync(arg('--in'), 'utf8'));
-      doc.children.push({type: 'frame', id: 'draft', name: 'claim'});
+      const name = arg('--out').split('/').pop().replace('.pen', '');
+      doc.children.push({type: 'frame', id: 'draft', name});
       fs.writeFileSync(arg('--out'), JSON.stringify(doc));
       fs.writeFileSync(arg('--export'), 'fixture preview');
     };
@@ -157,7 +158,7 @@ test('the CLI retries a timed-out draft after setup and process cleanup, includi
         '--out',
         out,
         '--only',
-        'claim',
+        'claim,homepage',
       ],
       {
         env: {
@@ -171,13 +172,21 @@ test('the CLI retries a timed-out draft after setup and process cleanup, includi
     const { drafts } = JSON.parse(
       readFileSync(join(out, 'receipt.json'), 'utf8')
     );
-    assert.equal(drafts[0].status, 'drafted');
-    assert.equal(drafts[0].attempts, 2);
-    assert.equal(drafts[0].error, undefined);
-    const doc = JSON.parse(readFileSync(join(out, 'claim.pen'), 'utf8'));
-    assert.deepEqual(doc.children[0], canonical.children[0]);
-    assert.equal(doc.children[1].name, 'claim');
-    if (trim === '1') assert.equal(doc.children[1].x, 600);
+    assert.deepEqual(
+      drafts.map(d => d.frame),
+      ['claim', 'homepage']
+    );
+    for (const draft of drafts) {
+      assert.equal(draft.status, 'drafted');
+      assert.equal(draft.attempts, 2);
+      assert.equal(draft.error, undefined);
+      const doc = JSON.parse(
+        readFileSync(join(out, `${draft.frame}.pen`), 'utf8')
+      );
+      assert.deepEqual(doc.children[0], canonical.children[0]);
+      assert.equal(doc.children[1].name, draft.frame);
+      if (trim === '1') assert.equal(doc.children[1].x, 600);
+    }
   }
 });
 

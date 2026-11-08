@@ -101,6 +101,12 @@ jobs:
     runs-on: ubuntu-24.04
     # pen-draft.mjs budgets 20 minutes for bounded retries; reserve five for setup and upload.
     timeout-minutes: 25
+    # Share the editor lease across PRs, main pushes and manual runs. Native
+    # queueing retains up to 100 pending jobs instead of replacing the oldest.
+    concurrency:
+      group: pen-draft-canonical-editor
+      cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
     strategy:
