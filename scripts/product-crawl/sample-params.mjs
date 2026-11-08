@@ -397,12 +397,26 @@ export const followUps = samples =>
  * How the crawl covers a dynamic route: the sample's target, or the receipt's
  * uncovered entry (reviewed and accepted, or with the specific reason).
  * @param {string} route @param {Map<string, { target: string, source: string }>} samples
- * @param {{ signedIn: boolean }} opts
+ * When /sitemap.xml could not be read, a route sampled from it is reported
+ * with that problem and never as a reviewed exception, so a failed fetch
+ * can't pass the gate in place of a page the sitemap would have listed.
+ * @param {{ signedIn: boolean, sitemapProblem?: string | null }} opts
  */
-export function coverRoute(route, samples, { signedIn }) {
+export function coverRoute(
+  route,
+  samples,
+  { signedIn, sitemapProblem = null }
+) {
   const s = samples.get(route);
   if (s) return { target: s.target, source: s.source };
   const known = SAMPLE_SOURCES[route];
+  if (sitemapProblem && known?.missing?.includes('/sitemap.xml'))
+    return {
+      uncovered: {
+        route,
+        reason: `/sitemap.xml could not be read (${sitemapProblem}), so this route was not sampled`,
+      },
+    };
   const reason = !known
     ? 'needs sample data for its parameters'
     : known.signedIn && !signedIn

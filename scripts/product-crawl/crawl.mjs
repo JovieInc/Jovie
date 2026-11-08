@@ -191,12 +191,25 @@ const repo = repoSamples({
   exists: existsSync,
   handle: args.handle,
 });
-const sitemap = await fetch(new URL('/sitemap.xml', args.origin), {
-  headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {},
-})
-  .then(r => (r.ok ? r.text() : ''))
-  .then(xml => sitemapPaths(xml, hosts))
-  .catch(() => []);
+// One retry; a sitemap that still can't be read is named in the receipt and
+// on every route it would have sampled (coverRoute), never read as empty.
+let sitemapProblem = null;
+let sitemap = [];
+for (let attempt = 1; attempt <= 2; attempt++) {
+  try {
+    const res = await fetch(new URL('/sitemap.xml', args.origin), {
+      headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {},
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    sitemap = sitemapPaths(await res.text(), hosts);
+    sitemapProblem = null;
+    break;
+  } catch (error) {
+    sitemapProblem = error instanceof Error ? error.message : String(error);
+  }
+}
+if (sitemapProblem) console.warn(`[crawl] /sitemap.xml: ${sitemapProblem}`);
 const seen = [];
 const look = (target, identity) =>
   safeVisit({
@@ -226,7 +239,7 @@ const todo = [];
 for (const route of routes) {
   let target = concrete(route);
   if (!target) {
-    const cover = coverRoute(route, samples, { signedIn });
+    const cover = coverRoute(route, samples, { signedIn, sitemapProblem });
     if (cover.uncovered) {
       uncovered.push(cover.uncovered);
       continue;
@@ -291,6 +304,7 @@ const receipt = {
   at: new Date().toISOString(),
   routes,
   samples: Object.fromEntries(samples),
+  sitemapProblem,
   uncovered,
   closedInProduction,
   pages,

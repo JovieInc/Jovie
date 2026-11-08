@@ -250,7 +250,13 @@ test('with production data every route is crawled or a reviewed exception', () =
   for (const p of pages)
     if (p.identity === 'stranger' && /^\/(app|billing)(\/|$)/.test(p.route))
       p.authGated = true;
-  const receipt = { at: '2026-11-08T02:00:00Z', routes, pages, uncovered };
+  const receipt = {
+    origin: 'https://jov.ie',
+    at: '2026-11-08T02:00:00Z',
+    routes,
+    pages,
+    uncovered,
+  };
   const now = Date.parse('2026-11-08T03:00:00Z');
   assert.deepEqual(productReady(receipt, { now }).reasons, []);
   // Without the reviewed list, the same crawl is not ready.
@@ -278,4 +284,28 @@ test('the reviewed exceptions stay true to the repo', () => {
     const meta = JSON.parse(io.read(`${eng}/${f}`).split('\n')[1]);
     assert.notEqual(meta.status, 'published', `${f} is published`);
   }
+});
+
+test('a sitemap that could not be read is named, never passed as reviewed', () => {
+  // Sentry 4505477848: a failed /sitemap.xml fetch read as an empty sitemap
+  // left /engineering/[slug] on its reviewed exception, so a published story
+  // the sitemap would have listed went uncrawled while the gate passed.
+  const opts = { signedIn: true, sitemapProblem: 'HTTP 503' };
+  assert.deepEqual(
+    coverRoute('/engineering/[slug]', new Map(), opts).uncovered,
+    {
+      route: '/engineering/[slug]',
+      reason:
+        '/sitemap.xml could not be read (HTTP 503), so this route was not sampled',
+    }
+  );
+  assert.match(
+    coverRoute('/blog/[slug]', new Map(), opts).uncovered?.reason ?? '',
+    /HTTP 503/
+  );
+  // Routes not sampled from the sitemap keep their own reason.
+  assert.equal(
+    coverRoute('/out/[id]', new Map(), opts).uncovered?.accepted,
+    true
+  );
 });
