@@ -41,6 +41,15 @@ describe('SidebarCollapseButton', () => {
     expect(button.className).not.toContain('hover:border-default');
   });
 
+  it('shows the panel glyph from Pen while pinned, never a pin-off mark', () => {
+    render(<SidebarCollapseButton />);
+    const button = screen.getByRole('button', { name: /collapse sidebar/i });
+    const icon = screen.getByTestId('sidebar-rail-toggle-icon');
+    expect(button).toContainElement(icon);
+    expect(icon).toHaveClass('lucide-rail-left-open');
+    expect(icon.getAttribute('class') ?? '').not.toMatch(/pin/i);
+  });
+
   it('offers Pin sidebar during a flyout peek and can opt out of peek triggers', () => {
     sidebar.isPreview = true;
     render(<SidebarCollapseButton previewTrigger={false} />);
