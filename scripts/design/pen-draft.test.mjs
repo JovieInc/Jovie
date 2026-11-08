@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   loadBriefs,
+  missingOutputs,
   missingSecrets,
   parseBrief,
   penArgs,
@@ -52,5 +53,17 @@ test('missing secrets are named, so a blocked run never reads as done', () => {
   assert.deepEqual(
     missingSecrets({ PEN_CLI_KEY: 'k', PEN_GOLDEN_PATH_FILE_URL: 'u' }),
     []
+  );
+});
+
+test('a frame without its .pen or preview is not drafted', () => {
+  const b = { frame: 'claim' };
+  assert.deepEqual(
+    missingOutputs(b, 'o', () => true),
+    []
+  );
+  assert.deepEqual(
+    missingOutputs(b, 'o', p => p.endsWith('.pen')),
+    ['claim.png']
   );
 });

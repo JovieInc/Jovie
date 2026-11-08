@@ -14,7 +14,13 @@
  *   node scripts/design/pen-draft.mjs --out DIR [--only claim,homepage]
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -71,6 +77,13 @@ export function missingSecrets(env) {
   return ['PEN_CLI_KEY', 'PEN_GOLDEN_PATH_FILE_URL'].filter(k => !env[k]);
 }
 
+/** A frame counts as drafted only when pen wrote both its file and preview. */
+export function missingOutputs(brief, outDir, exists = existsSync) {
+  return [`${brief.frame}.pen`, `${brief.frame}.png`].filter(
+    f => !exists(join(outDir, f))
+  );
+}
+
 async function main() {
   const { values } = parseArgs({
     options: { out: { type: 'string' }, only: { type: 'string' } },
@@ -78,7 +91,13 @@ async function main() {
   if (!values.out) throw new Error('--out DIR is required');
   const outDir = values.out;
   mkdirSync(outDir, { recursive: true });
-  const briefs = loadBriefs(BRIEFS_DIR, values.only?.split(',') ?? null);
+  const only = values.only
+    ?.split(',')
+    .map(f => f.trim())
+    .filter(Boolean);
+  const briefs = loadBriefs(BRIEFS_DIR, only?.length ? only : null);
+  if (!briefs.length)
+    throw new Error(`no brief matches --only ${values.only ?? ''}`);
   const receipt = {
     schema: 'jovie.pen-draft/v1',
     at: new Date().toISOString(),
@@ -111,7 +130,9 @@ async function main() {
         stdio: ['ignore', 'inherit', 'inherit'],
         timeout: 15 * 60_000,
       });
-      row.status = 'drafted';
+      const missing = missingOutputs(brief, outDir);
+      row.status = missing.length ? 'failed' : 'drafted';
+      if (missing.length) row.error = `pen wrote no ${missing.join(' or ')}`;
     } catch (e) {
       row.status = 'failed';
       row.error = String(e.message || e)
