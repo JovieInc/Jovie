@@ -214,11 +214,22 @@ export const DSP_HOSTS = [
 ];
 export const JOVIE_HOSTS = ['jov.ie', 'jovie.com'];
 
+/** Streaming services named in visible text (link titles, snippets). */
+export const DSP_TEXT_PATTERN =
+  /\b(spotify|apple music|soundcloud|bandcamp|beatport|tidal|deezer|youtube|audiomack|amazon music)\b/i;
+
+/** Budget evidence read from visible words, for pages seen only as text. */
 export const TEXT_RULES: readonly {
   id: WeightId;
   label: string;
   pattern: RegExp;
 }[] = [
+  {
+    id: 'touring',
+    label: 'sells tickets (touring)',
+    pattern: /\b(tour dates|tickets|on tour|tour)\b/i,
+  },
+  { id: 'merch_store', label: 'sells merch', pattern: /\bmerch(andise)?\b/i },
   {
     id: 'team_contact',
     label: 'has a team (booking/management contact)',

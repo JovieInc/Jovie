@@ -18,6 +18,7 @@ import {
   BUYER_SIGNAL_WEIGHTS,
   type BuyerSignalCategory,
   DSP_HOSTS,
+  DSP_TEXT_PATTERN,
   HOST_RULES,
   JOVIE_HOSTS,
   TEXT_RULES,
@@ -180,7 +181,11 @@ export function prescreenBuyer(
         p.host.replace(/^(open|music)\./, '').replace('youtu.be', 'youtube.com')
       )
   );
-  if (dspHosts.size === 0 && releaseLinks.size === 0) {
+  if (
+    dspHosts.size === 0 &&
+    releaseLinks.size === 0 &&
+    !DSP_TEXT_PATTERN.test(text)
+  ) {
     return stop(
       'no_music_presence',
       'no streaming or release link on the page (dead or non-music page)'

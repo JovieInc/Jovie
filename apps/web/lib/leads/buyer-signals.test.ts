@@ -130,6 +130,18 @@ describe('prescreenBuyer', () => {
     expect(result.decision).toBe('pass');
   });
 
+  it('reads budget and music presence from link titles when there are no URLs', () => {
+    const result = prescreenBuyer(
+      page({
+        links: [],
+        text: 'Fixture Artist. Spotify. Apple Music. Tour dates. Official merch.',
+      })
+    );
+    expect(result.hardStop).toBeNull();
+    expect(result.signals.map(s => s.id)).toEqual(['touring', 'merch_store']);
+    expect(result.decision).toBe('pass');
+  });
+
   it('counts release cadence from distinct release links', () => {
     const result = prescreenBuyer(
       page({
