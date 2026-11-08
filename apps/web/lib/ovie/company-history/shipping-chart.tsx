@@ -145,6 +145,7 @@ function Bars({ summary }: { readonly summary: WindowSummary }) {
                 color: isToday ? CHART_TOKENS.secondary : CHART_TOKENS.primary,
                 marginBottom: 8,
                 opacity: showValue ? 1 : 0,
+                fontVariantNumeric: 'tabular-nums',
               }}
             >
               {point.count === null ? '–' : int(point.count)}
@@ -312,6 +313,7 @@ export function ShippingChart({
             fontWeight: 600,
             lineHeight: 1,
             letterSpacing: -3,
+            fontVariantNumeric: 'tabular-nums',
           }}
         >
           {org.total === null ? '–' : int(org.total)}
