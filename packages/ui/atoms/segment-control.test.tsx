@@ -705,8 +705,8 @@ describe('SegmentControl', () => {
         />
       );
       const root = container.firstChild;
-      expect((root as HTMLElement).className).toContain('inline-flex');
-      expect((root as HTMLElement).className).toContain('rounded-full');
+      expect(root).toHaveClass('inline-flex', 'rounded-full');
+      expect(root).toHaveAttribute('data-semantics', 'tabs');
       expect(root).toHaveAttribute('data-layout', 'fill');
       expect(root).toHaveAttribute('data-size', 'md');
       expect(root).toHaveAttribute('data-variant', 'default');
