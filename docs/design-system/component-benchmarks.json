@@ -142,16 +142,24 @@
           "reference": "Radix DropdownMenu"
         },
         {
-          "item": "aria-required-children: the search header (textbox + clear button) and the loading/empty role=status nodes render as direct children of role=menu, so a loading or empty menu owns no menuitem (renderer)",
+          "item": "aria-required-children: the loading/empty role=status nodes render as direct children of role=menu, so a loading or empty menu owns no menuitem (renderer)",
+          "decision": "adopt",
+          "status": "done",
+          "reference": "APG Menu",
+          "resolution": "loading and empty rows are disabled menuitems that arrow keys skip, each holding the polite status; common-dropdown.children.test.tsx checks owned roles and axe"
+        },
+        {
+          "item": "aria-required-children: the search header (textbox + clear button) renders inside role=menu, which may own only items, groups and separators, and axe also rejects it inside a group; in-menu search needs the APG Combobox shape (field outside a listbox) (renderer)",
           "decision": "adopt",
           "status": "open",
-          "reference": "APG Menu"
+          "reference": "APG Combobox"
         },
         {
           "item": "RTL: menu rows, inset labels, item indicators and the submenu chevron use physical pl-/pr-/left-/ml-auto (here and in lib/dropdown-styles MENU_ITEM_BASE); the chevron does not mirror (common-dropdown-renderer, item renderers)",
           "decision": "adopt",
-          "status": "open",
-          "reference": "APG Menu"
+          "status": "done",
+          "reference": "APG Menu",
+          "resolution": "rows, inset labels, check and radio indicators, shortcuts and trailing slots use logical ps-/pe-/start-/ms-auto (here and in lib/dropdown-styles), and the submenu chevron mirrors with rtl:rotate-180; physical overrides from callers still win in LTR because Tailwind emits physical utilities after logical ones"
         },
         {
           "item": "context variant cannot be opened programmatically",
@@ -177,15 +185,16 @@
     },
     "packages/ui/atoms/context-menu.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "5e0f2c2ff604a9fe0af83107752fe8a2a10784a7639b3e534562513e9951aa06",
+      "sourceHash": "a003a96f72ea05c32ea8e995eb437325c5de4a19b407b9a43ac4f85d6ceadeb8",
       "reference": "WAI-ARIA APG Menu; Radix ContextMenu; shadcn/ui ContextMenu",
       "checked": "Radix roles and keys, dir passthrough, RTL indicators and chevron",
       "gaps": [
         {
           "item": "RTL: menu rows, inset labels, item indicators and the submenu chevron use physical pl-/pr-/left-/ml-auto (here and in lib/dropdown-styles MENU_ITEM_BASE); the chevron does not mirror",
           "decision": "adopt",
-          "status": "open",
-          "reference": "shadcn/ui ContextMenu"
+          "status": "done",
+          "reference": "shadcn/ui ContextMenu",
+          "resolution": "rows, inset labels, check and radio indicators, shortcuts and trailing slots use logical ps-/pe-/start-/ms-auto (here and in lib/dropdown-styles), and the submenu chevron mirrors with rtl:rotate-180; physical overrides from callers still win in LTR because Tailwind emits physical utilities after logical ones"
         }
       ]
     },
@@ -211,15 +220,16 @@
     },
     "packages/ui/atoms/dropdown-menu.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "8d740b212d5d5d1b88584518c68879be6dd2d0f0f5d64114e413aa72fa5c4738",
+      "sourceHash": "06f601787e582942746d68b82e23acdf3cc77e827e777f198bcb9418ce692461",
       "reference": "WAI-ARIA APG Menu Button and Menu; Radix DropdownMenu; shadcn/ui DropdownMenu",
       "checked": "Radix roles and keys, dir passthrough, RTL indicators and chevron",
       "gaps": [
         {
           "item": "RTL: menu rows, inset labels, item indicators and the submenu chevron use physical pl-/pr-/left-/ml-auto (here and in lib/dropdown-styles MENU_ITEM_BASE); the chevron does not mirror",
           "decision": "adopt",
-          "status": "open",
-          "reference": "shadcn/ui DropdownMenu"
+          "status": "done",
+          "reference": "shadcn/ui DropdownMenu",
+          "resolution": "rows, inset labels, check and radio indicators, shortcuts and trailing slots use logical ps-/pe-/start-/ms-auto (here and in lib/dropdown-styles), and the submenu chevron mirrors with rtl:rotate-180; physical overrides from callers still win in LTR because Tailwind emits physical utilities after logical ones"
         }
       ]
     },
@@ -259,15 +269,16 @@
     },
     "packages/ui/atoms/icon-button.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "7f91c924aff09e580bb30798448b29a15940d77e0bbd2f0d9df5f592ada07aec",
+      "sourceHash": "1598c93b73d57dc48a68f84707c0d71ce8e30ab3a72c7e93d0573e0e5db1b508",
       "reference": "WAI-ARIA APG Button (icon-only needs an accessible name); shadcn/ui Button size icon",
       "checked": "accessible name, 44px target, destructive state, forwardRef",
       "gaps": [
         {
           "item": "Accessible name is optional in the types and unchecked at runtime, so an icon-only button can render nameless",
           "decision": "adopt",
-          "status": "open",
-          "reference": "APG Button"
+          "status": "done",
+          "reference": "APG Button",
+          "resolution": "IconButtonProps requires ariaLabel, aria-label or aria-labelledby (IconButtonName union); the web typecheck compiles expect-error cases that fail if an unnamed icon button type-checks again"
         }
       ]
     },
@@ -458,7 +469,7 @@
     },
     "packages/ui/atoms/searchable-submenu.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "bc3b9d298ae39871e653d518c59ce4215abc92feb9dd6c62784ef7409516ee15",
+      "sourceHash": "e7e85aeb85a570cfae30c4725ac0557ebd7e52e58a78934841223b1288becfef",
       "reference": "WAI-ARIA APG Combobox (listbox popup) inside APG Menu; Radix DropdownMenu.Sub",
       "checked": "combobox ARIA, activedescendant target, live regions, submenu keys, RTL search chrome",
       "gaps": [
@@ -477,22 +488,24 @@
         {
           "item": "two polite status regions announce loading at once (sr-only summary and the loading row)",
           "decision": "adapt",
-          "status": "open",
-          "reference": "WAI-ARIA live regions"
+          "status": "done",
+          "reference": "WAI-ARIA live regions",
+          "resolution": "the loading row is now visual only (its spinner aria-hidden); the one sr-only status region announces loading, results and empty"
         },
         {
           "item": "trigger row uses the physical MENU_ITEM_BASE padding (lib/dropdown-styles)",
           "decision": "adopt",
-          "status": "open",
-          "reference": "APG Menu"
+          "status": "done",
+          "reference": "APG Menu",
+          "resolution": "MENU_ITEM_BASE pads both edges equally (px-2.5) and the touch target centres with translate, so the trigger row is direction-neutral; the chevron already mirrors"
         }
       ]
     },
     "packages/ui/atoms/segment-control.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "a697b4edc6981ea591718333ac770d3484507d55add801df06609a1f1b05ae28",
+      "sourceHash": "e51cd7fe7241a604da6976613c526dedccb649a1d79e432e5d344425c13af87e",
       "reference": "WAI-ARIA APG Tabs (automatic activation); Radix Tabs; shadcn/ui Tabs",
-      "checked": "tablist naming, arrow/Home/End keys, dir, disabled tabs, panel relationship",
+      "checked": "tablist naming, arrow/Home/End keys, dir, disabled tabs, panel relationship, radio-group semantics",
       "gaps": [
         {
           "item": "dir was not honored: arrow keys ran LTR in RTL; now a dir prop reaches Radix Tabs",
@@ -503,8 +516,15 @@
         {
           "item": "standalone use exposes tabs whose aria-controls target empty, aria-hidden panels; for a pure choice APG Radio Group (or toggle-group) semantics fit",
           "decision": "adapt",
+          "status": "done",
+          "reference": "APG Tabs",
+          "resolution": "semantics='radio' renders a named Radix radio group with no tabpanels and nothing pointing at one; keys, dir and styling match the tab form"
+        },
+        {
+          "item": "app callers that offer a pure choice (time range, filters, modes) still use the tab form; move each to semantics='radio'",
+          "decision": "adopt",
           "status": "open",
-          "reference": "APG Tabs"
+          "reference": "APG Radio Group"
         },
         {
           "item": "controlled only (no defaultValue)",
@@ -607,15 +627,16 @@
     },
     "packages/ui/atoms/status-glyph.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "9486ecab1287345b4390e29e32e566bc836206cfec393b8d0e32e9f1f7e03627",
+      "sourceHash": "e48b9f1ebb21d0d08238a6103ff65c112039200a9715627bad033c61624d10a7",
       "reference": "WAI-ARIA APG Tooltip; WAI-ARIA img role",
       "checked": "img name, tooltip reachability, reduced motion",
       "gaps": [
         {
           "item": "tooltip trigger is a non-focusable span, so keyboard users cannot open the label tooltip",
           "decision": "adapt",
-          "status": "open",
-          "reference": "APG Tooltip"
+          "status": "done",
+          "reference": "APG Tooltip",
+          "resolution": "a focusable prop puts a standalone glyph in the tab order so focus opens its tooltip; off by default because glyphs sit inside rows, tiles and buttons, and never on while aria-hidden"
         }
       ]
     },

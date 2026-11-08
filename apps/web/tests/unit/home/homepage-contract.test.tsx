@@ -410,6 +410,10 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     expect(cinema).toMatch(
       /background-clip: text;[^}]*padding-block: 0\.12em;\s*margin-block: -0\.12em;/
     );
+    // The camera yaws then pitches with no roll, so stage rows stay level.
+    expect(strip('components/homepage/v3/stage.css')).toMatch(
+      /--hv3-cam: rotateY\(-?[\d.]+deg\) rotateX\(-?[\d.]+deg\);/
+    );
     // Controls are exact, never pills.
     for (const path of [
       'components/homepage/v3/chapters.css',

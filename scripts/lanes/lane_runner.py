@@ -6485,41 +6485,9 @@ def resolve_and_chain_conflict(worktree: Path, branch: str, log, *, guard=lambda
 
 
 def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
-    """Union quoted list entries when every conflict hunk with main is only those lines.
-
-    Main's order stays, then head-only lines. A prose hunk or any other shape aborts
-    and leaves the PR to the model. The push is a fast-forward of the PR branch."""
-    guard()
-    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
-    if merged.returncode != 0:
-        conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
-        if not conflicted:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-            return False
-        resolved: dict[str, str] = {}
-        for path in conflicted:
-            target = worktree / path
-            try:
-                text = fix_red_classes.resolve_additive_quoted_list_text(target.read_text())
-            except OSError:
-                text = None
-            if text is None:
-                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-                return False
-            resolved[path] = text
-        try:
-            for path, text in resolved.items():
-                atomic_write_text(worktree / path, text)
-        except OSError:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-            return False
-        guard()
-        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
-                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-            return False
-    guard()
-    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+    return fix_red_classes.resolve_additive_list_conflict(
+        worktree, branch, log, sh=sh, guard=guard,
+        merge_entries=fix_red_classes.resolve_additive_quoted_list_text)
 
 
 def resolve_identifier_list_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
