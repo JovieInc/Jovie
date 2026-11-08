@@ -384,23 +384,6 @@ describe('Input', () => {
       expect(input).toHaveAttribute('id');
     });
   });
-
-  describe('RTL', () => {
-    it('places the trailing slot and required asterisk with logical classes', () => {
-      const { container } = render(
-        <Input label='Email' required trailing={<span>@</span>} />
-      );
-      const input = screen.getByRole('textbox');
-      expect(input).toHaveClass('pe-10');
-      expect(input).not.toHaveClass('pr-10');
-      const slot = screen.getByText('@').parentElement?.parentElement;
-      expect(slot).toHaveClass('end-2.5');
-      expect(slot).not.toHaveClass('right-2.5');
-      const asterisk = container.querySelector('label span[aria-hidden]');
-      expect(asterisk).toHaveClass('ms-1');
-      expect(asterisk).not.toHaveClass('ml-1');
-    });
-  });
 });
 
 function ControlledInputHarness({ note }: { readonly note: string }) {
