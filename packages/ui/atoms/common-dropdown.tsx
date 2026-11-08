@@ -255,16 +255,17 @@ export function CommonDropdown(props: CommonDropdownProps) {
   /**
    * Type to filter: a printable key (or Backspace) pressed on a row goes to
    * the search field instead of Radix typeahead, so the list keeps filtering
-   * wherever focus sits. Arrow keys, Enter and Escape keep their menu roles.
+   * wherever focus sits. Arrow keys, Enter and Escape keep their menu behavior.
    */
   function redirectTypingToSearch(event: React.KeyboardEvent<HTMLDivElement>) {
     const input = rootSearchInputRef.current;
     if (!input || event.target === input) return;
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     // React bubbles keys out of portaled submenus and custom fields; only
-    // this menu's own rows hand typing to the search.
+    // this menu's own rows hand typing to the search (Radix's own check).
     const target = event.target as HTMLElement;
-    if (target.closest('[role="menu"]') !== event.currentTarget) return;
+    if (target.closest('[data-radix-menu-content]') !== event.currentTarget)
+      return;
     if (
       target.isContentEditable ||
       target.closest('input, textarea, select, [contenteditable="true"]')

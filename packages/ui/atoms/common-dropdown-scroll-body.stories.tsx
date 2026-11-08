@@ -48,13 +48,16 @@ const longList: CommonDropdownItem[] = TITLES.map((label, index) => ({
 function ScrollBodyMenu({
   items,
   emptyMessage,
+  dir,
 }: {
   readonly items: CommonDropdownItem[];
   readonly emptyMessage?: string;
+  readonly dir?: 'ltr' | 'rtl';
 }) {
   return (
     <CommonDropdown
       items={items}
+      dir={dir}
       open
       modal={false}
       searchable
@@ -80,4 +83,32 @@ export const ShortList: Story = {
 /** Nothing to show: the empty message sits inside the list. */
 export const Empty: Story = {
   render: () => <ScrollBodyMenu items={[]} emptyMessage='No Matching Items' />,
+};
+
+const rtlTitles = [
+  'خطة إطلاق ألبوم الربيع مع جولة المدن الكبرى وحملة المعجبين',
+  'ميزانية الجولة',
+  'أفكار البضائع',
+  'ملاحظات اجتماع شركة التسجيلات حول التوزيع الرقمي للإصدار القادم',
+  'أفضل المعجبين حسب المدينة',
+  'طلب منحة الفنون',
+  'جدول طرح الألبوم',
+  'متابعة عروض قوائم التشغيل',
+];
+
+/** Right to left: long titles truncate at the far edge, the fade stays put. */
+export const RtlOverflow: Story = {
+  render: () => (
+    <div dir='rtl' lang='ar'>
+      <ScrollBodyMenu
+        dir='rtl'
+        items={rtlTitles.map((label, index) => ({
+          type: 'action',
+          id: `rtl-${index}`,
+          label,
+          onClick: () => undefined,
+        }))}
+      />
+    </div>
+  ),
 };

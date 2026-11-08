@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { run as axeRun } from 'axe-core';
+import { run as axe } from 'axe-core';
 import { describe, expect, it, vi } from 'vitest';
 import { CommonDropdown } from './common-dropdown';
 import {
@@ -25,7 +25,7 @@ function historyItems(count: number): CommonDropdownItem[] {
 // rework in docs/design-system/component-benchmarks.json). Every other rule
 // runs, so a new violation from the scroll body still fails here.
 async function expectNoNewA11yViolations(element: Element) {
-  const { violations } = await axeRun(element, {
+  const { violations } = await axe(element, {
     rules: { 'aria-required-children': { enabled: false } },
   });
   expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.html)}`)).toEqual(
@@ -302,7 +302,7 @@ describe('CommonDropdown type to filter', () => {
             render: () => (
               <div>
                 <input aria-label='Rename' />
-                <div role='menu' aria-label='Nested'>
+                <div role='menu' aria-label='Nested' data-radix-menu-content=''>
                   <div role='menuitem' tabIndex={-1}>
                     Nested Row
                   </div>
