@@ -8089,7 +8089,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                            "model": spec.get("model"), "tool": "fix_red_pr", "accountPool": name},
                                           {"attempts": MAX_FIX_ATTEMPTS, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FIX_ATTEMPTS,
                                            "spend": MAX_FIX_ATTEMPTS,
-                                           "mutations": max(MAX_FIX_ATTEMPTS * 2, len(conflict_resolvers()) + 1),
+                                           "mutations": MAX_FIX_ATTEMPTS * (len(conflict_resolvers()) + 1),  # each attempt: resolvers + dispatch
                                            "leaseSeconds": host.agent_timeout + 900, "version": "lanes-v1"},
                                           {"triggerId": run_id, "correlationId": f"pr-{pr['number']}",
                                            "causationId": pr["headRefOid"]}, coordination=coordination,
