@@ -203,6 +203,12 @@
     },
     "apps/web/components/features/auth/AuthOfferSummary.tsx": {
       "permission-denied": "The recap has no permission input or gated action; the detector matched the pricing plan. Sign-in for an existing subscriber is shown by SignInContinue."
+    },
+    "apps/web/components/atoms/BrandLogo.tsx": {
+      "permission-denied": "BrandLogo only draws the brand mark and has no permission input or gated action; the detector matched role='img' on the svg."
+    },
+    "apps/web/components/features/tracking/AcquisitionCapture.tsx": {
+      "error": "AcquisitionCapture renders no markup; a failed acquisition request or blocked storage is swallowed by design and shows nothing, which AcquisitionCapture.test.tsx covers."
     }
   }
 }
