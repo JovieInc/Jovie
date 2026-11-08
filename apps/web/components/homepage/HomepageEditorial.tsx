@@ -161,7 +161,7 @@ interface ChapterCopy {
   readonly body: string;
 }
 
-/** 01 profile: jov.ie/tim, Tim's real profile, with what it does in three rows. */
+/** 01 profile: the featured artist's profile, with what it does in three rows. */
 export function HomepageProfileChapter({
   copy = HOMEPAGE_EDITORIAL_COPY.profile,
 }: Readonly<{ copy?: ChapterCopy }>) {
