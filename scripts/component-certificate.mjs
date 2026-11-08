@@ -23,6 +23,7 @@ import {
   renderAgentSpec,
   summarizeGuards,
 } from './lib/component-certificate.mjs';
+import { acceptStoryReceipts } from './lib/component-evidence.mjs';
 
 const { values } = parseArgs({
   options: {
@@ -104,8 +105,20 @@ const registry = readJson(values.registry, { policy: {}, waivers: {} });
 const policy = { ...DEFAULT_POLICY, ...(registry.policy ?? {}) };
 const mutation =
   readJson(values['mutation-state'], { modules: {} }).modules ?? {};
-const a11y = readJson(values.a11y, { components: {} }).components ?? {};
-const visual = readJson(values.visual, { components: {} }).components ?? {};
+// Story-capture receipts count only when every story was captured in light
+// and dark; partial passes are dropped (and listed) rather than trusted.
+const receipts = kind => {
+  const { components, rejected } = acceptStoryReceipts(
+    readJson(values[kind], { components: {} }).components
+  );
+  for (const r of rejected)
+    console.error(
+      `[component-certificate] ignored ${kind} receipt for ${r.path}: ${r.problem}`
+    );
+  return components;
+};
+const a11y = receipts('a11y');
+const visual = receipts('visual');
 const journeyMap = readJson(values.journeys, { components: {}, journeys: {} });
 const benchmarks =
   readJson(values.benchmarks, { components: {} }).components ?? {};

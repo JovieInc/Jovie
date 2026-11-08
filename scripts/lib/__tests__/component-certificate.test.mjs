@@ -24,6 +24,7 @@ import {
   statesCovered,
   summarizeGuards,
 } from '../component-certificate.mjs';
+import { storyReceipt } from '../component-evidence.mjs';
 import { moduleKey } from '../mutation-sweep.mjs';
 
 const sourceHash = source => createHash('sha256').update(source).digest('hex');
@@ -70,7 +71,6 @@ const mutationReceipt = (source, tests = []) => ({
 
 describe('component certificate', () => {
   const clean = `export function Card({ title }: { title: string }) { return <div className="bg-surface-1 text-primary-token">{title}</div>; }`;
-
   it.each([
     `const a = "bg-blue-500 text-white"; const b = '#fff'; const c = "rgb(1,2,3)";`,
     `const A = () => <div className="bg-blue-500 text-white" data-hex="#fff" data-rgb="rgb(1,2,3)" />;`,
@@ -322,7 +322,6 @@ describe('component certificate CLI evidence freshness', () => {
   const original = 'export function Card() { return <div />; }\n';
   const changed =
     'export function Card() { return <div title="updated" />; }\n';
-
   let f;
   beforeEach(() => {
     const root = mkdtempSync(join(tmpdir(), 'component-certificate-cli-'));
@@ -362,8 +361,8 @@ describe('component certificate CLI evidence freshness', () => {
           git(['hash-object', additionalTest]),
         ]),
       };
-      records.visual = { status: 'pass', captured: 1, sourceHash: binding };
-      records.a11y = { status: 'pass', sourceHash: binding };
+      records.visual = storyReceipt(binding);
+      records.a11y = storyReceipt(binding);
       records.benchmark = { libraryVersion: 1, sourceHash: binding, gaps: [] };
       save();
     };
@@ -412,6 +411,7 @@ describe('component certificate CLI evidence freshness', () => {
       'scripts/component-certificate.mjs',
       'scripts/component-ship-policy.mjs',
       'scripts/lib/component-certificate.mjs',
+      'scripts/lib/component-evidence.mjs',
       'scripts/lib/mutation-sweep.mjs',
       'scripts/lib/mutation-diff.mjs',
     ]) {
