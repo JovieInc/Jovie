@@ -117,8 +117,10 @@
  *    gradient stops on the box width, so they land on whole pixels.
  * 2. Registration marks: a small cross where each chapter rule meets a
  *    guide, the way a print sheet marks its trim.
- * 3. Headline ink: display type falls off from primary ink at the top to a
- *    cooler grey at the baseline, so large type reads cut, not printed.
+ * 3. Headline ink: chapter statements fall off from primary ink at the top
+ *    to a cooler grey at the baseline, so large type reads cut, not printed.
+ *    The hero headline keeps solid ink: it sits on the stage's imagery and
+ *    has to hold its contrast against it.
  */
 
 .hv3 {
@@ -183,7 +185,7 @@
   right: calc(var(--hv3-side) + 1px / 2 - var(--hv3-mark-size) / 2);
 }
 
-.hv3 :is(.hv3-display, .hv3-statement) {
+.hv3 .hv3-statement {
   background-image: linear-gradient(
     180deg,
     var(--hv3-t1) 35%,
@@ -201,7 +203,7 @@
 
 /* Forced colours paint text in the system ink; drop the clip so it shows. */
 @media (forced-colors: active) {
-  .hv3 :is(.hv3-display, .hv3-statement) {
+  .hv3 .hv3-statement {
     background-image: none;
     -webkit-text-fill-color: currentColor;
   }
