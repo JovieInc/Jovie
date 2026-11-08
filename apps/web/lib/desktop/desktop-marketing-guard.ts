@@ -108,22 +108,3 @@ export function resolveDesktopMarketingRedirect(input: {
   if (!isDesktopMarketingPath(input.pathname)) return null;
   return `${DESKTOP_APP_HOME_PATH}?runtime=electron`;
 }
-
-/**
- * Sign-out destination inside the Mac app. A marketing target would open
- * the homepage in the system browser and leave the app window behind, so
- * the app goes to sign-in instead.
- */
-export function resolveDesktopSignOutRedirect(
-  redirectUrl: string,
-  isDesktopShell: boolean
-): string {
-  if (!isDesktopShell) return redirectUrl;
-  let pathname: string;
-  try {
-    pathname = new URL(redirectUrl, 'https://jov.ie').pathname;
-  } catch {
-    return APP_ROUTES.SIGNIN;
-  }
-  return isDesktopMarketingPath(pathname) ? APP_ROUTES.SIGNIN : redirectUrl;
-}

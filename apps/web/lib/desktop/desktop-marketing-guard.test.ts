@@ -8,7 +8,6 @@ import {
   isDesktopMarketingPath,
   isDesktopShellUserAgent,
   resolveDesktopMarketingRedirect,
-  resolveDesktopSignOutRedirect,
 } from './desktop-marketing-guard';
 
 const DESKTOP_UA =
@@ -110,14 +109,5 @@ describe('desktop marketing guard', () => {
         userAgent: DESKTOP_UA,
       })
     ).toBeNull();
-  });
-
-  it('sends desktop sign-out to sign-in instead of the homepage', () => {
-    expect(resolveDesktopSignOutRedirect('/', true)).toBe(APP_ROUTES.SIGNIN);
-    expect(resolveDesktopSignOutRedirect('/pricing?x=1', true)).toBe(
-      APP_ROUTES.SIGNIN
-    );
-    expect(resolveDesktopSignOutRedirect('/signin', true)).toBe('/signin');
-    expect(resolveDesktopSignOutRedirect('/', false)).toBe('/');
   });
 });
