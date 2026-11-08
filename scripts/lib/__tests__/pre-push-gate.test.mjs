@@ -257,6 +257,7 @@ describe('publication range failures', () => {
       'scripts/hooks/resolve-repo-node.sh',
       'scripts/hooks/biome-pre-push.sh',
       'scripts/security/scan-secrets.sh',
+      'scripts/security/scan-secrets-sonar-pin.sh',
       'biome.json',
       '.nvmrc',
     ]) {
