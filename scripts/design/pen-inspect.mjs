@@ -1,0 +1,204 @@
+#!/usr/bin/env node
+/**
+ * Read-only look into the Pen workspace from CI, for agents that cannot open
+ * Pen on Tim's Mac. Finds frames whose name matches a query in every .pen of
+ * PEN_GOLDEN_PATH_FILE_URL, exports each one to PNG and dumps its node tree
+ * (size, fill, type, spacing, radius, text) as JSON, so a screen can be built
+ * to match its Pen design.
+ *
+ *   node scripts/design/pen-inspect.mjs --out DIR --query "sign ?in|auth"
+ *
+ * It never writes a .pen file: each headless session's --out is a throwaway.
+ * Without PEN_CLI_KEY or the file URL it inspects nothing and says so.
+ */
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
+
+export const PEN_CLI_VERSION = '0.3.14';
+export const HIT_PREFIX = 'PEN_INSPECT_HIT ';
+export const TREE_PREFIX = 'PEN_INSPECT_TREE ';
+export const LIST_PREFIX = 'PEN_INSPECT_TOP ';
+
+/** The `execute` program: list top frames, find matches, dump and export them. */
+export function inspectProgram(query, pngDir, { maxHits = 24 } = {}) {
+  // The query becomes a RegExp inside Pen; JSON keeps it a safe literal.
+  const q = JSON.stringify(String(query));
+  const dir = JSON.stringify(pngDir);
+  return `
+const re = new RegExp(${q}, 'i');
+const hits = [];
+const r = v => (typeof v === 'number' ? Math.round(v) : v);
+Get((n, c) => {
+  if (c.depth <= 1 && n.type === 'frame')
+    Print(${JSON.stringify(LIST_PREFIX)} + JSON.stringify({ id: n.id, name: n.name, depth: c.depth, w: r(c.bounds.width), h: r(c.bounds.height) }));
+  if (hits.length < ${Number(maxHits)} && n.type === 'frame' && re.test(n.name || '') && c.bounds.width >= 280) {
+    hits.push(n.id);
+    Print(${JSON.stringify(HIT_PREFIX)} + JSON.stringify({ id: n.id, name: n.name, depth: c.depth, w: r(c.bounds.width), h: r(c.bounds.height) }));
+    c.skipChildren();
+  }
+});
+for (const id of hits) {
+  const rows = [];
+  Get(id, (n, c) => {
+    rows.push({
+      d: c.depth, id: n.id, type: n.type, name: n.name,
+      x: r(c.bounds.x), y: r(c.bounds.y), w: r(c.bounds.width), h: r(c.bounds.height),
+      content: n.content, fill: n.fill, stroke: n.stroke, opacity: n.opacity,
+      cornerRadius: n.cornerRadius, padding: n.padding, gap: n.gap,
+      layout: n.layout, justifyContent: n.justifyContent, alignItems: n.alignItems,
+      fontFamily: n.fontFamily, fontSize: n.fontSize, fontWeight: n.fontWeight,
+      letterSpacing: n.letterSpacing, lineHeight: n.lineHeight, textAlign: n.textAlign,
+      effect: n.effect, enabled: n.enabled, ref: n.ref,
+    });
+  }, { resolveInstances: true });
+  Print(${JSON.stringify(TREE_PREFIX)} + JSON.stringify({ id, rows }));
+}
+if (hits.length) Export(hits, 'png', ${dir});
+`;
+}
+
+/** One interactive-shell script: run the program, then exit. */
+export function shellScript(program) {
+  return `execute(${JSON.stringify({ input: program })})\nexit()\n`;
+}
+
+/** Pull the tagged lines out of the shell's stdout. */
+export function parseOutput(stdout) {
+  const out = { top: [], hits: [], trees: [] };
+  for (const line of String(stdout).split('\n')) {
+    for (const [prefix, key] of [
+      [LIST_PREFIX, 'top'],
+      [HIT_PREFIX, 'hits'],
+      [TREE_PREFIX, 'trees'],
+    ]) {
+      const at = line.indexOf(prefix);
+      if (at < 0) continue;
+      try {
+        out[key].push(JSON.parse(line.slice(at + prefix.length)));
+      } catch {
+        // A line Pen cut short is skipped, not fatal.
+      }
+    }
+  }
+  return out;
+}
+
+function penFiles(dir) {
+  const all = [];
+  const walk = d => {
+    for (const entry of readdirSync(d, { withFileTypes: true })) {
+      const path = join(d, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (entry.name.endsWith('.pen')) all.push(path);
+    }
+  };
+  walk(dir);
+  return all.sort();
+}
+
+/**
+ * @param {{ out: string, query: string, env?: NodeJS.ProcessEnv, fetchImpl?: typeof fetch, run?: (cmd: string, args: string[], opts?: object) => Buffer | string, log?: (line: string) => void }} options
+ */
+export async function runInspect({
+  out,
+  query,
+  env = process.env,
+  fetchImpl = fetch,
+  run = (cmd, args, opts) =>
+    execFileSync(cmd, args, {
+      stdio: ['pipe', 'pipe', 'inherit'],
+      maxBuffer: 64 * 1024 * 1024,
+      ...opts,
+    }),
+  log = line => {
+    process.stdout.write(`${line}\n`);
+  },
+}) {
+  mkdirSync(out, { recursive: true });
+  const missing = ['PEN_CLI_KEY', 'PEN_GOLDEN_PATH_FILE_URL'].filter(
+    name => !env[name]
+  );
+  if (missing.length) {
+    log(`Pen inspect skipped: ${missing.join(' and ')} not set`);
+    writeFileSync(
+      join(out, 'inspect.json'),
+      JSON.stringify({ query, skipped: missing, files: [] }, null, 2)
+    );
+    return { skipped: missing, files: [] };
+  }
+  const work = join(out, 'workspace');
+  rmSync(work, { recursive: true, force: true });
+  mkdirSync(work, { recursive: true });
+  const response = await fetchImpl(env.PEN_GOLDEN_PATH_FILE_URL);
+  if (!response.ok)
+    throw new Error(`Pen file download: HTTP ${response.status}`);
+  const bytes = Buffer.from(await response.arrayBuffer());
+  const isArchive = bytes[0] === 0x1f && bytes[1] === 0x8b;
+  const download = join(work, isArchive ? 'workspace.tar.gz' : 'src.pen');
+  writeFileSync(download, bytes);
+  if (isArchive) run('tar', ['-xzf', download, '-C', work]);
+  const pens = isArchive ? penFiles(work) : [download];
+  const files = [];
+  for (const [i, pen] of pens.entries()) {
+    const pngDir = join(out, 'png', String(i));
+    mkdirSync(pngDir, { recursive: true });
+    const throwaway = join(out, `throwaway-${i}.pen`);
+    let stdout = '';
+    try {
+      stdout = String(
+        run(
+          'npx',
+          [
+            '-y',
+            `@pen.dev/cli@${PEN_CLI_VERSION}`,
+            'interactive',
+            '--in',
+            pen,
+            '--out',
+            throwaway,
+          ],
+          {
+            cwd: dirname(pen),
+            input: shellScript(inspectProgram(query, pngDir)),
+            env,
+          }
+        )
+      );
+    } catch (error) {
+      log(`Pen inspect failed on ${basename(pen)}: ${error?.message ?? error}`);
+      stdout = String(error?.stdout ?? '');
+    }
+    rmSync(throwaway, { force: true });
+    writeFileSync(join(out, `stdout-${i}.log`), stdout);
+    const parsed = parseOutput(stdout);
+    files.push({ index: i, name: basename(pen), ...parsed });
+    log(
+      `${basename(pen)}: ${parsed.top.length} top frames, ${parsed.hits.length} matches`
+    );
+  }
+  rmSync(work, { recursive: true, force: true });
+  writeFileSync(
+    join(out, 'inspect.json'),
+    JSON.stringify({ query, files }, null, 2)
+  );
+  return { skipped: [], files };
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const { values } = parseArgs({
+    options: { out: { type: 'string' }, query: { type: 'string' } },
+  });
+  if (!values.out || !values.query) {
+    process.stderr.write('usage: pen-inspect.mjs --out DIR --query REGEX\n');
+    process.exit(64);
+  }
+  try {
+    await runInspect({ out: resolve(values.out), query: values.query });
+  } catch (error) {
+    process.stderr.write(`${error?.message ?? error}\n`);
+    process.exit(1);
+  }
+}
