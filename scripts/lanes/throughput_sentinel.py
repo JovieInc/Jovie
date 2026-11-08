@@ -6,7 +6,8 @@ and routes through its Tracker like every other doctor alert; nothing here owns 
 
 Alarms (each names its stage and carries its evidence):
   throughput-no-push:<repo>:<lane>   demand > 0, seats configured, zero lane pushes for 60 min
-  throughput-queue-no-merge          merge queue > 0, zero merges in the last 60 min
+  throughput-queue-no-merge          merge queue > 0, zero merges in the last 60 min with the current
+                                     entries past the merge SLO (or unknown), or ejection churn without a landing
   throughput-queue-unmergeable      an UNMERGEABLE queue entry the sweep could not dequeue (it dequeues, comments and
                                      routes to lane-fix-conflict after 10 min; #23519 stalled the queue 3h)
   throughput-queue-starved           merge queue depth <= 1 while CLEAN unqueued PRs wait, for > 10 min (supply-side:
@@ -214,13 +215,13 @@ def sample_release_flow(state: Path, now: float, run=None, repo: str = REPO) -> 
         leases = [(now - started) / 60 for row in held.get("workflow_runs") or []
                   if (started := _iso_epoch(row.get("run_started_at"))) is not None]
         runs = [row.get("id") for row in held.get("workflow_runs") or []]
-        # Hosted-runner backlog: queued runs repo-wide and the oldest one's wait. 2026-10-28: 990 queued
-        # runs, oldest 18 min, 64 in progress, so a green head waited on runner concurrency, not on lanes.
-        queued = _gh_json(run, f"repos/{repo}/actions/runs?status=queued&per_page=1")
+        # Hosted-runner backlog: queued runs and the oldest one's wait (2026-10-28: 990 queued, oldest 18 min).
+        day = datetime.fromtimestamp(now - 86400, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")  # GitHub cancels queued runs after 24h; older "queued" rows are ghosts (2026-11-07: Aug-Oct ghosts held the brake)
+        queued = _gh_json(run, f"repos/{repo}/actions/runs?status=queued&per_page=1&created=%3E%3D{day}")
         queued_total = queued.get("total_count") if isinstance(queued.get("total_count"), int) else None
         oldest_min = None
         if queued_total:
-            tail = _gh_json(run, f"repos/{repo}/actions/runs?status=queued&per_page=1&page={queued_total}")
+            tail = _gh_json(run, f"repos/{repo}/actions/runs?status=queued&per_page=1&page={queued_total}&created=%3E%3D{day}")
             created = _iso_epoch(((tail.get("workflow_runs") or [{}])[0]).get("created_at"))
             oldest_min = round((now - created) / 60, 1) if created is not None else None
         signal = {"schema": "symphony-release-flow/v1", "observedAt": now,
@@ -241,6 +242,11 @@ def sample_release_flow(state: Path, now: float, run=None, repo: str = REPO) -> 
 QUEUE_TIMINGS_REFRESH_S, QUEUE_TIMINGS_PRS, QUEUE_TIMINGS_FILE = 900, 12, "queue-timings.json"
 SUPPLY_FILE, SUPPLY_REFRESH_S = "supply-flow.json", 120
 QUEUE_STARVED_S = 600          # depth <= 1 with CLEAN unqueued PRs for longer than this alarms
+# JOV-10345: a queue entry has not had time to merge before it has waited this long (the
+# queue-timings enqueueToMerge p50 SLO target), so "zero merges in the last 60 min" beside a
+# younger entry is the queue working, not a stall (2026-11-02 08:47Z: 1 entry 3.7 min old
+# merged 2 min later while the previous merge was 108 min old).
+QUEUE_STALL_P50_MIN = 30.0
 QUEUE_STARVED_DEPTH = 1
 # Dwell SLOs (p95 seconds a PR sits in one supply state before it moves). CLEAN-unqueued is the one
 # Green Enroll owns: one 10-minute backstop sweep plus its 200 s budget.
@@ -674,7 +680,13 @@ def judge(obs: dict) -> dict[str, str]:
     merge = obs.get("mergeThroughput") or {}
     if isinstance(merge.get("observedAt"), (int, float)) and obs["now"] - merge["observedAt"] < 1800 \
             and (merge.get("queueDepth") or 0) > 0 and merge.get("mergedPerHour") == 0:
-        alerts["throughput-queue-no-merge"] = (
+        wait_p50 = merge.get("queueWaitP50Minutes")
+        # JOV-10345: with sparse traffic the trailing hour is often merge-less while the queue
+        # is perfectly healthy -- a fresh entry simply has not had time to merge yet. A stall
+        # is entries old enough that a healthy queue would have drained them, an unknown wait
+        # (fail loud), or ejections churning without a landing.
+        if wait_p50 is None or wait_p50 >= QUEUE_STALL_P50_MIN or (merge.get("ejectionRate") or 0) > 0:
+            alerts["throughput-queue-no-merge"] = (
             f"stage queued->merged: {merge['queueDepth']} PRs in the merge queue, zero merges in the last 60 min "
             f"(queue wait p50 {merge.get('queueWaitP50Minutes')} min, ejection rate {merge.get('ejectionRate')}); "
             f"evidence: node scripts/promotion-loss-metrics.mjs --since 1h --json")

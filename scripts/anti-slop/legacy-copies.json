@@ -7,5 +7,9 @@
     ".claude/skills/design-review/SKILL.md",
     ".claude/skills/plan-design-review/SKILL.md",
     ".claude/skills/ship/SKILL.md"
+  ],
+  "titleCaseHeadings": [
+    "apps/web/app/app/(shell)/admin/investors/settings/page.tsx: title='Investor Settings'",
+    "apps/web/app/app/(shell)/settings/data-privacy/page.tsx: title='Data & Privacy'"
   ]
 }

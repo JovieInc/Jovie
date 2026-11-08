@@ -42,7 +42,7 @@ import lifecycle  # noqa: E402
 import outcome_escalation as esc  # noqa: E402
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
-from atomic_state import atomic_write_text  # noqa: E402
+from atomic_state import append_json_object, atomic_write_text  # noqa: E402
 
 VERDICT_SCHEMA = "jovie.outcome-verdict/v1"
 VERDICT_FILE = "outcome-verdict.json"
@@ -416,8 +416,7 @@ def ledger(state: Path, issue: str, ask: dict, result: dict) -> None:
            "decision": result.get("decision"), "sha": ask.get("sha")}
     try:
         (state / "runs").mkdir(parents=True, exist_ok=True)
-        with open(state / "runs" / "ledger.jsonl", "a") as out:
-            out.write(json.dumps(row) + "\n")
+        append_json_object(state / "runs" / "ledger.jsonl", row)
     except OSError:
         pass  # measurement never blocks a recorded receipt
 

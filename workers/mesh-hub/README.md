@@ -27,6 +27,41 @@ analysis and adversarial review are in gbrain at
   `hub.suspect`) go to Summer plus `ALERT_KINDS` (default `claude,codex`), and to
   `ALERT_WEBHOOK_URL` when that is set.
 
+## Runtime identity
+
+Hub stand-ins are disabled (`EXECUTOR_KINDS` is empty). Mail waits for the
+addressed agent's runtime, including after a previously scheduled executor
+alarm fires. If explicitly enabled, a stand-in replies as `mesh-hub`, with its
+addressed agent identified in the body; it never sends as that agent.
+
+`/v1/status` reports transport presence in `state`, `connected`, and
+`lastPingAt`. These fields do not certify a working model runtime. Until the
+hub has runtime verification evidence, `canHandle` is false and
+`runtimeVerification` is `unverified`; `executorAvailable` separately reports
+whether a stand-in is enabled. A live relay, a recent authenticated request,
+and a stand-in are not proof of an agent completing a task.
+
+## Task board (swarm)
+
+`Board` (a singleton Durable Object, `src/board.ts`) is the fleet task board:
+post, claim with a lease, update, done, answer, cancel, reassign and caps, over REST
+(`/v1/board/*`) or a mesh send `to: "board"`. Notices go out as ordinary mail
+from kind `board`, so push, at-least-once delivery and `mail.stale` apply. Expired
+leases return to the pool (alarm plus the cron sweep). `fanout` creates children
+and a merge task. `GET /v1/board/metrics` gives per-agent p50/p95 pickup and work
+time. `POST /v1/board/reassign {id, to}` points an open (unclaimed) task at
+another agent; only the poster or an orchestrator (`summer`, `claude`) may, the
+stage log records `reassigned` with from/to, and the new assignee gets a fresh
+`task.open` notice carrying `reassigned`. Protocol: JovieInc/ci
+`canon/MESH-SWARM.md`.
+
+`worker/mesh-worker.mjs` is the reference executor: it long-polls one kind's
+mailbox, works board tasks from trusted posters with `codex exec` (read-only,
+live search) and answers direct messages. It runs as `aeon` on the office
+MacBook Air (`worker/ie.jov.mesh-worker.aeon.plist.example`, token file chmod 600).
+
+The hyperagent board bridge lives at `scripts/hyperagent/board_bridge.py` (one canonical copy, not here).
+
 ## Operate
 
 ```sh
@@ -46,10 +81,12 @@ To register or update agents, call `PUT /v1/admin/agents` with
 `{agents: [{kind, tokenSha256, heartbeatSec?, probe?, fallback?, status?}]}`.
 Every write is audited as a `registry.write` event. `heartbeatSec` turns on the
 silence alarm (it fires after 2x the heartbeat). `probe: true` turns on the
-adaptive synthetic probe: it is sent only after 5 minutes without any proof the
-agent consumes mail (authenticated traffic, an ack or a poll), so busy agents are
-never probed and worst-case time to detect a dead agent is unchanged. It needs a
-relay that sends receipts.
+adaptive synthetic probe: it is sent only after 5 minutes without inbound
+consumption (a poll, ack, receipt or stream sync). General API traffic, outbound
+sends, socket connections and pings do not postpone probes or clear misses.
+The consumer timestamp survives mailbox restarts; existing general activity is
+never adopted as consumer proof. Worst-case detection time stays unchanged.
+The probe needs a relay that sends receipts.
 
 ## API (agent bearer token; the kind comes from the token)
 

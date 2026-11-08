@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { HOMEPAGE_COPY } from '@/data/homepageCopy';
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import {
   type CorrectionHit,
   findBannedNames,
@@ -157,29 +157,30 @@ describe('correction pyramid guards', () => {
   });
 
   it('locks the homepage H1 to the homepage copy module', () => {
-    expect(HOMEPAGE_COPY.hero.headline).toBe(LOCKED_HOMEPAGE_H1);
-    expect(LOCKED_HOMEPAGE_H1).toBe('Be found. Be understood.');
-    expect(HOMEPAGE_COPY.seo.title).toBe('Jovie | Be found. Be understood.');
+    expect(HOMEPAGE_EDITORIAL_COPY.hero.headline).toBe(LOCKED_HOMEPAGE_H1);
+    expect(LOCKED_HOMEPAGE_H1).toBe('Jovie helps you move your music forward.');
+    expect(HOMEPAGE_EDITORIAL_COPY.seo.title).toBe(
+      'Jovie | Move your music forward'
+    );
     const hero = readFileSync(
-      path.join(webRoot, 'components/homepage/HomepageArtistProfile.tsx'),
+      path.join(webRoot, 'components/homepage/HomepageEditorial.tsx'),
       'utf8'
     );
     const page = readFileSync(
       path.join(webRoot, 'app/(home)/page.tsx'),
       'utf8'
     );
-    expect(hero).toContain('copy.headline');
-    expect(hero).toContain('HOMEPAGE_COPY');
+    expect(hero).toContain('HOMEPAGE_EDITORIAL_COPY.hero.headline');
     expect(hero).not.toContain(`>${LOCKED_HOMEPAGE_H1}<`);
     // The page renders the published spec; the hero headline has no spec
-    // slot, so the renderer always passes the locked copy module headline.
+    // slot, so the hero always reads the locked copy module headline.
     expect(page).toContain('<HomepageSpecSections');
     const renderer = readFileSync(
       path.join(webRoot, 'components/homepage/HomepageSpecSections.tsx'),
       'utf8'
     );
-    expect(renderer).toContain('<HomepageArtistHero');
-    expect(renderer).toContain('...HOMEPAGE_COPY.hero,');
+    expect(renderer).toContain('<HomepageStoryHero');
+    expect(renderer).toContain('...HOMEPAGE_EDITORIAL_COPY.hero,');
   });
 
   it('tightens a warn baseline only when every live key is already known', () => {

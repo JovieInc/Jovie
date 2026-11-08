@@ -127,8 +127,6 @@ export const CRON_KEEP_REASONS = Object.freeze({
     'external: new official Node release lines plus the soak-day promotion policy are calendar facts',
   '.github/workflows/node-runtime-freshness.yml':
     'external: Node.js publishes releases and security advisories on its own schedule',
-  '.github/workflows/pr-review-learn.yml':
-    'AI credits: weekly Gateway-budgeted replay of the review kernel; disabled until PR_REVIEW_LEARN_ENABLED',
   '.github/workflows/production-continuity.yml':
     'external: Vercel spend pauses and outages on Jovie and Summer have no event Jovie receives reliably',
   '.github/workflows/production-controller-health.yml':

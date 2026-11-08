@@ -9,6 +9,15 @@ import {
   sha256Hex,
 } from './core.ts';
 import type { Env } from './env.ts';
+import {
+  allowedUrls,
+  buildPrompt,
+  fetchEvidence,
+  isExecutable,
+  runModel,
+  runtimeStatus,
+  validateReply,
+} from './executor.ts';
 import { backoffFor, isOpen, Outbox, type RecipientStatus } from './outbox.ts';
 
 const SWEEP_MS = 5 * 60_000;
@@ -30,6 +39,8 @@ export type Liveness = {
   connected: number;
   lastPingAt: number | null;
   lastActivityAt: number | null;
+  /** Inbound poll, ack, receipt or stream sync; never sends or socket pings. */
+  lastConsumerActivityAt: number | null;
   unhandled: number;
   oldestUnhandledAgeMs: number | null;
   lastProbe: { acceptedAt: number; receivedAt: number | null } | null;
@@ -71,6 +82,11 @@ export class Mailbox extends DurableObject<Env> {
     this.store.setMeta('lastActivityAt', String(now));
   }
 
+  private touchConsumer(now = Date.now()) {
+    this.touch(now);
+    this.store.setMeta('lastConsumerActivityAt', String(now));
+  }
+
   private async arm(): Promise<void> {
     const due = this.outbox.nextDue();
     if (due === null) return;
@@ -85,6 +101,8 @@ export class Mailbox extends DurableObject<Env> {
       this.push();
       for (const wake of this.waiters) wake();
       if (this.isWebhookTarget()) this.outbox.schedule('webhook', Date.now());
+      if (this.isExecutorTarget(envelope))
+        this.outbox.schedule('exec', Date.now() + this.graceMs());
       this.outbox.schedule('sweep', Date.now() + SWEEP_MS);
       await this.arm();
     }
@@ -151,7 +169,7 @@ export class Mailbox extends DurableObject<Env> {
 
   /** Agent read (`mesh read`/long-poll): claim unhandled messages, waiting up to `wait` s. */
   async poll(waitSeconds: number, limit: number) {
-    this.touch();
+    this.touchConsumer();
     let messages = this.store.claim(Date.now(), limit);
     const wait = Math.min(Math.max(waitSeconds, 0), LIMITS.longPollMaxSeconds);
     if (!messages.length && wait > 0) {
@@ -182,12 +200,12 @@ export class Mailbox extends DurableObject<Env> {
   }
 
   async ack(ids: string[]) {
-    this.touch();
+    this.touchConsumer();
     return this.store.ack(ids, Date.now());
   }
 
   async receipt(ids: string[]) {
-    this.touch();
+    this.touchConsumer();
     return this.store.receipt(ids, Date.now());
   }
 
@@ -207,11 +225,15 @@ export class Mailbox extends DurableObject<Env> {
     }
     const oldest = this.store.oldestUnacked();
     const activity = this.store.getMeta('lastActivityAt');
+    const consumerActivity = this.store.getMeta('lastConsumerActivityAt');
     return {
       kind: this.config()?.kind ?? null,
       connected: sockets.length,
       lastPingAt,
       lastActivityAt: activity ? Number(activity) : null,
+      lastConsumerActivityAt: consumerActivity
+        ? Number(consumerActivity)
+        : null,
       unhandled: this.store.unackedCount(),
       oldestUnhandledAgeMs: oldest ? now - oldest.acceptedAt : null,
       lastProbe: this.store.lastProbe(),
@@ -266,12 +288,15 @@ export class Mailbox extends DurableObject<Env> {
           .slice(0, 500)
       : [];
     if (frame.type === 'receipt' || frame.type === 'ack') {
+      this.touchConsumer();
       if (frame.type === 'receipt') this.store.receipt(ids, Date.now());
       else this.store.ack(ids, Date.now());
       // A page is capped; drain the rest of the backlog as the client catches up.
       if (ids.length) this.sendBatch(ws, this.store.unreceived(Date.now()));
-    } else if (frame.type === 'sync')
+    } else if (frame.type === 'sync') {
+      this.touchConsumer();
       this.sendBatch(ws, this.store.unreceived(Date.now()));
+    }
   }
 
   async webSocketClose(ws: WebSocket, code: number) {
@@ -280,6 +305,105 @@ export class Mailbox extends DurableObject<Env> {
     } catch {
       // already closed
     }
+  }
+
+  private graceMs(): number {
+    return Math.max(0, Number(this.env.EXECUTOR_GRACE_MS ?? 20_000));
+  }
+
+  private isExecutorTarget(envelope: Envelope): boolean {
+    const kind = this.config()?.kind;
+    return Boolean(
+      kind &&
+        runtimeStatus(kind, this.env).executorAvailable &&
+        isExecutable({ ...envelope, to: kind })
+    );
+  }
+
+  /**
+   * Failover: a message no real reader handled within the grace window is run
+   * read-only through Workers AI and answered as "hub executor". Validated before
+   * sending; failures are retried (3 attempts) then alarmed through the registry.
+   */
+  private async runExecutor(now: number) {
+    const config = this.config();
+    // Old exec alarms survive configuration changes. Recheck before claiming mail.
+    if (
+      !config ||
+      !this.env.AI ||
+      !runtimeStatus(config.kind, this.env).executorAvailable
+    )
+      return;
+    const batch = this.store.claimForExecutor(now, this.graceMs(), 120_000, 3);
+    const registry = this.env.REGISTRY.get(
+      this.env.REGISTRY.idFromName('registry')
+    );
+    for (const message of batch) {
+      if (!isExecutable({ ...message, to: config.kind })) {
+        this.store.ack([message.id], Date.now());
+        continue;
+      }
+      const attemptKey = `execAttempts:${message.id}`;
+      const attempts = Number(this.store.getMeta(attemptKey) ?? 0) + 1;
+      this.store.setMeta(attemptKey, String(attempts));
+      let reply: string | null = null;
+      try {
+        const evidence = await fetchEvidence(allowedUrls(message.body));
+        reply = await runModel(
+          this.env.AI,
+          buildPrompt(config.kind, message.from, message.body, evidence)
+        );
+      } catch {
+        reply = null;
+      }
+      reply = validateReply(reply);
+      if (!reply) {
+        if (attempts >= 3) {
+          this.store.ack([message.id], Date.now());
+          await registry.recordEvent('executor.failed', config.kind, {
+            id: message.id,
+            from: message.from,
+            attempts,
+          });
+        } else this.outbox.schedule('exec', Date.now() + 30_000 * attempts);
+        continue;
+      }
+      const body =
+        `[hub-executor:workers-ai for ${config.kind}] ${reply}`.slice(0, 3_900);
+      // The shared hub sender needs a collision-free namespace across target kinds.
+      const correlationId = `reply-exec-${await sha256Hex(
+        JSON.stringify([config.kind, message.id])
+      )}`;
+      const envelope: Envelope = {
+        id: `mesh-hub:${correlationId}`,
+        from: 'mesh-hub',
+        to: message.from,
+        correlationId,
+        sha256: await sha256Hex(body),
+        body,
+        refs: message.refs,
+        inReplyTo: message.id,
+        sentAt: null,
+        acceptedAt: Date.now(),
+        kind: 'message',
+      };
+      try {
+        const stub = this.env.MAILBOX.get(
+          this.env.MAILBOX.idFromName(message.from)
+        );
+        const sent = await stub.enqueue(envelope);
+        if (sent.ok || sent.status === 409) {
+          this.store.ack([message.id], Date.now());
+          await registry.recordEvent('executor.handled', config.kind, {
+            id: message.id,
+            ms: Date.now() - message.acceptedAt,
+          });
+        }
+      } catch {
+        this.outbox.schedule('exec', Date.now() + 30_000);
+      }
+    }
+    if (batch.length === 3) this.outbox.schedule('exec', Date.now() + 1_000);
   }
 
   private isWebhookTarget(): boolean {
@@ -315,6 +439,7 @@ export class Mailbox extends DurableObject<Env> {
       if (due.includes('sweep')) await run('sweep', () => this.sweep(now));
       if (due.includes('webhook'))
         await run('webhook', () => this.pushWebhook(now));
+      if (due.includes('exec')) await run('exec', () => this.runExecutor(now));
     } finally {
       // Re-arm before returning so a failing task can never stop the timers.
       await this.arm();
@@ -342,8 +467,33 @@ export class Mailbox extends DurableObject<Env> {
         }
       }
     }
+    await this.alarmStale(config, now);
     if (this.store.unackedCount() > 0 || this.outbox.open(1).length)
       this.outbox.schedule('sweep', now + SWEEP_MS);
+  }
+
+  /**
+   * Mail received but not handled within MAIL_STALE_MS (default 10 min) alarms once per
+   * oldest message through the registry (-> Summer + ALERT_KINDS), whatever the cause:
+   * dead reader, executor failure, or no reader at all.
+   */
+  private async alarmStale(config: MailboxConfig | null, now: number) {
+    const oldest = this.store.oldestUnackedMessage();
+    if (!config || !oldest) return;
+    const staleMs = Math.max(60_000, Number(this.env.MAIL_STALE_MS ?? 600_000));
+    const age = now - oldest.acceptedAt;
+    if (age < staleMs || this.store.getMeta('staleAlarmedFor') === oldest.id)
+      return;
+    this.store.setMeta('staleAlarmedFor', oldest.id);
+    const registry = this.env.REGISTRY.get(
+      this.env.REGISTRY.idFromName('registry')
+    );
+    await registry.recordEvent('mail.stale', config.kind, {
+      id: oldest.id,
+      from: oldest.from,
+      ageMin: Math.round(age / 60_000),
+      unhandled: this.store.unackedCount(),
+    });
   }
 
   /** DLQ: one deterministic wrapper per dead message to the fallback owner. */

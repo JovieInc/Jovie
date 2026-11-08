@@ -28,14 +28,16 @@ from pathlib import Path
 import migration_renumber
 import remediation
 from atomic_state import atomic_write_text
+from fix_red_source_edits import snap_added_conservative_spacing, strip_added_legacy_cache_exports  # noqa: F401
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent")
+    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent")
 DETERMINISTIC = frozenset({
-    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE})
+    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
+    REGISTER_DOMAIN, ATOMIC_WRITE})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -48,6 +50,11 @@ UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
 BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?## ?(?:Red-before-green|Blast radius)",
                        re.IGNORECASE)
+# Source Validation includes passing fixtures that print quota/network errors.
+# A concrete component error needs regression coverage, never an infra retry.
+COMPONENT_TEST_TEXT = re.compile(
+    r"::error file=[^\s:]+::\[test-not-touched\] Component changed but test "
+    r"((?:apps/web|packages/ui)/[\w./-]+\.(?:test|spec)\.[jt]sx?) was not touched in this diff\.")
 # The internal customer-changelog decision. A second note is `ambiguous`, so a body that already
 # contains one is never stamped again. The quota form is the attempt>1 mask of the same defect:
 # the guard could not re-read the body, so the log no longer says missing-metadata.
@@ -66,17 +73,11 @@ CENSUS_CERTIFICATION = re.compile(r"source changed; renew certification evidence
 # PR added a 10px/14px utility. Snap those added utilities; do not raise the floor.
 SPACING_RATCHET_TEXT = re.compile(
     r"off-grid 10px/14px spacing steps \(\*-2\.5, \*-3\.5\) grew")
-# Same utility shape as apps/web/scripts/optical-grid-scanners.ts, limited to the
-# armed conservative steps. Longer prefixes are not required: `p` fails closed on
-# `px-2.5` because the step hyphen does not follow `p`.
-CONSERVATIVE_UTILITY = re.compile(
-    r"(?<![\w-])(?P<sign>-)?(?P<prefix>p|px|py|pt|pr|pb|pl|ps|pe|m|mx|my|mt|mr|mb|ml|ms|me|"
-    r"gap|gap-x|gap-y|space-x|space-y)-(?P<step>2\.5|3\.5)(?![\w./%])")
-# 10px and 14px sit halfway between canonical seams. Tie-break toward the lower
-# seam (8px / 12px) so the rewrite is deterministic and stays on the 4px grid.
-SNAP_STEP = {"2.5": "2", "3.5": "3"}
-SPACING_SCAN_PREFIXES = ("apps/web/app/", "apps/web/components/", "packages/ui/")
-NON_PRODUCT_SPACING = re.compile(r"\.(?:test|spec|stories)\.[tj]sx?$")
+# Cache Components ratchet (assertStackPatternRatchet). Growth is a newly added
+# `export const dynamic|fetchCache|revalidate`. Delete that added line. Never
+# raise the ceiling. Checked before platform text: the count can look like HTTP 5xx.
+CACHE_SURFACE_TEXT = re.compile(
+    r"legacy Cache Components surface grew to \d+ \(maximum \d+\)")
 # Source Validation's merge probe. Deterministic unions:
 # - NARROWED vitest command in scripts/preflight-changed.mjs
 # - shell && chains (node --test or vitest paths, plus added prefixes)
@@ -120,19 +121,19 @@ _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
+    ("component-test-evidence", COMPONENT_TEST_TEXT, AGENT),
     ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),
-    # Before platform-infra: a Source Validation log can carry passing-test
-    # rate-limit lines beside the guard error that actually failed the job.
+    # Before platform-infra: a Source Validation log can carry passing-test rate-limit lines beside the guard error that actually failed the job.
     ("domain-write", DOMAIN_WRITE, REGISTER_DOMAIN),
     ("changelog-metadata", CHANGELOG_MISSING, STAMP_CHANGELOG),
-    # Before platform-infra: the ratchet message includes a count such as 591,
-    # and `\b5\d\d\b` would otherwise treat that count as an HTTP 5xx.
+    ("cache-surface", CACHE_SURFACE_TEXT, STRIP_CACHE),
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
+    # Inventory assertion outranks quota/infra noise echoed in the same log.
+    ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
-    ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     ("atomic-write", ATOMIC_TEXT, ATOMIC_WRITE),
     ("pr-body", BODY_TEXT, AGENT),
 )
@@ -144,8 +145,10 @@ DEFAULT_BREAKER_N, MAX_BREAKER_N, MIN_CELL_RUNS = 2, 3, 10
 
 
 def error_signature(text: str) -> str:
-    """The first error-looking line with volatile tokens removed, so two runs of one failure match."""
-    for line in str(text or "").splitlines():
+    """Prefer the failed-test summary to setup/mock output; normalize volatile tokens."""
+    text = re.sub(r"\x1b\[[0-9;]*m", "", str(text or ""))
+    text = re.split(r"(?m)^.*?\bFailed (?:Tests|Suites) [1-9]\d*\s*[⎯─-]*\s*$", text)[-1]
+    for line in text.splitlines():
         if re.search(r"\b(error|fail(?:ed|ure)?|assert|expected|unwired|violation)\b", line, re.IGNORECASE):
             line = re.sub(r"^\S*\d{4}-\d\d-\d\dT[\d:.]+Z\s*", "", line.strip())
             line = re.sub(r"\b[0-9a-f]{7,40}\b|\d+", "#", line)
@@ -201,6 +204,8 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
             and stamp_internal_changelog(pr.get("body")) is not None:
         cls, action, signature = "changelog-metadata", STAMP_CHANGELOG, ""
     files = []
+    if cls == "component-test-evidence":
+        files = sorted({test for name in names for test in COMPONENT_TEST_TEXT.findall(logs.get(name) or "")})
     if cls == "ci-fast-wiring":
         for name in names:
             found = UNWIRED.search(logs.get(name) or "")
@@ -210,98 +215,6 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         files = sorted(_domain_write_hits("\n".join(logs.get(name) or "" for name in names)))
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
             "checks": names, "signature": signature, "files": files}
-
-
-def _snap_spacing_line(line: str) -> str:
-    def repl(match: re.Match) -> str:
-        sign = match.group("sign") or ""
-        return f"{sign}{match.group('prefix')}-{SNAP_STEP[match.group('step')]}"
-    return CONSERVATIVE_UTILITY.sub(repl, line)
-
-
-def _spacing_product_path(path: str) -> bool:
-    """Product TS/TSX under the spacing ratchet's scan roots. Tests and stories are debt-free."""
-    rel = str(path or "").replace("\\", "/")
-    if not rel or rel.startswith("/") or ".." in Path(rel).parts:
-        return False
-    if not rel.endswith((".ts", ".tsx")) or NON_PRODUCT_SPACING.search(rel):
-        return False
-    return rel.startswith(SPACING_SCAN_PREFIXES)
-
-
-def _added_spacing_edits(diff: str) -> dict[str, dict[int, tuple[str, str]]]:
-    """Map eligible file -> {new 1-based line: (added text, snapped text)} for utilities the diff adds."""
-    edits: dict[str, dict[int, tuple[str, str]]] = {}
-    rel = ""
-    eligible = False
-    new_line = 0
-    in_hunk = False
-    for raw in str(diff or "").splitlines():
-        if raw.startswith("+++ b/"):
-            rel = raw[6:]
-            eligible = _spacing_product_path(rel)
-            in_hunk = False
-            continue
-        if raw.startswith("--- ") or raw.startswith("diff --git "):
-            continue
-        header = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", raw)
-        if header:
-            new_line = int(header.group(1))
-            in_hunk = True
-            continue
-        if not in_hunk:
-            continue
-        if raw.startswith("\\"):
-            continue  # "\ No newline at end of file" is not a source line
-        if raw.startswith("+"):
-            added = raw[1:]
-            snapped = _snap_spacing_line(added)
-            if eligible and snapped != added:
-                edits.setdefault(rel, {})[new_line] = (added, snapped)
-            new_line += 1
-        elif raw.startswith("-"):
-            continue
-        else:
-            # A context line (rare with -U0) still occupies a new-file line.
-            new_line += 1
-    return edits
-
-
-def snap_added_conservative_spacing(root: Path, diff: str) -> list[str]:
-    """Snap conservative spacing utilities on lines this diff adds. Returns the files written.
-
-    Grandfathered lines are left alone, including an identical `gap-2.5` elsewhere in the
-    file. A line that no longer matches the diff is left alone so a stale patch cannot
-    rewrite a neighbor. 2.5 -> 2 (10px -> 8px) and 3.5 -> 3 (14px -> 12px).
-    """
-    changed = []
-    root = Path(root)
-    for rel, lines in _added_spacing_edits(diff).items():
-        path = root / rel
-        try:
-            original = path.read_text()
-        except OSError:
-            continue
-        file_lines = original.splitlines(keepends=True)
-        dirty = False
-        for lineno, (added, snapped) in lines.items():
-            index = lineno - 1
-            if index < 0 or index >= len(file_lines):
-                continue
-            ending = "\r\n" if file_lines[index].endswith("\r\n") else "\n" if file_lines[index].endswith("\n") else ""
-            current = file_lines[index][: len(file_lines[index]) - len(ending)]
-            if current != added:
-                continue
-            file_lines[index] = snapped + ending
-            dirty = True
-        if not dirty:
-            continue
-        try:
-            atomic_write_text(path, "".join(file_lines))
-        except OSError:
-            continue
-        changed.append(rel)
-    return sorted(changed)
 
 
 def _split_shell_and(command: str) -> list[str] | None:

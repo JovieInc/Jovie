@@ -201,10 +201,10 @@ export const selectContentClasses = [
  * Destructive variant for menu items (delete, remove actions)
  */
 export const MENU_ITEM_DESTRUCTIVE =
-  'text-error hover:text-error hover:bg-error-subtle ' +
-  'data-[highlighted]:text-error data-[highlighted]:bg-error-subtle ' +
+  'text-error-text hover:text-error-text hover:bg-error-subtle ' +
+  'data-[highlighted]:text-error-text data-[highlighted]:bg-error-subtle ' +
   'focus-visible:ring-error ' +
-  '[&_svg]:text-error hover:[&_svg]:text-error data-[highlighted]:[&_svg]:text-error';
+  '[&_svg]:text-error-text hover:[&_svg]:text-error-text data-[highlighted]:[&_svg]:text-error-text';
 
 /**
  * Selected/active item state for menus with current choices

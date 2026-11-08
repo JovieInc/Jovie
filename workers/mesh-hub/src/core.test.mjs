@@ -559,6 +559,29 @@ test('percentile uses nearest-rank and handles empty input', () => {
   );
 });
 
+test('clearDead un-flags a message so a failed dead-letter notification is retried', async () => {
+  const store = new MailboxStore(sqlite());
+  store.enqueue(await envelope({ acceptedAt: 0 }));
+  const first = store.sweepDead(
+    LIMITS.deadAfterActiveMs + 2,
+    LIMITS.deadAfterActiveMs
+  );
+  assert.equal(first.length, 1);
+  assert.equal(
+    store.sweepDead(LIMITS.deadAfterActiveMs + 3, LIMITS.deadAfterActiveMs)
+      .length,
+    0,
+    'dead once'
+  );
+  store.clearDead(first[0].seq);
+  assert.equal(
+    store.sweepDead(LIMITS.deadAfterActiveMs + 4, LIMITS.deadAfterActiveMs)
+      .length,
+    1,
+    'retried after clearDead'
+  );
+});
+
 test('probe is adaptive: traffic that proves the agent replaces the probe', () => {
   const quiet = PROBE.intervalMs;
   // Busy agent: recent proof, no probe sent even though the last probe is old.
@@ -604,16 +627,13 @@ test('probe is adaptive: traffic that proves the agent replaces the probe', () =
   });
   assert.deepEqual([recovered.misses, recovered.event], [0, 'agent.reachable']);
   // Socket pings alone are not consumer proof.
-  assert.equal(
-    lastConsumerAlive({ lastSeenAt: null, lastActivityAt: null }),
-    null
-  );
+  assert.equal(lastConsumerAlive({ lastConsumerActivityAt: null }), null);
 });
 
 test('negative control: a dead agent is detected no later than with the fixed probe', () => {
   const MIN = 60_000;
   // Simulate the minute sweep. The agent answers until `diesAt`, then is silent.
-  // `adaptive` also gets unrelated traffic every 90 s until it dies.
+  // `adaptive` also consumes mail every 90 s until it dies.
   const detect = (diesAt, adaptive) => {
     let lastProbeAt = null;
     let lastAck = null;
@@ -656,25 +676,25 @@ test('negative control: a dead agent is detected no later than with the fixed pr
   );
 });
 
-test('clearDead un-flags a message so a failed dead-letter notification is retried', async () => {
-  const store = new MailboxStore(sqlite());
-  store.enqueue(await envelope({ acceptedAt: 0 }));
-  const first = store.sweepDead(
-    LIMITS.deadAfterActiveMs + 2,
-    LIMITS.deadAfterActiveMs
-  );
-  assert.equal(first.length, 1);
-  assert.equal(
-    store.sweepDead(LIMITS.deadAfterActiveMs + 3, LIMITS.deadAfterActiveMs)
-      .length,
-    0,
-    'dead once'
-  );
-  store.clearDead(first[0].seq);
-  assert.equal(
-    store.sweepDead(LIMITS.deadAfterActiveMs + 4, LIMITS.deadAfterActiveMs)
-      .length,
-    1,
-    'retried after clearDead'
-  );
+test('a continuously consuming agent needs zero probes per day instead of 288', () => {
+  const count = adaptive => {
+    let probes = 0;
+    let lastProbeAt = null;
+    for (let now = 60_000; now <= 86_400_000; now += 60_000) {
+      const result = evaluateProbe({
+        now,
+        lastProbeAt,
+        lastProbeAckAt: lastProbeAt,
+        misses: 0,
+        lastAliveAt: adaptive ? now : null,
+      });
+      if (result.sendNew) {
+        probes++;
+        lastProbeAt = now;
+      }
+    }
+    return probes;
+  };
+  assert.equal(count(false), 288);
+  assert.equal(count(true), 0);
 });

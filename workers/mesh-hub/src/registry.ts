@@ -10,6 +10,7 @@ import {
   sha256Hex,
 } from './core.ts';
 import type { Env } from './env.ts';
+import { runtimeStatus } from './executor.ts';
 import type { Liveness } from './mailbox.ts';
 import {
   type AgentState,
@@ -39,6 +40,8 @@ const ALERTING = new Set([
   'message.dead',
   'webhook.rejected',
   'hub.suspect',
+  'mail.stale',
+  'executor.failed',
 ]);
 const TOUCH_DEBOUNCE_MS = 15_000;
 
@@ -325,11 +328,7 @@ export class Registry extends DurableObject<Env> {
             Number(agent.probe_misses),
             now,
             pending,
-            lastConsumerAlive({
-              lastSeenAt:
-                agent.last_seen_at === null ? null : Number(agent.last_seen_at),
-              lastActivityAt: live.lastActivityAt,
-            })
+            lastConsumerAlive(live)
           );
         } catch {
           // One unreachable mailbox must not abort the sweep for every agent.
@@ -469,6 +468,7 @@ export class Registry extends DurableObject<Env> {
           const live = await this.mailbox(agent.kind).liveness();
           return {
             ...agent,
+            ...runtimeStatus(agent.kind, this.env),
             connected: live.connected,
             lastPingAt: live.lastPingAt
               ? new Date(live.lastPingAt).toISOString()
@@ -479,6 +479,7 @@ export class Registry extends DurableObject<Env> {
         } catch {
           return {
             ...agent,
+            ...runtimeStatus(agent.kind, this.env),
             connected: null,
             lastPingAt: null,
             unhandled: null,

@@ -120,6 +120,7 @@ export async function main(argv, io = console) {
     return 0;
   }
   if (cmd === 'rollup') {
+    const limit = 500;
     const since = new Date(Date.now() - 56 * 86_400_000)
       .toISOString()
       .slice(0, 10);
@@ -134,17 +135,24 @@ export async function main(argv, io = console) {
         '--search',
         `merged:>=${since}`,
         '--limit',
-        '500',
+        String(limit),
         '--json',
         'createdAt,mergedAt',
       ],
       { priority: 'default' }
     );
     if (r.code !== 0) throw new Error(`GitHub read failed: ${r.stderr.trim()}`);
+    const merged = JSON.parse(r.stdout);
+    // A full capped response cannot establish that the cohort is complete.
+    // Stop before aggregation/publication; retain the previous snapshot.
+    if (merged.length >= limit)
+      throw new Error(
+        `Merged PR cohort reached the ${limit}-row limit; completeness is unproven. Weekly rollup not written.`
+      );
     const out = {
       schema: 'jovie.wins-weekly/v1',
       at: new Date().toISOString(),
-      weeks: weeklyRollup(wins, JSON.parse(r.stdout)),
+      weeks: weeklyRollup(wins, merged),
       unmeasured: ['ciMinutesSaved', 'costPerMergedPr'],
       note: 'Engineering metrics only. Dollar figures belong in the private ops store and are never written here.',
     };

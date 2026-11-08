@@ -348,12 +348,16 @@ function specRepository(t) {
     Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
   );
   const git = (...args) =>
-    execFileSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], {
-      cwd: root,
-      env,
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
+    execFileSync(
+      'git',
+      ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', ...args],
+      {
+        cwd: root,
+        env,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }
+    ).trim();
   const spec = join(root, 'apps/web/lib/api/v1/openapi.json');
   mkdirSync(dirname(spec), { recursive: true });
   mkdirSync(join(root, 'apps/web/scripts'), { recursive: true });

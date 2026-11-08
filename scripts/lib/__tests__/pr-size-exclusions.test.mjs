@@ -8,6 +8,7 @@ import {
   isSizeExcluded,
   TEST_SIZE_EXCLUSION,
 } from '../pr-size-exclusions.mjs';
+import { wipAdmission, wipGate } from '../pr-wip-gate.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const MODULE = resolve(ROOT, 'scripts/lib/pr-size-exclusions.mjs');
@@ -118,5 +119,66 @@ describe('PR size exclusions', () => {
       )
     ).toContain("from './pr-size-exclusions.mjs'");
     expect(TEST_SIZE_EXCLUSION.source.length).toBeGreaterThan(0);
+  });
+});
+
+describe('pr-open per-producer WIP gate', () => {
+  const python =
+    (status, stdout, stderr = '') =>
+    () => ({
+      status,
+      stdout,
+      stderr,
+    });
+  const over = python(
+    3,
+    '{"allowed":false,"producer":"hyperagent","used":36,"cap":5}'
+  );
+
+  it('wipAdmission refuses only on exit 3 with a decision, and fails open otherwise', () => {
+    const refused = wipAdmission('hyperagent/x', over, '.');
+    expect(refused.allowed).toBe(false);
+    expect(refused.message).toMatch(/wip-cap: `hyperagent\/` already owns 36/);
+    const unknown = wipAdmission('codex/x', python(1, '', 'gh down'), '.');
+    expect(unknown.allowed).toBe(true);
+    expect(unknown.message).toMatch(/admitting/);
+    const within = wipAdmission(
+      'codex/x',
+      python(0, '{"allowed":true,"producer":"codex","used":2,"cap":8}'),
+      '.'
+    );
+    expect(within).toEqual({ allowed: true, message: null });
+  });
+
+  it('wipGate refuses over the cap, and a recorded override labels instead', () => {
+    const rows = [];
+    const out = [];
+    const env = execute => ({
+      execute,
+      log: x => out.push(x),
+      record: row => rows.push(row),
+    });
+    expect(wipGate({ repo: '.' }, 'hyperagent/x', env(over))).toEqual({
+      refused: true,
+      override: false,
+    });
+    expect(out.join('\n')).toMatch(/FAIL {2}wip-cap/);
+    const short = { repo: '.', wipOverride: 'too short' };
+    expect(wipGate(short, 'hyperagent/x', env(over)).refused).toBe(true);
+    const reason = 'this PR installs the cap itself';
+    const given = { repo: '.', wipOverride: reason };
+    expect(wipGate(given, 'hyperagent/x', env(over))).toEqual({
+      refused: false,
+      override: true,
+    });
+    expect(rows.at(-1).override).toBe(reason);
+    const ok = python(
+      0,
+      '{"allowed":true,"producer":"codex","used":1,"cap":8}'
+    );
+    expect(wipGate({ repo: '.' }, 'codex/x', env(ok))).toEqual({
+      refused: false,
+      override: false,
+    });
   });
 });

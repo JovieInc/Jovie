@@ -311,7 +311,7 @@ describe('UserButton billing actions', () => {
       />
     );
     const trigger = screen.getByRole('button', {
-      name: /Open user menu · Update available/,
+      name: /^Open user menu · Update available/,
     });
     expect(trigger).toContainElement(screen.getByTestId('dock-status'));
     await user.click(trigger);
@@ -675,7 +675,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('does not show the passive billing-status toast while the pathname is unavailable', () => {
-    mockUsePathname.mockReturnValue(null);
+    mockUsePathname.mockReturnValue(null as unknown as string);
     mockUseBillingStatusQuery.mockReturnValue({
       data: null,
       isLoading: false,

@@ -94,6 +94,16 @@ describe('WorkInspectorActions', () => {
     expect(screen.queryByTestId('work-action-review-publish')).toBeNull();
   });
 
+  it('renders every action as one secondary button style, preview included', () => {
+    renderActions({ preview: <button type='button'>Play Preview</button> });
+    const share = screen.getByTestId('work-action-share-page');
+    const previewPage = screen.getByTestId('work-action-preview-page');
+    const ask = screen.getByTestId('work-action-ask-jovie');
+    expect(previewPage.className).toBe(share.className);
+    expect(ask.className).toBe(share.className);
+    expect(screen.getByText('Play Preview')).toBeInTheDocument();
+  });
+
   it('keeps primary and utility actions in keyboard order without activating them on focus', async () => {
     const user = userEvent.setup();
     const onSharePrivately = vi.fn();

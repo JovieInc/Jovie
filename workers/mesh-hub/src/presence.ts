@@ -79,22 +79,21 @@ export type ProbeInput = {
   lastProbeAckAt: number | null;
   misses: number;
   /**
-   * Last event that proves the agent consumes mail (authenticated traffic, an
-   * ack or a poll). Omitted/null keeps the fixed cadence. Socket pings never
+   * Last inbound consumption action (poll, ack, receipt or stream sync).
+   * Omitted/null keeps the fixed cadence. General API traffic and socket pings never
    * count: a wedged consumer behind a healthy socket is what the probe is for.
    */
   lastAliveAt?: number | null;
 };
 
-/** Last sign that the agent itself (not just its socket) is working. */
+/** Consumer proof is independent of general API and transport presence. */
 export function lastConsumerAlive(input: {
-  lastSeenAt: number | null;
-  lastActivityAt: number | null;
+  lastConsumerActivityAt: number | null;
 }): number | null {
-  const candidates = [input.lastSeenAt, input.lastActivityAt].filter(
-    (value): value is number => typeof value === 'number' && value > 0
-  );
-  return candidates.length ? Math.max(...candidates) : null;
+  const value = input.lastConsumerActivityAt;
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? value
+    : null;
 }
 
 export type ProbeResult = {

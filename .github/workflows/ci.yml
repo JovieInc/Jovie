@@ -58,6 +58,18 @@ env:
   TURBO_TOKEN: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && secrets.TURBO_TOKEN || '' }}
   TURBO_TEAM: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && secrets.TURBO_TEAM || '' }}
   TURBO_CACHE: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && 'local:rw,remote:rw' || 'local:rw' }}
+  # Cloudflare R2 Turbo cache (infra/turbo-cache). Push, dispatch and
+  # merge_group (the exact tree main is about to be, after required PR checks)
+  # get the read-write token; pull_request gets a read-only token, so
+  # PR-controlled code can read artifacts but can never write or poison them.
+  # Every artifact is HMAC-signed (CF_TURBO_SIGNATURE_KEY); unsigned or
+  # wrongly-signed artifacts are rejected. No key means read-only everywhere. Fork PRs receive no secrets and stay local-only. The composite
+  # setup-node-pnpm action probes the Worker and falls back to the legacy
+  # Vercel cache above (push only) when it is unreachable.
+  CF_TURBO_URL: ${{ secrets.CF_TURBO_CACHE_URL }}
+  CF_TURBO_ROLE: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group') && 'rw' || 'ro' }}
+  CF_TURBO_TOKEN: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group') && secrets.CF_TURBO_CACHE_RW_TOKEN || secrets.CF_TURBO_CACHE_RO_TOKEN }}
+  CF_TURBO_SIGNATURE_KEY: ${{ secrets.CF_TURBO_SIGNATURE_KEY }}
   # JOV-2497: four-slot cross-PR pool caps Neon branch *creation* (one endpoint per branch).
   # Only jobs that call neon-create-branch-with-retry use the pool — artifact consumers
   # (Lighthouse/A11y/Mobile Overflow) reuse neon-db and must NOT share the pool or
@@ -562,8 +574,12 @@ jobs:
       run_marketing_dom: ${{ steps.homepage-visual.outputs.run_marketing_dom || 'false' }}
       run_drizzle: ${{ steps.detect.outputs.run_drizzle || 'false' }}
       run_neon: ${{ steps.detect.outputs.run_neon || 'false' }}
-      run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
-      run_macos: ${{ steps.detect.outputs.run_macos || 'false' }}
+      # Merge queue must not wait on the hosted macOS pool. A macos-26
+      # runner sat pending from 23:56Z to 00:24Z on 2026-11-05 and the
+      # 30-minute queue budget ejected #23881 before the lane could finish.
+      # These lanes still run on push to main and on workflow_dispatch.
+      run_ios: ${{ github.event_name == 'merge_group' && 'false' || steps.detect.outputs.run_ios || 'false' }}
+      run_macos: ${{ github.event_name == 'merge_group' && 'false' || steps.detect.outputs.run_macos || 'false' }}
       # 'false' only when the Mac lane is selected solely by node-only inputs
       # (MAC_NODE_ONLY_RULES): the lane then runs on ubuntu. Absent from an older
       # trusted classifier, so it defaults to the macOS lane.
@@ -1063,6 +1079,29 @@ jobs:
           printf '\n### Blog content qualification\n\n- Profile: `%s`\n- Receipt: `blog-content-receipt.json`\n' \
             "$profile" >> "$GITHUB_STEP_SUMMARY"
 
+      # The trusted classifier can still select mac or ios. The queue must
+      # not wait on the hosted macOS pool for that selection. Push to main
+      # still runs both lanes. Run 41946653614 failed the receipt because
+      # mac stayed selected while the lane was skipped.
+      - name: Drop hosted macOS lanes from the merge-queue receipt
+        if: ${{ github.event_name == 'merge_group' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/product-lane-classification"
+          jq '
+            .selectedLanes |= map(select(. != "ios" and . != "mac"))
+            | .skippedLanes = (
+                [.skippedLanes[] | select(.lane != "ios" and .lane != "mac")]
+                + [
+                  {"lane":"ios","reason":"merge queue does not wait on the hosted macOS pool"},
+                  {"lane":"mac","reason":"merge queue does not wait on the hosted macOS pool"}
+                ]
+              )
+            | .requiredGates |= del(.ios, .mac)
+          ' "$root/receipt.json" > "$root/receipt.queue.json"
+          mv "$root/receipt.queue.json" "$root/receipt.json"
+
       - name: Detect web coverage applicability
         id: coverage-detect
         shell: bash
@@ -1131,11 +1170,11 @@ jobs:
     # repo variable MERGE_GATE_POOL=fixed routes back to the gem pool.
     runs-on: ${{ vars.MERGE_GATE_POOL == 'fixed' && fromJSON('["self-hosted","Linux","X64","jovie-fixed"]') || 'ubuntu-latest' }}
     # Must exceed MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS (66 min) plus the
-    # 6-minute check poll plus setup/checkout. The helper sleeps until
+    # 10-minute check poll plus setup/checkout. The helper sleeps until
     # x-ratelimit-reset inside that window. A hard cancel would eject the
     # group. The wait stays in the helper: a workflow sleep before a GitHub
     # read is polling debt (JOV-INV-042).
-    timeout-minutes: 75
+    timeout-minutes: 78
     outputs:
       admitted: ${{ steps.admission.outputs.admitted || 'false' }}
       obsolete: ${{ steps.admission.outputs.obsolete || 'false' }}
@@ -2034,6 +2073,7 @@ jobs:
     env:
       CI_FAST_STRUCTURAL_PYTEST: skip
       CI_FAST_STRUCTURAL_WEB: skip
+      CI_FAST_STRUCTURAL_LANES: skip
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
       # Match prior Structural Contract job so actionlint/shellcheck is hermetic.
       SHELLCHECK_OPTS: >-
@@ -2098,6 +2138,11 @@ jobs:
       # idles awaiting the base-branch fetch instead of serially before the
       # structural lane (10s of merge-group run 36270458408's critical path).
       # Unconditional: a strict superset of the former structural-only gate.
+      - name: Set up Go for source-pinned actionlint
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.10'
+          cache: false
       - name: Run actionlint
         run: bash .github/scripts/run-actionlint.sh
       - name: Fetch base-branch history
@@ -2260,6 +2305,7 @@ jobs:
             echo "tasks=false"
             echo "desktop_update=false"
             echo "dsp=false"
+            echo "smart_link=false"
             echo "run=false"
           } >> "$GITHUB_OUTPUT"
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
@@ -2271,6 +2317,7 @@ jobs:
           TASKS_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/tasks/(Task(DataTable|ListRow)(\.stories)?\.tsx|TasksPageClient\.tsx)|components/organisms/table/(atoms/TableCell\.tsx|table\.types\.ts|organisms/VirtualizedTableRow\.tsx|molecules/TaskProjectionListRow\.tsx)|tests/e2e/storybook-task-row-geometry\.spec\.ts)$'
           DESKTOP_UPDATE_STORYBOOK_PATTERN='^apps/web/(components/organisms/desktop-update/DesktopUpdateModal(\.stories)?\.tsx|tests/e2e/storybook-desktop-update-modal\.spec\.ts)$'
           DSP_STORYBOOK_PATTERN='^apps/web/(components/shell/DspAvatarStack(\.mobile-drawer)?(\.stories|\.test)?\.tsx|components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow(\.stories)?\.tsx|components/organisms/release-sidebar/ReleaseSidebarSections\.tsx|components/molecules/drawer/RightDrawer\.tsx|lib/a11y/modal-focus-boundary\.ts|tests/e2e/storybook-dsp-details\.spec\.ts)$'
+          SMART_LINK_STORYBOOK_PATTERN='^apps/web/(components/features/release/(SmartLinkShell|MusicServiceDial|ActionDial)(\.stories|\.test)?\.tsx|components/organisms/public-surface/PublicSurface(Shell|Stage)(\.stories|\.test)?\.tsx|components/organisms/ReleaseLandingPage\.stories\.tsx|app/r/\[slug\]/ReleaseLandingPage\.tsx|app/globals\.css|styles/design-system\.css|tests/e2e/storybook-smart-link-reachability\.spec\.ts)$'
           # Overlay primitives, their layer tokens, and the
           # collision harness re-prove stacking, focus, and viewport fit.
           OVERLAY_STORYBOOK_PATTERN='^(packages/ui/atoms/(dialog|alert-dialog|sheet|popover|dropdown-menu|context-menu|select|tooltip)\.tsx|packages/ui/lib/(overlay-styles|overlay-focus|dropdown-styles|utils)\.ts|apps/web/styles/tailwind-foundation\.css|apps/web/\.storybook/stories/overlay-collisions\.stories\.tsx|apps/web/tests/e2e/storybook-overlay-collisions\.spec\.ts)$'
@@ -2310,6 +2357,12 @@ jobs:
           if grep -qE "$DSP_STORYBOOK_PATTERN" "$changed_files"; then
             {
               echo "dsp=true"
+              echo "run=true"
+            } >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qE "$SMART_LINK_STORYBOOK_PATTERN" "$changed_files"; then
+            {
+              echo "smart_link=true"
               echo "run=true"
             } >> "$GITHUB_OUTPUT"
           fi
@@ -2405,6 +2458,7 @@ jobs:
           RUN_TASKS: ${{ steps.storybook-browser.outputs.tasks }}
           RUN_DESKTOP_UPDATE: ${{ steps.storybook-browser.outputs.desktop_update }}
           RUN_DSP: ${{ steps.storybook-browser.outputs.dsp }}
+          RUN_SMART_LINK: ${{ steps.storybook-browser.outputs.smart_link }}
           STORYBOOK_BASE_URL: http://localhost:6006
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
@@ -2436,6 +2490,9 @@ jobs:
           fi
           if [[ "$RUN_DSP" == 'true' ]]; then
             specs+=(tests/e2e/storybook-dsp-details.spec.ts)
+          fi
+          if [[ "${RUN_SMART_LINK:-false}" == 'true' ]]; then
+            specs+=(tests/e2e/storybook-smart-link-reachability.spec.ts)
           fi
           test "${#specs[@]}" -gt 0
           pnpm exec storybook dev -p 6006 --no-open &
@@ -2630,6 +2687,7 @@ jobs:
         ci-profile-admission-browser,
         ci-fast-structural-python,
         ci-fast-structural-web,
+        ci-fast-structural-lanes,
       ]
     if: >-
       always() &&
@@ -2651,13 +2709,14 @@ jobs:
           PROFILE_BROWSER_RESULT: ${{ needs.ci-profile-admission-browser.result }}
           STRUCTURAL_PYTHON_RESULT: ${{ needs.ci-fast-structural-python.result }}
           STRUCTURAL_WEB_RESULT: ${{ needs.ci-fast-structural-web.result }}
+          STRUCTURAL_LANES_RESULT: ${{ needs.ci-fast-structural-lanes.result }}
         run: |
           set -euo pipefail
-          if [[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" || "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$STRUCTURAL_WEB_RESULT" != "success" ]]; then
-            echo "::error title=ci-fast failed closed::typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT structural-python=$STRUCTURAL_PYTHON_RESULT structural-web=$STRUCTURAL_WEB_RESULT"
+          if [[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" || "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$STRUCTURAL_WEB_RESULT" != "success" || "$STRUCTURAL_LANES_RESULT" != "success" ]]; then
+            echo "::error title=ci-fast failed closed::typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT structural-python=$STRUCTURAL_PYTHON_RESULT structural-web=$STRUCTURAL_WEB_RESULT structural-lanes=$STRUCTURAL_LANES_RESULT"
             exit 1
           fi
-          echo "All ci-fast lane groups passed: typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT structural-python=$STRUCTURAL_PYTHON_RESULT structural-web=$STRUCTURAL_WEB_RESULT"
+          echo "All ci-fast lane groups passed: typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT structural-python=$STRUCTURAL_PYTHON_RESULT structural-web=$STRUCTURAL_WEB_RESULT structural-lanes=$STRUCTURAL_LANES_RESULT"
 
   ci-promptfoo-evals:
     name: Promptfoo Evals (deterministic)
@@ -2859,6 +2918,47 @@ jobs:
             ${{ runner.temp }}/ci-fast-lanes-structural.json
           retention-days: 7
           if-no-files-found: warn
+
+  ci-fast-structural-lanes:
+    name: ci-fast (structural lanes)
+    # The lanes coverage pytest (four shards + per-module coverage floors) set
+    # remaining's whole structural wall (478s of 478s, merge group
+    # 41250311104) while contending for 4 vCPU; it runs alone here.
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    timeout-minutes: 20
+    if: *ci-fast-gate
+    env:
+      CI_FAST_STRUCTURAL_LANES: only
+    steps:
+      - *shallow-checkout
+      - name: Start base-branch history fetch
+        shell: bash
+        env: *base-fetch-start-env
+        run: *base-fetch-start
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
+      - name: Fetch base-branch history
+        shell: bash
+        timeout-minutes: 10
+        env: *base-fetch-await-env
+        run: *base-fetch-await
+      - name: Decide structural lane
+        id: structural
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: *structural-decision
+      - *structural-python
+      - *structural-pytest
+      - name: Run lanes coverage pytest
+        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
+        env: *structural-run-env
+        run: node scripts/ci-fast-lanes.mjs
 
   ci-knip:
     name: Knip (dead code)
@@ -3675,6 +3775,7 @@ jobs:
                   tests/e2e/storybook-separator.spec.ts \
                   tests/e2e/storybook-sheet.spec.ts \
                   tests/e2e/storybook-overlay-collisions.spec.ts \
+                  tests/e2e/storybook-profile-claim-name.spec.ts \
                   tests/e2e/storybook-spotify-connect.spec.ts \
                   tests/e2e/storybook-ovie-privacy-boundary.spec.ts \
                   tests/e2e/storybook-onboarding-dsp-strip-clearance.spec.ts \
@@ -3682,6 +3783,7 @@ jobs:
                   tests/e2e/storybook-task-row-geometry.spec.ts \
                   tests/e2e/storybook-desktop-update-modal.spec.ts \
                   tests/e2e/storybook-dsp-details.spec.ts \
+                  tests/e2e/storybook-smart-link-reachability.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
                   --workers=2 --shard="$STORYBOOK_SHARD"
               exit 0
@@ -3721,9 +3823,9 @@ jobs:
           allow-images: 'true'
           retention-days: 7
 
-  # The coverage-bearing iOS unit gate belongs on the synthetic combined head,
-  # never the source PR. Full simulator UI/screenshot regression is preserved
-  # as a release-blocking TestFlight predecessor instead of delaying merges.
+  # iOS unit coverage runs on push to main and on workflow_dispatch.
+  # It does not run in the merge queue: the hosted macOS pool cannot hold
+  # check_response_timeout. Full simulator regression stays a TestFlight gate.
   ci-ios:
     name: iOS Fast Unit + Coverage (combined)
     needs: [ci-path-changes, ci-merge-group-admission]
@@ -4677,11 +4779,26 @@ jobs:
       group: neon-endpoint-pool-ci-lighthouse-dashboard-pr-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
       cancel-in-progress: false
     steps:
+      - name: Check Lighthouse identity prerequisite
+        id: lighthouse-identity
+        shell: bash
+        env:
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+        run: |
+          if [ -z "$E2E_CLERK_USER_ID" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "E2E_CLERK_USER_ID not set — skipping dashboard Lighthouse."
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.lighthouse-identity.outputs.available == 'true'
         with:
           fetch-depth: 1
 
       - name: Check for relevant changes
+        if: steps.lighthouse-identity.outputs.available == 'true'
         id: check_changes
         shell: bash
         run: |
@@ -4695,19 +4812,19 @@ jobs:
           fi
 
       - name: Skip notification
-        if: steps.check_changes.outputs.run_full_ci != 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci != 'true')
         run: echo "Skipping dashboard Lighthouse — no dashboard-relevant paths changed."
 
       - uses: ./.github/actions/setup-node-pnpm
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true')
 
       - name: Setup Playwright (Chromium)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true')
         uses: ./.github/actions/setup-playwright
 
       - name: Create ephemeral Neon database branch (with retry)
         id: neon-branch
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true')
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
@@ -4717,7 +4834,7 @@ jobs:
           protected_branches: main,production,prod,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true')
         id: resolve-dashboard-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -4727,11 +4844,11 @@ jobs:
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
       - name: Export DATABASE_URL
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true')
         run: echo "DATABASE_URL=${{ steps.resolve-dashboard-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true')
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -4740,7 +4857,7 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Download build artifact
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true')
         id: download-build
         continue-on-error: true
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -4749,11 +4866,11 @@ jobs:
           path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
-        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome == 'success'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome == 'success')
         run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
       - name: Build app fallback for dashboard Lighthouse
-        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome != 'success'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome != 'success')
         run: pnpm --filter=@jovie/web run build
         env:
           NEXT_IGNORE_ESLINT: '1'
@@ -4762,7 +4879,7 @@ jobs:
           SKIP_SKILLS_CATALOG_SYNC: '1'
 
       - name: Run authenticated dashboard Lighthouse
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.check_changes.outputs.run_full_ci == 'true')
         run: |
           cd apps/web
 
@@ -4813,7 +4930,7 @@ jobs:
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
 
       - name: Upload dashboard Lighthouse artifacts
-        if: always() && steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (always() && steps.check_changes.outputs.run_full_ci == 'true')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: lighthouse-dashboard-pr-${{ github.run_id }}-${{ github.run_attempt }}
@@ -4822,7 +4939,7 @@ jobs:
           retention-days: 3
 
       - name: Cleanup ephemeral Neon branch
-        if: always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.neon-branch.outputs.branch_id != ''
+        if: steps.lighthouse-identity.outputs.available == 'true' && (always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.neon-branch.outputs.branch_id != '')
         continue-on-error: true
         run: |
           curl -sS -X DELETE \
@@ -4857,26 +4974,42 @@ jobs:
       contents: read
     timeout-minutes: 30
     steps:
+      - name: Check Lighthouse identity prerequisite
+        id: lighthouse-identity
+        shell: bash
+        env:
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+        run: |
+          if [ -z "$E2E_CLERK_USER_ID" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "E2E_CLERK_USER_ID not set — skipping onboarding Lighthouse."
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.lighthouse-identity.outputs.available == 'true'
         with:
           fetch-depth: 1
 
       - uses: ./.github/actions/setup-node-pnpm
+        if: steps.lighthouse-identity.outputs.available == 'true'
 
       - name: Setup Playwright (Chromium)
+        if: steps.lighthouse-identity.outputs.available == 'true'
         uses: ./.github/actions/setup-playwright
 
       - name: Download Neon DB connection artifact
         # Reuse the shared ephemeral branch from neon-db to avoid parallel endpoint limits.
         # neon-db is dispatch-only; merge-group runs fall back to DATABASE_URL_MAIN.
-        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success')
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
-        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success')
         id: resolve-onboarding-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -4885,16 +5018,16 @@ jobs:
           fallback_json_key: db_url
 
       - name: Export DATABASE_URL (ephemeral branch)
-        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success')
         run: echo "DATABASE_URL=${{ steps.resolve-onboarding-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
       - name: Export DATABASE_URL (main — non-DB PR)
         # No ephemeral branch was created; use the stable main DB for SSR reads.
-        if: needs.ci-path-changes.outputs.run_neon != 'true' || needs.neon-db.result != 'success'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (needs.ci-path-changes.outputs.run_neon != 'true' || needs.neon-db.result != 'success')
         run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
-        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success')
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -4903,6 +5036,7 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Download build artifact
+        if: steps.lighthouse-identity.outputs.available == 'true'
         id: download-build
         continue-on-error: true
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -4911,11 +5045,11 @@ jobs:
           path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
-        if: steps.download-build.outcome == 'success'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.download-build.outcome == 'success')
         run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
       - name: Build app fallback for onboarding Lighthouse
-        if: steps.download-build.outcome != 'success'
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.download-build.outcome != 'success')
         run: pnpm --filter=@jovie/web run build
         env:
           NEXT_IGNORE_ESLINT: '1'
@@ -4924,6 +5058,7 @@ jobs:
           SKIP_SKILLS_CATALOG_SYNC: '1'
 
       - name: Run authenticated onboarding Lighthouse
+        if: steps.lighthouse-identity.outputs.available == 'true'
         run: |
           cd apps/web
 
@@ -4974,7 +5109,7 @@ jobs:
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
 
       - name: Upload onboarding Lighthouse artifacts
-        if: always()
+        if: steps.lighthouse-identity.outputs.available == 'true' && (always())
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: lighthouse-onboarding-pr-${{ github.run_id }}-${{ github.run_attempt }}
@@ -5595,8 +5730,22 @@ jobs:
             pnpm turbo test:fast --filter=@jovie/web -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
             echo "🔍 Merge group: Running affected test suite"
-            # Run affected tests against the merge-group base SHA.
-            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
+            # run_web includes Ovie/CLI and inputs outside Turbo's graph.
+            # Keep affected tasks; explicitly run web if it was not selected.
+            pnpm turbo test:fast --affected --dry=json > "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json"
+            UNIT_SELECTION_MODE="$(node scripts/ci-unit-selection.mjs < "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json")"
+            # Preserve sibling packages' existing empty-shard policy.
+            pnpm turbo test:fast --affected --filter='!@jovie/web' -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
+            WEB_CACHE_FLAG=""
+            if [[ "$UNIT_SELECTION_MODE" == "affected-and-web" ]]; then
+              echo "Affected graph omitted web; running the selected web lane explicitly"
+              pnpm turbo test:fast --filter=@jovie/web --dry=json > "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json"
+              node scripts/ci-unit-selection.mjs --require-web < "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json"
+              # Unknown dependency edges are also absent from cache inputs.
+              WEB_CACHE_FLAG="--force"
+            fi
+            # Override the wrapper's empty-suite success only for web shards.
+            pnpm turbo test:fast --filter=@jovie/web $WEB_CACHE_FLAG -- $VITEST_CI_FLAGS $RETRY_FLAG --passWithNoTests=false --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           else
             echo "🔍 Manual dispatch: Running critical + interaction tests (no base_ref available)"
             # Non-main manual dispatches have no base_ref. Run the critical and
@@ -6139,6 +6288,9 @@ jobs:
             exit 1
           fi
 
+          # The root-not-found axe fixture is guarded by the /dev layout/proxy.
+          # Match Mobile's explicit development runtime on this local-only server.
+          export VERCEL_ENV=development
           # Keep absolute URLs on loopback (GHA HOSTNAME is the runner machine name).
           export HOSTNAME=localhost
           export NEXT_PUBLIC_APP_URL=http://localhost:3220
@@ -6552,6 +6704,10 @@ jobs:
       # the active test-mode USD 1200/month price. The assertion stays
       # fail-closed; true reports a contract breach instead of a missing secret.
       FEATURE_STRIPE_TEST_PRICE_CONFIGURED: 'true'
+      # This job proves the admitted journey from /start to billing. Closed public
+      # signup redirects anonymous /start to /waitlist, and that handoff has its
+      # own proof in auth-public-ready.spec.ts.
+      FEATURE_PUBLIC_SIGNUP_CLOSED: 'false'
     # Scope pending replacement to one PR. GitHub replaces the older pending job in
     # a constant concurrency group even when cancel-in-progress is false, which can
     # cancel a required check before it obtains a runner. Golden-path cleanup only
@@ -7635,6 +7791,50 @@ jobs:
 
   # Deep Lighthouse runs only by manual dispatch. Production Lighthouse remains
   # a separate hosted post-deploy release probe.
+
+  # JOV-10687 / JOV-10682 E: explicit suite scope on merge-group proof.
+  # Today the merge group still runs the full web unit matrix when web is
+  # selected. Provenance only lets main skip duplicate unit/build work when
+  # this job claims full_web_units (or a legacy run has no scope job yet).
+  # ordinary_admission is reserved for a later shrink and must force main
+  # fallback — never let a smaller MQ pass stand in for full-suite proof.
+  ci-merge-suite-scope:
+    name: Merge Suite Scope / full_web_units
+    needs:
+      [
+        ci-path-changes,
+        ci-unit-tests,
+        ci-merge-group-ready,
+      ]
+    if: ${{ always() && github.event_name == 'merge_group' && needs.ci-merge-group-ready.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    steps:
+      - name: Claim full merge-suite proof scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_WEB="${{ needs.ci-path-changes.outputs.run_web }}"
+          BLOG_CONTENT_ONLY="${{ needs.ci-path-changes.outputs.blog_content_only }}"
+          UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
+          if [[ "$BLOG_CONTENT_ONLY" == "true" ]]; then
+            RUN_WEB=false
+          fi
+          if [[ "$RUN_WEB" == "true" && "$UNIT_RESULT" != "success" ]]; then
+            echo "::error::Cannot claim full_web_units without successful Unit Tests ($UNIT_RESULT)."
+            exit 1
+          fi
+          {
+            echo "### Merge suite scope"
+            echo
+            echo "- Claimed scope: \`full_web_units\`"
+            echo "- Web selected: \`$RUN_WEB\`"
+            echo "- Unit Tests: \`$UNIT_RESULT\`"
+            echo
+            echo "Main may reuse this merge-group proof to skip duplicate unit/build lanes."
+            echo "An \`ordinary_admission\` claim (future) must not authorize that skip."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Claimed merge suite scope: full_web_units (JOV-10687)"
 
   ci-merge-group-ready:
     name: ${{ github.event_name == 'merge_group' && 'PR Ready' || 'PR Ready (merge-group inactive)' }}

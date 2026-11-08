@@ -282,6 +282,26 @@ test('5: real locked paths require a GBrain or locking PR reference', () => {
   );
 });
 
+test('test-quality ratchet config stays locked until the body cites the lock', () => {
+  const path = 'scripts/test-quality/ratchets.json';
+  assert.equal(isLockedArea(path), true);
+  const bare = check(pr(), [file(path)]);
+  assert.ok(
+    bare.errors.some(
+      error => error.startsWith('locked-areas:') && error.includes(path)
+    )
+  );
+  assert.deepEqual(
+    check(
+      pr({
+        body: `${proof}\n## Locked areas\nGBrain: decisions/guardrail-ratchet-intent-discovery-20260624\nLocking PR: #22870`,
+      }),
+      [file(path)]
+    ).errors,
+    []
+  );
+});
+
 const event = {
   repository: { full_name: 'JovieInc/Jovie' },
   pull_request: { number: 1, head: { sha: 'a'.repeat(40) } },
@@ -335,6 +355,20 @@ test('runner: reads current paginated PR evidence, rejects stale/incomplete read
     }),
     /incomplete|count/
   );
+});
+
+test('runner: a path whose type changed (symlink to file) appears twice but counts once', async () => {
+  const typeChanged = [
+    file('AGENTS.md', { status: 'removed' }),
+    file('AGENTS.md', { status: 'added' }),
+    file('CLAUDE.md', { status: 'removed' }),
+    file('CLAUDE.md', { status: 'added' }),
+  ];
+  const request = async path =>
+    path.includes('/files?')
+      ? typeChanged
+      : { ...pr(), number: 1, head: event.pull_request.head, changed_files: 2 };
+  assert.equal((await runFleetRules({ event, request })).errors.length, 0);
 });
 
 test('workflow: GITHUB_TOKEN read-only, non-blocking warning step, source required aggregate includes fleet', () => {

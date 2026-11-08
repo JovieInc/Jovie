@@ -47,9 +47,8 @@ import shipping_attribution  # noqa: E402  (company merge provenance report)
 import stage_events  # noqa: E402  (jovie-stage-event/v1 rows for the stage collector)
 import ledger_archive  # noqa: E402  (bounded runs/ledger.jsonl)
 import throughput_sentinel  # noqa: E402
-import deploy_health  # noqa: E402  (production deploy failure and lag incidents, Jovie + LogYourBody)
-import release_evidence  # noqa: E402  (release-evidence job red on main; production build stale)
-import release_gates  # noqa: E402  (every controller-derived release gate red 2+ runs; new blocker reasons)
+import health_checks  # noqa: E402  (source certification and release health providers)
+import integration_probes  # noqa: E402  (synthetic probes of the Gem integrations fleet work depends on)
 
 COOL_OFF_S = 6 * 3600
 # High (P1), not Urgent, though under an Urgent prefix: a stale build is a lag signal, not an outage.
@@ -580,8 +579,15 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     stranded_claims = fleet_ledger.stranded(state, now)
     if not os.environ.get("LANES_SELFTEST"):
         fleet_ledger.record_ready(state, now, capacity_by_provider, eligible_by_provider)
+    # Evidence age is measured from when the observation COMPLETED, not when the pass started:
+    # a heavy pass (2026-10-31 gem: ~7 min observe, ~12 min total) used to stamp every report with
+    # its start time, so the ops-report contract (MAX_EVIDENCE_AGE_MS, JOV-8308) rejected every
+    # alert as stale-evidence and filed content-free "Root cause: UNKNOWN" stubs (JOV-10197..199).
+    observed_done = sample_clock()
     return {
         "now": now, "tick": tick, "tickAge": age_s(tick.get("at"), now),
+        "observationCompletedAt": observed_done,
+        "observationSeconds": round(observed_done - now, 1),
         "gateTimeouts24h": sum(1 for r in receipts if r.get("verdict") == "gate-timeout"),
         # Per-PR seat-queue time from run receipts: the measured input for gate-capacity
         # decisions (more seats vs a second host), not an assumption.
@@ -621,9 +627,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "fileOverlap": file_overlap.doctor_view(state),
         **automation_observation(host, lane, now),
         "outcomeQueue": read_json(state / "outcome-queue.json", {}),
-        "deployHealth": deploy_health.sample(state, now)[0] if not os.environ.get("LANES_SELFTEST") else None,
-        "releaseEvidence": release_evidence.sample(state, now)[0] if not os.environ.get("LANES_SELFTEST") else None,
-        "releaseGates": release_gates.sample(state, now)[0] if not os.environ.get("LANES_SELFTEST") else None,
+        "integrationProbes": integration_probes.observe(state, lane.HOST, now),
+        **health_checks.observe(state, now),
         "sentinel": throughput_sentinel.observe(
             state, now, receipts,
             {"inventoryBytes": getattr(lane, "REPAIR_INVENTORY_MAX_BYTES", 16 * 1024 * 1024)},
@@ -951,7 +956,13 @@ def provider_idle_with_qualified_work(obs: dict, provider: str) -> bool:
     account_ready = provider != "codex" or bool(account_state.get("unleasedAvailable"))
     slots, running = capacity.get("slots"), capacity.get("running")
     vacant = (type(slots) is int and type(running) is int and 0 <= running < slots)
-    return bool(pool and account_ready and vacant
+    # The pool is new-issue work. When autoscale closed this lane's intake by policy (WIP cap, CI
+    # runner backlog, quota deferral), that pool is unclaimable on purpose and a restart cannot
+    # change it: not an idle provider. 2026-10-26 -> 11-02 this false alarm on hyperagent (intake 0,
+    # no repair seats) exhausted the stay-up watchdog and kept the factory "unhealthy" for a week.
+    lane = (((obs.get("autoscale") or {}).get("lanes") or {}).get(provider) or {})
+    intake_closed = lane.get("intakeEffective") == 0 and bool(lane.get("intakeBlockers"))
+    return bool(pool and account_ready and vacant and not intake_closed
                 and provider in (tick.get("spawned") or []) and provider not in (tick.get("unhealthy") or []))
 
 
@@ -1020,10 +1031,13 @@ def codex_attribution(report: dict, now: float) -> dict:
         counts["unleasedAvailable"] += (free if type(free) is int and free >= 0 else int(not row["leased"])) \
             if row["available"] else 0
         if not row["available"]:
-            until = age_s(row.get("exhaustedUntil"), now)
+            # An account at or below the subsidy floor (codex_lane burn policy) is spent for new
+            # work until its window resets, like a recorded usage-limit hold.
+            floor_only = row.get("atFloor") is True and not row.get("exhaustedUntil")
+            until = age_s(row.get("floorUntil") if floor_only else row.get("exhaustedUntil"), now)
             if until is None or until >= 0:
                 return unknown
-            kind = row.get("lastKind")
+            kind = "limit" if floor_only else row.get("lastKind")
             if kind is not None and not isinstance(kind, str):
                 return unknown
             key = {"limit": "quotaBanked", "auth": "authCooldown", "rate": "rateCooldown"}.get(kind, "unknownCooldown")
@@ -1195,7 +1209,12 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["linear-app-credential-missing"] = (
             "no Jovie Lanes Linear app credential (~/.config/jovie-lanes/linear-app.env); lanes Linear "
             "access fails closed (no personal-key fallback) until the lanes host owner reinstalls it")
+    probed = obs.get("integrationProbes")
+    # A red probe of the same component is the more specific incident: one issue, not two.
+    same_incident = integration_probes.suppressed_silence(probed)
     for automation_id, row in sorted(((obs.get("automation") or {}).get("silent") or {}).items()):
+        if automation_id in same_incident:
+            continue
         age = row.get("ageS")
         alerts[f"automation-silent:{automation_id}"] = (
             f"registered automation {automation_id} left no fresh receipt at {row.get('location')} "
@@ -1205,10 +1224,9 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["automation-registry-unreadable"] = (
             f"origin/main:{AUTOMATION_REGISTRY} is unreadable ({watched.get('error') or 'missing or not JSONL'}); "
             "no Gem host-local automation receipt is being watched")
+    alerts.update(integration_probes.alerts(probed, obs.get("now") or time.time()))
     alerts.update(throughput_sentinel.judge(obs))
-    alerts.update(deploy_health.judge(obs.get("deployHealth"), obs.get("now") or time.time()))
-    alerts.update(release_evidence.judge(obs.get("releaseEvidence"), obs.get("now") or time.time()))
-    alerts.update(release_gates.judge(obs.get("releaseGates"), obs.get("now") or time.time()))
+    alerts.update(health_checks.judge(obs))
     # Closed loop, last hop: Validating issues owing an `outcome` receipt wait on the outcome
     # lane. Its daily budget exhausted (or the drain gone silent) with owed receipts older than
     # OUTCOME_OWED_MAX_S used to stall in silence for the rest of the UTC day.
@@ -1409,11 +1427,29 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     return alerts
 
 
+def last_good_epoch(key: str, obs: dict, now: float) -> float | None:
+    """Last proof of life before a condition, where the doctor knows it (start of incident:undetected)."""
+    if key.startswith("probe-red:"):
+        entry = ((obs.get("integrationProbes") or {}).get("probes") or {}).get(key.split(":", 1)[1]) or {}
+        value = entry.get("lastGoodAt")
+        return float(value) if type(value) in (int, float) else None
+    if key.startswith("automation-silent:"):
+        row = ((obs.get("automation") or {}).get("silent") or {}).get(key.split(":", 1)[1]) or {}
+        age = row.get("ageS")
+        return now - age if type(age) in (int, float) else None
+    return None
+
+
 def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_name: str) -> dict[str, dict]:
-    """Typed, generation-deduped evidence for every actionable doctor condition."""
+    """Typed, generation-deduped evidence for every actionable doctor condition.
+
+    Evidence timestamps use the observation COMPLETION stamp (obs['observationCompletedAt'])
+    so a report's freshness is its delivery lag, not the pass's own runtime."""
     prior = previous.get("conditions") or {}
     receipts: dict[str, dict] = {}
     now = float(obs["now"])
+    # Report freshness measures delivery lag from completed observation.
+    observed_at = float(obs.get("observationCompletedAt") or now)
     critical = ("tick-error", "linear-down", "spawn-exit", "no-landing", "disk-critical", "delivery-stalled", "install-lag-refused")
     actions = {
         "tick-error": "retry-dispatch-tick",
@@ -1447,7 +1483,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         generation = int(old.get("generation") or 0) + (0 if continuing else 1)
         provider = key.split(":", 1)[1] if ":" in key else None
         first = (float(old["firstObservedEpoch"]) if continuing and old.get("firstObservedEpoch") is not None
-                 else float((previous.get("providerIdleSince") or {}).get(provider, now)))
+                 else float((previous.get("providerIdleSince") or {}).get(provider, observed_at)))
         source_status = "unknown" if key == "linear-down" else "stale" if key == "hud-stale" else "degraded"
         if key == "delivery-stalled" and (obs.get("delivery") or {}).get("state") in ("unknown", "controller-held"):
             source_status = "unknown"
@@ -1467,6 +1503,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
                      obs.get("tickAge") if key.startswith(("tick-", "provider-", "spawn-")) else 0)
         action = ("dispatch-provider-workers" if key.startswith("provider-idle:") else
                   "retry-provider-health-probe" if key.startswith("provider-down:") else
+                  "bounded-unit-heal-then-verify-probe" if key.startswith("probe-red:") else
                   actions.get(key, "reconcile-control-plane-condition"))
         affected = resources.get(key) or ([provider] if provider else [key])
         receipts[key] = {
@@ -1481,8 +1518,9 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
             "affectedResources": affected,
             "firstObservedAt": epoch_iso(first),
             "firstObservedEpoch": first,
+            "lastGoodEpoch": old.get("lastGoodEpoch") if continuing else last_good_epoch(key, obs, now),
             "source": {"producer": "scripts/lanes/doctor.py", "status": source_status,
-                       "observedAt": epoch_iso(now), "freshnessSeconds": freshness},
+                       "observedAt": epoch_iso(observed_at), "freshnessSeconds": freshness},
             "deadlineAt": epoch_iso(first + ESCALATION_S),
             "recovery": {"action": action, "outcome": "failed" if key.startswith("provider-idle:") or key == "spawn-exit" else "retrying"},
             "nextAction": "wake-summer-via-linear-or-independent-status-feed",
@@ -1494,7 +1532,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
             if key not in receipts:
                 receipts[key] = old
             continue
-        receipts[key] = {**old, "state": "resolved", "resolvedAt": epoch_iso(now),
+        receipts[key] = {**old, "state": "resolved", "resolvedAt": epoch_iso(observed_at),
                          "nextAction": "none", "terminalOutcome": "health-proven"}
         if key == "delivery-stalled":
             delivery = obs.get("delivery") or {}
@@ -1507,8 +1545,8 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
                   "workers-without-completions": ("busy", "lastWorkAge", "leaseAgesComplete", "oldestLeaseAge")}
         if key in fields:
             receipts[key]["source"] = {**old.get("source", {}), "status": "healthy",
-                                       "observedAt": epoch_iso(now), "freshnessSeconds": 0}
-            receipts[key]["recoveryEvidence"] = {"observedAt": epoch_iso(now),
+                                       "observedAt": epoch_iso(observed_at), "freshnessSeconds": 0}
+            receipts[key]["recoveryEvidence"] = {"observedAt": epoch_iso(observed_at),
                                                   **{field: obs.get(field) for field in fields[key]}}
     return receipts
 
@@ -2046,7 +2084,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
         obs.get("now") or time.time())
     return {"schema": "symphony-lanes-status/v1", "at": now_iso(), "host": lane.HOST, "release": tick.get("release"),
             "fileOverlap": overlap, "linear": obs.get("linearSync") or tick.get("linear"),
-            "deployHealth": deploy_health.feed_block(obs.get("deployHealth"), obs.get("now") or time.time()),
+            **health_checks.feed(obs),
             "ownership": obs.get("ownership"),
             "lanes": counts, "providerPayloads": obs.get("providerPayloads"), "running": sum(c["running"] for c in counts.values()),
             "idle": sum(max(0, c["slots"] - c["running"]) for c in counts.values()),
@@ -2067,6 +2105,9 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "gateWaitMaxS24h": obs.get("gateWaitMaxS24h"),
             "codexAvailable": account_state.get("unleasedAvailable"),
             "codexAttribution": account_state,
+            # Burn-before-reset ledger (codex_lane.subsidy_ledger): per-pool remaining %, reset,
+            # banked resets, burn order, the open reset proposal card and window-use metrics.
+            "subsidyLedger": (obs.get("codex") or {}).get("subsidyLedger"),
             "alerts": alerts, "conditions": conditions or {},
             "delivery": obs.get("delivery"),
             "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
@@ -2149,6 +2190,15 @@ STAGE_EVENTS_NAME = "stage-events.ndjson"
 PUBLIC_OVERLAP_TOP = 10
 PUBLIC_FEED_WARN_RATIO = 0.70
 PUBLIC_REMEDIATION_FIELDS = ("state", "issue", "cls", "lane")
+
+# Top-level heartbeat paths hosted dead-man receipts read straight from the lanes gist
+# (canon/automation-registry.jsonl, live json-timestamp entries on this feed): gem:lanes-tick
+# reads `at`, gem:deploy-health reads `deployHealth.observedAt`/`deployHealth.healthy`, and the
+# production-promotion silence budget reads `deployHealth.limits`. The oversize refusal keeps
+# them: during the 2026-10-25 13:50-17:41Z oversize window it dropped every heartbeat path and
+# both gist-backed entries false-alerted "heartbeat-source-missing" while the tick kept
+# publishing on schedule (JOV-9115). A registry test pins this list against new gist receipts.
+HEARTBEAT_FEED_KEYS = ("at", "deployHealth")
 
 
 def _compact_overlap(public: dict) -> None:
@@ -2284,12 +2334,26 @@ def public_status_projection(feed: dict, full_text: str) -> str:
         return text
     # Never trim operational ownership/hold/attempt arrays to pretend they fit.
     # Existing schema-checking readers reject this as unknown, not an empty fleet.
-    return json.dumps({
-        "schema": "symphony-lanes-status-unavailable/v1", "status": "unavailable",
-        "reason": "essential-public-feed-exceeds-byte-limit",
-        "requiredBytes": len(text.encode("utf-8")), "maxBytes": PUBLIC_FEED_MAX_BYTES,
-        "fullEvidence": evidence,
-    }, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    def unavailable():
+        return {
+            "schema": "symphony-lanes-status-unavailable/v1", "status": "unavailable",
+            "reason": "essential-public-feed-exceeds-byte-limit",
+            "requiredBytes": len(text.encode("utf-8")), "maxBytes": PUBLIC_FEED_MAX_BYTES,
+            "fullEvidence": evidence, "at": evidence["at"],
+        }
+
+    def fits(payload):
+        return len(json.dumps(payload, ensure_ascii=False, separators=(",", ":"),
+                              allow_nan=False).encode("utf-8")) <= PUBLIC_FEED_MAX_BYTES
+
+    # Carry each heartbeat block that fits whole: a fat operational feed still reads as its
+    # real heartbeats to the hosted dead-man, not "heartbeat-source-missing" (JOV-9115); a
+    # heartbeat block too big to carry is refused whole, never trimmed to a half reading.
+    payload = unavailable()
+    for key in HEARTBEAT_FEED_KEYS:
+        if key != "at" and key in public and fits({**payload, key: public[key]}):
+            payload[key] = public[key]
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
 
 
 def _status_gist_raw_readback(stored: dict, name: str, expected: str, deadline: float) -> None:
@@ -2580,6 +2644,10 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         except Exception:
             tracker = None
     result = reconcile(alerts, previous, tracker, obs["now"], conditions)
+    try:  # incident stage events (detected, filed, cleared); a lost row only drops a sample
+        stage_events.journal_incidents(host.state, previous, result, lane.HOST, obs["now"])
+    except Exception:  # noqa: BLE001
+        pass
     if getattr(tracker, "linear", None) is not None:
         try:
             factory_signals.write(host.state, factory_signals.sentinel_signals(host.state))
