@@ -25,6 +25,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import fix_red_size_split
 import migration_renumber
 import remediation
 from atomic_state import atomic_write_text
@@ -32,12 +33,12 @@ from fix_red_source_edits import snap_added_conservative_spacing, strip_added_le
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, SPLIT_SIZE, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent")
+    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "split-size-500", "agent")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE})
+    REGISTER_DOMAIN, ATOMIC_WRITE, SPLIT_SIZE})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -78,6 +79,17 @@ SPACING_RATCHET_TEXT = re.compile(
 # raise the ceiling. Checked before platform text: the count can look like HTTP 5xx.
 CACHE_SURFACE_TEXT = re.compile(
     r"legacy Cache Components surface grew to \d+ \(maximum \d+\)")
+# Company guards prints `grew A -> B` for a file already in the shrink-only
+# baseline. That is main's shrink or the diff-scoped pin, not an unbaselined
+# split. A red required check reports BLOCKED, so the BEHIND fallback never
+# runs. Sync main. size-500-new is matched first, so a log that also names an
+# unbaselined file still splits.
+SIZE_BASELINE_GREW = re.compile(
+    r"size-500: [A-Za-z0-9_./-]+: grew \d+ -> \d+")
+# node:test failure glyph. A passing line with the same title must not match.
+# Checked before platform text: the unit log echoes a fixture rate-limit line.
+COPY_REGISTRY_GAP = re.compile(
+    r"✖ committed ID registry covers every extracted row")
 # Source Validation's merge probe. Deterministic unions:
 # - NARROWED vitest command in scripts/preflight-changed.mjs
 # - shell && chains (node --test or vitest paths, plus added prefixes)
@@ -131,6 +143,12 @@ SIGNATURES = (
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
     # Inventory assertion outranks quota/infra noise echoed in the same log.
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
+    # Before quota and platform text: those logs echo a rate limit beside the
+    # real size or registry error. Grew lines are baselined. An unbaselined
+    # size-500 line still wins when both are present.
+    ("size-500-new", fix_red_size_split.SIZE_500_NEW, SPLIT_SIZE),
+    ("size-baseline-grew", SIZE_BASELINE_GREW, SYNC_MAIN),
+    ("copy-registry-gap", COPY_REGISTRY_GAP, SYNC_MAIN),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
@@ -189,8 +207,13 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         hit = next(((cls, action) for cls, pattern, action in SIGNATURES if pattern.search(text)), None)
         per_check.append(hit or ("other", AGENT))
     classes = {cls for cls, _ in per_check}
+    actions = {action for _, action in per_check}
     if len(classes) == 1:
         cls, action = per_check[0]
+    elif classes and actions == {SYNC_MAIN}:
+        # Different sync-main classes are one main lag. GitHub reports BLOCKED
+        # while required checks are red, so the BEHIND override below misses them.
+        cls, action = BEHIND_CLASS, SYNC_MAIN
     elif classes:
         cls, action = "mixed", AGENT
     else:
@@ -213,6 +236,8 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         files = sorted(set(files))
     elif cls == "domain-write":
         files = sorted(_domain_write_hits("\n".join(logs.get(name) or "" for name in names)))
+    elif cls == "size-500-new":
+        files = fix_red_size_split.paths_from_log("\n".join(logs.get(name) or "" for name in names))
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
             "checks": names, "signature": signature, "files": files}
 

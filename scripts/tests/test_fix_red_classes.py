@@ -26,6 +26,8 @@ class ClassifyTest(unittest.TestCase):
             "Error: legacy Cache Components surface grew to 242 (maximum 241):": ("cache-surface", "strip-cache-exports"),
             "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.": ("spacing-scale", "snap-spacing"),
             "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence": ("census-certification", "sync-main"),
+            "size-500: scripts/ci-fast-lanes.mjs: grew 3516 -> 3518": ("size-baseline-grew", "sync-main"),
+            "✖ committed ID registry covers every extracted row (12ms)": ("copy-registry-gap", "sync-main"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "atomic-write"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
             "AssertionError: expected 1": ("other", "agent"),
@@ -97,6 +99,39 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual((blocked["cls"], blocked["action"]), ("census-certification", "sync-main"))
         behind = classes.classify(pr("Source Validation", merge="BEHIND"), {"Source Validation": log})
         self.assertEqual((behind["cls"], behind["action"]), ("census-certification", "sync-main"))
+
+    def test_baselined_size_growth_and_registry_gap_sync_main_while_blocked(self):
+        guards = (
+            "size-500: apps/web/lib/chat/system-prompt.ts: grew 512 -> 514\n"
+            "size-500: scripts/ci-fast-lanes.mjs: grew 3516 -> 3518\n"
+            "company-guards: FAIL (2)\n"
+        )
+        units = (
+            "✔ does not fail over for another quota class: API rate limit exceeded for user ID 123.\n"
+            "✖ failing tests:\n"
+            "✖ committed ID registry covers every extracted row (290.906772ms)\n"
+        )
+        grew_only = classes.classify(pr("Company guards", merge="BLOCKED"), {"Company guards": guards})
+        self.assertEqual((grew_only["cls"], grew_only["action"]), ("size-baseline-grew", "sync-main"))
+        both = classes.classify(
+            pr("Company guards", "Affected Unit Tests (4/4)", merge="BLOCKED"),
+            {"Company guards": guards, "Affected Unit Tests (4/4)": units},
+        )
+        self.assertEqual((both["cls"], both["action"]), ("stale-branch", "sync-main"))
+        passing = (
+            "✔ committed ID registry covers every extracted row\n"
+            "API rate limit exceeded for user ID 123\n"
+        )
+        fixture = classes.classify(
+            pr("Affected Unit Tests (4/4)", merge="BLOCKED"),
+            {"Affected Unit Tests (4/4)": passing},
+        )
+        self.assertEqual(fixture["action"], "rerun")
+        mixed = classes.classify(
+            pr("Company guards", "Affected Unit Tests (4/4)", merge="BLOCKED"),
+            {"Company guards": guards, "Affected Unit Tests (4/4)": "AssertionError: expected 1\n"},
+        )
+        self.assertEqual((mixed["cls"], mixed["action"]), ("mixed", "agent"))
 
     def test_missing_changelog_metadata_stamps_and_a_quota_mask_stamps_only_a_bare_body(self):
         missing = "Error: Customer outcome decision missing or invalid (missing-metadata)."

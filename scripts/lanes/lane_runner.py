@@ -65,6 +65,7 @@ import hyperagent_repair  # noqa: E402
 import migration_renumber  # noqa: E402  (no-model fix for migration number collisions)
 import fix_red_rewrite  # noqa: E402
 import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
+import fix_red_size_split  # noqa: E402  (split a new vitest file that crossed 500 lines)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
 import machine_gap  # noqa: E402
 import slot_yield  # noqa: E402  (slot ceilings from measured merged-per-dollar)  (abstraction gate: build the machine on the 3rd repeat or a costly task)
@@ -151,7 +152,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py", "scripts/tests/test_linear_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_qualification_guard.py",
-              "scripts/tests/test_git_housekeeping.py",
+              "scripts/tests/test_git_housekeeping.py", "scripts/tests/test_fix_red_size_split.py",
               "scripts/tests/test_continuity_clock.py",
               "scripts/tests/test_worktree_sweep.py", "scripts/tests/test_service_census.py",
               "scripts/tests/test_worktree_pool.py",
@@ -7167,6 +7168,10 @@ def strip_cache_exports_fix(host: Host, pr: dict, route: dict, worktree: Path, l
         "fix(ci): drop added legacy cache segment exports", "stripped-cache-exports", "strippedFiles")
 
 
+def split_size_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """Split an unbaselined vitest file that crossed 500 lines, then commit and push."""
+    return fix_red_size_split.apply(sh, pr, worktree, log, receipt, (route or {}).get("files") or [])
+
 
 def claim_route(host: Host, pr: dict, action: str) -> bool:
     """True once per (PR, head, action): a deterministic route is tried once, then the model gets the head."""
@@ -8202,7 +8207,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                          fix_red_classes.SNAP_SPACING: snap_spacing_fix,
                          fix_red_classes.STRIP_CACHE: strip_cache_exports_fix,
                          fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix,
-                         fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix}.get((route or {}).get("action"))
+                         fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix,
+                         fix_red_classes.SPLIT_SIZE: split_size_fix}.get((route or {}).get("action"))
                 agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
                 agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
