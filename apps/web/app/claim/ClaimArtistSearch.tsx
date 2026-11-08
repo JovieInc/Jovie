@@ -169,8 +169,14 @@ export function ClaimArtistSearch() {
         />
       </div>
 
-      <div aria-live='polite' className='min-h-6'>
-        {status === 'loading' ? (
+      <div
+        aria-live='polite'
+        aria-busy={status === 'loading'}
+        className='min-h-6'
+      >
+        {/* With results on screen, a new search dims them in place instead of
+            adding a line above them, so the rows and the button never jump. */}
+        {status === 'loading' && results.length === 0 ? (
           <p className='text-xs text-tertiary-token'>Searching…</p>
         ) : null}
         {status === 'error' ? (
@@ -184,7 +190,10 @@ export function ClaimArtistSearch() {
           </p>
         ) : null}
         {results.length > 0 ? (
-          <ul className='space-y-2' data-testid='claim-artist-results'>
+          <ul
+            className={`space-y-2 transition-opacity duration-subtle ${status === 'loading' ? 'opacity-60' : ''}`}
+            data-testid='claim-artist-results'
+          >
             {results.map(artist => (
               <ArtistRow key={artist.id} artist={artist} />
             ))}

@@ -83,6 +83,34 @@ describe('claim artist search rows', () => {
     expect(taken).toHaveTextContent('Claimed');
   });
 
+  it('keeps the rows in place while a new search runs', async () => {
+    await searchFor('artist');
+    const before = screen.getByTestId('claim-artist-results');
+    vi.mocked(globalThis.fetch).mockImplementation(
+      () => new Promise<Response>(() => undefined)
+    );
+    fireEvent.change(screen.getByTestId('claim-artist-search'), {
+      target: { value: 'artists' },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+    // No status line is inserted above the rows; they dim where they are.
+    expect(screen.queryByText('Searching…')).toBeNull();
+    const list = screen.getByTestId('claim-artist-results');
+    expect(list).toBe(before);
+    expect(list.parentElement).toHaveAttribute('aria-busy', 'true');
+    expect(list.className).toContain('opacity-60');
+  });
+
+  it('says it is searching before the first results arrive', async () => {
+    vi.mocked(globalThis.fetch).mockImplementation(
+      () => new Promise<Response>(() => undefined)
+    );
+    await searchFor('artist');
+    expect(screen.getByText('Searching…')).toBeInTheDocument();
+  });
+
   it('uses a readable avatar size', async () => {
     await searchFor('artist');
     const row = screen.getAllByTestId('claim-artist-option')[0];
