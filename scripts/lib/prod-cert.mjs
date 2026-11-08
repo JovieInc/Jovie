@@ -338,6 +338,7 @@ export function stepChecks(
         value: step.value,
         unit: step.unit,
         sampleSize: step.sampleSize ?? 1,
+        ...(Array.isArray(step.samples) ? { samples: step.samples } : {}),
       });
       continue;
     }

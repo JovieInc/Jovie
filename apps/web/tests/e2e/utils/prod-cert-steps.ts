@@ -212,60 +212,108 @@ export function recordCertCapabilities(
 }
 
 /**
- * Jank evidence (truthful certification, 2026-11-08). Reads the current
- * document's layout shifts and long animation frames since it loaded
- * (buffered observers, so it works even when telemetry started after
- * navigation) and records them as `jank.*` observations. scripts/prod-cert.mjs
- * fails the surface past CLS 0.1 or a frame blocked over 200 ms
- * (scripts/lib/prod-cert-truth.mjs JANK_LIMITS). CLS here is the plain sum of
- * unexpected shifts, stricter than the session-window CLS of Web Vitals.
+ * Reads the current document's layout shifts and long animation frames since
+ * it loaded (buffered observers, so it works even when telemetry started
+ * after navigation). Runs in the page, so it must stay self-contained.
+ */
+const measureJank = () =>
+  new Promise<{ cls: number; worstFrameMs: number; frames: boolean }>(
+    resolve => {
+      const types = PerformanceObserver.supportedEntryTypes ?? [];
+      const out = {
+        cls: 0,
+        worstFrameMs: 0,
+        frames: types.includes('long-animation-frame'),
+      };
+      let pending = 2;
+      const done = () => {
+        pending -= 1;
+        if (pending === 0) resolve(out);
+      };
+      const watch = (type: string, take: (entry: PerformanceEntry) => void) => {
+        if (!types.includes(type)) return done();
+        const observer = new PerformanceObserver(list =>
+          list.getEntries().forEach(take)
+        );
+        observer.observe({ type, buffered: true });
+        setTimeout(() => {
+          observer.takeRecords().forEach(take);
+          observer.disconnect();
+          done();
+        }, 50);
+      };
+      watch('layout-shift', entry => {
+        const shift = entry as PerformanceEntry & {
+          value: number;
+          hadRecentInput: boolean;
+        };
+        if (!shift.hadRecentInput) out.cls += shift.value;
+      });
+      watch('long-animation-frame', entry => {
+        out.worstFrameMs = Math.max(out.worstFrameMs, entry.duration);
+      });
+    }
+  );
+
+/** scripts/lib/prod-cert-truth.mjs JANK_LIMITS['jank.worst-frame-ms'].max */
+const FRAME_LIMIT_MS = 200;
+/** Loads judged per frozen frame, as the product crawl does (ready-gate.mjs). */
+export const FRAME_SAMPLES = 3;
+
+/** Median of the samples; the lower middle for an even count. */
+export function medianMs(samples: readonly number[]): number {
+  const sorted = [...samples].sort((a, b) => a - b);
+  return sorted[Math.floor((sorted.length - 1) / 2)];
+}
+
+/**
+ * One more cold load of `url` in a new tab of the same browser context (same
+ * sign-in, HTTP cache off), returning its longest frame, or null when the
+ * load or the measurement fails.
+ */
+async function coldLoadWorstFrame(
+  currentPage: Page,
+  url: string
+): Promise<number | null> {
+  const context = currentPage.context();
+  const tab = await context.newPage();
+  try {
+    // A warm-cache repeat would flatter the page, so a browser that cannot
+    // turn the cache off (not Chromium) takes no repeat loads.
+    const cdp = await context.newCDPSession(tab);
+    await cdp.send('Network.setCacheDisabled', { cacheDisabled: true });
+    await tab.goto(url, { waitUntil: 'load', timeout: 30_000 });
+    await tab
+      .waitForLoadState('networkidle', { timeout: 5_000 })
+      .catch(() => undefined);
+    const jank = await tab.evaluate(measureJank);
+    return jank.frames ? jank.worstFrameMs : null;
+  } catch {
+    return null;
+  } finally {
+    await tab.close().catch(() => undefined);
+  }
+}
+
+/**
+ * Jank evidence (truthful certification, 2026-11-08). Records the page's
+ * layout shifts and long animation frames as `jank.*` observations.
+ * scripts/prod-cert.mjs fails the surface past CLS 0.1 or a frame blocked
+ * over 200 ms (scripts/lib/prod-cert-truth.mjs JANK_LIMITS). CLS here is the
+ * plain sum of unexpected shifts, stricter than the session-window CLS of
+ * Web Vitals, and is judged on this load.
+ *
+ * Frame timing on a shared CI runner is noisy (Nov 8: one cert load of the
+ * profile measured 376.6 ms, the crawl's repeat loads 106 and 176 ms). A
+ * frame over the limit is measured on two more cold loads and judged on the
+ * median of three, like the product crawl; every sample, the worst included,
+ * stays on the receipt. If a repeat load fails, the first load's number
+ * stands.
  */
 async function recordJank(currentPage: Page, surface: string): Promise<void> {
   if (!process.env.PROD_CERT_STEPS_FILE) return;
   try {
-    const jank = await currentPage.evaluate(
-      () =>
-        new Promise<{ cls: number; worstFrameMs: number; frames: boolean }>(
-          resolve => {
-            const types = PerformanceObserver.supportedEntryTypes ?? [];
-            const out = {
-              cls: 0,
-              worstFrameMs: 0,
-              frames: types.includes('long-animation-frame'),
-            };
-            let pending = 2;
-            const done = () => {
-              pending -= 1;
-              if (pending === 0) resolve(out);
-            };
-            const watch = (
-              type: string,
-              take: (entry: PerformanceEntry) => void
-            ) => {
-              if (!types.includes(type)) return done();
-              const observer = new PerformanceObserver(list =>
-                list.getEntries().forEach(take)
-              );
-              observer.observe({ type, buffered: true });
-              setTimeout(() => {
-                observer.takeRecords().forEach(take);
-                observer.disconnect();
-                done();
-              }, 50);
-            };
-            watch('layout-shift', entry => {
-              const shift = entry as PerformanceEntry & {
-                value: number;
-                hadRecentInput: boolean;
-              };
-              if (!shift.hadRecentInput) out.cls += shift.value;
-            });
-            watch('long-animation-frame', entry => {
-              out.worstFrameMs = Math.max(out.worstFrameMs, entry.duration);
-            });
-          }
-        )
-    );
+    const jank = await currentPage.evaluate(measureJank);
     // The contract ledger keys on contract and dimension, so the dimension
     // names the surface: one surface's jank must not overwrite another's.
     recordCertObservation({
@@ -276,12 +324,23 @@ async function recordJank(currentPage: Page, surface: string): Promise<void> {
       unit: 'score',
     });
     if (!jank.frames) return;
+    const samples = [jank.worstFrameMs];
+    if (jank.worstFrameMs > FRAME_LIMIT_MS) {
+      const url = currentPage.url();
+      for (let n = 1; n < FRAME_SAMPLES; n += 1) {
+        const again = await coldLoadWorstFrame(currentPage, url);
+        if (again === null) break;
+        samples.push(again);
+      }
+    }
+    const judged = samples.length === FRAME_SAMPLES;
     recordCertObservation({
       surface,
       contractId: 'jank.worst-frame-ms',
       dimension: `responsiveness:${surface}`,
-      value: jank.worstFrameMs,
+      value: judged ? medianMs(samples) : jank.worstFrameMs,
       unit: 'ms',
+      ...(judged ? { sampleSize: samples.length, samples } : {}),
     });
   } catch {
     // Best-effort evidence: a page that cannot be evaluated records nothing.
@@ -321,6 +380,10 @@ export function recordCertObservation(observation: {
   readonly dimension: string;
   readonly value: number;
   readonly unit: string;
+  /** Loads the value was judged on, when more than one. */
+  readonly sampleSize?: number;
+  /** Every load's value, the worst included, when more than one. */
+  readonly samples?: readonly number[];
 }): void {
   const file = process.env.PROD_CERT_STEPS_FILE;
   if (!file || !Number.isFinite(observation.value)) return;

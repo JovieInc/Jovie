@@ -179,6 +179,36 @@ describe('quality observations', () => {
       []
     );
   });
+
+  it('keeps every load of a frame judged on several loads', async () => {
+    const steps = [
+      {
+        kind: 'observation',
+        surface: 'landing',
+        contractId: 'jank.worst-frame-ms',
+        dimension: 'responsiveness:landing',
+        value: 176,
+        unit: 'ms',
+        sampleSize: 3,
+        samples: [376.6, 106, 176],
+      },
+    ];
+    const { receipts } = await runProductionCertification({
+      fetchImpl: fakeFetch(),
+      steps,
+      authStatus: 'passed',
+    });
+    expect(receipts.find(r => r.surface === 'landing').observations).toEqual([
+      {
+        contractId: 'jank.worst-frame-ms',
+        dimension: 'responsiveness:landing',
+        value: 176,
+        unit: 'ms',
+        sampleSize: 3,
+        samples: [376.6, 106, 176],
+      },
+    ]);
+  });
 });
 
 describe('fileSurfaceIssues', () => {

@@ -143,24 +143,34 @@ export function strangerChecks({ origin, fetchImpl, run }) {
 /**
  * Turn jank observations into checks. Unknown contracts are ignored; a
  * missing measurement is not a pass, but it is also not a jank failure, so
- * nothing is emitted for it here.
- * @param {{ contractId: string, value: number, unit?: string }[]} observations
+ * nothing is emitted for it here. A frame measured on several loads is judged
+ * on its median (apps/web/tests/e2e/utils/prod-cert-steps.ts), and the summary
+ * still names the worst load so an outlier stays visible.
+ * @param {{ contractId: string, value: number, unit?: string, samples?: number[] }[]} observations
  */
 export function jankChecks(observations = [], at = new Date().toISOString()) {
   const worst = new Map();
   for (const o of observations) {
     if (!JANK_LIMITS[o.contractId] || !Number.isFinite(o.value)) continue;
-    worst.set(o.contractId, Math.max(worst.get(o.contractId) ?? 0, o.value));
+    const held = worst.get(o.contractId);
+    if (!held || o.value > held.value) worst.set(o.contractId, o);
   }
-  return [...worst].map(([contractId, value]) => {
+  const round = n => Math.round(n * 1000) / 1000;
+  return [...worst].map(([contractId, o]) => {
     const { max, what } = JANK_LIMITS[contractId];
-    const shown = Math.round(value * 1000) / 1000;
+    const samples = Array.isArray(o.samples)
+      ? o.samples.filter(Number.isFinite)
+      : [];
+    const across =
+      samples.length > 1
+        ? ` (middle of ${samples.length} loads; worst ${round(Math.max(...samples))})`
+        : '';
     return {
       id: contractId,
-      status: value > max ? 'failed' : 'passed',
+      status: o.value > max ? 'failed' : 'passed',
       startedAt: at,
       endedAt: at,
-      summary: `${what} ${shown} (limit ${max})`,
+      summary: `${what} ${round(o.value)}${across} (limit ${max})`,
     };
   });
 }

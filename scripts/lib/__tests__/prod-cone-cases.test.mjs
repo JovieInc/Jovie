@@ -388,6 +388,34 @@ describe('truthful certification: a stranger, no token, no canary', () => {
     ]);
     expect(jankChecks([])).toEqual([]);
   });
+
+  it('judges a frame measured on three loads by its median and names the worst load', () => {
+    const [noisy] = jankChecks(
+      [
+        {
+          contractId: 'jank.worst-frame-ms',
+          value: 176,
+          samples: [376.6, 106, 176],
+        },
+      ],
+      'T'
+    );
+    expect(noisy.status).toBe('passed');
+    expect(noisy.summary).toBe(
+      'longest blocked frame (ms) 176 (middle of 3 loads; worst 376.6) (limit 200)'
+    );
+    const [slow] = jankChecks(
+      [
+        {
+          contractId: 'jank.worst-frame-ms',
+          value: 240,
+          samples: [260, 240, 190],
+        },
+      ],
+      'T'
+    );
+    expect(slow.status).toBe('failed');
+  });
 });
 
 describe('design first: every Golden Path screen needs a Pen frame', () => {
