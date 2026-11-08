@@ -4,7 +4,11 @@ import { env } from '@/lib/env-server';
 import { resolveHudGithubToken } from '@/lib/github/hud-token.server';
 import type { ShippingClock, ShippingStateProjection } from './contract';
 import { systemClock } from './envelope';
-import { createLiveShippingStateReaders, defaultLiveIo } from './live';
+import {
+  createLiveShippingStateReaders,
+  defaultLiveIo,
+  readSearchCounts,
+} from './live';
 import { ageShippingStateProjection, unknownProjection } from './project';
 import {
   getLastKnownShippingState,
@@ -14,18 +18,33 @@ import {
 
 export const CONFIGURED_SHIPPING_STATE_MAX_AGE_MS = 6_000;
 
-const configuredReaders = createLiveShippingStateReaders(
-  defaultLiveIo({
-    githubToken: env.HUD_GITHUB_TOKEN,
-    getGithubToken: () => resolveHudGithubToken(),
-    githubOwner: env.HUD_GITHUB_OWNER,
-    githubRepo: env.HUD_GITHUB_REPO,
-    gemBridge:
-      env.HUD_GEM_BRIDGE_URL && env.HUD_GEM_BRIDGE_TOKEN
-        ? { url: env.HUD_GEM_BRIDGE_URL, token: env.HUD_GEM_BRIDGE_TOKEN }
-        : undefined,
-  })
-);
+const configuredIo = defaultLiveIo({
+  githubToken: env.HUD_GITHUB_TOKEN,
+  getGithubToken: () => resolveHudGithubToken(),
+  githubOwner: env.HUD_GITHUB_OWNER,
+  githubRepo: env.HUD_GITHUB_REPO,
+  gemBridge:
+    env.HUD_GEM_BRIDGE_URL && env.HUD_GEM_BRIDGE_TOKEN
+      ? { url: env.HUD_GEM_BRIDGE_URL, token: env.HUD_GEM_BRIDGE_TOKEN }
+      : undefined,
+});
+
+const configuredReaders = createLiveShippingStateReaders(configuredIo);
+
+/** GitHub owner the configured readers count merges for. */
+export function configuredGithubOwner(): string | null {
+  return configuredIo.githubOwner?.trim() || null;
+}
+
+/**
+ * Aliased search counts through the configured token and the same per-IO
+ * rate-limit backoff as the shipping readers. Company history sync only.
+ */
+export function readConfiguredSearchCounts(
+  queries: Readonly<Record<string, string>>
+) {
+  return readSearchCounts(configuredIo, queries);
+}
 
 /**
  * Compose the installed authorities through the publisher's reader-keyed,

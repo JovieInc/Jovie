@@ -28,6 +28,7 @@ const {
   mockRefreshCompanyStateCache,
   mockApplySummerCardDefaults,
   mockRefreshProofStats,
+  mockSyncCompanyHistory,
   mockRunReleaseEmailCanary,
   mockGetReleaseEmailCanaryStatus,
 } = vi.hoisted(() => ({
@@ -60,6 +61,7 @@ const {
   mockRefreshCompanyStateCache: vi.fn(),
   mockApplySummerCardDefaults: vi.fn(),
   mockRefreshProofStats: vi.fn(),
+  mockSyncCompanyHistory: vi.fn(),
 }));
 
 vi.mock('@/lib/admin/ops-queries', () => ({
@@ -78,6 +80,10 @@ vi.mock('@/lib/acquisition/eligibility.server', () => ({
 
 vi.mock('@/lib/ovie/company-state.server', () => ({
   refreshCompanyStateCache: mockRefreshCompanyStateCache,
+}));
+
+vi.mock('@/lib/ovie/company-history/configured.server', () => ({
+  syncConfiguredCompanyHistory: mockSyncCompanyHistory,
 }));
 
 vi.mock('@/lib/proof-stats/publish.server', () => ({
@@ -549,6 +555,40 @@ describe('GET /api/cron/frequent', () => {
     const later = await (await call()).json();
     expect(later.results.proofStats).toEqual({ success: true, skipped: true });
     expect(mockRefreshProofStats).toHaveBeenCalledOnce();
+  });
+
+  it('fills company history in the hourly slot only', async () => {
+    mockSyncCompanyHistory.mockResolvedValue({
+      at: '2026-03-24T10:00:00.000Z',
+      requested: 8,
+      written: 8,
+      requests: 1,
+      status: 'ok',
+      reason: null,
+    });
+    const { GET } = await import('@/app/api/cron/frequent/route');
+    const call = () =>
+      GET(
+        new Request('http://localhost/api/cron/frequent', {
+          headers: { Authorization: 'Bearer test-secret' },
+        })
+      );
+
+    vi.setSystemTime(new Date('2026-03-24T10:00:00.000Z'));
+    const hourly = await (await call()).json();
+    expect(hourly.results.companyHistory).toMatchObject({
+      success: true,
+      data: { written: 8, requests: 1, status: 'ok' },
+    });
+    expect(mockSyncCompanyHistory).toHaveBeenCalledOnce();
+
+    vi.setSystemTime(new Date('2026-03-24T10:30:00.000Z'));
+    const later = await (await call()).json();
+    expect(later.results.companyHistory).toEqual({
+      success: true,
+      skipped: true,
+    });
+    expect(mockSyncCompanyHistory).toHaveBeenCalledOnce();
   });
 
   it('returns 207 and classifies an exhausted Redis quota as a failed canary', async () => {

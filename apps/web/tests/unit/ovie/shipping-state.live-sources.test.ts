@@ -22,6 +22,7 @@ import {
   readLanesStatus,
   readLiveBuild,
   readMerges,
+  readSearchCounts,
   readSummerRuntime,
   SOURCE_CACHE_TTL_MS,
 } from '@/lib/ovie/shipping-state/live';
@@ -949,5 +950,62 @@ describe('configured readers', () => {
     expect(projection.delivery.production.sha).toBeNull();
     expect(projection.delivery.summer.availability).toBeNull();
     expect(projectDelivery(projection.sources)).toEqual(projection.delivery);
+  });
+});
+
+describe('readSearchCounts', () => {
+  it('reads every alias in one GraphQL request', async () => {
+    const live = io(async (_url, init) => {
+      const { query, variables } = graphqlBody(init);
+      expect(query).toContain('q0:search(type:ISSUE,query:$q0,first:1)');
+      expect(query).toContain('$q1:String!');
+      expect(variables).toEqual({ q0: 'org:JovieInc is:pr', q1: 'repo:x' });
+      return json({ data: { q0: { issueCount: 97 }, q1: { issueCount: 0 } } });
+    });
+    await expect(
+      readSearchCounts(live, { q0: 'org:JovieInc is:pr', q1: 'repo:x' })
+    ).resolves.toEqual({ status: 'ok', counts: { q0: 97, q1: 0 } });
+    expect(live.fetch).toHaveBeenCalledOnce();
+  });
+
+  it('refuses bad aliases before any request', async () => {
+    const live = io(async () => json({}));
+    for (const queries of [
+      {},
+      { 'q-0': 'x' },
+      Object.fromEntries(Array.from({ length: 61 }, (_, i) => [`q${i}`, 'x'])),
+    ]) {
+      await expect(readSearchCounts(live, queries)).resolves.toEqual({
+        status: 'unavailable',
+        reason: 'invalid-search-aliases',
+      });
+    }
+    expect(live.fetch).not.toHaveBeenCalled();
+  });
+
+  it('is unavailable on a provider error, a malformed count or a throw', async () => {
+    await expect(
+      readSearchCounts(
+        io(async () => json({}, 502)),
+        { q0: 'x' }
+      )
+    ).resolves.toEqual({ status: 'unavailable', reason: 'github-unavailable' });
+    await expect(
+      readSearchCounts(
+        io(async () => json({ data: { q0: { issueCount: -1 } } })),
+        { q0: 'x' }
+      )
+    ).resolves.toEqual({
+      status: 'unavailable',
+      reason: 'malformed-search-count',
+    });
+    await expect(
+      readSearchCounts(
+        io(async () => {
+          throw new Error('boom');
+        }),
+        { q0: 'x' }
+      )
+    ).resolves.toEqual({ status: 'unavailable', reason: 'github-unavailable' });
   });
 });

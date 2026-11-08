@@ -95,6 +95,11 @@ const nextConfig = {
       'public/fonts/Satoshi-Bold.ttf',
       'public/fonts/DMSans-Regular.ttf',
     ],
+    // Company chart PNGs (next/og) read their fonts with fs at request time.
+    '/api/internal/ovie/summer-company/charts/**': [
+      'public/fonts/Inter-Regular.ttf',
+      'public/fonts/Inter-SemiBold.ttf',
+    ],
     '/api/ovie/certifications': ['runtime-data/docs/certification/**/*'],
     '/api/ovie/certifications/**': ['runtime-data/docs/certification/**/*'],
     '/api/admin/outbound/readiness': [
