@@ -362,10 +362,10 @@ describe('AnalyticsSidebar cities tab with no city data', () => {
       screen.getByRole('heading', { name: 'No City Data Yet' })
     ).toBeInTheDocument();
     expect(
-      screen.getByTestId('analytics-ranked-empty-state')
-    ).toHaveTextContent(
-      'Cities appear as visitors with a known location open your profile.'
-    );
+      screen.getByText(
+        'Cities appear as visitors with a known location open your profile.'
+      )
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'View Countries' }));
     expect(onActiveTabChange).toHaveBeenCalledWith('countries');
@@ -375,7 +375,7 @@ describe('AnalyticsSidebar cities tab with no city data', () => {
     renderCities({ data: { ...visitsWithoutCities, top_countries: [] } });
 
     expect(
-      screen.getByTestId('analytics-ranked-empty-state')
+      screen.getByRole('heading', { name: 'No City Data Yet' })
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'View Countries' })

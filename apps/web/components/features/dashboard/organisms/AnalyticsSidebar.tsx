@@ -53,6 +53,45 @@ const ANALYTICS_TAB_OPTIONS = [
 
 const numberFormatter = new Intl.NumberFormat();
 
+const RANKED_TAB_ICONS = {
+  cities: MapPin,
+  countries: Globe,
+  sources: Globe,
+  links: Link2,
+} as const;
+
+const RANKED_TAB_EMPTY = {
+  cities: 'No City Data Yet',
+  countries: 'No country data yet',
+  sources: 'No source data yet',
+  links: 'No link data yet',
+} as const;
+
+/** Top rows for one tab as [key, label, count]. */
+function rankedRows(
+  data: DashboardAnalyticsResponse | null | undefined,
+  tab: AnalyticsTab
+): readonly (readonly [string, string, number])[] {
+  switch (tab) {
+    case 'cities':
+      return (data?.top_cities ?? []).map(r => [r.city, r.city, r.count]);
+    case 'countries':
+      return (data?.top_countries ?? []).map(r => [
+        r.country,
+        r.country,
+        r.count,
+      ]);
+    case 'sources':
+      return (data?.top_referrers ?? []).map(r => [
+        r.referrer || 'direct',
+        r.referrer || 'Direct',
+        r.count,
+      ]);
+    default:
+      return (data?.top_links ?? []).map(r => [r.id, r.url, r.clicks]);
+  }
+}
+
 function formatMetricValue(
   loading: boolean,
   value: number | undefined | null
@@ -339,65 +378,32 @@ export function AnalyticsSidebarView({
         </div>
       }
     >
-      {activeTab === 'cities' && (
-        <RankedList
-          icon={MapPin}
-          loading={loading}
-          items={(data?.top_cities ?? []).slice(0, 5).map(city => ({
-            key: city.city,
-            label: city.city,
-            value: numberFormatter.format(city.count),
+      <RankedList
+        icon={RANKED_TAB_ICONS[activeTab]}
+        loading={loading}
+        items={rankedRows(data, activeTab)
+          .slice(0, 5)
+          .map(([key, label, count]) => ({
+            key,
+            label,
+            value: numberFormatter.format(count),
           }))}
-          emptyMessage='No City Data Yet'
-          emptyState={{
-            description:
-              'Cities appear as visitors with a known location open your profile.',
-            action:
-              (data?.top_countries?.length ?? 0) > 0
-                ? {
-                    label: 'View Countries',
-                    onClick: () => onActiveTabChange('countries'),
-                  }
-                : undefined,
-          }}
-        />
-      )}
-      {activeTab === 'countries' && (
-        <RankedList
-          icon={Globe}
-          loading={loading}
-          items={(data?.top_countries ?? []).slice(0, 5).map(country => ({
-            key: country.country,
-            label: country.country,
-            value: numberFormatter.format(country.count),
-          }))}
-          emptyMessage='No country data yet'
-        />
-      )}
-      {activeTab === 'sources' && (
-        <RankedList
-          icon={Globe}
-          loading={loading}
-          items={(data?.top_referrers ?? []).slice(0, 5).map(referrer => ({
-            key: referrer.referrer || 'direct',
-            label: referrer.referrer || 'Direct',
-            value: numberFormatter.format(referrer.count),
-          }))}
-          emptyMessage='No source data yet'
-        />
-      )}
-      {activeTab === 'links' && (
-        <RankedList
-          icon={Link2}
-          loading={loading}
-          items={(data?.top_links ?? []).slice(0, 5).map(link => ({
-            key: link.id,
-            label: link.url,
-            value: numberFormatter.format(link.clicks),
-          }))}
-          emptyMessage='No link data yet'
-        />
-      )}
+        emptyMessage={RANKED_TAB_EMPTY[activeTab]}
+        emptyState={
+          activeTab === 'cities'
+            ? {
+                description:
+                  'Cities appear as visitors with a known location open your profile.',
+                action: data?.top_countries?.length
+                  ? {
+                      label: 'View Countries',
+                      onClick: () => onActiveTabChange('countries'),
+                    }
+                  : undefined,
+              }
+            : undefined
+        }
+      />
     </EntityTabbedRail>
   );
 }

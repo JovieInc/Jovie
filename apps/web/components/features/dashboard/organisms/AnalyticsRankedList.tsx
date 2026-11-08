@@ -68,20 +68,15 @@ export function AnalyticsRankedList({
 
   if (items.length === 0 && emptyState) {
     return (
-      <div className='flex min-h-49 flex-col'>
-        <EmptyState
-          icon={<IconComponent className='h-4 w-4 text-quaternary-token' />}
-          heading={emptyMessage}
-          description={emptyState.description}
-          action={
-            emptyState.action
-              ? { ...emptyState.action, variant: 'secondary' }
-              : undefined
-          }
-          className='py-4'
-          testId='analytics-ranked-empty-state'
-        />
-      </div>
+      <EmptyState
+        icon={<IconComponent className='h-4 w-4 text-quaternary-token' />}
+        heading={emptyMessage}
+        description={emptyState.description}
+        action={
+          emptyState.action && { ...emptyState.action, variant: 'secondary' }
+        }
+        className='min-h-49 py-4'
+      />
     );
   }
 
