@@ -20,6 +20,10 @@ export const GROWTH_ANSWER_MAX = 600;
 /** The line between the two paid spend bands the join route stores. */
 const SPEND_BAND_LINE = formatAmountNoCents(5000);
 
+/** Shown when Continue is pressed on a link that names no Spotify artist. */
+export const ARTIST_LINK_ERROR =
+  'That link is not a Spotify artist. Paste one from open.spotify.com/artist, or skip.';
+
 const SPEND_LABELS: Record<PromoSpendBand, string> = {
   none: 'Nothing yet',
   under_50: `Under ${SPEND_BAND_LINE} a month`,
@@ -34,10 +38,12 @@ const SPEND_LABELS: Record<PromoSpendBand, string> = {
 function WaitlistArtistAnswer({
   answers,
   submitting,
+  linkError,
   onChange,
 }: Readonly<{
   answers: QualifyingAnswers;
   submitting: boolean;
+  linkError: boolean;
   onChange: (next: Partial<QualifyingAnswers>) => void;
 }>) {
   const [showPick, setShowPick] = useState(
@@ -49,7 +55,7 @@ function WaitlistArtistAnswer({
         spotifyUrl={answers.spotifyUrl}
         onUrlChange={url => onChange({ spotifyUrl: url })}
         onArtistNameChange={name => onChange({ artistName: name })}
-        fieldErrors={{}}
+        fieldErrors={linkError ? { spotifyUrl: [ARTIST_LINK_ERROR] } : {}}
         isSubmitting={submitting}
         isHydrating={false}
         setInputRef={() => undefined}
@@ -103,6 +109,13 @@ export function WaitlistQualifyingSteps({
 }>) {
   const id = useId();
   const isLast = step === 'spend';
+  const [linkErrorShown, setLinkErrorShown] = useState(false);
+  // A pasted link that names no artist (an album, a short link, a typo) would
+  // otherwise be dropped without a word, so Continue stops and says so.
+  const linkIsUnusable =
+    step === 'artist' &&
+    answers.spotifyUrl.trim() !== '' &&
+    spotifyArtistIdFromUrl(answers.spotifyUrl) === null;
 
   return (
     <div
@@ -119,6 +132,7 @@ export function WaitlistQualifyingSteps({
             <WaitlistArtistAnswer
               answers={answers}
               submitting={submitting}
+              linkError={linkErrorShown && linkIsUnusable}
               onChange={onChange}
             />
             <p className='text-xs text-tertiary-token'>
@@ -176,7 +190,16 @@ export function WaitlistQualifyingSteps({
         ) : null}
       </div>
       <div className='flex flex-col gap-2'>
-        <Button type='submit' size='lg' disabled={submitting}>
+        <Button
+          type='submit'
+          size='lg'
+          disabled={submitting}
+          onClick={event => {
+            if (!linkIsUnusable) return;
+            event.preventDefault();
+            setLinkErrorShown(true);
+          }}
+        >
           {isLast ? 'Request access' : 'Continue'}
         </Button>
         <div className='flex items-center justify-between'>

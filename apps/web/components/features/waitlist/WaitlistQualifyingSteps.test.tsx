@@ -184,4 +184,26 @@ describe('WaitlistRoleForm request-access questions', () => {
     expect(screen.queryByTestId('waitlist-chosen-artist')).toBeNull();
     expect(screen.getByLabelText('Spotify link')).toHaveValue('h');
   });
+
+  it('stops on a pasted link that names no artist instead of dropping it', async () => {
+    startAsArtist();
+    submit();
+    await screen.findByTestId('waitlist-qualifying-step');
+    fireEvent.change(screen.getByLabelText(/search spotify/i), {
+      target: { value: 'Maya' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /manually add url/i }));
+    fireEvent.change(screen.getByLabelText('Spotify link'), {
+      target: { value: 'https://open.spotify.com/album/1A2B3C' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(
+      await screen.findByText(/not a Spotify artist/i)
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('waitlist-qualifying-step')).toHaveAttribute(
+      'data-step',
+      'artist'
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
