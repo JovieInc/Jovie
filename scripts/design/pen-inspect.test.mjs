@@ -5,13 +5,14 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import vm from 'node:vm';
 import {
-  inspectProgram,
+  findProgram,
+  frameProgram,
   parseOutput,
   runInspect,
   shellScript,
 } from './pen-inspect.mjs';
 
-test('program finds matching frames, dumps their trees and exports them', () => {
+test('programs find matching frames, then dump and export each one', () => {
   const nodes = [
     {
       id: 'A',
@@ -44,13 +45,18 @@ test('program finds matching frames, dumps their trees and exports them', () => 
     if (typeof a === 'function') return walk(nodes, a, 0);
     walk([nodes.find(n => n.id === a)], b, 0);
   };
-  vm.runInNewContext(inspectProgram('sign ?in', '/tmp/png'), {
+  const context = {
     Get,
     Print: line => printed.push(line),
     Export: (ids, kind, dir) => {
       exported = { ids, kind, dir };
     },
-  });
+  };
+  vm.runInNewContext(findProgram('sign ?in'), context);
+  assert.equal(exported, null);
+  const found = parseOutput(printed.join('\n'));
+  for (const hit of found.hits)
+    vm.runInNewContext(frameProgram(hit.id, '/tmp/png'), context);
   const parsed = parseOutput(printed.join('\n'));
   assert.deepEqual(
     parsed.hits.map(h => h.id),
@@ -66,11 +72,11 @@ test('program finds matching frames, dumps their trees and exports them', () => 
   assert.equal(parsed.top.length, 3);
 });
 
-test('shell script is one execute call and an exit', () => {
-  const script = shellScript('Print("it\'s")');
+test('shell script runs each program, then exits', () => {
+  const script = shellScript('Print("it\'s")', 'Print(1)');
   assert.match(
     script,
-    /^execute\(\{"input":"Print\(\\"it's\\"\)"\}\)\nexit\(\)\n$/
+    /^execute\(\{"input":"Print\(\\"it's\\"\)"\}\)\nexecute\(\{"input":"Print\(1\)"\}\)\nexit\(\)\n$/
   );
 });
 

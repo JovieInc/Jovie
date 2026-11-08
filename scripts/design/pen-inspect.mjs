@@ -29,52 +29,61 @@ export const HIT_PREFIX = 'PEN_INSPECT_HIT ';
 export const TREE_PREFIX = 'PEN_INSPECT_TREE ';
 export const LIST_PREFIX = 'PEN_INSPECT_TOP ';
 
-/** The `execute` program: list top frames, find matches, dump and export them. */
-export function inspectProgram(
-  query,
-  pngDir,
-  { maxHits = 24, maxRows = 1500 } = {}
-) {
+const ROUND = 'const r = v => (typeof v === "number" ? Math.round(v) : v);';
+
+/** First `execute`: list top frames and find the matching ones (cheap). */
+export function findProgram(query, { maxHits = 24 } = {}) {
   // The query becomes a RegExp inside Pen; JSON keeps it a safe literal.
   const q = JSON.stringify(String(query));
-  const dir = JSON.stringify(pngDir);
-  return `
+  // Each program is a block, in case executes share one global scope.
+  return `{
 const re = new RegExp(${q}, 'i');
-const hits = [];
-const r = v => (typeof v === 'number' ? Math.round(v) : v);
+let hits = 0;
+${ROUND}
 Get((n, c) => {
   if (c.depth <= 1 && n.type === 'frame')
     Print(${JSON.stringify(LIST_PREFIX)} + JSON.stringify({ id: n.id, name: n.name, depth: c.depth, w: r(c.bounds.width), h: r(c.bounds.height) }));
-  if (hits.length < ${Number(maxHits)} && n.type === 'frame' && (re.test(n.name || '') || re.test(n.id)) && c.bounds.width >= 280) {
-    hits.push(n.id);
+  if (hits < ${Number(maxHits)} && n.type === 'frame' && (re.test(n.name || '') || re.test(n.id)) && c.bounds.width >= 280) {
+    hits += 1;
     Print(${JSON.stringify(HIT_PREFIX)} + JSON.stringify({ id: n.id, name: n.name, depth: c.depth, w: r(c.bounds.width), h: r(c.bounds.height) }));
     c.skipChildren();
   }
 });
-for (const id of hits) {
-  const rows = [];
-  Get(id, (n, c) => {
-    if (rows.length >= ${Number(maxRows)}) return c.skipChildren();
-    rows.push({
-      d: c.depth, id: n.id, type: n.type, name: n.name,
-      x: r(c.bounds.x), y: r(c.bounds.y), w: r(c.bounds.width), h: r(c.bounds.height),
-      content: n.content, fill: n.fill, stroke: n.stroke, opacity: n.opacity,
-      cornerRadius: n.cornerRadius, padding: n.padding, gap: n.gap,
-      layout: n.layout, justifyContent: n.justifyContent, alignItems: n.alignItems,
-      fontFamily: n.fontFamily, fontSize: n.fontSize, fontWeight: n.fontWeight,
-      letterSpacing: n.letterSpacing, lineHeight: n.lineHeight, textAlign: n.textAlign,
-      effect: n.effect, enabled: n.enabled, ref: n.ref,
-    });
-  }, { resolveInstances: true });
-  Print(${JSON.stringify(TREE_PREFIX)} + JSON.stringify({ id, rows }));
-}
-if (hits.length) Export(hits, 'png', ${dir});
-`;
+}`;
 }
 
-/** One interactive-shell script: run the program, then exit. */
-export function shellScript(program) {
-  return `execute(${JSON.stringify({ input: program })})\nexit()\n`;
+/**
+ * One `execute` per frame: dump its tree and export it. Pen gives each
+ * execute about 55 s, so a big workspace can't do every frame in one call.
+ */
+export function frameProgram(id, pngDir, { maxRows = 1500 } = {}) {
+  const fid = JSON.stringify(String(id));
+  return `{
+const rows = [];
+${ROUND}
+Get(${fid}, (n, c) => {
+  if (rows.length >= ${Number(maxRows)}) return c.skipChildren();
+  rows.push({
+    d: c.depth, id: n.id, type: n.type, name: n.name,
+    x: r(c.bounds.x), y: r(c.bounds.y), w: r(c.bounds.width), h: r(c.bounds.height),
+    content: n.content, fill: n.fill, stroke: n.stroke, opacity: n.opacity,
+    cornerRadius: n.cornerRadius, padding: n.padding, gap: n.gap,
+    layout: n.layout, justifyContent: n.justifyContent, alignItems: n.alignItems,
+    fontFamily: n.fontFamily, fontSize: n.fontSize, fontWeight: n.fontWeight,
+    letterSpacing: n.letterSpacing, lineHeight: n.lineHeight, textAlign: n.textAlign,
+    effect: n.effect, enabled: n.enabled, ref: n.ref,
+  });
+}, { resolveInstances: true });
+Print(${JSON.stringify(TREE_PREFIX)} + JSON.stringify({ id: ${fid}, rows }));
+Export([${fid}], 'png', ${JSON.stringify(pngDir)});
+}`;
+}
+
+/** One interactive-shell script: run each program in turn, then exit. */
+export function shellScript(...programs) {
+  return `${programs
+    .map(program => `execute(${JSON.stringify({ input: program })})\n`)
+    .join('')}exit()\n`;
 }
 
 /** Pull the tagged lines out of the shell's stdout. */
@@ -113,7 +122,7 @@ function penFiles(dir) {
 }
 
 /**
- * @param {{ out: string, query: string, logPng?: string | null, env?: NodeJS.ProcessEnv, fetchImpl?: typeof fetch, run?: (cmd: string, args: string[], opts?: object) => Buffer | string, log?: (line: string) => void }} options
+ * @param {{ out: string, query: string, logPng?: string | null, maxHits?: number, env?: NodeJS.ProcessEnv, fetchImpl?: typeof fetch, run?: (cmd: string, args: string[], opts?: object) => Buffer | string, log?: (line: string) => void }} options
  */
 /** Where artifacts can't be downloaded, print chosen frames into the log. */
 export function echoFrames({ parsed, pngDir, pattern, log, chunk = 6000 }) {
@@ -143,6 +152,7 @@ export async function runInspect({
   out,
   query,
   logPng = null,
+  maxHits = 8,
   env = process.env,
   fetchImpl = fetch,
   run = (cmd, args, opts) =>
@@ -184,34 +194,44 @@ export async function runInspect({
     const pngDir = join(out, 'png', String(i));
     mkdirSync(pngDir, { recursive: true });
     const throwaway = join(out, `throwaway-${i}.pen`);
-    let stdout = '';
-    try {
-      stdout = String(
-        run(
-          'npx',
-          [
-            '-y',
-            `@pen.dev/cli@${PEN_CLI_VERSION}`,
-            'interactive',
-            '--in',
-            pen,
-            '--out',
-            throwaway,
-          ],
-          {
-            cwd: dirname(pen),
-            input: shellScript(inspectProgram(query, pngDir)),
-            env,
-          }
-        )
-      );
-    } catch (error) {
-      log(`Pen inspect failed on ${basename(pen)}: ${error?.message ?? error}`);
-      stdout = String(error?.stdout ?? '');
-    }
-    rmSync(throwaway, { force: true });
+    const session = (label, script) => {
+      try {
+        return String(
+          run(
+            'npx',
+            [
+              '-y',
+              `@pen.dev/cli@${PEN_CLI_VERSION}`,
+              'interactive',
+              '--in',
+              pen,
+              '--out',
+              throwaway,
+            ],
+            { cwd: dirname(pen), input: script, env }
+          )
+        );
+      } catch (error) {
+        log(
+          `Pen inspect ${label} failed on ${basename(pen)}: ${error?.message ?? error}`
+        );
+        return String(error?.stdout ?? '');
+      } finally {
+        rmSync(throwaway, { force: true });
+      }
+    };
+    const findOut = session(
+      'find',
+      shellScript(findProgram(query, { maxHits }))
+    );
+    const found = parseOutput(findOut);
+    // One session per frame: a frame that runs out of time costs only itself.
+    const frames = found.hits.map(h =>
+      session(`export ${h.id}`, shellScript(frameProgram(h.id, pngDir)))
+    );
+    const stdout = [findOut, ...frames].join('\n');
     writeFileSync(join(out, `stdout-${i}.log`), stdout);
-    const parsed = parseOutput(stdout);
+    const parsed = { ...found, trees: parseOutput(stdout).trees };
     files.push({ index: i, name: basename(pen), ...parsed });
     log(
       `${basename(pen)}: ${parsed.top.length} top frames, ${parsed.hits.length} matches`
