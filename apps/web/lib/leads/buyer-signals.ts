@@ -17,7 +17,7 @@
 import {
   BUYER_SIGNAL_WEIGHTS,
   type BuyerSignalCategory,
-  DSP_HOSTS,
+  DSP_PROVIDERS,
   DSP_TEXT_PATTERN,
   HOST_RULES,
   JOVIE_HOSTS,
@@ -175,11 +175,11 @@ export function prescreenBuyer(
     }
   }
   const dspHosts = new Set(
-    parsed
-      .filter(p => matchesHost(p.host, DSP_HOSTS))
-      .map(p =>
-        p.host.replace(/^(open|music)\./, '').replace('youtu.be', 'youtube.com')
-      )
+    parsed.flatMap(p =>
+      Object.entries(DSP_PROVIDERS)
+        .filter(([, hosts]) => matchesHost(p.host, hosts))
+        .map(([provider]) => provider)
+    )
   );
   if (
     dspHosts.size === 0 &&

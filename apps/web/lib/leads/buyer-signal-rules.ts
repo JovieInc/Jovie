@@ -198,20 +198,23 @@ export const HOST_RULES: readonly HostRule[] = [
   },
 ];
 
-export const DSP_HOSTS = [
-  'open.spotify.com',
-  'spotify.com',
-  'music.apple.com',
-  'soundcloud.com',
-  'youtube.com',
-  'music.youtube.com',
-  'youtu.be',
-  'tidal.com',
-  'deezer.com',
-  'music.amazon.com',
-  'beatport.com',
-  'audiomack.com',
-];
+/**
+ * Streaming services by canonical provider id. Subdomains match their root
+ * (open./artists.spotify.com, on.soundcloud.com, m./music.youtube.com), so a
+ * page counts each service once. Short links resolve to their provider.
+ */
+export const DSP_PROVIDERS: Readonly<Record<string, readonly string[]>> = {
+  spotify: ['spotify.com', 'spoti.fi', 'spotify.link'],
+  apple_music: ['music.apple.com', 'itunes.apple.com'],
+  soundcloud: ['soundcloud.com', 'snd.sc'],
+  youtube: ['youtube.com', 'youtu.be'],
+  bandcamp: ['bandcamp.com'],
+  tidal: ['tidal.com'],
+  deezer: ['deezer.com', 'deezer.page.link'],
+  amazon_music: ['music.amazon.com'],
+  beatport: ['beatport.com'],
+  audiomack: ['audiomack.com'],
+};
 export const JOVIE_HOSTS = ['jov.ie', 'jovie.com'];
 
 /** Streaming services named in visible text (link titles, snippets). */

@@ -202,6 +202,55 @@ describe('prescreenBuyer', () => {
     expect(result.score).toBe(0);
   });
 
+  it.each([
+    ['Bandcamp', 'https://fixture.bandcamp.com/album/one'],
+    ['a Spotify short link', 'https://spoti.fi/3fixture'],
+    ['a Spotify share link', 'https://spotify.link/fixture'],
+  ])('counts a page linking only %s as a music presence', (_label, url) => {
+    const result = prescreenBuyer(page({ links: [{ url }] }));
+    expect(result.hardStop).toBeNull();
+  });
+
+  it('passes a Bandcamp-only artist with a paid tool', () => {
+    const result = prescreenBuyer(
+      page({
+        links: [
+          { url: 'https://fixture.bandcamp.com/' },
+          { url: 'https://laylo.com/fixture' },
+        ],
+      })
+    );
+    expect(result.decision).toBe('pass');
+  });
+
+  it('counts each streaming service once, whatever the subdomain', () => {
+    const result = prescreenBuyer(
+      page({
+        links: [
+          { url: 'https://open.spotify.com/artist/abc123' },
+          { url: 'https://artists.spotify.com/c/artist/abc123' },
+          { url: 'https://on.soundcloud.com/fixture' },
+          { url: 'https://soundcloud.com/fixture' },
+          { url: 'https://m.youtube.com/@fixture' },
+          { url: 'https://youtu.be/fixture' },
+        ],
+      })
+    );
+    const multi = result.signals.find(s => s.id === 'multi_dsp');
+    expect(multi?.evidence).toBe('spotify,soundcloud,youtube');
+    const twoServices = prescreenBuyer(
+      page({
+        links: [
+          { url: 'https://open.spotify.com/artist/abc123' },
+          { url: 'https://artists.spotify.com/c/artist/abc123' },
+          { url: 'https://m.youtube.com/@fixture' },
+          { url: 'https://youtu.be/fixture' },
+        ],
+      })
+    );
+    expect(twoServices.signals.map(s => s.id)).not.toContain('multi_dsp');
+  });
+
   it('ignores lookalike hosts', () => {
     const result = prescreenBuyer(
       page({ links: [{ url: 'https://notffm.to.example.test/x' }] })
