@@ -173,13 +173,20 @@ describe('Input', () => {
     it('shows loading state with spinner', () => {
       render(<Input loading data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input).toBeDisabled();
+      expect(input).toHaveAttribute('readonly');
       expect(input).toHaveAttribute('aria-busy', 'true');
     });
 
-    it('disables input when loading', () => {
-      render(<Input loading data-testid='input' />);
-      expect(screen.getByTestId('input')).toBeDisabled();
+    it('keeps focus and value while loading instead of disabling', () => {
+      const { rerender } = render(
+        <Input data-testid='input' defaultValue='tim' />
+      );
+      const input = screen.getByTestId('input');
+      input.focus();
+      rerender(<Input loading data-testid='input' defaultValue='tim' />);
+      expect(input).not.toBeDisabled();
+      expect(input).toHaveFocus();
+      expect(input).toHaveValue('tim');
     });
   });
 
@@ -304,7 +311,9 @@ describe('Input', () => {
       expect(container.querySelector('.min-h-5')).toBeInTheDocument();
       const alert = screen.getByRole('alert');
       expect(alert).toHaveTextContent('Invalid email');
-      expect(alert.parentElement).toHaveAttribute('aria-live', 'polite');
+      // role=alert alone: an aria-live wrapper would announce it twice.
+      expect(alert.parentElement).not.toHaveAttribute('aria-live');
+      expect(alert.closest('[aria-live]')).toBeNull();
     });
   });
 
@@ -373,6 +382,23 @@ describe('Input', () => {
       render(<Input label='Email' />);
       const input = screen.getByLabelText('Email');
       expect(input).toHaveAttribute('id');
+    });
+  });
+
+  describe('RTL', () => {
+    it('places the trailing slot and required asterisk with logical classes', () => {
+      const { container } = render(
+        <Input label='Email' required trailing={<span>@</span>} />
+      );
+      const input = screen.getByRole('textbox');
+      expect(input).toHaveClass('pe-10');
+      expect(input).not.toHaveClass('pr-10');
+      const slot = screen.getByText('@').parentElement?.parentElement;
+      expect(slot).toHaveClass('end-2.5');
+      expect(slot).not.toHaveClass('right-2.5');
+      const asterisk = container.querySelector('label span[aria-hidden]');
+      expect(asterisk).toHaveClass('ms-1');
+      expect(asterisk).not.toHaveClass('ml-1');
     });
   });
 });

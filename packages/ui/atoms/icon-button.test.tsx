@@ -180,7 +180,9 @@ describe('IconButton', () => {
     const loadingButton = screen.getByRole('button', {
       name: 'Secondary state',
     });
-    expect(loadingButton).toBeDisabled();
+    // Loading keeps focus: aria-disabled blocks activation, not native disabled.
+    expect(loadingButton).not.toBeDisabled();
+    expect(loadingButton).toHaveAttribute('aria-disabled', 'true');
     expect(loadingButton).toHaveAttribute('data-state', 'loading');
     expect(loadingButton).toHaveAttribute('aria-busy', 'true');
     expect(loadingButton.className).toContain('h-8');
