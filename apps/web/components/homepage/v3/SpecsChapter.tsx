@@ -1,14 +1,15 @@
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import {
-  HOMEPAGE_EDITORIAL_COPY,
   HOMEPAGE_PRODUCT_UI,
-} from '@/data/homepageEditorialCopy';
+  HOMEPAGE_SPECS_COPY,
+} from '@/data/homepageProductUi';
 import { PUBLIC_ARTIST_API_VERSIONING_POLICY } from '@/lib/api/v1/contract';
 import { HOME_SPEC } from './home-spec';
 import { Orbit } from './Orbit';
 import { ReleaseInspector } from './ProductUi';
 import { Callout, CommandPaletteCard } from './Surfaces';
 
-const SPECS = HOMEPAGE_EDITORIAL_COPY.specs;
+const SPECS = HOMEPAGE_SPECS_COPY;
 
 interface SheetCell {
   readonly value: string;

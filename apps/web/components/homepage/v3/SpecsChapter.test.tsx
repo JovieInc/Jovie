@@ -1,9 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  HOMEPAGE_EDITORIAL_COPY,
   HOMEPAGE_PRODUCT_UI,
-} from '@/data/homepageEditorialCopy';
+  HOMEPAGE_SPECS_COPY,
+} from '@/data/homepageProductUi';
 import { PUBLIC_ARTIST_API_VERSIONING_POLICY } from '@/lib/api/v1/contract';
 import { HOME_SPEC } from './home-spec';
 import { SpecsChapter } from './SpecsChapter';
@@ -33,16 +33,13 @@ describe('homepage v3 specs', () => {
     ).toHaveLength(HOME_SPEC.listen);
     expect(
       screen.getByText(
-        HOMEPAGE_EDITORIAL_COPY.specs.meter(
-          HOME_SPEC.listen,
-          HOME_SPEC.recognised
-        )
+        HOMEPAGE_SPECS_COPY.meter(HOME_SPEC.listen, HOME_SPEC.recognised)
       )
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: HOMEPAGE_EDITORIAL_COPY.specs.headline,
+        name: HOMEPAGE_SPECS_COPY.headline,
       })
     ).toBeInTheDocument();
   });

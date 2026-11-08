@@ -24,7 +24,7 @@ import {
   HOMEPAGE_CATALOG,
   HOMEPAGE_PRODUCT_UI,
   type HomepageCatalogRelease,
-} from '@/data/homepageEditorialCopy';
+} from '@/data/homepageProductUi';
 import { cn } from '@/lib/utils';
 import { type DspGlyphData, ROW_SERVICES } from './home-spec';
 

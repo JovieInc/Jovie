@@ -131,6 +131,9 @@ describe('homepage contract', { timeout: 60_000 }, () => {
 
   it('renders one h1, the locked line, and one h2 per chapter', async () => {
     const { HOMEPAGE_EDITORIAL_COPY: copy } = await loadCopy();
+    const { HOMEPAGE_SPECS_COPY: specs } = await import(
+      '@/data/homepageProductUi'
+    );
     await renderHomePage();
 
     const h1s = screen.getAllByRole('heading', { level: 1 });
@@ -142,7 +145,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     ).toEqual([
       copy.profile.headline,
       copy.releases.headline,
-      copy.specs.headline,
+      specs.headline,
       copy.invite.headline,
     ]);
   });

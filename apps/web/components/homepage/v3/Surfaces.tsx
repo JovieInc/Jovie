@@ -10,7 +10,7 @@ import {
   Search,
 } from 'lucide-react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { HOMEPAGE_PRODUCT_UI } from '@/data/homepageEditorialCopy';
+import { HOMEPAGE_PRODUCT_UI } from '@/data/homepageProductUi';
 import { HOME_SPEC, RELEASE_PAGE_SERVICES } from './home-spec';
 import { Anchor, Cover, DspGlyph } from './ProductUi';
 

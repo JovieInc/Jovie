@@ -130,9 +130,14 @@
     padding-top: 4.5rem;
   }
 
+  .hv3-split > .hv3-reveal {
+    padding-top: 0;
+  }
+
   .hv3-stage--profile {
     height: 40rem;
     margin-top: 1.5rem;
+    perspective-origin: 30% 30%;
   }
 
   .hv3-stage--profile > .hv3-orbit {

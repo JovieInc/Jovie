@@ -49,6 +49,41 @@ describe('StageMotion', () => {
     expect(document.documentElement).not.toHaveClass('hv3-motion');
   });
 
+  it('moves the UPC callout with the inspector parallax on scroll', () => {
+    mockReducedMotion(false);
+    vi.stubGlobal('requestAnimationFrame', (run: FrameRequestCallback) => {
+      run(0);
+      return 1;
+    });
+    document.body.innerHTML = `
+      <div id="lift" data-hv3-parallax></div>
+      <div id="host"><i data-hv3-anchor="a"></i><i data-hv3-anchor="b"></i>
+      <svg data-hv3-connector="a>b"></svg></div>`;
+    const host = document.getElementById('host') as HTMLElement;
+    host.getBoundingClientRect = () => rect(0, 0, 800, 600);
+    let anchorTop = 300;
+    (
+      document.querySelector('[data-hv3-anchor="a"]') as HTMLElement
+    ).getBoundingClientRect = () => rect(100, anchorTop);
+    (
+      document.querySelector('[data-hv3-anchor="b"]') as HTMLElement
+    ).getBoundingClientRect = () => rect(200, 100);
+    render(<StageMotion paletteQuery='releases' paletteTarget='Releases' />);
+    anchorTop = 280;
+    Object.defineProperty(window, 'scrollY', {
+      value: 400,
+      configurable: true,
+    });
+    window.dispatchEvent(new Event('scroll'));
+    expect(
+      document.getElementById('lift')?.style.getPropertyValue('--hv3-par')
+    ).toBe('-20px');
+    expect(
+      document.querySelector('svg[data-hv3-connector] path')?.getAttribute('d')
+    ).toMatch(/^M100 280 /);
+    Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
+  });
+
   it('keeps everything still under prefers-reduced-motion', () => {
     mockReducedMotion(true);
     render(<StageMotion paletteQuery='releases' paletteTarget='Releases' />);

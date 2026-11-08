@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { HOMEPAGE_PRODUCT_UI } from '@/data/homepageEditorialCopy';
+import { HOMEPAGE_PRODUCT_UI } from '@/data/homepageProductUi';
 import { Callout, CommandPaletteCard } from './Surfaces';
 
 const PALETTE = HOMEPAGE_PRODUCT_UI.palette;

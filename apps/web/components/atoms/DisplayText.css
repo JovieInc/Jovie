@@ -1,5 +1,0 @@
-/* Ink alignment for display type (grid guide rule 5). The shift is the
-   measured left side-bearing of the first glyph, set by DisplayText. */
-.display-text {
-  margin-inline-start: var(--display-ink-shift, 0px);
-}

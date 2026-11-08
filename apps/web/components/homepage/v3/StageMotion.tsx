@@ -87,13 +87,19 @@ function drawConnectors() {
   }
 }
 
-function startParallax(): () => void {
+function startParallax(relayout: () => void): () => void {
   const lift = document.querySelector<HTMLElement>('[data-hv3-parallax]');
   if (!lift) return () => undefined;
   let frame = 0;
+  let last = 0;
   const update = () => {
     frame = 0;
-    lift.style.setProperty('--hv3-par', `${Math.min(scrollY, 900) * -0.05}px`);
+    const offset = Math.min(scrollY, 900) * -0.05;
+    if (offset === last) return;
+    last = offset;
+    lift.style.setProperty('--hv3-par', `${offset}px`);
+    // The UPC anchor rides on the lifted inspector, so its callout follows.
+    relayout();
   };
   const onScroll = () => {
     if (!frame) frame = requestAnimationFrame(update);
@@ -172,7 +178,7 @@ export function StageMotion({
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
       document.documentElement.classList.add('hv3-motion');
       cleanups.push(
-        startParallax(),
+        startParallax(layout),
         startPaletteTyping(paletteQuery, paletteTarget),
         () => document.documentElement.classList.remove('hv3-motion')
       );

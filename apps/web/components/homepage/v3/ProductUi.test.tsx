@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   HOMEPAGE_CATALOG,
   HOMEPAGE_PRODUCT_UI,
-} from '@/data/homepageEditorialCopy';
+} from '@/data/homepageProductUi';
 import { AppWindow, CatalogPlate, ReleaseInspector } from './ProductUi';
 
 vi.mock('next/image', () => ({

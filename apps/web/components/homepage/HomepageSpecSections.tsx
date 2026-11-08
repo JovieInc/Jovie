@@ -7,10 +7,8 @@ import {
 } from '@/components/homepage/HomepageEditorial';
 import { SpecsChapter } from '@/components/homepage/v3/SpecsChapter';
 import { StageMotion } from '@/components/homepage/v3/StageMotion';
-import {
-  HOMEPAGE_EDITORIAL_COPY,
-  HOMEPAGE_PRODUCT_UI,
-} from '@/data/homepageEditorialCopy';
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
+import { HOMEPAGE_PRODUCT_UI } from '@/data/homepageProductUi';
 import type {
   MarketingPageSection,
   MarketingPageSections,

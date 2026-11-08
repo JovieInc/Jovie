@@ -8,8 +8,8 @@ import {
   HOMEPAGE_EDITORIAL_COPY,
   HOMEPAGE_HEADLINE_BREAKS,
   HOMEPAGE_INVITE_ANCHOR,
-  HOMEPAGE_LATEST_RELEASE,
 } from '@/data/homepageEditorialCopy';
+import { HOMEPAGE_LATEST_RELEASE } from '@/data/homepageProductUi';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { HOME_SPEC } from './v3/home-spec';
 import { Orbit } from './v3/Orbit';
