@@ -243,20 +243,12 @@ describe('POST /api/track', () => {
   ])(
     'anonymizes clicks and skips audience members when consent is withheld: %s',
     async (_label, cookieHeader) => {
-      const insertMock = vi.fn();
       const valuesMock = vi.fn().mockReturnValue({
         returning: vi.fn().mockResolvedValue([{ id: 'click_event_123' }]),
       });
-
-      insertMock.mockReturnValue({
-        values: valuesMock,
-      });
-
+      const insertMock = vi.fn().mockReturnValue({ values: valuesMock });
       hoisted.withSystemIngestionSession.mockImplementationOnce(
-        async callback =>
-          callback({
-            insert: insertMock,
-          })
+        async callback => callback({ insert: insertMock })
       );
 
       const request = new NextRequest('http://localhost/api/track', {
@@ -325,19 +317,12 @@ describe('POST /api/track', () => {
   });
 
   it('uses server geo headers when the consent-required cookie is tampered off', async () => {
-    const insertMock = vi.fn();
     const valuesMock = vi.fn().mockReturnValue({
       returning: vi.fn().mockResolvedValue([{ id: 'click_event_123' }]),
     });
-
-    insertMock.mockReturnValue({
-      values: valuesMock,
-    });
-
+    const insertMock = vi.fn().mockReturnValue({ values: valuesMock });
     hoisted.withSystemIngestionSession.mockImplementationOnce(async callback =>
-      callback({
-        insert: insertMock,
-      })
+      callback({ insert: insertMock })
     );
 
     const request = new NextRequest('http://localhost/api/track', {

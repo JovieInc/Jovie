@@ -74,7 +74,6 @@ function anonymizeIp(ip: string): string {
   return '0.0.0.0';
 }
 
-// API routes should be dynamic
 export const dynamic = 'force-dynamic';
 
 export const runtime = 'nodejs';
@@ -377,7 +376,6 @@ export async function POST(request: NextRequest) {
     const userAgent = request.headers.get('user-agent');
     const platformDetected = detectPlatformFromUA(userAgent || undefined);
     const botDetection = detectBot(request, '/api/track');
-    // ipAddress already extracted above for rate limiting
     // Filter out self-referrals: the HTTP Referer header on same-origin fetch()
     // is the current page URL, not the external traffic source.
     const httpReferer = request.headers.get('referer') ?? undefined;
@@ -418,7 +416,6 @@ export async function POST(request: NextRequest) {
       ? createFingerprint(ipAddress, userAgent)
       : 'anonymous';
 
-    // Find the creator profile
     const [profile] = await db
       .select({ id: creatorProfiles.id })
       .from(creatorProfiles)
