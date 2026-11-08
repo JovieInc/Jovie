@@ -67,19 +67,19 @@ const ALIASES = Object.freeze([
  * Pick the changed files this lane mutates.
  * @param {string[]} changedPaths repo-relative paths
  * @param {(path: string) => string | null} [readModule] apps/web-relative reader
- * @param {{ prefixes?: readonly string[] | null }} [options] `prefixes: null`
- *   widens selection to every apps/web source (scripts/mutation-sweep.mjs).
- * @returns {string[]} apps/web-relative source paths
+ * @param {{ prefixes?: readonly string[] | null, root?: string }} [options] `prefixes: null`
+ *   widens selection to every source under `root` (default apps/web; scripts/mutation-sweep.mjs).
+ * @returns {string[]} root-relative source paths
  */
 export function selectHighRiskSources(
   changedPaths,
   readModule,
-  { prefixes = HIGH_RISK_PREFIXES } = {}
+  { prefixes = HIGH_RISK_PREFIXES, root = WEB_ROOT } = {}
 ) {
   const selected = new Set();
   for (const path of changedPaths) {
-    if (!path.startsWith(`${WEB_ROOT}/`)) continue;
-    const webPath = path.slice(WEB_ROOT.length + 1);
+    if (!path.startsWith(`${root}/`)) continue;
+    const webPath = path.slice(root.length + 1);
     if (!SOURCE_EXTENSION.test(webPath) || NON_SOURCE.test(webPath)) continue;
     if (!prefixes || prefixes.some(prefix => webPath.startsWith(prefix))) {
       const contents = readModule?.(webPath);
