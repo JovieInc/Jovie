@@ -98,6 +98,10 @@ async function main() {
   const briefs = loadBriefs(BRIEFS_DIR, only?.length ? only : null);
   if (!briefs.length)
     throw new Error(`no brief matches --only ${values.only ?? ''}`);
+  // A typo in a list of frames must not pass as a smaller, complete run.
+  const unknown = (only ?? []).filter(f => !briefs.some(b => b.frame === f));
+  if (unknown.length)
+    throw new Error(`no brief for --only ${unknown.join(', ')}`);
   const receipt = {
     schema: 'jovie.pen-draft/v1',
     at: new Date().toISOString(),

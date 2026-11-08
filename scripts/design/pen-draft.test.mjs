@@ -63,7 +63,7 @@ test('a frame without its .pen or preview is not drafted', () => {
     []
   );
   assert.deepEqual(
-    missingOutputs(b, 'o', p => p.endsWith('.pen')),
+    missingOutputs(b, 'o', p => String(p).endsWith('.pen')),
     ['claim.png']
   );
 });
