@@ -224,9 +224,9 @@ describe('WaitlistRoleForm', () => {
       new Response(JSON.stringify({ state: 'joined' }), { status: 201 })
     );
     fireEvent.submit(screen.getByTestId('waitlist-role-form'));
-    expect(
-      await screen.findByTestId('waitlist-role-form-joined')
-    ).toHaveFocus();
+    // Focus moves in an effect after the confirmation renders.
+    const confirmation = await screen.findByTestId('waitlist-role-form-joined');
+    await waitFor(() => expect(confirmation).toHaveFocus());
   });
 
   it('loads the security check only once the visitor touches the form', () => {
