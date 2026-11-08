@@ -183,7 +183,24 @@ is_trufflehog_excluded() {
   return 1
 }
 
-# Filter only the known GitHubOauth2 false positive inside an action SHA.
+# A 40-hex SonarCloud hit with no file is the commit message. Dependabot
+# compare URLs repeat the previous action pin, and path excludes cannot
+# suppress commit messages. Accept it only when this commit or its first
+# parent still records that exact value as a uses: pin. Any other
+# SonarCloud match, including one with a file path, still fails the scan.
+is_recorded_workflow_pin() {
+  local rev="$1" raw="$2" path line
+  local pin_re="uses:[[:space:]]+[[:alnum:]_.-]+/[[:alnum:]_./-]+@${raw}([[:space:]]|#|$)"
+  [[ "$raw" =~ ^[0-9a-f]{40}$ ]] || return 1
+  for path in .github/workflows .github/actions; do
+    while IFS= read -r line; do
+      [[ "$line" =~ $pin_re ]] && return 0
+    done < <(git grep -F -h -e "@${raw}" "$rev" -- "$path" 2>/dev/null || true)
+  done
+  return 1
+}
+
+# Filter known false positives inside an action SHA.
 # Git findings must use the attributed commit's source, never the current file.
 # Keep the Commit lines consumed by the existing exact-range classifiers.
 filter_trufflehog_findings() {
@@ -223,6 +240,12 @@ filter_trufflehog_findings() {
           continue
         fi
       fi
+    fi
+    if [[ "$source" == Git && -z "$file" && "$raw" =~ ^[0-9a-f]{40}$ ]] \
+      && jq -e '.Verified == false and .DetectorName == "SonarCloud"' <<<"$finding" >/dev/null \
+      && { is_recorded_workflow_pin "$commit" "$raw" \
+        || is_recorded_workflow_pin "${commit}^" "$raw"; }; then
+      continue
     fi
     kept=$((kept + 1))
     printf 'Found result: %q:%q (detector %q)\n' "$file" "$line" "$(jq -r '.DetectorName' <<<"$finding")"

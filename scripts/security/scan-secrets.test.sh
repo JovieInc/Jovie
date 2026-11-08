@@ -50,6 +50,16 @@ case "${1:-}" in
       printf '%s\n' "$commit"
     done
     ;;
+  grep)
+    case "${SCAN_TEST_ACTION_PIN_GREP:-}" in
+      1)
+        printf '        uses: SonarSource/sonarqube-scan-action@%s # pin\n' "$PIN_RAW"
+        ;;
+      comment)
+        printf '        # compare %s\n' "$PIN_RAW"
+        ;;
+    esac
+    ;;
   config)
     exit 0
     ;;
@@ -94,7 +104,8 @@ case "${SCAN_TEST_SCENARIO:-}" in
     esac
     source=Filesystem
     [[ "$1" != git ]] || source=Git
-    jq -cn --arg source "$source" --arg file "$SCAN_TEST_STAGED_FILES" \
+    file_value="${PIN_FILE-$SCAN_TEST_STAGED_FILES}"
+    jq -cn --arg source "$source" --arg file "$file_value" \
       --arg commit "${PIN_COMMIT:-dddddddddddddddddddddddddddddddddddddddd}" \
       --arg detector "${PIN_DETECTOR:-GitHubOauth2}" --arg raw "$PIN_RAW" \
       --arg secret "${PIN_SECRET_PART:-${PIN_RAW}287c895573f7108da1b3}" \
@@ -518,3 +529,28 @@ pin_scan publication 0
 pin_scan ci-pr-trufflehog 183
 
 echo 'PASS: trufflehog per-line pins, historical source, same-file findings and scanner failures'
+
+# Dependabot commit messages repeat the previous action pin. TruffleHog
+# reports that unverified SonarCloud hit with no file. Drop it only when git
+# grep shows the same 40-hex value as a uses: pin.
+SONAR_PIN_RAW="$(printf '%s%s' 'a1b2c3d4e5f60789abcd' '0123456789abcdef0123')"
+export PIN_DETECTOR=SonarCloud
+export PIN_VERIFIED=false
+export PIN_LINE=19
+export PIN_COMMIT='dddddddddddddddddddddddddddddddddddddddd'
+export PIN_MIXED=
+export PIN_SCANNER_ERROR=
+export PIN_SECRET_PART=not-a-pin
+export PIN_RAW="$SONAR_PIN_RAW"
+export PIN_FILE=
+unset SCAN_TEST_PIN_READ_ERROR
+export SCAN_TEST_ACTION_PIN_GREP=1
+pin_scan ci-pr-trufflehog 0
+SCAN_TEST_ACTION_PIN_GREP= pin_scan ci-pr-trufflehog 183
+SCAN_TEST_ACTION_PIN_GREP=comment pin_scan ci-pr-trufflehog 183
+PIN_VERIFIED=true SCAN_TEST_ACTION_PIN_GREP=1 pin_scan ci-pr-trufflehog 183
+PIN_VERIFIED=false
+PIN_FILE='apps/web/lib/example.ts' SCAN_TEST_ACTION_PIN_GREP=1 pin_scan ci-pr-trufflehog 183
+unset PIN_FILE SCAN_TEST_ACTION_PIN_GREP
+
+echo 'PASS: SonarCloud commit-message action pins stay distinct from other hits'
