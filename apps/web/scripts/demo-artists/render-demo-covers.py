@@ -267,9 +267,9 @@ def main() -> None:
     for name, (fn, seed) in COVERS.items():
         arr = fn(np.random.default_rng(seed))
         img = Image.fromarray((np.clip(arr, 0, 1) * 255).round().astype(np.uint8), "RGB")
-        path = out_dir / f"{name}.jpg"
-        img.save(path, "JPEG", quality=86, optimize=True, progressive=True)
-        (out_dir / f"{name}.jpg.meta.json").write_text(json.dumps(SIDECAR, indent=2) + "\n")
+        path = out_dir / f"{name}.webp"
+        img.save(path, "WEBP", quality=74, method=6)
+        (out_dir / f"{name}.webp.meta.json").write_text(json.dumps(SIDECAR, indent=2) + "\n")
         print(f"wrote {path.relative_to(OUT.parents[2])} ({path.stat().st_size // 1024} KB)")
 
 
