@@ -66,6 +66,7 @@ const COVERED_PRODUCTION_SOURCES = [
   'packages/ui/atoms/founder-pen-atoms.ts',
   'packages/ui/atoms/status-glyph.tsx',
   'packages/ui/atoms/inline-subscribe.tsx',
+  'packages/ui/atoms/searchable-submenu-helpers.ts',
   'packages/ui/brand/JovieO.tsx',
   'packages/ui/brand/JovieWordmark.tsx',
 ];
@@ -157,7 +158,7 @@ test('repo shared-UI visual arbitrary findings match the shrink-only baseline', 
   assert.equal(result.status, 'pass');
   assert.equal(result.totalFindings, 0);
   assert.deepEqual(result.findings, []);
-  assert.equal(result.scannedFiles.length, 72);
+  assert.equal(result.scannedFiles.length, 73);
   for (const relativePath of COVERED_PRODUCTION_SOURCES) {
     assert.equal(
       result.scannedFiles.includes(relativePath),
