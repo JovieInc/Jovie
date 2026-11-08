@@ -15,11 +15,13 @@ const DirectDspImagesContext = createContext(false);
 
 export function DirectDspImagesProvider({
   children,
+  enabled = true,
 }: {
   readonly children: ReactNode;
+  readonly enabled?: boolean;
 }) {
   return (
-    <DirectDspImagesContext.Provider value>
+    <DirectDspImagesContext.Provider value={enabled}>
       {children}
     </DirectDspImagesContext.Provider>
   );

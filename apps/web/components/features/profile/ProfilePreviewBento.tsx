@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { PhoneFrame } from '@/components/molecules/PhoneFrame';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { ProfileCompactSurface } from '@/features/profile/templates/ProfileCompactSurface';
+import { DirectDspImagesProvider } from '@/lib/images/direct-dsp-images';
 import { cn } from '@/lib/utils';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
@@ -57,6 +58,8 @@ export interface ProfilePreviewBentoProps {
   /** Extra hero layout classes (sizing, padding). */
   readonly heroClassName?: string;
   readonly phoneFrameClassName?: string;
+  /** Load DSP images straight from their CDN (one-off onboarding preview). */
+  readonly directDspImages?: boolean;
   /** CSS var overrides forwarded to the phone surface wrapper. */
   readonly coverVars?: CSSProperties;
   readonly dataTestId?: string;
@@ -103,6 +106,7 @@ export function ProfilePreviewBento({
   heroStyle,
   heroClassName,
   phoneFrameClassName,
+  directDspImages = false,
   coverVars,
   dataTestId,
   phonePreviewTestId,
@@ -177,7 +181,9 @@ export function ProfilePreviewBento({
           <div className='absolute left-3.5 top-3.5 z-20'>{overlay}</div>
         )}
 
-        {phone}
+        <DirectDspImagesProvider enabled={directDspImages}>
+          {phone}
+        </DirectDspImagesProvider>
 
         {showBottomFade && (
           <div

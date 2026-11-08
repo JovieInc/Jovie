@@ -5,7 +5,6 @@ import { useEffect, useRef } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ProfileIdentityHeader } from '@/features/profile/ProfileIdentityHeader';
 import { ProfilePreviewBento } from '@/features/profile/ProfilePreviewBento';
-import { DirectDspImagesProvider } from '@/lib/images/direct-dsp-images';
 import {
   type CanonicalArtistMetrics,
   getDisplaySpotifyFollowers,
@@ -346,8 +345,7 @@ export function resolvePreviewArtist(
 
 /**
  * Pen R6As7U `SDt0M`: names the panel so the phone reads as the visitor's own
- * draft. No eyebrow: the title already names the panel, and all-caps UI text
- * is banned (ASR-022, guarded by no-uppercase-ratchet).
+ * draft. No all-caps eyebrow: banned UI text (ASR-022, no-uppercase-ratchet).
  */
 function OnboardingDraftProfileHeader() {
   return (
@@ -452,75 +450,71 @@ export function OnboardingProfileRail({
       >
         <div className='flex min-h-0 w-full flex-col items-center'>
           {isInline ? null : <OnboardingDraftProfileHeader />}
-          <DirectDspImagesProvider>
-            <ProfilePreviewBento
-              phoneContent={
-                draft?.activeRole && draft.activeRole !== 'artist' && source ? (
-                  <div
-                    className='h-full overflow-y-auto bg-surface-1 px-4 pb-6 pt-19'
-                    data-testid='onboarding-source-preview'
-                  >
-                    <ProfileIdentityHeader
-                      name={previewArtist.name}
-                      handle={previewArtist.handle}
-                      imageUrl={null}
-                      profileHref={source.url}
-                      listenHref={source.url}
-                      hasListenDestination={false}
-                      headingAs='p'
-                    />
-                    <p className='my-4 line-clamp-4 text-app text-secondary-token'>
-                      {draft.outcome ?? 'Profile draft'}
-                    </p>
-                    <Button asChild variant='secondary'>
-                      <a
-                        href={source.url}
-                        target='_blank'
-                        rel='noopener noreferrer'
-                      >
-                        {sourceLabels[draft.activeRole]}
-                      </a>
-                    </Button>
-                  </div>
-                ) : undefined
-              }
-              artist={previewArtist}
-              releases={previewReleases}
-              socialLinks={previewLinks}
-              genres={previewArtist.genres}
-              profileHref={profileHref}
-              // Onboarding previews the cold-visitor experience, never owner controls.
-              isSubscribed={false}
-              // Never show Live — ownership is unverified during onboarding.
-              showLiveBadge={false}
-              dataTestId='onboarding-profile-bento'
-              phonePreviewTestId='onboarding-phone-preview'
-              surfaceTestId='onboarding-profile-compact-surface'
-              className={cn(
-                'w-full',
-                isInline ? 'max-w-86' : 'h-full max-w-87'
-              )}
-              heroClassName={cn(
-                'w-full rounded-3xl',
-                isInline ? 'min-h-114 p-4' : 'min-h-0 max-h-170 px-5'
-              )}
-              // Width only: the screen keeps its 402:874 aspect, so a fixed frame
-              // height let it overflow the frame (JOV-7192).
-              phoneFrameClassName={isInline ? 'w-50 sm:w-57' : 'w-71'}
-              topRight={
-                <span
-                  className='inline-flex h-6 items-center rounded-full border border-white/12 bg-black/60 px-2.5 text-2xs font-medium text-white backdrop-blur-md dark:text-white'
-                  data-testid='onboarding-profile-preview-badge'
+          <ProfilePreviewBento
+            phoneContent={
+              draft?.activeRole && draft.activeRole !== 'artist' && source ? (
+                <div
+                  className='h-full overflow-y-auto bg-surface-1 px-4 pb-6 pt-19'
+                  data-testid='onboarding-source-preview'
                 >
-                  Preview
-                </span>
-              }
-              // One caption for every path: internal draft state ("Draft · artist ·
-              // Review") is not visitor-facing (2026-10-31 golden-path walk).
-              caption='Preview · not claimed yet'
-              overlay={<DspMatchStrip matches={dspMatches} />}
-            />
-          </DirectDspImagesProvider>
+                  <ProfileIdentityHeader
+                    name={previewArtist.name}
+                    handle={previewArtist.handle}
+                    imageUrl={null}
+                    profileHref={source.url}
+                    listenHref={source.url}
+                    hasListenDestination={false}
+                    headingAs='p'
+                  />
+                  <p className='my-4 line-clamp-4 text-app text-secondary-token'>
+                    {draft.outcome ?? 'Profile draft'}
+                  </p>
+                  <Button asChild variant='secondary'>
+                    <a
+                      href={source.url}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                    >
+                      {sourceLabels[draft.activeRole]}
+                    </a>
+                  </Button>
+                </div>
+              ) : undefined
+            }
+            artist={previewArtist}
+            releases={previewReleases}
+            socialLinks={previewLinks}
+            genres={previewArtist.genres}
+            profileHref={profileHref}
+            // Onboarding previews the cold-visitor experience, never owner controls.
+            isSubscribed={false}
+            // Never show Live — ownership is unverified during onboarding.
+            showLiveBadge={false}
+            directDspImages
+            dataTestId='onboarding-profile-bento'
+            phonePreviewTestId='onboarding-phone-preview'
+            surfaceTestId='onboarding-profile-compact-surface'
+            className={cn('w-full', isInline ? 'max-w-86' : 'h-full max-w-87')}
+            heroClassName={cn(
+              'w-full rounded-3xl',
+              isInline ? 'min-h-114 p-4' : 'min-h-0 max-h-170 px-5'
+            )}
+            // Width only: the screen keeps its 402:874 aspect, so a fixed frame
+            // height let it overflow the frame (JOV-7192).
+            phoneFrameClassName={isInline ? 'w-50 sm:w-57' : 'w-71'}
+            topRight={
+              <span
+                className='inline-flex h-6 items-center rounded-full border border-white/12 bg-black/60 px-2.5 text-2xs font-medium text-white backdrop-blur-md dark:text-white'
+                data-testid='onboarding-profile-preview-badge'
+              >
+                Preview
+              </span>
+            }
+            // One caption for every path: internal draft state ("Draft · artist ·
+            // Review") is not visitor-facing (2026-10-31 golden-path walk).
+            caption='Preview · not claimed yet'
+            overlay={<DspMatchStrip matches={dspMatches} />}
+          />
           {previewArtist.tagline ? (
             <p className='px-4 pt-2 text-center text-xs text-secondary-token'>
               {previewArtist.tagline}

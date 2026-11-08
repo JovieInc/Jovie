@@ -74,3 +74,26 @@ export async function expectNoForcedCaps(scope: Locator): Promise<void> {
   });
   expect(shouting, 'UI text is forced into all caps').toEqual([]);
 }
+
+/**
+ * The whole Golden Path preview bar: a real release from the catalog, a
+ * painted portrait and artwork, and no UI text forced into caps (JOV-9758).
+ */
+export async function expectPreviewIsReal(
+  scope: Locator,
+  rail: Locator
+): Promise<void> {
+  await expect
+    .poll(
+      async () =>
+        Number((await rail.getAttribute('data-catalog-releases')) ?? 0),
+      {
+        message:
+          'Onboarding preview did not show any release from the real catalog',
+        timeout: 60_000,
+      }
+    )
+    .toBeGreaterThanOrEqual(1);
+  await expectPreviewMediaPainted(rail);
+  await expectNoForcedCaps(scope);
+}
