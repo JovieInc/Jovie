@@ -395,11 +395,9 @@ status="$(run_full_scenario full-blocked "$FULL_BLOCKED_COMMIT")"
 
 bash "$REPO_ROOT/scripts/security/prepare-ci-secret-scan-range.test.sh"
 
-# JOV-6809: a transient download failure (curl 35 connection reset on
-# ubuntu-latest) must be retried, not fail the scan outright. Stub curl to
-# fail the first attempt then succeed; stub tar to lay down a no-op binary.
-# A restricted PATH keeps real gitleaks/trufflehog installs from
-# short-circuiting the download path.
+# JOV-6809: curl 35 must be retried. A restricted PATH keeps real scanners
+# from short-circuiting the download. HTTP 504 uses the asset-url fallback.
+bash "$REPO_ROOT/scripts/security/scan-secrets-release-fetch.test.sh"
 DL_BIN="$TEST_ROOT/dl-bin"
 DL_TMP="$TEST_ROOT/dl-tmp"
 mkdir -p "$DL_BIN" "$DL_TMP"

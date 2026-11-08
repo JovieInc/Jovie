@@ -9,8 +9,9 @@ trap 'rm -rf "$tmp_dir"' EXIT
 git -C "$tmp_dir" init -q
 mkdir -p "$tmp_dir/scripts/security"
 cp "$root/scripts/security/scan-secrets.sh" "$tmp_dir/scripts/security/"
-# scan-secrets.sh sources this helper. The temp repo must contain it.
+# scan-secrets.sh sources these helpers. The temp repo must contain them.
 cp "$root/scripts/security/scan-secrets-sonar-pin.sh" "$tmp_dir/scripts/security/"
+cp "$root/scripts/security/scan-secrets-release-fetch.sh" "$tmp_dir/scripts/security/"
 cp "$root/scripts/security/gitleaks-staged-public-digests.b64" "$tmp_dir/scripts/security/"
 cp "$root/.gitleaks.toml" "$tmp_dir/.gitleaks.toml"
 mkdir -p "$tmp_dir/scripts/invariants/art-direction"

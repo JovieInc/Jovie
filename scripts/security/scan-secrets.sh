@@ -18,28 +18,11 @@ GITLEAKS_VERSION="${GITLEAKS_VERSION:-8.21.2}"
 TRUFFLEHOG_VERSION="${TRUFFLEHOG_VERSION:-3.99.8}"
 EXCLUDE_PATHS="$REPO_ROOT/.trufflehog-exclude.txt"
 
-# Retry release downloads after curl 35 resets (JOV-6809) via a temp file.
+# Retry release downloads after curl 35 resets (JOV-6809). HTTP 504 falls
+# back to the release asset URL inside the sourced fetcher.
 SCAN_SECRETS_RETRY_DELAY="${SCAN_SECRETS_RETRY_DELAY:-2}"
-fetch_release_tarball() {
-  local url="$1" dest_dir="$2" member="$3"
-  local tmp attempt
-  tmp="$(mktemp)"
-  for attempt in 1 2 3; do
-    if curl -sSfL -o "$tmp" "$url" \
-      && tar -xzf "$tmp" -C "$dest_dir" "$member"; then
-      chmod +x "$dest_dir/$member"
-      rm -f "$tmp"
-      return 0
-    fi
-    if [[ $attempt -lt 3 ]]; then
-      echo "scanner download attempt $attempt failed; retrying" >&2
-      sleep "$SCAN_SECRETS_RETRY_DELAY"
-    fi
-  done
-  rm -f "$tmp"
-  echo "::error title=Secret scanner download failed::Could not fetch $member after 3 attempts ($url)." >&2
-  return 1
-}
+# shellcheck source=scripts/security/scan-secrets-release-fetch.sh
+. "$REPO_ROOT/scripts/security/scan-secrets-release-fetch.sh"
 
 ensure_gitleaks() {
   if [[ -n "${GITLEAKS_BIN:-}" ]]; then
