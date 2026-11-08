@@ -174,6 +174,11 @@ for (const route of routes) {
         identity: 'stranger',
         fixture: 'unclaimed',
       });
+    if (signedIn && SIGNED_IN_SKIP.test(route) && viewport === 'desktop')
+      uncovered.push({
+        route,
+        reason: 'not loaded signed in: it could change the test account',
+      });
     if (signedIn && !SIGNED_IN_SKIP.test(route))
       todo.push({
         route,
