@@ -137,7 +137,7 @@ export function FounderFunnelDrilldown({
       ) : result.rows.length === 0 ? (
         <TableEmptyState
           testId='founder-funnel-drilldown-empty'
-          heading='No Records in This Stage'
+          heading='No Records In This Stage'
           description='Nothing in this stage for the selected window.'
         />
       ) : (

@@ -109,7 +109,7 @@ describe('FounderFunnelDrilldown', () => {
 
     expect(
       screen.getByTestId('founder-funnel-drilldown-empty')
-    ).toHaveTextContent('No Records in This Stage');
+    ).toHaveTextContent('No Records In This Stage');
   });
 
   it('surfaces query errors instead of the table', () => {
