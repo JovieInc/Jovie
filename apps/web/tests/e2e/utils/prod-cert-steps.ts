@@ -226,11 +226,16 @@ const measureJank = () =>
     loadWorstMs: number;
     inputWorstMs: number;
     frames: boolean;
+    worstScripts: string[];
   }>(resolve => {
     const types = PerformanceObserver.supportedEntryTypes ?? [];
     let cls = 0;
     let firstInputAt = Number.POSITIVE_INFINITY;
     const frames: { startTime: number; duration: number }[] = [];
+    let worst: { duration: number; scripts: string[] } = {
+      duration: 0,
+      scripts: [],
+    };
     let pending = 3;
     const done = () => {
       pending -= 1;
@@ -251,6 +256,7 @@ const measureJank = () =>
         loadWorstMs,
         inputWorstMs,
         frames: types.includes('long-animation-frame'),
+        worstScripts: worst.scripts,
       });
     };
     const watch = (type: string, take: (entry: PerformanceEntry) => void) => {
@@ -277,6 +283,30 @@ const measureJank = () =>
     });
     watch('long-animation-frame', entry => {
       frames.push({ startTime: entry.startTime, duration: entry.duration });
+      if (entry.duration <= worst.duration) return;
+      // The scripts that ran in the longest frame, longest first, so a long
+      // frame names its cause in the run log.
+      const scripts =
+        (
+          entry as PerformanceEntry & {
+            scripts?: {
+              duration: number;
+              invoker?: string;
+              sourceURL?: string;
+              sourceFunctionName?: string;
+            }[];
+          }
+        ).scripts ?? [];
+      worst = {
+        duration: entry.duration,
+        scripts: [...scripts]
+          .sort((a, b) => b.duration - a.duration)
+          .slice(0, 3)
+          .map(
+            script =>
+              `${Math.round(script.duration)}ms ${script.invoker ?? '?'} ${(script.sourceURL ?? '').split('?')[0]}${script.sourceFunctionName ? `#${script.sourceFunctionName}` : ''}`
+          ),
+      };
     });
   });
 
@@ -363,6 +393,13 @@ async function recordJank(currentPage: Page, surface: string): Promise<void> {
     }
     const judged = samples.length === FRAME_SAMPLES;
     const load = judged ? medianMs(samples) : jank.loadWorstMs;
+    if (Math.max(load, jank.inputWorstMs) > FRAME_LIMIT_MS) {
+      // Receipts upload as artifacts; the run log is where a fixer reads
+      // which scripts held the longest frame.
+      process.stdout.write(
+        `[prod-cert:jank] ${surface} longest frame ${Math.round(jank.worstFrameMs)}ms; loads ${samples.map(Math.round).join('/')}ms; scripts: ${jank.worstScripts.join(' | ') || 'none attributed'}\n`
+      );
+    }
     recordCertObservation({
       surface,
       contractId: 'jank.worst-frame-ms',
