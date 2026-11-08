@@ -13,10 +13,10 @@ import {
   type NavigationItemId,
   type NavigationLatencyBucket,
   type NavigationPlatform,
-  type NavigationTelemetryPayload,
   type NavigationVariant,
   navigationLatencyBucketUpperBoundMs,
 } from '@/lib/tracking/navigation-telemetry-contract';
+import type { NavigationTelemetryPayload } from '@/lib/tracking/navigation-telemetry-schema';
 import { navigationTelemetryPayloadSchema } from '@/lib/tracking/navigation-telemetry-schema';
 
 export const NAVIGATION_TELEMETRY_BASELINE_DAYS = 30;
