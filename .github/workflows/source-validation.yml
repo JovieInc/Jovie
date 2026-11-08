@@ -255,6 +255,8 @@ jobs:
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
           BASE_BRANCH: ${{ github.base_ref }}
+          # Read-only token for the release-download fallback.
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
           SHELLCHECK_OPTS: >-
             --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
         run: |
@@ -479,6 +481,8 @@ jobs:
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           SECURITY_GATE_ENABLED: ${{ vars.SECURITY_GATE_ENABLED }}
+          # Read-only token for the release-download fallback.
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         run: |
           git fetch --no-tags origin "${{ github.base_ref }}"
           base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
@@ -561,6 +565,9 @@ jobs:
           pnpm exec tsx scripts/online-index-migrate.ts --validate-only
       - name: Lint added or changed migration SQL
         if: steps.reuse.outputs.reuse != 'true'
+        env:
+          # Read-only token for the release-download fallback.
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin "${{ github.base_ref }}"

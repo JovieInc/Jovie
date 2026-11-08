@@ -12,6 +12,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { downloadReleaseAsset } from '../lib/github-release-asset.mjs';
+
 export const SQUAWK_VERSION = '2.70.0';
 export const SQUAWK_CONFIG = 'scripts/db/squawk.toml';
 export const MIGRATION_PREFIX = 'apps/web/drizzle/migrations/';
@@ -78,7 +80,7 @@ export function assertSha256(bytes, expected) {
 }
 
 /**
- * @param {{ fetchImpl?: typeof fetch, arch?: string, platform?: string, sleep?: (ms: number) => Promise<void> }} [options]
+ * @param {{ download?: typeof downloadReleaseAsset, arch?: string, platform?: string }} [options]
  */
 export async function installSquawk(options = {}) {
   const platform = options.platform ?? process.platform;
@@ -90,30 +92,16 @@ export async function installSquawk(options = {}) {
   }
   const asset = `squawk-linux-${arch}`;
   const url = `https://github.com/sbdchd/squawk/releases/download/v${SQUAWK_VERSION}/${asset}`;
-  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
-  const sleep = options.sleep ?? (ms => new Promise(r => setTimeout(r, ms)));
-  // Release downloads return runs of HTTP 504 (#23770, 2026-11-08). Back off
-  // with jitter over 6 attempts (62-124s of waiting), then fail closed.
-  let bytes;
-  let failure = '';
-  for (let attempt = 1, delay = 2000; !bytes && attempt <= 6; attempt += 1) {
-    try {
-      const response = await fetchImpl(url);
-      if (response.ok) bytes = Buffer.from(await response.arrayBuffer());
-      else failure = String(response.status);
-    } catch (error) {
-      failure = error instanceof Error ? error.message : String(error);
-    }
-    if (!bytes && attempt < 6) {
-      await sleep(delay + Math.floor(Math.random() * (delay + 1)));
-      delay *= 2;
-    }
-  }
-  if (!bytes) {
+  // The shared helper backs off, falls back to the authenticated releases
+  // API (anonymous 504s for hours, #23770) and fails closed; the sha256 pin
+  // below still decides.
+  const fetched = (options.download ?? downloadReleaseAsset)(url);
+  if (fetched.ok === false) {
     throw new Error(
-      `Squawk ${SQUAWK_VERSION} download failed: ${failure} ${url}`
+      `Squawk ${SQUAWK_VERSION} download failed: ${fetched.status} ${url}`
     );
   }
+  const bytes = fetched.bytes;
   assertSha256(bytes, SQUAWK_SHA256[arch]);
   const bin = join(mkdtempSync(join(tmpdir(), 'squawk-')), 'squawk');
   writeFileSync(bin, bytes);
@@ -158,7 +146,7 @@ export function readMigrationDiff(repoRoot, base, head, run = spawnSync) {
  *   nameStatus?: string,
  *   squawkBin?: string,
  *   run?: RunCommand,
- *   fetchImpl?: typeof fetch,
+ *   download?: typeof downloadReleaseAsset,
  *   platform?: string,
  *   arch?: string,
  *   stdio?: 'inherit' | 'pipe',
@@ -181,7 +169,7 @@ export async function lintChangedMigrations(options) {
     options.squawkBin ??
     process.env.SQUAWK_BIN ??
     (await installSquawk({
-      fetchImpl: options.fetchImpl,
+      download: options.download,
       platform: options.platform,
       arch: options.arch,
     }));

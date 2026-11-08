@@ -15,7 +15,7 @@ fi
 out=''
 prev=''
 for arg in "$@"; do
-  [[ "$prev" == '-o' ]] && out="$arg"
+  [[ "$prev" == '-o' || "$prev" == '--output' ]] && out="$arg"
   prev="$arg"
 done
 printf 'fake-tarball' >"$out"
@@ -31,9 +31,16 @@ done
 member="${!#}"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$dest/$member"
 EOF
+  # Authenticated fallback: log token and args, write the asset to -O.
+  cat >"$fixture_bin/gh" <<'EOF'
+#!/usr/bin/env bash
+printf '%s %s\n' "${GH_TOKEN:-}" "$*" >>"$GH_CALLS"
+while [[ $# -gt 0 ]]; do [[ "$1" == -O ]] && out="$2"; shift; done
+printf 'fake-tarball' >"$out"
+EOF
   # No container fallback in this fixture: the release path alone is under test.
   printf '#!/usr/bin/env bash\nexit 1\n' >"$fixture_bin/docker"
-  chmod +x "$fixture_bin/curl" "$fixture_bin/tar" "$fixture_bin/docker"
+  chmod +x "$fixture_bin/curl" "$fixture_bin/tar" "$fixture_bin/docker" "$fixture_bin/gh"
   # Keep scanner discovery isolated while retaining the actual Node runtime.
   ln -s "$(node -p 'process.execPath')" "$fixture_bin/node"
 }

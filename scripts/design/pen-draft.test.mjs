@@ -25,6 +25,7 @@ test('every checked-in brief parses and names a unique frame', () => {
       'empty-states',
       'homepage',
       'insights',
+      'page-skeletons',
       'profile-analytics-card',
       'request-access',
       'workspace-table',

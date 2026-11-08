@@ -327,7 +327,7 @@ describe('AnalyticsSidebar ranked-list density (JOV densify pass)', () => {
     );
   });
 });
-
+// The Cities tab's empty state lives in AnalyticsSidebar.cities-empty.test.tsx.
 describe('AnalyticsSidebar first look (no visits in range)', () => {
   const zeroData = {
     profile_views: 0,
