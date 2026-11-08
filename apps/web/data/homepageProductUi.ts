@@ -1,9 +1,11 @@
 /**
- * Homepage v3 product UI data: Tim White's catalog and the visible strings
+ * Homepage v3 product UI data: the featured artist's catalog and the visible strings
  * inside the live product mockups (window, inspector, release page, ⌘K
  * palette). Kept apart from the editorial copy so only the homepage bundles
  * it; the editorial copy is shared with the marketing registries.
  */
+
+import { HOMEPAGE_FEATURED_ARTIST } from '@/data/demoArtists';
 
 export interface HomepageCatalogRelease {
   readonly title: string;
@@ -13,51 +15,19 @@ export interface HomepageCatalogRelease {
   readonly selected?: boolean;
 }
 
-/** Tim White's real catalog, as the approved design shows it (newest first). */
-export const HOMEPAGE_CATALOG: readonly HomepageCatalogRelease[] = [
-  {
-    title: 'Never Say A Word',
-    byline: 'Tim White',
-    year: '2024',
-    src: '/img/releases/never-say-a-word.jpg',
-  },
-  {
-    title: 'Take Me Over',
-    byline: 'Austin Leeds Remix · Tim White',
-    year: '2024',
-    src: '/img/releases/take-me-over-remix.jpg',
-  },
-  {
-    title: 'Doge (To Mars)',
-    byline: 'Tim White',
-    year: '2021',
-    src: '/img/releases/doge-to-mars.jpg',
-  },
-  {
-    title: 'Tomorrow Sounds',
-    byline: 'Tim White',
-    year: '2020',
-    src: '/img/releases/tomorrow-sounds.jpg',
-  },
-  {
-    title: 'Supernova Girl',
-    byline: 'Tim White',
-    year: '2020',
-    src: '/img/releases/supernova-girl.jpg',
-    selected: true,
-  },
-  {
-    title: 'This Is Love',
-    byline: 'Tim White',
-    year: '2020',
-    src: '/img/releases/this-is-love.jpg',
-  },
-];
+/** The featured artist (Tim, 2026-11-08: not Tim; a demo artist until real
+ * artists opt in). Their catalog, newest first; the inspected release is
+ * the selected row. */
+const ARTIST = HOMEPAGE_FEATURED_ARTIST;
+const INSPECTED = ARTIST.inspected;
+
+export const HOMEPAGE_CATALOG: readonly HomepageCatalogRelease[] =
+  ARTIST.releases.map(release =>
+    release.title === INSPECTED.title ? { ...release, selected: true } : release
+  );
 
 /** The release the profile phone leads with. */
 export const HOMEPAGE_LATEST_RELEASE = HOMEPAGE_CATALOG[0];
-
-const SUPERNOVA = '/img/releases/supernova-girl.jpg';
 
 /** Visible strings inside the live product UI on the homepage. */
 export const HOMEPAGE_PRODUCT_UI = {
@@ -68,9 +38,9 @@ export const HOMEPAGE_PRODUCT_UI = {
   searchCommand: 'Search or run a command',
   columns: { title: 'Title', platforms: 'Platforms', released: 'Released' },
   inspector: {
-    src: SUPERNOVA,
-    title: 'Supernova Girl',
-    artist: 'Tim White',
+    src: INSPECTED.src,
+    title: INSPECTED.title,
+    artist: ARTIST.name,
     tabs: ['Details', 'Assets', 'Links', 'Rights'],
     /** Field names as the product inspector shows them (sentence case). */
     fields: {
@@ -82,18 +52,18 @@ export const HOMEPAGE_PRODUCT_UI = {
       label: 'Label',
       upc: 'UPC',
     },
-    date: 'Mar 6',
-    type: 'Single',
-    tracks: '1',
-    duration: '2:34',
-    genres: ['Melodic Techno', 'Trance'],
-    label: 'The Bubblegum Factory',
-    upc: '5054526843813',
+    date: INSPECTED.date,
+    type: INSPECTED.type,
+    tracks: INSPECTED.tracks,
+    duration: INSPECTED.duration,
+    genres: INSPECTED.genres,
+    label: INSPECTED.label,
+    upc: INSPECTED.upc,
   },
   releasePage: {
-    src: SUPERNOVA,
-    title: 'Supernova Girl',
-    artist: 'Tim White',
+    src: INSPECTED.src,
+    title: INSPECTED.title,
+    artist: ARTIST.name,
     play: 'Play',
     more: (count: number) => `+${count} more services`,
     madeWith: 'Made with Jovie',
