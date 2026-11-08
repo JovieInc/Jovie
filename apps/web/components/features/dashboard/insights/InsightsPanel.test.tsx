@@ -17,6 +17,7 @@ vi.mock('@/lib/queries', () => ({
   useUpdateInsightMutation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+import { FetchDeadlineError } from '@/lib/queries/fetch';
 import { InsightsPanel, InsightsPanelView } from './InsightsPanel';
 
 describe('InsightsPanelView', () => {
@@ -184,6 +185,43 @@ describe('InsightsPanelView', () => {
     expect(screen.getByRole('button', { name: 'Show All' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Generate insights' }));
     expect(generateMock).toHaveBeenCalledOnce();
+  });
+
+  it('clears a failed press once the list loads again after it', () => {
+    const reset = vi.fn();
+    useGenerateInsightsMutationMock.mockReturnValue({
+      mutate: generateMock,
+      isPending: false,
+      isError: true,
+      error: new FetchDeadlineError('Request timed out'),
+      submittedAt: 1_000,
+      reset,
+    });
+    const query = {
+      data: { insights: [] },
+      dataUpdatedAt: 500,
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    useInsightsQueryMock.mockReturnValue(query);
+
+    const { rerender } = render(
+      <TooltipProvider>
+        <InsightsPanel />
+      </TooltipProvider>
+    );
+    expect(screen.getByText('Insights Are Still Generating')).toBeVisible();
+    expect(reset).not.toHaveBeenCalled();
+
+    // Check Again (or any refetch) lands after the failed press.
+    useInsightsQueryMock.mockReturnValue({ ...query, dataUpdatedAt: 2_000 });
+    rerender(
+      <TooltipProvider>
+        <InsightsPanel />
+      </TooltipProvider>
+    );
+    expect(reset).toHaveBeenCalledOnce();
   });
 
   it('names the click threshold up front instead of vague AI copy', () => {

@@ -1,7 +1,7 @@
 'use client';
 
 import type { CSSProperties } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
 import {
@@ -374,7 +374,7 @@ export function InsightsPanel() {
     [selectedCategory]
   );
 
-  const { data, isLoading, error, refetch } = useInsightsQuery({
+  const { data, dataUpdatedAt, isLoading, error, refetch } = useInsightsQuery({
     category: categoryFilter,
     limit: 50,
   });
@@ -385,7 +385,15 @@ export function InsightsPanel() {
     data: lastRun,
     isError: generateFailed,
     error: generateError,
+    submittedAt,
+    reset: resetGenerate,
   } = useGenerateInsightsMutation();
+
+  // A failed press is stale once the list has loaded again after it (Check
+  // Again or any refetch), so the copy never sticks on "Still Generating".
+  useEffect(() => {
+    if (generateFailed && dataUpdatedAt > submittedAt) resetGenerate();
+  }, [generateFailed, dataUpdatedAt, submittedAt, resetGenerate]);
 
   const insights = useMemo(() => data?.insights ?? [], [data?.insights]);
 
