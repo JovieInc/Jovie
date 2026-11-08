@@ -218,7 +218,8 @@ export function filterItems(
 export function getContentStyle(
   minWidth?: number | string,
   maxHeight?: number | string,
-  kind: 'dropdown' | 'context' = 'dropdown'
+  kind: 'dropdown' | 'context' = 'dropdown',
+  overflowY: 'auto' | 'hidden' = 'auto'
 ): CSSProperties | undefined {
   const available = `var(--radix-${kind}-menu-content-available-height)`;
   const requested =
@@ -229,8 +230,22 @@ export function getContentStyle(
         ? `min(${requested}, ${available})`
         : available,
     minWidth,
-    overflowY: 'auto',
+    overflowY,
   };
+}
+
+/** Default list-panel width for a scroll-body menu. */
+export const MENU_SCROLL_BODY_WIDTH = '25rem';
+
+/**
+ * A scroll-body menu is a fixed-width list: long rows truncate instead of
+ * widening the panel, and it never grows past the viewport gutter.
+ */
+export function getScrollBodyWidth(
+  width: number | string = MENU_SCROLL_BODY_WIDTH
+): string {
+  const requested = typeof width === 'number' ? `${width}px` : width;
+  return `min(${requested}, calc(100vw - var(--space-8, 2rem)))`;
 }
 
 /** Count real controls, including action rows and radio groups. Never truncate. */

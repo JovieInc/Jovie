@@ -331,6 +331,23 @@ export interface CommonDropdownProps {
   readonly maxHeight?: number | string;
 
   /**
+   * Pin the search header and scroll only the item list. The list fades at
+   * whichever edge still has rows clipped behind it, and the fade goes away
+   * once that edge is reached. Use for long history-style lists. The panel
+   * takes a fixed width (`minWidth`, default 25rem, capped to the viewport)
+   * so long rows truncate instead of widening it.
+   */
+  readonly scrollBody?: boolean;
+
+  /**
+   * Open/close motion.
+   * - 'fade': opacity only (default)
+   * - 'anchored': subtle scale and fade from the trigger; exit is faster than
+   *   enter. Reduced motion removes both.
+   */
+  readonly motion?: 'fade' | 'anchored';
+
+  /**
    * Loading state (shows spinner)
    */
   readonly isLoading?: boolean;

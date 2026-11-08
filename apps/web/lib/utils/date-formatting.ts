@@ -190,6 +190,19 @@ export function formatTimeAgo(value: string | Date | null | undefined): string {
 }
 
 /**
+ * Compact relative age for dense lists: "now", "5m", "2h", "3d", "5w",
+ * "3mo", "2y". Same buckets as formatTimeAgo without the " ago" suffix.
+ * Used in: chat history switcher
+ */
+export function formatTimeAgoCompact(
+  value: string | Date | null | undefined
+): string {
+  const relative = formatTimeAgo(value);
+  if (relative === 'just now') return 'now';
+  return relative.endsWith(' ago') ? relative.slice(0, -4) : relative;
+}
+
+/**
  * Format time remaining: "now", "30 seconds", "5 minutes", "2 hours"
  * Used in: rate limit messages, countdown timers
  */

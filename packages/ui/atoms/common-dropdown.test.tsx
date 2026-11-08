@@ -1594,3 +1594,25 @@ describe('CommonDropdown', () => {
     });
   });
 });
+
+describe('CommonDropdown opt-in list behaviour', () => {
+  it('keeps the default menu as one scrolling surface with fade motion', () => {
+    render(
+      <CommonDropdown
+        items={[{ type: 'action', id: 'one', label: 'One', onClick: vi.fn() }]}
+        open
+        searchable
+      />
+    );
+    const content = document.querySelector<HTMLElement>(
+      '[data-slot="common-dropdown-content"]'
+    );
+
+    expect(
+      document.querySelector('[data-slot="common-dropdown-scroll-body"]')
+    ).toBeNull();
+    expect(content?.style.overflowY).toBe('auto');
+    expect(content).toHaveAttribute('data-motion', 'fade');
+    expect(content?.className).not.toContain('zoom-in');
+  });
+});

@@ -321,6 +321,23 @@ export const MENU_BADGE_BASE =
   'inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-subtle bg-surface-1 px-1.5 text-3xs font-medium tabular-nums text-tertiary-token';
 
 /**
+ * `scrollBody` menus: the content is a fixed column (search header pinned,
+ * rows scroll inside MenuScrollBody), so the surface itself never scrolls and
+ * the header hairline runs edge to edge.
+ */
+export const MENU_SCROLL_BODY_CONTENT = 'flex flex-col overflow-y-hidden p-0';
+
+/**
+ * `motion='anchored'`: a subtle scale and fade from the trigger
+ * (DROPDOWN_TRANSFORM_ORIGIN). Enter uses the dropdown duration, exit the
+ * faster one. Reduced motion removes both states' animation.
+ */
+export const MENU_ANCHORED_MOTION =
+  'data-[state=open]:zoom-in-97 data-[state=closed]:zoom-out-97 ' +
+  'data-[state=open]:duration-subtle data-[state=closed]:duration-fast ease-out ' +
+  'motion-reduce:data-[state=open]:animate-none motion-reduce:data-[state=closed]:animate-none';
+
+/**
  * Search header and input styles shared by root menus and searchable submenus
  */
 export const MENU_SEARCH_HEADER_BASE = 'border-b border-subtle px-2 py-2';

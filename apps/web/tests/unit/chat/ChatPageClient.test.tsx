@@ -393,7 +393,7 @@ describe('ChatPageClient', () => {
     expect(mockSetHeaderActions.mock.calls.at(-1)?.[0]).not.toBeNull();
   });
 
-  it('updates the title for another conversation and clears it for a new chat', () => {
+  it('updates the title for another conversation and shows New Chat for a new chat', () => {
     const { rerender } = fastRender(
       <DashboardDataProvider value={baseDashboardData}>
         <ChatPageClient
@@ -424,7 +424,14 @@ describe('ChatPageClient', () => {
       </DashboardDataProvider>
     );
 
-    expect(mockSetHeaderBadge).toHaveBeenLastCalledWith(null);
+    expect(mockSetHeaderBadge).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        props: expect.objectContaining({
+          title: null,
+          activeConversationId: null,
+        }),
+      })
+    );
     expect(mockSetHeaderActions).toHaveBeenLastCalledWith(null);
   });
 

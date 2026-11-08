@@ -10,9 +10,11 @@ import {
   contextMenuContentCompactClasses,
   dropdownMenuContentClasses,
   dropdownMenuContentCompactClasses,
+  MENU_ANCHORED_MOTION,
   MENU_ICON_TRIGGER_BASE,
   MENU_ITEM_BASE,
   MENU_ITEM_COMPACT,
+  MENU_SCROLL_BODY_CONTENT,
   OVERLAY_COLLISION_PADDING,
   SELECT_TRIGGER_BASE,
 } from '../lib/dropdown-styles';
@@ -20,6 +22,7 @@ import { cn } from '../lib/utils';
 import {
   type MenuPrimitiveKind,
   type MenuRenderContext,
+  MenuScrollBody,
   renderItem,
   renderRootBody,
   SearchableContent,
@@ -32,6 +35,7 @@ import {
   filterItems,
   flattenMenuItems,
   getContentStyle,
+  getScrollBodyWidth,
   MENU_MAX_SUBMENU_DEPTH,
   menuNeedsSearch,
   menuSubmenuDepth,
@@ -73,6 +77,8 @@ export function CommonDropdown(props: CommonDropdownProps) {
     disabled = false,
     minWidth,
     maxHeight,
+    scrollBody = false,
+    motion = 'fade',
     children,
   } = props;
   const deepMenu = menuSubmenuDepth(items) > MENU_MAX_SUBMENU_DEPTH;
@@ -237,6 +243,34 @@ export function CommonDropdown(props: CommonDropdownProps) {
     );
   }
 
+  function renderDropdownBody() {
+    return renderRootBody({
+      isLoading,
+      items: filteredItems,
+      emptyMessage,
+      renderItems: itemsToRender => renderItems(itemsToRender, 'dropdown'),
+    });
+  }
+
+  /**
+   * Type to filter: a printable key (or Backspace) pressed on a row goes to
+   * the search field instead of Radix typeahead, so the list keeps filtering
+   * wherever focus sits. Arrow keys, Enter and Escape keep their menu roles.
+   */
+  function redirectTypingToSearch(event: React.KeyboardEvent<HTMLDivElement>) {
+    const input = rootSearchInputRef.current;
+    if (!input || event.target === input) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    const isPrintable = event.key.length === 1 && event.key !== ' ';
+    if (!isPrintable && event.key !== 'Backspace') return;
+    event.preventDefault();
+    const current = searchQueryRef.current;
+    handleSearchChange(
+      event.key === 'Backspace' ? current.slice(0, -1) : current + event.key
+    );
+    input.focus();
+  }
+
   function renderDropdownContent() {
     const content = (
       <DropdownMenuPrimitive.Content
@@ -247,8 +281,23 @@ export function CommonDropdown(props: CommonDropdownProps) {
         data-menu-surface='toolbar'
         data-slot='common-dropdown-content'
         aria-busy={isLoading || undefined}
-        className={cn(dropdownContentBase, contentClassName)}
-        style={getContentStyle(minWidth, maxHeight, 'dropdown')}
+        data-scroll-body={scrollBody ? 'true' : undefined}
+        data-motion={motion}
+        className={cn(
+          dropdownContentBase,
+          scrollBody && MENU_SCROLL_BODY_CONTENT,
+          motion === 'anchored' && MENU_ANCHORED_MOTION,
+          contentClassName
+        )}
+        style={
+          scrollBody
+            ? {
+                ...getContentStyle(undefined, maxHeight, 'dropdown', 'hidden'),
+                width: getScrollBodyWidth(minWidth),
+              }
+            : getContentStyle(minWidth, maxHeight, 'dropdown')
+        }
+        onKeyDown={searchable ? redirectTypingToSearch : undefined}
         onEscapeKeyDown={event => {
           if (searchQuery) {
             event.preventDefault();
@@ -265,12 +314,11 @@ export function CommonDropdown(props: CommonDropdownProps) {
             onClear={clearSearch}
           />
         ) : null}
-        {renderRootBody({
-          isLoading,
-          items: filteredItems,
-          emptyMessage,
-          renderItems: itemsToRender => renderItems(itemsToRender, 'dropdown'),
-        })}
+        {scrollBody ? (
+          <MenuScrollBody>{renderDropdownBody()}</MenuScrollBody>
+        ) : (
+          renderDropdownBody()
+        )}
       </DropdownMenuPrimitive.Content>
     );
 
