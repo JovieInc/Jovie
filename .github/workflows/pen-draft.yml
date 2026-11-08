@@ -94,7 +94,10 @@ jobs:
       contents: read
     strategy:
       fail-fast: false
-      max-parallel: 4
+      # One at a time: the Pen editor behind one PEN_CLI_KEY serves one
+      # document. With 4 in parallel on Nov 8, 19 of 20 drafts got only
+      # "Timeout waiting for document"; one after another, 4 of 8 drew.
+      max-parallel: 1
       matrix:
         frame: ${{ fromJSON(needs.plan.outputs.frames) }}
     steps:
