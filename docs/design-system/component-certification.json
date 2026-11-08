@@ -236,6 +236,10 @@
     },
     "apps/web/components/shell/Tooltip.tsx": {
       "empty": "The shell Tooltip wraps exactly one trigger with a required label and takes no collection; the detector matched the word rows in comments about sidebar nav rows."
+    },
+    "apps/web/components/features/dashboard/dashboard-nav/InboxAttentionLink.tsx": {
+      "offline": "InboxAttentionLink never fetches or mutates; it renders the pending count its owner passes, and with no connection that count stays unloaded, which the Partial story shows.",
+      "permission-denied": "InboxAttentionLink links to the signed-in Inbox that every account can open and has no gated action; a viewer who cannot reach the dashboard never sees the app rail."
     }
   }
 }

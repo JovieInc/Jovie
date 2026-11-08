@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { InboxAttentionLink } from './InboxAttentionLink';
 
 vi.mock('next/link', () => ({
@@ -74,5 +75,18 @@ describe('InboxAttentionLink', () => {
     expect(link).toHaveClass('bg-sidebar-accent-active');
     fireEvent.click(link);
     expect(onClick).toHaveBeenCalledTimes(1);
+  });
+  it.each([
+    ['empty', { attention: 'empty' }],
+    ['partial', { attention: 'unknown' }],
+    ['pending', { attention: 'available', pendingCount: 3 }],
+    ['long content', { attention: 'available', pendingCount: 140 }],
+    ['update available', { attention: 'available', runtimeUpdate: true }],
+    ['navigation pending', { attention: 'empty', navigationPending: true }],
+  ] as const)('has no accessibility violations when %s', async (_, props) => {
+    const { container } = render(
+      <InboxAttentionLink label='Inbox' itemId='home' {...props} />
+    );
+    await expectNoA11yViolations(container);
   });
 });

@@ -46,3 +46,30 @@ export const UpdateAvailable: Story = {
 export const NavigationPending: Story = {
   args: { navigationPending: true },
 };
+
+/** The pending count has not loaded yet, so the bell shows no badge. */
+export const Partial: Story = {
+  args: { attention: 'unknown' },
+};
+
+/** A large backlog caps the badge at 99 so the bell keeps its size. */
+export const LongContent: Story = {
+  args: {
+    label: 'Inbox, 140 pending items',
+    attention: 'available',
+    pendingCount: 140,
+  },
+};
+
+export const Rtl: Story = {
+  args: {
+    label: 'البريد الوارد، 3 عناصر معلقة',
+    attention: 'available',
+    pendingCount: 3,
+  },
+  render: args => (
+    <div dir='rtl'>
+      <InboxAttentionLink {...args} />
+    </div>
+  ),
+};
