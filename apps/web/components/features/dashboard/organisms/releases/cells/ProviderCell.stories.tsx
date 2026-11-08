@@ -37,6 +37,10 @@ const meta = {
   component: ProviderCell,
   parameters: {
     layout: 'centered',
+    jovie: {
+      // testId and releaseId are callback argument names, not props.
+      uncoveredProps: ['testId', 'releaseId'],
+    },
   },
   decorators: [
     Story => (
