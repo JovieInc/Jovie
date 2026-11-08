@@ -31,8 +31,14 @@ function placeCallouts() {
       continue;
     }
     const box = parent.getBoundingClientRect();
-    const x = rect.left + rect.width / 2 - box.left;
-    const y = rect.top + rect.height / 2 - box.top;
+    // A zoomed stage (1024-1439) reports viewport pixels; the callout moves
+    // in the stage's own pixels.
+    const scale =
+      parent instanceof HTMLElement && parent.offsetWidth > 0
+        ? box.width / parent.offsetWidth
+        : 1;
+    const x = (rect.left + rect.width / 2 - box.left) / scale;
+    const y = (rect.top + rect.height / 2 - box.top) / scale;
     const left = callout.classList.contains('hv3-callout--l')
       ? x + 4.5 - callout.offsetWidth
       : x - 4.5;
@@ -54,13 +60,14 @@ function drawConnectors() {
       continue;
     }
     const box = host.getBoundingClientRect();
-    const x1 = from.left - box.left;
-    const y1 = from.top - box.top;
-    const x2 = to.left - box.left;
-    const y2 = to.top - box.top;
+    const scale = host.offsetWidth > 0 ? box.width / host.offsetWidth : 1;
+    const x1 = (from.left - box.left) / scale;
+    const y1 = (from.top - box.top) / scale;
+    const x2 = (to.left - box.left) / scale;
+    const y2 = (to.top - box.top) / scale;
     const mid = (x1 + x2) / 2;
-    svg.setAttribute('width', String(box.width));
-    svg.setAttribute('height', String(box.height));
+    svg.setAttribute('width', String(box.width / scale));
+    svg.setAttribute('height', String(box.height / scale));
     const path = document.createElementNS(SVG_NS, 'path');
     path.setAttribute(
       'd',

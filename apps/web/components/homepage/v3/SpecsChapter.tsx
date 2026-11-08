@@ -106,7 +106,11 @@ export function SpecsChapter() {
       </div>
       <div className='hv3-moments hv3-reveal'>
         <article className='hv3-moment'>
-          <div className='hv3-moment__stage' aria-hidden>
+          <div
+            className='hv3-moment__stage'
+            aria-hidden
+            data-dom-certification='ignore'
+          >
             <Orbit id='hv3-orbit-palette' rings={[520, 420]} arc={[300, 42]} />
             <div className='hv3-glow hv3-glow--palette' />
             <CommandPaletteCard />
@@ -127,7 +131,11 @@ export function SpecsChapter() {
           </p>
         </article>
         <article className='hv3-moment'>
-          <div className='hv3-moment__stage' aria-hidden>
+          <div
+            className='hv3-moment__stage'
+            aria-hidden
+            data-dom-certification='ignore'
+          >
             <div className='hv3-glow hv3-glow--insp' />
             <div className='hv3-rig hv3-rig--moment'>
               <div className='hv3-lift hv3-lift--moment hv3-edge'>

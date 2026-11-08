@@ -1,7 +1,7 @@
 /* Homepage v3 below the approved 1440 frame: the 390 composition (phones and
    small tablets) and fluid display type in between. */
 
-@media (min-width: 48rem) and (max-width: 89.9375rem) {
+@media (min-width: 64rem) and (max-width: 89.9375rem) {
   .hv3-display,
   .hv3-hero .marketing-hero-headline {
     font-size: clamp(4rem, 7.78vw, 7rem);
@@ -38,7 +38,10 @@
   .hv3 {
     --hv3-gutter: 1rem;
   }
+}
 
+/* Below 1024: the approved 390 composition (stages anchored left). */
+@media (max-width: 63.9375rem) {
   .hv3-display,
   .hv3-hero .marketing-hero-headline {
     font-size: 3.25rem;
@@ -286,5 +289,36 @@
   .hv3-steps {
     grid-template-columns: 1fr;
     margin-top: 4rem;
+  }
+}
+
+/* 1024-1439: the stages keep the approved 1440 composition, scaled. */
+@media (min-width: 64rem) and (max-width: 89.9375rem) {
+  .hv3 {
+    --hv3-z: 0.9;
+  }
+
+  .hv3-stage,
+  .hv3-moment__stage {
+    zoom: var(--hv3-z);
+  }
+
+  /* zoom scales the stage's own offset too; keep it 450px below the top. */
+  .hv3-stage--hero {
+    top: calc(28.125rem / var(--hv3-z));
+  }
+
+  .hv3-hero {
+    height: 83rem;
+  }
+}
+
+@media (min-width: 64rem) and (max-width: 79.9375rem) {
+  .hv3 {
+    --hv3-z: 0.72;
+  }
+
+  .hv3-hero {
+    height: 72rem;
   }
 }

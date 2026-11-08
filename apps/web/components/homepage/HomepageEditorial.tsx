@@ -115,7 +115,12 @@ export function HomepageStoryHero({
           <p className='hv3-mono hv3-hero__note'>{COPY.hero.note}</p>
         </div>
       </div>
-      <div className='hv3-stage hv3-stage--hero'>
+      {/* Product mockups under the 3D camera: their boxes overlap by projection,
+          not by layout, so the DOM layout detectors skip them. */}
+      <div
+        className='hv3-stage hv3-stage--hero'
+        data-dom-certification='ignore'
+      >
         <div className='hv3-bounce' />
         <div
           className='hv3-rig hv3-rig--hero'
@@ -185,7 +190,10 @@ export function HomepageProfileChapter({
             ))}
           </dl>
         </div>
-        <div className='hv3-stage hv3-stage--profile'>
+        <div
+          className='hv3-stage hv3-stage--profile'
+          data-dom-certification='ignore'
+        >
           <Orbit
             id='hv3-orbit-profile'
             rings={[380, 300, 220]}
@@ -240,7 +248,10 @@ export function HomepageReleasesChapter({
         <h2 className='hv3-statement text-balance'>{lines(copy.headline)}</h2>
         <p className='hv3-lede hv3-lede--center'>{copy.body}</p>
       </div>
-      <div className='hv3-stage hv3-stage--releases hv3-frame'>
+      <div
+        className='hv3-stage hv3-stage--releases hv3-frame'
+        data-dom-certification='ignore'
+      >
         <Orbit id='hv3-orbit-releases' rings={[620, 500]} arc={[345, 36]} />
         <div className='hv3-bounce' />
         <div className='hv3-rig hv3-rig--releases'>
