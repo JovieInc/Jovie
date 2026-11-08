@@ -23,6 +23,7 @@ vi.mock('next/navigation', () => ({
   },
 }));
 
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { AuthOfferSummary } from './AuthOfferSummary';
 
 describe('AuthOfferSummary', () => {
@@ -83,5 +84,16 @@ describe('AuthOfferSummary', () => {
     expect(summary).not.toHaveTextContent(
       'Start your 14-day Artist Presence trial'
     );
+  });
+
+  it('has no axe violations for the sign-up and sign-in recaps', async () => {
+    searchParamsState.value = 'plan=pro&interval=month';
+    const { container, rerender } = render(
+      <AuthOfferSummary mode='sign-up' enabled />
+    );
+    await expectNoA11yViolations(container);
+
+    rerender(<AuthOfferSummary mode='sign-in' enabled />);
+    await expectNoA11yViolations(container);
   });
 });
