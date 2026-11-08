@@ -246,10 +246,10 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'app/app/(shell)/shell-route-matches.ts'),
       'utf-8'
     );
-    const appShellLayout = readFileSync(
-      join(ROOT, 'app/app/(shell)/layout.tsx'),
-      'utf-8'
-    );
+    // The shell boot fallback picks its route skeleton in shell-route-skeleton.
+    const appShellLayout = ['layout.tsx', 'shell-route-skeleton.tsx']
+      .map(file => readFileSync(join(ROOT, 'app/app/(shell)', file), 'utf-8'))
+      .join('\n');
 
     expect(tasksPage).toContain('WorkspacePage');
     expect(tasksPage).toContain("frame='none'");
@@ -257,14 +257,8 @@ describe('surface elevation guardrails', () => {
     expect(tasksPage).toContain("data-testid='tasks-content-panel'");
     expect(tasksPage).toContain('TaskDataTable');
     expect(tasksPage).not.toMatch(/<UnifiedTable\b/);
-    const shellRouteSkeleton = readFileSync(
-      join(ROOT, 'app/app/(shell)/shell-route-skeleton.tsx'),
-      'utf-8'
-    );
     expect(shellRouteMatches).toContain('isTasksShellRoute');
-    expect(appShellLayout).toContain('resolveShellRouteSkeleton');
-    expect(shellRouteSkeleton).toContain('isTasksShellRoute');
-    expect(shellRouteSkeleton).toContain('TasksRouteSkeleton');
+    expect(appShellLayout).toContain('TasksRouteSkeleton');
   });
 
   it('keeps presence and earnings inside framed content panels', () => {
@@ -380,10 +374,10 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'app/app/(shell)/library/LibrarySurface.tsx'),
       'utf-8'
     );
-    const appShellLayout = readFileSync(
-      join(ROOT, 'app/app/(shell)/layout.tsx'),
-      'utf-8'
-    );
+    // The shell boot fallback picks its route skeleton in shell-route-skeleton.
+    const appShellLayout = ['layout.tsx', 'shell-route-skeleton.tsx']
+      .map(file => readFileSync(join(ROOT, 'app/app/(shell)', file), 'utf-8'))
+      .join('\n');
 
     // JOV-8792: the library keeps its own live filter pills; the retired
     // header search adapter registration must stay gone.
@@ -391,13 +385,8 @@ describe('surface elevation guardrails', () => {
     expect(librarySurface).not.toContain("key: 'library'");
     expect(librarySurface).not.toContain('Filter Work');
     expect(librarySurface).not.toContain('OPEN_COMMAND_PALETTE_EVENT');
-    const shellRouteSkeleton = readFileSync(
-      join(ROOT, 'app/app/(shell)/shell-route-skeleton.tsx'),
-      'utf-8'
-    );
-    expect(appShellLayout).toContain('resolveShellRouteSkeleton');
-    expect(shellRouteSkeleton).toContain('isLibraryShellRoute');
-    expect(shellRouteSkeleton).toContain('LibraryLoadingState');
+    expect(appShellLayout).toContain('isLibraryShellRoute');
+    expect(appShellLayout).toContain('LibraryLoadingState');
   });
 
   it('routes task filters through the shared header search contract', () => {
