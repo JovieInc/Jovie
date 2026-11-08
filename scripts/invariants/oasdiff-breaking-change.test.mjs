@@ -341,6 +341,31 @@ test('the pinned oasdiff release is exact and sha-verified', () => {
   assert.match(result.error, /does not match the pinned/);
 });
 
+test('an HTTP 5xx download fails as a download, never as a sha mismatch', t => {
+  // The stub behaves like curl: an error page on stdout, exit 22 only with -f.
+  const dir = mkdtempSync(join(tmpdir(), 'jovie-oasdiff-curl-'));
+  const argsLog = join(dir, 'args');
+  writeFileSync(
+    join(dir, 'curl'),
+    `#!/usr/bin/env bash\nprintf '%s\\n' "$@" >${JSON.stringify(argsLog)}\necho '<html>504 Gateway Time-out</html>'\n[[ "$1" == -f* ]] && exit 22\nexit 0\n`
+  );
+  chmodSync(join(dir, 'curl'), 0o755);
+  const saved = { PATH: process.env.PATH, BIN: process.env.OASDIFF_BIN };
+  process.env.PATH = `${dir}:${process.env.PATH}`;
+  delete process.env.OASDIFF_BIN;
+  t.after(() => {
+    process.env.PATH = saved.PATH;
+    if (saved.BIN !== undefined) process.env.OASDIFF_BIN = saved.BIN;
+    rmSync(dir, { recursive: true, force: true });
+  });
+  const result = ensureOasdiffBinary({ cacheDir: join(dir, 'cache') });
+  assert.equal(result.code, 1);
+  assert.match(result.error, /download failed: curl exit 22/);
+  const args = readFileSync(argsLog, 'utf8').split('\n');
+  assert.ok(args.includes('--retry-all-errors'));
+  assert.ok(Number(args[args.indexOf('--retry') + 1]) >= 6);
+});
+
 function specRepository(t) {
   const root = mkdtempSync(join(tmpdir(), 'jovie-oasdiff-tree-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
