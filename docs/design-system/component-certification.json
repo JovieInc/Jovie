@@ -222,6 +222,20 @@
     "apps/web/components/organisms/CookieModal.tsx": {
       "empty": "The dialog maps over the fixed COOKIE_CATEGORIES constant (Essential, Analytics, Marketing), which is never empty, so there is no empty-data state.",
       "long-content": "Every category label, description and button in the dialog is fixed copy from module constants with no props or user text, so its content cannot grow."
+    },
+    "apps/web/components/feedback/Banner.tsx": {
+      "permission-denied": "Banner only renders caller-supplied status copy with an optional action and dismiss, and has no gated action or permission input; the detector matched role='alert' and role='status' on its live region."
+    },
+    "apps/web/components/atoms/VerifiedBadge.tsx": {
+      "partial": "VerifiedBadge takes no data; its only optional props are size and className, both styling with defaults, and its glyph and accessible name are fixed, so nothing can be partially present.",
+      "permission-denied": "VerifiedBadge is a static verification mark with no gated action or permission input; the detector matched role='img' on its wrapper."
+    },
+    "apps/web/components/atoms/SocialIcon.tsx": {
+      "long-content": "SocialIcon draws one fixed 24x24 glyph and lays out no text; its only string input, aria-label, is announced rather than rendered, so there is no content to overflow.",
+      "permission-denied": "SocialIcon only draws a platform glyph and has no gated action or permission input; the detector matched role='img' on the labelled svg."
+    },
+    "apps/web/components/shell/Tooltip.tsx": {
+      "empty": "The shell Tooltip wraps exactly one trigger with a required label and takes no collection; the detector matched the word rows in comments about sidebar nav rows."
     }
   }
 }
