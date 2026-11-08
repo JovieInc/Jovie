@@ -82,10 +82,10 @@ export function DashboardFeedbackModal({
             <CheckCircle2 className='h-6 w-6' aria-hidden='true' />
           </div>
           <DialogTitle className='mt-4 text-balance text-lg font-semibold text-primary-token'>
-            Thank You!
+            Feedback Sent
           </DialogTitle>
           <DialogDescription className='mt-2 text-app text-secondary-token'>
-            Sent — thanks for the feedback.
+            Thanks for telling us.
           </DialogDescription>
         </div>
       ) : (
