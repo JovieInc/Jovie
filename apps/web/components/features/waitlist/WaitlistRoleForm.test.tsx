@@ -14,6 +14,8 @@ const challenge = vi.hoisted(() => ({
     | ((state: InvisibleTurnstileState) => void)
     | undefined,
 }));
+// Read the latest handler without the caller's narrowing sticking to it.
+const currentStateHandler = () => challenge.onStateChange;
 vi.mock('@/components/atoms/InvisibleTurnstile', () => ({
   InvisibleTurnstile: ({
     onStateChange,
@@ -241,8 +243,7 @@ describe('WaitlistRoleForm', () => {
     render(<WaitlistRoleForm />);
     challenge.onStateChange = undefined;
     fireEvent.focus(screen.getByLabelText('Email address'));
-    // Read through a function: the assignment above narrows the property.
-    const lateFailure = (() => challenge.onStateChange)();
+    const lateFailure = currentStateHandler();
     expect(lateFailure).toBeTypeOf('function');
     fireEvent.click(screen.getByRole('radio', { name: 'Artist' }));
     fireEvent.change(screen.getByLabelText('Email address'), {
