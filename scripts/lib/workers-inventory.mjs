@@ -66,6 +66,7 @@ export function compareWorkers({ deployed, repoNames, canon }) {
   return errors;
 }
 
+/** @param {{accountId: string, token?: string, fetchImpl?: typeof fetch, store?: import('../../packages/api-client/store.ts').LedgerStore}} options */
 export async function fetchDeployedWorkers({
   accountId,
   token,
@@ -86,7 +87,10 @@ export async function fetchDeployedWorkers({
     timeoutMs: 15_000,
     maxAttempts: 1,
   });
-  const body = await res.json();
+  const body =
+    /** @type {{success?: boolean, result?: Array<{id: string}>}} */ (
+      res.json()
+    );
   if (
     res.status < 200 ||
     res.status >= 300 ||
