@@ -150,10 +150,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/molecules/FirstFanCelebration.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/molecules/universal-link-input/MultiLinkPasteDialog.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -183,10 +179,6 @@
     },
     {
       "path": "apps/web/components/features/dashboard/organisms/contacts-table/columns.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/features/dashboard/organisms/contacts-table/row-actions.tsx",
       "linearIssue": "JOV-8847"
     },
     {
@@ -299,10 +291,6 @@
     },
     {
       "path": "apps/web/components/features/dashboard/organisms/releases/cells/ProviderCell.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/features/dashboard/organisms/settings-artist-profile-section/ConnectedDspList.tsx",
       "linearIssue": "JOV-8847"
     },
     {
@@ -571,18 +559,6 @@
     },
     {
       "path": "apps/web/components/shell/InlineEditRow.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/shell/PickerAction.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/shell/PickerLink.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/shell/PickerToggle.tsx",
       "linearIssue": "JOV-8847"
     },
     {
