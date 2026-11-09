@@ -365,6 +365,7 @@ export const REQUIRED_CHECK_NAMES = Object.freeze([
   'Migration Guard',
   'Fork PR Gate',
   'PR Size Guard',
+  'Company guards',
 ]);
 export const REQUIRED_CHECK_PREFIXES = Object.freeze(['ci-fast (']);
 
