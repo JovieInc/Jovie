@@ -1,5 +1,6 @@
 import { render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ElectronAPI } from '@/lib/desktop/electron-bridge';
 
 const electronRuntimeMock = vi.hoisted(() => ({ isElectronRuntime: false }));
 
@@ -46,16 +47,19 @@ describe('DesktopTitlebarSlot', () => {
 
   it('lazy-loads the titlebar once the electron runtime is detected', async () => {
     electronRuntimeMock.isElectronRuntime = true;
-    window.electronAPI = {
-      platform: 'darwin',
-      electronVersion: '33.0.0',
-      onUpdateAvailable: vi.fn(),
-      onUpdateDownloaded: vi.fn(),
-      installUpdateAndRestart: vi.fn(),
-      goBack: vi.fn(),
-      goForward: vi.fn(),
-      onNavStateChanged: vi.fn(),
-    } as unknown as Window['electronAPI'];
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        platform: 'darwin',
+        electronVersion: '33.0.0',
+        onUpdateAvailable: vi.fn(),
+        onUpdateDownloaded: vi.fn(),
+        installUpdateAndRestart: vi.fn(),
+        goBack: vi.fn(async () => {}),
+        goForward: vi.fn(async () => {}),
+        onNavStateChanged: vi.fn(() => vi.fn()),
+      } satisfies ElectronAPI,
+    });
     render(<DesktopTitlebarSlot />);
     await waitFor(() => {
       expect(
