@@ -14,6 +14,7 @@ import type { Lead } from '@/lib/db/schema/leads';
 import { normalizeArtistName } from '@/lib/dsp-enrichment/matching/name-similarity';
 import { isCoreSocialHtmlHost } from '@/lib/ingestion/social-html-policy';
 import { normalizeHandle } from '@/lib/ingestion/strategies/base/utils';
+import { isLayloUrl } from '@/lib/ingestion/strategies/laylo';
 import type { ExtractionResult } from '@/lib/ingestion/types';
 import { cleanScrapedDisplayName } from '@/lib/profile/scraped-display-name';
 import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
@@ -57,10 +58,15 @@ type PagelessLeadInput = Pick<
   | 'signalSnapshot'
 >;
 
-/** True for leads whose link page Jovie must not read. */
+/**
+ * True for leads whose link page Jovie must not read. Laylo pages are read
+ * through Laylo's public profile JSON, so a Laylo URL is never pageless, even
+ * when the row kept the schema's default `linktree` source platform.
+ */
 export function isPagelessLead(
   lead: Pick<Lead, 'linktreeUrl' | 'sourcePlatform'>
 ): boolean {
+  if (isLayloUrl(lead.linktreeUrl)) return false;
   if (lead.sourcePlatform === 'linktree' || lead.sourcePlatform === 'beacons')
     return true;
   try {

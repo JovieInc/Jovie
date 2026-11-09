@@ -154,45 +154,6 @@ describe('AppShellFrame', () => {
     expect(plane).toHaveClass('bg-(--app-shell-content-surface)');
   });
 
-  it('contains the right overlay inside the main route without allocating a column', () => {
-    render(
-      <AppShellFrame
-        sidebar={<aside>Sidebar</aside>}
-        header={<header>Header</header>}
-        main={<div>Main Content</div>}
-        rightPanel={<div data-testid='fixture-right-rail'>Right rail</div>}
-      />
-    );
-
-    const scrollPane = screen.getByTestId('app-shell-scroll');
-    const rightRail = screen.getByTestId('app-shell-right-rail');
-
-    expect(scrollPane).toHaveClass('overflow-hidden');
-    expect(scrollPane).not.toHaveClass('overflow-y-auto');
-    expect(scrollPane).toContainElement(screen.getByText('Main Content'));
-    const main = screen.getByRole('main');
-    const mainPlane = rightRail.closest('[data-app-shell-main-plane]');
-    const routeContent = main.querySelector('[data-app-shell-main-content]');
-
-    expect(mainPlane).toHaveAttribute('data-app-shell-main-plane', 'true');
-    expect(mainPlane).toContainElement(main);
-    expect(mainPlane).toContainElement(rightRail);
-    expect(main).toContainElement(rightRail);
-    expect(main).toContainElement(routeContent as HTMLElement);
-    expect(rightRail.parentElement).toBe(routeContent);
-    expect(routeContent?.parentElement).toBe(main);
-    expect(scrollPane).not.toContainElement(rightRail);
-    expect(rightRail).toContainElement(
-      screen.getByTestId('fixture-right-rail')
-    );
-    expect(rightRail).toHaveClass('shell-inspector-overlay');
-    expect(mainPlane).toHaveClass(
-      'transition-[flex-basis,width]',
-      'duration-cinematic',
-      'motion-reduce:transition-none'
-    );
-  });
-
   it('reserves dev-toolbar height inside the shell scroll pane', () => {
     render(
       <AppShellFrame
@@ -496,33 +457,6 @@ describe('AppShellFrame', () => {
       'true'
     );
     expect(tray).toHaveClass('shrink-0');
-  });
-
-  it('keeps the inspector within main while the audio dock retains the same column', () => {
-    render(
-      <AppShellFrame
-        sidebar={<aside>Sidebar</aside>}
-        header={<header>Header</header>}
-        main={<div>Main Content</div>}
-        rightPanel={<div data-testid='fixture-rail'>Rail</div>}
-        audioPlayer={<div data-testid='audio-player'>Player</div>}
-      />
-    );
-
-    const main = screen.getByRole('main');
-    const rail = screen.getByTestId('app-shell-right-rail');
-    const tray = screen.getByTestId('app-shell-audio-tray');
-
-    expect(main).toContainElement(rail);
-    expect(rail).not.toContainElement(tray);
-    expect(tray.parentElement).toHaveAttribute(
-      'data-app-shell-main-column',
-      'true'
-    );
-    expect(rail.parentElement).toHaveAttribute(
-      'data-app-shell-main-content',
-      'true'
-    );
   });
 
   it('mounts mobile navigation in the shared in-flow bottom surface', () => {

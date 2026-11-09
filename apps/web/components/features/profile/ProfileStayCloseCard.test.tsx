@@ -1,10 +1,11 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ProfileStayCloseCard } from './ProfileStayCloseCard';
 
 describe('ProfileStayCloseCard', () => {
-  it('wraps the alerts flow with the Stay close eyebrow and its accent', () => {
-    render(
+  it('wraps the alerts flow with the Stay close eyebrow and its accent', async () => {
+    const { container } = render(
       <ProfileStayCloseCard accent={{ accent: 'orange', strength: 'text' }}>
         <form aria-label='Alerts sign-up' />
       </ProfileStayCloseCard>
@@ -19,5 +20,6 @@ describe('ProfileStayCloseCard', () => {
     expect(
       within(card).getByRole('form', { name: 'Alerts sign-up' })
     ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 });
