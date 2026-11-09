@@ -4,6 +4,8 @@
 // the route manifest, copy truth sources, the one primary action, product
 // imagery, and tokenized styles. Changing the page means changing its typed
 // records, not rewriting a dozen source-string guards.
+// Frame checks (labels, keycaps and edges inside their frames) live in
+// homepage-frames.test.tsx, so this file stays under the size limit.
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
