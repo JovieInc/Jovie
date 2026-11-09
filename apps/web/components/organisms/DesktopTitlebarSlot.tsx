@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/organisms/DesktopTitlebarSlot.test.tsx
+
 import dynamic from 'next/dynamic';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-runtime';
 

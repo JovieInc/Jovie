@@ -9,7 +9,7 @@ import type { ElectronAPI } from './electron-bridge';
 // shortcuts, radix dialog) into the initial chunks. electron-bridge
 // re-exports everything here, so existing importers are unaffected.
 
-function getRawElectronAPI(): Partial<ElectronAPI> | undefined {
+export function getRawElectronAPI(): Partial<ElectronAPI> | undefined {
   if (globalThis.window === undefined) return undefined;
   const raw = (
     globalThis.window as Window & { electronAPI?: Partial<ElectronAPI> }
