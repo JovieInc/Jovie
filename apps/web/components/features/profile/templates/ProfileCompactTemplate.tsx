@@ -1260,7 +1260,7 @@ export function ProfileCompactTemplate({
               data-sheet-container
             >
               <ProfileDesktopSurface
-                presentation='modal'
+                presentation='embedded'
                 overlaysEnabled={isDesktopLayout}
                 onReady={handleDesktopSurfaceReady}
                 artist={artist}
@@ -1311,7 +1311,7 @@ export function ProfileCompactTemplate({
                 open={creditsOpen && isDesktopLayout}
                 onOpenChange={setCreditsOpen}
                 credits={visibleReleaseCredits}
-                presentation='modal'
+                presentation='embedded'
               />
             </div>
           ) : null
