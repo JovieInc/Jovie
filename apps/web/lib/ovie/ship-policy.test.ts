@@ -10,6 +10,8 @@ describe('ship policy', () => {
       waitHours: 0,
       defaultDecision: 'approve',
     });
+    // A ship-now card settles at once, so it can't promise a reject; feedback is the way back.
+    expect(at('low', 'high').defaultIfSilent).not.toMatch(/reject/i);
     expect(at('low', 'low')).toMatchObject({
       gate: 'wait_then_ship',
       waitHours: 48,

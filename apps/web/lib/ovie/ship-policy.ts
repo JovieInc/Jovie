@@ -19,7 +19,7 @@ export const SHIP_CONFIDENCES = ['high', 'low'] as const;
 export type ShipConfidence = (typeof SHIP_CONFIDENCES)[number];
 
 export type ShipGate =
-  /** Ships now; the card is a receipt Tim can still reverse. */
+  /** Ships now; the card is a receipt, and Tim's feedback on it asks Summer to roll it back. */
   | 'ship_now'
   /** Waits for Tim, then ships on silence. */
   | 'wait_then_ship'
@@ -88,7 +88,7 @@ export function shipPolicy(input: ShipPolicyInput): ShipPolicyDecision {
       gate: 'ship_now',
       waitHours: 0,
       defaultDecision: 'approve',
-      defaultIfSilent: 'Ships now. Reject to roll it back.',
+      defaultIfSilent: 'Ships now. Leave feedback to have Summer roll it back.',
     };
   return {
     schema: SHIP_POLICY_SCHEMA,
