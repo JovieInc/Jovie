@@ -143,7 +143,7 @@ for (const viewport of VIEWPORTS) {
       `DSP strip reaches the profile identity at ${viewport.id}`
     ).toBeLessThanOrEqual(nameBox.y);
 
-    await testInfo.attach(`preview-${viewport.width}x${viewport.height}`, {
+    await testInfo.attach(`preview-${viewport.width}x${viewport.height}.png`, {
       body: await page.screenshot(),
       contentType: 'image/png',
     });
