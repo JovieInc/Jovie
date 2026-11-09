@@ -215,6 +215,21 @@ export const readMarker = body => {
   }
 };
 
+/**
+ * Open incidents an alert replaces: same key family (`supersedes` prefix), other
+ * key. A queue-head-stuck alert is about one head; once another head is the one
+ * stuck, the older alerts are stale (Tim, 2026-11-09: close them all, "dont ask
+ * again"). Without this they piled up past the 50-issue read and the alert
+ * stopped finding its own open issue, so it filed duplicates.
+ */
+export function supersededIncidents(found, key, supersedes) {
+  if (!supersedes) return [];
+  return found.filter(i => {
+    const k = readMarker(i.body)?.key;
+    return typeof k === 'string' && k.startsWith(supersedes) && k !== key;
+  });
+}
+
 // ---- queue pitfalls ---------------------------------------------------------
 
 /**

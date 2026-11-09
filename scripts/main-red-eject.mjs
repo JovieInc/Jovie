@@ -43,6 +43,7 @@ import {
   REVERT_LABEL,
   readMarker,
   shouldFailOver,
+  supersededIncidents,
   titles,
   verifyJump,
 } from './lib/main-red-eject.mjs';
@@ -442,11 +443,26 @@ async function enqueueWithJump(number) {
 
 // ---- incident --------------------------------------------------------------
 
-async function incident(key, title, body) {
+async function incident(key, title, body, { supersedes = null } = {}) {
   const found = await api(
-    `repos/${REPO}/issues?state=open&labels=${INCIDENT_LABEL}&per_page=50`,
+    `repos/${REPO}/issues?state=open&labels=${INCIDENT_LABEL}&per_page=100`,
     'repair'
   );
+  for (const stale of supersededIncidents(found, key, supersedes)) {
+    // Closing a stale alert is housekeeping; a failure must not block the new alert.
+    await gh([
+      'api',
+      '-X',
+      'PATCH',
+      `repos/${REPO}/issues/${stale.number}`,
+      '-f',
+      'state=closed',
+      '-f',
+      'state_reason=completed',
+    ]).catch(error =>
+      console.error(`::warning::stale incident close failed: ${error.message}`)
+    );
+  }
   const existing = found.find(i => readMarker(i.body)?.key === key);
   const text = `${marker({ key })}\n${body}`;
   if (existing) {
@@ -706,7 +722,8 @@ export async function stuckHead({ doApply = false, now = Date.now() } = {}) {
     await incident(
       `queue-head-stuck:${head.number}`,
       `queue head #${head.number} stuck ${metric.stuckMin} min (${head.state})`,
-      `Queue head #${head.number} has been at position 1 for ${metric.stuckMin} min in state ${head.state} (alert threshold ${HEAD_STUCK_ALERT_MIN} min). Dequeue it if it is red.`
+      `Queue head #${head.number} has been at position 1 for ${metric.stuckMin} min in state ${head.state} (alert threshold ${HEAD_STUCK_ALERT_MIN} min). Dequeue it if it is red.`,
+      { supersedes: 'queue-head-stuck:' }
     );
   // Only an UNMERGEABLE head needs the first-sighting comment read: skip the call otherwise.
   if (head.state !== 'UNMERGEABLE')
