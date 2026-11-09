@@ -30,6 +30,25 @@ const toastMock = vi.hoisted(() =>
 vi.mock('@/components/feedback', () => ({ toast: toastMock }));
 
 describe('HomeLoopCanvas', () => {
+  it('reserves the shipping provenance layout across loading and unavailable states', () => {
+    const { rerender } = render(
+      <HomeLoopCanvas
+        {...props({ reservePulseSourceCaption: true, loopStatus: 'loading' })}
+      />
+    );
+    const layout = screen.getByTestId('home-loop-pulse').className;
+    rerender(
+      <HomeLoopCanvas {...props({ reservePulseSourceCaption: true })} />
+    );
+    expect(screen.getByTestId('home-loop-pulse').className).toBe(layout);
+    rerender(
+      <HomeLoopCanvas
+        {...props({ reservePulseSourceCaption: true, pulse: [] })}
+      />
+    );
+    expect(screen.getByTestId('home-loop-pulse').className).toBe(layout);
+  });
+
   it('puts the company row above the shipping verdict with its caption', () => {
     render(
       <HomeLoopCanvas
