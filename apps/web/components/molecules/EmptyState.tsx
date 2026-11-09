@@ -140,7 +140,10 @@ function parseShortcut(shortcut: string): React.ReactNode {
     return (
       <span className='ml-2 inline-flex items-center gap-1'>
         <Kbd>{parts[0]}</Kbd>
-        <span className='text-3xs text-(--color-btn-primary-fg)/60'> then </span>
+        <span className='text-3xs text-(--color-btn-primary-fg)/60'>
+          {' '}
+          then{' '}
+        </span>
         <Kbd>{parts[1]}</Kbd>
       </span>
     );
