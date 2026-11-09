@@ -93,4 +93,30 @@ describe('PresenceIdentityPhoto', () => {
     );
     expect(queryByTestId('presence-identity-platform-mark')).toBeNull();
   });
+  it.each([
+    ['website', 'example', /lucide/],
+    ['authority', 'wikipedia', /lucide/],
+  ])(
+    'gives a compact %s row its own mark, not the generic link',
+    (kind, platform, glyph) => {
+      const { getByTestId } = render(
+        <PresenceIdentityPhoto
+          size='sm'
+          artistName='Tim'
+          subject={{
+            kind,
+            platform,
+            label: 'Tim',
+            handle: null,
+            url: 'https://example.com',
+            monitoringState: 'active',
+          }}
+        />
+      );
+      const svg = getByTestId('presence-identity-platform-mark').querySelector(
+        'svg'
+      );
+      expect(svg?.getAttribute('class') ?? '').toMatch(glyph);
+    }
+  );
 });

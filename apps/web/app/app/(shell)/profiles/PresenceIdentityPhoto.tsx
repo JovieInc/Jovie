@@ -1,5 +1,7 @@
 'use client';
 
+import { BookOpen, Globe2 } from 'lucide-react';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import {
   getPlatformIconMetadata,
   SocialIcon,
@@ -44,6 +46,33 @@ function ProviderBadge({
   );
 }
 
+/**
+ * The compact row's platform glyph, resolved like the Profiles brand icon:
+ * Jovie, source and website rows have no social glyph, so they get their own
+ * mark instead of SocialIcon's generic link fallback.
+ */
+function CompactPlatformGlyph({
+  subject,
+}: Readonly<{ subject: PresenceIdentitySubject }>) {
+  if (subject.kind === 'jovie')
+    return (
+      <BrandLogo
+        size='chrome'
+        tone='color'
+        rounded={false}
+        aria-hidden
+        className='h-3 w-3 [&_svg]:h-full [&_svg]:w-full'
+      />
+    );
+  if (subject.kind === 'authority')
+    return <BookOpen className='h-3 w-3' aria-hidden />;
+  if (subject.kind === 'website')
+    return <Globe2 className='h-3 w-3' aria-hidden />;
+  return (
+    <SocialIcon platform={subject.platform} className='h-3 w-3' aria-hidden />
+  );
+}
+
 export function PresenceIdentityPhoto({
   subject,
   artistName,
@@ -84,11 +113,7 @@ export function PresenceIdentityPhoto({
           data-testid='presence-identity-platform-mark'
           className='inline-flex h-5 w-5 items-center justify-center text-secondary-token'
         >
-          <SocialIcon
-            platform={subject.platform}
-            className='h-3 w-3'
-            aria-hidden
-          />
+          <CompactPlatformGlyph subject={subject} />
         </span>
       ) : (
         <Avatar
