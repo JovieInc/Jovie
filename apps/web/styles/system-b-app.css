@@ -134,6 +134,23 @@
   line-height: 1.4;
 }
 
+/* JOV-12045: the side rail's phone preview must fit the rail at rest. The
+   preview keeps the locked 402:874 screen aspect (JOV-7192, width-only
+   sizing), which is ~618px tall at its w-71 width and ran past the rail's
+   fold at the 1280x720 golden-path viewport, leaving the draft-profile card
+   cut at the bottom edge with no clean scroll position. The rail hero is a
+   size container; the phone shrinks only when the hero is short (45.9cqh
+   derives from the locked 402/874 ratio, one step under the exact fit) and
+   never grows past its w-71 width on tall viewports. Unlayered so the width
+   holds against the w-auto utility and PhoneFrame's base w-71. */
+.system-b-onboarding-rail-hero {
+  container-type: size;
+}
+
+.system-b-onboarding-rail-phone {
+  width: min(17.75rem, 45.9cqh);
+}
+
 :where(.system-b-onboarding-empty-state) {
   border-bottom: 1px solid
     color-mix(in oklab, var(--system-b-app-frame-seam) 58%, transparent);
@@ -3592,19 +3609,22 @@
 }
 
 /* Hide scrolled-away thread content under a floating header row (JOV-7192).
-   The clearance band above the first resting message stays fully clear and
-   only its last --space-4 ramps in, so a half-scrolled bubble dissolves
-   instead of reading as a clipped control. Resting content starts at
-   --space-16 (the scroll region's pt-16) and is never masked. */
+   The clearance band above the first resting message stays fully clear.
+   Resting content starts at --space-16 (the scroll region's pt-16) and is
+   never masked. JOV-12045: the old 16px reveal ramp (transparent until
+   --space-12) half-revealed a scrolled-away agent-turn brand row in recorded
+   visual review, which read as a clipped control — the band is now fully
+   masked, so scrolled-away content is either invisible above the clearance
+   or fully visible below it. */
 :where(.system-b-chat-thread-top-fade) {
   mask-image: linear-gradient(
     to bottom,
-    transparent var(--space-12),
+    transparent var(--space-16),
     black var(--space-16)
   );
   -webkit-mask-image: linear-gradient(
     to bottom,
-    transparent var(--space-12),
+    transparent var(--space-16),
     black var(--space-16)
   );
 }
