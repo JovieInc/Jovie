@@ -108,11 +108,13 @@ export const summerCardInputSchema = z
   .refine(
     card =>
       card.risk === null ||
-      (card.decideBy === null && card.defaultDecision === null),
+      (card.decideBy === null &&
+        card.defaultDecision === null &&
+        card.defaultIfSilent === null),
     {
       path: ['risk'],
       message:
-        'declare either risk and confidence or decideBy and defaultDecision, not both',
+        'declare either risk and confidence or decideBy, defaultDecision and defaultIfSilent, not both; the ship policy writes the silence copy',
     }
   )
   .refine(card => card.kind !== 'spend' || card.preflightReceiptId, {

@@ -246,6 +246,16 @@ describe('summer card default-plus-deadline contract', () => {
         confidence: 'high',
       }).success
     ).toBe(false);
+    expect(
+      summerCardInputSchema.safeParse({
+        ...tasteInput,
+        decideBy: undefined,
+        defaultDecision: undefined,
+        defaultIfSilent: 'Ships in 48 hours unless you reject it.',
+        risk: 'low',
+        confidence: 'low',
+      }).success
+    ).toBe(false);
   });
 
   it('reads a legacy card with the default window from filing and a reject default', async () => {
