@@ -138,6 +138,26 @@ async function scanCandidates(page: Page): Promise<PageScan> {
         // divider or gradient rule (full width, genuinely painted) isn't
         // dropped as an image layer or a candidate.
         if (rect.width <= 1 && rect.height <= 1) return false;
+        // A descendant of a clip-hidden container (the same sr-only recipe
+        // applied to an ancestor — the desktop build's compact slot) is also
+        // never painted: the ancestor clip hides every child's ink, while
+        // each child's own layout rect stays full-size (JOV-11623).
+        for (
+          let node: Element | null = element;
+          node;
+          node = node.parentElement
+        ) {
+          if (node instanceof HTMLElement) {
+            const ancestorRect = node.getBoundingClientRect();
+            if (ancestorRect.width > 1 || ancestorRect.height > 1) continue;
+            const ancestorStyle = getComputedStyle(node);
+            if (
+              ancestorStyle.clip === 'rect(0px, 0px, 0px, 0px)' ||
+              ancestorStyle.clipPath === 'inset(50%)'
+            )
+              return false;
+          }
+        }
         const style = getComputedStyle(element);
         return (
           style.display !== 'none' &&
