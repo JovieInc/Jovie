@@ -16,7 +16,6 @@ const SHA = /^[0-9a-f]{40}$/;
 const ID = /^[1-9][0-9]*$/;
 const POLICY = '.github/testflight-release-policy.json';
 const INTENT = 'testflight-upload-intent';
-const MAX_INTENT_BUCKETS = 64;
 const MAX_INTENTS = 1000;
 const TESTFLIGHT = '.github/workflows/ios-testflight.yml';
 const CONTROLLER = '.github/workflows/production-controller.yml';
@@ -377,7 +376,14 @@ export function validateLease({
     const bucket = buckets.shift();
     if (visited.has(bucket)) continue;
     visited.add(bucket);
-    assert(visited.size <= MAX_INTENT_BUCKETS, 'upload intent traversal limit');
+    // Every visited bucket beyond the root is the sourceSha of an intent
+    // already read, so this traversal is bounded by MAX_INTENTS + 1 by
+    // construction and MAX_INTENTS below is the real runaway guard. The
+    // former fixed 64-bucket cap was structurally exceeded once repeated
+    // failed upload attempts accumulated 64 distinct-source receipts in the
+    // unchanged baseline bucket (run 42590625900, 2026-11-09); the enumeration
+    // itself is unchanged and still reaches every reachable intent.
+    assert(visited.size <= MAX_INTENTS + 1, 'upload intent traversal limit');
     const intentName = `${INTENT}-${bucket || 'bootstrap'}`;
     const intents = listing(
       api,

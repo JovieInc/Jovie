@@ -762,6 +762,38 @@ for (const attempt of ['another run', 'another attempt'])
     assert.throws(() => validateLease(f.input), /duplicate or uncertain/);
   });
 
+test('a baseline bucket saturated with failed-attempt receipts still admits', () => {
+  const f = fixture();
+  // Advance the certified source to NEXT so the unchanged older baseline
+  // bucket (SOURCE) is the walk root, mirroring a real admission where the
+  // frontier marker predates every failed attempt.
+  f.input.baselineSha = SOURCE;
+  f.input.sourceSha = NEXT;
+  f.input.transportSha = NEXT;
+  f.run.head_sha = NEXT;
+  f.controller.head_sha = NEXT;
+  f.controller.display_title = `Production Controller ${NEXT} from CI 60 attempt 1`;
+  f.marker.sha = NEXT;
+  f.artifacts[0].name = `production-generation-verified-${NEXT}`;
+  f.artifacts[0].workflow_run.head_sha = NEXT;
+  f.jobs[0].head_sha = NEXT;
+  f.table.get('actions/runs/60/attempts/1').head_sha = NEXT;
+  f.moveMain(NEXT);
+  // 70 failed release attempts shared the unchanged baseline bucket, each on
+  // its own newer main, so each receipt contributes a distinct successor
+  // bucket. Admit must still enumerate all of them and find no duplicate or
+  // divergent upload (the former fixed 64-bucket traversal cap rejected this).
+  for (let i = 0; i < 70; i += 1) {
+    addReservation(f, {
+      id: 100 + i,
+      source: `${String(i).padStart(2, '0')}${'f'.repeat(38)}`,
+      baseline: SOURCE,
+      run: 100 + i,
+    });
+  }
+  assert.equal(validateLease(f.input).sourceSha, NEXT);
+});
+
 test('a successful source watermark retires expired predecessor buckets', () => {
   const f = fixture();
   const prior = validateLease(f.input);
