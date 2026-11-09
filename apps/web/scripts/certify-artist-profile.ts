@@ -5,6 +5,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   discoveryApiSchema,
   inspectDiscoveryGuide,
@@ -75,15 +76,45 @@ async function referenceReleaseFields(
 
 /**
  * Redirects the codebase declares on purpose: the stable `/artists/:id`
- * entity route (survives claims and renames) and the profile mode
- * redirect-sinks registered in route-config. Only these get one followed
- * hop, and only to a same-origin 200. Every other redirect still fails.
+ * entity route (survives claims and renames), the profile mode
+ * redirect-sinks registered in route-config, and the closed-signup waitlist
+ * handoff. Only these get one followed hop, and only to a same-origin 200.
+ * Every other redirect still fails.
  */
-export function isDeclaredRedirect(url: URL, handle: string): boolean {
+function isClosedSignupEntryPath(pathname: string): boolean {
+  // Closed public signup (canon/PRODUCT.md, 2026-11-02, PR #24224): anonymous
+  // /signup and /start redirect to the /waitlist role form. The artist
+  // profile links /start for the proof-to-claim funnel, so the certificate
+  // observes that handoff on every run.
+  return pathname === '/start' || pathname === '/signup';
+}
+
+function resolvesToWaitlist(location: string | null | undefined): boolean {
+  if (!location) return false;
+  try {
+    return (
+      new URL(location, TIM_WHITE_PROFILE.publicProfileUrl).pathname ===
+      APP_ROUTES.WAITLIST
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function isDeclaredRedirect(
+  url: URL,
+  handle: string,
+  location?: string | null
+): boolean {
   if (STABLE_ARTIST_ROUTE.test(url.pathname)) return true;
-  return REDIRECT_SINK_ROUTE_KEYS.some(
-    key => PROFILE_ROUTE_CONFIG[key].buildPath(handle) === url.pathname
-  );
+  if (
+    REDIRECT_SINK_ROUTE_KEYS.some(
+      key => PROFILE_ROUTE_CONFIG[key].buildPath(handle) === url.pathname
+    )
+  ) {
+    return true;
+  }
+  return isClosedSignupEntryPath(url.pathname) && resolvesToWaitlist(location);
 }
 
 async function deployedCommitSha(
@@ -350,7 +381,7 @@ export async function certifyArtistProfile(
               result.status >= 300 &&
               result.status < 400 &&
               location &&
-              isDeclaredRedirect(new URL(url), handle)
+              isDeclaredRedirect(new URL(url), handle, location)
             ) {
               await result.body?.cancel();
               const target = new URL(location, url);
