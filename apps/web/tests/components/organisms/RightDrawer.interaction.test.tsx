@@ -10,8 +10,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
+// Push/overlay presentation coverage lives in RightDrawer.presentation.test.tsx.
 const mockUseBreakpointDown = vi.fn();
-
 vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpointDown: (...args: unknown[]) => mockUseBreakpointDown(...args),
 }));

@@ -824,11 +824,12 @@
     color-mix(in oklab, var(--color-focus-ring) 35%, transparent);
 }
 
+/* Selection is a quiet fill, never a box: an inset ring on every selected
+ * row read as a hard bordered rectangle (Linear-precision bar, founder
+ * 2026-11-08). The ring is reserved for keyboard focus above. */
 :where(.system-b-table-row-selected),
 :where(.system-b-table-selection-selected) {
   background: var(--color-row-selected);
-  box-shadow: inset 0 0 0 1px
-    color-mix(in oklab, var(--color-focus-ring) 24%, transparent);
 }
 
 :where(.system-b-table-row-selected):hover,
@@ -6418,19 +6419,25 @@
   table-layout: fixed;
 }
 
-/* Settings owns its usable pane beside the companion overlay. Reserve on
-   the pane, so the capped form centers and shrinks inside the remaining
-   space. The shell's existing content inset already accounts for part of
-   the overlay padding; do not subtract that inset a second time. */
+/* Settings reserves its automatic Profile companion from the server paint,
+   so the capped form never moves while the rail mounts and opens. The rail
+   pushes the route (it is a column of the shell main plane), so the
+   reservation is exactly the rail's allocation: the drawer width plus the
+   shell gap. Before the rail mounts, the pane holds it; once the rail slot
+   exists, the slot holds it until the first opening settles, then the
+   drawer's own width takes over at the same size. */
 @media (min-width: 1024px) {
-  [data-testid="settings-shell-content"]:has(
-    [data-settings-companion-rail="true"]
-  ) {
-    margin-inline-end: calc(
-      360px +
-      2 *
-      var(--space-1-5) -
-      var(--app-shell-content-inset)
-    );
+  [data-app-shell-main-plane="true"]:not(
+      :has(> [data-testid="app-shell-right-rail"])
+    )
+    [data-testid="settings-shell-content"]:has(
+      [data-settings-companion-rail="true"]
+    ) {
+    margin-inline-end: calc(360px + var(--app-shell-gap));
+  }
+
+  [data-app-shell-main-plane="true"]:has([data-settings-companion-rail="true"])
+    > [data-testid="app-shell-right-rail"] {
+    min-width: calc(360px + var(--app-shell-gap));
   }
 }

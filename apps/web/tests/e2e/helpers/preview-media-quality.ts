@@ -1,4 +1,5 @@
 import { expect, type Locator } from '@playwright/test';
+import { isForcedCapsElement } from '../../../../../scripts/lib/design-rules/forced-caps.mjs';
 
 /**
  * Truthful draft-profile checks (2026-11-08). The Golden Path used to pass
@@ -57,21 +58,26 @@ export async function expectPreviewMediaPainted(rail: Locator): Promise<void> {
  * release names keep their own spelling; this only bans the UI shouting.
  */
 export async function expectNoForcedCaps(scope: Locator): Promise<void> {
-  const shouting = await scope.evaluate(root => {
-    const found: string[] = [];
-    for (const element of Array.from(root.querySelectorAll('*'))) {
+  // Read each element's computed style in the page, judge it with the shared
+  // all-caps rule (scripts/lib/design-rules/forced-caps.mjs) here.
+  const elements = await scope.evaluate(root =>
+    Array.from(root.querySelectorAll('*')).map(element => {
       const style = getComputedStyle(element);
-      if (style.textTransform !== 'uppercase') continue;
-      if (style.display === 'none' || style.visibility === 'hidden') continue;
-      const ownText = Array.from(element.childNodes)
-        .filter(node => node.nodeType === Node.TEXT_NODE)
-        .map(node => node.textContent?.trim() ?? '')
-        .join(' ')
-        .trim();
-      if (ownText) found.push(ownText);
-    }
-    return found;
-  });
+      return {
+        textTransform: style.textTransform,
+        display: style.display,
+        visibility: style.visibility,
+        ownText: Array.from(element.childNodes)
+          .filter(node => node.nodeType === Node.TEXT_NODE)
+          .map(node => node.textContent?.trim() ?? '')
+          .join(' ')
+          .trim(),
+      };
+    })
+  );
+  const shouting = elements
+    .filter(element => isForcedCapsElement(element))
+    .map(element => element.ownText);
   expect(shouting, 'UI text is forced into all caps').toEqual([]);
 }
 

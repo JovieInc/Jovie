@@ -129,7 +129,7 @@ export async function submitSummerCard(
     title: input.title,
     body: input.body,
     recommendation: input.recommendation,
-    defaultIfSilent: input.defaultIfSilent,
+    defaultIfSilent: contract.policyDefaultIfSilent ?? input.defaultIfSilent,
     recipient: input.recipient,
     amountUsd: input.amountUsd,
     preflightReceiptId: input.preflightReceiptId,

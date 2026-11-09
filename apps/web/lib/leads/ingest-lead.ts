@@ -14,7 +14,10 @@ import {
   enqueueDspArtistDiscoveryJob,
   enqueueMusicFetchEnrichmentJob,
 } from '@/lib/ingestion/jobs';
-import { isLayloUrl } from '@/lib/ingestion/strategies/laylo';
+import {
+  extractLayloHandle,
+  isLayloUrl,
+} from '@/lib/ingestion/strategies/laylo';
 import { cleanScrapedDisplayName } from '@/lib/profile/scraped-display-name';
 import { reconcileProfileSurfaces } from '@/lib/profile-surfaces/reconciliation';
 import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
@@ -116,7 +119,13 @@ export async function ingestLeadAsCreator(
     return { success: false, error: pageless.error, reason: pageless.reason };
   }
 
-  const handle = pageless?.handle ?? lead.linktreeHandle;
+  // Hand-added Laylo leads are stored with a host-prefixed fallback handle
+  // (laylocom-<name>); Laylo's profile lookup needs the bare Laylo handle.
+  const isLaylo = isLayloUrl(lead.linktreeUrl);
+  const handle =
+    pageless?.handle ??
+    (isLaylo ? extractLayloHandle(lead.linktreeUrl) : null) ??
+    lead.linktreeHandle;
 
   try {
     const existingCheck = await checkExistingProfile(handle);
@@ -137,11 +146,7 @@ export async function ingestLeadAsCreator(
 
     const extraction = pageless
       ? pageless.extraction
-      : await fetchFullExtractionProfile(
-          isLayloUrl(lead.linktreeUrl),
-          lead.linktreeUrl,
-          handle
-        );
+      : await fetchFullExtractionProfile(isLaylo, lead.linktreeUrl, handle);
 
     // Keep leads.displayName as the raw scrape provenance; only the public
     // profile receives the artist-name projection.

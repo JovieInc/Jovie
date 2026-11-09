@@ -102,6 +102,9 @@
     ]
   },
   "waivers": {
+    "apps/web/components/jovie/ChatHistorySwitcher.tsx": {
+      "offline": "ChatHistorySwitcher only reads the chat list through useChatConversationsQuery and never submits; lost connectivity reaches it as the failed load, which the ErrorLoadingHistory story shows with its Retry row."
+    },
     "packages/ui/atoms/avatar.tsx": {
       "loading": "While a composed AvatarImage loads, the avatar shows its AvatarFallback in the same frame, which the Default and ImageFailure stories show; a static story cannot hold an image request in flight, so avatar.composed.test.tsx covers the loading swap.",
       "offline": "Avatar never fetches or mutates; lost connectivity reaches it only as an image that fails to load, which the ImageFailure story shows.",
@@ -176,6 +179,9 @@
     },
     "packages/ui/atoms/textarea.tsx": {
       "offline": "Textarea never fetches or submits; its only async signal is the pending validationState its owner passes in, so the owning form shows offline status."
+    },
+    "packages/ui/atoms/title-menu-trigger.tsx": {
+      "empty": "TitleMenuTrigger renders one title slot and a fixed chevron and takes no collection; the detector matched the items-center utility class. A blank title is the caller's to replace (ChatHistorySwitcher shows New Chat)."
     },
     "packages/ui/atoms/tooltip.tsx": {
       "empty": "TooltipContent only renders caller-supplied children and owns no data or collection; callers omit the Tooltip rather than open an empty one, and the detector matched the items-center utility class.",
@@ -269,11 +275,9 @@
       "partial": "LogoLink takes no data; its optional props (href, sizes, variant, reveal, prefetch, className) are presentation defaults and its mark and accessible name are fixed, so nothing can be partially present.",
       "long-content": "LogoLink renders no caller text; its only strings are the fixed 'Jovie' wordmark and aria-label, which the detector matched as label."
     },
-    "apps/web/components/jovie/ChatHistorySwitcher.tsx": {
-      "offline": "ChatHistorySwitcher only reads the chat list through useChatConversationsQuery and never submits; lost connectivity reaches it as the failed load, which the ErrorLoadingHistory story shows with its Retry row."
-    },
-    "packages/ui/atoms/title-menu-trigger.tsx": {
-      "empty": "TitleMenuTrigger renders one title slot and a fixed chevron and takes no collection; the detector matched the items-center utility class. A blank title is the caller's to replace (ChatHistorySwitcher shows New Chat)."
+    "apps/web/components/features/dashboard/dashboard-nav/InboxAttentionLink.tsx": {
+      "offline": "InboxAttentionLink never fetches or mutates; it renders the pending count its owner passes, and with no connection that count stays unloaded, which the Partial story shows.",
+      "permission-denied": "InboxAttentionLink links to the signed-in Inbox that every account can open and has no gated action; a viewer who cannot reach the dashboard never sees the app rail."
     }
   }
 }

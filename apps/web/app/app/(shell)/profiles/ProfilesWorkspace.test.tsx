@@ -713,7 +713,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(
       within(toolbar).getByRole('button', { name: 'Add Profile Or Site' })
     ).toBeInTheDocument();
-    expect(within(toolbar).getByText('Profiles')).toBeInTheDocument();
+    expect(toolbar.textContent).toMatch(/^(?!.*\bProfiles\b).*\d+ profiles?/);
     expect(
       screen.getByTestId('registered-header-actions')
     ).toBeEmptyDOMElement();
