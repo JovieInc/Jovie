@@ -22,6 +22,7 @@ import {
 } from '@/lib/tracking/navigation-telemetry';
 import { trackPacClientEvent } from '@/lib/tracking/pac-events';
 import { useMarketingConsent } from '@/lib/tracking/use-marketing-consent';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { CookieBannerMount } from './CookieBannerMount';
 
 vi.mock('@/hooks/useClerkSafe', () => ({
@@ -135,6 +136,7 @@ describe('Your Privacy Choices', () => {
       await screen.findByRole('switch', {}, { timeout: 5000 })
     ).toBeChecked();
     expect(screen.getByRole('switch')).toBeDisabled();
+    await expectNoA11yViolations(await screen.findByRole('dialog'));
   });
 
   it('persists an opt-out and suppresses pixels immediately and after remount', async () => {
@@ -143,6 +145,7 @@ describe('Your Privacy Choices', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Your Privacy Choices' }));
     const toggle = await screen.findByRole('switch', {}, { timeout: 5000 });
     expect(toggle).not.toBeChecked();
+    await expectNoA11yViolations(await screen.findByRole('dialog'));
     fireEvent.click(toggle);
     await waitFor(() =>
       expect(saveConsent).toHaveBeenCalledWith({
@@ -262,6 +265,7 @@ describe('Your Privacy Choices', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Your Privacy Choices' }));
     fireEvent.click(await screen.findByRole('switch', {}, { timeout: 5000 }));
     expect(await screen.findByRole('alert')).toBeVisible();
+    await expectNoA11yViolations(await screen.findByRole('dialog'));
     expect(screen.queryByTestId('ad-pixel')).toBeNull();
     expect(document.cookie).toContain('jv_tracking_consent=rejected');
   });

@@ -215,6 +215,10 @@
       "partial": "Its three handlers are required and its optional props (className, disabled, compact) are presentation flags with defaults, so there is no partially present data; Compact, Standard and Disabled show them.",
       "long-content": "The three button labels are fixed consent copy with no props or caller text, so the content cannot grow; the detector matched text in the --linear-text-primary token and a layout comment."
     },
+    "apps/web/components/organisms/CookieBannerMount.tsx": {
+      "loading": "The only in-flight state is a null Suspense fallback while PrivacyChoices loads. A static story cannot hold that chunk, and CookieBannerMount.test.tsx covers the banner after the lazy import.",
+      "offline": "CookieBannerMount never fetches or mutates. The detector treats Suspense as offline. A chunk that has not resolved leaves the null fallback, which CookieBannerMount.test.tsx covers by waiting for the runtime."
+    },
     "apps/web/components/organisms/CookieBannerSection.tsx": {
       "partial": "The card always shows the same fixed consent message and three actions; its two optional props are a test-only pathname override and the server-resolved visibility flag, so no content can be partially present.",
       "long-content": "The consent message, Privacy link and action labels are fixed copy with no props or user text, so the card's content cannot grow; the detector matched the aria-label and the text-* utility classes."
@@ -222,6 +226,12 @@
     "apps/web/components/organisms/CookieModal.tsx": {
       "empty": "The dialog maps over the fixed COOKIE_CATEGORIES constant (Essential, Analytics, Marketing), which is never empty, so there is no empty-data state.",
       "long-content": "Every category label, description and button in the dialog is fixed copy from module constants with no props or user text, so its content cannot grow."
+    },
+    "apps/web/components/organisms/PrivacyChoices.tsx": {
+      "empty": "The dialog always shows the opt-out switch and fixed copy and owns no collection. The detector matched the items-center class.",
+      "error": "A rejected saveConsent shows the alert inside the open dialog. A static story cannot reject that module. PrivacyChoices.test.tsx covers it in the server-save failure case.",
+      "partial": "The dialog's only prop is onClose. The optional analytics and onSave fields belong to stored consent and the cookie modal, not to partial content of this dialog.",
+      "long-content": "The title, description, switch label and status lines are fixed copy with no caller text, so the dialog cannot grow. The detector matched text utilities and the description prop name."
     },
     "apps/web/components/feedback/Banner.tsx": {
       "permission-denied": "Banner only renders caller-supplied status copy with an optional action and dismiss, and has no gated action or permission input; the detector matched role='alert' and role='status' on its live region."

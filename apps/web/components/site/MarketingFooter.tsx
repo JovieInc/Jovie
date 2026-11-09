@@ -191,9 +191,13 @@ function FooterLegalNav({
 }: Readonly<{ links?: readonly MarketingFooterLink[] }>) {
   return (
     <nav aria-label='Legal' className='flex flex-wrap items-center gap-6'>
-      <a href={PRIVACY_CHOICES_HREF} className={footerLegalLinkClassName}>
+      <Link
+        href={PRIVACY_CHOICES_HREF}
+        prefetch={false}
+        className={footerLegalLinkClassName}
+      >
         {PRIVACY_CHOICES_LABEL}
-      </a>
+      </Link>
       {links.map(link => (
         <Link
           key={link.href}
