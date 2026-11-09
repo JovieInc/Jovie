@@ -56,9 +56,17 @@ export default async function ProfileModeRenderPage({
 
 export async function generateMetadata({
   params,
-}: Readonly<ProfileModeRenderPageProps>) {
+}: Readonly<ProfileModeRenderPageProps>): Promise<Metadata> {
   const { username, profileMode, marker } = await params;
-  if (!resolvePrivateProfileMode(profileMode, marker)) notFound();
+  if (!resolvePrivateProfileMode(profileMode, marker)) {
+    // notFound() inside generateMetadata bypasses the app router's not-found
+    // boundary and renders Next's raw __next_error__ 404 shell (observed on
+    // production and in the workflow_dispatch CI lanes). Return miss metadata
+    // here and let the page's own notFound() below render the branded
+    // app/[username]/not-found.tsx boundary with its data-testid="not-found"
+    // sentinel and a real 404 status.
+    return { title: 'Not Found', robots: RENDER_FIXTURE_METADATA.robots };
+  }
 
   const profileMetadata = await generatePublicProfileMetadata({
     params: Promise.resolve({ username }),
