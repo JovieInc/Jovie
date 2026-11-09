@@ -361,12 +361,6 @@
   font-size: 0.8125rem;
 }
 
-.hv3-insp__ok {
-  width: 0.9375rem;
-  height: 0.9375rem;
-  color: var(--color-success);
-}
-
 .hv3-insp__more {
   margin-left: auto;
   color: var(--hv3-t3);

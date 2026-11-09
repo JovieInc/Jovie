@@ -1012,6 +1012,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/idea-radar/idea-radar.test.mjs',
   'scripts/invariants/art-direction/images.test.mjs',
   'scripts/invariants/art-direction/imagery-provenance.test.mjs',
+  'scripts/invariants/art-direction/no-invented-customer.test.mjs',
   'scripts/invariants/assurance-matrix.test.mjs',
   'scripts/invariants/browser-owned-input.test.mjs',
   'scripts/invariants/founder-calibration.test.mjs',

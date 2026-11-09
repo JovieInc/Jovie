@@ -42,6 +42,8 @@ describe('homepage v3 product UI', () => {
       screen.getByText(HOMEPAGE_PRODUCT_UI.inspector.upc)
     ).toBeInTheDocument();
     expect(container.querySelector('[data-hv3-anchor="upc"]')).not.toBeNull();
+    expect(screen.getByText('Example artist')).toBeInTheDocument();
+    expect(container.querySelector('.hv3-insp__ok')).toBeNull();
   });
 
   it('anchors the connector on the selected catalog row only', () => {

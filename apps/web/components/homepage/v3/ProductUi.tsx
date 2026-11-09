@@ -3,7 +3,6 @@ import {
   Bell,
   Building2,
   Calendar,
-  CircleCheck,
   Clock,
   Ellipsis,
   House,
@@ -222,10 +221,7 @@ export function ReleaseInspector({
         <Cover src={release.src} size={56} eager={eager} />
         <div>
           <b>{release.title}</b>
-          <span>
-            {release.artist}
-            <CircleCheck className='hv3-ui-i hv3-insp__ok' />
-          </span>
+          <span>{release.artist}</span>
         </div>
         <Ellipsis className='hv3-ui-i hv3-insp__more' />
       </div>
