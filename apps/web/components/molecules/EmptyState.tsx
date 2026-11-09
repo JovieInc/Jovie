@@ -140,7 +140,7 @@ function parseShortcut(shortcut: string): React.ReactNode {
     return (
       <span className='ml-2 inline-flex items-center gap-1'>
         <Kbd>{parts[0]}</Kbd>
-        <span className='text-3xs text-tertiary-token'>then</span>
+        <span className='text-3xs text-(--color-btn-primary-fg)/60'> then </span>
         <Kbd>{parts[1]}</Kbd>
       </span>
     );
@@ -179,9 +179,16 @@ export function EmptyState({
   const renderPrimaryAction = (): React.ReactNode => {
     if (!action) return null;
 
+    // The rendered shortcut keycaps are visible text; the accessible name
+    // must include them (label-content-name-mismatch) — "N then I" reads
+    // exactly as the keycap sequence displays.
+    const buttonAriaLabel =
+      action.ariaLabel ??
+      (action.shortcut ? `${action.label} ${action.shortcut}` : action.label);
     const buttonContent = (
       <>
         {action.label}
+        {action.shortcut ? ' ' : null}
         {action.shortcut && parseShortcut(action.shortcut)}
       </>
     );
@@ -193,7 +200,7 @@ export function EmptyState({
             variant={action.variant ?? 'primary'}
             size={buttonSize}
             disabled
-            aria-label={action.ariaLabel ?? action.label}
+            aria-label={buttonAriaLabel}
           >
             {buttonContent}
           </Button>
@@ -207,7 +214,7 @@ export function EmptyState({
             prefetch={action.prefetch ?? false}
             target={action.target}
             rel={action.rel}
-            aria-label={action.ariaLabel ?? action.label}
+            aria-label={buttonAriaLabel}
           >
             {buttonContent}
           </Link>
@@ -221,7 +228,7 @@ export function EmptyState({
         size={buttonSize}
         onClick={action.onClick}
         disabled={action.disabled}
-        aria-label={action.ariaLabel ?? action.label}
+        aria-label={buttonAriaLabel}
       >
         {buttonContent}
       </Button>

@@ -282,11 +282,6 @@ export function EntityChipPopover({
           type='button'
           aria-haspopup='dialog'
           aria-expanded={open}
-          aria-label={
-            sourceFact
-              ? `Inspect source: ${sourceFact.subject.displayName ?? 'Reference'}`
-              : `${KIND_PREFIX[kind]}: ${label}`
-          }
           onPointerDown={() => {
             pointerDown.current = true;
           }}
@@ -310,8 +305,21 @@ export function EntityChipPopover({
           className='system-b-entity-chip-trigger focus-ring'
           data-testid='entity-chip-popover-trigger'
         >
+          {/*
+            Fallback chips render arbitrary visible content, so the accessible
+            name must INCLUDE it (label-content-name-mismatch): an sr-only
+            action prefix joins the children instead of an aria-label that
+            would replace them.
+          */}
           {entity || sourceFact || pending ? (
-            children
+            <>
+              <span className='sr-only'>{
+                sourceFact
+                  ? `Inspect source: ${sourceFact.subject.displayName ?? 'Reference'} — `
+                  : `${KIND_PREFIX[kind]}: ${label} — `
+              }</span>
+              {children}
+            </>
           ) : (
             <EntityChip
               data={{ kind, id, label }}

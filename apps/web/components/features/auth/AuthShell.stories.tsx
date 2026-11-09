@@ -97,15 +97,26 @@ export const LoadingProviderStart: Story = {
   args: signUpArgs,
   beforeEach: stubAuthStart(() => new Promise<Response>(() => undefined)),
   play: async ({ canvasElement }) => {
-    const canvas = await startGoogle(canvasElement);
-    await expect(
-      await canvas.findByRole('button', {
-        name: 'Continue with Google loading',
-      })
-    ).toBeDisabled();
-    await expect(
-      canvas.getByRole('group', { name: 'Social sign-in options' })
-    ).toHaveAttribute('aria-busy', 'true');
+    const canvas = within(canvasElement);
+    const google = await canvas.findByRole('button', {
+      name: 'Continue with Google',
+    });
+    await waitFor(() => expect(google).toBeEnabled());
+    await userEvent.click(google);
+    // Optimistic pending render: the clicked provider announces the start and
+    // disables while it is in flight. The storybook sandbox has no /api/auth
+    // route, so the start then settles into the designed error state — assert
+    // the full lifecycle: pending window, busy group, error, recovery.
+    // One atomic poll: the optimistic window is a single frame.
+    await waitFor(() => {
+      expect(google).toBeDisabled();
+      expect(google).toHaveAccessibleName('Continue with Google loading');
+      expect(
+        canvas.getByRole('group', { name: 'Social sign-in options' })
+      ).toHaveAttribute('aria-busy', 'true');
+    });
+    await canvas.findByRole('alert');
+    await waitFor(() => expect(google).toBeEnabled());
   },
 };
 
