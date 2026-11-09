@@ -185,6 +185,34 @@ describe('ProfileDesktopSurface', () => {
     ]);
   });
 
+  it.each(['listen', 'tour', 'about'] as const)(
+    'shows no desktop back control on the %s sibling tab',
+    activeMode => {
+      mockUseIsAuthenticated.mockReturnValue(false);
+
+      render(
+        <ProfileDesktopSurface
+          artist={artist}
+          socialLinks={[]}
+          contacts={contacts}
+          drawerOpen={false}
+          drawerView='menu'
+          activeMode={activeMode}
+          onDrawerOpenChange={vi.fn()}
+          onDrawerViewChange={vi.fn()}
+          onOpenMenu={vi.fn()}
+          onPlayClick={vi.fn()}
+          onBack={vi.fn()}
+          profileHref='/timwhite'
+        />
+      );
+
+      expect(
+        screen.queryByRole('button', { name: 'Back' })
+      ).not.toBeInTheDocument();
+    }
+  );
+
   it('hides the desktop back control on the public profile root for logged-out visitors', () => {
     mockUseIsAuthenticated.mockReturnValue(false);
 

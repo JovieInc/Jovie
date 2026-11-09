@@ -425,6 +425,26 @@ describe('ProfileCompactSurface', () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
+  // Walk 2026-11-09 (jov.ie/tim): Music, Events and About are Home's siblings
+  // in the visible tab row, so their top chrome matches Home's.
+  it.each(['listen', 'tour', 'about'] as const)(
+    'shows no back control on the %s sibling tab',
+    activeMode => {
+      renderSurface({ activeMode });
+
+      expect(screen.getByTestId('profile-bottom-nav')).toBeTruthy();
+      expect(
+        screen.queryByRole('button', { name: 'Back' })
+      ).not.toBeInTheDocument();
+    }
+  );
+
+  it('keeps the back control on a nested mode', () => {
+    renderSurface({ activeMode: 'releases' });
+
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+  });
+
   it('hides the back control on the public profile root first landing for logged-out visitors', () => {
     renderSurface();
 
