@@ -14,9 +14,9 @@ export const REQUIRED_ISOLATED_CHECKS = Object.freeze([
   'PR Size Guard',
   'Company guards',
 ]);
-
 const SHA_RE = /^[0-9a-f]{40}$/;
-const MAX_CHANGED_FILES = 12, MAX_CHANGED_LINES = 500;
+const MAX_CHANGED_FILES = 12;
+const MAX_CHANGED_LINES = 500;
 const EXECUTABLE_RE = /\.(?:[cm]?[jt]sx?)$/;
 const SEMANTIC_TEXT_RE = /\.(?:[cm]?[jt]sx?|css)$/;
 const DOC_RE = /^(?:docs\/.*\.(?:md|png|jpe?g|webp|gif|svg)|DESIGN\.md)$/;
