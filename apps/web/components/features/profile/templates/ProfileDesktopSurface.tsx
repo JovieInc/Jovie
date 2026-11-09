@@ -35,6 +35,7 @@ import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
 import {
   getPublicProfileHistoryServerSnapshot,
   getPublicProfileHistorySnapshot,
+  isPublicProfileRootLevel,
   PUBLIC_EVENTS_NO_SURFACE,
   resolveProfileSurfaceState,
   resolvePublicMusicSurface,
@@ -325,8 +326,9 @@ export function ProfileDesktopSurface({
     getPublicProfileHistorySnapshot,
     getPublicProfileHistoryServerSnapshot
   );
+  // The primary tabs are always visible here, so they are Home's siblings.
   const showBackChevron = shouldShowPublicProfileBackChevron({
-    isProfileRoot: activeMode === 'profile',
+    isProfileRoot: isPublicProfileRootLevel(activeMode),
     hasHistoryDestination,
     isSignedIn,
   });

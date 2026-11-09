@@ -25,6 +25,7 @@ import type {
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import {
   getPublicProfileHistoryExitDelta,
+  isPublicProfileRootLevel,
   readPublicProfileHistoryDepth,
   resolvePublicProfileBackAction,
   withPublicProfileHistoryDepth,
@@ -1056,7 +1057,7 @@ export function ProfileCompactTemplate({
       arrivalHistoryLengthRef.current ?? historyLength;
     const internalHistoryDepth = profileHistoryDepthRef.current;
     const action = resolvePublicProfileBackAction({
-      isProfileRoot: requestedMode === 'profile',
+      isProfileRoot: isPublicProfileRootLevel(requestedMode),
       historyLength,
       referrer: document.referrer,
       isSignedIn,

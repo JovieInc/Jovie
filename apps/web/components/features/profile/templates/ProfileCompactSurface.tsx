@@ -34,6 +34,7 @@ import { ProofClaimCtaLink } from '@/features/profile/ProofClaimCtaLink';
 import {
   getPublicProfileHistoryServerSnapshot,
   getPublicProfileHistorySnapshot,
+  isPublicProfileRootLevel,
   resolveProfileSurfaceState,
   shouldShowPublicProfileBackChevron,
   subscribeToPublicProfileHistory,
@@ -493,8 +494,12 @@ export function ProfileCompactSurface({
     getPublicProfileHistorySnapshot,
     getPublicProfileHistoryServerSnapshot
   );
+  // With the tab row visible, Music / Events / About are Home's siblings:
+  // their top chrome matches Home's instead of growing a Back arrow.
   const showBackChevron = shouldShowPublicProfileBackChevron({
-    isProfileRoot: activeMode === 'profile',
+    isProfileRoot: showBottomNav
+      ? isPublicProfileRootLevel(activeMode)
+      : activeMode === 'profile',
     hasHistoryDestination,
     isSignedIn,
     forceHidden: hideBackButton || isNotificationsFlowOpen,

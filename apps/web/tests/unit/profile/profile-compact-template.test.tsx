@@ -528,7 +528,7 @@ describe('ProfileCompactTemplate', () => {
   it('keeps the floating back control on nested modes with a profile-root destination', async () => {
     render(
       <ProfileCompactTemplate
-        mode='listen'
+        mode='releases'
         artist={mockArtist}
         socialLinks={[]}
         contacts={[]}
@@ -537,6 +537,27 @@ describe('ProfileCompactTemplate', () => {
 
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
+
+  // Walk 2026-11-09 (jov.ie/tim): Music, Events and About sit beside Home in
+  // the tab row, so they are siblings and carry Home's top chrome, not a Back.
+  it.each(['listen', 'tour', 'about'] as const)(
+    'shows no back control on the %s sibling tab first landing',
+    async mode => {
+      render(
+        <ProfileCompactTemplate
+          mode={mode}
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
+
+      expect(screen.getByTestId('profile-bottom-nav')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Back' })
+      ).not.toBeInTheDocument();
+    }
+  );
 
   // Regression: JOV-4103 — public profile hero must show social media icons
   // when the artist has Instagram/Twitter links (missed-ship recovery).
@@ -1270,7 +1291,7 @@ describe('ProfileCompactTemplate', () => {
 
     render(
       <ProfileCompactTemplate
-        mode='listen'
+        mode='releases'
         artist={mockArtist}
         socialLinks={[]}
         contacts={[]}
@@ -1389,14 +1410,43 @@ describe('ProfileCompactTemplate', () => {
     vi.unstubAllGlobals();
   });
 
-  it('returns nested listen mode to the profile root instead of leaving the profile', async () => {
+  it('exits from a sibling tab exactly as Home does for a signed-in arrival', async () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+    Object.defineProperty(window.history, 'length', {
+      configurable: true,
+      value: 1,
+    });
+    const assignSpy = vi.fn();
+    vi.stubGlobal('location', {
+      ...window.location,
+      assign: assignSpy,
+    });
+
+    try {
+      render(
+        <ProfileCompactTemplate
+          mode='tour'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+      expect(assignSpy).toHaveBeenCalledWith('/app');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('returns nested releases mode to the profile root instead of leaving the profile', async () => {
     const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
       // noop
     });
 
     render(
       <ProfileCompactTemplate
-        mode='listen'
+        mode='releases'
         artist={mockArtist}
         socialLinks={[]}
         contacts={[]}

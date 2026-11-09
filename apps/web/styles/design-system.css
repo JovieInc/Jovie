@@ -1380,31 +1380,58 @@
     text-underline-offset: 8px;
   }
 
-  /* Home: two top-aligned columns centered in the viewport (1fr / auto / 1fr
-     rows put the pair on the optical middle). */
+  /* Every tab: two top-aligned columns, identity left, the tab's content
+     right. The identity column sits at the same place on Home, Music, Events
+     and About, so switching tabs never reflows the header (walk 2026-11-09:
+     the non-Home tabs re-centred it into one narrow column). Rows start at
+     the top instead of optically centring the pair, because a centred row
+     moves the header whenever the right column changes height. */
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll {
+    .public-profile-compact-shell
+    .profile-content-scroll-region {
     display: grid;
     grid-template-columns: 320px 400px;
-    grid-template-rows: 1fr auto 1fr;
+    grid-template-rows: auto 1fr;
     column-gap: 96px;
     justify-content: center;
     align-items: start;
     padding-inline: 48px;
-    overflow: visible;
+    padding-block-start: 40px;
   }
 
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
     [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .profile-home-content-scroll {
+    overflow: visible;
+  }
+
+  /* The tab's content (Home rail, Music, Events, About) is the right column. */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    .profile-content-scroll-region
+    > :not([data-testid="profile-identity-header"]):not(
+      [data-testid="profile-jovie-branding"]
+    ) {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     > [data-testid="profile-identity-header"] {
     grid-column: 1;
-    grid-row: 2;
+    grid-row: 1;
     align-items: flex-start;
     text-align: left;
     padding: 0;
@@ -1413,8 +1440,8 @@
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-portrait"] {
     width: 160px !important;
     height: 160px !important;
@@ -1423,8 +1450,8 @@
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-portrait"]
     > div:first-child {
     width: 100% !important;
@@ -1434,8 +1461,8 @@
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-header"] {
     margin-top: 16px;
   }
@@ -1443,8 +1470,8 @@
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-link"] {
     justify-content: flex-start;
     font-size: 40px;
@@ -1456,8 +1483,8 @@
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-link"]
     > span {
     overflow: visible;
@@ -1470,8 +1497,8 @@
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-handle"] {
     font-size: 16px;
     line-height: 24px;
@@ -1482,8 +1509,8 @@
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-actions"] {
     flex-direction: column;
     align-items: stretch;
@@ -1494,15 +1521,15 @@
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-actions"]
     > a,
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-actions"]
     > div:first-child:not([data-testid]) {
     flex: none;
@@ -1512,8 +1539,8 @@
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-actions"]
     .profile-glass-pill {
     height: 44px;
@@ -1523,8 +1550,8 @@
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-social-row"] {
     flex: none;
     justify-content: flex-start;
@@ -1539,7 +1566,7 @@
     .profile-home-content-scroll
     > [data-testid="profile-home-rail"] {
     grid-column: 2;
-    grid-row: 2;
+    grid-row: 1;
     flex: none;
     width: 400px;
     height: auto;
@@ -1639,8 +1666,8 @@
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-listen"] {
     display: none;
   }
@@ -1661,26 +1688,13 @@
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     > [data-testid="profile-jovie-branding"] {
     grid-column: 1 / -1;
-    grid-row: 3;
+    grid-row: 2;
     align-self: end;
     opacity: 0.4;
-  }
-
-  /* Non-Home tabs keep one readable column inside the wider page. */
-  .profile-viewport:not(.profile-viewport--embedded):not(
-      .profile-viewport--desktop-surface
-    )
-    .public-profile-compact-shell
-    [data-testid="profile-compact-surface"]:not([data-mode="profile"])
-    .profile-content-scroll-region
-    > * {
-    margin-inline: auto;
-    max-width: 560px;
-    width: 100%;
   }
 }
 

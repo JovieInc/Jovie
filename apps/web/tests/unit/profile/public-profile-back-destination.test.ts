@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   hasPublicProfileHistoryDestination,
+  isPublicProfileRootLevel,
+  isPublicProfileSiblingTab,
   resolvePublicProfileBackAction,
   shouldShowPublicProfileBackChevron,
 } from '@/features/profile/profile-surface-state';
@@ -122,5 +124,18 @@ describe('public profile back destination', () => {
         internalHistoryDepth: 0,
       })
     ).toBe('history-back');
+  });
+
+  it('treats the tab-row destinations as Home siblings, not nested pages', () => {
+    for (const mode of ['listen', 'tour', 'about'] as const) {
+      expect(isPublicProfileSiblingTab(mode)).toBe(true);
+      expect(isPublicProfileRootLevel(mode)).toBe(true);
+    }
+    expect(isPublicProfileSiblingTab('profile')).toBe(false);
+    expect(isPublicProfileRootLevel('profile')).toBe(true);
+    for (const mode of ['releases', 'subscribe', 'pay', 'contact'] as const) {
+      expect(isPublicProfileSiblingTab(mode)).toBe(false);
+      expect(isPublicProfileRootLevel(mode)).toBe(false);
+    }
   });
 });
