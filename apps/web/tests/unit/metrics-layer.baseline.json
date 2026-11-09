@@ -241,10 +241,6 @@
       "tables": 0,
       "rates": 1
     },
-    "lib/chat/artist-context.server.ts": {
-      "tables": 4,
-      "rates": 0
-    },
     "lib/connectors/workflows/outcome-attribution.ts": {
       "tables": 8,
       "rates": 0

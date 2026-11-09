@@ -8,10 +8,10 @@ import { resolveHasMusicLinks } from '@/lib/chat/music-link-presence';
 import { countVisibleReleaseListenLinks } from '@/lib/chat/release-listen-links';
 import type { ArtistContext } from '@/lib/chat/types';
 import { db } from '@/lib/db';
-import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
+import { fetchTippingStats } from '@/lib/mobile/chat/artist-context';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { logger } from '@/lib/utils/logger';
 
@@ -49,14 +49,10 @@ export async function fetchArtistContext(
   }
 
   // Fetch link counts and tipping stats in parallel
-  const startOfMonth = new Date();
-  startOfMonth.setUTCDate(1);
-  startOfMonth.setUTCHours(0, 0, 0, 0);
-  const startOfMonthISO = startOfMonth.toISOString();
 
   // Release listen links render on the public profile too.
   const releaseListenCount = countVisibleReleaseListenLinks(profileId);
-  const [linkCounts, tipTotals, clickStats, profileViews, artistRules] =
+  const [linkCounts, tippingStats, profileViews, artistRules] =
     await Promise.all([
       db
         .select({
@@ -71,27 +67,7 @@ export async function fetchArtistContext(
           )
         )
         .then(r => r[0]),
-      db
-        .select({
-          totalReceived: drizzleSql<number>`COALESCE(SUM(${tips.amountCents}), 0)`,
-          monthReceived: drizzleSql<number>`COALESCE(SUM(CASE WHEN ${tips.createdAt} >= ${startOfMonthISO}::timestamp THEN ${tips.amountCents} ELSE 0 END), 0)`,
-          tipsSubmitted: drizzleSql<number>`COALESCE(COUNT(${tips.id}), 0)`,
-        })
-        .from(tips)
-        .where(eq(tips.creatorProfileId, profileId))
-        .then(r => r[0]),
-      db
-        .select({
-          total: drizzleSql<number>`count(*)`,
-        })
-        .from(clickEvents)
-        .where(
-          and(
-            eq(clickEvents.creatorProfileId, profileId),
-            eq(clickEvents.linkType, 'tip')
-          )
-        )
-        .then(r => r[0]),
+      fetchTippingStats(profileId),
       readAuthorizedProfileViews(appUserId).catch(error => {
         logger.warn('Authorized analytics unavailable for chat context', {
           profileId,
@@ -125,12 +101,7 @@ export async function fetchArtistContext(
       spotifyUrl: result.spotifyUrl,
       appleMusicUrl: result.appleMusicUrl,
     }),
-    tippingStats: {
-      tipClicks: Number(clickStats?.total ?? 0),
-      tipsSubmitted: Number(tipTotals?.tipsSubmitted ?? 0),
-      totalReceivedCents: Number(tipTotals?.totalReceived ?? 0),
-      monthReceivedCents: Number(tipTotals?.monthReceived ?? 0),
-    },
+    tippingStats,
     artistRules,
   };
 }
