@@ -290,9 +290,11 @@ describe('ConfirmDialog accessibility', () => {
       />
     );
     fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Action failed. Please try again.'
-    );
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Action failed. Please try again.');
+    const classes = alert.className.split(/\s+/);
+    expect(classes).toContain('text-error-text');
+    expect(classes).not.toContain('text-error');
     await expectNoA11yViolations(document.body);
   });
 
