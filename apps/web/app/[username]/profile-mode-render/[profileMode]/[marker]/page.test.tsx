@@ -5,7 +5,11 @@ import {
 } from '@/lib/render-fixture-policy';
 
 const { artistPage, profileMetadata, notFoundMock } = vi.hoisted(() => ({
-  artistPage: vi.fn(async () => 'rendered'),
+  artistPage: vi.fn<
+    (props: {
+      params: Promise<{ username: string; __profileMode: string }>;
+    }) => Promise<string>
+  >(async () => 'rendered'),
   profileMetadata: vi.fn(async () => ({ title: 'Artist' })),
   notFoundMock: vi.fn(() => {
     throw new Error('NEXT_NOT_FOUND');
@@ -97,10 +101,7 @@ describe('profile mode render miss boundary', () => {
     ).resolves.toBe('rendered');
 
     expect(notFoundMock).not.toHaveBeenCalled();
-    const params = artistPage.mock.calls[0]?.[0]?.params as Promise<{
-      username: string;
-      __profileMode: string;
-    }>;
+    const params = artistPage.mock.calls[0]?.[0]?.params;
     await expect(params).resolves.toEqual({
       username: 'dualipa',
       __profileMode: 'releases',
