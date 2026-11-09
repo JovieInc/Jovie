@@ -7,6 +7,7 @@ import {
 } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   ActionDial,
   type ActionDialOption,
@@ -108,8 +109,8 @@ const status = () => screen.getByRole('status').textContent;
 const link = () => screen.getByRole('link', { name: /^Stream Now with/ });
 
 describe('ActionDial semantics', () => {
-  it('is a labelled listbox with positional options and an activedescendant', () => {
-    render(<Fixture options={MANY} />);
+  it('is a labelled listbox with positional options and an activedescendant', async () => {
+    const { container } = render(<Fixture options={MANY} />);
     const listbox = screen.getByRole('listbox', {
       name: 'Choose a streaming service',
     });
@@ -121,6 +122,7 @@ describe('ActionDial semantics', () => {
     expect(
       screen.getByRole('group', { name: 'Choose a streaming service' })
     ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
   it('windows 100 options to a handful of rows', () => {
     render(<Fixture options={MANY} />);
@@ -390,8 +392,20 @@ function cleanupAnimate() {
 }
 
 describe('ActionDial edge cases', () => {
-  it('shows a lone service without a reel or listbox', () => {
-    render(<Fixture options={OPTIONS.slice(0, 1)} />);
+  it('renders nothing without options so the host owns the fallback', () => {
+    const { container } = render(
+      <ActionDial
+        options={[]}
+        selectedId=''
+        onSelect={vi.fn()}
+        actionLabel='Stream Now'
+        groupLabel='Choose a streaming service'
+      />
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+  it('shows a lone service without a reel or listbox', async () => {
+    const { container } = render(<Fixture options={OPTIONS.slice(0, 1)} />);
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('action-dial-icon-track')
@@ -400,6 +414,7 @@ describe('ActionDial edge cases', () => {
     expect(
       screen.getByText('Swipe to switch. Your choice is remembered.')
     ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
   it('follows an externally changed selection without a haptic', async () => {
     mockMotion(true);
