@@ -1032,12 +1032,20 @@ export function ProfileDesktopSurface({
                 Release credits
               </button>
             ) : null}
-            {showBackChevron && onBack ? (
+            {onBack ? (
+              /* D9kdx "Back + nav": the back slot stays reserved so the
+                 pill nav never shifts between modes (the mode-history
+                 contract); it is visibility-hidden, not unmounted, at the
+                 profile root where there is nothing to go back to. */
               <CircleIconButton
-                onClick={onBack}
+                onClick={showBackChevron ? onBack : undefined}
                 size='lg'
                 variant='pearlQuiet'
-                className='profile-top-chrome-icon text-white dark:text-white'
+                aria-hidden={!showBackChevron}
+                className={cn(
+                  'profile-top-chrome-icon text-white dark:text-white',
+                  !showBackChevron && 'invisible'
+                )}
                 ariaLabel='Back'
               >
                 <ChevronLeft className='h-5 w-5' />
