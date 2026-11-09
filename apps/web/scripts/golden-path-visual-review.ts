@@ -281,59 +281,45 @@ export async function reviewWithModel(input: {
   }
 }
 
-/**
- * Reviewer A with provider failover: Workers AI first (Cloudflare credits),
- * the Gateway when Workers AI is unconfigured or answers `unknown` (out of
- * credit, rate limited, outage, off-contract). A Gateway out of credit is
- * already `unknown`, so neither provider's balance can silence the review.
- */
-export async function reviewWithFailover(
-  frame: {
-    readonly png: Buffer;
-    readonly stepId: string;
-    readonly path: string;
-    readonly expectedArtistName?: string;
-    readonly fetchImpl?: typeof fetch;
-  },
-  keys: {
-    readonly gatewayKey: string | undefined;
-    readonly gatewayBaseUrl: string;
-    readonly workersAiToken: string | undefined;
-  }
-): Promise<ModelVerdict> {
-  return (await reviewKeyframe(frame, keys)).model;
+export interface KeyframeReviewInput {
+  readonly png: Buffer;
+  readonly stepId: string;
+  readonly path: string;
+  readonly expectedArtistName?: string;
+  readonly fetchImpl?: typeof fetch;
 }
+
+/** One keyframe review input as main() reads it, and the provider keys the failover reads. */
+export interface ReviewerProviderKeys {
+  readonly gatewayKey: string | undefined;
+  readonly gatewayBaseUrl: string;
+  readonly workersAiToken: string | undefined;
+}
+
+/** Reviewer A's verdict without routing attribution (see ./golden-path-review-routing.ts). */
+export const reviewWithFailover = async (
+  frame: KeyframeReviewInput,
+  keys: ReviewerProviderKeys
+): Promise<ModelVerdict> => (await reviewKeyframe(frame, keys)).model;
 
 /** The traced failover result for one keyframe, on the reviewer's verdict type. */
 export function reviewKeyframe(
-  frame: {
-    readonly png: Buffer;
-    readonly stepId: string;
-    readonly path: string;
-    readonly expectedArtistName?: string;
-    readonly fetchImpl?: typeof fetch;
-  },
-  keys: {
-    readonly gatewayKey: string | undefined;
-    readonly gatewayBaseUrl: string;
-    readonly workersAiToken: string | undefined;
-  }
+  frame: KeyframeReviewInput,
+  keys: ReviewerProviderKeys
 ): Promise<TrackedModelReview<ModelVerdict>> {
   return reviewKeyframeTraced(
     provider =>
-      provider === 'workers-ai'
-        ? reviewWithModel({
-            ...frame,
-            apiKey: keys.workersAiToken,
-            baseUrl: WORKERS_AI_REVIEW_BASE_URL,
-            model: WORKERS_AI_REVIEW_MODEL,
-            provider: 'workers-ai',
-          })
-        : reviewWithModel({
-            ...frame,
-            apiKey: keys.gatewayKey,
-            baseUrl: keys.gatewayBaseUrl,
-          }),
+      reviewWithModel({
+        ...frame,
+        ...(provider === 'workers-ai'
+          ? {
+              apiKey: keys.workersAiToken,
+              baseUrl: WORKERS_AI_REVIEW_BASE_URL,
+              model: WORKERS_AI_REVIEW_MODEL,
+              provider: 'workers-ai' as const,
+            }
+          : { apiKey: keys.gatewayKey, baseUrl: keys.gatewayBaseUrl }),
+      }),
     keys.workersAiToken !== undefined
   );
 }
@@ -429,13 +415,9 @@ export async function main(
       const raw = tracked.model;
       if (tracked.provider === 'workers-ai') routing.viaWorkersAi += 1;
       else routing.viaGateway += 1;
-      if (
-        tracked.workersAiFallbackReason &&
-        !routing.workersAiFallbackReasons.includes(
-          tracked.workersAiFallbackReason
-        )
-      )
-        routing.workersAiFallbackReasons.push(tracked.workersAiFallbackReason);
+      const { workersAiFallbackReason: fallback } = tracked;
+      if (fallback && !routing.workersAiFallbackReasons.includes(fallback))
+        routing.workersAiFallbackReasons.push(fallback);
       if (raw.verdict === 'blocker') {
         for (const finding of raw.findings) {
           if (isKnownArtistIdentityFalsePositive(finding))
@@ -501,7 +483,7 @@ export async function main(
     `[golden-path-review] ${verdicts.length} keyframes, suspected=${suspected.length}${first ? `, confirmed=${confirmed.length}` : ''}`
   );
   console.log(
-    `[golden-path-review] routing: ${routing.viaWorkersAi} via Workers AI, ${routing.viaGateway} via Gateway${routing.workersAiFallbackReasons.length ? ` (${routing.workersAiFallbackReasons.join('; ')})` : ''}`
+    `[golden-path-review] routing: ${routing.viaWorkersAi} via Workers AI, ${routing.viaGateway} via Gateway${routing.workersAiFallbackReasons.join('; ') ? ` (${routing.workersAiFallbackReasons.join('; ')})` : ''}`
   );
   if (first && confirmed.length > 0) process.exit(1);
 }
