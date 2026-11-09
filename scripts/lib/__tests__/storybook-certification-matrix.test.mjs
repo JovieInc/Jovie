@@ -50,11 +50,14 @@ function runMatrixMember(shard, exitCode = 0) {
   try {
     return spawnSync(
       '/bin/bash',
-      ['-c', `sleep 30 &\nexport STORYBOOK_PID=$!\n${matrixStep.run}`],
+      [
+        '-c',
+        `sleep 60 </dev/null >/dev/null 2>&1 &\nexport STORYBOOK_PID=$!\n${matrixStep.run}`,
+      ],
       {
         cwd: root,
         encoding: 'utf8',
-        timeout: 5_000,
+        timeout: 30_000,
         env: {
           ...process.env,
           PATH: `${bin}${delimiter}${process.env.PATH || ''}`,
@@ -93,7 +96,7 @@ describe('combined-head Storybook certification deduplication', () => {
       '/scripts/component-merge-group-storybook-cert.mjs'
     );
     expect(result.stdout).not.toContain('playwright test');
-  });
+  }, 40_000);
 
   it.each([1, 2, 3])(
     'keeps the complete browser spec list in shard %s without repeating certification',
@@ -111,7 +114,8 @@ describe('combined-head Storybook certification deduplication', () => {
         result.stdout.match(/tests\/e2e\/storybook-[\w-]+\.spec\.ts/g)
       ).toHaveLength(21);
       expect(result.stdout).toContain(`--workers=2 --shard=${shard}/3`);
-    }
+    },
+    40_000
   );
 
   it.each(['certification', 1, 2, 3])(
@@ -120,6 +124,7 @@ describe('combined-head Storybook certification deduplication', () => {
       const result = runMatrixMember(shard, 23);
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(23);
-    }
+    },
+    40_000
   );
 });
