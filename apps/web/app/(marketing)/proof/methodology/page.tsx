@@ -12,18 +12,18 @@ import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 const PAGE_URL = `${BASE_URL}${APP_ROUTES.PROOF_METHODOLOGY}`;
-const TITLE = 'How Jovie Measures Its Numbers';
+const TITLE = 'How Jovie measures its numbers';
 const DESCRIPTION =
   'Where every public Jovie number comes from: what it counts, how it is rounded, when it is shown and how competitor benchmarks are run.';
 
 export const metadata: Metadata = {
   // Withheld until a proof stat is published (data/marketing/withheldRoutes.ts).
   robots: NOINDEX_ROBOTS,
-  title: documentTitle(`${TITLE} - ${APP_NAME}`),
+  title: documentTitle(TITLE),
   description: DESCRIPTION,
   alternates: { canonical: PAGE_URL },
   openGraph: {
-    title: `${TITLE} - ${APP_NAME}`,
+    title: TITLE,
     description: DESCRIPTION,
     url: PAGE_URL,
     type: 'article',
