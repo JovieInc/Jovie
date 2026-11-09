@@ -33,6 +33,7 @@ import {
   assertOviePrivacyUnlocked,
   getOviePrivacyLockState,
   mutateOviePrivacyLock,
+  readOviePrivacyPolicy,
 } from './server';
 
 const now = new Date('2026-09-29T20:00:00Z');
@@ -105,6 +106,32 @@ describe('session-bound Ovie privacy persistence', () => {
       throw Error('DB down');
     });
     await expect(assertOviePrivacyUnlocked(auth)).rejects.toThrow('DB down');
+  });
+  it('recovers a transient connection failure with a fresh read attempt (JOV-9909)', async () => {
+    const policyRow = [{ enabled: false, version: 0, lockedAt: null }];
+    let attempts = 0;
+    mocks.select.mockImplementation(() => {
+      const q: any = {
+        from: () => q,
+        where: () => q,
+        limit: async () => {
+          attempts += 1;
+          if (attempts === 1) {
+            throw new Error('Connection terminated unexpectedly');
+          }
+          return policyRow.shift() ?? [];
+        },
+      };
+      return q;
+    });
+    const pending = readOviePrivacyPolicy('u1');
+    await vi.advanceTimersByTimeAsync(2000);
+    await expect(pending).resolves.toEqual({
+      enabled: false,
+      version: 0,
+      lockedAt: null,
+    });
+    expect(attempts).toBe(2);
   });
   it('skips the Postgres policy read for the synthetic capture session', async () => {
     mocks.syntheticCapture = true;
