@@ -43,7 +43,8 @@ describe('EmptyState', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Add Contact' }));
+    // The shortcut is now part of the accessible name (visible keycap text).
+    await user.click(screen.getByRole('button', { name: 'Add Contact N then C' }));
     await user.click(screen.getByRole('button', { name: 'Import CSV' }));
     expect(onPrimary).toHaveBeenCalledTimes(1);
     expect(onSecondary).toHaveBeenCalledTimes(1);
