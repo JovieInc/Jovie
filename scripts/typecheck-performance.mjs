@@ -82,6 +82,7 @@ function parseArgs(argv) {
     return index === -1 ? fallback : argv[index + 1];
   };
   return {
+    confirmRetries: Number(value('--confirm-retries', '1')),
     enforce: argv.includes('--enforce'),
     output: resolve(
       ROOT,
@@ -90,6 +91,25 @@ function parseArgs(argv) {
     samples: Number(value('--samples', '3')),
     scenarios: value('--scenario', 'all').split(','),
   };
+}
+
+// With 3 samples the enforced p95 IS the maximum, and one cold sample on a
+// shared hosted runner can swing from ~70s to ~120s+ on the same tree
+// (scheduled runs 2026-10-12..11-09 measured both clusters; checkouts, setup
+// and hook rungs stay fast on the slow days, so it is runner draw, not code).
+// A sustained regression reproduces on every measurement; a contended runner
+// draw does not. `--confirm-retries` (default 1) re-measures a breached
+// scenario with the same scenario, sample count, budgets and statistic, and
+// only a breach that reproduces keeps its fail verdict — never weaken or
+// raise the budgets to deal with this. Budgets live in
+// .github/ci-harness/typecheck-performance.json.
+export function applyConfirmations(ratchet, confirmations) {
+  const resolved = { ...ratchet };
+  for (const { scenario, verdict } of confirmations) {
+    if (resolved[scenario]?.status === 'fail' && verdict.status !== 'fail')
+      resolved[scenario] = verdict;
+  }
+  return resolved;
 }
 
 function commandResult(command, env = {}) {
@@ -322,6 +342,8 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   if (!Number.isInteger(options.samples) || options.samples < 1)
     throw new Error('--samples must be a positive integer');
+  if (!Number.isInteger(options.confirmRetries) || options.confirmRetries < 0)
+    throw new Error('--confirm-retries must be a non-negative integer');
   const names = options.scenarios.includes('all')
     ? Object.keys(SCENARIOS)
     : options.scenarios;
@@ -329,18 +351,46 @@ async function main() {
   if (unknown.length)
     throw new Error(`unknown scenario(s): ${unknown.join(', ')}`);
   const config = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
+  const ratchetFor = (samples, name) =>
+    evaluateRatchet(samples, {
+      ...config.ratchet,
+      ...config.scenarios[name],
+    });
   const scenarios = [];
   for (const name of names)
     scenarios.push(await runScenario(name, SCENARIOS[name], options.samples));
   const ratchet = Object.fromEntries(
     scenarios.map(scenario => [
       scenario.name,
-      evaluateRatchet(scenario.samples, {
-        ...config.ratchet,
-        ...config.scenarios[scenario.name],
-      }),
+      ratchetFor(scenario.samples, scenario.name),
     ])
   );
+  const confirmations = [];
+  if (options.enforce && options.confirmRetries > 0) {
+    let pending = scenarios
+      .filter(scenario => ratchet[scenario.name]?.status === 'fail')
+      .map(scenario => scenario.name);
+    for (
+      let round = 1;
+      pending.length > 0 && round <= options.confirmRetries;
+      round += 1
+    ) {
+      const stillFailing = [];
+      for (const name of pending) {
+        const rerun = await runScenario(name, SCENARIOS[name], options.samples);
+        const verdict = ratchetFor(rerun.samples, name);
+        confirmations.push({
+          round,
+          samples: rerun.samples,
+          scenario: name,
+          verdict,
+        });
+        if (verdict.status === 'fail') stillFailing.push(name);
+      }
+      pending = stillFailing;
+    }
+  }
+  const resolvedRatchet = applyConfirmations(ratchet, confirmations);
   const report = {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
@@ -351,19 +401,23 @@ async function main() {
       platform: process.platform,
     },
     scenarios,
-    ratchet,
+    confirmations,
+    ratchet: resolvedRatchet,
   };
   mkdirSync(dirname(options.output), { recursive: true });
   writeFileSync(options.output, `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   if (
     options.enforce &&
-    Object.values(ratchet).some(item => item.status === 'fail')
+    Object.values(resolvedRatchet).some(item => item.status === 'fail')
   )
     process.exitCode = 1;
   if (
     scenarios.some(scenario =>
       scenario.samples.some(sample => sample.exitCode !== 0)
+    ) ||
+    confirmations.some(confirmation =>
+      confirmation.samples.some(sample => sample.exitCode !== 0)
     )
   )
     process.exitCode = 1;

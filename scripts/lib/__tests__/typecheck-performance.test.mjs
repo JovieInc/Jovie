@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  applyConfirmations,
   evaluateRatchet,
   sampleEnv,
   statistics,
@@ -39,6 +40,42 @@ describe('typecheck performance', () => {
         policy
       ).status
     ).toBe('fail');
+  });
+
+  it('clears an enforced breach that fails to reproduce on its confirmation measurement', () => {
+    const policy = {
+      baselineP95Ms: 100000,
+      targetP95Ms: 125000,
+      minimumSamples: 3,
+      warningRegression: 0.1,
+      failureRegression: 0.2,
+    };
+    const verdict = samples =>
+      evaluateRatchet(
+        samples.map(durationMs => ({ durationMs })),
+        policy
+      );
+    // Same tree, scheduled runs 2026-10-12..11-09: per-sample cold typecheck
+    // measured ~67s on some days and ~104-123s on others, so max-of-3
+    // straddles the 120s fail line. A real regression reproduces.
+    const initial = { ci: verdict([112000, 118000, 124000]) };
+    expect(initial.ci.status).toBe('fail');
+    const cleared = applyConfirmations(initial, [
+      { scenario: 'ci', verdict: verdict([96000, 101000, 106000]) },
+    ]);
+    expect(cleared.ci.status).toBe('pass');
+    const reproduced = applyConfirmations(initial, [
+      { scenario: 'ci', verdict: verdict([121000, 126000, 131000]) },
+    ]);
+    expect(reproduced.ci.status).toBe('fail');
+    // A passing scenario is never re-measured, and a confirmation can never
+    // make a healthy measurement fail.
+    const healthy = { ci: verdict([90000, 95000, 100000]) };
+    expect(
+      applyConfirmations(healthy, [
+        { scenario: 'ci', verdict: verdict([130000, 135000, 140000]) },
+      ]).ci.status
+    ).toBe('pass');
   });
 
   it('gives every sample a fresh singleflight state dir so replays cannot warm the ratchet', () => {
