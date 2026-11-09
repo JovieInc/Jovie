@@ -37,6 +37,7 @@ import {
   INCIDENT_SCHEMA,
   MAX_LOOKBACK_COMMITS,
   marker,
+  openIncidents,
   parsePrNumber,
   planJump,
   REOPEN_LABEL,
@@ -443,10 +444,7 @@ async function enqueueWithJump(number) {
 // ---- incident --------------------------------------------------------------
 
 async function incident(key, title, body) {
-  const found = await api(
-    `repos/${REPO}/issues?state=open&labels=${INCIDENT_LABEL}&per_page=50`,
-    'repair'
-  );
+  const found = await openIncidents({ api, gh, repo: REPO, key });
   const existing = found.find(i => readMarker(i.body)?.key === key);
   const text = `${marker({ key })}\n${body}`;
   if (existing) {

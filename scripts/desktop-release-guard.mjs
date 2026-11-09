@@ -260,6 +260,11 @@ function gitRaw(args) {
   return execFileSync('git', args, {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
+    // CHANGELOG.md carries the daily-changelog receipt comments and exceeds the
+    // 1 MiB execFileSync default (1.3 MB on main as of 2026-11); without this
+    // `git show <base>:CHANGELOG.md` throws ENOBUFS and the guard reads it as
+    // missing promoted release evidence.
+    maxBuffer: 64 * 1024 * 1024,
   });
 }
 
