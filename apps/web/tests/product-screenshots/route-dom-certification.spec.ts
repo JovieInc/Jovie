@@ -32,12 +32,15 @@ import {
   expectDeliberateRed,
   flatImg,
   isTasteKind,
+  markupKinds,
   outputRoot,
+  plane,
   prepareProfileState,
   profileRoute,
   profileStates,
   profileViewports,
   safeName,
+  slowImageBlankMedia,
   sourceGitSha,
   tasteBaseline,
   tasteBaselinePath,
@@ -52,10 +55,6 @@ import {
 test.describe.configure({ retries: 0 });
 
 test.describe('Route DOM detector deliberate-red fixtures', () => {
-  // JOV-7710 / AM-017: one semantic level reads as one material.
-  const plane = (inner: string) =>
-    `<main id="main-content" style="width:1000px;height:600px;background:rgb(16,17,20)">${inner}</main>`;
-
   test('rejects an inset header strip on the main plane (JOV-7207)', async ({
     page,
   }) => {
@@ -290,12 +289,7 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     await expectDeliberateRed(page, 'marketing', 'placeholder-copy');
   });
 
-  const kindsOf = async (html: string): Promise<string[]> => {
-    await page_ref.setContent(html);
-    return (
-      await inspectRouteDom(page_ref, { surface: 'marketing' })
-    ).findings.map(finding => finding.kind);
-  };
+  const kindsOf = (html: string) => markupKinds(page_ref, html);
   let page_ref: Page;
   test.beforeEach(({ page }) => {
     page_ref = page;
@@ -323,26 +317,7 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
   });
 
   test('blank-media: judges a slow image once it has loaded, not its empty slot', async () => {
-    const slowUrl = 'https://blank-media.fixture.test/slow-hero.svg';
-    await page_ref.route(slowUrl, async route => {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      await route.fulfill({
-        contentType: 'image/svg+xml',
-        body: decodeURIComponent(busyImg.slice(busyImg.indexOf(',') + 1)),
-      });
-    });
-    // A receipt starts at domcontentloaded, so the image is still in flight.
-    await page_ref.setContent(
-      `<main><section data-pen-section="hero" style="background:#0b0b0d"><h1>Product</h1><img src="${slowUrl}" width="600" height="400" alt="Dashboard"></section></main>`,
-      { waitUntil: 'domcontentloaded' }
-    );
-    expect(
-      await page_ref.evaluate(() => document.querySelector('img')?.complete)
-    ).toBe(false);
-    const snapshot = await inspectRouteDom(page_ref, { surface: 'marketing' });
-    expect(snapshot.findings.map(finding => finding.kind)).not.toContain(
-      'blank-media'
-    );
+    expect(await slowImageBlankMedia(page_ref)).not.toContain('blank-media');
   });
 
   test('placeholder-copy: flags common placeholders in text, alt and aria', async () => {
