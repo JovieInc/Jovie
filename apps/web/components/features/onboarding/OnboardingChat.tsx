@@ -91,29 +91,21 @@ import {
   THINKING_PLACEHOLDER_ID,
   type ToolPart,
 } from './onboardingChatHelpers';
+import {
+  preloadOnboardingConversationChunks,
+  scheduleOnboardingConversationPreload,
+} from './onboardingConversationWarm';
 import type { OnboardingProfileBuilderState } from './onboardingProfileRailState';
 
 /**
  * /start LCP (JOV-9611): the empty state paints only the intro heading and the
  * composer. Everything that renders a conversation (markdown/streamdown message
  * bodies, tool UI, proposal cards) is split out of the entry bundle so the
- * first paint is not starved behind its evaluation on slow mobile CPUs.
- * `preloadOnboardingConversationChunks` warms them on the visitor's first
- * interaction with the chat (or the first submit, so a starter auto-send never
- * waits), so the first assistant reply renders without a visible fetch while
- * the main thread stays idle during the page's first seconds (JOV-12023).
+ * first paint is not starved behind its evaluation on slow mobile CPUs. The
+ * chunks warm on user intent, never on idle (JOV-12023) — see
+ * onboardingConversationWarm.
  * Guard: tests/unit/onboarding/OnboardingChat.entry-bundle.test.ts
  */
-const loadChatMessage = () =>
-  import('@/components/jovie/components/ChatMessage').then(
-    mod => mod.ChatMessage
-  );
-const loadToolPartsRenderer = () =>
-  import('@/components/jovie/tool-ui').then(mod => mod.ToolPartsRenderer);
-const loadChatProposeCheckoutCard = () =>
-  import('./ChatProposeCheckoutCard').then(mod => mod.ChatProposeCheckoutCard);
-const loadChatProposeNextStepCard = () =>
-  import('./ChatProposeNextStepCard').then(mod => mod.ChatProposeNextStepCard);
 
 // Inline import() inside dynamic() keeps Next's loadable preload metadata; the
 // loaders above resolve to the same chunks for idle preloading. Message rows
@@ -146,46 +138,6 @@ const ChatProposeNextStepCard = dynamic(
     ),
   { loading: () => <ReservedChatSlot minHeightClass='min-h-24' /> }
 );
-
-function preloadOnboardingConversationChunks() {
-  void Promise.all([
-    loadChatMessage(),
-    loadToolPartsRenderer(),
-    loadChatProposeCheckoutCard(),
-    loadChatProposeNextStepCard(),
-  ]).catch(() => undefined);
-}
-
-/**
- * JOV-12023: warm on user intent, never on idle. The idle warm pulled the
- * conversation chunks (markdown/streamdown message bodies, tool UI) into
- * /start's first seconds — inside Lighthouse's measured window — where their
- * parse/eval owned ~170 ms of TBT on the merge-group gate (run 42689319887:
- * /start TBT 431 against a 350 budget, performance 0.89 against 0.92). The
- * main thread now stays idle until the visitor interacts: the first pointer
- * or key event on the chat, or the first submit, warms the chunks so they
- * still overlap the server roundtrip.
- */
-const CONVERSATION_WARM_EVENTS = ['pointerdown', 'keydown'] as const;
-
-function scheduleOnboardingConversationPreload(
-  element: HTMLElement | null
-): () => void {
-  if (!element) return () => undefined;
-  const warm = () => preloadOnboardingConversationChunks();
-  for (const event of CONVERSATION_WARM_EVENTS) {
-    element.addEventListener(event, warm, {
-      capture: true,
-      once: true,
-      passive: true,
-    });
-  }
-  return () => {
-    for (const event of CONVERSATION_WARM_EVENTS) {
-      element.removeEventListener(event, warm, { capture: true });
-    }
-  };
-}
 
 const STARTER_VERIFICATION_INSTRUCTION = 'One quick check before we send';
 
@@ -1067,8 +1019,7 @@ export function OnboardingChat({
         hasAutoSubmittedStarterPromptRef.current = true;
         return;
       }
-      // JOV-12023: the starter auto-send has no user gesture to trigger the
-      // intent warm, so the first submit warms the conversation chunks itself.
+      // JOV-12023: the starter auto-send has no gesture, so submit warms too.
       preloadOnboardingConversationChunks();
       lastAttemptedMessageRef.current = text;
       setChatError(null);

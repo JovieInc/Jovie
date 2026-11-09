@@ -108,19 +108,22 @@ describe('UserButton browser chunk diet (JOV-12023)', () => {
   // reintroduce them. A static titlebar import drags electron-bridge, the
   // update modal and radix dialog into every browser shell chunk.
   const source = readFileSync(path.join(__dirname, 'UserButton.tsx'), 'utf8');
+  const lazySource = readFileSync(
+    path.join(__dirname, 'desktop-release-identity.lazy.ts'),
+    'utf8'
+  );
 
-  it('never statically imports the desktop titlebar module', () => {
+  it('keeps every desktop module out of the static import graph', () => {
     expect(source).not.toMatch(
       /from '@\/components\/organisms\/DesktopTitlebar'/
     );
-    expect(source).toMatch(
-      /import\('@\/components\/organisms\/DesktopTitlebar'/
-    );
-  });
-
-  it('reads the runtime hook from the leaf module, not the bridge', () => {
     expect(source).not.toMatch(/from '@\/lib\/desktop\/electron-bridge'/);
     expect(source).toMatch(/from '@\/lib\/desktop\/electron-runtime'/);
+    expect(source).toMatch(/from '\.\/desktop-release-identity\.lazy'/);
+    expect(lazySource).toMatch(
+      /import\('@\/components\/organisms\/DesktopTitlebar'/
+    );
+    expect(lazySource).toMatch(/ssr: false/);
   });
 });
 

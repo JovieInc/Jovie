@@ -47,6 +47,7 @@ import {
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
 import { useDesktopUpdateContext } from '../desktop-update/DesktopUpdateProvider';
+import { DesktopReleaseIdentity } from './desktop-release-identity.lazy';
 import { OviePrivacyLockControl } from './OviePrivacyLockControl';
 import type { UserButtonProps } from './types';
 import { UsageMenuItem } from './UsageMenuItem';
@@ -59,21 +60,6 @@ const DashboardFeedbackModal = dynamic(
         default: mod.DashboardFeedbackModal,
       })
     ),
-  { ssr: false, loading: () => null }
-);
-
-/**
- * JOV-12023: the release identity lives in the desktop titlebar module, whose
- * graph (electron-bridge wiring, update modal, radix dialog) must stay out of
- * every browser tab's initial chunks (#24725 left this the last eager edge).
- * Loaded only when the electron runtime is detected; the browser renders the
- * plain web version string instead.
- */
-const DesktopReleaseIdentity = dynamic(
-  () =>
-    import('@/components/organisms/DesktopTitlebar').then(mod => ({
-      default: mod.DesktopReleaseIdentity,
-    })),
   { ssr: false, loading: () => null }
 );
 
