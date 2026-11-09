@@ -1,7 +1,12 @@
 import { writeFile } from 'node:fs/promises';
 import { expect, type Page, type TestInfo } from '@playwright/test';
+import { PROFILE_DESKTOP_SURFACE_SHIPPED } from './profile-desktop-surface';
 
-/** The JOV-6571 four-mode contract, exercised through the real profile controls. */
+/** The JOV-6571 four-mode contract, exercised through the real profile controls.
+ *  Layout-aware (JOV-11623): at desktop widths the canonical desktop surface
+ *  (Pen frame D9kdx) owns the presentation — the same URL/data-mode/aria-current
+ *  contract is asserted through its pill navigation instead of the bottom nav.
+ */
 export async function certifyProfileModeHistory(
   page: Page,
   testInfo: TestInfo,
@@ -10,13 +15,21 @@ export async function certifyProfileModeHistory(
   const source = 'jov-6572';
   const href = (mode: string) =>
     `/${handle}?${mode === 'profile' ? '' : `mode=${mode}&`}source=${source}`;
-  const surface = page.getByTestId('profile-compact-surface');
-  const nav = page.getByTestId('profile-bottom-nav');
+  const desktop =
+    PROFILE_DESKTOP_SURFACE_SHIPPED &&
+    (page.viewportSize()?.width ?? 0) >= 1180;
+  const surface = page.getByTestId(
+    desktop ? 'profile-desktop-surface' : 'profile-compact-surface'
+  );
+  const nav = desktop
+    ? surface.getByRole('navigation', { name: 'Profile Navigation' })
+    : page.getByTestId('profile-bottom-nav');
   const ready = async () => {
-    await expect(page.getByTestId('profile-compact-shell')).toHaveAttribute(
-      'data-interactive-ready',
-      'true'
-    );
+    await expect(
+      page.getByTestId(
+        desktop ? 'profile-desktop-surface' : 'profile-compact-shell'
+      )
+    ).toHaveAttribute('data-interactive-ready', 'true');
   };
   const observations: unknown[] = [];
   let stage = 'direct-events';
@@ -29,23 +42,26 @@ export async function certifyProfileModeHistory(
     observations.push({
       stage: name,
       observedAt: new Date().toISOString(),
-      ...(await page.evaluate(() => ({
-        url: location.href,
-        mode:
-          document
-            .querySelector('[data-testid="profile-compact-surface"]')
-            ?.getAttribute('data-mode') ?? null,
-        selected:
-          document.querySelector(
-            '[data-testid="profile-bottom-nav"] [aria-current="page"]'
-          )?.textContent ?? null,
-        historyLength: history.length,
-        // Guard-level receipts from lib/testing/runtime-trace: which
-        // history-effect guard fired/blocked, in order (B/C diagnostics).
-        runtimeTrace:
-          (window as unknown as { __JOVIE_RUNTIME_TRACE__?: unknown })
-            .__JOVIE_RUNTIME_TRACE__ ?? null,
-      }))),
+      ...(await page.evaluate(
+        shellId => ({
+          url: location.href,
+          mode:
+            document
+              .querySelector(`[data-testid="${shellId}"]`)
+              ?.getAttribute('data-mode') ?? null,
+          selected:
+            document.querySelector(
+              '[data-testid="profile-bottom-nav"] [aria-current="page"], [data-testid="profile-desktop-surface"] [data-public-profile-nav] [aria-current="page"]'
+            )?.textContent ?? null,
+          historyLength: history.length,
+          // Guard-level receipts from lib/testing/runtime-trace: which
+          // history-effect guard fired/blocked, in order (B/C diagnostics).
+          runtimeTrace:
+            (window as unknown as { __JOVIE_RUNTIME_TRACE__?: unknown })
+              .__JOVIE_RUNTIME_TRACE__ ?? null,
+        }),
+        desktop ? 'profile-desktop-surface' : 'profile-compact-surface'
+      )),
     });
     await writeFile(
       testInfo.outputPath('profile-mode-history.json'),
