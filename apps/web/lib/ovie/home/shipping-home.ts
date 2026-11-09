@@ -300,6 +300,10 @@ function rawPulse(
   const flow = lanes.flow ?? null;
   const mergesPerDay = perDay(delivery.merges.last7Days);
   const ejection = flow?.queueEjectionRate ?? null;
+  const ejectionAt = flow?.at ? Date.parse(flow.at) : Number.NaN;
+  const ejectionSource = Number.isFinite(ejectionAt)
+    ? `Snapshot ${new Date(ejectionAt).toISOString().slice(0, 16).replace('T', ' ')} UTC`
+    : 'Snapshot time unknown';
   const behind = countValue(production.behindMain);
   const running = countValue(lanes.running);
   const slots = countValue(lanes.slots);
@@ -311,7 +315,7 @@ function rawPulse(
   return [
     {
       key: 'merges-day',
-      label: 'Merges / day (7d)',
+      label: 'Org merges / day (7d)',
       value: mergesPerDay === null ? OVIE_NOT_MEASURED : String(mergesPerDay),
       measured: mergesPerDay !== null,
       tone:
@@ -338,6 +342,7 @@ function rawPulse(
               TARGETS.queueEjectionRate * 2
             ),
       target: `Target ≤ ${Math.round(TARGETS.queueEjectionRate * 100)}%`,
+      sourceCaption: ejectionSource,
       href: shipping,
     },
     {
@@ -378,7 +383,7 @@ function rawPulse(
     },
     {
       key: 'ownerless',
-      label: 'Ownerless PRs',
+      label: 'Ownerless issues',
       value: ownerless === null ? OVIE_NOT_MEASURED : String(ownerless),
       measured: ownerless !== null,
       tone:
@@ -430,7 +435,7 @@ const PULSE_NAMES: Record<OviePulseKey, string> = {
   prod: 'production',
   'lyb-deploy': 'LYB production',
   lanes: 'lanes',
-  ownerless: 'ownerless PRs',
+  ownerless: 'ownerless issues',
 };
 
 function breachText(tile: OviePulseTile): string {
@@ -446,7 +451,7 @@ function breachText(tile: OviePulseTile): string {
     case 'lanes':
       return `${tile.value} lanes busy`;
     case 'ownerless':
-      return `${tile.value} ownerless PRs`;
+      return `${tile.value} ownerless issues`;
   }
 }
 

@@ -250,6 +250,43 @@ function onTargetDelivery(): DeliverySummary {
 }
 
 describe('buildPulse', () => {
+  it('discloses metric scope and the inner SLO snapshot even with a fresh lanes feed', () => {
+    const base = onTargetDelivery();
+    const pulse = buildPulse({
+      ...base,
+      lanes: {
+        ...base.lanes,
+        stale: false,
+        flow: {
+          ...base.lanes.flow!,
+          at: '2026-11-07T14:24:24.583Z',
+          ownerless: 11,
+        },
+      },
+    });
+    expect(
+      pulse.find(tile => tile.key === 'ejections')?.sourceCaption
+    ).toContain('Snapshot 2026-11-07 14:24 UTC');
+    expect(pulse.find(tile => tile.key === 'ownerless')).toMatchObject({
+      label: 'Ownerless issues',
+      value: '11',
+    });
+    expect(pulse.find(tile => tile.key === 'merges-day')?.label).toBe(
+      'Org merges / day (7d)'
+    );
+  });
+
+  it.each([null, 'invalid'])('does not invent a snapshot time for %s', at => {
+    const base = onTargetDelivery();
+    const pulse = buildPulse({
+      ...base,
+      lanes: { ...base.lanes, flow: { ...base.lanes.flow!, at } },
+    });
+    expect(
+      pulse.find(tile => tile.key === 'ejections')?.sourceCaption
+    ).toContain('Snapshot time unknown');
+  });
+
   it('shows Not measured, neutral tone, and no was for an empty summary', () => {
     const pulse = buildPulse(delivery());
     expect(pulse.map(tile => tile.key)).toEqual([

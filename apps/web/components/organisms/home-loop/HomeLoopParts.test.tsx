@@ -106,6 +106,20 @@ describe('HomeLoopConstraintBanner details', () => {
 });
 
 describe('HomeLoopPulse', () => {
+  it('renders measurement provenance separately from the target', () => {
+    render(
+      <HomeLoopPulse
+        tiles={[
+          {
+            ...HOME_LOOP_FIXTURE_PULSE[0],
+            sourceCaption: 'Snapshot 2026-11-07 14:24 UTC',
+          },
+        ]}
+      />
+    );
+    expect(screen.getByText('Snapshot 2026-11-07 14:24 UTC')).toBeVisible();
+  });
+
   it('shows each tile with its previous value and a named tone', () => {
     render(<HomeLoopPulse tiles={HOME_LOOP_FIXTURE_PULSE} />);
     expect(

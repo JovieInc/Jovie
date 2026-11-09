@@ -38,7 +38,7 @@ const PLACEHOLDER_SLOTS = [
 ] as const;
 
 const TILE_FRAME =
-  'flex h-20 min-w-34 flex-1 basis-0 flex-col justify-between gap-0.5 rounded-lg bg-surface-1 px-3 py-2';
+  'flex h-24 min-w-34 flex-1 basis-0 flex-col justify-between gap-0.5 rounded-lg bg-surface-1 px-3 py-2';
 
 /**
  * The single highest-severity condition; a quiet line when there is none.
@@ -149,6 +149,11 @@ export function HomeLoopTileCard({
       <span className='truncate text-2xs tabular-nums text-tertiary-token'>
         {footer || '\u00a0'}
       </span>
+      {tile.sourceCaption ? (
+        <span className='text-2xs tabular-nums text-tertiary-token'>
+          {tile.sourceCaption}
+        </span>
+      ) : null}
     </>
   );
   const shared = {
@@ -156,7 +161,9 @@ export function HomeLoopTileCard({
     'data-measured': tile.measured,
     'data-testid': `home-loop-tile-${tile.key}`,
     'data-tone': tile.tone,
-    title: [tile.label, tile.value, footer].filter(Boolean).join(' · '),
+    title: [tile.label, tile.value, footer, tile.sourceCaption]
+      .filter(Boolean)
+      .join(' · '),
   } as const;
   return tile.href ? (
     <a
@@ -200,7 +207,7 @@ export function HomeLoopPulse({
   return (
     <div
       ref={ref}
-      className='relative flex h-20 shrink-0 flex-wrap gap-2 overflow-hidden'
+      className='relative flex h-24 shrink-0 flex-wrap gap-2 overflow-hidden'
       data-testid={testId}
       aria-busy={loading}
     >
