@@ -320,6 +320,7 @@ describe('ingestLeadAsCreator for leads whose page is never read', () => {
     await ingestLeadAsCreator(
       lead({
         linktreeUrl: 'https://laylo.com/novaray',
+        linktreeHandle: 'laylocom-novaray',
         sourcePlatform: 'linktree',
       })
     );

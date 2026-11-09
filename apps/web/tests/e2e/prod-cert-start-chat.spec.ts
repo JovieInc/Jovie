@@ -71,6 +71,9 @@ recordCertCapabilities({
 
 const ORIGIN = process.env.PROD_CERT_START_ORIGIN ?? 'https://jov.ie';
 
+/** iPhone-sized viewport for the phone pass of the preview check. */
+const PHONE_VIEWPORT = { width: 390, height: 844 } as const;
+
 /**
  * Candidate fixture artists, in pool order (JOV-9928). UNMARKED stays first
  * for continuity; the rest are real, obscure Spotify artists with verified
@@ -240,10 +243,31 @@ test('anonymous /start reaches a real catalog preview on production', async ({
       await expectPreviewMediaPainted(rail);
       await expectRequiredFieldsPainted(rail);
       await expectNoForcedCaps(page.locator('main'));
+
+      // The same preview on a phone: the inline rail in the conversation must
+      // be just as real as the desktop side rail.
+      const desktopViewport = page.viewportSize();
+      await page.setViewportSize(PHONE_VIEWPORT);
+      try {
+        const phoneRail = page
+          .getByTestId('onboarding-profile-rail-inline')
+          .filter({ visible: true })
+          .first();
+        await expect(
+          phoneRail,
+          'phone showed no inline preview of the draft profile'
+        ).toBeVisible({ timeout: 15_000 });
+        await phoneRail.scrollIntoViewIfNeeded();
+        await expectPreviewMediaPainted(phoneRail);
+        await expectRequiredFieldsPainted(phoneRail);
+        await expectNoForcedCaps(page.locator('main'));
+      } finally {
+        if (desktopViewport) await page.setViewportSize(desktopViewport);
+      }
       return releases;
     },
     releases =>
-      `preview shows ${releases} real releases with painted portrait and artwork, filled fields, no forced caps, no pricing step`
+      `preview shows ${releases} real releases with painted portrait and artwork, filled fields, no forced caps, no pricing step, on desktop and phone`
   );
 
   telemetry.record('claim');

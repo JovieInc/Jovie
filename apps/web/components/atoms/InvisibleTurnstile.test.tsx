@@ -7,6 +7,7 @@ import {
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InvisibleTurnstile } from '@/components/atoms/InvisibleTurnstile';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 type TurnstileOptions = Parameters<
   NonNullable<Window['turnstile']>['render']
@@ -25,9 +26,13 @@ vi.mock('next/script', () => ({
     readonly src: string;
   }) => {
     if (scriptMock.autoLoad) queueMicrotask(() => onLoad?.());
+    // Fixture only: the real next/script renders a <script>, which has no
+    // role. This stand-in is a button so tests can fire onError, so it gets a
+    // name to keep the axe checks about the component, not the stub.
     return (
       <button
         type='button'
+        aria-label='Cloudflare script stand-in'
         data-testid='next-script'
         data-src={src}
         onClick={onError}
@@ -63,7 +68,7 @@ describe('InvisibleTurnstile', () => {
       remove: vi.fn(),
     };
 
-    render(<InvisibleTurnstile onToken={onToken} />);
+    const { container } = render(<InvisibleTurnstile onToken={onToken} />);
 
     await waitFor(() => {
       expect(renderMock).toHaveBeenCalledWith(
@@ -87,6 +92,7 @@ describe('InvisibleTurnstile', () => {
       'h-16',
       'w-80'
     );
+    await expectNoA11yViolations(container);
   });
 
   it('bypasses verification when NEXT_PUBLIC_AUTH_MOCK is enabled', async () => {
@@ -196,7 +202,7 @@ describe('InvisibleTurnstile', () => {
       remove: vi.fn(),
     };
 
-    render(
+    const { container } = render(
       <InvisibleTurnstile onToken={onToken} onStateChange={onStateChange} />
     );
 
@@ -210,6 +216,7 @@ describe('InvisibleTurnstile', () => {
     expect(widget).toHaveClass('fixed', 'h-[154px]', 'w-[164px]', 'z-50');
     expect(widget).not.toHaveClass('relative');
     expect(onStateChange).toHaveBeenCalledWith({ status: 'interactive' });
+    await expectNoA11yViolations(container);
   });
 
   it('reports a Cloudflare script-load failure without throwing', async () => {

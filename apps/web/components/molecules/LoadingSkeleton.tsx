@@ -155,9 +155,11 @@ export function ButtonSkeleton() {
 
 const SOCIAL_BAR_SKELETON_KEYS = generateSkeletonKeys('social-link', 4);
 
+// A div, not a nav: role='status' is not an allowed role on <nav>, and the
+// placeholder holds no links to navigate yet.
 export function SocialBarSkeleton() {
   return (
-    <nav
+    <div
       className='flex flex-wrap justify-center gap-4'
       role='status'
       aria-label='Loading Social Media Links'
@@ -168,7 +170,7 @@ export function SocialBarSkeleton() {
       {SOCIAL_BAR_SKELETON_KEYS.map(key => (
         <Skeleton key={key} className='h-12 w-12' rounded='full' />
       ))}
-    </nav>
+    </div>
   );
 }
 
