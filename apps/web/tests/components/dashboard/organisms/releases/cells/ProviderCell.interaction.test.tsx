@@ -66,6 +66,8 @@ describe('ProviderCell actions', () => {
     );
 
     const [openButton, copyButton] = screen.getAllByRole('button');
+    expect(openButton).toHaveAttribute('aria-label', 'Open');
+    expect(copyButton).toHaveAttribute('aria-label', 'Copy');
     fireEvent.click(openButton);
     fireEvent.click(copyButton);
 
@@ -149,7 +151,9 @@ describe('Ion-token feedback on availability surfaces', () => {
       </TooltipProvider>
     );
     await user.click(
-      screen.getByRole('button', { name: 'Show Provider Availability Details' })
+      screen.getByRole('button', {
+        name: /^Show provider availability details:/i,
+      })
     );
     await user.click(screen.getByRole('button', { name: '+ Add link' }));
     const input = screen.getByPlaceholderText('Paste URL...');
@@ -275,7 +279,9 @@ describe('Ion-token feedback on availability surfaces', () => {
     );
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Show Provider Availability Details' })
+      screen.getByRole('button', {
+        name: /^Show provider availability details:/i,
+      })
     );
 
     const statusDot = document.querySelector('span.ring-2');

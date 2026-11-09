@@ -38,7 +38,7 @@ import file_overlap  # noqa: E402
 import fleet_ledger  # noqa: E402  (claim ledger view, ready-work recorder)
 import factory_intake  # noqa: E402  (fleet-improvement signals -> agent-ready issues)
 import factory_signals  # noqa: E402  (recurring-alarm adapter)
-import linear_sync  # noqa: E402  (local Linear mirror and outbox status)
+import linear_sync, urgent_sla  # noqa: E402  (local Linear mirror and outbox status; Urgent SLA)
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
 from atomic_state import atomic_write_text  # noqa: E402
@@ -47,9 +47,7 @@ import shipping_attribution  # noqa: E402  (company merge provenance report)
 import stage_events  # noqa: E402  (jovie-stage-event/v1 rows for the stage collector)
 import ledger_archive  # noqa: E402  (bounded runs/ledger.jsonl)
 import throughput_sentinel  # noqa: E402
-import deploy_health  # noqa: E402  (production deploy failure and lag incidents, Jovie + LogYourBody)
-import release_evidence  # noqa: E402  (release-evidence job red on main; production build stale)
-import release_gates  # noqa: E402  (every controller-derived release gate red 2+ runs; new blocker reasons)
+import health_checks  # noqa: E402  (source certification and release health providers)
 import integration_probes  # noqa: E402  (synthetic probes of the Gem integrations fleet work depends on)
 
 COOL_OFF_S = 6 * 3600
@@ -630,15 +628,13 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         **automation_observation(host, lane, now),
         "outcomeQueue": read_json(state / "outcome-queue.json", {}),
         "integrationProbes": integration_probes.observe(state, lane.HOST, now),
-        "deployHealth": deploy_health.sample(state, now)[0] if not os.environ.get("LANES_SELFTEST") else None,
-        "releaseEvidence": release_evidence.sample(state, now)[0] if not os.environ.get("LANES_SELFTEST") else None,
-        "releaseGates": release_gates.sample(state, now)[0] if not os.environ.get("LANES_SELFTEST") else None,
+        **health_checks.observe(state, now),
         "sentinel": throughput_sentinel.observe(
             state, now, receipts,
             {"inventoryBytes": getattr(lane, "REPAIR_INVENTORY_MAX_BYTES", 16 * 1024 * 1024)},
             fetch_remote=not os.environ.get("LANES_SELFTEST")),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
-        "linearSync": linear_sync.status(state, now),
+        "linearSync": {**linear_sync.status(state, now), "urgentSla": urgent_sla.view(state)},
         "publicFeed": read_json(state / "public-feed-sizes.json", {}),
         "installLag": {key: read_json(state / "update.json", {}).get(key) for key in ("behindS", "behindCommit", "error", "at")},
         "linearAppCredential": _linear_app_credential(lane),
@@ -1181,7 +1177,7 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                 continue
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
-    alerts.update(linear_sync.alerts(obs.get("linearSync") or {}))
+    alerts.update({**linear_sync.alerts(obs.get("linearSync") or {}), **urgent_sla.alerts(obs.get("linearSync") or {})})
     gaps = alert_issue_gaps(dict(alerts), ((previous or {}).get("issues") or {}), time.time())
     if gaps:
         shown = "; ".join(f"{key} ({why[:80]})" for key, why in list(gaps.items())[:4])
@@ -1230,9 +1226,7 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             "no Gem host-local automation receipt is being watched")
     alerts.update(integration_probes.alerts(probed, obs.get("now") or time.time()))
     alerts.update(throughput_sentinel.judge(obs))
-    alerts.update(deploy_health.judge(obs.get("deployHealth"), obs.get("now") or time.time()))
-    alerts.update(release_evidence.judge(obs.get("releaseEvidence"), obs.get("now") or time.time()))
-    alerts.update(release_gates.judge(obs.get("releaseGates"), obs.get("now") or time.time()))
+    alerts.update(health_checks.judge(obs))
     # Closed loop, last hop: Validating issues owing an `outcome` receipt wait on the outcome
     # lane. Its daily budget exhausted (or the drain gone silent) with owed receipts older than
     # OUTCOME_OWED_MAX_S used to stall in silence for the rest of the UTC day.
@@ -2090,7 +2084,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
         obs.get("now") or time.time())
     return {"schema": "symphony-lanes-status/v1", "at": now_iso(), "host": lane.HOST, "release": tick.get("release"),
             "fileOverlap": overlap, "linear": obs.get("linearSync") or tick.get("linear"),
-            "deployHealth": deploy_health.feed_block(obs.get("deployHealth"), obs.get("now") or time.time()),
+            **health_checks.feed(obs),
             "ownership": obs.get("ownership"),
             "lanes": counts, "providerPayloads": obs.get("providerPayloads"), "running": sum(c["running"] for c in counts.values()),
             "idle": sum(max(0, c["slots"] - c["running"]) for c in counts.values()),

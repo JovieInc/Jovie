@@ -73,6 +73,23 @@ function orderSessions(
   });
 }
 
+/** The card's loading geometry, also shown before auth has loaded. */
+export function SessionManagementSkeleton() {
+  return (
+    <SessionsFrame>
+      {SESSION_SKELETON_KEYS.map(key => (
+        <div
+          key={key}
+          className={SESSION_ROW_CLASS}
+          data-testid='session-row-skeleton'
+        >
+          <LoadingSkeleton height='h-10' />
+        </div>
+      ))}
+    </SessionsFrame>
+  );
+}
+
 export function SessionManagementCard({
   activeSessionId,
 }: SessionManagementCardProps) {
@@ -186,21 +203,7 @@ export function SessionManagementCard({
     : orderedSessions.slice(0, SESSION_PREVIEW_ROWS);
   const hiddenCount = orderedSessions.length - SESSION_PREVIEW_ROWS;
 
-  if (sessionsLoading) {
-    return (
-      <SessionsFrame>
-        {SESSION_SKELETON_KEYS.map(key => (
-          <div
-            key={key}
-            className={SESSION_ROW_CLASS}
-            data-testid='session-row-skeleton'
-          >
-            <LoadingSkeleton height='h-10' />
-          </div>
-        ))}
-      </SessionsFrame>
-    );
-  }
+  if (sessionsLoading) return <SessionManagementSkeleton />;
 
   if (sessionsError) {
     return (

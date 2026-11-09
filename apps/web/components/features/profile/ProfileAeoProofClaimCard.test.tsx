@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ProfileAeoProofClaimCard } from './ProfileAeoProofClaimCard';
 
 vi.mock('@/lib/acquisition/proof-claim-client', () => ({
@@ -40,5 +41,17 @@ describe('ProfileAeoProofClaimCard', () => {
     const row = screen.getByTestId('profile-aeo-claim-cta').parentElement;
     expect(row).toHaveClass('items-start');
     expect(row?.className).not.toMatch(/justify-between/);
+  });
+
+  it('has no axe violations', async () => {
+    const { container } = render(
+      <ProfileAeoProofClaimCard
+        artistName='Tim White'
+        href='/start'
+        label='Claim yours'
+        note='Limited · Reserve your name'
+      />
+    );
+    await expectNoA11yViolations(container);
   });
 });

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 
 import { Link } from './link';
 
@@ -184,4 +185,65 @@ export const StateMatrix: Story = {
       </Link>
     </div>
   ),
+};
+
+// Certificate states
+
+export const EmptyStreamedLabel: Story = {
+  args: {
+    href: '#reserved-label',
+    variant: 'compact',
+    touchTarget: true,
+    reserveLabel: 'Sign in',
+    children: null,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Before streamed children arrive the anchor is empty: the reserved label holds its width and supplies the accessible name, so nothing shifts when the text lands.',
+      },
+    },
+  },
+};
+
+export const LongContent: Story = {
+  render: () => (
+    <div className='w-56'>
+      <Link href='#release'>
+        Read the full release notes for Midnight Sessions (Extended Club Mix)
+        <ArrowRight className='size-3.5 shrink-0' aria-hidden='true' />
+      </Link>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A long label in a narrow container wraps onto several lines; the trailing icon stays attached and never shrinks.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl' className='grid w-56 justify-items-start gap-3'>
+      <Link href='#release'>
+        اقرأ ملاحظات الإصدار الكاملة لجلسات منتصف الليل
+        <ArrowLeft className='size-3.5 shrink-0' aria-hidden='true' />
+      </Link>
+      <Link href='#profile' variant='subtle'>
+        الملف الشخصي للفنان
+      </Link>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Right-to-left links keep the icon at the inline end of the reading order and wrap within the container.',
+      },
+    },
+  },
 };

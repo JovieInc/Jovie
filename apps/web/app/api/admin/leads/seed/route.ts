@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
-import { seedFeatureFmKeywords } from '@/lib/leads/seed-keywords';
+import { seedDiscoveryKeywords } from '@/lib/leads/seed-keywords';
 import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -8,7 +8,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 export const runtime = 'nodejs';
 
 /**
- * POST /api/admin/leads/seed — Seed Feature.fm discovery keywords.
+ * POST /api/admin/leads/seed — Seed Feature.fm and tool-search discovery keywords.
  */
 export async function POST() {
   const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
@@ -26,7 +26,7 @@ export async function POST() {
   }
 
   try {
-    const result = await seedFeatureFmKeywords();
+    const result = await seedDiscoveryKeywords();
     return NextResponse.json(
       { result },
       { status: 200, headers: NO_STORE_HEADERS }

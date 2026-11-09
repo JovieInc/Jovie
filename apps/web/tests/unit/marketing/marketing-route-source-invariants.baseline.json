@@ -36,7 +36,6 @@
   "inline-style::components/atoms/SocialIcon.tsx": 2,
   "inline-style::components/features/home/label-logos.tsx": 1,
   "inline-style::components/feedback/BannerViewport.tsx": 1,
-  "inline-style::components/marketing/MarketingEditorialHeroPhoto.tsx": 1,
   "inline-style::components/marketing/MarketingElectricSeam.tsx": 3,
   "inline-style::components/marketing/MarketingHero.tsx": 1,
   "inline-style::components/marketing/MarketingStoryPrimitives.tsx": 1,
@@ -59,6 +58,5 @@
   "raw-color::components/features/auth/AuthenticatedAuthEntryGuard.tsx": 1,
   "raw-color::components/features/home/HomeTrustSection.tsx": 3,
   "raw-color::components/marketing/MarketingSurfaceCard.tsx": 21,
-  "raw-color::components/marketing/ProductScreenshotFrame.tsx": 1,
-  "raw-palette::components/atoms/VerifiedBadge.tsx": 2
+  "raw-color::components/marketing/ProductScreenshotFrame.tsx": 1
 }

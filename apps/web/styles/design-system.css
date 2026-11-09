@@ -1709,6 +1709,11 @@
   --noir-ion-card: #ffffff;
   --noir-ion-elevated: #ffffff;
   --noir-ion-floating: #ffffff;
+  /* ZiaWI marks (2026-11-08): verified blue and the white that stays white
+     on brand fills, photos and fixed-dark media. */
+  --color-verified: #0084d1;
+  --color-on-media: #ffffff;
+  --color-verified-backing: var(--color-on-media);
   /* Glass (2026-10-26): one semantic material for frosted panels. Shell
      mixed 3% toward ion in OKLab (same recipe as JOV-8927 ds-glass), alpha per
      theme so secondary text clears 4.5:1 over black, white and every accent
@@ -1809,6 +1814,8 @@
   --color-accent-blue-subtle: rgba(17, 175, 255, 0.12);
   --color-accent-purple: #8e56f5;
   --color-accent-purple-subtle: rgba(142, 86, 245, 0.12);
+  /* Purple as TEXT on white (7:1); fills keep --color-accent-purple. */
+  --color-accent-purple-text: #6d28d9;
   --color-accent-pink: #f52bb5;
   --color-accent-pink-subtle: rgba(245, 43, 181, 0.12);
   --color-accent-red: #f72a36;
@@ -1987,7 +1994,7 @@
   );
   --color-link-visited: var(--color-accent-purple);
   --state-disabled-opacity: 0.5;
-  --state-partial-opacity: 0.62;
+  --state-partial-opacity: 0.8;
   --state-offline-bg: var(--color-warning-subtle);
   --state-offline-border: color-mix(
     in oklab,
@@ -2026,6 +2033,9 @@
   --noir-ion-card: #131417;
   --noir-ion-elevated: #1a1b1e;
   --noir-ion-floating: #232427;
+  --color-verified: #00bcff;
+  --color-on-media: #ffffff;
+  --color-verified-backing: var(--color-bg-base);
   --noir-ion-text-strong: #ffffff;
   --noir-ion-text-primary: #f5f7fb;
   /* Cinematic depth ramp (Tim, 2026-09-25): one big step from primary, then a
@@ -2147,6 +2157,8 @@
   --color-accent-blue-subtle: rgba(17, 175, 255, 0.12);
   --color-accent-purple: #8e56f5;
   --color-accent-purple-subtle: rgba(142, 86, 245, 0.12);
+  /* Purple as TEXT on dark surfaces (6:1 on #131417); fills keep --color-accent-purple. */
+  --color-accent-purple-text: #a47bff;
   --color-accent-pink: #f52bb5;
   --color-accent-pink-subtle: rgba(245, 43, 181, 0.12);
   --color-accent-red: #f72a36;
@@ -2318,7 +2330,7 @@
   --color-link-visited: var(--noir-ion-ultra);
   --color-focus-ring: var(--color-border-focus);
   --state-disabled-opacity: 0.5;
-  --state-partial-opacity: 0.62;
+  --state-partial-opacity: 0.8;
   --state-offline-bg: var(--color-warning-subtle);
   --state-offline-border: color-mix(
     in oklab,
@@ -2335,6 +2347,14 @@
   );
   /* Selection roles */
   --color-bg-selected: var(--noir-ion-selected);
+}
+
+/* Brand marks follow a scoped .dark wrapper too (brand, playlists and
+   not-found mount .system-b-marketing.dark under a light root), the way the
+   dark: variant did. The backing re-resolves bg-base on the wrapper. */
+.dark {
+  --color-verified: #00bcff;
+  --color-verified-backing: var(--color-bg-base);
 }
 
 /* Public-profile navigation is one distinct functional glass layer. It floats
@@ -3177,6 +3197,24 @@
   /* Info — Aqua/system signal (not Ion blue; Ion is action/focus) */
   --color-info: var(--color-accent-teal);
   --color-info-subtle: var(--color-accent-teal-subtle);
+}
+
+/* Status colors as TEXT. The status tokens above are fills/accents (neon mint,
+   orange, red) that stay locked to the Noir Ion palette; these derived tokens
+   keep status copy at WCAG AA (4.5:1) on white (light) and on the error-tinted
+   and elevated dark surfaces, without redefining the palette. */
+:root {
+  --color-success-text: color-mix(in srgb, var(--color-success) 48%, black);
+  --color-warning-text: color-mix(in srgb, var(--color-warning) 70%, black);
+  --color-error-text: color-mix(in srgb, var(--color-error) 85%, black);
+  --color-accent-text: color-mix(in srgb, var(--color-accent) 65%, black);
+}
+
+:root.dark {
+  --color-success-text: var(--color-success);
+  --color-warning-text: var(--color-warning);
+  --color-error-text: color-mix(in srgb, var(--color-error) 75%, white);
+  --color-accent-text: var(--color-accent);
 }
 
 /* ============================================

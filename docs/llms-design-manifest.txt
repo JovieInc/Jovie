@@ -62,7 +62,7 @@
 - `border-subtle`, `border-default`, `border-strong`
 - `focus-ring-themed` or `focus-visible:*` on interactive elements
 
-## Design Tokens (290 contract tokens; 568 total in CSS)
+## Design Tokens (293 contract tokens; 576 total in CSS)
 
 Contract tokens below are the semantic surface for AI edits. DSP brand colors and extended accent palettes live in `apps/web/styles/design-system.css` only.
 
@@ -128,6 +128,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--color-error`: var(--color-accent-red)
 - `--color-error-foreground`: oklch(100% 0 0)
 - `--color-error-subtle`: var(--color-accent-red-subtle)
+- `--color-error-text`: color-mix(in srgb, var(--color-error) 85%, black)
 - `--color-info`: var(--color-accent-blue)
 - `--color-info-foreground`: oklch(100% 0 0)
 - `--color-info-subtle`: var(--color-accent-blue-subtle)
@@ -136,6 +137,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--color-success`: var(--color-accent-green)
 - `--color-success-foreground`: oklch(100% 0 0)
 - `--color-success-subtle`: var(--color-accent-green-subtle)
+- `--color-success-text`: color-mix(in srgb, var(--color-success) 48%, black)
 - `--color-text-disabled-token`: oklch( 70% var(--theme-base-chroma) var(--theme-base-hue) )
 - `--color-text-primary-token`: #f7f8f8
 - `--color-text-quaternary-token`: #62666d
@@ -146,6 +148,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--color-warning`: var(--color-accent-orange)
 - `--color-warning-foreground`: oklch(20% 0 0)
 - `--color-warning-subtle`: var(--color-accent-orange-subtle)
+- `--color-warning-text`: color-mix(in srgb, var(--color-warning) 70%, black)
 
 ### System B Surfaces
 

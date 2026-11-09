@@ -358,7 +358,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.getByRole('button', { name: 'Switch Identity' })
+      screen.getByRole('button', { name: /Switch identity:/ })
     ).toBeInTheDocument();
   });
 
@@ -369,7 +369,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.queryByRole('button', { name: 'Switch Identity' })
+      screen.queryByRole('button', { name: /Switch identity:/ })
     ).not.toBeInTheDocument();
   });
 
@@ -606,7 +606,7 @@ describe('UnifiedSidebar library route', () => {
         logos[0].parentElement?.closest('[inert], [aria-hidden="true"]')
       ).toBeNull();
       expect(
-        screen.getByRole('button', { name: 'Switch Workspace' })
+        screen.getByRole('button', { name: /Switch Workspace:/ })
       ).toBeInTheDocument();
       expect(
         screen.getAllByRole('button', { name: 'Expand sidebar' })
@@ -622,7 +622,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.getByRole('button', { name: 'Switch Workspace' })
+      screen.getByRole('button', { name: /Switch Workspace:/ })
     ).toHaveTextContent('Jovie');
   });
 
@@ -634,7 +634,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.queryByRole('button', { name: 'Switch Workspace' })
+      screen.queryByRole('button', { name: /Switch Workspace:/ })
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Ask Jovie' })
@@ -649,7 +649,7 @@ describe('UnifiedSidebar library route', () => {
       variant: 'ov',
     });
 
-    const trigger = screen.getByRole('button', { name: 'Switch Workspace' });
+    const trigger = screen.getByRole('button', { name: /Switch Workspace:/ });
     expect(trigger).toHaveTextContent('OV');
     expect(trigger).toHaveClass('h-7');
     expect(container.querySelector('[data-brand-variant="ov"]')).not.toBeNull();
@@ -681,11 +681,10 @@ describe('UnifiedSidebar library route', () => {
     const link = within(nav).getByRole('link', { name: 'Shipping' });
     fireEvent.mouseOver(link);
     fireEvent.focus(link);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/hud/shipping-state',
-      expect.objectContaining({ signal: expect.any(AbortSignal) })
-    );
+    const shippingCalls = () =>
+      fetchMock.mock.calls.filter(([url]) => url === '/api/hud/shipping-state');
+    await waitFor(() => expect(shippingCalls()).toHaveLength(1));
+    expect(shippingCalls()[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
     fetchMock.mockRestore();
   });
 

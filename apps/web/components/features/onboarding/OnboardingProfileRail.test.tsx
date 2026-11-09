@@ -7,22 +7,25 @@ import {
   emptyOnboardingProfileDraft,
   onboardingRoleSchema,
 } from '@/lib/onboarding/profile-draft';
+import { OnboardingProfileRail } from './OnboardingProfileRail';
+import { deriveProfileBuilderState } from './onboardingChatHelpers';
 import {
   type OnboardingProfileBuilderState,
-  OnboardingProfileRail,
   resolvePreviewArtist,
-} from './OnboardingProfileRail';
-import { deriveProfileBuilderState } from './onboardingChatHelpers';
+} from './onboardingProfileRailState';
 
 vi.mock('@/features/profile/templates/ProfileCompactSurface', () => ({
   ProfileCompactSurface: ({
     dataTestId,
+    artist,
     releases = [],
   }: {
     dataTestId?: string;
+    artist: { tagline?: string };
     releases?: readonly { id: string; title: string }[];
   }) => (
     <div data-testid={dataTestId ?? 'profile-compact-surface'}>
+      {artist.tagline}
       {releases.map(release => (
         <span key={release.id} data-testid='preview-release'>
           {release.title}
@@ -215,8 +218,14 @@ describe('OnboardingProfileRail', () => {
     // Geometry (clear of Listen now at 1280x720 and 390x844) is asserted by
     // tests/e2e/storybook-onboarding-dsp-strip-clearance.spec.ts.
     expect(rail).toContainElement(strip);
+    expect(rail).toHaveTextContent('12.3K Spotify followers');
+    expect(rail).not.toHaveTextContent('source: enrichment');
     expect(phonePreview).not.toContainElement(strip);
-    expect(screen.getByText(/12\.3K Spotify followers/)).toBeVisible();
+    // The compact-surface double also prints the tagline. The caption under
+    // the phone is the visible follower line.
+    expect(
+      screen.getByText(/12\.3K Spotify followers/, { selector: 'p' })
+    ).toBeVisible();
     // No pipeline words in the preview (2026-10-31 golden-path walk).
     expect(screen.queryByText(/enrichment|\(source:/i)).toBeNull();
   });
@@ -240,6 +249,14 @@ describe('OnboardingProfileRail', () => {
     expect(
       screen.getByRole('complementary', { name: 'Profile Preview' })
     ).toHaveFocus();
+  });
+
+  it('keeps the side-rail badge readable over light imagery (AA)', () => {
+    render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
+
+    const badge = document.querySelector('[class*="bg-black/60"]');
+    expect(badge).not.toBeNull();
+    expect(badge?.className).not.toContain('bg-black/50');
   });
 
   it('does not add a container tab stop to the inline preview', async () => {
@@ -313,6 +330,23 @@ describe('resolvePreviewArtist', () => {
 // the browser default, which the live chat's focus/keyboard layers can shadow
 // mid-journey — leaving the rail at its bottom edge with the preview badge
 // clipped at the scrollport top (golden-path toBeInViewport ratio 0.8125).
+// 2026-11-08 production: the draft profile shouted at the artist with an
+// all-caps eyebrow and badges. The rail chrome now forces no caps at all.
+describe('OnboardingProfileRail casing (ASR-022)', () => {
+  it('forces no text into all caps in the rail chrome', () => {
+    render(<OnboardingProfileRail state={CONFIRMED_STATE} />);
+
+    const rail = screen.getByTestId('onboarding-profile-rail');
+    const shouting = Array.from(rail.querySelectorAll('[class]')).filter(el =>
+      /(?:^|\s)uppercase(?:\s|$)/.test(el.getAttribute('class') ?? '')
+    );
+    expect(shouting.map(el => el.textContent)).toEqual([]);
+    expect(
+      screen.getByTestId('onboarding-profile-preview-badge')
+    ).toHaveTextContent('Preview');
+  });
+});
+
 describe('OnboardingProfileRail keyboard scrolling (JOV-7973)', () => {
   it('scrolls itself to the top edge on Home', async () => {
     const user = userEvent.setup();

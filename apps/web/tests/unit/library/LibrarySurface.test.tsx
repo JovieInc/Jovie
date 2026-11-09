@@ -545,21 +545,20 @@ describe('LibrarySurface', () => {
     renderLibrary([]);
 
     const emptyState = screen.getByTestId('library-workspace-empty-state');
-    expect(screen.getByText('No work yet')).toBeDefined();
+    expect(screen.getByText('No Work Yet')).toBeDefined();
     expect(
       screen.getByText(
-        'Releases, merch, images, videos, and audio will appear here as they land.'
+        'Your releases, videos, images, audio, and merch live here.'
       )
     ).toBeDefined();
+    // One next step: the toolbar no longer repeats the empty state's action.
     const firstActions = screen.getAllByRole('link', {
       name: 'Open Releases',
     });
-    expect(firstActions).toHaveLength(2);
-    for (const action of firstActions) {
-      expect(action).toHaveAttribute('href', APP_ROUTES.RELEASES);
-    }
+    expect(firstActions).toHaveLength(1);
+    expect(firstActions[0]).toHaveAttribute('href', APP_ROUTES.RELEASES);
     expect(emptyState).toHaveClass('py-16', 'min-h-90');
-    expect(screen.getByRole('heading', { name: 'No work yet' })).toHaveClass(
+    expect(screen.getByRole('heading', { name: 'No Work Yet' })).toHaveClass(
       'text-sm',
       'font-semibold',
       'text-primary-token'
@@ -998,10 +997,10 @@ describe('LibrarySurface', () => {
     ).not.toBeInTheDocument();
     // Editable approval lives exactly once under Details.
     expect(
-      drawer.getByRole('button', { name: 'Approval Status' })
+      drawer.getByRole('button', { name: /^Approval Status: / })
     ).toBeInTheDocument();
     expect(
-      drawer.getAllByRole('button', { name: 'Approval Status' })
+      drawer.getAllByRole('button', { name: /^Approval Status: / })
     ).toHaveLength(1);
   });
 
@@ -1013,7 +1012,7 @@ describe('LibrarySurface', () => {
     const trigger = screen.getByTestId(
       'library-approval-status-select-release-1'
     );
-    expect(trigger).toHaveAccessibleName('Approval Status');
+    expect(trigger).toHaveAccessibleName('Approval Status: Draft');
     expect(trigger.tagName).toBe('BUTTON');
   });
 
@@ -1039,7 +1038,7 @@ describe('LibrarySurface', () => {
     ).toBeInTheDocument();
     // Approval status stays a single accessible editor on the Overview tab.
     expect(
-      drawer.getByRole('button', { name: 'Approval Status' })
+      drawer.getByRole('button', { name: /^Approval Status: / })
     ).toBeInTheDocument();
     expect(drawer.getByRole('link', { name: /Spotify/u })).toHaveAttribute(
       'href',
@@ -2293,7 +2292,7 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Search Jovie/ }));
 
     expect(screen.queryByLabelText('Filter work')).toBeNull();
     expect(
@@ -2458,9 +2457,9 @@ describe('LibrarySurface', () => {
 
     expect(screen.queryByLabelText('Search library by title')).toBeNull();
     expect(
-      screen.getByRole('button', { name: 'Search Jovie' })
+      screen.getByRole('button', { name: /^Search Jovie/ })
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Search Jovie/ }));
     expect(
       screen.queryByRole('searchbox', { name: 'Command Palette Search' })
     ).toBeNull();

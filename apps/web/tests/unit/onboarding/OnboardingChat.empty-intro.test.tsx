@@ -2,15 +2,12 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import type { UIMessage } from 'ai';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
+import { sourceMessageFixture } from '@/components/jovie/components/source-evidence.fixtures';
 import { ONBOARDING_ENTRY_TITLE } from '@/lib/onboarding/empty-state';
 
 const chatMocks = vi.hoisted(() => ({
   messageRenderGate: null as Promise<void> | null,
-  messages: [] as Array<{
-    id: string;
-    role: 'user' | 'assistant';
-    parts: Array<{ type: 'text'; text: string }>;
-  }>,
+  messages: [] as UIMessage[],
   sendMessage: vi.fn(),
   setMessages: vi.fn(),
   status: 'ready' as 'ready' | 'submitted' | 'streaming',
@@ -139,13 +136,22 @@ vi.mock('@/components/jovie/components', () => ({
       placeholder={placeholder}
     />
   ),
+}));
+
+vi.mock('@/components/jovie/components/ChatMessage', () => ({
   ChatMessage: ({
     parts,
+    sourceFacts,
   }: {
+    readonly sourceFacts?: readonly unknown[];
     readonly parts: Array<{ type: 'text'; text: string }>;
   }) => {
     if (chatMocks.messageRenderGate) throw chatMocks.messageRenderGate;
-    return <div data-testid='chat-message'>{parts[0]?.text}</div>;
+    return (
+      <div data-testid='chat-message' data-source-count={sourceFacts?.length}>
+        {parts[0]?.text}
+      </div>
+    );
   },
 }));
 
@@ -159,14 +165,13 @@ vi.mock('@/components/features/onboarding/ChatProposeNextStepCard', () => ({
   ),
 }));
 
+const text = (id: string, role: 'user' | 'assistant', value: string) =>
+  ({ id, role, parts: [{ type: 'text', text: value }] }) as UIMessage;
+
 describe('OnboardingChat empty intro', () => {
   it('gives the sign-up card the handle locked in chat, not the homepage one (JOV-10127)', async () => {
     const initialMessages: UIMessage[] = [
-      {
-        id: 'u1',
-        role: 'user',
-        parts: [{ type: 'text', text: 'I want to claim jov.ie/gpwo879d.' }],
-      },
+      text('u1', 'user', 'I want to claim jov.ie/gpwo879d.'),
       {
         id: 'confirmation',
         role: 'assistant',
@@ -266,8 +271,6 @@ describe('OnboardingChat empty intro', () => {
   });
 
   it('opens each restored agent turn with one Jovie speaker row (Pen R6As7U)', () => {
-    const text = (id: string, role: 'user' | 'assistant', value: string) =>
-      ({ id, role, parts: [{ type: 'text', text: value }] }) as UIMessage;
     render(
       <OnboardingChat
         conversationId='saved-conversation'
@@ -292,16 +295,8 @@ describe('OnboardingChat empty intro', () => {
 
   it('renders persisted progress without auto-submitting a starter or re-triggering claim activity', async () => {
     const initialMessages: UIMessage[] = [
-      {
-        id: 'saved-user',
-        role: 'user',
-        parts: [{ type: 'text', text: 'I already selected my artist' }],
-      },
-      {
-        id: 'saved-assistant',
-        role: 'assistant',
-        parts: [{ type: 'text', text: 'Your artist is saved' }],
-      },
+      text('saved-user', 'user', 'I already selected my artist'),
+      sourceMessageFixture('saved-assistant', 'Your artist is saved'),
     ];
     const activity = vi.fn();
     render(
@@ -320,6 +315,10 @@ describe('OnboardingChat empty intro', () => {
       id: 'saved-conversation',
       messages: initialMessages,
     });
+    expect(screen.getByText('Your artist is saved')).toHaveAttribute(
+      'data-source-count',
+      '1'
+    );
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
     expect(activity).not.toHaveBeenCalled();
     expect(
@@ -383,7 +382,6 @@ describe('OnboardingChat empty intro', () => {
     render(
       <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
     );
-
     expect(screen.getByTestId('onboarding-empty-intro')).toBeTruthy();
     expect(
       screen.getByTestId('chat-empty-state-composer-region')
@@ -392,6 +390,7 @@ describe('OnboardingChat empty intro', () => {
     expect(screen.getByText(ONBOARDING_ENTRY_TITLE)).toBeTruthy();
     expect(screen.queryByTestId('onboarding-sign-in-skip')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
+    expect(screen.queryByTestId(/^onboarding-profile-rail/)).toBeNull();
   });
 
   it('keeps a validated starter as a draft while verification is pending', () => {

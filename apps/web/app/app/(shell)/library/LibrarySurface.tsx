@@ -2027,25 +2027,15 @@ function EmptyCatalog({
       toolbar={
         <PageToolbar
           start={<span className={PAGE_TOOLBAR_META_TEXT_CLASS}>0 items</span>}
-          end={
-            <>
-              <YouTubeLedgerLink />
-              <LibraryFirstAction
-                canSyncSpotify={canSyncSpotify}
-                isSyncing={isSyncing}
-                onSyncSpotify={onSyncSpotify}
-                testId='library-sync-spotify-toolbar'
-              />
-            </>
-          }
+          end={<YouTubeLedgerLink />}
         />
       }
     >
       <NavigationDestinationReady destination='library' />
       <EmptyState
-        icon={<Music2 className='h-5 w-5' strokeWidth={2.25} />}
-        heading='No work yet'
-        description='Releases, merch, images, videos, and audio will appear here as they land.'
+        icon={<Music2 className='h-5 w-5' aria-hidden='true' />}
+        heading='No Work Yet'
+        description='Your releases, videos, images, audio, and merch live here.'
         presentation='workspace'
         testId='library-workspace-empty-state'
         className='min-h-90'
@@ -2065,8 +2055,8 @@ function EmptyCatalog({
 function NoResults({ onReset }: { readonly onReset: () => void }) {
   return (
     <TableEmptyState
-      heading='No work matches'
-      description='No releases, products, or files match the selected view or filters.'
+      heading='No Work Matches'
+      description='Nothing in this view matches the selected filters.'
       className='min-h-75'
       action={{
         label: 'Reset View',
@@ -2084,7 +2074,7 @@ function MetadataRow({
   readonly label: string;
   readonly value: ReactNode;
 }) {
-  return <InspectorRow label={label} value={value} />;
+  return <InspectorRow definitionList label={label} value={value} />;
 }
 
 function PreviewActionButton({
@@ -2176,13 +2166,13 @@ function ApprovalStatusEditor({
           type='button'
           variant='ghost'
           disabled={isDisabled}
-          aria-label='Approval Status'
           data-testid={`library-approval-status-select-${asset.id}`}
           className={cn(
             '-ml-1 inline-flex h-6 max-w-full items-center justify-start gap-1 truncate px-1 font-normal text-primary-token hover:bg-surface-1 disabled:opacity-100',
             LIBRARY_BUTTON_FOCUS_CLASS
           )}
         >
+          <span className='sr-only'>Approval Status:</span>{' '}
           <span>{formatLibraryApprovalStatus(asset.approvalStatus)}</span>
           <ChevronDown
             className='h-3 w-3 shrink-0 opacity-70'

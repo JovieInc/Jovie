@@ -27,18 +27,18 @@ import {
 } from '@/lib/turnstile/keys';
 import { cn } from '@/lib/utils';
 import { OnboardingChat } from './OnboardingChat';
-import {
-  EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
-  type OnboardingProfileBuilderState,
-  OnboardingProfileRail,
-  resolvePreviewArtist,
-} from './OnboardingProfileRail';
+import { OnboardingProfileRail } from './OnboardingProfileRailLazy';
 import {
   isOnboardingTurnstilePanelVisible,
   OnboardingTurnstile,
   type OnboardingTurnstileState,
 } from './OnboardingTurnstile';
 import { endsInTerminalNextStep } from './onboardingChatHelpers';
+import {
+  EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
+  type OnboardingProfileBuilderState,
+  resolvePreviewArtist,
+} from './onboardingProfileRailState';
 import { useOnboardingClaim } from './useOnboardingClaim';
 import { useOnboardingTurnstileFailOpen } from './useOnboardingTurnstileFailOpen';
 
@@ -104,6 +104,9 @@ export function buildEntryProfileBuilderState(
     socialLinks: entryProfile.socialLinks,
   };
 }
+
+/** The /start frame runs dark; the restore state reuses it so nothing repaints. */
+export const ONBOARDING_FRAME_CLASS = '[color-scheme:dark]';
 
 export function OnboardingShell({
   isSignedIn = false,
@@ -273,7 +276,7 @@ export function OnboardingShell({
       <AppShellFrame
         sidebar={null}
         flushContent
-        containerClassName='[color-scheme:dark]'
+        containerClassName={ONBOARDING_FRAME_CLASS}
         contentClassName='overflow-clip!'
         main={
           <div className='flex min-h-0 min-w-0 flex-1'>
@@ -439,7 +442,7 @@ export function OnboardingIdentityConflict({
           ) : !isSignedIn ? (
             <JovieLink asChild variant='compact' touchTarget>
               <NextLink href={APP_ROUTES.SIGNIN}>
-                Sign in with original account
+                Sign In with Original Account
               </NextLink>
             </JovieLink>
           ) : null}

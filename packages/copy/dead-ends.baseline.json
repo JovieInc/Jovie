@@ -1,7 +1,7 @@
 {
   "schema": "jovie.dead-ends/v1",
   "invariant": "JOV-INV-046",
-  "totalFindings": 156,
+  "totalFindings": 155,
   "files": {
     "apps/desktop/src/build-identity.ts": {
       "copy:dead-end-not-available:development (build time unavailable)": 1
@@ -114,9 +114,6 @@
     "apps/web/components/features/admin/hud/OperationalTasksPanel.tsx": {
       "copy:dead-end-not-available:Task cache unavailable. Active tasks are unknown. Retrying automatically.": 1
     },
-    "apps/web/components/features/admin/hud/OvieMacHud.tsx": {
-      "copy:dead-end-not-available:GitHub PR signal unavailable.": 1
-    },
     "apps/web/components/features/admin/hud/SummerReconcileSection.tsx": {
       "copy:dead-end-not-available:Recovery unavailable — founder identity is not configured.": 1,
       "copy:dead-end-not-available:Recovery unavailable — this operation only runs from the production origin.": 1,
@@ -145,11 +142,6 @@
     },
     "apps/web/components/features/dashboard/dashboard-nav/DashboardNav.tsx": {
       "copy:dead-end-not-available:${item.name} is not available in demo mode": 1
-    },
-    "apps/web/components/features/dashboard/organisms/DashboardAnalyticsCards.tsx": {
-      "copy:dead-end-not-available:Analytics Overview Unavailable": 1,
-      "copy:dead-end-not-available:Profile Views Metric Unavailable": 1,
-      "copy:dead-end-not-available:Unique Visitors Metric Unavailable": 1
     },
     "apps/web/components/features/dashboard/organisms/SettingsBillingSection.tsx": {
       "copy:dead-end-not-available:Billing unavailable": 1

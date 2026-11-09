@@ -1,9 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import {
-  MarketingContainer,
-  MarketingEditorialHeroPhoto,
-} from '@/components/marketing';
+import { MarketingContainer } from '@/components/marketing';
 import { ChangelogSubscribeColumn } from '@/components/marketing/changelog/ChangelogSubscribeColumn';
 import { CustomerChangelogArchive } from '@/components/marketing/changelog/CustomerChangelogArchive';
 import { NoOrphanText } from '@/components/marketing/NoOrphanText';
@@ -60,11 +57,6 @@ function ReleaseJournalHero({
 }) {
   return (
     <div className='marketing-hero-dock relative overflow-hidden'>
-      <MarketingEditorialHeroPhoto
-        src='/images/hero/changelog-index.webp'
-        opacity={0.4}
-        testId='changelog-hero-photo'
-      />
       <section
         className='changelog-hero relative z-10'
         aria-labelledby='changelog-hero-title'
@@ -187,8 +179,8 @@ export default async function ChangelogPage() {
       </MarketingContainer>
 
       <MarketingFooterCta
-        ctaLabel='Find your profile'
-        ctaHref='/#homepage-claim-handle'
+        ctaLabel='Request an Invite'
+        ctaHref='/#request-invite'
       />
     </div>
   );

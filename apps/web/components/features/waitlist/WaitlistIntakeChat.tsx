@@ -324,7 +324,7 @@ export function WaitlistIntakeChat({
             </span>
           </div>
           {userEmail ? (
-            <span className='hidden truncate text-xs text-white/42 sm:block'>
+            <span className='hidden truncate text-xs text-white/50 sm:block'>
               {userEmail}
             </span>
           ) : null}
@@ -450,7 +450,7 @@ function ContextRow({
 }: Readonly<{ label: string; value: string }>) {
   return (
     <div>
-      <dt className='text-white/38'>{label}</dt>
+      <dt className='text-white/50'>{label}</dt>
       <dd className='mt-1 break-words text-white/74'>{value || 'Not Set'}</dd>
     </div>
   );

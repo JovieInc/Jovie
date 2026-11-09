@@ -40,6 +40,7 @@ const {
   mockProfileInlineNotificationsCTA,
   mockProfileDesktopSurface,
   mockProfileUnifiedDrawer,
+  mockDrawerSlot,
   mockProfilePrimaryTabPanel,
   MockProfileDesktopSurface,
   mockClientNavigation,
@@ -74,26 +75,22 @@ const {
     mockProfileInlineNotificationsCTA: vi.fn(),
     mockProfileDesktopSurface,
     mockProfileUnifiedDrawer: vi.fn(),
+    mockDrawerSlot: (props: unknown) => mockProfileUnifiedDrawer(props),
     mockProfilePrimaryTabPanel: vi.fn(),
     MockProfileDesktopSurface,
     mockClientNavigation: vi.fn((_href: string) => false),
   };
 });
 
+vi.mock(
+  '../../../components/features/profile/templates/useProfileUnifiedDrawerModule',
+  () => ({ ProfileUnifiedDrawerSlot: mockDrawerSlot })
+);
 vi.mock('next/dynamic', () => ({
   default: (loader: unknown) => {
     const source = String(loader);
-
-    if (source.includes('ProfileUnifiedDrawer')) {
-      return (props: unknown) => mockProfileUnifiedDrawer(props);
-    }
-
     if (source.includes('ProfileInlineNotificationsCTA')) {
       return (props: unknown) => mockProfileInlineNotificationsCTA(props);
-    }
-
-    if (source.includes('ProfileDesktopSurface')) {
-      return MockProfileDesktopSurface;
     }
 
     return () => null;
@@ -1961,7 +1958,7 @@ describe('ProfileCompactTemplate', () => {
         render(profile());
 
         const expectClaimIntent = () => {
-          expect(screen.getByTestId('claim-banner')).toHaveTextContent(
+          expect(screen.getByTestId('claim-banner-copy')).toHaveTextContent(
             'Your profile is ready. Claim it to turn on release emails.'
           );
           expect(screen.getByTestId('claim-banner-cta')).toHaveAttribute(
@@ -2017,7 +2014,7 @@ describe('ProfileCompactTemplate', () => {
           `/test-artist?claim=${claim}&source=qr&token=private-token`
         );
         render(profile());
-        expect(screen.getByTestId('claim-banner')).toHaveTextContent(
+        expect(screen.getByTestId('claim-banner-copy')).toHaveTextContent(
           'This profile is unclaimed. Is it yours? Claim it with Spotify.'
         );
         fireEvent.click(

@@ -149,10 +149,6 @@
       "tables": 0,
       "rates": 1
     },
-    "components/features/dashboard/organisms/GetStartedChecklistCard.tsx": {
-      "tables": 0,
-      "rates": 1
-    },
     "components/features/dashboard/organisms/LinkClicksCard.tsx": {
       "tables": 0,
       "rates": 1

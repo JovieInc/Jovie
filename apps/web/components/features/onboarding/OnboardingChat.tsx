@@ -1,5 +1,7 @@
 'use client';
 
+import { useSourceFactsByMessage } from '@/components/jovie/source-evidence-context';
+
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx
 
 import { useChat } from '@ai-sdk/react';
@@ -57,8 +59,7 @@ import {
   type OnboardingEntryMode,
 } from './OnboardingChatEmptyIntro';
 import { OnboardingMessageRecoveryRow } from './OnboardingMessageRecoveryRow';
-import type { OnboardingProfileBuilderState } from './OnboardingProfileRail';
-import { OnboardingProfileRail } from './OnboardingProfileRail';
+import { OnboardingProfileRail } from './OnboardingProfileRailLazy';
 import { OnboardingSecurityCheckRecovery } from './OnboardingSecurityCheckRecovery';
 import {
   OnboardingArtistConfirmedCard,
@@ -86,9 +87,11 @@ import {
   isHandleCheckOutput,
   isNextStepPayload,
   isSocialLinkOutput,
+  rollbackFailedUserTurn,
   THINKING_PLACEHOLDER_ID,
   type ToolPart,
 } from './onboardingChatHelpers';
+import type { OnboardingProfileBuilderState } from './onboardingProfileRailState';
 
 /**
  * /start LCP (JOV-9611): the empty state paints only the intro heading and the
@@ -100,7 +103,9 @@ import {
  * Guard: tests/unit/onboarding/OnboardingChat.entry-bundle.test.ts
  */
 const loadChatMessage = () =>
-  import('@/components/jovie/components').then(mod => mod.ChatMessage);
+  import('@/components/jovie/components/ChatMessage').then(
+    mod => mod.ChatMessage
+  );
 const loadToolPartsRenderer = () =>
   import('@/components/jovie/tool-ui').then(mod => mod.ToolPartsRenderer);
 const loadChatProposeCheckoutCard = () =>
@@ -117,7 +122,9 @@ function ReservedChatSlot({ minHeightClass }: { minHeightClass: string }) {
 }
 
 const ChatMessage = dynamic(() =>
-  import('@/components/jovie/components').then(mod => mod.ChatMessage)
+  import('@/components/jovie/components/ChatMessage').then(
+    mod => mod.ChatMessage
+  )
 );
 const ToolPartsRenderer = dynamic(
   () => import('@/components/jovie/tool-ui').then(mod => mod.ToolPartsRenderer),
@@ -558,6 +565,7 @@ function OnboardingMessageList({
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
 }) {
+  const sourceFacts = useSourceFactsByMessage(displayMessages);
   const handleStepDone =
     hasToolOutputAction(
       displayMessages,
@@ -608,6 +616,7 @@ function OnboardingMessageList({
                   id={message.id}
                   role={message.role}
                   parts={(message.parts ?? []) as MessagePart[]}
+                  sourceFacts={sourceFacts.get(message.id)}
                   isThinking={isThinking}
                   isStreaming={
                     isStreaming && message.id === lastAssistantMessageId
@@ -647,25 +656,6 @@ function isTurnstileTokenUsable(
 ): boolean {
   if (!token) return false;
   return !BLOCKED_TURNSTILE_TOKEN_STATUSES.has(status);
-}
-
-function rollbackFailedUserTurn(
-  messages: readonly UIMessage[],
-  failedText: string | null | undefined
-): readonly UIMessage[] {
-  const trimmedFailed = failedText?.trim();
-  if (!trimmedFailed) return messages;
-
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message.role !== 'user') continue;
-    if (getMessageText(message).trim() === trimmedFailed) {
-      return messages.slice(0, index);
-    }
-    break;
-  }
-
-  return messages;
 }
 
 function getDisplayMessages(

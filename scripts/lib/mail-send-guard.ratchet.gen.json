@@ -1,0 +1,17 @@
+{
+  "schema": "jovie-mail-send-ratchet/v1",
+  "entries": {
+    "apps/web/app/api/admin/outreach/debug/route.ts": {
+      "mail-host": 1
+    },
+    "apps/web/app/api/webhooks/resend-inbound/route.ts": {
+      "mail-host": 1
+    },
+    "apps/web/scripts/seed-demo-account.ts": {
+      "hardcoded-from": 8
+    },
+    "scripts/send-changelog-email.mjs": {
+      "mail-sdk": 2
+    }
+  }
+}

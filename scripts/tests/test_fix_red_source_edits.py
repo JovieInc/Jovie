@@ -1,0 +1,243 @@
+import sys
+import subprocess
+from types import SimpleNamespace
+from unittest.mock import patch
+import tempfile
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
+import fix_red_classes as classes  # noqa: E402
+import lane_runner as lane  # noqa: E402
+
+
+def pr(*names, merge="BLOCKED"):
+    return {"mergeStateStatus": merge, "statusCheckRollup": [{"name": n, "conclusion": "FAILURE"} for n in names]
+            + [{"name": "PR Ready", "conclusion": "FAILURE"}, {"name": "ok", "conclusion": "SUCCESS"}]}
+
+
+class SpacingSnapTest(unittest.TestCase):
+    DIFF = """diff --git a/apps/web/components/Card.tsx b/apps/web/components/Card.tsx
+--- a/apps/web/components/Card.tsx
++++ b/apps/web/components/Card.tsx
+@@ -1,0 +2 @@
++        <div className='mb-4 flex items-center gap-2.5 h-3.5 -mx-3.5 sm:gap-3.5'>
+diff --git a/apps/web/components/Card.test.tsx b/apps/web/components/Card.test.tsx
+--- a/apps/web/components/Card.test.tsx
++++ b/apps/web/components/Card.test.tsx
+@@ -1,0 +1 @@
++expect(node).toHaveClass('gap-2.5')
+diff --git a/apps/web/lib/skip.ts b/apps/web/lib/skip.ts
+--- a/apps/web/lib/skip.ts
++++ b/apps/web/lib/skip.ts
+@@ -1,0 +1 @@
++const klass = 'gap-2.5'
+"""
+
+    def test_snaps_only_the_added_product_line(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "apps/web/components/Card.tsx"
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                "const kept = 'gap-2.5'\n"
+                "        <div className='mb-4 flex items-center gap-2.5 h-3.5 -mx-3.5 sm:gap-3.5'>\n"
+            )
+            (root / "apps/web/components/Card.test.tsx").write_text("expect(node).toHaveClass('gap-2.5')\n")
+            (root / "apps/web/lib").mkdir()
+            (root / "apps/web/lib/skip.ts").write_text("const klass = 'gap-2.5'\n")
+            changed = classes.snap_added_conservative_spacing(root, self.DIFF)
+            self.assertEqual(changed, ["apps/web/components/Card.tsx"])
+            text = path.read_text()
+            self.assertIn("const kept = 'gap-2.5'\n", text)
+            self.assertIn("gap-2 h-3.5 -mx-3 sm:gap-3", text)
+            self.assertNotIn("gap-2.5 h-3.5", text)
+            self.assertIn("gap-2.5", (root / "apps/web/components/Card.test.tsx").read_text())
+            self.assertIn("gap-2.5", (root / "apps/web/lib/skip.ts").read_text())
+
+    def test_stale_line_is_not_rewritten(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "apps/web/components/Card.tsx"
+            path.parent.mkdir(parents=True)
+            path.write_text("const kept = 'gap-2.5'\nalready snapped gap-2\n")
+            self.assertEqual(classes.snap_added_conservative_spacing(root, self.DIFF), [])
+            self.assertIn("already snapped gap-2\n", path.read_text())
+
+
+class CacheSurfaceTest(unittest.TestCase):
+    LOG = (
+        "passing fixture: github-quota-deferred; API rate limit exceeded\n"
+        "HttpError: HTTP 500\n"
+        "Error: legacy Cache Components surface grew to 500 (maximum 241):\n"
+        "  apps/web/app/api/internal/ovie/dogfood-judge-evidence/route.ts\n"
+    )
+    DIFF = """diff --git a/apps/web/app/api/internal/ovie/dogfood-judge-evidence/route.ts b/apps/web/app/api/internal/ovie/dogfood-judge-evidence/route.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/app/api/internal/ovie/dogfood-judge-evidence/route.ts
+@@ -0,0 +1,3 @@
++export const runtime = 'nodejs';
++export const dynamic = 'force-dynamic';
++export const revalidate = 0;
+diff --git a/apps/web/app/api/internal/ovie/certification-evidence/route.ts b/apps/web/app/api/internal/ovie/certification-evidence/route.ts
+--- a/apps/web/app/api/internal/ovie/certification-evidence/route.ts
++++ b/apps/web/app/api/internal/ovie/certification-evidence/route.ts
+@@ -2,0 +3 @@
++export const fetchCache = 'force-no-store';
+diff --git a/apps/web/app/api/internal/ovie/dogfood-judge-evidence/route.test.ts b/apps/web/app/api/internal/ovie/dogfood-judge-evidence/route.test.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/app/api/internal/ovie/dogfood-judge-evidence/route.test.ts
+@@ -0,0 +1,1 @@
++export const dynamic = 'force-dynamic';
+diff --git a/apps/web/../outside.ts b/apps/web/../outside.ts
+--- /dev/null
++++ b/apps/web/../outside.ts
+@@ -0,0 +1,1 @@
++export const dynamic = 'force-dynamic';
+"""
+
+    def test_growth_outranks_http_500_noise(self):
+        got = classes.classify(pr("Source Validation"), {"Source Validation": self.LOG})
+        self.assertEqual((got["cls"], got["action"]), ("cache-surface", "strip-cache-exports"))
+        self.assertIn(got["action"], classes.DETERMINISTIC)
+
+    def test_strips_only_added_exports(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            new = root / "apps/web/app/api/internal/ovie/dogfood-judge-evidence/route.ts"
+            old = root / "apps/web/app/api/internal/ovie/certification-evidence/route.ts"
+            test = root / "apps/web/app/api/internal/ovie/dogfood-judge-evidence/route.test.ts"
+            new.parent.mkdir(parents=True)
+            old.parent.mkdir(parents=True)
+            new.write_text(
+                "export const runtime = 'nodejs';\n"
+                "export const dynamic = 'force-dynamic';\n"
+                "export const revalidate = 0;\n"
+            )
+            old.write_text(
+                "export const runtime = 'nodejs';\n"
+                "export const dynamic = 'force-dynamic';\n"
+                "export const fetchCache = 'force-no-store';\n"
+            )
+            test.write_text("export const dynamic = 'force-dynamic';\n")
+            outside = root / "outside.ts"
+            outside.write_text("export const dynamic = 'force-dynamic';\n")
+            changed = classes.strip_added_legacy_cache_exports(root, self.DIFF)
+            self.assertEqual(changed, [
+                "apps/web/app/api/internal/ovie/certification-evidence/route.ts",
+                "apps/web/app/api/internal/ovie/dogfood-judge-evidence/route.ts",
+            ])
+            self.assertEqual(new.read_text(), "export const runtime = 'nodejs';\n")
+            self.assertEqual(
+                old.read_text(),
+                "export const runtime = 'nodejs';\nexport const dynamic = 'force-dynamic';\n",
+            )
+            self.assertIn("force-dynamic", test.read_text())
+            self.assertIn("force-dynamic", outside.read_text())
+
+    def test_stale_line_is_not_deleted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "apps/web/app/api/internal/ovie/dogfood-judge-evidence/route.ts"
+            path.parent.mkdir(parents=True)
+            path.write_text("export const runtime = 'nodejs';\n")
+            self.assertEqual(classes.strip_added_legacy_cache_exports(root, self.DIFF), [])
+            self.assertEqual(path.read_text(), "export const runtime = 'nodejs';\n")
+
+
+class AdditiveNodeTestMergeTest(unittest.TestCase):
+    @staticmethod
+    def block(name, assertion="  assert.ok(true);"):
+        return f"test('{name}', () => {{\n{assertion}\n}});\n\n"
+
+    def conflict(self, ours, theirs, base=""):
+        return f"<<<<<<< HEAD\n{ours}||||||| base\n{base}=======\n{theirs}>>>>>>> main\n"
+
+    def test_unions_complete_added_tests_in_main_order(self):
+        ours, theirs = self.block("head"), self.block("main")
+        merged = classes.resolve_additive_node_tests_text(self.conflict(ours, theirs))
+        self.assertEqual(merged, theirs + ours)
+        self.assertEqual(classes.resolve_additive_node_tests_text(
+            self.conflict(ours + theirs, theirs)), theirs + ours)
+
+    def test_unknown_hunks_and_changes_to_existing_tests_stay_unresolved(self):
+        ours, theirs = self.block("head"), self.block("main")
+        for value in (self.conflict(ours, theirs, self.block("old")),
+                      self.conflict(ours, "const x = 1;\n"),
+                      self.conflict(ours, self.block("head", "  assert.ok(false);")),
+                      self.conflict(ours + ours, theirs),
+                      self.conflict(ours, theirs).replace("||||||| base\n", ""),
+                      self.conflict(ours, theirs) + "<<<<<<< unknown\n"):
+            with self.subTest(value=value):
+                self.assertIsNone(classes.resolve_additive_node_tests_text(value))
+
+
+class AdditiveNodeTestFileTest(unittest.TestCase):
+    def test_real_git_conflict_preserves_and_executes_both_sides(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            work, origin = root / "work", root / "origin.git"
+            subprocess.run(["git", "init", "-q", "-b", "main", str(work)], check=True)
+            subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+            def git(*args):
+                return subprocess.run(["git", *args], cwd=work, check=True, capture_output=True, text=True)
+            hooks = root / "hooks"
+            hooks.mkdir()
+            for key, value in (("user.name", "t"), ("user.email", "t@example.test"),
+                               ("commit.gpgsign", "false"), ("core.hooksPath", str(hooks))):
+                git("config", key, value)
+            git("remote", "add", "origin", str(origin))
+            path = work / "draft.test.mjs"
+            base = "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\n"
+            divider = "".join(f"// unchanged boundary {i}\n" for i in range(8))
+            path.write_text(base + divider)
+            git("add", ".")
+            git("commit", "-qm", "base")
+            git("branch", "feature")
+            git("checkout", "-q", "feature")
+            ours = "test('head retry budget', () => {\n  assert.equal(1 + 1, 2);\n});\n\n"
+            ours_tail = AdditiveNodeTestMergeTest.block("head second insertion")
+            path.write_text(base + ours + divider + ours_tail)
+            git("commit", "-qam", "head test")
+            git("push", "-q", "origin", "HEAD:refs/heads/feature")
+            before = git("rev-parse", "HEAD").stdout.strip()
+            git("checkout", "-q", "main")
+            theirs = "test('main verbose errors', () => {\n  assert.ok(true);\n});\n\n"
+            theirs_tail = AdditiveNodeTestMergeTest.block("main second insertion")
+            path.write_text(base + theirs + divider + theirs_tail)
+            git("commit", "-qam", "main test")
+            git("push", "-q", "origin", "HEAD:refs/heads/main")
+            git("checkout", "-q", "feature")
+            self.assertTrue(lane.resolve_additive_list_conflict(work, "feature", None))
+            self.assertEqual(path.read_text(), base + theirs + ours + divider + theirs_tail + ours_tail)
+            after = git("rev-parse", "HEAD").stdout.strip()
+            self.assertNotEqual(after, before)
+            self.assertEqual(after, git("rev-parse", "origin/feature").stdout.strip())
+            git("merge-base", "--is-ancestor", before, after)
+            result = subprocess.run(["node", "--test", str(path)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("# pass 4", result.stdout.replace("ℹ", "#"))
+
+    def test_unknown_files_missing_stages_and_merge_errors_fail_closed(self):
+        for rel, replies in (("code.mjs", []),
+                             ("draft.test.mjs", [SimpleNamespace(returncode=1)]),
+                             ("draft.test.mjs", [SimpleNamespace(returncode=0, stdout="")]*3
+                              + [SimpleNamespace(returncode=2, stdout="")])):
+            with self.subTest(rel=rel, replies=replies), patch.object(lane, "sh", side_effect=replies):
+                self.assertIsNone(classes.resolve_additive_node_test_file(Path("."), rel, lane.sh))
+
+    def test_merge_status_bounds_preserve_fail_closed_behavior(self):
+        block = AdditiveNodeTestMergeTest.block
+        conflict = AdditiveNodeTestMergeTest().conflict(block("head"), block("main"))
+        for code in (0, -1, 128, 255, 127):
+            replies = [SimpleNamespace(returncode=0, stdout="")] * 3
+            replies.append(SimpleNamespace(returncode=code, stdout=conflict))
+            with self.subTest(code=code), patch.object(lane, "sh", side_effect=replies):
+                actual = classes.resolve_additive_node_test_file(Path("."), "draft.test.mjs", lane.sh)
+                self.assertEqual(actual, block("main") + block("head") if code == 127 else None)
+
+
+if __name__ == "__main__":
+    unittest.main()

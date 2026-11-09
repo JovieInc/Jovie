@@ -1,0 +1,393 @@
+/*
+ * Homepage v3 (approved by Tim 2026-11-08 01:43Z, design-approvals receipt
+ * home-canonical-v3). Stage system: scoped token aliases, type, the Orbit,
+ * the one camera, callouts and the motion layer.
+ *
+ * Colours are DS semantic tokens only. The light, glow and shadow values are
+ * alpha derivations of those tokens (accent.ion for light, bg.base for
+ * shade, text.primary for edge highlights), as in the approved design.
+ */
+
+.hv3 {
+  --hv3-canvas: var(--color-bg-base);
+  --hv3-shell: var(--color-bg-surface-0);
+  --hv3-panel: var(--color-bg-surface-1);
+  --hv3-elevated: var(--color-bg-surface-2);
+  --hv3-floating: var(--color-bg-surface-3);
+  --hv3-t1: var(--color-text-primary-token);
+  --hv3-t2: var(--color-text-secondary-token);
+  --hv3-t3: var(--color-text-tertiary-token);
+  --hv3-t4: var(--color-text-quaternary-token);
+  --hv3-b1: var(--color-border-subtle);
+  --hv3-b2: var(--color-border-default);
+  --hv3-b3: var(--color-border-strong);
+  --hv3-ion: var(--color-accent);
+  --hv3-selected: var(--color-bg-selected);
+  --hv3-ion-glow: color-mix(in srgb, var(--hv3-ion) 20%, transparent);
+  --hv3-ion-faint: color-mix(in srgb, var(--hv3-ion) 8%, transparent);
+  --hv3-shade: var(--color-bg-base);
+  --hv3-light: var(--color-text-primary-token);
+  --hv3-display: var(--font-display);
+  --hv3-ui: var(--font-sans);
+  --hv3-mono: var(--font-geist-mono, var(--font-mono));
+  /*
+   * The camera is square to the page: every mockup is a flat pane whose
+   * edges sit on the content box, so its rows, type and frame are exact.
+   * Depth comes from light, shadow and layering, never from a tilt.
+   */
+  --hv3-cam: rotate(0deg);
+  /* Stage zoom: the 1248px design frame scaled to the content box. 1 from
+     1440 up; StageMotion sets the exact value below that. */
+  --hv3-z: 1;
+  /* The approved 1440 design frame of every stage: the content box. */
+  --hv3-box: 78rem;
+  /* The three-column caption grid of that box: 25rem columns, 1.5rem gaps. */
+  --hv3-col1: calc((var(--hv3-box) - 3rem) / 3);
+  --hv3-col2: calc(var(--hv3-col1) * 2 + 1.5rem);
+  --hv3-cast:
+    0 3.75rem 7.5rem -1.25rem
+    color-mix(in srgb, var(--hv3-shade) 85%, transparent),
+    0 2px 0 color-mix(in srgb, var(--hv3-shade) 60%, transparent);
+  --hv3-gutter: 6rem;
+  /* Extra side room beyond the approved 1440 frame, so wider screens centre it. */
+  --hv3-edge: max(0px, calc((100% - 90rem) / 2));
+  --hv3-side: calc(var(--hv3-edge) + var(--hv3-gutter));
+
+  position: relative;
+  color: var(--hv3-t1);
+  font-family: var(--hv3-ui);
+  /* The approved design sets type on the browser's normal line box. */
+  line-height: normal;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+.hv3 :where(h1, h2, h3, h4, h5, p, dl, dd, ol, ul, figure) {
+  margin: 0;
+  padding: 0;
+}
+
+/* Body copy keeps the approved plain wrapping (every break was reviewed at
+   1440 and 390); headings balance, and display headlines break explicitly. */
+.hv3 :where(p, dd) {
+  text-wrap: wrap;
+}
+
+.hv3-mono {
+  color: var(--hv3-t3);
+  font-family: var(--hv3-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  line-height: 1rem;
+}
+
+/* ── Type ─────────────────────────────────────────────────────────── */
+
+.hv3-display {
+  margin-left: -0.055em;
+  font-family: var(--hv3-display);
+  font-size: 7rem;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 6.25rem;
+}
+
+.hv3-statement {
+  font-family: var(--hv3-display);
+  font-size: 4.5rem;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 4.5rem;
+}
+
+.hv3-line {
+  display: block;
+}
+
+.hv3-lede {
+  color: var(--hv3-t2);
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+  line-height: 2rem;
+}
+
+.hv3-lede--center {
+  max-width: 40rem;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.hv3-body {
+  color: var(--hv3-t2);
+  font-size: 1rem;
+  line-height: 1.625rem;
+}
+
+/* ── Orbit ────────────────────────────────────────────────────────── */
+
+.hv3-orbit {
+  position: absolute;
+  pointer-events: none;
+}
+
+.hv3-orbit__svg {
+  display: block;
+  overflow: visible;
+}
+
+.hv3-orbit stop {
+  stop-color: var(--hv3-ion);
+}
+
+.hv3-orbit__ring {
+  fill: none;
+  /* The rings recede to a trace so the lit arc carries the light alone
+     (Tim, 2026-11-08: "premium not consumer"). */
+  stroke: color-mix(in srgb, var(--hv3-b1) 55%, transparent);
+  stroke-width: 1;
+}
+
+.hv3-orbit__ring--outer {
+  stroke: var(--hv3-b1);
+}
+
+.hv3-orbit__arc {
+  fill: none;
+  opacity: 0.7;
+  stroke-linecap: round;
+  stroke-width: 1.5;
+}
+
+.hv3-orbit__bloom {
+  fill: none;
+  opacity: 0.45;
+  stroke-width: 8;
+}
+
+.hv3-orbit__sweep {
+  fill: none;
+  opacity: 0;
+  stroke: var(--hv3-light);
+  stroke-dasharray: 6 120;
+  stroke-linecap: round;
+  stroke-width: 1.5;
+}
+
+.hv3-orbit__closed {
+  fill: none;
+  stroke: var(--hv3-b3);
+  stroke-width: 1;
+}
+
+/* Key light, emitted from the lit arc (drawn in the SVG). */
+.hv3-orbit__light {
+  filter: blur(0.625rem);
+}
+
+/* ── Stage and camera ─────────────────────────────────────────────── */
+
+.hv3-stage {
+  position: relative;
+}
+
+.hv3-rig {
+  position: absolute;
+  transform: var(--hv3-cam);
+  transform-style: preserve-3d;
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+.hv3-bounce {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--hv3-ion-glow), transparent);
+  filter: blur(2.5rem);
+  pointer-events: none;
+}
+
+/* Edge highlight from the top-left key light: a 1px masked border. */
+.hv3-edge::after {
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--hv3-light) 28%, transparent),
+    color-mix(in srgb, var(--hv3-light) 6%, transparent) 35%,
+    color-mix(in srgb, var(--hv3-light) 3%, transparent) 70%,
+    color-mix(in srgb, var(--hv3-light) 10%, transparent)
+  );
+  content: "";
+  pointer-events: none;
+  mask:
+    linear-gradient(var(--hv3-shade) 0 0) content-box,
+    linear-gradient(var(--hv3-shade) 0 0);
+  mask-composite: exclude;
+}
+
+.hv3-lift {
+  position: absolute;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 3.125rem 5.625rem -0.625rem
+    color-mix(in srgb, var(--hv3-shade) 90%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--hv3-shade) 60%, transparent);
+}
+
+.hv3-anchor {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 2px;
+  pointer-events: none;
+}
+
+/* Anchor offsets from the element they mark (approved v3 positions). */
+.hv3-anchor--after {
+  right: -0.375rem;
+}
+
+.hv3-anchor--after-tight {
+  right: -0.25rem;
+}
+
+.hv3-anchor--before {
+  left: -0.375rem;
+}
+
+.hv3-anchor--start {
+  left: -2px;
+}
+
+.hv3-anchor--row-end {
+  right: 0.5rem;
+}
+
+.hv3-anchor--row-start {
+  left: 0.25rem;
+}
+
+/* ── Callouts: Apple dimension-line style ─────────────────────────── */
+
+.hv3-callout {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity var(--duration-subtle) var(--ease-out);
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.hv3-callout[data-placed="true"] {
+  opacity: 1;
+}
+
+.hv3-callout--m-upc {
+  --hv3-w: 3.125rem;
+}
+
+.hv3-callout__node {
+  flex: none;
+  width: 0.5625rem;
+  height: 0.5625rem;
+  border: 1px solid var(--hv3-ion);
+  border-radius: 50%;
+  background: var(--hv3-canvas);
+  box-shadow: 0 0 0.75rem var(--hv3-ion-glow);
+}
+
+.hv3-callout__leader {
+  flex: none;
+  width: var(--hv3-w, 3rem);
+  height: 1px;
+  background: linear-gradient(90deg, var(--hv3-b3), var(--hv3-b2));
+}
+
+.hv3-callout .hv3-mono {
+  padding: 0 0.625rem;
+  color: var(--hv3-t2);
+}
+
+.hv3-callout--l {
+  flex-direction: row-reverse;
+}
+
+.hv3-callout--l .hv3-callout__leader {
+  background: linear-gradient(270deg, var(--hv3-b3), var(--hv3-b2));
+}
+
+.hv3-connector {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.hv3-connector path {
+  fill: none;
+  stroke: var(--hv3-ion);
+  stroke-dasharray: 2 4;
+  stroke-opacity: 0.6;
+  stroke-width: 1;
+}
+
+.hv3-connector circle {
+  fill: var(--hv3-canvas);
+  stroke: var(--hv3-ion);
+}
+
+/* ── Motion (off under reduced motion; transforms and opacity only) ── */
+
+.hv3-motion .hv3-orbit__sweep {
+  animation: hv3-sweep calc(var(--duration-o-orbit) * 2.7) var(--ease-in-out)
+    infinite;
+}
+
+@keyframes hv3-sweep {
+  0% {
+    opacity: 0;
+    stroke-dashoffset: 8;
+  }
+
+  15%,
+  70% {
+    opacity: 0.55;
+  }
+
+  100% {
+    opacity: 0;
+    stroke-dashoffset: -100;
+  }
+}
+
+/* Fade-ups are scroll-driven (no script, nothing hidden before hydration).
+   Browsers without view timelines, and reduced motion, show content as is. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .hv3-reveal {
+      animation: hv3-rise linear both;
+      animation-range: entry 0% entry 60%;
+      animation-timeline: view();
+    }
+  }
+}
+
+@keyframes hv3-rise {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hv3-orbit__sweep {
+    display: none;
+  }
+}

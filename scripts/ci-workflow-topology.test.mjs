@@ -4,11 +4,27 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { load as yamlLoad } from 'js-yaml';
 import { buildTopology, findCycle, syncTopology, validateTopology } from './ci-workflow-topology.mjs';
+
+test('Pen drafts share one editor across runs and retain pending frame jobs', () => {
+  const workflow = /** @type {{jobs: {draft: {concurrency: unknown, strategy: {'max-parallel': number}}}, concurrency: {group: string}}} */ (yamlLoad(fs.readFileSync('.github/workflows/pen-draft.yml', 'utf8')));
+  assert.deepEqual(workflow.jobs.draft.concurrency, {
+    group: 'pen-draft-canonical-editor',
+    'cancel-in-progress': false,
+    queue: 'max',
+  });
+  assert.equal(workflow.jobs.draft.strategy['max-parallel'], 1);
+  assert.match(workflow.concurrency.group, /github\.event\.pull_request\.number/);
+  assert.match(workflow.concurrency.group, /github\.sha/);
+});
 
 test('repository workflows satisfy the topology and fan-out contract', () => {
   const { policy, nodes, edges } = buildTopology();
   assert.equal(nodes.find(node => node.name === 'Test Coverage Audit')?.category, 'source-validation');
+  assert.equal(nodes.find(node => node.name === 'Main Health')?.category, 'source-validation');
+  assert.deepEqual(edges.filter(edge => edge.from === 'Main Health'),
+    [{ from: 'Main Health', to: 'Main Red Eject', type: 'workflow_run' }]);
   assert.deepEqual(validateTopology({ policy, nodes, edges }).errors, []);
   const observers = new Set(nodes.filter(node => node.active && node.category === 'telemetry-aggregation').map(node => node.name));
   assert.equal(edges.some(edge => edge.type === 'workflow_run' && observers.has(edge.from)), false);

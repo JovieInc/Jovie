@@ -52,6 +52,7 @@ export function buildContentStageEvents(
   for (const event of [...events].sort(
     (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
   )) {
+    if (event.action !== 'publish' && event.action !== 'rollback') continue;
     // The first pointer move to a version is its edit-to-live time.
     if (!liveByVersion.has(event.toVersionId)) {
       liveByVersion.set(event.toVersionId, event);

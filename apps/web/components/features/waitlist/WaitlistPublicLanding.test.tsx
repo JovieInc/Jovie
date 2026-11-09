@@ -2,14 +2,14 @@ import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-const { authLayoutMock, authShellMock, pageMock, trackMock } = vi.hoisted(
-  () => ({
+const { authLayoutMock, authShellMock, pageMock, roleFormMock, trackMock } =
+  vi.hoisted(() => ({
     authLayoutMock: vi.fn(),
     authShellMock: vi.fn(),
     pageMock: vi.fn(),
+    roleFormMock: vi.fn(),
     trackMock: vi.fn(),
-  })
-);
+  }));
 
 vi.mock('@/lib/analytics', () => ({
   page: (...args: unknown[]) => pageMock(...args),
@@ -44,8 +44,10 @@ vi.mock('@/features/auth', async () => {
 vi.mock('./WaitlistRoleForm', async () => {
   const reactModule = await import('react');
   return {
-    WaitlistRoleForm: () =>
-      reactModule.createElement('div', { 'data-testid': 'role-form' }),
+    WaitlistRoleForm: (props: Record<string, unknown>) => {
+      roleFormMock(props);
+      return reactModule.createElement('div', { 'data-testid': 'role-form' });
+    },
   };
 });
 
@@ -105,6 +107,9 @@ describe('WaitlistPublicLanding', () => {
     render(<WaitlistPublicLanding signupClosed />);
 
     expect(screen.getByTestId('role-form')).toBeInTheDocument();
+    expect(roleFormMock).toHaveBeenCalledWith(
+      expect.objectContaining({ qualify: true })
+    );
     expect(screen.queryByTestId('auth-shell')).not.toBeInTheDocument();
     expect(authShellMock).not.toHaveBeenCalled();
     expect(authLayoutMock).toHaveBeenCalledWith(

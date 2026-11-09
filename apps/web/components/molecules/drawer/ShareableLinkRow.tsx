@@ -31,7 +31,7 @@ const DENSITY_CLASSES = {
     container: 'h-6 gap-1 rounded-full px-2',
     icon: 'h-3 w-3',
     value: 'text-3xs',
-    button: 'h-4 w-4 rounded-full',
+    button: 'h-6 w-6 rounded-full',
     glyph: 'h-3 w-3',
   },
   rail: {

@@ -40,7 +40,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "3dbed7e15801a9c4e7591606fb8402bf57d040e1b2afff3996ece2ccf18e9633"
+    "bodySha256": "e9c46b96f7549ccf1a2c9a380c6cae1497bda7c6e10c9ae8e957ae7944e62d7e"
   },
   {
     "file": ".claude/rules/event-driven.md",
@@ -72,12 +72,12 @@
       ".claude/skills/**",
       "docs/agent-context/**"
     ],
-    "bodySha256": "4591abc2c1aa6e310d88ec278463142cfcdd413441bd1bd04998482b22793d01"
+    "bodySha256": "81ffe4da6cf4f869dd5d627f2beeb5188a982b8088b3df6b63b429c5fb29fe66"
   },
   {
     "file": ".claude/rules/hermes-air.md",
     "paths": ["docs/HERMES_AIR.md"],
-    "bodySha256": "1146534132d4a342e1ed2d00e9594d10e4e3fcf347054041bfe91323c5de98e7"
+    "bodySha256": "8f3fe75a0a77dd812481cbea13e7e2fabf83b95d48af9f5646b2fc9a2fc725f0"
   },
   {
     "file": ".claude/rules/infra.md",
@@ -88,6 +88,15 @@
       "vercel.json"
     ],
     "bodySha256": "164b4bac543f555d7584cfdf8ba8e3d62767b14bbaae1f8128f98d1220470d3d"
+  },
+  {
+    "file": ".claude/rules/investor-deck.md",
+    "paths": [
+      "scripts/investor-deck/**",
+      "apps/web/lib/investors/**",
+      "apps/web/components/features/pitch/**"
+    ],
+    "bodySha256": "ebd4fe95307adefcf3ce0f8bf7ad5e5ff7ed876aa58a3ea6182b26d88daebabd"
   },
   {
     "file": ".claude/rules/ios.md",
@@ -113,7 +122,7 @@
       "apps/ios/Packages/JovieKit/**",
       "docs/macos/**"
     ],
-    "bodySha256": "bfabfbafb0ea988e669fba7b3ea3b4c62810855ea3f977a112746271a8ba77ab"
+    "bodySha256": "d454e6f80e8fe4322b7d03ac03ed472f69095e16e935212b1f1025bdbbdb2f17"
   },
   {
     "file": ".claude/rules/motion.md",

@@ -29,8 +29,18 @@ describe('ProfileClaimFooter', () => {
     );
     const cta = screen.getByTestId('profile-claim-footer-cta');
     expect(cta).toHaveAttribute('href', '/waitlist?campaign=proof-to-claim');
-    expect(cta).toHaveAccessibleName('Request access');
+    expect(cta).toHaveAccessibleName('Jovie · Request access');
     expect(screen.getByText('Request access')).toBeInTheDocument();
     expect(screen.queryByText(/unclaimed/i)).toBeNull();
+  });
+
+  it('makes the action the brightest part of the line, not the brand', () => {
+    render(<ProfileClaimFooter href='/claim' label='Claim yours' proofClaim />);
+    const cta = screen.getByTestId('profile-claim-footer-cta');
+    const brand = screen.getByText('Jovie');
+    // The label inherits the link colour; the brand sits a step quieter.
+    expect(cta.className).toContain('text-white/88');
+    expect(cta.className).not.toContain('text-white/55');
+    expect(brand.className).toContain('text-white/55');
   });
 });

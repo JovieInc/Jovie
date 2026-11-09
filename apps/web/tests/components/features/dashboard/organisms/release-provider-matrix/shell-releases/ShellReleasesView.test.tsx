@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TableActionMenuProps } from '@/components/atoms/table-action-menu/types';
 import { useImportPolling } from '@/components/features/dashboard/organisms/release-provider-matrix/hooks/useImportPolling';
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
+import { INITIAL_LIST_PAINT_BUDGET_MS } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/useInitialListPaintGate';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import {
   HeaderActionsProvider,
@@ -102,7 +103,6 @@ vi.mock('sonner', () => ({
     dismiss: vi.fn(),
   }),
 }));
-
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/hooks/useImportPolling',
   () => ({
@@ -396,9 +396,11 @@ function HeaderActionsProbe() {
   );
 }
 
+// Pass the container of an earlier render to re-render into the same root.
 function renderShell(
   releases: readonly ReleaseViewModel[],
-  extraProps: Partial<Parameters<typeof ShellReleasesView>[0]> = {}
+  extraProps: Partial<Parameters<typeof ShellReleasesView>[0]> = {},
+  renderOptions?: { readonly container: HTMLElement }
 ) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -424,7 +426,8 @@ function renderShell(
           <RightPanelProbe />
         </RightPanelProvider>
       </HeaderActionsProvider>
-    </QueryClientProvider>
+    </QueryClientProvider>,
+    renderOptions
   );
 }
 
@@ -530,55 +533,46 @@ describe('ShellReleasesView', () => {
     ).toHaveAttribute('data-selected', 'true');
   });
 
-  it('waits to mount the list until Apple eligibility resolves, then commits banner and rows together', () => {
-    mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: true });
-    const rendered = renderShell(
-      [fakeRelease({ id: 'release-1', title: 'Wait for eligibility' })],
-      { spotifyConnected: true }
-    );
+  it('holds the list for Apple eligibility only briefly: banner and rows land together, or rows alone after the budget', () => {
+    vi.useFakeTimers();
+    const release = fakeRelease({
+      id: 'release-1',
+      title: 'Wait for eligibility',
+    });
+    const row = () =>
+      screen.queryByRole('listitem', { name: /Wait for eligibility/ });
+    const banner = () => screen.queryByTestId('apple-music-sync-banner');
+    try {
+      mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: true });
+      const rendered = renderShell([release], { spotifyConnected: true });
+      expect(row()).not.toBeInTheDocument();
+      expect(banner()).not.toBeInTheDocument();
 
-    expect(
-      screen.queryByRole('listitem', { name: /Wait for eligibility/ })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('apple-music-sync-banner')
-    ).not.toBeInTheDocument();
+      mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: false });
+      renderShell([release], { spotifyConnected: true }, rendered);
+      expect(row()).toBeInTheDocument();
+      expect(banner()).toBeInTheDocument();
+      rendered.unmount();
 
-    mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: false });
-    rendered.rerender(
-      <QueryClientProvider client={new QueryClient()}>
-        <HeaderActionsProvider>
-          <RightPanelProvider>
-            <ShellReleasesView
-              releases={[
-                fakeRelease({ id: 'release-1', title: 'Wait for eligibility' }),
-              ]}
-              providerConfig={providerConfig}
-              primaryProviders={primaryProviders}
-              artistName='Bahamas'
-              spotifyConnected
-            />
-            <HeaderActionsProbe />
-            <RightPanelProbe />
-          </RightPanelProvider>
-        </HeaderActionsProvider>
-      </QueryClientProvider>
-    );
-
-    expect(
-      screen.getByRole('listitem', { name: /Wait for eligibility/ })
-    ).toBeInTheDocument();
-    expect(screen.getByTestId('apple-music-sync-banner')).toBeInTheDocument();
+      // A slow read never keeps the catalog off screen past the budget.
+      mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: true });
+      renderShell([release], { spotifyConnected: true });
+      act(() => vi.advanceTimersByTime(INITIAL_LIST_PAINT_BUDGET_MS));
+      expect(row()).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps the settled no-banner release list mounted', () => {
     mockUseDspMatchesQuery.mockReturnValue({
-      data: [{ status: 'confirmed' }],
+      data: [],
       isLoading: false,
     });
 
     renderShell([fakeRelease({ id: 'release-2', title: 'Already linked' })], {
       spotifyConnected: true,
+      appleMusicConnected: true,
     });
 
     expect(
@@ -602,11 +596,11 @@ describe('ShellReleasesView', () => {
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
     expect(screen.getByText('Bahamas')).toBeInTheDocument();
     expect(screen.getByText('Other')).toBeInTheDocument();
-    // The catalog is a native list (not an ARIA listbox): rows own real
-    // per-cell controls, which an ARIA `option` cannot contain (axe
-    // nested-interactive).
+    // List rows own real per-cell controls and keep their list owner.
     const list = screen.getByRole('list', { name: 'Releases' });
-    expect(list.tagName).toBe('UL');
+    expect(
+      screen.getByRole('listitem', { name: 'Lost in the Light' }).closest('ul')
+    ).toBe(list);
     expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(2);
   });
 
@@ -766,7 +760,7 @@ describe('ShellReleasesView', () => {
     const probe = await screen.findByTestId('header-actions-probe');
     expect(probe).toBeInTheDocument();
     const searchTrigger = await screen.findByRole('button', {
-      name: 'Search Jovie',
+      name: /^Search Jovie/,
     });
     expect(searchTrigger).toHaveAttribute('data-app-search-trigger', 'true');
   });
@@ -792,7 +786,7 @@ describe('ShellReleasesView', () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Search Jovie' })
+      await screen.findByRole('button', { name: /^Search Jovie/ })
     );
 
     expect(

@@ -59,7 +59,7 @@ function SearchDropdownState({
       <p
         className={cn(
           'min-w-0 flex-1 text-xs',
-          tone === 'error' ? 'text-error' : 'text-secondary-token'
+          tone === 'error' ? 'text-error-text' : 'text-secondary-token'
         )}
         role={tone === 'error' ? 'alert' : undefined}
       >
