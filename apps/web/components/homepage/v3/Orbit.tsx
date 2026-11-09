@@ -16,6 +16,12 @@ export interface OrbitProps {
   readonly arcRing?: number;
   /** A closed ring with no lit arc (the invitation). */
   readonly closed?: boolean;
+  /**
+   * Fill the disc inside the outer ring. The footer uses this so the ground
+   * sits under the horizon arc. The small key-light blob does not follow
+   * that curve, and a straight edge above it reads as a cut.
+   */
+  readonly ground?: boolean;
   readonly className?: string;
 }
 
@@ -34,6 +40,7 @@ export function Orbit({
   arc,
   arcRing = 0,
   closed = false,
+  ground = false,
   className,
 }: OrbitProps) {
   const outer = rings[0] / 2;
@@ -88,8 +95,30 @@ export function Orbit({
           >
             <feGaussianBlur stdDeviation='7' />
           </filter>
+          {ground ? (
+            <radialGradient
+              id={`${id}-ground`}
+              cx={outer}
+              cy={0}
+              r={outer}
+              gradientUnits='userSpaceOnUse'
+            >
+              <stop offset='0' stopOpacity='0.18' />
+              <stop offset='0.06' stopOpacity='0.05' />
+              <stop offset='0.2' stopOpacity='0' />
+            </radialGradient>
+          ) : null}
         </defs>
-        {closed ? null : (
+        {ground ? (
+          <circle
+            cx={outer}
+            cy={outer}
+            r={outer}
+            fill={`url(#${id}-ground)`}
+            className='hv3-orbit__ground'
+          />
+        ) : null}
+        {closed || ground ? null : (
           <circle
             cx={lx}
             cy={ly}

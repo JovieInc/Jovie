@@ -362,6 +362,12 @@
 
 /* ── Invite ───────────────────────────────────────────────────────── */
 
+/* The last chapter meets the footer horizon. The shared 10rem tail was the
+   dead band under the steps. Guides continue on the footer and end on the arc. */
+.hv3-chapter.hv3-invite {
+  padding-bottom: 2.5rem;
+}
+
 .hv3-invite__inner {
   position: relative;
   padding-top: 11.25rem;

@@ -18,6 +18,17 @@ describe('Orbit', () => {
     expect(container.firstElementChild).toHaveAttribute('aria-hidden', 'true');
   });
 
+  it('fills the ground inside the outer ring and skips the key-light blob', () => {
+    const { container } = render(
+      <Orbit id='g' rings={[2800]} arc={[346, 28]} ground />
+    );
+    const ground = container.querySelector('.hv3-orbit__ground');
+    expect(ground).toHaveAttribute('r', '1400');
+    expect(ground).toHaveAttribute('fill', 'url(#g-ground)');
+    expect(container.querySelector('.hv3-orbit__light')).toBeNull();
+    expect(container.querySelector('.hv3-orbit__arc')).not.toBeNull();
+  });
+
   it('draws a closed ring with no lit arc and no key light', () => {
     const { container } = render(
       <Orbit id='c' rings={[760]} arc={[0, 360]} closed />

@@ -53,7 +53,7 @@ export default async function HomeLayout({
         className={`${geistMono.variable} home-viewport home-viewport--hero-canvas min-h-svh overflow-x-clip bg-base text-primary-token`}
         footerClassName='hv3 hv3-footer'
         footerDecoration={
-          <Orbit id='hv3-orbit-footer' rings={[2800]} arc={[346, 28]} />
+          <Orbit id='hv3-orbit-footer' rings={[2800]} arc={[346, 28]} ground />
         }
         footerPenSection='footer'
         footerShowCta={false}

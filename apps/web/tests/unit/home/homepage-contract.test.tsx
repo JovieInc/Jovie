@@ -424,6 +424,15 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     }
     // Stages span exactly the content box, at every zoom.
     const chapters = v3[1];
+    // The invite meets the footer horizon: no dead tail, no straight rule
+    // across the arc, and the footer guides end on the same disc.
+    expect(chapters).toMatch(
+      /\.hv3-chapter\.hv3-invite\s*\{[^}]*padding-bottom:\s*2\.5rem;/
+    );
+    expect(v3[2]).toMatch(/\.hv3-footer\s*\{[^}]*border-top:\s*0;/);
+    expect(v3[2]).toMatch(
+      /\.hv3-footer::before\s*\{[^}]*mask-image:\s*radial-gradient\([^;]*87\.5rem/
+    );
     expect(chapters).toMatch(
       /\.hv3-frame\s*\{\s*margin-inline: calc\(var\(--hv3-side\) \/ var\(--hv3-z\)\);/
     );
