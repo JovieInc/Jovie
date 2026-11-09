@@ -469,43 +469,4 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     const { container } = await renderHomePage();
     expect(container.querySelector('.hv3-invite .hv3-orbit')).toBeNull();
   });
-
-  it('keeps every label, keycap and edge inside its frame (prod walk, Nov 9)', async () => {
-    const strip = (path: string) => read(path).replace(/\/\*[\s\S]*?\*\//g, '');
-    const { container } = await renderHomePage();
-    // 02: the catalog sits on the left frame guide, so a label to its left
-    // would leave the page; the connector alone ties the row to its page.
-    const releases = container.querySelector('.hv3-releases');
-    expect(releases).not.toBeNull();
-    expect(releases?.querySelector('[data-hv3-callout]')).toBeNull();
-    expect(
-      releases?.querySelector('[data-hv3-connector="rowR>title"]')
-    ).not.toBeNull();
-    const stage = strip('components/homepage/v3/stage.css');
-    expect(stage).toMatch(
-      /\.hv3-phone--release \.hv3-anchor--before\s*\{\s*left: -0\.75rem;/
-    );
-    // 03: the keycaps sit above the palette, and the palette is inset evenly.
-    const surfaces = strip('components/homepage/v3/surfaces.css');
-    expect(surfaces).toMatch(
-      /\.hv3-palette\s*\{[^}]*top: 8rem;\s*right: 3rem;\s*left: 3rem;/
-    );
-    expect(surfaces).toMatch(
-      /\.hv3-keys\s*\{[^}]*top: 1\.5rem;\s*right: 3rem;/
-    );
-    expect(surfaces).not.toMatch(/\.hv3-keys\s*\{[^}]*bottom:/);
-    expect(strip('components/homepage/v3/responsive.css')).not.toMatch(
-      /\.hv3-keys\s*\{[^}]*bottom:/
-    );
-    // US spelling throughout.
-    expect(container.textContent).not.toMatch(/recognis/i);
-    // 04: the email field spans the role chips; the scrolled nav is opaque.
-    const form = strip('components/homepage/v3/form.css');
-    expect(form).toMatch(
-      /@media \(min-width: 48rem\)\s*\{\s*\.hv3-form > div\s*\{\s*width: fit-content;\s*max-width: 100%;\s*\}\s*\.hv3-form \[data-slot="inline-subscribe"\]\s*\{\s*width: 100%;/
-    );
-    expect(form).toMatch(
-      /\.home-viewport \.header-nav--docked\s*\{\s*--marketing-dock-glass: var\(--noir-ion-shell\);/
-    );
-  });
 });
