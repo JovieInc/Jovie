@@ -26,6 +26,14 @@ describe('AskJovieMark', () => {
     expect(trigger.querySelector('.ask-jovie-mark-icon')).not.toBeNull();
   });
 
+  it('puts the mark on the sidebar icon column with no side padding', () => {
+    render(<AskJovieMark />);
+    const trigger = screen.getByTestId('ask-jovie-trigger');
+    // Side padding pushed the mark 4px past the 12px column every nav icon
+    // uses; a negative margin would off-centre it in the collapsed rail.
+    expect(trigger.className).not.toMatch(/(?:^|\s)-?(?:px|pl|ml)-/);
+  });
+
   it('opens the panel with suggested prompts on click', () => {
     render(<AskJovieMark />);
     fireEvent.click(screen.getByTestId('ask-jovie-trigger'));

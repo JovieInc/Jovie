@@ -19,6 +19,17 @@ describe('VerifiedBadge', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('paints with the ZiaWI verified mark and on-media check, not raw colours', () => {
+    const { container } = render(<VerifiedBadge />);
+    const badge = screen.getByRole('img', { name: 'Verified Jovie Profile' });
+    expect(badge).toHaveClass('text-verified', 'bg-verified-backing');
+    expect(badge.className).not.toMatch(/\b(sky-\d+|bg-white)\b/);
+    expect(container.querySelector('svg')).toHaveAttribute(
+      'stroke',
+      'var(--color-on-media)'
+    );
+  });
+
   it('is not a tab stop between interactive neighbours', async () => {
     const user = userEvent.setup();
     const { container } = render(
