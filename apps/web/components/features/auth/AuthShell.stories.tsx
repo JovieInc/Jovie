@@ -92,7 +92,7 @@ const signUpArgs = {
   oppositeModeUrl: APP_ROUTES.SIGNIN,
 } as const;
 
-/** A provider start is in flight: every provider is disabled and the group is busy. */
+/** A provider start is in flight: every provider is disabled and the group is busy (JOV-8873). */
 export const LoadingProviderStart: Story = {
   args: signUpArgs,
   beforeEach: stubAuthStart(() => new Promise<Response>(() => undefined)),
