@@ -1,5 +1,12 @@
 import { z } from 'zod';
 import { DECISION_CARD_COPY_LIMITS } from './decision-card-copy';
+import {
+  SHIP_CONFIDENCES,
+  SHIP_RISKS,
+  type ShipConfidence,
+  type ShipRisk,
+  shipPolicy,
+} from './ship-policy';
 
 /** Summer ↔ Jovie contract v1: approval cards in the admin Ovie inbox. */
 
@@ -78,8 +85,38 @@ export const summerCardInputSchema = z
       .enum(['approve', 'reject', 'none'])
       .optional()
       .transform(value => value ?? null),
+    /**
+     * Risk and confidence (`jovie.ship-policy/v1`). Declared together and
+     * with no `decideBy`/`defaultDecision`, they set the card's deadline and
+     * default instead: most things ship, outbound and spend never do on
+     * silence.
+     */
+    risk: z
+      .enum(SHIP_RISKS)
+      .optional()
+      .transform(value => value ?? null),
+    confidence: z
+      .enum(SHIP_CONFIDENCES)
+      .optional()
+      .transform(value => value ?? null),
   })
   .strict()
+  .refine(card => (card.risk === null) === (card.confidence === null), {
+    path: ['confidence'],
+    message: 'risk and confidence are declared together',
+  })
+  .refine(
+    card =>
+      card.risk === null ||
+      (card.decideBy === null &&
+        card.defaultDecision === null &&
+        card.defaultIfSilent === null),
+    {
+      path: ['risk'],
+      message:
+        'declare either risk and confidence or decideBy, defaultDecision and defaultIfSilent, not both; the ship policy writes the silence copy',
+    }
+  )
   .refine(card => card.kind !== 'spend' || card.preflightReceiptId, {
     path: ['preflightReceiptId'],
     message: 'spend cards require a purchase-admission preflight receipt',
@@ -101,8 +138,12 @@ export const summerCardInputSchema = z
 /** Code-built cards (claim review, spend preflight, recovery) may omit facts. */
 export type SummerCardInput = Omit<
   z.infer<typeof summerCardInputSchema>,
-  'facts'
-> & { readonly facts?: readonly string[] };
+  'facts' | 'risk' | 'confidence'
+> & {
+  readonly facts?: readonly string[];
+  readonly risk?: ShipRisk | null;
+  readonly confidence?: ShipConfidence | null;
+};
 
 export const summerCardDecisionSchema = z
   .object({
@@ -164,10 +205,37 @@ export type SummerCardFeedback = {
  * forbids them from defaulting to `approve`.
  */
 export function summerCardDecisionContract(
-  input: Pick<SummerCardInput, 'decideBy' | 'defaultDecision'>,
+  input: Pick<
+    SummerCardInput,
+    'decideBy' | 'defaultDecision' | 'kind' | 'risk' | 'confidence'
+  >,
   createdAt: Date
-): { decideBy: string; defaultDecision: SummerCardDefaultDecision } {
+): {
+  decideBy: string;
+  defaultDecision: SummerCardDefaultDecision;
+  /** Set when the ship policy chose the default; the card's silence copy. */
+  policyDefaultIfSilent: string | null;
+} {
   const filed = createdAt.getTime();
+  if (
+    input.risk &&
+    input.confidence &&
+    input.decideBy === null &&
+    input.defaultDecision === null
+  ) {
+    const policy = shipPolicy({
+      kind: input.kind,
+      risk: input.risk,
+      confidence: input.confidence,
+    });
+    return {
+      decideBy: new Date(
+        filed + policy.waitHours * 60 * 60 * 1000
+      ).toISOString(),
+      defaultDecision: policy.defaultDecision,
+      policyDefaultIfSilent: policy.defaultIfSilent,
+    };
+  }
   const requested = input.decideBy
     ? Date.parse(input.decideBy)
     : filed + SUMMER_CARD_DEFAULT_WINDOW_MS;
@@ -178,6 +246,7 @@ export function summerCardDecisionContract(
   return {
     decideBy: new Date(bounded).toISOString(),
     defaultDecision: input.defaultDecision ?? 'reject',
+    policyDefaultIfSilent: null,
   };
 }
 
