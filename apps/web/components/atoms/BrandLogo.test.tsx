@@ -74,6 +74,13 @@ describe('BrandLogo', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('paints the white tone with the ZiaWI on-media mark, not raw white', () => {
+    render(<BrandLogo tone='white' />);
+    const wrapper = screen.getByRole('img', { name: 'Jovie' }).parentElement;
+    expect(wrapper).toHaveClass('text-on-media');
+    expect(wrapper?.className).not.toMatch(/\btext-white\b/);
+  });
+
   it('has no axe violations for coloured and decorative marks', async () => {
     const { container } = render(
       <>
