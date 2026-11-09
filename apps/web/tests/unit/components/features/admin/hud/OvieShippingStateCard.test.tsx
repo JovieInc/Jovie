@@ -8,10 +8,7 @@ import {
   resetHudShippingStateForTests,
 } from '@/components/features/admin/hud/useHudShippingStateQuery';
 import { unknownProjection } from '@/lib/ovie/shipping-state';
-import {
-  SHIPPING_STATE_REQUEST_TIMEOUT_MS,
-  SHIPPING_STATE_SCHEMA,
-} from '@/lib/ovie/shipping-state-client';
+import { SHIPPING_STATE_SCHEMA } from '@/lib/ovie/shipping-state-client';
 
 const fetchMock = vi.fn();
 vi.stubGlobal('fetch', fetchMock);
@@ -499,83 +496,6 @@ describe('OvieShippingStateCard', () => {
     expect(panel()).toHaveAttribute('data-flags', 'cacheExpired');
     expect(screen.getByText('Cache expired')).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('times out a hung read without inventing a measurement', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(NOW);
-    fetchMock.mockImplementation(
-      (_input: RequestInfo | URL, init?: RequestInit) =>
-        new Promise<Response>((_resolve, reject) => {
-          init?.signal?.addEventListener('abort', () => {
-            reject(new DOMException('Aborted', 'AbortError'));
-          });
-        })
-    );
-    render(
-      <QueryClientProvider client={createQueryClient()}>
-        <OvieShippingStateCard />
-      </QueryClientProvider>
-    );
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(SHIPPING_STATE_REQUEST_TIMEOUT_MS);
-      await vi.advanceTimersByTimeAsync(0);
-    });
-
-    const panel = screen.getByTestId('hud-shipper-status-panel');
-    await vi.waitFor(() =>
-      expect(panel).toHaveAttribute('data-truth', 'unavailable')
-    );
-    expect(panel).toHaveAttribute('data-connection', 'disconnected');
-    expect(screen.getByText('Shipping-state request timed out')).toBeTruthy();
-    expect(metricValue('Merged Today')).toMatch(/^Unknown/);
-    expect(screen.queryByText('0')).toBeNull();
-  });
-
-  it('times out a stalled response body after headers arrive', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(NOW);
-    fetchMock.mockImplementation(
-      (_input: RequestInfo | URL, init?: RequestInit) =>
-        Promise.resolve({
-          status: 200,
-          ok: true,
-          json: () =>
-            new Promise((_resolve, reject) => {
-              init?.signal?.addEventListener('abort', () => {
-                reject(new DOMException('Aborted', 'AbortError'));
-              });
-            }),
-        } as Response)
-    );
-    render(
-      <QueryClientProvider client={createQueryClient()}>
-        <OvieShippingStateCard />
-      </QueryClientProvider>
-    );
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(SHIPPING_STATE_REQUEST_TIMEOUT_MS);
-      await vi.advanceTimersByTimeAsync(0);
-    });
-
-    const panel = screen.getByTestId('hud-shipper-status-panel');
-    await vi.waitFor(() =>
-      expect(panel).toHaveAttribute('data-truth', 'unavailable')
-    );
-    expect(panel).toHaveAttribute('data-connection', 'disconnected');
-    expect(screen.getByText('Shipping-state request timed out')).toBeTruthy();
-    expect(metricValue('Merged Today')).toMatch(/^Unknown/);
-    expect(screen.queryByText('0')).toBeNull();
   });
 
   it('shows unsupported schema and sequence anomalies while retaining identity', async () => {

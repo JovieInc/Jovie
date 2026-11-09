@@ -37,6 +37,12 @@ import type {
   StageSummary,
 } from '@/lib/ovie/shipping-state/contract';
 import { fleetVerdict } from './fleet-verdict';
+import {
+  perDay,
+  shippingSnapshotCaption,
+  toneAtLeast,
+  toneAtMost,
+} from './shipping-pulse-format';
 
 type OperationalTaskFeed = ShippingCockpitProjection['operationalTasks'];
 type OperationalTask = OperationalTaskFeed['tasks'][number];
@@ -272,24 +278,6 @@ function behindLabel(behind: number): string {
 }
 
 /** Inside `target` is good, up to `badAbove` is warn, past it is bad. */
-function toneAtMost(
-  value: number,
-  target: number,
-  badAbove: number
-): OvieHomeTone {
-  if (value <= target) return 'good';
-  return value > badAbove ? 'bad' : 'warn';
-}
-
-function toneAtLeast(value: number, target: number): OvieHomeTone {
-  if (value >= target) return 'good';
-  return value < target / 2 ? 'bad' : 'warn';
-}
-
-function perDay(measurement: CountMeasurement): number | null {
-  const week = countValue(measurement);
-  return week === null ? null : Math.round(week / 7);
-}
 
 const TARGETS = OVIE_THROUGHPUT_TARGETS;
 
@@ -300,10 +288,7 @@ function rawPulse(
   const flow = lanes.flow ?? null;
   const mergesPerDay = perDay(delivery.merges.last7Days);
   const ejection = flow?.queueEjectionRate ?? null;
-  const ejectionAt = flow?.at ? Date.parse(flow.at) : Number.NaN;
-  const ejectionSource = Number.isFinite(ejectionAt)
-    ? `Snapshot ${new Date(ejectionAt).toISOString().slice(0, 16).replace('T', ' ')} UTC`
-    : 'Snapshot time unknown';
+  const ejectionSource = shippingSnapshotCaption(flow?.at);
   const behind = countValue(production.behindMain);
   const running = countValue(lanes.running);
   const slots = countValue(lanes.slots);
