@@ -3169,7 +3169,7 @@ describe('ProfileCompactTemplate', () => {
         expect.objectContaining({
           artist: mockArtist,
           activeMode: 'profile',
-          presentation: 'modal',
+          presentation: 'embedded',
         })
       );
     });
