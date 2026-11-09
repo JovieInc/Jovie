@@ -921,6 +921,104 @@ test('preserves git object bytes for release-stamp content validation', () => {
   assert.equal(version?.endsWith('\n'), true);
 });
 
+test('release-stamp CLI reads base CHANGELOG objects above the spawn maxBuffer', async t => {
+  // CHANGELOG.md carries the daily-changelog receipt comments and exceeded the
+  // 1 MiB execFileSync default (1.3 MB on main, 2026-11), which made
+  // `git show <base>:CHANGELOG.md` throw ENOBUFS and the stamp guard report
+  // 'promoted release evidence unavailable' (run 42590625677).
+  const root = await realpath(
+    await mkdtemp(join(tmpdir(), 'jovie-desktop-big-changelog-'))
+  );
+  t.after(() => rm(root, { force: true, recursive: true }));
+  const git = (...args) =>
+    execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+  const write = async (path, content) => {
+    const destination = join(root, path);
+    await mkdir(join(destination, '..'), { recursive: true });
+    await writeFile(destination, content);
+  };
+
+  const manifests = ['package.json', 'apps/desktop/package.json'];
+  const baseVersion = '26.10.16';
+  const nextVersion = '26.11.0';
+  const dateISO = '2026-11-09';
+  const manifest = version =>
+    `${JSON.stringify(
+      { name: 'jovie-monorepo', version, private: true },
+      null,
+      2
+    )}\n`;
+  const base = {
+    'CHANGELOG.md': `# Changelog\n\n<!-- daily-changelog-receipt/v1 ${'x'.repeat(
+      1300 * 1024
+    )} -->\n\n## [Unreleased]\n\n### Fixed\n- Guard repair.\n\n## [${baseVersion}] - 2026-11-08\n`,
+    VERSION: `${baseVersion}\n`,
+    'version.json': `${JSON.stringify({ version: baseVersion }, null, 2)}\n`,
+  };
+  for (const manifestPath of manifests) {
+    base[manifestPath] = manifest(baseVersion);
+  }
+  assert.ok(
+    Buffer.byteLength(base['CHANGELOG.md']) > 1024 * 1024,
+    'fixture CHANGELOG must exceed the default spawn maxBuffer'
+  );
+
+  for (const [path, content] of Object.entries(base)) {
+    await write(path, content);
+  }
+  for (const path of [
+    'desktop-release-guard.mjs',
+    'version-fanout-guard.mjs',
+    'version-stamp.mjs',
+    'lib/changelog-filter-rules.mjs',
+  ]) {
+    const destination = join(root, 'scripts', path);
+    await mkdir(join(destination, '..'), { recursive: true });
+    await copyFile(new URL(`./${path}`, import.meta.url), destination);
+  }
+  git('init', '-q');
+  git('config', 'user.email', 'desktop-guard-test@jov.ie');
+  git('config', 'user.name', 'Desktop Guard Test');
+  git('add', '.');
+  git('commit', '-qm', 'base');
+  git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+
+  for (const plan of planStamp({
+    nextVersion,
+    manifests: manifests.map(path => ({ path, content: base[path] })),
+    versionFile: base.VERSION,
+    changelog: base['CHANGELOG.md'],
+    dateISO,
+  })) {
+    await write(plan.path, plan.content);
+  }
+
+  const result = spawnSync(
+    process.execPath,
+    [
+      join(root, 'scripts/desktop-release-guard.mjs'),
+      '--base',
+      'origin/main',
+    ],
+    {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GITHUB_EVENT_NAME: '',
+        GITHUB_HEAD_REF: 'release/2026-11-09',
+        GITHUB_BASE_REF: '',
+        GITHUB_REF_NAME: '',
+      },
+    }
+  );
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(
+    result.stdout,
+    /deterministic desktop version fan-out allowed/
+  );
+});
+
 test('fails deterministic fan-out on a feature branch', () => {
   const result = evaluateDesktopReleaseGuard({
     branch: 'tim/jov-5748-release-stamp',
