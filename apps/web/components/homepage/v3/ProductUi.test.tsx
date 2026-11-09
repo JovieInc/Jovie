@@ -49,7 +49,7 @@ describe('homepage v3 product UI', () => {
     const anchors = container.querySelectorAll('[data-hv3-anchor]');
     expect(
       [...anchors].map(anchor => anchor.getAttribute('data-hv3-anchor'))
-    ).toEqual(['rowR', 'row']);
+    ).toEqual(['rowR']);
     expect(anchors[0]?.closest('.hv3-rrow')).toHaveTextContent(
       HOMEPAGE_PRODUCT_UI.inspector.title
     );

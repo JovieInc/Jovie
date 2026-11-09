@@ -319,10 +319,7 @@ export function CatalogPlate() {
           <ReleaseTitle release={release} />
           <RowServices />
           {release.selected ? (
-            <>
-              <Anchor id='rowR' className='hv3-anchor--row-end' />
-              <Anchor id='row' className='hv3-anchor--row-start' />
-            </>
+            <Anchor id='rowR' className='hv3-anchor--row-end' />
           ) : null}
         </div>
       ))}

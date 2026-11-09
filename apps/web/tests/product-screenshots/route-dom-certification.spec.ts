@@ -32,12 +32,15 @@ import {
   expectDeliberateRed,
   flatImg,
   isTasteKind,
+  markupKinds,
   outputRoot,
+  plane,
   prepareProfileState,
   profileRoute,
   profileStates,
   profileViewports,
   safeName,
+  slowImageBlankMedia,
   sourceGitSha,
   tasteBaseline,
   tasteBaselinePath,
@@ -52,10 +55,6 @@ import {
 test.describe.configure({ retries: 0 });
 
 test.describe('Route DOM detector deliberate-red fixtures', () => {
-  // JOV-7710 / AM-017: one semantic level reads as one material.
-  const plane = (inner: string) =>
-    `<main id="main-content" style="width:1000px;height:600px;background:rgb(16,17,20)">${inner}</main>`;
-
   test('rejects an inset header strip on the main plane (JOV-7207)', async ({
     page,
   }) => {
@@ -290,12 +289,7 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     await expectDeliberateRed(page, 'marketing', 'placeholder-copy');
   });
 
-  const kindsOf = async (html: string): Promise<string[]> => {
-    await page_ref.setContent(html);
-    return (
-      await inspectRouteDom(page_ref, { surface: 'marketing' })
-    ).findings.map(finding => finding.kind);
-  };
+  const kindsOf = (html: string) => markupKinds(page_ref, html);
   let page_ref: Page;
   test.beforeEach(({ page }) => {
     page_ref = page;
@@ -320,6 +314,10 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
         `<main><section data-pen-section="hero"><h1>Product</h1><img data-decorative src="${flatImg}" width="600" height="400" alt=""></section></main>`
       )
     ).not.toContain('blank-media');
+  });
+
+  test('blank-media: judges a slow image once it has loaded, not its empty slot', async () => {
+    expect(await slowImageBlankMedia(page_ref)).not.toContain('blank-media');
   });
 
   test('placeholder-copy: flags common placeholders in text, alt and aria', async () => {
