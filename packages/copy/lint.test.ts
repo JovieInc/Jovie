@@ -55,7 +55,7 @@ describe('slop tells', () => {
     ['banned-phrase', "Here's the thing: fans forget."],
     ['banned-phrase', 'Excited to announce our new feature.'],
     ['corporate-verb', 'Leverage a seamless, robust workflow.'],
-    ['generic-workspace', 'Your catalog, in one quiet workspace.'],
+    ['marketing-hype', 'Your catalog, in one quiet workspace.'],
     ['style-as-outcome', 'A modern, elegant, seamless experience.'],
     ['cheerleading', 'You are crushing it, superstar.'],
     ['emoji', 'New release out now 🎵'],

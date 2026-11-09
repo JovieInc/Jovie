@@ -300,19 +300,9 @@ export const COPY_RULES: readonly CopyRule[] = [
     severity: 'block',
     registers: ['jovie-marketing'],
     pattern:
-      /\b(?:unlock(?:s|ed|ing)?|reimagin(?:e|es|ed|ing)|all-in-one|one-stop shop)\b/i,
+      /\b(?:unlock(?:s|ed|ing)?|reimagin(?:e|es|ed|ing)|all-in-one|one-stop shop|quiet workspace|in one (?:quiet |simple |single |beautiful )?workspace)\b/i,
     message:
       'Generic promotion. Replace with a concrete action or consequence.',
-  },
-  {
-    id: 'generic-workspace',
-    category: 'slop',
-    severity: 'block',
-    registers: ['jovie-marketing'],
-    pattern:
-      /\b(?:quiet workspace|in one (?:quiet |simple |single |beautiful )?workspace)\b/i,
-    message:
-      'Generic workspace line. Name the music-specific thing the customer gets.',
   },
   {
     id: 'ai-transition',
