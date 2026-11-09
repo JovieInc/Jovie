@@ -215,6 +215,56 @@ export const readMarker = body => {
   }
 };
 
+/** Key families where a newer alert replaces the older open ones. */
+export const SUPERSEDING_FAMILIES = ['queue-head-stuck:'];
+
+/**
+ * Open incidents an alert replaces: same key family, other key. A
+ * queue-head-stuck alert is about one head; once another head is the one stuck,
+ * the older alerts are stale (Tim, 2026-11-09: close them all, "dont ask
+ * again"). Without this they piled up past the 50-issue read and the alert
+ * stopped finding its own open issue, so it filed duplicates.
+ */
+export function supersededIncidents(
+  found,
+  key,
+  families = SUPERSEDING_FAMILIES
+) {
+  const family = families.find(f => key.startsWith(f));
+  if (!family) return [];
+  return found.filter(i => {
+    const k = readMarker(i.body)?.key;
+    return typeof k === 'string' && k.startsWith(family) && k !== key;
+  });
+}
+
+/**
+ * Read the open incidents, close the ones `key` supersedes and return the rest.
+ * A failed close only warns: housekeeping must not block the new alert.
+ */
+export async function openIncidents({ api, gh, repo, key }) {
+  const found = await api(
+    `repos/${repo}/issues?state=open&labels=${INCIDENT_LABEL}&per_page=100`,
+    'repair'
+  );
+  const stale = supersededIncidents(found, key);
+  for (const { number } of stale) {
+    await gh([
+      'api',
+      '-X',
+      'PATCH',
+      `repos/${repo}/issues/${number}`,
+      '-f',
+      'state=closed',
+      '-f',
+      'state_reason=completed',
+    ]).catch(error =>
+      console.error(`::warning::stale incident close failed: ${error.message}`)
+    );
+  }
+  return found.filter(i => !stale.includes(i));
+}
+
 // ---- queue pitfalls ---------------------------------------------------------
 
 /**
