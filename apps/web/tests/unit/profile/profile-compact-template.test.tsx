@@ -3562,7 +3562,7 @@ describe('ProfileCompactTemplate', () => {
     });
   });
 
-  describe('with the desktop surface flag off (shipped default)', () => {
+  describe('with the desktop surface flag off (explicit opt-out)', () => {
     beforeEach(() => {
       vi.stubEnv('NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE', '');
     });
