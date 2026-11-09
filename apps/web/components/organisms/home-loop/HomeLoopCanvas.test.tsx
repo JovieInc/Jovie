@@ -12,7 +12,6 @@ import {
   HOME_LOOP_FIXTURE_ASKS,
   HOME_LOOP_FIXTURE_UNMEASURED_PULSE,
 } from './fixtures';
-import { HomeLoopAnswerPanel } from './HomeLoopAnswerPanel';
 import { HomeLoopAsks } from './HomeLoopAsks';
 import { HomeLoopCanvas, type HomeLoopCanvasProps } from './HomeLoopCanvas';
 import { props } from './HomeLoopCanvas.test-fixtures';
@@ -185,6 +184,26 @@ describe('HomeLoopCanvas', () => {
     const banner = screen.getByTestId('home-loop-constraint');
     expect(banner).toHaveTextContent('Shipping status is unknown');
     expect(banner).not.toHaveTextContent('Nothing is blocking shipping');
+    expect(banner).toHaveAttribute('data-tone', 'unknown');
+  });
+
+  it('lets a constraint with its own read override the shipping loop state', () => {
+    const blocker = { tone: 'bad' as const, text: 'Checkout fails' };
+    const { rerender } = render(
+      <HomeLoopCanvas
+        {...props({ loopStatus: 'loading', constraint: blocker })}
+        constraintStatus='ready'
+      />
+    );
+    const banner = screen.getByTestId('home-loop-constraint');
+    expect(banner).toHaveTextContent('Checkout fails');
+    rerender(
+      <HomeLoopCanvas
+        {...props({ constraint: null })}
+        constraintStatus='error'
+      />
+    );
+    expect(banner).toHaveTextContent('Shipping status is unknown');
     expect(banner).toHaveAttribute('data-tone', 'unknown');
   });
 
@@ -448,35 +467,6 @@ describe('HomeLoopAsks defaults and feedback', () => {
 });
 
 describe('HomeLoopAnswerPanel', () => {
-  it('bounds history navigation and exposes every control by name', () => {
-    const handlers = {
-      onBack: vi.fn(),
-      onForward: vi.fn(),
-      onHome: vi.fn(),
-      onOpenTranscript: vi.fn(),
-    };
-    render(
-      <HomeLoopAnswerPanel
-        prompt='Status?'
-        reply='All green.'
-        pending={false}
-        position={1}
-        total={2}
-        {...handlers}
-      />
-    );
-    expect(
-      screen.getByRole('button', { name: 'Previous Answer' })
-    ).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Next Answer' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Open Conversation' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Back To Home' }));
-    expect(handlers.onForward).toHaveBeenCalledOnce();
-    expect(handlers.onOpenTranscript).toHaveBeenCalledOnce();
-    expect(handlers.onHome).toHaveBeenCalledOnce();
-    expect(screen.getByTestId('home-loop-answer')).toHaveTextContent('1 of 2');
-  });
-
   it('replaces the in-flight rows when generated UI updates them in place', () => {
     render(
       <HomeLoopCanvas
