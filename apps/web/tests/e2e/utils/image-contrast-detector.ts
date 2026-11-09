@@ -59,6 +59,8 @@ interface CandidateRecord {
   readonly color: string;
   readonly fontSize: number;
   readonly fontWeight: number;
+  /** The candidate's testid-bearing ancestors, nearest first — where it lives. */
+  readonly ancestorChain: readonly string[];
 }
 
 interface PageScan {
@@ -309,6 +311,15 @@ async function scanCandidates(page: Page): Promise<PageScan> {
         const index = candidates.length;
         element.setAttribute(hideAttribute, String(index));
         const style = getComputedStyle(element);
+        const ancestorChain: string[] = [];
+        for (
+          let node: Element | null = element.parentElement;
+          node;
+          node = node.parentElement
+        ) {
+          const id = node.getAttribute('data-testid');
+          if (id) ancestorChain.push(`${node.tagName.toLowerCase()}#${id}`);
+        }
         candidates.push({
           index,
           element: describe(element),
@@ -317,6 +328,7 @@ async function scanCandidates(page: Page): Promise<PageScan> {
           color: style.color,
           fontSize: Number.parseFloat(style.fontSize || '16'),
           fontWeight: Number.parseInt(style.fontWeight || '400', 10) || 400,
+          ancestorChain,
         });
       };
 
@@ -535,6 +547,7 @@ export async function inspectImageContrast(
         measurements: {
           worstContrastRatio: Math.round(worstRatio * 100) / 100,
           requiredRatio,
+          ancestorChain: candidate.ancestorChain.join(' > '),
         },
       });
     }
