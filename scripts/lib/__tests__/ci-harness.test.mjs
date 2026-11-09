@@ -197,9 +197,8 @@ describe('ci-harness manifest', () => {
       'PR Size Guard',
       'Company guards',
     ]);
-    // Individual harness merge-gate job names must stay in the forbidden pin list
-    // so a batch failure bisects instead of evicting siblings. ci-fast is a real
-    // collapsed job (JOV-3464) but must never be pinned alone — only PR Ready is.
+    // Individual harness merge-gate job names must stay in the forbidden pin list so
+    // a batch failure bisects. ci-fast (JOV-3464) is real but never pinned alone.
     for (const name of EXPECTED_MERGE_GATE_NAMES) {
       if (REQUIRED_MERGE_STATUSES.includes(name)) continue;
       expect(

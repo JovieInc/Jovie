@@ -56,6 +56,14 @@ const LIVE_NATIVE_RULESET_FIXTURE = JSON.parse(
   )
 );
 
+const liveRequiredContexts = [
+  'PR Ready',
+  'Migration Guard',
+  'Fork PR Gate',
+  'PR Size Guard',
+  'Company guards',
+];
+
 const greenStatuses = [
   { name: 'PR Ready', conclusion: 'SUCCESS' },
   { name: 'Migration Guard', conclusion: 'SUCCESS' },
@@ -567,13 +575,9 @@ describe('aggregate required checks', () => {
       type: 'required_status_checks',
       parameters: {
         strict_required_status_checks_policy: false,
-        required_status_checks: [
-          'PR Ready',
-          'Migration Guard',
-          'Fork PR Gate',
-          'PR Size Guard',
-          'Company guards',
-        ].map(context => ({ context })),
+        required_status_checks: liveRequiredContexts.map(context => ({
+          context,
+        })),
       },
     };
     const nativeRules = [
@@ -2382,13 +2386,9 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
             type: 'required_status_checks',
             parameters: {
               strict_required_status_checks_policy: false,
-              required_status_checks: [
-                'PR Ready',
-                'Migration Guard',
-                'Fork PR Gate',
-                'PR Size Guard',
-                'Company guards',
-              ].map(context => ({ context })),
+              required_status_checks: liveRequiredContexts.map(context => ({
+                context,
+              })),
             },
           },
           {
@@ -2435,13 +2435,9 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
             type: 'required_status_checks',
             parameters: {
               strict_required_status_checks_policy: false,
-              required_status_checks: [
-                'PR Ready',
-                'Migration Guard',
-                'Fork PR Gate',
-                'PR Size Guard',
-                'Company guards',
-              ].map(context => ({ context })),
+              required_status_checks: liveRequiredContexts.map(context => ({
+                context,
+              })),
             },
           },
           {
@@ -2530,13 +2526,9 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
             type: 'required_status_checks',
             parameters: {
               strict_required_status_checks_policy: false,
-              required_status_checks: [
-                'PR Ready',
-                'Migration Guard',
-                'Fork PR Gate',
-                'PR Size Guard',
-                'Company guards',
-              ].map(context => ({ context })),
+              required_status_checks: liveRequiredContexts.map(context => ({
+                context,
+              })),
             },
           },
           {
