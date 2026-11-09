@@ -33,6 +33,7 @@ const THEMES = /** @type {const} */ (['light', 'dark']);
 const SURFACES = ['surface-0', 'surface-1', 'surface-2', 'surface-3'];
 const ELEVATION_ROLES = ['canvas', 'shell', 'card', 'elevated', 'floating'];
 const ACCENT_ROLES = ['ion', 'ultra', 'pulse', 'mint', 'orange', 'red'];
+const MARK_ROLES = ['verified', 'on-media'];
 const SWATCH_TO_ELEVATION = {
   canvas: 'canvas',
   'surface-0': 'shell',
@@ -103,16 +104,16 @@ export function bindZiawiColorSot(sot, swatches, add) {
       }
     }
   }
-  for (const role of ACCENT_ROLES) {
-    const expected = accents.hex?.[role];
-    for (const theme of THEMES) {
-      const actual = swatches[role]?.[theme]?.hex;
-      if (!expected || !actual || !hexEquals(actual, expected)) {
-        add(
-          'color-sot',
-          `${role}.${theme} want ZiaWI ${expected} got ${actual ?? 'missing'}`
-        );
-      }
+  const marks = doc.marks ?? {};
+  if (marks.count !== 2 || marks.roles?.join(',') !== MARK_ROLES.join(',')) {
+    add('color-sot', 'marks must be verified/on-media');
+  }
+  const roles = [...ACCENT_ROLES, ...MARK_ROLES];
+  for (const [role, theme] of roles.flatMap(r => THEMES.map(t => [r, t]))) {
+    const expected = accents.hex?.[role] ?? marks[theme]?.[role];
+    const actual = swatches[role]?.[theme]?.hex;
+    if (!expected || !actual || !hexEquals(actual, expected)) {
+      add('color-sot', `${role}.${theme} want ZiaWI ${expected} got ${actual}`);
     }
   }
   for (const [alias, target] of Object.entries(accents.aliases ?? {})) {
