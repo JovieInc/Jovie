@@ -76,31 +76,10 @@ async function referenceReleaseFields(
 
 /**
  * Redirects the codebase declares on purpose: the stable `/artists/:id`
- * entity route (survives claims and renames), the profile mode
- * redirect-sinks registered in route-config, and the closed-signup waitlist
- * handoff. Only these get one followed hop, and only to a same-origin 200.
- * Every other redirect still fails.
+ * entity route (survives claims and renames), route-config redirect sinks,
+ * and the closed-signup waitlist handoff. Only these get one followed hop,
+ * and only to a same-origin 200. Every other redirect still fails.
  */
-function isClosedSignupEntryPath(pathname: string): boolean {
-  // Closed public signup (canon/PRODUCT.md, 2026-11-02, PR #24224): anonymous
-  // /signup and /start redirect to the /waitlist role form. The artist
-  // profile links /start for the proof-to-claim funnel, so the certificate
-  // observes that handoff on every run.
-  return pathname === '/start' || pathname === '/signup';
-}
-
-function resolvesToWaitlist(location: string | null | undefined): boolean {
-  if (!location) return false;
-  try {
-    return (
-      new URL(location, TIM_WHITE_PROFILE.publicProfileUrl).pathname ===
-      APP_ROUTES.WAITLIST
-    );
-  } catch {
-    return false;
-  }
-}
-
 export function isDeclaredRedirect(
   url: URL,
   handle: string,
@@ -114,7 +93,13 @@ export function isDeclaredRedirect(
   ) {
     return true;
   }
-  return isClosedSignupEntryPath(url.pathname) && resolvesToWaitlist(location);
+  // Closed public signup (canon/PRODUCT.md, 2026-11-02, PR #24224): /start +
+  // /signup 307 to /waitlist; malformed Location throws to the link catch.
+  if (!/^\/(?:start|signup)$/.test(url.pathname) || !location) return false;
+  return (
+    new URL(location, TIM_WHITE_PROFILE.publicProfileUrl).pathname ===
+    APP_ROUTES.WAITLIST
+  );
 }
 
 async function deployedCommitSha(

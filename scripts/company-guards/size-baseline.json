@@ -542,7 +542,6 @@
   "apps/web/lib/youtube-library/queries.ts": 574,
   "apps/web/next.config.js": 889,
   "apps/web/scripts/admin-green-loop.ts": 610,
-  "apps/web/scripts/certify-artist-profile.ts": 515,
   "apps/web/scripts/compare-chunks.ts": 798,
   "apps/web/scripts/design-ci-judge-dispatch.test.ts": 533,
   "apps/web/scripts/design-ci-judge-dispatch.ts": 837,
