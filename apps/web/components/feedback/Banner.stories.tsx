@@ -59,3 +59,45 @@ export const DismissibleWithAction: Story = {
     onDismiss: fn(),
   },
 };
+
+/** Partial: the optional description, action and dismiss are all absent. */
+export const PartialTitleOnly: Story = {
+  args: {
+    title: 'Imports are paused',
+    description: undefined,
+    variant: 'info',
+  },
+};
+
+export const LongContent: Story = {
+  args: {
+    title:
+      'Spotify, Apple Music, YouTube Music and Amazon Music imports are paused while Jovie reconnects to every platform',
+    description:
+      'Your audience links, release smart links and pre-save campaigns keep working. Jovie will resume syncing new releases, artist profile updates and listener counts automatically as soon as each platform is reachable again, usually within a few minutes.',
+    variant: 'warning',
+    action: { label: 'View sync status', onClick: fn() },
+    onDismiss: fn(),
+  },
+  render: args => (
+    <div className='w-96'>
+      <Banner {...args} />
+    </div>
+  ),
+};
+
+export const Rtl: Story = {
+  args: {
+    title: 'تم إيقاف الاستيراد مؤقتًا حتى يتوفر الاتصال بمنصة سبوتيفاي',
+    description:
+      'ستستأنف جوفي مزامنة الإصدارات الجديدة وروابط الجمهور تلقائيًا عند استعادة الاتصال.',
+    variant: 'info',
+    action: { label: 'مراجعة', onClick: fn() },
+    onDismiss: fn(),
+  },
+  render: args => (
+    <div dir='rtl' className='w-96'>
+      <Banner {...args} />
+    </div>
+  ),
+};

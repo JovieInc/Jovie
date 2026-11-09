@@ -55,8 +55,8 @@ jobs:
         env:
           PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
           PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
-          QUERY: ${{ inputs.query || '^oaz9c$|^Route /signin|^STAGING · Auth column|^CANONICAL · Mac sign-in|^Cinematic — Jovie window · macOS auth|^EVIDENCE / Jovie for Mac / Auth' }}
-          LOG_PNG: ${{ inputs.log_png || '.' }}
+          QUERY: ${{ inputs.query || 'auth|sign ?in|sign ?up|log ?in|otp|verif|code' }}
+          LOG_PNG: ${{ inputs.log_png || '' }}
         run: |
           set -euo pipefail
           args=(--out "$RUNNER_TEMP/pen-inspect" --query "$QUERY")

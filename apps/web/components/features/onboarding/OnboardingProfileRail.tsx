@@ -279,7 +279,7 @@ function DspMatchStrip({
 
 /**
  * Pen R6As7U `SDt0M`: names the panel so the phone reads as the visitor's own
- * draft. Pen sets the eyebrow in its canonical uppercase eyebrow style.
+ * draft. No all-caps eyebrow: banned UI text (ASR-022, no-uppercase-ratchet).
  */
 function OnboardingDraftProfileHeader() {
   return (
@@ -287,9 +287,6 @@ function OnboardingDraftProfileHeader() {
       className='system-b-onboarding-draft-header'
       data-testid='onboarding-draft-profile-header'
     >
-      <p className='system-b-onboarding-draft-eyebrow'>
-        Your profile, taking shape
-      </p>
       <h2 className='system-b-onboarding-draft-title text-balance'>
         Your Draft Profile
       </h2>
@@ -427,6 +424,7 @@ export function OnboardingProfileRail({
             isSubscribed={false}
             // Never show Live — ownership is unverified during onboarding.
             showLiveBadge={false}
+            directDspImages
             dataTestId='onboarding-profile-bento'
             phonePreviewTestId='onboarding-phone-preview'
             surfaceTestId='onboarding-profile-compact-surface'
@@ -440,7 +438,7 @@ export function OnboardingProfileRail({
             phoneFrameClassName={isInline ? 'w-50 sm:w-57' : 'w-71'}
             topRight={
               <span
-                className='inline-flex h-6 items-center rounded-full border border-white/12 bg-black/60 px-2.5 text-3xs font-semibold uppercase tracking-wider text-white backdrop-blur-md dark:text-white'
+                className='inline-flex h-6 items-center rounded-full border border-white/12 bg-black/60 px-2.5 text-2xs font-medium text-white backdrop-blur-md dark:text-white'
                 data-testid='onboarding-profile-preview-badge'
               >
                 Preview
