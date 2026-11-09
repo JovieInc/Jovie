@@ -54,7 +54,7 @@ export const INBOX: OvieInbox = {
       kind: 'spend',
       source: { system: 'summer', id: 'card-1', revision: null },
       title: 'Vercel on-demand concurrency',
-      recommendation: 'Approve about $6 a month',
+      recommendation: 'Approve the small monthly cost',
       owner: null,
       state: 'needs_you',
       priority: 1,
