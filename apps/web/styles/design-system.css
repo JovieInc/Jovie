@@ -799,12 +799,8 @@
   color: var(--color-bg-paper);
 }
 
-/* One interruption at a time (JOV-3209): while a profile mobile alerts/
-   subscribe flow is open, the consent card must not stack over it and
-   intercept its inputs (it mounts lazily and can land on top of an already
-   open flow at phone widths). Hide it for the flow's duration; JOV-7114
-   geometry is untouched — the card returns unchanged when the flow closes. */
-html[data-profile-flow-open='true'] .cookie-banner-card {
+/* JOV-3209: hide the consent card while a profile mobile flow is open. */
+html[data-profile-flow-open="true"] .cookie-banner-card {
   visibility: hidden;
   pointer-events: none;
 }
@@ -1206,6 +1202,12 @@ html[data-profile-flow-open='true'] .cookie-banner-card {
   .profile-viewport--desktop-surface:not(.profile-viewport--embedded)
     .public-profile-layout-desktop-shell {
     display: flex;
+  }
+
+  /* JOV-11623: top-align the desktop stage across mode switches. */
+  .profile-viewport--desktop-surface:not(.profile-viewport--embedded)
+  .public-profile-layout-frame--desktop {
+    align-items: flex-start;
   }
 }
 
