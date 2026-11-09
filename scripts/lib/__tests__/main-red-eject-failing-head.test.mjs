@@ -177,12 +177,10 @@ describe('stale queue-head-stuck alerts', () => {
       alert(3, 'eject:abc'),
       { number: 4, body: 'no marker' },
     ];
-    expect(
-      supersededIncidents(found, 'queue-head-stuck:23966', 'queue-head-stuck:')
-    ).toEqual([found[0]]);
-    expect(supersededIncidents(found, 'queue-head-stuck:23966', null)).toEqual(
-      []
-    );
+    expect(supersededIncidents(found, 'queue-head-stuck:23966')).toEqual([
+      found[0],
+    ]);
+    expect(supersededIncidents(found, 'eject:abc')).toEqual([]);
   });
 
   it('closes older heads alerts when a new head alerts, and keeps its own', async () => {
