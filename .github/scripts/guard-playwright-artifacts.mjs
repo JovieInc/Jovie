@@ -899,13 +899,13 @@ const DIAGNOSTIC_MAX_LINES = 4;
 const DIAGNOSTIC_MAX_LINE_LENGTH = 1200;
 
 function truncateAnnotation(value, maxLength) {
-  return value.length <= maxLength ? value : `${value.slice(0, maxLength - 1)}…`;
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength - 1)}…`;
 }
 
 /**
- * Parse one line-reporter output stream into failure records. Summary
- * lines and their indented echoes are not failures — only the numbered
- * `N)` blocks the reporter prints for tests that exhausted retries.
+ * Parse numbered failure blocks for tests that exhausted retries; summary
+ * lines and their indented echoes are not failures.
  */
 export function parsePlaywrightFailures(output) {
   const lines = String(output ?? '')

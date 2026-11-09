@@ -95,7 +95,9 @@ test('diagnostic lines survive the CI escape prefixes', () => {
     '\u001B[1A\u001B[2K    at fake',
     '\u001B[1A\u001B[2K  POST /api/stripe/checkout returned 500: {"error":"boom"}',
   ].join('\n');
-  assert.deepEqual(collectDiagnosticLines(output).length, 1);
+  assert.deepEqual(collectDiagnosticLines(output), [
+    '  POST /api/stripe/checkout returned 500: {"error":"boom"}',
+  ]);
 });
 
 test('ignores flaky, passed and skipped summary lines', () => {
