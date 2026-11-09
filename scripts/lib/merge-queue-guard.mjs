@@ -495,9 +495,8 @@ export const NATIVE_BRANCH_PROTECTION_POLICY = Object.freeze({
 });
 
 /**
- * Allowed required-check contexts for main. These are aggregates — never pin
- * individual CI jobs (ci-fast, Typecheck, Unit Tests, …) or a batch failure
- * evicts siblings instead of bisecting to the culprit.
+ * Allowed required-check contexts for main — aggregates only; never pin an individual
+ * CI job (ci-fast, Typecheck, …): a batch failure evicts siblings instead of bisecting.
  */
 export const ALLOWED_REQUIRED_CHECK_CONTEXTS = Object.freeze([
   'CI / PR Ready',
