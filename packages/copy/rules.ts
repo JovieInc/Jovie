@@ -305,6 +305,16 @@ export const COPY_RULES: readonly CopyRule[] = [
       'Generic promotion. Replace with a concrete action or consequence.',
   },
   {
+    id: 'generic-workspace',
+    category: 'slop',
+    severity: 'block',
+    registers: ['jovie-marketing'],
+    pattern:
+      /\b(?:quiet workspace|in one (?:quiet |simple |single |beautiful )?workspace)\b/i,
+    message:
+      'Generic workspace line. Name the music-specific thing the customer gets.',
+  },
+  {
     id: 'ai-transition',
     category: 'slop',
     severity: 'block',

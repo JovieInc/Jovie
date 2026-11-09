@@ -794,10 +794,20 @@
       "scope": ["marketing", "artifact"],
       "severity": "block",
       "enforcement": {
-        "kind": "human",
-        "status": "planned",
-        "check": "covered in part by ASR-024 and ASR-027",
-        "evidence": []
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/invariants/art-direction/no-invented-customer.mjs",
+        "evidence": [
+          "scripts/invariants/art-direction/no-invented-customer.mjs",
+          "scripts/invariants/art-direction/no-invented-customer.test.mjs"
+        ],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
+          }
+        ]
       }
     },
     {
