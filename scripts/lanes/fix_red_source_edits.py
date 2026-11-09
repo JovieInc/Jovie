@@ -2,6 +2,7 @@
 strip added legacy Cache Components exports and resolve additive source conflicts. Split from fix_red_classes to keep it under its size ceiling."""
 from __future__ import annotations
 
+import json
 import re
 import tempfile
 from pathlib import Path
@@ -261,8 +262,57 @@ def resolve_additive_node_test_file(worktree: Path, rel: str, sh) -> str | None:
         return resolve_additive_node_tests_text(probe.stdout)
 
 
+def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | None:
+    """Union new component waiver rows, proven against Git's three stages.
+
+    This is authored policy, not generated metadata. Existing rows and every
+    other policy field must be unchanged; ambiguous edits remain unresolved.
+    """
+    if rel != "docs/design-system/component-certification.json":
+        return None
+
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate JSON key")
+            result[key] = value
+        return result
+
+    documents = []
+    for stage in (1, 2, 3):
+        blob = sh(["git", "show", f":{stage}:{rel}"], cwd=worktree)
+        if blob.returncode:
+            return None
+        try:
+            document = json.loads(blob.stdout, object_pairs_hook=unique_object)
+        except (ValueError, TypeError):
+            return None
+        if not isinstance(document, dict) or not isinstance(document.get("waivers"), dict):
+            return None
+        if any(not isinstance(row, dict) or not row or
+               any(not isinstance(reason, str) or not reason.strip() for reason in row.values())
+               for row in document["waivers"].values()):
+            return None
+        documents.append(document)
+    base, ours, theirs = documents
+    base_policy = {key: value for key, value in base.items() if key != "waivers"}
+    for document in (ours, theirs):
+        if {key: value for key, value in document.items() if key != "waivers"} != base_policy:
+            return None
+        if any(document["waivers"].get(key) != value for key, value in base["waivers"].items()):
+            return None
+    merged = dict(theirs["waivers"])
+    for key, value in ours["waivers"].items():
+        if key in merged and merged[key] != value:
+            return None
+        merged[key] = value
+    theirs["waivers"] = merged
+    return json.dumps(theirs, ensure_ascii=False, indent=2) + "\n"
+
+
 def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merge_entries, guard=lambda: None) -> bool:
-    """Union quoted list entries or proven additive node:test blocks.
+    """Union quoted list entries, additive node:test blocks or certificate rows.
 
     Main's order stays, then head-only lines. A prose hunk or any other shape aborts
     and leaves the PR to the model. The push is a fast-forward of the PR branch."""
@@ -280,6 +330,8 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
                 text = merge_entries(target.read_text())
                 if text is None:
                     text = resolve_additive_node_test_file(worktree, path, sh)
+                if text is None:
+                    text = resolve_additive_certificate_waivers(worktree, path, sh)
             except OSError:
                 text = None
             if text is None:

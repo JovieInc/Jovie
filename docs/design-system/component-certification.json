@@ -269,6 +269,10 @@
       "partial": "LogoLink takes no data; its optional props (href, sizes, variant, reveal, prefetch, className) are presentation defaults and its mark and accessible name are fixed, so nothing can be partially present.",
       "long-content": "LogoLink renders no caller text; its only strings are the fixed 'Jovie' wordmark and aria-label, which the detector matched as label."
     },
+    "apps/web/components/features/dashboard/dashboard-nav/InboxAttentionLink.tsx": {
+      "offline": "InboxAttentionLink never fetches or mutates; it renders the pending count its owner passes, and with no connection that count stays unloaded, which the Partial story shows.",
+      "permission-denied": "InboxAttentionLink links to the signed-in Inbox that every account can open and has no gated action; a viewer who cannot reach the dashboard never sees the app rail."
+    },
     "packages/ui/atoms/common-dropdown-item-renderers.tsx": {
       "empty": "The renderers draw one menu row per caller item and never decide what an empty menu shows; CommonDropdown owns that message (its EmptyState story). The detector matched the .map( over an action row's or radio group's own items.",
       "offline": "The renderers never fetch or submit; a row only shows loading when its owner sets the loading flag (LoadingRows), so lost connectivity reaches them only as caller state."
