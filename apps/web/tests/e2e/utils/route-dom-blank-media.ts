@@ -8,6 +8,15 @@ export const BLANK_MEDIA_DOMINANT_SHARE_MIN = 0.985;
 /** Share of 16x16 grid cells that are flat (stddev < 2.5) above which the media is mostly empty. */
 export const BLANK_MEDIA_EMPTY_CELL_SHARE_MAX = 0.6;
 const BLANK_MEDIA_MAX_PROBES = 16;
+/**
+ * How long to let a probed image finish loading and decoding before its pixels
+ * are judged. A receipt starts at domcontentloaded, so a priority hero from a
+ * cold image optimizer, or a lazy image the probe just scrolled to, can still
+ * be in flight; judging it then reads the slot's own background as blank. An
+ * image still loading after this is judged as it stands, so a slow or stuck
+ * image is still a finding.
+ */
+export const BLANK_MEDIA_LOAD_WAIT_MS = 5000;
 
 /**
  * Blank-media: an img, video or canvas inside a designed section (a
@@ -83,11 +92,26 @@ export async function inspectBlankMedia(
       });
       continue;
     }
+    const media = page.locator(`[data-blank-probe="${probe.id}"]`);
     let png: Buffer;
     try {
-      png = await page
-        .locator(`[data-blank-probe="${probe.id}"]`)
-        .screenshot({ animations: 'disabled', timeout: 5000 });
+      await media.scrollIntoViewIfNeeded({ timeout: 5000 });
+      await media.evaluate(async (node, waitMs) => {
+        if (!(node instanceof HTMLImageElement)) return;
+        const loaded = node.complete
+          ? Promise.resolve()
+          : new Promise<void>(resolve => {
+              node.addEventListener('load', () => resolve(), { once: true });
+              node.addEventListener('error', () => resolve(), { once: true });
+            });
+        await Promise.race([
+          loaded
+            .then(() => (node.naturalWidth > 0 ? node.decode() : undefined))
+            .catch(() => undefined),
+          new Promise(resolve => setTimeout(resolve, waitMs)),
+        ]);
+      }, BLANK_MEDIA_LOAD_WAIT_MS);
+      png = await media.screenshot({ animations: 'disabled', timeout: 5000 });
     } catch {
       continue;
     }
