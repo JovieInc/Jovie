@@ -1133,6 +1133,17 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         if re.search(r"^#{1,6}\s+|customer-changelog/v1", win_section.split("\n", 1)[1], re.M):
             raise ValueError("measured win must contain only Win evidence; use the dedicated repair fields")
         if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Win\s*$", re.I)) is None:
+            # Reuse Fleet's policy before publishing caller-supplied measurements.
+            # A heading alone previously let incomplete evidence restart red CI.
+            validated = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { requiredWinErrors, winSectionErrors } from './scripts/lib/wins-ledger.mjs';
+const body = readFileSync(0, 'utf8');
+const errors = [...requiredWinErrors({title: 'ci: repair evidence', body}), ...winSectionErrors(body)];
+if (errors.length) { console.error(errors.join('\\n')); process.exitCode = 1; }
+"""], cwd=HERE.parent.parent, input=win_section, text=True, capture_output=True, timeout=10)
+            if validated.returncode:
+                raise ValueError("measured win failed canonical Win validation: " + validated.stderr.strip())
             updated = updated.rstrip("\n") + "\n\n" + win_section.rstrip("\n") + "\n"
     if premise is not None:
         fields = ("Assumption", "Falsifying test", "Result")
