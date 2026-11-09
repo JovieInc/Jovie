@@ -354,9 +354,12 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
   // only when revenue is clear. An unreadable blocker never reads as clear.
   // Until it reads (or if it can't), the banner keeps its shipping behavior,
   // so an unreadable blocker never reads as "nothing is blocking revenue".
-  const revenueRead = revenueBlocker.isSuccess;
+  // A failed refetch keeps the last good read rather than dropping to
+  // shipping health (the failure still raises a panel alert below).
+  const revenueData = revenueBlocker.data;
+  const revenueRead = revenueData !== undefined;
   const constraint = revenueRead
-    ? homeConstraint(revenueBlocker.data.blocker, shippingConstraint)
+    ? homeConstraint(revenueData.blocker, shippingConstraint)
     : shippingConstraint;
   const asksStatus: HomeLoopSectionStatus = inbox.data
     ? 'ready'

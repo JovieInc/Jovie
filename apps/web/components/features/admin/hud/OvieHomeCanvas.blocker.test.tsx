@@ -74,12 +74,12 @@ describe('OvieHomeCanvas revenue blocker', () => {
         <OvieHomeCanvas />
       </QueryClientProvider>
     );
-    return screen.getByTestId('home-loop-constraint');
+    return { banner: screen.getByTestId('home-loop-constraint'), client };
   }
 
   it('leads the banner with the revenue blocker over shipping health', async () => {
     responses['/api/ovie/home/blocker'] = BLOCKED;
-    const banner = renderCanvas();
+    const { banner } = renderCanvas();
     await waitFor(() => expect(banner).toHaveTextContent(BLOCKED.blocker.text));
     expect(banner).toHaveAttribute('data-tone', 'bad');
     expect(
@@ -88,7 +88,7 @@ describe('OvieHomeCanvas revenue blocker', () => {
   });
 
   it('drops the shipping all-clear once revenue reads clear', async () => {
-    const banner = renderCanvas();
+    const { banner } = renderCanvas();
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/ovie/home/blocker',
@@ -106,7 +106,7 @@ describe('OvieHomeCanvas revenue blocker', () => {
 
   it('reports an unreadable blocker and never says revenue is clear', async () => {
     delete responses['/api/ovie/home/blocker'];
-    const banner = renderCanvas();
+    const { banner } = renderCanvas();
     await waitFor(() =>
       expect(panelAlert).toHaveBeenCalledWith(
         'revenue-blocker',
@@ -114,5 +114,20 @@ describe('OvieHomeCanvas revenue blocker', () => {
       )
     );
     expect(banner).not.toHaveTextContent('Nothing is blocking revenue');
+  });
+
+  it('keeps the last blocker when a refetch fails', async () => {
+    responses['/api/ovie/home/blocker'] = BLOCKED;
+    const { banner, client } = renderCanvas();
+    await waitFor(() => expect(banner).toHaveTextContent(BLOCKED.blocker.text));
+    delete responses['/api/ovie/home/blocker'];
+    await client.refetchQueries({ queryKey: ['ovie', 'home', 'blocker'] });
+    await waitFor(() =>
+      expect(panelAlert).toHaveBeenCalledWith(
+        'revenue-blocker',
+        'company-state-unavailable'
+      )
+    );
+    expect(banner).toHaveTextContent(BLOCKED.blocker.text);
   });
 });
