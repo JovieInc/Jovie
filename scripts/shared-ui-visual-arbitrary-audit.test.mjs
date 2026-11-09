@@ -67,6 +67,8 @@ const COVERED_PRODUCTION_SOURCES = [
   'packages/ui/atoms/status-glyph.tsx',
   'packages/ui/atoms/inline-subscribe.tsx',
   'packages/ui/atoms/searchable-submenu-helpers.ts',
+  'packages/ui/atoms/common-dropdown-scroll-body.tsx',
+  'packages/ui/atoms/title-menu-trigger.tsx',
   'packages/ui/brand/JovieO.tsx',
   'packages/ui/brand/JovieWordmark.tsx',
 ];
@@ -79,6 +81,8 @@ const EXCLUDED_NON_PRODUCTION_SOURCES = [
   'packages/ui/theme/motion-policy.test.ts',
   'packages/ui/atoms/inline-subscribe.stories.tsx',
   'packages/ui/atoms/inline-subscribe.test.tsx',
+  'packages/ui/atoms/title-menu-trigger.stories.tsx',
+  'packages/ui/atoms/title-menu-trigger.test.tsx',
   'packages/ui/atoms/fixtures/cropped-artwork-avatar.tsx',
   'packages/ui/atoms/fixtures/badge-geometry-drift-fixtures.tsx',
   'packages/ui/generated/red.tsx',
@@ -158,7 +162,7 @@ test('repo shared-UI visual arbitrary findings match the shrink-only baseline', 
   assert.equal(result.status, 'pass');
   assert.equal(result.totalFindings, 0);
   assert.deepEqual(result.findings, []);
-  assert.equal(result.scannedFiles.length, 73);
+  assert.equal(result.scannedFiles.length, 75);
   for (const relativePath of COVERED_PRODUCTION_SOURCES) {
     assert.ok(result.scannedFiles.includes(relativePath), relativePath);
   }
