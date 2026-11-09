@@ -224,6 +224,12 @@ describe('summer card default-plus-deadline contract', () => {
     );
   });
 
+  it('adds no risk or confidence keys to a card that declares neither', () => {
+    // Receipts compare parsed cards deep-equal on replay; a pre-deploy card must still match.
+    expect(Object.keys(taste)).not.toContain('risk');
+    expect(Object.keys(taste)).not.toContain('confidence');
+  });
+
   it('never lets risk and confidence ship outbound, or mix with a deadline', () => {
     const outbound = summerCardInputSchema.parse({
       ...tasteInput,
