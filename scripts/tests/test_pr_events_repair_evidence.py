@@ -148,6 +148,37 @@ console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
         updated = events.repair_evidence_body(self.PR, body + template, win_section=self.WIN)
         self.assertTrue(updated.endswith(self.WIN))
 
+    def test_measured_win_replacement_requires_the_observed_section(self):
+        old = "## Win\n\n- Claim: Existing unmeasured claim\n"
+        suffix = "## Verification\n\nKeep the original runtime proof.\n"
+        body = events.red_before_green_block(self.PR) + "\n" + old + "\n" + suffix
+        updated = events.repair_evidence_body(
+            self.PR, body, win_section=self.WIN, previous_win_section=old,
+            customer_decision={"releaseWorthy": False})
+        self.assertNotIn(old, updated)
+        self.assertIn(suffix, updated)
+        self.assertEqual(updated.count("## Win"), 1)
+        self.assertIn(self.WIN, updated)
+        self.assertEqual(updated.count("customer-changelog/v1"), 1)
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+const bodies = JSON.parse(readFileSync(0, 'utf8'));
+console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
+  pr: {title: 'ci: repair annotation evidence', body}, files: [],
+}).errors)));
+"""], cwd=ROOT, input=json.dumps([body, updated]), text=True, capture_output=True, check=True)
+        before, after = json.loads(checked.stdout)
+        self.assertTrue(any(error.startswith("win:") for error in before), before)
+        self.assertEqual(after, [])
+        with self.assertRaisesRegex(ValueError, "Win section changed"):
+            events.repair_evidence_body(self.PR, body.replace(old, self.WIN),
+                                        win_section=self.WIN, previous_win_section=old)
+        with self.assertRaisesRegex(ValueError, "replacement requires"):
+            events.repair_evidence_body(self.PR, body, previous_win_section=old)
+        with self.assertRaisesRegex(ValueError, "Win section changed"):
+            events.repair_evidence_body(self.PR, suffix, win_section=self.WIN, previous_win_section=old)
+
     def test_ensure_can_write_measured_win_without_a_red_run(self):
         written = []
         def shell(args):
@@ -192,6 +223,9 @@ console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
         for win in invalid:
             with self.subTest(win=win), self.assertRaisesRegex(ValueError, "canonical Win validation"):
                 events.repair_evidence_body(self.PR, body, win_section=win)
+            with self.subTest(replacement=win), self.assertRaisesRegex(ValueError, "canonical Win validation"):
+                events.repair_evidence_body(self.PR, body + "\n" + self.WIN,
+                                            win_section=win, previous_win_section=self.WIN)
 
     def test_pending_win_uses_the_canonical_pending_measurement_contract(self):
         win = self.WIN.replace("| 1 | 0 |", "| 1 | ? |") + "- Pending: yes\n"

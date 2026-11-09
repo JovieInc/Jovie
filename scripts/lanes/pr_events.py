@@ -1013,8 +1013,7 @@ RED_RUN_URL = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9
 
 
 def red_section_bounds(lines: list[str], heading=RED_HEADING) -> tuple[int, int] | None:
-    """Match Fleet's section boundaries: headings inside code fences are log text."""
-    # Ignore hidden Markdown while retaining source line indexes for replacement.
+    """Match Fleet boundaries, ignoring fenced/hidden headings but preserving source line indexes."""
     visible = re.sub(r"<!--[\s\S]*?-->", lambda match: "\n" * match.group().count("\n"), "\n".join(lines))
     fenced = False
     start = None
@@ -1051,12 +1050,8 @@ def red_section_complete(body: str) -> bool:
 
 
 def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
-    """A `## Red-before-green` section built from the PR's own red check: the failing run URL and
-    the failed jobs' error lines the fixer is shown. Preserve a command that exits nonzero
-    for the failed run: `gh run view --log-failed` only displays logs and exits successfully.
-    Repair PRs require this evidence; agents forget it (45 of 138 Fleet Rules failures on
-    2026-10-25) and the lane already has it. Conflict-only repairs use observed git merge
-    failure output instead. None without a red run or an observed merge failure."""
+    """Build proof from the PR's red run/errors or observed merge conflict; otherwise None.
+    Use a failing command; `gh run view --log-failed` only displays logs."""
     for check in pr.get("statusCheckRollup") or []:
         if str(check.get("conclusion") or "").lower() not in RED_CONCLUSIONS:
             continue
@@ -1074,8 +1069,7 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
             f"- Failing command: `gh run watch {run_url.rsplit('/', 1)[-1]} --repo {REPO} --exit-status`",
             f"- Failing run (before fix): {run_url}", "",
             "```text", *lines, "```", "", RED_BLOCK_MARKER])
-    # Conflict-only repairs have no failed CI run. Require both the observed
-    # git merge failure and a conflicting PR state; a label alone is not red proof.
+    # Conflict-only proof needs observed merge failure and conflicting state, not just a label.
     observed = str(excerpt or "").splitlines()
     conflicts = [line for line in observed if re.fullmatch(r"CONFLICT \([^)]+\): .+", line)]
     if (pr.get("mergeable") == "CONFLICTING" or pr.get("mergeStateStatus") == "DIRTY") and conflicts and (
@@ -1101,10 +1095,8 @@ def with_red_section(body: str, block: str) -> str:
 
 def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
                          locking_pr: int | None = None, win_section: str | None = None,
-                         premise: dict | None = None) -> str:
-    """Complete caller-supplied evidence without inventing outcomes or provenance.
-    Preserve existing proof and decisions; Fleet/changelog guards validate the result.
-    """
+                         premise: dict | None = None, previous_win_section: str | None = None) -> str:
+    """Complete explicit evidence; preserve proof/decisions for Fleet/changelog validation."""
     if len(re.findall(r"<!--\s*customer-changelog/v1\b[\s\S]*?-->", body)) > 1:
         raise ValueError("repair requires exactly one customer changelog decision")
     updated = body
@@ -1127,12 +1119,19 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         visible = re.sub(r"<!--[\s\S]*?-->", "", updated)
         if not re.search(r"^#{1,6}\s+Locked areas\s*$", visible, re.I | re.M):
             updated = updated.rstrip("\n") + f"\n\n## Locked areas\n\nLocking PR: #{locking_pr}\n"
+    if previous_win_section is not None and not win_section:
+        raise ValueError("Win replacement requires explicit measured win evidence")
     if win_section is not None and win_section != "":
         if not isinstance(win_section, str) or not re.match(r"\A## Win\s*\n", win_section):
             raise ValueError("measured win requires a complete ## Win section")
         if re.search(r"^#{1,6}\s+|customer-changelog/v1", win_section.split("\n", 1)[1], re.M):
             raise ValueError("measured win must contain only Win evidence; use the dedicated repair fields")
-        if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Win\s*$", re.I)) is None:
+        lines = updated.split("\n")
+        bounds = red_section_bounds(lines, re.compile(r"^#{2,3}\s*Win\s*$", re.I))
+        if previous_win_section is not None:
+            if not bounds or "\n".join(lines[bounds[0]:bounds[1]]).rstrip("\n") != previous_win_section.rstrip("\n"):
+                raise ValueError("Win section changed; re-read the evidence before replacement")
+        if previous_win_section is not None or bounds is None:
             # Reuse Fleet's policy before publishing caller-supplied measurements.
             # A heading alone previously let incomplete evidence restart red CI.
             validated = subprocess.run(["node", "--input-type=module", "-e", """
@@ -1144,6 +1143,10 @@ if (errors.length) { console.error(errors.join('\\n')); process.exitCode = 1; }
 """], cwd=HERE.parent.parent, input=win_section, text=True, capture_output=True, timeout=10)
             if validated.returncode:
                 raise ValueError("measured win failed canonical Win validation: " + validated.stderr.strip())
+        if previous_win_section is not None:
+            start, end = bounds
+            updated = "\n".join(lines[:start] + win_section.rstrip("\n").split("\n") + [""] + lines[end:])
+        elif bounds is None:
             updated = updated.rstrip("\n") + "\n\n" + win_section.rstrip("\n") + "\n"
     if premise is not None:
         fields = ("Assumption", "Falsifying test", "Result")
