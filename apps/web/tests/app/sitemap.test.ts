@@ -77,6 +77,7 @@ vi.mock('@/lib/db/schema/content', () => ({
   discogReleaseTracks: {
     releaseId: 'releaseId',
     recordingId: 'recordingId',
+    slug: 'releaseTrackSlug',
   },
   providerLinks: {
     ownerType: 'ownerType',
@@ -187,18 +188,21 @@ describe('sitemap', () => {
       .mockResolvedValueOnce([
         {
           username: 'tim',
+          recordingId: 'recording-album',
           slug: 'album',
           releaseSlug: 'album',
           updatedAt: new Date('2026-01-03'),
         },
         {
           username: 'tim',
+          recordingId: 'recording-album',
           slug: 'album',
           releaseSlug: 'best-of',
           updatedAt: new Date('2026-01-03'),
         },
         {
           username: 'tim',
+          recordingId: 'recording-single',
           slug: 'single',
           releaseSlug: 'single-release',
           updatedAt: new Date('2026-01-04'),

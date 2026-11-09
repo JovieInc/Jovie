@@ -8,6 +8,9 @@ const mockCleanupSmsIntents = vi.hoisted(() => vi.fn());
 const mockRunWaitlistAutoAccept = vi.hoisted(() => vi.fn());
 const mockReconcileWaitlistAdmission = vi.hoisted(() => vi.fn());
 const mockSweepUnderEnrichedProfilesForCron = vi.hoisted(() => vi.fn());
+const mockSweepLegacySlugs = vi.hoisted(() =>
+  vi.fn(async () => ({ renamed: 1 }))
+);
 const mockRunOnboardingScriptAggregation = vi.hoisted(() => vi.fn());
 const mockRunProfileSearchMonitoring = vi.hoisted(() => vi.fn());
 const mockSyncAiCrawlerAnalyticsCron = vi.hoisted(() => vi.fn());
@@ -94,6 +97,10 @@ vi.mock('@/lib/waitlist/admission-detector', async () => {
 
 vi.mock('@/lib/waitlist/auto-accept', () => ({
   runWaitlistAutoAccept: mockRunWaitlistAutoAccept,
+}));
+
+vi.mock('@/lib/discography/slug-migration', () => ({
+  sweepLegacySlugsForCron: mockSweepLegacySlugs,
 }));
 
 vi.mock('@/lib/discography/re-enrich', () => ({
@@ -273,6 +280,7 @@ describe('GET /api/cron/daily-maintenance', () => {
       hasMoreProfiles: true,
     });
     expect(mockSweepUnderEnrichedProfilesForCron).toHaveBeenCalledTimes(1);
+    expect(data.results.legacySlugMigration.data).toEqual({ renamed: 1 });
     expect(data.results.onboardingScriptAggregation.success).toBe(true);
     expect(data.results.onboardingScriptAggregation.data).toEqual({
       syncedSeeds: 2,
