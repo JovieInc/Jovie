@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { reviewKeyframeTraced } from './golden-path-review-routing';
 import type { KeyframeRecord } from './golden-path-visual-review';
-import { main } from './golden-path-visual-review';
+import { main, reviewKeyframe } from './golden-path-visual-review';
 
 function record(): KeyframeRecord {
   return {
@@ -36,32 +36,20 @@ const verdictBody = () =>
   });
 
 describe('reviewKeyframeTraced (routing attribution)', () => {
-  it('retries the relay once on a 429 so a burst stays on Cloudflare credits', async () => {
-    let relayCalls = 0;
-    const hosts: string[] = [];
+  it('retries the relay once on a 429 and never touches the Gateway', async () => {
+    const providers: string[] = [];
     const result = await reviewKeyframeTraced(
-      {
-        ...frame,
-        fetchImpl: async url => {
-          hosts.push(new URL(String(url)).host);
-          if (String(url).includes('workers.dev')) {
-            relayCalls += 1;
-            return relayCalls === 1
-              ? new Response('rate limited', { status: 429 })
-              : verdictBody();
-          }
-          return verdictBody();
-        },
+      async provider => {
+        providers.push(provider);
+        return provider === 'workers-ai' && providers.length === 1
+          ? { verdict: 'unknown', reason: 'workers-ai 429' }
+          : { verdict: 'pass', findings: [] };
       },
-      keys,
+      true,
       0
     );
 
-    expect(relayCalls).toBe(2);
-    expect(hosts).toEqual([
-      'jovie-workers-ai.tim-fd8.workers.dev',
-      'jovie-workers-ai.tim-fd8.workers.dev',
-    ]);
+    expect(providers).toEqual(['workers-ai', 'workers-ai']);
     expect(result).toMatchObject({
       provider: 'workers-ai',
       model: { verdict: 'pass' },
@@ -69,48 +57,107 @@ describe('reviewKeyframeTraced (routing attribution)', () => {
     expect(result.workersAiFallbackReason).toBeUndefined();
   });
 
-  it('does not retry the Gateway onto a hard relay rejection', async () => {
-    let relayCalls = 0;
-    const hosts: string[] = [];
+  it('keeps the fallback reason and the Gateway verdict on a hard relay rejection', async () => {
+    const providers: string[] = [];
     const result = await reviewKeyframeTraced(
-      {
-        ...frame,
-        fetchImpl: async url => {
-          hosts.push(new URL(String(url)).host);
-          if (String(url).includes('workers.dev')) {
-            relayCalls += 1;
-            return new Response('unauthorized', { status: 401 });
-          }
-          return verdictBody();
-        },
+      async provider => {
+        providers.push(provider);
+        return provider === 'workers-ai'
+          ? { verdict: 'unknown', reason: 'workers-ai 401' }
+          : { verdict: 'pass', findings: [] };
       },
-      keys,
+      true,
       0
     );
 
-    expect(relayCalls).toBe(1);
+    expect(providers).toEqual(['workers-ai', 'gateway']);
     expect(result).toMatchObject({
       provider: 'gateway',
+      model: { verdict: 'pass' },
       workersAiFallbackReason: 'workers-ai 401',
     });
   });
 
-  it('attributes the serving provider for the relay and the unconfigured relay', async () => {
-    const viaRelay = await reviewKeyframeTraced(
-      { ...frame, fetchImpl: async () => verdictBody() },
-      keys,
+  it('never retries an unusable relay answer, only a rate limit', async () => {
+    const providers: string[] = [];
+    const result = await reviewKeyframeTraced(
+      async provider => {
+        providers.push(provider);
+        return provider === 'workers-ai'
+          ? { verdict: 'unknown', reason: 'unusable verdict: maybe' }
+          : { verdict: 'unknown', reason: 'gateway 402' };
+      },
+      true,
       0
     );
-    expect(viaRelay.provider).toBe('workers-ai');
-    expect(viaRelay.workersAiFallbackReason).toBeUndefined();
+    expect(providers).toEqual(['workers-ai', 'gateway']);
+    expect(result.workersAiFallbackReason).toBe('unusable verdict: maybe');
+  });
 
-    const unconfigured = await reviewKeyframeTraced(
-      { ...frame, fetchImpl: async () => verdictBody() },
-      { ...keys, workersAiToken: undefined },
+  it('marks an unconfigured relay instead of pretending it was tried', async () => {
+    const providers: string[] = [];
+    const result = await reviewKeyframeTraced(
+      async provider => {
+        providers.push(provider);
+        return { verdict: 'pass', findings: [] };
+      },
+      false,
       0
     );
-    expect(unconfigured.provider).toBe('gateway');
-    expect(unconfigured.workersAiFallbackReason).toBe('not configured');
+    expect(providers).toEqual(['gateway']);
+    expect(result).toMatchObject({
+      provider: 'gateway',
+      workersAiFallbackReason: 'not configured',
+    });
+  });
+});
+
+describe('reviewKeyframe (relay first, Gateway second)', () => {
+  it('serves from the relay and attributes it', async () => {
+    const result = await reviewKeyframe(
+      { ...frame, fetchImpl: async () => verdictBody() },
+      keys
+    );
+    expect(result.provider).toBe('workers-ai');
+    expect(result.workersAiFallbackReason).toBeUndefined();
+  });
+
+  it('records the relay rejection reason that triggered the Gateway fallback', async () => {
+    const hosts: string[] = [];
+    const result = await reviewKeyframe(
+      {
+        ...frame,
+        fetchImpl: async url => {
+          hosts.push(new URL(String(url)).host);
+          return String(url).includes('workers.dev')
+            ? new Response('unauthorized', { status: 401 })
+            : verdictBody();
+        },
+      },
+      keys
+    );
+    expect(hosts[0]).toBe('jovie-workers-ai.tim-fd8.workers.dev');
+    expect(result.provider).toBe('gateway');
+    expect(result.workersAiFallbackReason).toBe('workers-ai 401');
+  });
+
+  it('reports an unconfigured relay as the fallback reason', async () => {
+    const hosts: string[] = [];
+    const result = await reviewKeyframe(
+      {
+        ...frame,
+        fetchImpl: async url => {
+          hosts.push(new URL(String(url)).host);
+          return verdictBody();
+        },
+      },
+      { ...keys, workersAiToken: undefined }
+    );
+    expect(hosts).toEqual(['gw.test']);
+    expect(result).toMatchObject({
+      provider: 'gateway',
+      workersAiFallbackReason: 'not configured',
+    });
   });
 });
 
@@ -123,10 +170,12 @@ describe('main routing aggregate', () => {
   it('records the routing aggregate so a Gateway fallback is diagnosable', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'gpr-routing-'));
     dirs.push(dir);
-    const lines = [record(), record()].map(r => JSON.stringify(r));
-    writeFileSync(join(dir, 'manifest.jsonl'), `${lines.join('\n')}\n`);
-    for (const r of [record(), record()])
-      writeFileSync(join(dir, r.file), 'png');
+    const records = [record(), record()];
+    writeFileSync(
+      join(dir, 'manifest.jsonl'),
+      records.map(r => JSON.stringify(r)).join('\n')
+    );
+    for (const r of records) writeFileSync(join(dir, r.file), 'png');
     const out = join(dir, 'verdict.json');
     await main(
       ['--dir', dir, '--out', out],

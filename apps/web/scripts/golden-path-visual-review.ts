@@ -19,7 +19,10 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { reviewKeyframeTraced } from './golden-path-review-routing.ts';
+import {
+  reviewKeyframeTraced,
+  type TrackedModelReview,
+} from './golden-path-review-routing.ts';
 
 export const RUBRIC_VERSION = 'golden-path-user-blocking/v3';
 /** Public catalog artist claimed by the golden-path journey. */
@@ -298,7 +301,41 @@ export async function reviewWithFailover(
     readonly workersAiToken: string | undefined;
   }
 ): Promise<ModelVerdict> {
-  return (await reviewKeyframeTraced(frame, keys)).model;
+  return (await reviewKeyframe(frame, keys)).model;
+}
+
+/** The traced failover result for one keyframe, on the reviewer's verdict type. */
+export function reviewKeyframe(
+  frame: {
+    readonly png: Buffer;
+    readonly stepId: string;
+    readonly path: string;
+    readonly expectedArtistName?: string;
+    readonly fetchImpl?: typeof fetch;
+  },
+  keys: {
+    readonly gatewayKey: string | undefined;
+    readonly gatewayBaseUrl: string;
+    readonly workersAiToken: string | undefined;
+  }
+): Promise<TrackedModelReview<ModelVerdict>> {
+  return reviewKeyframeTraced(
+    provider =>
+      provider === 'workers-ai'
+        ? reviewWithModel({
+            ...frame,
+            apiKey: keys.workersAiToken,
+            baseUrl: WORKERS_AI_REVIEW_BASE_URL,
+            model: WORKERS_AI_REVIEW_MODEL,
+            provider: 'workers-ai',
+          })
+        : reviewWithModel({
+            ...frame,
+            apiKey: keys.gatewayKey,
+            baseUrl: keys.gatewayBaseUrl,
+          }),
+    keys.workersAiToken !== undefined
+  );
 }
 
 export function readManifest(dir: string): KeyframeRecord[] {
@@ -375,7 +412,7 @@ export async function main(
     const png = readFileSync(join(values.dir, record.file));
     const modelSamples: ModelVerdict[] = [];
     for (let i = 0; i < MODEL_SAMPLES; i += 1) {
-      const tracked = await reviewKeyframeTraced(
+      const tracked = await reviewKeyframe(
         {
           png,
           stepId: record.id,
