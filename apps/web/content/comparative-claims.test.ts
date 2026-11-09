@@ -9,6 +9,7 @@ import {
   COMPARATIVE_BENCHMARK,
   COMPARATIVE_CLAIM_RECEIPTS,
   COMPARATIVE_CLAIMS,
+  type ComparativeMetric,
   comparativeAnswer,
   comparativeRatio,
   evaluateComparativeClaim,
@@ -80,9 +81,11 @@ describe('comparative claims registry', () => {
   });
 
   it('keeps the retired lcp multiplier claim unpublished until a re-measure clears 3x', () => {
-    expect(COMPARATIVE_CLAIMS.some(claim => claim.metric === 'lcp-ms')).toBe(
-      false
-    );
+    expect(
+      COMPARATIVE_CLAIMS.some(
+        claim => claim.metric === ('lcp-ms' as ComparativeMetric)
+      )
+    ).toBe(false);
   });
 
   it('never rounds a published figure above the measurement', () => {
