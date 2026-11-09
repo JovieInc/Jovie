@@ -98,8 +98,10 @@ import type { OnboardingProfileBuilderState } from './onboardingProfileRailState
  * composer. Everything that renders a conversation (markdown/streamdown message
  * bodies, tool UI, proposal cards) is split out of the entry bundle so the
  * first paint is not starved behind its evaluation on slow mobile CPUs.
- * `preloadOnboardingConversationChunks` warms them once the page is idle, so
- * the first assistant reply never waits on a network fetch.
+ * `preloadOnboardingConversationChunks` warms them on the visitor's first
+ * interaction with the chat (or the first submit, so a starter auto-send never
+ * waits), so the first assistant reply renders without a visible fetch while
+ * the main thread stays idle during the page's first seconds (JOV-12023).
  * Guard: tests/unit/onboarding/OnboardingChat.entry-bundle.test.ts
  */
 const loadChatMessage = () =>
@@ -154,19 +156,35 @@ function preloadOnboardingConversationChunks() {
   ]).catch(() => undefined);
 }
 
-function scheduleOnboardingConversationPreload(): () => void {
-  if (typeof globalThis.requestIdleCallback === 'function') {
-    const handle = globalThis.requestIdleCallback(
-      preloadOnboardingConversationChunks,
-      { timeout: 4000 }
-    );
-    return () => globalThis.cancelIdleCallback?.(handle);
+/**
+ * JOV-12023: warm on user intent, never on idle. The idle warm pulled the
+ * conversation chunks (markdown/streamdown message bodies, tool UI) into
+ * /start's first seconds — inside Lighthouse's measured window — where their
+ * parse/eval owned ~170 ms of TBT on the merge-group gate (run 42689319887:
+ * /start TBT 431 against a 350 budget, performance 0.89 against 0.92). The
+ * main thread now stays idle until the visitor interacts: the first pointer
+ * or key event on the chat, or the first submit, warms the chunks so they
+ * still overlap the server roundtrip.
+ */
+const CONVERSATION_WARM_EVENTS = ['pointerdown', 'keydown'] as const;
+
+function scheduleOnboardingConversationPreload(
+  element: HTMLElement | null
+): () => void {
+  if (!element) return () => undefined;
+  const warm = () => preloadOnboardingConversationChunks();
+  for (const event of CONVERSATION_WARM_EVENTS) {
+    element.addEventListener(event, warm, {
+      capture: true,
+      once: true,
+      passive: true,
+    });
   }
-  const handle = globalThis.setTimeout(
-    preloadOnboardingConversationChunks,
-    1500
-  );
-  return () => globalThis.clearTimeout(handle);
+  return () => {
+    for (const event of CONVERSATION_WARM_EVENTS) {
+      element.removeEventListener(event, warm, { capture: true });
+    }
+  };
 }
 
 const STARTER_VERIFICATION_INSTRUCTION = 'One quick check before we send';
@@ -888,7 +906,11 @@ export function OnboardingChat({
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [hasSentFirst, setHasSentFirst] = useState(initialMessages.length > 0);
 
-  useEffect(() => scheduleOnboardingConversationPreload(), []);
+  const chatSectionRef = useRef<HTMLElement | null>(null);
+  useEffect(
+    () => scheduleOnboardingConversationPreload(chatSectionRef.current),
+    []
+  );
   const [verificationRequested, setVerificationRequested] = useState(false);
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
@@ -1045,6 +1067,9 @@ export function OnboardingChat({
         hasAutoSubmittedStarterPromptRef.current = true;
         return;
       }
+      // JOV-12023: the starter auto-send has no user gesture to trigger the
+      // intent warm, so the first submit warms the conversation chunks itself.
+      preloadOnboardingConversationChunks();
       lastAttemptedMessageRef.current = text;
       setChatError(null);
       notifyJankSend();
@@ -1419,6 +1444,7 @@ export function OnboardingChat({
 
   return (
     <section
+      ref={chatSectionRef}
       className='system-b-onboarding-chat relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)'
       aria-label='Jovie Onboarding Chat'
       data-testid='onboarding-chat'

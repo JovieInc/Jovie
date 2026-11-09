@@ -52,7 +52,7 @@ describe('OnboardingChat entry bundle', () => {
     );
   });
 
-  it('loads conversation renderers on demand and warms them when idle', () => {
+  it('loads conversation renderers on demand and warms them on user intent', () => {
     // Inline import() keeps Next preload metadata. The transcript owns one
     // boundary; tool cards retain local fallbacks instead of suspending the route.
     const dynamicCalls =
@@ -61,6 +61,16 @@ describe('OnboardingChat entry bundle', () => {
     expect(source.match(/\{\s*loading:/g) ?? []).toHaveLength(3);
     expect(source).toMatch(/<Suspense fallback=\{null\}>/);
     expect(source).toMatch(/loadChatMessage\(\)/);
-    expect(source).toMatch(/scheduleOnboardingConversationPreload\(\)/);
+    expect(source).toMatch(/scheduleOnboardingConversationPreload\(/);
+    // JOV-12023: an idle warm evaluates the conversation chunks inside
+    // Lighthouse's measured window and owned ~170 ms of /start TBT (run
+    // 42689319887). The warm must ride user intent only.
+    expect(source).not.toMatch(/requestIdleCallback/);
+    // Three call sites: the warm callback, the first submit, and the function
+    // definition — the submit warm covers the starter auto-send, which has no
+    // user gesture to trip the intent listeners.
+    expect(
+      source.match(/preloadOnboardingConversationChunks\(/g) ?? []
+    ).toHaveLength(3);
   });
 });

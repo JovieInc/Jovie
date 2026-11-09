@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
@@ -100,6 +102,27 @@ const mockUsePathname = vi.mocked(usePathname);
 const mockUseDesktopUpdateContext = vi.mocked(useDesktopUpdateContext);
 
 const originalLocation = window.location;
+
+describe('UserButton browser chunk diet (JOV-12023)', () => {
+  // #24725 named these the last eager desktop edges; UserButton must never
+  // reintroduce them. A static titlebar import drags electron-bridge, the
+  // update modal and radix dialog into every browser shell chunk.
+  const source = readFileSync(path.join(__dirname, 'UserButton.tsx'), 'utf8');
+
+  it('never statically imports the desktop titlebar module', () => {
+    expect(source).not.toMatch(
+      /from '@\/components\/organisms\/DesktopTitlebar'/
+    );
+    expect(source).toMatch(
+      /import\('@\/components\/organisms\/DesktopTitlebar'/
+    );
+  });
+
+  it('reads the runtime hook from the leaf module, not the bridge', () => {
+    expect(source).not.toMatch(/from '@\/lib\/desktop\/electron-bridge'/);
+    expect(source).toMatch(/from '@\/lib\/desktop\/electron-runtime'/);
+  });
+});
 
 describe('UserButton cookie settings access', () => {
   let fetchMock: Mock;

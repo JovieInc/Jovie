@@ -26,7 +26,6 @@ import {
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { DesktopReleaseIdentity } from '@/components/organisms/DesktopTitlebar';
 import { SHELL_RAIL_STAGE } from '@/components/shell/rail-motion';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { APP_ROUTES } from '@/constants/routes';
@@ -36,7 +35,7 @@ import { track } from '@/lib/analytics';
 import { getCurrentAppShellWorkspace } from '@/lib/app-shell/workspaces';
 import { isCookieBannerRequiredFromCookieString } from '@/lib/cookies/consent-regions';
 import type { DesktopUpdateViewState } from '@/lib/desktop/desktop-updates';
-import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-runtime';
 import { GLYPH_CMD, GLYPH_OPT, GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { useFeedbackMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -60,6 +59,21 @@ const DashboardFeedbackModal = dynamic(
         default: mod.DashboardFeedbackModal,
       })
     ),
+  { ssr: false, loading: () => null }
+);
+
+/**
+ * JOV-12023: the release identity lives in the desktop titlebar module, whose
+ * graph (electron-bridge wiring, update modal, radix dialog) must stay out of
+ * every browser tab's initial chunks (#24725 left this the last eager edge).
+ * Loaded only when the electron runtime is detected; the browser renders the
+ * plain web version string instead.
+ */
+const DesktopReleaseIdentity = dynamic(
+  () =>
+    import('@/components/organisms/DesktopTitlebar').then(mod => ({
+      default: mod.DesktopReleaseIdentity,
+    })),
   { ssr: false, loading: () => null }
 );
 
