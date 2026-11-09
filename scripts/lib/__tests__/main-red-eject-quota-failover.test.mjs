@@ -245,6 +245,65 @@ describe('stuck-head dequeue under installation quota exhaustion (run 4122729902
     }
   });
 
+  it('reports a workflow-disabled dispatch target and still runs the remaining stuck-head actions (run 42623483651)', async () => {
+    wireHappyGh();
+    const happy = ghRoutes;
+    const disabled = {
+      code: 1,
+      stdout: '',
+      stderr:
+        'gh: Cannot trigger a workflow_dispatch on a disabled workflow (HTTP 422)',
+    };
+    ghRoutes = line =>
+      line.includes('pr-remediation-swarm.yml') ? disabled : happy(line);
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let out;
+    try {
+      out = await stuckHead({ doApply: true, now: NOW });
+    } finally {
+      warn.mockRestore();
+    }
+    // The dequeue itself succeeded; only the swarm dispatch was refused.
+    expect(out).toMatchObject({ dequeued: true, stuck: true });
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('::warning::workflow-disabled:')
+    );
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('disabled workflow')
+    );
+    // The remaining stuck-head actions still ran: green-enroll re-admission
+    // and the incident receipt.
+    expect(
+      writes()
+        .map(c => c.line)
+        .some(l => l.includes('merge-queue-green-enroll.yml'))
+    ).toBe(true);
+    expect(writes().some(c => c.line.includes('/issues -f'))).toBe(true);
+  });
+
+  it('still fails on a real dispatch error that is not the disabled-workflow case', async () => {
+    wireHappyGh();
+    const happy = ghRoutes;
+    ghRoutes = line =>
+      line.includes('pr-remediation-swarm.yml')
+        ? { code: 1, stdout: '', stderr: 'gh: unknown flag: -x' }
+        : happy(line);
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await expect(stuckHead({ doApply: true, now: NOW })).rejects.toThrow(
+        'unknown flag'
+      );
+    } finally {
+      warn.mockRestore();
+    }
+    // The failure happened before any green-enroll or incident work.
+    expect(
+      writes()
+        .map(c => c.line)
+        .some(l => l.includes('merge-queue-green-enroll.yml'))
+    ).toBe(false);
+  });
+
   it('defers when the fallback token bucket is exhausted too', async () => {
     backendRoute = () => rateLimited;
     const out = await stuckHead({ doApply: true, now: NOW });
