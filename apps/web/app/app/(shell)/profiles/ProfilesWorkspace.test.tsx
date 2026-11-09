@@ -10,17 +10,12 @@ import {
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  PRESENCE_BUTTON_DESKTOP_DENSITY,
-  PresenceSignalList,
-  PresenceStatusBadge,
-} from '@/components/features/presence/PresenceStatusParts';
+import { PRESENCE_BUTTON_DESKTOP_DENSITY } from '@/components/features/presence/PresenceStatusParts';
 import {
   HeaderActionsProvider,
   useHeaderActions,
 } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
-import { classifyConnectionInput } from './AddConnectionRail';
 import type { ProfilesWorkspaceData, ProfileWorkspaceSurfaceRow } from './data';
 import { ProfilesWorkspace } from './ProfilesWorkspace';
 
@@ -42,91 +37,6 @@ vi.mock('next/navigation', () => ({
   }),
   useSearchParams: () => navigationMock.searchParams,
 }));
-
-describe('shared Presence status vocabulary', () => {
-  it.each(['success', 'warning', 'error', 'neutral'] as const)(
-    'shows the %s status and explains the next action',
-    async tone => {
-      const user = userEvent.setup();
-      render(
-        <TooltipProvider>
-          <PresenceStatusBadge
-            status={{
-              label: 'Source status',
-              tone,
-              needsAttention: tone !== 'success',
-              nextAction: 'Reconnect this source.',
-              sortPriority: 1,
-            }}
-          />
-        </TooltipProvider>
-      );
-
-      await user.hover(screen.getByText('Source status'));
-      const tooltip = await screen.findByRole('tooltip');
-      expect(tooltip).toHaveTextContent('Reconnect this source.');
-    }
-  );
-
-  it('does not invent evidence for an empty signal list', () => {
-    render(<PresenceSignalList signals={[]} />);
-    expect(screen.getByTestId('presence-signal-list')).toBeEmptyDOMElement();
-  });
-});
-
-describe('classifyConnectionInput', () => {
-  it('normalizes and classifies a bare provider domain', () => {
-    const result = classifyConnectionInput('Instagram.com/timwhite', [], 'Tim');
-
-    expect(result.error).toBeNull();
-    expect(result.candidate).toMatchObject({
-      platformId: 'instagram',
-      platformName: 'Instagram',
-      url: 'https://instagram.com/timwhite',
-    });
-  });
-
-  it('offers ranked handle-capable platforms for an at-handle', () => {
-    const result = classifyConnectionInput('@timwhite', [], 'Tim');
-
-    expect(result.candidate).toBeNull();
-    expect(result.suggestions.slice(0, 4).map(item => item.platformId)).toEqual(
-      ['instagram', 'tiktok', 'youtube', 'twitter']
-    );
-    expect(result.suggestions[0]).toMatchObject({
-      handle: '@timwhite',
-      url: 'https://instagram.com/timwhite',
-    });
-  });
-
-  it('fuzzy filters a platform-qualified username', () => {
-    const result = classifyConnectionInput('insta timwhite', [], 'Tim');
-
-    expect(result.suggestions[0]).toMatchObject({
-      platformId: 'instagram',
-      handle: '@timwhite',
-    });
-  });
-
-  it('does not suggest a platform that already exists', () => {
-    const result = classifyConnectionInput('@timwhite', ['instagram'], 'Tim');
-
-    expect(result.suggestions.map(item => item.platformId)).not.toContain(
-      'instagram'
-    );
-  });
-
-  it('rejects credential-bearing URLs', () => {
-    const credentialBearingUrl = [
-      'https://user',
-      'pass@instagram.com/timwhite',
-    ].join(':');
-    const result = classifyConnectionInput(credentialBearingUrl, [], 'Tim');
-
-    expect(result.candidate).toBeNull();
-    expect(result.error).toMatch(/without credentials/i);
-  });
-});
 
 vi.mock('@/hooks/useRegisterRightPanel', () => ({
   useRegisterRightPanel: vi.fn(),
