@@ -38,10 +38,12 @@ const verdictBody = () =>
 describe('reviewKeyframeTraced (routing attribution)', () => {
   it('retries the relay once on a 429 so a burst stays on Cloudflare credits', async () => {
     let relayCalls = 0;
+    const hosts: string[] = [];
     const result = await reviewKeyframeTraced(
       {
         ...frame,
         fetchImpl: async url => {
+          hosts.push(new URL(String(url)).host);
           if (String(url).includes('workers.dev')) {
             relayCalls += 1;
             return relayCalls === 1
@@ -56,6 +58,10 @@ describe('reviewKeyframeTraced (routing attribution)', () => {
     );
 
     expect(relayCalls).toBe(2);
+    expect(hosts).toEqual([
+      'jovie-workers-ai.tim-fd8.workers.dev',
+      'jovie-workers-ai.tim-fd8.workers.dev',
+    ]);
     expect(result).toMatchObject({
       provider: 'workers-ai',
       model: { verdict: 'pass' },
