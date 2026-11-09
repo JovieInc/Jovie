@@ -151,6 +151,17 @@
   width: min(17.75rem, 45.9cqh);
 }
 
+/* Keep the full-width profile composition when the phone shrinks. Reflowing
+   its fixed-size identity and featured card into a narrower screen clips the
+   Listen now action even though the phone itself fits the rail. The screen
+   already owns the inline-size container; zoom scales content and hit areas
+   together without a measurement effect or a second preview implementation.
+   tan(atan2(width, full-width)) is the unitless width ratio, including in
+   browsers that do not yet support dividing two lengths in calc(). */
+.system-b-onboarding-rail-phone .mobile-web-screen > div {
+  zoom: min(1, tan(atan2(100cqi, 17.75rem)));
+}
+
 :where(.system-b-onboarding-empty-state) {
   border-bottom: 1px solid
     color-mix(in oklab, var(--system-b-app-frame-seam) 58%, transparent);
