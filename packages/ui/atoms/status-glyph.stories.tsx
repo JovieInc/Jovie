@@ -209,3 +209,28 @@ export const Rtl: Story = {
     },
   },
 };
+
+export const KeyboardFocusable: Story = {
+  render: () => (
+    <div className='flex items-center gap-4'>
+      <StatusGlyph
+        state='failed'
+        tooltipLabel='Distributor rejected the release'
+        focusable
+      />
+      <StatusGlyph
+        state='blocked'
+        tooltipLabel='Waiting on artwork'
+        focusable
+      />
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Standalone glyphs whose tooltip carries the only words: Tab reaches each one and opens its tooltip.',
+      },
+    },
+  },
+};

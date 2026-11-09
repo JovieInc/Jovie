@@ -16,9 +16,10 @@
   border-top: 1px solid var(--hv3-b1);
 }
 
-/* Stages keep the approved 1440 coordinate frame and centre on wider screens. */
+/* A stage spans exactly the content box. Its own coordinates are the 1248px
+   design frame (zoom scales its margins too, hence the division). */
 .hv3-frame {
-  margin: 0 var(--hv3-edge);
+  margin-inline: calc(var(--hv3-side) / var(--hv3-z));
 }
 
 .hv3-btn {
@@ -27,7 +28,7 @@
   gap: 0.5rem;
   height: 2.75rem;
   padding: 0 1.375rem;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   font-size: 0.9375rem;
   font-weight: 500;
   line-height: 1;
@@ -111,10 +112,9 @@
 .hv3-stage--hero {
   position: absolute;
   top: 28.125rem;
-  right: var(--hv3-edge);
-  left: var(--hv3-edge);
+  right: calc(var(--hv3-side) / var(--hv3-z));
+  left: calc(var(--hv3-side) / var(--hv3-z));
   height: 47.5rem;
-  perspective-origin: 50% 10%;
 }
 
 .hv3-stage--hero::before {
@@ -134,9 +134,8 @@
 
 .hv3-stage--hero .hv3-bounce {
   top: 37.5rem;
-  left: 7.5rem;
-  /* container-width-allow: stage geometry in the approved 1440 frame, not a page column */
-  width: 81.25rem;
+  left: 1.5rem;
+  width: calc(var(--hv3-box) - 3rem);
   height: 15rem;
   background: radial-gradient(
     closest-side,
@@ -148,24 +147,22 @@
 
 .hv3-rig--hero {
   top: 3.75rem;
-  left: 3.75rem;
-  /* container-width-allow: stage geometry in the approved 1440 frame, not a page column */
-  width: 78rem;
+  left: 0;
+  width: var(--hv3-box);
   height: 36.5rem;
-  transform: var(--hv3-cam) scale(1.06);
-  transform-origin: 50% 0;
+  transform: var(--hv3-cam);
+  transform-origin: 0 0;
 }
 
-/* The inspector is lifted out of the window in depth only, so its edges stay
-   parallel to the window under the one camera. Its height ends below the UPC
-   row (v3 left an empty band there). */
+/* The inspector sits on the third column of the box, its right edge on the
+   window's, lifted by shadow alone. Its height ends below the UPC row. */
 .hv3-lift--inspector {
   top: 2.5rem;
-  left: 53rem;
-  width: 25rem;
+  left: calc(var(--hv3-col2) + 1.5rem);
+  width: var(--hv3-col1);
   height: 29rem;
   border-radius: var(--radius-md);
-  transform: translate3d(0, var(--hv3-par, 0px), 5.625rem);
+  transform: translateY(var(--hv3-par, 0px));
 }
 
 .hv3-index {
@@ -249,7 +246,6 @@
 
 .hv3-stage--profile {
   height: 53.75rem;
-  perspective-origin: 7.0125rem 30%;
 }
 
 .hv3-stage--profile > .hv3-orbit {
@@ -285,9 +281,8 @@
 }
 
 .hv3-stage--releases {
-  height: 53.75rem;
+  height: 57rem;
   margin-top: 1.5rem;
-  perspective-origin: 50% 20%;
 }
 
 .hv3-stage--releases > .hv3-orbit {
@@ -296,44 +291,46 @@
 }
 
 .hv3-stage--releases .hv3-bounce {
-  top: 42.5rem;
-  left: 17.5rem;
+  top: 46rem;
+  left: 10.875rem;
   /* container-width-allow: stage geometry in the approved 1440 frame, not a page column */
   width: 56.25rem;
   height: 11.25rem;
 }
 
+/* The catalog spans the first two caption columns and the release page the
+   third, so each pane's edges sit on the grid the captions below it use. */
 .hv3-rig--releases {
   top: 6.875rem;
-  left: 18.75rem;
-  /* container-width-allow: stage geometry in the approved 1440 frame, not a page column */
-  width: 56.25rem;
+  left: 0;
+  width: var(--hv3-box);
   height: 40rem;
-  transform-origin: 50% 50%;
+  transform-origin: 0 0;
 }
 
 .hv3-plate {
   position: absolute;
   top: 3.75rem;
   left: 0;
-  width: 29.375rem;
+  width: calc(var(--hv3-col2) / 1.12);
   height: 29.5rem;
   overflow: hidden;
   border-radius: var(--radius-lg);
   background: var(--hv3-shell);
   box-shadow: var(--hv3-cast);
-  transform: translateZ(-3.75rem) scale(1.12);
+  transform: scale(1.12);
   transform-origin: 0 0;
 }
 
 .hv3-phone.hv3-phone--release {
-  top: -1.875rem;
-  left: 35rem;
+  top: -5.875rem;
+  left: calc(var(--hv3-col2) + 1.5rem);
   width: 24.375rem;
   height: 53.75rem;
   border-radius: calc(var(--radius-3xl) + var(--radius-lg));
   background: var(--hv3-canvas);
-  transform: translateZ(7.5rem) scale(0.86);
+  /* The 390px phone scaled to the 25rem column: 25 / 24.375. */
+  transform: scale(1.0256);
   transform-origin: 0 0;
 }
 
@@ -373,29 +370,6 @@
 
 .hv3-invite__inner > * {
   position: relative;
-}
-
-.hv3-invite__inner > .hv3-orbit {
-  position: absolute;
-  /* container-width-allow: stage geometry in the approved 1440 frame, not a page column */
-  width: 50rem;
-  height: 50rem;
-  top: 1.875rem;
-  left: calc(50% - 25rem);
-}
-
-.hv3-invite__inner > .hv3-orbit::before {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 40rem;
-  height: 40rem;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, var(--hv3-ion-glow), transparent);
-  content: "";
-  filter: blur(1.875rem);
-  opacity: 0.55;
-  transform: translate(-50%, -50%);
 }
 
 .hv3-invite .hv3-lede {

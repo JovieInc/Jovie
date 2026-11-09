@@ -917,6 +917,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/hostops/pen-golden-path-sync.test.mjs',
+  'scripts/design/pen-inspect.test.mjs',
   'scripts/hostops/pen-files-worker/src/index.test.mjs',
   'scripts/runner-pool-routing.test.mjs',
   'scripts/sentry-build-config.test.mjs',
@@ -1006,10 +1007,12 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/invariants/art-direction/hue.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
+  'scripts/node-runtime-bump.test.mjs',
   'scripts/invariants/art-direction/hero-scroll.test.mjs',
   'scripts/idea-radar/idea-radar.test.mjs',
   'scripts/invariants/art-direction/images.test.mjs',
   'scripts/invariants/art-direction/imagery-provenance.test.mjs',
+  'scripts/invariants/art-direction/no-invented-customer.test.mjs',
   'scripts/invariants/assurance-matrix.test.mjs',
   'scripts/invariants/browser-owned-input.test.mjs',
   'scripts/invariants/founder-calibration.test.mjs',
@@ -1218,6 +1221,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/alias-ledger-unreadable-intake.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-policy.test.mjs',
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
+  'scripts/lib/__tests__/resolve-repo-node-autofetch.test.mjs',
   'scripts/lib/__tests__/preflight-depth.test.mjs',
   'scripts/lib/__tests__/production-unbound-repair-attestation.test.mjs',
   'scripts/lib/__tests__/projected-tree-budget.test.mjs',
@@ -3122,7 +3126,7 @@ export async function runStructural(opts = {}) {
     // Revision-bound acquisition decisions and unchanged marketing CAS behavior.
     ACQUISITION_CERTIFICATION_COMMAND,
     // JOV-4421: hard ship gate — tests + matching stories for shippable UI.
-    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs lib/__tests__/component-certificate-gate.test.mjs lib/__tests__/component-certificate-companions.test.mjs lib/__tests__/component-evidence.test.mjs lib/__tests__/component-story-evidence.test.mjs lib/__tests__/component-certificate-mutation.test.mjs lib/__tests__/mutation-sweep-root.test.mjs lib/__tests__/component-benchmark-review.test.mjs',
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs lib/__tests__/component-certificate-gate.test.mjs lib/__tests__/component-cert-screens.test.mjs lib/__tests__/forced-caps.test.mjs lib/__tests__/component-certificate-companions.test.mjs lib/__tests__/component-evidence.test.mjs lib/__tests__/component-story-evidence.test.mjs lib/__tests__/component-certificate-mutation.test.mjs lib/__tests__/mutation-sweep-root.test.mjs lib/__tests__/component-benchmark-review.test.mjs',
     // JOV-5454: live Storybook certification evaluator + lifecycle.
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs',
     'pnpm component-ship-gate',

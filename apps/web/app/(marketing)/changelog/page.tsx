@@ -21,7 +21,7 @@ import './changelog-editorial.css';
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: documentTitle('Jovie Changelog: Product Updates & New Features'),
+  title: documentTitle('Changelog: product updates and new features'),
   description: `Audience and control updates in ${APP_NAME}. What got better for you, not every deploy.`,
   alternates: {
     canonical: `${BASE_URL}${APP_ROUTES.CHANGELOG}`,

@@ -5,7 +5,7 @@ import {
   dogfoodClaims,
   parseProdReadCount,
 } from './dogfood';
-import { ClaimSchema } from './registry';
+import { ClaimSchema } from './registry.schema';
 
 describe('dogfood proof generator', () => {
   it('parses the single count prod-read prints', () => {

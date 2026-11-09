@@ -1872,8 +1872,8 @@ function ProfilesWorkspaceContent({
         <PageToolbar
           data-testid='connections-workspace-toolbar'
           start={
-            <span className='text-app font-medium text-primary-token'>
-              Profiles
+            <span className='text-app tabular-nums text-secondary-token'>
+              {rows.length === 1 ? '1 profile' : `${rows.length} profiles`}
             </span>
           }
           end={

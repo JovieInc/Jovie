@@ -59,8 +59,7 @@ import {
   type OnboardingEntryMode,
 } from './OnboardingChatEmptyIntro';
 import { OnboardingMessageRecoveryRow } from './OnboardingMessageRecoveryRow';
-import type { OnboardingProfileBuilderState } from './OnboardingProfileRail';
-import { OnboardingProfileRail } from './OnboardingProfileRail';
+import { OnboardingProfileRail } from './OnboardingProfileRailLazy';
 import { OnboardingSecurityCheckRecovery } from './OnboardingSecurityCheckRecovery';
 import {
   OnboardingArtistConfirmedCard,
@@ -92,6 +91,7 @@ import {
   THINKING_PLACEHOLDER_ID,
   type ToolPart,
 } from './onboardingChatHelpers';
+import type { OnboardingProfileBuilderState } from './onboardingProfileRailState';
 
 /**
  * /start LCP (JOV-9611): the empty state paints only the intro heading and the

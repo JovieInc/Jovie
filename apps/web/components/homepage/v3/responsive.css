@@ -92,14 +92,23 @@
     margin-top: 1.5rem;
   }
 
+  /* Each stage is the content box; a mockup wider than a phone is cropped at
+     the box's edges rather than running to the screen's. */
+  .hv3-stage {
+    overflow-x: clip;
+  }
+
   .hv3-stage--hero {
     top: 29.375rem;
     height: 35rem;
   }
 
+  /* The rig now scales from its top-left corner, so the offset that kept the
+     approved 390 crop (sidebar edge into the list) when it scaled from its
+     top centre gains 39rem x (1 - 0.72) = 10.92rem. */
   .hv3-rig--hero {
     top: 0.625rem;
-    left: -20.625rem;
+    left: calc(-9.705rem - var(--hv3-gutter));
     transform: var(--hv3-cam) scale(0.72);
   }
 
@@ -137,7 +146,6 @@
   .hv3-stage--profile {
     height: 40rem;
     margin-top: 1.5rem;
-    perspective-origin: 30% 30%;
   }
 
   .hv3-stage--profile > .hv3-orbit {
@@ -183,11 +191,19 @@
     left: -7.5rem;
   }
 
+  /* The release page alone, centred in the box: its centre sits
+     (35rem + 10.48rem) x 0.8 into the rig. */
   .hv3-rig--releases {
     top: 3.125rem;
-    left: -20.9375rem;
+    left: calc(50% - 36.39rem);
     transform: var(--hv3-cam) scale(0.8);
     transform-origin: 0 0;
+  }
+
+  .hv3-phone.hv3-phone--release {
+    top: -1.875rem;
+    left: 35rem;
+    transform: scale(0.86);
   }
 
   .hv3-plate,
@@ -244,15 +260,18 @@
     height: 26.25rem;
   }
 
+  /* The palette keeps its width and runs off the card's right edge on a
+     phone; the keycaps stay above it. */
   .hv3-palette {
-    top: 2.5rem;
+    top: 6rem;
+    right: auto;
     left: 1.25rem;
     width: 35rem;
   }
 
   .hv3-keys {
+    top: 1.25rem;
     right: 1.25rem;
-    bottom: 1.5rem;
   }
 
   .hv3-key {
@@ -273,17 +292,8 @@
     transform-origin: 0 0;
   }
 
-  /* Invite: any ring size crosses text at 390, so the Orbit is hidden. */
   .hv3-invite__inner {
     padding-top: 7.5rem;
-  }
-
-  .hv3-invite__inner > .hv3-orbit {
-    top: -0.625rem;
-  }
-
-  .hv3-invite__inner > .hv3-orbit .hv3-orbit__svg {
-    display: none;
   }
 
   .hv3-invite .hv3-lede--center {
@@ -297,10 +307,11 @@
   }
 }
 
-/* 1024-1439: the stages keep the approved 1440 composition, scaled. */
+/* 1024-1439: the stages keep the approved 1440 composition, scaled to the
+   box. StageMotion sets the exact fit; these floors never overflow it. */
 @media (min-width: 64rem) and (max-width: 89.9375rem) {
   .hv3 {
-    --hv3-z: 0.9;
+    --hv3-z: 0.87;
   }
 
   .hv3-stage,
@@ -320,10 +331,61 @@
 
 @media (min-width: 64rem) and (max-width: 79.9375rem) {
   .hv3 {
-    --hv3-z: 0.72;
+    --hv3-z: 0.74;
   }
 
   .hv3-hero {
     height: 72rem;
+  }
+
+  /* The stages are zoomed to about three quarters here; the air between
+     sections follows them, so no band reads as empty. */
+  .hv3-chapter {
+    padding-bottom: 7.5rem;
+  }
+
+  .hv3-centered {
+    padding-top: 7.5rem;
+  }
+
+  .hv3-specs__head {
+    padding-top: 7.5rem;
+    padding-bottom: 3.75rem;
+  }
+
+  .hv3-invite__inner {
+    padding-top: 8.5rem;
+  }
+}
+
+/* Stepped floors of the fit, each the box at the step's narrowest width:
+   (width - 2 gutters) / 78rem. StageMotion refines them to the exact width. */
+@media (min-width: 84rem) and (max-width: 89.9375rem) {
+  .hv3 {
+    --hv3-z: 0.92;
+  }
+}
+
+@media (min-width: 88rem) and (max-width: 89.9375rem) {
+  .hv3 {
+    --hv3-z: 0.97;
+  }
+}
+
+@media (min-width: 68rem) and (max-width: 79.9375rem) {
+  .hv3 {
+    --hv3-z: 0.79;
+  }
+}
+
+@media (min-width: 72rem) and (max-width: 79.9375rem) {
+  .hv3 {
+    --hv3-z: 0.84;
+  }
+}
+
+@media (min-width: 76rem) and (max-width: 79.9375rem) {
+  .hv3 {
+    --hv3-z: 0.89;
   }
 }

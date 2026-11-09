@@ -2482,7 +2482,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
     expect(script).toMatch(/^set -euo pipefail$/m);
     expect(script).toContain(
-      "readonly ACTIONLINT_VERSION='1.7.12+fd33e9f582a0'"
+      "readonly ACTIONLINT_VERSION='1.7.12+fd33e9f582a0.queue644076a59742'"
     );
     expect(script).toContain(
       "readonly ACTIONLINT_COMMIT='fd33e9f582a01a02885c93ae3775e1190cf63653'"

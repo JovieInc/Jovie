@@ -71,7 +71,7 @@ import machine_gap  # noqa: E402
 import slot_yield  # noqa: E402  (slot ceilings from measured merged-per-dollar)  (abstraction gate: build the machine on the 3rd repeat or a costly task)
 import update_drain  # noqa: E402  (drain gate admission while an update waits)
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
-import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
+import linear_sync, urgent_sla  # noqa: E402  (local issue mirror, claim ledger, write outbox; Urgent SLA rank)
 import escalation_reconcile  # noqa: E402  (lane-fix-escalating is consumed, never parked)
 import board_intake  # noqa: E402  (mesh board work for codex, closed on verified outcomes)
 import ownership  # noqa: E402  (started-state live-owner invariant)
@@ -875,7 +875,7 @@ def admission_order(issue: Issue, now: float) -> tuple:
             else 0 if effective_priority == 1 or workstreams.compounding(stream) else 1)
     # Summer's signed rank comes first, then Urgent, marketing, tier, aged priority, age (JOV-7073).
     return (*priority_admission.claim_key(issue.identifier, priority_admission.summer_ranks(now=now)),
-            0 if priority == 1 else 1, not priority_admission.marketing_priority(issue.labels),
+            urgent_sla.rank(issue.title, priority), not priority_admission.marketing_priority(issue.labels),
             tier, effective_priority, workstreams.rank(stream),
             created_at if created_at is not None else float("inf"))
 
@@ -6485,41 +6485,9 @@ def resolve_and_chain_conflict(worktree: Path, branch: str, log, *, guard=lambda
 
 
 def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
-    """Union quoted list entries when every conflict hunk with main is only those lines.
-
-    Main's order stays, then head-only lines. A prose hunk or any other shape aborts
-    and leaves the PR to the model. The push is a fast-forward of the PR branch."""
-    guard()
-    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
-    if merged.returncode != 0:
-        conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
-        if not conflicted:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-            return False
-        resolved: dict[str, str] = {}
-        for path in conflicted:
-            target = worktree / path
-            try:
-                text = fix_red_classes.resolve_additive_quoted_list_text(target.read_text())
-            except OSError:
-                text = None
-            if text is None:
-                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-                return False
-            resolved[path] = text
-        try:
-            for path, text in resolved.items():
-                atomic_write_text(worktree / path, text)
-        except OSError:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-            return False
-        guard()
-        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
-                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-            return False
-    guard()
-    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+    return fix_red_classes.resolve_additive_list_conflict(
+        worktree, branch, log, sh=sh, guard=guard,
+        merge_entries=fix_red_classes.resolve_additive_quoted_list_text)
 
 
 def resolve_identifier_list_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:

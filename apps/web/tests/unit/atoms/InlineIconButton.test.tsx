@@ -14,14 +14,24 @@ describe('InlineIconButton', () => {
     kind => {
       const onClick = vi.fn();
       render(
-        <InlineIconButton
-          size='sm'
-          aria-label='Compact action'
-          onClick={onClick}
-          {...(kind === 'link' ? { href: '#profile' } : {})}
-        >
-          <svg aria-hidden='true' />
-        </InlineIconButton>
+        kind === 'link' ? (
+          <InlineIconButton
+            size='sm'
+            aria-label='Compact action'
+            onClick={onClick}
+            href='#profile'
+          >
+            <svg aria-hidden='true' />
+          </InlineIconButton>
+        ) : (
+          <InlineIconButton
+            size='sm'
+            aria-label='Compact action'
+            onClick={onClick}
+          >
+            <svg aria-hidden='true' />
+          </InlineIconButton>
+        )
       );
       const action = screen.getByRole(kind, { name: 'Compact action' });
       expect(action).toHaveAttribute('data-size', 'icon-sm');
@@ -112,5 +122,21 @@ describe('InlineIconButton', () => {
     );
 
     await expectNoA11yViolations(container);
+  });
+
+  it('names a link from aria-labelledby', () => {
+    render(
+      <>
+        <span id='inline-link-name'>Open release</span>
+        <InlineIconButton href='/releases/1' aria-labelledby='inline-link-name'>
+          <svg aria-hidden='true' />
+        </InlineIconButton>
+      </>
+    );
+
+    expect(screen.getByRole('link', { name: 'Open release' })).toHaveAttribute(
+      'aria-labelledby',
+      'inline-link-name'
+    );
   });
 });

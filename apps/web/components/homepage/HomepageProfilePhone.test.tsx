@@ -35,5 +35,8 @@ describe('HomepageProfilePhone', () => {
     expect(phone).not.toHaveTextContent('Tim White');
     expect(phone).not.toHaveTextContent('jov.ie/tim');
     expect(phone.innerHTML).not.toContain('tim-white');
+    // A demo slot is labeled as an example. It does not wear a verified badge.
+    expect(ARTIST.name).toBe('Example artist');
+    expect(phone.querySelector('.hv3-pp__badge')).toBeNull();
   });
 });

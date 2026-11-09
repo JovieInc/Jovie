@@ -467,4 +467,12 @@ describe('Pen sign-in polish (glm/auth-focal-polish)', () => {
     expect(cta.className).not.toMatch(/\bh-8\b/);
     expect(cta.className).not.toMatch(/\bmin-h-8\b/);
   });
+
+  it('draws Send sign-in code as the 28px Pen oaz9c pill inside its tap layer', () => {
+    render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/start' />);
+    const cta = screen.getByRole('button', { name: 'Send sign-in code' });
+    expect(cta).toHaveClass('h-7');
+    expect(cta).toHaveClass('min-h-7');
+    expect(cta).not.toHaveClass('my-2');
+  });
 });

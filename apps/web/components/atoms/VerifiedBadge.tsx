@@ -17,7 +17,7 @@ export function VerifiedBadge({
 
   return (
     <span
-      className={`inline-flex align-middle rounded-full bg-white dark:bg-base p-0.5 text-sky-600 dark:text-sky-400 ${className}`}
+      className={`inline-flex align-middle rounded-full bg-verified-backing p-0.5 text-verified ${className}`}
       role='img'
       title='Verified Jovie Profile'
       aria-label='Verified Jovie Profile'
@@ -26,7 +26,7 @@ export function VerifiedBadge({
         className={`${sizeClasses[size]}`}
         aria-hidden='true'
         fill='currentColor'
-        stroke='white'
+        stroke='var(--color-on-media)'
         strokeWidth={2}
       />
     </span>

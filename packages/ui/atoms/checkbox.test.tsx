@@ -360,3 +360,34 @@ describe('Checkbox certificate evidence', () => {
     await expectNoA11yViolations(container);
   });
 });
+
+describe('Checkbox uncontrolled indicator', () => {
+  it('renders the minus icon for defaultChecked="indeterminate"', () => {
+    // Deliberate-red: the icon used to follow the checked prop, so an
+    // uncontrolled indeterminate checkbox showed a check mark.
+    const { container } = render(
+      <Checkbox defaultChecked='indeterminate' aria-label='Select all' />
+    );
+    expect(container.querySelector('svg.lucide-minus')).toBeInTheDocument();
+    expect(container.querySelector('svg.lucide-check')).not.toBeInTheDocument();
+  });
+
+  it('switches to the check icon after an uncontrolled click', () => {
+    const changes: unknown[] = [];
+    const { container } = render(
+      <Checkbox
+        defaultChecked='indeterminate'
+        aria-label='Select all'
+        onCheckedChange={next => changes.push(next)}
+      />
+    );
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(changes).toEqual([true]);
+    expect(screen.getByRole('checkbox')).toHaveAttribute(
+      'data-state',
+      'checked'
+    );
+    expect(container.querySelector('svg.lucide-check')).toBeInTheDocument();
+    expect(container.querySelector('svg.lucide-minus')).not.toBeInTheDocument();
+  });
+});

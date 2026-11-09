@@ -14,9 +14,10 @@
  *   node scripts/design/pen-draft.mjs --out DIR [--only claim,homepage]
  *   node scripts/design/pen-draft.mjs --plan [--changed FILE] [--only ...]
  *
- * Each draft starts from a cut-down copy of the canonical file (components,
- * related screens, variables), because the Pen editor timed out loading the
- * whole file; the new frame is then spliced back into the full file.
+ * With PEN_DRAFT_TRIM=1 a draft starts from a cut-down copy of the canonical
+ * file (components, related screens, variables) and the new frame is spliced
+ * back into the full file. It is off by default: it did not stop the Pen
+ * editor's "Timeout waiting for document" on Nov 8.
  *
  * --plan prints the frames a run should draft as a JSON array. CI drafts
  * each one in its own job, because ten briefs at up to 15 minutes each
@@ -34,7 +35,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 export const PEN_CLI_VERSION = '0.3.14';
-export const PEN_MAX_FAILED_CALLS = 20;
+export const PEN_MAX_FAILED_CALLS = 30;
 export const BRIEFS_DIR = 'docs/design-system/pen-briefs';
 export const MANIFEST = 'docs/pen-stills/golden-path/manifest.json';
 
@@ -73,6 +74,30 @@ export function loadBriefs(dir = BRIEFS_DIR, only = null) {
     .filter(b => !only || only.includes(b.frame));
 }
 
+// The canonical document is about 25 MB, so the editor takes a minute or two
+// to load it and early canvas calls time out. With 8 allowed failures the
+// agent gave up on 3 of 4 briefs before the editor was ready (run 42457693051).
+export const LOAD_NOTE =
+  'The document is large and the editor can take a few minutes to load it. Work in the open editor (leave the file path empty), and when a canvas call times out, wait and retry it rather than giving up.';
+/** Attempts per brief: a second try starts with the editor cache warm. */
+export const ATTEMPTS = 2;
+// Each matrix job has 25 minutes; reserve five for setup and uploading.
+export const BUDGET_MS = 20 * 60_000;
+const ATTEMPT_MS = 15 * 60_000;
+const MIN_ATTEMPT_MS = 5 * 60_000;
+
+/** How long the next attempt may run, or 0 when the budget can't fit one. */
+export function attemptTimeout(elapsedMs, budgetMs = BUDGET_MS, attempt = 1) {
+  const left = budgetMs - elapsedMs;
+  // Reserve a retry plus one minute for process teardown/startup. Giving the
+  // first attempt all 15 minutes left <5 minutes after even 1 ms of overhead.
+  const reserve = MIN_ATTEMPT_MS + 60_000;
+  const retry = attempt < ATTEMPTS && left >= MIN_ATTEMPT_MS + reserve;
+  return left < MIN_ATTEMPT_MS
+    ? 0
+    : Math.min(ATTEMPT_MS, left - (retry ? reserve : 0));
+}
+
 /** Files whose change means every frame has to be drafted again. */
 export const DRAFTER_FILES = [
   'scripts/design/pen-draft.mjs',
@@ -102,7 +127,7 @@ export function planFrames({ briefs, changed = null, only = null }) {
 }
 
 /** The pen arguments for one brief, drafting into its own output file. */
-export function penArgs(brief, { input, outDir }) {
+export function penArgs(brief, { input, outDir, trim = false }) {
   return [
     '-y',
     `@pen.dev/cli@${PEN_CLI_VERSION}`,
@@ -110,7 +135,7 @@ export function penArgs(brief, { input, outDir }) {
     '--out',
     join(outDir, `${brief.frame}.pen`),
     '--prompt',
-    `Add a new top-level frame named "${brief.frame}" (route ${brief.route ?? 'n/a'}). Leave every existing frame untouched. This file holds the design system's components and the screens this frame builds on, not every screen.\n\n${brief.prompt}`,
+    `Add a new top-level frame named "${brief.frame}" (route ${brief.route ?? 'n/a'}). Leave every existing frame untouched.${trim ? " This file holds the design system's components and the screens this frame builds on, not every screen." : ''}\n\n${LOAD_NOTE}\n\n${brief.prompt}`,
     '--agent',
     'claude',
     '--export',
@@ -124,6 +149,11 @@ export function penArgs(brief, { input, outDir }) {
     '--max-failed-calls',
     String(PEN_MAX_FAILED_CALLS),
   ];
+}
+
+/** The cut-down input is opt-in, with PEN_DRAFT_TRIM=1. */
+export function useTrimmedInput(env) {
+  return env.PEN_DRAFT_TRIM === '1';
 }
 
 export function missingSecrets(env) {
@@ -388,53 +418,75 @@ async function main() {
     throw new Error('the canonical Pen file is not a Pen document');
   const fullBytes = readFileSync(input).length;
 
+  // Off by default: on Nov 8, 0 of 13 drafts from the cut-down copy drew a
+  // frame, against 5 of 18 from the whole file, so the copy is opt-in.
+  const trim = useTrimmedInput(process.env);
+
   for (const brief of briefs) {
+    const startedAt = Date.now();
     const row = { frame: brief.frame, route: brief.route };
-    // Beside the canonical file, so its fonts and images still resolve.
-    const trimmedPath = join(dirname(input), `${brief.frame}.trimmed.pen`);
-    const trimmed = trimCanonical(canonical, brief);
-    writeFileSync(trimmedPath, JSON.stringify(trimmed));
-    row.trimmed = {
-      frames: trimmed.children.length,
-      of: canonical.children.length,
-      bytes: readFileSync(trimmedPath).length,
-      ofBytes: fullBytes,
-    };
-    console.log(
-      `pen-draft: ${brief.frame} starts from ${row.trimmed.frames} of ${row.trimmed.of} frames (${(row.trimmed.bytes / 1e6).toFixed(1)} of ${(fullBytes / 1e6).toFixed(1)} MB)`
-    );
-    try {
-      execFileSync('npx', penArgs(brief, { input: trimmedPath, outDir }), {
-        stdio: ['ignore', 'inherit', 'inherit'],
-        timeout: 15 * 60_000,
-        // Workspace fonts and images resolve relative to the .pen file.
-        cwd: dirname(input),
-        env: { ...process.env, NODE_OPTIONS: PEN_NODE_OPTIONS },
-      });
-      const missing = missingOutputs(brief, outDir);
-      const problem = missing.length
-        ? `pen wrote no ${missing.join(' or ')}`
-        : draftProblem(
-            trimmed,
-            readJsonFile(join(outDir, `${brief.frame}.pen`)),
-            brief.frame
-          );
-      row.status = problem ? 'failed' : 'drafted';
-      if (problem) row.error = problem;
-      else {
-        // Reviewers get the whole canonical file with the new frame in it,
-        // as before, not the cut-down copy the agent worked in.
-        const out = join(outDir, `${brief.frame}.pen`);
-        writeFileSync(
-          out,
-          JSON.stringify(spliceDraft(canonical, trimmed, readJsonFile(out)))
-        );
+    let before = canonical;
+    let from = input;
+    if (trim) {
+      // Beside the canonical file, so its fonts and images still resolve.
+      from = join(dirname(input), `${brief.frame}.trimmed.pen`);
+      before = trimCanonical(canonical, brief);
+      writeFileSync(from, JSON.stringify(before));
+      row.trimmed = {
+        frames: before.children.length,
+        of: canonical.children.length,
+        bytes: readFileSync(from).length,
+        ofBytes: fullBytes,
+      };
+      console.log(
+        `pen-draft: ${brief.frame} starts from ${row.trimmed.frames} of ${row.trimmed.of} frames (${(row.trimmed.bytes / 1e6).toFixed(1)} of ${(fullBytes / 1e6).toFixed(1)} MB)`
+      );
+    }
+    for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+      const timeout = attemptTimeout(
+        Date.now() - startedAt,
+        BUDGET_MS,
+        attempt
+      );
+      if (!timeout) {
+        row.status ??= 'failed';
+        row.error ??= 'no time left in the job for an attempt';
+        break;
       }
-    } catch (e) {
-      row.status = 'failed';
-      row.error = String(e.message || e)
-        .split('\n')[0]
-        .slice(0, 200);
+      row.attempts = attempt;
+      delete row.error;
+      try {
+        execFileSync('npx', penArgs(brief, { input: from, outDir, trim }), {
+          stdio: ['ignore', 'inherit', 'inherit'],
+          timeout,
+          // Workspace fonts and images resolve relative to the .pen file.
+          cwd: dirname(input),
+          env: { ...process.env, NODE_OPTIONS: PEN_NODE_OPTIONS },
+        });
+        const missing = missingOutputs(brief, outDir);
+        const problem = missing.length
+          ? `pen wrote no ${missing.join(' or ')}`
+          : draftProblem(
+              before,
+              readJsonFile(join(outDir, `${brief.frame}.pen`)),
+              brief.frame
+            );
+        row.status = problem ? 'failed' : 'drafted';
+        if (problem) row.error = problem;
+        else if (trim) {
+          const out = join(outDir, `${brief.frame}.pen`);
+          writeFileSync(
+            out,
+            JSON.stringify(spliceDraft(canonical, before, readJsonFile(out)))
+          );
+        }
+      } catch (e) {
+        row.status = 'failed';
+        row.error = String(e.message || e)
+          .split('\n')[0]
+          .slice(0, 200);
+      }
+      if (row.status === 'drafted') break;
     }
     receipt.drafts.push(row);
     write();

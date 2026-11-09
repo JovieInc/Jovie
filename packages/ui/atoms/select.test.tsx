@@ -323,4 +323,14 @@ describe('Select certificate evidence', () => {
       screen.getByRole('combobox', { name: 'Favourite food', hidden: true })
     ).toHaveAttribute('aria-expanded', 'true');
   });
+
+  it('places the item indicator and padding on logical sides', () => {
+    render(<TestSelect open={true} />);
+    const option = screen.getByRole('option', { name: 'Apple' });
+    expect(option.className).toContain('ps-8');
+    expect(option.className).not.toContain('pl-8');
+    const indicatorSlot = option.querySelector('span.absolute');
+    expect(indicatorSlot).toHaveClass('start-2');
+    expect(indicatorSlot).not.toHaveClass('left-2');
+  });
 });

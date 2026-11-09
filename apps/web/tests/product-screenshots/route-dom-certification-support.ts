@@ -160,5 +160,40 @@ export const busyImg = svg(
       `<rect x="${(i % 8) * 75}" y="${Math.floor(i / 8) * 80}" width="60" height="60" fill="hsl(${i * 9} 60% ${20 + (i % 5) * 12}%)"/>`
   ).join('')
 );
+/** Outcome-detector finding kinds for a marketing fixture. */
+const markupKindsAsIs = async (page: Page) =>
+  (await inspectRouteDom(page, { surface: 'marketing' })).findings.map(
+    finding => finding.kind
+  );
+export const markupKinds = async (page: Page, html: string) => {
+  await page.setContent(html);
+  return markupKindsAsIs(page);
+};
+/**
+ * A busy image that lands 1.5s after domcontentloaded, as a receipt sees a
+ * priority hero from a cold image optimizer. Blank-media must wait for it.
+ */
+export const slowImageBlankMedia = async (page: Page) => {
+  const url = 'https://blank-media.fixture.test/slow-hero.svg';
+  await page.route(url, async route => {
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    await route.fulfill({
+      contentType: 'image/svg+xml',
+      body: decodeURIComponent(busyImg.slice(busyImg.indexOf(',') + 1)),
+    });
+  });
+  await page.setContent(
+    `<main><section data-pen-section="hero" style="background:#0b0b0d"><h1>Product</h1><img src="${url}" width="600" height="400" alt="Dashboard"></section></main>`,
+    { waitUntil: 'domcontentloaded' }
+  );
+  // The receipt's race: the image is still in flight when inspection starts.
+  expect(
+    await page.evaluate(() => document.querySelector('img')?.complete)
+  ).toBe(false);
+  return markupKindsAsIs(page);
+};
+// JOV-7710 / AM-017: one semantic level reads as one material.
+export const plane = (inner: string) =>
+  `<main id="main-content" style="width:1000px;height:600px;background:rgb(16,17,20)">${inner}</main>`;
 export const axisSection = (align: string, attrs = '') =>
   `<section ${attrs} style="text-align:${align}"><h2>Heading ${align}</h2><p>A lede that is long enough to count as copy.</p></section>`;
