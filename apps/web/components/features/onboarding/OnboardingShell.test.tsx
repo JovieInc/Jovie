@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { type ReactNode, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -148,8 +149,16 @@ const STARTED_CONVERSATION = [
   },
 ];
 
+async function openOptions() {
+  await vi.waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Onboarding options' })
+  );
+  return screen.findByRole('menu');
+}
+
 describe('OnboardingShell status', () => {
-  it('does not offer Start Over on a first visit with nothing to discard', () => {
+  it('does not offer Start over on a first visit with nothing to discard', async () => {
     render(
       <OnboardingShell
         sessionLabel='pending'
@@ -157,11 +166,16 @@ describe('OnboardingShell status', () => {
         onRestart={vi.fn()}
       />
     );
-    expect(screen.queryByRole('button', { name: 'Start Over' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Sign in' })).toBeTruthy();
+    expect(screen.queryByRole('menuitem', { name: 'Sign in' })).toBeNull();
+    await openOptions();
+    expect(screen.queryByRole('menuitem', { name: 'Start over' })).toBeNull();
+    expect(screen.getByRole('menuitem', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/signin'
+    );
   });
 
-  it('keeps explicit restart/logout visible and prevents them during a pending turn', () => {
+  it('keeps restart/logout in the shared menu and prevents them during a pending turn', async () => {
     const restart = vi.fn();
     const logout = vi.fn();
     const { rerender } = render(
@@ -177,8 +191,10 @@ describe('OnboardingShell status', () => {
       'data-flush-content',
       'true'
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Start Over' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Log Out' }));
+    await openOptions();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Start over' }));
+    await openOptions();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Log out' }));
     expect(restart).toHaveBeenCalledOnce();
     expect(logout).toHaveBeenCalledOnce();
     rerender(
@@ -191,8 +207,15 @@ describe('OnboardingShell status', () => {
         controlsDisabled
       />
     );
-    expect(screen.getByRole('button', { name: 'Start Over' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Log Out' })).toBeDisabled();
+    await openOptions();
+    const restartItem = screen.getByRole('menuitem', { name: 'Start over' });
+    const logoutItem = screen.getByRole('menuitem', { name: 'Log out' });
+    expect(restartItem).toHaveAttribute('aria-disabled', 'true');
+    expect(logoutItem).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(restartItem);
+    fireEvent.click(logoutItem);
+    expect(restart).toHaveBeenCalledOnce();
+    expect(logout).toHaveBeenCalledOnce();
     expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
   });
   beforeEach(() => {
@@ -255,7 +278,7 @@ describe('OnboardingShell status', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('keeps recovery below navigation and above the transcript, using existing logout authority', () => {
+  it('keeps recovery below navigation and above the transcript, using existing logout authority', async () => {
     claimState.value = 'identity-conflict';
     const logout = vi.fn();
     render(
@@ -272,7 +295,10 @@ describe('OnboardingShell status', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Profile Conflict' }));
     fireEvent.click(screen.getByRole('button', { name: 'Switch Account' }));
     expect(logout).toHaveBeenCalledOnce();
-    expect(screen.getByRole('button', { name: 'Log Out' })).toBeEnabled();
+    await openOptions();
+    expect(
+      screen.getByRole('menuitem', { name: 'Log out' })
+    ).not.toHaveAttribute('aria-disabled');
     expect(screen.queryByRole('link', { name: /claim/i })).toBeNull();
   });
 
@@ -313,35 +339,38 @@ describe('OnboardingShell status', () => {
     expect(session).toHaveClass('flex', 'flex-col', 'min-h-0', 'flex-1');
   });
 
-  it('keeps the compact sign-in face inside the canonical 44px hit target (JOV-4411)', () => {
+  it('uses the canonical compact icon button and keeps its accessible name without an icon', () => {
     render(<OnboardingShell sessionLabel='pending' />);
-
-    const signIn = screen.getByRole('link', { name: 'Sign in' });
-    expect(signIn).toHaveAttribute('data-variant', 'link');
-    expect(signIn).toHaveAttribute('data-appearance', 'compact');
-    expect(signIn).toHaveClass('btn-linear-login', 'focus-ring-themed');
-    expect(signIn.className).toContain('before:min-h-11');
-    expect(signIn.className).toContain('before:min-w-11');
-    expect(signIn.className).not.toMatch(/(?:^|\s)h-11(?:\s|$)/);
+    const trigger = screen.getByRole('button', { name: 'Onboarding options' });
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+    expect(trigger.className).toContain('before:h-11');
+    expect(trigger.className).toContain('before:w-11');
+    trigger.replaceChildren();
+    expect(screen.getByRole('button', { name: 'Onboarding options' })).toBe(
+      trigger
+    );
+    trigger.focus();
+    expect(trigger).toHaveFocus();
   });
 
-  it('keeps the real sign-in link named and reachable before its label child arrives', () => {
-    render(<OnboardingShell sessionLabel='pending' />);
-
-    const signIn = screen.getByRole('link', { name: 'Sign in' });
-    const destination = signIn.getAttribute('href');
-    const labelNodes = Array.from(signIn.childNodes);
-    signIn.replaceChildren();
-
-    expect(screen.getByRole('link', { name: 'Sign in' })).toBe(signIn);
-    expect(signIn).toHaveAttribute('href', destination);
-    signIn.focus();
-    expect(signIn).toHaveFocus();
-
-    signIn.append(...labelNodes);
-    expect(signIn).toHaveTextContent('Sign in');
-    expect(screen.getByRole('link', { name: 'Sign in' })).toBe(signIn);
-    expect(signIn).toHaveFocus();
+  it('dismisses the menu with Escape and returns focus without resetting the conversation', async () => {
+    const restart = vi.fn();
+    render(
+      <OnboardingShell
+        sessionLabel='pending'
+        initialMessages={STARTED_CONVERSATION}
+        onRestart={restart}
+      />
+    );
+    const menu = await openOptions();
+    fireEvent.keyDown(menu, { key: 'Escape' });
+    await vi.waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+    await vi.waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Onboarding options' })
+      ).toHaveFocus()
+    );
+    expect(restart).not.toHaveBeenCalled();
   });
 
   it('never dead-ends a failed bot check: the chat sends on the unverified path', () => {
@@ -417,12 +446,13 @@ describe('OnboardingShell status', () => {
     );
   });
 
-  it('retries claim after a completed turn while retaining sign-in access', () => {
+  it('retries claim after a completed turn while retaining sign-in access', async () => {
     render(<OnboardingShell sessionLabel='anonymous' />);
     expect(claimState.trigger).toBe(0);
     act(() => chatProps.current?.onConversationActivity());
     expect(claimState.trigger).toBe(1);
-    expect(screen.getByRole('link', { name: 'Sign in' })).toBeVisible();
+    await openOptions();
+    expect(screen.getByRole('menuitem', { name: 'Sign in' })).toBeVisible();
   });
 
   it('restores owned history without redirecting and retries the existing claim after a genuine turn', () => {

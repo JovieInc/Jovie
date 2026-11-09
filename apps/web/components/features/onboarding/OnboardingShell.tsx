@@ -2,8 +2,17 @@
 
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingShell.sign-in-placement.test.tsx
 
-import { Button, Link as JovieLink } from '@jovie/ui';
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  IconButton,
+  Link as JovieLink,
+} from '@jovie/ui';
 import type { UIMessage } from 'ai';
+import { Ellipsis } from 'lucide-react';
 import NextLink from 'next/link';
 import {
   type ReactNode,
@@ -291,41 +300,12 @@ export function OnboardingShell({
                   onLogout={onLogout}
                   disabled={actionPending || controlsDisabled}
                 >
-                  {onRestart && hasConversation ? (
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      className='shrink-0 whitespace-nowrap'
-                      disabled={actionPending || controlsDisabled}
-                      onClick={onRestart}
-                    >
-                      Start Over
-                    </Button>
-                  ) : null}
-                  {isSignedIn && onLogout ? (
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      className='shrink-0 whitespace-nowrap'
-                      disabled={actionPending || controlsDisabled}
-                      onClick={onLogout}
-                    >
-                      Log Out
-                    </Button>
-                  ) : null}
-                  {!isSignedIn ? (
-                    <JovieLink
-                      asChild
-                      variant='compact'
-                      touchTarget
-                      reserveLabel={SIGN_IN_LABEL}
-                      className='shrink-0 whitespace-nowrap'
-                    >
-                      <NextLink href={APP_ROUTES.SIGNIN}>
-                        {SIGN_IN_LABEL}
-                      </NextLink>
-                    </JovieLink>
-                  ) : null}
+                  <OnboardingOverflowMenu
+                    isSignedIn={isSignedIn}
+                    onRestart={hasConversation ? onRestart : undefined}
+                    onLogout={onLogout}
+                    disabled={actionPending || controlsDisabled}
+                  />
                 </OnboardingIdentityConflict>
               ) : null}
               <OnboardingChat
@@ -372,6 +352,46 @@ export function OnboardingShell({
         }
       />
     </SidebarProvider>
+  );
+}
+
+/** Presentation only: the shell's existing callbacks retain action authority. */
+export function OnboardingOverflowMenu({
+  isSignedIn,
+  onRestart,
+  onLogout,
+  disabled = false,
+}: Readonly<{
+  isSignedIn: boolean;
+  onRestart?: () => void;
+  onLogout?: () => void;
+  disabled?: boolean;
+}>) {
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <IconButton ariaLabel='Onboarding options' variant='ghost' size='sm'>
+          <Ellipsis aria-hidden='true' />
+        </IconButton>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align='end'>
+        {onRestart ? (
+          <DropdownMenuItem disabled={disabled} onSelect={onRestart}>
+            Start over
+          </DropdownMenuItem>
+        ) : null}
+        {isSignedIn && onLogout ? (
+          <DropdownMenuItem disabled={disabled} onSelect={onLogout}>
+            Log out
+          </DropdownMenuItem>
+        ) : null}
+        {!isSignedIn ? (
+          <DropdownMenuItem asChild>
+            <NextLink href={APP_ROUTES.SIGNIN}>{SIGN_IN_LABEL}</NextLink>
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

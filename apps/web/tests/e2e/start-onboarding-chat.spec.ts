@@ -369,10 +369,11 @@ test.describe('canonical /start onboarding chat', () => {
     await expect(
       page.getByText(/remember this chat so we can pick up where we left off/i)
     ).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
-      'href',
-      '/signin'
-    );
+    await page.getByRole('button', { name: 'Onboarding options' }).click();
+    await expect(
+      page.getByRole('menuitem', { name: 'Sign in' })
+    ).toHaveAttribute('href', '/signin');
+    await page.keyboard.press('Escape');
     const emptyComposer = page.locator(COMPOSER_TEXTAREA);
     await expect(emptyComposer).toHaveAttribute(
       'aria-label',
