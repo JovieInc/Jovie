@@ -92,6 +92,9 @@ export function EntityChipPopover({
   const label = sourceFact
     ? 'Inspect source'
     : (entity?.label ?? 'Unavailable reference');
+  const srOnlyName = sourceFact
+    ? `Inspect source: ${sourceFact.subject.displayName ?? 'Reference'} — `
+    : `${KIND_PREFIX[kind]}: ${label} — `;
   const mobile = useMediaQuery('(max-width: 639px)');
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -305,19 +308,9 @@ export function EntityChipPopover({
           className='system-b-entity-chip-trigger focus-ring'
           data-testid='entity-chip-popover-trigger'
         >
-          {/*
-            Fallback chips render arbitrary visible content, so the accessible
-            name must INCLUDE it (label-content-name-mismatch): an sr-only
-            action prefix joins the children instead of an aria-label that
-            would replace them.
-          */}
           {entity || sourceFact || pending ? (
             <>
-              <span className='sr-only'>{
-                sourceFact
-                  ? `Inspect source: ${sourceFact.subject.displayName ?? 'Reference'} — `
-                  : `${KIND_PREFIX[kind]}: ${label} — `
-              }</span>
+              <span className='sr-only'>{srOnlyName}</span>
               {children}
             </>
           ) : (
