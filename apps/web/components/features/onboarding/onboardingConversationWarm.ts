@@ -26,6 +26,12 @@ export const loadChatProposeNextStepCard = () =>
 
 /** Fire-and-forget warm of every conversation chunk. */
 export function preloadOnboardingConversationChunks(): void {
+  // Unit tests drive submitText through the real pipeline; the warm's dynamic
+  // import graph can resolve after the test file's environment tears down and
+  // surface as EnvironmentTeardownError unhandled rejections (vitest exits 1
+  // with every test green — merge-group run 42697661623, shard 3/14). The
+  // warm is a browser-navigation optimization; no-op under the test runner.
+  if (process.env.NODE_ENV === 'test') return;
   void Promise.all([
     loadChatMessage(),
     loadToolPartsRenderer(),

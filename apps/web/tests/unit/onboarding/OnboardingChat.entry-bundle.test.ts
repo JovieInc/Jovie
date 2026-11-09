@@ -81,5 +81,11 @@ describe('OnboardingChat entry bundle', () => {
     // The submit warm covers the starter auto-send, which has no user
     // gesture to trip the intent listeners.
     expect(chatSource).toMatch(/preloadOnboardingConversationChunks\(\)/);
+    // The warm must never fire inside the vitest runner: its import graph
+    // resolves after file teardown and fails the shard with unhandled
+    // EnvironmentTeardownError rejections (run 42697661623, shard 3/14).
+    expect(warmSource).toMatch(
+      /if \(process\.env\.NODE_ENV === 'test'\) return;/
+    );
   });
 });
