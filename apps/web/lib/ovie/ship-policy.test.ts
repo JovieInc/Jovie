@@ -23,7 +23,8 @@ describe('ship policy', () => {
     });
     expect(at('high', 'low')).toMatchObject({
       gate: 'wait_for_tim',
-      defaultDecision: 'none',
+      waitHours: 168,
+      defaultDecision: 'reject',
     });
   });
 

@@ -209,7 +209,7 @@ describe('summer card default-plus-deadline contract', () => {
         declared({ risk: 'high', confidence: 'low' }),
         FILED
       ).defaultDecision
-    ).toBe('none');
+    ).toBe('reject');
     hoisted.insertReturning.mockResolvedValue([{ key: 'k' }]);
     const unsure = declared({ risk: 'low', confidence: 'low' });
     await expect(submitSummerCard(unsure, FILED)).resolves.toMatchObject({

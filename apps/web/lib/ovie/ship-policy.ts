@@ -23,7 +23,7 @@ export type ShipGate =
   | 'ship_now'
   /** Waits for Tim, then ships on silence. */
   | 'wait_then_ship'
-  /** Waits for Tim and never ships on silence (escalates instead). */
+  /** Waits for Tim and never ships on silence; the card settles as not shipped. */
   | 'wait_for_tim'
   /** Outbound or spend: only Tim's yes acts; silence rejects. */
   | 'tim_only';
@@ -38,12 +38,16 @@ export interface ShipPolicyDecision {
   readonly schema: typeof SHIP_POLICY_SCHEMA;
   readonly gate: ShipGate;
   readonly waitHours: number;
-  readonly defaultDecision: 'approve' | 'reject' | 'none';
+  readonly defaultDecision: 'approve' | 'reject';
   /** Card copy for what happens if Tim doesn't answer. */
   readonly defaultIfSilent: string;
 }
 
-/** Hours to wait before shipping on silence; `null` never ships on silence. */
+/**
+ * Hours to wait before shipping on silence; `null` never ships on silence. A
+ * card still never waits forever ("nothing waits on a human"): risky, unsure
+ * work settles as not shipped after a week.
+ */
 const WAIT_HOURS: Readonly<
   Record<ShipRisk, Readonly<Record<ShipConfidence, number | null>>>
 > = {
@@ -54,6 +58,8 @@ const WAIT_HOURS: Readonly<
 
 /** Outbound and spend keep the existing silence-rejects window. */
 const TIM_ONLY_WAIT_HOURS = 48;
+/** Risky, unsure work gets Tim's longest window, then settles unshipped. */
+const WAIT_FOR_TIM_HOURS = 7 * 24;
 
 export function shipPolicy(input: ShipPolicyInput): ShipPolicyDecision {
   if (input.kind === 'outbound' || input.kind === 'spend')
@@ -72,9 +78,9 @@ export function shipPolicy(input: ShipPolicyInput): ShipPolicyDecision {
     return {
       schema: SHIP_POLICY_SCHEMA,
       gate: 'wait_for_tim',
-      waitHours: TIM_ONLY_WAIT_HOURS,
-      defaultDecision: 'none',
-      defaultIfSilent: 'Waits for you; it never ships on silence.',
+      waitHours: WAIT_FOR_TIM_HOURS,
+      defaultDecision: 'reject',
+      defaultIfSilent: "Doesn't ship unless you approve it within 7 days.",
     };
   if (wait === 0)
     return {
