@@ -114,7 +114,14 @@ export async function certifyProfileModeHistory(
     expect(navBox).not.toBeNull();
     expect(homeNavBox).not.toBeNull();
     for (const key of ['x', 'y', 'width', 'height'] as const) {
-      expect(Math.abs(homeNavBox![key] - navBox![key])).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(homeNavBox![key] - navBox![key]),
+        `nav ${key} must hold across the mode switch: ${JSON.stringify({
+          key,
+          navBox,
+          homeNavBox,
+        })}`
+      ).toBeLessThanOrEqual(1);
     }
     await capture('home-after-15s.png');
     stage = 'home-reloaded';

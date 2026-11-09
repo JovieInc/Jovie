@@ -429,13 +429,16 @@ test.describe('public profile browser admission', () => {
     ).toBeVisible();
     await expect(page.getByTestId('profile-bottom-nav')).toHaveCount(0);
 
-    // D9kdx "Home overview grid": 4:5 cover left with the name header,
-    // Selected work above Events in the center column, and the Get updates
-    // side rail right — three side-by-side columns inside the content width.
+    // D9kdx "Home overview grid": 4:5 cover left with the name header and
+    // Selected work above Events in the center column. The admission fixture
+    // ships fan capture off, so the Get-updates/Payments side rail is
+    // legitimately absent here (rail-enabled=false) — the rail's own
+    // contract is pinned by the desktop-surface unit test with capture on.
     const surface = page.getByTestId('profile-desktop-surface');
     await expect(surface).toHaveAttribute('data-mode', 'profile');
     const overview = page.getByTestId('profile-desktop-home-overview');
     await expect(overview).toBeVisible();
+    await expect(overview).toHaveAttribute('data-side-rail-enabled', 'false');
     const cover = page.getByTestId('profile-desktop-cover');
     await expect(cover.getByTestId('profile-header')).toBeVisible();
     const secondary = page.getByTestId('profile-desktop-secondary-grid');
@@ -445,15 +448,6 @@ test.describe('public profile browser admission', () => {
     await expect(
       secondary.getByRole('button', { name: 'View all', exact: true })
     ).toBeVisible();
-    const rail = page.getByTestId('profile-desktop-side-rail');
-    await expect(rail).toBeVisible();
-    await expect(rail.getByTestId('profile-desktop-alerts-card')).toBeVisible();
-    await expect(
-      rail.getByTestId('profile-desktop-payments-card')
-    ).toBeVisible();
-    await expect(
-      rail.getByTestId('profile-desktop-open-payments')
-    ).toContainText('Open payments');
 
     const geometry = await overview.evaluate(element => {
       const box = (testId: string) => {
@@ -472,11 +466,7 @@ test.describe('public profile browser admission', () => {
     });
     expect(geometry.cover, 'cover must render').not.toBeNull();
     expect(geometry.cards, 'cards column must render').not.toBeNull();
-    expect(geometry.rail, 'side rail must render').not.toBeNull();
     expect(geometry.cover!.left).toBeLessThan(geometry.cards!.left);
-    expect(geometry.rail!.left).toBeGreaterThan(
-      geometry.cards!.left + geometry.cards!.width - 1
-    );
 
     // The compact shell is fully unmounted at desktop widths.
     await expect(page.getByTestId('profile-compact-shell')).toHaveCount(0);
@@ -750,7 +740,13 @@ test.describe('public profile browser admission', () => {
       // Scoped to the owning surface: the armed desktop surface also renders
       // a primary-tab panel inside the display:none no-morph shell at compact
       // widths, so page-level locators resolve duplicates.
-      const selected = surface.getByTestId('profile-primary-tab-tour');
+      // The desktop surface carries the SAME testid on the pill-nav tab
+      // button and the panel; the panel is the section.
+      const selected = surface.locator(
+        layout === 'desktop'
+          ? 'section[data-testid="profile-primary-tab-tour"]'
+          : '[data-testid="profile-primary-tab-tour"]'
+      );
       await expect(selected).toBeVisible();
       if (layout === 'desktop') {
         await expect(
