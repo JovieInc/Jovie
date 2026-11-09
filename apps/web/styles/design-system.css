@@ -2349,6 +2349,14 @@
   --color-bg-selected: var(--noir-ion-selected);
 }
 
+/* Brand marks follow a scoped .dark wrapper too (brand, playlists and
+   not-found mount .system-b-marketing.dark under a light root), the way the
+   dark: variant did. The backing re-resolves bg-base on the wrapper. */
+.dark {
+  --color-verified: #00bcff;
+  --color-verified-backing: var(--color-bg-base);
+}
+
 /* Public-profile navigation is one distinct functional glass layer. It floats
    over the stable content reservation; child states are tint/selection only
    and never add another backdrop-filter. */
