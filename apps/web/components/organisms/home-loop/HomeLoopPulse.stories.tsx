@@ -31,6 +31,8 @@ export const SnapshotProvenance: Story = {
         key: 'ejections',
         label: 'Queue ejections',
         value: '52%',
+        tone: 'bad',
+        was: null,
         target: 'Target ≤ 10%',
         sourceCaption: 'Snapshot 2026-11-07 14:24 UTC',
       },
