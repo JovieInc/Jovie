@@ -76,7 +76,7 @@ import escalation_reconcile  # noqa: E402  (lane-fix-escalating is consumed, nev
 import board_intake  # noqa: E402  (mesh board work for codex, closed on verified outcomes)
 import ownership  # noqa: E402  (started-state live-owner invariant)
 import fleet_ledger  # noqa: E402  (external agent claims, stranded-claim view)
-import pr_events  # noqa: E402
+import empty_review, pr_events  # noqa: E402
 import repair_order  # noqa: E402  (one fair claim order for event and polling repair)
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import shipping_attribution  # noqa: E402  (receipt-first merged-PR provenance)
@@ -6245,7 +6245,7 @@ def review_excerpt(pr: dict, limit: int = 4000) -> str:
         return ""
     rows = list(pr.get("reviewSummaries") or []) + list(pr.get("reviewThreads") or [])
     text = "\n".join(f"- {row['author']['login']}: {row['body']}" for row in rows if row.get("body"))
-    return ("Reviewers requested changes:\n" + text)[:limit] if text else "Reviewers requested changes (no active current-head comment text)."
+    return ("Reviewers requested changes:\n" + text)[:limit] if text else ""
 
 
 def render_fix_prompt(pr: dict, excerpt: str) -> str:
@@ -8182,7 +8182,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             agent = None
             if resolved_name:
                 receipt.update(resolution=resolved_name)
-            else:
+            elif not empty_review.skip_model(pr, lambda: pr_events.consume(THIS, pr, ["review"])):
                 boundary("before-install")
                 install_dependencies(host, worktree, log)
                 excerpt = failure_excerpt(pr)
@@ -8242,7 +8242,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                     "after-remote-read")
             if not rewritten:
                 receipt.update(agentExit=agent.returncode if agent else None, headAfter=after,
-                               verdict="fix-pushed" if pushed else "fix-no-change")
+                               verdict="fix-pushed" if pushed else "fix-no-change", **({} if pushed or not empty_review.stale_review_only(pr) else {"reasons": ["empty-current-head-review"]}))
                 if not pushed and agent is not None:
                     log.flush()
                     receipt["reasons"] = classify_unpushed_repair(

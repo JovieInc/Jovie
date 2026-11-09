@@ -57,7 +57,9 @@ def check_fingerprint(pr: dict) -> str:
     """Hash the failing check names. A CANCELLED sibling does not open a second class when a
     FAILURE or TIMED_OUT is present: Fleet Rules Evidence cancelled beside Source Validation
     recorded fix-red-6c3efaf400 on seven unrelated lane runs (2026-10-29..31). A rollup that
-    is only cancelled still fingerprints those names. Advisory names are always skipped."""
+    is only cancelled still fingerprints those names. Advisory names are always skipped.
+    An empty name list is fix-red-e3b0c44298. empty_review.stale_review_only refuses that
+    dispatch when the only signal is a loaded review with no current-head body."""
     red = {"FAILURE", "TIMED_OUT", "CANCELLED"}
     hard = {"FAILURE", "TIMED_OUT"}
     skip = {"pr ready", "ci summary", *(name.lower() for name in ADVISORY_CHECKS)}

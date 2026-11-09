@@ -3126,3 +3126,82 @@ class WakeFileTest(unittest.TestCase):
                                          "GITHUB_EVENT_PATH": str(event_path)}):
                 self.assertEqual(events.main(["wake", "--prs", "22868"]), 0)
             self.assertFalse((state / "wake").exists())
+
+
+class EmptyReviewTest(unittest.TestCase):
+    """fix-red-e3b0c44298: a review label with no current-head text is not a failing check."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = SimpleNamespace(state=Path(self.tmp.name))
+
+    def loaded(self, **extra):
+        fields = {"kinds": ["review"], "labels": ["lane-fix-review"], "merge": "UNSTABLE",
+                  "reviewDecision": None, "reviewAuthorityDigest": "d",
+                  "reviewSummaries": [], "reviewThreads": []}
+        fields.update(extra)
+        return pr(**fields)
+
+    def reconcile(self, module, live):
+        module.reconcile_fix_target = lambda src: {
+            **live, "state": "OPEN", "headRefOid": src["headRefOid"], "headRefName": src["headRefName"]}
+
+    def test_unloaded_review_still_needs_a_read(self):
+        row = pr(kinds=["review"], labels=["lane-fix-review"])
+        self.assertTrue(events.needs_work(fake_lane(Shell()), row))
+        self.assertFalse(events.empty_review.review_evidence_loaded(row))
+        self.assertFalse(events.empty_review.stale_review_only(row))
+        self.assertTrue(events.empty_review.unloaded_review_only(row, lambda item: events.needs_work(fake_lane(Shell()), item)))
+
+    def test_loaded_empty_review_is_not_work_and_cleanup_drops_the_label(self):
+        shell = Shell()
+        module = fake_lane(shell)
+        row = pr(kinds=["review"], labels=["lane-fix-review"], merge="UNSTABLE")
+        live = self.loaded()
+        self.reconcile(module, live)
+        self.assertFalse(events.needs_work(module, live))
+        self.assertIsNone(events.claim_event_pr(self.host, module, "devin", [row], NOW))
+        self.assertFalse((self.host.state / "fix-attempts.json").exists())
+        self.assertEqual(events.cleanup_one_event(self.host, module, [row], NOW), 5)
+        self.assertEqual(len(shell.made("gh", "api", "-X", "DELETE")), 1)
+
+    def test_loaded_review_text_is_still_claimed(self):
+        shell = Shell()
+        module = fake_lane(shell)
+        live = self.loaded(reviewSummaries=[{"author": {"login": "reviewer"}, "body": "rename the prop"}])
+        self.reconcile(module, live)
+        claimed = events.claim_event_pr(self.host, module, "devin",
+                                        [pr(kinds=["review"], labels=["lane-fix-review"])], NOW)
+        self.assertEqual(claimed["number"], 5)
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [])
+
+    def test_changes_requested_with_no_body_still_needs_a_model(self):
+        row = self.loaded(reviewDecision="CHANGES_REQUESTED")
+        self.assertTrue(events.needs_work(fake_lane(Shell()), row))
+        self.assertFalse(events.empty_review.stale_review_only(row))
+
+    def test_empty_excerpt_is_not_a_failing_check(self):
+        self.assertEqual(runner.review_excerpt(self.loaded()), "")
+        prompt = runner.render_fix_prompt({**self.loaded(), "title": "t"}, "")
+        self.assertNotIn("no active current-head", prompt)
+        self.assertIn("(no failing check excerpt)", prompt)
+        asked = self.loaded(reviewSummaries=[{"author": {"login": "reviewer"}, "body": "rename the prop"}])
+        self.assertIn("rename the prop", runner.review_excerpt(asked))
+
+    def test_stale_review_only_rejects_other_repair_signals(self):
+        empty = events.empty_review
+        self.assertTrue(empty.stale_review_only(self.loaded()))
+        self.assertFalse(empty.stale_review_only(self.loaded(checks=[{"name": "ci", "conclusion": "FAILURE"}])))
+        self.assertFalse(empty.stale_review_only(self.loaded(merge="DIRTY")))
+        self.assertFalse(empty.stale_review_only(self.loaded(kinds=["review", "conflict"])))
+        self.assertFalse(empty.stale_review_only(self.loaded(kinds=["review", "red"])))
+        self.assertFalse(empty.stale_review_only(self.loaded(kinds=["review", "dequeued"])))
+        self.assertFalse(empty.stale_review_only(self.loaded(kinds=["review", "stale"])))
+        self.assertFalse(empty.stale_review_only(self.loaded(reviewThreads=[{"body": "still open"}])))
+        self.assertFalse(empty.stale_review_only(pr(kinds=["review"])))
+        consumed = []
+        self.assertTrue(empty.skip_model(self.loaded(), lambda: consumed.append("review")))
+        self.assertEqual(consumed, ["review"])
+        self.assertFalse(empty.skip_model(self.loaded(reviewDecision="CHANGES_REQUESTED"), lambda: consumed.append("no")))
+        self.assertEqual(consumed, ["review"])
