@@ -14,16 +14,24 @@ import {
   enqueueDspArtistDiscoveryJob,
   enqueueMusicFetchEnrichmentJob,
 } from '@/lib/ingestion/jobs';
+import { isLayloUrl } from '@/lib/ingestion/strategies/laylo';
 import { cleanScrapedDisplayName } from '@/lib/profile/scraped-display-name';
 import { reconcileProfileSurfaces } from '@/lib/profile-surfaces/reconciliation';
 import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
 import { logger } from '@/lib/utils/logger';
+import {
+  buildPagelessLeadProfile,
+  isPagelessLead,
+  type PagelessLeadSkipReason,
+} from './pageless-lead-profile';
 
 export interface LeadIngestionResult {
   success: boolean;
   profileId?: string;
   profileUsername?: string;
   error?: string;
+  /** Stable code when a pageless lead stays approved but not ingested. */
+  reason?: PagelessLeadSkipReason;
 }
 
 /**
@@ -95,7 +103,20 @@ export async function ingestLeadAsCreator(
     return { success: false, error: 'Lead has no Linktree URL' };
   }
 
-  const handle = lead.linktreeHandle;
+  // Linktree, Beacons and other blocked hosts are never read: their profile
+  // comes from the search match and Spotify instead of the page.
+  const pageless = isPagelessLead(lead)
+    ? await buildPagelessLeadProfile(lead)
+    : null;
+  if (pageless && !pageless.ok) {
+    logger.warn('Lead left approved without a profile', {
+      leadId: lead.id,
+      reason: pageless.reason,
+    });
+    return { success: false, error: pageless.error, reason: pageless.reason };
+  }
+
+  const handle = pageless?.handle ?? lead.linktreeHandle;
 
   try {
     const existingCheck = await checkExistingProfile(handle);
@@ -114,17 +135,25 @@ export async function ingestLeadAsCreator(
       };
     }
 
-    const extraction = await fetchFullExtractionProfile(
-      false, // not Laylo
-      lead.linktreeUrl,
-      handle
-    );
+    const extraction = pageless
+      ? pageless.extraction
+      : await fetchFullExtractionProfile(
+          isLayloUrl(lead.linktreeUrl),
+          lead.linktreeUrl,
+          handle
+        );
 
     // Keep leads.displayName as the raw scrape provenance; only the public
     // profile receives the artist-name projection.
     const displayName =
-      cleanScrapedDisplayName(extraction.displayName) ?? handle;
-    const hostedAvatarUrl = await resolveHostedAvatarUrl(handle, extraction);
+      pageless?.displayName ??
+      cleanScrapedDisplayName(extraction.displayName) ??
+      handle;
+    // A pageless avatar comes only from Spotify; its links are never scanned.
+    const hostedAvatarUrl = await resolveHostedAvatarUrl(
+      handle,
+      pageless ? { avatarUrl: extraction.avatarUrl, links: [] } : extraction
+    );
 
     const extractionWithHostedAvatar = {
       ...extraction,
@@ -162,6 +191,11 @@ export async function ingestLeadAsCreator(
 
     // Update the lead with the creator profile ID and mark as ingested
     if (body.profile?.id) {
+      // A Spotify match found by search becomes the lead's Spotify link, so
+      // approval's Spotify enrichment and evidence refresh can use it.
+      const matchedSpotifyUrl = lead.spotifyUrl
+        ? null
+        : (pageless?.spotifyUrl ?? null);
       await db
         .update(leads)
         .set({
@@ -169,13 +203,17 @@ export async function ingestLeadAsCreator(
           creatorProfileId: body.profile.id,
           ingestedAt: new Date(),
           updatedAt: new Date(),
+          ...(matchedSpotifyUrl ? { spotifyUrl: matchedSpotifyUrl } : {}),
         })
         .where(eq(leads.id, lead.id));
 
       // Enqueue MusicFetch enrichment and DSP discovery for the new profile.
       // Wrapped in try/catch so failures don't flip the ingestion result.
       try {
-        await refreshLeadProfileEvidence(body.profile.id, lead);
+        await refreshLeadProfileEvidence(body.profile.id, {
+          id: lead.id,
+          spotifyUrl: lead.spotifyUrl ?? matchedSpotifyUrl,
+        });
       } catch (err) {
         await captureError(
           'Post-ingestion enrichment enqueue failed for lead',
