@@ -41,7 +41,7 @@ import {
   tool,
   type UIMessageChunk,
 } from 'ai';
-import { and, count, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { tryHandleAnonymousOnboardingChat } from '@/app/api/chat/onboarding-handler';
@@ -59,9 +59,7 @@ import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
 import { createInspectPressSourceTool } from '@/lib/ai/tools/inspect-press-source';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
 import { createVoicePromoTool } from '@/lib/ai/tools/voice-promo';
-import { readAuthorizedProfileViews } from '@/lib/analytics/authorized-read';
 import { getOptionalAuth } from '@/lib/auth/cached';
-import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import { getSessionContext } from '@/lib/auth/session';
 import { resolveChatAccountContext } from '@/lib/chat/account-context';
 import { createAccountChatTools } from '@/lib/chat/account-tools';
@@ -70,6 +68,7 @@ import {
   detectAlbumArtGenerationIntent,
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
+import { fetchArtistContext } from '@/lib/chat/artist-context.server';
 import { fetchCatalogTrackTitlesForChat } from '@/lib/chat/catalog-titles';
 import { assertChatToolsRegistered } from '@/lib/chat/chat-tool-inventory';
 import {
@@ -81,11 +80,9 @@ import {
   extractLastUserImageUrl,
   extractLastUserText,
 } from '@/lib/chat/message-text';
-import { resolveHasMusicLinks } from '@/lib/chat/music-link-presence';
 import { canUseOvChatMode, parseChatMode } from '@/lib/chat/ov-mode';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import { buildRelatedSuggestionsFraming } from '@/lib/chat/related-recommendations';
-import { countVisibleReleaseListenLinks } from '@/lib/chat/release-listen-links';
 import {
   updateOwnedReleaseGeneratedPitches,
   updateOwnedReleaseMetadata,
@@ -143,11 +140,9 @@ import {
 import { gateAssistantReply } from '@/lib/chat/voice-lint';
 import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
 import { loadCustomerChatPinnedOpportunity } from '@/lib/connectors/customer-pinned-opportunity';
+import { isArtistRuleViolation } from '@/lib/copy/outbound-floor';
 import { db } from '@/lib/db';
-import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { socialLinks } from '@/lib/db/schema/links';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { sqlAny } from '@/lib/db/sql-helpers';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
@@ -229,7 +224,6 @@ import {
   resolvePitchDestination,
 } from '@/lib/services/pitch';
 import { isRetouchConfigured } from '@/lib/services/retouching/provider-gemini';
-import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { isWeeklyQuotaExemptCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
@@ -256,116 +250,6 @@ const CHAT_KILL_SWITCH_GATES = {
   DISABLED: 'ai_chat_disabled',
   FORCE_LIGHT: 'ai_chat_force_light',
 } as const;
-
-/**
- * Fetches artist context server-side from the database.
- * Validates that the authenticated user can manage the profile.
- */
-async function fetchArtistContext(
-  profileId: string,
-  appUserId: string
-): Promise<ArtistContext | null> {
-  const access = await getExactProfileAccess(db, appUserId, profileId);
-  if (!access.ok) {
-    return null;
-  }
-
-  const [result] = await db
-    .select({
-      displayName: creatorProfiles.displayName,
-      username: creatorProfiles.username,
-      bio: creatorProfiles.bio,
-      genres: creatorProfiles.genres,
-      spotifyFollowers: creatorProfiles.spotifyFollowers,
-      spotifyPopularity: creatorProfiles.spotifyPopularity,
-      spotifyUrl: creatorProfiles.spotifyUrl,
-      appleMusicUrl: creatorProfiles.appleMusicUrl,
-    })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, profileId))
-    .limit(1);
-
-  if (!result) {
-    return null;
-  }
-
-  // Fetch link counts and tipping stats in parallel
-  const startOfMonth = new Date();
-  startOfMonth.setUTCDate(1);
-  startOfMonth.setUTCHours(0, 0, 0, 0);
-  const startOfMonthISO = startOfMonth.toISOString();
-
-  // Release listen links render on the public profile too.
-  const releaseListenCount = countVisibleReleaseListenLinks(profileId);
-  const [linkCounts, tipTotals, clickStats, profileViews] = await Promise.all([
-    db
-      .select({
-        totalActive: count(),
-        musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
-      })
-      .from(socialLinks)
-      .where(
-        and(
-          eq(socialLinks.creatorProfileId, profileId),
-          eq(socialLinks.state, 'active')
-        )
-      )
-      .then(r => r[0]),
-    db
-      .select({
-        totalReceived: drizzleSql<number>`COALESCE(SUM(${tips.amountCents}), 0)`,
-        monthReceived: drizzleSql<number>`COALESCE(SUM(CASE WHEN ${tips.createdAt} >= ${startOfMonthISO}::timestamp THEN ${tips.amountCents} ELSE 0 END), 0)`,
-        tipsSubmitted: drizzleSql<number>`COALESCE(COUNT(${tips.id}), 0)`,
-      })
-      .from(tips)
-      .where(eq(tips.creatorProfileId, profileId))
-      .then(r => r[0]),
-    db
-      .select({
-        total: drizzleSql<number>`count(*)`,
-      })
-      .from(clickEvents)
-      .where(
-        and(
-          eq(clickEvents.creatorProfileId, profileId),
-          eq(clickEvents.linkType, 'tip')
-        )
-      )
-      .then(r => r[0]),
-    readAuthorizedProfileViews(appUserId).catch(error => {
-      logger.warn('Authorized analytics unavailable for chat context', {
-        profileId,
-        error,
-      });
-      return 0;
-    }),
-  ]);
-
-  return {
-    displayName: result.displayName ?? result.username,
-    username: result.username,
-    bio: result.bio,
-    genres: result.genres ?? [],
-    spotifyFollowers: result.spotifyFollowers,
-    spotifyPopularity: result.spotifyPopularity,
-    spotifyUrl: result.spotifyUrl,
-    appleMusicUrl: result.appleMusicUrl,
-    profileViews,
-    hasSocialLinks: Number(linkCounts?.totalActive ?? 0) > 0,
-    hasMusicLinks: resolveHasMusicLinks({
-      dspSocialLinkCount: Number(linkCounts?.musicActive ?? 0),
-      releaseListenLinkCount: await releaseListenCount,
-      spotifyUrl: result.spotifyUrl,
-      appleMusicUrl: result.appleMusicUrl,
-    }),
-    tippingStats: {
-      tipClicks: Number(clickStats?.total ?? 0),
-      tipsSubmitted: Number(tipTotals?.tipsSubmitted ?? 0),
-      totalReceivedCents: Number(tipTotals?.totalReceived ?? 0),
-      monthReceivedCents: Number(tipTotals?.monthReceived ?? 0),
-    },
-  };
-}
 
 /**
  * Find a release by title (exact match first, then partial).
@@ -1744,7 +1628,8 @@ function createSubmitFeedbackTool(clerkUserId: string) {
 function createGenerateReleasePitchTool(
   resolvedProfileId: string,
   identity: { clerkUserId: string; conversationId: string | null },
-  releases: ReleaseContext[]
+  releases: ReleaseContext[],
+  artistRules?: ArtistContext['artistRules']
 ) {
   return tool({
     description: `Generate one copy-paste-ready release pitch for a specific destination. Use for playlist, radio, Sirius XM, install, playback/music supervisor, editorial post, record label, or collaborator pitching. Ask the artist where they want to pitch it before calling this tool unless a task or user message clearly maps to one of these destinations: ${PITCH_TARGET_OPTIONS_TEXT}. Ask which release they want to pitch if unclear. If the artist provides custom guidance, pass it via instructions. ${PITCH_GRILL_PROCEDURE}`,
@@ -1847,6 +1732,7 @@ function createGenerateReleasePitchTool(
             userId: identity.clerkUserId,
             sessionId: identity.conversationId,
           },
+          artistRules,
         });
 
         const updated = await updateOwnedReleaseGeneratedPitches({
@@ -1880,7 +1766,9 @@ function createGenerateReleasePitchTool(
 
         return {
           success: false as const,
-          error: 'Failed to generate pitches. Please try again.',
+          error: isArtistRuleViolation(error)
+            ? 'That pitch broke one of your artist rules, so I held it back.'
+            : 'Failed to generate pitches. Please try again.',
         };
       }
     },
@@ -2007,7 +1895,8 @@ function buildChatTools(
               clerkUserId,
               conversationId: reservedTurn?.conversationId ?? null,
             },
-            releases
+            releases,
+            artistContext.artistRules
           ),
         }
       : {}),
@@ -3164,10 +3053,10 @@ export async function POST(req: Request) {
             responseMessage.parts as Array<{ type: string; text?: string }>
           )
         ).text;
-        // Copy floor (canon/VOICE.md): a streamed reply can't be blocked
-        // mid-flight, so gate the completed text before it persists. A floor
-        // violation swaps in a safe fallback and logs the rules that fired.
-        const gatedReply = gateAssistantReply(assistantText);
+        // Copy floor (canon/VOICE.md) and artist rules: a streamed reply can't
+        // be blocked mid-flight, so gate the completed text before it persists.
+        // A violation swaps in a safe fallback and logs the rules that fired.
+        const gatedReply = gateAssistantReply(assistantText, artistContext);
         if (gatedReply.violations.length > 0) {
           logger.warn(
             'Assistant reply failed copy floor; persisting fallback',
