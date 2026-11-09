@@ -249,6 +249,9 @@
 }
 
 @theme inline {
+  --color-verified: var(--color-verified);
+  --color-verified-backing: var(--color-verified-backing);
+  --color-on-media: var(--color-on-media);
   --color-sidebar: rgb(var(--sidebar-background));
   --color-sidebar-foreground: rgb(var(--sidebar-foreground));
   --color-sidebar-primary: rgb(var(--sidebar-primary));
