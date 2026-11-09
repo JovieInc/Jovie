@@ -10,6 +10,7 @@ export const REQUIRED_MERGE_STATUSES = [
   'Migration Guard',
   'Fork PR Gate',
   'PR Size Guard',
+  'Company guards',
 ];
 
 /** Canonical native merge-queue operating policy (controller + repo guardrails). */

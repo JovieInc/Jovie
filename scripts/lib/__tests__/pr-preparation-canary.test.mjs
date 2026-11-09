@@ -89,14 +89,18 @@ function plan(overrides = {}) {
 }
 
 function greenChecks() {
-  return ['PR Ready', 'Migration Guard', 'Fork PR Gate', 'PR Size Guard'].map(
-    name => ({
-      __typename: 'CheckRun',
-      name,
-      status: 'COMPLETED',
-      conclusion: 'SUCCESS',
-    })
-  );
+  return [
+    'PR Ready',
+    'Migration Guard',
+    'Fork PR Gate',
+    'PR Size Guard',
+    'Company guards',
+  ].map(name => ({
+    __typename: 'CheckRun',
+    name,
+    status: 'COMPLETED',
+    conclusion: 'SUCCESS',
+  }));
 }
 
 function pullRequest(overrides = {}) {

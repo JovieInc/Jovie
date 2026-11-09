@@ -44,6 +44,7 @@ const REQUIRED_CHECKS = Object.freeze([
   'Migration Guard',
   'Fork PR Gate',
   'PR Size Guard',
+  'Company guards',
 ]);
 const NATIVE_QUEUE_ENTRY_STATES = new Set([
   'QUEUED',

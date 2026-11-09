@@ -195,6 +195,7 @@ describe('ci-harness manifest', () => {
       'Migration Guard',
       'Fork PR Gate',
       'PR Size Guard',
+      'Company guards',
     ]);
     // Individual harness merge-gate job names must stay in the forbidden pin list
     // so a batch failure bisects instead of evicting siblings. ci-fast is a real

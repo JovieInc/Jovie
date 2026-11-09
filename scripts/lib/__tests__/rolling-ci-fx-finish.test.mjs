@@ -202,6 +202,7 @@ const ruleset = {
           'Migration Guard',
           'Fork PR Gate',
           'PR Size Guard',
+          'Company guards',
         ].map(context => ({ context })),
       },
     },
@@ -236,18 +237,21 @@ const native = () => ({
   successRunId: 901,
   successRunAttempt: 2,
   checks: {
-    total_count: 3,
-    check_runs: ['PR Ready', 'Migration Guard', 'PR Size Guard'].map(
-      (name, index) => ({
-        id: index + 1,
-        name,
-        head_sha: repairedHead,
-        status: 'completed',
-        conclusion: 'success',
-        started_at: '2026-09-24T02:59:00Z',
-        completed_at: createdAt,
-      })
-    ),
+    total_count: 4,
+    check_runs: [
+      'PR Ready',
+      'Migration Guard',
+      'PR Size Guard',
+      'Company guards',
+    ].map((name, index) => ({
+      id: index + 1,
+      name,
+      head_sha: repairedHead,
+      status: 'completed',
+      conclusion: 'success',
+      started_at: '2026-09-24T02:59:00Z',
+      completed_at: createdAt,
+    })),
   },
   statuses: [
     {

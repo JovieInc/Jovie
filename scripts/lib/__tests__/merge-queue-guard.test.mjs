@@ -61,6 +61,7 @@ const greenStatuses = [
   { name: 'Migration Guard', conclusion: 'SUCCESS' },
   { name: 'Fork PR Gate', state: 'SUCCESS' },
   { name: 'PR Size Guard', state: 'SUCCESS' },
+  { name: 'Company guards', state: 'SUCCESS' },
 ];
 
 function buildUiFastTrackBody({
@@ -385,6 +386,7 @@ describe('aggregate required checks', () => {
       'CI / Migration Guard',
       'Fork PR Gate',
       'PR Size Guard',
+      'Company guards',
     ]);
     expect(ok.ok).toBe(true);
 
@@ -423,6 +425,7 @@ describe('aggregate required checks', () => {
       'Migration Guard',
       'Fork PR Gate',
       'PR Size Guard',
+      'Company guards',
     ]);
     expect(normalizeBranchProtectionSource(branchProtectionYaml)).toEqual(
       LIVE_NATIVE_RULESET_FIXTURE
@@ -569,6 +572,7 @@ describe('aggregate required checks', () => {
           'Migration Guard',
           'Fork PR Gate',
           'PR Size Guard',
+          'Company guards',
         ].map(context => ({ context })),
       },
     };
@@ -2383,6 +2387,7 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
                 'Migration Guard',
                 'Fork PR Gate',
                 'PR Size Guard',
+                'Company guards',
               ].map(context => ({ context })),
             },
           },
@@ -2435,6 +2440,7 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
                 'Migration Guard',
                 'Fork PR Gate',
                 'PR Size Guard',
+                'Company guards',
               ].map(context => ({ context })),
             },
           },
@@ -2529,6 +2535,7 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
                 'Migration Guard',
                 'Fork PR Gate',
                 'PR Size Guard',
+                'Company guards',
               ].map(context => ({ context })),
             },
           },
