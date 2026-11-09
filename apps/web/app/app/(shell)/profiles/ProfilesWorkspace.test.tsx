@@ -1,3 +1,5 @@
+// Load the real lazy rail before assertions, independent of classification tests.
+import './AddConnectionRail';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
