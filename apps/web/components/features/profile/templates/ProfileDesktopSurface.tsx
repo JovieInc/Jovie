@@ -1009,9 +1009,7 @@ export function ProfileDesktopSurface({
     );
 
   return (
-    <div
-      className='profile-desktop-surface relative flex w-full overflow-hidden rounded-3xl bg-(--color-bg-surface-0)'
-    >
+    <div className='profile-desktop-surface relative flex w-full overflow-hidden rounded-3xl bg-(--color-bg-surface-0)'>
       <div
         ref={setNotificationsPortalContainer}
         className='relative flex min-h-0 w-full flex-col'

@@ -230,7 +230,7 @@
   "apps/web/components/features/profile/templates/ProfileCompactSurface.test.tsx": 725,
   "apps/web/components/features/profile/templates/ProfileCompactSurface.tsx": 976,
   "apps/web/components/features/profile/templates/ProfileCompactTemplate.tsx": 1322,
-  "apps/web/components/features/profile/templates/ProfileDesktopSurface.test.tsx": 1116,
+  "apps/web/components/features/profile/templates/ProfileDesktopSurface.test.tsx": 1208,
   "apps/web/components/features/profile/templates/ProfileDesktopSurface.tsx": 1168,
   "apps/web/components/features/release/ActionDial.tsx": 618,
   "apps/web/components/features/release/AudioWaveformEditor.tsx": 535,
