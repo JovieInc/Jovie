@@ -322,6 +322,29 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     ).not.toContain('blank-media');
   });
 
+  test('blank-media: judges a slow image once it has loaded, not its empty slot', async () => {
+    const slowUrl = 'https://blank-media.fixture.test/slow-hero.svg';
+    await page_ref.route(slowUrl, async route => {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      await route.fulfill({
+        contentType: 'image/svg+xml',
+        body: decodeURIComponent(busyImg.slice(busyImg.indexOf(',') + 1)),
+      });
+    });
+    // A receipt starts at domcontentloaded, so the image is still in flight.
+    await page_ref.setContent(
+      `<main><section data-pen-section="hero" style="background:#0b0b0d"><h1>Product</h1><img src="${slowUrl}" width="600" height="400" alt="Dashboard"></section></main>`,
+      { waitUntil: 'domcontentloaded' }
+    );
+    expect(
+      await page_ref.evaluate(() => document.querySelector('img')?.complete)
+    ).toBe(false);
+    const snapshot = await inspectRouteDom(page_ref, { surface: 'marketing' });
+    expect(snapshot.findings.map(finding => finding.kind)).not.toContain(
+      'blank-media'
+    );
+  });
+
   test('placeholder-copy: flags common placeholders in text, alt and aria', async () => {
     for (const html of [
       '<p>Your Name</p>',
