@@ -99,6 +99,10 @@ import {
 } from '@/lib/chat/retouch-capability';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
 import { isShowTopInsightsTurnRelevant } from '@/lib/chat/show-top-insights-relevance';
+import {
+  createRequestCapabilityTool,
+  createUseSkillTool,
+} from '@/lib/chat/skills/tools';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { resolveSummerHandoff } from '@/lib/chat/summer-summon';
 import {
@@ -1782,7 +1786,8 @@ function createGenerateReleasePitchTool(
 function buildFreeChatTools(
   resolvedProfileId: string | null,
   clerkUserId: string,
-  accountContext: Awaited<ReturnType<typeof resolveChatAccountContext>>
+  accountContext: Awaited<ReturnType<typeof resolveChatAccountContext>>,
+  conversationId: string | null = null
 ) {
   return {
     ...createAccountChatTools(accountContext),
@@ -1790,6 +1795,12 @@ function buildFreeChatTools(
     proposeSocialLink: createSocialLinkTool(),
     proposeSocialLinkRemoval: createSocialLinkRemovalTool(resolvedProfileId),
     submitFeedback: createSubmitFeedbackTool(clerkUserId),
+    useSkill: createUseSkillTool(),
+    requestCapability: createRequestCapabilityTool({
+      clerkUserId,
+      founder: authorizeFounderSummerUser(clerkUserId) === 'authorized',
+      conversationId,
+    }),
   };
 }
 
@@ -2807,7 +2818,8 @@ export async function POST(req: Request) {
     const freeTools = buildFreeChatTools(
       resolvedProfileId,
       userId,
-      accountContext
+      accountContext,
+      dispatchConversationId
     );
     // Advanced tools gated behind paid plans
     const paidTools = canUsePaidChatTools(accountContext)

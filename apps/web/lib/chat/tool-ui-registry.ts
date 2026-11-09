@@ -45,6 +45,22 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Feedback sent',
     errorTitle: "Couldn't send your feedback",
   },
+  useSkill: {
+    label: 'Skill',
+    uiHint: 'status',
+    renderer: 'status',
+    loadingTitle: 'Opening the playbook…',
+    successTitle: 'Playbook ready',
+    errorTitle: "Couldn't open that playbook",
+  },
+  requestCapability: {
+    label: 'Request',
+    uiHint: 'status',
+    renderer: 'status',
+    loadingTitle: 'Filing the request…',
+    successTitle: 'Request filed',
+    errorTitle: "Couldn't file the request",
+  },
   showTopInsights: {
     label: 'Insights',
     uiHint: 'artifact',

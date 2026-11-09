@@ -92,6 +92,7 @@ const nextConfig = {
       // Blog catalog validation checks these assets with fs.access at request time.
       'public/images/blog/**/*',
       'lib/chat/knowledge/topics/**/*',
+      'lib/chat/skills/library/**/*',
       'public/fonts/Satoshi-Bold.ttf',
       'public/fonts/DMSans-Regular.ttf',
     ],
