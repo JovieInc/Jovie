@@ -37,6 +37,29 @@ export interface SlugRename {
 }
 
 /**
+ * Bare title slugs no legacy release may take: when every release sharing a
+ * title is credited with another main artist (`Seaside Heights` with Vigel),
+ * the bare slug stays free for the artist's own solo release, which may not
+ * be imported yet. Those releases get a `-with-{artist}` slug instead.
+ */
+function coPrimaryOnlyBases(releases: readonly SlugItem[]): Set<string> {
+  const byBase = new Map<string, SlugItem[]>();
+  for (const release of releases) {
+    const base = slugify(release.title);
+    if (!base) continue;
+    byBase.set(base, [...(byBase.get(base) ?? []), release]);
+  }
+  const bases = new Set<string>();
+  for (const [base, group] of byBase) {
+    const hasLegacy = group.some(
+      r => legacySlugBase(r.currentSlug, r.title) !== null
+    );
+    if (hasLegacy && group.every(r => r.coPrimary.length > 0)) bases.add(base);
+  }
+  return bases;
+}
+
+/**
  * Plan release renames for one artist. Every release whose slug is not
  * legacy keeps its URL (pinned); legacy releases are planned around them
  * with the shared policy. `reserved` holds slugs owned by anything outside
@@ -56,7 +79,11 @@ export function planLegacyReleaseSlugRenames(
       .filter(r => legacySlugBase(r.currentSlug, r.title) === null)
       .map(r => r.key)
   );
-  const plan = planSlugs(releases, reserved, pinned);
+  const plan = planSlugs(
+    releases,
+    new Set([...reserved, ...coPrimaryOnlyBases(releases)]),
+    pinned
+  );
 
   const renames: SlugRename[] = [];
   for (const release of legacy) {

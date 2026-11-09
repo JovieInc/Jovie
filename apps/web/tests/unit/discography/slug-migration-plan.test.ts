@@ -86,6 +86,21 @@ describe('planLegacyReleaseSlugRenames', () => {
     ]);
   });
 
+  it('keeps the bare slug free when the only release is a co-primary version', () => {
+    const renames = planLegacyReleaseSlugRenames([
+      release('r1', 'Seaside Heights', 'seaside-heights-3', '2019-09-20', [
+        'Vigel',
+      ]),
+    ]);
+    expect(renames).toEqual([
+      {
+        id: 'r1',
+        from: 'seaside-heights-3',
+        to: 'seaside-heights-with-vigel',
+      },
+    ]);
+  });
+
   it('is idempotent: a migrated catalog plans nothing', () => {
     const once = planLegacyReleaseSlugRenames([
       release('r1', 'Take Me Over', 'take-me-over-2', '2014-05-06'),

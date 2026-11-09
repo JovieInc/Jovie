@@ -213,8 +213,9 @@ describe('sitemap', () => {
 
     const { default: sitemap } = await import('../../app/sitemap');
     const entries = await sitemap();
+    const urls = entries.map(entry => entry.url);
 
-    expect(entries.map(entry => entry.url)).toEqual(
+    expect(urls).toEqual(
       expect.arrayContaining([
         'https://jov.ie',
         'https://jov.ie/blog',
@@ -241,16 +242,9 @@ describe('sitemap', () => {
       ])
     );
 
-    const albumMatches = entries.filter(
-      entry => entry.url === 'https://jov.ie/tim/album'
-    );
-    expect(albumMatches).toHaveLength(1);
-    expect(entries.map(entry => entry.url)).not.toContain(
-      'https://jov.ie/tim/best-of/album'
-    );
-    expect(entries.map(entry => entry.url)).not.toContain(
-      'https://jov.ie/tim/single'
-    );
+    expect(urls.filter(u => u === 'https://jov.ie/tim/album')).toHaveLength(1);
+    expect(urls).not.toContain('https://jov.ie/tim/best-of/album');
+    expect(urls).not.toContain('https://jov.ie/tim/single');
 
     for (const blockedUrl of [
       'https://jov.ie/demo',
