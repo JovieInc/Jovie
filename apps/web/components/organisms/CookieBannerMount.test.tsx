@@ -19,7 +19,11 @@ vi.mock('@/components/organisms/CookieBannerSection', () => ({
   ),
 }));
 
-vi.mock('@/lib/tracking/consent', () => ({ setConsentState: vi.fn() }));
+vi.mock('@/lib/tracking/consent', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/tracking/consent')>();
+  return { ...actual, setConsentState: vi.fn() };
+});
 
 const savedConsent: Consent = {
   essential: true,
