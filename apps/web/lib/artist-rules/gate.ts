@@ -98,11 +98,18 @@ export function buildArtistRulesPromptSection(
   const lines = ordered.map(rule => {
     const label =
       rule.strength === 'hard_constraint' ? 'Always follow' : 'Prefer';
+    const detail = oneLine(rule.instruction, 200);
     if (rule.category === PEOPLE_RULE_CATEGORY) {
-      const names = peopleRuleNames(rule).join(', ');
-      return `- ${label}: never feature, name or suggest ${oneLine(names, 120)}. ${oneLine(rule.instruction, 200)}`;
+      const names = oneLine(peopleRuleNames(rule).join(', '), 120);
+      return [
+        '-',
+        `${label}:`,
+        'never feature, name or suggest',
+        `${names}.`,
+        detail,
+      ].join(' ');
     }
-    return `- ${label} (${oneLine(rule.category, 30)}): ${oneLine(rule.instruction, 200)}`;
+    return ['-', `${label} (${oneLine(rule.category, 30)}):`, detail].join(' ');
   });
   return `
 ## Artist Rules
