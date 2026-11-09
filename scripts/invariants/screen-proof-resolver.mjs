@@ -147,7 +147,7 @@ function runOnce(command, args, binary = false) {
   if (result.status !== 0) throw new Error('controlled transport unavailable');
   return result.stdout;
 }
-// Run 42650227305: a single transient `gh api` exit per screen (rate limit
+// Run 42650227305: a single transient GitHub CLI exit per screen (rate limit
 // / blip) killed four screens' exact-head proofs with no retry while every
 // producer artifact sat intact in the same run. Transport retries here
 // only, bounded; trust findings are never retried or softened.

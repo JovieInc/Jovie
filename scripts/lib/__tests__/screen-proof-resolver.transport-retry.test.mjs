@@ -11,7 +11,7 @@ const spawnSync = vi.hoisted(() => vi.fn());
 vi.mock('node:child_process', () => ({ spawnSync }));
 
 const { run, setTransportRetryDelaysForTests } = await import(
-  './screen-proof-resolver.mjs'
+  '../../invariants/screen-proof-resolver.mjs'
 );
 
 describe('controlled transport retry (run 42650227305)', () => {
@@ -39,8 +39,8 @@ describe('controlled transport retry (run 42650227305)', () => {
     expect(spawnSync).toHaveBeenCalledTimes(3);
   });
 
-  it('keeps zero retries when a screen has no delays configured', () => {
-    setTransportRetryDelaysForTests([]);
+  it('attempts transport once when retries are disabled', () => {
+    setTransportRetryDelaysForTests([0]);
     spawnSync.mockReset();
     spawnSync.mockImplementation(() => ({ status: 1, stdout: '', stderr: '' }));
     expect(() => run('gh', ['api', 'repos/x/y'])).toThrow(
