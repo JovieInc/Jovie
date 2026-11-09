@@ -25,6 +25,7 @@ export const NotMeasured: Story = {
 
 export const SnapshotProvenance: Story = {
   args: {
+    reserveSourceCaption: true,
     tiles: [
       {
         ...HOME_LOOP_FIXTURE_PULSE[0],
@@ -38,4 +39,11 @@ export const SnapshotProvenance: Story = {
       },
     ],
   },
+};
+
+export const SnapshotLoading: Story = {
+  args: { reserveSourceCaption: true, loading: true, tiles: [] },
+};
+export const SnapshotUnavailable: Story = {
+  args: { reserveSourceCaption: true, tiles: [] },
 };

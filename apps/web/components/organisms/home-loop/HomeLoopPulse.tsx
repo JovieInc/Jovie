@@ -193,11 +193,13 @@ export function HomeLoopPulse({
   loading = false,
   placeholderCount = 7,
   testId = 'home-loop-pulse',
+  reserveSourceCaption = false,
 }: Readonly<{
   readonly tiles: readonly HomeLoopTile[];
   readonly loading?: boolean;
   readonly placeholderCount?: number;
   readonly testId?: string;
+  readonly reserveSourceCaption?: boolean;
 }>) {
   const { ref } = useFitList<HTMLDivElement>(
     loading
@@ -209,7 +211,7 @@ export function HomeLoopPulse({
       ref={ref}
       className={cn(
         'relative flex shrink-0 flex-wrap gap-2 overflow-hidden',
-        tiles.some(tile => tile.sourceCaption) ? 'h-32' : 'h-20'
+        reserveSourceCaption ? 'h-32' : 'h-20'
       )}
       data-testid={testId}
       aria-busy={loading}
