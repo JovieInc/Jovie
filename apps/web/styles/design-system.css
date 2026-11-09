@@ -1709,6 +1709,11 @@
   --noir-ion-card: #ffffff;
   --noir-ion-elevated: #ffffff;
   --noir-ion-floating: #ffffff;
+  /* ZiaWI marks (2026-11-08): verified blue and the white that stays white
+     on brand fills, photos and fixed-dark media. */
+  --color-verified: #0084d1;
+  --color-on-media: #ffffff;
+  --color-verified-backing: var(--color-on-media);
   /* Glass (2026-10-26): one semantic material for frosted panels. Shell
      mixed 3% toward ion in OKLab (same recipe as JOV-8927 ds-glass), alpha per
      theme so secondary text clears 4.5:1 over black, white and every accent
@@ -2028,6 +2033,9 @@
   --noir-ion-card: #131417;
   --noir-ion-elevated: #1a1b1e;
   --noir-ion-floating: #232427;
+  --color-verified: #00bcff;
+  --color-on-media: #ffffff;
+  --color-verified-backing: var(--color-bg-base);
   --noir-ion-text-strong: #ffffff;
   --noir-ion-text-primary: #f5f7fb;
   /* Cinematic depth ramp (Tim, 2026-09-25): one big step from primary, then a
@@ -2339,6 +2347,14 @@
   );
   /* Selection roles */
   --color-bg-selected: var(--noir-ion-selected);
+}
+
+/* Brand marks follow a scoped .dark wrapper too (brand, playlists and
+   not-found mount .system-b-marketing.dark under a light root), the way the
+   dark: variant did. The backing re-resolves bg-base on the wrapper. */
+.dark {
+  --color-verified: #00bcff;
+  --color-verified-backing: var(--color-bg-base);
 }
 
 /* Public-profile navigation is one distinct functional glass layer. It floats
