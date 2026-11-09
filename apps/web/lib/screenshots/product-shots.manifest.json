@@ -25,7 +25,7 @@
     "setup-claim-handle": {
       "width": 696,
       "height": 372,
-      "sourceHash": "44284c581a65d922376078f1a049e09dbe8d8a6b835793bdf4b030c887a32df8",
+      "sourceHash": "74216792f949371ab0a3514daa9ff78dc1dea573552f5788cabf2deb9b10cf31",
       "specHash": "8e8165321af2f58428e0d98ae5f458702ea14d0331883630a01c31630c875ffd",
       "renderedAt": "2026-11-02T12:28:39.725Z",
       "sources": [
@@ -38,6 +38,12 @@
       "bytes": {
         "avif": 6617,
         "webp": 10728
+      },
+      "sourceEquivalence": {
+        "capturedSourceHash": "44284c581a65d922376078f1a049e09dbe8d8a6b835793bdf4b030c887a32df8",
+        "sourceCommit": "fbae862d8fd2e8eb10480927bf68b451bb41c589",
+        "change": "Only aria-label='Continue' was added; Storybook pixels match with and without it at 390/1440px in light/dark themes, with visible-mutation negative controls.",
+        "evidence": "https://github.com/JovieInc/Jovie/pull/24404#handle-source-equivalence"
       }
     },
     "setup-connect-music": {
