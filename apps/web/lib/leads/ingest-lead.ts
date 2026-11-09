@@ -14,6 +14,7 @@ import {
   enqueueDspArtistDiscoveryJob,
   enqueueMusicFetchEnrichmentJob,
 } from '@/lib/ingestion/jobs';
+import { isLayloUrl } from '@/lib/ingestion/strategies/laylo';
 import { cleanScrapedDisplayName } from '@/lib/profile/scraped-display-name';
 import { reconcileProfileSurfaces } from '@/lib/profile-surfaces/reconciliation';
 import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
@@ -137,7 +138,7 @@ export async function ingestLeadAsCreator(
     const extraction = pageless
       ? pageless.extraction
       : await fetchFullExtractionProfile(
-          false, // not Laylo
+          isLayloUrl(lead.linktreeUrl),
           lead.linktreeUrl,
           handle
         );

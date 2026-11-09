@@ -12,7 +12,8 @@
  *   component, or a regression) blocks the merge;
  * - a debt entry that now passes, or that no screen renders any more, blocks
  *   too, so the debt is rewritten smaller (`--refresh`) in the PR that paid it;
- * - against the base registry, debt may grow only for a screen being enrolled.
+ * - against the base registry, debt may grow only for a screen being enrolled
+ *   or for a criterion the base registry did not list yet; criteria never drop.
  *
  * A screen with no debt left is must-pass by construction. Enrollment and the
  * ranked list of failing components are machine-driven (`--enroll`, `--issues`)
@@ -211,14 +212,26 @@ export function evaluateScreenGates(report, screens, byScreen, base = null) {
     const newScreenComponents = new Set(
       [...enrolledNow].flatMap(id => byScreen.get(id) ?? [])
     );
+    // A criterion the base registry did not have yet starts as debt for
+    // every component that fails it; after it lands, its debt only shrinks.
+    const newCriteria = new Set(
+      criteria.filter(id => !(base.criteria ?? []).includes(id))
+    );
     for (const [component, entry] of Object.entries(debt)) {
       const before = new Set(owedCriteria(base.debt[component]));
-      const added = owedCriteria(entry).filter(id => !before.has(id));
+      const added = owedCriteria(entry).filter(
+        id => !before.has(id) && !newCriteria.has(id)
+      );
       if (added.length && !newScreenComponents.has(component))
         errors.push(
-          `debt for ${component} grew (${added.join(', ')}); debt only shrinks, except for a screen being enrolled`
+          `debt for ${component} grew (${added.join(', ')}); debt only shrinks, except for a screen being enrolled or a criterion being added`
         );
     }
+    for (const id of base.criteria ?? [])
+      if (!criteria.includes(id))
+        errors.push(
+          `cert-screens: criterion ${id} was removed; screen criteria only grow`
+        );
   }
   const perScreen = [...byScreen].map(([id, list]) => {
     const owing = list.filter(

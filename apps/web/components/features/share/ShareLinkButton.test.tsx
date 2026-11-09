@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ShareLinkButton } from '@/components/features/share/ShareLinkButton';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 function setShare(value: unknown) {
   Object.defineProperty(navigator, 'share', { configurable: true, value });
@@ -43,9 +44,10 @@ describe('ShareLinkButton', () => {
     setShare(undefined);
     const writeText = vi.fn().mockResolvedValue(undefined);
     setClipboard(writeText);
-    render(
+    const { container } = render(
       <ShareLinkButton title='Tim White' getUrl={() => 'https://jov.ie/tim'} />
     );
+    await expectNoA11yViolations(container);
 
     fireEvent.click(screen.getByRole('button', { name: 'Share' }));
 
@@ -53,6 +55,7 @@ describe('ShareLinkButton', () => {
       await screen.findByRole('button', { name: 'Link copied' })
     ).toBeInTheDocument();
     expect(writeText).toHaveBeenCalledWith('https://jov.ie/tim');
+    await expectNoA11yViolations(container);
   });
 
   it('does nothing visible when the person cancels the share sheet', async () => {
@@ -75,6 +78,22 @@ describe('ShareLinkButton', () => {
 
     await waitFor(() => expect(onShare).toHaveBeenCalledWith('cancelled'));
     expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it('uses the host label in a right-to-left page', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <ShareLinkButton
+          title='عمرو دياب'
+          getUrl={() => 'https://jov.ie/amrdiab'}
+          ariaLabel='مشاركة الملف الشخصي لعمرو دياب'
+        />
+      </div>
+    );
+    expect(
+      screen.getByRole('button', { name: 'مشاركة الملف الشخصي لعمرو دياب' })
+    ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 
   it('is a 44pt target', () => {

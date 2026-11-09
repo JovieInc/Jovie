@@ -11,6 +11,7 @@ vi.mock('@/lib/auth/client', () => ({
   isGoogleOneTapConfigured: () => oneTapConfiguredState.value,
 }));
 
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { GoogleOneTap } from './GoogleOneTap';
 
 describe('GoogleOneTap', () => {
@@ -36,6 +37,23 @@ describe('GoogleOneTap', () => {
       });
     });
     expect(container).toBeEmptyDOMElement();
+    await expectNoA11yViolations(container);
+  });
+
+  it('swallows a dismissed or unauthorized prompt and adds no markup', async () => {
+    oneTapMock.mockRejectedValue(new Error('One Tap dismissed'));
+    const { container } = render(
+      <GoogleOneTap mode='sign-up' suppress={false} />
+    );
+
+    await waitFor(() => {
+      expect(oneTapMock).toHaveBeenCalledWith({
+        callbackURL: '/signup',
+        context: 'signup',
+      });
+    });
+    expect(container).toBeEmptyDOMElement();
+    await expectNoA11yViolations(container);
   });
 
   it('skips One Tap when the root layout marks managed e2e/audit mode', async () => {
