@@ -453,6 +453,23 @@ export function ProfileMobileNotificationsFlow({
     setMounted(true);
   }, []);
 
+  // One interruption at a time (JOV-3209 default-yes guardrail): while the
+  // mobile alerts/subscribe flow is open, the lazy-mounted consent card must
+  // not stack over it and intercept its inputs. Flip a root attribute that the
+  // consent-card CSS reads; the banner returns when the flow closes. Set for
+  // every presentation — inline flows live inside the profile surface where
+  // the fixed consent card paints above them.
+  useEffect(() => {
+    if (!open || !mounted) {
+      return;
+    }
+    const root = document.documentElement;
+    root.dataset.profileFlowOpen = 'true';
+    return () => {
+      delete root.dataset.profileFlowOpen;
+    };
+  }, [open, mounted]);
+
   useEffect(() => {
     if (!open) {
       return;
