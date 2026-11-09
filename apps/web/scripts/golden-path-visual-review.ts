@@ -19,6 +19,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
+import { reviewKeyframeTraced } from './golden-path-review-routing.ts';
 
 export const RUBRIC_VERSION = 'golden-path-user-blocking/v3';
 /** Public catalog artist claimed by the golden-path journey. */
@@ -297,24 +298,7 @@ export async function reviewWithFailover(
     readonly workersAiToken: string | undefined;
   }
 ): Promise<ModelVerdict> {
-  if (keys.workersAiToken) {
-    const viaWorkers = await reviewWithModel({
-      ...frame,
-      apiKey: keys.workersAiToken,
-      baseUrl: WORKERS_AI_REVIEW_BASE_URL,
-      model: WORKERS_AI_REVIEW_MODEL,
-      provider: 'workers-ai',
-    });
-    if (viaWorkers.verdict !== 'unknown') return viaWorkers;
-    console.log(
-      `[golden-path-review] workers-ai unavailable (${viaWorkers.reason}); using the gateway`
-    );
-  }
-  return reviewWithModel({
-    ...frame,
-    apiKey: keys.gatewayKey,
-    baseUrl: keys.gatewayBaseUrl,
-  });
+  return (await reviewKeyframeTraced(frame, keys)).model;
 }
 
 export function readManifest(dir: string): KeyframeRecord[] {
@@ -381,12 +365,17 @@ export async function main(
   const baseUrl =
     env.VISUAL_REVIEW_BASE_URL ?? 'https://ai-gateway.vercel.sh/v1';
   const verdicts: KeyframeVerdict[] = [];
+  const routing = {
+    viaWorkersAi: 0,
+    viaGateway: 0,
+    workersAiFallbackReasons: [] as string[],
+  };
   for (const record of records) {
     const layout = reviewLayout(record);
     const png = readFileSync(join(values.dir, record.file));
     const modelSamples: ModelVerdict[] = [];
     for (let i = 0; i < MODEL_SAMPLES; i += 1) {
-      const raw = await reviewWithFailover(
+      const tracked = await reviewKeyframeTraced(
         {
           png,
           stepId: record.id,
@@ -400,6 +389,16 @@ export async function main(
           workersAiToken: env.WORKERS_AI_TOKEN,
         }
       );
+      const raw = tracked.model;
+      if (tracked.provider === 'workers-ai') routing.viaWorkersAi += 1;
+      else routing.viaGateway += 1;
+      if (
+        tracked.workersAiFallbackReason &&
+        !routing.workersAiFallbackReasons.includes(
+          tracked.workersAiFallbackReason
+        )
+      )
+        routing.workersAiFallbackReasons.push(tracked.workersAiFallbackReason);
       if (raw.verdict === 'blocker') {
         for (const finding of raw.findings) {
           if (isKnownArtistIdentityFalsePositive(finding))
@@ -449,6 +448,7 @@ export async function main(
         reviewers: {
           model: REVIEW_MODEL,
           layout: 'golden-path-layout-audit/v1',
+          routing,
         },
         reviewedAt: new Date().toISOString(),
         phase: first ? 'replay' : 'first',
@@ -462,6 +462,9 @@ export async function main(
   );
   console.log(
     `[golden-path-review] ${verdicts.length} keyframes, suspected=${suspected.length}${first ? `, confirmed=${confirmed.length}` : ''}`
+  );
+  console.log(
+    `[golden-path-review] routing: ${routing.viaWorkersAi} via Workers AI, ${routing.viaGateway} via Gateway${routing.workersAiFallbackReasons.length ? ` (${routing.workersAiFallbackReasons.join('; ')})` : ''}`
   );
   if (first && confirmed.length > 0) process.exit(1);
 }
