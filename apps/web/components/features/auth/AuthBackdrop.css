@@ -1,0 +1,40 @@
+/* Pen odZZY "Full-bleed gradient — proof atom": blue glow top right and
+   bottom left, under a cinematic vignette and a dark scrim behind the
+   column so the form keeps its contrast. */
+.auth-backdrop-glow {
+  background-image:
+    radial-gradient(
+      ellipse 19% 12% at 82% 12%,
+      color-mix(in oklab, var(--color-text-primary) 15%, transparent),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 102.5% 31% at 118% -8%,
+      color-mix(in oklab, var(--color-accent) 75%, transparent),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 70% 25% at 86% 10%,
+      color-mix(in oklab, var(--color-accent) 47%, transparent),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 62.5% 33% at -8% 116%,
+      color-mix(in oklab, var(--color-accent) 39%, transparent),
+      transparent
+    );
+}
+
+.auth-backdrop-veil {
+  background-image:
+    radial-gradient(
+      ellipse 34.7% 44.4% at 50% 50%,
+      color-mix(in oklab, var(--color-bg-base) 70%, transparent),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 57.5% 67.5% at 50% 46%,
+      transparent 45%,
+      color-mix(in oklab, var(--color-bg-base) 85%, transparent)
+    );
+}
