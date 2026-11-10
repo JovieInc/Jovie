@@ -1,16 +1,12 @@
 import { act, fireEvent, screen } from '@testing-library/react';
 import type { UIMessage } from 'ai';
-import {
-  type ComponentProps,
-  type ReactNode,
-  useLayoutEffect,
-  useState,
-} from 'react';
+import { type ComponentProps, useLayoutEffect, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetComposerDraftStoreForTests } from '@/lib/chat/composer-draft-store';
 import { getDesktopWorkState } from '@/lib/desktop/session-work-state';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 import type { ChatInputProps } from './components/ChatInput';
+import { observeComposerRender } from './composer-render-test-utils';
 import type { PendingFile } from './hooks/useChatFileAttachments';
 import { createComposerDraft } from './hooks/useComposerDraft';
 import { resetChatTimelineStateCacheForTests } from './hooks/useJovieChat';
@@ -102,6 +98,7 @@ vi.mock('@/lib/queries', async importOriginal => ({
 vi.mock('@/lib/flags/client', () => ({ useAppFlag: () => false }));
 vi.mock('@/lib/chat/open-chat-with-prompt', () => ({
   consumePendingChatPrompt: () => null,
+  consumePendingChatDraft: () => null,
 }));
 vi.mock('@/components/jovie/components/ChatUsageAlert', () => ({
   ChatUsageAlert: () => null,
@@ -143,31 +140,6 @@ vi.mock('@/components/jovie/components', async importOriginal => {
     ScrollToBottom: () => null,
   };
 });
-
-// Observe the real render body before mounting. The baseline exports a function;
-// the optimized version keeps React's real memo object/comparison and spies its type.
-function observeComposerRender() {
-  const component: unknown = sections.ChatDraftComposerSurface;
-  if (typeof component === 'function') {
-    return vi.spyOn(sections, 'ChatDraftComposerSurface');
-  }
-  if (
-    component !== null &&
-    typeof component === 'object' &&
-    'type' in component &&
-    typeof component.type === 'function'
-  ) {
-    return vi.spyOn(
-      component as {
-        type: (
-          props: ComponentProps<typeof sections.ChatDraftComposerSurface>
-        ) => ReactNode;
-      },
-      'type'
-    );
-  }
-  throw new Error('Expected the actual composer render function or memo type');
-}
 
 describe('composer draft ownership', () => {
   beforeEach(() => {

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
-  "generatedAt": "2026-10-20T19:15:13.794Z",
-  "totalErrors": 99,
+  "generatedAt": "2026-11-10T03:40:06.918Z",
+  "totalErrors": 86,
   "files": {
     "apps/web/scripts/generate-brand-assets.ts": {
       "TS1470": 2,
@@ -44,9 +44,7 @@
     },
     "scripts/knowledge/fetch.ts": {
       "TS1470": 1,
-      "TS2304": 2,
-      "TS2307": 1,
-      "TS2584": 8
+      "TS2307": 1
     },
     "scripts/lib/__tests__/automation-verify.test.mjs": {
       "TS2345": 1
@@ -92,9 +90,6 @@
     "scripts/send-changelog-email.mjs": {
       "TS2307": 2,
       "TS2339": 2
-    },
-    "scripts/ship-swarm/next-batch.mjs": {
-      "TS2339": 3
     },
     "scripts/skill-governance-guard.mjs": {
       "TS2339": 1

@@ -57,6 +57,7 @@ import {
   presenceWorkspaceScopeKey,
   usePresenceWorkspaceController,
 } from '@/components/features/presence/workspace-controller';
+import { toast } from '@/components/feedback';
 import {
   DrawerAnalyticsSummaryCard,
   DrawerSection,
@@ -77,7 +78,9 @@ import {
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { useFounderDoor } from '@/contexts/FounderDoorContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import { openChatWithDraft } from '@/lib/chat/open-chat-with-prompt';
 import { fixChatHref, fixForRow } from '@/lib/presence-loop/adapter';
 import type { SourceIdentity } from '@/lib/profile-surfaces/presence-identity';
 import {
@@ -91,6 +94,7 @@ import {
   formatProfileRankChange,
   getConnectionPrimaryAction,
   getConnectionStatus,
+  selectPresenceReviewRows,
 } from '@/lib/profile-surfaces/workspace';
 import {
   FetchError,
@@ -98,10 +102,30 @@ import {
   queryKeys,
   STANDARD_CACHE,
 } from '@/lib/queries';
+import { getCacheScope } from '@/lib/queries/cache-isolation';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import type { ConnectionIntakeCandidate } from './AddConnectionRail';
 import { buildConnectionActions } from './connection-actions';
+import { connectionChatDraft } from './connection-chat-context';
+import {
+  type ConnectionSuggestion,
+  findNextSuggestionFocusTarget,
+  groupConnectionSuggestions,
+  type IdentityDecision,
+  type IdentityDecisionResponse,
+  SUGGESTED_QUEUE_FOCUS_TARGET,
+  type SuggestedConnectionGroup,
+  type SuggestionAction,
+  type SuggestionActionError,
+  type SuggestionMutationResponse,
+  type SuggestionsApiResponse,
+  suggestionActionEndpoint,
+  suggestionContext,
+  suggestionFocusKey,
+  suggestionIdentity,
+  suggestionToAcceptedRow,
+} from './connection-suggestion-helpers';
 import type {
   PresenceSignal,
   ProfilesWorkspaceData,
@@ -127,59 +151,6 @@ function combineSourceIdentityQueries(
 
 const columnHelper = createColumnHelper<ProfileWorkspaceRow>();
 
-type ConnectionSuggestion = ProfileSuggestion & {
-  readonly type: 'dsp_match' | 'social_link';
-  readonly externalUrl: string;
-};
-
-interface SuggestionActionError {
-  readonly suggestionId: string;
-  readonly message: string;
-}
-
-interface SuggestedConnectionGroup {
-  readonly id: string;
-  readonly identity: string;
-  readonly suggestions: readonly ConnectionSuggestion[];
-}
-
-interface SuggestionsApiResponse {
-  readonly success: boolean;
-  readonly suggestions?: ProfileSuggestion[];
-  readonly error?: string;
-}
-
-interface SuggestionMutationResponse {
-  readonly success?: boolean;
-  readonly error?: string;
-}
-
-interface IdentityDecisionResponse {
-  readonly ok: boolean;
-  readonly error?: string;
-}
-
-type IdentityDecision = 'yes' | 'no' | 'unsure';
-
-type SuggestionAction = 'accept' | 'reject';
-
-const CONNECTION_SUGGESTION_PLATFORM_PRIORITY: Readonly<
-  Record<string, number>
-> = {
-  instagram: 0,
-  tiktok: 1,
-  youtube: 2,
-  twitter: 3,
-  x: 3,
-  facebook: 4,
-  spotify: 10,
-  apple_music: 11,
-  youtube_music: 12,
-  soundcloud: 13,
-  bandcamp: 14,
-};
-
-const SUGGESTED_QUEUE_FOCUS_TARGET = 'suggested-connections-region';
 const SUGGESTED_CONNECTION_SKELETON_IDS = [
   'suggested-connection-loading-1',
   'suggested-connection-loading-2',
@@ -195,16 +166,6 @@ function connectionSuggestionsQueryKey(
     'connections-review',
     presenceWorkspaceScopeKey(scope),
   ];
-}
-
-function isConnectionSuggestion(
-  suggestion: ProfileSuggestion
-): suggestion is ConnectionSuggestion {
-  return (
-    (suggestion.type === 'dsp_match' || suggestion.type === 'social_link') &&
-    typeof suggestion.externalUrl === 'string' &&
-    suggestion.externalUrl.trim().length > 0
-  );
 }
 
 async function fetchConnectionSuggestions(
@@ -223,135 +184,14 @@ async function fetchConnectionSuggestions(
   return (data.suggestions ?? []).filter(isConnectionSuggestion);
 }
 
-function compactUrlDisplay(value: string): string {
-  try {
-    const url = new URL(value);
-    const path = url.pathname
-      .split('/')
-      .findLast(segment => segment.length > 0)
-      ?.replace(/^@/, '');
-    if (path) return `@${path}`;
-    return url.hostname.replace(/^www\./, '');
-  } catch {
-    return value;
-  }
-}
-
-function suggestionIdentity(suggestion: ConnectionSuggestion): string {
-  const title = suggestion.title.trim();
-  if (title) return title;
-  if (suggestion.externalUrl) return compactUrlDisplay(suggestion.externalUrl);
-  return suggestion.platformLabel;
-}
-
-function suggestionIdentityKey(suggestion: ConnectionSuggestion): string {
-  return suggestionIdentity(suggestion).trim().toLowerCase().replace(/^@/, '');
-}
-
-function formatConfidence(confidence: number | null): string | null {
-  if (confidence === null) return null;
-  return `${Math.round(confidence * 100)}% match`;
-}
-
-function suggestionContext(suggestion: ConnectionSuggestion): string {
-  const confidence = formatConfidence(suggestion.confidence);
-  return [suggestion.subtitle, confidence].filter(Boolean).join(' · ');
-}
-
-function sortConnectionSuggestions(
-  suggestions: readonly ConnectionSuggestion[]
-): ConnectionSuggestion[] {
-  return [...suggestions].sort((left, right) => {
-    const identityDifference = suggestionIdentityKey(left).localeCompare(
-      suggestionIdentityKey(right)
-    );
-    if (identityDifference !== 0) return identityDifference;
-
-    const platformDifference =
-      (CONNECTION_SUGGESTION_PLATFORM_PRIORITY[left.platform] ?? 50) -
-      (CONNECTION_SUGGESTION_PLATFORM_PRIORITY[right.platform] ?? 50);
-    if (platformDifference !== 0) return platformDifference;
-
-    return (right.confidence ?? 0) - (left.confidence ?? 0);
-  });
-}
-
-function groupConnectionSuggestions(
-  suggestions: readonly ConnectionSuggestion[]
-): SuggestedConnectionGroup[] {
-  const groups = new Map<string, SuggestedConnectionGroup>();
-
-  for (const suggestion of sortConnectionSuggestions(suggestions)) {
-    const identity = suggestionIdentity(suggestion);
-    const id = suggestionIdentityKey(suggestion) || suggestion.id;
-    const existing = groups.get(id);
-    groups.set(id, {
-      id,
-      identity,
-      suggestions: existing
-        ? [...existing.suggestions, suggestion]
-        : [suggestion],
-    });
-  }
-
-  return [...groups.values()];
-}
-
-function suggestionActionEndpoint(
-  suggestion: ConnectionSuggestion,
-  action: SuggestionAction
-): string {
-  if (suggestion.type === 'dsp_match') {
-    return `/api/dsp/matches/${encodeURIComponent(suggestion.id)}/${
-      action === 'accept' ? 'confirm' : 'reject'
-    }`;
-  }
-
-  return `/api/suggestions/social-links/${encodeURIComponent(suggestion.id)}/${
-    action === 'accept' ? 'approve' : 'reject'
-  }`;
-}
-
-function suggestionFocusKey(
-  suggestionId: string,
-  action: SuggestionAction
-): string {
-  return `${suggestionId}:${action}`;
-}
-
-function findNextSuggestionFocusTarget(
-  suggestions: readonly ConnectionSuggestion[],
-  suggestionId: string
-): string {
-  const index = suggestions.findIndex(
-    suggestion => suggestion.id === suggestionId
+function isConnectionSuggestion(
+  suggestion: ProfileSuggestion
+): suggestion is ConnectionSuggestion {
+  return (
+    (suggestion.type === 'dsp_match' || suggestion.type === 'social_link') &&
+    typeof suggestion.externalUrl === 'string' &&
+    suggestion.externalUrl.trim().length > 0
   );
-  const nextSuggestion = suggestions[index + 1] ?? suggestions[index - 1];
-  return nextSuggestion
-    ? suggestionFocusKey(nextSuggestion.id, 'accept')
-    : SUGGESTED_QUEUE_FOCUS_TARGET;
-}
-
-function suggestionToAcceptedRow(
-  suggestion: ConnectionSuggestion
-): ProfileWorkspaceSurfaceRow {
-  return {
-    id: `accepted:${suggestion.type}:${suggestion.id}`,
-    rowType: 'surface',
-    kind: suggestion.type === 'dsp_match' ? 'dsp' : 'social',
-    platform: suggestion.platform,
-    label: suggestion.platformLabel || suggestion.platform,
-    handle:
-      suggestion.type === 'social_link' ? suggestionIdentity(suggestion) : null,
-    url: suggestion.externalUrl,
-    trackedUrl: null,
-    qualificationStatus: 'qualified',
-    isOfficial: true,
-    monitoringState: 'unavailable',
-    rank: null,
-    previousRank: null,
-    lastObservedAt: null,
-  };
 }
 
 function kindLabel(row: ProfileWorkspaceRow): string {
@@ -522,8 +362,10 @@ function ConnectionSecondaryIdentity({
         .join(' · ')}
     >
       {showPlatform ? <span>{platform}</span> : null}
-      {showPlatform && handle ? ' · ' : null}
-      {handle ? <span>{handle}</span> : null}
+      {showPlatform && handle ? (
+        <span className='max-sm:hidden'> · </span>
+      ) : null}
+      {handle ? <span className='max-sm:hidden'>{handle}</span> : null}
     </div>
   );
 }
@@ -1418,10 +1260,25 @@ function ProfilesWorkspaceContent({
     adapter: CREATOR_PRESENCE_ADAPTER,
     initialFilter: 'all',
   });
+  const identityReviewRows = useMemo(
+    () => selectPresenceReviewRows(rows).filter(row => row.kind !== 'jovie'),
+    [rows]
+  );
+  const handleReviewIdentities = useCallback(() => {
+    const reviewRow =
+      identityReviewRows.find(row => row.id === selected?.id) ??
+      identityReviewRows[0];
+    if (!reviewRow) return;
+    setPendingCandidate(null);
+    setIsAddConnectionOpen(false);
+    setShowSuggestions(false);
+    setSelected(reviewRow);
+  }, [identityReviewRows, selected?.id, setSelected]);
   const suggestionActionRefs = useRef(new Map<string, HTMLButtonElement>());
   const suggestedRegionRef = useRef<HTMLDivElement>(null);
   const pendingSuggestionFocusTargetRef = useRef<string | null>(null);
   const router = useRouter();
+  const { chatMode: founderChatMode } = useFounderDoor();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const profileId = data?.profileId ?? null;
@@ -1595,6 +1452,22 @@ function ProfilesWorkspaceContent({
       if (row.id.startsWith('preview:')) return [];
       const primaryAction = getConnectionPrimaryAction(row);
       return buildConnectionActions(row, primaryAction, {
+        onEditProfile: () => router.push(APP_ROUTES.SETTINGS_PROFILE),
+        onAskJovie: connection => {
+          if (founderChatMode === 'ov') {
+            toast.error('Switch to Jovie, then ask about this item again.');
+            return;
+          }
+          if (
+            !data ||
+            getCacheScope().profileId !== data.profileId ||
+            !openChatWithDraft(connectionChatDraft(connection, data), router)
+          ) {
+            toast.error(
+              'Chat is unavailable. Reopen the selected profile and try again.'
+            );
+          }
+        },
         onViewDetails: setSelected,
         onOpen: connection => {
           if (connection.url.startsWith('http')) {
@@ -1625,7 +1498,7 @@ function ProfilesWorkspaceContent({
         },
       });
     },
-    [router, setSelected]
+    [data, router, setSelected, founderChatMode]
   );
   const columns = useMemo(
     () => [
@@ -1633,7 +1506,7 @@ function ProfilesWorkspaceContent({
         header: 'Profile',
         size: 200,
         minSize: 140,
-        meta: { className: 'px-3' },
+        meta: { className: cn('px-3', styles.identityNameColumn) },
         cell: context => {
           const row = context.row.original;
           return (
@@ -1652,8 +1525,13 @@ function ProfilesWorkspaceContent({
                   className={styles.profilePhoto}
                 />
               )}
-              <div className='flex min-w-0 items-center gap-2'>
-                <div className='truncate text-sm font-medium text-primary-token'>
+              <div
+                className={cn(
+                  'flex min-w-0 flex-wrap items-center gap-x-2 sm:flex-nowrap',
+                  styles.identityLabel
+                )}
+              >
+                <div className='truncate text-sm font-medium text-primary-token max-sm:w-full'>
                   {row.rowType === 'connector'
                     ? row.label
                     : getPresenceRowTitle(row, data?.artist.name ?? '')}
@@ -1696,14 +1574,14 @@ function ProfilesWorkspaceContent({
         id: 'rank',
         header: 'Search Rank',
         size: 72,
-        meta: { className: 'max-lg:hidden' },
+        meta: { className: cn('max-lg:hidden', styles.identityDetailColumn) },
         cell: context => <RankCell row={context.row.original} />,
       }),
       columnHelper.display({
         id: 'change',
         header: 'Change',
         size: 78,
-        meta: { className: 'max-xl:hidden' },
+        meta: { className: cn('max-xl:hidden', styles.identityDetailColumn) },
         cell: context => {
           const row = context.row.original;
           if (row.rowType === 'connector') {
@@ -1738,31 +1616,49 @@ function ProfilesWorkspaceContent({
         id: 'monitoring',
         header: 'Monitoring',
         size: 124,
-        meta: { className: 'hidden 2xl:table-cell' },
+        meta: {
+          className: cn('hidden 2xl:table-cell', styles.identityDetailColumn),
+        },
         cell: context => <MonitoringCell row={context.row.original} />,
       }),
       columnHelper.display({
         id: 'actions',
         header: 'Actions',
-        size: 44,
+        size: 112,
         meta: {
-          className: 'px-3',
+          className: cn('px-3', styles.identityActionsColumn),
+          cellContentClassName:
+            'flex items-center justify-end overflow-visible',
           headerVisibility: 'sr-only',
-          actionVisibility: 'contextual',
         },
         cell: context => {
           const row = context.row.original;
           if (row.id.startsWith('preview:')) return null;
           const actionItems = convertContextMenuItems(getContextMenuItems(row));
           return (
-            <div className='flex justify-end'>
+            <div className='flex items-center justify-end'>
+              {row.rowType === 'surface' && row.kind === 'jovie' ? (
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  aria-label='Edit Jovie Profile'
+                  className='shrink-0'
+                  onKeyDown={event => event.stopPropagation()}
+                  onClick={event => {
+                    event.stopPropagation();
+                    router.push(APP_ROUTES.SETTINGS_PROFILE);
+                  }}
+                >
+                  Edit
+                </Button>
+              ) : null}
               <TableActionMenu items={actionItems} align='end' trigger='custom'>
                 <button
                   type='button'
                   aria-label={`Actions for ${row.label}`}
                   onClick={event => event.stopPropagation()}
                   onKeyDown={event => event.stopPropagation()}
-                  className='inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-colors duration-fast hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/50 sm:h-8 sm:w-8'
+                  className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-colors duration-fast hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/50 sm:h-8 sm:w-8'
                 >
                   <MoreHorizontal className='h-4 w-4' aria-hidden />
                 </button>
@@ -1776,6 +1672,7 @@ function ProfilesWorkspaceContent({
       data?.artist.name,
       data?.providerAvailable,
       getContextMenuItems,
+      router,
       selected?.id,
     ]
   );
@@ -1872,6 +1769,9 @@ function ProfilesWorkspaceContent({
       toolbar={
         <PageToolbar
           data-testid='connections-workspace-toolbar'
+          className='flex-wrap max-sm:flex-col max-sm:items-stretch'
+          startClassName='flex-none'
+          endClassName='max-w-full flex-wrap max-sm:ml-0 max-sm:justify-start'
           start={
             <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
               {rows.length === 1 ? '1 profile' : `${rows.length} profiles`}
@@ -1879,6 +1779,15 @@ function ProfilesWorkspaceContent({
           }
           end={
             <>
+              {identityReviewRows.length > 0 ? (
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  onClick={handleReviewIdentities}
+                >
+                  Review Identities ({identityReviewRows.length})
+                </Button>
+              ) : null}
               <Button
                 variant='ghost'
                 size='sm'
@@ -1933,7 +1842,7 @@ function ProfilesWorkspaceContent({
         }}
         getContextMenuItems={getContextMenuItems}
         rowMode='list'
-        containerClassName='min-h-0 flex-1'
+        containerClassName={cn('min-h-0 flex-1', styles.identityContainer)}
         minWidth='0'
         className={styles.table}
         isRowSelected={row =>
