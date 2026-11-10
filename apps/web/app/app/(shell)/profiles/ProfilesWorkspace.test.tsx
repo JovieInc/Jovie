@@ -719,9 +719,37 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
 
     // The generic DSP path names a resource kind, not a handle.
     expect(screen.queryByText('@artist')).not.toBeInTheDocument();
-    // Canonical display names render for registry and non-registry platforms.
-    expect(screen.getAllByText('Spotify').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('LINE').length).toBeGreaterThan(0);
+
+    // The canonical name is the ROW TITLE, not just the unchanged subtitle:
+    // scope to the title cell (div.truncate.text-sm) inside each row.
+    const subtitles = screen.getAllByTestId('presence-page-identity');
+    const spotifySubtitle = subtitles.find(node =>
+      node.textContent?.includes('Spotify')
+    );
+    if (!spotifySubtitle) throw new Error('Missing Spotify row');
+    const spotifyRow = spotifySubtitle.closest('tr');
+    if (!spotifyRow) throw new Error('Missing Spotify table row');
+    expect(
+      within(spotifyRow as HTMLElement).getByText('Spotify', {
+        selector: 'div.truncate.text-sm',
+      })
+    ).toBeInTheDocument();
+    // Subtitle outcome: the platform, and no invented handle.
+    expect(spotifySubtitle).toHaveTextContent(/^Spotify$/);
+
+    const lineSubtitle = subtitles.find(node =>
+      node.textContent?.includes('LINE')
+    );
+    if (!lineSubtitle) throw new Error('Missing LINE row');
+    const lineRow = lineSubtitle.closest('tr');
+    if (!lineRow) throw new Error('Missing LINE table row');
+    expect(
+      within(lineRow as HTMLElement).getByText('LINE', {
+        selector: 'div.truncate.text-sm',
+      })
+    ).toBeInTheDocument();
+    // Username-rooted platforms still infer the handle in the subtitle.
+    expect(lineSubtitle).toHaveTextContent('LINE · @timwhite');
   });
 
   it('renders persisted suggestions without fabricating profile surface suggestions', async () => {

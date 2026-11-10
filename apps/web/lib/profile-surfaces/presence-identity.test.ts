@@ -346,6 +346,10 @@ describe('canonical platform names and valid handles', () => {
     ['tiktok', 'TikTok'],
     ['line', 'LINE'],
     ['website', 'Website'],
+    ['linkedin', 'LinkedIn'],
+    ['github', 'GitHub'],
+    ['paypal', 'PayPal'],
+    ['whatsapp', 'WhatsApp'],
   ])('renders the canonical platform name for %s', (platform, expected) => {
     expect(getPresencePlatformLabel({ platform })).toBe(expected);
   });
@@ -363,6 +367,22 @@ describe('canonical platform names and valid handles', () => {
         'Tim White'
       )
     ).toBe('Spotify');
+    // Correctly branded and lowercase labels both canonicalize.
+    expect(
+      getPresenceRowTitle(
+        { platform: 'linkedin', label: 'LinkedIn' },
+        'Tim White'
+      )
+    ).toBe('LinkedIn');
+    expect(
+      getPresenceRowTitle(
+        { platform: 'linkedin', label: 'linkedin' },
+        'Tim White'
+      )
+    ).toBe('LinkedIn');
+    expect(
+      getPresenceRowTitle({ platform: 'paypal', label: 'paypal' }, 'Tim White')
+    ).toBe('PayPal');
     // Custom titles are never rewritten.
     expect(
       getPresenceRowTitle(
@@ -415,6 +435,60 @@ describe('canonical platform names and valid handles', () => {
         url: 'https://unknown-provider.example/artist',
       })
     ).toBeNull();
+    // Casing and percent-encoding do not bypass the generic-route check.
+    expect(
+      getPresenceHandle({
+        kind: 'dsp',
+        handle: null,
+        url: 'https://open.spotify.com/Artist?id=1539',
+      })
+    ).toBeNull();
+    expect(
+      getPresenceHandle({
+        kind: 'dsp',
+        handle: null,
+        url: 'https://open.spotify.com/%61rtist?id=1539',
+      })
+    ).toBeNull();
+  });
+
+  it('preserves username-rooted /artist paths and explicit handles on social platforms', () => {
+    expect(
+      getPresenceHandle({
+        kind: 'social',
+        handle: null,
+        url: 'https://instagram.com/artist',
+      })
+    ).toBe('@artist');
+    expect(
+      getPresenceHandle({
+        kind: 'social',
+        handle: null,
+        url: 'https://instagram.com/Artist',
+      })
+    ).toBe('@Artist');
+    expect(
+      getPresenceHandle({
+        kind: 'social',
+        handle: null,
+        url: 'https://instagram.com/%40artist',
+      })
+    ).toBe('@artist');
+    expect(
+      getPresenceHandle({
+        kind: 'social',
+        handle: null,
+        url: 'https://www.tiktok.com/@artist',
+      })
+    ).toBe('@artist');
+    // A stored handle always wins over URL inference.
+    expect(
+      getPresenceHandle({
+        kind: 'social',
+        handle: 'artist',
+        url: 'https://open.spotify.com/artist?id=06HL4z0CvFAxyc27GXpf02',
+      })
+    ).toBe('@artist');
   });
 
   it('still infers handles from legitimate social profile paths', () => {

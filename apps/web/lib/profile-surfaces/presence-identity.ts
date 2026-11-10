@@ -1,4 +1,5 @@
 import { isPresenceObservationStale } from '@/components/features/presence/evidence';
+import { ALL_PLATFORMS } from '@/constants/platforms/data';
 import { getDspArtistImageUrl } from '@/lib/dsp-enrichment/artist-image';
 import { getDspDisplayName } from '@/lib/dsp-registry';
 
@@ -83,15 +84,22 @@ const PROFILE_METADATA_KEYS = [
  * presence workspace. The DSP registry owns streaming platforms; a naive
  * title-case fallback mangles the rest ("line" → "Line", not "LINE").
  */
-const NON_DSP_PLATFORM_NAMES: Record<string, string> = {
-  line: 'LINE',
-};
+/**
+ * Canonical product-facing names for non-DSP platforms. The DSP registry
+ * owns streaming names; everything else resolves through the shared
+ * platform registry (LinkedIn, GitHub, PayPal, WhatsApp, Website, …) plus
+ * LINE, which is absent from it. The naive title-case fallback mangles all
+ * of these ("Linkedin", "Whatsapp", "Line").
+ */
+const NON_DSP_PLATFORM_NAMES: ReadonlyMap<string, string> = new Map([
+  ['line', 'LINE'],
+  ...ALL_PLATFORMS.map(platform => [platform.id, platform.name] as const),
+]);
 
 function platformDisplayName(platform: string): string {
-  const canonical = NON_DSP_PLATFORM_NAMES[platform.trim().toLowerCase()];
-  if (canonical) return canonical;
   return (
     getDspDisplayName(platform) ??
+    NON_DSP_PLATFORM_NAMES.get(platform.trim().toLowerCase()) ??
     platform
       .replaceAll('_', ' ')
       .replaceAll(/\b\w/g, letter => letter.toUpperCase())
@@ -294,11 +302,12 @@ export function getPresenceRowTitle(
 }
 
 /**
- * Generic DSP path segments name a resource kind ("/artist?id=…", "/search"),
- * not a profile handle — a single-segment match on one must never be
- * presented as "@artist".
+ * Generic DSP path segments name a resource kind ("/artist?id=…"), not a
+ * profile handle. They are suppressed only for DSP-kind subjects: on
+ * username-rooted platforms (instagram, tiktok, …) a single "artist"
+ * segment IS a legitimate handle.
  */
-const GENERIC_PATH_SEGMENTS = new Set(['artist']);
+const GENERIC_DSP_PATH_SEGMENTS = new Set(['artist']);
 
 export function getPresenceHandle(
   subject: Pick<PresenceIdentitySubject, 'kind' | 'handle' | 'url'>
@@ -321,7 +330,10 @@ export function getPresenceHandle(
     if (atSegment) return decodeURIComponent(atSegment);
     if (segments.length === 1) {
       const value = decodeURIComponent(segments[0] ?? '').replace(/^@/, '');
-      if (value && !GENERIC_PATH_SEGMENTS.has(value.toLowerCase())) {
+      const isGenericDspPath =
+        subject.kind === 'dsp' &&
+        GENERIC_DSP_PATH_SEGMENTS.has(value.toLowerCase());
+      if (value && !isGenericDspPath) {
         return `@${value}`;
       }
     }
