@@ -953,7 +953,6 @@ struct JovieChangelogWhatsNewView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
       }
-
       VStack(spacing: JovieSpacing.small) {
         Button(linkTitle) {
           openURL(unseen.link)
@@ -968,9 +967,6 @@ struct JovieChangelogWhatsNewView: View {
         .buttonStyle(JoviePillButtonStyle(filled: false))
         .accessibilityIdentifier("whats-new-got-it")
       }
-      // The pill hit frames are flexible (minHeight 44 inside JoviePillButtonStyle),
-      // so at the .medium detent a long changelog entry compressed them below 44pt
-      // and the 44pt hit-target test failed. The scroll view must absorb the deficit.
       .layoutPriority(1)
     }
     .padding(JovieSpacing.large)
