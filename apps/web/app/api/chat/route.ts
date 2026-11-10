@@ -69,7 +69,10 @@ import {
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
 import { fetchArtistContext } from '@/lib/chat/artist-context.server';
-import { findOwnedReleaseForChat } from '@/lib/chat/catalog-query';
+import {
+  findOwnedReleaseForChat,
+  resolveChatRelease,
+} from '@/lib/chat/catalog-query';
 import { fetchCatalogTrackTitlesForChat } from '@/lib/chat/catalog-titles';
 import { assertChatToolsRegistered } from '@/lib/chat/chat-tool-inventory';
 import {
@@ -254,46 +257,6 @@ const CHAT_KILL_SWITCH_GATES = {
   FORCE_LIGHT: 'ai_chat_force_light',
 } as const;
 
-/**
- * Find a release by title (exact match first, then partial).
- * Returns null if no match found.
- */
-function findReleaseByTitle(
-  releases: ReleaseContext[],
-  title: string
-): ReleaseContext | null {
-  const lower = title.toLowerCase();
-  return (
-    releases.find(r => r.title.toLowerCase() === lower) ??
-    releases.find(r => r.title.toLowerCase().includes(lower)) ??
-    null
-  );
-}
-
-/**
- * Resolve a release the artist referenced by id or title: the per-turn
- * loaded slice first (no extra query), then the owned-catalog lookup for
- * titles/ids beyond the slice (dogfood 2026-11-10: a release past the slice
- * used to be reported as "not found"). DB failures propagate so the tool
- * errors visibly instead of answering a false "not found".
- */
-async function resolveChatRelease(
-  profileId: string | null,
-  releases: ReleaseContext[],
-  input: { releaseId?: string; releaseTitle?: string }
-): Promise<ReleaseContext | null> {
-  const local = input.releaseId
-    ? (releases.find(item => item.id === input.releaseId) ?? null)
-    : input.releaseTitle?.trim()
-      ? findReleaseByTitle(releases, input.releaseTitle)
-      : null;
-  if (local) return local;
-
-  if (!profileId) return null;
-  if (!input.releaseId && !input.releaseTitle?.trim()) return null;
-  return findOwnedReleaseForChat(profileId, input);
-}
-
 function normalizeReleaseTitle(value: string): string {
   return value
     .trim()
@@ -326,12 +289,8 @@ async function resolveAlbumArtReleaseTarget(
     }
 > {
   if (input.releaseId) {
-    const local = releases.find(item => item.id === input.releaseId);
-    if (local) return { status: 'resolved', release: local };
-
-    // Owned id lookup beyond the prompt slice.
-    const owned = await resolveChatRelease(profileId, releases, input);
-    if (owned) return { status: 'resolved', release: owned };
+    const resolved = await resolveChatRelease(profileId, releases, input);
+    if (resolved) return { status: 'resolved', release: resolved };
   }
 
   if (!input.releaseTitle?.trim()) {
@@ -341,21 +300,15 @@ async function resolveAlbumArtReleaseTarget(
     };
   }
 
-  const normalized = normalizeReleaseTitle(input.releaseTitle);
-  const exact = releases.find(
-    release => normalizeReleaseTitle(release.title) === normalized
-  );
+  // Exact tiers first: local exact, then the owned catalog beyond the slice.
+  // A local fuzzy match must not suppress a full-catalog exact match.
+  const exact = await resolveChatRelease(profileId, releases, {
+    releaseTitle: input.releaseTitle,
+    match: 'exact',
+  });
   if (exact) return { status: 'resolved', release: exact };
 
-  // Owned title lookup beyond the prompt slice: resolve an exact-titled
-  // release the per-turn slice does not carry.
-  const owned = await resolveChatRelease(profileId, releases, {
-    releaseTitle: input.releaseTitle,
-  });
-  if (owned && normalizeReleaseTitle(owned.title) === normalized) {
-    return { status: 'resolved', release: owned };
-  }
-
+  const normalized = normalizeReleaseTitle(input.releaseTitle);
   const fuzzy = releases.filter(release => {
     const title = normalizeReleaseTitle(release.title);
     return title.includes(normalized) || normalized.includes(title);
@@ -771,6 +724,75 @@ function createSocialLinkRemovalTool(profileId: string | null) {
 }
 
 /**
+ * Creates the lookupRelease tool: a read-only, plan-unowned catalog lookup so
+ * the model can answer "when did X come out?" without driving a creative or
+ * mutating tool (dogfood 2026-11-10, Astra review). Explicit found /
+ * not-found / unavailable outcomes; a failed read never reads as "not found".
+ */
+function createLookupReleaseTool(profileId: string | null) {
+  return tool({
+    description:
+      "Look up one of the artist's own releases by title or id and return its facts: id, title, type, release date, track count, catalog identifiers (UPC, label, distributor) and streaming provider links. Read-only: use it whenever the artist asks about a specific release (dates, links, identity) or names a release not shown in the Discography Context. It never creates or changes anything.",
+    inputSchema: chatToolSchema({
+      releaseTitle: z
+        .string()
+        .max(200)
+        .optional()
+        .describe('The title of the release to look up'),
+      releaseId: z
+        .string()
+        .uuid()
+        .optional()
+        .describe('The release id to look up (from an @release token)'),
+    }),
+    execute: async ({ releaseTitle, releaseId }) => {
+      if (!profileId) {
+        return { status: 'error' as const, error: 'Profile ID required' };
+      }
+      if (!releaseId && !releaseTitle?.trim()) {
+        return {
+          status: 'needs-input' as const,
+          error: 'Pass a release title or a release id.',
+        };
+      }
+      try {
+        const release = await findOwnedReleaseForChat(profileId, {
+          releaseId,
+          releaseTitle,
+        });
+        if (!release) {
+          return {
+            status: 'not-found' as const,
+            message:
+              "No matching release in this artist's catalog. Ask them to confirm the exact title.",
+          };
+        }
+        return {
+          status: 'found' as const,
+          release: {
+            id: release.id,
+            title: release.title,
+            releaseType: release.releaseType,
+            releaseDate: release.releaseDate,
+            totalTracks: release.totalTracks,
+            upc: release.upc,
+            label: release.label,
+            distributor: release.distributor,
+            providerLinks: release.providerLinks,
+          },
+        };
+      } catch {
+        return {
+          status: 'unavailable' as const,
+          message:
+            'The release catalog is temporarily unavailable. Try again in a moment.',
+        };
+      }
+    },
+  });
+}
+
+/**
  * Creates the checkCanvasStatus tool for querying release canvas status.
  * Fetches release data and reports which releases need canvas videos.
  */
@@ -802,10 +824,11 @@ function createCheckCanvasStatusTool(
         // A failed catalog read must not masquerade as "no releases" (dogfood
         // 2026-11-10).
         if (releaseCatalog?.status === 'unavailable') {
+          // No numeric total: an unavailable read is not a measured zero.
           return {
             success: true,
+            unavailable: true,
             summary: {
-              total: 0,
               message:
                 'The release catalog is temporarily unavailable. Try again in a moment.',
             },
@@ -1572,6 +1595,14 @@ function createWorldClassBioTool(
         .describe('Maximum words for the returned draft (default 180)'),
     }),
     execute: async ({ goal, tone, maxWords }) => {
+      // A failed catalog read must not become "0 releases" in bio facts.
+      if (releaseCatalog?.status === 'unavailable') {
+        return {
+          success: false,
+          error:
+            'The release catalog is temporarily unavailable, so the bio draft would risk wrong release facts. Try again in a moment.',
+        };
+      }
       const wordLimit = maxWords ?? 180;
       const draftPackage = buildArtistBioDraft({
         artistName: context.displayName,
@@ -1864,6 +1895,7 @@ function buildFreeChatTools(
     proposeSocialLink: createSocialLinkTool(),
     proposeSocialLinkRemoval: createSocialLinkRemovalTool(resolvedProfileId),
     submitFeedback: createSubmitFeedbackTool(clerkUserId),
+    lookupRelease: createLookupReleaseTool(resolvedProfileId),
   };
 }
 

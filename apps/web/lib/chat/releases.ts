@@ -74,13 +74,17 @@ export async function fetchReleaseCatalogForChat(
 }
 
 /**
- * Legacy slice-only fetch kept for the mobile turn handler. Prefer
- * `fetchReleaseCatalogForChat`, which also reports the whole-catalog total
- * and read health.
+ * Legacy slice-only fetch kept for the mobile turn handler. Preserves the
+ * base rejection contract: a failed read THROWS (it never resolves to an
+ * empty list that would read as "no releases"). Prefer
+ * `fetchReleaseCatalogForChat`, which reports read health instead.
  */
 export async function fetchReleasesForChat(
   profileId: string
 ): Promise<ReleaseContext[]> {
   const snapshot = await fetchReleaseCatalogForChat(profileId);
+  if (snapshot.status === 'unavailable') {
+    throw new Error('Release catalog read failed');
+  }
   return snapshot.releases;
 }

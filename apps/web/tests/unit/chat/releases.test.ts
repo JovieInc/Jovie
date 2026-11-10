@@ -63,6 +63,21 @@ export function sqlTokens(node: unknown): string {
   return parts.join(' ').replace(/\s+/g, ' ').trim();
 }
 
+type ReleaseRowShape = {
+  id: string;
+  title: string;
+  releaseType: string;
+  releaseDate: Date | string | null;
+  artworkUrl: string | null;
+  spotifyPopularity: number | null;
+  totalTracks: number;
+  metadata: Record<string, unknown> | null;
+};
+
+function sliceRowCompat(title = 'Loaded Title'): ReleaseRowShape {
+  return { ...releaseRow, title };
+}
+
 function makeChain(rows: unknown[]) {
   return {
     from: vi.fn().mockReturnThis(),
@@ -108,7 +123,7 @@ describe('fetchReleaseCatalogForChat', () => {
     });
   });
 
-  it('issues one catalog query per fetch call (window count, no second round trip)', async () => {
+  it('issues one catalog query per fetch call with the full total', async () => {
     pendingRows.push([
       {
         id: 'release-1',
@@ -127,6 +142,11 @@ describe('fetchReleaseCatalogForChat', () => {
     const snapshot = await fetchReleaseCatalogForChat('profile-1');
 
     expect(selectMock).toHaveBeenCalledTimes(1);
+    // The single query selects the whole-catalog total via an aggregate
+    // over the full filtered row set, not a second round trip.
+    const selectConfig = selectMock.mock.calls[0][0] as Record<string, unknown>;
+    expect('total' in selectConfig).toBe(true);
+    expect(sqlTokens(selectConfig.total)).toBe('count(*) over ()');
     expect(snapshot).toEqual({
       status: 'ok',
       total: 1,
@@ -298,9 +318,21 @@ describe('findOwnedReleaseForChat', () => {
 
     // Exactly two queries: the exact-title release read, then provider links.
     expect(selectMock).toHaveBeenCalledTimes(2);
-    expect(sqlTokens(recorded[0].where.mock.calls[0][0])).toContain(
+    const exactWhere = sqlTokens(recorded[0].where.mock.calls[0][0]);
+    expect(exactWhere).toContain(
       'lower( discog_releases.title ) = lower( midnight )'
     );
+    // Ownership + live-row predicates on the exact branch too, and
+    // deterministic known-dates-first ordering for duplicate titles.
+    expect(exactWhere).toContain(
+      'discog_releases.creator_profile_id = profile-1'
+    );
+    expect(exactWhere).toContain('discog_releases.deleted_at is null');
+    const [dateOrder, idOrder] = recorded[0].orderBy.mock.calls[0];
+    expect(sqlTokens(dateOrder)).toBe(
+      'discog_releases.release_date DESC NULLS LAST'
+    );
+    expect(sqlTokens(idOrder)).toBe('discog_releases.id desc');
     expect(release?.title).toBe('Midnight');
   });
 
@@ -315,8 +347,14 @@ describe('findOwnedReleaseForChat', () => {
     });
 
     expect(selectMock).toHaveBeenCalledTimes(3);
-    expect(sqlTokens(recorded[1].where.mock.calls[0][0])).toContain('ilike');
-    expect(sqlTokens(recorded[1].where.mock.calls[0][0])).toContain('%Midn%');
+    const partialWhere = sqlTokens(recorded[1].where.mock.calls[0][0]);
+    expect(partialWhere).toContain('ilike');
+    expect(partialWhere).toContain('%Midn%');
+    // Ownership + live-row predicates on the partial branch too.
+    expect(partialWhere).toContain(
+      'discog_releases.creator_profile_id = profile-1'
+    );
+    expect(partialWhere).toContain('discog_releases.deleted_at is null');
     expect(release?.title).toBe('Midnight');
   });
 
@@ -356,6 +394,280 @@ describe('findOwnedReleaseForChat', () => {
   });
 });
 
+describe('findOwnedReleaseForChat failure contract', () => {
+  let recorded: ReturnType<typeof makeChain>[];
+  let pendingRows: unknown[][];
+
+  beforeEach(() => {
+    selectMock.mockReset();
+    recorded = [];
+    pendingRows = [];
+    selectMock.mockImplementation(() => {
+      const chain = makeChain(pendingRows.shift() ?? []);
+      recorded.push(chain);
+      return chain;
+    });
+  });
+
+  it('rejects when the release query fails instead of answering not-found', async () => {
+    selectMock.mockImplementation(() => {
+      const chain = makeChain([]);
+      chain.limit.mockRejectedValue(new Error('connection reset'));
+      return chain;
+    });
+
+    const { findOwnedReleaseForChat } = await import(
+      '@/lib/chat/catalog-query'
+    );
+    await expect(
+      findOwnedReleaseForChat('profile-1', { releaseTitle: 'Midnight' })
+    ).rejects.toThrow('connection reset');
+  });
+
+  it('rejects when the provider-links query fails instead of answering not-found', async () => {
+    const ok = makeChain([releaseRow]);
+    const failing = makeChain([]);
+    failing.limit.mockRejectedValue(new Error('link read failed'));
+    selectMock.mockImplementation(() =>
+      recorded.length === 0 ? (recorded.push(ok), ok) : failing
+    );
+
+    const { findOwnedReleaseForChat } = await import(
+      '@/lib/chat/catalog-query'
+    );
+    await expect(
+      findOwnedReleaseForChat('profile-1', { releaseTitle: 'Midnight' })
+    ).rejects.toThrow('link read failed');
+  });
+});
+
+describe('resolveChatRelease precedence', () => {
+  let recorded: ReturnType<typeof makeChain>[];
+  let pendingRows: unknown[][];
+
+  beforeEach(() => {
+    selectMock.mockReset();
+    recorded = [];
+    pendingRows = [];
+    selectMock.mockImplementation(() => {
+      const chain = makeChain(pendingRows.shift() ?? []);
+      recorded.push(chain);
+      return chain;
+    });
+  });
+
+  const sliceRow = (title: string): ReleaseRowShape => ({
+    ...releaseRow,
+    title,
+  });
+
+  it('a full-catalog exact match beats a loaded partial (remix) match', async () => {
+    // Loaded slice carries only "Midnight — Remix"; the exact "Midnight"
+    // sits beyond row 50. The remix must not win without querying.
+    const releases = [sliceRow('Midnight — Remix')];
+    pendingRows.push([{ ...releaseRow, title: 'Midnight' }], [linkRow]);
+
+    const { resolveChatRelease } = await import('@/lib/chat/catalog-query');
+    const release = await resolveChatRelease('profile-1', releases, {
+      releaseTitle: 'Midnight',
+    });
+
+    expect(release?.title).toBe('Midnight');
+    // One owned resolution: the exact-title release read plus provider links.
+    expect(selectMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('a local exact match wins without a database query', async () => {
+    const releases = [sliceRow('Midnight'), sliceRow('Midnight — Remix')];
+
+    const { resolveChatRelease } = await import('@/lib/chat/catalog-query');
+    const release = await resolveChatRelease('profile-1', releases, {
+      releaseTitle: 'Midnight',
+    });
+
+    expect(release?.title).toBe('Midnight');
+    expect(selectMock).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the loaded partial match only after the database exact tier misses', async () => {
+    const releases = [sliceRow('Midnight — Remix')];
+    // Database exact misses, database partial misses.
+    pendingRows.push([], []);
+
+    const { resolveChatRelease } = await import('@/lib/chat/catalog-query');
+    const release = await resolveChatRelease('profile-1', releases, {
+      releaseTitle: 'Midnight',
+    });
+
+    expect(release?.title).toBe('Midnight — Remix');
+    expect(selectMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("match 'exact' returns null when both exact tiers miss", async () => {
+    const releases = [sliceRow('Midnight — Remix')];
+    pendingRows.push([], []);
+
+    const { resolveChatRelease } = await import('@/lib/chat/catalog-query');
+    const release = await resolveChatRelease('profile-1', releases, {
+      releaseTitle: 'Midnight',
+      match: 'exact',
+    });
+
+    expect(release).toBeNull();
+  });
+});
+
+describe('fetchReleasesForChat legacy wrapper', () => {
+  let recorded: ReturnType<typeof makeChain>[];
+  let pendingRows: unknown[][];
+
+  beforeEach(() => {
+    selectMock.mockReset();
+    recorded = [];
+    pendingRows = [];
+    selectMock.mockImplementation(() => {
+      const chain = makeChain(pendingRows.shift() ?? []);
+      recorded.push(chain);
+      return chain;
+    });
+  });
+
+  it('returns the slice on a successful read', async () => {
+    pendingRows.push([{ ...releaseRow, total: 1 }]);
+
+    const { fetchReleasesForChat } = await import('@/lib/chat/releases');
+    const releases = await fetchReleasesForChat('profile-1');
+
+    expect(releases).toEqual([
+      expect.objectContaining({ id: 'release-1', title: 'Midnight' }),
+    ]);
+  });
+
+  it('preserves the base rejection contract on a failed read', async () => {
+    // On main, fetchReleasesForChat rejected on DB failure; the mobile turn
+    // handler depends on that. It must never resolve to [].
+    const failing = makeChain([]);
+    failing.limit.mockRejectedValue(new Error('connection reset'));
+    selectMock.mockImplementation(() => failing);
+
+    const { fetchReleasesForChat } = await import('@/lib/chat/releases');
+    await expect(fetchReleasesForChat('profile-1')).rejects.toThrow();
+  });
+});
+
+describe('resolveOwnedReleaseTokensForHydration', () => {
+  let recorded: ReturnType<typeof makeChain>[];
+  let pendingRows: unknown[][];
+
+  beforeEach(() => {
+    selectMock.mockReset();
+    recorded = [];
+    pendingRows = [];
+    selectMock.mockImplementation(() => {
+      const chain = makeChain(pendingRows.shift() ?? []);
+      recorded.push(chain);
+      return chain;
+    });
+  });
+
+  it('resolves beyond-slice @release tokens through the owned query', async () => {
+    const releases = [sliceRowCompat('Loaded Title')];
+    pendingRows.push([{ ...releaseRow, title: 'Never Say A Word' }]);
+
+    const { resolveOwnedReleaseTokensForHydration } = await import(
+      '@/lib/chat/catalog-query'
+    );
+    const resolved = await resolveOwnedReleaseTokensForHydration(
+      releases,
+      ['Check @release:11111111-2222-3333-4444-555555555555[Never Say A Word]'],
+      'profile-1'
+    );
+
+    expect(resolved.map(release => release.title)).toEqual([
+      'Never Say A Word',
+    ]);
+    expect(sqlTokens(recorded[0].where.mock.calls[0][0])).toContain(
+      'discog_releases.creator_profile_id = profile-1'
+    );
+  });
+
+  it('skips tokens already in the loaded slice and deduplicates ids', async () => {
+    const releases = [
+      { ...releaseRow, title: 'Loaded Title', id: 'release-1' },
+    ];
+    const text =
+      '@release:release-9[Other] and @release:11111111-2222-3333-4444-555555555555[Never Say A Word]';
+    // Same beyond-slice id twice across texts: one query.
+    pendingRows.push([releaseRow]);
+
+    const { resolveOwnedReleaseTokensForHydration } = await import(
+      '@/lib/chat/catalog-query'
+    );
+    await resolveOwnedReleaseTokensForHydration(
+      releases,
+      [text, text],
+      'profile-1'
+    );
+
+    // One owned resolution: release read plus provider links.
+    expect(selectMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('bounds hydration queries and skips non-release or malformed tokens', async () => {
+    const releases: ReleaseRowShape[] = [];
+    const beyond = Array.from({ length: 10 }, (_, i) => ({
+      id: `1111111${i}-2222-3333-4444-555555555555`,
+    }));
+    const texts = beyond.map(
+      token => `@release:${token.id}[T] @track:${token.id}[T] @release:nope[T]`
+    );
+    pendingRows.push(
+      ...Array.from({ length: 10 }, () => [[releaseRow], []]).flat()
+    );
+
+    const { resolveOwnedReleaseTokensForHydration } = await import(
+      '@/lib/chat/catalog-query'
+    );
+    const resolved = await resolveOwnedReleaseTokensForHydration(
+      releases,
+      texts,
+      'profile-1'
+    );
+
+    // Only well-formed release uuids beyond the slice, capped at 8 release
+    // lookups (each may add one provider-links read).
+    const releaseQueries = recorded.filter(
+      chain =>
+        chain.where.mock.calls.length > 0 &&
+        sqlTokens(chain.where.mock.calls[0][0]).includes('discog_releases.id')
+    );
+    expect(releaseQueries).toHaveLength(8);
+    expect(resolved).toHaveLength(8);
+  });
+
+  it('does not query without a profile id or release tokens', async () => {
+    const { resolveOwnedReleaseTokensForHydration } = await import(
+      '@/lib/chat/catalog-query'
+    );
+
+    expect(
+      await resolveOwnedReleaseTokensForHydration(
+        [sliceRowCompat()],
+        ['no tokens here'],
+        'profile-1'
+      )
+    ).toEqual([]);
+    expect(
+      await resolveOwnedReleaseTokensForHydration(
+        [],
+        ['@release:11111111-2222-3333-4444-555555555555[T]'],
+        null
+      )
+    ).toEqual([]);
+    expect(selectMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('chat route release-query wiring', () => {
   it('does not call fetchReleaseCatalogForChat inside tool executors', async () => {
     const routePath = path.join(process.cwd(), 'app/api/chat/route.ts');
@@ -380,13 +692,19 @@ describe('chat route release-query wiring', () => {
     const source = await readFile(routePath, 'utf8');
 
     expect(source).toContain(
-      "import { findOwnedReleaseForChat } from '@/lib/chat/catalog-query'"
+      "import {\n  findOwnedReleaseForChat,\n  resolveChatRelease,\n} from '@/lib/chat/catalog-query'"
     );
+    // The in-memory-only resolver is gone; resolution is catalog-aware.
+    expect(source).not.toContain('function findReleaseByTitle');
     // The turn consumes the snapshot: slice for closures, meta for the prompt.
     expect(source).toContain(
       'const releaseCatalog = await fetchOptionalReleases(resolvedProfileId);'
     );
     expect(source).toContain('const releases = [...releaseCatalog.releases];');
     expect(source).toContain('releaseCatalog,');
+    // A read-only catalog lookup tool is wired for informational asks.
+    expect(source).toContain(
+      'lookupRelease: createLookupReleaseTool(resolvedProfileId)'
+    );
   });
 });

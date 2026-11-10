@@ -107,6 +107,8 @@ describe('buildSystemPrompt', () => {
     });
 
     expect(prompt).toContain('- **Total Releases:** 120');
+    // Total / loaded / shown reported distinctly.
+    expect(prompt).toContain('- **Total Releases:** 120 (30 loaded, 25 shown)');
     expect(prompt).toContain('Track 25');
     expect(prompt).not.toContain('Track 26');
     expect(prompt).toContain(
@@ -127,7 +129,9 @@ describe('buildSystemPrompt', () => {
 
     expect(prompt).toContain('- **Total Releases:** 30');
     expect(prompt).toContain('...and 5 more releases in the catalog.');
-    expect(prompt).not.toContain('This list is truncated');
+    // The prompt list is truncated at 25 rows even when the catalog meta is
+    // absent, so the truncation note fires (Astra review).
+    expect(prompt).toContain('This list is truncated');
   });
 
   it('says the catalog is unavailable instead of claiming no releases exist', () => {

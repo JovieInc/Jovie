@@ -23,11 +23,12 @@
  */
 
 export const CHAT_ROUTE_TOOL_IDS = [
-  // Free-tier profile / feedback
+  // Free-tier profile / feedback / catalog lookup
   'proposeAvatarUpload',
   'proposeSocialLink',
   'proposeSocialLinkRemoval',
   'submitFeedback',
+  'lookupRelease',
   // Account (all plans)
   'showAccountStatus',
   'showUsage',

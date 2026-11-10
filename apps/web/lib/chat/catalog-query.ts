@@ -9,13 +9,17 @@ import {
 } from '@/lib/db/schema/content';
 import { getCanvasStatusFromMetadata } from '@/lib/services/canvas/service';
 import { toISOStringOrNull } from '@/lib/utils/date';
-import type { ChatReleaseLookup } from './types';
+import { extractEntities } from './tokens';
+import type { ChatReleaseLookup, ReleaseContext } from './types';
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Cap on provider-link evidence per lookup; keeps tool output bounded. */
 const PROVIDER_LINK_LIMIT = 20;
+
+/** Bound on per-turn beyond-slice token hydration queries. */
+const TOKEN_HYDRATION_LIMIT = 8;
 
 function releaseColumns() {
   return {
@@ -47,6 +51,27 @@ type ReleaseRow = {
   metadata: Record<string, unknown> | null;
 };
 
+/** Deterministic known-dates-first ordering for every release query here. */
+function releaseOrder() {
+  return [
+    sql`${discogReleases.releaseDate} DESC NULLS LAST`,
+    desc(discogReleases.id),
+  ] as const;
+}
+
+async function queryOwnedReleases(
+  ownership: ReturnType<typeof and>,
+  filter: ReturnType<typeof and>,
+  withOrder: boolean
+): Promise<ReleaseRow[]> {
+  const query = db
+    .select(releaseColumns())
+    .from(discogReleases)
+    .where(and(ownership, filter));
+  const ordered = withOrder ? query.orderBy(...releaseOrder()) : query;
+  return ordered.limit(1);
+}
+
 /**
  * Owned release lookup for chat tool executors, against the FULL catalog
  * rather than the per-turn prompt slice (dogfood 2026-11-10: a release past
@@ -54,13 +79,13 @@ type ReleaseRow = {
  *
  * - Scoped to `profileId` and live rows only (soft-deleted/archived excluded),
  *   so a lookup can never resolve another artist's release.
- * - Title matching mirrors the in-memory resolver: exact (case-insensitive)
- *   first, then substring. Deterministic ordering (`releaseDate DESC NULLS
- *   LAST`, id desc) so duplicate or undated titles resolve consistently.
+ * - Title matching: exact (case-insensitive) first, then substring. Both
+ *   tiers order `releaseDate DESC NULLS LAST` with an id tiebreaker so
+ *   duplicate or undated titles resolve deterministically (known dates first).
  * - Returns identity + catalog identifiers + provider links so tool output
  *   can ground statements about the release with evidence.
- * - Throws on DB failure: callers surface a tool error rather than a false
- *   "not found".
+ * - Throws on DB failure: callers surface an error/unavailable outcome
+ *   rather than a false "not found".
  */
 export async function findOwnedReleaseForChat(
   profileId: string,
@@ -81,36 +106,30 @@ export async function findOwnedReleaseForChat(
     // Guard the uuid column: a malformed id would throw at the DB boundary
     // where the in-memory resolver used to return null.
     if (!UUID_PATTERN.test(releaseId)) return null;
-    const rows = await db
-      .select(releaseColumns())
-      .from(discogReleases)
-      .where(and(ownership, eq(discogReleases.id, releaseId)))
-      .limit(1);
-    row = rows[0];
-  } else if (releaseTitle) {
-    const exact = await db
-      .select(releaseColumns())
-      .from(discogReleases)
-      .where(
-        and(
-          ownership,
-          sql`lower(${discogReleases.title}) = lower(${releaseTitle})`
-        )
-      )
-      .limit(1);
-    row = exact[0];
-    if (!row) {
-      const escaped = releaseTitle.replaceAll(/[\\%_]/g, match => `\\${match}`);
-      const partial = await db
+    row = (
+      await db
         .select(releaseColumns())
         .from(discogReleases)
-        .where(and(ownership, ilike(discogReleases.title, `%${escaped}%`)))
-        .orderBy(
-          sql`${discogReleases.releaseDate} DESC NULLS LAST`,
-          desc(discogReleases.id)
+        .where(and(ownership, eq(discogReleases.id, releaseId)))
+        .limit(1)
+    )[0];
+  } else if (releaseTitle) {
+    row = (
+      await queryOwnedReleases(
+        ownership,
+        sql`lower(${discogReleases.title}) = lower(${releaseTitle})`,
+        true
+      )
+    )[0];
+    if (!row) {
+      const escaped = releaseTitle.replaceAll(/[\\%_]/g, match => `\\${match}`);
+      row = (
+        await queryOwnedReleases(
+          ownership,
+          ilike(discogReleases.title, `%${escaped}%`),
+          true
         )
-        .limit(1);
-      row = partial[0];
+      )[0];
     }
   } else {
     return null;
@@ -146,4 +165,109 @@ export async function findOwnedReleaseForChat(
       isPrimary: link.isPrimary,
     })),
   };
+}
+
+function matchesExact(release: ReleaseContext, title: string): boolean {
+  return release.title.toLowerCase() === title.toLowerCase();
+}
+
+function matchesPartial(release: ReleaseContext, title: string): boolean {
+  return release.title.toLowerCase().includes(title.toLowerCase());
+}
+
+/**
+ * Resolve a release the artist referenced by id or title, with explicit
+ * precedence (dogfood 2026-11-10, Astra review): local exact → owned database
+ * exact → local partial → owned database partial. A local substring match
+ * (e.g. a loaded "Title — Remix") must never beat a full-catalog exact match
+ * ("Title" beyond the loaded slice).
+ *
+ * `match: 'exact'` stops after the exact tiers, for callers with their own
+ * ambiguity handling. DB failures propagate so callers never answer a false
+ * "not found".
+ */
+export async function resolveChatRelease(
+  profileId: string | null,
+  releases: readonly ReleaseContext[],
+  input: {
+    releaseId?: string;
+    releaseTitle?: string;
+    match?: 'exact' | 'any';
+  }
+): Promise<ReleaseContext | null> {
+  const releaseId = input.releaseId?.trim();
+  const releaseTitle = input.releaseTitle?.trim();
+
+  if (releaseId) {
+    const local = releases.find(item => item.id === releaseId) ?? null;
+    if (local) return local;
+    if (!profileId) return null;
+    return findOwnedReleaseForChat(profileId, { releaseId });
+  }
+
+  if (!releaseTitle) return null;
+
+  const localExact =
+    releases.find(item => matchesExact(item, releaseTitle)) ?? null;
+  if (localExact) return localExact;
+
+  if (profileId) {
+    const ownedExact = await findOwnedReleaseForChat(profileId, {
+      releaseTitle,
+    });
+    // findOwnedReleaseForChat itself tries exact before partial; only an
+    // exact result counts in the exact tier.
+    if (
+      ownedExact &&
+      ownedExact.title.toLowerCase() === releaseTitle.toLowerCase()
+    ) {
+      return ownedExact;
+    }
+    if (input.match === 'exact') return null;
+
+    const localPartial =
+      releases.find(item => matchesPartial(item, releaseTitle)) ?? null;
+    if (localPartial) return localPartial;
+    return ownedExact; // owned partial match, or null when nothing matched
+  }
+
+  if (input.match === 'exact') return null;
+  return releases.find(item => matchesPartial(item, releaseTitle)) ?? null;
+}
+
+/**
+ * Resolve `@release:<id>` entity tokens whose ids are missing from the loaded
+ * slice, through the same ownership-scoped query (Astra review: beyond-slice
+ * token hydration). Bounded and deduplicated; supplements hydration input
+ * only — it never inflates catalog counts or lifts the prompt cap. Token
+ * labels are never trusted; ids are resolved against the owned catalog.
+ */
+export async function resolveOwnedReleaseTokensForHydration(
+  releases: readonly ReleaseContext[],
+  userTexts: readonly string[],
+  profileId: string | null
+): Promise<ReleaseContext[]> {
+  if (!profileId) return [];
+  const loadedIds = new Set(releases.map(release => release.id));
+  const missingIds: string[] = [];
+  for (const text of userTexts) {
+    for (const token of extractEntities(text)) {
+      if (
+        token.kind === 'release' &&
+        !loadedIds.has(token.id) &&
+        !missingIds.includes(token.id) &&
+        UUID_PATTERN.test(token.id)
+      ) {
+        missingIds.push(token.id);
+      }
+    }
+  }
+  const resolved: ReleaseContext[] = [];
+  for (const id of missingIds.slice(0, TOKEN_HYDRATION_LIMIT)) {
+    const release = await findOwnedReleaseForChat(profileId, {
+      releaseId: id,
+    });
+    if (release) resolved.push(release);
+  }
+  return resolved;
 }
