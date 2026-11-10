@@ -96,6 +96,26 @@ describe('ai-review boundary scanner', () => {
     rmSync(resolve(tmp, '.github/workflows/warden.yml'));
   });
 
+  it('fails a Warden-style action input that gates on findings', () => {
+    writeWorkflow(
+      'warden-action.yml',
+      `name: Warden
+on: [pull_request]
+jobs:
+  review:
+    steps:
+      - uses: warden/ai-review@v1
+        with:
+          fail-on: findings
+`
+    );
+    const error = runScannerExpectFailure(tmp);
+    expect(error).not.toBeNull();
+    expect(error?.stderr).toContain('warden-action.yml');
+    expect(error?.stderr).toContain('fail-on');
+    rmSync(resolve(tmp, '.github/workflows/warden-action.yml'));
+  });
+
   it('fails a Seer-style review that fails a check', () => {
     writeWorkflow('seer.yml', SEER_FAILCHECK);
     const error = runScannerExpectFailure(tmp);
