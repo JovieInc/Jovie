@@ -797,18 +797,6 @@ class JudgeTest(unittest.TestCase):
         for present in (True, None):  # installed, or a fixture/self-test with no host file
             self.assertNotIn("linear-app-credential-missing", doctor.judge(obs(linearAppCredential=present)))
 
-    def test_token_failure_is_visible_even_during_linear_cooldown(self):
-        key = "linear-app-token-unavailable"
-        for view in ({}, {"scopeMatches": True, "expiresInS": 0, "mintFailed": False},
-                     {"scopeMatches": True, "expiresInS": 100, "mintFailed": True},
-                     {"scopeMatches": False, "expiresInS": 100, "mintFailed": False}):
-            with self.subTest(view=view):
-                self.assertIn(key, doctor.judge(obs(linearAppCredential=True, linearAppToken=view,
-                                                   linearSkipped="cooldown")))
-        healthy = {"scopeMatches": True, "expiresInS": 100, "mintFailed": False}
-        self.assertNotIn(key, doctor.judge(obs(linearAppCredential=True, linearAppToken=healthy)))
-        self.assertNotIn(key, doctor.judge(obs(linearAppCredential=False, linearAppToken={})))
-
     def test_started_issues_without_a_live_owner_escalate_after_the_grace(self):
         quiet = doctor.judge(obs(ownership={"started": 536, "ownerless": 3, "overGrace": 0}))
         self.assertNotIn("started-without-owner", quiet)  # inside the grace period
@@ -2665,23 +2653,6 @@ class PublishTest(unittest.TestCase):
     def ledger(self, rows):
         (self.state / "runs").mkdir(exist_ok=True)
         (self.state / "runs" / "ledger.jsonl").write_text("".join(json.dumps(row) + "\n" for row in rows) + "not json\n")
-
-    def test_token_alarm_publishes_with_linear_unavailable(self):
-        key = "linear-app-token-unavailable"
-        observed = obs(linearAppCredential=True, linearSkipped="cooldown",
-                       linearAppToken={"scopeMatches": True, "expiresInS": None, "mintFailed": True})
-        alerts = doctor.judge(observed)
-        self.assertIn(key, alerts)
-        events = doctor.condition_receipts(alerts, {}, observed, "gem")
-        reconciled = doctor.reconcile(alerts, {}, None, observed["now"], events)
-        feed = {**self.feed(0), "alerts": alerts, "conditions": reconciled["conditions"]}
-        self.lane.Linear = mock.Mock(side_effect=AssertionError("Linear unavailable"))
-        doctor.publish_status(self.host, self.lane, feed)
-        public = json.loads(self.api.files["lanes-status.json"])
-        self.assertIn(key, public["alerts"])
-        self.assertEqual(public["conditions"][key]["state"], "active")
-        self.lane.Linear.assert_not_called()
-        self.assertIn("verifiedAt", json.loads(self.record.read_text()))
 
     def test_stage_events_publish_with_the_status_feed_and_only_when_they_change(self):
         now = time.time()
