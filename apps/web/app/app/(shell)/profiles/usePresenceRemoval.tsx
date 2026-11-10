@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { flushSync } from 'react-dom';
 import type {
+  PresenceRemovalPrincipal,
   PresenceRemovalTarget,
   ProfilesWorkspaceData,
   ProfileWorkspaceRow,
@@ -30,8 +31,6 @@ import {
 import { FetchError, fetchWithTimeout } from '@/lib/queries/fetch';
 import { queryKeys } from '@/lib/queries/keys';
 import { useRemoveSocialLinkMutation } from '@/lib/queries/useRemoveSocialLinkMutation';
-
-import type { PresenceRemovalPrincipal } from './removal-principal';
 
 interface RemovalIntent {
   readonly rowId: string;

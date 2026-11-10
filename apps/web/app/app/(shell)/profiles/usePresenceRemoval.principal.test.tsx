@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useLayoutEffect } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
+import type { PresenceRemovalPrincipal } from '@/components/features/presence/types';
 import {
   QueryProvider,
   resetBrowserQueryClientForTests,
@@ -12,7 +13,6 @@ import {
   resetCacheIsolationForTests,
 } from '@/lib/queries/cache-isolation';
 import { data, row, scope } from './presence-removal-test-fixtures';
-import type { PresenceRemovalPrincipal } from './removal-principal';
 import { usePresenceRemoval } from './usePresenceRemoval';
 
 const mocks = vi.hoisted(() => ({

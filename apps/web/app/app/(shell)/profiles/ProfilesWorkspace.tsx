@@ -50,6 +50,7 @@ import {
   PresenceStatusBadge,
 } from '@/components/features/presence/PresenceStatusParts';
 import styles from '@/components/features/presence/presence-workspace.module.css';
+import type { PresenceRemovalPrincipal } from '@/components/features/presence/types';
 import { CREATOR_PRESENCE_ADAPTER } from '@/components/features/presence/workspace-adapters';
 import {
   PresenceWorkspaceBoundary,
@@ -133,7 +134,6 @@ import type {
 } from './data';
 import { PresenceIdentityPhoto } from './PresenceIdentityPhoto';
 import { PresenceLockAffordance } from './PresenceLockAffordance';
-import type { PresenceRemovalPrincipal } from './removal-principal';
 import { usePresenceRemoval } from './usePresenceRemoval';
 
 const AddConnectionRail = dynamic(() =>

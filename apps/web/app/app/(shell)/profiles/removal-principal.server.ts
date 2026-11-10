@@ -1,8 +1,8 @@
 import 'server-only';
 
+import type { PresenceRemovalPrincipal } from '@/components/features/presence/types';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { getRequestSession } from '@/lib/auth/request-session';
-import type { PresenceRemovalPrincipal } from './removal-principal';
 
 export async function loadPresenceRemovalPrincipal(
   routeActorId: string
