@@ -2481,6 +2481,7 @@ describe('source-read guard selection', () => {
       'external-api-guard',
       'domain-write-guard',
       'copy-leak',
+      'jump-policy-pin',
     ]);
     expect(selected('', ['README.md'])).toEqual(all);
     expect(selected('pull_request', null)).toEqual(all);
@@ -2503,6 +2504,7 @@ describe('source-read guard selection', () => {
       'external-api-guard',
       'domain-write-guard',
       'copy-leak',
+      'jump-policy-pin',
     ]);
   });
 

@@ -1029,7 +1029,7 @@
   "scripts/lib/__tests__/automation-verify.test.mjs": 4794,
   "scripts/lib/__tests__/capacity-registry.test.mjs": 508,
   "scripts/lib/__tests__/changed-test-coverage.test.mjs": 882,
-  "scripts/lib/__tests__/ci-fast-lanes.test.mjs": 2818,
+  "scripts/lib/__tests__/ci-fast-lanes.test.mjs": 2820,
   "scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs": 3781,
   "scripts/lib/__tests__/ci-harness.test.mjs": 968,
   "scripts/lib/__tests__/component-certificate.test.mjs": 525,

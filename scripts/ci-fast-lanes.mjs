@@ -546,6 +546,18 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // Golden pin for the inline merge-queue jump policy (constants, hashed
+    // jumpPolicy/isPriorityLabel bodies, jump-site count, label parity across
+    // main-red-eject/wins-ledger/bindings.py/priority_admission.py). A policy
+    // change now needs a visible pin edit; comment-only and format-only
+    // workflow edits never trip.
+    id: 'jump-policy-pin',
+    command: 'cd scripts && node --test invariants/jump-policy-pin.test.mjs',
+    inputs:
+      /(?:^\.github\/workflows\/merge-queue-green-enroll\.yml$|^scripts\/invariants\/jump-policy-pin\.(?:json|test\.mjs)$|^scripts\/lib\/main-red-eject\.mjs$|^scripts\/lib\/wins-ledger\.mjs$|^scripts\/lanes\/bindings\.py$|^scripts\/lanes\/priority_admission\.py$|^\.github\/MERGE_QUEUE\.md$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     // JOV-INV-045. Trusted-base copy scans the pull request diff and fails
     // when the diff loosens a blocking gate. Pull requests only.
     id: 'gate-weakening-detector',
@@ -929,6 +941,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/pr-open-win.test.mjs',
   'scripts/lib/__tests__/sources-of-truth.test.mjs',
   'scripts/invariants/duplicate-literals.test.mjs',
+  'scripts/invariants/jump-policy-pin.test.mjs',
   'scripts/lib/__tests__/source-drift.test.mjs',
   'scripts/lib/__tests__/typecheck-slot.test.mjs',
   'scripts/preflight.test.mjs',
