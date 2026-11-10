@@ -38,11 +38,10 @@ const START_CTA = {
   label: 'Find yourself',
 } as const;
 
-// Invite-only homepage (PUBLIC_SIGNUP_CLOSED): the one action is the
-// on-page role waitlist form.
-const HOME_INVITE_CTA = {
-  href: '/#request-invite',
-  label: 'Request an Invite',
+// The homepage's one action routes into /start (the chat onboarding).
+const HOME_CLAIM_CTA = {
+  href: APP_ROUTES.START,
+  label: 'Claim your handle',
 } as const;
 
 const CLAIM_PROFILE_CTA = {
@@ -55,10 +54,10 @@ export const MARKETING_PAGE_CONTRACTS = {
     routeGlob: '(home)/page.tsx',
     copyScope: 'shared',
     url: APP_ROUTES.HOME,
-    job: 'tell the Jovie story and take an invitation request',
+    job: 'tell the Jovie story and start a claim',
     proof: 'the template profile and the real releases workspace',
-    successEvent: 'visitor requests an invitation',
-    primaryCta: HOME_INVITE_CTA,
+    successEvent: 'visitor claims their handle',
+    primaryCta: HOME_CLAIM_CTA,
   },
   '(marketing)/new/page.tsx': {
     routeGlob: '(marketing)/new/page.tsx',
@@ -346,7 +345,7 @@ export const MARKETING_PAGE_CONTRACTS = {
     successEvent: 'visitor submits or confirms waitlist intent',
     primaryCta: {
       href: APP_ROUTES.WAITLIST,
-      label: 'Join the waitlist',
+      label: 'Reserve your spot',
     },
   },
 } as const satisfies Readonly<Record<string, MarketingPageContract>>;

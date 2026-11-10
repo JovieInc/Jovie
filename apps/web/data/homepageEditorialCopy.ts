@@ -1,3 +1,4 @@
+import { APP_ROUTES } from '@/constants/routes';
 import { HOMEPAGE_FEATURED_ARTIST } from '@/data/demoArtists';
 import { HOMEPAGE_INVITE_ANCHOR } from '@/data/homepageInviteAnchor';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
@@ -6,10 +7,10 @@ import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
  * Homepage copy for `/` (Tim, 2026-11-03: "Music line wins" for the root
  * route only; gbrain decisions/homepage-music-line-scope-2026-11-03-0420).
  *
- * Invite-only go-to-market (decisions/close-public-signup-waitlist-2026-11-02):
- * the page is an editorial story that ends in the role waitlist form. While
- * `PUBLIC_SIGNUP_CLOSED` is on, nothing here links to public signup; the one
- * primary action scrolls to the on-page form.
+ * One front door (Tim, 2026-11-09): the page is an editorial story that ends
+ * in the claim entry, and every door routes into `/start` (the chat
+ * onboarding). There is no invitation wording on the page; claiming a handle
+ * is open to anyone.
  *
  * These are the code defaults. The published `marketing-page/home` content
  * record fills the open slots (`lib/content-records/marketing-page.ts`); the
@@ -31,19 +32,19 @@ export const HOMEPAGE_EDITORIAL_COPY = {
     title: 'Jovie | Move your music forward',
   },
   hero: {
-    headline: 'Move your music forward.',
+    headline: 'The page people find when they look you up.',
     subhead:
-      'Your profile, every release, and a link to each place the music is streaming.',
-    primaryAction: 'Request an invite',
-    primaryHref: `#${HOMEPAGE_INVITE_ANCHOR}`,
+      'Jovie is your profile at jov.ie/yourname, showing who you are and everything you make. Tell it what changed and it’s done, and visitors become people you can reach again.',
+    primaryAction: 'Claim your handle',
+    primaryHref: APP_ROUTES.START,
     secondaryAction: 'See a live profile',
     secondaryHref: TIM_WHITE_PROFILE.publicProfilePath,
-    note: 'two fields · we email when your spot opens',
+    note: 'free to start · no credit card',
     windowLabel: `Jovie for Mac: an example artist's Releases list with ${HOMEPAGE_FEATURED_ARTIST.inspected.title} open in the inspector`,
     upcCallout: 'per release',
   },
   /** Chapter index (mono, lowercase, as approved). */
-  chapters: ['profile', 'releases', 'specs', 'invitation'],
+  chapters: ['profile', 'releases', 'specs', 'claim'],
   chaptersLabel: 'On this page',
   profile: {
     headline: 'One name. Found everywhere.',
@@ -85,23 +86,24 @@ export const HOMEPAGE_EDITORIAL_COPY = {
     },
   },
   invite: {
-    headline: 'Jovie opens by invitation.',
+    headline: 'Claim your handle.',
     subhead:
-      'Tell us your role and where to reach you. We’ll email you when your spot opens.',
-    roleLabel: 'I’m a',
-    action: 'Request an invite',
+      'Your page at jov.ie/yourname is free to claim. Tell Jovie who you are and it sets the page up with you.',
+    action: 'Claim your handle',
+    claimLabel: 'Your handle',
+    claimPlaceholder: 'yourname',
     steps: [
       {
-        title: 'Tell us who you are',
-        body: 'Under a minute.',
+        title: 'Tell Jovie who you are',
+        body: 'A few questions, about a minute.',
       },
       {
-        title: 'We review each request',
-        body: 'Jovie opens to a small group at a time.',
+        title: 'Claim your name',
+        body: 'Your page goes up at jov.ie/yourname.',
       },
       {
-        title: 'Your invite arrives',
-        body: 'A link to claim your name and bring in your catalog.',
+        title: 'Bring your catalog',
+        body: 'Releases import once, and every page matches.',
       },
     ],
   },
@@ -110,7 +112,10 @@ export const HOMEPAGE_EDITORIAL_COPY = {
 export const HOMEPAGE_HEADLINE_BREAKS: Readonly<
   Record<string, readonly string[]>
 > = {
-  [HOMEPAGE_EDITORIAL_COPY.hero.headline]: ['Move your', 'music forward.'],
+  [HOMEPAGE_EDITORIAL_COPY.hero.headline]: [
+    'The page people find',
+    'when they look you up.',
+  ],
   [HOMEPAGE_EDITORIAL_COPY.profile.headline]: [
     'One name.',
     'Found everywhere.',
@@ -119,5 +124,4 @@ export const HOMEPAGE_HEADLINE_BREAKS: Readonly<
     'Every release,',
     'ready on day one.',
   ],
-  [HOMEPAGE_EDITORIAL_COPY.invite.headline]: ['Jovie opens', 'by invitation.'],
 };

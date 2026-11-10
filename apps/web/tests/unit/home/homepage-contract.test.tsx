@@ -1,9 +1,9 @@
-// Homepage page contract (Tim, 2026-11-03: "Jovie helps you move your music
-// forward." on `/`; invite-only, the story ends in the role waitlist form).
-// One table-driven contract: it renders the real `/` page module and checks
-// the route manifest, copy truth sources, the one primary action, product
-// imagery, and tokenized styles. Changing the page means changing its typed
-// records, not rewriting a dozen source-string guards.
+// Homepage page contract (Tim, 2026-11-09: the locked headline on `/`; one
+// front door — the story ends in the claim entry, and every door routes into
+// /start). One table-driven contract: it renders the real `/` page module and
+// checks the route manifest, copy truth sources, the one primary action,
+// product imagery, and tokenized styles. Changing the page means changing its
+// typed records, not rewriting a dozen source-string guards.
 // Frame checks (labels, keycaps and edges inside their frames) live in
 // homepage-frames.test.tsx, so this file stays under the size limit.
 import { readdirSync, readFileSync } from 'node:fs';
@@ -141,8 +141,12 @@ describe('homepage contract', { timeout: 60_000 }, () => {
 
     const h1s = screen.getAllByRole('heading', { level: 1 });
     expect(h1s).toHaveLength(1);
-    expect(h1s[0]).toHaveTextContent('Move your music forward.');
-    expect(copy.hero.headline).toBe('Move your music forward.');
+    expect(h1s[0]).toHaveTextContent(
+      'The page people find when they look you up.'
+    );
+    expect(copy.hero.headline).toBe(
+      'The page people find when they look you up.'
+    );
     expect(
       screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)
     ).toEqual([
@@ -154,25 +158,30 @@ describe('homepage contract', { timeout: 60_000 }, () => {
   });
 
   it.each([true, false])(
-    'ends in the one role waitlist form and links nowhere near signup, waitlist=%s',
+    'ends in the one claim entry and every door routes into /start, waitlist=%s',
     async waitlist => {
       gate.WAITLIST_ENABLED = waitlist;
       const { HOMEPAGE_EDITORIAL_COPY: copy, HOMEPAGE_INVITE_ANCHOR } =
         await loadCopy();
       const { container } = await renderHomePage();
 
-      // One conversion: the role waitlist form inside the closing section.
+      // One conversion: the claim entry inside the closing section. A plain
+      // GET form lands on /start?handle=<name> (JOV-7753).
       const forms = [...container.querySelectorAll('form')];
       expect(forms).toHaveLength(1);
-      expect(forms[0]).toHaveAttribute('data-testid', 'waitlist-role-form');
+      expect(forms[0]).toHaveAttribute('data-testid', 'homepage-claim-entry');
+      expect(forms[0]).toHaveAttribute('action', '/start');
+      expect(forms[0]).toHaveAttribute('method', 'get');
       const close = container.querySelector(`#${HOMEPAGE_INVITE_ANCHOR}`);
       expect(close).toHaveAttribute('data-testid', 'marketing-section-cta');
       expect(close?.contains(forms[0] ?? null)).toBe(true);
-      expect(within(forms[0]!).getAllByRole('radio')).toHaveLength(6);
+      expect(
+        within(forms[0]!).getByLabelText(copy.invite.claimLabel)
+      ).toHaveAttribute('name', 'handle');
 
-      // The hero's primary action scrolls to that form; no public signup.
+      // The hero's primary action routes into /start like every other door.
       const primary = screen.getByTestId('homepage-primary-cta');
-      expect(primary).toHaveAttribute('href', `#${HOMEPAGE_INVITE_ANCHOR}`);
+      expect(primary).toHaveAttribute('href', '/start');
       expect(primary).toHaveTextContent(copy.hero.primaryAction);
       expect(
         container.querySelectorAll('[data-primary-action="true"]')
@@ -181,7 +190,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
         link => link.getAttribute('href') ?? ''
       );
       expect(
-        hrefs.filter(href => /^\/(signup|sign-up|start|claim)\b/.test(href))
+        hrefs.filter(href => /^\/(signup|sign-up|waitlist)\b/.test(href))
       ).toEqual([]);
     }
   );
@@ -281,12 +290,9 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     collectAnchors('app');
     collectAnchors('components');
 
-    expect(
-      anchors.size,
-      `no homepage fragment anchors found — the guard scan went stale: ${[
-        ...anchors,
-      ].join(', ')}`
-    ).toBeGreaterThan(0);
+    // Tim, 2026-11-09: no surface advertises a /#fragment CTA anymore —
+    // every door routes into /start. Any anchor that does appear must name
+    // an id the homepage actually renders.
     const missing = [...anchors].filter(id => !renderedIds.has(id));
     expect(missing).toEqual([]);
   });

@@ -173,12 +173,11 @@ function HomePageShell({ children }: { readonly children: React.ReactNode }) {
 }
 
 /**
- * The homepage leads with "Jovie helps you move your music forward." (Tim,
- * 2026-11-03, `/` only) and tells one editorial story: the profile at
- * jov.ie/you, the releases workspace, then the role waitlist form. Signup is
- * invite-only (`PUBLIC_SIGNUP_CLOSED`), so the page has no signup link; the
- * hero action scrolls to the on-page form. The ORGANIZATION schema keeps the
- * general company identity.
+ * The homepage leads with its locked headline (Tim, 2026-11-09: "The page
+ * people find when they look you up.") and tells one editorial story: the
+ * profile at jov.ie/you, the releases workspace, then the claim entry. Every
+ * door routes into `/start` (the chat onboarding). The ORGANIZATION schema
+ * keeps the general company identity.
  *
  * Section order and copy slots come from the published `marketing-page/home`
  * content record, so copy changes go live without a code deploy. The page

@@ -89,12 +89,12 @@ export function HomepageNameSearch({
     >
       <noscript>
         <p>
-          <Link href='/waitlist' prefetch={false}>
-            {HOMEPAGE_SEARCH_COPY.waitlist}
+          <Link href='/start' prefetch={false}>
+            {HOMEPAGE_SEARCH_COPY.claim}
           </Link>
           {' · '}
           <Link href='/signin' prefetch={false}>
-            {HOMEPAGE_SEARCH_COPY.invite}
+            {HOMEPAGE_SEARCH_COPY.signin}
           </Link>
         </p>
       </noscript>
@@ -159,12 +159,12 @@ export function HomepageNameSearch({
         state === 'limited' ||
         state === 'error' ? (
           <p>
-            <a href='#waitlist' className='focus-ring-themed'>
-              {HOMEPAGE_SEARCH_COPY.waitlist}
+            <a href='/start' className='focus-ring-themed'>
+              {HOMEPAGE_SEARCH_COPY.claim}
             </a>
             {' · '}
             <Link href='/signin' className='focus-ring-themed'>
-              {HOMEPAGE_SEARCH_COPY.invite}
+              {HOMEPAGE_SEARCH_COPY.signin}
             </Link>
           </p>
         ) : null}

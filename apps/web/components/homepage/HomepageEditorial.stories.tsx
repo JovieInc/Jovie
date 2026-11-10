@@ -7,8 +7,9 @@ import {
 } from './HomepageEditorial';
 
 /**
- * The editorial homepage (Tim, 2026-11-03): the locked line, the jov.ie/you
- * profile, the releases workspace, then the role waitlist form.
+ * The editorial homepage (Tim, 2026-11-03; Tim, 2026-11-09 one front door):
+ * the locked line, the jov.ie/you profile, the releases workspace, then the
+ * claim entry.
  */
 const meta = {
   title: 'Marketing/HomepageEditorial',
@@ -18,7 +19,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Invite-only homepage chapters. The hero action scrolls to the on-page role waitlist form; product imagery comes from the screenshot registry.',
+          'Homepage chapters. The hero action claims your handle at /start; product imagery comes from the screenshot registry.',
       },
     },
   },
@@ -38,6 +39,6 @@ export const Releases: Story = {
   render: () => <HomepageReleasesChapter />,
 };
 
-export const InviteClose: Story = {
+export const ClaimClose: Story = {
   render: () => <HomepageInviteClose />,
 };

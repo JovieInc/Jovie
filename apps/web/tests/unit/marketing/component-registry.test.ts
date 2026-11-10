@@ -874,6 +874,14 @@ describe('canonical marketing component registry', () => {
         'utf8'
       )
     ).toContain('export function MarketingFinalCTA');
+    // One front door (Tim, 2026-11-09): the default final CTA claims the
+    // handle into /start — no invitation wording.
+    expect(
+      fs.readFileSync(
+        path.join(repoRoot, 'apps/web/components/site/MarketingFinalCTA.tsx'),
+        'utf8'
+      )
+    ).toContain("const DEFAULT_CTA_LABEL = 'Claim your handle';");
   });
 
   it('keeps contract ids and Pen roots globally unique', () => {
@@ -1490,7 +1498,7 @@ describe('canonical shared source atom registry', () => {
         ref =>
           ref.overrides.find(override => override.property === 'content')?.value
       )
-    ).toEqual(['Download for Mac', 'Get started', 'Request Access']);
+    ).toEqual(['Download for Mac', 'Get started', 'Claim your handle']);
     // Each instance carries only its independent label override; none
     // claims a leading-icon slot the Pen master does not expose.
     for (const ref of refs) {
@@ -1769,7 +1777,7 @@ vi.mock('next/link', async () => {
 it('preserves the mounted homepage front-door auth boundary and public secondary navigation', () => {
   const { container } = render(createElement(HomepageV2Route));
   const auth = screen.getByTestId('homepage-v2-hero-primary-cta');
-  expect(auth).toHaveAttribute('href', '/signup');
+  expect(auth).toHaveAttribute('href', '/start');
   expect(auth).toHaveAttribute('data-test-prefetch', 'false');
   const publicLink = container.querySelector('a.public-action-secondary');
   expect(publicLink).toHaveAttribute('href', '/artist-profiles');

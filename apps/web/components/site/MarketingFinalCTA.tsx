@@ -8,7 +8,7 @@ export interface MarketingFinalCTAProps {
   readonly title?: string;
   /** Optional supporting paragraph below the headline. */
   readonly body?: string;
-  /** Primary CTA label. Defaults to "Request Access". */
+  /** Primary CTA label. Defaults to "Claim your handle". */
   readonly ctaLabel?: string;
   /** Primary CTA destination. Defaults to the signup route. */
   readonly ctaHref?: string;
@@ -20,7 +20,7 @@ export interface MarketingFinalCTAProps {
 }
 
 const DEFAULT_TITLE = 'Request private launch access.';
-const DEFAULT_CTA_LABEL = 'Request Access';
+const DEFAULT_CTA_LABEL = 'Claim your handle';
 const DEFAULT_CTA_HREF = HOMEPAGE_FRONT_DOOR_CTA.primary.href;
 
 export function MarketingFinalCTA({

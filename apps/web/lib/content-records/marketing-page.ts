@@ -19,12 +19,12 @@ import type { ContentKindDefinition } from './kind';
  * - Prices, plan names, and included features. Those come from offer truth
  *   and the entitlement registry (same price everywhere); copy slots reject
  *   currency and price-period text.
- * - Locked lines. The homepage headline ("Jovie helps you move your music
- *   forward.", Tim 2026-11-03) has no slot.
+ * - Locked lines. The homepage headline ("The page people find when they
+ *   look you up.", Tim 2026-11-09) has no slot.
  */
 
-// 2026-11-07: the editorial invite-only homepage replaced the artist-profile
-// claim sections. A record stored with the old section variants no longer
+// 2026-11-07: the editorial homepage replaced the artist-profile claim
+// sections. A record stored with the old section variants no longer
 // validates, so `getLiveContent` serves the code default below (source
 // 'incompatible') until a valid version is published.
 const MARKETING_PAGE_SPEC_SCHEMA_VERSION = 1;
@@ -150,7 +150,7 @@ export type MarketingPageSections = MarketingPageSpec['sections'];
 export const MARKETING_PAGE_KEYS = ['home'] as const;
 export type MarketingPageKey = (typeof MARKETING_PAGE_KEYS)[number];
 
-/** The code default: the editorial story, ending in the invitation form. */
+/** The code default: the editorial story, ending in the claim entry. */
 export const DEFAULT_HOME_SPEC: MarketingPageSpec = {
   sections: [
     {

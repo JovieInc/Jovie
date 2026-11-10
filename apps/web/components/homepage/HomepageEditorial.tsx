@@ -2,8 +2,8 @@
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, type ReactNode } from 'react';
-import { WaitlistRoleForm } from '@/components/features/waitlist/WaitlistRoleForm';
 import { HomepageProfilePhone } from '@/components/homepage/HomepageProfilePhone';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   HOMEPAGE_EDITORIAL_COPY,
   HOMEPAGE_HEADLINE_BREAKS,
@@ -295,7 +295,11 @@ export function HomepageReleasesChapter({
   );
 }
 
-/** 04 invitation: the role waitlist form, the page's one conversion. */
+/**
+ * 04 claim: the handle entry, the page's one conversion. A plain GET form:
+ * it lands on /start?handle=<name>, where the onboarding chat shows the
+ * visitor's real page first (JOV-7753). No client JS.
+ */
 export function HomepageInviteClose({
   copy = HOMEPAGE_EDITORIAL_COPY.invite,
 }: Readonly<{
@@ -317,14 +321,30 @@ export function HomepageInviteClose({
         <h2 className='hv3-statement text-balance'>{lines(copy.headline)}</h2>
         <p className='hv3-lede hv3-lede--center'>{copy.subhead}</p>
         <div className='hv3-form'>
-          <WaitlistRoleForm
-            presentation='chips'
-            align='center'
-            headingLevel={2}
-            title={copy.headline}
-            roleLabel={invite.roleLabel}
-            submitLabel={invite.action}
-          />
+          <form
+            method='get'
+            action={APP_ROUTES.START}
+            data-testid='homepage-claim-entry'
+            className='hv3-claim'
+          >
+            <label
+              className='hv3-claim__label'
+              htmlFor='homepage-claim-entry-handle'
+            >
+              {invite.claimLabel}
+            </label>
+            <input
+              id='homepage-claim-entry-handle'
+              name='handle'
+              type='text'
+              autoComplete='off'
+              spellCheck={false}
+              maxLength={30}
+              placeholder={invite.claimPlaceholder}
+              aria-label={invite.claimLabel}
+            />
+            <button type='submit'>{invite.action}</button>
+          </form>
         </div>
         <ol className='hv3-steps hv3-reveal'>
           {invite.steps.map((step, index) => (
