@@ -27,8 +27,9 @@ export const SignupClosed: Story = {
     const canvas = within(canvasElement);
     const form = canvas.getByTestId('waitlist-role-form');
     await expect(form).toBeVisible();
-    await expect(
-      form.locator('input:not([disabled]), button:not([disabled])').first()
-    ).toBeVisible();
+    const liveControls = form.querySelectorAll(
+      'input:not([disabled]), button:not([disabled])'
+    );
+    await expect(liveControls.length).toBeGreaterThan(0);
   },
 };
