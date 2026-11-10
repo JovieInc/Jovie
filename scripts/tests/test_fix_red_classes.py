@@ -71,22 +71,6 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual(got["files"], ["scripts/a.test.mjs", "scripts/b.test.mjs"])
         self.assertEqual(got["checks"], ["Source Validation"])
 
-    def test_a_lone_pr_ready_quota_deferral_reruns(self):
-        log = ("::warning::github-quota-deferred: gh api primary after 1 attempt(s) until 2026-11-10T12:59:15.000Z\n"
-               "::error::Fleet rule evidence is missing (github-quota-deferred or not yet complete)")
-        solo = {"mergeStateStatus": "BLOCKED", "statusCheckRollup": [
-            {"name": "PR Ready", "conclusion": "FAILURE"},
-            {"name": "Source Validation", "conclusion": "SUCCESS"},
-            {"name": "Fleet Rules Evidence", "conclusion": "CANCELLED"},
-        ]}
-        got = classes.classify(solo, {"PR Ready": log})
-        self.assertEqual((got["cls"], got["action"], got["checks"]), ("quota-deferred", "rerun", ["PR Ready"]))
-        still = classes.classify(pr("Source Validation"), {"Source Validation": "AssertionError: expected 1"})
-        self.assertEqual(still["checks"], ["Source Validation"])
-        cancelled = classes.real_failures({"statusCheckRollup": [
-            {"name": "PR Ready", "conclusion": "CANCELLED"}]})
-        self.assertEqual(cancelled, [])
-
     def test_unwired_guard_error_outranks_quota_and_infra_fixture_output(self):
         log = ("echo 'github-quota-deferred; Fleet rule evidence is missing'\n"
                "✔ handles API rate limit exceeded and HTTP 503\n"

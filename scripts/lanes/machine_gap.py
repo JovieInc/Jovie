@@ -75,6 +75,20 @@ def without_aggregate_sibling(checks: list, *, hard: set[str]) -> list:
     return [check for check in checks if low(check) != "pr ready"]
 
 
+def red_checks(checks: list, red: set[str], aggregate: tuple[str, ...] = ("pr ready", "ci summary", "rollup")) -> list:
+    """Red checks whose logs decide a class. Summary and rollup never do.
+
+    A lone hard PR Ready stays, so a quota-deferred fleet lookup reruns. Any other
+    hard failure drops PR Ready. A cancelled-only PR Ready is dropped.
+    """
+    skip = {name for name in aggregate if name != "pr ready"}
+    hard = {item for item in red if item != "CANCELLED"}
+    reds = [check for check in checks
+            if str(check.get("conclusion") or "").upper() in red
+            and str(check.get("name") or "").lower() not in skip]
+    return without_aggregate_sibling(reds, hard=hard)
+
+
 def check_fingerprint(pr: dict) -> str:
     """Hash the failing check names. A CANCELLED sibling does not open a second class when a
     FAILURE or TIMED_OUT is present: Fleet Rules Evidence cancelled beside Source Validation

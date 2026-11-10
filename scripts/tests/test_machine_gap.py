@@ -202,5 +202,47 @@ class RemediationRecurrenceTest(unittest.TestCase):
             self.assertNotIn("Machine-builder task", row["dossier"])
 
 
+class LoneReadyTest(unittest.TestCase):
+    def test_a_lone_pr_ready_quota_deferral_reruns(self):
+        import fix_red_classes as classes
+        log = ("::warning::github-quota-deferred: gh api primary after 1 attempt(s) until 2026-11-10T12:59:15.000Z\n"
+               "::error::Fleet rule evidence is missing (github-quota-deferred or not yet complete)")
+        solo = {"mergeStateStatus": "BLOCKED", "statusCheckRollup": [
+            {"name": "PR Ready", "conclusion": "FAILURE"},
+            {"name": "Source Validation", "conclusion": "SUCCESS"},
+            {"name": "Fleet Rules Evidence", "conclusion": "CANCELLED"},
+        ]}
+        got = classes.classify(solo, {"PR Ready": log})
+        self.assertEqual((got["cls"], got["action"], got["checks"]), ("quota-deferred", "rerun", ["PR Ready"]))
+        beside = {"mergeStateStatus": "BLOCKED", "statusCheckRollup": [
+            {"name": "Source Validation", "conclusion": "FAILURE"},
+            {"name": "PR Ready", "conclusion": "FAILURE"}]}
+        still = classes.classify(beside, {"Source Validation": "AssertionError: expected 1"})
+        self.assertEqual(still["checks"], ["Source Validation"])
+        cancelled = classes.real_failures({"statusCheckRollup": [
+            {"name": "PR Ready", "conclusion": "CANCELLED"}]})
+        self.assertEqual(cancelled, [])
+
+    def test_lone_pr_ready_quota_deferral_reruns_instead_of_the_empty_class(self):
+        import test_lane_runner as harness
+        case = harness.FixRedTest("test_quota_deferred_red_is_rerun_not_dispatched_and_carries_its_fingerprint")
+        case.setUp()
+        try:
+            pr = case.pr(checks=[{
+                "name": "PR Ready", "status": "COMPLETED", "conclusion": "FAILURE",
+                "detailsUrl": "https://github.com/x/actions/runs/1/job/42"}])
+            log = ("::warning::github-quota-deferred: gh api primary after 1 attempt(s)\n"
+                   "::error::Fleet rule evidence is missing (github-quota-deferred or not yet complete)")
+            with tempfile.TemporaryDirectory() as tmp:
+                _, receipt, agent, again = case.run_gate(tmp, log, pr=pr)
+            case.assertEqual(receipt["reasons"], ["infra-rerun:quota-deferred"])
+            case.assertEqual(receipt["failureFingerprint"]["cls"], "quota-deferred")
+            agent.assert_not_called()
+            again.assert_called_once()
+            case.assertNotEqual(harness.lane.machine_gap.check_fingerprint(pr), "fix-red-e3b0c44298")
+        finally:
+            case.doCleanups()
+
+
 if __name__ == "__main__":
     unittest.main()

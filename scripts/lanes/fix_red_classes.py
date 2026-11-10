@@ -164,9 +164,6 @@ SIGNATURES = (
 )
 BEHIND_CLASS = "stale-branch"
 AGGREGATE = ("pr ready", "ci summary", "rollup")
-# PR Ready stays in AGGREGATE for readers, but real_failures keeps a lone hard PR Ready.
-_ALWAYS_AGGREGATE = frozenset(name for name in AGGREGATE if name != "pr ready")
-_HARD_RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR"})
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "CANCELLED", "ERROR"})
 LLM_VERDICTS = frozenset({"fix-pushed", "fix-no-change", "cancelled", "failed"})
 DEFAULT_BREAKER_N, MAX_BREAKER_N, MIN_CELL_RUNS = 2, 3, 10
@@ -185,16 +182,7 @@ def error_signature(text: str) -> str:
 
 
 def real_failures(pr: dict) -> list[dict]:
-    """Red checks whose logs decide the class. CI Summary and rollup never do.
-
-    PR Ready is dropped while another hard failure remains. When it is the only
-    hard failure, its log is the class: a quota-deferred fleet lookup must rerun,
-    not hash to the empty fix-red class and dispatch a model.
-    """
-    reds = [check for check in pr.get("statusCheckRollup") or []
-            if str(check.get("conclusion") or "").upper() in RED
-            and str(check.get("name") or "").lower() not in _ALWAYS_AGGREGATE]
-    return machine_gap.without_aggregate_sibling(reds, hard=_HARD_RED)
+    return machine_gap.red_checks(pr.get("statusCheckRollup") or [], RED, AGGREGATE)
 
 
 def fingerprint_key(cls: str, names: list[str], signature: str = "") -> str:
