@@ -27,13 +27,56 @@ vi.mock('@/lib/queries', () => ({
 }));
 
 import { FetchDeadlineError } from '@/lib/queries/fetch';
+import type { InsightResponse } from '@/types/insights';
 import { InsightsPanel, InsightsPanelView } from './InsightsPanel';
+
+function makeInsight(
+  overrides: Partial<InsightResponse> = {}
+): InsightResponse {
+  return {
+    id: 'insight-1',
+    insightType: 'subscriber_surge',
+    category: 'growth',
+    priority: 'high',
+    title: 'Audience growth accelerated',
+    description: 'Weekly listeners increased.',
+    actionSuggestion: null,
+    confidence: '0.92',
+    status: 'active',
+    periodStart: '2026-08-11T00:00:00.000Z',
+    periodEnd: '2026-08-18T00:00:00.000Z',
+    createdAt: '2026-08-18T00:00:00.000Z',
+    expiresAt: '2026-09-18T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function renderPanel(
+  props: Partial<React.ComponentProps<typeof InsightsPanelView>> = {}
+) {
+  render(
+    <TooltipProvider>
+      <InsightsPanelView
+        insights={[]}
+        isLoading={false}
+        error={null}
+        selectedCategory='all'
+        onCategoryChange={vi.fn()}
+        onGenerate={vi.fn()}
+        onRetry={vi.fn()}
+        isGenerating={false}
+        {...props}
+      />
+    </TooltipProvider>
+  );
+}
 
 describe('InsightsPanelView', () => {
   beforeEach(() => {
     useInsightsQueryMock.mockReset();
     useGenerateInsightsMutationMock.mockReset();
     generateMock.mockReset();
+    routerPushMock.mockReset();
     useGenerateInsightsMutationMock.mockReturnValue({
       mutate: generateMock,
       isPending: false,
@@ -41,20 +84,7 @@ describe('InsightsPanelView', () => {
   });
 
   it('wraps every category filter inside the compact viewport', () => {
-    render(
-      <TooltipProvider>
-        <InsightsPanelView
-          insights={[]}
-          isLoading={false}
-          error={null}
-          selectedCategory='all'
-          onCategoryChange={vi.fn()}
-          onGenerate={vi.fn()}
-          onRetry={vi.fn()}
-          isGenerating={false}
-        />
-      </TooltipProvider>
-    );
+    renderPanel();
 
     const tablist = screen.getByRole('tablist', {
       name: 'Filter Insights By Category',
@@ -70,20 +100,7 @@ describe('InsightsPanelView', () => {
   });
 
   it('uses the canonical workspace empty state without decorative card chrome', () => {
-    render(
-      <TooltipProvider>
-        <InsightsPanelView
-          insights={[]}
-          isLoading={false}
-          error={null}
-          selectedCategory='all'
-          onCategoryChange={vi.fn()}
-          onGenerate={vi.fn()}
-          onRetry={vi.fn()}
-          isGenerating={false}
-        />
-      </TooltipProvider>
-    );
+    renderPanel();
 
     const emptyState = screen.getByTestId('insights-empty-state');
     expect(emptyState.tagName).toBe('OUTPUT');
@@ -93,20 +110,7 @@ describe('InsightsPanelView', () => {
 
   it('renders the canonical recoverable error state', () => {
     const onRetry = vi.fn();
-    render(
-      <TooltipProvider>
-        <InsightsPanelView
-          insights={[]}
-          isLoading={false}
-          error={new Error('Insights request failed')}
-          selectedCategory='all'
-          onCategoryChange={vi.fn()}
-          onGenerate={vi.fn()}
-          onRetry={onRetry}
-          isGenerating={false}
-        />
-      </TooltipProvider>
-    );
+    renderPanel({ error: new Error('Insights request failed'), onRetry });
 
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Failed to load insights.'
@@ -116,51 +120,25 @@ describe('InsightsPanelView', () => {
   });
 
   it('groups loaded insights by priority without adding extra workspace cards', () => {
-    render(
-      <TooltipProvider>
-        <InsightsPanelView
-          insights={[
-            {
-              id: 'high-1',
-              insightType: 'subscriber_surge',
-              category: 'growth',
-              priority: 'high',
-              title: 'Audience growth accelerated',
-              description: 'Weekly listeners increased.',
-              actionSuggestion: null,
-              confidence: '0.92',
-              status: 'active',
-              periodStart: '2026-08-11T00:00:00.000Z',
-              periodEnd: '2026-08-18T00:00:00.000Z',
-              createdAt: '2026-08-18T00:00:00.000Z',
-              expiresAt: '2026-09-18T00:00:00.000Z',
-            },
-            {
-              id: 'medium-1',
-              insightType: 'release_momentum',
-              category: 'content',
-              priority: 'medium',
-              title: 'Share the new clip',
-              description: 'Recent posts are converting.',
-              actionSuggestion: null,
-              confidence: '0.81',
-              status: 'active',
-              periodStart: '2026-08-11T00:00:00.000Z',
-              periodEnd: '2026-08-18T00:00:00.000Z',
-              createdAt: '2026-08-18T00:00:00.000Z',
-              expiresAt: '2026-09-18T00:00:00.000Z',
-            },
-          ]}
-          isLoading={false}
-          error={null}
-          selectedCategory='all'
-          onCategoryChange={vi.fn()}
-          onGenerate={vi.fn()}
-          onRetry={vi.fn()}
-          isGenerating={false}
-        />
-      </TooltipProvider>
-    );
+    renderPanel({
+      insights: [
+        makeInsight({
+          id: 'high-1',
+          priority: 'high',
+          category: 'growth',
+          insightType: 'subscriber_surge',
+        }),
+        makeInsight({
+          id: 'medium-1',
+          priority: 'medium',
+          category: 'content',
+          insightType: 'release_momentum',
+          title: 'Share the new clip',
+          description: 'Recent posts are converting.',
+          confidence: '0.81',
+        }),
+      ],
+    });
 
     expect(screen.getByText('High Priority')).toBeVisible();
     expect(screen.getByText('Recommended')).toBeVisible();
@@ -234,20 +212,7 @@ describe('InsightsPanelView', () => {
   });
 
   it('names the click threshold up front instead of vague AI copy', () => {
-    render(
-      <TooltipProvider>
-        <InsightsPanelView
-          insights={[]}
-          isLoading={false}
-          error={null}
-          selectedCategory='all'
-          onCategoryChange={vi.fn()}
-          onGenerate={vi.fn()}
-          onRetry={vi.fn()}
-          isGenerating={false}
-        />
-      </TooltipProvider>
-    );
+    renderPanel();
 
     const empty = screen.getByTestId('insights-empty-state');
     expect(empty).toHaveTextContent('at least 20 link clicks');
@@ -258,22 +223,7 @@ describe('InsightsPanelView', () => {
   });
 
   it('explains a generate run that came back short of data, with the real count', () => {
-    const onGenerate = vi.fn();
-    render(
-      <TooltipProvider>
-        <InsightsPanelView
-          insights={[]}
-          isLoading={false}
-          error={null}
-          selectedCategory='all'
-          onCategoryChange={vi.fn()}
-          onGenerate={onGenerate}
-          onRetry={vi.fn()}
-          isGenerating={false}
-          lastRun={{ insightsGenerated: 0, dataPointsAnalyzed: 6 }}
-        />
-      </TooltipProvider>
-    );
+    renderPanel({ lastRun: { insightsGenerated: 0, dataPointsAnalyzed: 6 } });
 
     expect(screen.getByText('Not Enough Activity Yet')).toBeVisible();
     expect(screen.getByTestId('insights-empty-state')).toHaveTextContent(
@@ -291,53 +241,17 @@ describe('InsightsPanelView', () => {
   it('offers a retry when generation failed', async () => {
     const user = userEvent.setup();
     const onGenerate = vi.fn();
-    render(
-      <TooltipProvider>
-        <InsightsPanelView
-          insights={[]}
-          isLoading={false}
-          error={null}
-          selectedCategory='all'
-          onCategoryChange={vi.fn()}
-          onGenerate={onGenerate}
-          onRetry={vi.fn()}
-          isGenerating={false}
-          generateFailed
-        />
-      </TooltipProvider>
-    );
+    renderPanel({ onGenerate, generateFailed: true });
 
     expect(screen.getByText('Insights Did Not Generate')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Try Again' }));
     expect(onGenerate).toHaveBeenCalledOnce();
   });
 
-  function renderView(
-    props: Partial<React.ComponentProps<typeof InsightsPanelView>> = {}
-  ) {
-    const handlers = {
-      onGenerate: vi.fn(),
-      onCategoryChange: vi.fn(),
-    };
-    render(
-      <TooltipProvider>
-        <InsightsPanelView
-          insights={[]}
-          isLoading={false}
-          error={null}
-          selectedCategory='all'
-          onRetry={vi.fn()}
-          isGenerating={false}
-          {...handlers}
-          {...props}
-        />
-      </TooltipProvider>
-    );
-    return handlers;
-  }
-
   it('after a run that found nothing, offers no Generate press the cooldown would refuse', () => {
-    renderView({ lastRun: { insightsGenerated: 0, dataPointsAnalyzed: 1240 } });
+    renderPanel({
+      lastRun: { insightsGenerated: 0, dataPointsAnalyzed: 1240 },
+    });
     expect(screen.getByText('Nothing New To Report')).toBeVisible();
     expect(screen.getByTestId('insights-empty-state')).toHaveTextContent(
       'can run again in an hour'
@@ -353,8 +267,10 @@ describe('InsightsPanelView', () => {
   it('a timeout reads as still working and only refetches the list', async () => {
     const user = userEvent.setup();
     const onRetry = vi.fn();
-    const { onGenerate } = renderView({
+    const onGenerate = vi.fn();
+    renderPanel({
       onRetry,
+      onGenerate,
       generateFailed: true,
       generateFailure: { status: 408, kind: 'deadline' },
     });
@@ -366,7 +282,7 @@ describe('InsightsPanelView', () => {
   });
 
   it('a 429 says the cooldown and offers no immediate retry', () => {
-    renderView({
+    renderPanel({
       generateFailed: true,
       generateFailure: { status: 429, nextAllowedAt: null },
     });
@@ -381,10 +297,7 @@ describe('InsightsPanelView', () => {
   });
 
   it('a 403 names the plan and links to billing, not a retry', () => {
-    renderView({
-      generateFailed: true,
-      generateFailure: { status: 403 },
-    });
+    renderPanel({ generateFailed: true, generateFailure: { status: 403 } });
     expect(screen.getByText(/^Insights Need /)).toBeVisible();
     expect(screen.getByRole('link', { name: 'See Plans' })).toHaveAttribute(
       'href',
@@ -395,7 +308,9 @@ describe('InsightsPanelView', () => {
 
   it('any other failure keeps the generic retry', async () => {
     const user = userEvent.setup();
-    const { onGenerate } = renderView({
+    const onGenerate = vi.fn();
+    renderPanel({
+      onGenerate,
       generateFailed: true,
       generateFailure: { status: 500 },
     });
@@ -406,7 +321,9 @@ describe('InsightsPanelView', () => {
 
   it('an empty category speaks to that filter and offers Show All', async () => {
     const user = userEvent.setup();
-    const { onCategoryChange } = renderView({
+    const onCategoryChange = vi.fn();
+    renderPanel({
+      onCategoryChange,
       selectedCategory: 'tour',
       lastRun: { insightsGenerated: 0, dataPointsAnalyzed: 6 },
     });
@@ -446,30 +363,13 @@ describe('InsightsPanelView', () => {
   });
 
   it('uses the typographic ellipsis while generating', () => {
-    render(
-      <TooltipProvider>
-        <InsightsPanelView
-          insights={[]}
-          isLoading={false}
-          error={null}
-          selectedCategory='all'
-          onCategoryChange={vi.fn()}
-          onGenerate={vi.fn()}
-          onRetry={vi.fn()}
-          isGenerating
-        />
-      </TooltipProvider>
-    );
+    renderPanel({ isGenerating: true });
 
     expect(screen.getByRole('button', { name: 'Generating…' })).toBeDisabled();
     expect(document.body.textContent).not.toContain('...');
   });
 
   describe('audience workspace navigation', () => {
-    beforeEach(() => {
-      routerPushMock.mockReset();
-    });
-
     const NAV_STATES: {
       name: string;
       props: Partial<React.ComponentProps<typeof InsightsPanelView>>;
@@ -477,28 +377,7 @@ describe('InsightsPanelView', () => {
       { name: 'loading', props: { isLoading: true } },
       { name: 'error', props: { error: new Error('Insights request failed') } },
       { name: 'empty', props: {} },
-      {
-        name: 'populated',
-        props: {
-          insights: [
-            {
-              id: 'high-1',
-              insightType: 'subscriber_surge',
-              category: 'growth',
-              priority: 'high',
-              title: 'Audience growth accelerated',
-              description: 'Weekly listeners increased.',
-              actionSuggestion: null,
-              confidence: '0.92',
-              status: 'active',
-              periodStart: '2026-08-11T00:00:00.000Z',
-              periodEnd: '2026-08-18T00:00:00.000Z',
-              createdAt: '2026-08-18T00:00:00.000Z',
-              expiresAt: '2026-09-18T00:00:00.000Z',
-            },
-          ],
-        },
-      },
+      { name: 'populated', props: { insights: [makeInsight()] } },
     ];
 
     it('keeps Contacts, Audience and Insights reachable in every panel state', () => {
@@ -541,20 +420,7 @@ describe('InsightsPanelView', () => {
 
     it('routes Contacts and Audience through the canonical workspace hrefs', async () => {
       const user = userEvent.setup();
-      render(
-        <TooltipProvider>
-          <InsightsPanelView
-            insights={[]}
-            isLoading={false}
-            error={null}
-            selectedCategory='all'
-            onCategoryChange={vi.fn()}
-            onGenerate={vi.fn()}
-            onRetry={vi.fn()}
-            isGenerating={false}
-          />
-        </TooltipProvider>
-      );
+      renderPanel();
 
       await user.click(screen.getByRole('tab', { name: 'Contacts' }));
       expect(routerPushMock).toHaveBeenCalledWith('/app/contacts');
@@ -562,45 +428,22 @@ describe('InsightsPanelView', () => {
       expect(routerPushMock).toHaveBeenCalledWith('/app/contacts?tab=audience');
     });
 
-    it('keeps the canonical keyboard focus movement between workspace tabs', async () => {
+    it('keeps canonical keyboard focus movement and routes on activation', async () => {
       const user = userEvent.setup();
-      render(
-        <TooltipProvider>
-          <InsightsPanelView
-            insights={[]}
-            isLoading={false}
-            error={null}
-            selectedCategory='all'
-            onCategoryChange={vi.fn()}
-            onGenerate={vi.fn()}
-            onRetry={vi.fn()}
-            isGenerating={false}
-          />
-        </TooltipProvider>
-      );
+      renderPanel();
 
       const insights = screen.getByRole('tab', { name: 'Insights' });
       insights.focus();
       expect(insights).toHaveFocus();
       await user.keyboard('{ArrowLeft}');
-      expect(screen.getByRole('tab', { name: 'Audience' })).toHaveFocus();
+      const audience = screen.getByRole('tab', { name: 'Audience' });
+      expect(audience).toHaveFocus();
+      await user.keyboard('{Enter}');
+      expect(routerPushMock).toHaveBeenCalledWith('/app/contacts?tab=audience');
     });
 
     it('preserves the category filters and Generate beside the workspace tabs', () => {
-      render(
-        <TooltipProvider>
-          <InsightsPanelView
-            insights={[]}
-            isLoading={false}
-            error={null}
-            selectedCategory='all'
-            onCategoryChange={vi.fn()}
-            onGenerate={vi.fn()}
-            onRetry={vi.fn()}
-            isGenerating={false}
-          />
-        </TooltipProvider>
-      );
+      renderPanel();
 
       expect(
         screen.getByRole('tablist', { name: 'Filter Insights By Category' })
