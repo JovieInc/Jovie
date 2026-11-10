@@ -163,9 +163,7 @@ describe('ensureAssignment', () => {
     });
     const inserted = dbQueue.insertCalls[0].values;
     expect(inserted.generation).toBe(2);
-    expect(inserted.selectionProbability).toBe(
-      PILOT_ALLOCATION.incumbent
-    );
+    expect(inserted.selectionProbability).toBe(PILOT_ALLOCATION.incumbent);
   });
 });
 
