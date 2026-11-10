@@ -149,6 +149,23 @@ describe('JOV-INV-045 gate-weakening detector', () => {
     const excluded = { ...config, scanExclusions: ['scripts/invariants/fixtures/gate-weakening/'] };
     assert.deepEqual(evaluateGateWeakening([hidden], excluded), []);
   });
+  it('flags any modification of the detector body, cleared only by the override ceremony, and still flags deletion', () => {
+    const path = 'scripts/invariants/gate-weakening-detector.mjs';
+    const before = 'export function inspectSelf() {\n  return [];\n}\n';
+    const after = 'export function inspectSelf() {\n  return hardened;\n}\n';
+    const edit = { path, before, after };
+    assert.deepEqual(kindsOf(edit), ['detector-modified']);
+    assert.deepEqual(kindsOf({ path, before, after: `${before}\n` }), ['detector-modified']);
+    const override = { body: 'note\ngate-change: detector self-protection tightened\n', labels: ['codeowners-approved'] };
+    const allowed = decide(evaluateGateWeakening([fileOf(edit)], config), override, config);
+    assert.equal(allowed.ok, true);
+    assert.match(formatReport(allowed), /OVERRIDE/);
+    assert.match(formatReport(allowed), /detector-modified/);
+    const raw = evaluateGateWeakening([fileOf(edit)], config);
+    assert.equal(decide(raw, { body: override.body, labels: [] }, config).ok, false);
+    assert.equal(decide(raw, { body: '', labels: ['codeowners-approved'] }, config).ok, false);
+    assert.deepEqual(kindsOf({ path, before, after: null }), ['detector-deleted']);
+  });
   it('skips a listed generated report, but still flags the same edit in a gate file', () => {
     const edit = path => ({ path, before: '{\n  "risk_score": 50\n}\n', after: '{\n  "risk_score": 42.1\n}\n' });
     assert.deepEqual(evaluateGateWeakening([edit('apps/web/reports/test-coverage-snapshot.json')], config), []);

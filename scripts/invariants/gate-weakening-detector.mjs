@@ -211,7 +211,7 @@ function inspectInvariantTest(file) {
 }
 function inspectSelf(file) {
   if (file.path.endsWith('gate-weakening-detector.mjs')) {
-    return file.before != null && file.after == null ? [finding('detector-deleted', file.path, 'script removed')] : [];
+    return file.after == null ? [finding('detector-deleted', file.path, 'script removed')] : file.before !== file.after ? [finding('detector-modified', file.path, 'script modified')] : [];
   }
   if (!file.path.endsWith('gate-weakening-detector.config.json') || file.before == null) {
     return [];
