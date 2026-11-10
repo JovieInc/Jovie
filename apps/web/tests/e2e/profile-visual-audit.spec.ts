@@ -495,9 +495,7 @@ test.describe('Public profile surface sizing', () => {
     await waitForImages(page);
     await waitForSettle(page);
 
-    // #24709 made the desktop surface the canonical profile at >=1180px and
-    // unmounts the compact shell there, so this sizing guard targets the
-    // desktop surface; the compact shell stays canonical below 1180px.
+    // #24709 unmounts the compact shell at >=1180px in favor of desktop.
     await expect(page.getByTestId('profile-compact-shell')).toHaveCount(0);
     const shell = page.getByTestId('profile-desktop-surface');
     await expect(shell).toBeVisible();
@@ -508,10 +506,7 @@ test.describe('Public profile surface sizing', () => {
       return;
     }
 
-    // At 1280x900 the desktop stage pads the viewport by clamp(16px, 2vw,
-    // 24px) (24px at 1280) and caps the surface at min(940px, 100dvh - 48px)
-    // = 852px, so the card sits well inside the viewport instead of
-    // stretching close to full height again.
+    // At 1280x900, 24px stage insets cap desktop at min(940px, 100dvh - 48px) = 852px.
     expect(shellBox.height).toBeLessThanOrEqual(852);
     expect(shellBox.y).toBeGreaterThanOrEqual(24);
     expect(shellBox.y + shellBox.height).toBeLessThanOrEqual(876);
