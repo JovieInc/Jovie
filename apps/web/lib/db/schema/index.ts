@@ -1456,10 +1456,13 @@ export {
 } from './user-interviews';
 // Waitlist
 export {
+  type CapabilityWant,
+  capabilityWants,
   insertWaitlistAuditLogSchema,
   insertWaitlistEntrySchema,
   insertWaitlistInviteSchema,
   insertWaitlistSettingsSchema,
+  type NewCapabilityWant,
   type NewWaitlistAuditLog,
   type NewWaitlistEntry,
   type NewWaitlistInvite,

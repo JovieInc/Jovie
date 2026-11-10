@@ -278,6 +278,10 @@ export const waitlistStatusEnum = pgEnum('waitlist_status', [
   'chat_started',
   'qualified',
   'waitlisted',
+  // Mom Test funnel (qualify/2026-11-v1): queued = held on OUR readiness or
+  // capacity, with needs stored; disqualified = not a fit, with a reason.
+  'disqualified',
+  'queued',
   'approved',
   'signed_up',
   'rejected',
