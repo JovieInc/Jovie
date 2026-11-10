@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 export const HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT =
   'Hey, I want to get access to Jovie.';
@@ -48,14 +49,18 @@ export function getHomepageFrontDoorCtaContract(
   waitlistEnabled: boolean
 ): HomepageFrontDoorCtaContract {
   // One front door (Tim, 2026-11-09): both modes resolve the same claim
-  // CTA into /start; the server-side gate decides admit vs reserve.
+  // CTA into /start; the server-side gate decides admit vs reserve. The
+  // secondary stays the quiet live-profile proof path in both modes.
   void waitlistEnabled;
   return {
     primary: {
       label: 'Claim your handle',
       href: buildHomepageStartHref(),
     },
-    secondary: null,
+    secondary: {
+      label: 'See a live profile',
+      href: TIM_WHITE_PROFILE.publicProfilePath,
+    },
     fallbackSupport: 'Free to start. Reserve your name now.',
   };
 }

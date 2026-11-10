@@ -15,11 +15,17 @@ describe('marketing CTA intent registry', () => {
     expect(MARKETING_CTA_INTENTS.seeLiveProfile.href).toBe(
       TIM_WHITE_PROFILE.publicProfilePath
     );
-    expect(homepage.secondary).toBeNull();
+    expect(homepage.secondary).toEqual({
+      label: 'See a live profile',
+      href: TIM_WHITE_PROFILE.publicProfilePath,
+    });
     expect(HOMEPAGE_LAUNCH_COPY.hero.secondaryCta.href).toBe(
       TIM_WHITE_PROFILE.publicProfilePath
     );
-    expect(getHomepageFrontDoorCtaContract(true).secondary).toBeNull();
+    expect(getHomepageFrontDoorCtaContract(true).secondary).toEqual({
+      label: 'See a live profile',
+      href: TIM_WHITE_PROFILE.publicProfilePath,
+    });
   });
 
   it('preserves empty handles at the open auth entry', () => {

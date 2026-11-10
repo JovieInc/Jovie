@@ -8,6 +8,7 @@ import {
 import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
 import { MARKETING_PRICING_PLANS } from '@/data/marketingPricingPlans';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 describe('auth front-door contract', () => {
   it('keeps both front-door modes on the one claim CTA routed into /start', () => {
@@ -22,7 +23,10 @@ describe('auth front-door contract', () => {
       });
       expect(PUBLIC_WAITLIST_URL).toBe(APP_ROUTES.START);
       expect(contract.primary.href).not.toBe(APP_ROUTES.WAITLIST);
-      expect(contract.secondary).toBeNull();
+      expect(contract.secondary).toEqual({
+        label: 'See a live profile',
+        href: TIM_WHITE_PROFILE.publicProfilePath,
+      });
       expect(contract.fallbackSupport).toBe(
         'Free to start. Reserve your name now.'
       );
