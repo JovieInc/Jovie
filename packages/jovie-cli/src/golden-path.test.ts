@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { JovieInputError, JovieRequestError } from './client.js';
+import { findCommand } from './commands.js';
 import {
   answerOnboardingQuestion,
+  buildProfile,
   claimHandle,
   draftRef,
   getQualification,
+  publishProfile,
   shareProfile,
   startUpgrade,
 } from './golden-path.js';
@@ -46,6 +49,22 @@ function mcpFetch(result: unknown, isError = false) {
     });
   };
 }
+
+describe('command table registration', () => {
+  it('registers the seven golden-path commands', () => {
+    for (const [first, second] of [
+      ['claim', 'handle'],
+      ['onboarding', 'answer'],
+      ['onboarding', 'qualify'],
+      ['onboarding', 'setup'],
+      ['onboarding', 'publish'],
+      ['profile', 'share'],
+      ['profile', 'upgrade'],
+    ]) {
+      expect(findCommand([first, second]), `${first} ${second}`).toBeTruthy();
+    }
+  });
+});
 
 describe('draftRef', () => {
   it('shapes the capability pair for the MCP call', () => {
@@ -154,6 +173,42 @@ describe('golden-path tool calls', () => {
       answer: 'under_50',
       draft_id: DRAFT_ID,
     });
+  });
+
+  it('build_profile and publish_profile pass the capability through', async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const fetchImpl = async (input: string | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as {
+        params: { name: string; arguments: Record<string, unknown> };
+      };
+      calls.push({ name: body.params.name, args: body.params.arguments });
+      if (body.params.name === 'build_profile')
+        return mcpFetch({ status: 'draft_ready', catalog: null })(input, init);
+      return mcpFetch({
+        status: 'claim_required',
+        claim_url: 'https://jov.ie/claim/agent/x?h=y',
+      })(input, init);
+    };
+    const ref = { draft_id: DRAFT_ID, draft_token: 't' };
+    const built = (await buildProfile(ref, { fetchImpl })) as Record<
+      string,
+      unknown
+    >;
+    expect(built).toMatchObject({ status: 'draft_ready' });
+    const published = (await publishProfile(ref, { fetchImpl })) as Record<
+      string,
+      unknown
+    >;
+    expect(published).toMatchObject({ status: 'claim_required' });
+    expect(calls.map(call => call.name)).toEqual([
+      'build_profile',
+      'publish_profile',
+    ]);
+    for (const call of calls)
+      expect(call.args).toMatchObject({
+        draft_id: DRAFT_ID,
+        draft_token: 't',
+      });
   });
 
   it('returns the checkout entry from start_upgrade untouched', async () => {
