@@ -1151,7 +1151,7 @@
   "scripts/merge-group-failure-hold.mjs": 1907,
   "scripts/merge-group-victim-rearm.mjs": 730,
   "scripts/merge-queue-backend.mjs": 2195,
-  "scripts/merge-queue-green-enroll.test.mjs": 2710,
+  "scripts/merge-queue-green-enroll.test.mjs": 2810,
   "scripts/ownerless-recovery-sweeper.mjs": 561,
   "scripts/ownership-registry.mjs": 548,
   "scripts/postmortem-review.mjs": 832,
