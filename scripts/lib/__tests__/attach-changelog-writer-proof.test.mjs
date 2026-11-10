@@ -191,12 +191,6 @@ describe('changelog release PR writer proof (JOV-10216)', () => {
     expect(
       releasePrEligibleForWriterProof({ ...base, prNumber: 0 })
     ).toMatchObject({ eligible: false, reason: 'pr-unavailable' });
-    expect(
-      releasePrEligibleForWriterProof({ ...base, actualHeadSha: OTHER_HEAD })
-    ).toMatchObject({ eligible: false, reason: 'head-mismatch' });
-    expect(
-      releasePrEligibleForWriterProof({ ...base, actualHeadSha: HEAD })
-    ).toMatchObject({ eligible: true, reason: 'release-pr-shape' });
   });
 });
 
