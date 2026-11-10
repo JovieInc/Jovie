@@ -117,7 +117,7 @@ const producerStageExempt = new Set([
 ]);
 // Jobs that must keep the receipt even if their uploads move elsewhere.
 const producerStageRequired = [
-  ...'ci-fast-remaining ci-visual-snapshot-compare ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-lighthouse-dashboard-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'
+  ...'ci-fast-remaining ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-lighthouse-dashboard-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'
     .split(' ')
     .map(job => `ci.yml:${job}`),
   'e2e-full-matrix.yml:e2e-full-matrix',
@@ -145,6 +145,9 @@ const imageAllowedJobs = new Set([
   'ci.yml:ci-lighthouse-pr',
   'ci.yml:ci-storybook-surfaces',
   'ci.yml:ci-visual-snapshot-compare',
+  'ci.yml:ci-visual-snapshot-homepage',
+  'ci.yml:ci-visual-marketing-dom',
+  'ci.yml:ci-visual-marketing-routes',
   // Manual public-profile CTA identity captures only (dispatch-gated flag).
   'e2e-full-matrix.yml:e2e-full-matrix',
   'screenshots.yml:generate',
@@ -160,6 +163,9 @@ const markdownAllowedJobs = new Set([
   'ci.yml:ci-smoke-required',
   'ci.yml:ci-storybook-surfaces',
   'ci.yml:ci-visual-snapshot-compare',
+  'ci.yml:ci-visual-snapshot-homepage',
+  'ci.yml:ci-visual-marketing-dom',
+  'ci.yml:ci-visual-marketing-routes',
   'e2e-full-matrix.yml:e2e-full-matrix',
   'nightly-testing-agent.yml:report',
   'postdeploy-probes.yml:auth-smoke',
