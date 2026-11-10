@@ -98,9 +98,11 @@ export function SettingsAppearanceSection() {
       : null;
   // systemTheme is the device-level resolution (independent of the stored
   // preference), so the System option reports what the device would pick.
+  // systemTheme is client-derived — gate it on hydration like the stored
+  // preference so the server HTML and the first client render agree.
   let systemThemeLabel = '';
-  if (systemTheme === 'light') systemThemeLabel = 'Light';
-  else if (systemTheme === 'dark') systemThemeLabel = 'Dark';
+  if (hasHydrated && systemTheme === 'light') systemThemeLabel = 'Light';
+  else if (hasHydrated && systemTheme === 'dark') systemThemeLabel = 'Dark';
 
   return (
     <SettingsPanel

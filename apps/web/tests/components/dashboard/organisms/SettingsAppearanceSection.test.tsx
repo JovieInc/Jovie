@@ -1,5 +1,6 @@
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsAppearanceSection } from '@/features/dashboard/organisms/SettingsAppearanceSection';
@@ -220,6 +221,57 @@ describe('SettingsAppearanceSection', () => {
       'aria-pressed',
       'true'
     );
+  });
+
+  it('hydrates server markup without recoverable errors when the device resolution appears only on the client', async () => {
+    // Server snapshot: systemTheme is client-derived and undefined pre-hydration.
+    themeState.theme = 'dark';
+    themeState.systemTheme = undefined;
+
+    const html = renderToString(
+      <TooltipProvider>
+        <SettingsAppearanceSection />
+      </TooltipProvider>
+    );
+    expect(html).not.toContain('resolves System to');
+
+    // The device reports Light only after hydration, as next-themes does.
+    themeState.systemTheme = 'light';
+
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    container.innerHTML = html;
+
+    const consoleErrors: unknown[][] = [];
+    const errorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation((...args: unknown[]) => {
+        consoleErrors.push(args);
+      });
+
+    try {
+      hydrateRoot(
+        container,
+        <TooltipProvider>
+          <SettingsAppearanceSection />
+        </TooltipProvider>
+      );
+
+      // Post-hydration: the System option reports the real device resolution.
+      await waitFor(() => {
+        expect(screen.getAllByText('Light').length).toBeGreaterThanOrEqual(2);
+      });
+      expect(
+        consoleErrors.filter(args =>
+          args.some(argument =>
+            /hydrat|did not match|mismatch/i.test(String(argument))
+          )
+        )
+      ).toEqual([]);
+    } finally {
+      errorSpy.mockRestore();
+      container.remove();
+    }
   });
 
   it('keeps high contrast writable while the theme is forced', () => {
