@@ -477,7 +477,7 @@ export function ProfileDesktopSurface({
   const homeOverview = (
     <div
       className={cn(
-        'grid min-h-0 min-w-0 flex-1 gap-4',
+        'grid min-h-0 min-w-0 flex-none gap-4',
         // Canonical Pen frame D9kdx ("Public profile / Desktop ≥1180 —
         // CANONICAL", docs/pen-stills/golden-path/manifest.json): the 4:5
         // cover left, the Selected-work/Events column center, and a narrow
@@ -1108,7 +1108,7 @@ export function ProfileDesktopSurface({
             {nonHomeContent}
             {!hideJovieBranding ? (
               <div
-                className='flex justify-center pb-1 pt-2'
+                className='mt-auto flex justify-center pb-1 pt-2'
                 data-testid='profile-jovie-branding'
               >
                 <FooterBranding
