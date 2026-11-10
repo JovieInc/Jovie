@@ -8,7 +8,7 @@ import { intakeDocsDeploy } from '../../docs-deploy-intake.mjs';
 import {
   deferLinearRateLimited,
   withLinearRateLimitRetry,
-} from '../../lib/linear-issue-intake.mjs';
+} from '../../lib/linear-rate-limit-retry.mjs';
 import { runSyntheticMonitoringIntake } from '../../synthetic-monitoring-intake.mjs';
 import { runWebAiHealthIntake } from '../../web-ai-health-intake.mjs';
 

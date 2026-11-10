@@ -7,8 +7,8 @@ import {
   logRemediationDryRun,
   remediationTriggersEnabled,
   upsertLinearIssueByTitleFingerprint,
-  withLinearRateLimitRetry,
 } from './lib/linear-issue-intake.mjs';
+import { withLinearRateLimitRetry } from './lib/linear-rate-limit-retry.mjs';
 
 function failureRows(receipt) {
   return receipt.results.filter(result => result.ok === false);

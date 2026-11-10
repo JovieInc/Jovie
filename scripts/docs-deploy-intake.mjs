@@ -9,8 +9,8 @@ import {
   logRemediationDryRun,
   remediationTriggersEnabled,
   upsertLinearIssueByTitleFingerprint,
-  withLinearRateLimitRetry,
 } from './lib/linear-issue-intake.mjs';
+import { withLinearRateLimitRetry } from './lib/linear-rate-limit-retry.mjs';
 
 export const DOCS_DEPLOY_KEY = 'vercel-deploy-failed-jovie-docs';
 export const DOCS_ENVIRONMENT = 'Production – jovie-docs';

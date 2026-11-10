@@ -7,8 +7,8 @@ import {
   logRemediationDryRun,
   remediationTriggersEnabled,
   upsertLinearIssueByTitleFingerprint,
-  withLinearRateLimitRetry,
 } from './lib/linear-issue-intake.mjs';
+import { withLinearRateLimitRetry } from './lib/linear-rate-limit-retry.mjs';
 
 export const BILLING_HEALTH_PUBLIC_KEY = 'billing-health-public';
 

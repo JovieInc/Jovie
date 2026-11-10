@@ -5,8 +5,8 @@ import {
   logRemediationDryRun,
   remediationTriggersEnabled,
   upsertLinearIssueByTitleFingerprint,
-  withLinearRateLimitRetry,
 } from './lib/linear-issue-intake.mjs';
+import { withLinearRateLimitRetry } from './lib/linear-rate-limit-retry.mjs';
 
 export const BILLING_SYNC_STALE_KEY = 'billing-sync-stale';
 const STALE_MS = 36 * 60 * 60 * 1000;

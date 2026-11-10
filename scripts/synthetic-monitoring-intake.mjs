@@ -3,12 +3,14 @@
 import {
   addLinearIssueComment,
   closeLinearIssueByFingerprint,
-  isLinearRateLimited,
   logRemediationDryRun,
   remediationTriggersEnabled,
   upsertLinearIssueByTitleFingerprint,
-  withLinearRateLimitRetry,
 } from './lib/linear-issue-intake.mjs';
+import {
+  isLinearRateLimited,
+  withLinearRateLimitRetry,
+} from './lib/linear-rate-limit-retry.mjs';
 
 export const SYNTHETIC_REMEDIATION_KEY = 'synthetic-monitoring';
 
