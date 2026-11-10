@@ -93,6 +93,27 @@ export function prLane(pr) {
 }
 
 /**
+ * Provider classifier from the branch prefix alone (no extra API calls) —
+ * prefix evidence sampled on JovieInc/Jovie, 2026-11-10:
+ *   - `hyperagent/*`: 48 branch heads, 8 merged PRs (all authored
+ *     itstimwhite via the GitHub App, like every agent lane — the prefix is
+ *     the only discriminator) → 'hyperagent'.
+ *   - `glm/*`: 95 branch heads, 21 merged PRs → 'glm' (GLM coding agents).
+ *   - `gem/*`: zero branch heads in the repo, so Gem stays in 'other' until a
+ *     branch prefix or label actually appears (no invented mapping).
+ * The ratchet keys `prLane`/`lead_time.devin|codex|other` are unchanged; this
+ * finer split feeds the daily history row and gistSlo.leadTimeByProvider only.
+ */
+const PROVIDER_PREFIXES = new Set(['devin', 'codex', 'hyperagent', 'glm']);
+export function prProvider(pr) {
+  const ref = String(pr?.headRefName ?? pr?.head_ref ?? '').toLowerCase();
+  const first = ref.split('/')[0] || '';
+  if (first === 'devin' || first === 'devin-ai-integration') return 'devin';
+  if (PROVIDER_PREFIXES.has(first)) return first;
+  return 'other';
+}
+
+/**
  * Per-workflow/per-event CI wall-clock percentiles for runs created inside
  * [sinceMs, nowMs]. Returns { '<event>.p95': seconds|null, detail: {...} }.
  */
@@ -174,6 +195,23 @@ export function leadTimeByLane(prs, sinceMs, nowMs) {
   const out = {};
   for (const [lane, values] of Object.entries(byLane))
     out[lane] = percentiles(values);
+  return out;
+}
+
+/** PR lead time (createdAt → mergedAt) percentiles grouped by provider. */
+export function leadTimeByProvider(prs, sinceMs, nowMs) {
+  const byProvider = {};
+  for (const pr of prs ?? []) {
+    if (!pr?.mergedAt || !pr?.createdAt) continue;
+    const mergedAt = Date.parse(pr.mergedAt);
+    if (mergedAt < sinceMs || mergedAt > nowMs) continue;
+    const seconds = secondsBetween(pr.createdAt, pr.mergedAt);
+    if (!seconds) continue;
+    (byProvider[prProvider(pr)] ||= []).push(seconds);
+  }
+  const out = {};
+  for (const [provider, values] of Object.entries(byProvider))
+    out[provider] = percentiles(values);
   return out;
 }
 
@@ -558,6 +596,94 @@ export function ratchetBaseline(baseline, flat, evaluation, { now }) {
     },
   ].slice(-HISTORY_DAYS);
   return { next, tightened };
+}
+
+/**
+ * One daily history row (no ratchet): 7d stage/e2e dwell per declared stage.
+ */
+export function stageHistorySummary(timings) {
+  const out = {};
+  for (const [type, entity] of Object.entries(timings?.entities ?? {})) {
+    for (const [id, row] of Object.entries(entity?.stages ?? {})) {
+      const w = row?.['7d'] ?? {};
+      out[`${type}:${id}`] = {
+        n: w.n ?? 0,
+        p50: w.p50 ?? null,
+        p95: w.p95 ?? null,
+      };
+    }
+    for (const [pair, row] of Object.entries(entity?.endToEnd ?? {})) {
+      const w = row?.['7d'] ?? {};
+      out[`${type}:${pair}`] = {
+        n: w.n ?? 0,
+        p50: w.p50 ?? null,
+        p95: w.p95 ?? null,
+      };
+    }
+  }
+  return out;
+}
+
+/**
+ * Append (or replace) today's daily history row on the baseline document.
+ *
+ * Called from the `--write-latest` report path so the scheduled collector
+ * accumulates day-over-day context even when nothing ratchets — `history`
+ * was previously only written on the tighten path. Deliberately does NOT
+ * touch `metrics`, `updatedAt`, or any ratchet state: the ratchet command
+ * owns those. A history-only write is marked with `historyUpdatedAt`.
+ *
+ * `report` is the document buildReport returns: flat numeric values
+ * (report.flat), PRs/hour (report.prsPerHour), stage timings
+ * (report.stageTimings), provider lead-time percentiles
+ * (report.metrics.leadTimeByProvider) and throughput
+ * (report.metrics.throughput).
+ */
+export function appendDailyHistory(
+  baseline,
+  report,
+  { now = Date.now() } = {}
+) {
+  const at = typeof now === 'number' ? now : Date.parse(now);
+  const iso = new Date(Number.isFinite(at) ? at : Date.now()).toISOString();
+  const date = iso.slice(0, 10);
+  const values = {};
+  for (const [key, value] of Object.entries(report?.flat ?? {}))
+    if (Number.isFinite(value)) values[key] = value;
+  const row = {
+    date,
+    values,
+    prsPerHour: {
+      last24h: report?.prsPerHour?.last24h ?? null,
+      from7d: report?.prsPerHour?.from7d ?? null,
+    },
+    stages: stageHistorySummary(report?.stageTimings),
+    leadTimeByProvider: Object.fromEntries(
+      Object.entries(report?.metrics?.leadTimeByProvider ?? {}).map(
+        ([provider, stat]) => [
+          provider,
+          {
+            n: stat?.n ?? 0,
+            p50: stat?.p50 ?? null,
+            p95: stat?.p95 ?? null,
+          },
+        ]
+      )
+    ),
+    throughput: {
+      wowGrowth: report?.metrics?.throughput?.wowGrowth ?? null,
+      growthTrend: report?.metrics?.throughput?.growthTrend ?? null,
+      mergesPerDay: report?.metrics?.throughput?.mergesPerDay ?? null,
+      verifiedPerDay: report?.metrics?.throughput?.verifiedPerDay ?? null,
+    },
+  };
+  const next = { ...(baseline ?? {}) };
+  next.history = [
+    ...(next.history ?? []).filter(row => row?.date !== date),
+    row,
+  ].slice(-HISTORY_DAYS);
+  next.historyUpdatedAt = iso;
+  return next;
 }
 
 /** Compact `slo` block for the Symphony lanes status gist. */

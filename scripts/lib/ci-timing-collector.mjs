@@ -43,6 +43,87 @@ const TURBO_WORKFLOWS = new Set(['CI', 'Source Validation']);
 const TURBO_JOB_RE =
   /^(Source Validation|Exact-head Coverage|Unit Tests|Build \+ Layout|Visual Snapshot Compare|ci-fast)/;
 
+/** Backfill scope: the PR-gate workflows the timing layer measures. */
+const BACKFILL_WORKFLOW_PATHS = new Set([
+  '.github/workflows/ci.yml',
+  '.github/workflows/source-validation.yml',
+]);
+const BACKFILL_WORKFLOW_NAMES = new Set(['CI', 'Source Validation']);
+const DATA_DAY_RE = new RegExp(`^${CAPS.dataDir}/(\\d{4}-\\d{2}-\\d{2})/`);
+
+/**
+ * Backfill scope check: collectable AND one of the measured workflows.
+ * Applied BEFORE the 20-run cap so unrelated scheduled runs cannot evict
+ * CI/Source Validation runs from the overlap window.
+ * @param {any} run
+ */
+export function isBackfillRun(run) {
+  return (
+    isCollectableRun(run) &&
+    (BACKFILL_WORKFLOW_PATHS.has(run.path) ||
+      BACKFILL_WORKFLOW_NAMES.has(run.name))
+  );
+}
+
+/**
+ * Overlap-window run selection (best-effort backfill): the triggering run is
+ * reserved first, keyed by (run_id, run_attempt) so a rerun listing alongside
+ * it cannot displace it; the rest are the measured-workflow runs completed or
+ * updated inside the window, most recently finished first. A long-running job
+ * created before the window but finished inside it is eligible via updated_at.
+ * This does NOT recover every dropped pending run — runs outside the listed
+ * pages or outside the measured workflows are simply not re-collected; per-run
+ * idempotent overwrite makes the next event heal the gap.
+ * @param {{ triggerRun: any, listedRuns: any[], windowStartMs: number, maxRuns: number }} args
+ */
+export function selectBackfillRuns({
+  triggerRun,
+  listedRuns,
+  windowStartMs,
+  maxRuns = CAPS.maxBackfillRuns,
+}) {
+  const finishedAt = run => {
+    const t = ms(run?.updated_at ?? run?.created_at);
+    return t === null ? -Infinity : t;
+  };
+  const selected = new Map();
+  if (isBackfillRun(triggerRun))
+    selected.set(`${triggerRun.id}:${triggerRun.run_attempt}`, triggerRun);
+  const candidates = (listedRuns ?? [])
+    .filter(run => isBackfillRun(run) && finishedAt(run) >= windowStartMs)
+    .sort((a, b) => finishedAt(b) - finishedAt(a));
+  for (const run of candidates) {
+    if (selected.size >= maxRuns) break;
+    selected.set(`${run.id}:${run.run_attempt}`, run);
+  }
+  return [...selected.values()];
+}
+
+/**
+ * Retention plan for the data branch: explicit null-SHA deletion entries for
+ * blob paths under data/YYYY-MM-DD/ older than the cutoff. Deleting via
+ * kept-entry overlays (base_tree + re-listing survivors) left stale blobs in
+ * the tree — only a null sha removes a path. Returns null when the recursive
+ * tree listing was truncated (fail-safe: never prune from a partial listing).
+ * @param {any} tree
+ * @param {{ cutoffMs: number, maxDeletes?: number }} limits
+ */
+export function pruneDeletions(
+  tree,
+  { cutoffMs, maxDeletes = CAPS.maxPruneDeletes }
+) {
+  if (!tree || tree.truncated) return null;
+  return (tree.tree ?? [])
+    .filter(entry => entry?.type === 'blob' && DATA_DAY_RE.test(entry.path))
+    .filter(entry => {
+      const day = DATA_DAY_RE.exec(entry.path)?.[1];
+      const t = ms(`${day}T00:00:00Z`);
+      return t !== null && t < cutoffMs;
+    })
+    .slice(0, maxDeletes)
+    .map(entry => ({ path: entry.path, sha: null }));
+}
+
 /** Events worth a row; everything else (schedule, workflow_dispatch, repository) is noise. */
 const COLLECTED_EVENTS = new Set(['pull_request', 'merge_group', 'push']);
 
@@ -259,34 +340,35 @@ export function toNdjson(rows) {
 }
 
 /**
- * Fetch a paginated collection endpoint, bounded by maxPages.
+ * Fetch a paginated collection endpoint, bounded by maxPages. Pages advance
+ * until the fetched item count reaches `total_count` or a short page marks
+ * the end — 101 jobs therefore fetch 2 pages, not 10.
  * @param {(path: string) => Promise<any>} fetchJson
  * @param {string} path
  * @param {number} maxPages
  */
 async function pagedJson(fetchJson, path, maxPages) {
   const first = await fetchJson(path);
-  const firstItems = /** @type {any[]} */ (
-    first.jobs ?? first.workflow_runs ?? first.items ?? []
-  );
-  const total =
-    typeof first.total_count === 'number'
-      ? first.total_count
-      : firstItems.length;
   const pages = [first];
-  const itemsPerPage = firstItems.length || CAPS.jobsPerPage;
-  const maxPossible = maxPages * itemsPerPage;
-  for (
-    let page = 2;
-    page <= maxPages &&
-    firstItems.length < total &&
-    pages.length * itemsPerPage < maxPossible;
-    page += 1
-  ) {
+  const items = [
+    .../** @type {any[]} */ (
+      first.jobs ?? first.workflow_runs ?? first.items ?? []
+    ),
+  ];
+  const total =
+    typeof first.total_count === 'number' ? first.total_count : items.length;
+  const itemsPerPage = items.length || CAPS.jobsPerPage;
+  for (let page = 2; page <= maxPages && items.length < total; page += 1) {
     const sep = path.includes('?') ? '&' : '?';
-    pages.push(await fetchJson(`${path}${sep}page=${page}`));
+    const next = await fetchJson(`${path}${sep}page=${page}`);
+    const nextItems = /** @type {any[]} */ (
+      next.jobs ?? next.workflow_runs ?? next.items ?? []
+    );
+    pages.push(next);
+    items.push(...nextItems);
+    // A short page is the last one even when total_count disagrees.
+    if (nextItems.length < itemsPerPage) break;
   }
-  const items = pages.flatMap(p => p.jobs ?? p.workflow_runs ?? p.items ?? []);
   return { items, pagesFetched: pages.length, total };
 }
 
@@ -302,7 +384,11 @@ export async function collectRunRows({
   fetchText,
   collectedAt,
 }) {
-  const jobsPath = `/repos/{owner}/{repo}/actions/runs/${run.id}/jobs?per_page=${CAPS.jobsPerPage}&filter_run_attempt=${run.run_attempt}`;
+  // The attempt-scoped jobs endpoint is the only race-free way to read a
+  // rerun's jobs: the general /runs/{id}/jobs URL serves the latest attempt
+  // and can mix two attempts' jobs when a rerun starts mid-collection.
+  const attempt = Number(run.run_attempt) || 1;
+  const jobsPath = `/repos/{owner}/{repo}/actions/runs/${run.id}/attempts/${attempt}/jobs?per_page=${CAPS.jobsPerPage}`;
   const {
     items: jobs,
     pagesFetched,
@@ -408,6 +494,34 @@ function repoCoords() {
   return { owner, repo };
 }
 
+// The github provider paces writes to one per minWriteIntervalMs (1000ms) and
+// the `report` priority runs in the background class with a zero wait budget
+// — so a write issued inside the spacing window would be deferred and the
+// collector would exit 0 without publishing. The collector waits out the
+// spacing itself (bounded: at most one interval per call) while keeping the
+// report priority. Priority is never raised.
+export const WRITE_SPACING_MS = 1100;
+
+/**
+ * Bounded write pacing. Returns a `paceWrite()` that sleeps at most one
+ * spacing interval so consecutive blob/tree/commit/ref writes land outside
+ * the ledger's min-write window.
+ */
+export function createWritePacer({
+  spacingMs = WRITE_SPACING_MS,
+  now = Date.now,
+  sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
+} = {}) {
+  let lastWriteAt = null;
+  return async function paceWrite() {
+    const wait = lastWriteAt === null ? 0 : lastWriteAt + spacingMs - now();
+    if (wait > 0) await sleep(wait);
+    lastWriteAt = now();
+  };
+}
+
+const paceWrite = createWritePacer();
+
 /**
  * GitHub API through the client layer (packages/api-client runGh -> gh api).
  * `path` may contain the literal {owner}/{repo} placeholders, expanded from
@@ -418,13 +532,27 @@ function repoCoords() {
  * @param {string} path
  * @param {any} [body]
  */
-async function ghApi(coords, method, path, body, { raw = false } = {}) {
-  const { runGh } = await import('../../packages/api-client/gh.ts');
+export async function ghApi(
+  coords,
+  method,
+  path,
+  body,
+  { raw = false, run = null, pacer = null } = {}
+) {
+  const { runGh } =
+    run !== null
+      ? { runGh: run }
+      : await import('../../packages/api-client/gh.ts');
   const resolved = path
     .replace('{owner}', coords.owner)
     .replace('{repo}', coords.repo);
-  const args = ['api'];
-  if (method !== 'GET') args.push('-X', method);
+  // The endpoint is gh api's positional argument — without it every call
+  // failed with a usage error (the path was resolved but never passed).
+  const args = ['api', resolved];
+  if (method !== 'GET') {
+    args.push('-X', method);
+    await (pacer ?? paceWrite)();
+  }
   let cleanup = null;
   if (body !== undefined) {
     const { mkdtempSync, writeFileSync: wf, rmSync } = await import('node:fs');
@@ -543,28 +671,35 @@ async function modeWriteData() {
   const coords = repoCoords();
   const triggerRun = eventPayload().workflow_run;
 
-  // Overlap backfill: the collector's concurrency group is latest-wins, so a
-  // burst can cancel an older pending collection. Re-scan recently completed
-  // runs; per-run files make re-collection an idempotent overwrite.
-  const windowStart = new Date(
-    Date.now() - CAPS.backfillWindowMinutes * 60_000
-  ).toISOString();
-  const recent = await ghApi(
-    coords,
-    'GET',
-    `/repos/{owner}/{repo}/actions/runs?status=completed&created=>=${encodeURIComponent(windowStart)}&per_page=${CAPS.jobsPerPage}`
-  );
+  // Overlap backfill (best-effort): the collector's concurrency group is
+  // latest-wins, so a burst can cancel an older pending collection. Re-scan
+  // recently completed runs of the measured workflows (CI + Source
+  // Validation, filtered BEFORE the cap); per-run files make re-collection
+  // an idempotent overwrite. This does not recover every dropped pending
+  // run — see selectBackfillRuns.
+  const windowStartMs = Date.now() - CAPS.backfillWindowMinutes * 60_000;
+  const listedRuns = [];
+  const backfillListPages = 3;
+  for (let page = 1; page <= backfillListPages; page += 1) {
+    const list = await ghApi(
+      coords,
+      'GET',
+      `/repos/{owner}/{repo}/actions/runs?status=completed&per_page=${CAPS.jobsPerPage}&page=${page}`
+    );
+    const batch = /** @type {any[]} */ (list?.workflow_runs ?? []);
+    listedRuns.push(...batch);
+    if (batch.length < CAPS.jobsPerPage) break;
+  }
   const runsById = new Map(
-    /** @type {any[]} */ (recent.workflow_runs ?? [])
-      .filter(run => isCollectableRun(run))
-      .slice(0, CAPS.maxBackfillRuns)
-      .map(run => [run.id, run])
+    selectBackfillRuns({ triggerRun, listedRuns, windowStartMs }).map(run => [
+      `${run.id}:${run.run_attempt}`,
+      run,
+    ])
   );
-  if (isCollectableRun(triggerRun)) runsById.set(triggerRun.id, triggerRun);
 
   const files = /** @type {Array<{ path: string, content: string }>} */ ([]);
   let truncatedRuns = 0;
-  for (const run of [...runsById.values()].slice(0, CAPS.maxBackfillRuns)) {
+  for (const run of runsById.values()) {
     const { rows, truncated } = await collectRunRows({
       run,
       fetchJson: path => ghApi(coords, 'GET', path),
@@ -620,37 +755,29 @@ async function modePrune() {
     `/repos/{owner}/{repo}/git/trees/${head.tree.sha}?recursive=1`
   );
   const cutoff = Date.now() - CAPS.retentionDays * 24 * 60 * 60_000;
-  const blobs = /** @type {any[]} */ (tree.tree ?? []).filter(
-    entry => entry.type === 'blob'
-  );
-  const stale = blobs
-    .filter(entry => {
-      const t = ms(
-        `${entry.path.slice(CAPS.dataDir.length + 1, CAPS.dataDir.length + 11)}T00:00:00Z`
-      );
-      return t !== null && t < cutoff;
-    })
-    .slice(0, CAPS.maxPruneDeletes);
+  const stale = pruneDeletions(tree, { cutoffMs: cutoff });
+  if (stale === null) {
+    console.log(
+      'ci-timing-collector: tree listing truncated, skipping prune (fail-safe)'
+    );
+    return;
+  }
   if (stale.length === 0) {
     console.log('ci-timing-collector: prune found nothing past retention');
     return;
   }
 
-  const kept = blobs
-    .filter(entry => !stale.some(s => s.path === entry.path))
-    .map(entry => ({
-      path: entry.path,
-      mode: '100644',
-      type: 'blob',
-      sha: entry.sha,
-    }));
+  // Explicit null-SHA deletions on top of the head tree: base_tree carries
+  // every surviving path forward, and a sha: null entry REMOVES the path.
+  // (Overlaying kept entries onto base_tree was a no-op — the stale blobs
+  // stayed.) Deletions are constrained to data/YYYY-MM-DD/ in pruneDeletions.
   const newTree = await ghApi(
     coords,
     'POST',
     `/repos/{owner}/{repo}/git/trees`,
     {
       base_tree: head.tree.sha,
-      tree: kept,
+      tree: stale,
     }
   );
   const commit = await ghApi(

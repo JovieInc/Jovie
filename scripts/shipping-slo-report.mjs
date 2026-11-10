@@ -39,11 +39,13 @@ import { ciRoundsMetrics, flattenCiRounds } from './lib/ci-rounds.mjs';
 import { formatBiomeJson } from './lib/format-biome-json.mjs';
 import { digestBlock } from './lib/merge-queue-speed.mjs';
 import {
+  appendDailyHistory,
   buildGistSloBlock,
   ciWalltimeByEvent,
   evaluateShippingSlo,
   flattenMetrics,
   leadTimeByLane,
+  leadTimeByProvider,
   mergeQueueStats,
   prLane,
   productionLag,
@@ -462,6 +464,7 @@ export function buildReport(
       nowMs
     ),
     leadTime: leadTimeByLane(merged, sinceMs, nowMs),
+    leadTimeByProvider: leadTimeByProvider(merged, sinceMs, nowMs),
     remediation: remediationStats({
       prRuns,
       mainRuns: raw.runs?.main ?? [],
@@ -524,8 +527,21 @@ export function buildReport(
   flat.throughput_wow_growth = metrics.throughput.wowGrowth;
   flat.throughput_growth_trend = metrics.throughput.growthTrend;
 
+  // PRs/hour from the last 24h and the last 7d windows — a finer-grain
+  // throughput signal for the daily history row.
+  const countMergedBetween = (lo, hi) =>
+    merged.filter(p => {
+      const at = p?.mergedAt ? Date.parse(p.mergedAt) : NaN;
+      return Number.isFinite(at) && at >= lo && at <= hi;
+    }).length;
+  const prsPerHour = {
+    last24h: countMergedBetween(nowMs - 86_400_000, nowMs) / 24,
+    from7d: countMergedBetween(sinceMs, nowMs) / (7 * 24),
+  };
+
   const evaluation = evaluateShippingSlo(flat, baseline, {});
   const gistSlo = buildGistSloBlock(flat, evaluation, { now: nowMs });
+  gistSlo.leadTimeByProvider = metrics.leadTimeByProvider;
   const stageTimings =
     raw.stages && stageManifest
       ? computeStageTimings(
@@ -613,6 +629,7 @@ export function buildReport(
     schemaVersion: 1,
     generatedAt: new Date(nowMs).toISOString(),
     windowDays: 7,
+    prsPerHour,
     ciCapacity,
     metrics,
     blogPublishLatency,
@@ -747,6 +764,27 @@ export function stageMarkdown(timings) {
       '',
       `**Stage sources unavailable:** ${down.map(([id, s]) => `${id} (${s.error})`).join('; ')}`
     );
+  // Partial sources still carry data (ok: true) — surface the counts so a
+  // shed/missing batch is visible next to the timings it weakens.
+  const partial = Object.entries(timings.sources ?? {}).filter(
+    ([, s]) => s.partial || s.counts
+  );
+  if (partial.length)
+    lines.push(
+      '',
+      `**Stage sources partial:** ${partial
+        .map(([id, s]) => {
+          const c = s.counts ?? {};
+          const bits = [];
+          if (c.failed) bits.push(`${c.failed} failed batch(es)`);
+          if (c.missing) bits.push(`${c.missing} not returned`);
+          if (c.capped) bits.push(`${c.capped} capped`);
+          if (c.historyTruncated)
+            bits.push(`${c.historyTruncated} truncated histories`);
+          return `${id}${bits.length ? ` (${bits.join(', ')})` : ' (partial)'}`;
+        })
+        .join('; ')}`
+    );
   return lines;
 }
 
@@ -875,6 +913,7 @@ async function main() {
     mergeQueueSpeed,
   });
 
+  let baselineDoc = baseline;
   if (hasArg(args, '--ratchet')) {
     const { next, tightened } = ratchetBaseline(
       baseline,
@@ -882,7 +921,8 @@ async function main() {
       { tightenCandidates: report.evaluation.tightenCandidates },
       { now: report.generatedAt }
     );
-    writeFileSync(BASELINE_PATH, formatBiomeJson(next));
+    baselineDoc = next;
+    writeFileSync(BASELINE_PATH, formatBiomeJson(baselineDoc));
     report.tightened = tightened;
     console.log(
       tightened.length
@@ -892,6 +932,15 @@ async function main() {
   }
 
   if (hasArg(args, '--write-latest')) {
+    // Daily history row (JOV-8933 follow-up): accumulates day-over-day
+    // context on every --write-latest run without touching metric baselines
+    // — the ratchet command owns those. appendDailyHistory replaces any
+    // same-day row (including the bare row ratchetBaseline just appended),
+    // so at most one row per UTC date lands.
+    baselineDoc = appendDailyHistory(baselineDoc, report, {
+      now: report.generatedAt,
+    });
+    writeFileSync(BASELINE_PATH, formatBiomeJson(baselineDoc));
     writeFileSync(LATEST_PATH, formatBiomeJson(report.gistSlo));
     writeFileSync(
       BLOG_LATENCY_PATH,
