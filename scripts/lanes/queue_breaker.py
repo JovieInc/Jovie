@@ -9,7 +9,11 @@ check and its first error line. Failures count per PR head: a merge-group run th
 PR's current head existed belongs to an older head and is ignored, so a fix pushed after a trip never
 inherits the old head's failures. The hold stays while the head is the one that failed (the sweep puts
 the label back if the relay cleared it); when a new head is pushed the sweep removes `lane-fix-red`
-itself, for PRs this breaker tripped only (a human or hold-contract label is never touched). State: queue-breaker.json, log:
+itself, for PRs this breaker tripped only (a human or hold-contract label is never touched). JOV-8492
+(2026-11-09): supersession — a failure older than the PR's latest SUCCESSFUL merge-group run is no
+evidence (that tree already passed), so it neither trips the breaker nor sustains a re-block; the
+sweep releases such a hold itself (`released-superseded`) instead of re-labeling a head whose reds
+later green runs at the same head already superseded. State: queue-breaker.json, log:
 queue-breaker.jsonl. HEADGREEN grouping (live 2026-10-29): only a group head's build gates the merge, so a failed
 build of an entry that is still queued on that same synthetic commit did not eject it and is not counted.
 2026-11-01: merge-group failures are attributed before a trip. A signal that also fails WITHOUT the PR — the same
@@ -56,6 +60,24 @@ def _gh(run, *args):
     if done.returncode != 0:
         raise RuntimeError((done.stderr or done.stdout or f"exit {done.returncode}").strip()[-200:])
     return done.stdout
+
+
+def latest_green_by_pr(runs: list[dict]) -> dict[int, float]:
+    """Per PR: when its latest SUCCESSFUL merge-group run ended (JOV-8492). A failure that ended
+    before this is superseded — that exact tree already passed a full group build — so it is no
+    evidence against the current head. 2026-11-09 #24694: the breaker kept a 24h hold whose two
+    reds 34 later green runs at the same head had superseded, and each relay clear of the stale
+    label re-enqueued the head for another full merge-group flight."""
+    latest: dict[int, float] = {}
+    for row in runs:
+        match = BRANCH.match(str(row.get("head_branch") or ""))
+        ended = _epoch(row.get("updated_at"))
+        if row.get("conclusion") != "success" or not match or ended is None:
+            continue
+        number = int(match[1])
+        if ended > latest.get(number, 0):
+            latest[number] = ended
+    return latest
 
 
 def failures_by_pr(runs: list[dict], now: float) -> dict[int, list[dict]]:
@@ -239,11 +261,22 @@ def sweep(state, run, now: float | None = None, repo: str = "JovieInc/Jovie") ->
     except (RuntimeError, ValueError) as error:
         out["errors"].append(f"read: {error}")
         return out
+    try:
+        # Unreadable green runs keep today's behavior (no supersession knowledge), like every
+        # other unreadable attribution input here; they never sharpen a hold.
+        greens = latest_green_by_pr(json.loads(_gh(run, "api", f"repos/{repo}/actions/workflows/ci.yml/runs?event=merge_group&status=success&per_page=100")).get("workflow_runs") or [])
+    except (RuntimeError, ValueError) as error:
+        greens = {}
+        out["errors"].append(f"green-runs read: {error}")
     queued = {(e.get("pullRequest") or {}).get("number"): e["pullRequest"] for e in entries if e.get("pullRequest")}
     live_commits = {(e.get("pullRequest") or {}).get("number"): ((e.get("headCommit") or {}).get("oid") or "").lower()
                     for e in entries if e.get("pullRequest")}
     for number, fails in sorted(failures_by_pr(runs, now).items()):
         pr = queued.get(number)
+        # Supersession first (JOV-8492): a failure older than this PR's latest green merge-group
+        # run says nothing about the current head — that tree already passed. A genuinely red
+        # head keeps failing after its latest green, so it still trips.
+        fails = [f for f in fails if (f.get("at") or 0) > greens.get(number, 0)]
         if len(fails) < TRIP_FAILURES or pr is None or len(out["tripped"]) >= MAX_TRIPS_PER_TICK:
             continue
         live = live_commits.get(number)
@@ -303,6 +336,21 @@ def sweep(state, run, now: float | None = None, repo: str = "JovieInc/Jovie") ->
                                           "action": "released-new-head"}) + "\n")
             else:
                 labels = [l.get("name") for l in current.get("labels") or []]
+                if greens.get(int(number), 0) > float(record.get("at") or 0):
+                    # Superseded (JOV-8492): a green merge-group run at this head ended after the
+                    # trip, so the reds the hold names are no longer the latest verdict. Release
+                    # like a new head: take back the label this breaker applied (when still
+                    # present) and never re-apply it — each re-application wakes dequeue-held and
+                    # churns a green queued PR.
+                    removed = HOLD_LABEL in labels
+                    if removed:
+                        _gh(run, "api", "-X", "DELETE", f"repos/{repo}/issues/{number}/labels/{HOLD_LABEL}")
+                    saved.pop(number, None)
+                    out.setdefault("released-superseded", []).append(int(number))
+                    with open(state / LOG_FILE, "a") as log:
+                        log.write(json.dumps({"at": now, "pr": int(number), "head": record.get("head"),
+                                              "action": "released-superseded", "label_removed": removed}) + "\n")
+                    continue
                 shared = shared_failure_evidence(run, repo, runs, number, record.get("check") or {}, now, cache)
                 if shared:
                     # The trip's failures were never this PR's. Release the hold: take back the label this breaker
