@@ -53,6 +53,68 @@ describe('Desktop update download feedback', () => {
     expect(screen.queryByText(/\/s$/)).not.toBeInTheDocument();
   });
 
+  it('keeps unknown totals indeterminate instead of inventing a percentage', () => {
+    render(
+      <DesktopUpdateModalView
+        open
+        state={{ ...downloadingUpdate(0), totalBytes: 0 }}
+        notes={null}
+        loading={false}
+        onDownload={vi.fn()}
+        onInstall={vi.fn()}
+        onRetry={vi.fn()}
+        onLater={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('progressbar')).not.toHaveAttribute(
+      'aria-valuenow'
+    );
+    expect(screen.queryByText('0%')).not.toBeInTheDocument();
+  });
+
+  it('focuses Hide when the download begins and retains focus as progress changes', () => {
+    const props = {
+      open: true,
+      notes: null,
+      loading: false,
+      onDownload: vi.fn(),
+      onInstall: vi.fn(),
+      onRetry: vi.fn(),
+      onLater: vi.fn(),
+    };
+    const { rerender } = render(
+      <DesktopUpdateModalView
+        {...props}
+        state={{
+          state: 'available',
+          version: '26.9.16',
+          notesUrl: '/changelog',
+        }}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Download', exact: true })
+    ).toHaveFocus();
+    rerender(
+      <DesktopUpdateModalView {...props} state={downloadingUpdate(12)} />
+    );
+    expect(screen.getByRole('button', { name: 'Hide' })).toHaveFocus();
+    rerender(
+      <DesktopUpdateModalView {...props} state={downloadingUpdate(75)} />
+    );
+    expect(screen.getByRole('button', { name: 'Hide' })).toHaveFocus();
+  });
+
+  it('offers a manual download without replacing the active update', () => {
+    renderDownload(0, 0);
+    expect(
+      screen.getByRole('link', { name: 'Download the latest version' })
+    ).toHaveAttribute('href', '/download');
+    expect(
+      screen.getByRole('link', { name: 'Download the latest version' })
+    ).toHaveAttribute('target', '_blank');
+  });
+
   it('keeps Escape available while the download continues', async () => {
     const onLater = renderDownload(128 * 1024, 256 * 1024);
     await userEvent.keyboard('{Escape}');
