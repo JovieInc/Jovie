@@ -71,6 +71,7 @@ import {
   type ContextMenuItemType,
   convertContextMenuItems,
   convertToCommonDropdownItems,
+  PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbar,
   TableEmptyState,
   UnifiedTable,
@@ -1872,7 +1873,9 @@ function ProfilesWorkspaceContent({
         <PageToolbar
           data-testid='connections-workspace-toolbar'
           start={
-            <span className='text-app tabular-nums text-secondary-token'>
+            // Shared toolbar count treatment (PAGE_TOOLBAR_META_TEXT_CLASS),
+            // same as the Work and Audience toolbars.
+            <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
               {rows.length === 1 ? '1 profile' : `${rows.length} profiles`}
             </span>
           }
