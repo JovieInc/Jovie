@@ -27,38 +27,13 @@ import {
   hashWaitlistInviteToken,
   type WaitlistInviteTokenPair,
 } from '@/lib/waitlist/tokens';
-import {
-  buildWinbackEmail,
-  buildWinbackResumeUrl,
-  isWithinWinbackOutreachBudget,
-  WINBACK_EMAIL_TEMPLATE_VERSION,
-  winbackSendApprovalError,
-} from '@/lib/waitlist/winback';
-import {
-  getLastUnansweredWinbackSentAt,
-  getWinbackApprovalRecord,
-} from '@/lib/waitlist/winback.server';
 import type { NotificationChannelResult } from '@/types/notifications';
 
 export const waitlistEmailTypeSchema = z.enum([
   'waitlist_confirmation',
   'approval_invite',
   'welcome',
-  'winback_capability_shipped',
 ]);
-
-export const winbackCapabilityShippedPayloadSchema = z.object({
-  entryId: z.string().uuid(),
-  type: z.literal('winback_capability_shipped'),
-  capabilityKey: z.string().min(1),
-  capabilityLabel: z.string().min(1),
-  wants: z.array(z.string().min(1)).min(1),
-  handle: z.string().min(1),
-  batchId: z.string().min(1),
-  origin: z.string().url(),
-  templateVersion: z.literal(WINBACK_EMAIL_TEMPLATE_VERSION),
-  encryptedResumeToken: z.string().min(32),
-});
 
 export const waitlistEmailJobPayloadSchema = z.object({
   entryId: z.string().uuid(),
@@ -759,102 +734,6 @@ async function processWelcomeEmail(params: {
   throw new Error(error);
 }
 
-async function processWinbackCapabilityShippedEmail(params: {
-  tx: DbOrTransaction;
-  rawPayload: unknown;
-  entry: LockedWaitlistEmailEntry;
-  now: Date;
-  jobId?: string;
-}): Promise<WaitlistEmailJobResult> {
-  const { tx, rawPayload, entry, now, jobId } = params;
-  const parsed = winbackCapabilityShippedPayloadSchema.safeParse(rawPayload);
-  if (!parsed.success) {
-    throw new Error(
-      `Invalid winback email job payload: ${
-        parsed.error.issues[0]?.message ?? 'unknown'
-      }`
-    );
-  }
-  const payload = parsed.data;
-
-  // APPROVAL GATE — fail-closed. Without a valid approval record (approved
-  // template version + admin-approved batch containing this entry) the send
-  // NEVER happens. This is the founder-locked guarantee that nothing sends
-  // without Tim's explicit approval.
-  const approval = await getWinbackApprovalRecord(tx, payload.batchId);
-  const approvalError = winbackSendApprovalError(approval, {
-    batchId: payload.batchId,
-    templateVersion: WINBACK_EMAIL_TEMPLATE_VERSION,
-    entryId: payload.entryId,
-  });
-  if (approvalError) {
-    logger.error('[winback] Send refused', {
-      detail: approvalError,
-      batchId: payload.batchId,
-      entryId: payload.entryId,
-    });
-    return skippedWaitlistEmailResult({
-      entryId: payload.entryId,
-      type: payload.type,
-      detail: approvalError,
-    });
-  }
-
-  // JOV-6655: at most one unanswered win-back per person per 14 days.
-  const lastUnanswered = await getLastUnansweredWinbackSentAt(
-    tx,
-    payload.entryId
-  );
-  if (
-    !isWithinWinbackOutreachBudget({
-      lastUnansweredSentAt: lastUnanswered,
-      now,
-    })
-  ) {
-    const detail =
-      'Winback outreach budget: an unanswered winback was sent within the last 14 days (JOV-6655)';
-    return skippedWaitlistEmailResult({
-      entryId: payload.entryId,
-      type: payload.type,
-      detail,
-    });
-  }
-
-  const rawToken = decryptInviteTokenForJob(payload.encryptedResumeToken);
-  const resumeUrl = buildWinbackResumeUrl(payload.origin, rawToken);
-  const { message, target } = buildWinbackEmail({
-    email: entry.email,
-    fullName: entry.fullName,
-    wants: payload.wants,
-    capabilityLabel: payload.capabilityLabel,
-    handle: payload.handle,
-    resumeUrl,
-    dedupKey: `winback:${payload.batchId}:${payload.entryId}`,
-  });
-  message.idempotencyKey = `winback:${payload.batchId}:${payload.entryId}`;
-
-  const result = await sendAndRecordWaitlistEmail({
-    tx,
-    entryId: payload.entryId,
-    type: payload.type,
-    recipientEmail: entry.email,
-    message,
-    target,
-  });
-
-  // Scrub the resume token from the job payload after a successful send,
-  // mirroring the approval-invite token scrub.
-  if (result.status === 'sent' && jobId) {
-    const { encryptedResumeToken: _scrubbed, ...restPayload } = payload;
-    await tx
-      .update(ingestionJobs)
-      .set({ payload: restPayload, updatedAt: now })
-      .where(eq(ingestionJobs.id, jobId));
-  }
-
-  return result;
-}
-
 export async function processWaitlistEmailJob(
   tx: DbOrTransaction,
   rawPayload: unknown,
@@ -872,16 +751,6 @@ export async function processWaitlistEmailJob(
     return processApprovalInviteEmail({
       tx,
       payload,
-      entry,
-      now,
-      jobId: options.jobId,
-    });
-  }
-
-  if (payload.type === 'winback_capability_shipped') {
-    return processWinbackCapabilityShippedEmail({
-      tx,
-      rawPayload,
       entry,
       now,
       jobId: options.jobId,
