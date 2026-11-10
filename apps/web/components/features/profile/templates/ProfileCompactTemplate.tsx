@@ -67,7 +67,10 @@ import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
 import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
-import { useDesktopSurfaceModule } from './useDesktopSurfaceModule';
+import {
+  DesktopSurfaceSlot,
+  useDesktopSurfaceModule,
+} from './useDesktopSurfaceModule';
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
@@ -354,7 +357,7 @@ export function ProfileCompactTemplate({
   const [desktopSurfaceReady, setDesktopSurfaceReady] = useState(false);
   // Loads only when a viewport or preview can present the desktop surface —
   // mobile never parses, hydrates, or preloads it (JOV-12207/JOV-12208).
-  const DesktopSurface = useDesktopSurfaceModule(
+  const { Surface } = useDesktopSurfaceModule(
     PROFILE_DESKTOP_SURFACE_ENABLED && (isDesktopLayout || embeddedPreview)
   );
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
@@ -1264,56 +1267,55 @@ export function ProfileCompactTemplate({
               className='relative flex min-h-0 w-full flex-1 flex-col'
               data-sheet-container
             >
-              {DesktopSurface && (
-                <DesktopSurface
-                  presentation='embedded'
-                  overlaysEnabled={isDesktopLayout}
-                  onReady={handleDesktopSurfaceReady}
-                  artist={artist}
-                  socialLinks={socialLinks}
-                  contacts={contacts}
-                  showPayButton={showPayButton}
-                  latestRelease={latestRelease}
-                  profileSettings={profileSettings}
-                  alertOptInVariant={resolvedAlertOptInVariant}
-                  allowFanCapture={allowFanCapture}
-                  genres={genres}
-                  pressPhotos={pressPhotos}
-                  allowPhotoDownloads={allowPhotoDownloads}
-                  creditSegments={creditSegments}
-                  photoDownloadSizes={photoDownloadSizes}
-                  tourDates={tourDates}
-                  viewerCountryCode={resolvedViewerCountryCode}
-                  visitorAssignmentResolved={visitorAssignmentResolved}
-                  releases={releases}
-                  catalogLoadFailed={catalogLoadFailed}
-                  drawerOpen={drawerOpen}
-                  drawerView={drawerView}
-                  activeMode={requestedMode}
-                  onModeSelect={nextMode => {
-                    clearCloseResetTimer();
-                    setRequestedMode(nextMode);
-                  }}
-                  onAlertsModalClose={() => setRequestedMode('profile')}
-                  hideJovieBranding={hideJovieBranding || embeddedPreview}
-                  onDrawerOpenChange={handleDrawerOpenChange}
-                  onDrawerViewChange={handleDrawerViewChange}
-                  onOpenMenu={() => openDrawerMode('menu')}
-                  onPlayClick={handlePlayClick}
-                  onBack={handleBack}
-                  profileHref={profileHref}
-                  isSubscribed={isSubscribed}
-                  contentPrefs={contentPrefs}
-                  onTogglePref={handleTogglePref}
-                  onUnsubscribe={handleUnsubscribe}
-                  isUnsubscribing={unsubMutation.isPending}
-                  onOpenReleaseCredits={
-                    visibleReleaseCredits.length > 0
-                      ? () => setCreditsOpen(true)
-                      : undefined
-                  }
-                />
-              )}
+              <DesktopSurfaceSlot
+                surface={Surface}
+                presentation='embedded'
+                overlaysEnabled={isDesktopLayout}
+                onReady={handleDesktopSurfaceReady}
+                artist={artist}
+                socialLinks={socialLinks}
+                contacts={contacts}
+                showPayButton={showPayButton}
+                latestRelease={latestRelease}
+                profileSettings={profileSettings}
+                alertOptInVariant={resolvedAlertOptInVariant}
+                allowFanCapture={allowFanCapture}
+                genres={genres}
+                pressPhotos={pressPhotos}
+                allowPhotoDownloads={allowPhotoDownloads}
+                creditSegments={creditSegments}
+                photoDownloadSizes={photoDownloadSizes}
+                tourDates={tourDates}
+                viewerCountryCode={resolvedViewerCountryCode}
+                visitorAssignmentResolved={visitorAssignmentResolved}
+                releases={releases}
+                catalogLoadFailed={catalogLoadFailed}
+                drawerOpen={drawerOpen}
+                drawerView={drawerView}
+                activeMode={requestedMode}
+                onModeSelect={nextMode => {
+                  clearCloseResetTimer();
+                  setRequestedMode(nextMode);
+                }}
+                onAlertsModalClose={() => setRequestedMode('profile')}
+                hideJovieBranding={hideJovieBranding || embeddedPreview}
+                onDrawerOpenChange={handleDrawerOpenChange}
+                onDrawerViewChange={handleDrawerViewChange}
+                onOpenMenu={() => openDrawerMode('menu')}
+                onPlayClick={handlePlayClick}
+                onBack={handleBack}
+                profileHref={profileHref}
+                isSubscribed={isSubscribed}
+                contentPrefs={contentPrefs}
+                onTogglePref={handleTogglePref}
+                onUnsubscribe={handleUnsubscribe}
+                isUnsubscribing={unsubMutation.isPending}
+                onOpenReleaseCredits={
+                  visibleReleaseCredits.length > 0
+                    ? () => setCreditsOpen(true)
+                    : undefined
+                }
+              />
               <ReleaseCreditsDrawer
                 open={creditsOpen && isDesktopLayout}
                 onOpenChange={setCreditsOpen}

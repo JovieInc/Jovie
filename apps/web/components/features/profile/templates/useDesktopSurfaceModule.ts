@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { createElement, useEffect, useState } from 'react';
 
 /**
  * The desktop profile surface's concrete component type, resolved at the
@@ -12,6 +12,21 @@ type DesktopSurfaceModule =
 export type DesktopSurfaceComponent =
   DesktopSurfaceModule['ProfileDesktopSurface'];
 
+/**
+ * Renders the state-held desktop surface inside its stage container. The
+ * loaded module flows through a prop — never created in render — so the
+ * caller's JSX stays a static, module-level component (react-hooks/
+ * static-components) while nothing renders until the chunk resolves.
+ */
+export function DesktopSurfaceSlot({
+  surface: Surface,
+  ...props
+}: {
+  readonly surface: DesktopSurfaceComponent | null;
+} & ProfileDesktopSurfaceProps) {
+  if (!Surface) return null;
+  return createElement(Surface, props);
+}
 /**
  * Loads the desktop profile surface WITHOUT a lazy Suspense boundary, and
  * only when something can present it.
@@ -30,9 +45,12 @@ export type DesktopSurfaceComponent =
  * lands in state — a stable, state-held component, never one created during
  * render — and renders the real surface once the fetch resolves. Once loaded
  * it stays loaded, so crossing the 1180px breakpoint does not refetch or
- * remount it. The caller renders the slot conditionally while null.
+ * remount it. The caller passes the result to `DesktopSurfaceSlot` as the
+ * `surface` prop.
  */
-export function useDesktopSurfaceModule(enabled: boolean) {
+export function useDesktopSurfaceModule(enabled: boolean): {
+  Surface: DesktopSurfaceComponent | null;
+} {
   const [Surface, setSurface] = useState<DesktopSurfaceComponent | null>(null);
 
   useEffect(() => {
@@ -48,5 +66,5 @@ export function useDesktopSurfaceModule(enabled: boolean) {
     };
   }, [enabled]);
 
-  return Surface;
+  return { Surface };
 }
