@@ -47,6 +47,38 @@ assert.equal(receipt.sample.kind, 'synthetic'); assert.equal(receipt.excluded.le
 const comment = formatComment({ ...receipt, sample: { ...receipt.sample, triptych: undefined }, triptychs: [] });
 assert.match(comment, /pen-still-diff/); assert.match(comment, /synthetic sample/);
 assert.doesNotMatch(comment, /!\[/); /* No links before artifacts have been written. */ });
+test('a conformant render passes even when DOM geometry counts different things (JOV-11623)', async () => {
+const dir = mkdtempSync(join(tmpdir(), 'pen-still-'));
+const { pen, render } = syntheticPair();
+writeFileSync(join(dir, 'hero.png'), encodePng(pen));
+const receipt = await evaluateManifest({
+schema: 'pen-still-manifest/v1', primaryMode: 'dark', frames: [{
+sectionId: 'hero', penNodeId: 'node', stillPath: 'hero.png',
+viewport: 1440, mode: 'dark', status: 'active', route: '/' }]},
+{ root: dir, baseUrl: 'http://127.0.0.1:9', capture: async () => ({
+// DOM geometry that disagrees with the pixels: a null mockup element and
+// one text block where the pixels hold two bands. The comparison must
+// derive both sides from pixels and pass the conformant render.
+png: encodePng(render),
+geometry: { section: { width: 1440, height: 900 }, mockup: null,
+textBlocks: [{ x: 0, y: 0, width: 10, height: 10 }] } }) });
+assert.equal(receipt.frames[0].verdict, 'pass');
+assert.equal(receipt.frames[0].judgment.textPass, true);
+assert.equal(receipt.frames[0].judgment.mockupPass, true); });
+
+test('a capture that lands on a different route waits instead of comparing (JOV-11623)', async () => {
+const dir = mkdtempSync(join(tmpdir(), 'pen-still-'));
+const { pen } = syntheticPair();
+writeFileSync(join(dir, 'start.png'), encodePng(pen));
+const receipt = await evaluateManifest({
+schema: 'pen-still-manifest/v1', primaryMode: 'dark', frames: [{
+sectionId: 'onboarding/start', penNodeId: 'node', stillPath: 'start.png',
+viewport: 1440, mode: 'dark', status: 'active', route: '/start' }]},
+{ root: dir, baseUrl: 'http://127.0.0.1:9', capture: async () => ({
+png: encodePng(pen), finalUrl: 'https://jov.ie/waitlist' }) });
+assert.equal(receipt.frames[0].verdict, 'waiting');
+assert.equal(receipt.frames[0].reason, 'capture-redirected-off-route'); });
+
 test('a hash mismatch fails the frame without reading a capture', async () => {
 const dir = mkdtempSync(join(tmpdir(), 'pen-still-'));
 writeFileSync(join(dir, 'hero.png'), encodePng(syntheticPair().pen)); const receipt = await evaluateManifest({

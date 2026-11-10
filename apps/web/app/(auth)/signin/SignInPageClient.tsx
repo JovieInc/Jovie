@@ -211,27 +211,33 @@ export function SignInPageClient({
   }
 
   return (
-    <AuthenticatedAuthEntryGuard>
-      <AuthLayout
-        formTitle='Log in to Jovie'
-        showFormTitle={false}
-        showFooterPrompt={false}
-        layoutVariant='stack'
-        contentPlacement='center'
-      >
-        <AuthRoutePrefetch href={signUpUrl} />
-        <SignInOauthErrorBanner />
-        {showOfferSummary ? <AuthOfferSummary mode='sign-in' enabled /> : null}
-        <AuthShell
-          mode='sign-in'
-          forceOppositeModeHardNavigation
-          oppositeModeUrl={
-            desktopReturnRoute || mobileReturnRoute ? signUpUrl : undefined
-          }
-          fallbackRedirectUrl={fallbackRedirectUrl}
-          initialValues={initialValues}
-        />
-      </AuthLayout>
-    </AuthenticatedAuthEntryGuard>
+    // Pen golden-path capture scope (JOV-11623): the signin composition
+    // the signup-signin/signin frame is diffed against.
+    <div data-pen-section='signup-signin/signin'>
+      <AuthenticatedAuthEntryGuard>
+        <AuthLayout
+          formTitle='Log in to Jovie'
+          showFormTitle={false}
+          showFooterPrompt={false}
+          layoutVariant='stack'
+          contentPlacement='center'
+        >
+          <AuthRoutePrefetch href={signUpUrl} />
+          <SignInOauthErrorBanner />
+          {showOfferSummary ? (
+            <AuthOfferSummary mode='sign-in' enabled />
+          ) : null}
+          <AuthShell
+            mode='sign-in'
+            forceOppositeModeHardNavigation
+            oppositeModeUrl={
+              desktopReturnRoute || mobileReturnRoute ? signUpUrl : undefined
+            }
+            fallbackRedirectUrl={fallbackRedirectUrl}
+            initialValues={initialValues}
+          />
+        </AuthLayout>
+      </AuthenticatedAuthEntryGuard>
+    </div>
   );
 }
