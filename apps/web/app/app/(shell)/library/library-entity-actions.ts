@@ -1,3 +1,7 @@
+import { buildLibraryAskJovieDraft } from './library-chat-context';
+
+export { buildLibraryAskJovieDraft } from './library-chat-context';
+
 import {
   Archive,
   ArchiveRestore,
@@ -342,22 +346,6 @@ function buildCopyAction({
 }
 
 /** Editable context only; labels never substitute for authoritative object identity. */
-export function buildLibraryAskJovieDraft(
-  asset: LibraryReleaseAsset,
-  profileId: string
-): string {
-  return `Help me with this library item.\n${JSON.stringify({
-    kind: asset.itemKind ?? 'release',
-    id: asset.id,
-    profileId,
-    title: asset.title,
-    artist: asset.artist,
-    source: asset.source ?? null,
-    linkedReleaseId: asset.linkedReleaseId ?? null,
-    revision: asset.updatedAt ?? null,
-  })}`;
-}
-
 export function buildLibraryEntityActions({
   asset,
   profileId,

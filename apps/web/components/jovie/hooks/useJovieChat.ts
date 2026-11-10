@@ -20,7 +20,6 @@ import {
 import { track } from '@/lib/analytics';
 import { matchCommand } from '@/lib/chat/command-registry';
 import {
-  type ComposerRecoveryContext,
   clearComposerDraft,
   clearSummerTurnRecovery,
   currentComposerDraftScope,
@@ -52,10 +51,8 @@ import {
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { queryKeys, useChatConversationQuery } from '@/lib/queries';
 import { subscribeCacheFence } from '@/lib/queries/cache-isolation';
-import { FetchError } from '@/lib/queries/fetch';
 import { captureException } from '@/lib/sentry/client-lite';
 import { logger } from '@/lib/utils/logger';
-
 import { hydratePersistedMessageParts } from '../message-parts';
 import {
   type ChatTimelineEvent,
@@ -80,6 +77,17 @@ import {
   getPreferredErrorMessage,
   shouldSuppressChatPauseForToolFailure,
 } from '../utils';
+import {
+  extractChatTurnMetadata,
+  getTitlePollIntervalMs,
+  inferToolIntentFromPrompt,
+  inferToolIntentFromSkill,
+  isRecord,
+  isRecoverableSummerHistoryFailure,
+  readRecoveryError,
+  TITLE_POLL_MAX_DURATION_MS,
+  toError,
+} from './chat-controller-helpers';
 import { composeMessage, useChipTray } from './useChipTray';
 import { createComposerDraft, useComposerDraft } from './useComposerDraft';
 
@@ -115,17 +123,6 @@ interface UseJovieChatOptions {
   readonly chatMode?: 'ov';
 }
 
-/** Fast interval (ms) to poll for auto-generated title after first message. */
-const TITLE_POLL_FAST_INTERVAL_MS = 2_000;
-
-/** Slower interval (ms) used once title polling appears stalled. */
-const TITLE_POLL_BACKOFF_INTERVAL_MS = 5_000;
-
-/** Max duration (ms) to keep polling before giving up. */
-const TITLE_POLL_MAX_DURATION_MS = 15_000;
-
-/** Number of fast poll intervals to allow before backing off. */
-const TITLE_POLL_FAST_WINDOW_MS = TITLE_POLL_FAST_INTERVAL_MS * 3;
 const TIMELINE_CACHE_LIMIT = 20;
 /**
  * Longest a turn may show typing dots with no streamed progress. Above the
@@ -148,13 +145,6 @@ interface SubmitChatMessageOptions {
   readonly preserveComposerDraft?: boolean;
 }
 
-interface ChatTurnMetadata {
-  readonly conversationId?: string;
-  readonly turnId?: string;
-  readonly requestId?: string;
-  readonly toolStepCapExhausted?: boolean;
-}
-
 interface ActiveChatLatency {
   readonly clientTurnId: string;
   readonly startedAt: number;
@@ -164,103 +154,6 @@ interface ActiveChatLatency {
 
 function uxLatencyNowMs(): number {
   return globalThis.performance?.now?.() ?? Date.now();
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function isRecoverableSummerHistoryFailure(error: unknown): boolean {
-  return (
-    error instanceof FetchError && (error.status === 404 || error.isRetryable())
-  );
-}
-
-function extractChatTurnMetadata(value: unknown): ChatTurnMetadata | null {
-  if (!isRecord(value)) return null;
-  const conversationId =
-    typeof value.conversationId === 'string' ? value.conversationId : undefined;
-  const turnId = typeof value.turnId === 'string' ? value.turnId : undefined;
-  const requestId =
-    typeof value.requestId === 'string' ? value.requestId : undefined;
-  const toolStepCapExhausted =
-    value.toolStepCapExhausted === true ? true : undefined;
-
-  if (!conversationId && !turnId && !requestId && !toolStepCapExhausted) {
-    return null;
-  }
-  return { conversationId, turnId, requestId, toolStepCapExhausted };
-}
-
-function inferToolIntentFromPrompt(text: string): string | null {
-  const normalized = text.trim().toLowerCase();
-  const mentionsAlbumArt =
-    /\balbum\s+art\b/.test(normalized) ||
-    /\bcover\s+art\b/.test(normalized) ||
-    /\bartwork\b/.test(normalized);
-  const asksForGeneration = /\b(generate|create|make|design|produce)\b/.test(
-    normalized
-  );
-  const asksForBrief =
-    /\bbrief\b/.test(normalized) || /\bdraft\b/.test(normalized);
-
-  if (mentionsAlbumArt && asksForGeneration && !asksForBrief) {
-    return 'album_art_generation';
-  }
-
-  const mentionsImage =
-    /\b(photo|image|picture|shot|pic|selfie|portrait|press)\b/.test(normalized);
-  const asksForRetouch =
-    /\b(retouch|touch[\s-]?up|enhance|polish|clean\s+up)\b/.test(normalized);
-
-  if (mentionsImage && asksForRetouch) {
-    return 'image_retouch';
-  }
-
-  return null;
-}
-
-function inferToolIntentFromSkill(id: string): string | null {
-  return id === 'generateAlbumArt' ? 'album_art_generation' : id;
-}
-
-function getTitlePollIntervalMs(
-  titlePollingSince: number | null,
-  currentTime: number
-): number | false {
-  if (titlePollingSince === null) {
-    return false;
-  }
-
-  const elapsed = currentTime - titlePollingSince;
-
-  if (elapsed >= TITLE_POLL_MAX_DURATION_MS) {
-    return false;
-  }
-
-  return elapsed < TITLE_POLL_FAST_WINDOW_MS
-    ? TITLE_POLL_FAST_INTERVAL_MS
-    : TITLE_POLL_BACKOFF_INTERVAL_MS;
-}
-
-function toError(value: unknown): Error {
-  return value instanceof Error ? value : new Error('Chat send failed');
-}
-
-function readRecoveryError(context: ComposerRecoveryContext): ChatError | null {
-  const recovery = readSummerTurnRecovery(context);
-  if (!recovery) return null;
-  return {
-    type: 'server',
-    message: summerRetryExplanation(recovery.retry),
-    errorCode: recovery.errorCode,
-    ...recovery.error,
-    requestId: recovery.requestId,
-    failedMessage: recovery.retry === 'none' ? undefined : recovery.message,
-    ...(recovery.retry === 'same-turn'
-      ? { retryClientTurnId: recovery.clientTurnId }
-      : {}),
-  };
 }
 
 function getMessageParts(message: UIMessage | undefined): UIMessage['parts'] {

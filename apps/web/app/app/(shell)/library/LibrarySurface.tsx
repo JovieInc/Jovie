@@ -232,6 +232,12 @@ import {
   persistLibrarySavedView,
   readPersistedLibrarySavedView,
 } from './library-saved-views';
+import {
+  compareAssets,
+  countBy,
+  type LibrarySortKey,
+  uniqueSorted,
+} from './library-sort-helpers';
 import { PostReleasePanel, RightsholdersList } from './PostReleasePanel';
 import {
   YouTubeMerchRelationshipEditor,
@@ -253,7 +259,6 @@ const LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS = cn(
   'w-8 min-w-8'
 );
 
-type LibrarySortKey = 'releaseDate' | 'title' | 'status' | 'providers';
 type LibraryPresetId = LibraryView;
 type LibraryPreviewToggle = (
   asset: LibraryReleaseAsset,
@@ -282,8 +287,6 @@ type LibraryFilters = {
   readonly assetKinds: Set<LibraryAssetKind>;
   readonly providers: Set<string>;
 };
-
-type CountMap<T extends string> = ReadonlyMap<T, number>;
 
 const ASSET_KIND_LABELS: Record<LibraryAssetKind, string> = {
   artwork: 'Artwork',
@@ -492,38 +495,6 @@ function hasActiveFilters(filters: LibraryFilters): boolean {
       filters.providers.size >
     0
   );
-}
-
-function releaseDateTime(asset: LibraryReleaseAsset): number {
-  if (!asset.releaseDate) return 0;
-  const date = new Date(asset.releaseDate);
-  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
-}
-
-function compareAssets(sort: LibrarySortKey) {
-  return (a: LibraryReleaseAsset, b: LibraryReleaseAsset) => {
-    if (sort === 'releaseDate') return releaseDateTime(b) - releaseDateTime(a);
-    if (sort === 'title') return a.title.localeCompare(b.title);
-    if (sort === 'status') return a.status.localeCompare(b.status);
-    return b.providerCount - a.providerCount;
-  };
-}
-
-function uniqueSorted<T extends string>(values: readonly T[]): T[] {
-  return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
-}
-
-function countBy<T extends string>(
-  assets: readonly LibraryReleaseAsset[],
-  getValues: (asset: LibraryReleaseAsset) => readonly T[]
-): CountMap<T> {
-  const counts = new Map<T, number>();
-  for (const asset of assets) {
-    for (const value of getValues(asset)) {
-      counts.set(value, (counts.get(value) ?? 0) + 1);
-    }
-  }
-  return counts;
 }
 
 const LibraryDependencyContext = createContext<

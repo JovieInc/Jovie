@@ -15,7 +15,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   LibrarySurface,
   PRESETS,
-  resolveLibraryReviewStep,
   workPrimaryActionLabel,
 } from '@/app/app/(shell)/library/LibrarySurface';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
@@ -44,6 +43,7 @@ import {
   applyCacheScope,
   resetCacheIsolationForTests,
 } from '@/lib/queries/cache-isolation';
+import { buildAsset } from './library-surface-fixtures';
 
 Element.prototype.scrollIntoView = vi.fn();
 
@@ -181,50 +181,6 @@ vi.mock('next/image', () => ({
     return <img alt='' {...imgProps} />;
   },
 }));
-
-function buildAsset(
-  overrides: Partial<LibraryReleaseAsset> = {}
-): LibraryReleaseAsset {
-  return {
-    id: 'release-1',
-    title: 'Take Me Over',
-    artist: 'Tim White',
-    artworkUrl: 'https://cdn.example.com/artwork.jpg',
-    previewUrl: 'https://cdn.example.com/preview.mp3',
-    previewVerification: 'verified',
-    videoUrl: null,
-    waveformSeed: 17,
-    smartLinkPath: '/tim/take-me-over',
-    releaseDate: '2026-04-28T00:00:00.000Z',
-    releaseType: 'single',
-    status: 'released',
-    approvalStatus: 'draft',
-    profileVisibility: 'visible',
-    lifecycleStatus: 'active',
-    trackCount: 1,
-    providerCount: 1,
-    providers: [
-      {
-        key: 'spotify',
-        label: 'Spotify',
-        url: 'https://open.spotify.com/album/take-me-over',
-      },
-    ],
-    hasLyrics: true,
-    hasArtwork: true,
-    hasVideoLinks: false,
-    assetKinds: ['artwork', 'preview', 'lyrics', 'providers'],
-    genres: ['Progressive House'],
-    spotifyPopularity: 68,
-    targetPlaylistCount: 2,
-    isExplicit: false,
-    label: 'Jovie',
-    upc: '123456789012',
-    distributor: 'Jovie',
-    totalDurationMs: 212_000,
-    ...overrides,
-  };
-}
 
 function RightPanelOutlet() {
   return useRightPanel();
@@ -2912,62 +2868,5 @@ describe('LibrarySurface', () => {
     });
     expect(trigger).toHaveFocus();
     expect(globalThis.scrollY).toBe(320);
-  });
-});
-
-describe('resolveLibraryReviewStep', () => {
-  const page = document.body;
-
-  it('moves one item on J/K and one row of tiles on up/down in the grid', () => {
-    expect(resolveLibraryReviewStep('j', page, 5)).toEqual({
-      kind: 'move',
-      delta: 1,
-    });
-    expect(resolveLibraryReviewStep('k', page, 5)).toEqual({
-      kind: 'move',
-      delta: -1,
-    });
-    expect(resolveLibraryReviewStep('ArrowDown', page, 5)).toEqual({
-      kind: 'move',
-      delta: 5,
-    });
-    expect(resolveLibraryReviewStep('ArrowUp', page, 5)).toEqual({
-      kind: 'move',
-      delta: -5,
-    });
-    expect(resolveLibraryReviewStep('ArrowLeft', page, 5)).toEqual({
-      kind: 'move',
-      delta: -1,
-    });
-    // Lists and tables move one row and leave left/right to scrolling.
-    expect(resolveLibraryReviewStep('ArrowDown', page, null)).toEqual({
-      kind: 'move',
-      delta: 1,
-    });
-    expect(resolveLibraryReviewStep('ArrowRight', page, null)).toBeNull();
-    expect(resolveLibraryReviewStep('End', page, null)).toEqual({
-      kind: 'edge',
-      to: 'last',
-    });
-  });
-
-  it('plays on Space and inspects on Enter without stealing native controls', () => {
-    const tile = document.createElement('button');
-    tile.dataset.libraryItemFocus = '';
-    const control = document.createElement('button');
-    const slider = document.createElement('div');
-    slider.setAttribute('role', 'slider');
-    const input = document.createElement('input');
-
-    expect(resolveLibraryReviewStep(' ', page, 4)).toEqual({ kind: 'play' });
-    expect(resolveLibraryReviewStep(' ', tile, 4)).toEqual({ kind: 'play' });
-    expect(resolveLibraryReviewStep(' ', control, 4)).toBeNull();
-    expect(resolveLibraryReviewStep('Enter', page, 4)).toEqual({
-      kind: 'open',
-    });
-    expect(resolveLibraryReviewStep('Enter', tile, 4)).toBeNull();
-    expect(resolveLibraryReviewStep('j', slider, 4)).toBeNull();
-    expect(resolveLibraryReviewStep('j', input, 4)).toBeNull();
-    expect(resolveLibraryReviewStep('ArrowLeft', input, 4)).toBeNull();
   });
 });
