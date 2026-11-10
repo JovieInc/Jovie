@@ -685,8 +685,7 @@ def resolve_additive_identifier_list_text(text: str) -> str | None:
 
 
 def merge_additive_quoted_path_line(ours: str, theirs: str) -> str | None:
-    """Union one `NAME = ["a", "b",` line. Main order, then head-only paths.
-    A second line, prose, a reordered shared path, or a repeated path returns None."""
+    """Union one `NAME = ["a", "b",` line (main order, then head-only paths); a second line, prose, a reordered shared path, or a repeated path returns None."""
 
     def parse(side: str):
         if not str(side or "").endswith("\n") or "\n" in side[:-1]:
@@ -696,8 +695,7 @@ def merge_additive_quoted_path_line(ours: str, theirs: str) -> str | None:
             return None
         trail, body = rest.endswith(","), (rest[:-1] if rest.endswith(",") else rest).rstrip()
         parts = [part.strip() for part in body.split(",")] if body else []
-        if any(len(part) < 2 or part[0] != '"' or part[-1] != '"' or part.count('"') != 2
-               or any(ch.isspace() for ch in part) for part in parts):
+        if any(len(part) < 2 or part[0] != '"' or part[-1] != '"' or part.count('"') != 2 or any(ch.isspace() for ch in part) for part in parts):
             return None
         tokens = [part[1:-1] for part in parts]
         if not tokens or len(tokens) != len(set(tokens)) or body != ", ".join(f'"{t}"' for t in tokens):
@@ -707,8 +705,8 @@ def merge_additive_quoted_path_line(ours: str, theirs: str) -> str | None:
     left, right = parse(ours), parse(theirs)
     if not left or not right or left[0] != right[0] or left[2] != right[2]:
         return None
-    shared = set(left[1]) & set(right[1])
-    if [token for token in left[1] if token in shared] != [token for token in right[1] if token in shared]:
+    # `t in shared` for t in left[1]/right[1] is exactly `t in` the other side's list.
+    if [t for t in left[1] if t in right[1]] != [t for t in right[1] if t in left[1]]:
         return None
     merged = list(dict.fromkeys([*right[1], *left[1]]))
     return left[0] + "[" + ", ".join(f'"{token}"' for token in merged) + ("," if left[2] else "") + "\n"
