@@ -5,6 +5,8 @@ import {
   ExternalLink,
   Eye,
   Link2,
+  MessageCircle,
+  Pencil,
   RefreshCw,
   Wrench,
 } from 'lucide-react';
@@ -16,6 +18,8 @@ export interface BuildConnectionActionsCallbacks {
   readonly onViewDetails: (row: ProfileWorkspaceRow) => void;
   readonly onOpen: (row: ProfileWorkspaceRow) => void;
   readonly onPrimaryAction: (row: ProfileWorkspaceRow) => void;
+  readonly onAskJovie?: (row: ProfileWorkspaceRow) => void;
+  readonly onEditProfile?: (row: ProfileWorkspaceRow) => void;
   /** Present only when the row has a fixable issue (never a dead end). */
   readonly onFix?: (row: ProfileWorkspaceRow) => void;
 }
@@ -56,6 +60,30 @@ export function buildConnectionActions(
       onClick: () => callbacks.onOpen(row),
     },
   ];
+
+  if (callbacks.onAskJovie) {
+    const { onAskJovie } = callbacks;
+    items.unshift({
+      id: 'ask-jovie',
+      label: 'Ask Jovie',
+      icon: <MessageCircle className='h-3.5 w-3.5' aria-hidden />,
+      onClick: () => onAskJovie(row),
+    });
+  }
+
+  if (
+    row.rowType === 'surface' &&
+    row.kind === 'jovie' &&
+    callbacks.onEditProfile
+  ) {
+    const { onEditProfile } = callbacks;
+    items.unshift({
+      id: 'edit-profile',
+      label: 'Edit Profile',
+      icon: <Pencil className='h-3.5 w-3.5' aria-hidden />,
+      onClick: () => onEditProfile(row),
+    });
+  }
 
   if (primaryAction !== 'open') {
     const action = PRIMARY_ACTION_COPY[primaryAction];

@@ -20,6 +20,39 @@ const spotify: ProfileWorkspaceRow = {
 };
 
 describe('buildConnectionActions', () => {
+  it('offers contextual Ask Jovie on every entity and Edit only on the Jovie profile', () => {
+    const callbacks = {
+      onViewDetails: vi.fn(),
+      onOpen: vi.fn(),
+      onPrimaryAction: vi.fn(),
+      onAskJovie: vi.fn(),
+      onEditProfile: vi.fn(),
+    };
+    const jovie: ProfileWorkspaceRow = {
+      ...spotify,
+      id: 'jovie',
+      kind: 'jovie',
+      platform: 'jovie',
+    };
+    for (const row of [spotify, jovie]) {
+      const actions = buildConnectionActions(row, 'open', callbacks);
+      const ask = actions.find(
+        action => 'id' in action && action.id === 'ask-jovie'
+      );
+      if (!ask || !('onClick' in ask)) throw new Error('Missing Ask Jovie');
+      ask.onClick();
+      expect(callbacks.onAskJovie).toHaveBeenLastCalledWith(row);
+      const edit = actions.find(
+        action => 'id' in action && action.id === 'edit-profile'
+      );
+      if (row.kind === 'jovie') {
+        if (!edit || !('onClick' in edit))
+          throw new Error('Missing Edit Profile');
+        edit.onClick();
+        expect(callbacks.onEditProfile).toHaveBeenCalledWith(jovie);
+      } else expect(edit).toBeUndefined();
+    }
+  });
   it('builds one action contract for row, ellipsis, and right rail menus', () => {
     const callbacks = {
       onViewDetails: vi.fn(),
