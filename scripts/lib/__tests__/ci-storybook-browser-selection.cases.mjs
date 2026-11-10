@@ -9,89 +9,77 @@ const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 // Registered by the maintained ci-fast workflow contract test entry point.
 /** @param {(jobId: string, nextJobId: string) => string} jobBlock */
 export function defineStorybookBrowserSelectionTests(jobBlock) {
-  it('runs onboarding recovery proof before queue admission for affected source, stories and specs', () => {
-    const remaining = jobBlock(
-      'ci-fast-remaining',
-      'ci-profile-admission-browser'
+  it('runs onboarding recovery proof in active Source Validation for affected source, stories and specs', () => {
+    const workflow = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/source-validation.yml'),
+      'utf8'
     );
-    const selector = remaining
-      .split('id: storybook-browser\n')[1]
-      .split('      - name: Start ci-fast lanes')[0];
-    const command = selector
-      .split('run: |\n')[1]
-      .replaceAll('${{ github.event_name }}', 'pull_request')
-      .replaceAll('${{ github.base_ref }}', 'main');
-    const runner = remaining
-      .split('id: storybook-browser-test')[1]
-      .split('      - name: Upload Storybook browser evidence')[0];
-    const selection = runner.slice(
-      runner.indexOf('          specs=()'),
-      runner.indexOf('          pnpm exec storybook dev')
-    );
-    const root = mkdtempSync(join(tmpdir(), 'onboarding-storybook-selection-'));
-    try {
-      for (const [path, expected] of [
-        ['apps/web/components/features/onboarding/OnboardingShell.tsx', 'true'],
-        [
-          'apps/web/components/features/onboarding/OnboardingShell.recovery.stories.tsx',
-          'true',
-        ],
-        ['apps/web/components/features/onboarding/OnboardingChat.tsx', 'true'],
-        ['apps/web/tests/e2e/storybook-onboarding-recovery.spec.ts', 'true'],
-        ['apps/web/components/shell/Other.tsx', 'false'],
-      ]) {
-        const output = join(root, 'output');
-        const result = spawnSync(
-          'bash',
-          ['-c', 'git() { printf "%s\\n" "$CHANGED_PATHS"; }\n' + command],
-          {
-            encoding: 'utf8',
-            env: {
-              ...process.env,
-              CHANGED_PATHS: path,
-              RUNNER_TEMP: root,
-              GITHUB_OUTPUT: output,
-            },
-          }
-        );
-        expect(result.status, result.stderr).toBe(0);
-        const values = Object.fromEntries(
-          readFileSync(output, 'utf8')
-            .trim()
-            .split('\n')
-            .map(line => line.split('='))
-        );
-        expect(values.onboarding, path).toBe(expected);
-        expect(values.run, path).toBe(expected);
-        const chosen = spawnSync(
-          'bash',
-          ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
-          {
-            encoding: 'utf8',
-            env: {
-              ...process.env,
-              ...Object.fromEntries(
-                Object.entries(values).map(([key, value]) => [
-                  `RUN_${key.toUpperCase()}`,
-                  value,
-                ])
-              ),
-            },
-          }
-        );
-        if (expected === 'true') {
-          expect(chosen.status, chosen.stderr).toBe(0);
-          expect(chosen.stdout.trim()).toBe(
-            'tests/e2e/storybook-onboarding-recovery.spec.ts'
-          );
-        }
-      }
-      expect(runner).toContain(
-        'RUN_ONBOARDING: ${{ steps.storybook-browser.outputs.onboarding }}'
-      );
-    } finally {
-      rmSync(root, { recursive: true, force: true });
+    expect(workflow).toMatch(/on:\s*\n\s+pull_request:/);
+    const step = workflow
+      .split('      - name: Verify onboarding recovery browser behavior\n')[1]
+      ?.split('      - name:')[0];
+    expect(
+      step,
+      'the active pull_request workflow must run the proof'
+    ).toBeTruthy();
+    const command = step.split('run: |\n')[1];
+    const stubs = `git() {
+      case "$1" in
+        rev-parse) printf '%s\\n' "$EXPECTED_HEAD" ;;
+        merge-base) printf 'base\\n' ;;
+        diff) printf '%s\\n' "$CHANGED_PATHS" ;;
+        *) return 1 ;;
+      esac
     }
+    node() { printf '%s\\n' "$*"; }
+    `;
+    for (const [path, selected] of [
+      ['apps/web/components/features/onboarding/OnboardingShell.tsx', true],
+      [
+        'apps/web/components/features/onboarding/OnboardingShell.recovery.stories.tsx',
+        true,
+      ],
+      ['apps/web/components/features/onboarding/OnboardingChat.tsx', true],
+      ['apps/web/tests/e2e/storybook-onboarding-recovery.spec.ts', true],
+      ['apps/web/components/shell/Other.tsx', false],
+      ['apps/web/tests/e2e/storybook-onboarding-recovery.spec.ts.bak', false],
+    ]) {
+      const result = spawnSync('bash', ['-c', stubs + command], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CHANGED_PATHS: path,
+          EXPECTED_HEAD: 'head',
+          BASE_BRANCH: 'main',
+        },
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(
+        result.stdout.includes(
+          'tests/e2e/storybook-onboarding-recovery.spec.ts'
+        ),
+        path
+      ).toBe(selected);
+      if (selected)
+        expect(result.stdout).toContain(
+          'guard-playwright-artifacts.mjs --run -- pnpm --filter @jovie/web exec playwright test'
+        );
+    }
+    const failure = spawnSync(
+      'bash',
+      ['-c', stubs + 'node() { return 37; }\n' + command],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CHANGED_PATHS:
+            'apps/web/components/features/onboarding/OnboardingShell.tsx',
+          EXPECTED_HEAD: 'head',
+          BASE_BRANCH: 'main',
+        },
+      }
+    );
+    expect(failure.status).toBe(37);
   });
 
   it('selects the crawler state proof through the maintained Storybook browser path', () => {
@@ -167,7 +155,6 @@ export function defineStorybookBrowserSelectionTests(jobBlock) {
         overlay: 'false',
         privacy: 'false',
         tasks: 'false',
-        onboarding: 'false',
       });
 
       const runner = remaining
@@ -394,7 +381,6 @@ export function defineStorybookBrowserSelectionTests(jobBlock) {
         crawler: 'false',
         overlay: 'false',
         tasks: 'true',
-        onboarding: 'false',
         desktop_update: 'false',
         dsp: 'false',
         smart_link: 'false',
