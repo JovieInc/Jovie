@@ -635,7 +635,7 @@
   "apps/web/tests/e2e/pricing.spec.ts": 508,
   "apps/web/tests/e2e/profile-admission.spec.ts": 1249,
   "apps/web/tests/e2e/profile-mobile-viewport-stability.spec.ts": 1728,
-  "apps/web/tests/e2e/profile-visual-audit.spec.ts": 542,
+  "apps/web/tests/e2e/profile-visual-audit.spec.ts": 547,
   "apps/web/tests/e2e/profile.spec.ts": 519,
   "apps/web/tests/e2e/profile/public-profile-cta-identity.spec.ts": 617,
   "apps/web/tests/e2e/profile/public-profile-layout.spec.ts": 1105,

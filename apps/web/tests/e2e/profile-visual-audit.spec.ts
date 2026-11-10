@@ -473,7 +473,7 @@ test.describe('Public profile visual audit @smoke', () => {
   }
 });
 
-test.describe('Public profile compact shell sizing', () => {
+test.describe('Public profile surface sizing', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test('desktop shell stays materially below viewport height', async ({
@@ -495,9 +495,12 @@ test.describe('Public profile compact shell sizing', () => {
     await waitForImages(page);
     await waitForSettle(page);
 
-    const shell = page.getByTestId('profile-compact-shell');
+    // #24709 made the desktop surface the canonical profile at >=1180px and
+    // unmounts the compact shell there, so this sizing guard targets the
+    // desktop surface; the compact shell stays canonical below 1180px.
+    await expect(page.getByTestId('profile-compact-shell')).toHaveCount(0);
+    const shell = page.getByTestId('profile-desktop-surface');
     await expect(shell).toBeVisible();
-
     const shellBox = await shell.boundingBox();
     expect(shellBox).not.toBeNull();
 
@@ -505,9 +508,11 @@ test.describe('Public profile compact shell sizing', () => {
       return;
     }
 
-    // At 1280x900 with md:py-8, the compact card should sit well inside the
-    // viewport instead of stretching close to full height again.
-    expect(shellBox.height).toBeLessThan(780);
+    // At 1280x900 the desktop stage pads the viewport by clamp(16px, 2vw,
+    // 24px) (24px at 1280) and caps the surface at min(940px, 100dvh - 48px)
+    // = 852px, so the card sits well inside the viewport instead of
+    // stretching close to full height again.
+    expect(shellBox.height).toBeLessThanOrEqual(852);
     expect(shellBox.y).toBeGreaterThanOrEqual(24);
     expect(shellBox.y + shellBox.height).toBeLessThanOrEqual(876);
   });
