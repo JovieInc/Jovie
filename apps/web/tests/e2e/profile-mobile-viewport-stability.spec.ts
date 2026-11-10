@@ -1075,6 +1075,8 @@ test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
       { label: 'phone small', width: 320, height: 568 },
       { label: 'phone', width: 390, height: 844 },
       { label: 'phone max', width: 430, height: 932 },
+      { label: 'embedded tablet narrow', width: 670, height: 1024 },
+      { label: 'embedded tablet wide', width: 754, height: 1024 },
       { label: 'compact edge', width: 767, height: 1024 },
       { label: 'tablet', width: 768, height: 1024 },
       { label: 'desktop', width: 1024, height: 1024 },
@@ -1297,6 +1299,13 @@ test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
       if (viewport.width < 768) {
         expect(after.banner, 'phone consent card should render').not.toBeNull();
         expect(after.dock, 'phone dock should render').not.toBeNull();
+        expect(
+          Math.abs(
+            ((after.banner?.left ?? 0) + (after.banner?.right ?? 0)) / 2 -
+              viewport.width / 2
+          ),
+          `${viewport.label} consent card should stay centered with the profile`
+        ).toBeLessThanOrEqual(1);
         expect(
           after.banner?.bottom ?? Number.POSITIVE_INFINITY,
           'phone consent card should clear the glass dock'

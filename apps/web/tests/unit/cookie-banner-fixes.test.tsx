@@ -99,6 +99,7 @@ describe('CookieBannerSection consent sync', () => {
         css
       )?.[1];
 
+    expect(phoneRule).toContain('left: 50%;');
     expect(phoneRule).toContain('top: auto;');
     expect(phoneRule).toContain('bottom: var(--profile-bottom-nav-height);');
   });
