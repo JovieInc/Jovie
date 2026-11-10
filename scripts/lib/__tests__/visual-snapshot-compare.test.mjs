@@ -243,6 +243,19 @@ describe('visual snapshot compare (JOV-5459)', () => {
     const fullyWiredMergeReady = [
       '  ci-merge-group-ready:',
       '    needs: [ci-visual-snapshot-compare, ci-visual-snapshot-homepage, ci-visual-marketing-dom, ci-visual-marketing-routes]',
+      '    steps:',
+      '      - run: |',
+      '          VISUAL_HOMEPAGE_RESULT="${{ needs.ci-visual-snapshot-homepage.result }}"',
+      '          VISUAL_MARKETING_DOM_RESULT="${{ needs.ci-visual-marketing-dom.result }}"',
+      '          VISUAL_MARKETING_ROUTES_RESULT="${{ needs.ci-visual-marketing-routes.result }}"',
+      '          RUN_HOMEPAGE_VISUAL="${{ needs.ci-path-changes.outputs.run_homepage_visual }}"',
+      '          RUN_MARKETING_DOM="${{ needs.ci-path-changes.outputs.run_marketing_dom }}"',
+      '          for selected_gate in \\',
+      '            "Homepage Visual Compare:$RUN_HOMEPAGE_VISUAL:$VISUAL_HOMEPAGE_RESULT" \\',
+      '            "Marketing DOM Certification:$RUN_MARKETING_DOM:$VISUAL_MARKETING_DOM_RESULT" \\',
+      '            "Marketing Route Capture:$RUN_MARKETING_DOM:$VISUAL_MARKETING_ROUTES_RESULT"; do',
+      '            if [[ "$selected" == "true" && "$result" != "success" ]]; then exit 1; fi',
+      '          done',
     ].join('\n');
     const gatedSourceReady = [
       '  ci-pr-ready:',
@@ -290,6 +303,48 @@ describe('visual snapshot compare (JOV-5459)', () => {
         /\n *if \[\[ "\$RUN_MARKETING_DOM" == "true" && "\$VISUAL_MARKETING_ROUTES_RESULT" != "success" \]\]; then exit 1; fi/,
         ''
       );
+    // Merge-group side: an aggregate that lists all four needs but drops any
+    // single suite's result validation must be rejected — per suite.
+    const dropSuiteValidation = needle =>
+      fullyWiredMergeReady.replace(needle, '');
+    const mergeReadyNegatives = [
+      [
+        'homepage',
+        dropSuiteValidation(
+          '          VISUAL_HOMEPAGE_RESULT="${{ needs.ci-visual-snapshot-homepage.result }}"\n'
+        ),
+      ],
+      [
+        'marketing DOM',
+        dropSuiteValidation(
+          '          VISUAL_MARKETING_DOM_RESULT="${{ needs.ci-visual-marketing-dom.result }}"\n'
+        ),
+      ],
+      [
+        'marketing routes',
+        dropSuiteValidation(
+          '          VISUAL_MARKETING_ROUTES_RESULT="${{ needs.ci-visual-marketing-routes.result }}"\n'
+        ),
+      ],
+    ];
+    for (const [label, crippledMergeReady] of mergeReadyNegatives) {
+      expect(crippledMergeReady, label).not.toBe(fullyWiredMergeReady);
+      expect(
+        assertVisualCompareWorkflowContract({
+          visualRegressionYaml,
+          ciYaml: [
+            renderedBuildJob,
+            renderedHomepageSuiteJob,
+            marketingDomSuiteJob,
+            marketingRoutesSuiteJob,
+            crippledMergeReady,
+            gatedSourceReady,
+          ].join('\n'),
+        })
+      ).toContain(
+        'merge-group PR Ready must validate every selected visual suite result'
+      );
+    }
     expect(uncheckedSourceReady).not.toBe(gatedSourceReady);
     expect(
       assertVisualCompareWorkflowContract({

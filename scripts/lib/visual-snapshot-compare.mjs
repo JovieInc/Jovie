@@ -390,6 +390,25 @@ export function assertVisualCompareWorkflowContract({
       break;
     }
   }
+  // Listing the needs is not enough: the merge-group aggregate must also
+  // validate each selected suite's result, or a failing/skipped suite rides
+  // through on the shared build's success.
+  const mergeReadySuiteValidations = [
+    ['needs.ci-visual-snapshot-homepage.result', 'VISUAL_HOMEPAGE_RESULT'],
+    ['needs.ci-visual-marketing-dom.result', 'VISUAL_MARKETING_DOM_RESULT'],
+    [
+      'needs.ci-visual-marketing-routes.result',
+      'VISUAL_MARKETING_ROUTES_RESULT',
+    ],
+  ];
+  for (const [needRef, resultVar] of mergeReadySuiteValidations) {
+    if (!mergeReady.includes(needRef) || !mergeReady.includes(resultVar)) {
+      issues.push(
+        'merge-group PR Ready must validate every selected visual suite result'
+      );
+      break;
+    }
+  }
   const sourceReady = extractJobBlock(ciYaml, 'ci-pr-ready');
   for (const jobId of mergeReadyRequiredJobs) {
     if (!sourceReady.includes(jobId)) {
