@@ -370,9 +370,8 @@ test.describe('canonical /start onboarding chat', () => {
       page.getByText(/remember this chat so we can pick up where we left off/i)
     ).toHaveCount(0);
     await page.getByRole('button', { name: 'Onboarding options' }).click();
-    await expect(
-      page.getByRole('menuitem', { name: 'Sign in' })
-    ).toHaveAttribute('href', '/signin');
+    const signIn = page.getByRole('menuitem', { name: 'Sign in' });
+    await expect(signIn).toHaveAttribute('href', '/signin');
     await page.keyboard.press('Escape');
     const emptyComposer = page.locator(COMPOSER_TEXTAREA);
     await expect(emptyComposer).toHaveAttribute(

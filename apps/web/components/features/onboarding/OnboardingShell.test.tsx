@@ -4,11 +4,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ReactNode, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  buildEntryProfileBuilderState,
-  OnboardingShell,
-  OnboardingShellStatus,
-} from './OnboardingShell';
+import { OnboardingShell, OnboardingShellStatus } from './OnboardingShell';
 
 vi.mock('@/components/organisms/AppShellFrame', () => ({
   AppShellFrame: ({
@@ -539,39 +535,6 @@ const MEGARAN_ENTRY = {
   linkPlatforms: ['instagram'],
   linkCount: 1,
 } as const;
-
-describe('buildEntryProfileBuilderState (JOV-7753)', () => {
-  it('maps a prebuilt page to rail preview state and nothing else', () => {
-    expect(buildEntryProfileBuilderState(MEGARAN_ENTRY)).toEqual({
-      artist: {
-        id: 'handle-megaran',
-        name: 'Mega Ran',
-        url: '',
-        imageUrl: 'https://blob.example.com/a.png',
-        genres: ['hip hop'],
-      },
-      artistConfirmed: false,
-      handle: 'megaran',
-      socialLinks: ['https://instagram.com/megaran'],
-    });
-    expect(
-      buildEntryProfileBuilderState({ status: 'available', handle: 'x-y-z' })
-        .artist
-    ).toBeNull();
-    expect(buildEntryProfileBuilderState(null).artist).toBeNull();
-  });
-
-  it('seeds the draft panel with an open handle before the first message (Pen R6As7U)', () => {
-    expect(
-      buildEntryProfileBuilderState({ status: 'available', handle: 'timwhite' })
-    ).toEqual({
-      artist: null,
-      artistConfirmed: false,
-      handle: 'timwhite',
-      socialLinks: [],
-    });
-  });
-});
 
 // JOV-7973: the /start shell pane must clip without owning a programmatically
 // scrollable box. overflow:hidden stays scrollable, so a journey scrollIntoView
