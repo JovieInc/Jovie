@@ -79,6 +79,15 @@ const environmentProjects: TestProjectInlineConfiguration[] = [
   },
 ];
 
+// Merge-time pilot (Nov 2026): VITEST_ISOLATE=false opts a single CI shard into
+// shared-worker mode (isolate: false). The default — and every unset/unset-value
+// environment — keeps per-file isolation. With isolation off, every test file in
+// a fork shares one module registry, so each test file MUST unwind its own
+// global state: restore spies, unstub env/globals, use real timers, and not leak
+// DOM/storage/global singletons (tests/setup-optimized.ts enforces that baseline
+// unwind while the pilot is on). Rollback = unset VITEST_ISOLATE.
+const isolate = process.env.VITEST_ISOLATE !== 'false';
+
 // Detect CI environment
 const isCI = process.env.CI === 'true';
 const isChangedRun = process.argv.includes('--changed');
@@ -217,9 +226,10 @@ export default defineConfig({
     ],
 
     // Performance optimizations
-    // Use forks for better memory isolation (Vitest 4 style)
+    // Use forks for better memory isolation (Vitest 4 style).
+    // isolate is VITEST_ISOLATE-gated: see the comment at the top of the file.
     pool: 'forks',
-    isolate: true,
+    isolate,
     singleFork: isChangedRun && !isCoverageRun,
     // CI stability: reduce memory pressure. Exact-head coverage is a single
     // merge-queue job and must use the runner instead of the serial changed
