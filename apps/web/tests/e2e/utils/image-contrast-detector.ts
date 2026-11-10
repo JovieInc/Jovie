@@ -479,6 +479,34 @@ export async function inspectImageContrast(
     }
   };
   let screenshot: Buffer;
+  // Fresh boxes at capture time: late-loading media (release artwork, hero
+  // imagery) reflows the page between the scan and this capture, so a
+  // scan-time box would sample whatever content slid into the old rectangle
+  // instead of the background behind the candidate (JOV-11623). The hide
+  // tags identify each candidate; re-derive its rect now.
+  const freshBoxes: Record<
+    string,
+    { x: number; y: number; width: number; height: number }
+  > = await page.evaluate(() => {
+    const boxes: Record<
+      string,
+      { x: number; y: number; width: number; height: number }
+    > = {};
+    for (const element of Array.from(
+      document.querySelectorAll(`[${HIDE_ATTRIBUTE}]`)
+    )) {
+      const index = element.getAttribute(HIDE_ATTRIBUTE);
+      if (index === null) continue;
+      const rect = element.getBoundingClientRect();
+      boxes[index] = {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      };
+    }
+    return boxes;
+  });
   try {
     screenshot = await captureScreenshot();
   } finally {
@@ -490,16 +518,19 @@ export async function inspectImageContrast(
   const imageHeight = metadata.height ?? 0;
 
   for (const candidate of candidates) {
+    // Sample where the element IS at capture time, not where the scan saw it.
+    const scannedBox = candidate.box;
+    const liveBox = freshBoxes[String(candidate.index)] ?? scannedBox;
     const box = {
-      x: candidate.box.x,
-      y: candidate.box.y,
+      x: liveBox.x,
+      y: liveBox.y,
       width: Math.min(
-        candidate.box.width,
-        imageWidth / deviceScaleFactor - candidate.box.x
+        liveBox.width,
+        imageWidth / deviceScaleFactor - liveBox.x
       ),
       height: Math.min(
-        candidate.box.height,
-        imageHeight / deviceScaleFactor - candidate.box.y
+        liveBox.height,
+        imageHeight / deviceScaleFactor - liveBox.y
       ),
     };
     if (box.width <= 0 || box.height <= 0) continue;

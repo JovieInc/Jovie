@@ -655,7 +655,7 @@
   "apps/web/tests/e2e/tasks-layout.spec.ts": 686,
   "apps/web/tests/e2e/utils/auth-text-containment.ts": 638,
   "apps/web/tests/e2e/utils/dashboard-route-matrix.ts": 738,
-  "apps/web/tests/e2e/utils/image-contrast-detector.ts": 529,
+  "apps/web/tests/e2e/utils/image-contrast-detector.ts": 602,
   "apps/web/tests/e2e/utils/public-surface-helpers.ts": 866,
   "apps/web/tests/e2e/utils/public-surface-manifest.ts": 1234,
   "apps/web/tests/e2e/utils/route-dom-detector.ts": 899,
