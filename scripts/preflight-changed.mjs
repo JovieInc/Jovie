@@ -905,8 +905,6 @@ export async function main({
     if (phase === 0 && args.write) {
       // Recompute after generators so newly written outputs are included too.
       await formatChangedFiles(cwd, baseRef, childEnv);
-    }
-    if (phase === 0 && args.write) {
       const changedByGen = git(cwd, ['status', '--porcelain'])
         .split('\n')
         .filter(l => /workflow-topology|ci-harness|design-tokens|llms/.test(l));
