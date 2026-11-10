@@ -13,13 +13,9 @@ import {
 } from './image-contrast-sample';
 
 // Invariant consumer: JOV-INV-019 `text-aware-contrast` (JOV-6916).
-// Unlike the token-pair ratchet (scripts/lint-contrast-ratchet.mjs), this
-// inspects RENDERED pixels: for every text node and interactive control whose
-// box overlaps a painted image layer (hero photo, editorial card, CSS
-// background image), the glyph ink is hidden and the pixels behind the glyph
-// box are sampled. WCAG AA is enforced against the worst-case percentile of
-// the sampled background luminance, so art direction must reserve contrast
-// rather than rely on a post-hoc overlay.
+// Unlike the token-pair ratchet, this inspects RENDERED pixels: glyph ink is
+// hidden and the pixels behind each glyph box sampled, WCAG AA judged on the
+// worst-case background percentile.
 
 export const IMAGE_CONTRAST_CERTIFICATION_SCHEMA =
   'jovie-image-contrast/v1' as const;
@@ -128,9 +124,10 @@ async function scanCandidates(
           // divider or gradient rule (full width, genuinely painted) isn't
           // dropped as an image layer or a candidate.
           if (rect.width <= 1 && rect.height <= 1) return false;
-          // A descendant of a clip-hidden ancestor (the desktop build's
-          // compact slot) is also never painted even though its own layout
-          // rect stays full-size (JOV-11623).
+          // A descendant of a clip-hidden container (the same sr-only recipe
+          // applied to an ancestor — the desktop build's compact slot) is also
+          // never painted: the ancestor clip hides every child's ink, while
+          // each child's own layout rect stays full-size (JOV-11623).
           for (
             let node: Element | null = element;
             node;
@@ -258,11 +255,14 @@ async function scanCandidates(
               if (overlapRight <= overlapLeft || overlapBottom <= overlapTop) {
                 return false;
               }
-              // Resolve the stack at the center of THIS layer's overlap with the
-              // candidate, not the candidate's own center: a candidate can span several
-              // layers or be only partially covered by an unrelated sibling (drawer
-              // sheet, modal scrim), and a single global sample point would judge
-              // reachability from a pixel outside this overlap.
+              // Resolve the hit-test stack at the center of THIS layer's overlap
+              // with the candidate, not the candidate's own center: a candidate
+              // can span several layers, or be only partially covered elsewhere
+              // by an unrelated sibling (an open drawer sheet, a modal scrim). A
+              // single global sample point would wrongly call the whole candidate
+              // unreachable — or wrongly call a layer "behind" it — based on
+              // whatever happens to sit at a point that isn't even part of this
+              // particular overlap.
               const sampleX = Math.min(
                 viewportWidth - 1,
                 Math.max(0, (overlapLeft + overlapRight) / 2)
@@ -288,8 +288,9 @@ async function scanCandidates(
                   item => !item.contains(element) && !element.contains(item)
                 );
               if (occludedByUnrelated) return false;
-              // An image-painting ancestor is trivially behind its own
-              // unoccluded descendant candidate.
+              // An ancestor that paints the image is trivially behind its own
+              // descendant candidate once we know the candidate is genuinely
+              // reachable (unoccluded) here.
               if (layer.contains(element)) return true;
               // Otherwise the layer must stack below the candidate at this point.
               const layerDepth = stack.findIndex(
@@ -301,9 +302,11 @@ async function scanCandidates(
           if (layersBehind.length === 0) return;
           seen.add(element);
           const index = candidates.length;
-          // Hide the whole control's content, not just the candidate:
-          // sibling ink in the same control (brand mark, wordmark span)
-          // would otherwise be sampled as background (JOV-11623).
+          // Hide the whole control's content, not just the candidate: a
+          // sibling subtree inside the same interactive control (the brand
+          // mark beside the credit text, a bold wordmark span) paints ink the
+          // candidate's own hide cannot remove, and the sample would read
+          // that ink as background (JOV-11623).
           const control = element.closest(
             'a, button, [role="button"], [role="link"], [role="menuitem"], [role="tab"], summary'
           );
@@ -361,9 +364,12 @@ async function scanCandidates(
           if (isInteractive(element)) {
             const ariaLabel = element.getAttribute('aria-label');
             if (!ariaLabel) continue;
-            // An sr-only duplicate of the aria-label isn't where the glyph
-            // paints; counting it would defer to a descendant this loop
-            // discards via isRendered, silently dropping the control.
+            // A visually hidden duplicate (sr-only span mirroring the
+            // aria-label) isn't where the glyph actually paints, so it must not
+            // count as "the label lives in a descendant" — that would defer to
+            // a descendant this same loop is about to discard via isRendered's
+            // own sr-only exclusion, silently dropping the control from
+            // checking entirely.
             const hasVisibleNestedText = Array.from(
               element.querySelectorAll('*')
             ).some(
@@ -388,12 +394,8 @@ async function scanCandidates(
 /**
  * Inspect the rendered page for text and interactive controls painted over
  * image layers, then measure real contrast by hiding the glyph ink and
- * sampling the pixels exposed behind each glyph box.
- *
- * WCAG AA is applied against the worst-case background percentile: for light
- * foregrounds the 90th-percentile background luminance, for dark foregrounds
- * the 10th. Large text (>=24px, or >=18.66px bold) requires 3:1; everything
- * else requires 4.5:1.
+ * sampling the pixels behind each glyph box. WCAG AA uses the worst-case
+ * background percentile; large text (>=24px, or >=18.66px bold) needs 3:1.
  */
 export async function inspectImageContrast(
   page: Page
@@ -428,8 +430,7 @@ export async function inspectImageContrast(
 
   for (const candidate of candidates) {
     // Sample where the element IS at capture time, not where the scan saw it.
-    const scannedBox = candidate.box;
-    const liveBox = freshBoxes[String(candidate.index)] ?? scannedBox;
+    const liveBox = freshBoxes[String(candidate.index)] ?? candidate.box;
     const box = {
       x: liveBox.x,
       y: liveBox.y,
