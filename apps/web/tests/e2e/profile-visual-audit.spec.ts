@@ -528,6 +528,24 @@ test.describe('profile publication gate', () => {
     expect(unknown.status()).toBe(404);
     expect(await unknown.text()).not.toContain('profile-compact-shell');
   });
+
+  // JOV-12153: the unknown-handle 404 head carries exactly ONE robots meta
+  // containing "noindex" — Next's automatic NonIndex noindex for status > 400
+  // renders. Explicit robots on 404 metadata used to emit a second tag and
+  // fail the synthetic smoke's noindex-count-1 assertion.
+  test('unknown-handle 404 serves exactly one noindex robots meta', async ({
+    page,
+  }) => {
+    const unknown = await page.request.get('/zz-no-such-artist-e2e-gate');
+    expect(unknown.status()).toBe(404);
+    const html = await unknown.text();
+    const robotsMetas = [...html.matchAll(/<meta\s+name="robots"[^>]*>/gi)].map(
+      match => match[0]
+    );
+    expect(
+      robotsMetas.filter(meta => /content="[^"]*noindex/.test(meta))
+    ).toHaveLength(1);
+  });
 });
 
 // JOV-10246: the release artwork (profile LCP element) is server-rendered
