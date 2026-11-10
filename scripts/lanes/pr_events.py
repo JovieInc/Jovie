@@ -30,6 +30,7 @@ from urllib.parse import urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import disk_guard  # noqa: E402
 import lifecycle, pr_wip, repair_order  # noqa: E402  (pr_wip: per-producer WIP census; repair_order: fair claims)
+from label_episodes import RELAY_RED_LABELLER, label_episode_applier  # noqa: E402  (JOV-8492 provenance gate)
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -286,8 +287,7 @@ def dependency_refs(body: str | None) -> set[int]:
 
 def pr_scalar(number: int, field: str, sh=run) -> str:
     """One field of one PR ("" when unreadable): the body/deps read for stale drafts only."""
-    viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json", field,
-                 "--jq", f".{field}"])
+    viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json", field, "--jq", f".{field}"])
     return (viewed.stdout or "") if viewed.returncode == 0 else ""
 
 
@@ -416,8 +416,7 @@ def label_names(pr: dict) -> list[str]:
 def add_label(number: int, kind: str, sh=run, *, prefix: str = PREFIX) -> bool:
     """The issues API creates a missing label, so the queue needs no setup. `prefix=""` applies
     an exact label name (the human-decision hold)."""
-    return sh(["gh", "api", "-X", "POST", f"repos/{REPO}/issues/{number}/labels",
-               "-f", f"labels[]={prefix}{kind}"]).returncode == 0
+    return sh(["gh", "api", "-X", "POST", f"repos/{REPO}/issues/{number}/labels", "-f", f"labels[]={prefix}{kind}"]).returncode == 0
 
 
 def stale_fix_labels(pr: dict, labels: set) -> list[str]:
@@ -436,35 +435,23 @@ def stale_fix_labels(pr: dict, labels: set) -> list[str]:
 
 HEAD_CHECKS_QUERY = """query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){
 pullRequest(number:$number){commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100){nodes{__typename
-... on CheckRun{name conclusion startedAt completedAt} ... on StatusContext{context state createdAt}}}}}}}}}}
-"""
+... on CheckRun{name conclusion startedAt completedAt} ... on StatusContext{context state createdAt}}}}}}}}}}"""
 RED_CHECK_STATES = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR"})
 # Advisory checks that never gate a merge: their red (Tently's provider was down all night on
 # 2026-11-01, ~100 PRs got lane-fix-red) is no repair signal.
 NON_REQUIRED_CHECKS = frozenset({"tently"})
-# A superseded (cancelled) run surfaces as FAILURE in the rollup; when its completion timestamp
-# ties a SUCCESS of the same check — the re-run that replaced it — the success is the newer
-# verdict (JOV-8492: do not label a head for a check a green rerun already superseded).
-LABEL_EPISODE_QUERY = """query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){
-pullRequest(number:$number){timelineItems(last:100,itemTypes:[LABELED_EVENT]){nodes{... on LabeledEvent{createdAt
-label{name} actor{__typename login}}}}}}}}"""
-# The relay applies lane-fix-red with GITHUB_TOKEN, so its episodes are always actor
-# github-actions[bot] — the only reds this PR-head rollup can evaluate (the queue breaker's
-# jovie-bot episode holds merge-group reds the rollup cannot see, and a human label is a human
-# hold): the relay clears neither (JOV-8492). Unreadable keeps the label — fail closed.
-RELAY_RED_LABELLER = "github-actions[bot]"
 
 
 def read_head_rollup(number: int, sh=run):
     """One GraphQL read of the head check rollup. Callers own True, False, and None."""
     owner, name = REPO.split("/", 1)
-    return sh(["gh", "api", "graphql", "-f", f"query={HEAD_CHECKS_QUERY}", "-F", f"owner={owner}",
-               "-F", f"name={name}", "-F", f"number={number}"])
+    return sh(["gh", "api", "graphql", "-f", f"query={HEAD_CHECKS_QUERY}", "-F", f"owner={owner}", "-F", f"name={name}", "-F", f"number={number}"])
 
 
 def head_red(number: int, sh=run) -> bool | None:
     """True only when the latest run of some check on the head failed. GitHub's rollup counts
-    a CANCELLED (superseded) run as FAILURE even after its replacement passed. None: unreadable."""
+    a CANCELLED (superseded) run as FAILURE even after its replacement passed. None: unreadable.
+    A SUCCESS tying a FAILURE's completedAt is that replacement — the newer verdict (JOV-8492)."""
     read = read_head_rollup(number, sh)
     try:
         commits = json.loads(read.stdout)["data"]["repository"]["pullRequest"]["commits"]["nodes"]
@@ -480,9 +467,7 @@ def head_red(number: int, sh=run) -> bool | None:
         state = str(node.get("conclusion") or node.get("state") or "").upper()
         if key and key.lower() in NON_REQUIRED_CHECKS:
             continue
-        if key and (key not in latest or at > latest[key][0]
-                    or (at == latest[key][0] and latest[key][1] in RED_CHECK_STATES
-                        and state not in RED_CHECK_STATES)):
+        if key and (key not in latest or at > latest[key][0] or (at == latest[key][0] and latest[key][1] in RED_CHECK_STATES and state not in RED_CHECK_STATES)):
             latest[key] = (at, state)
     return any(state in RED_CHECK_STATES for _, state in latest.values())
 
@@ -528,23 +513,6 @@ def red_label_justified(number: int, pr: dict, sh=run) -> bool:
     return head_red(number, sh) is not False
 
 
-def lane_fix_red_applier(number: int, sh=run) -> str | None:
-    """Login that applied the current lane-fix-red episode (one GraphQL read); None when
-    unreadable or absent. Callers fail closed: an unreadable applier keeps the label."""
-    owner, name = REPO.split("/", 1)
-    read = sh(["gh", "api", "graphql", "-f", f"query={LABEL_EPISODE_QUERY}", "-F", f"owner={owner}",
-               "-F", f"name={name}", "-F", f"number={number}"])
-    try:
-        nodes = json.loads(read.stdout)["data"]["repository"]["pullRequest"]["timelineItems"]["nodes"]
-        episodes = [node for node in nodes
-                    if str((node.get("label") or {}).get("name") or "").lower() == LANE_FIX_RED]
-        latest = max(episodes, key=lambda node: str(node.get("createdAt") or ""))
-        login = (latest.get("actor") or {}).get("login")
-    except (ValueError, KeyError, IndexError, TypeError, AttributeError):
-        return None
-    return str(login).lower() if login else None
-
-
 def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
     """Drop lane-fix-red once this head is required-green.
 
@@ -562,15 +530,10 @@ def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
     # until that check's own completion.
     if pr.get("mergeStateStatus") not in REQUIRED_GREEN and not head_settled_green(number, sh):
         return False
-    # JOV-8492: this rollup can only supersede a red the relay itself applied (a PR-head check
-    # red). A jovie-bot episode is the queue breaker's merge-group hold — those reds are invisible
-    # here, and clearing one re-armed the hold/re-enroll churn that flew #24694's green head
-    # through ~35 merge-group builds — and a human label is a human hold. Unreadable keeps the
-    # label: fail closed.
-    if lane_fix_red_applier(number, sh) != RELAY_RED_LABELLER:
+    # JOV-8492: this rollup can only supersede a red the relay itself applied (see label_episodes.py).
+    if label_episode_applier(number, LANE_FIX_RED, sh) != RELAY_RED_LABELLER:
         return False
-    deleted = sh(["gh", "api", "-X", "DELETE",
-                  f"repos/{REPO}/issues/{number}/labels/{LANE_FIX_RED}"])
+    deleted = sh(["gh", "api", "-X", "DELETE", f"repos/{REPO}/issues/{number}/labels/{LANE_FIX_RED}"])
     return deleted.returncode == 0
 
 
@@ -791,8 +754,7 @@ def mark_poison(number: int, pr: dict, now: float, sh=run) -> bool:
     the enroll workflow skips it; the lanes still fix it and drop the label with their fix."""
     if POISON_LABEL in label_names(pr) or (queue_ejections(number, now, sh, head=pr.get("headRefOid")) or 0) < 2:
         return False
-    viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json",
-                 "state,isDraft,headRefName,headRefOid,isCrossRepository,labels"])
+    viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json", "state,isDraft,headRefName,headRefOid,isCrossRepository,labels"])
     try:
         live = json.loads(viewed.stdout or "{}")
     except (ValueError, TypeError):
@@ -802,8 +764,7 @@ def mark_poison(number: int, pr: dict, now: float, sh=run) -> bool:
         return False
     if sh(["gh", "api", "-X", "POST", f"repos/{REPO}/issues/{number}/labels", "-f", f"labels[]={POISON_LABEL}"]).returncode:
         return False
-    sh(["gh", "pr", "comment", str(number), "--repo", REPO, "--body",
-        f"🤖 `{POISON_LABEL}`: the merge queue ejected this source revision twice in 24 h, so it stays out of the queue "
+    sh(["gh", "pr", "comment", str(number), "--repo", REPO, "--body", f"🤖 `{POISON_LABEL}`: the merge queue ejected this source revision twice in 24 h, so it stays out of the queue "
         "until a fix lands (each re-entry fails every merge group behind it). The lanes are fixing it from "
         "the merge-group failure and remove this label when their fix pushes; remove it by hand once the "
         "failing merge-group check passes locally."])
@@ -1231,8 +1192,7 @@ def failure_held(sha: str | None, sh=run) -> bool:
     by the enroll controller until a new head that nothing was asked to push."""
     if not sha:
         return False
-    listed = sh(["gh", "api", f"repos/{REPO}/commits/{sha}/statuses?per_page=100", "--jq",
-                 f'[.[] | select(.context == "{FAILURE_HOLD_CONTEXT}" and .state == "success") '
+    listed = sh(["gh", "api", f"repos/{REPO}/commits/{sha}/statuses?per_page=100", "--jq", f'[.[] | select(.context == "{FAILURE_HOLD_CONTEXT}" and .state == "success") '
                  '| .creator.login] | unique | join(" ")'])
     return listed.returncode == 0 and bool(set((listed.stdout or "").split()) & FAILURE_HOLD_WRITERS)
 
@@ -1271,8 +1231,7 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
             if not failure_held(sha, sh):
                 continue
             kind = "dequeued"
-        viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json",
-                     "state,isDraft,headRefName,headRefOid,isCrossRepository,mergeStateStatus,labels"])
+        viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json", "state,isDraft,headRefName,headRefOid,isCrossRepository,mergeStateStatus,labels"])
         if viewed.returncode != 0:
             continue
         pr = json.loads(viewed.stdout or "{}")
@@ -2720,14 +2679,9 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
         if add_label(number, kind, lane.sh):
             labeled.append((number, kind))
     for number, kind in plan["unlabel"]:
-        if kind == "red":
-            # JOV-8492: the queue breaker still holds this exact head, and its reds (merge-group
-            # failures) are invisible to the required-green check above — unlabeing here re-arms
-            # the breaker's re-block and churns the head. The breaker's own sweep releases on
-            # supersession or a new head; anything else waits for that.
-            record = breaker_held.get(str(number)) if isinstance(breaker_held, dict) else None
-            if isinstance(record, dict) and record.get("head") == (by_number.get(number) or {}).get("headRefOid"):
-                continue
+        # JOV-8492: the breaker still holds this head (merge-group reds invisible to the check above).
+        if kind == "red" and (breaker_held.get(str(number)) or {}).get("head") == (by_number.get(number) or {}).get("headRefOid"):
+            continue
         consume(lane, {"number": number}, [kind])
     if plan["reset"]:
         reset = {str(number) for number in plan["reset"]}
@@ -2761,8 +2715,7 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
         next_nags[str(row["pr"])] = {"head": row["head"], "at": now}
         if auto_unhold and row["auto"]:
             for name in auto_unhold_labels(by_number[row["pr"]]):
-                lane.sh(["gh", "api", "-X", "DELETE",
-                         f"repos/{lane.REPO_SLUG}/issues/{row['pr']}/labels/{name}"])
+                lane.sh(["gh", "api", "-X", "DELETE", f"repos/{lane.REPO_SLUG}/issues/{row['pr']}/labels/{name}"])
             lane.sh(["gh", "pr", "comment", str(row["pr"]), "--repo", lane.REPO_SLUG, "--body",
                      f"🤖 lanes: the automation hold went stale: CLEAN, and the head moved past it "
                      f"(head `{row['head']}`), so `hold`/`{POISON_LABEL}` are removed and the "
