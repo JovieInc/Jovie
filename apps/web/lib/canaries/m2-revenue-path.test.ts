@@ -4,6 +4,7 @@ import {
   CHECKOUT_PENDING_COPY,
   CHECKOUT_RECOVERY_COPY,
 } from '@/app/billing/success/checkout-success-state';
+import { APP_ROUTES } from '@/constants/routes';
 import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
 import {
   buildM2RevenuePathRepro,
@@ -19,6 +20,7 @@ import {
   M2_CLAIM_FIRST_COPY,
   M2_CLAIM_PRICE_DISPLAY,
   M2_CLAIM_PRO_ACCESS_COPY,
+  M2_CLAIM_SIGNUP_WAITLIST_EVIDENCE,
   M2_PRO_MONTHLY_AMOUNT_CENTS,
   M2_PRO_MONTHLY_USD,
   M2_REVENUE_PATH_CANARY,
@@ -46,6 +48,11 @@ const HOME_HTML = `
 `;
 
 const CLAIM_HTML = `<html><body>${'claim '.repeat(120)}<input data-testid="claim-artist-search" /><p>$12/mo. Cancel anytime.</p></body></html>`;
+
+/** Live closed-signup shape (2026-11-07): /signup streams a 200 shell whose
+ *  `__next-page-redirect` meta refresh bounces anonymous visitors to the
+ *  /waitlist role form (canon/PRODUCT.md, 2026-11-02). */
+const CLOSED_SIGNUP_HTML = `<html><head><meta id="__next-page-redirect" http-equiv="refresh" content="1;url=${APP_ROUTES.WAITLIST}"/></head><body>${'closed '.repeat(120)}</body></html>`;
 
 const SUCCESS_HTML = `
   <html><body>
@@ -154,6 +161,57 @@ describe('evaluateSignedOutSurface', () => {
 });
 
 describe('evaluateClaimSurface', () => {
+  it('accepts the closed-signup waitlist handoff while public signup is closed', () => {
+    expect(
+      evaluateClaimSurface({
+        pricingStatus: 200,
+        pricingBody: PRICING_HTML,
+        signupStatus: 200,
+        signupBody: CLOSED_SIGNUP_HTML,
+      })
+    ).toMatchObject({
+      ok: true,
+      evidence: expect.arrayContaining([
+        M2_CLAIM_FIRST_COPY,
+        M2_CLAIM_PRO_ACCESS_COPY,
+        M2_CLAIM_PRICE_DISPLAY,
+        M2_CLAIM_SIGNUP_WAITLIST_EVIDENCE,
+      ]),
+    });
+    expect(
+      evaluateClaimSurface({
+        pricingStatus: 200,
+        pricingBody: PRICING_HTML,
+        signupStatus: 307,
+        signupBody: '',
+        signupLocation: APP_ROUTES.WAITLIST,
+      }).ok
+    ).toBe(true);
+  });
+
+  it('fails when the signup handoff redirects anywhere but the waitlist', () => {
+    expect(
+      evaluateClaimSurface({
+        pricingStatus: 200,
+        pricingBody: PRICING_HTML,
+        signupStatus: 307,
+        signupBody: '',
+        signupLocation: '/signin',
+      }).ok
+    ).toBe(false);
+    expect(
+      evaluateClaimSurface({
+        pricingStatus: 200,
+        pricingBody: PRICING_HTML,
+        signupStatus: 200,
+        signupBody: CLOSED_SIGNUP_HTML.replaceAll(
+          `url=${APP_ROUTES.WAITLIST}`,
+          'url=/pricing'
+        ),
+      }).ok
+    ).toBe(false);
+  });
+
   it('requires claim-first copy, $12, and the Pro signup handoff', () => {
     expect(
       evaluateClaimSurface({
@@ -177,11 +235,11 @@ describe('evaluateClaimSurface', () => {
     expect(
       evaluateClaimSurface({
         pricingStatus: 200,
-        pricingBody: PRICING_HTML.replace('$12', '$39'),
+        pricingBody: PRICING_HTML.replaceAll('$12', '$39'),
         signupStatus: 200,
         signupBody: `<html><body>${'signup'.repeat(200)}<div data-auth-shell-ready="true"></div></body></html>`,
       }).detail
-    ).toMatch(/\$12/);
+    ).toMatch(/Pro request-access|\$12/);
   });
 });
 
@@ -420,6 +478,64 @@ describe('runM2RevenuePathCanary', () => {
     expect(receipt.steps.every(step => step.ok)).toBe(true);
     expect(receipt.repro).toContain('--base-url https://jov.ie');
     expect(formatM2RevenuePathSummary(receipt)).toContain('PASS');
+  });
+
+  it('stays green when closed public signup streams the waitlist handoff', async () => {
+    const receipt = await runM2RevenuePathCanary({
+      baseUrl: 'https://jov.ie',
+      fetchImpl: async (input, init) => {
+        const url = String(input);
+        if (url.endsWith('/claim/start')) {
+          return new Response(null, {
+            status: 307,
+            headers: { location: 'https://jov.ie/claim' },
+          });
+        }
+        if (url.endsWith('/claim')) {
+          return htmlResponse(200, CLAIM_HTML);
+        }
+        if (url.endsWith('/') || url.endsWith('jov.ie')) {
+          return htmlResponse(200, HOME_HTML, 'https://jov.ie/');
+        }
+        if (url.includes('/pricing') && !url.includes('pricing-options')) {
+          return htmlResponse(200, PRICING_HTML);
+        }
+        if (url.includes('/signup')) {
+          return htmlResponse(200, CLOSED_SIGNUP_HTML);
+        }
+        if (url.includes('/api/stripe/pricing-options')) {
+          return jsonResponse(200, {
+            pricingOptions: [
+              {
+                priceId: 'price_visibility_pro',
+                amount: 1200,
+                currency: 'usd',
+                interval: 'month',
+                description: 'Artist Presence',
+              },
+            ],
+          });
+        }
+        if (url.includes('/api/stripe/checkout')) {
+          if (init?.method === 'POST') {
+            return jsonResponse(401, { error: 'Unauthorized' });
+          }
+          return jsonResponse(405, { error: 'Method not allowed' });
+        }
+        if (url.includes('/billing/success')) {
+          return htmlResponse(200, SUCCESS_HTML);
+        }
+        if (url.includes('/api/billing/checkout-session')) {
+          return jsonResponse(401, { error: 'Unauthorized' });
+        }
+        return jsonResponse(404, { error: 'missing' });
+      },
+    });
+
+    expect(receipt.pass).toBe(true);
+    const claim = receipt.steps.find(step => step.name === 'claim');
+    expect(claim?.ok).toBe(true);
+    expect(claim?.evidence).toContain(M2_CLAIM_SIGNUP_WAITLIST_EVIDENCE);
   });
 
   it('stays red when checkout pricing drifts off $12', async () => {

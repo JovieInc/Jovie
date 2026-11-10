@@ -34,6 +34,24 @@ describe('useStoredAppFlagOverrides — orphan handling', () => {
     expect(result.current.orphanKeys).toEqual([ORPHAN_KEY]);
   });
 
+  it('treats retired product and V1 keys as orphans while preserving incident stops', () => {
+    const retired = {
+      'code:DESIGN_V1': true,
+      'code:INBOX_HOME': false,
+      'code:PROFILES_WORKSPACE': false,
+    };
+    seed({ ...retired, [VALID_KEY_B]: false });
+
+    const { result } = renderHook(() => useStoredAppFlagOverrides());
+
+    expect(result.current.validOverrides).toEqual({ [VALID_KEY_B]: false });
+    expect(result.current.orphanKeys.sort()).toEqual(
+      Object.keys(retired).sort()
+    );
+    // Reading the configuration must not erase persisted state or operator stops.
+    expect(readStorage()).toEqual({ ...retired, [VALID_KEY_B]: false });
+  });
+
   it('returns empty orphans when all keys are in the contract', () => {
     seed({ [VALID_KEY_A]: true, [VALID_KEY_B]: false });
 

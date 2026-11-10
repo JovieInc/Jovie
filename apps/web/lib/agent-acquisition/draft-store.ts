@@ -5,8 +5,13 @@ import { BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import { agentVisibilityDrafts } from '@/lib/db/schema/agent-drafts';
 import { resolveAgentArtist } from './artist-resolution';
+import { agentClaimUrl } from './claim-handoff';
 import { draftTokenHash, verifyDraftCapability } from './draft-capability';
-import { createAgentDraftSchema, type DraftCapability } from './draft-contract';
+import {
+  createAgentDraftSchema,
+  type DraftCapability,
+  invalidInputError,
+} from './draft-contract';
 import type { StoredReleaseLaunch } from './draft-preview';
 
 export type AgentDraftRow = typeof agentVisibilityDrafts.$inferSelect;
@@ -39,7 +44,8 @@ function presentDraft(row: AgentDraftRow) {
   );
   return {
     status: 'draft_ready' as const,
-    next_action: 'review_draft' as const,
+    // The person, not the agent, claims the draft: show them claim_url.
+    next_action: 'send_user_claim_url' as const,
     draft_id: row.id,
     receipt_id: row.id,
     status_url: `${BASE_URL}/api/agents/drafts/${row.id}`,
@@ -49,10 +55,10 @@ function presentDraft(row: AgentDraftRow) {
     acquisition: { ...row.acquisition, draft_id: row.id },
     ownership: 'unverified' as const,
     published_url: null,
-    claim_url: null,
+    claim_url: agentClaimUrl(row),
     missing_fields: missing,
     warnings: [
-      'This draft is unpublished. Human ownership verification and approval are required before publication.',
+      'This draft is unpublished. Show claim_url to the user: they sign in on Jovie, the artist is matched to its Spotify identity (well-known artists go through verification), and nothing is public until they publish it.',
     ],
     retryable: false,
   };
@@ -114,12 +120,7 @@ export async function storeAgentReleaseLaunch(
 /** One PK-protected insert makes retries and racing instances share one draft. */
 export async function createAgentDraft(input: unknown) {
   const parsed = createAgentDraftSchema.safeParse(input);
-  if (!parsed.success)
-    return {
-      status: 'error' as const,
-      code: 'INVALID_INPUT' as const,
-      retryable: false,
-    };
+  if (!parsed.success) return invalidInputError(parsed.error);
   const { artist_id: artistId, draft_token: token } = parsed.data;
   const capability = verifyDraftCapability(token);
   if (!capability || capability.artist_id !== artistId) return unavailable();

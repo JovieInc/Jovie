@@ -178,12 +178,12 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
     upcomingTourDates.find(show => show.id === nearbyTourDateId) ??
     upcomingTourDates[0] ??
     null;
+  // Streaming destinations alone are not a featured subject: with no real
+  // release the card would show the artist name as a release title, fallback
+  // artwork and a "Listen now" that leads nowhere. The header and Music tab
+  // already carry the listen destinations. Shared by the onboarding preview.
   const hasPacSubject = Boolean(
-    pacRelease ||
-      merchCards[0] ||
-      pacNextShow ||
-      hasTip ||
-      hasPlayableDestinations
+    pacRelease || merchCards[0] || pacNextShow || hasTip
   );
 
   // Pen parity (Tim, 2026-09-26/28): the featured editorial card is the only

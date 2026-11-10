@@ -1,6 +1,7 @@
 """Recover missing production workflow invocations without duplicate or false health receipts."""
 import fcntl
 import json
+import os
 import re
 import subprocess
 import sys
@@ -15,8 +16,34 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/lanes"))
 import continuity_clock as clock
 import credentials_spend
+import redact as redact_mod
 
 NOW = 1790860000.0
+
+
+# Hermetic by construction: these tests run on the lanes host, which has real
+# credentials in its environment and may own the credentials-spend job. Scrub every
+# secret-named variable for the whole module and refuse any unmocked spawn of that job,
+# so a failing assertion can never print a real value or reach a real provider.
+_ENV_PATCH = None
+_REAL_POPEN = subprocess.Popen
+
+
+def _guarded_popen(args, *a, **kw):
+    if "credentials-spend-check" in " ".join(map(str, args)):
+        raise AssertionError("test spawned the real credentials-spend job")
+    return _REAL_POPEN(args, *a, **kw)
+
+
+def setUpModule():
+    global _ENV_PATCH
+    scrubbed = {k: v for k, v in os.environ.items() if not redact_mod.SECRET_NAME.search(k)}
+    _ENV_PATCH = patch.dict(os.environ, scrubbed, clear=True)
+    _ENV_PATCH.start()
+    patcher = patch.object(subprocess, "Popen", _guarded_popen)
+    patcher.start()
+    unittest.addModuleCleanup(patcher.stop)
+    unittest.addModuleCleanup(_ENV_PATCH.stop)
 
 
 def run_row(age=3600, **fields):
@@ -162,6 +189,7 @@ class ClockTest(unittest.TestCase):
         import lane_runner as lane
         with patch.object(lane.disk_guard, "check", return_value={"admitted": False}), \
              patch.object(lane.continuity_clock, "tick", return_value={"status": "current"}) as probe, \
+             patch.object(lane.credentials_spend, "tick", return_value={"status": "selftest-skipped"}), \
              patch.object(lane.doctor, "run"), patch.object(lane.subprocess, "Popen") as spawn:
             host = lane.Host(state=self.path, repo=self.path)
             self.assertEqual(lane.dispatch(host), 1)
@@ -203,6 +231,50 @@ class CadenceClocksTest(unittest.TestCase):
     def posts(self):
         return [call[-1] for call in self.calls if "POST" in call]
 
+    @unittest.skipUnless(
+        (ROOT / ".github/workflows").is_dir()
+        and (ROOT / "canon/automation-registry.jsonl").is_file(),
+        "release trees carry no workflows or automation registry",
+    )
+    def test_daily_evidence_clocks_preserve_manual_runs_and_deadman_receipts(self):
+        registry = {row["id"]: row for row in map(json.loads,
+            (ROOT / "canon/automation-registry.jsonl").read_text().splitlines()) if "id" in row}
+        daily = {"nightlyTests", "e2eFullMatrix", "testCoverageAudit"}
+        selected = [c for c in clock.CLOCKS if c.name in daily]
+        self.assertEqual({c.name for c in selected}, daily)
+        for c in selected:
+            with self.subTest(workflow=c.workflow):
+                self.assertEqual(c.interval_s, 86400)
+                self.assertFalse(c.github_cron)
+                workflow = (ROOT / ".github/workflows" / c.workflow).read_text()
+                triggers = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+                self.assertIn("  workflow_dispatch:\n", triggers)
+                self.assertNotIn("  push:\n", triggers)
+                self.assertNotIn("  schedule:\n", triggers)
+                row = registry[f"lanes-clock:{c.workflow.removesuffix('.yml')}"]
+                self.assertEqual(row["trigger"]["clock"], c.name)
+                self.assertEqual(row["clock"]["scheduler"], "gem:lanes-tick")
+                self.assertGreaterEqual(len(row["clock"]["whyNotEvent"]), 30)
+                self.assertEqual(row["receipt"]["workflow"], c.workflow)
+                self.assertEqual(row["maxStalenessMinutes"], 36 * 60)
+                self.assertIn(c.state_file, row["receipt"]["location"])
+
+    def test_daily_evidence_dispatches_when_due_and_manual_run_refreshes_cadence(self):
+        for c in clock.CLOCKS:
+            if c.name not in {"nightlyTests", "e2eFullMatrix", "testCoverageAudit"}:
+                continue
+            with self.subTest(workflow=c.workflow):
+                self.calls.clear()
+                self.age[c.workflow] = 25 * 3600
+                result = clock.tick(self.path, "gem", self.api, NOW, clocks=(c,))
+                self.assertEqual(result["clocks"][c.name]["status"], "dispatch-requested")
+                self.assertEqual(self.posts(), [f"event_type={c.event_type}"])
+                self.assertTrue((self.path / c.state_file).exists())
+                page = lambda run, args: json.dumps({"workflow_runs": [
+                    run_row(30, event="workflow_dispatch")]})
+                with patch.object(clock, "api", side_effect=page):
+                    self.assertEqual(clock.observe(None, NOW, c)["status"], "current")
+
     @unittest.skipUnless((ROOT / ".github/workflows").is_dir(), "release trees carry no workflows")
     def test_each_workflow_has_a_listening_trigger_and_a_kept_backstop_cron(self):
         # Plain text, no PyYAML: the Gem release self-test runs this file too.
@@ -223,7 +295,10 @@ class CadenceClocksTest(unittest.TestCase):
                         self.assertIn("'repository_dispatch'", condition)
 
     def test_stale_workflows_are_dispatched_once_on_their_own_intervals(self):
-        self.age = {"stale-branch-sweep.yml": 8 * 86400}
+        self.age = {"stale-branch-sweep.yml": 8 * 86400, "vs-linktree-claims.yml": 8 * 86400,
+                    "postdeploy-probes.yml": 13 * 3600,
+                    "nightly-tests.yml": 25 * 3600, "e2e-full-matrix.yml": 25 * 3600,
+                    "test-coverage-audit.yml": 25 * 3600}
         result = clock.tick(self.path, "gem", self.api, NOW)
         self.assertEqual(result["status"], "dispatch-requested")
         self.assertEqual(set(result["clocks"]), {c.name for c in clock.CLOCKS[1:]})
@@ -255,6 +330,21 @@ class CadenceClocksTest(unittest.TestCase):
         self.assertEqual(result["clocks"]["costAnomaly"]["status"], "current")
         self.assertNotIn("event_type=clock_runner_heartbeat", self.posts())
 
+    def test_ignored_triggers_neither_refresh_nor_invalidate_a_clock(self):
+        cert = next(c for c in clock.CLOCKS if c.name == "prodGoldenPathCert")
+        page = lambda rows: (lambda run, args: json.dumps(
+            {"workflow_runs": []} if "status=in_progress" in args[-1]
+            else {"total_count": len(rows), "workflow_runs": rows}))
+        promotions = [run_row(age=60, id=7, event="workflow_run")]
+        with patch.object(clock, "api", side_effect=page(promotions)):
+            self.assertEqual(clock.observe(None, NOW, cert)["status"], "overdue")
+        with patch.object(clock, "api", side_effect=page(
+                promotions + [run_row(age=3600, id=8, event="repository_dispatch")])):
+            self.assertEqual(clock.observe(None, NOW, cert)["status"], "current")
+        with patch.object(clock, "api", side_effect=page(
+                promotions + [run_row(age=13 * 3600, id=9, event="repository_dispatch")])):
+            self.assertEqual(clock.observe(None, NOW, cert)["status"], "overdue")
+
     def test_one_broken_clock_state_leaves_the_others_running(self):
         (self.path / "cost-anomaly-clock.json").write_text("broken")
         result = clock.tick(self.path, "gem", self.api, NOW)
@@ -267,8 +357,6 @@ class CadenceClocksTest(unittest.TestCase):
         self.assertEqual(self.calls, [])
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class CredentialsSpendTickTest(unittest.TestCase):
@@ -350,3 +438,58 @@ class CredentialsSpendTickTest(unittest.TestCase):
             self.assertEqual(credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW,
                                                     home=self.home)["status"], "selftest-skipped")
         self.assertEqual(self.calls, [])
+
+
+FAKE_SECRET = "zz-fake-secret-value-0123456789"
+
+
+class SecretHygieneTest(unittest.TestCase):
+    """Deliberate-red guards: a secret-named env value must never reach captured output."""
+
+    def test_module_environment_is_scrubbed_of_secret_names(self):
+        self.assertEqual([k for k in os.environ if redact_mod.SECRET_NAME.search(k)], [])
+
+    def test_redact_replaces_secret_named_values_only(self):
+        env = {"LINEAR_ACCESS_TOKEN": FAKE_SECRET, "DOPPLER_TOKEN": "dp.st.abcdef123", "PATH": "/usr/bin/local-bin"}
+        out = redact_mod.redact(f"a {FAKE_SECRET} b dp.st.abcdef123 c /usr/bin/local-bin", env)
+        self.assertNotIn(FAKE_SECRET, out)
+        self.assertNotIn("dp.st.abcdef123", out)
+        self.assertIn("/usr/bin/local-bin", out)
+        self.assertIn("[REDACTED:LINEAR_ACCESS_TOKEN]", out)
+
+    def test_child_output_echoing_a_secret_env_value_never_survives_the_job_runner(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        state, release = Path(tmp.name) / "state", Path(tmp.name) / "release"
+        (release / "scripts").mkdir(parents=True)
+        state.mkdir()
+        (release / credentials_spend.SCRIPT).write_text("")
+        captured = {}
+
+        def run(args, **kw):
+            captured["env"] = kw["env"]
+            # A hostile/buggy child that dumps its environment to stdout and stderr.
+            dump = json.dumps({"findings": [], "env": kw["env"].get("LINEAR_ACCESS_TOKEN")})
+            captured["done"] = SimpleNamespace(returncode=0, stdout=dump, stderr=dump)
+            return captured["done"]
+
+        with patch.dict(os.environ, {"LINEAR_API_KEY": FAKE_SECRET}):
+            # The release self-test runs this file with LANES_SELFTEST set, where tick() returns
+            # "selftest-skipped" before running the job (merge group 40193646918, 12:42Z).
+            os.environ.pop("LANES_SELFTEST", None)
+            os.environ.pop("LANES_EXECUTION_BACKEND", None)
+            result = credentials_spend.tick(state, release, run=run, now=NOW,
+                                            home=Path(tmp.name), linear_token=lambda _s: FAKE_SECRET)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(captured["env"]["LINEAR_ACCESS_TOKEN"], FAKE_SECRET)  # the child did get it
+        for path in state.rglob("*"):
+            if path.is_file():
+                self.assertNotIn(FAKE_SECRET, path.read_text(), f"{path.name} leaked a secret-named value")
+        self.assertNotIn(FAKE_SECRET, json.dumps(result))
+        # Captured child output is redacted before anything can log or raise it.
+        self.assertNotIn(FAKE_SECRET, captured["done"].stdout)
+        self.assertNotIn(FAKE_SECRET, captured["done"].stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()

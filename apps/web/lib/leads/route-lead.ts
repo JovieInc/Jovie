@@ -4,9 +4,12 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
 import { getOutboundClaimUrl } from '@/lib/outbound/claim-url';
-import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { DEFAULT_DM_TEMPLATE } from './constants';
 import { filterEmail } from './email-filter';
+import {
+  ensureLeadClaimToken,
+  persistLeadClaimToken,
+} from './lead-claim-token';
 import { detectRepresentation } from './management-filter';
 import { pipelineLog, pipelineWarn } from './pipeline-logger';
 
@@ -63,17 +66,16 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
     hasInstagram: lead.hasInstagram,
   });
 
-  // 6. Reuse token if present and not expired, otherwise generate claim token
-  const token = lead.claimToken;
-  const tokenHash = lead.claimTokenHash;
-  const expiresAt = lead.claimTokenExpiresAt;
-
-  const isTokenValid =
-    token && tokenHash && expiresAt && expiresAt > new Date();
-  const tokenPair = isTokenValid
-    ? { token, tokenHash, expiresAt }
-    : await generateClaimTokenPair();
+  // 6. One canonical token per lead, stored hashed. The plaintext is derived
+  // on demand (lead-claim-token.ts), never persisted. The profile holds the
+  // same hash, so the link we send resolves on the claim route.
+  const tokenPair = await ensureLeadClaimToken({
+    id: leadId,
+    claimTokenHash: lead.claimTokenHash,
+    claimTokenExpiresAt: lead.claimTokenExpiresAt,
+  });
   const claimUrl = getOutboundClaimUrl(tokenPair.token);
+  await persistLeadClaimToken(leadId, lead.creatorProfileId, tokenPair);
 
   // 7. Build DM copy if needed
   let dmCopy: string | null = null;
@@ -96,9 +98,6 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
     .set({
       outreachRoute: route,
       outreachStatus: 'pending',
-      claimToken: tokenPair.token,
-      claimTokenHash: tokenPair.tokenHash,
-      claimTokenExpiresAt: tokenPair.expiresAt,
       emailInvalid: emailResult.invalid,
       emailSuspicious: emailResult.suspicious,
       emailInvalidReason: emailResult.reason,

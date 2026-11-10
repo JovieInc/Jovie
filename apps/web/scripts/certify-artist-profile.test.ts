@@ -25,6 +25,151 @@ async function output() {
 const html = `<link rel="canonical" href="https://jov.ie/tim"><script type="application/ld+json">{"@graph":[{"@id":"https://jov.ie/tim#musicgroup","sameAs":["${TIM_WHITE_PROFILE.spotifyUrl}"]}]}</script><section data-testid="profile-aeo-content"><a href="/tim">Tim White</a><a href="/broken">other</a><a href="https://example.com/">external</a></section>`;
 
 describe('artist proof collector', () => {
+  it('certifies guide/API/MCP and exact raw-HTML items with stable build evidence', async () => {
+    const profileUrl = 'https://jov.ie/tim';
+    const release = {
+      id: 'release-1',
+      title: 'Song',
+      url: `${profileUrl}/song`,
+      releaseDate: '2026-01-02',
+    };
+    const product = {
+      id: '00000000-0000-4000-8000-000000000002',
+      title: 'Tee',
+      url: `${profileUrl}/merch/00000000-0000-4000-8000-000000000002`,
+    };
+    const artist = {
+      username: 'tim',
+      name: 'Tim White',
+      profileUrl,
+      isClaimed: false,
+      isVerified: false,
+      links: [{ url: 'https://example.com/work' }],
+    };
+    const releaseNode = {
+      '@type': 'MusicAlbum',
+      name: 'Song',
+      url: release.url,
+      datePublished: release.releaseDate,
+      sameAs: ['https://music.apple.com/album/song'],
+      potentialAction: [
+        {
+          '@type': 'ListenAction',
+          name: 'Listen on Apple Music',
+          target: { urlTemplate: 'https://music.apple.com/album/song' },
+        },
+      ],
+    };
+    const profileHtml = `<link rel="canonical" href="${profileUrl}"><script type="application/ld+json">${JSON.stringify({ '@graph': [{ '@id': `${profileUrl}#musicgroup`, name: 'Tim White', sameAs: [TIM_WHITE_PROFILE.spotifyUrl] }] })}</script><section data-testid="profile-aeo-content"></section>`;
+    const guide = `# Tim White\n- **Canonical URL**: ${profileUrl}\n- **Claim status**: Unclaimed\n- **Jovie verification**: Not verified\n- [Work](<https://example.com/work>)\n## Latest Release\n- **Title**: Song\n- **Released**: 2026-01-02\n- **Link**: ${release.url}\n`;
+    const api = { artist, releases: [release], merch: [product] };
+    for (const scenario of [
+      'valid',
+      'collection',
+      'mcp-mismatch',
+      'wrong-item',
+      'missing-service',
+      'build-drift',
+      'off-origin',
+      'unavailable',
+    ]) {
+      const directory = await output();
+      const observedApi =
+        scenario === 'collection'
+          ? {
+              ...api,
+              releases: [{ ...release, url: `${profileUrl}/releases` }],
+            }
+          : scenario === 'off-origin'
+            ? {
+                ...api,
+                releases: [{ ...release, url: 'https://outside.example/song' }],
+              }
+            : api;
+      let buildReads = 0;
+      const fetcher = vi
+        .fn<typeof fetch>()
+        .mockImplementation(async (url, init) => {
+          const href = String(url);
+          if (href === profileUrl) return new Response(profileHtml);
+          if (href.endsWith('/api/health/build-info')) {
+            buildReads++;
+            return Response.json({
+              commitSha: (scenario === 'build-drift' && buildReads > 2
+                ? 'b'
+                : 'a'
+              ).repeat(40),
+            });
+          }
+          if (href.endsWith('/api/v1/tim')) return Response.json(observedApi);
+          if (href.endsWith('/llms.txt')) return new Response(guide);
+          if (href.endsWith('/api/mcp/tim')) {
+            if (scenario === 'unavailable')
+              return new Response('', { status: 503 });
+            const request = JSON.parse(String(init?.body));
+            const resource = request.params.uri.split('/').at(-1);
+            let content =
+              resource === 'bio'
+                ? artist
+                : observedApi[resource as 'releases' | 'merch'];
+            if (scenario === 'mcp-mismatch' && resource === 'releases')
+              content = [];
+            return Response.json({
+              result: { contents: [{ text: JSON.stringify(content) }] },
+            });
+          }
+          if (href === release.url) {
+            const node =
+              scenario === 'wrong-item'
+                ? { ...releaseNode, name: 'Wrong item' }
+                : scenario === 'missing-service'
+                  ? { ...releaseNode, potentialAction: [] }
+                  : releaseNode;
+            return new Response(
+              `<link rel="canonical" href="${release.url}"><script type="application/ld+json">${JSON.stringify(node)}</script>`
+            );
+          }
+          if (href === product.url)
+            return new Response(
+              `<script type="application/ld+json">${JSON.stringify({ '@type': 'Product', name: 'Tee', url: product.url, sku: product.id })}</script>`
+            );
+          throw new Error(`Unexpected URL: ${href}`);
+        });
+      const result = await certifyArtistProfile(
+        ['--output', directory, '--agent-surfaces'],
+        fetcher
+      );
+      expect(result.discovery?.failed, scenario).toBe(scenario !== 'valid');
+      expect(result.failed, scenario).toBe(scenario !== 'valid');
+      expect(
+        fetcher.mock.calls.every(
+          ([url]) => new URL(String(url)).origin === 'https://jov.ie'
+        )
+      ).toBe(true);
+      const report = JSON.parse(await readFile(result.reportPath, 'utf8'));
+      expect(report.discovery.evidence.length).toBeGreaterThan(0);
+      for (const receipt of report.discovery.evidence) {
+        expect(receipt.sha256).toMatch(/^[a-f0-9]{64}$/);
+        expect(
+          await readFile(join(directory, receipt.file), 'utf8')
+        ).toBeTypeOf('string');
+      }
+      if (scenario === 'valid') {
+        expect(report.discovery).toMatchObject({
+          releaseSha: 'a'.repeat(40),
+          stableBuild: true,
+          mcpMatches: true,
+        });
+        expect(report.discovery.items[0].destinations).toEqual([
+          {
+            label: 'Listen on Apple Music',
+            url: 'https://music.apple.com/album/song',
+          },
+        ]);
+      }
+    }
+  });
+
   it('treats the live pay control as the deferred tips surface', () => {
     for (const marker of [
       'pay-trigger',
@@ -138,13 +283,21 @@ describe('artist proof collector', () => {
 
   it('follows only declared redirects, one same-origin hop, and requires a 200', async () => {
     const artist = '/artists/f5441adb-6789-449a-9553-ab7460c9c61c';
-    const redirectHtml = `<section data-testid="profile-aeo-content"><a href="${artist}">Austin Leeds</a><a href="/tim/listen">Listen</a><a href="/moved">Moved</a><a href="/artists/3836027a-8351-4c0b-8922-c3259387bbf8">Off site</a></section>`;
+    const redirectHtml = `<section data-testid="profile-aeo-content"><a href="${artist}">Austin Leeds</a><a href="/tim/listen">Listen</a><a href="/moved">Moved</a><a href="/artists/3836027a-8351-4c0b-8922-c3259387bbf8">Off site</a><a href="/start?campaign=proof-to-claim">Claim yours</a></section>`;
     const routes: Record<string, Response | (() => Response)> = {
       'https://jov.ie/tim': () => new Response(redirectHtml, { status: 200 }),
       'https://jov.ie/api/health/build-info': () =>
         Response.json({
           commitSha: '0f42058e6e24a9882a538a6b5d94fa84b2f7c15f',
         }),
+      // Closed public signup (canon/PRODUCT.md, 2026-11-02): the profile's
+      // /start CTA hands off to the /waitlist role form.
+      'https://jov.ie/start?campaign=proof-to-claim': () =>
+        new Response(null, {
+          status: 307,
+          headers: { location: '/waitlist' },
+        }),
+      'https://jov.ie/waitlist': () => new Response('', { status: 200 }),
       [`https://jov.ie${artist}`]: () =>
         new Response(null, {
           status: 307,
@@ -188,6 +341,13 @@ describe('artist proof collector', () => {
       status: 307,
       finalStatus: 404,
     });
+    expect(byUrl['https://jov.ie/start?campaign=proof-to-claim']).toMatchObject(
+      {
+        status: 307,
+        redirectedTo: 'https://jov.ie/waitlist',
+        finalStatus: 200,
+      }
+    );
     expect(byUrl['https://jov.ie/moved']).toEqual(
       expect.not.objectContaining({ finalStatus: expect.anything() })
     );
@@ -207,7 +367,7 @@ describe('artist proof collector', () => {
     expect(result.failed).toBe(true);
   });
 
-  it('declares only the stable artist route and route-config redirect sinks', () => {
+  it('declares only the stable artist route, route-config redirect sinks, and the closed-signup waitlist handoff', () => {
     expect(
       isDeclaredRedirect(
         new URL('https://jov.ie/artists/f5441adb-6789-449a-9553-ab7460c9c61c'),
@@ -226,6 +386,31 @@ describe('artist proof collector', () => {
     expect(isDeclaredRedirect(new URL('https://jov.ie/moved'), 'tim')).toBe(
       false
     );
+    // Closed public signup (canon/PRODUCT.md, 2026-11-02): the /start and
+    // /signup entry paths are declared only when they hand off to the
+    // /waitlist role form — any other destination still fails.
+    expect(
+      isDeclaredRedirect(new URL('https://jov.ie/start'), 'tim', '/waitlist')
+    ).toBe(true);
+    expect(
+      isDeclaredRedirect(
+        new URL('https://jov.ie/start?campaign=proof-to-claim'),
+        'tim',
+        'https://jov.ie/waitlist'
+      )
+    ).toBe(true);
+    expect(
+      isDeclaredRedirect(new URL('https://jov.ie/signup'), 'tim', '/waitlist')
+    ).toBe(true);
+    expect(
+      isDeclaredRedirect(new URL('https://jov.ie/start'), 'tim', '/signin')
+    ).toBe(false);
+    expect(
+      isDeclaredRedirect(new URL('https://jov.ie/start'), 'tim', undefined)
+    ).toBe(false);
+    expect(
+      isDeclaredRedirect(new URL('https://jov.ie/claim'), 'tim', '/waitlist')
+    ).toBe(false);
   });
 
   it('requires the reference release to return explicitly to Tim White', async () => {

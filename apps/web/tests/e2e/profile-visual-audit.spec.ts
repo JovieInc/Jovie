@@ -512,3 +512,31 @@ test.describe('Public profile compact shell sizing', () => {
     expect(shellBox.y + shellBox.height).toBeLessThanOrEqual(876);
   });
 });
+
+// JOV-8629 §6.2: the profile document is ISR-cached behind the proxy's
+// per-request publication gate. A published handle renders its header; an
+// unknown handle never renders a profile body.
+test.describe('profile publication gate', () => {
+  test('renders a published handle and refuses an unknown one', async ({
+    page,
+  }) => {
+    const published = await page.goto(`/${TEST_PROFILE}`);
+    expect(published?.status()).toBe(200);
+    await expect(page.locator(PROFILE_READY_SELECTOR).first()).toBeVisible();
+
+    const unknown = await page.request.get('/zz-no-such-artist-e2e-gate');
+    expect(unknown.status()).toBe(404);
+    expect(await unknown.text()).not.toContain('profile-compact-shell');
+  });
+});
+
+// JOV-10246: the release artwork (profile LCP element) is server-rendered
+// markup with a high fetch priority, so it can paint before hydration.
+test.describe('profile LCP artwork', () => {
+  test('ships the artwork in the first HTML', async ({ page }) => {
+    const response = await page.request.get(`/${TEST_PROFILE}`);
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+    expect(html).toMatch(/<img[^>]*fetchPriority="high"/i);
+  });
+});

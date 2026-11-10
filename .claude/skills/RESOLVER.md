@@ -20,6 +20,7 @@ Nested `.bak` / `.cursor` / `.factory` / `src` / `test` / `bin` copies are not c
 - **design-html**: .agents/skills/gstack/design-html/SKILL.md
 - **design-review**: .agents/skills/gstack/design-review/SKILL.md
 - **design-shotgun**: .agents/skills/gstack/design-shotgun/SKILL.md
+- **design-system**: .claude/skills/design-system/SKILL.md
 - **document-release**: .agents/skills/gstack/document-release/SKILL.md
 - **eve**: .claude/skills/eve/SKILL.md
 - **find-skills**: .claude/skills/find-skills/SKILL.md | .agents/skills/find-skills/SKILL.md

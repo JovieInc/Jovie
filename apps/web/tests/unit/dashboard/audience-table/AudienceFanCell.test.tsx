@@ -17,6 +17,7 @@ const baseMember: AudienceMember = {
   referrerHistory: [],
   utmParams: {},
   email: 'tim@example.com',
+  emailVisibleToArtist: true,
   phone: null,
   spotifyConnected: false,
   purchaseCount: 0,
@@ -57,6 +58,7 @@ describe('AudienceFanCell', () => {
           ...baseMember,
           displayName: 'dj_night_owl',
           email: null,
+          emailVisibleToArtist: true,
           // 8 digits — not a real international number; do not invent a CC.
           phone: '+15551005',
         }}
@@ -72,6 +74,7 @@ describe('AudienceFanCell', () => {
           ...baseMember,
           displayName: 'someone',
           email: null,
+          emailVisibleToArtist: true,
           phone: '+12025551234',
         }}
       />
@@ -93,7 +96,7 @@ describe('AudienceFanCell', () => {
     expect(screen.queryByText('tim@example.com')).not.toBeInTheDocument();
   });
 
-  it('renders Anonymous Fan when displayName, email, and phone are all empty', () => {
+  it('renders Anonymous visitor when displayName, email, and phone are all empty', () => {
     render(
       <AudienceFanCell
         member={{
@@ -104,7 +107,7 @@ describe('AudienceFanCell', () => {
         }}
       />
     );
-    expect(screen.getByText('Anonymous Fan')).toBeInTheDocument();
+    expect(screen.getByText('Anonymous visitor')).toBeInTheDocument();
     // A neutral face, not initials that read as a real person ("AF").
     expect(
       document.querySelector('[data-slot="app-avatar"]')?.textContent
@@ -138,7 +141,7 @@ describe('AudienceFanCell', () => {
         }}
       />
     );
-    expect(screen.getByText('Anonymous Fan')).toBeInTheDocument();
+    expect(screen.getByText('Anonymous visitor')).toBeInTheDocument();
     expect(screen.queryByText('hidden@example.com')).not.toBeInTheDocument();
   });
 

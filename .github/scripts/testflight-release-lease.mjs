@@ -16,7 +16,6 @@ const SHA = /^[0-9a-f]{40}$/;
 const ID = /^[1-9][0-9]*$/;
 const POLICY = '.github/testflight-release-policy.json';
 const INTENT = 'testflight-upload-intent';
-const MAX_INTENT_BUCKETS = 64;
 const MAX_INTENTS = 1000;
 const TESTFLIGHT = '.github/workflows/ios-testflight.yml';
 const CONTROLLER = '.github/workflows/production-controller.yml';
@@ -377,7 +376,8 @@ export function validateLease({
     const bucket = buckets.shift();
     if (visited.has(bucket)) continue;
     visited.add(bucket);
-    assert(visited.size <= MAX_INTENT_BUCKETS, 'upload intent traversal limit');
+    // Bounded by construction: root + <=1 bucket per read intent; MAX_INTENTS is the runaway guard.
+    assert(visited.size <= MAX_INTENTS + 1, 'upload intent traversal limit');
     const intentName = `${INTENT}-${bucket || 'bootstrap'}`;
     const intents = listing(
       api,
@@ -503,6 +503,16 @@ export function validateLease({
   return lease;
 }
 
+/**
+ * Where annotation lines from a child's stderr are re-emitted. Production
+ * surfaces them as workflow annotations; tests replace `emit` so a mocked
+ * refusal (a fake rate-limit reset) never reaches the runner's log parser.
+ */
+export const annotationSink = {
+  /** @param {string} line */
+  emit: line => console.error(line),
+};
+
 export function command(args, options = {}) {
   const { label = args[0], route = '', ...spawnOptions } = options;
   const budget = Number(
@@ -526,7 +536,7 @@ export function command(args, options = {}) {
   const stderr = textOf(result.stderr);
   for (const line of stderr.split('\n')) {
     if (line.startsWith('::error::') || line.startsWith('::warning::'))
-      console.error(line);
+      annotationSink.emit(line);
   }
   // No raw provider output: it can include sensitive request headers.
   const kind =
@@ -535,7 +545,7 @@ export function command(args, options = {}) {
       : evidenceFailureKind(result.stderr, result.stdout, route);
   const annotation = stderr
     .split('\n')
-    .find(line => line.startsWith('::error::GitHub rate limit'));
+    .find(line => /^::error::(?:\[fixture\] )?GitHub rate limit/.test(line));
   const detail = annotation ? `: ${annotation.slice('::error::'.length)}` : '';
   assert(
     result.status === 0,

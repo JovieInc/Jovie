@@ -1,9 +1,12 @@
+import { resolveNewAccountClass } from '@/lib/accounts/internal-account';
+import { readRequestAccountClassHeader } from '@/lib/accounts/request-account-class.server';
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { cache } from 'react';
 import { getRequestSession } from '@/lib/auth/request-session';
+import { isProofBlockingPublication } from '@/lib/claim/claim-verification';
 import { db } from '@/lib/db';
 import {
   getDeepErrorMessage,
@@ -148,6 +151,7 @@ interface AuthGateRecord {
   profileIsPublic: boolean | null;
   profileAvatarUrl: string | null;
   profileOnboardingCompletedAt: Date | null;
+  profileSettings?: unknown;
 }
 
 interface AuthGateDbUser {
@@ -168,6 +172,7 @@ interface AuthGateProfile {
   avatarUrl: string | null;
   isPublic: boolean | null;
   onboardingCompletedAt: Date | null;
+  proofPending?: boolean;
   isClaimed: true;
 }
 
@@ -276,6 +281,10 @@ async function upsertUser(
         email,
         userStatus,
         waitlistEntryId,
+        accountClass: resolveNewAccountClass({
+          email,
+          header: await readRequestAccountClassHeader(),
+        }),
       })
       .onConflictDoUpdate({
         target: users.betterAuthUserId,
@@ -608,6 +617,7 @@ async function loadAuthGateRecord(
         profileIsPublic: creatorProfiles.isPublic,
         profileAvatarUrl: creatorProfiles.avatarUrl,
         profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+        profileSettings: creatorProfiles.settings,
       })
       .from(users)
       .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
@@ -665,6 +675,9 @@ function toAuthGateProfile(
     avatarUrl: dbResult.profileAvatarUrl,
     isPublic: dbResult.profileIsPublic,
     onboardingCompletedAt: dbResult.profileOnboardingCompletedAt,
+    ...(isProofBlockingPublication(dbResult.profileSettings)
+      ? { proofPending: true }
+      : {}),
     isClaimed: true, // joined via activeProfileId = claimed
   };
 }

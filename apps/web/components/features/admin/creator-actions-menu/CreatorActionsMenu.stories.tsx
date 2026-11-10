@@ -58,3 +58,21 @@ export const Mobile: Story = {
     open: true,
   },
 };
+
+/**
+ * Loading state: `status: 'loading'` derives the component's internal
+ * `isLoading`, which disables the trigger while an action is in flight.
+ */
+export const Loading: Story = {
+  args: {
+    status: 'loading',
+  },
+};
+
+/** Ingest refresh in flight: `isLoading` also covers refreshIngestStatus. */
+export const RefreshingIngest: Story = {
+  args: {
+    refreshIngestStatus: 'loading',
+    onRefreshIngest: async () => {},
+  },
+};

@@ -25,7 +25,8 @@ const meta = {
       href: '/timwhite/tour',
       external: false,
       onClick: profileStoryNoop,
-      ariaLabel: 'Get Tim White tickets',
+      // Accessible name must contain the visible label "Get tickets" (WCAG 2.5.3).
+      ariaLabel: 'Get tickets for Tim White',
     },
     onPlayClick: profileStoryNoop,
     onBellClick: profileStoryNoop,
@@ -57,7 +58,8 @@ export const Compact: Story = {
       href: '/timwhite/listen',
       external: false,
       onClick: profileStoryNoop,
-      ariaLabel: 'Listen to Tim White',
+      // Accessible name must contain the visible label "Listen now" (WCAG 2.5.3).
+      ariaLabel: 'Listen now — Tim White',
     },
   },
 };

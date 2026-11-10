@@ -1,0 +1,19 @@
+2026-10-26T21:59:23.2845355Z [36;1mecho "Staged production deployment: ${production_deploy_id} (${production_deploy_url})"[0m
+2026-10-26T22:05:22.6013177Z Staged production deployment: dpl_7iRsXRQHXtRc3vXYuNm8eRrVhf6t (https://jovie-7d2subgnh-jovie.vercel.app)
+2026-10-26T22:08:01.2486189Z Performance budgets: PASS
+2026-10-26T22:13:37.3313420Z Performance budgets: PASS
+2026-10-26T22:13:54.4664791Z   start sample 1/3: LCP 6775ms CLS 0.000 element unknown element
+2026-10-26T22:14:09.6149990Z   start sample 2/3: LCP 8527ms CLS 0.000 element unknown element
+2026-10-26T22:14:24.9373522Z   start sample 3/3: LCP 8547ms CLS 0.000 element unknown element
+2026-10-26T22:14:40.6516324Z   claim sample 1/3: LCP 4368ms CLS 0.000 element unknown element
+2026-10-26T22:14:53.3976317Z   claim sample 2/3: LCP 1970ms CLS 0.000 element unknown element
+2026-10-26T22:15:06.4088001Z   claim sample 3/3: LCP 2859ms CLS 0.000 element unknown element
+2026-10-26T22:15:22.9018218Z   claim-link sample 1/3: LCP 6170ms CLS 0.000 element unknown element
+2026-10-26T22:15:38.4881165Z   claim-link sample 2/3: LCP 5270ms CLS 0.000 element unknown element
+2026-10-26T22:15:55.7205636Z   claim-link sample 3/3: LCP 7064ms CLS 0.000 element unknown element
+2026-10-26T22:15:55.7220660Z FAIL start: LCP 8527ms / 4000ms, CLS 0.000 / 0.05
+2026-10-26T22:15:55.7221432Z   LCP median 8527ms > 4000ms budget
+2026-10-26T22:15:55.7222286Z PASS claim: LCP 2859ms / 4000ms, CLS 0.000 / 0.05
+2026-10-26T22:15:55.7223178Z FAIL claim-link: LCP 6170ms / 4000ms, CLS 0.000 / 0.05
+2026-10-26T22:15:55.7223672Z   LCP median 6170ms > 4000ms budget
+2026-10-26T22:15:55.7486917Z ##[error]Throttled-mobile entry-route LCP budgets failed on the exact staged build.

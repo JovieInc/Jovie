@@ -2,33 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockReadFile = vi.fn();
 
-vi.mock('node:fs', async importOriginal => {
-  const actual = await importOriginal<typeof import('node:fs')>();
-
-  return {
-    ...actual,
-    promises: {
-      ...actual.promises,
-      readFile: mockReadFile,
-    },
-    default: {
-      ...actual,
-      promises: {
-        ...actual.promises,
-        readFile: mockReadFile,
-      },
-    },
-  };
-});
-
-vi.mock('node:path', async () => {
-  const actual = await vi.importActual<typeof import('node:path')>('node:path');
-
-  return {
-    ...actual,
-    default: actual,
-  };
-});
+vi.mock('@/lib/investors/private-content', () => ({
+  readInvestorPrivateText: mockReadFile,
+}));
 
 const MOCK_MANIFEST = JSON.stringify({
   pages: [
@@ -99,8 +75,7 @@ describe('getInvestorManifest', () => {
     await getInvestorManifest();
 
     expect(mockReadFile).toHaveBeenCalledWith(
-      expect.stringMatching(/content[\\/]+investors[\\/]+manifest\.json$/),
-      'utf-8'
+      'content/investors/manifest.json'
     );
   });
 

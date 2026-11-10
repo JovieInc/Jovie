@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -211,12 +212,12 @@ function parseExactCiFastFailureOperands(script) {
     .map(
       clause =>
         clause.match(
-          /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT|STRUCTURAL_PYTHON_RESULT|STRUCTURAL_WEB_RESULT)"\s+!=\s+"success"$/
+          /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT|STRUCTURAL_PYTHON_RESULT|STRUCTURAL_WEB_RESULT|STRUCTURAL_LANES_RESULT)"\s+!=\s+"success"$/
         )?.[1]
     );
   if (
     operands.sort().join() !==
-    'PROFILE_BROWSER_RESULT,REMAINING_RESULT,STRUCTURAL_PYTHON_RESULT,STRUCTURAL_WEB_RESULT,TYPECHECK_RESULT'
+    'PROFILE_BROWSER_RESULT,REMAINING_RESULT,STRUCTURAL_LANES_RESULT,STRUCTURAL_PYTHON_RESULT,STRUCTURAL_WEB_RESULT,TYPECHECK_RESULT'
   )
     throw new Error('Invalid ci-fast fail-closed result set');
   return operands;
@@ -226,6 +227,7 @@ const BLOBLESS_BASE_FETCH_JOBS = new Set([
   'ci-exact-head-coverage-shard',
   'ci-exact-head-coverage',
   'ci-profile-admission-browser',
+  'ci-fast-remaining',
 ]);
 
 // Jobs whose full base fetch runs in the background during dependency
@@ -278,9 +280,9 @@ describe('merge_group workflow contract', () => {
   it('accepts reordered exact ci-fast failure operands', () => {
     expect(
       parseExactCiFastFailureOperands(
-        'if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_WEB_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
+        'if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_LANES_RESULT" != "success" || "$STRUCTURAL_WEB_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
       )
-    ).toHaveLength(5);
+    ).toHaveLength(6);
   });
 
   it('rejects a ci-fast failure condition missing a required operand', () => {
@@ -309,7 +311,7 @@ describe('merge_group workflow contract', () => {
     );
 
     const consumers =
-      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare drizzle-migration-guard';
+      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-fast-structural-lanes ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare drizzle-migration-guard';
     for (const jobId of consumers.split(' ')) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
       expect(job, jobId).toContain('ci-merge-group-workspace');
@@ -373,7 +375,6 @@ describe('merge_group workflow contract', () => {
     expect(CI_WORKFLOW).not.toContain('ready_for_review');
     expect(SIZE_GUARD_WORKFLOW).not.toContain('ready_for_review');
     expect(FORK_GATE_WORKFLOW).not.toContain('ready_for_review');
-    expect(CI_WORKFLOW).toMatch(/merge_group:\n\s+types: \[checks_requested\]/);
     expect(SIZE_GUARD_WORKFLOW).toMatch(
       /merge_group:\n\s+types: \[checks_requested\]/
     );
@@ -402,7 +403,7 @@ describe('merge_group workflow contract', () => {
       true
     );
     expect(GREEN_ENROLL_WORKFLOW).toContain(
-      'types: [converted_to_draft, labeled, unlabeled, reopened, ready_for_review, synchronize]'
+      'types: [converted_to_draft, labeled, unlabeled, reopened, ready_for_review]'
     );
     expect(getJobBlock(GREEN_ENROLL_WORKFLOW, 'enroll')).toContain(
       "(github.event_name != 'pull_request_target' || github.event.pull_request.draft == false)"
@@ -430,7 +431,7 @@ describe('merge_group workflow contract', () => {
     const route = getJobBlock(CI_WORKFLOW, 'ci-unit-runner-route');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
 
-    expect(route).toContain('runs-on: ubuntu-latest');
+    expect(route).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(route).toContain("if: github.event_name == 'workflow_dispatch'");
     expect(route).not.toContain("github.event_name == 'merge_group'");
     expect(route).toContain('ref: main');
@@ -444,7 +445,7 @@ describe('merge_group workflow contract', () => {
     expect(route).not.toContain('runner: ${{ steps.route.outputs.runner }}');
     expect(units).not.toContain('ci-unit-runner-route');
     expect(units).toContain('ci-merge-group-admission');
-    expect(units).toContain('runs-on: ubuntu-latest');
+    expect(units).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(units).not.toContain('runs-on: jovie-runner');
     expect(units).not.toContain('vars.CI_UNIT_RUNNER');
     expect(units).toContain('max-parallel: 120');
@@ -456,8 +457,10 @@ describe('merge_group workflow contract', () => {
     const sizeGuard = getJobBlock(SIZE_GUARD_WORKFLOW, 'merge-group-size');
     expect(admission).toContain('needs: [ci-path-changes]');
     expect(admission).toContain("github.event_name == 'merge_group'");
-    expect(admission).toContain('runs-on: ubuntu-latest');
-    expect(admission).toContain('timeout-minutes: 75');
+    expect(admission).toContain(
+      'runs-on: ${{ vars.MERGE_GATE_POOL == \'fixed\' && fromJSON(\'["self-hosted","Linux","X64","jovie-fixed"]\') || \'ubuntu-latest\' }}'
+    );
+    expect(admission).toContain('timeout-minutes: 78');
     expect(admission).not.toContain('sleep "$wait_s"');
     expect(admission).toContain('actions: read');
     expect(admission).toContain(
@@ -537,6 +540,19 @@ describe('merge_group workflow contract', () => {
         MERGE_GROUP_ADMISSION_WAIT_MS / 2
       );
     }
+    // Fork PR Gate starts after Size Guard; both full job budgets must fit
+    // within the admission polling window even if each consumes its limit.
+    const sizeMinutes = Number(
+      sizeGuard.match(/timeout-minutes:\s*(\d+)/)?.[1]
+    );
+    const forkMinutes = Number(
+      getJobBlock(SIZE_GUARD_WORKFLOW, 'merge-group-fork').match(
+        /timeout-minutes:\s*(\d+)/
+      )?.[1]
+    );
+    expect((sizeMinutes + forkMinutes) * 60_000).toBeLessThan(
+      MERGE_GROUP_ADMISSION_WAIT_MS
+    );
     expect(sizeGuard).toContain('GH_TOKEN: ${{ github.token }}');
     expect(sizeGuard).toContain('--policy=size');
     expect(sizeGuard).toContain('--policy=size --also=fork');
@@ -635,7 +651,7 @@ describe('merge_group workflow contract', () => {
     expect(ciFast).toContain('TYPECHECK_RESULT');
     expect(ciFast).toContain('REMAINING_RESULT');
     expect(ciFast).toContain('PROFILE_BROWSER_RESULT');
-    expect(parseExactCiFastFailureOperands(ciFast)).toHaveLength(5);
+    expect(parseExactCiFastFailureOperands(ciFast)).toHaveLength(6);
     expect(ciFast).toContain('exit 1');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     expect(units).not.toContain('ci-unit-runner-route');
@@ -860,6 +876,19 @@ describe('merge_group workflow contract', () => {
     }
   });
 
+  it('emits an explicit full_web_units merge suite scope after PR Ready (JOV-10687)', () => {
+    const scope = getJobBlock(CI_WORKFLOW, 'ci-merge-suite-scope');
+    expect(scope).toContain('name: Merge Suite Scope / full_web_units');
+    expect(scope).toContain('ci-merge-group-ready');
+    expect(scope).toContain("needs.ci-merge-group-ready.result == 'success'");
+    expect(scope).toContain('full_web_units');
+    expect(scope).toContain(
+      'Cannot claim full_web_units without successful Unit Tests'
+    );
+    expect(scope).toContain('runs-on: ubuntu-24.04');
+    expect(CI_WORKFLOW).toContain('ordinary_admission');
+  });
+
   it('fans real combined-head checks into PR Ready without PR metadata or deploy evidence', () => {
     const aggregate = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
     const sourceAggregate = getJobBlock(CI_WORKFLOW, 'ci-pr-ready');
@@ -1037,7 +1066,7 @@ describe('merge_group workflow contract', () => {
       'pnpm exec tsx scripts/online-index-migrate.ts --validate-only'
     );
     const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
-    expect(buildLayout).toContain('runs-on: ubuntu-latest');
+    expect(buildLayout).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(buildLayout).toContain('Build exact combined head');
     expect(buildLayout).toContain('Run deterministic layout behavior guard');
     expect(buildLayout).not.toContain('actions/upload-artifact');
@@ -1072,9 +1101,30 @@ describe('merge_group workflow contract', () => {
       'uses: ./.github/workflows/mac-lane-route.yml'
     );
     expect(macos).toContain(
-      `runs-on: \${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}`
+      `runs-on: \${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || (inputs.native && 'macos-15' || 'ubuntu-latest') }}`
     );
     expect(macos).toContain("needs.mac.outputs.run_hosted == 'true'");
+    // Node-only web inputs run the Mac lane's node checks on ubuntu; swift
+    // and the MenuMonitor artifact stay macOS-only.
+    expect(macosCaller).toContain(
+      "native: ${{ needs.ci-path-changes.outputs.run_macos_native != 'false' }}"
+    );
+    expect(CI_WORKFLOW).toContain(
+      "run_macos_native: ${{ steps.detect.outputs.run_macos_native || 'true' }}"
+    );
+    expect(macosRoute).toContain('inputs.native');
+    for (const step of [
+      'Swift test and build (macOS only)',
+      'Verify exact Mac artifact set',
+    ]) {
+      const at = MACOS_CI_WORKFLOW.indexOf(`name: ${step}`);
+      expect(at, step).toBeGreaterThan(-1);
+      expect(MACOS_CI_WORKFLOW.slice(at, at + 160), step).toContain(
+        'inputs.native'
+      );
+    }
+    expect(macos).toContain('pnpm --filter @jovie/desktop run typecheck');
+    expect(macos).toContain('pnpm --filter @jovie/desktop run test');
     expect(macos).not.toContain('runs-on: macos-26');
     expect(CI_WORKFLOW).not.toContain('mac_runner_class');
     expect(CI_WORKFLOW).not.toContain('mac-runner-heartbeat.yml');
@@ -1097,32 +1147,13 @@ describe('merge_group workflow contract', () => {
       'swift build --package-path apps/macos/MenuMonitor -c release'
     );
     expect(macos).toContain(
-      '--staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"'
-    );
-    expect(macos).toContain('id: desktop-staging-identity');
-    expect(macos).toContain('echo "version=$version" >> "$GITHUB_OUTPUT"');
-    expect(macos).toContain(
-      'DESKTOP_VERSION="${{ steps.desktop-staging-identity.outputs.version }}"'
-    );
-    expect(macos).toContain('JOVIE_DESKTOP_SOURCE_REVISION="$SOURCE_SHA"');
-    expect(macos).toContain(
       'SOURCE_SHA: ${{ inputs.checkout-ref || github.sha }}'
     );
-    expect(macos).toContain(
-      'version="${{ steps.desktop-staging-identity.outputs.version }}"'
-    );
+    expect(macos).not.toContain('desktop-staging');
+    expect(macos).not.toContain('package:staging');
     expect(macos).not.toContain(
       'echo "DESKTOP_VERSION=$version" >> "$GITHUB_ENV"'
     );
-    expect(
-      macos.indexOf('Bind staging package identity to the exact CI attempt')
-    ).toBeLessThan(macos.indexOf('Test and package exact Mac head'));
-    expect(
-      macos.indexOf(
-        'DESKTOP_VERSION="${{ steps.desktop-staging-identity.outputs.version }}"'
-      )
-    ).toBeGreaterThan(macos.indexOf('pnpm --filter @jovie/desktop run test'));
-    expect(macos).toContain('pnpm --filter @jovie/desktop run package:staging');
     expect(unitTests).toContain(
       "run_full_ci == 'true' && matrix.shard == 'packages/ui'\n        run: pnpm turbo test --filter=@jovie/ui"
     );
@@ -1146,7 +1177,7 @@ describe('merge_group workflow contract', () => {
       );
       expect(job).toContain("github.event_name == 'workflow_dispatch'");
       expect(job).not.toContain("github.event_name == 'pull_request'");
-      expect(job).toContain('runs-on: ubuntu-latest');
+      expect(job).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     }
   });
 
@@ -1195,7 +1226,7 @@ describe('merge_group workflow contract', () => {
     // merges the shard reports and runs the changed-line ratchet.
     const shard = getJobBlock(CI_WORKFLOW, 'ci-exact-head-coverage-shard');
     const coverage = getJobBlock(CI_WORKFLOW, 'ci-exact-head-coverage');
-    expect(NATIVE_QUEUE_POLICY.check_response_timeout_minutes).toBe(20);
+    expect(NATIVE_QUEUE_POLICY.check_response_timeout_minutes).toBe(30);
     for (const job of [shard, coverage]) {
       const timeout = Number(job.match(/timeout-minutes:\s*(\d+)/)?.[1]);
       expect(timeout).toBe(EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES);
@@ -1293,12 +1324,22 @@ describe('merge_group workflow contract', () => {
     expect(setupAt).toBeGreaterThan(startAt);
     expect(waitAt).toBeGreaterThan(setupAt);
     expect(firstConsumer).toBeGreaterThan(waitAt);
-    // Guards here read historical blobs, so the fetch must stay full.
-    expect(start).not.toContain('--filter=blob:none');
+    // Blobless (186 MB / 11 s versus 2 GB / 259 s full, which stalled past
+    // the 540 s await deadline and ejected PRs from the merge queue). Guards
+    // that read historical blobs lazily fetch them with the job token
+    // exported via GIT_CONFIG_* (not persisted), and a stalled attempt is
+    // bounded and retried.
+    expect(start).toContain('--unshallow --filter=blob:none');
+    expect(start).toContain('timeout 150 git');
+    expect(start).toContain('for attempt in 1 2 3; do');
+    expect(start).toContain(
+      'GIT_CONFIG_KEY_0=http.https://github.com/.extraheader'
+    );
+    expect(start).toContain('>> "$GITHUB_ENV"');
     expect(start).toContain('set -euo pipefail');
     // The exit status is published atomically only after git fetch returns.
     expect(start).toMatch(
-      /echo "\$\?" > "\$BASE_FETCH_DIR\/status\.tmp"\n\s*mv "\$BASE_FETCH_DIR\/status\.tmp" "\$BASE_FETCH_DIR\/status"/
+      /echo "\$fetch_rc" > "\$BASE_FETCH_DIR\/status\.tmp"\n\s*mv "\$BASE_FETCH_DIR\/status\.tmp" "\$BASE_FETCH_DIR\/status"/
     );
     expect(start).toContain('< /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &');
     // The awaiting step holds no token and fails closed on every failure mode.
@@ -1778,7 +1819,11 @@ describe('merge_group workflow contract', () => {
   });
 
   it('materializes a release-consumable intake receipt for equal-tree no-op groups', () => {
-    const root = mkdtempSync(join(tmpdir(), 'noop-intake-receipt-'));
+    // Node resolves module URLs through macOS's /var symlink. Match that
+    // canonical path so the copied classifiers recognize their CLI entrypoint.
+    const root = realpathSync(
+      mkdtempSync(join(tmpdir(), 'noop-intake-receipt-'))
+    );
     const laneDir = join(root, 'product-lane-classification');
     mkdirSync(laneDir);
     writeFileSync(join(laneDir, 'changed-paths.txt'), '');
@@ -1983,8 +2028,8 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain(
       "run_web: ${{ steps.detect.outputs.run_web || 'false' }}"
     );
-    expect(pathChanges).toContain(
-      "run_macos: ${{ steps.detect.outputs.run_macos || 'false' }}"
+    expect(pathChanges).toMatch(
+      /run_ios: \$\{\{ github\.event_name == 'merge_group' && 'false' \|\| steps\.detect\.outputs\.run_ios \|\| 'false' \}\}[\s\S]*run_macos: \$\{\{ github\.event_name == 'merge_group' && 'false' \|\| steps\.detect\.outputs\.run_macos \|\| 'false' \}\}[\s\S]*Drop hosted macOS lanes from the merge-queue receipt[\s\S]*del\(\.ios, \.mac\)/
     );
     expect(pathChanges).toContain(
       "run_cross_product: ${{ steps.detect.outputs.run_cross_product || 'false' }}"
@@ -2448,7 +2493,7 @@ ${selectedGateScript}`,
     expect(warm).not.toContain('secrets.');
     expect(warm).not.toContain('TURBO_TOKEN');
     expect(warm).toContain('persist-credentials: false');
-    expect(warm).toContain('runs-on: ubuntu-latest');
+    expect(warm).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
 
     const job = getJobBlock(warm, 'warm');
     expect(job).toContain("github.ref == 'refs/heads/main' &&");
@@ -3026,7 +3071,7 @@ ${selectedGateScript}`,
     expect(POSTDEPLOY_PROBES_WORKFLOW).not.toContain('environment:');
 
     const resolve = getJobBlock(POSTDEPLOY_PROBES_WORKFLOW, 'resolve-target');
-    expect(resolve).toContain('runs-on: ubuntu-latest');
+    expect(resolve).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(resolve).toContain('timeout-minutes:');
     expect(resolve).toContain('persist-credentials: false');
     // Exact trigger cross-proof, same observer shape as the release observers.
@@ -3096,11 +3141,17 @@ ${selectedGateScript}`,
     );
     expect(resolve).toContain('should_probe');
 
+    // JOV-9822: auth smoke feeds the golden-path certification, which also
+    // runs after every Production Verified and on the lanes clock.
+    expect(resolve).toContain('should_certify');
+    expect(resolve).toContain('.name == "Production Verified"');
     for (const jobId of ['smoke', 'auth-smoke', 'lighthouse']) {
       const job = getJobBlock(POSTDEPLOY_PROBES_WORKFLOW, jobId);
       expect(job, jobId).toContain('needs: [resolve-target]');
       expect(job, jobId).toContain(
-        "needs.resolve-target.outputs.should_probe == 'true'"
+        jobId === 'auth-smoke'
+          ? "needs.resolve-target.outputs.should_certify == 'true'"
+          : "needs.resolve-target.outputs.should_probe == 'true'"
       );
       expect(job, jobId).toContain(
         'ref: ${{ needs.resolve-target.outputs.commit_sha }}'
@@ -3111,7 +3162,7 @@ ${selectedGateScript}`,
       expect(job, jobId).toContain(
         'PRODUCTION_BASE_URL_B64: ${{ needs.resolve-target.outputs.deployment_url_b64 }}'
       );
-      expect(job, jobId).toContain('runs-on: ubuntu-latest');
+      expect(job, jobId).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
       expect(job, jobId).toContain('timeout-minutes:');
       expect(job, jobId).not.toContain('needs.production-release');
       expect(job, jobId).not.toContain('needs.authorize-production');
@@ -3251,6 +3302,20 @@ ${selectedGateScript}`,
       /merge_group:\n\s+types: \[checks_requested\]/
     );
     const sizeGuard = getJobBlock(SIZE_GUARD_WORKFLOW, 'merge-group-size');
+    const timeoutMinutes = Number(
+      sizeGuard.match(/timeout-minutes: (\d+)/)?.[1]
+    );
+    const fetchSeconds = Number(
+      sizeGuard.match(
+        /timeout --kill-after=5s (\d+)s\s+\\\s*git fetch --refetch/
+      )?.[1]
+    );
+    // Run 41705044176 spent 43s in checkout; allow another minute for setup
+    // and cleanup beyond the independently bounded fetch and policy budgets.
+    expect(fetchSeconds).toBe(70);
+    expect(timeoutMinutes * 60).toBeGreaterThanOrEqual(
+      fetchSeconds + MERGE_GROUP_JOB_BUDGET_MS / 1000 + 43 + 60
+    );
     expect(sizeGuard).toContain(
       "github.event_name == 'merge_group' && 'PR Size Guard'"
     );
@@ -3290,7 +3355,15 @@ ${selectedGateScript}`,
       'node scripts/lib/merge-group-member-policy.mjs --policy=size'
     );
     expect(sizeGuard).toContain('--filter=blob:limit=1g');
-    expect(sizeGuard).not.toContain('--filter=blob:none');
+    expect(sizeGuard).toContain(
+      'git fetch --refetch --filter=blob:none --no-tags --depth=2 origin "$GROUP_HEAD"'
+    );
+    expect(sizeGuard).not.toContain(
+      'git fetch --refetch --filter=blob:limit=1g --no-tags --depth=2'
+    );
+    expect(sizeGuard).toContain(
+      'node scripts/lib/merge-group-local-evidence.mjs || true'
+    );
     expect(MEMBER_POLICY).toContain('await enforceCombinedTreePayload({');
     expect(MEMBER_POLICY).toContain('/git/trees/${treeSha}?recursive=1');
     expect(MEMBER_POLICY).not.toContain("from 'node:child_process'");
@@ -3304,7 +3377,25 @@ ${selectedGateScript}`,
       'ref: ${{ github.event.pull_request.head.sha }}'
     );
     expect(sourceSizeGuard).toContain('persist-credentials: false');
-    expect(sourceSizeGuard).toContain('fetch-depth: 0');
+    // Depth-one checkout is followed by one targeted unshallow fetch: a
+    // merely available shallow merge base is not proof of complete ancestry.
+    expect(sourceSizeGuard).toContain('fetch-depth: 1');
+    expect(sourceSizeGuard).toContain(
+      'name: Fetch exact PR and current base ancestry'
+    );
+    expect(sourceSizeGuard).toContain(
+      'git fetch --filter=blob:none --no-tags --unshallow origin "$PR_HEAD_SHA"'
+    );
+    expect(sourceSizeGuard).toContain(
+      '+refs/heads/$PR_BASE_REF:refs/remotes/origin/$PR_BASE_REF'
+    );
+    expect(sourceSizeGuard).toContain(
+      '[[ "$(git rev-parse HEAD)" == "$PR_HEAD_SHA" ]]'
+    );
+    expect(sourceSizeGuard).toContain(
+      '[[ "$(git rev-parse --is-shallow-repository)" == false ]]'
+    );
+    expect(sourceSizeGuard).toContain('git archive "$PR_BASE_SHA" scripts/lib');
     expect(sourceSizeGuard).toContain('id: pr-merge-base');
     // The event base SHA goes stale on long-lived PRs; judge the PR against
     // the fetched base branch tip instead (#18131 failed on a 3-day-old base).
@@ -3333,7 +3424,7 @@ ${selectedGateScript}`,
       /^\s*max_entries_to_merge:\s*(\d+)$/m
     )?.[1];
     expect(maxMembers).toBeTruthy();
-    // ALLGREEN layers each entry's synthetic head on the entry ahead, so one
+    // ALLGREEN and HEADGREEN both layer each entry's synthetic head on the entry ahead, so one
     // group carries exactly one member even when up to max_entries_to_merge
     // entries land in one push. The member bound stays at one (fail closed)
     // and never exceeds the checked-in merge batch.
@@ -3457,9 +3548,6 @@ ${selectedGateScript}`,
     );
 
     const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
-    expect(buildLayout).toContain(
-      'pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk'
-    );
     expect(buildLayout).not.toContain('secrets.');
 
     const mergeGroupWorkflows = readdirSync(
@@ -3474,10 +3562,30 @@ ${selectedGateScript}`,
       .sort();
     expect(mergeGroupWorkflows).toEqual([
       'ci.yml',
+      'company-guards.yml',
       'pr-fleet-rules.yml',
       'pr-size-guard.yml',
       'pr-targets-main.yml',
+      'private-data-guard.yml',
     ]);
+    const privateGuardSource = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/private-data-guard.yml'),
+      'utf8'
+    );
+    const privateGuard =
+      /** @type {{ permissions: Record<string, string>, jobs: Record<string, { permissions: Record<string, string>, uses: string, secrets?: unknown }> }} */ (
+        load(privateGuardSource)
+      );
+    expect(privateGuard.permissions).toEqual({});
+    expect(Object.keys(privateGuard.jobs)).toEqual(['guard']);
+    expect(privateGuard.jobs.guard.permissions).toEqual({ contents: 'read' });
+    expect(privateGuard.jobs.guard.uses).toBe(
+      'JovieInc/ci/.github/workflows/private-data-guard.yml@a26a5e2b62ec427b4d1bf465662adac0627b5102'
+    );
+    expect(privateGuardSource).not.toMatch(
+      /secrets\.[A-Z0-9_]+|secrets:\s*inherit/
+    );
+    expect(privateGuard.jobs.guard.secrets).toBeUndefined();
     const fleet = readFileSync(
       resolve(REPO_ROOT, '.github/workflows/pr-fleet-rules.yml'),
       'utf8'
@@ -4224,6 +4332,41 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
     });
   });
 
+  it('widens a stacked head to the entries ahead of it (HEADGREEN, #23600)', () => {
+    const { seed, rootSha } = createFixture();
+    git(seed, ['update-ref', 'refs/remotes/origin/main', rootSha]);
+    git(seed, ['switch', '-q', '-c', 'queue']);
+    const entryAhead = writeAndCommit(
+      seed,
+      'apps/web/components/site/MarketingFooter.tsx',
+      'export const footer = 1;\n',
+      'entry ahead'
+    );
+    const headSha = writeAndCommit(
+      seed,
+      'docs/ci/memo.md',
+      'docs only\n',
+      'docs-only head'
+    );
+
+    const result = resolveMergeGroupPathDiff({
+      git: createGitRunner(seed),
+      eventBaseSha: entryAhead,
+      eventHeadSha: headSha,
+      fetchLiveMain: false,
+    });
+
+    expect(result).toMatchObject({
+      source: 'live_main_merge_base',
+      isNoop: false,
+      baseSha: rootSha,
+      files: [
+        'apps/web/components/site/MarketingFooter.tsx',
+        'docs/ci/memo.md',
+      ],
+    });
+  });
+
   it('recomputes against live main when the event-base range is empty', () => {
     const { origin, seed, rootSha } = createFixture();
     git(seed, ['switch', '-q', '-c', 'feature']);
@@ -4772,6 +4915,14 @@ describe('merge-queue green enroll scan window and failure hold', () => {
     // revision failure hold, may re-enroll an unchanged removed head.
     expect(ENROLL).toContain("removalReason === 'manual'");
     expect(ENROLL).toContain("failure.action === 'allow' &&");
+    // 2026-10-29 ejection re-enroll: a non-human removal with no revision
+    // failure hold is re-admitted (bounded); a failure hold still blocks first
+    // and admission never runs from a cron (JOV-INV-042).
+    expect(ENROLL).toContain("failureBeforeReenroll === 'allow'");
+    expect(ENROLL).toContain("reason: 'ejection-reenroll'");
+    expect(ENROLL).toContain('removalsOnHead < REENROLL_MAX_REMOVALS');
+    expect(ENROLL).toContain('!humanDequeued');
+    expect(ENROLL).not.toMatch(/^\s{2}schedule:/m);
     for (const runtimePath of [
       'scripts/merge-group-failure-hold.mjs',
       'scripts/lib/merge-queue-guard.mjs',

@@ -31,9 +31,13 @@ function fleetGate(overrides = {}) {
 }
 
 function greenChecks() {
-  return ['PR Ready', 'Migration Guard', 'Fork PR Gate', 'PR Size Guard'].map(
-    name => ({ name, state: 'SUCCESS', bucket: 'pass' })
-  );
+  return [
+    'PR Ready',
+    'Migration Guard',
+    'Fork PR Gate',
+    'PR Size Guard',
+    'Company guards',
+  ].map(name => ({ name, state: 'SUCCESS', bucket: 'pass' }));
 }
 
 function body() {

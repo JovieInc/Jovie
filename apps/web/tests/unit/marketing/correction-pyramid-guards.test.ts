@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { HOMEPAGE_COPY } from '@/data/homepageCopy';
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import {
   type CorrectionHit,
   findBannedNames,
@@ -117,6 +117,30 @@ describe('correction pyramid guards', () => {
     ).toBe(liveGrandfather);
   });
 
+  it('bans fan, white-label, remove-branding, revolutionary and all-in-one', () => {
+    const planted = findBannedPhrases(
+      [
+        "const a = 'Reach every fan';",
+        "const b = 'A white-label, all-in-one tool';",
+        "const c = 'Remove branding with Pro';",
+        "const d = 'A revolutionary link';",
+        "const id = 'capture-the-fan';",
+        '// fan in a comment',
+      ].join('\n'),
+      'apps/web/data/sample.ts'
+    );
+    expect(planted.map(hit => hit.rule).sort()).toEqual([
+      'all-in-one',
+      'banned-fan',
+      'remove-branding',
+      'revolutionary',
+      'white-label',
+    ]);
+    expect(
+      findBannedPhrases('Fans buy tickets', 'apps/web/content/blog/post.md')
+    ).toEqual([]);
+  });
+
   it('keeps raw marketing JSX copy on the warn baseline', () => {
     const source = [
       '<h1>{copy.headline}</h1>',
@@ -133,21 +157,30 @@ describe('correction pyramid guards', () => {
   });
 
   it('locks the homepage H1 to the homepage copy module', () => {
-    expect(HOMEPAGE_COPY.hero.headline).toBe(LOCKED_HOMEPAGE_H1);
-    expect(LOCKED_HOMEPAGE_H1).toBe('Be found. Be understood.');
-    expect(HOMEPAGE_COPY.seo.title).toBe('Jovie | Be found. Be understood.');
+    expect(HOMEPAGE_EDITORIAL_COPY.hero.headline).toBe(LOCKED_HOMEPAGE_H1);
+    expect(LOCKED_HOMEPAGE_H1).toBe('Move your music forward.');
+    expect(HOMEPAGE_EDITORIAL_COPY.seo.title).toBe(
+      'Jovie | Move your music forward'
+    );
     const hero = readFileSync(
-      path.join(webRoot, 'components/homepage/HomepageArtistProfile.tsx'),
+      path.join(webRoot, 'components/homepage/HomepageEditorial.tsx'),
       'utf8'
     );
     const page = readFileSync(
       path.join(webRoot, 'app/(home)/page.tsx'),
       'utf8'
     );
-    expect(hero).toContain('copy.headline');
-    expect(hero).toContain('HOMEPAGE_COPY');
+    expect(hero).toContain('HOMEPAGE_EDITORIAL_COPY.hero.headline');
     expect(hero).not.toContain(`>${LOCKED_HOMEPAGE_H1}<`);
-    expect(page).toContain('HomepageArtistHero');
+    // The page renders the published spec; the hero headline has no spec
+    // slot, so the hero always reads the locked copy module headline.
+    expect(page).toContain('<HomepageSpecSections');
+    const renderer = readFileSync(
+      path.join(webRoot, 'components/homepage/HomepageSpecSections.tsx'),
+      'utf8'
+    );
+    expect(renderer).toContain('<HomepageStoryHero');
+    expect(renderer).toContain('...HOMEPAGE_EDITORIAL_COPY.hero,');
   });
 
   it('tightens a warn baseline only when every live key is already known', () => {

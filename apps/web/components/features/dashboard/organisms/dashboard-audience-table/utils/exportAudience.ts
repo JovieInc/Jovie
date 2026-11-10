@@ -3,6 +3,7 @@
  * Defines column mapping and formatting for CSV export.
  */
 
+import { redactUnsharedContact } from '@/lib/audience/share-gate';
 import { type CSVColumn, capitalize } from '@/lib/utils/csv';
 import type { AudienceMember } from '@/types';
 
@@ -74,8 +75,11 @@ export function getAudienceForExport(
   rows: AudienceMember[],
   selectedIds?: Set<string>
 ): AudienceMember[] {
-  if (selectedIds && selectedIds.size > 0) {
-    return rows.filter(r => selectedIds.has(r.id));
-  }
-  return rows;
+  const scoped =
+    selectedIds && selectedIds.size > 0
+      ? rows.filter(r => selectedIds.has(r.id))
+      : rows;
+  // Level-2 gate: export never carries email/phone for people who have not
+  // shared with the artist.
+  return scoped.map(redactUnsharedContact);
 }

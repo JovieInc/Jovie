@@ -2,17 +2,23 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
+import {
+  buildLibraryAskJovieDraft,
+  buildLibraryEntityActions,
+  libraryEntityActionsToContextMenuItems,
+} from '@/app/app/(shell)/library/library-entity-actions';
+import {
+  convertContextMenuItems,
+  convertToCommonDropdownItems,
+} from '@/components/organisms/table/molecules/TableContextMenu';
+
 import type { WorkLaunchSummary } from '@/lib/library/work-actions';
 import { WorkInspectorActions } from './WorkInspectorActions';
 
-const openChatWithPromptMock = vi.hoisted(() => vi.fn());
+const onAskJovieMock = vi.hoisted(() => vi.fn());
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
-}));
-
-vi.mock('@/lib/chat/open-chat-with-prompt', () => ({
-  openChatWithPrompt: openChatWithPromptMock,
 }));
 
 vi.mock('sonner', () => ({
@@ -76,6 +82,7 @@ function renderActions(
   return render(
     <WorkInspectorActions
       asset={buildAsset()}
+      onAskJovie={onAskJovieMock}
       canPublish
       onSharePrivately={vi.fn()}
       {...props}
@@ -84,6 +91,50 @@ function renderActions(
 }
 
 describe('WorkInspectorActions', () => {
+  it('uses the same exact draft context through right-click, ellipsis and inspector adapters', () => {
+    const asset = buildAsset({
+      itemKind: 'merch',
+      id: 'merch-7',
+      updatedAt: '2026-11-10T00:00:00Z',
+    });
+    const onAskJovie = vi.fn();
+    const actions = buildLibraryEntityActions({
+      asset,
+      profileId: 'profile-1',
+      isPreviewPlaying: false,
+      isApprovalSaving: false,
+      onTogglePreview: vi.fn(),
+      onApprovalStatusChange: vi.fn(),
+      onAskJovie,
+    });
+    const contextItems = libraryEntityActionsToContextMenuItems(actions);
+    const menus = [
+      contextItems,
+      convertContextMenuItems(contextItems),
+      convertToCommonDropdownItems(contextItems),
+    ];
+    for (const items of menus) {
+      const ask = items.find(item => 'id' in item && item.id === 'ask-jovie');
+      expect(ask).toBeDefined();
+      if (ask && 'onClick' in ask) ask.onClick?.();
+    }
+    expect(onAskJovie).toHaveBeenCalledTimes(3);
+    for (const call of onAskJovie.mock.calls) {
+      expect(call).toEqual([
+        buildLibraryAskJovieDraft(asset, 'profile-1'),
+        'profile-1',
+      ]);
+    }
+    expect(
+      JSON.parse(onAskJovie.mock.calls[0][0].split('\n')[1])
+    ).toMatchObject({
+      kind: 'merch',
+      id: 'merch-7',
+      profileId: 'profile-1',
+      revision: '2026-11-10T00:00:00Z',
+    });
+  });
+
   it('offers Share page for a live public work', () => {
     renderActions();
     expect(screen.getByTestId('work-action-share-page')).toBeInTheDocument();
@@ -92,6 +143,16 @@ describe('WorkInspectorActions', () => {
       'http://localhost:3000/tim/take-me-over'
     );
     expect(screen.queryByTestId('work-action-review-publish')).toBeNull();
+  });
+
+  it('renders every action as one secondary button style, preview included', () => {
+    renderActions({ preview: <button type='button'>Play Preview</button> });
+    const share = screen.getByTestId('work-action-share-page');
+    const previewPage = screen.getByTestId('work-action-preview-page');
+    const ask = screen.getByTestId('work-action-ask-jovie');
+    expect(previewPage.className).toBe(share.className);
+    expect(ask.className).toBe(share.className);
+    expect(screen.getByText('Play Preview')).toBeInTheDocument();
   });
 
   it('keeps primary and utility actions in keyboard order without activating them on focus', async () => {
@@ -105,15 +166,14 @@ describe('WorkInspectorActions', () => {
     expect(screen.getByTestId('work-action-preview-page')).toHaveFocus();
     await user.tab();
     expect(screen.getByTestId('work-action-ask-jovie')).toHaveFocus();
-    expect(openChatWithPromptMock).not.toHaveBeenCalled();
+    expect(onAskJovieMock).not.toHaveBeenCalled();
     expect(onSharePrivately).not.toHaveBeenCalled();
 
     await user.tab({ shift: true });
     expect(screen.getByTestId('work-action-preview-page')).toHaveFocus();
     await user.tab();
     await user.keyboard('{Enter}');
-    expect(openChatWithPromptMock).toHaveBeenCalledOnce();
-    expect(openChatWithPromptMock.mock.calls[0]?.[0]).toContain('release-1');
+    expect(onAskJovieMock).toHaveBeenCalledOnce();
   });
 
   it('offers Review & publish for a prepared unpublished work', () => {
@@ -148,13 +208,17 @@ describe('WorkInspectorActions', () => {
     expect(onSharePrivately).toHaveBeenCalledOnce();
   });
 
-  it('opens the existing Jovie conversation with an explicit work context', () => {
+  it('uses the same selected-item Ask callback supplied by the shared action owner', () => {
     renderActions();
     fireEvent.click(screen.getByTestId('work-action-ask-jovie'));
-    expect(openChatWithPromptMock).toHaveBeenCalledOnce();
-    const [prompt] = openChatWithPromptMock.mock.calls[0] as [string, unknown];
-    expect(prompt).toContain('release-1');
-    expect(prompt).toContain('Take Me Over');
+    expect(onAskJovieMock).toHaveBeenCalledOnce();
+  });
+
+  it('disables Ask when the selected-item action is unavailable', () => {
+    renderActions({ onAskJovie: undefined });
+    expect(screen.getByTestId('work-action-ask-jovie')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('work-action-ask-jovie'));
+    expect(onAskJovieMock).not.toHaveBeenCalled();
   });
 
   it('renders no press-kit slot when the work has no launch', () => {

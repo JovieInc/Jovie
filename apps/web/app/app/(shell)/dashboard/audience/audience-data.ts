@@ -12,6 +12,8 @@ import {
 } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { z } from 'zod';
+import { applyShareGate } from '@/lib/audience/share-gate';
+import { loadSharedContactKeys } from '@/lib/audience/share-gate.server';
 import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL, createAudienceDataTag } from '@/lib/cache/tags';
@@ -30,6 +32,7 @@ import {
   isArtistEmailOptedIn,
   readArtistEmailReadyFromSettings,
 } from '@/lib/notifications/artist-email';
+import { withTimeout } from '@/lib/resilience/primitives';
 import { formatCountryLabel } from '@/lib/utils/audience';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { safeDecodeURIComponent } from '@/lib/utils/string-utils';
@@ -100,7 +103,8 @@ const subscriberQuerySchema = z.object({
     val => Number(val ?? 10),
     z.number().int().min(1).max(100)
   ),
-  sort: z.enum(['email', 'phone', 'country', 'createdAt']).default('createdAt'),
+  // email/phone sorts removed: row order would leak ordering of hidden identifiers.
+  sort: z.enum(['country', 'createdAt']).default('createdAt'),
   direction: z.enum(['asc', 'desc']).default('desc'),
 });
 
@@ -204,11 +208,8 @@ function transformMemberRow(member: {
     utmParams: normalizeUtmParams(member.utmParams),
     email: member.email,
     phone: member.phone,
-    // Members captured via Spotify auth or gated content are visible to the
-    // creator who owns the audience. Subscribers override this flag based on
-    // artist-email opt-in state (see fetchSubscribersData). New cells must
-    // read this flag and fall back to phone/anonymous when false.
-    emailVisibleToArtist: member.email != null,
+    // Fail closed; the per-request share gate decides (see getAudienceServerData).
+    emailVisibleToArtist: false,
     spotifyConnected: Boolean(member.spotifyConnected),
     purchaseCount: member.purchaseCount,
     tipAmountTotalCents: member.tipAmountTotalCents ?? 0,
@@ -565,6 +566,8 @@ async function fetchMembersData(
     }
   }
 
+  // Contact details are redacted per request in getAudienceServerData, outside
+  // the 5-minute cache, so a revoked share never outlives the revocation.
   return {
     mode: 'members',
     rows: rows.map(transformMemberRow),
@@ -607,8 +610,6 @@ async function _fetchSubscribersData(
         direction: 'desc' as const,
       };
   const SUBSCRIBER_SORT_COLUMN_SQL = {
-    email: 'ns.email',
-    phone: 'ns.phone',
     country: 'ns.country_code',
     createdAt: 'ns.created_at',
   } as const;
@@ -745,12 +746,13 @@ async function _fetchSubscribersData(
       latestActions: [],
       referrerHistory: [],
       utmParams: {},
-      email: artistEmailState.visibleToArtist ? subscriber.email : null,
+      // Raw here; redacted by applyShareGate below (per person, latest revocation wins).
+      email: subscriber.email,
       phone: subscriber.phone,
       jovieEmailSubscribed: type === 'email',
       artistEmailOptedIn: artistEmailState.optedIn,
       artistEmailPendingProvider: artistEmailState.pendingProvider,
-      emailVisibleToArtist: artistEmailState.visibleToArtist,
+      emailVisibleToArtist: false,
       spotifyConnected: false,
       purchaseCount: 0,
       tipAmountTotalCents: 0,
@@ -767,6 +769,7 @@ async function _fetchSubscribersData(
 
   return {
     mode: 'subscribers',
+    // Raw (cached); the share gate runs per request in getAudienceServerData.
     rows: normalizedRows,
     total: null,
     page: safe.page,
@@ -897,7 +900,7 @@ export async function getAudienceServerData(params: {
     return Array.isArray(v) ? (v[0] ?? '') : (v ?? '');
   };
   const cacheKeyParts: string[] = [
-    'audience-data',
+    'audience-data-v2',
     userId,
     selectedProfileId,
     view,
@@ -911,26 +914,63 @@ export async function getAudienceServerData(params: {
     segmentsKey,
   ];
 
-  return unstable_cache(
-    () =>
-      fetchAudienceData(
-        userId,
-        selectedProfileId,
-        searchParams,
-        includeDetails,
-        memberId,
-        view,
-        segments
-      ),
-    cacheKeyParts,
-    {
-      revalidate: CACHE_TTL.MEDIUM, // 300 seconds (5 minutes)
-      tags: [
-        CACHE_TAGS.AUDIENCE_DATA,
-        createAudienceDataTag(selectedProfileId),
-      ],
-    }
-  )();
+  // Bounded waits (JOV-8791 / resilience.spec.ts): a wedged read must reject
+  // so the route renders its error state, never park the document on the
+  // loading skeleton forever (matrix run 41165879189 — chromium shard 4 sat
+  // on AppShellSkeleton past the observation window).
+  const cached = await withTimeout(
+    unstable_cache(
+      () =>
+        fetchAudienceData(
+          userId,
+          selectedProfileId,
+          searchParams,
+          includeDetails,
+          memberId,
+          view,
+          segments
+        ),
+      cacheKeyParts,
+      {
+        revalidate: CACHE_TTL.MEDIUM, // 300 seconds (5 minutes)
+        tags: [
+          CACHE_TAGS.AUDIENCE_DATA,
+          createAudienceDataTag(selectedProfileId),
+        ],
+      }
+    )(),
+    { timeoutMs: 10_000, context: 'Audience data read' }
+  );
+
+  // Level-2 gate for BOTH modes, evaluated fresh on every request after the
+  // cache (never cached), so a revoked share disappears immediately.
+  const gatedRows = await withTimeout(
+    withDbSessionTx(
+      async tx => {
+        const keys = await loadSharedContactKeys(
+          tx,
+          selectedProfileId,
+          cached.rows
+        );
+        const gated = applyShareGate(cached.rows, keys);
+        if (cached.mode !== 'subscribers') return gated;
+        // Names and birthdays are gated with the contact for subscribers.
+        return gated.map(row =>
+          row.emailVisibleToArtist
+            ? row
+            : {
+                ...row,
+                displayName:
+                  row.type === 'email' ? 'Email Subscriber' : 'SMS Subscriber',
+                birthday: null,
+              }
+        );
+      },
+      { clerkUserId: userId }
+    ),
+    { timeoutMs: 10_000, context: 'Audience share gate' }
+  );
+  return { ...cached, rows: gatedRows };
 }
 
 export function getAudienceUrlSearchParams(searchParams: SearchParams) {

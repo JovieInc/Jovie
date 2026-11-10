@@ -62,6 +62,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_API_HOLD_BUDGET_SECONDS: '480'
+          GH_API_RETRY_ATTEMPTS: '3'
+          GH_API_RETRY_SECONDS: '2'
           EVENT_NAME: ${{ github.event_name }}
           MANUAL_SHA: ${{ github.sha }}
           REPOSITORY: ${{ github.repository }}
@@ -982,7 +984,7 @@ jobs:
         run: xcodebuild -version
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
+        uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1.336.0
         with:
           ruby-version: "3.3"
           bundler-cache: true

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { LogoLink } from './LogoLink';
 
 const logoLinkCss = readFileSync(
@@ -24,8 +25,29 @@ function cssBlock(source: string, marker: string): string {
 }
 
 describe('LogoLink', () => {
-  it('exposes the destination, label, and nested logo at the requested size', () => {
-    render(
+  it('uses the marketing mark size without changing the ordinary chrome default', () => {
+    const view = render(
+      <LogoLink variant='icon' logoMarkSize='marketing' reveal />
+    );
+    const link = screen.getByRole('link', { name: 'Jovie' });
+    expect(link.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '28'
+    );
+    expect(link.querySelector('svg')).toHaveAttribute('width', '28');
+    expect(link.querySelector('svg')).toHaveAttribute('height', '28');
+
+    view.rerender(<LogoLink variant='icon' reveal />);
+    expect(link.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '20'
+    );
+    expect(link.querySelector('svg')).toHaveAttribute('width', '20');
+    expect(link.querySelector('svg')).toHaveAttribute('height', '20');
+  });
+
+  it('exposes the destination, label, and nested logo at the requested size', async () => {
+    const { container } = render(
       <LogoLink
         href='/app'
         logoSize='lg'
@@ -41,10 +63,11 @@ describe('LogoLink', () => {
     expect(link.querySelector('svg')).toHaveAttribute('height', '32');
     expect(link).not.toHaveClass('logo-reveal');
     expect(screen.queryByTestId('logo-reveal-wordmark')).toBeNull();
+    await expectNoA11yViolations(container);
   });
 
-  it('wraps the icon in a spin mark and a hidden sliding wordmark when revealing', () => {
-    render(<LogoLink variant='icon' reveal />);
+  it('wraps the icon in a spin mark and a hidden sliding wordmark when revealing', async () => {
+    const { container } = render(<LogoLink variant='icon' reveal />);
 
     const link = screen.getByRole('link', { name: 'Jovie' });
     expect(link).toHaveClass('logo-reveal');
@@ -60,6 +83,7 @@ describe('LogoLink', () => {
     expect(wordmark).toHaveTextContent('Jovie');
     // The link already carries the accessible name; the wordmark is visual.
     expect(wordmark).toHaveAttribute('aria-hidden', 'true');
+    await expectNoA11yViolations(container);
   });
 
   it('spins the mark and slides the wordmark on hover and keyboard focus', () => {

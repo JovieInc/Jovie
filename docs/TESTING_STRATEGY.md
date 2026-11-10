@@ -303,7 +303,7 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `Ovie Typecheck (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/ovie typecheck` |
 | `Storybook Surface Matrix (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/web exec playwright test tests/e2e/storybook-elevation.spec.ts tests/e2e/storybook-input.spec.ts --config=playwright.config.storybook.ts --project=chromium` |
 | `iOS Fast Unit + Coverage (combined)` | merge-group | combined-integration | `pnpm run ios:lint && bash apps/ios/scripts/run-unit-tests.sh && bash apps/ios/scripts/check_coverage.sh` |
-| `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm run macos:test && pnpm run macos:build && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging` |
+| `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm run macos:test && pnpm run macos:build && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test` |
 | `Cross-Product Integration (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test && pnpm --filter @jovie/release-channel-contracts test` |
 | `Promptfoo Evals (deterministic)` | merge-group | combined-integration | `pnpm run evals` |
 | `Golden Eval Set (deterministic)` | merge-group | combined-integration | `pnpm run evals:golden` |
@@ -358,6 +358,11 @@ its committed baselines match. Don't loosen thresholds. Adopt CI's own render in
    PR worktree. It copies each render over the one committed baseline with the
    same name, and reports unknown or ambiguous names instead of guessing.
 3. Review the image diff and commit the updated baselines in the same PR.
+
+The adopt tool refuses Pen stills (`docs/pen-stills/`) and the baselines of any
+route that has Pen stills in `docs/design-system/pen-bindings.json`. Routes
+with `enforce: true` are judged by the blocking `Pen Diff` check against the
+committed Pen still; other routes are diffed and reported without failing (`pnpm design:pen-diff`; thresholds in `scripts/invariants/pen-diff.config.json`).
 
 The scheduled `visual-regression.yml` refresh remains the only
 `--update-snapshots` path for drift on main.

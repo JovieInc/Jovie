@@ -111,7 +111,9 @@ function FlagEnvCell({
           onClick={onClear}
           disabled={pending || !overridden}
           title={overridden ? 'Reset to default' : undefined}
-          aria-label={overridden ? `Reset ${envLabel} to default` : undefined}
+          // The slot is aria-hidden until overridden, so the name is only read
+          // once the reset is available.
+          aria-label={`Reset ${envLabel} to default`}
           aria-hidden={!overridden}
           tabIndex={overridden ? 0 : -1}
           data-testid={
@@ -302,7 +304,9 @@ export function AdminFeaturesTable({
           columnHelper.accessor(tier.key, {
             header: () => (
               <span
-                className={tier.key === currentTier ? 'text-accent' : undefined}
+                className={
+                  tier.key === currentTier ? 'text-accent-text' : undefined
+                }
               >
                 {tier.label}
                 {tier.key === currentTier ? ' •' : ''}
@@ -352,8 +356,8 @@ export function AdminFeaturesTable({
       start={
         <span className='text-tertiary-token text-xs'>
           {rows.length} runtime flags • this deploy is{' '}
-          <span className='text-accent'>{currentTier}</span> • each cell shows
-          On/Off and Default/Override
+          <span className='text-accent-text'>{currentTier}</span> • each cell
+          shows On/Off and Default/Override
         </span>
       }
     />

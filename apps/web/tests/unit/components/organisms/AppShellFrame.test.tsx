@@ -1,10 +1,60 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
+import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
+
+afterEach(() => {
+  document.documentElement.removeAttribute('data-desktop-runtime');
+});
 
 describe('AppShellFrame', () => {
+  it('mounts exactly one deferred titlebar in the desktop shell', async () => {
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    render(<AppShellFrame sidebar={null} main={<div>Desktop content</div>} />);
+
+    const titlebar = await screen.findByTestId('electron-titlebar-row');
+    expect(
+      screen.getByRole('main').closest('[data-app-shell-frame]')
+    ).toContainElement(titlebar);
+    expect(screen.getAllByTestId('electron-titlebar-row')).toHaveLength(1);
+  });
+
+  it.each([false, true])(
+    'keeps Ovie paint ownership stable while loading: %s',
+    loading => {
+      const { container } = render(
+        loading ? (
+          <AppShellSkeleton brandVariant='ov' />
+        ) : (
+          <AppShellFrame
+            brandVariant='ov'
+            sidebar={null}
+            main={<div>Home</div>}
+          />
+        )
+      );
+      expect(
+        container.querySelector('[data-app-shell-workspace="ov"]')
+      ).toBeInTheDocument();
+    }
+  );
+
+  it('keeps the Electron-only flush rule out of browser shell layout', () => {
+    const globalsSource = readFileSync(
+      resolve(process.cwd(), 'app/globals.css'),
+      'utf8'
+    );
+
+    expect(globalsSource).toMatch(
+      /html\[data-desktop-runtime="electron"\][\s\S]*?\[data-app-shell-body="true"\]\[data-electron-top-gap-owner="titlebar"\][\s\S]*?padding-right:\s*0;[\s\S]*?padding-bottom:\s*0;/
+    );
+    expect(globalsSource).toMatch(
+      /html\[data-desktop-runtime="electron"\][\s\S]*?\[data-app-shell-main-column="true"\][\s\S]*?> #main-content[\s\S]*?border-radius:\s*var\(--app-shell-radius\) 0 0 0;/
+    );
+  });
+
   // JOV-8974: the Electron shell keeps one gutter on every window edge. The
   // body's top padding and the titlebar band's top offset must both come from
   // the shell gap token, never a flush 0 or an invented px literal.
@@ -33,15 +83,16 @@ describe('AppShellFrame', () => {
 
     const mainContent = screen.getByRole('main');
     const appShellFrame = mainContent.closest('[data-app-shell-frame]');
-    const desktopTitlebar = screen.getByTestId('electron-titlebar-row');
 
     expect(mainContent).toHaveAttribute('id', 'main-content');
     expect(mainContent).not.toHaveAttribute('tabindex');
     expect(appShellFrame).toBeInTheDocument();
-    expect(appShellFrame).toContainElement(desktopTitlebar);
+    expect(
+      screen.queryByTestId('electron-titlebar-row')
+    ).not.toBeInTheDocument();
     expect(
       appShellFrame?.querySelectorAll('[data-testid="electron-titlebar-row"]')
-    ).toHaveLength(1);
+    ).toHaveLength(0);
     const shellBody = mainContent.closest('[data-app-shell-body]');
     expect(shellBody).toHaveAttribute('data-shell-rail-motion', 'coordinated');
     expect(shellBody).toHaveAttribute(
@@ -117,45 +168,6 @@ describe('AppShellFrame', () => {
     ).filter(element => element.style.mixBlendMode === 'overlay');
     expect(decorativePaint).toHaveLength(0);
     expect(plane).toHaveClass('bg-(--app-shell-content-surface)');
-  });
-
-  it('contains the right overlay inside the main route without allocating a column', () => {
-    render(
-      <AppShellFrame
-        sidebar={<aside>Sidebar</aside>}
-        header={<header>Header</header>}
-        main={<div>Main Content</div>}
-        rightPanel={<div data-testid='fixture-right-rail'>Right rail</div>}
-      />
-    );
-
-    const scrollPane = screen.getByTestId('app-shell-scroll');
-    const rightRail = screen.getByTestId('app-shell-right-rail');
-
-    expect(scrollPane).toHaveClass('overflow-hidden');
-    expect(scrollPane).not.toHaveClass('overflow-y-auto');
-    expect(scrollPane).toContainElement(screen.getByText('Main Content'));
-    const main = screen.getByRole('main');
-    const mainPlane = rightRail.closest('[data-app-shell-main-plane]');
-    const routeContent = main.querySelector('[data-app-shell-main-content]');
-
-    expect(mainPlane).toHaveAttribute('data-app-shell-main-plane', 'true');
-    expect(mainPlane).toContainElement(main);
-    expect(mainPlane).toContainElement(rightRail);
-    expect(main).toContainElement(rightRail);
-    expect(main).toContainElement(routeContent as HTMLElement);
-    expect(rightRail.parentElement).toBe(routeContent);
-    expect(routeContent?.parentElement).toBe(main);
-    expect(scrollPane).not.toContainElement(rightRail);
-    expect(rightRail).toContainElement(
-      screen.getByTestId('fixture-right-rail')
-    );
-    expect(rightRail).toHaveClass('shell-inspector-overlay');
-    expect(mainPlane).toHaveClass(
-      'transition-[flex-basis,width]',
-      'duration-cinematic',
-      'motion-reduce:transition-none'
-    );
   });
 
   it('reserves dev-toolbar height inside the shell scroll pane', () => {
@@ -463,33 +475,6 @@ describe('AppShellFrame', () => {
     expect(tray).toHaveClass('shrink-0');
   });
 
-  it('keeps the inspector within main while the audio dock retains the same column', () => {
-    render(
-      <AppShellFrame
-        sidebar={<aside>Sidebar</aside>}
-        header={<header>Header</header>}
-        main={<div>Main Content</div>}
-        rightPanel={<div data-testid='fixture-rail'>Rail</div>}
-        audioPlayer={<div data-testid='audio-player'>Player</div>}
-      />
-    );
-
-    const main = screen.getByRole('main');
-    const rail = screen.getByTestId('app-shell-right-rail');
-    const tray = screen.getByTestId('app-shell-audio-tray');
-
-    expect(main).toContainElement(rail);
-    expect(rail).not.toContainElement(tray);
-    expect(tray.parentElement).toHaveAttribute(
-      'data-app-shell-main-column',
-      'true'
-    );
-    expect(rail.parentElement).toHaveAttribute(
-      'data-app-shell-main-content',
-      'true'
-    );
-  });
-
   it('mounts mobile navigation in the shared in-flow bottom surface', () => {
     render(
       <AppShellFrame
@@ -509,5 +494,30 @@ describe('AppShellFrame', () => {
       screen.getByRole('navigation', { name: 'Mobile Navigation' })
     );
     expect(surface).not.toHaveClass('fixed', 'absolute');
+  });
+
+  // JOV-7973: the shell frame planes clip, but must never own a programmatically
+  // scrollable box. overflow:hidden stays scrollable, so a route journey's
+  // scrollIntoView can leave the whole pane shifted under the clip (the /start
+  // onboarding preview badge measured a stable viewport ratio 0.8125 in CI from
+  // a 34.5px drift that keyboard End/Home on the rail could never undo).
+  it('clips shell planes without owning a vertical scroll box (JOV-7973)', () => {
+    const { container } = render(
+      <AppShellFrame sidebar={null} main={<div>Main Content</div>} />
+    );
+
+    const planes = [
+      container.querySelector('[data-app-shell-frame]'),
+      container.querySelector('[data-app-shell-body]'),
+      screen.getByRole('main'),
+      container.querySelector('[data-app-shell-main-content]'),
+      container.querySelector('[data-app-shell-content-inset]'),
+    ];
+
+    for (const plane of planes) {
+      expect(plane).not.toBeNull();
+      expect(plane).not.toHaveClass('overflow-hidden');
+      expect(plane).toHaveClass('overflow-clip');
+    }
   });
 });

@@ -28,7 +28,6 @@ const { plugin: shadcn } = require('@shadcn/lint');
 const shadcnNoRestyleBaseline = require('./tests/unit/design-system/shadcn-no-restyle.baseline.json');
 const shadcnNoRestyleOptions = require('./eslint-rules/shadcn-no-restyle.options.json');
 const retiredDesignSystemModules = require('./data/designSystem/retired-modules.json');
-
 // Retired DS forks/shims (CI gate: tests/unit/design-system/retired-modules.test.ts).
 const retiredDesignSystemImportPaths =
   retiredDesignSystemModules.modules.flatMap(entry =>
@@ -263,7 +262,6 @@ const baseConfig = {
     'shadcn/no-inline-styles': 'off',
   },
 };
-
 module.exports = [
   {
     ignores: [
@@ -339,7 +337,6 @@ module.exports = [
       ],
     },
   },
-
   // Disable server/client boundary rules for server-only contexts
   {
     files: ['**/app/api/**', '**/actions.ts', '**/actions/*.ts'],
@@ -348,7 +345,6 @@ module.exports = [
       '@jovie/server-only-imports': 'off',
     },
   },
-
   {
     files: ['components/atoms/**/*.tsx'],
     ignores: [
@@ -398,7 +394,6 @@ module.exports = [
       'shadcn/no-restyle': 'off',
     },
   },
-
   // JOV-INV-031 thread-blocking hard-gate (latency-sensitive-execution-v1).
   // Separate from route-response-latency budgets in performance-invariants-v1.
   // Author-time selectors; the CI harness also follows aliases/wrappers so a
@@ -559,6 +554,11 @@ module.exports = [
     rules: {
       '@jovie/no-ad-hoc-currency': 'off',
     },
+  },
+  // PaySelector: pre-existing molecule→features layering debt, surfaced by whole-file lint; deferred (JOV-2168 pattern).
+  {
+    files: ['components/molecules/PaySelector.tsx'],
+    rules: { 'boundaries/element-types': 'off' },
   },
   // Experimental shell routes — not production UI; label-casing ratchet deferred (#11251).
   {

@@ -45,7 +45,7 @@ describe('MarketingPlatformSpecBento', () => {
       screen.getByRole('heading', { name: 'One Adaptive Profile' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Capture Every Fan' })
+      screen.getByRole('heading', { name: 'Capture every listener' })
     ).toBeInTheDocument();
     expect(screen.getAllByRole('img').length).toBe(PLATFORM_SPEC_TILES.length);
   });

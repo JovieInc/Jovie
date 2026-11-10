@@ -65,6 +65,103 @@
   padding-bottom: var(--space-5);
 }
 
+/* Draft profile panel header (Pen R6As7U · SDt0M). */
+:where(.system-b-onboarding-draft-header) {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-4);
+}
+
+:where(.system-b-onboarding-draft-title) {
+  color: var(--color-text-primary-token);
+  font-size: var(--text-3xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.016em;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+:where(.system-b-onboarding-draft-lead) {
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-app);
+  line-height: 1.4;
+}
+
+/*
+ * /start claim chat transcript (Pen R6As7U · T68xUV). The onboarding thread
+ * reads at 16px body with dark surface-2 user bubbles; the app chat keeps its
+ * own ladder. Tokens are re-pointed here so ChatMessage stays one component.
+ */
+:where(.system-b-onboarding-chat) {
+  --system-b-chat-body-size: var(--text-base);
+  --system-b-chat-body-line-height: 1.5;
+  --system-b-chat-message-max-width: 75%;
+  --system-b-chat-user-bubble-bg: var(--color-bg-surface-2);
+  --system-b-chat-user-bubble-text: var(--color-text-primary-token);
+  --system-b-chat-user-bubble-border: transparent;
+  --system-b-chat-user-bubble-shadow: none;
+}
+
+/* A streamed starter response can stop at the dock's opening tag. Its
+   padding-only box must not paint before the instruction and input arrive.
+   The trailing HTML marker releases paint without waiting for hydration;
+   the heading stays visible and the original controls keep their identity. */
+.system-b-onboarding-chat[data-starter-handoff="true"]
+[data-dock="bottom"]:not(:has([data-onboarding-composer-complete])) {
+  visibility: hidden;
+}
+
+/* Specificity (not :where) so this beats the shared pill/rectangle shapes. */
+.system-b-onboarding-chat .system-b-chat-user-bubble {
+  border-radius: calc(var(--radius-xl) + var(--space-0-5));
+  padding: var(--space-4) var(--space-5);
+}
+
+.system-b-onboarding-chat .system-b-chat-user-text {
+  line-height: 1.45;
+}
+
+:where(.system-b-onboarding-speaker-row) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  color: var(--color-text-primary-token);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.4;
+}
+
+/* JOV-12045: the side rail's phone preview must fit the rail at rest. The
+   preview keeps the locked 402:874 screen aspect (JOV-7192, width-only
+   sizing), which is ~618px tall at its w-71 width and ran past the rail's
+   fold at the 1280x720 golden-path viewport, leaving the draft-profile card
+   cut at the bottom edge with no clean scroll position. The rail hero is a
+   size container; the phone shrinks only when the hero is short (45.9cqh
+   derives from the locked 402/874 ratio, one step under the exact fit) and
+   never grows past its w-71 width on tall viewports. Unlayered so the width
+   holds against the w-auto utility and PhoneFrame's base w-71. */
+.system-b-onboarding-rail-hero {
+  container-type: size;
+}
+
+.system-b-onboarding-rail-phone {
+  width: min(17.75rem, 45.9cqh);
+}
+
+/* Keep the full-width profile composition when the phone shrinks. Reflowing
+   its fixed-size identity and featured card into a narrower screen clips the
+   Listen now action even though the phone itself fits the rail. The screen
+   already owns the inline-size container; zoom scales content and hit areas
+   together without a measurement effect or a second preview implementation.
+   tan(atan2(width, full-width)) is the unitless width ratio, including in
+   browsers that do not yet support dividing two lengths in calc(). */
+.system-b-onboarding-rail-phone .mobile-web-screen > div {
+  zoom: min(1, tan(atan2(100cqi, 17.75rem)));
+}
+
 :where(.system-b-onboarding-empty-state) {
   border-bottom: 1px solid
     color-mix(in oklab, var(--system-b-app-frame-seam) 58%, transparent);
@@ -661,6 +758,22 @@
   --color-skeleton-shimmer: rgba(255, 255, 255, 0.11);
 }
 
+/* Ovie consumes the canonical Noir Ion ramp instead of a second near-identical
+   graphite palette. Home, dashboards, shell chrome, and composer share one
+   content tone; cards retain their existing borders and geometry. */
+.dark [data-app-shell-workspace="ov"],
+[data-app-shell-workspace="ov"].dark {
+  --app-shell-content-surface: var(--noir-ion-card);
+  --color-bg-surface-0: var(--noir-ion-shell);
+  --color-bg-surface-1: var(--noir-ion-card);
+  --color-bg-surface-2: var(--noir-ion-elevated);
+  --color-bg-surface-3: var(--noir-ion-floating);
+  --color-bg-elevated: var(--noir-ion-elevated);
+  --color-bg-tooltip: var(--noir-ion-floating);
+  --color-bg-input: var(--noir-ion-card);
+  --color-skeleton-base: var(--noir-ion-elevated);
+}
+
 /* A selected row mode owns the same geometry during loading and after data arrives. */
 [data-table-row-mode] tbody > .system-b-table-row-height {
   height: var(--table-row-height);
@@ -739,11 +852,12 @@
     color-mix(in oklab, var(--color-focus-ring) 35%, transparent);
 }
 
+/* Selection is a quiet fill, never a box: an inset ring on every selected
+ * row read as a hard bordered rectangle (Linear-precision bar, founder
+ * 2026-11-08). The ring is reserved for keyboard focus above. */
 :where(.system-b-table-row-selected),
 :where(.system-b-table-selection-selected) {
   background: var(--color-row-selected);
-  box-shadow: inset 0 0 0 1px
-    color-mix(in oklab, var(--color-focus-ring) 24%, transparent);
 }
 
 :where(.system-b-table-row-selected):hover,
@@ -804,26 +918,15 @@
   }
 }
 
+/* Sticky table headers paint a fully opaque app-shell content surface (the
+   same surface as the sticky group header). A translucent surface plus
+   backdrop-filter is WebKit-unstable on sticky table cells: WebKit composites
+   the filter against the wrong backdrop, so scrolled rows bleed through and
+   overlap the column labels (JOV-9079). */
 :where(.system-b-table-sticky-header) {
-  background: color-mix(
-    in oklab,
-    var(--system-b-app-content-surface) 92%,
-    transparent
-  );
+  background: var(--system-b-app-content-surface);
   box-shadow: inset 0 -1px 0
     color-mix(in oklab, var(--system-b-app-shell-border) 74%, transparent);
-}
-
-@supports (backdrop-filter: blur(1px)) {
-  :where(.system-b-table-sticky-header) {
-    backdrop-filter: blur(14px);
-  }
-}
-
-@supports (-webkit-backdrop-filter: blur(1px)) {
-  :where(.system-b-table-sticky-header) {
-    -webkit-backdrop-filter: blur(14px);
-  }
 }
 
 :where(.system-b-table-sticky-group-header) {
@@ -1906,6 +2009,14 @@
 :where(.system-b-pill-search-kbd) {
   color: var(--color-text-quaternary-token);
   font-size: var(--text-3xs);
+}
+
+/* Shell search trigger shortcut hint: the glyph renders as generated content
+   so axe's visible-text pass (label-content-name-mismatch, WCAG 2.5.3) only
+   measures the control label. aria-hidden does not remove a text node from
+   that pass; CSS content is not a DOM text node, so the hint is excluded. */
+:where(.system-b-shell-search-trigger-kbd)::before {
+  content: attr(data-shortcut-glyph);
 }
 
 :where(.system-b-pill-search-chip) {
@@ -3223,6 +3334,33 @@
   box-shadow: none;
 }
 
+:where(.system-b-chat-composer-input-grid) {
+  /* Match the textarea's measured height/min-h-6 plus field pt-0.5 before
+     either child streams. Auto still admits chips and multiline drafts. */
+  --system-b-chat-composer-textarea-min-height: calc(var(--spacing) * 6);
+  grid-template-rows:
+    minmax(
+      calc(
+        max(
+          var(--system-b-chat-composer-measured-input-height),
+          var(--system-b-chat-composer-textarea-min-height)
+        ) +
+        var(--spacing) *
+        0.5
+      ),
+      auto
+    )
+    minmax(calc(var(--spacing) * 9), auto);
+}
+
+:where(
+  .system-b-chat-composer-surface[data-hero="true"]
+    .system-b-chat-composer-input-grid
+) {
+  /* Filled hero fields use min-h-7; the empty hero pill is a separate flex row. */
+  --system-b-chat-composer-textarea-min-height: calc(var(--spacing) * 7);
+}
+
 .system-b-chat-composer-input {
   color: var(--color-text-primary-token);
   caret-color: var(--color-text-primary-token);
@@ -3482,19 +3620,22 @@
 }
 
 /* Hide scrolled-away thread content under a floating header row (JOV-7192).
-   The clearance band above the first resting message stays fully clear and
-   only its last --space-4 ramps in, so a half-scrolled bubble dissolves
-   instead of reading as a clipped control. Resting content starts at
-   --space-16 (the scroll region's pt-16) and is never masked. */
+   The clearance band above the first resting message stays fully clear.
+   Resting content starts at --space-16 (the scroll region's pt-16) and is
+   never masked. JOV-12045: the old 16px reveal ramp (transparent until
+   --space-12) half-revealed a scrolled-away agent-turn brand row in recorded
+   visual review, which read as a clipped control — the band is now fully
+   masked, so scrolled-away content is either invisible above the clearance
+   or fully visible below it. */
 :where(.system-b-chat-thread-top-fade) {
   mask-image: linear-gradient(
     to bottom,
-    transparent var(--space-12),
+    transparent var(--space-16),
     black var(--space-16)
   );
   -webkit-mask-image: linear-gradient(
     to bottom,
-    transparent var(--space-12),
+    transparent var(--space-16),
     black var(--space-16)
   );
 }
@@ -5062,206 +5203,6 @@
 }
 
 /* ============================================
-   SYSTEM B START LOADING PRIMITIVES
-   ============================================ */
-
-/* Host matching the SidebarProvider wrapper the resolved /start page renders
-   around AppShellFrame (flex h-svh w-full overflow-x-hidden bg-base). */
-:where(.system-b-start-loading-page) {
-  display: flex;
-  width: 100%;
-  height: 100svh;
-  overflow-x: hidden;
-  background: var(--system-b-bg-page);
-  color: var(--system-b-text-primary);
-  color-scheme: dark;
-}
-
-/* OnboardingShell main wrapper + chat section: fills the shell content panel. */
-:where(.system-b-start-loading-main) {
-  position: relative;
-  display: flex;
-  min-height: 0;
-  flex: 1 1 auto;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--system-b-app-content-surface);
-}
-
-/* Chat scroll area (px-4 py-5 sm:px-6 lg:px-8 on the resolved page). */
-:where(.system-b-start-loading-scroll) {
-  position: relative;
-  flex: 1 1 auto;
-  overflow-y: auto;
-  padding-block: var(--space-5);
-  padding-inline: var(--space-4);
-}
-
-@media (min-width: 640px) {
-  :where(.system-b-start-loading-scroll) {
-    padding-inline: var(--space-6);
-  }
-}
-
-@media (min-width: 1024px) {
-  :where(.system-b-start-loading-scroll) {
-    padding-inline: var(--space-8);
-  }
-}
-
-/* Centering column (max-w-[52rem] justify-center on the resolved page). */
-:where(.system-b-start-loading-column) {
-  display: flex;
-  width: 100%;
-  min-height: 100%;
-  max-width: 52rem;
-  flex-direction: column;
-  justify-content: center;
-  margin-inline: auto;
-}
-
-/* ChatEmptyStateComposerRegion: content shell + centered flex region. */
-:where(.system-b-start-loading-region) {
-  position: relative;
-  display: flex;
-  width: 100%;
-  max-width: var(--system-b-chat-composer-max-width);
-  min-height: 100%;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin-inline: auto;
-  padding-block: var(--space-8);
-  padding-inline: var(--space-1);
-}
-
-/* Empty-state intro, anchored to the region midline exactly like the resolved
-   `above` slot (absolute inset-x-0 bottom-1/2 mb-12, max-w-[44rem]). */
-:where(.system-b-start-loading-intro) {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 50%;
-  z-index: 1;
-  display: flex;
-  width: 100%;
-  max-width: 44rem;
-  max-height: min(46svh, calc(var(--space-24) * 4));
-  flex-direction: column;
-  gap: var(--space-4);
-  margin-inline: auto;
-  margin-bottom: var(--space-12);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-inline: var(--space-1);
-  padding-bottom: var(--space-1);
-}
-
-:where(.system-b-start-loading-intro-message) {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-:where(.system-b-start-loading-intro-message) > * {
-  width: 72%;
-  height: var(--space-4);
-}
-
-:where(.system-b-start-loading-intro-message) > *:last-child {
-  width: 46%;
-}
-
-:where(.system-b-start-loading-intro-pills) {
-  display: flex;
-  gap: var(--space-2);
-  overflow: hidden;
-}
-
-:where(.system-b-start-loading-intro-pills) > * {
-  height: var(--space-8);
-  flex-shrink: 0;
-  border-radius: var(--system-b-radius-pill);
-}
-
-:where(.system-b-start-loading-intro-pills) > *:nth-child(1) {
-  width: calc(var(--space-24) + var(--space-20));
-}
-
-:where(.system-b-start-loading-intro-pills) > *:nth-child(2) {
-  width: calc(var(--space-24) + var(--space-10));
-}
-
-:where(.system-b-start-loading-intro-pills) > *:nth-child(3) {
-  width: calc(var(--space-24) + var(--space-16));
-}
-
-:where(.system-b-start-loading-intro-pills) > *:nth-child(4) {
-  width: calc(var(--space-24) + var(--space-20));
-}
-
-:where(.system-b-start-loading-intro) > :last-child {
-  width: calc(var(--space-24) + var(--space-24));
-  height: var(--space-3);
-  margin-inline: auto;
-}
-
-:where(.system-b-start-loading-composer-anchor) {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-}
-
-:where(.system-b-start-loading-composer-wrap) {
-  width: 100%;
-  max-width: var(--system-b-chat-composer-max-width);
-  margin-inline: auto;
-}
-
-/* Resolved composer surface: 1px seam border, 3xl radius, content-surface
-   fill, shared chat loading composer height token (matches ChatInput empty
-   geometry within a couple px). */
-:where(.system-b-start-loading-composer) {
-  height: var(--system-b-chat-loading-composer-height);
-  overflow: hidden;
-  border: 1px solid
-    color-mix(in oklab, var(--system-b-app-frame-seam) 84%, transparent);
-  border-radius: var(--radius-3xl);
-  background: var(--system-b-app-content-surface);
-}
-
-:where(.system-b-start-loading-composer-row) {
-  display: flex;
-  height: 100%;
-  align-items: center;
-  gap: var(--space-2);
-  padding-block: var(--space-2);
-  padding-inline: var(--space-3);
-}
-
-:where(.system-b-start-loading-copy-slot) {
-  min-width: 0;
-  flex: 1 1 auto;
-  padding-inline: var(--space-3);
-}
-
-:where(.system-b-start-loading-copy-slot) > * {
-  width: min(58%, calc(var(--space-24) * 2));
-  height: var(--space-5);
-}
-
-:where(.system-b-start-loading-actions) {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-:where(.system-b-start-loading-actions) > * {
-  width: calc(var(--space-8) + var(--space-1));
-  height: calc(var(--space-8) + var(--space-1));
-}
-
-/* ============================================
    SYSTEM B SHELL LOADING PRIMITIVES
    ============================================ */
 
@@ -6509,19 +6450,25 @@
   table-layout: fixed;
 }
 
-/* Settings owns its usable pane beside the companion overlay. Reserve on
-   the pane, so the capped form centers and shrinks inside the remaining
-   space. The shell's existing content inset already accounts for part of
-   the overlay padding; do not subtract that inset a second time. */
+/* Settings reserves its automatic Profile companion from the server paint,
+   so the capped form never moves while the rail mounts and opens. The rail
+   pushes the route (it is a column of the shell main plane), so the
+   reservation is exactly the rail's allocation: the drawer width plus the
+   shell gap. Before the rail mounts, the pane holds it; once the rail slot
+   exists, the slot holds it until the first opening settles, then the
+   drawer's own width takes over at the same size. */
 @media (min-width: 1024px) {
-  [data-testid="settings-shell-content"]:has(
-    [data-settings-companion-rail="true"]
-  ) {
-    margin-inline-end: calc(
-      360px +
-      2 *
-      var(--space-1-5) -
-      var(--app-shell-content-inset)
-    );
+  [data-app-shell-main-plane="true"]:not(
+      :has(> [data-testid="app-shell-right-rail"])
+    )
+    [data-testid="settings-shell-content"]:has(
+      [data-settings-companion-rail="true"]
+    ) {
+    margin-inline-end: calc(360px + var(--app-shell-gap));
+  }
+
+  [data-app-shell-main-plane="true"]:has([data-settings-companion-rail="true"])
+    > [data-testid="app-shell-right-rail"] {
+    min-width: calc(360px + var(--app-shell-gap));
   }
 }

@@ -6,6 +6,7 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 import re
@@ -24,7 +25,12 @@ reason = importlib.util.module_from_spec(SPEC)
 sys.modules["reason_lane"] = reason
 SPEC.loader.exec_module(reason)
 
-CONFIG = reason.load_config()
+REAL_CONFIG = reason.load_config()
+# Execution tests drive the proposer through a stdin stub so each test controls its replies. The shipped
+# proposer (Hyperagent, never a subscription login) is asserted separately in ShippedRoutesTest.
+STUB = {"name": "stub", "model": "stub-model", "timeoutS": 60, "stdin": True, "health": ["proposer_stub", "status"],
+        "healthy": ".", "cmd": ["proposer_stub", "{schema}", "{max_budget_usd}"]}
+CONFIG = {**REAL_CONFIG, "proposer": STUB}
 PROPOSAL = {"summary": "Ship the $199 upsell first", "confidence": 0.8, "assumptions": ["artists convert"],
             "risks": ["no traffic"],
             "precedentDisposition": "adapt", "materialDifference": "Jovie serves independent artists",
@@ -348,16 +354,14 @@ class ParseOutputTest(unittest.TestCase):
 
 class RunModelTest(unittest.TestCase):
     def test_success_formats_the_command_and_uses_stdin(self):
-        run = Runner(claude=claude_ok())
+        run = Runner(proposer_stub=claude_ok())
         out = reason.run_model(CONFIG["proposer"], "PROMPT", reason.PROPOSAL_SCHEMA,
                                tuple(reason.PROPOSAL_SCHEMA["required"]), run=run)
         self.assertTrue(out["ok"])
         args, kw = run.calls[0]
         self.assertEqual(kw["input"], "PROMPT")
-        self.assertIn("claude-opus-5-5", args)
-        self.assertEqual(json.loads(args[args.index("--json-schema") + 1]), reason.PROPOSAL_SCHEMA)
-        self.assertEqual(args[args.index("--max-budget-usd") + 1], "3")
-        self.assertEqual(args[args.index("--tools") + 1], "", "the proposer runs with no tools")
+        self.assertEqual(json.loads(args[1]), reason.PROPOSAL_SCHEMA)
+        self.assertEqual(args[2], "3")
 
     def test_prompt_file_is_written_then_removed(self):
         seen = {}
@@ -386,18 +390,18 @@ class RunModelTest(unittest.TestCase):
 
     def test_health_and_env_file(self):
         with tempfile.TemporaryDirectory() as tmp:
-            env = Path(tmp) / "claude.env"
-            env.write_text("# token\nexport CLAUDE_CODE_OAUTH_TOKEN='abc'\n")
-            spec = {**CONFIG["proposer"], "env": str(env)}
+            env = Path(tmp) / "stub.env"
+            env.write_text("# token\nexport STUB_TOKEN='abc'\n")
+            spec = {**CONFIG["proposer"], "env": str(env), "healthy": '"loggedIn": true'}
             seen = {}
 
             def status(args, kw):
-                seen["token"] = kw["env"].get("CLAUDE_CODE_OAUTH_TOKEN")
+                seen["token"] = kw["env"].get("STUB_TOKEN")
                 return done('{"loggedIn": true}')
-            self.assertTrue(reason.healthy(spec, run=Runner(claude=status)))
+            self.assertTrue(reason.healthy(spec, run=Runner(proposer_stub=status)))
             self.assertEqual(seen["token"], "abc")
-        self.assertFalse(reason.healthy(CONFIG["proposer"], run=Runner(claude=done('{"loggedIn": false}'))))
-        self.assertFalse(reason.healthy(CONFIG["proposer"], run=Runner(claude=OSError("gone"))))
+        self.assertFalse(reason.healthy({**CONFIG["proposer"], "healthy": '"loggedIn": true'}, run=Runner(proposer_stub=done('{"loggedIn": false}'))))
+        self.assertFalse(reason.healthy(CONFIG["proposer"], run=Runner(proposer_stub=OSError("gone"))))
         self.assertEqual(reason.load_env_file("/nonexistent/env"), {})
 
 
@@ -455,13 +459,13 @@ class ExecuteTest(unittest.TestCase):
     job = reason.parse_job("JOV-9", "t", description())
 
     def test_limited_grok_falls_back_to_the_hyperagent_reviewer_and_cools_down(self):
-        run = Runner(claude=claude_ok(), grok=[done("logged in"), done('{"type":"error","message":"402"}', 1)],
+        run = Runner(proposer_stub=claude_ok(), grok=[done("logged in"), done('{"type":"error","message":"402"}', 1)],
                      hyperagent=[done('{"models": {}}'), hyper_ok()])
         with tempfile.TemporaryDirectory() as tmp:
             out = reason.execute(self.job, CONFIG, "ctx", Path(tmp), run=run)
             self.assertTrue(reason.cooled(Path(tmp), "grok-cli"))
             again = reason.execute(self.job, CONFIG, "ctx", Path(tmp), run=Runner(
-                claude=claude_ok(), hyperagent=[done('{"models": {}}'), hyper_ok()]))
+                proposer_stub=claude_ok(), hyperagent=[done('{"models": {}}'), hyper_ok()]))
             self.assertEqual(again["record"]["reviewer"], "hyperagent-grok-reviewer (grok-4.7)",
                              "a cooled reviewer is skipped without a call")
         record = out["record"]
@@ -472,14 +476,14 @@ class ExecuteTest(unittest.TestCase):
         self.assertIn('"A1"', prompt, "the reviewer sees the proposal")
 
     def test_no_reviewer_is_low_confidence_with_reasons(self):
-        run = Runner(claude=claude_ok(), grok=done("not logged", 1), hyperagent=done("", 1))
+        run = Runner(proposer_stub=claude_ok(), grok=done("not logged", 1), hyperagent=done("", 1))
         with tempfile.TemporaryDirectory() as tmp:
             record = reason.execute(self.job, CONFIG, "ctx", Path(tmp), run=run)["record"]
         self.assertEqual(record["confidence"], "low")
         self.assertIn("grok-cli: unavailable", record["reasons"])
 
     def test_non_limit_reviewer_failure_is_not_cooled(self):
-        run = Runner(claude=claude_ok(), grok=[done("logged in"), done("gibberish")],
+        run = Runner(proposer_stub=claude_ok(), grok=[done("logged in"), done("gibberish")],
                      hyperagent=[done('{"models": {}}'), done("", 1, "approval pause")])
         with tempfile.TemporaryDirectory() as tmp:
             record = reason.execute(self.job, CONFIG, "ctx", Path(tmp), run=run)["record"]
@@ -488,7 +492,7 @@ class ExecuteTest(unittest.TestCase):
 
     def test_proposer_failure_asks_for_retry(self):
         with tempfile.TemporaryDirectory() as tmp:
-            out = reason.execute(self.job, CONFIG, "ctx", Path(tmp), run=Runner(claude=done("", 1, "not logged in")))
+            out = reason.execute(self.job, CONFIG, "ctx", Path(tmp), run=Runner(proposer_stub=done("", 1, "not logged in")))
         self.assertTrue(out["retry"])
         self.assertEqual(out["record"]["confidence"], "failed")
 
@@ -537,7 +541,7 @@ class OneJobTest(unittest.TestCase):
 
     def test_success_comments_the_block_writes_gbrain_and_closes(self):
         linear = FakeLinear()
-        run = Runner(claude=claude_ok(), grok=[done("logged in"), done(json.dumps(AGREE))], gbrain=StoringGbrain())
+        run = Runner(proposer_stub=claude_ok(), grok=[done("logged in"), done(json.dumps(AGREE))], gbrain=StoringGbrain())
         with tempfile.TemporaryDirectory() as tmp:
             record = reason.one_job(linear, {**self.issue, "description": description({**JOB_BLOCK, "contextRefs": []})},
                                     CONFIG, Path(tmp), run=run)
@@ -562,7 +566,7 @@ class OneJobTest(unittest.TestCase):
                     return stored
                 return done("ok")
             linear = FakeLinear()
-            run = Runner(claude=claude_ok(), grok=[done("logged in"), done(json.dumps(AGREE))], gbrain=gbrain)
+            run = Runner(proposer_stub=claude_ok(), grok=[done("logged in"), done(json.dumps(AGREE))], gbrain=gbrain)
             with tempfile.TemporaryDirectory() as tmp:
                 record = reason.one_job(linear, self.issue, CONFIG, Path(tmp), run=run)
             self.assertIsNone(record["gbrainSlug"])
@@ -575,7 +579,7 @@ class OneJobTest(unittest.TestCase):
 
     def test_gbrain_failure_drops_the_slug(self):
         linear = FakeLinear()
-        run = Runner(claude=claude_ok(), grok=[done("logged in"), done(json.dumps(AGREE))], gbrain=done("", 1))
+        run = Runner(proposer_stub=claude_ok(), grok=[done("logged in"), done(json.dumps(AGREE))], gbrain=done("", 1))
         with tempfile.TemporaryDirectory() as tmp:
             record = reason.one_job(linear, self.issue, CONFIG, Path(tmp), run=run)
         self.assertIsNone(record["gbrainSlug"])
@@ -586,13 +590,13 @@ class OneJobTest(unittest.TestCase):
         linear = FakeLinear()
         issue = {**self.issue, "description": description({**JOB_BLOCK, "question": "How should we price Jovie?",
                                                             "contextRefs": []})}
-        run = Runner(gbrain=done("", 1, "gbrain offline"), claude=claude_ok())
+        run = Runner(gbrain=done("", 1, "gbrain offline"), proposer_stub=claude_ok())
         with tempfile.TemporaryDirectory() as tmp:
             state = Path(tmp)
             record = reason.one_job(linear, issue, CONFIG, state, run=run)
             self.assertFalse(reason.budget_path(state).exists())
         self.assertEqual(record["priorArt"]["status"], "retrieval-failed")
-        self.assertEqual(run.made("claude"), [])
+        self.assertEqual(run.made("proposer_stub"), [])
         self.assertEqual(linear.moves[-1], ("i-9", "Todo"))
 
     def test_known_yc_playbook_reaches_the_prompt_before_a_fresh_experiment(self):
@@ -612,10 +616,10 @@ class OneJobTest(unittest.TestCase):
                     "ranking": [{**item, "evidence": ["knowledge/external/yc/playbook/hiring-team", "JOV-12"]}
                                 for item in PROPOSAL["ranking"]]}
         run = Runner(gbrain=[done(page), done("ok"), done("", 1)],
-                     claude=claude_ok(proposal), grok=[done("logged in"), done(json.dumps(AGREE))])
+                     proposer_stub=claude_ok(proposal), grok=[done("logged in"), done(json.dumps(AGREE))])
         with tempfile.TemporaryDirectory() as tmp:
             record = reason.one_job(linear, issue, CONFIG, Path(tmp), run=run)
-        prompt = run.calls[next(i for i, (args, _) in enumerate(run.calls) if args[0] == "claude")][1]["input"]
+        prompt = run.calls[next(i for i, (args, _) in enumerate(run.calls) if args[0] == "proposer_stub")][1]["input"]
         self.assertIn("knowledge/external/yc/playbook/hiring-team", prompt)
         self.assertIn("what is materially different about Jovie's case?", prompt)
         self.assertEqual(record["decisionEvidence"]["inference"]["precedentDisposition"], "adopt")
@@ -624,9 +628,9 @@ class OneJobTest(unittest.TestCase):
     def test_failure_retries_once_then_cancels(self):
         linear = FakeLinear()
         with tempfile.TemporaryDirectory() as tmp:
-            reason.one_job(linear, self.issue, CONFIG, Path(tmp), run=Runner(claude=done("", 1)))
+            reason.one_job(linear, self.issue, CONFIG, Path(tmp), run=Runner(proposer_stub=done("", 1)))
             self.assertEqual(linear.moves[-1], ("i-9", "Todo"))
-            reason.one_job(linear, self.issue, CONFIG, Path(tmp), run=Runner(claude=done("", 1)))
+            reason.one_job(linear, self.issue, CONFIG, Path(tmp), run=Runner(proposer_stub=done("", 1)))
             self.assertEqual(reason.failure_count(Path(tmp), "JOV-9"), 2)
         self.assertEqual(linear.moves[-1], ("i-9", "Canceled"))
         self.assertEqual(result_block(linear.comments[-1][1])["confidence"], "failed")
@@ -701,7 +705,7 @@ class DrainAndTickTest(unittest.TestCase):
                 return "In Progress"
             return real_state(issue_id)
         linear.state_of = state_of
-        run = Runner(claude=[done('"loggedIn": true'), claude_ok()], grok=[done("logged in"), done(json.dumps(AGREE))],
+        run = Runner(proposer_stub=[done('"loggedIn": true'), claude_ok()], grok=[done("logged in"), done(json.dumps(AGREE))],
                      gbrain=done("ok"))
         with tempfile.TemporaryDirectory() as tmp:
             host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "env")
@@ -730,7 +734,7 @@ class DrainAndTickTest(unittest.TestCase):
                                              spawn=lambda *a, **k: self.fail("cooldown must not spawn"))
                     else:
                         result = reason.drain(host, self.lane(linear), CONFIG,
-                                              run=Runner(claude=done('"loggedIn": true'), grok=done("logged in")))
+                                              run=Runner(proposer_stub=done('"loggedIn": true'), grok=done("logged in")))
                     self.assertEqual(result["status"], "linear-rate-limited")
                     self.assertEqual(result["resetAt"], error.reset_at)
                     self.assertTrue(release.called, "cooldown must release the lane/claim locks")
@@ -743,11 +747,11 @@ class DrainAndTickTest(unittest.TestCase):
             FakeLock.held_paths = {"reason.lock"}
             self.assertEqual(reason.drain(host, self.lane(FakeLinear()), CONFIG)["status"], "busy")
             FakeLock.held_paths = set()
-            unhealthy = reason.drain(host, self.lane(FakeLinear()), CONFIG, run=Runner(claude=done("", 1)))
+            unhealthy = reason.drain(host, self.lane(FakeLinear()), CONFIG, run=Runner(proposer_stub=done("", 1)))
             self.assertEqual(unhealthy["status"], "proposer-unhealthy")
             linear = FakeLinear(jobs=[{"id": "i-1", "identifier": "JOV-1", "title": "a", "description": description(), "createdAt": "1"}])
             capped = reason.drain(host, self.lane(linear), {**CONFIG, "maxJobsPerDay": 0},
-                                  run=Runner(claude=done('"loggedIn": true')))
+                                  run=Runner(proposer_stub=done('"loggedIn": true')))
             self.assertEqual(capped["status"], "budget-exhausted")
             self.assertEqual(linear.moves, [], "an over-budget job stays in Todo")
 
@@ -755,7 +759,7 @@ class DrainAndTickTest(unittest.TestCase):
         research = description({**JOB_BLOCK, "decisionType": "research", "question": "Why?"})
         linear = FakeLinear(jobs=[{"id": "i-1", "identifier": "JOV-1", "title": "rank", "description": description(), "createdAt": "1"},
                                   {"id": "i-2", "identifier": "JOV-2", "title": "research", "description": research, "createdAt": "2"}])
-        run = Runner(claude=done("", 1), hyperagent=[done('{"models": {}}'), done(json.dumps({"text": "Answer: yes"}))],
+        run = Runner(proposer_stub=done("", 1), hyperagent=[done('{"models": {}}'), done(json.dumps({"text": "Answer: yes"}))],
                      gbrain=done("ok"))
         with tempfile.TemporaryDirectory() as tmp:
             host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "env")
@@ -768,7 +772,7 @@ class DrainAndTickTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "env")
             out = reason.drain(host, self.lane(linear), CONFIG,
-                               run=Runner(claude=[done('"loggedIn": true'), done("", 1)]))
+                               run=Runner(proposer_stub=[done('"loggedIn": true'), done("", 1)]))
         self.assertEqual(out["status"], "idle")
         self.assertEqual(linear.moves[-1], ("i-1", "Todo"))
 
@@ -1075,15 +1079,300 @@ class OutcomeLaneTest(unittest.TestCase):
         self.assertEqual((gaps[0]["capability"], gaps[0]["owner"]), ("signed-in-browser", "golden-path (authqaprod fixture)"))
         self.assertIn(esc.GAP_MARKER, comments[-1])
         self.assertIn("JOV-7771", json.loads((state / esc.GAP_FILE).read_text()))
-        # A page that loads fine for the lane's browser was observable: the shrug becomes a failure.
+        # Reachability alone does not prove this criterion in either direction.
         probe.update(finalUrl="https://jov.ie/app/tasks", text="Tasks due today 3")
         flipped = esc.escalate([item], tree=tree, out_dir=out, run=run, env={}, codex_cmd=["x"], linear=Linear(), issue=issue)
-        self.assertEqual(flipped[0]["status"], "fail")
-        self.assertIn("observable but not observed", flipped[0]["evidence"])
+        self.assertEqual(flipped[0]["status"], "unverifiable")
+        self.assertEqual(flipped[0]["evidence"], item["evidence"])
         # Judgement items also ask a second model; without one configured the gap is recorded as such.
-        judgement = esc.escalate([{**item, "kind": "judgement", "capability": "taste", "evidence": "taste, no url"}], tree=tree,
-                                 out_dir=out, run=run, env={}, codex_cmd=["x"], linear=Linear(), issue=issue)
-        self.assertIn("no second-model reviewer", {a["step"]: a["result"] for a in judgement[0]["attempts"]}["adversarial"])
+        with patch.object(esc, "gateway_key", return_value=None):
+            judgement = esc.escalate([{**item, "kind": "judgement", "capability": "taste", "evidence": "taste, no url"}], tree=tree,
+                                     out_dir=out, run=run, env={}, codex_cmd=["x"], linear=Linear(), issue=issue)
+        with patch.object(esc, "gateway_key", return_value=None):
+            unconfigured = esc.escalate([{**item, "kind": "judgement", "capability": "taste", "evidence": "taste, no url"}], tree=tree,
+                                        out_dir=out, run=run, env={}, codex_cmd=["x"], linear=Linear(), issue=issue)
+        self.assertIn("no AI Gateway key", {a["step"]: a["result"] for a in unconfigured[0]["attempts"]}["adversarial"])
+
+    def outcome_probe_fixture(self, **changes):
+        item = {"criterion": "Mac disk health stays below the pressure threshold", "status": "unverifiable",
+                "kind": "observable", "capability": "device",
+                "evidence": "Device observation unavailable; build binding only: https://jov.ie/api/version",
+                "attempts": [{"step": "telemetry", "result": "Needs a device observation, not public build metadata"}]}
+        return {**item, **changes}
+
+    def escalate_with_public_probe(self, items, issue=None, **kwargs):
+        esc = outcome.esc
+        probe = {"url": "https://jov.ie/api/version", "ok": True, "status": 200,
+                 "finalUrl": "https://jov.ie/api/version", "text": '{"buildId":"abc1234"}'}
+        with patch.object(esc, "browser_probe", return_value=probe), patch.object(esc, "request_agent_help", return_value={
+                "channel": "none", "delivered": False, "note": "fixture has no authenticated agent"}):
+            return esc.escalate(items, tree=ROOT, out_dir=Path("unused"), run=None, env={}, codex_cmd=[], linear=None,
+                                issue=issue or {"id": "u1", "identifier": "JOV-7771"}, sha=SHA, **kwargs)
+
+    def test_unrelated_successful_probe_preserves_each_criterion_and_its_evidence(self):
+        for criterion, capability in (("Mac disk pressure stays below threshold", "device"),
+                                      ("Installed protocol rollout is complete", "process-record"),
+                                      ("Authenticated chat replies stream", "signed-in-browser")):
+            with self.subTest(criterion=criterion):
+                item = self.outcome_probe_fixture(criterion=criterion, capability=capability)
+                original = json.loads(json.dumps(item))
+                row, = self.escalate_with_public_probe([item])
+                self.assertEqual((row["status"], row["evidence"]), ("unverifiable", item["evidence"]))
+                self.assertEqual(item, original, "escalation must not mutate the verifier's original evidence")
+                self.assertEqual(outcome.esc.missing_steps(row), [])
+                self.assertIn("https://jov.ie/api/version -> 200", row["attempts"][1]["result"])
+                self.assertEqual(outcome.esc.gap_for("JOV-7771", row)["capability"], capability)
+
+    def test_relevant_help_evidence_still_decides_despite_an_unrelated_successful_probe(self):
+        esc = outcome.esc
+        item = self.outcome_probe_fixture(criterion="Task due chips render", capability="signed-in-browser")
+        corr = esc.correlation_id("u1", item, SHA)
+        for verdict, status, observation in (("contradicted", "fail", "Signed in on the verified build: due chips are missing"),
+                                              ("supported", "pass", "Signed in on the verified build: 3 due chips are visible"),
+                                              ("insufficient", "unverifiable", "I have not opened this build")):
+            with self.subTest(verdict=verdict), patch.object(esc, "evaluate_reply", return_value={
+                    "ran": True, "verdict": verdict, "result": observation}) as evaluate:
+                issue = {"id": "u1", "identifier": "JOV-7771", "comments": {"nodes": self.help_thread(corr, observation)}}
+                row, = self.escalate_with_public_probe([item], issue)
+                self.assertEqual(row["status"], status)
+                evaluate.assert_called_once()
+                self.assertEqual(evaluate.call_args.args[0]["criterion"], item["criterion"])
+                self.assertEqual(evaluate.call_args.args[1], observation)
+                self.assertIn(observation if verdict != "insufficient" else item["evidence"], row["evidence"])
+
+    def test_mixed_criteria_retain_true_failures_passes_and_residuals(self):
+        passed = {"criterion": "Build contains the binding merge", "status": "pass", "evidence": "git merge-base confirmed the binding SHA"}
+        failed = {"criterion": "Chat streams a reply", "status": "fail", "evidence": "Authenticated observation: stream closes with HTTP 500"}
+        unknown = self.outcome_probe_fixture()
+        rows = self.escalate_with_public_probe([passed, failed, unknown])
+        self.assertEqual(rows[:2], [passed, failed])
+        self.assertEqual([r["status"] for r in rows], ["pass", "fail", "unverifiable"])
+        verdict = {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": rows}
+        self.assertEqual(outcome.judge(verdict, "JOV-7771", SHA)["status"], "fail", "a real contradiction still fails")
+        verdict["items"] = self.escalate_with_public_probe([passed, {**passed, "criterion": "Tests pass"}, unknown])
+        decision = outcome.judge(verdict, "JOV-7771", SHA)
+        self.assertEqual((decision["status"], decision["reason"]), ("pass", "verified-with-residual"))
+        self.assertEqual(decision["items"][-1]["status"], "unverifiable", "the aggregate policy never turns the unknown into a pass")
+
+    def test_unavailable_authentication_is_unknown_even_when_another_probe_loads(self):
+        esc = outcome.esc
+        item = self.outcome_probe_fixture(criterion="Authenticated chat replies stream", capability="signed-in-browser",
+                                          urls=["https://jov.ie/app/chat"],
+                                          evidence="No authenticated fixture; build binding only: https://jov.ie/api/version")
+        for final_url, text, status in (("https://jov.ie/signin", "Log in to Jovie", 200),
+                                        ("https://jov.ie/app/chat", "Unauthorized", 401),
+                                        ("https://jov.ie/app/chat", "Public application shell", 200)):
+            with self.subTest(final_url=final_url, status=status):
+                def probe(tree, url, *args):
+                    return {"ok": True, "status": status if url.endswith("/chat") else 200,
+                            "finalUrl": final_url if url.endswith("/chat") else url, "text": text}
+                with patch.object(esc, "browser_probe", side_effect=probe), patch.object(esc, "request_agent_help", return_value={
+                        "channel": "none", "delivered": False, "note": "authentication unavailable"}):
+                    row, = esc.escalate([item], tree=ROOT, out_dir=Path("unused"), run=None, env={}, codex_cmd=[], linear=None,
+                                        issue={"id": "u1", "identifier": "JOV-7771"}, sha=SHA)
+                self.assertEqual((row["status"], row["evidence"]), ("unverifiable", item["evidence"]))
+                self.assertEqual(esc.missing_steps(row), [])
+
+    def test_verify_routes_sanitized_gap_correlation_so_later_help_replies_are_evaluated(self):
+        esc = outcome.esc
+        unknown = self.outcome_probe_fixture(criterion="Authenticated chat replies stream", capability="signed-in-browser",
+                                             helpCorr="oh-0000000000")
+        proved = {"criterion": "Build contains the binding merge", "status": "pass", "evidence": "git merge-base confirmed the binding SHA"}
+        verdict = {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA,
+                   "items": [proved, {**proved, "criterion": "Related tests pass"}, unknown]}
+        corr = esc.correlation_id("uuid-7771", unknown, SHA)
+        self.assertNotEqual(corr, unknown["helpCorr"], "the lane replaces model-supplied correlation metadata")
+        for reply_verdict in ("supported", "contradicted"):
+            with self.subTest(reply_verdict=reply_verdict):
+                with patch.object(esc, "browser_probe", return_value={"ok": True, "status": 200,
+                        "finalUrl": "https://jov.ie/api/version", "text": '{"buildId":"abc1234"}'}):
+                    # Exercise the real verify -> escalate -> judge -> route_gaps path, with only I/O faked.
+                    result, calls, comments, state = self.drain(verdict, manifest_extra={"receiptNotBefore": "2026-10-20T00:00:00Z"})
+                queries, resolutions = [], []
+                thread = self.help_thread(corr, "Signed in on this build: observed chat response state")
+
+                class ReplyLinear:
+                    def gql(self, query, variables):
+                        queries.append((query, variables))
+                        return {"issue": {"id": "uuid-7771", "identifier": "JOV-7771", "state": {"name": "Validating"},
+                                          "comments": {"nodes": thread}}}
+                    def comment(self, issue_id, body):
+                        resolutions.append(body)
+
+                with patch.object(esc, "evaluate_reply", return_value={"ran": True, "verdict": reply_verdict,
+                        "result": "criterion-specific fixture observation"}) as evaluate:
+                    resolved = esc.followup_replies(state, ReplyLinear(), 5.0)
+                    self.assertEqual(len(queries), 1, "a sanitized gap must retain the correlation needed to query its issue")
+                    evaluate.assert_called_once()
+                    self.assertEqual(esc.followup_replies(state, ReplyLinear(), 6.0), [], "a resolved gap is not evaluated twice")
+                self.assertEqual(result["done"][0]["decision"], "pass", "the existing proven-majority policy is unchanged")
+                self.assertEqual((resolved[0]["verdict"], resolved[0]["sha"], resolved[0]["episode"]),
+                                 (reply_verdict, SHA, "2026-10-20T00:00:00Z"))
+                stored = json.loads((state / esc.GAP_FILE).read_text())["JOV-7771"]["gaps"][0]
+                self.assertEqual((stored["helpCorr"], stored["evidence"]), (corr, unknown["evidence"]))
+                self.assertEqual(stored["resolved"]["verdict"], reply_verdict)
+                self.assertEqual(evaluate.call_args.args[0]["criterion"], unknown["criterion"])
+                self.assertIn(esc.RESOLUTION_MARKER, resolutions[0])
+                self.assertTrue(any(f"corr={corr}" in body for _, body in comments), "the original help request uses the stored correlation")
+
+    def test_judge_preserves_only_well_formed_help_correlation_metadata(self):
+        attempts = [{"step": step, "result": "fixture attempted"} for step in ("tools", "telemetry", "agent-help")]
+        for corr in ("oh-0123456789", None, 123, {}, [], "", "oh-012345678", "oh-01234567890",
+                     "oh-012345678g", "oh-ABCDEF0123", "oh-0123456789\n", "prefix-oh-0123456789"):
+            with self.subTest(corr=corr):
+                item = self.outcome_probe_fixture(helpCorr=corr, attempts=attempts, unexpectedMetadata={"keep": "no"})
+                decision = outcome.judge({"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA,
+                                          "items": [item]}, "JOV-7771", SHA)
+                row = decision["items"][0]
+                self.assertEqual((row["status"], row["evidence"]), ("unverifiable", item["evidence"]))
+                self.assertNotIn("unexpectedMetadata", row)
+                if corr == "oh-0123456789":
+                    self.assertEqual(row.get("helpCorr"), corr)
+                else:
+                    self.assertNotIn("helpCorr", row)
+
+    def test_stale_help_evidence_for_another_build_cannot_decide_a_current_unknown(self):
+        esc = outcome.esc
+        item = self.outcome_probe_fixture(criterion="Installed protocol rollout is complete", capability="process-record")
+        stale_corr = esc.correlation_id("u1", item, "0" * 40)
+        issue = {"id": "u1", "identifier": "JOV-7771", "comments": {"nodes": self.help_thread(
+            stale_corr, "Previous build: protocol installed and verified")}}
+        with patch.object(esc, "evaluate_reply") as evaluate:
+            row, = self.escalate_with_public_probe([item], issue)
+        evaluate.assert_not_called()
+        self.assertNotEqual(row["helpCorr"], stale_corr)
+        self.assertEqual((row["status"], row["evidence"]), ("unverifiable", item["evidence"]))
+        self.assertEqual(esc.missing_steps(row), [])
+
+    def gateway(self, verdict, reason="because", prompt_tokens=1000, completion_tokens=100, calls=None):
+        def urlopen(request, timeout=0):
+            if calls is not None:
+                calls.append(json.loads(request.data))
+            body = {"choices": [{"message": {"content": json.dumps({"verdict": verdict, "reason": reason})}}],
+                    "usage": {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens}}
+            return io.BytesIO(json.dumps(body).encode())
+        return urlopen
+
+    def test_adversarial_reviewer_defaults_on_through_the_gateway_with_a_different_family(self):
+        esc = outcome.esc
+        self.assertEqual(esc.DEFAULT_ADVERSARIAL_MODEL, "openai/gpt-6.1-sol")
+        calls = []
+        with patch.object(esc, "gateway_key", return_value="k"), patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("LANES_OUTCOME_ADVERSARIAL_MODEL", None)
+            review = esc.adversarial_review({"criterion": "c", "evidence": "e"}, urlopen=self.gateway("contradicted", calls=calls))
+            self.assertEqual((review["ran"], review["verdict"], calls[0]["model"]), (True, "contradicted", "openai/gpt-6.1-sol"))
+            self.assertIn("$0.0030", review["result"])
+            with patch.dict(os.environ, {"LANES_OUTCOME_ADVERSARIAL_MODEL": "off"}):
+                self.assertIn("disabled", esc.adversarial_review({"criterion": "c"})["result"])
+            bad = esc.gateway_judge("q", "openai/gpt-6.1-sol", urlopen=self.gateway("maybe"))
+            self.assertFalse(bad["ran"])
+        with patch.object(esc, "gateway_key", return_value=None):
+            self.assertIn("no AI Gateway key", esc.adversarial_review({"criterion": "c"})["result"])
+
+    def test_the_default_gateway_read_goes_through_the_shared_client_with_the_contract_host(self):
+        esc = outcome.esc
+        seen = {}
+        class Response:
+            status = 200
+            def json(self):
+                return {"choices": [{"message": {"content": json.dumps({"verdict": "supported", "reason": "r"})}}], "usage": {}}
+        class Client:
+            def __init__(self, provider, credential, authorize=None, **kw):
+                seen["provider"] = provider
+                headers = {}
+                authorize(headers)
+                seen["auth"] = headers["Authorization"]
+            def request(self, url, **kw):
+                seen["url"] = url
+                seen["priority"] = kw.get("priority")
+                return Response()
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        import apiclient
+        with patch.object(esc, "gateway_key", return_value="k"), patch.object(apiclient, "ApiClient", Client):
+            verdict = esc.gateway_judge("q", "openai/gpt-6.1-sol")
+        self.assertEqual(verdict["verdict"], "supported")
+        self.assertEqual((seen["provider"], seen["auth"], seen["priority"]), ("ai-gateway", "Bearer k", "report"))
+        self.assertEqual(seen["url"], "https://ai-gateway.vercel.sh/v1/chat/completions")
+
+    def help_thread(self, corr, reply_body=None, *, child=True):
+        request = {"id": "c-req", "createdAt": "2026-10-25T01:00:00Z", "body": f"<!-- outcome-help-request:v1 corr={corr} -->\nplease look"}
+        nodes = [request]
+        if reply_body is not None:
+            nodes.append({"id": "c-rep", "createdAt": "2026-10-25T02:00:00Z", "user": {"name": "Instinct"},
+                          "body": reply_body if child else f"corr:{corr} {reply_body}", "parent": {"id": "c-req"} if child else None})
+        return nodes
+
+    def test_a_reply_to_the_help_request_re_evaluates_the_item_on_the_next_run(self):
+        esc = outcome.esc
+        item = {"criterion": "Task due chips render", "status": "unverifiable", "kind": "observable", "capability": "signed-in-browser",
+                "evidence": "redirects to /signin", "attempts": [{"step": "telemetry", "result": "not cheap"}]}
+        corr = esc.correlation_id("u1", item, SHA)
+        comments = []
+
+        class Linear:
+            def comment(self, issue_id, body):
+                comments.append(body)
+
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        probe_run = lambda args, **kw: subprocess.CompletedProcess(args, 1, "", "no browser")
+        base = dict(tree=Path(tmp.name), out_dir=Path(tmp.name) / "o", run=probe_run, env={}, codex_cmd=["x"], linear=Linear(), sha=SHA)
+        for child in (True, False):
+            issue = {"id": "u1", "identifier": "JOV-7771", "comments": {"nodes": self.help_thread(corr, "Signed in as the fixture: 3 chips visible, due Today/Tomorrow", child=child)}}
+            with patch.object(esc, "gateway_key", return_value="k"):
+                done = esc.escalate([item], issue=issue, urlopen=self.gateway("supported"), **base)
+            self.assertEqual(done[0]["status"], "pass", f"child={child}")
+            self.assertIn("observed by Instinct", done[0]["evidence"])
+            steps = {a["step"]: a["result"] for a in done[0]["attempts"]}
+            self.assertIn(f"reply from Instinct to {corr}", steps["agent-help"])
+            self.assertFalse(comments, "no second help request is posted once a reply exists")
+            with patch.object(esc, "gateway_key", return_value="k"):
+                contradicted = esc.escalate([item], issue=issue, urlopen=self.gateway("contradicted"), **base)
+            self.assertEqual(contradicted[0]["status"], "fail")
+            with patch.object(esc, "gateway_key", return_value="k"):
+                vague = esc.escalate([item], issue=issue, urlopen=self.gateway("insufficient"), **base)
+            self.assertEqual(vague[0]["status"], "unverifiable")
+        pending = {"id": "u1", "identifier": "JOV-7771", "comments": {"nodes": self.help_thread(corr)}}
+        waiting = esc.escalate([item], issue=pending, **base)
+        self.assertIn("no reply yet, not re-posted", {a["step"]: a["result"] for a in waiting[0]["attempts"]}["agent-help"])
+        self.assertFalse(comments)
+
+    def test_followup_closes_the_loop_between_verifications_and_fails_a_contradicted_validating_issue(self):
+        esc = outcome.esc
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        state = Path(tmp.name)
+        item = {"criterion": "Task due chips render", "evidence": "redirects to /signin"}
+        corr = esc.correlation_id("u1", item, SHA)
+        (state / esc.GAP_FILE).write_text(json.dumps({"JOV-7771": {"sha": SHA, "episode": None, "gaps": [
+            {"criterion": item["criterion"], "evidence": item["evidence"], "helpCorr": corr, "capability": "signed-in-browser"},
+            {"criterion": "other", "helpCorr": None}]}}))
+        thread = self.help_thread(corr, "Signed in: the chips are missing on mobile")
+        comments = []
+
+        class Linear:
+            def gql(self, query, variables):
+                return {"issue": {"id": "u1", "identifier": variables["id"], "state": {"name": "Validating"},
+                                  "comments": {"nodes": thread}}}
+            def comment(self, issue_id, body):
+                comments.append(body)
+
+        with patch.object(esc, "gateway_key", return_value="k"):
+            resolved = esc.followup_replies(state, Linear(), 5.0, urlopen=self.gateway("contradicted"))
+        self.assertEqual([(r["issue"], r["verdict"], r["state"]) for r in resolved], [("JOV-7771", "contradicted", "Validating")])
+        self.assertIn(esc.RESOLUTION_MARKER, comments[0])
+        stored = json.loads((state / esc.GAP_FILE).read_text())["JOV-7771"]["gaps"][0]
+        self.assertEqual(stored["resolved"]["verdict"], "contradicted")
+        with patch.object(esc, "gateway_key", return_value="k"):
+            self.assertEqual(esc.followup_replies(state, Linear(), 6.0, urlopen=self.gateway("supported")), [], "resolved once")
+        # The lane records a failing outcome receipt for a contradicted issue still in Validating.
+        calls = []
+        host = SimpleNamespace(state=state, repo=state / "repo")
+        with patch.object(outcome, "app_authorization", return_value="Bearer app"), \
+                patch.object(outcome.esc, "followup_replies", return_value=resolved):
+            outcome.help_followups(host, Linear(), 7.0, run=lambda a, **k: calls.append(a) or subprocess.CompletedProcess(a, 0, "", ""))
+        receipt = next(a for a in calls if "linear-sync-on-merge.mjs" in " ".join(map(str, a)))
+        self.assertEqual(receipt[receipt.index("--status") + 1], "fail")
 
     def test_verifier_gets_node24_dependencies_and_the_binding_rules(self):
         with tempfile.TemporaryDirectory() as home, patch.object(outcome.Path, "home", return_value=Path(home)):
@@ -1105,11 +1394,116 @@ class OutcomeLaneTest(unittest.TestCase):
             self.assertIn(needle, text)
         self.assertIn("NOT installed (boom)", outcome.prompt(outcome_issue(), {"sha": SHA, "manifest": {}}, "NOT installed (boom)"))
 
-    def drain(self, verdict, *, authorization="Bearer app", receipt_rc=0, manifest_extra=None, per_day=None):
+    def test_complete_verification_retires_old_gaps_before_later_correlated_replies(self):
+        esc = outcome.esc
+        episode = "2026-10-20T00:00:00Z"
+        old = self.outcome_probe_fixture(helpCorr="oh-0123456789")
+        book = {"JOV-7771": {"at": 1, "sha": SHA, "episode": episode, "gaps": [esc.gap_for("JOV-7771", old)]},
+                "JOV-7772": {"sha": SHA, "episode": episode, "gaps": [{"criterion": "Other issue", "helpCorr": None}]}}
+        for status in ("pass", "fail"):
+            with self.subTest(status=status):
+                verdict = {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": [
+                    {"criterion": old["criterion"], "status": status, "evidence": "Current device observation establishes this result"}]}
+                result, calls, comments, state = self.drain(verdict, seed_gaps=book,
+                                                            manifest_extra={"receiptNotBefore": episode})
+                self.assertEqual((result["done"][0]["result"], result["done"][0]["decision"]), ("recorded", status))
+                receipt = next(a for a, _ in calls if "linear-sync-on-merge.mjs" in " ".join(map(str, a)))
+                self.assertEqual(receipt[receipt.index("--status") + 1], status, "a fresh true failure is still recorded")
+                stored = esc.read_gaps(state)
+                self.assertEqual(stored["JOV-7771"]["gaps"], [])
+                self.assertEqual((stored["JOV-7771"]["sha"], stored["JOV-7771"]["episode"]), (SHA, episode))
+                self.assertEqual(stored["JOV-7772"], book["JOV-7772"])
+                self.assertFalse(any(esc.GAP_MARKER in body for _, body in comments), "retiring gaps needs no gap comment")
+                queries = []
+                linear = SimpleNamespace(gql=lambda q, v: queries.append(v) or {"issue": {
+                    "id": "uuid-7771", "state": {"name": "Validating"}, "comments": {"nodes": self.help_thread(
+                        old["helpCorr"], "Earlier device observation contradicted the criterion")}}})
+                with patch.object(esc, "evaluate_reply") as evaluate, patch.object(outcome, "record_receipt") as write:
+                    self.assertEqual(outcome.help_followups(SimpleNamespace(state=state), linear, time.time()), [])
+                self.assertFalse(queries)
+                evaluate.assert_not_called()
+                write.assert_not_called()
+
+    def test_empty_malformed_and_partial_verdicts_do_not_supersede_existing_gaps(self):
+        esc = outcome.esc
+        old = self.outcome_probe_fixture(helpCorr="oh-0123456789")
+        book = {"JOV-7771": {"at": 1, "sha": SHA, "episode": None, "gaps": [esc.gap_for("JOV-7771", old)]}}
+        proved = {"criterion": "Current build responds", "status": "pass", "evidence": "GET version returned the bound build"}
+        unknown = self.outcome_probe_fixture(criterion="A different unknown", evidence="Authentication unavailable")
+        base = {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": [proved]}
+        cases = [None, {}, {**base, "sha": "0" * 40}, {**base, "items": []},
+                 {**base, "items": [proved, None]}, {**base, "items": [proved, {}]},
+                 {**base, "items": [unknown, {}]}]
+        cases += [{**base, "items": [proved] * 40 + [tail]} for tail in (None, {}, unknown)]
+        for verdict in cases:
+            with self.subTest(verdict=verdict):
+                _, _, _, state = self.drain(verdict, seed_gaps=book)
+                self.assertEqual(esc.read_gaps(state), book)
+        result, _, _, state = self.drain({**base, "items": [unknown] + [proved] * 39 + [None]}, seed_gaps=book)
+        self.assertEqual(result["done"][0]["decision"], "pass", "existing escalation and first-40 judgment stay unchanged")
+        self.assertEqual(esc.read_gaps(state), book, "a truncated judgment is not a complete gap replacement")
+        # An empty direct call also cannot erase a previously recorded observation gap.
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / esc.GAP_FILE).write_text(json.dumps(book))
+            esc.route_gaps(state, SimpleNamespace(), {"id": "uuid-7771", "identifier": "JOV-7771"}, [], 2, sha=SHA)
+            self.assertEqual(esc.read_gaps(state), book)
+
+    def test_followup_query_failure_preserves_other_progress_and_delivers_true_failure_receipt(self):
+        esc = outcome.esc
+        corr, episode = "oh-0123456789", "2026-10-20T00:00:00Z"
+        for error_type in (RuntimeError, OSError, ValueError, KeyError):
+            with self.subTest(error_type=error_type.__name__), tempfile.TemporaryDirectory() as tmp:
+                state = Path(tmp)
+                book = {ident: {"sha": SHA, "episode": episode, "gaps": [{"criterion": ident,
+                        "evidence": "Authentication unavailable", "helpCorr": corr}]} for ident in ("JOV-0001", "JOV-0002", "JOV-0003")}
+                (state / esc.GAP_FILE).write_text(json.dumps(book))
+                queries, comments, failing = [], [], [True]
+                thread = self.help_thread(corr, "A direct authenticated observation of this criterion")
+
+                class Linear:
+                    def gql(self, query, variables):
+                        ident = variables["id"]
+                        queries.append(ident)
+                        if ident == "JOV-0002" and failing[0]:
+                            raise error_type("fixture query failure")
+                        return {"issue": {"id": ident, "state": {"name": "Validating"}, "comments": {"nodes": thread}}}
+                    def comment(self, ident, body):
+                        comments.append((ident, body))
+
+                host = SimpleNamespace(state=state, repo=state / "repo")
+                def evaluate(item, reply, **kwargs):
+                    return {"verdict": "supported" if item["criterion"] == "JOV-0003" else "contradicted",
+                            "result": "Concrete observation for " + item["criterion"]}
+                with patch.object(esc, "evaluate_reply", side_effect=evaluate) as judged, \
+                        patch.object(outcome, "app_authorization", return_value="Bearer fixture"), \
+                        patch.object(outcome, "checkout", return_value=state / "tree"), \
+                        patch.object(outcome, "drop_checkout"), patch.object(outcome, "record_receipt", return_value=True) as write:
+                    result = outcome.help_followups(host, Linear(), 2)
+                    self.assertEqual(result, [{"issue": "JOV-0001", "verdict": "contradicted"},
+                        {"issue": "JOV-0002", "error": error_type.__name__}, {"issue": "JOV-0003", "verdict": "supported"}])
+                    stored = esc.read_gaps(state)
+                    self.assertEqual(stored["JOV-0001"]["gaps"][0]["resolved"]["verdict"], "contradicted")
+                    self.assertEqual(stored["JOV-0002"], book["JOV-0002"], "failed queries remain retryable")
+                    self.assertEqual(stored["JOV-0003"]["gaps"][0]["resolved"]["verdict"], "supported")
+                    write.assert_called_once()
+                    self.assertEqual(write.call_args.args[1:3], ("JOV-0001", SHA))
+                    self.assertEqual(write.call_args.args[3]["status"], "fail")
+                    self.assertEqual(write.call_args.args[5], {"receiptNotBefore": episode})
+                    self.assertEqual(outcome.help_followups(host, Linear(), 3), [{"issue": "JOV-0002", "error": error_type.__name__}])
+                    self.assertEqual((judged.call_count, write.call_count, len(comments)), (2, 1, 2), "no replay of completed effects")
+                    failing[0] = False
+                    self.assertEqual(outcome.help_followups(host, Linear(), 4), [{"issue": "JOV-0002", "verdict": "contradicted"}])
+                    self.assertEqual(write.call_count, 2, "the recovered query's contradiction reaches the receipt writer")
+                    self.assertEqual(queries, ["JOV-0001", "JOV-0002", "JOV-0003", "JOV-0002", "JOV-0002"])
+
+    def drain(self, verdict, *, authorization="Bearer app", receipt_rc=0, manifest_extra=None, per_day=None, seed_gaps=None):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         state = Path(tmp.name)
         calls, comments = [], []
+        if seed_gaps is not None:
+            (state / outcome.esc.GAP_FILE).write_text(json.dumps(seed_gaps))
 
         class Locked:
             def __init__(self, path, blocking=False):
@@ -1189,3 +1583,57 @@ class OutcomeLaneTest(unittest.TestCase):
     def test_tick_never_runs_in_a_selftest(self):
         with patch.dict(os.environ, {"LANES_SELFTEST": "1"}):
             self.assertEqual(outcome.tick(SimpleNamespace(), SimpleNamespace())["status"], "selftest-skipped")
+
+
+class ShippedRoutesTest(unittest.TestCase):
+    """No reason-lane proposer runs on a subscription login (terms of service)."""
+    def test_proposers_are_hyperagent_credit_routes(self):
+        for key in ("proposer", "judgmentProposer"):
+            spec = REAL_CONFIG[key]
+            self.assertEqual(spec["cmd"][:2], ["hyperagent", "execute"], key)
+            self.assertNotIn("claude", json.dumps(spec).lower().replace("claude-opus-5-5", ""), key)
+            self.assertNotIn("env", spec, key)
+        self.assertEqual(REAL_CONFIG["judgmentProposer"]["model"], "claude-opus-5-5")
+
+    def test_judgment_job_blocks_carry_through_only_when_valid(self):
+        esc = {"schema": reason.ESCALATION_SCHEMA, "class": "money", "model": "claude-opus-5-5"}
+        job = reason.parse_job("JOV-9", "t", description({**JOB_BLOCK, "escalation": esc}))
+        self.assertEqual(job["escalation"], esc)
+        bad = reason.parse_job("JOV-9", "t", description({**JOB_BLOCK, "escalation": {**esc, "model": "x"}}))
+        self.assertIsNone(bad["escalation"])
+        self.assertIsNone(reason.parse_job("JOV-9", "t", description())["escalation"])
+
+    def judgment_job(self):
+        esc = {"schema": reason.ESCALATION_SCHEMA, "class": "money", "model": "claude-opus-5-5"}
+        return reason.parse_job("JOV-9", "t", description({**JOB_BLOCK, "escalation": esc}))
+
+    def test_judgment_runs_the_opus_agent_and_writes_the_receipt(self):
+        config = {**CONFIG, "judgmentProposer": {**REAL_CONFIG["judgmentProposer"], "agentId": "agent_opus_1"}}
+        envelope = {"ok": True, "thread_id": "thr_42", "text": json.dumps(PROPOSAL)}
+        run = Runner(hyperagent=[done(json.dumps(envelope)), done("", 1)], grok=done("not logged", 1))
+        with tempfile.TemporaryDirectory() as tmp:
+            out = reason.execute(self.judgment_job(), config, "ctx", Path(tmp), run=run)
+        cmd = run.made("hyperagent")[0]
+        self.assertEqual(cmd[cmd.index("--agent-id") + 1], "agent_opus_1")
+        self.assertEqual(cmd[cmd.index("--model") + 1], "claude-opus-5-5")
+        receipt = out["record"]["escalation"]
+        self.assertEqual((receipt["schema"], receipt["route"], receipt["model"], receipt["threadId"], receipt["costUsd"]),
+                         ("summer.judgment-escalation-receipt/v1", "hyperagent", "claude-opus-5-5", "thr_42", None))
+        self.assertIsInstance(receipt["latencyMs"], int)
+
+    def test_judgment_without_a_configured_agent_fails_closed_without_running(self):
+        run = Runner()
+        with tempfile.TemporaryDirectory() as tmp:
+            out = reason.execute(self.judgment_job(), CONFIG, "ctx", Path(tmp), run=run)
+        self.assertEqual(run.calls, [])
+        self.assertEqual(out["record"]["confidence"], "failed")
+        self.assertIn("judgment-agent-unconfigured", out["record"]["reasons"])
+        self.assertFalse(out["retry"])
+        self.assertNotIn("escalation", out["record"])
+
+    def test_ordinary_jobs_carry_no_receipt(self):
+        run = Runner(proposer_stub=claude_ok(), grok=done("not logged", 1), hyperagent=done("", 1))
+        job = reason.parse_job("JOV-9", "t", description())
+        with tempfile.TemporaryDirectory() as tmp:
+            out = reason.execute(job, CONFIG, "ctx", Path(tmp), run=run)
+        self.assertNotIn("escalation", out["record"])

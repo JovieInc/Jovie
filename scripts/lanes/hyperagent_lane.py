@@ -20,6 +20,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import capacity_registry, hyperagent_network as network  # noqa: E402
+
 REPO = "JovieInc/Jovie"
 PROOF_SOURCES = ("hyperagent-settings-readback", "hyperagent-identity+owner-attestation")
 PROOF_TTL_S = 300
@@ -43,7 +46,7 @@ def verified(spec, now):
             and 0 <= now - proof["verifiedAt"] <= PROOF_TTL_S and now < proof["expiresAt"])
 
 
-def refresh_proof(spec, call, now, attestation=None):
+def refresh_proof(spec, call, now, attestation=None, registry=None):
     """Build `verifiedRemote` from a live identity read plus the owner's attestation.
 
     Returns (proof, None) or (None, reason). The live agent must be the configured id,
@@ -80,7 +83,12 @@ def refresh_proof(spec, call, now, attestation=None):
              "evidenceSha256": hashlib.sha256(evidence).hexdigest(),
              "verifiedAt": now, "expiresAt": min(now + PROOF_TTL_S, owner["expiresAt"])}
     spec = {**spec, "verifiedRemote": proof}
-    return (proof, None) if verified(spec, now) else (None, "owner-attestation-incomplete")
+    if not verified(spec, now):
+        return None, "owner-attestation-incomplete"
+    cap = capacity_registry.per_run_cap_usd(registry if registry is not None else capacity_registry.load(), "hyperagent")
+    if cap is not None and proof["maxCostUsd"] > cap:
+        return None, "owner-attestation-exceeds-registry-cap"
+    return proof, None
 
 
 def main(argv=None, call=None, clock=time.time):
@@ -226,6 +234,8 @@ def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
                 if type(payload.get("isRunning")) is not bool or type(payload.get("awaitingApproval")) is not bool:
                     return held("remote-status-unverified", thread)
                 if payload["awaitingApproval"]:
+                    if network.grant_registry_access(call, thread, issue, path.parent, clock):
+                        pause(1); continue  # exact registries granted; the agent retries its install
                     record_approval(call, thread, issue, path.parent, clock)
                     return held("remote-approval-required", thread)
                 if payload["isRunning"]:
@@ -238,7 +248,7 @@ def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
                                  and m.get("role") == "assistant" and isinstance(m.get("content"), str))
                 urls = set(re.findall(r"https://github\.com/[^\s/]+/[^\s/]+/pull/\d+", text))
                 if len(urls) != 1:
-                    return held("remote-pr-ambiguous" if urls else "remote-pr-missing", thread)
+                    return held("remote-pr-ambiguous" if urls else network.missing_pr_reason(text), thread)
                 url = urls.pop()
                 if not re.fullmatch(r"https://github\.com/JovieInc/Jovie/pull/\d+", url):
                     return held("remote-pr-attribution-mismatch", thread)

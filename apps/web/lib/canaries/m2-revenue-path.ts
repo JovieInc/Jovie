@@ -15,8 +15,13 @@
  *  - Pure evaluation of typed HTTP evidence — no Playwright imports here.
  *  - Does not create Stripe sessions, paid subscriptions, or identities.
  *  - Each step records startedAt / finishedAt on the receipt.
+ *
+ * The claim step accepts both live signup states: the ready auth shell while
+ * public signup is open, and the /waitlist handoff while PUBLIC_SIGNUP_CLOSED
+ * is on (founder decision, canon/PRODUCT.md 2026-11-02).
  */
 
+import { APP_ROUTES } from '@/constants/routes';
 import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
 import { hasServerError, isOkStatus } from './public-profile';
@@ -63,9 +68,13 @@ export const M2_CLAIM_PRICE_DISPLAY = `$${M2_PRO_MONTHLY_USD}`;
 /** Self-serve claim entry: artist search plus the $12/mo offer line. */
 export const M2_CLAIM_ENTRY_MARKER = 'claim-artist-search';
 export const M2_CLAIM_ENTRY_PRICE = `${M2_CLAIM_PRICE_DISPLAY}/mo`;
+/** Evidence recorded when anonymous /signup hands off to the waitlist role
+ *  form because public signup is closed (canon/PRODUCT.md, 2026-11-02). */
+export const M2_CLAIM_SIGNUP_WAITLIST_EVIDENCE =
+  'signup → waitlist (closed public signup)' as const;
 
 export const M2_ACTIVATION_MARKERS = [
-  'Artist Visibility is starting',
+  'Artist Presence is active',
   'Checkout not confirmed',
   'Confirming checkout',
 ] as const;
@@ -220,11 +229,44 @@ export function evaluateSignedOutSurface(input: {
   return { ok: true, statusCode: input.statusCode, evidence };
 }
 
+function resolvesToWaitlistPath(location: string | null | undefined): boolean {
+  if (!location) return false;
+  try {
+    return new URL(location, 'https://jov.ie').pathname === APP_ROUTES.WAITLIST;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Closed public signup handoff (canon/PRODUCT.md, 2026-11-02): anonymous
+ * /signup is redirected to the /waitlist role form
+ * (PUBLIC_SIGNUP_CLOSED_REDIRECT). The deployed route answers either a
+ * plain 3xx Location hop or a 200 whose streamed shell carries the
+ * client-side redirect (the `__next-page-redirect` meta refresh), so both
+ * shapes count as the documented handoff.
+ */
+export function isClosedSignupWaitlistHandoff(input: {
+  readonly status: number;
+  readonly body: string;
+  readonly location?: string | null;
+}): boolean {
+  if (input.status >= 300 && input.status < 400) {
+    return resolvesToWaitlistPath(input.location);
+  }
+  if (!isOkStatus(input.status)) return false;
+  const meta =
+    /<meta\b[^>]*__next-page-redirect[^>]*>/.exec(input.body)?.[0] ?? '';
+  const target = /\bcontent\s*=\s*"[^"]*\burl=([^";]+)/.exec(meta)?.[1] ?? '';
+  return resolvesToWaitlistPath(target);
+}
+
 export function evaluateClaimSurface(input: {
   readonly pricingStatus: number;
   readonly pricingBody: string;
   readonly signupStatus: number;
   readonly signupBody: string;
+  readonly signupLocation?: string | null;
 }): M2StepEvaluation {
   const evidence: string[] = [
     `pricing http ${input.pricingStatus}`,
@@ -273,6 +315,16 @@ export function evaluateClaimSurface(input: {
     };
   }
   evidence.push(M2_CLAIM_PRICE_DISPLAY);
+  if (
+    isClosedSignupWaitlistHandoff({
+      status: input.signupStatus,
+      body: input.signupBody,
+      location: input.signupLocation,
+    })
+  ) {
+    evidence.push(M2_CLAIM_SIGNUP_WAITLIST_EVIDENCE);
+    return { ok: true, statusCode: input.pricingStatus, evidence };
+  }
   if (!isOkStatus(input.signupStatus)) {
     return {
       ok: false,
@@ -301,7 +353,8 @@ export function evaluateClaimSurface(input: {
     return {
       ok: false,
       statusCode: input.signupStatus,
-      detail: 'Claim signup handoff is missing the ready auth shell',
+      detail:
+        'Claim signup handoff is neither the closed-signup waitlist redirect nor a ready auth shell',
       evidence,
     };
   }
@@ -623,7 +676,7 @@ export async function runM2RevenuePathCanary(
   await record('claim', async () => {
     const [pricing, signup, claim, claimStart] = await Promise.all([
       request(M2_REVENUE_PATH_ROUTES.claimPricing),
-      request(M2_REVENUE_PATH_ROUTES.claimSignup),
+      request(M2_REVENUE_PATH_ROUTES.claimSignup, { redirect: 'manual' }),
       request(M2_REVENUE_PATH_ROUTES.claimEntry),
       request(M2_REVENUE_PATH_ROUTES.claimStart, { redirect: 'manual' }),
     ]);
@@ -632,6 +685,7 @@ export async function runM2RevenuePathCanary(
       pricingBody: pricing.body,
       signupStatus: signup.status,
       signupBody: signup.body,
+      signupLocation: signup.location,
     });
     if (!surface.ok) return surface;
     const entry = evaluateClaimEntry({

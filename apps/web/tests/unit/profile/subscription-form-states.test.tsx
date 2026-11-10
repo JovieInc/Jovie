@@ -183,7 +183,7 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
 
     expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
-    expect(screen.queryByText('Get Updates')).not.toBeInTheDocument();
+    expect(screen.queryByText('Get New Music')).not.toBeInTheDocument();
   });
 
   it('does not render the retired fallback CTA when notifications are disabled', async () => {
@@ -200,7 +200,7 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
   it('opens directly to email entry for unsubscribed fans', async () => {
     await renderCTA();
 
-    expect(await screen.findByText('Get Updates')).toBeInTheDocument();
+    expect(await screen.findByText('Get New Music')).toBeInTheDocument();
     expect(screen.getByTestId('mobile-email-input')).toHaveAttribute(
       'type',
       'email'
@@ -220,7 +220,7 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
     await renderCTA();
 
     const user = userEvent.setup();
-    await screen.findByText('Get Updates');
+    await screen.findByText('Get New Music');
 
     await user.click(screen.getByRole('button', { name: 'Submit' }));
 
@@ -257,7 +257,7 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
     await renderCTA();
 
     const user = userEvent.setup();
-    await screen.findByText('Get Updates');
+    await screen.findByText('Get New Music');
     await user.click(screen.getByRole('button', { name: 'Submit' }));
     await screen.findByText('Enter the code');
     await user.click(screen.getByRole('button', { name: 'Verify' }));

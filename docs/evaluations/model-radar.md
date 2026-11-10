@@ -69,6 +69,13 @@ arm fails about half of triage; policy-labeled triage cases are the next eval
 improvement. Verdict: keep glm-5.3-flash (decision
 `decisions/models/summer-main-model-96-cases-2026-10-20`, superseding the 28-case one).
 
+> Routing reality (2026-10-31): the sentence below describes the contained trial path,
+> which ships idle. What actually runs where is declared in
+> `apps/web/lib/ai/routing.json` and checked against the live Gateway report by
+> `scripts/ai-routing-check.mjs`. Summer's agent turns and fast chat run on Workers AI;
+> the planner, Jev and Jovie chat run on the Gateway. "On Cloudflare credits" is true
+> only where routing.json says `workers-first`.
+
 Summer's model is now a managed choice in summer-config: a roster of models
 priced within the budget ceilings, a hash-bucketed canary slice per turn and a
 promote/rollback rule on cost per successful turn. A contained trial path for

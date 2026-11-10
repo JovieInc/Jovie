@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/profile/inline-notifications-cta.test.tsx
 'use client';
 
 import { Bell, CheckCircle2 } from 'lucide-react';
@@ -44,6 +45,8 @@ type FlowOrigin = 'manage' | 'subscribe';
 
 export interface ProfileInlineNotificationsCTAProps {
   readonly artist: Artist;
+  /** Content types this artist has. Defaults to new music only. */
+  readonly availableContent?: ReadonlyArray<'newMusic' | 'tourDates' | 'merch'>;
   readonly onManageNotifications?: () => void;
   readonly onRegisterReveal?: (reveal: () => void) => void;
   readonly variant?: 'default' | 'hero' | 'button' | 'link';
@@ -163,6 +166,7 @@ function getTriggerClassName(
 
 export function ProfileInlineNotificationsCTA({
   artist,
+  availableContent,
   onManageNotifications,
   onRegisterReveal,
   variant = 'default',
@@ -561,13 +565,17 @@ export function ProfileInlineNotificationsCTA({
       if (captureSuccessTimerRef.current) {
         clearTimeout(captureSuccessTimerRef.current);
       }
+      // No mailbox proof on this path (returning verified email, or SMS), so
+      // no signup-session cookie exists and the name/birthday save would be
+      // refused. Only the OTP-verified path continues to those steps.
       captureSuccessTimerRef.current = setTimeout(() => {
-        setStep('name');
+        handleClose();
       }, CAPTURE_SUCCESS_HOLD_MS);
     }
   }, [
     channel,
     emailInput,
+    handleClose,
     handleSubscribe,
     markSubscriptionActivated,
     phoneInput,
@@ -768,6 +776,8 @@ export function ProfileInlineNotificationsCTA({
     [canEditPreferences]
   );
 
+  const [prefsError, setPrefsError] = useState<string | null>(null);
+
   const handlePreferencesSubmit = useCallback(async () => {
     if (!canEditPreferences) {
       setFlowOrigin('subscribe');
@@ -793,9 +803,12 @@ export function ProfileInlineNotificationsCTA({
             showArtistEmailSection && email ? artistEmailOptIn : undefined,
         });
       } catch {
-        // Keep the flow moving. Status will reconcile on the next fetch.
+        // A failed save must not look saved (turning sharing off especially).
+        setPrefsError('We could not save your choices. Try again.');
+        return;
       }
     }
+    setPrefsError(null);
 
     const selectedAlertToggles = Object.entries(alertPrefs)
       .filter(([, enabled]) => enabled)
@@ -806,7 +819,10 @@ export function ProfileInlineNotificationsCTA({
       source: resolvedSource,
       alert_opt_in_variant: experimentVariant,
       selected_alert_toggles: selectedAlertToggles,
-      artist_email_opt_in: artistEmailOptIn,
+      artist_email_opt_in:
+        showArtistEmailSection && Boolean(activeEmail)
+          ? artistEmailOptIn
+          : false,
       signup_completion_result: 'success',
     });
 
@@ -887,7 +903,7 @@ export function ProfileInlineNotificationsCTA({
         otpCode={otpCode}
         nameInput={nameInput}
         birthdayInput={birthdayInput}
-        error={error}
+        error={error ?? prefsError}
         isSubmitting={isSubmitting}
         isNameSaving={nameMutation.isPending}
         isBirthdaySaving={birthdayMutation.isPending}
@@ -905,6 +921,7 @@ export function ProfileInlineNotificationsCTA({
         artistEmailOptIn={artistEmailOptIn}
         artistEmailReady={artistEmailReady}
         showArtistEmailSection={showArtistEmailSection}
+        availableContent={availableContent}
         onClose={handleClose}
         onBack={handleBack}
         onChannelChange={handleChannelChange}

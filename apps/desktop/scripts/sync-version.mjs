@@ -6,7 +6,7 @@
  * sync, every build ships as 0.1.0 and electron-updater cannot compare
  * versions, so auto-update silently does nothing.
  *
- * Runs as a prebuild hook for build:staging and build:production.
+ * Runs as a prebuild hook for build:production.
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';

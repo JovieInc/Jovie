@@ -6,7 +6,7 @@ JOV-7706); grok and kimi stay `enabled: false`. Symphony Elixir on Gem is retire
 `gem-retire-elixir.sh`); nothing else claims JOV work.
 
 A lane is a provider command in `providers.json` plus a Linear label that expresses a routing
-preference. Every JOV Todo issue is eligible (Tim 2026-10-11: no `agent-ready`, plan or
+preference. Every JOV Todo issue is eligible, and since 2026-10-29 Backlog admission no longer requires `agent-ready` either (readiness is computed: spec, acceptance, no hold, no blocker, no red line) (Tim 2026-10-11: no `agent-ready`, plan or
 approval label is required): every lane reads one shared all-Todo snapshot per TTL (at most
 `TODO_POOL_PAGES` x 100 issues; a larger pool fails closed) and the cost-aware router (below)
 decides which lane takes each issue. `hold` is the one stop signal, and it expires: the
@@ -31,7 +31,10 @@ The harness, not the model, owns:
 | File-overlap admission: declared paths, then the workstream map, are compared with the cached open-PR inventory and In Progress lane tasks; hot control-plane and duplicate migration-number collisions wait, shared/generated files sequence, other overlaps flag | `file_overlap.py`, `overlap_inventory()` |
 | Hotspot admission (JOV-7708): an issue whose predicted touch set (named file paths, else its workstream area; Symphony-throughput = the lanes harness) hits a hotspot an open, non-parked PR holds waits as `hotspot-held:<path>#<pr>`. Hotspots = a static seed (lanes harness, `code-flags.ts`, command/product-truth registries, `node-environment-files.json`, `destructive-red-drift.baseline.json`) plus any file two open PRs touch; an unreadable file list admits ungated | `pool_rejections()`, `hotspot_holds()`, `open_hotspot_holds()` |
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
-| Generated-file conflicts: merge main, take its copy, run each file's canonical regenerator (`pnpm install --lockfile-only` for `pnpm-lock.yaml`, `pnpm ci:topology:write` for `.github/workflow-topology.gen.yml`), push; no model, no force-push | `resolve_generated_conflict()`, `remediation.GENERATED_RESOLVERS` |
+| Generated-file conflicts: merge main, restore its generated copies (including cleanly merged outputs), run each file's canonical regenerator (`pnpm install --lockfile-only` for `pnpm-lock.yaml`, `pnpm ci:topology:write` for `.github/workflow-topology.gen.yml`, `node scripts/agent-context/rule-scopes.mjs --write` for `scripts/agent-context/rule-scopes.json`), push; after resolving source conflicts, reuse the same regeneration helper | `resolve_generated_conflict()`, `regenerate_merged_generated()`, `remediation.GENERATED_RESOLVERS` |
+| Shell `&&` conflicts: when every hunk is only an `&&` chain, keep base order and append head-only prefixes; `node --test` and vitest paths follow the same rule | `resolve_and_chain_conflict()`, `fix_red_classes.resolve_and_chain_text()` |
+| Quoted-list conflicts: when every hunk is only `'path',` entries, keep main's order and append head-only lines; any other hunk stays for the model | `resolve_additive_list_conflict()`, `fix_red_classes.resolve_additive_quoted_list_text()` |
+| Identifier-list conflicts: when every hunk is one comma-separated line of slugs, keep main's order and append head-only tokens; any other hunk stays for the model. The repair mutation budget is the class list plus the model dispatch, so a new class still runs | `resolve_identifier_list_conflict()`, `fix_red_classes.merge_additive_identifier_list()`, `conflict_resolvers()` |
 | Slot locks that die with their holder | `Locked` |
 | Worktree from `origin/main`: a pre-installed pool slot when one is ready (`worktreeSource: pool` on the receipt), else fresh; shared-store hardlink install; background refill; afterwards an idle, clean checkout with fresh origin publication proof is recycled into the pool (`verdict: recycled` in `worktree-removals.jsonl`) or removed. Busy, dirty, unpublished or unverified source is preserved with a cleanup receipt; its branch is deleted only after successful checkout retirement | `run_issue()`, `worktree_pool.take()`, `remove_worktree()`, `worktree_pool.recycle()` |
 | GBrain context pack in the prompt, plus the repo contract | `context_pack()`, `render_prompt()` |
@@ -49,8 +52,8 @@ The harness, not the model, owns:
 | Disabled-lane drafts: adopted for bounded repair; provider state, issue completion and exhausted attempts never authorize closing unlabelled work | `pr_events.retire_orphan()`, `return_to_pool()` |
 | Held and failed records carry `reason` + `next_action`; the status feed publishes `held_by_reason` | `pr_events.held_reason()`, `doctor.status_feed()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
-| Worktree retirement (JOV-7704): the tick spawns one sweep per hour (10 min under 15% free, and even when disk admission fails) over lanes, Codex, Conductor, Claude-scratch and `jovie-wt-*` checkouts. A checkout retires when its PR closed (1h grace) or after 12h idle; preserved repairs expire on PR close or after 3 days. Live-process paths are never touched; dirty or unpushed work is pushed to `refs/jovie-preserved/sweep/<host>/<name>-<date>-<snapshot>` first (a non-branch ref: no Actions or Vercel build); existing backup refs are immutable and push hooks run. A snapshot that is not proven secret-free is not published and the checkout stays untouched. A failed backup keeps the checkout and strips only build output. Primary clones, bare mirrors, `~/.cache` and the pnpm store are out of scope | `worktree_sweep.py`, `dispatch()` |
-| Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source. The same sweep also removes transient `_work` output of runners with no `Runner.Worker` running, retires idle Symphony workspaces on a low filesystem (never through a mount; dirty or unpushed work is pushed to a backup branch first, else only build output goes) and lane logs idle 14 days | `disk_guard.py`, `dispatch()`, `worker()` |
+| Worktree retirement (JOV-7704): the tick spawns one sweep per hour (10 min under 15% free, and even when disk admission fails) over lanes, Codex, Conductor, Claude-scratch and `jovie-wt-*` checkouts. A checkout retires when its PR closed (1h grace) or after 12h idle; preserved repairs expire on PR close or after 3 days. Live-process paths are never touched; dirty or unpushed work is preserved with full parent history in the verified private `JovieInc/Ops` archive at `refs/jovie-preserved/sweep/<host>/<name>-<date>-<snapshot>` (a non-branch ref). Set `LANES_SWEEP_ARCHIVE_GH` to the absolute path of the existing authorized GitHub CLI to select its saved credentials; token environment and App shims are not fallback credentials. Exact repository identity, private visibility, active status and push rights are checked before and after creation, and the exact remote SHA is read back before removal. Backup refs are immutable and ordinary push hooks run. Missing credentials, incomplete ancestry, failed scans, metadata, push or readback keep the checkout untouched. A clean scan never establishes privacy; source origin is never an archive fallback. Primary clones, bare mirrors, `~/.cache` and the pnpm store are out of scope | `worktree_sweep.py`, `dispatch()` |
+| Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. A denied tick still drains the Linear outbox first — it is the doctor's own reporting channel, and the flush is bounded and touches only small state JSONs on the state root, never the full worktree volume (JOV-10355). Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source. The same sweep also removes transient `_work` output of runners with no `Runner.Worker` running, retires idle Symphony workspaces on a low filesystem (never through a mount; dirty or unpushed work is preserved only in the verified private archive; unverified preservation keeps the checkout and build output) and lane logs idle 14 days | `disk_guard.py`, `dispatch()`, `worker()` |
 | Adaptive slots (default on, every tick, measured limits only; kill switch `SYMPHONY_AUTOSCALE=0`) | `autoscale.decide()`, `dispatch()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
 | Host upkeep on the same update event (no timers): fetch the bare object mirror the lanes clone borrows from (`objects/info/alternates`, under `<root>/locks/<name>-mirror.lock`) right before update's own fetch, and refresh the codex lanes' `autoreview`/`behavior-validator` skills from `~/agent-skills` only when its `main` moved. Both are bounded, non-fatal, and recorded in `update.json` | `update()` |
@@ -61,22 +64,20 @@ The harness, not the model, owns:
 | Repository bindings: the one service also routes LogYourBody (Linear `LYB` -> `JovieInc/LogYourBody`, `~/LogYourBody` on Gem, `LANES_REPO_LYB` overrides, `LANES_BINDING_LYB=0` disables). A worker spends its held seat on one LYB repair (red or behind lane PR, 2 tries per head, a per-PR lease so two seats never repair one PR) or one claim (any Todo issue without `hold` or a hard-excluded label; sensitive labels only on the Codex lane; no LYB-specific concurrency cap or open-PR ceiling, only the host's seats) before Jovie intake. Jovie-only holds never block LYB and a binding fault never blocks Jovie. The harness pushes, opens a ready PR (never draft: LYB's native merge queue skips drafts; a repair readies a draft lane PR) and moves the issue to In Review; LYB required checks and its native queue land it. LYB runs iOS only in merge groups, so one failed_checks ejection sends that head to repair with the failed merge-group run's log in the prompt, and a queued PR is never re-enqueued Refusal reasons land in `bindings.json`. LYB remediation events never run in the Jovie repo | `bindings.py`, `routing.json` `bindings`, `worker_with_slot()` |
 | Cost-aware routing: one capability floor per issue (`routing.json`), then the cheapest available `(lane, model)` route that clears it by effective cost; every claim is logged with its rationale | `remediation.route_issue()`, `issue_router()`, `runs/routing.jsonl` |
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
+| Dormant Codex Cloud adapter: `CODEX_CLOUD_ENV` and absolute `CODEX_CLOUD_BINARY` explicitly select the environment and real CLI. It supports opt-in repo-only submission, locked single-writer reservations, quota fallback, unknown-outcome holds, on-demand status and remote-id-correlated PR capture. No Claude Code provider. No `run_issue` dispatch or routing activation; subscription headroom, result application and dispatch remain the commissioning boundary tracked by JOV-10357. Stats report time-to-PR p50/p95 and unmeasured marginal cost | `cloud_lane.route()`, `status()`, `poll()`, `stats()` |
 | Stop revokes publication: a kill writes `runs/publication-revocations.jsonl` before the kill is acked, and every irreversible boundary (push, PR open, label, enqueue) revalidates it — revoked branches never ship (JOV-5060) | `run_agent(on_kill=)`, `revoke_publication()`, `require_publishable()` |
 
-Execution receipts retain `jovie-execution-attempt/v1`. The default production and CLI
-writer still emits legacy numeric status chains; self-update cannot activate the new
-wire format. `IMMUTABLE_WRITER_ENABLED` is checked in as false, with no environment or
-caller override. The upgraded reader also validates candidate-linked receipts, while
-a disabled writer refuses to extend them. Enabling the writer requires a separately
-reviewed source change after every participating reader and writer is drained, updated
-and verified ready; JOV-8293 remains open for that activation and runtime outcome.
+Execution receipts retain `jovie-execution-attempt/v1`. The production and CLI writer
+now emits the candidate-linked immutable wire format (JOV-8293 enablement), with no
+environment or caller override; the dual reader still validates legacy numeric
+chains, while an un-updated writer refuses to extend candidate-linked reservations.
 Enabled recovery reserves an existing `failed_unknown` disposition before projecting
 an unknown boundary, so helper crashes and repeated retries remain held. Boundary IDs
 bind existing dispatch, handoff, repair and adoption phases within the original fence;
 duplicate or changed-cost reuse is held, and distinct intended phases charge normally.
 Legacy common-source-SHA reservations have no owner proof and remain held for
-authoritative reconciliation. Source merge is preparatory and does not repair or
-certify the running coordinator.
+authoritative reconciliation. Source merge is preparatory; the exact installed
+runtime generation still needs its own interrupted-reservation outcome receipts.
 
 PR repair selection captures one qualified bulk inventory outside the global claim lock,
 using the existing per-key cache lock. Current local preservation and attempt state,
@@ -535,6 +536,8 @@ Effective cost = base x (1 + quota pressure): Claude runs in its 5h window, bank
 
 Hyperagent runs agent `cmtj3n2q901i407adklzzq01t` (GLM 5.3 Developer, `auto`; the agent id picks the model, Astra Planner is `confirm`). It is remote-only (`repairs: false`): it claims issues through `hyperagent_lane.py` and local lanes maintain its PRs. Each attempt joins a live `list_agents` identity read with the owner's attestation at `~/.config/jovie-lanes/hyperagent-attestation.json` (`agentId`, `model`, `repository`, `currentInstructions`, `allInCap`, `balanceUsd`, `maxCostUsd`, `attestedAt`, `expiresAt`, `attestedBy`), because the API exposes no balance or cap. Without it the lane is unhealthy. Only the owner can write the attestation — the API exposes no balance or cap for an agent to read back — so a host that lacks it must scope the lane off with `LANES_SLOTS_HYPERAGENT=0` (no probe, no `provider-down` alert) rather than page on a credential that does not exist.
 
+Hyperagent can also repair existing PRs remotely (`hyperagent_repair.py`, enabled by `remoteRepairs: true` in `providers.json`; it ships `false` until GLM 5.3 model timeouts stop ending repair threads early). The shared daily cap below applies either way. Each hyperagent lane turn first takes one DIRTY or required-check-red PR (revenue and golden-path first, then `compounding`, then oldest), sends the branch, head and failing-check log excerpt, and the agent pushes to the same branch with a `Hyperagent-Repair: <attempt>` trailer. The lane counts a success only when the PR head moved forward (no force push), the tip carries that trailer, and every required check is green; the receipt (`kind: remote-repair`, stage stamps, thread URL) goes to `runs/ledger.jsonl` and a PR comment. It never touches a hold-labelled PR or a head pushed in the last 30 minutes. One writer per PR: the local `locks/repair-pr-N.lock` flock, an in-flight `fix-attempts.json` record (no local attempt charged) and a lane claim comment; a definite failure releases all three, an unknown remote outcome keeps the record and comment until their TTLs. The 24 threads/day cap (`HYPERAGENT_RUNS_PER_DAY`) is shared with the mesh bridge counter and the lane's issue runs; a spent cap ends the hyperagent turn before it claims issues. `hyperagent_repair.py status` shows cap use and the queue; `run --pr N` does one repair by hand.
+
 ## Install on a host
 
 Gem (systemd user timer) or a Mac (launchd), with a dedicated clone:
@@ -548,6 +551,23 @@ Select the repository's pinned Node in the installing shell first. The installer
 puts that Node directory first in the timer PATH on both Linux and macOS.
 After changing the host's Node installation, rerun the installer so the timer
 does not retain a removed runtime directory.
+
+On Linux, set `LANES_TMPDIR` when installing to place scanner clones and worker
+temporaries on a volume with sufficient headroom. The installer creates a private
+mode-700 directory or validates an existing one without changing its permissions,
+then writes `65-temp-placement.conf` for the lanes, watchdog and wake services.
+Relative paths, symlinks, shared directories and unit specifiers are rejected.
+Unset preserves existing placement. To roll back, remove only those three
+drop-ins and reload the user systemd configuration; active workers keep their
+existing environment until they finish. Security scans and disk guards are unchanged.
+
+The Linux wake service shares the main service's declarative environment and
+resource drop-ins through ordered `50-main-*.conf` links. Subscription pool and
+Claude-disabled policies therefore follow the same source files. The installer
+rejects command overrides, unit-specific identity specifiers, unsupported sections and collisions with operator-owned
+wake files before enabling timers. Rerunning it removes only stale managed links;
+it does not copy credentials or change their source bindings. Qualify the actual
+wake route and effective policy before activating a newly installed path watcher.
 
 Per-host knobs: `LANES_SLOTS_<PROVIDER>`, `LANES_LINEAR_ENV`, `LANES_AGENT_TIMEOUT_S`,
 `LANES_GATE_TIMEOUT_S`, `LANES_GATE_SLOTS`. A host-specific GitHub token in
@@ -581,9 +601,11 @@ waiting, a worker is running or completed after the recovery request.
 Each incident gets at most three attempts, spaced by at least two minutes. The atomic latest
 receipt is `factory-watchdog.json`; every incident, action, and verified after-state is also
 fsynced to `runs/factory-watchdog.jsonl`. Exhaustion or a complete provider-capacity bank opens
-one deduped Linear doctor issue; alert delivery retries at most every 15 minutes until
-acknowledged. A later healthy observation closes that issue. Inspect the receipt before manual
-action; restarting workers outside the installed service path would bypass its ownership lock.
+one deduped Linear doctor issue; a re-raise within the doctor's cool-off re-opens the previous
+incident's issue with a "fired again" comment instead of filing a duplicate (JOV-10358 flap).
+Alert delivery retries at most every 15 minutes until acknowledged. A later healthy observation
+closes that issue. Inspect the receipt before manual action; restarting workers outside the
+installed service path would bypass its ownership lock.
 
 The extra timer is necessary because the normal event-driven worker re-exec and five-minute
 idle fallback cannot observe their own timer/process being dark. It performs only local file
@@ -747,7 +769,7 @@ the relay), deploy
 failures and Sentry `repository_dispatch` `sentry-issue` payloads become one
 `jovie.remediation-event/v1`. `classify_blocker` / `classify_event` name exactly one class:
 `ready`, `needs-rebase` (`lockfile-only`, `generated-only` or `semantic`), `flaky-infra`, `fixable-by-model`,
-`needs-human-decision`, `obsolete`, plus `main-red` when main itself is the failure.
+`needs-human-decision` (a reserved decision or a secret-file security gate: it surfaces once and files a non-blocking Ovie `decisionAsk` with a default and a deadline; it applies no label and holds nothing, EVENT 2026-10-28), `obsolete`, plus `main-red` when main itself is the failure.
 
 The ladder (`plan_ladder`) runs deterministic rungs first — one `update-branch` per episode,
 the existing generated-file resolver, one `gh run rerun --failed` per head. Those spend no model
@@ -760,7 +782,7 @@ Spent caps are `ladder-exhausted`. Re-entry is a new external head, a cleared de
 main turning green; attempt history is kept on the `jovie-reentry/v1` receipt.
 
 Flags: `LANES_ESCALATION` default on; `LANES_ESCALATION_NOTIFY_TIM` default off (Linear
-`needs-human` label plus one comment); `LANES_ESCALATION_LIFT_HUMAN_HOLDS` default off.
+`needs-human` label plus one comment). A repaired PR always lifts its machine `hold`.
 Needs-human, obsolete and ladder-exhausted share one PR comment marked
 `<!-- symphony-surface pr=N head=SHA -->`. Hold nags are at most one per PR per head per 24h.
 Escalating, ladder-exhausted and surfaced PRs count toward the terminal cap (`slots × 4`)
@@ -853,6 +875,42 @@ MusicFetch.
 (state, issue, class, lane, and the exact ask). A surfaced PR that is still open raises
 alert `escalation-surfaced` for the lanes repair owner (never a human by default); PRs
 that merged or closed drop out once the reconcile pass has a complete open-PR view.
+
+The bounded public `lanes-status.json` projection replaces the historical
+`remediation.byFingerprint` index with `byFingerprintSummary` counts and a
+`byFingerprintRef` into the same publication's `lanes-status-details.json`.
+The reference binds through `publicProjection.fullEvidence`; absence of the index
+is not an empty or partial result. Full evidence and active ownership/escalation
+arrays remain unchanged. If essential data still exceeds the 256 KiB budget,
+size alerts retain its `requiredBytes`, separately from the small published
+unavailable envelope's `publishedBytes`, until the actual snapshot fits again.
+
+## Fleet work ledger (`fleet_ledger.py`)
+
+One read-only view of every claim (lanes run leases, repo-binding issue locks, the claim ledger and
+external-agent claims in `fleet-claims/`), each with a verdict: `live`, `starting`, `stranded`
+(active, no live lease for 3 h) or `expired` (external claim silent past its ttl). Non-lane agents
+(Lola, Hyperagent threads, Summer) take work with `fleet_ledger.py claim JOV-1 --agent lola --ttl 1800`,
+renew with `heartbeat`, and drop it with `release`; anyone checking `external_active` ignores an
+expired claim. `metrics` reports duplicate overlapping runs, overnight (00-08 UTC) vs day
+throughput and the factory share of issue runs (floor 20 %). `ownership.reconcile` also releases
+repo-binding claims whose binding issue lock is no longer held.
+
+Also in the same module and companions:
+
+- Lanes skip any issue under an unexpired external claim (`held_back_issues`); the doctor raises
+  `stranded-claims` and records one `fleet-ready.jsonl` row per pass, so `metrics` reports
+  `idleWhileReady` (allowed seat free while work waited) and `throttledMin` (autoscaler cut seats).
+- `fleet_ledger.py gates`: human-gated issues must carry `Default:` and `Deadline:` lines; they park
+  (lanes skip them), come due, or are `unbounded` (a gate that can block forever).
+- `fleet_ledger.py burn` reads `quota-windows.json` and ranks capped agents by how far behind their
+  reset window they are, so quota is spent before it resets.
+- `factory_intake.py`: `state/factory-signals/*.json` (`jovie-factory-signal/v1`: fingerprint, problem,
+  acceptance, metric) become Todo issues labelled `factory`, `ws:symphony-throughput` and
+  `factory-fp:<fp>` on each doctor pass (max 3, deduped by the label). Done means the metric moved.
+- `codex_delegate.py --agent dots -- codex exec ...`: agents that delegate to Codex take a
+  `slots/codex.N` seat under the lanes' admission lock and cap (exit 75 if none) and are logged per
+  agent in `runs/delegations.jsonl`.
 
 ## Tests
 
@@ -963,3 +1021,14 @@ own gate fails before CI does.
 CI (`.github/workflows/design-gate.yml`) warns when a PR touches the same
 paths with no completed brief; it enforces only when `DESIGN_GATE_ENFORCE`
 is truthy, and unreadable briefs stay warnings even then.
+
+### Dormant cloud adapter recovery
+
+An unknown submit outcome keeps the reservation held. Do not retry or delete the ledger.
+The commissioning owner (JOV-10357) must inspect the configured environment with the real
+`codex cloud list --json` and correlate the remote task to the branch and submission time.
+After verifying the task id, append an `accepted` event with that id to the same ledger
+and inspect it with `status()`. Only positive evidence that no remote task was accepted
+permits an operator to append a `limit` rejection event for that exact task/branch;
+ambiguous CLI diagnostics such as 429 or capacity are insufficient. Corrupt ledgers hold
+routing; preserve the original and restore verified records before resuming.

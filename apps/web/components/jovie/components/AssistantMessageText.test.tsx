@@ -20,15 +20,20 @@ vi.mock('./ChatMarkdown', () => ({
 }));
 
 describe('AssistantMessageText', () => {
-  it('delegates plain assistant copy to ChatMarkdown', () => {
+  it('shows the text immediately and hands it to the lazy ChatMarkdown chunk', async () => {
     fastRender(
-      <AssistantMessageText content='Here is a plain assistant reply.' />
+      <AssistantMessageText content='Here is a plain assistant reply. (source: enrichment)' />
     );
 
-    expect(screen.getByTestId('chat-markdown')).toHaveTextContent(
+    // Before the markdown chunk resolves the words are already on screen.
+    expect(screen.getByText('Here is a plain assistant reply.')).toBeTruthy();
+    expect(await screen.findByTestId('chat-markdown')).toHaveTextContent(
       'Here is a plain assistant reply.'
     );
     expect(screen.queryByTestId('entity-mention-span')).toBeNull();
+    expect(screen.getByTestId('chat-markdown')).not.toHaveTextContent(
+      'source: enrichment'
+    );
   });
 
   it('renders entity wire tokens as subdued mention spans with hover cards', async () => {

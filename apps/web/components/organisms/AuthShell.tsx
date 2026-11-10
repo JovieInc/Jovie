@@ -14,7 +14,7 @@ import { useRightPanel } from '@/contexts/RightPanelContext';
 import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/features/dashboard/organisms/MobileProfileDrawer';
-import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-runtime';
 import type { AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
@@ -70,7 +70,7 @@ function AuthShellInner({
   // removes it after hydration without replacing the shell or losing drafts.
   const sidebarTrigger =
     isMobile || isElectron ? null : !sidebarPinned ? (
-      <SidebarCollapseButton />
+      <SidebarCollapseButton previewTrigger={false} />
     ) : null;
 
   const isInSettings = section === 'settings';
@@ -108,6 +108,7 @@ function AuthShellInner({
   return (
     <RuntimeUpdateProvider>
       <AppShellFrame
+        brandVariant={section === 'ov' ? 'ov' : 'jovie'}
         sidebar={sidebar}
         header={
           hideTopHeader ? null : (
@@ -130,7 +131,8 @@ function AuthShellInner({
             />
           )
         }
-        chatAmbientGradient={isChatRoute}
+        // Ovie Home and dashboards share one flat shell canvas.
+        chatAmbientGradient={isChatRoute && section !== 'ov'}
         main={children}
         rightPanel={rightPanel}
         audioPlayer={audioPlayer}

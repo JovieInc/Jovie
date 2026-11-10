@@ -99,8 +99,7 @@ export interface GoldenPathClaim {
   readonly evidence?: ClaimEvidence;
 }
 
-const HOMEPAGE_COPY = 'apps/web/data/homepageCopy.ts';
-const HOMEPAGE_FAN_STATES_COPY = 'apps/web/data/homepageFanStatesCopy.ts';
+const HOMEPAGE_COPY = 'apps/web/data/homepageEditorialCopy.ts';
 const CHECKOUT_CLIENT =
   'apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx';
 const PRESENCE_STEPS = 'apps/web/lib/onboarding/presence-build/execute-step.ts';
@@ -111,7 +110,7 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     step: 'homepage',
     route: '/',
     source: HOMEPAGE_COPY,
-    copy: 'Be found. Be understood.',
+    copy: 'Move your music forward.',
     nature: 'capability',
     capabilityIds: ['artist-profiles', 'public-profile'],
   },
@@ -120,38 +119,25 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     step: 'homepage',
     route: '/',
     source: HOMEPAGE_COPY,
-    copy: 'A free profile for your music, bio, and links. Your latest release leads, with tour dates and updates one tap away.',
+    copy: 'Your profile, every release, and a link to each place the music is streaming.',
     nature: 'capability',
-    capabilityIds: [
-      'artist-profiles',
-      'public-profile',
-      'artist-notifications',
-    ],
+    capabilityIds: ['artist-profiles', 'public-profile'],
   },
   {
-    id: 'homepage.fan-states.headline',
-    step: 'homepage',
-    route: '/',
-    source: HOMEPAGE_FAN_STATES_COPY,
-    copy: 'Each visit gets the right next step.',
-    nature: 'capability',
-    capabilityIds: ['artist-profiles'],
-  },
-  {
-    id: 'homepage.offer.headline',
+    id: 'homepage.profile.body',
     step: 'homepage',
     route: '/',
     source: HOMEPAGE_COPY,
-    copy: 'Free to claim. Yours to share.',
+    copy: 'Your profile at jov.ie leads with what matters now: your latest release, your links, and a way for listeners to get updates.',
     nature: 'capability',
-    capabilityIds: ['public-profile'],
+    capabilityIds: ['artist-profiles', 'artist-notifications'],
   },
   {
-    id: 'homepage.offer.smart-links',
+    id: 'homepage.releases.body',
     step: 'homepage',
     route: '/',
     source: HOMEPAGE_COPY,
-    copy: 'Unlimited smart links',
+    copy: 'Each release gets its own page with listen links for every service',
     nature: 'capability',
     capabilityIds: ['smart-links'],
   },
@@ -208,7 +194,7 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     step: 'signup',
     route: '/signup',
     source: 'apps/web/lib/billing/offer-truth.ts',
-    copy: 'Your Jovie profile stays free forever. Downgrading restores Jovie branding and keeps audience capture.',
+    copy: 'Your Jovie profile stays free forever and keeps audience capture.',
     nature: 'offer',
     capabilityIds: ['public-profile'],
   },
@@ -232,20 +218,20 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     evidence: { class: 'computed', slot: 'assembled-profile' },
   },
   {
-    id: 'upgrade.checkout.payments',
+    id: 'upgrade.checkout.release-emails',
     step: 'upgrade',
     route: APP_ROUTES.ONBOARDING_CHECKOUT,
     source: CHECKOUT_CLIENT,
-    copy: 'Take tips and payments on your profile',
+    copy: 'Email your verified subscribers when new music drops',
     nature: 'capability',
-    capabilityIds: ['pay'],
+    capabilityIds: ['artist-notifications'],
   },
   {
     id: 'pricing.pro.note',
     step: 'pricing',
     route: '/pricing',
     source: 'apps/web/lib/billing/offer-truth.ts',
-    copy: 'Self-serve. Cancel anytime.',
+    copy: 'Self-serve.',
     nature: 'offer',
     capabilityIds: [],
   },

@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   backoffMs,
   funnelPaths,
   POLL_CAP_MS,
   parseDeploymentUrl,
+  parseDopplerScopes,
   previewUrlFor,
+  readBypassSecret,
 } from './preview-gate.mjs';
 
 const SHA = 'a'.repeat(40);
@@ -29,6 +32,48 @@ test('only funnel surfaces trigger the gate', () => {
   );
 });
 
+test('preview lookup accepts colorized gh JSON', async () => {
+  const paint = value => `\u001B[1;37m${JSON.stringify(value)}\u001B[m\n`;
+  const result = await previewUrlFor({
+    sha: SHA,
+    ref: 'feat/x',
+    pr: 1,
+    gh: args => {
+      const path = args[1] ?? '';
+      if (path.includes('/runs?')) {
+        return { status: 0, stdout: paint({ workflow_runs: [{ id: 7 }] }) };
+      }
+      if (path.includes('/jobs?')) {
+        return {
+          status: 0,
+          stdout: paint({
+            jobs: [
+              {
+                id: 9,
+                name: 'Preview Deploy (manual)',
+                status: 'completed',
+                conclusion: 'success',
+              },
+            ],
+          }),
+        };
+      }
+      if (path.includes('/logs')) {
+        return {
+          status: 0,
+          stdout: '  DEPLOYMENT_URL: https://jovie-x.vercel.app\n',
+        };
+      }
+      return { status: 0, stdout: 'null' };
+    },
+    ...clock(),
+  });
+  assert.deepEqual(result, {
+    url: 'https://jovie-x.vercel.app',
+    reason: null,
+  });
+});
+
 test('reads the preview URL from the readiness step env block', () => {
   const log = [
     '2026-10-04T01:00:00Z ##[group]Run set -euo pipefail',
@@ -40,6 +85,36 @@ test('reads the preview URL from the readiness step env block', () => {
     'https://jovie-abc123-jovie.vercel.app'
   );
   assert.equal(parseDeploymentUrl('no url here'), null);
+  assert.equal(
+    parseDeploymentUrl('  DEPLOYMENT_URL: https://***-abc123-***.vercel.app\n'),
+    null
+  );
+  const encoded = Buffer.from('https://jovie-abc123-jovie.vercel.app').toString(
+    'base64'
+  );
+  assert.equal(
+    parseDeploymentUrl(
+      [
+        '  DEPLOYMENT_URL: https://***-abc123-***.vercel.app',
+        `  DEPLOYMENT_URL_B64: ${encoded}`,
+      ].join('\n')
+    ),
+    'https://jovie-abc123-jovie.vercel.app'
+  );
+});
+
+test('preview readiness prints a base64 URL the log mask cannot punch out', () => {
+  const workflow = readFileSync(
+    new URL('../../.github/workflows/ci.yml', import.meta.url),
+    'utf8'
+  );
+  const start = workflow.indexOf('name: Wait for PR preview readiness');
+  assert.ok(start >= 0);
+  const step = workflow.slice(start, workflow.indexOf('\n      - ', start + 1));
+  assert.match(
+    step,
+    /echo "DEPLOYMENT_URL_B64: \$\(printf '%s' "\$DEPLOYMENT_URL" \| base64 -w0\)"/
+  );
 });
 
 test('backoff never polls faster than every 30s', () => {
@@ -190,4 +265,87 @@ test('gives up at the 15-minute cap and on a failed preview job', async () => {
     ...clock(),
   });
   assert.match(failed.reason, /preview deploy failure/);
+});
+
+const DOPPLER_CONFIG = `
+scoped:
+  /work/other:
+    token: other-token
+    enclave.project: other
+    enclave.config: dev
+  "/work/jovie":
+    token: scoped-token
+    enclave.project: "jovie-web"
+    enclave.config: 'dev'
+version-check: {}
+tui:
+  introVersionSeen: 0
+`;
+
+test('reads jovie-web/dev directories from the Doppler CLI config', () => {
+  assert.deepEqual(parseDopplerScopes(DOPPLER_CONFIG), ['/work/jovie']);
+  assert.deepEqual(
+    parseDopplerScopes(DOPPLER_CONFIG, { project: 'other', config: 'dev' }),
+    ['/work/other']
+  );
+  assert.deepEqual(parseDopplerScopes(''), []);
+  // Doppler's own file uses 4-space indentation and an inline sibling map.
+  assert.deepEqual(
+    parseDopplerScopes(`
+scoped:
+    /home/dev/Jovie:
+        token: secret
+        enclave.project: jovie-web
+        enclave.config: dev
+version-check: {}
+tui:
+    introVersionSeen: 0
+`),
+    ['/home/dev/Jovie']
+  );
+});
+
+test('uses a saved Doppler scope when the worktree has no token', () => {
+  const calls = [];
+  const secret = readBypassSecret({
+    env: {},
+    scopes: ['/work/jovie'],
+    spawn: (_cmd, args) => {
+      calls.push(args);
+      if (!args.includes('--scope')) {
+        return { status: 1, stdout: '', stderr: 'you must provide a token' };
+      }
+      return { status: 0, stdout: 'bypass-secret\n' };
+    },
+  });
+  assert.equal(secret, 'bypass-secret');
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1][calls[1].indexOf('--scope') + 1], '/work/jovie');
+  assert.ok(calls[1].includes('--project'));
+  assert.ok(calls[1].includes('jovie-web'));
+});
+
+test('prefers the environment bypass secret and ignores empty Doppler output', () => {
+  let calls = 0;
+  assert.equal(
+    readBypassSecret({
+      env: { VERCEL_AUTOMATION_BYPASS_SECRET: ' from-env ' },
+      scopes: ['/work/jovie'],
+      spawn: () => {
+        calls += 1;
+        return { status: 0, stdout: 'should-not-run' };
+      },
+    }),
+    'from-env'
+  );
+  assert.equal(calls, 0);
+
+  assert.equal(
+    readBypassSecret({
+      env: {},
+      scopes: ['/work/jovie'],
+      spawn: () => ({ status: 0, stdout: '  \n' }),
+    }),
+    null
+  );
 });

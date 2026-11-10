@@ -30,12 +30,14 @@ async function enterPersona(
   await expect(page.locator('#main-content')).toBeVisible({ timeout: 60_000 });
 }
 
-/** Tools stays collapsed until the viewer opens it (Tim 2026-10-21). */
+/** Company and Tools stay collapsed until the viewer opens them (Tim 2026-10-21). */
 async function expandOperatorTools(navigation: Locator) {
-  const tools = navigation.getByRole('button', { name: 'Tools', exact: true });
-  if ((await tools.count()) === 0) return;
-  if ((await tools.getAttribute('aria-expanded')) !== 'true') {
-    await tools.click();
+  for (const name of ['Company', 'Tools']) {
+    const group = navigation.getByRole('button', { name, exact: true });
+    if ((await group.count()) === 0) continue;
+    if ((await group.getAttribute('aria-expanded')) !== 'true') {
+      await group.click();
+    }
   }
 }
 
@@ -140,17 +142,21 @@ async function customerNavigationContract(
           };
         })
       );
-      const accessibility = Array.from(
-        element.querySelectorAll('a[href], button')
-      ).map(interactive => ({
-        role: interactive.tagName.toLowerCase(),
-        name:
-          interactive.getAttribute('aria-label') ??
-          interactive.textContent?.trim() ??
-          null,
-        href: interactive.getAttribute('href'),
-        current: interactive.getAttribute('aria-current'),
-      }));
+      // The accessibility pass follows the same roots as the nodes pass:
+      // scanning the whole landmark leaks the per-user recent-chat rows
+      // (chat links and thread action buttons render inside the nav but
+      // outside every [data-nav-section]), which can never be role-invariant.
+      const accessibility = roots
+        .flatMap(root => Array.from(root.querySelectorAll('a[href], button')))
+        .map(interactive => ({
+          role: interactive.tagName.toLowerCase(),
+          name:
+            interactive.getAttribute('aria-label') ??
+            interactive.textContent?.trim() ??
+            null,
+          href: interactive.getAttribute('href'),
+          current: interactive.getAttribute('aria-current'),
+        }));
 
       return { nodes, styleInvariants, accessibility };
     },
@@ -206,7 +212,7 @@ test.describe('OV responsive navigation exclusivity', () => {
           (async () => {
             if (entry === 'selector') {
               await page
-                .getByRole('button', { name: 'Switch Workspace' })
+                .getByRole('button', { name: /^Switch Workspace: / })
                 .click();
               await page
                 .getByRole('menuitem', {
@@ -225,7 +231,7 @@ test.describe('OV responsive navigation exclusivity', () => {
             } else {
               // The shortcut intentionally ignores focused text inputs.
               await page
-                .getByRole('button', { name: 'Switch Workspace' })
+                .getByRole('button', { name: /^Switch Workspace: / })
                 .focus();
               await page.keyboard.press('Alt+Shift+KeyW');
             }
@@ -233,7 +239,7 @@ test.describe('OV responsive navigation exclusivity', () => {
         ]);
         await expect(page).toHaveURL(new RegExp(`${destination.href}/?$`));
         await expect(
-          page.getByRole('button', { name: 'Switch Workspace' })
+          page.getByRole('button', { name: /^Switch Workspace: / })
         ).toHaveText(destination.label);
         if (destination.label === 'OV') {
           await expect(operatorNavigation).toBeVisible();

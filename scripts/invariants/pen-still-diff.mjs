@@ -4,14 +4,15 @@
 * Pen-still screenshot diff. Advisory until canonical stills exist.
 *
 *   node scripts/invariants/pen-still-diff.mjs \
-*     --manifest docs/pen-stills/homepage/manifest.json --out pen-still-out
+*     --manifest docs/design-system/pen-bindings.json [--route /] --out pen-still-out
 *
-* Exit 0 unless `--strict` and a comparable frame misses tolerance.
+* Advisory exits 0; strict requires at least one active frame and every active comparison to pass.
 * Parked and fork frames are excluded. Dark is the primary mode.
 * Capture reuses clef-screenshot-evaluator.mjs.
 */
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { BINDING_SCHEMA, bindingsToStillFrames } from '../design/pen-bindings-lib.mjs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path'; import { fileURLToPath } from 'node:url'; import {
 composeTriptych, decodePng, diffImage, encodePng, judgePair, measureGeometry, measureImage,
 PEN_STILL_TOLERANCES, resizeImage, ssim, syntheticPair, } from './pen-still-diff-lib.mjs';
@@ -66,7 +67,7 @@ penMetrics, renderMetrics, ssim(penImage, aligned) ); return { penMetrics, rende
 triptych: composeTriptych( penImage, aligned, diffImage(penImage, renderImage) ), }; }
 export function syntheticComparison() { const { pen, render } = syntheticPair();
 const compared = compareImages(pen, render); return { kind: 'synthetic', reason:
-'No canonical Pen still is on disk. This triptych exercises the diff and is not a design verdict.',
+'No canonical image pair was compared. This synthetic triptych exercises the diff and is not design evidence.',
 pass: compared.judgment.pass, judgment: compared.judgment, triptych: compared.triptych, }; }
 /**
 * @typedef {ReturnType<typeof frameId> & {
@@ -79,7 +80,7 @@ const { active, excluded } = selectFrames(manifest);
 /** @type {FrameResult[]} */
 const frames = []; for (const frame of active) {
 const stillPath = resolve(root, frame.stillPath); if (!existsSync(stillPath)) { frames.push({ ...frameId(frame),
-verdict: 'waiting', reason: 'canonical-still-missing', }); continue; } const actualHash = createHash('sha256')
+verdict: 'waiting', reason: 'canonical-still-missing', }); continue; } try { const actualHash = createHash('sha256')
 .update(readFileSync(stillPath)) .digest('hex');
 const expectedHash = frame.fileHash?.replace(/^sha256:/, '') ?? null;
 if (expectedHash && expectedHash !== actualHash) { frames.push({ ...frameId(frame), verdict: 'fail',
@@ -88,16 +89,19 @@ if (!url || !options.capture) { frames.push({ ...frameId(frame), verdict: 'waiti
 reason: 'capture-target-missing', }); continue; } const captured = await options.capture(frame, url);
 const compared = compareImages( decodePng(readFileSync(stillPath)), decodePng(captured.png), captured.geometry
 ); frames.push({ ...frameId(frame), verdict: compared.judgment.pass ? 'pass' : 'fail',
-judgment: compared.judgment, triptych: compared.triptych, }); }
-const comparable = frames.some(frame => frame.verdict !== 'waiting'); return { schema: RECEIPT_SCHEMA,
-advisory: true, primaryMode: 'dark', lockedHeadline: LOCKED_HEADLINE, tolerances: PEN_STILL_TOLERANCES,
+judgment: compared.judgment, triptych: compared.triptych, }); } catch {
+frames.push({ ...frameId(frame), verdict: 'fail', reason: 'comparison-unavailable' }); } }
+const comparable = frames.some(frame => frame.triptych); return { schema: RECEIPT_SCHEMA,
+advisory: !options.strict, primaryMode: 'dark', lockedHeadline: LOCKED_HEADLINE, tolerances: PEN_STILL_TOLERANCES,
 excluded: excluded.map(frame => ({ sectionId: frame.sectionId, status: frame.status, mode: frame.mode,
 viewport: frame.viewport, })), frames: frames.map(({ triptych: _triptych, ...rest }) => rest),
 triptychs: frames.flatMap(frame => frame.triptych ? [ { sectionId: frame.sectionId, mode: frame.mode,
 viewport: frame.viewport, triptych: frame.triptych, }, ] : [] ),
-sample: comparable ? null : syntheticComparison(), pass: frames.every(frame => frame.verdict !== 'fail'), }; }
-export function formatComment(receipt) { const lines = [ COMMENT_MARKER, '## Pen still diff (advisory)', '',
-`Dark is the primary review mode. The locked homepage headline is "${receipt.lockedHeadline}". This job does not block merge.`,
+sample: comparable ? null : syntheticComparison(), pass: options.strict
+? frames.length > 0 && frames.every(frame => frame.verdict === 'pass')
+: frames.every(frame => frame.verdict !== 'fail'), }; }
+export function formatComment(receipt) { const lines = [ COMMENT_MARKER, `## Pen still diff (${receipt.advisory ? 'advisory' : 'strict'})`, '',
+`Dark is the primary review mode. ${receipt.advisory ? 'This job does not block merge.' : `Strict qualification: ${receipt.pass ? 'pass' : 'fail'}. Every active frame must be compared and pass.`}`,
 '', ]; if (receipt.sample) lines.push(receipt.sample.reason, ''); lines.push(
 '| Section | Mode | Viewport | Verdict | SSIM | Section height ratio |', '| --- | --- | --- | --- | --- | --- |'
 ); const rows = [...receipt.frames]; if (receipt.sample) { rows.push({ sectionId: 'synthetic sample',
@@ -105,30 +109,43 @@ mode: 'dark', viewport: '—', verdict: receipt.sample.pass ? 'pass' : 'fail', j
 }); } for (const frame of rows) { const ssimScore = frame.judgment ? frame.judgment.ssim.toFixed(3) : '—';
 const ratio = frame.judgment ? frame.judgment.sectionHeightRatio.toFixed(3) : '—'; lines.push(
 `| ${frame.sectionId} | ${frame.mode} | ${frame.viewport} | ${frame.verdict} | ${ssimScore} | ${ratio} |` ); }
-lines.push( '', '![Pen, render, and diff](triptych.png)', '',
+for (const item of receipt.triptychs) { if (item.file) lines.push('',
+`![Pen, render, and diff: ${String(item.sectionId).replace(/[\[\]\r\n]/g, ' ')} (${item.mode}, ${item.viewport})](${item.file})`); }
+if (receipt.sample?.file) lines.push('', `![Synthetic sample (not design evidence)](${receipt.sample.file})`);
+lines.push( '',
 `Excluded parked or fork frames: ${receipt.excluded.length}.`, '' ); return lines.join('\n'); }
 function parseArgs(argv) { const args = {}; for (let i = 0; i < argv.length; i++) { const token = argv[i];
 if (!token.startsWith('--')) continue; const next = argv[i + 1];
 if (next === undefined || next.startsWith('--'))
 args[token.slice(2)] = true; else { args[token.slice(2)] = next; i += 1; } } return args; }
-async function main() { const args = parseArgs(process.argv.slice(2)); if (args.help || !args.manifest) {
+export async function main(argv = process.argv.slice(2), options = {}) { const args = parseArgs(argv); if (args.help || !args.manifest) {
 process.stdout.write(
-'usage: pen-still-diff.mjs --manifest <file> --out <dir> [--base-url URL] [--storybook-url URL] [--strict]\n' );
-process.exit(args.help ? 0 : 2); } const manifest = parseManifest(readFileSync(String(args.manifest), 'utf8'));
+'usage: pen-still-diff.mjs --manifest <file> [--route /] --out <dir> [--base-url URL] [--storybook-url URL] [--strict]\n' );
+process.exit(args.help ? 0 : 2); } const manifestText = readFileSync(String(args.manifest), 'utf8'); const manifest = JSON.parse(manifestText).schema === BINDING_SCHEMA
+? { schema: MANIFEST_SCHEMA, primaryMode: 'dark', frames: bindingsToStillFrames(JSON.parse(manifestText), typeof args.route === 'string' ? args.route : null) }
+: parseManifest(manifestText);
 const baseUrl = args['base-url'] || process.env.PEN_STILL_BASE_URL; const storybookUrl =
-args['storybook-url'] || process.env.PEN_STILL_STORYBOOK_URL; const capture = baseUrl || storybookUrl
+args['storybook-url'] || process.env.PEN_STILL_STORYBOOK_URL; const capture = options.capture ?? (baseUrl || storybookUrl
 ? async (frame, url) => { const { captureSurfacePng, withCaptureBrowser } = await import(
 './clef-screenshot-evaluator.mjs' ); return withCaptureBrowser(browser => captureSurfacePng(browser, { url,
 viewport: frame.viewport, mode: frame.mode, selector: frame.sectionSelector,
-mockupSelector: frame.mockupSelector, }) ); } : undefined; const receipt = await evaluateManifest(manifest, {
-root: REPO_ROOT, baseUrl: typeof baseUrl === 'string' ? baseUrl : undefined,
+mockupSelector: frame.mockupSelector, }) ); } : undefined); const receipt = await evaluateManifest(manifest, {
+root: options.root ?? REPO_ROOT, strict: Boolean(args.strict), baseUrl: typeof baseUrl === 'string' ? baseUrl : undefined,
 storybookUrl: typeof storybookUrl === 'string' ? storybookUrl : undefined, capture, });
 const outDir = resolve(String(args.out ?? 'pen-still-out')); mkdirSync(outDir, { recursive: true });
-const triptych = receipt.triptychs[0]?.triptych ?? receipt.sample?.triptych ?? null; if (triptych)
-writeFileSync(join(outDir, 'triptych.png'), encodePng(triptych)); const publicReceipt = { ...receipt,
-triptychs: receipt.triptychs.map(item => ({ sectionId: item.sectionId, mode: item.mode, viewport: item.viewport,
-file: 'triptych.png', })), sample: receipt.sample ? { kind: receipt.sample.kind, reason: receipt.sample.reason,
-pass: receipt.sample.pass, judgment: receipt.sample.judgment, file: 'triptych.png', } : null, }; writeFileSync(
+// Hash the full identity, not a lossy slug: separators, case, Unicode and long IDs stay distinct.
+const triptychs = receipt.triptychs.map(({ triptych, ...identity }) => {
+const digest = createHash('sha256').update(JSON.stringify(identity)).digest('hex');
+const file = `triptych-${digest}.png`; writeFileSync(join(outDir, file), encodePng(triptych));
+return { ...identity, file }; });
+const sample = receipt.sample ? { kind: receipt.sample.kind, reason: receipt.sample.reason,
+pass: receipt.sample.pass, judgment: receipt.sample.judgment, file: 'synthetic-triptych.png' } : null;
+if (sample) writeFileSync(join(outDir, sample.file), encodePng(receipt.sample.triptych));
+// Keep the old attachment only when it identifies exactly one image. Clear stale aliases on reuse.
+const legacy = triptychs.length === 1 ? triptychs[0].file : sample?.file;
+if (legacy) writeFileSync(join(outDir, 'triptych.png'), readFileSync(join(outDir, legacy)));
+else rmSync(join(outDir, 'triptych.png'), { force: true });
+const publicReceipt = { ...receipt, triptychs, sample }; writeFileSync(
 join(outDir, 'receipt.json'), `${JSON.stringify(publicReceipt, null, 2)}\n` );
 writeFileSync(join(outDir, 'comment.md'), formatComment(publicReceipt));
 process.stdout.write(`${JSON.stringify(publicReceipt, null, 2)}\n`);

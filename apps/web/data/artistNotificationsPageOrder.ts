@@ -28,7 +28,7 @@ export const ARTIST_NOTIFICATIONS_SECTION_ORDER: readonly ArtistNotificationsSec
     },
     {
       id: 'capture',
-      label: 'Capture Every Fan',
+      label: 'Capture every listener',
       testId: 'artist-notifications-section-capture',
     },
     {

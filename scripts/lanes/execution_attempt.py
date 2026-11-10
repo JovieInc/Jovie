@@ -14,8 +14,22 @@ def digest(value) -> str: return hashlib.sha256(json.dumps(value, sort_keys=True
 def identity(domain: str, work: dict, generation) -> dict:
     work_key, generation = f"{domain}:{digest(work)}", digest(generation)
     return {"workKey": work_key, "executionGeneration": generation, "identityDigest": digest({"workKey": work_key, "generation": generation})}
+def _mirror_rows(text: str) -> list[dict]:
+    """A crash or full disk can tear the last append. The local file mirrors the GitHub ledger,
+    so a torn final line (no newline) is dropped, never fatal: one torn line failed every
+    fix-red claim on Gem from 2026-10-26 07:30Z. Interior corruption still raises."""
+    lines = text.split("\n")
+    if lines[-1] == "": lines.pop()
+    else:
+        try: json.loads(lines[-1])
+        except json.JSONDecodeError: lines.pop()
+    return [json.loads(line) for line in lines if line]
+def _ends_open(path: Path) -> bool:
+    if not path.exists() or not path.stat().st_size: return False
+    with open(path, "rb") as handle:
+        handle.seek(-1, os.SEEK_END); return handle.read(1) != b"\n"
 def _rows(path: Path) -> list[dict]:
-    rows = [] if not path.exists() else [json.loads(line) for line in path.read_text().splitlines()]
+    rows = [] if not path.exists() else _mirror_rows(path.read_text())
     if any(row.get("schema") != SCHEMA or not row.get("identityDigest") for row in rows): raise RuntimeError("execution-ledger-malformed")
     return rows
 def _file_locked(path: Path, fn):
@@ -24,6 +38,8 @@ def _file_locked(path: Path, fn):
         fcntl.flock(lock, fcntl.LOCK_EX)
         result, additions = fn(_rows(path))
         if additions:
+            if _ends_open(path):
+                data = path.read_bytes(); path.write_bytes(data[:data.rfind(b"\n") + 1])
             with open(path, "a") as ledger:
                 ledger.writelines(json.dumps(row, sort_keys=True) + "\n" for row in additions)
                 ledger.flush(); os.fsync(ledger.fileno())
@@ -134,10 +150,12 @@ def _github_rows(coordination: dict, ident: dict) -> tuple[list[dict], int | str
     pages = _gh(coordination, "GET", f"repos/{repository}/commits/{sha}/statuses?per_page=100")
     return _status_rows(_status_pages(pages), ident, coordination=coordination)
 RESERVATION_SCHEMA = "jovie-execution-reservation/v1"
-# Reader-first rollout: self-update must not activate incompatible writer links.
-# Enable only in a reviewed release after every participating reader/writer is
-# verified ready. This is deliberately not a JSON or environment override.
-IMMUTABLE_WRITER_ENABLED = False
+# Candidate-linked writer enablement (JOV-8293): the separately reviewed release
+# after the dual-format reader and every boundary_id caller landed and drained.
+# Legacy numeric chains stay readable, legacy common-source-SHA reservations are
+# never extended or reused, and an un-updated writer still refuses new receipts.
+# This is deliberately not a JSON or environment override.
+IMMUTABLE_WRITER_ENABLED = True
 def _append_ref(ident: dict, head) -> str:
     return f"refs/jovie-execution/{ident['identityDigest']}/append-{head if head is not None else 'root'}"
 def _without_status(row: dict) -> dict:
@@ -320,10 +338,10 @@ def _locked(path: Path, ident: dict, coordination: dict | None, fn, *, now=None)
 def _for(rows: list[dict], ident: dict) -> list[dict]: return [row for row in rows if row["identityDigest"] == ident["identityDigest"]]
 def _usage(rows: list[dict], now: float) -> dict:
     starts = [row for row in rows if row["event"] == "attempt_started"]
-    finishes = {row["fencingToken"] for row in rows if row["event"] == "attempt_finished"}
+    finishes = {row["fencingToken"]: row["at"] for row in rows if row["event"] == "attempt_finished"}  # token -> finish time
     boundaries = [row for row in rows if row["event"] == "boundary_admitted"]
     return {"attempts": len(starts), "concurrency": sum(row["fencingToken"] not in finishes for row in starts),
-            "wallSeconds": max(0, now - min((row["at"] for row in starts), default=now)),
+            "wallSeconds": sum(max(0, min(finishes.get(row["fencingToken"], now), row.get("leaseExpiresAt", now)) - row["at"]) for row in starts),  # spent; never past a lease
             "spend": sum(row["reservation"]["spend"] for row in boundaries),
             "mutations": sum(row["reservation"]["mutations"] for row in boundaries)}
 def _remaining(policy: dict, used: dict) -> dict: return {name: max(0, policy[name] - used[name]) for name in ("attempts", "concurrency", "wallSeconds", "spend", "mutations")}
@@ -342,7 +360,7 @@ def _expired_row(rows: list[dict], ident: dict, active: dict, now: float) -> dic
     expired["diagnosis"] = _diagnosis([*rows, expired], "failed_unknown")
     return expired
 def _number(value) -> bool: return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
-def claim(path: Path, ident: dict, owner: dict, policy: dict, trigger: dict, now: float | None = None, coordination: dict | None = None) -> dict:
+def claim(path: Path, ident: dict, owner: dict, policy: dict, trigger: dict, now: float | None = None, coordination: dict | None = None, min_reservation: dict | None = None) -> dict:
     now = time.time() if now is None else now
     required = ("attempts", "concurrency", "wallSeconds", "spend", "mutations", "leaseSeconds")
     if any(not _number(policy.get(key)) or policy[key] < 0 for key in required) or any(policy[key] <= 0 for key in required[:3] + ("leaseSeconds",)): raise ValueError("execution-policy-malformed")
@@ -364,8 +382,8 @@ def claim(path: Path, ident: dict, owner: dict, policy: dict, trigger: dict, now
         # positive boundary still fails closed; positive exhausted caps retain
         # their existing stop semantics. This never grants a provider route.
         exhausted = next((key for key in ("attempts", "concurrency", "wallSeconds", "spend", "mutations")
-                          if used[key] >= policy[key] and not
-                          (key in {"spend", "mutations"} and used[key] == policy[key] == 0)), None)
+                          if (used[key] >= policy[key] and not (key in {"spend", "mutations"} and used[key] == policy[key] == 0))
+                          or used[key] + (min_reservation or {}).get(key, 0) > policy[key]), None)  # JOV-11407: room for the dispatch
         if exhausted:
             row = {**ident, "schema": SCHEMA, "event": "decision", "at": now, "terminalState": "budget_exhausted", "retryDecision": "stop",
                    "reason": f"{exhausted}_budget_exhausted", "diagnosis": _diagnosis(rows, "budget_exhausted")}

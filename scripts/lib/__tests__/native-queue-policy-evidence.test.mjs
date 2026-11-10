@@ -13,6 +13,7 @@ const required = [
   'Migration Guard',
   'Fork PR Gate',
   'PR Size Guard',
+  'Company guards',
 ].map(context => ({ context }));
 const policy = {
   required,
@@ -134,7 +135,7 @@ describe('native queue strict acceptance', () => {
     ).toHaveLength(1);
     expect(
       checkFailures(checks, required, head, Date.parse(at) - 1)
-    ).toHaveLength(4);
+    ).toHaveLength(5);
   });
 });
 

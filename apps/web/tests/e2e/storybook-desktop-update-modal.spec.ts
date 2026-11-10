@@ -1,6 +1,25 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('Desktop update release notes geometry', () => {
+  test('does not persist a light override into the next default story', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto(
+      '/iframe.html?id=organisms-desktopupdatemodal--available-light&viewMode=story'
+    );
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.locator('html')).toHaveClass(/light/);
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+    // Navigate in the same browser context without resetting theme storage.
+    await page.goto(
+      '/iframe.html?id=organisms-desktopupdatemodal--downloading-slow&viewMode=story'
+    );
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await expect(page.locator('html')).not.toHaveClass(/light/);
+  });
+
   for (const [width, height] of [
     [390, 844],
     [768, 1024],
@@ -26,6 +45,11 @@ test.describe('Desktop update release notes geometry', () => {
           .getByRole('dialog')
           .evaluate(el => el.contains(document.activeElement))
       ).toBe(true);
+      // Isolate the download-speed fixture from saved theme preferences.
+      // The dedicated transition test above verifies navigation without a reset.
+      await page.evaluate(() =>
+        localStorage.removeItem('jovie-theme-storybook')
+      );
       await page.goto(
         '/iframe.html?id=organisms-desktopupdatemodal--downloading-slow&viewMode=story'
       );
@@ -39,7 +63,7 @@ test.describe('Desktop update release notes geometry', () => {
       await expect(page.getByRole('button', { name: 'Hide' })).toBeVisible();
     });
 
-    test(`keeps the dialog and footer stable at ${width}px`, async ({
+    test(`sizes the settled dialog to its content at ${width}px`, async ({
       page,
     }) => {
       await page.setViewportSize({ width, height });
@@ -79,12 +103,18 @@ test.describe('Desktop update release notes geometry', () => {
           await dialog.evaluate(el => el.contains(document.activeElement))
         ).toBe(true);
       }
-      expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(
-        1
-      );
-      expect(Math.max(...footers) - Math.min(...footers)).toBeLessThanOrEqual(
-        1
-      );
+      // JOV-9023: settled bodies size to their content instead of a fixed
+      // height. The loading skeleton still reserves the scroll region and
+      // long notes still cap and scroll at that same bound, so those two
+      // dialogs stay height-equal; short notes and the fallback link make a
+      // visibly smaller dialog with no empty expanse above the actions.
+      const [loading, shortNotes, longNotes, fallbackLink] = heights;
+      const [, , , fallbackFooter] = footers;
+      expect(Math.abs(longNotes - loading)).toBeLessThanOrEqual(1);
+      expect(loading - shortNotes).toBeGreaterThanOrEqual(32);
+      expect(loading - fallbackLink).toBeGreaterThanOrEqual(64);
+      expect(fallbackFooter).toBeLessThan(footers[0]);
+      expect(Math.abs(footers[2] - footers[0])).toBeLessThanOrEqual(1);
     });
   }
 });

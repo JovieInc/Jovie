@@ -8,8 +8,8 @@ import {
   NAVIGATION_ITEM_IDS,
   NAVIGATION_PLATFORMS,
   NAVIGATION_VARIANTS,
-  type NavigationTelemetryPayload,
 } from '../tracking/navigation-telemetry-contract';
+import type { NavigationTelemetryPayload } from '../tracking/navigation-telemetry-schema';
 import {
   getNavigationTelemetryBaseline,
   NAVIGATION_TELEMETRY_CARDINALITY_SAFETY_MARGIN,

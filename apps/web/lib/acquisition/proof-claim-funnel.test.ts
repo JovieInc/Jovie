@@ -31,7 +31,7 @@ describe('proof-to-claim funnel contract (JOV-6440)', () => {
     expect(isProofProfileHandle(null)).toBe(false);
   });
 
-  it('locks Artist Presence at $199/mo', () => {
+  it('locks Artist Presence at $12/mo', () => {
     expect(getProofClaimOffer()).toEqual({
       product: 'Artist Presence',
       monthlyUsd: 12,

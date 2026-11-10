@@ -1,5 +1,8 @@
 import { neon } from '@neondatabase/serverless';
-import { PRODUCTION_AUTH_SMOKE_EMAIL } from './production-auth-credentials';
+import {
+  isProdcertCanaryEmail,
+  newProdcertUserEmail,
+} from '@/lib/synthetic/prodcert-identities';
 
 const OTP_PATTERN = /^\d{6}$/;
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -24,6 +27,16 @@ type LoadProductionAuthOtpRecord = (
 
 function buildSignInVerificationIdentifier(email: string): string {
   return `sign-in-otp-${email.trim().toLowerCase()}`;
+}
+
+/**
+ * Production canary addresses (JOV-9625) come from one lib module so the OTP
+ * reader and the /start passage token accept exactly the same identities.
+ */
+export { newProdcertUserEmail };
+
+export function isProductionCanaryOtpEmail(email: string): boolean {
+  return isProdcertCanaryEmail(email);
 }
 
 export function extractProductionAuthOtp(
@@ -102,7 +115,7 @@ export async function waitForProductionAuthOtp({
   readonly pollIntervalMs?: number;
 }): Promise<string> {
   const normalizedEmail = email.trim().toLowerCase();
-  if (normalizedEmail !== PRODUCTION_AUTH_SMOKE_EMAIL) {
+  if (!isProductionCanaryOtpEmail(normalizedEmail)) {
     throw new Error(
       'Production Better Auth OTP retrieval refused a non-smoke identity.'
     );

@@ -68,12 +68,24 @@ describe('WorkspaceSelector', () => {
     }
   );
 
+  it('cancels its padding so the brand mark sits on the nav icon column', () => {
+    render(
+      <WorkspaceSelector currentWorkspaceId='ov' workspaces={workspaces} />
+    );
+    const trigger = screen.getByRole('button', { name: /^Switch Workspace: / });
+    // -ml-1.5 cancels px-1.5: the mark starts at the 12px sidebar inset.
+    expect(trigger).toHaveClass('-ml-1.5', 'px-1.5');
+    expect(trigger.className).not.toMatch(/(?:^|\s)px-2\.5(?:\s|$)/);
+    // The collapsed rail centres the mark instead.
+    expect(trigger).toHaveClass('group-data-[collapsible=icon]:ml-0');
+  });
+
   it('renders the active workspace in a stable selector trigger', () => {
     render(
       <WorkspaceSelector currentWorkspaceId='ov' workspaces={workspaces} />
     );
 
-    const trigger = screen.getByRole('button', { name: 'Switch Workspace' });
+    const trigger = screen.getByRole('button', { name: /^Switch Workspace: / });
     expect(trigger).toHaveTextContent('OV');
     expect(trigger.querySelector('svg.lucide-chevron-down')).toBeNull();
     expect(trigger.querySelector('[data-brand-mark-size]')).toHaveAttribute(
@@ -87,7 +99,7 @@ describe('WorkspaceSelector', () => {
       <WorkspaceSelector currentWorkspaceId='ov' workspaces={workspaces} />
     );
 
-    const trigger = screen.getByRole('button', { name: 'Switch Workspace' });
+    const trigger = screen.getByRole('button', { name: /^Switch Workspace: / });
     const label = within(trigger).getByText('OV');
     // JOV-4522: max-width + opacity + travel keep the label mounted during
     // the rail collapse instead of popping to display:none at frame one.
@@ -129,7 +141,7 @@ describe('WorkspaceSelector', () => {
     );
 
     expect(
-      screen.getByRole('button', { name: 'Switch Workspace' })
+      screen.getByRole('button', { name: /^Switch Workspace: / })
     ).toHaveTextContent('Jovie');
   });
 

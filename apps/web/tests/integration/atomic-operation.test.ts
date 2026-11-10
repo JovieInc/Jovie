@@ -17,6 +17,7 @@ import {
   disapproveWaitlistEntryInTx,
 } from '@/lib/waitlist/approval';
 import { enqueueWaitlistApprovalInviteEmail } from '@/lib/waitlist/email-jobs';
+import { registerContentPublicationCertification } from './fixtures/content-publication-certification';
 
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: vi.fn(),
@@ -248,6 +249,7 @@ describe.skipIf(!target)(
         ok: 1,
       });
     }, 90_000);
+    registerContentPublicationCertification(() => target);
   }
 );
 

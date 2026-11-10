@@ -17,6 +17,7 @@ on:
       - 'scripts/invariants/pen-token-parity.mjs'
       - 'scripts/invariants/pen-token-parity.test.mjs'
       - 'scripts/ci-fast-lanes.mjs'
+      - 'scripts/pen-review/**'
       - '.github/workflows/pen-token-parity.yml'
   push:
     branches: [main]
@@ -27,6 +28,7 @@ on:
       - 'docs/pen-stills/pen-variable-baseline.json'
       - 'scripts/invariants/pen-token-parity.mjs'
       - 'scripts/invariants/pen-token-parity.test.mjs'
+      - 'scripts/pen-review/**'
       - '.github/workflows/pen-token-parity.yml'
   workflow_dispatch:
 
@@ -49,9 +51,12 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: '.nvmrc'
 
       - name: Unit tests and ratchet
-        run: node --test scripts/invariants/pen-token-parity.test.mjs && node scripts/invariants/pen-token-parity.mjs
+        run: node --test scripts/invariants/pen-token-parity.test.mjs scripts/pen-review/*.test.mjs && node scripts/invariants/pen-token-parity.mjs

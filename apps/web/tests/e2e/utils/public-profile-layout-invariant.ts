@@ -46,8 +46,8 @@ export async function auditPublicProfileLayout(page: Page) {
     const layout = root?.dataset.layout ?? null;
     const isDesktopViewport = window.innerWidth >= desktopBreakpoint;
     const ownsDesktop = isDesktopViewport && layout === 'desktop';
-    // Builds without NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE (the default,
-    // Tim 2026-09-26) keep desktop widths on the compact profile, centered in
+    // Opted-out builds (NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE=0)
+    // keep desktop widths on the compact profile, centered in
     // a phone-width column. That column is the admitted desktop presentation
     // only while the layout honestly reports `compact`; a shell that claims
     // desktop ownership while showing the compact card is still a hybrid.
@@ -69,9 +69,13 @@ export async function auditPublicProfileLayout(page: Page) {
       for (const compact of compactSurfaces) {
         if (isPhoneColumn(compact)) {
           const rect = compact.getBoundingClientRect();
+          // >= 1024px the flag-off profile is the two-column desktop
+          // composition; below it the phone column.
           const maxWidth = Number.parseFloat(
             getComputedStyle(document.documentElement).getPropertyValue(
-              '--profile-shell-max-width'
+              window.innerWidth >= 1024
+                ? '--profile-desktop-max-width'
+                : '--profile-shell-max-width'
             )
           );
           const viewportWidth = document.documentElement.clientWidth;
@@ -157,13 +161,29 @@ export async function auditPublicProfileLayout(page: Page) {
     if (ownsDesktop && desktopCover && isVisible(artistName ?? null)) {
       const coverBox = desktopCover.getBoundingClientRect();
       const nameBox = artistName.getBoundingClientRect();
+      // The header can fit while a no-break name is clipped inside its
+      // line-clamped span. Observe the text fragments, not just the flex box.
+      const nameText = artistName.querySelector('span');
+      const textBox = nameText?.getBoundingClientRect();
+      const range = document.createRange();
+      if (nameText) range.selectNodeContents(nameText);
+      const textEscapes = textBox
+        ? Array.from(range.getClientRects()).some(
+            rect =>
+              rect.left <
+                Math.max(textBox.left, nameBox.left, coverBox.left) - 1 ||
+              rect.right >
+                Math.min(textBox.right, nameBox.right, coverBox.right) + 1
+          )
+        : false;
       if (
         nameBox.left < coverBox.left - 1 ||
-        nameBox.right > coverBox.right + 1
+        nameBox.right > coverBox.right + 1 ||
+        textEscapes
       ) {
         violations.push({
           code: 'artist_name_clipped',
-          detail: `artist name bounds ${nameBox.left.toFixed(1)}..${nameBox.right.toFixed(1)} escape cover ${coverBox.left.toFixed(1)}..${coverBox.right.toFixed(1)}`,
+          detail: `artist name bounds ${nameBox.left.toFixed(1)}..${nameBox.right.toFixed(1)}, cover ${coverBox.left.toFixed(1)}..${coverBox.right.toFixed(1)}, clipped text=${textEscapes}`,
         });
       }
     }
