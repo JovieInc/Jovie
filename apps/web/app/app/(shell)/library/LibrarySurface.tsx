@@ -140,9 +140,11 @@ import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { RowWaveform } from '@/components/shell/RowWaveform';
 import { APP_ROUTES } from '@/constants/routes';
+import { useFounderDoor } from '@/contexts/FounderDoorContext';
 import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import { openChatWithDraft } from '@/lib/chat/open-chat-with-prompt';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import type { ProviderKey } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
@@ -173,6 +175,7 @@ import {
   deriveWorkInspectorPresentation,
   scopeWorkInspectorBundle,
 } from '@/lib/library/work-inspector-read-model';
+import { getCacheScope } from '@/lib/queries/cache-isolation';
 import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries/useReleaseMutations';
 import {
   type ColumnDef,
@@ -2392,6 +2395,11 @@ function AssetDrawer({
     },
     [onClose]
   );
+  const askJovieAction = current
+    ? getContextMenuItems(current).find(
+        item => 'id' in item && item.id === 'ask-jovie'
+      )
+    : undefined;
   const drawerHeaderActions = current ? (
     // The shared header shows the visible mobile Close for every drawer.
     <DrawerHeaderActions
@@ -2491,6 +2499,13 @@ function AssetDrawer({
                       canPublish={profileId !== null}
                       disabled={!open}
                       onSharePrivately={openPrivateShare}
+                      onAskJovie={
+                        askJovieAction &&
+                        'onClick' in askJovieAction &&
+                        !askJovieAction.disabled
+                          ? askJovieAction.onClick
+                          : undefined
+                      }
                       preview={
                         hasVerifiedLibraryAudioPreview(current) ? (
                           <PreviewActionButton
@@ -2902,6 +2917,7 @@ export function LibrarySurface({
   readonly workLaunches?: readonly WorkLaunchSummary[];
 }) {
   const router = useRouter();
+  const { chatMode: founderChatMode } = useFounderDoor();
   const searchParams = useSearchParams();
   const { mutate: syncSpotify, isPending: isSyncingSpotify } =
     useSyncReleasesFromSpotifyMutation(profileId ?? '');
@@ -3495,6 +3511,22 @@ export function LibrarySurface({
     [profileId]
   );
 
+  const handleAskJovie = useCallback(
+    (draft: string, targetProfileId: string) => {
+      if (founderChatMode === 'ov') {
+        toast.error('Switch to Jovie, then ask about this item again.');
+        return;
+      }
+      if (
+        getCacheScope().profileId !== targetProfileId ||
+        !openChatWithDraft(draft, router)
+      ) {
+        toast.error('Chat is unavailable. Reopen this item and try again.');
+      }
+    },
+    [router, founderChatMode]
+  );
+
   const getContextMenuItems = useCallback<LibraryContextMenuBuilder>(
     asset =>
       libraryEntityActionsToContextMenuItems(
@@ -3513,12 +3545,14 @@ export function LibrarySurface({
             isSaving: lifecycleSavingIds.has(asset.id),
             onChange: handleLifecycleChange,
           },
+          onAskJovie: handleAskJovie,
           onTogglePreview: handleTogglePreview,
           onApprovalStatusChange: handleApprovalStatusChange,
         })
       ),
     [
       approvalSavingIds,
+      handleAskJovie,
       handleApprovalStatusChange,
       handleLifecycleChange,
       handleProfileVisibilityChange,

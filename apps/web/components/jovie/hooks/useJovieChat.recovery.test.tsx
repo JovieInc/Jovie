@@ -5,8 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   readComposerDraft,
   resetComposerDraftStoreForTests,
+  saveComposerDraft,
 } from '@/lib/chat/composer-draft-store';
-import { PENDING_CHAT_PROMPT_KEY } from '@/lib/chat/open-chat-with-prompt';
+import {
+  openChatWithDraft,
+  PENDING_CHAT_PROMPT_KEY,
+} from '@/lib/chat/open-chat-with-prompt';
 import {
   applyCacheScope,
   resetCacheIsolationForTests,
@@ -546,6 +550,152 @@ describe('Summer failed turn recovery', () => {
     });
     expect(h.send).toHaveBeenCalledTimes(1);
     expect(first.result.current.chatError).toBeNull();
+  });
+
+  it('appends pending entity context to the existing draft once without sending', async () => {
+    applyCacheScope({ profileId: 'profile-a' });
+    saveComposerDraft(null, 'My unfinished question');
+    const context = 'Help with link link-123 in profile-a: https://example.com';
+    expect(openChatWithDraft(context, { push: vi.fn() })).toBe(true);
+    const first = renderHook(() => useJovieChat({ profileId: 'profile-a' }), {
+      wrapper: StrictMode,
+    });
+    await act(async () => {});
+    expect(first.result.current.input).toBe(
+      `My unfinished question\n\n${context}`
+    );
+    expect(h.send).not.toHaveBeenCalled();
+    expect(first.result.current.messages).toEqual([]);
+    first.rerender();
+    await act(async () => {});
+    expect(first.result.current.input).toBe(
+      `My unfinished question\n\n${context}`
+    );
+    expect(h.send).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { profileId: 'profile-b' },
+    { userId: 'another-user' },
+    { sessionId: 'session-b' },
+    { impersonationSubject: 'another-subject' },
+  ])(
+    'rejects consumed and edited entity drafts after fence %j',
+    async change => {
+      applyCacheScope({ profileId: 'profile-a' });
+      openChatWithDraft('Private A context', { push: vi.fn() });
+      const first = renderHook(() => useJovieChat({ profileId: 'profile-a' }));
+      await act(async () => {});
+      act(() => first.result.current.setInput(value => `${value} edited`));
+      first.unmount();
+      expect(readComposerDraft(null)).toContain('Private A context');
+      act(() => applyCacheScope(change));
+      const next = renderHook(() => useJovieChat({ profileId: 'profile-b' }));
+      expect(next.result.current.input).toBe('');
+      act(() => next.result.current.setInput('Fresh ordinary draft'));
+      next.unmount();
+      expect(readComposerDraft(null)).toBe('Fresh ordinary draft');
+      expect(h.send).not.toHaveBeenCalled();
+    }
+  );
+
+  it('clears a consumed live draft and rejects stale unmount saves after a fence', async () => {
+    applyCacheScope({ profileId: 'profile-a' });
+    openChatWithDraft('Private A context', { push: vi.fn() });
+    const first = renderHook(() => useJovieChat({ profileId: 'profile-a' }));
+    await act(async () => {});
+    act(() => applyCacheScope({ profileId: 'profile-b' }));
+    expect(first.result.current.input).toBe('');
+    saveComposerDraft(null, 'Fresh B draft');
+    first.unmount();
+    expect(readComposerDraft(null)).toBe('Fresh B draft');
+    applyCacheScope({ profileId: 'profile-a' });
+    expect(readComposerDraft(null)).not.toContain('Private A context');
+    expect(h.send).not.toHaveBeenCalled();
+  });
+
+  it.each(['clear', 'send', 'fence'] as const)(
+    'releases scoped ownership for fresh ordinary edits after %s',
+    async action => {
+      applyCacheScope({ profileId: 'profile-a' });
+      openChatWithDraft('Private A context', { push: vi.fn() });
+      const first = renderHook(() => useJovieChat({ profileId: 'profile-a' }));
+      await act(async () => {});
+      if (action === 'send') {
+        await act(async () => {
+          await first.result.current.submitMessage(first.result.current.input);
+        });
+      } else if (action === 'fence') {
+        act(() => applyCacheScope({ profileId: 'profile-b' }));
+      } else {
+        act(() => first.result.current.setInput(''));
+      }
+      act(() => first.result.current.setInput('Fresh ordinary draft'));
+      first.unmount();
+      expect(readComposerDraft(null)).toBe('Fresh ordinary draft');
+      applyCacheScope({ profileId: 'profile-c' });
+      expect(readComposerDraft(null)).toBe('Fresh ordinary draft');
+    }
+  );
+
+  it('retains origin scope when a failed send restores entity text', async () => {
+    applyCacheScope({ profileId: 'profile-a' });
+    openChatWithDraft('Private A context', { push: vi.fn() });
+    const first = renderHook(() => useJovieChat({ profileId: 'profile-a' }));
+    await act(async () => {});
+    h.send.mockRejectedValueOnce(new Error('Network unavailable'));
+    await act(async () => {
+      await first.result.current.submitMessage(first.result.current.input);
+    });
+    expect(first.result.current.input).toBe('Private A context');
+    first.unmount();
+    applyCacheScope({ profileId: 'profile-b' });
+    expect(readComposerDraft(null)).toBe('');
+  });
+
+  it('keeps failed entity ownership through clear and Retry', async () => {
+    applyCacheScope({ profileId: 'profile-a' });
+    openChatWithDraft('Private A context', { push: vi.fn() });
+    const first = renderHook(() => useJovieChat({ profileId: 'profile-a' }));
+    await act(async () => {});
+    h.send.mockRejectedValue(new Error('Network unavailable'));
+    await act(async () => {
+      await first.result.current.submitMessage(first.result.current.input);
+    });
+    act(() => first.result.current.setInput(''));
+    await act(async () => {
+      first.result.current.handleRetry();
+    });
+    expect(first.result.current.input).toBe('Private A context');
+    first.unmount();
+    applyCacheScope({ profileId: 'profile-b' });
+    expect(readComposerDraft(null)).toBe('');
+  });
+
+  it('does not restore or carry enriched creator drafts into Ovie', async () => {
+    applyCacheScope({ profileId: 'profile-a' });
+    openChatWithDraft('Private A context', { push: vi.fn() });
+    const first = renderHook(
+      ({ chatMode }) => useJovieChat({ profileId: 'profile-a', chatMode }),
+      { initialProps: { chatMode: undefined as 'ov' | undefined } }
+    );
+    await act(async () => {});
+    first.rerender({ chatMode: 'ov' });
+    expect(first.result.current.input).toBe('');
+    first.unmount();
+    expect(mount().result.current.input).toBe('');
+    expect(h.send).not.toHaveBeenCalled();
+  });
+
+  it('discards entity context after a profile switch without sending or changing the draft', async () => {
+    applyCacheScope({ profileId: 'profile-a' });
+    openChatWithDraft('Private profile-a context', { push: vi.fn() });
+    applyCacheScope({ profileId: 'profile-b' });
+    saveComposerDraft(null, 'Keep my draft');
+    const next = renderHook(() => useJovieChat({ profileId: 'profile-b' }));
+    await act(async () => {});
+    expect(next.result.current.input).toBe('Keep my draft');
+    expect(h.send).not.toHaveBeenCalled();
   });
 
   it('sends a pending initial prompt once after StrictMode effect replay', async () => {

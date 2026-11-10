@@ -1164,7 +1164,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(useRegisterRightPanel).not.toHaveBeenCalled();
   });
 
-  it('uses the shared semantic, contextual action slot without shifting rows', () => {
+  it('keeps the semantic action slot visible without shifting rows', () => {
     renderWorkspace(data);
 
     expect(
@@ -1177,7 +1177,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       name: 'Actions for Spotify',
     });
     expect(action.parentElement).not.toHaveClass('sm:opacity-0');
-    expect(action.closest('td')).toHaveClass(
+    expect(action.closest('td')).not.toHaveClass(
       'system-b-table-contextual-action-cell'
     );
   });

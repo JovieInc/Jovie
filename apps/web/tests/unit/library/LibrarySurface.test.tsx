@@ -33,11 +33,26 @@ import {
   useShellSidebarOverride,
 } from '@/contexts/ShellSidebarOverrideContext';
 import {
+  consumePendingChatDraft,
+  consumePendingChatPrompt,
+} from '@/lib/chat/open-chat-with-prompt';
+import {
   type LibraryPostReleaseBundle,
   withInspectorScope,
 } from '@/lib/library/post-release-types';
+import {
+  applyCacheScope,
+  resetCacheIsolationForTests,
+} from '@/lib/queries/cache-isolation';
 
 Element.prototype.scrollIntoView = vi.fn();
+
+const founderDoor = vi.hoisted(() => ({
+  chatMode: undefined as 'ov' | undefined,
+}));
+vi.mock('@/contexts/FounderDoorContext', () => ({
+  useFounderDoor: () => founderDoor,
+}));
 
 const LIBRARY_SURFACE_SOURCE = 'app/app/(shell)/library/LibrarySurface.tsx';
 const legacyGeistAccentPattern = new RegExp(
@@ -66,6 +81,7 @@ const librarySurfaceLocalVisualRecipePatterns = [
 ] as const;
 
 const navigationMock = vi.hoisted(() => ({
+  push: vi.fn(),
   refresh: vi.fn(),
   replace: vi.fn(),
   searchParams: new URLSearchParams(),
@@ -146,7 +162,7 @@ vi.mock('@/lib/queries/useReleaseMutations', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
-    push: vi.fn(),
+    push: navigationMock.push,
     replace: navigationMock.replace,
     refresh: navigationMock.refresh,
   }),
@@ -397,6 +413,7 @@ describe('LibrarySurface', () => {
   );
 
   beforeEach(() => {
+    founderDoor.chatMode = undefined;
     window.localStorage.clear();
     // Grid is the shipped default view mode; most tests below exercise the
     // list renderer, so seed the persisted preference explicitly instead of
@@ -1149,6 +1166,54 @@ describe('LibrarySurface', () => {
 
     expect(writeText).toHaveBeenCalledWith('https://jov.ie/p/token-1');
   });
+
+  it.each([false, true, 'ovie'] as const)(
+    'opens selected work as an unsent draft, rejecting a changed profile: %s',
+    async changedProfile => {
+      founderDoor.chatMode = changedProfile === 'ovie' ? 'ov' : undefined;
+      resetCacheIsolationForTests();
+      applyCacheScope({
+        userId: 'user-1',
+        sessionId: 'session-1',
+        profileId: 'profile-1',
+        ready: true,
+      });
+      const user = userEvent.setup();
+      render(
+        <TooltipProvider>
+          <RightPanelProvider>
+            <LibrarySurface assets={[buildAsset()]} profileId='profile-1' />
+            <RightPanelOutlet />
+          </RightPanelProvider>
+        </TooltipProvider>
+      );
+      const actions = within(
+        screen.getByTestId('library-row-actions-release-1')
+      );
+      await user.click(actions.getByRole('button', { name: 'More actions' }));
+      if (changedProfile === true) applyCacheScope({ profileId: 'profile-2' });
+      await user.click(screen.getByRole('menuitem', { name: 'Ask Jovie' }));
+      expect(consumePendingChatPrompt()).toBeNull();
+      const draft = consumePendingChatDraft('profile-1');
+      if (changedProfile === 'ovie') {
+        expect(draft).toBeNull();
+        expect(navigationMock.push).not.toHaveBeenCalled();
+        expect(feedbackMocks.error).toHaveBeenCalledWith(
+          'Switch to Jovie, then ask about this item again.'
+        );
+      } else if (changedProfile) {
+        expect(draft).toBeNull();
+        expect(feedbackMocks.error).toHaveBeenCalledWith(
+          'Chat is unavailable. Reopen this item and try again.'
+        );
+      } else {
+        expect(draft).toContain('"kind":"release"');
+        expect(draft).toContain('"id":"release-1"');
+        expect(draft).toContain('"profileId":"profile-1"');
+      }
+      resetCacheIsolationForTests();
+    }
+  );
 
   it('rolls back profile visibility when the canonical mutation fails', async () => {
     const user = userEvent.setup();

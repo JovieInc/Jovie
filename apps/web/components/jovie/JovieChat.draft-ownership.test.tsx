@@ -102,6 +102,7 @@ vi.mock('@/lib/queries', async importOriginal => ({
 vi.mock('@/lib/flags/client', () => ({ useAppFlag: () => false }));
 vi.mock('@/lib/chat/open-chat-with-prompt', () => ({
   consumePendingChatPrompt: () => null,
+  consumePendingChatDraft: () => null,
 }));
 vi.mock('@/components/jovie/components/ChatUsageAlert', () => ({
   ChatUsageAlert: () => null,

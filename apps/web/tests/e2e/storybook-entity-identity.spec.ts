@@ -99,3 +99,68 @@ for (const width of [1440, 834, 390]) {
     });
   }
 }
+
+for (const width of [1440, 390, 320]) {
+  test(`Identity pinned profile keeps its name and actions readable at ${width}px`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(
+      '/iframe.html?id=presence-profilespublicsources--pinned-profile-and-actions&viewMode=story'
+    );
+    const edit = page.getByRole('button', { name: 'Edit Jovie Profile' });
+    await expect(edit).toBeVisible();
+    const row = page.getByRole('row').nth(1);
+    const title = row.getByText('Jovie Profile', { exact: true });
+    await expect(title).toBeVisible();
+    expect(
+      await title.evaluate(
+        element => element.scrollWidth <= element.clientWidth
+      )
+    ).toBe(true);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth
+      )
+    ).toBe(true);
+    if (width < 640) {
+      const titleBox = await title.boundingBox();
+      const statusBox = await row
+        .getByText('Unavailable', { exact: true })
+        .filter({ visible: true })
+        .first()
+        .boundingBox();
+      expect(statusBox!.y).toBeGreaterThanOrEqual(
+        titleBox!.y + titleBox!.height - 1
+      );
+      // Text Button keeps its compact face and owns a 44px pseudo hit target.
+      const hitTarget = await edit.evaluate(element => {
+        const style = getComputedStyle(element, '::before');
+        return {
+          width: Number.parseFloat(style.width),
+          height: Number.parseFloat(style.height),
+        };
+      });
+      expect(hitTarget.width).toBeGreaterThanOrEqual(44);
+      expect(hitTarget.height).toBeGreaterThanOrEqual(44);
+    }
+    const actions = row.getByRole('button', {
+      name: 'Actions for Jovie Profile',
+    });
+    if (width < 640) {
+      expect((await actions.boundingBox())!.width).toBeGreaterThanOrEqual(44);
+      expect((await actions.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    }
+    await page.screenshot({
+      path: testInfo.outputPath(`identity-${width}.png`),
+      fullPage: true,
+    });
+    await actions.focus();
+    await page.keyboard.press('Enter');
+    await expect(
+      page.getByRole('menuitem', { name: 'Ask Jovie' })
+    ).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(actions).toBeFocused();
+  });
+}

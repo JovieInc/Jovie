@@ -125,7 +125,11 @@ function FixturePanel() {
   const panel = useRightPanel();
   return panel ? <AppShellRightRail>{panel}</AppShellRightRail> : null;
 }
-function PublicSourcesFixture() {
+function PublicSourcesFixture({
+  pinnedProfile = false,
+}: {
+  readonly pinnedProfile?: boolean;
+}) {
   const [client] = useState(() => {
     const cache = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -179,7 +183,27 @@ function PublicSourcesFixture() {
               keyboard-focus a row to inspect avatar emphasis.
             </div>
             <div className='relative h-160 overflow-hidden border border-subtle bg-surface-0'>
-              <ProfilesWorkspace data={data} scope={scope} />
+              <ProfilesWorkspace
+                data={
+                  pinnedProfile
+                    ? {
+                        ...data,
+                        rows: [
+                          ...data.rows,
+                          {
+                            ...rows[0],
+                            id: 'jovie-profile-review',
+                            kind: 'jovie',
+                            platform: 'jovie',
+                            label: 'Jovie Profile',
+                            url: 'https://jov.ie/tim',
+                          },
+                        ],
+                      }
+                    : data
+                }
+                scope={scope}
+              />
               <FixturePanel />
             </div>
           </section>
@@ -199,3 +223,4 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const PublicPortraitsAndExceptions: Story = {};
+export const PinnedProfileAndActions: Story = { args: { pinnedProfile: true } };

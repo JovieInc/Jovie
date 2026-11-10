@@ -57,6 +57,7 @@ import {
   presenceWorkspaceScopeKey,
   usePresenceWorkspaceController,
 } from '@/components/features/presence/workspace-controller';
+import { toast } from '@/components/feedback';
 import {
   DrawerAnalyticsSummaryCard,
   DrawerSection,
@@ -76,7 +77,9 @@ import {
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { useFounderDoor } from '@/contexts/FounderDoorContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import { openChatWithDraft } from '@/lib/chat/open-chat-with-prompt';
 import { fixChatHref, fixForRow } from '@/lib/presence-loop/adapter';
 import type { SourceIdentity } from '@/lib/profile-surfaces/presence-identity';
 import {
@@ -97,10 +100,12 @@ import {
   queryKeys,
   STANDARD_CACHE,
 } from '@/lib/queries';
+import { getCacheScope } from '@/lib/queries/cache-isolation';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import type { ConnectionIntakeCandidate } from './AddConnectionRail';
 import { buildConnectionActions } from './connection-actions';
+import { connectionChatDraft } from './connection-chat-context';
 import type {
   PresenceSignal,
   ProfilesWorkspaceData,
@@ -521,8 +526,10 @@ function ConnectionSecondaryIdentity({
         .join(' · ')}
     >
       {showPlatform ? <span>{platform}</span> : null}
-      {showPlatform && handle ? ' · ' : null}
-      {handle ? <span>{handle}</span> : null}
+      {showPlatform && handle ? (
+        <span className='max-sm:hidden'> · </span>
+      ) : null}
+      {handle ? <span className='max-sm:hidden'>{handle}</span> : null}
     </div>
   );
 }
@@ -1421,6 +1428,7 @@ function ProfilesWorkspaceContent({
   const suggestedRegionRef = useRef<HTMLDivElement>(null);
   const pendingSuggestionFocusTargetRef = useRef<string | null>(null);
   const router = useRouter();
+  const { chatMode: founderChatMode } = useFounderDoor();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const profileId = data?.profileId ?? null;
@@ -1594,6 +1602,22 @@ function ProfilesWorkspaceContent({
       if (row.id.startsWith('preview:')) return [];
       const primaryAction = getConnectionPrimaryAction(row);
       return buildConnectionActions(row, primaryAction, {
+        onEditProfile: () => router.push(APP_ROUTES.SETTINGS_PROFILE),
+        onAskJovie: connection => {
+          if (founderChatMode === 'ov') {
+            toast.error('Switch to Jovie, then ask about this item again.');
+            return;
+          }
+          if (
+            !data ||
+            getCacheScope().profileId !== data.profileId ||
+            !openChatWithDraft(connectionChatDraft(connection, data), router)
+          ) {
+            toast.error(
+              'Chat is unavailable. Reopen the selected profile and try again.'
+            );
+          }
+        },
         onViewDetails: setSelected,
         onOpen: connection => {
           if (connection.url.startsWith('http')) {
@@ -1624,7 +1648,7 @@ function ProfilesWorkspaceContent({
         },
       });
     },
-    [router, setSelected]
+    [data, router, setSelected, founderChatMode]
   );
   const columns = useMemo(
     () => [
@@ -1651,8 +1675,8 @@ function ProfilesWorkspaceContent({
                   className={styles.profilePhoto}
                 />
               )}
-              <div className='flex min-w-0 items-center gap-2'>
-                <div className='truncate text-sm font-medium text-primary-token'>
+              <div className='flex min-w-0 flex-wrap items-center gap-x-2 sm:flex-nowrap'>
+                <div className='truncate text-sm font-medium text-primary-token max-sm:w-full'>
                   {row.rowType === 'connector'
                     ? row.label
                     : getPresenceRowTitle(row, data?.artist.name ?? '')}
@@ -1743,25 +1767,39 @@ function ProfilesWorkspaceContent({
       columnHelper.display({
         id: 'actions',
         header: 'Actions',
-        size: 44,
+        size: 112,
         meta: {
           className: 'px-3',
           headerVisibility: 'sr-only',
-          actionVisibility: 'contextual',
         },
         cell: context => {
           const row = context.row.original;
           if (row.id.startsWith('preview:')) return null;
           const actionItems = convertContextMenuItems(getContextMenuItems(row));
           return (
-            <div className='flex justify-end'>
+            <div className='flex items-center justify-end'>
+              {row.rowType === 'surface' && row.kind === 'jovie' ? (
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  aria-label='Edit Jovie Profile'
+                  className='shrink-0'
+                  onKeyDown={event => event.stopPropagation()}
+                  onClick={event => {
+                    event.stopPropagation();
+                    router.push(APP_ROUTES.SETTINGS_PROFILE);
+                  }}
+                >
+                  Edit
+                </Button>
+              ) : null}
               <TableActionMenu items={actionItems} align='end' trigger='custom'>
                 <button
                   type='button'
                   aria-label={`Actions for ${row.label}`}
                   onClick={event => event.stopPropagation()}
                   onKeyDown={event => event.stopPropagation()}
-                  className='inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-colors duration-fast hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/50 sm:h-8 sm:w-8'
+                  className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-colors duration-fast hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/50 sm:h-8 sm:w-8'
                 >
                   <MoreHorizontal className='h-4 w-4' aria-hidden />
                 </button>
@@ -1775,6 +1813,7 @@ function ProfilesWorkspaceContent({
       data?.artist.name,
       data?.providerAvailable,
       getContextMenuItems,
+      router,
       selected?.id,
     ]
   );

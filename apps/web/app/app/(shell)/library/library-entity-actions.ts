@@ -14,6 +14,7 @@ import {
   Pause,
   PlayCircle,
   Share2,
+  Sparkles,
   Video,
 } from 'lucide-react';
 import { createElement, isValidElement, type ReactNode } from 'react';
@@ -38,6 +39,7 @@ export const LIBRARY_ENTITY_ACTION_ORDER = [
   'open-artwork',
   'open-primary',
   'copy',
+  'ask-jovie',
   'archive',
   'restore',
 ] as const;
@@ -96,6 +98,7 @@ export interface BuildLibraryEntityActionsOptions {
     asset: LibraryReleaseAsset,
     approvalStatus: LibraryApprovalStatus
   ) => Promise<void>;
+  readonly onAskJovie?: (draft: string, profileId: string) => void;
   readonly openUrl?: (url: string) => void;
   readonly copyText?: (value: string) => void | Promise<void>;
 }
@@ -338,6 +341,23 @@ function buildCopyAction({
   };
 }
 
+/** Editable context only; labels never substitute for authoritative object identity. */
+export function buildLibraryAskJovieDraft(
+  asset: LibraryReleaseAsset,
+  profileId: string
+): string {
+  return `Help me with this library item.\n${JSON.stringify({
+    kind: asset.itemKind ?? 'release',
+    id: asset.id,
+    profileId,
+    title: asset.title,
+    artist: asset.artist,
+    source: asset.source ?? null,
+    linkedReleaseId: asset.linkedReleaseId ?? null,
+    revision: asset.updatedAt ?? null,
+  })}`;
+}
+
 export function buildLibraryEntityActions({
   asset,
   profileId,
@@ -347,6 +367,7 @@ export function buildLibraryEntityActions({
   lifecycle,
   onTogglePreview,
   onApprovalStatusChange,
+  onAskJovie,
   openUrl = defaultOpenUrl,
   copyText = defaultCopyText,
 }: BuildLibraryEntityActionsOptions): LibraryEntityAction[] {
@@ -418,6 +439,24 @@ export function buildLibraryEntityActions({
     },
     buildCopyAction({ asset, copyText })
   );
+
+  actions.push({
+    id: 'ask-jovie',
+    label: 'Ask Jovie',
+    icon: Sparkles,
+    authority: 'none',
+    disabled: !profileId || !onAskJovie,
+    disabledReason: !profileId
+      ? 'Select a creator profile'
+      : !onAskJovie
+        ? 'Chat is unavailable'
+        : undefined,
+    destructive: false,
+    onExecute: () => {
+      if (!profileId || !onAskJovie) return;
+      onAskJovie(buildLibraryAskJovieDraft(asset, profileId), profileId);
+    },
+  });
 
   const lifecycleAction = buildLifecycleAction({
     asset,
