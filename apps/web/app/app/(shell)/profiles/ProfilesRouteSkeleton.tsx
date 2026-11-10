@@ -49,7 +49,7 @@ export const PROFILES_TABLE_SKELETON_COLUMNS = [
   {
     id: 'actions',
     header: 'Actions',
-    size: 44,
+    size: 112,
     meta: { className: 'px-3', headerVisibility: 'sr-only' },
   },
 ] as ColumnDef<Record<string, never>, unknown>[];
