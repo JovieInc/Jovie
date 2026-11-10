@@ -229,7 +229,7 @@
   "apps/web/components/features/profile/profile-surface-state.ts": 524,
   "apps/web/components/features/profile/templates/ProfileCompactSurface.test.tsx": 725,
   "apps/web/components/features/profile/templates/ProfileCompactSurface.tsx": 976,
-  "apps/web/components/features/profile/templates/ProfileCompactTemplate.tsx": 1327,
+  "apps/web/components/features/profile/templates/ProfileCompactTemplate.tsx": 1329,
   "apps/web/components/features/profile/templates/ProfileDesktopSurface.test.tsx": 1224,
   "apps/web/components/features/profile/templates/ProfileDesktopSurface.tsx": 1174,
   "apps/web/components/features/release/ActionDial.tsx": 618,

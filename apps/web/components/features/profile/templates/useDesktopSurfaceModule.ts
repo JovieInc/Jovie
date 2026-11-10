@@ -26,18 +26,13 @@ export type DesktopSurfaceComponent = ComponentType<ProfileDesktopSurfaceProps>;
  * `useProfileUnifiedDrawerModule`) with no suspend/retry lane: the module
  * lands in state and the same component instance renders the real surface in
  * the commit after the fetch resolves. Once loaded it stays loaded, so
- * crossing the 1180px breakpoint does not refetch or remount it.
+ * crossing the 1180px breakpoint does not refetch or remount it. The caller
+ * renders the slot conditionally while null — the component is state-held,
+ * never created during render.
  */
-function DesktopSurfaceUnloaded() {
-  return null;
-}
-
 export function useDesktopSurfaceModule(
   enabled: boolean
-): DesktopSurfaceComponent {
-  // A nothing-rendering component keeps the caller's JSX shape stable while
-  // the real surface is loading: same element, same slot, same drawer
-  // anchoring — only the desktop dashboard's own subtree is absent.
+): DesktopSurfaceComponent | null {
   const [Surface, setSurface] = useState<DesktopSurfaceComponent | null>(null);
 
   useEffect(() => {
@@ -53,5 +48,5 @@ export function useDesktopSurfaceModule(
     };
   }, [enabled]);
 
-  return Surface ?? DesktopSurfaceUnloaded;
+  return Surface;
 }
