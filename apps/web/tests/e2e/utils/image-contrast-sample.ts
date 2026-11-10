@@ -172,6 +172,29 @@ export async function readContrastHideBoxes(
   }, hideAttribute);
 }
 
+// The hide stylesheet, injected AT the screenshot (Playwright's `style`
+// option guarantees it applies to the copied frame): an addStyleTag + rAF
+// capture can copy a stale compositor frame still carrying pre-hide ink —
+// the identical bright pixels every dispatch kept sampling behind the
+// desktop footer credit (JOV-11623). Glyph ink is stripped in every form
+// (color, text-shadow/stroke, SVG fill/stroke, the link's underline);
+// solid control fills (background-color) stay painted so the sampled
+// region is exactly what sits behind each glyph.
+export const CONTRAST_HIDE_STYLE =
+  '[data-image-contrast-hide], [data-image-contrast-hide] * { color: transparent !important; text-shadow: none !important; -webkit-text-stroke: transparent !important; caret-color: transparent !important; background-image: none !important; fill: transparent !important; stroke: transparent !important; text-decoration: none !important; text-decoration-color: transparent !important; }';
+
+// Capture-time evidence for one inspection pass: the candidate boxes are
+// re-read after the scan (late-loading media reflows the page between the
+// scan and the capture, JOV-11623) and the screenshot carries the hide.
+export async function captureContrastEvidence(
+  page: Page,
+  candidateAttribute: string
+): Promise<{ screenshot: Buffer; freshBoxes: Record<string, ContrastBox> }> {
+  const freshBoxes = await readContrastHideBoxes(page, candidateAttribute);
+  const screenshot = await captureContrastScreenshot(page, CONTRAST_HIDE_STYLE);
+  return { screenshot, freshBoxes };
+}
+
 export async function captureContrastScreenshot(
   page: Page,
   hideStyle: string
