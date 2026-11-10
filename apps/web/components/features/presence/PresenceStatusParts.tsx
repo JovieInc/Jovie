@@ -1,4 +1,4 @@
-// @coverage-via apps/web/app/app/(shell)/profiles/ProfilesWorkspace.test.tsx
+// @coverage-via apps/web/app/app/(shell)/profiles/PresenceStatusVocabulary.test.tsx
 'use client';
 import { SimpleTooltip } from '@jovie/ui';
 import { Circle, CircleAlert, CircleCheck, CircleX } from 'lucide-react';
