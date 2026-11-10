@@ -87,3 +87,22 @@ export const Embedded: Story = {
     ),
   ],
 };
+
+export const Offline: Story = {
+  args: {
+    state: 'error',
+    title: 'Download paused',
+    description: 'You are offline. Reconnect to try again.',
+    actions: <Button variant='primary'>Try Again</Button>,
+  },
+};
+export const RtlOverflow: Story = {
+  ...LongContent,
+  decorators: [
+    Story => (
+      <div dir='rtl'>
+        <Story />
+      </div>
+    ),
+  ],
+};

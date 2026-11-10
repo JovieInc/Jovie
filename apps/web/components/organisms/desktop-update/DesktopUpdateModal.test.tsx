@@ -75,7 +75,14 @@ describe('DesktopUpdateModalView', () => {
       },
       { version: '26.9.16' }
     );
-    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toHaveAttribute(
+      'aria-valuenow',
+      '42'
+    );
+    expect(screen.getByText('42%')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Downloading Jovie 26.9.16'
+    );
     expect(screen.getByText('Downloading Jovie 26.9.16')).toBeInTheDocument();
     expect(screen.getByText('84 MB of 200 MB')).toBeInTheDocument();
     expect(screen.getByText('12 MB/s')).toBeInTheDocument();
