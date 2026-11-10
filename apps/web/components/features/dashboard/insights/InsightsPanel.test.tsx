@@ -1,15 +1,24 @@
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { useInsightsQueryMock, useGenerateInsightsMutationMock, generateMock } =
-  vi.hoisted(() => ({
-    useInsightsQueryMock: vi.fn(),
-    useGenerateInsightsMutationMock: vi.fn(),
-    generateMock: vi.fn(),
-  }));
+const {
+  useInsightsQueryMock,
+  useGenerateInsightsMutationMock,
+  generateMock,
+  routerPushMock,
+} = vi.hoisted(() => ({
+  useInsightsQueryMock: vi.fn(),
+  useGenerateInsightsMutationMock: vi.fn(),
+  generateMock: vi.fn(),
+  routerPushMock: vi.fn(),
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: routerPushMock }),
+}));
 
 vi.mock('@/lib/queries', () => ({
   useInsightsQuery: useInsightsQueryMock,
@@ -52,7 +61,7 @@ describe('InsightsPanelView', () => {
     });
     expect(tablist).toHaveClass('flex-wrap');
 
-    const tabs = screen.getAllByRole('tab');
+    const tabs = within(tablist).getAllByRole('tab');
     expect(tabs).toHaveLength(9);
     for (const tab of tabs) {
       expect(tab).toHaveClass('shrink-0');
@@ -423,7 +432,11 @@ describe('InsightsPanelView', () => {
       </TooltipProvider>
     );
 
-    expect(screen.getAllByRole('tab')).toHaveLength(9);
+    expect(
+      within(
+        screen.getByRole('tablist', { name: 'Filter Insights By Category' })
+      ).getAllByRole('tab')
+    ).toHaveLength(9);
     const rows = screen.getByTestId('insights-loading-rows');
     const firstRow = rows.querySelector('.border-b');
     expect(firstRow).toHaveClass('px-1', 'py-3.5');
@@ -450,5 +463,151 @@ describe('InsightsPanelView', () => {
 
     expect(screen.getByRole('button', { name: 'Generating…' })).toBeDisabled();
     expect(document.body.textContent).not.toContain('...');
+  });
+
+  describe('audience workspace navigation', () => {
+    beforeEach(() => {
+      routerPushMock.mockReset();
+    });
+
+    const NAV_STATES: {
+      name: string;
+      props: Partial<React.ComponentProps<typeof InsightsPanelView>>;
+    }[] = [
+      { name: 'loading', props: { isLoading: true } },
+      { name: 'error', props: { error: new Error('Insights request failed') } },
+      { name: 'empty', props: {} },
+      {
+        name: 'populated',
+        props: {
+          insights: [
+            {
+              id: 'high-1',
+              insightType: 'subscriber_surge',
+              category: 'growth',
+              priority: 'high',
+              title: 'Audience growth accelerated',
+              description: 'Weekly listeners increased.',
+              actionSuggestion: null,
+              confidence: '0.92',
+              status: 'active',
+              periodStart: '2026-08-11T00:00:00.000Z',
+              periodEnd: '2026-08-18T00:00:00.000Z',
+              createdAt: '2026-08-18T00:00:00.000Z',
+              expiresAt: '2026-09-18T00:00:00.000Z',
+            },
+          ],
+        },
+      },
+    ];
+
+    it('keeps Contacts, Audience and Insights reachable in every panel state', () => {
+      for (const state of NAV_STATES) {
+        const { unmount } = render(
+          <TooltipProvider>
+            <InsightsPanelView
+              insights={[]}
+              isLoading={false}
+              error={null}
+              selectedCategory='all'
+              onCategoryChange={vi.fn()}
+              onGenerate={vi.fn()}
+              onRetry={vi.fn()}
+              isGenerating={false}
+              {...state.props}
+            />
+          </TooltipProvider>
+        );
+
+        const tablist = screen.getByRole('tablist', {
+          name: 'Audience Workspace',
+        });
+        expect(tablist).toBeVisible();
+        for (const label of ['Contacts', 'Audience', 'Insights']) {
+          expect(
+            within(tablist).getByRole('tab', { name: label })
+          ).toBeVisible();
+        }
+        expect(
+          within(tablist).getByRole('tab', { name: 'Insights' })
+        ).toHaveAttribute('aria-selected', 'true');
+        expect(
+          within(tablist).getByRole('tab', { name: 'Contacts' })
+        ).toHaveAttribute('aria-selected', 'false');
+
+        unmount();
+      }
+    });
+
+    it('routes Contacts and Audience through the canonical workspace hrefs', async () => {
+      const user = userEvent.setup();
+      render(
+        <TooltipProvider>
+          <InsightsPanelView
+            insights={[]}
+            isLoading={false}
+            error={null}
+            selectedCategory='all'
+            onCategoryChange={vi.fn()}
+            onGenerate={vi.fn()}
+            onRetry={vi.fn()}
+            isGenerating={false}
+          />
+        </TooltipProvider>
+      );
+
+      await user.click(screen.getByRole('tab', { name: 'Contacts' }));
+      expect(routerPushMock).toHaveBeenCalledWith('/app/contacts');
+      await user.click(screen.getByRole('tab', { name: 'Audience' }));
+      expect(routerPushMock).toHaveBeenCalledWith('/app/contacts?tab=audience');
+    });
+
+    it('keeps the canonical keyboard focus movement between workspace tabs', async () => {
+      const user = userEvent.setup();
+      render(
+        <TooltipProvider>
+          <InsightsPanelView
+            insights={[]}
+            isLoading={false}
+            error={null}
+            selectedCategory='all'
+            onCategoryChange={vi.fn()}
+            onGenerate={vi.fn()}
+            onRetry={vi.fn()}
+            isGenerating={false}
+          />
+        </TooltipProvider>
+      );
+
+      const insights = screen.getByRole('tab', { name: 'Insights' });
+      insights.focus();
+      expect(insights).toHaveFocus();
+      await user.keyboard('{ArrowLeft}');
+      expect(screen.getByRole('tab', { name: 'Audience' })).toHaveFocus();
+    });
+
+    it('preserves the category filters and Generate beside the workspace tabs', () => {
+      render(
+        <TooltipProvider>
+          <InsightsPanelView
+            insights={[]}
+            isLoading={false}
+            error={null}
+            selectedCategory='all'
+            onCategoryChange={vi.fn()}
+            onGenerate={vi.fn()}
+            onRetry={vi.fn()}
+            isGenerating={false}
+          />
+        </TooltipProvider>
+      );
+
+      expect(
+        screen.getByRole('tablist', { name: 'Filter Insights By Category' })
+      ).toBeVisible();
+      expect(
+        screen.getByRole('button', { name: 'Generate insights' })
+      ).toBeVisible();
+    });
   });
 });
