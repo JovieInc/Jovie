@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { WaitlistPublicLanding } from '@/components/features/waitlist/WaitlistPublicLanding';
 import { WaitlistSuccessView } from '@/components/features/waitlist/WaitlistSuccessView';
 import { MarketingPageContractMarkers } from '@/components/site/MarketingPageContractMarkers';
+import { APP_ROUTES } from '@/constants/routes';
 import { getWaitlistRouteRedirect } from '@/lib/auth/access-route-redirect';
 import {
   CanonicalUserState,
@@ -61,6 +62,12 @@ export default async function WaitlistPage() {
   }
 
   if (authResult.state === CanonicalUserState.UNAUTHENTICATED) {
+    // One front door (Tim, 2026-11-09): with signup open, an anonymous
+    // visitor lands in the /start chat instead of the waitlist shell. The
+    // signed-in pending receipt below is untouched.
+    if (!isPublicSignupClosed()) {
+      redirect(APP_ROUTES.START);
+    }
     return (
       <WaitlistRouteWithContract>
         <WaitlistPublicLanding signupClosed={isPublicSignupClosed()} />

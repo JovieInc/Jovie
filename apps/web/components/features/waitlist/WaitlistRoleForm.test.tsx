@@ -48,8 +48,8 @@ describe('WaitlistRoleForm', () => {
     render(
       <WaitlistRoleForm
         headingLevel={2}
-        title='Request an invitation.'
-        description='We open to a small group at a time.'
+        title='Claim your handle.'
+        description='Your page goes up at jov.ie/yourname.'
         headingClassName='marketing-type-section'
         align='start'
       />
@@ -57,22 +57,20 @@ describe('WaitlistRoleForm', () => {
     expect(screen.getByTestId('waitlist-role-form')).toHaveClass('items-start');
     const heading = screen.getByRole('heading', {
       level: 2,
-      name: 'Request an invitation.',
+      name: 'Claim your handle.',
     });
     expect(heading).toHaveClass('marketing-type-section');
     expect(heading).not.toHaveClass('text-xl');
     expect(
-      screen.getByText('We open to a small group at a time.')
+      screen.getByText('Your page goes up at jov.ie/yourname.')
     ).toBeVisible();
-    expect(screen.getByRole('form')).toHaveAccessibleName(
-      'Request an invitation.'
-    );
+    expect(screen.getByRole('form')).toHaveAccessibleName('Claim your handle.');
   });
 
   it('keeps the default heading and no support line when the host passes none', () => {
     render(<WaitlistRoleForm />);
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Request access' })
+      screen.getByRole('heading', { level: 1, name: 'Reserve your spot' })
     ).toHaveClass('text-xl');
     expect(
       screen
@@ -100,7 +98,7 @@ describe('WaitlistRoleForm', () => {
     );
     render(<WaitlistRoleForm variant='general' headingLevel={3} />);
     expect(
-      screen.getByRole('heading', { level: 3, name: 'Request access' })
+      screen.getByRole('heading', { level: 3, name: 'Reserve your spot' })
     ).toBeVisible();
     expect(screen.queryByRole('radio', { name: 'Artist' })).toBeNull();
     fireEvent.change(screen.getByLabelText('Name'), {
@@ -124,7 +122,10 @@ describe('WaitlistRoleForm', () => {
       email: 'person@example.com',
     });
     expect(
-      screen.getByRole('heading', { level: 3, name: "You're on the list" })
+      screen.getByRole('heading', {
+        level: 3,
+        name: "You're on the waitlist.",
+      })
     ).toBeVisible();
     expect(confirmation).toHaveTextContent('person@example.com');
   });
@@ -326,9 +327,9 @@ describe('WaitlistRoleForm', () => {
       <WaitlistRoleForm
         presentation='chips'
         headingLevel={2}
-        title='Jovie opens by invitation.'
-        submitLabel='Request invite'
-        note='One email when your invite is ready. Nothing else.'
+        title='Claim your handle.'
+        submitLabel='Claim your handle'
+        note='One email when your spot opens. Nothing else.'
       />
     );
     expect(screen.getByRole('radio', { name: 'Artist' })).toBeChecked();
@@ -336,7 +337,7 @@ describe('WaitlistRoleForm', () => {
     fireEvent.change(screen.getByLabelText('Email address'), {
       target: { value: 'tim@example.com' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Request invite' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Claim your handle' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).role).toBe(
       'producer_songwriter'

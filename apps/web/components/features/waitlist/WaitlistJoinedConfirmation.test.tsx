@@ -6,10 +6,13 @@ describe('WaitlistJoinedConfirmation', () => {
   it('echoes the email and says what happens next', () => {
     render(<WaitlistJoinedConfirmation email='maya@example.com' />);
     expect(
-      screen.getByRole('heading', { level: 3, name: "You're on the list" })
+      screen.getByRole('heading', {
+        level: 3,
+        name: "You're on the waitlist.",
+      })
     ).toBeVisible();
     expect(screen.getByRole('status')).toHaveTextContent(
-      "We'll email maya@example.com when your invite is ready."
+      "We'll email maya@example.com when your spot opens."
     );
     expect(
       screen.queryByTestId('waitlist-role-form-joined-artist')
@@ -25,7 +28,10 @@ describe('WaitlistJoinedConfirmation', () => {
       />
     );
     expect(
-      screen.getByRole('heading', { level: 2, name: "You're on the list" })
+      screen.getByRole('heading', {
+        level: 2,
+        name: "You're on the waitlist.",
+      })
     ).toBeVisible();
     expect(
       screen.getByTestId('waitlist-role-form-joined-artist')

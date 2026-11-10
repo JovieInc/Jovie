@@ -85,7 +85,7 @@ const ROLE_CHIPS: ReadonlyArray<{
 export function WaitlistRoleForm({
   variant = 'artist',
   headingLevel = 1,
-  title = 'Request access',
+  title = 'Reserve your spot',
   description,
   headingClassName,
   align = 'center',
