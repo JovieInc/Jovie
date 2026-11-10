@@ -92,9 +92,7 @@ describe('Desktop update download feedback', () => {
         }}
       />
     );
-    expect(
-      screen.getByRole('button', { name: 'Download', exact: true })
-    ).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Download' })).toHaveFocus();
     rerender(
       <DesktopUpdateModalView {...props} state={downloadingUpdate(12)} />
     );
