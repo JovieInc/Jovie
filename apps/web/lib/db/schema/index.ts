@@ -16,6 +16,20 @@ export {
   type NewAcquisitionJourney,
   selectAcquisitionJourneySchema,
 } from './acquisition';
+// Activation pilot runtime persistence (JOV-6468)
+export {
+  type ActivationPilotAssignmentRow,
+  type ActivationPilotBaselineSnapshotRow,
+  type ActivationPilotBaselineStage,
+  type ActivationPilotDecisionRow,
+  type ActivationPilotExposureRow,
+  type ActivationPilotOutcomeRow,
+  activationPilotAssignments,
+  activationPilotBaselineSnapshots,
+  activationPilotDecisions,
+  activationPilotExposures,
+  activationPilotOutcomes,
+} from './activation-pilot';
 // Admin
 export {
   type AdminAuditLog,
