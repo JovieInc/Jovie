@@ -714,18 +714,16 @@ describe('LibrarySurface', () => {
       screen.getByRole('button', { name: 'Sort by Release Date' }),
       { square: true }
     );
-    expectToolbarControl(
-      screen.getByRole('button', { name: /Small cards/u }),
-      { square: true }
-    );
+    expectToolbarControl(screen.getByRole('button', { name: /Small cards/u }), {
+      square: true,
+    });
     expectToolbarControl(
       screen.getByRole('button', { name: /Medium cards/u }),
       { square: true }
     );
-    expectToolbarControl(
-      screen.getByRole('button', { name: /Large cards/u }),
-      { square: true }
-    );
+    expectToolbarControl(screen.getByRole('button', { name: /Large cards/u }), {
+      square: true,
+    });
     // The view slider (2026-09-25 header/toolbar IA) is a single fixed-size
     // sliding control rather than three independently-densified buttons, so
     // it intentionally stays at the founder-specified 28px visible size
