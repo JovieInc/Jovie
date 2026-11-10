@@ -25,6 +25,7 @@ import {
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import type { DbOrTransaction } from '@/lib/db';
 import { DB_CONFIG, isRetryableError } from '@/lib/db/client/retry';
+import { getDeepErrorMessage } from '@/lib/db/errors';
 import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
 import {
   dashboardQuery,
@@ -285,11 +286,24 @@ async function buildBioLinkActivation(
       baseDelayMs: DB_CONFIG.retryDelay,
       isRetryable: error =>
         isIdleTransactionTermination(error) ||
-        (isRetryableError(error) && !isPostgresTimeoutError(error)),
+        ((isCommitTransportFailure(error) || isRetryableError(error)) &&
+          !isPostgresTimeoutError(error)),
     }
   ).catch((error: unknown) => {
     // The transaction wrapper has completed rollback/release before a
     // tolerated failure becomes fallback data or another read is attempted.
+    // A commit-wrapped transport failure is connection-class on a
+    // side-effect-free read (JOV-12188): recovered once above or declined on
+    // the deadline, and the lookup already degrades to null — log-only,
+    // matching the JOV-8900 doctrine.
+    if (isCommitTransportFailure(error)) {
+      Sentry.logger.warn(
+        '[Dashboard] creator_distribution_events transient commit failure after retry; skipping activation lookup',
+        { profileId: profile.id }
+      );
+      return [];
+    }
+
     if (isMissingCreatorDistributionEventsTableError(error)) {
       Sentry.logger.warn(
         '[Dashboard] creator_distribution_events table missing; skipping activation lookup',
@@ -394,13 +408,32 @@ async function fetchSocialLinkExistence(
       maxRetries: 1,
       baseDelayMs: 0,
       isRetryable: error =>
-        isIdleTransactionTermination(error) &&
+        (isIdleTransactionTermination(error) ||
+          (isCommitTransportFailure(error) &&
+            !isPostgresTimeoutError(error))) &&
         performance.now() < retryDeadline,
     }
   )
     .then(result => mapSocialLinkExistence(result?.[0]))
     .catch((error: unknown) => {
       // Cleanup has finished before tolerated failures become fallback data.
+      // A commit-wrapped transport failure is connection-class on a
+      // side-effect-free read (JOV-12188): the recovery above either replayed
+      // it once or declined on the deadline, and the read already degrades to
+      // link-free defaults — log-only, matching the JOV-8900 doctrine.
+      if (isCommitTransportFailure(error)) {
+        logger.warn(
+          '[social-links] transient commit failure after retry; degrading to link-free defaults',
+          {
+            context,
+            operation,
+            userId,
+            error: getDeepErrorMessage(error),
+          }
+        );
+        return { hasLinks: false, hasMusicLinks: false };
+      }
+
       const migrationResult = handleMigrationErrors(error, {
         userId,
         operation,
