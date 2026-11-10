@@ -19,7 +19,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.values.mockReturnValue({ onConflictDoUpdate: mocks.conflict });
   mocks.conflict.mockReturnValue({ returning: mocks.returning });
-  mocks.returning.mockResolvedValue([{ created: true }]);
+  mocks.returning.mockResolvedValue([{ created: true, id: 'entry-1' }]);
 });
 describe('role waitlist persistence', () => {
   it('stores normalized general context and a machine timestamp without creating an account', async () => {
@@ -31,12 +31,18 @@ describe('role waitlist persistence', () => {
         name: ' Alex Example ',
         now,
       })
-    ).toEqual({ created: true });
+    ).toEqual({ created: true, entryId: 'entry-1' });
+    // qualify/2026-11-v1: no decision → pending review as `new`, never
+    // `waitlisted` (only reachable from disqualified).
     expect(mocks.values).toHaveBeenCalledWith(
       expect.objectContaining({
         emailNormalized: 'alex@example.com',
-        status: 'waitlisted',
-        waitlistedAt: now,
+        status: 'new',
+        decisionReason: null,
+        decisionRuleVersion: null,
+        decidedAt: null,
+        decidedBy: null,
+        waitlistedAt: null,
         qualificationInputs: {
           role: 'team',
           roleCapturedAt: now.toISOString(),
@@ -66,7 +72,7 @@ describe('role waitlist persistence', () => {
         email: 'person@example.com',
         role: 'individual',
       })
-    ).toEqual({ created: false });
+    ).toEqual({ created: false, entryId: null });
   });
   it('stores request-access qualification and never overwrites an earlier one', async () => {
     const now = new Date('2026-11-08T05:00:00Z');
@@ -101,6 +107,52 @@ describe('role waitlist persistence', () => {
     const where = dialect.sqlToQuery(conflict.setWhere);
     expect(where.sql).toContain(`->'momTest' IS NULL`);
   });
+  it('persists the Mom Test decision: status, decision columns, capability wants', async () => {
+    const now = new Date('2026-11-09T12:00:00Z');
+    await joinWaitlistWithRole({
+      email: 'artist@example.com',
+      role: 'artist',
+      now,
+      decision: {
+        ruleVersion: 'qualify/2026-11-v1',
+        contract: 'jovie.conversation-loop/v1',
+        outcome: 'qualified',
+        reason: 'mom_test_full_coverage',
+        wants: [
+          {
+            kind: 'current_tool',
+            text: 'post reels weekly',
+            capabilityKey: null,
+            sourceTurnId: null,
+          },
+        ],
+      },
+    });
+    const values = mocks.values.mock.calls[0][0];
+    expect(values).toMatchObject({
+      status: 'qualified',
+      statusReason: 'mom_test_full_coverage',
+      decisionReason: 'mom_test_full_coverage',
+      decisionRuleVersion: 'qualify/2026-11-v1',
+      decidedAt: now,
+      decidedBy: 'rules',
+      waitlistedAt: null,
+    });
+    // Second insert: capability_wants in their words (JOV-6655).
+    expect(mocks.values).toHaveBeenCalledTimes(2);
+    expect(mocks.values.mock.calls[1][0]).toEqual([
+      {
+        waitlistEntryId: 'entry-1',
+        kind: 'current_tool',
+        text: 'post reels weekly',
+        capabilityKey: null,
+        source: 'role_form',
+        sourceTurnId: null,
+        questionVariant: null,
+      },
+    ]);
+  });
+
   it('propagates persistence failure and rejects an unusable email', async () => {
     mocks.returning.mockRejectedValue(new Error('storage unavailable'));
     await expect(
