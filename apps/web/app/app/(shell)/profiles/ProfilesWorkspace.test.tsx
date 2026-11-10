@@ -464,6 +464,109 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(screen.queryByText('Up to Date')).not.toBeInTheDocument();
   });
 
+  it('makes six pending identities discoverable with zero suggestions without deciding for the owner', async () => {
+    const user = userEvent.setup();
+    const base = data.rows[1];
+    if (base.rowType !== 'surface') throw new Error('Missing DSP fixture');
+    const pendingRows: ProfileWorkspaceSurfaceRow[] = Array.from(
+      { length: 6 },
+      (_, index) => ({
+        ...base,
+        id: `22222222-2222-4222-8222-${String(index + 1).padStart(12, '0')}`,
+        label: index === 0 ? '7digital' : `Pending Identity ${index + 1}`,
+        platform: index === 0 ? '7digital' : `pending_${index + 1}`,
+        qualificationStatus: index === 5 ? 'conflicting' : 'suggested',
+        isOfficial: false,
+        monitoringState: index === 0 ? 'locked' : 'active',
+        identityEvidence: {
+          sourceCount: 1,
+          sourceTypes: ['identity_link'],
+          confidence: 0.7,
+        },
+      })
+    );
+    vi.mocked(globalThis.fetch).mockImplementation(async input =>
+      jsonResponse(
+        String(input).endsWith('/source')
+          ? { status: 'unavailable' }
+          : suggestionsResponse([])
+      )
+    );
+    renderWorkspace({
+      ...data,
+      providerAvailable: false,
+      rows: [...data.rows, ...pendingRows],
+    });
+    const review = screen.getByRole('button', {
+      name: 'Review Identities (6)',
+    });
+    expect(review).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Review Suggestions (0)' })
+    ).toBeVisible();
+    // Keyboard activation opens the existing inspector, never an approval.
+    review.focus();
+    await user.keyboard('{Enter}');
+    expect(review).toHaveFocus();
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    expect(
+      (panel as ReactElement<{ row: ProfileWorkspaceSurfaceRow }>).props.row.id
+    ).toBe(pendingRows[0].id);
+    const rail = render(
+      <TooltipProvider>{panel as ReactElement}</TooltipProvider>
+    );
+    expect(screen.getByText('Is this you?')).toBeVisible();
+    expect(
+      screen.getByText('1 live source · public identity link · 70% match')
+    ).toBeVisible();
+    for (const name of ['Yes', 'No', 'Unsure']) {
+      expect(screen.getByRole('button', { name })).toBeEnabled();
+    }
+    rail.unmount();
+    // A repeated review activation preserves an already selected pending row.
+    await user.click(screen.getByRole('row', { name: /Pending Identity 3/ }));
+    await user.click(review);
+    const repeatedPanel = vi
+      .mocked(useRegisterRightPanel)
+      .mock.calls.at(-1)?.[0];
+    expect(
+      (repeatedPanel as ReactElement<{ row: ProfileWorkspaceSurfaceRow }>).props
+        .row.id
+    ).toBe(pendingRows[2].id);
+    expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(
+      10
+    );
+    expect(
+      vi
+        .mocked(globalThis.fetch)
+        .mock.calls.filter(([, init]) => init?.method === 'POST')
+    ).toHaveLength(0);
+    expect(navigationMock.refresh).not.toHaveBeenCalled();
+  });
+
+  it('does not count monitoring limits, preview rows, rejected identities or the canonical Jovie profile as pending identity work', () => {
+    const base = data.rows[1];
+    const jovie = data.rows[0];
+    if (base.rowType !== 'surface' || jovie.rowType !== 'surface') {
+      throw new Error('Missing profile fixtures');
+    }
+    renderWorkspace({
+      ...data,
+      rows: [
+        ...data.rows,
+        { ...base, id: 'preview:pending', qualificationStatus: 'suggested' },
+        { ...base, id: 'rejected', qualificationStatus: 'rejected' },
+        { ...jovie, id: 'canonical', qualificationStatus: 'suggested' },
+      ],
+    });
+    expect(
+      screen.queryByRole('button', { name: /Review Identities/ })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Review Suggestions (0)' })
+    ).toBeVisible();
+  });
+
   it('persists an identity rejection and refreshes the canonical workspace', async () => {
     const user = userEvent.setup();
     const surfaceId = '22222222-2222-4222-8222-222222222222';

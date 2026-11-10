@@ -93,6 +93,7 @@ import {
   formatProfileRankChange,
   getConnectionPrimaryAction,
   getConnectionStatus,
+  selectPresenceReviewRows,
 } from '@/lib/profile-surfaces/workspace';
 import {
   FetchError,
@@ -1424,6 +1425,20 @@ function ProfilesWorkspaceContent({
     adapter: CREATOR_PRESENCE_ADAPTER,
     initialFilter: 'all',
   });
+  const identityReviewRows = useMemo(
+    () => selectPresenceReviewRows(rows).filter(row => row.kind !== 'jovie'),
+    [rows]
+  );
+  const handleReviewIdentities = useCallback(() => {
+    const reviewRow =
+      identityReviewRows.find(row => row.id === selected?.id) ??
+      identityReviewRows[0];
+    if (!reviewRow) return;
+    setPendingCandidate(null);
+    setIsAddConnectionOpen(false);
+    setShowSuggestions(false);
+    setSelected(reviewRow);
+  }, [identityReviewRows, selected?.id, setSelected]);
   const suggestionActionRefs = useRef(new Map<string, HTMLButtonElement>());
   const suggestedRegionRef = useRef<HTMLDivElement>(null);
   const pendingSuggestionFocusTargetRef = useRef<string | null>(null);
@@ -1910,6 +1925,9 @@ function ProfilesWorkspaceContent({
       toolbar={
         <PageToolbar
           data-testid='connections-workspace-toolbar'
+          className='flex-wrap max-sm:flex-col max-sm:items-stretch'
+          startClassName='flex-none'
+          endClassName='max-w-full flex-wrap max-sm:ml-0 max-sm:justify-start'
           start={
             <span className='text-app tabular-nums text-secondary-token'>
               {rows.length === 1 ? '1 profile' : `${rows.length} profiles`}
@@ -1917,6 +1935,15 @@ function ProfilesWorkspaceContent({
           }
           end={
             <>
+              {identityReviewRows.length > 0 ? (
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  onClick={handleReviewIdentities}
+                >
+                  Review Identities ({identityReviewRows.length})
+                </Button>
+              ) : null}
               <Button
                 variant='ghost'
                 size='sm'
