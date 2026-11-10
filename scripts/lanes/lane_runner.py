@@ -100,6 +100,7 @@ import binding_refill, pr_wip  # noqa: E401,E402  (Backlog -> Todo refill per ex
 import priority_admission  # noqa: E402  (Urgent/Summer-ranked admission, Todo WIP sanity, claim rank; JOV-7073)
 import macos_pool  # noqa: E402  (shared hosted-macOS pool: measure, record, gate LYB iOS intake)
 import decompose_pass  # noqa: E402  (standing epic decomposition when Todo < half target)
+import worktree_hosts, size_baseline_repair  # noqa: E401,E402  (gem-default hosts; size-500 peel)
 import epics  # noqa: E402  (epic decomposition/closure and the expiring hold)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
@@ -147,7 +148,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_worktree_hosts.py", "scripts/tests/test_size_baseline_repair.py", "scripts/tests/test_lane_runner_overflow.py", "scripts/tests/test_worktree_sweep_overflow.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_public_feed.py", "scripts/tests/test_pr_events.py", "scripts/tests/test_pr_events_repair_evidence.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -3261,6 +3262,10 @@ class DiskAdmissionError(RuntimeError):
     pass
 
 
+def worktree_count_run(args, **kwargs):
+    return sh(args, timeout=kwargs.get("timeout", 60))
+
+
 def require_disk(host: Host, stage: str) -> None:
     report = disk_guard.check(host)
     if not report.get("admitted"):
@@ -3557,6 +3562,12 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                        endedAt=now_iso(), result={"verdict": "recovery-handoff", "pr": None, "commit": None})
         append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
+    host_held = worktree_hosts.admission(HOST, host.repo, worktree_count_run)
+    if host_held:
+        receipt.update(verdict="worktree-host-held", reasons=[host_held], endedAt=now_iso(),
+                       result={"verdict": "worktree-host-held", "pr": None, "commit": None})
+        append_json_object(runs / "ledger.jsonl", receipt)
+        return receipt
     policy = {"attempts": MAX_FAILURES, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FAILURES,
               "spend": MAX_FAILURES, "mutations": MAX_FAILURES,
               "leaseSeconds": host.agent_timeout + 900, "version": "lanes-v1"}
@@ -3605,7 +3616,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                                                            log=log, sh=sh)
             # Always installed: the gate's checks need it even when the provider works remotely.
             install_dependencies(host, worktree, log)
-            worktree_pool.refill_in_background(host.repo)
+            if worktree_hosts.role(HOST) == "primary":
+                worktree_pool.refill_in_background(host.repo)
             brain_context = context_pack(issue)
             prior_attempts = prior_attempts_context(host, linear, issue)
             prompt = render_prompt(issue, branch, brain_context, provider=name, prior_attempts=prior_attempts,
@@ -5224,6 +5236,8 @@ def deterministic_conflict_pass(host: Host, prs: list[dict], now: float | None =
     spent or escalated PR is not left DIRTY by the thing a script can do. Each (PR, head, main)
     is tried once; every try is ledgered with the time the PR has been DIRTY-visible."""
     now = time.time() if now is None else now
+    if worktree_hosts.admission(HOST, host.repo, worktree_count_run):
+        return []  # no lane worktree may be created here: not a worktree host, or at its cap
     path = host.state / "deterministic-conflict.json"
     visits = read_json(path)
     acted = []
@@ -7974,6 +7988,11 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                "worktree": str(worktree), "branch": pr["headRefName"], "pr": pr["number"],
                "headBefore": pr["headRefOid"], "requestSource": fix_request_source(pr),
                "startedAt": now_iso()}
+    repair_held = worktree_hosts.admission(HOST, host.repo, worktree_count_run)
+    if repair_held:
+        receipt.update(verdict="worktree-host-held", reasons=[repair_held], endedAt=now_iso())
+        append_json_object(runs / "ledger.jsonl", receipt)
+        return receipt
     receipt["targetStateReads"] = 1
     try:
         live = require_fix_target(pr, "before-execution-claim", repair=True)
@@ -8177,7 +8196,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                          fix_red_classes.SNAP_SPACING: snap_spacing_fix,
                          fix_red_classes.STRIP_CACHE: strip_cache_exports_fix,
                          fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix,
-                         fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix}.get((route or {}).get("action"))
+                         fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix, fix_red_classes.SHRINK_SIZE: size_baseline_repair.shrink_size_fix}.get((route or {}).get("action"))
                 agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
                 agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
@@ -8351,6 +8370,11 @@ def _adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim, *, sensitive: b
                "origin": AUTONOMOUS_ORIGIN, "attribution": {"category": "review-only", "provider": name},
                "worktree": str(worktree), "branch": pr.get("headRefName"), "pr": pr["number"],
                "startedAt": now_iso()}
+    adopt_held = worktree_hosts.admission(HOST, host.repo, worktree_count_run)
+    if adopt_held:
+        receipt.update(verdict="worktree-host-held", reasons=[adopt_held], endedAt=now_iso())
+        append_json_object(runs / "ledger.jsonl", receipt)
+        return receipt
     with open(runs / f"{run_id}.log", "w") as log:
         try:
             live = require_fix_target(pr, "before-adopt-checkout")
@@ -9228,6 +9252,8 @@ def reserved_binding_pass(host: Host, name: str, spec: dict) -> int:
 
 def worker(host: Host, name: str) -> int:
     spec = load_providers()[name]
+    if not worktree_hosts.spawn_allowed(HOST, spec):
+        return 0  # a checkout lane on a host that may not create lane worktrees (JOV-10172)
     limit = host.slots(name, spec.get("slots", 1))
     if not spec.get("enabled", True):
         return 0
@@ -9809,7 +9835,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     if verdict in epics.SETTLED_VERDICTS:
         slot.release()
         return reexec(host, name)
-    if verdict == "disk-held":
+    if verdict in {"disk-held", "worktree-host-held"}:
         linear.move(issue.id, "Todo")
         slot.release()
         return 1  # do not charge the issue's retry budget or re-exec into pressure
@@ -10094,6 +10120,10 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
             tick["worktreeSweep"] = worktree_sweep.maybe_spawn(host.state, host.repo, tick["disk"].get("freePct"))
         except Exception as error:  # the sweep never takes dispatch down
             tick["worktreeSweep"] = f"{type(error).__name__}: {error}"[:200]
+        try:
+            tick["worktreeHosts"] = worktree_hosts.status(HOST, host.repo, worktree_count_run)
+        except Exception as error:  # the policy row never takes dispatch down
+            tick["worktreeHosts"] = f"{type(error).__name__}: {error}"[:200]
         if not tick["disk"].get("admitted"):
             if not os.environ.get("LANES_SELFTEST"):
                 try:
@@ -10189,6 +10219,8 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 # LANES_SLOTS_<P>=0 scopes a provider off this host: no health probe, no provider-down alert.
                 if not spec.get("enabled", True) or slots == 0 or cooling(host, name):
                     continue
+                if not worktree_hosts.spawn_allowed(HOST, spec):
+                    continue  # a checkout lane on a host that may not create lane worktrees
                 quota = quota_pressure(host, name, spec, time.time())
                 if not quota["ok"]:
                     tick["quotaBlocked"][name] = quota["why"]
