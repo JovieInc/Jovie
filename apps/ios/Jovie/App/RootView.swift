@@ -889,13 +889,8 @@ enum WhatsNewUITestFixture {
 
 /// Layout constants for the production What's New sheet.
 enum JovieWhatsNewLayout {
-  /// XCUITest measures a button's label layout box plus the pill style's
-  /// vertical paddings (8pt xSmall + 16pt hit inset); the style's minHeight
-  /// hit frames and any wrapper `.frame` never resize that box, which is why
-  /// the bare `Button("Got It")` label reported 18.25 + 24 = 42.25pt. Reserve
-  /// the label height here (same pattern as WaitlistPendingLayout's reserved
-  /// action height) so the reported accessibility frame is 24 + 24 = 48pt and
-  /// clears the 44pt touch target for every label font.
+  /// XCUITest reports the label's layout box plus the pill style's vertical
+  /// paddings; reserving 24pt in the label reports a 48pt touch target.
   static let reservedActionMinHeight: CGFloat = 24
 }
 
