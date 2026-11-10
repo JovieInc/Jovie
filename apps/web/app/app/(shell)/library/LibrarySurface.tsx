@@ -139,6 +139,7 @@ import {
 import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { RowWaveform } from '@/components/shell/RowWaveform';
+import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
@@ -173,6 +174,7 @@ import {
   deriveWorkInspectorPresentation,
   scopeWorkInspectorBundle,
 } from '@/lib/library/work-inspector-read-model';
+import { buildDestinationJovieLink } from '@/lib/links/destination-links';
 import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries/useReleaseMutations';
 import {
   type ColumnDef,
@@ -2756,6 +2758,21 @@ function AssetDrawer({
                           label={provider.label}
                           href={provider.url}
                           closedTabIndex={closedTabIndex}
+                          entity={{
+                            kind: 'release',
+                            id: current.id,
+                            label: current.title,
+                            thumbnail: current.artworkUrl ?? undefined,
+                            artist: current.artist,
+                            releaseType: current.releaseType,
+                            releaseDate: current.releaseDate ?? undefined,
+                          }}
+                          jovieLinkUrl={buildDestinationJovieLink({
+                            baseUrl: BASE_URL,
+                            linkPath: current.smartLinkPath,
+                            destinationKey: provider.key,
+                            surface: 'work-inspector',
+                          })}
                           icon={
                             <ProviderIcon
                               provider={provider.key as ProviderKey}

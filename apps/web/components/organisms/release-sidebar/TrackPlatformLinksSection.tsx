@@ -3,8 +3,11 @@
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { DrawerLinkSection } from '@/components/molecules/drawer';
 import { buildDspFindUrl, DspQuietRow } from '@/components/molecules/inspector';
+import type { EntityPopoverData } from '@/components/shell/EntityPopover';
+import { BASE_URL } from '@/constants/domains';
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import type { ProviderKey } from '@/lib/discography/types';
+import { buildDestinationJovieLink } from '@/lib/links/destination-links';
 
 export interface TrackPlatformLink {
   readonly key: ProviderKey;
@@ -23,6 +26,10 @@ interface TrackPlatformLinksSectionProps {
   readonly findQuery?: string;
   readonly emptyMessage?: string;
   readonly title?: string;
+  /** Track summary for the destination-row hover preview card. */
+  readonly entity?: EntityPopoverData;
+  /** Track smart-link path for the menu's 'Copy Jovie link with UTM'. */
+  readonly jovieLinkPath?: string;
 }
 
 export function TrackPlatformLinksSection({
@@ -31,6 +38,8 @@ export function TrackPlatformLinksSection({
   findQuery,
   title = 'DSPs',
   emptyMessage = 'No DSP links available for this track.',
+  entity,
+  jovieLinkPath,
 }: TrackPlatformLinksSectionProps) {
   const isEmpty = providers.length === 0 && missingProviders.length === 0;
 
@@ -54,6 +63,17 @@ export function TrackPlatformLinksSection({
             }
             label={PROVIDER_LABELS[provider.key] ?? provider.label}
             href={provider.url}
+            entity={entity}
+            jovieLinkUrl={
+              jovieLinkPath
+                ? buildDestinationJovieLink({
+                    baseUrl: BASE_URL,
+                    linkPath: jovieLinkPath,
+                    destinationKey: provider.key,
+                    surface: 'track-sidebar',
+                  })
+                : undefined
+            }
           />
         ))}
         {missingProviders.map(provider => {

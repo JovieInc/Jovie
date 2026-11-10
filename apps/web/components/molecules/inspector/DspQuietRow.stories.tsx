@@ -17,6 +17,8 @@ const meta = {
     layout: 'centered',
     chromatic: { viewports: [390, 1024] },
     jovie: { uncoveredProps: ['closedTabIndex', 'testId'] },
+    // docs: destination rows preview on hover (left) and carry the
+    // Open / Copy link / Copy Jovie link / Copy platform URI menu.
   },
   args: {
     label: 'Spotify',
@@ -70,5 +72,30 @@ export const MissingReadOnly: Story = {
     await expect(canvas.getByText('Spotify')).toBeVisible();
     await expect(canvas.queryByRole('button')).not.toBeInTheDocument();
     await expect(canvas.queryByRole('link')).not.toBeInTheDocument();
+  },
+};
+
+export const DestinationWithMenuAndPreview: Story = {
+  args: {
+    jovieLinkUrl:
+      'https://jov.ie/example/midnight-drive?utm_source=spotify&utm_medium=work-inspector',
+    entity: {
+      kind: 'release',
+      id: 'midnight-drive',
+      label: 'Midnight Drive',
+      artist: 'Example Artist',
+      releaseType: 'single',
+      releaseDate: '2026-10-02T00:00:00.000Z',
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole('button', { name: 'Destination actions for Spotify' })
+    ).toBeVisible();
+    await expect(canvas.getByRole('link', { name: 'Spotify' })).toHaveAttribute(
+      'href',
+      'https://open.spotify.com/album/example'
+    );
   },
 };

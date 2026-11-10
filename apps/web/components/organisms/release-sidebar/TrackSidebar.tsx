@@ -495,12 +495,32 @@ export function TrackSidebar({
             missingProviders={unresolvedProviders.map(key => ({ key }))}
             findQuery={track.title}
             title='Canonical DSPs'
+            entity={{
+              kind: 'track',
+              id: track.id,
+              label: track.title,
+              durationSec:
+                track.durationMs != null
+                  ? Math.round(track.durationMs / 1000)
+                  : undefined,
+            }}
+            jovieLinkPath={track.smartLinkPath}
           />
           {fallbackProviders.length > 0 ? (
             <TrackPlatformLinksSection
               providers={fallbackProviders}
               title='Search Fallback'
               emptyMessage='No fallback DSP links available.'
+              entity={{
+                kind: 'track',
+                id: track.id,
+                label: track.title,
+                durationSec:
+                  track.durationMs != null
+                    ? Math.round(track.durationMs / 1000)
+                    : undefined,
+              }}
+              jovieLinkPath={track.smartLinkPath}
             />
           ) : null}
           {unverifiedProviders.length > 0 ? (

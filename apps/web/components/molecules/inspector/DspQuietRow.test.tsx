@@ -19,14 +19,15 @@ describe('DspQuietRow', () => {
       'href',
       'https://open.spotify.com/album/take-me-over'
     );
-    expect(row.className).toContain('hover:bg-surface-1');
+    // The shared row geometry (hover fill, group) lives on the wrapper that
+    // also owns the destination action menu.
+    expect(row.parentElement?.className).toContain('hover:bg-surface-1');
     expect(row).toHaveAccessibleName('Spotify');
-    expect(row.querySelector('svg')).toHaveClass(
-      'shrink-0',
-      'opacity-0',
-      'group-hover:opacity-100',
-      'group-focus-within:opacity-100'
-    );
+    // The trailing control is the destination action menu (Open / Copy link
+    // / …) — hover-revealed in the same reserved slot the old ↗ icon used.
+    const menu = row.parentElement?.lastElementChild;
+    expect(menu?.querySelector('button svg')).not.toBeNull();
+    expect(menu?.className).toContain('group-hover:opacity-100');
     expect(screen.queryByText('Not found')).not.toBeInTheDocument();
     expect(screen.queryByText('Missing')).not.toBeInTheDocument();
   });
@@ -61,7 +62,11 @@ describe('DspQuietRow', () => {
 
     const row = screen.getByRole('link', { name: /Tidal/ });
     expect(row).toHaveTextContent('tidal.com/browse/track/77611316');
-    expect(row.querySelector('svg')).not.toHaveClass('opacity-0');
+    // showUrl rows keep the action menu permanently visible (no hover
+    // reveal) so link-review lists always expose the controls.
+    expect(row.parentElement?.lastElementChild?.className).not.toContain(
+      'opacity-0'
+    );
     expect(displayDspUrl('https://open.spotify.com/track/abc/')).toBe(
       'open.spotify.com/track/abc'
     );
