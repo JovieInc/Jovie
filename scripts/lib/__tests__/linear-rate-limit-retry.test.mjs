@@ -63,7 +63,7 @@ describe('withLinearRateLimitRetry', () => {
     const sleeps = [];
     const result = await withLinearRateLimitRetry(
       async () => ({ ok: true, action: 'updated' }),
-      { label: 'probe', sleep: ms => sleeps.push(ms) }
+      { label: 'probe', sleep: async ms => sleeps.push(ms) }
     );
     expect(result).toEqual({ ok: true, action: 'updated' });
     expect(sleeps).toEqual([]);
@@ -134,7 +134,7 @@ describe('withLinearRateLimitRetry', () => {
       withLinearRateLimitRetry(async () => RATE_LIMITED(FAR_RESET), {
         label: 'probe signal',
         retries: 2,
-        sleep: ms => sleeps.push(ms),
+        sleep: async ms => sleeps.push(ms),
       })
     );
     expect(result).toEqual({
@@ -153,7 +153,7 @@ describe('withLinearRateLimitRetry', () => {
     const sleeps = [];
     const result = await withLinearRateLimitRetry(
       async () => ({ ok: false, reason: 'linear_search_500' }),
-      { label: 'probe', sleep: ms => sleeps.push(ms) }
+      { label: 'probe', sleep: async ms => sleeps.push(ms) }
     );
     expect(result).toEqual({ ok: false, reason: 'linear_search_500' });
     expect(sleeps).toEqual([]);

@@ -22,6 +22,7 @@ export function isLinearRateLimited(result) {
  * monitored surface healthy and never resolves a Linear issue: the verdict is
  * `unknown` on the record, surfaced as a warning annotation plus a job-summary
  * section so the deferred state cannot hide in green.
+ * @param {{ label?: string, resetAt?: number | null }} [options]
  */
 export function deferLinearRateLimited({ label, resetAt } = {}) {
   const resetMs = Number(resetAt);
