@@ -1,7 +1,10 @@
 import { isPresenceObservationStale } from '@/components/features/presence/evidence';
-import { ALL_PLATFORMS } from '@/constants/platforms/data';
 import { getDspArtistImageUrl } from '@/lib/dsp-enrichment/artist-image';
-import { getDspDisplayName } from '@/lib/dsp-registry';
+import {
+  isGeneratedArtistTitle,
+  isPlatformRestatingLabel,
+  platformDisplayName,
+} from './presence-labels';
 
 export {
   isPresenceObservationStale,
@@ -78,37 +81,6 @@ const PROFILE_METADATA_KEYS = [
   'avatar_url',
   'profileImageUrl',
 ] as const;
-
-/**
- * Canonical product-facing names for non-DSP platforms that surface in the
- * presence workspace. The DSP registry owns streaming platforms; a naive
- * title-case fallback mangles the rest ("line" → "Line", not "LINE").
- */
-/**
- * Canonical product-facing names for non-DSP platforms. The DSP registry
- * owns streaming names; everything else resolves through the shared
- * platform registry (LinkedIn, GitHub, PayPal, WhatsApp, Website, …) plus
- * LINE, which is absent from it. The naive title-case fallback mangles all
- * of these ("Linkedin", "Whatsapp", "Line").
- */
-const NON_DSP_PLATFORM_NAMES: ReadonlyMap<string, string> = new Map([
-  ['line', 'LINE'],
-  ...ALL_PLATFORMS.map(platform => [platform.id, platform.name] as const),
-]);
-
-function platformDisplayName(platform: string): string {
-  return (
-    getDspDisplayName(platform) ??
-    NON_DSP_PLATFORM_NAMES.get(platform.trim().toLowerCase()) ??
-    platform
-      .replaceAll('_', ' ')
-      .replaceAll(/\b\w/g, letter => letter.toUpperCase())
-  );
-}
-
-function normalizeLabel(value: string): string {
-  return value.trim().toLowerCase().replaceAll(/[_-]+/g, ' ');
-}
 
 function pickHttpsUrl(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -244,28 +216,15 @@ export function getPresenceEntityName(
   const platformName = platformDisplayName(subject.platform);
   const artist = artistName.trim();
   if (subject.kind === 'connector') {
-    if (!label) return platformName;
-    const normalized = normalizeLabel(label);
-    if (
-      // A label restating the platform ("gmail", "GMAIL") is platform-
-      // derived; only a custom title stays as written.
-      normalized === normalizeLabel(platformName) ||
-      normalized === normalizeLabel(subject.platform)
-    ) {
-      return platformName;
-    }
-    return label;
+    return !label || isPlatformRestatingLabel(label, subject.platform)
+      ? platformName
+      : label;
   }
   if (!label) return artist || platformName;
-  const normalized = normalizeLabel(label);
   if (
     artist &&
-    (normalized === normalizeLabel(platformName) ||
-      normalized === normalizeLabel(subject.platform) ||
-      // Link titles auto-generated as "<artist> on <platform>" repeat the
-      // platform the row's subtitle already shows ("Tim on spotify").
-      normalized === normalizeLabel(`${artist} on ${platformName}`) ||
-      normalized === normalizeLabel(`${artist} on ${subject.platform}`))
+    (isPlatformRestatingLabel(label, subject.platform) ||
+      isGeneratedArtistTitle(label, artist, subject.platform))
   ) {
     return artist;
   }
@@ -286,27 +245,19 @@ export function getPresenceRowTitle(
   const platformName = platformDisplayName(subject.platform);
   const artist = artistName.trim();
   if (!label) return platformName;
-  const normalized = normalizeLabel(label);
   if (
-    // A label that merely restates the platform ("spotify", "TikTok") is
-    // platform-derived, not a custom title: render the canonical name.
-    normalized === normalizeLabel(platformName) ||
-    normalized === normalizeLabel(subject.platform) ||
-    (artist &&
-      (normalized === normalizeLabel(`${artist} on ${platformName}`) ||
-        normalized === normalizeLabel(`${artist} on ${subject.platform}`)))
+    // A platform-restating label ("spotify", "TikTok") is not a custom title.
+    isPlatformRestatingLabel(label, subject.platform) ||
+    (artist && isGeneratedArtistTitle(label, artist, subject.platform))
   ) {
     return platformName;
   }
   return label;
 }
 
-/**
- * Generic DSP path segments name a resource kind ("/artist?id=…"), not a
- * profile handle. They are suppressed only for DSP-kind subjects: on
- * username-rooted platforms (instagram, tiktok, …) a single "artist"
- * segment IS a legitimate handle.
- */
+// "/artist" on a DSP provider is a resource route ("/artist?id=…"), never
+// a username; on username-rooted social platforms it IS one. Suppression
+// therefore applies only to DSP-kind subjects.
 const GENERIC_DSP_PATH_SEGMENTS = new Set(['artist']);
 
 export function getPresenceHandle(
@@ -330,12 +281,10 @@ export function getPresenceHandle(
     if (atSegment) return decodeURIComponent(atSegment);
     if (segments.length === 1) {
       const value = decodeURIComponent(segments[0] ?? '').replace(/^@/, '');
-      const isGenericDspPath =
+      const genericDsp =
         subject.kind === 'dsp' &&
         GENERIC_DSP_PATH_SEGMENTS.has(value.toLowerCase());
-      if (value && !isGenericDspPath) {
-        return `@${value}`;
-      }
+      if (value && !genericDsp) return `@${value}`;
     }
   } catch {
     return handle || null;
