@@ -131,7 +131,7 @@ describe('ProfileEditPreviewCard', () => {
     // The apply affordance must name Jovie explicitly: a Spotify drafting
     // request must not read as if Apply pushes the bio to Spotify.
     expect(
-      screen.getByRole('button', { name: 'Apply to Jovie bio' })
+      screen.getByRole('button', { name: 'Apply to Jovie Bio' })
     ).toBeInTheDocument();
   });
 

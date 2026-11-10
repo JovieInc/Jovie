@@ -117,7 +117,7 @@ export function ProfileEditPreviewCard({
 
   // Name the destination for bio edits: applying updates the Jovie bio, never
   // the platform the artist may have been discussing (e.g. Spotify).
-  const applyLabel = preview.field === 'bio' ? 'Apply to Jovie bio' : 'Apply';
+  const applyLabel = preview.field === 'bio' ? 'Apply to Jovie Bio' : 'Apply';
 
   // Show completed state
   if (applied) {
