@@ -1,13 +1,22 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tmpdir } from 'node:os';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
-const scanner = resolve(repoRoot, 'scripts/company-guards/ai-review-boundary.mjs');
+const scanner = resolve(
+  repoRoot,
+  'scripts/company-guards/ai-review-boundary.mjs'
+);
 
 const CLEAN_ADVISORY = `# Advisory AI review — comments only, never blocks a merge.
 name: Advisory AI Review
@@ -54,7 +63,10 @@ function runScanner(root) {
 
 function runScannerExpectFailure(root) {
   try {
-    execFileSync('node', [scanner, '--root', root], { encoding: 'utf8', stdio: 'pipe' });
+    execFileSync('node', [scanner, '--root', root], {
+      encoding: 'utf8',
+      stdio: 'pipe',
+    });
   } catch (error) {
     return error;
   }
@@ -93,7 +105,10 @@ describe('ai-review boundary scanner', () => {
   });
 
   it('ignores non-AI files that merely mention the signals', () => {
-    writeWorkflow('pr-labels.yml', '# a maintainer may request changes; see CONTRIBUTING\n');
+    writeWorkflow(
+      'pr-labels.yml',
+      '# a maintainer may request changes; see CONTRIBUTING\n'
+    );
     expect(runScanner(tmp)).toContain('ai-review-boundary: ok');
   });
 
@@ -101,11 +116,14 @@ describe('ai-review boundary scanner', () => {
     expect(runScanner(repoRoot)).toContain('ai-review-boundary: ok');
   });
 
-  it('keeps the boundary step wired into the required Company Guards job', () => {
-    const workflow = readFileSync(
-      resolve(repoRoot, '.github/workflows/company-guards.yml'),
+  it('stays wired into the workflow topology contract (runs on every PR)', () => {
+    const topology = readFileSync(
+      resolve(repoRoot, 'scripts/ci-workflow-topology.mjs'),
       'utf8'
     );
-    expect(workflow).toContain('node scripts/company-guards/ai-review-boundary.mjs');
+    expect(topology).toContain(
+      "from './company-guards/ai-review-boundary.mjs'"
+    );
+    expect(topology).toContain('scanAiReviewBoundary(repoRoot)');
   });
 });
