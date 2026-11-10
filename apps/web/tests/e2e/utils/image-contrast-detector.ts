@@ -493,9 +493,9 @@ export async function inspectImageContrast(
       { x: number; y: number; width: number; height: number }
     > = {};
     for (const element of Array.from(
-      document.querySelectorAll(`[${HIDE_ATTRIBUTE}]`)
+      document.querySelectorAll('[data-image-contrast-hide]')
     )) {
-      const index = element.getAttribute(HIDE_ATTRIBUTE);
+      const index = element.getAttribute('data-image-contrast-hide');
       if (index === null) continue;
       const rect = element.getBoundingClientRect();
       boxes[index] = {
