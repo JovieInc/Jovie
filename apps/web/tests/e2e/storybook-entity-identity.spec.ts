@@ -110,7 +110,7 @@ for (const width of [1440, 390, 320]) {
     );
     const edit = page.getByRole('button', { name: 'Edit Jovie Profile' });
     await expect(edit).toBeVisible();
-    const row = page.getByRole('row').nth(1);
+    const row = page.getByTestId('profiles-workspace').getByRole('row').nth(1);
     const title = row.getByText('Jovie Profile', { exact: true });
     await expect(title).toBeVisible();
     expect(
@@ -124,15 +124,21 @@ for (const width of [1440, 390, 320]) {
       )
     ).toBe(true);
     if (width < 640) {
-      const titleBox = await title.boundingBox();
-      const statusBox = await row
-        .getByText('Unavailable', { exact: true })
-        .filter({ visible: true })
-        .first()
-        .boundingBox();
-      expect(statusBox!.y).toBeGreaterThanOrEqual(
-        titleBox!.y + titleBox!.height - 1
+      const textBounds = async (element: import('@playwright/test').Locator) =>
+        element.evaluate(node => {
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          const bounds = range.getBoundingClientRect();
+          return { top: bounds.top, bottom: bounds.bottom };
+        });
+      const titleText = await textBounds(title);
+      const statusText = await textBounds(
+        row
+          .getByText('Unavailable', { exact: true })
+          .filter({ visible: true })
+          .first()
       );
+      expect(statusText.top).toBeGreaterThanOrEqual(titleText.bottom);
       // Text Button keeps its compact face and owns a 44px pseudo hit target.
       const hitTarget = await edit.evaluate(element => {
         const style = getComputedStyle(element, '::before');
@@ -151,6 +157,18 @@ for (const width of [1440, 390, 320]) {
       expect((await actions.boundingBox())!.width).toBeGreaterThanOrEqual(44);
       expect((await actions.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     }
+    const workspaceBounds = await page
+      .getByTestId('profiles-workspace')
+      .boundingBox();
+    const rowBounds = await row.boundingBox();
+    const actionBounds = await actions.boundingBox();
+    expect(actionBounds!.x + actionBounds!.width).toBeLessThanOrEqual(
+      workspaceBounds!.x + workspaceBounds!.width
+    );
+    expect(actionBounds!.y).toBeGreaterThanOrEqual(rowBounds!.y);
+    expect(actionBounds!.y + actionBounds!.height).toBeLessThanOrEqual(
+      rowBounds!.y + rowBounds!.height
+    );
     await page.screenshot({
       path: testInfo.outputPath(`identity-${width}.png`),
       fullPage: true,
@@ -162,5 +180,80 @@ for (const width of [1440, 390, 320]) {
     ).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(actions).toBeFocused();
+  });
+}
+
+for (const routeWidth of [400, 432]) {
+  test(`Combined Identity actions fit a ${routeWidth}px route beside the inspector`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1024, height: 1000 });
+    await page.goto(
+      '/iframe.html?id=presence-profilespublicsources--combined-identity-actions-and-review&viewMode=story'
+    );
+    const workspace = page.getByTestId('profiles-workspace');
+    await workspace
+      .getByRole('button', { name: 'Review Identities (6)', exact: true })
+      .click();
+    await expect(page.getByText('Is this you?', { exact: true })).toBeVisible();
+    await workspace.evaluate((element, width) => {
+      element.style.width = `${width}px`;
+      element.style.maxWidth = `${width}px`;
+      element.style.flex = `0 0 ${width}px`;
+    }, routeWidth);
+    const row = workspace
+      .locator('tbody tr')
+      .filter({
+        has: page.getByRole('button', {
+          name: 'Edit Jovie Profile',
+          exact: true,
+        }),
+      })
+      .first();
+    expect(
+      await row.evaluate(element => {
+        const row = element.getBoundingClientRect();
+        const workspace = element
+          .closest('[data-testid="profiles-workspace"]')!
+          .getBoundingClientRect();
+        return (
+          row.width <= workspace.width &&
+          [...element.querySelectorAll('button')].every(button => {
+            const box = button.getBoundingClientRect();
+            return (
+              box.x >= workspace.x &&
+              box.right <= workspace.right &&
+              box.y >= row.y &&
+              box.bottom <= row.bottom
+            );
+          })
+        );
+      })
+    ).toBe(true);
+    const status = workspace
+      .getByText('Needs Qualification', { exact: true })
+      .filter({ visible: true })
+      .first();
+    expect(
+      await status.evaluate(element => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const text = range.getBoundingClientRect();
+        const cell = element
+          .closest('[data-table-cell-content]')!
+          .getBoundingClientRect();
+        return (
+          text.top >= cell.top - 1 &&
+          text.bottom <= cell.bottom + 1 &&
+          text.right <= cell.right + 1
+        );
+      })
+    ).toBe(true);
+    await expect(
+      workspace.getByRole('button', {
+        name: 'Review Suggestions (0)',
+        exact: true,
+      })
+    ).toBeVisible();
   });
 }

@@ -1671,7 +1671,7 @@ function ProfilesWorkspaceContent({
         header: 'Profile',
         size: 200,
         minSize: 140,
-        meta: { className: 'px-3' },
+        meta: { className: cn('px-3', styles.identityNameColumn) },
         cell: context => {
           const row = context.row.original;
           return (
@@ -1690,7 +1690,12 @@ function ProfilesWorkspaceContent({
                   className={styles.profilePhoto}
                 />
               )}
-              <div className='flex min-w-0 flex-wrap items-center gap-x-2 sm:flex-nowrap'>
+              <div
+                className={cn(
+                  'flex min-w-0 flex-wrap items-center gap-x-2 sm:flex-nowrap',
+                  styles.identityLabel
+                )}
+              >
                 <div className='truncate text-sm font-medium text-primary-token max-sm:w-full'>
                   {row.rowType === 'connector'
                     ? row.label
@@ -1734,14 +1739,14 @@ function ProfilesWorkspaceContent({
         id: 'rank',
         header: 'Search Rank',
         size: 72,
-        meta: { className: 'max-lg:hidden' },
+        meta: { className: cn('max-lg:hidden', styles.identityDetailColumn) },
         cell: context => <RankCell row={context.row.original} />,
       }),
       columnHelper.display({
         id: 'change',
         header: 'Change',
         size: 78,
-        meta: { className: 'max-xl:hidden' },
+        meta: { className: cn('max-xl:hidden', styles.identityDetailColumn) },
         cell: context => {
           const row = context.row.original;
           if (row.rowType === 'connector') {
@@ -1776,7 +1781,9 @@ function ProfilesWorkspaceContent({
         id: 'monitoring',
         header: 'Monitoring',
         size: 124,
-        meta: { className: 'hidden 2xl:table-cell' },
+        meta: {
+          className: cn('hidden 2xl:table-cell', styles.identityDetailColumn),
+        },
         cell: context => <MonitoringCell row={context.row.original} />,
       }),
       columnHelper.display({
@@ -1784,7 +1791,9 @@ function ProfilesWorkspaceContent({
         header: 'Actions',
         size: 112,
         meta: {
-          className: 'px-3',
+          className: cn('px-3', styles.identityActionsColumn),
+          cellContentClassName:
+            'flex items-center justify-end overflow-visible',
           headerVisibility: 'sr-only',
         },
         cell: context => {
@@ -2000,7 +2009,7 @@ function ProfilesWorkspaceContent({
         }}
         getContextMenuItems={getContextMenuItems}
         rowMode='list'
-        containerClassName='min-h-0 flex-1'
+        containerClassName={cn('min-h-0 flex-1', styles.identityContainer)}
         minWidth='0'
         className={styles.table}
         isRowSelected={row =>
