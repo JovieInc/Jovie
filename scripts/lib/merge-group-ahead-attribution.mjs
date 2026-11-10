@@ -21,6 +21,37 @@ export const AGGREGATE_JOBS = Object.freeze(
   new Set(['ci-fast', 'Product Lane Receipt', 'PR Ready'])
 );
 export const CI_FAST_REMAINING_JOB = 'ci-fast (remaining)';
+// Move 3 (2026-11-10): the structural pool's matrix legs carry the same
+// lane-status and structural-command evidence as ci-fast (remaining).
+export const CI_FAST_STRUCTURAL_CORE_JOB_PREFIX = 'ci-fast (structural core';
+
+/** Jobs whose logs carry lane statuses and structural command evidence. */
+export function isCiFastEvidenceJob(name) {
+  return (
+    name === CI_FAST_REMAINING_JOB ||
+    String(name ?? '').startsWith(CI_FAST_STRUCTURAL_CORE_JOB_PREFIX)
+  );
+}
+
+/**
+ * The evidence-bearing ci-fast jobs in a run, in stable order. Evidence is
+ * command-level, never shard-name-level: the structural matrix partition
+ * follows the selected command list, so a same-named leg succeeding on the
+ * ahead run proves nothing unless the exact command passed there.
+ */
+export function selectCiFastEvidenceJobs(
+  jobs,
+  { includeSuccessful = false } = {}
+) {
+  const accepted = includeSuccessful ? ['failure', 'success'] : ['failure'];
+  return (Array.isArray(jobs) ? jobs : []).filter(
+    job =>
+      job &&
+      isCiFastEvidenceJob(job.name) &&
+      accepted.includes(job.conclusion) &&
+      Number.isSafeInteger(job.id)
+  );
+}
 
 const LANE_HEADER = /^=+ lane: ([\w.-]+) =+$/;
 const LANE_STATUS =
@@ -129,12 +160,12 @@ export function attributeAgainstAheadRun({
   for (const job of substantive) {
     if (job.conclusion !== 'failure')
       return no(`job-not-a-failure:${job.name}`);
-    if (job.name === CI_FAST_REMAINING_JOB) continue;
+    if (isCiFastEvidenceJob(job.name)) continue;
     if (aheadByName.get(job.name)?.conclusion !== 'success') {
       return no(`job-unproven-on-base:${job.name}`);
     }
   }
-  if (!substantive.some(job => job.name === CI_FAST_REMAINING_JOB)) {
+  if (!substantive.some(job => isCiFastEvidenceJob(job.name))) {
     return { attributable: true, reason: 'failed-jobs-passed-on-ahead-run' };
   }
   if (!currentCiFastLog || !aheadCiFastLog) return no('ci-fast-log-missing');
@@ -248,7 +279,7 @@ export function attributeAgainstPeerRuns({
     .filter(job => !AGGREGATE_JOBS.has(job.name));
   if (
     substantive.length !== 1 ||
-    substantive[0].name !== CI_FAST_REMAINING_JOB ||
+    !isCiFastEvidenceJob(substantive[0].name) ||
     substantive[0].conclusion !== 'failure'
   ) {
     return no(
