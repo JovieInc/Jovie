@@ -15,6 +15,12 @@
  * - a shared recording ISRC never merges two releases (one recording can
  *   legitimately appear on several distinct releases);
  * - matches across different profiles are never grouped (different artists).
+ *
+ * Provider ids are extracted ONLY from validated album routes for the
+ * declared provider (exact host + album path). Every other provider link —
+ * search URLs, artist/track pages, unknown providers, wrong-host links — is
+ * preserved in the report as evidence but contributes NO identifier: its URL
+ * suffix is never treated as an album id.
  */
 
 export interface DuplicateReportProviderLink {
@@ -38,10 +44,16 @@ export interface DuplicateReportRelease {
   /** Lifecycle: when the release was soft-deleted, if it was. */
   deletedAt: string | null;
   providers: DuplicateReportProviderLink[];
+  /**
+   * Tracks as exported. `undefined`/absent means the export did NOT include
+   * track data (reported as unknown); an empty array means the export
+   * confirms the release has zero tracks.
+   */
   tracks?: DuplicateReportTrack[];
   /**
    * Optional dependent-object counts captured by the export (smart links,
-   * campaign runs, …) so cleanup scoping does not need another export.
+   * campaign runs, …). Absent = not exported (unknown); an empty object =
+   * export confirms none.
    */
   dependents?: Record<string, number>;
 }
@@ -54,7 +66,9 @@ export type DuplicateCandidateKind = 'provider-album-id' | 'upc';
 
 export interface DuplicateReportProviderId {
   key: string;
+  /** Album id, or null when the link is not a validated album route. */
   id: string | null;
+  /** Full original URL — preserved as evidence even when no id is extracted. */
   url: string;
 }
 
@@ -67,11 +81,15 @@ export interface DuplicateReportReleaseSummary {
   deletedAt: string | null;
   /** Lifecycle derived from deletedAt; both states are reported, never pruned. */
   lifecycle: 'active' | 'deleted';
-  /** Full provider links with the extracted album ids. */
+  /** Full provider links with album ids extracted from validated routes only. */
   providerIds: DuplicateReportProviderId[];
-  trackCount: number;
-  trackIsrcs: string[];
-  dependents: Record<string, number>;
+  /**
+   * Full track identity as exported (ids, titles, ISRCs) so cleanup review
+   * sees what would be affected. `null` = tracks were not exported.
+   */
+  tracks: DuplicateReportTrack[] | null;
+  /** Export-provided dependent counts. `null` = not exported. */
+  dependents: Record<string, number> | null;
 }
 
 /** One field whose values disagree across the colliding releases. */
@@ -89,10 +107,14 @@ export interface DuplicateCandidateGroup {
   /** Fields with more than one distinct value across the group. */
   conflictingEvidence: DuplicateReportEvidence[];
   dependentInventory: {
-    totalTracks: number;
+    /**
+     * Sum of tracks across the group, or `null` when ANY release's tracks
+     * were not exported (a sum over incomplete data would understate).
+     */
+    totalTracks: number | null;
     totalProviderLinks: number;
-    /** Sums of the export-provided dependent counts, by resource. */
-    byResource: Record<string, number>;
+    /** Sums of the export-provided dependent counts, or null if any missing. */
+    byResource: Record<string, number> | null;
   };
   /**
    * Always 'candidate'. The report does not execute consolidation; a human
@@ -108,19 +130,59 @@ export interface DuplicateReport {
   groupsByKind: Record<DuplicateCandidateKind, number>;
 }
 
-/** Exact provider id embedded in a provider URL, or null when unparseable. */
-export function providerIdFromUrl(url: string): string | null {
+/**
+ * Validated album routes per provider key: a provider link yields an album
+ * id only when its host matches exactly and its path contains the provider's
+ * album route segment. Providers not listed here never yield ids.
+ */
+const ALBUM_ROUTES: Readonly<
+  Record<string, { hosts: string[]; segment: 'album' | 'albums' }>
+> = {
+  spotify: { hosts: ['open.spotify.com'], segment: 'album' },
+  apple_music: { hosts: ['music.apple.com'], segment: 'album' },
+  deezer: {
+    hosts: ['deezer.com', 'www.deezer.com', 'link.deezer.com'],
+    segment: 'album',
+  },
+  tidal: {
+    hosts: [
+      'tidal.com',
+      'www.tidal.com',
+      'store.tidal.com',
+      'listen.tidal.com',
+    ],
+    segment: 'album',
+  },
+  amazon_music: { hosts: ['music.amazon.com'], segment: 'albums' },
+};
+
+/**
+ * Album id from a provider URL, extracted ONLY when the provider key has a
+ * validated album route, the host matches exactly, and the path contains the
+ * album route. Accepts an optional trailing slash and query/hash. Returns
+ * null for search pages, artist/track pages, host mismatches, unknown
+ * providers and unparseable URLs — the link stays in the report as evidence
+ * without contributing a hard identifier.
+ */
+export function providerAlbumId(
+  providerKey: string,
+  url: string
+): string | null {
+  const route = ALBUM_ROUTES[providerKey];
+  if (!route) return null;
   let parsed: URL;
   try {
     parsed = new URL(url);
   } catch {
     return null;
   }
-  // A trailing slash means the URL has no id segment (…/album/, …/album/1/).
-  if (parsed.pathname.endsWith('/')) return null;
+  if (!route.hosts.includes(parsed.hostname.toLowerCase())) return null;
   const segments = parsed.pathname.split('/').filter(s => s.length > 0);
-  const last = segments[segments.length - 1];
-  return last && last.length > 0 ? last : null;
+  const routeIndex = segments.indexOf(route.segment);
+  if (routeIndex === -1) return null;
+  const rest = segments.slice(routeIndex + 1);
+  const id = rest[rest.length - 1];
+  return id && id.length > 0 ? id : null;
 }
 
 function normalizeUpc(value: string | null): string | null {
@@ -142,16 +204,11 @@ function summarizeRelease(
     lifecycle: release.deletedAt ? 'deleted' : 'active',
     providerIds: release.providers.map(provider => ({
       key: provider.key,
-      id: providerIdFromUrl(provider.url),
+      id: providerAlbumId(provider.key, provider.url),
       url: provider.url,
     })),
-    trackCount: release.tracks?.length ?? 0,
-    trackIsrcs: (release.tracks ?? [])
-      .map(track => track.isrc)
-      .filter(
-        (isrc): isrc is string => typeof isrc === 'string' && isrc.length > 0
-      ),
-    dependents: { ...(release.dependents ?? {}) },
+    tracks: release.tracks ? release.tracks.map(track => ({ ...track })) : null,
+    dependents: release.dependents ? { ...release.dependents } : null,
   };
 }
 
@@ -181,14 +238,19 @@ function collectEvidence(
 
 function sumDependents(
   summaries: DuplicateReportReleaseSummary[]
-): Record<string, number> {
+): Record<string, number> | null {
+  let allExported = true;
   const totals: Record<string, number> = {};
   for (const summary of summaries) {
+    if (!summary.dependents) {
+      allExported = false;
+      continue;
+    }
     for (const [resource, count] of Object.entries(summary.dependents)) {
       totals[resource] = (totals[resource] ?? 0) + count;
     }
   }
-  return totals;
+  return allExported ? totals : null;
 }
 
 function pushSummary(
@@ -208,6 +270,7 @@ function buildGroup(
   profileId: string,
   summaries: DuplicateReportReleaseSummary[]
 ): DuplicateCandidateGroup {
+  const tracksAllExported = summaries.every(s => s.tracks !== null);
   return {
     kind,
     key,
@@ -215,7 +278,9 @@ function buildGroup(
     releases: summaries,
     conflictingEvidence: collectEvidence(summaries),
     dependentInventory: {
-      totalTracks: summaries.reduce((sum, s) => sum + s.trackCount, 0),
+      totalTracks: tracksAllExported
+        ? summaries.reduce((sum, s) => sum + (s.tracks?.length ?? 0), 0)
+        : null,
       totalProviderLinks: summaries.reduce(
         (sum, s) => sum + s.providerIds.length,
         0
@@ -252,8 +317,7 @@ function collisionKeysForRelease(
 /**
  * Build the deterministic duplicate-candidate report for one authorized
  * export. Groups are exact-identifier collisions scoped to a single profile,
- * sorted by kind, then key, then profile id — the same input always produces
- * the same output.
+ * sorted by kind, then key, then profile id — independent of input order.
  */
 export function buildDuplicateReport(
   input: DuplicateReportInput
