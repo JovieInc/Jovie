@@ -30,7 +30,7 @@ describe('central Inbox bell', () => {
       />
     );
     const link = screen.getByRole('link', {
-      name: 'Inbox — 3 items need attention',
+      name: 'Inbox — 3 Items Need Attention',
     });
     expect(link.querySelector('svg')).toHaveClass(
       'size-(--app-shell-sidebar-icon-size)'
@@ -79,7 +79,7 @@ describe('central Inbox bell', () => {
         />
       );
       const link = screen.getByRole('link', {
-        name: 'Inbox — 3 items need attention; app update available',
+        name: 'Inbox — 3 Items Need Attention; app update available',
       });
       expect(link.querySelectorAll('[data-runtime-update]')).toHaveLength(1);
       expect(link.querySelector('[data-runtime-update]')).toHaveClass(
@@ -107,7 +107,7 @@ describe('central Inbox bell', () => {
       />
     );
     expect(
-      screen.getByRole('link', { name: 'Inbox — 1 item needs attention' })
+      screen.getByRole('link', { name: 'Inbox — 1 Item Needs Attention' })
     ).toBeInTheDocument();
   });
 
@@ -120,7 +120,7 @@ describe('central Inbox bell', () => {
         />
       );
       const link = screen.getByRole('link', {
-        name: 'Inbox — 1 item needs attention; app update available',
+        name: 'Inbox — 1 Item Needs Attention; app update available',
       });
       expect(link.querySelector('[data-runtime-update]')).not.toBeNull();
     } finally {

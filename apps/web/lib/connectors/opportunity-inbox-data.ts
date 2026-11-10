@@ -73,8 +73,8 @@ function pendingForUser(userId: string): SQL | undefined {
 }
 
 /**
- * Pending-work count for the shell's Inbox badge: the uncapped TOTAL of
- * pending rows eligible for creator review, built on the exact eligibility
+ * Pending-work count for the shell's Inbox badge: the uncapped
+ * source-eligible pending-row total, built on the exact eligibility
  * condition the Inbox feed query uses (`pendingForUser`). An operator-only
  * pending row (Ovie workflow captures, founder/ops/ovie sources) therefore
  * never produces a creator-work badge.
@@ -82,11 +82,13 @@ function pendingForUser(userId: string): SQL | undefined {
  * Total-versus-page contract: this count deliberately does NOT come from the
  * feed's candidate page (SOCIAL_INBOX_CANDIDATE_LIMIT rows, of which at most
  * 50 cards render). Deriving the badge from that capped page would silently
- * drop valid pending work beyond the cap; the badge counts every eligible
- * pending row instead, so it may legitimately exceed the number of cards the
- * Inbox renders. Payload-level renderability is enforced at map time in
+ * drop valid pending work beyond the cap; the badge counts every
+ * source-eligible pending row instead, so it can exceed the number of cards
+ * the Inbox renders. Payload-level renderability is enforced at map time in
  * `buildOpportunityInboxData` (malformed payloads never become cards) and is
- * not replicated in this count.
+ * deliberately not replicated in this count — excluding malformed payloads
+ * from the count and recovering candidates starved behind the page cap
+ * remain outstanding follow-up work.
  */
 export async function countPendingCreatorInboxActions(
   userId: string,

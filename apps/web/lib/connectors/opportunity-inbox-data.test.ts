@@ -13,6 +13,10 @@ vi.mock('@/lib/db/queries/shared', () => ({ getUserByClerkId: mocks.user }));
 vi.mock('@/lib/utils/logger', () => ({ logger: { error: vi.fn() } }));
 
 import { GET } from '@/app/api/connectors/suggested-actions/route';
+import {
+  resolveInboxNavigationAvailability,
+  shouldShowInboxNavigation,
+} from '@/lib/inbox/navigation-availability';
 import { buildMobileInbox } from '@/lib/mobile/action-loop-inbox';
 import {
   countPendingCreatorInboxActions,
@@ -241,16 +245,132 @@ describe('explicit operator provenance', () => {
 });
 
 describe('creator-work badge count', () => {
-  it('counts pending rows with the feed eligibility, as an uncapped total', async () => {
-    mocks.where.mockResolvedValueOnce([{ count: 1 }]);
-    await expect(countPendingCreatorInboxActions('owner')).resolves.toBe(1);
+  interface PendingRow {
+    readonly userId: string;
+    readonly status: string;
+    readonly kind: string;
+  }
 
-    const query = new PgDialect().sqlToQuery(mocks.where.mock.calls[0][0]);
-    // Same eligibility condition as the feed query (see expectConsumerQuery):
-    // an operator-only pending row (workflow capture, founder/ops/ovie
-    // sources) is excluded, so it can never raise a creator-work badge.
-    expect(query.sql).toContain('lower("suggested_actions"."kind") <>');
-    expect(query.params).toEqual([
+  /**
+   * A fake db handle whose where() evaluates the compiled SQL the helper
+   * actually emits against fixture rows. Clause shapes are located in the
+   * emitted SQL and asserted present, so a dropped eligibility clause fails
+   * the test instead of silently passing.
+   */
+  function countingDb(rows: readonly PendingRow[]) {
+    let captured: ReturnType<PgDialect['sqlToQuery']> | undefined;
+    const handle = {
+      select: () => ({
+        from: () => ({
+          where: (condition: unknown) => {
+            const query = new PgDialect().sqlToQuery(
+              condition as Parameters<PgDialect['sqlToQuery']>[0]
+            );
+            captured = query;
+            const count = rows.filter(row =>
+              matchesPendingCreatorWhere(row, query)
+            ).length;
+            return Promise.resolve([{ count }]);
+          },
+        }),
+      }),
+    };
+    return {
+      captured: () => captured,
+      handle: handle as unknown as Parameters<
+        typeof countPendingCreatorInboxActions
+      >[1],
+    };
+  }
+
+  function matchesPendingCreatorWhere(
+    row: PendingRow,
+    query: ReturnType<PgDialect['sqlToQuery']>
+  ): boolean {
+    const userClause = /"suggested_actions"\."user_id" = \$(\d+)/.exec(
+      query.sql
+    );
+    const statusClause = /"suggested_actions"\."status" = \$(\d+)/.exec(
+      query.sql
+    );
+    const kindInsensitive =
+      /lower\("suggested_actions"\."kind"\) <> \$(\d+)/.exec(query.sql);
+    const kindSensitive = /"suggested_actions"\."kind" <> \$(\d+)/.exec(
+      query.sql
+    );
+    const kindExact = kindInsensitive ?? kindSensitive;
+    const kindPrefixes = [
+      ...query.sql.matchAll(/"suggested_actions"\."kind" not ilike \$(\d+)/g),
+    ];
+    expect(userClause, 'user clause').not.toBeNull();
+    expect(statusClause, 'status clause').not.toBeNull();
+    expect(kindExact, 'exact-kind exclusion').not.toBeNull();
+    expect(kindPrefixes.length, 'operator prefix exclusions').toBeGreaterThan(
+      0
+    );
+    if (row.userId !== query.params[Number(userClause![1]) - 1]) return false;
+    if (row.status !== query.params[Number(statusClause![1]) - 1]) return false;
+    const exactValue = String(query.params[Number(kindExact![1]) - 1]);
+    if (
+      kindInsensitive
+        ? row.kind.toLowerCase() === exactValue.toLowerCase()
+        : row.kind === exactValue
+    ) {
+      return false;
+    }
+    for (const match of kindPrefixes) {
+      const pattern = String(query.params[Number(match[1]) - 1]);
+      if (
+        row.kind.toLowerCase().startsWith(pattern.slice(0, -1).toLowerCase())
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  it('produces no creator-work badge from operator-only pending rows', async () => {
+    const db = countingDb([
+      { userId: 'owner', status: 'pending', kind: 'workflow_capture.request' },
+      { userId: 'owner', status: 'pending', kind: 'WORKFLOW_CAPTURE.REQUEST' },
+      { userId: 'owner', status: 'pending', kind: 'founder.brain_dump' },
+      { userId: 'owner', status: 'pending', kind: 'ops.healthcheck' },
+      { userId: 'owner', status: 'pending', kind: 'ovie.review' },
+    ]);
+    const count = await countPendingCreatorInboxActions('owner', db.handle);
+    expect(count).toBe(0);
+    // A zero count resolves to a conclusively empty Inbox — no badge.
+    expect(resolveInboxNavigationAvailability(count, 0)).toEqual({
+      state: 'empty',
+      pendingCount: 0,
+    });
+    expect(
+      shouldShowInboxNavigation(resolveInboxNavigationAvailability(count, 0))
+    ).toBe(false);
+  });
+
+  it('counts only creator-review rows in a mixed pending set', async () => {
+    const db = countingDb([
+      { userId: 'owner', status: 'pending', kind: 'calendar.create_event' },
+      { userId: 'owner', status: 'pending', kind: 'social_reply.draft' },
+      { userId: 'owner', status: 'pending', kind: 'ops.healthcheck' },
+      { userId: 'owner', status: 'approved', kind: 'calendar.create_event' },
+      { userId: 'other-user', status: 'pending', kind: 'creator.suggestion' },
+    ]);
+    await expect(
+      countPendingCreatorInboxActions('owner', db.handle)
+    ).resolves.toBe(2);
+  });
+
+  it('runs on the supplied transaction instead of the module db', async () => {
+    const db = countingDb([]);
+    await countPendingCreatorInboxActions('owner', db.handle);
+    expect(mocks.where).not.toHaveBeenCalled();
+    const query = db.captured();
+    expect(query).toBeDefined();
+    // Same eligibility the feed query applies (see expectConsumerQuery)…
+    expect(query!.sql).toContain('lower("suggested_actions"."kind") <>');
+    expect(query!.params).toEqual([
       'owner',
       'pending',
       'workflow_capture.request',
@@ -258,14 +378,10 @@ describe('creator-work badge count', () => {
       'ops.%',
       'ovie.%',
     ]);
-    // The badge is the uncapped total, never derived from the feed's capped
-    // candidate page: the count query applies no limit.
+    // …and the badge is the uncapped source-eligible total, never derived
+    // from the feed's capped candidate page: no limit clause, and the fake
+    // handle exposes no limit method (calling one would throw).
+    expect(query!.sql.toLowerCase()).not.toContain('limit');
     expect(mocks.limit).not.toHaveBeenCalled();
-    expect(query.sql.toLowerCase()).not.toContain('limit');
-  });
-
-  it('reads zero when no eligible pending work exists', async () => {
-    mocks.where.mockResolvedValueOnce([{ count: 0 }]);
-    await expect(countPendingCreatorInboxActions('owner')).resolves.toBe(0);
   });
 });
