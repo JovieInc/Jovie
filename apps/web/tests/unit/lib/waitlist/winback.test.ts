@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildWinbackDraftCopy,
@@ -279,8 +279,6 @@ describe('winbackSendApprovalError', () => {
 // The kv-backed signals ledger and the single emit helper (executed for the
 // exact-head coverage gate; behavior asserted through mocked collaborators).
 // ---------------------------------------------------------------------------
-
-import { vi } from 'vitest';
 
 const mockTrackServerEvent = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/server-analytics', () => ({
