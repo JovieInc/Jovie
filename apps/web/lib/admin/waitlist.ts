@@ -1,4 +1,4 @@
-import { and, desc, inArray, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, desc, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { db, doesTableExist } from '@/lib/db';
 import {
   capabilityWants,

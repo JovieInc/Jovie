@@ -2,18 +2,18 @@ import 'server-only';
 
 import { sql as drizzleSql } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import {
-  capabilityWants,
-  waitlistEntries,
-} from '@/lib/db/schema/waitlist';
+import { capabilityWants, waitlistEntries } from '@/lib/db/schema/waitlist';
 import { normalizeEmail } from '@/lib/utils/email';
-import { qualificationInputsPatch, type RoleEntrantQualification } from '@/lib/waitlist/role-qualification';
-import type { WaitlistRole } from '@/lib/waitlist/roles';
-import { hashEmailForWaitlist } from '@/lib/waitlist/signup-entry';
 import {
   type QualificationDecision,
   roleFormOutcomeToStatus,
 } from '@/lib/waitlist/decision';
+import {
+  qualificationInputsPatch,
+  type RoleEntrantQualification,
+} from '@/lib/waitlist/role-qualification';
+import type { WaitlistRole } from '@/lib/waitlist/roles';
+import { hashEmailForWaitlist } from '@/lib/waitlist/signup-entry';
 
 /**
  * Source of entries created by the closed-signup `/waitlist` role form
