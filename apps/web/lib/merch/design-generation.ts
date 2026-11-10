@@ -33,7 +33,10 @@ import {
 } from '@/lib/db/schema/merch';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { logger } from '@/lib/utils/logger';
-import { resolveMerchCatalogSelection } from './catalog';
+import {
+  type MerchCatalogSelection,
+  resolveMerchCatalogSelection,
+} from './catalog';
 import {
   MERCH_CONTENT_CONTRACT_VERSION,
   MERCH_PERSON_CONTENT_PUBLISH_BLOCKER,
@@ -389,22 +392,36 @@ function schedulePrintfulMockupEnrichment(params: {
   readonly designs: readonly {
     readonly optionId: string;
     readonly printFileUrl: string;
+    /** The option's OWN resolved catalog — mockups render on the option's product, never the default tee. */
+    readonly catalogProductId: number;
+    readonly catalogVariantIds: readonly number[];
+    readonly placements: readonly string[];
+    readonly technique: MerchCatalogSelection['technique'];
+    readonly productType: string;
   }[];
 }): void {
   scheduleMerchMockupEnrichment(
-    params.designs.map(({ optionId, printFileUrl }) => ({
-      optionId,
-      request: {
+    params.designs.map(
+      ({
+        optionId,
         printFileUrl,
-        catalogProductId: MERCH_DEFAULT_PRINTFUL_PRODUCT.catalogProductId,
-        catalogVariantIds: Object.values(
-          MERCH_DEFAULT_PRINTFUL_PRODUCT.variantMap
-        ),
-        placements: MERCH_DEFAULT_PRINTFUL_PRODUCT.placements,
-        technique: MERCH_DEFAULT_PRINTFUL_PRODUCT.technique,
-        productTypes: [MERCH_DEFAULT_PRINTFUL_PRODUCT.productType],
-      },
-    })),
+        catalogProductId,
+        catalogVariantIds,
+        placements,
+        technique,
+        productType,
+      }) => ({
+        optionId,
+        request: {
+          printFileUrl,
+          catalogProductId,
+          catalogVariantIds,
+          placements,
+          technique,
+          productTypes: [productType],
+        },
+      })
+    ),
     outcomes => {
       logMerchGenerationReceipt({
         pipeline: MERCH_CANONICAL_PIPELINE_ID,
@@ -792,7 +809,20 @@ export async function generateMerchDesigns(params: {
 
   const enrichmentDesigns = attempts.flatMap(attempt =>
     attempt.preview && attempt.printFileUrl
-      ? [{ optionId: attempt.optionId, printFileUrl: attempt.printFileUrl }]
+      ? [
+          {
+            optionId: attempt.optionId,
+            printFileUrl: attempt.printFileUrl,
+            // Enrich with the option's OWN resolved catalog product — the
+            // default tee here is what produced tee mockups on hoodie/hat
+            // options.
+            catalogProductId: catalog.catalogProductId,
+            catalogVariantIds: catalog.catalogVariantIds,
+            placements: catalog.placements,
+            technique: catalog.technique,
+            productType: catalog.productType,
+          },
+        ]
       : []
   );
   if (enrichmentDesigns.length > 0) {

@@ -47,6 +47,16 @@ export const MERCH_MOCKUP_FAILURE_PUBLISH_BLOCKER =
   'Product mockup failed to render on the real garment; regenerate the design before publishing.';
 
 /**
+ * User-visible publish blocker for an option whose truthful mockup has not
+ * been rendered yet (`pending_mockup`): the option may be selected as a
+ * draft, but the card cannot go live until the real Printful mockup is
+ * attached (`mockup_ready`) — a card without its real product mockup must
+ * never be presented as live merchandise.
+ */
+export const MERCH_MOCKUP_PENDING_PUBLISH_BLOCKER =
+  'The real product mockup has not finished rendering; publish once it is ready.';
+
+/**
  * Reads the persisted mockup lifecycle state from an option's qualityReview
  * evidence payload. Options generated before this contract (or through the
  * legacy deterministic path) have no stamp and return null — they keep their
