@@ -474,8 +474,13 @@ export async function inspectImageContrast(
 
   // Hide glyph ink only; control backgrounds stay painted so the sampled
   // region is exactly what sits behind each glyph.
+  // `background-image: none` is part of the hide: a candidate whose glyphs
+  // are painted by a clipped background gradient (bg-clip-text) or that sits
+  // on a gradient wash paints ink the color transparent cannot remove, and
+  // the sample would read that ink as "background". Solid backgrounds
+  // (background-color) stay painted, so control surfaces keep their fill.
   const styleTag = await page.addStyleTag({
-    content: `[${HIDE_ATTRIBUTE}], [${HIDE_ATTRIBUTE}] * { color: transparent !important; text-shadow: none !important; -webkit-text-stroke: transparent !important; caret-color: transparent !important; }`,
+    content: `[${HIDE_ATTRIBUTE}], [${HIDE_ATTRIBUTE}] * { color: transparent !important; text-shadow: none !important; -webkit-text-stroke: transparent !important; caret-color: transparent !important; background-image: none !important; }`,
   });
   // Headless Chromium rejects a capture with "Protocol error
   // (Page.captureScreenshot): Unable to capture screenshot" when the view has
