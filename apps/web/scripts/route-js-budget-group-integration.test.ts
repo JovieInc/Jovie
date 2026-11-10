@@ -151,9 +151,10 @@ describe('route-group policy reaches the existing evaluator and CLI', () => {
         join(targetDir, 'route-budgets.json'),
         JSON.stringify(ancestor)
       );
-      const env = Object.fromEntries(
-        Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
-      );
+      const env = { ...process.env };
+      for (const key of Object.keys(env)) {
+        if (key.startsWith('GIT_')) delete env[key];
+      }
       const emptyConfig = join(nextDir, 'empty.gitconfig');
       writeFileSync(emptyConfig, '');
       Object.assign(env, {

@@ -93,11 +93,14 @@ export function isKb(value) {
  * public routes could grow to the admin ceiling unnoticed. Group rows feed
  * the CI table; violations fail the job. A group whose baseline is missing
  * reports not-ok (the shape layer also fails closed on it).
- * @param {{ route: string, gzipKb: number, chunks: number }[]} appRows
- * @param {{ route: string, gzipKb: number, chunks: number }[]} publicRows
- * @param {Record<string, { baselineKb?: number }>} groups
- * @param {RouteGroups} routeGroups
- * @param {string[]} [marketingPatterns]
+ * @typedef {{ route: string, gzipKb: number, chunks: number }} RouteJsRow
+ * @param {{
+ *   appRows: RouteJsRow[],
+ *   publicRows: RouteJsRow[],
+ *   groups: Record<string, { baselineKb?: number }>,
+ *   routeGroups: RouteGroups,
+ *   marketingPatterns?: string[]
+ * }} options
  */
 export function checkGroupBudgets({
   appRows,
