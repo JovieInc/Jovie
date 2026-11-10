@@ -1,6 +1,5 @@
 {
   "apps/web/components/features/dashboard/organisms/SettingsAdPixelsSection.tsx:<button>": 1,
-  "apps/web/components/features/dashboard/organisms/SettingsPolished.tsx:<button>": 1,
   "apps/web/components/features/dashboard/organisms/SettingsSmsAccessSection.tsx:<button>": 1,
   "apps/web/components/features/dashboard/organisms/SettingsTouringSection.tsx:<button>": 2,
   "apps/web/components/shell/ActivityHoverRow.tsx:<button>": 1,
@@ -24,8 +23,6 @@
   "apps/web/components/shell/LyricsTimeline.tsx:<button>": 1,
   "apps/web/components/shell/LyricsView.tsx:<button>": 2,
   "apps/web/components/shell/PerformanceCard.tsx:<button>": 1,
-  "apps/web/components/shell/PickerAction.tsx:<button>": 1,
-  "apps/web/components/shell/PickerToggle.tsx:<button>": 1,
   "apps/web/components/shell/PillSearch.tsx:<input>": 1,
   "apps/web/components/shell/ScrubGradient.tsx:<input>": 1,
   "apps/web/components/shell/ShellDropdown.tsx:<input>": 1,

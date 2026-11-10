@@ -32,3 +32,43 @@ export const NarrowWidth: Story = {
     width: 'sm',
   },
 };
+
+/** Long content: tall content scrolls inside the page instead of clipping. */
+export const LongContentScrolls: Story = {
+  args: {
+    width: 'sm',
+    children: (
+      <div className='space-y-3'>
+        {Array.from({ length: 24 }, (_, i) => `Section ${i + 1}`).map(
+          section => (
+            <div
+              key={section}
+              className='rounded-lg border border-subtle bg-surface-0 p-4 text-sm text-secondary-token'
+            >
+              {section}
+            </div>
+          )
+        )}
+      </div>
+    ),
+  },
+};
+
+/** RTL: the page shell follows a right-to-left document. */
+export const RtlCentered: Story = {
+  args: {
+    centered: true,
+    children: (
+      <div className='rounded-lg border border-subtle bg-surface-0 p-6 text-sm text-secondary-token'>
+        المطالبة بملفك الشخصي
+      </div>
+    ),
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

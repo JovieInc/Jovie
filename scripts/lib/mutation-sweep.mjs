@@ -4,6 +4,7 @@
 
 import { createHash } from 'node:crypto';
 import { scoreMutants } from './mutation-diff.mjs';
+import { verifyCommand } from './mutation-sweep-root.mjs';
 
 export const STATE_SCHEMA_VERSION = 1;
 /** Modules with fewer valid mutants than this are scored but never ratcheted. */
@@ -277,7 +278,7 @@ export function buildSurvivorIssue(file, real, meta) {
         .join(', ') || 'its tests') +
       '). Do not change production code, weaken assertions, or lower any floor. If a mutant is behavior-equivalent, add it to `scripts/mutation-equivalents.json` with a justification instead.',
     '',
-    `Verify: \`node scripts/mutation-diff.mjs --scope all --files apps/web/${file}\` and confirm the listed survivors are Killed.`,
+    `Verify: \`${verifyCommand(file)}\` and confirm the listed survivors are Killed.`,
     meta.sha ? `Tested SHA: ${meta.sha}` : '',
     meta.runUrl ? `Run: ${meta.runUrl}` : '',
     '',

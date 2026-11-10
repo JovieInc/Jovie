@@ -77,3 +77,61 @@ export const Decorative: Story = {
     'aria-hidden': true,
   },
 };
+
+export const PartialDefaultsOnly: Story = {
+  render: () => (
+    <div className='rounded-lg bg-base p-6 text-primary-token'>
+      <BrandLogo />
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'No optional props supplied: the mark falls back to the chrome size, inherited colour, rounded frame and the Jovie wordmark as its accessible name.',
+      },
+    },
+  },
+};
+
+export const LongContentAccessibleName: Story = {
+  args: {
+    size: 'splash',
+    alt: 'Jovie, the link-in-bio and fan conversion platform for independent artists, DJs and labels, return to the homepage',
+  },
+  render: args => (
+    <div className='flex w-48 items-center gap-2 text-primary-token'>
+      <BrandLogo {...args} />
+      <span className='min-w-0 truncate text-sm'>
+        Midnight Sessions Vol. 2 (Deluxe Extended Anniversary Edition)
+      </span>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A long accessible name and long neighbouring copy never stretch or squeeze the mark: it keeps its square slot and does not shrink.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: args => (
+    <div dir='rtl' className='flex w-48 items-center gap-2 text-primary-token'>
+      <BrandLogo {...args} alt='جوفي' />
+      <span className='min-w-0 truncate text-sm'>
+        جلسات منتصف الليل، الإصدار الثاني الفاخر الممتد
+      </span>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'In a right-to-left row the mark leads from the right and keeps its square slot beside truncated Arabic copy.',
+      },
+    },
+  },
+};

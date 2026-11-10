@@ -103,7 +103,16 @@ function installFixture(mode = 'success') {
     if [ "$1" = --output ]; then printf fixture > "$2"; shift 2; else shift; fi
   done`
   );
-  executable('shasum', 'cat >> "$TEST_CHECKSUMS"');
+  executable(
+    'shasum',
+    `input=$(cat)
+    printf '%s\\n' "$input" >> "$TEST_CHECKSUMS"
+    if [ "$TEST_MODE" = queue-checksum-failure ] && [[ "$input" == *actionlint-queue.patch ]]; then exit 1; fi`
+  );
+  executable(
+    'patch',
+    '[ "$TEST_MODE" != patch-failure ] || exit 9; cat >/dev/null'
+  );
   executable(
     'tar',
     `case "$*" in
@@ -122,6 +131,15 @@ function installFixture(mode = 'success') {
   [ "$CGO_ENABLED" = 0 ] && [ "$GOOS" = darwin ] && [ "$GOARCH" = arm64 ]
   if [ "$1" = test ]; then
     [ "$TEST_MODE" != regression-failure ] || exit 7
+    case "$*" in *concurrency_queue*)
+      [ "$TEST_MODE" != queue-regression-failure ] || exit 7
+      if [ "$TEST_MODE" != queue-no-tests ]; then
+        case "$*" in
+          *TestLinterLintOK*) echo '--- PASS: TestLinterLintOK/concurrency_queue.yaml (0.00s)' ;;
+          *TestLinterLintError*) echo '--- PASS: TestLinterLintError/err/concurrency_queue (0.00s)' ;;
+        esac
+      fi ;;
+    esac
     for arg in "$@"; do case "$arg" in
       -coverprofile=*) printf 'mode: set\\ngithub.com/rhysd/actionlint/process.go:1.1,2.1 1 %s\\n' \\
         "$([ "$TEST_MODE" = uncovered ] && echo 0 || echo 5)" > "$(printf '%s' "$arg" | cut -d= -f2-)" ;;
@@ -137,7 +155,7 @@ function installFixture(mode = 'success') {
   cat > "$out" <<'BIN'
 #!/bin/bash
 if [ "$1" = -version ]; then
-  if [ "$TEST_MODE" = wrong-version ]; then echo wrong; else echo 1.7.12+fd33e9f582a0; fi
+  if [ "$TEST_MODE" = wrong-version ]; then echo wrong; else echo 1.7.12+fd33e9f582a0.queue644076a59742; fi
 else
   printf '%s\\n' "$@" > "$TEST_LINT_ARGS"
   echo 'lint ran'
@@ -226,6 +244,15 @@ describe('checksum-pinned actionlint platform execution', () => {
     expect(result.checksums).toContain(
       '475da14da4ed169c493d4f988f2cd6e4f15434752635ad809e5613cc3cde6fcc'
     );
+    expect(result.checksums).toContain(
+      '0378db3d77631edba189ecb92159417b0f5ed607d4ca41d370b4bfe1d4eee68f'
+    );
+    expect(result.goArgs).toContain(
+      '^TestLinterLintOK$/^concurrency_queue[.]yaml$'
+    );
+    expect(result.goArgs).toContain(
+      '^TestLinterLintError$/^err$/^concurrency_queue$'
+    );
     expect(result.lintArgs).toMatch(/-shellcheck=.*\/shellcheck/);
     expect(result.lintArgs).toMatch(/-pyflakes=.*\/pyflakes/);
     expect(result.lintArgs).toContain('-oneline\nworkflow with spaces.yml');
@@ -237,6 +264,10 @@ describe('checksum-pinned actionlint platform execution', () => {
     'uncovered',
     'build-failure',
     'wrong-version',
+    'patch-failure',
+    'queue-regression-failure',
+    'queue-no-tests',
+    'queue-checksum-failure',
   ])('fails closed before linting on %s', mode => {
     const result = installFixture(mode);
     expect(result.status).toBe(1);

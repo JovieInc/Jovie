@@ -193,6 +193,7 @@ function ReleaseSmartLinkControl({
           trigger={
             <DrawerInlineIconButton
               title='Share smart link'
+              aria-label='Share Smart Link'
               className='h-7 w-7 rounded-full text-tertiary-token'
             >
               <Share2 className='h-3 w-3' />

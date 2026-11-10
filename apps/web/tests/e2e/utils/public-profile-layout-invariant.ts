@@ -46,8 +46,8 @@ export async function auditPublicProfileLayout(page: Page) {
     const layout = root?.dataset.layout ?? null;
     const isDesktopViewport = window.innerWidth >= desktopBreakpoint;
     const ownsDesktop = isDesktopViewport && layout === 'desktop';
-    // Builds without NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE (the default,
-    // Tim 2026-09-26) keep desktop widths on the compact profile, centered in
+    // Opted-out builds (NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE=0)
+    // keep desktop widths on the compact profile, centered in
     // a phone-width column. That column is the admitted desktop presentation
     // only while the layout honestly reports `compact`; a shell that claims
     // desktop ownership while showing the compact card is still a hybrid.

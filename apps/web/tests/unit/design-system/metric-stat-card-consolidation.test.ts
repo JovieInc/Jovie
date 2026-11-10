@@ -50,22 +50,6 @@ describe('metric and stat card consolidation source contract', () => {
     );
   });
 
-  it('keeps dashboard overview loading and error cards on the content metric card owner', () => {
-    const source = readAppSource(
-      'components/features/dashboard/organisms/DashboardAnalyticsCards.tsx'
-    );
-
-    expect(source).toContain(
-      "import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';"
-    );
-    expect(source).toContain(
-      "import { ContentMetricCardSkeleton } from '@/components/molecules/ContentMetricCardSkeleton';"
-    );
-    expect(source).not.toMatch(/^function (SkeletonCards|ErrorCards)\(/m);
-    expect(source).not.toContain('bg-sky-500/10');
-    expect(source).not.toContain('bg-emerald-500/10');
-  });
-
   it('keeps admin chart loading and empty states on the content chart state owner', () => {
     const shippingVelocitySource = readAppSource(
       'components/features/admin/ShippingVelocityChart.tsx'

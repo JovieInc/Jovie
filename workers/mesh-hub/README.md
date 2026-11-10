@@ -62,6 +62,18 @@ MacBook Air (`worker/ie.jov.mesh-worker.aeon.plist.example`, token file chmod 60
 
 The hyperagent board bridge lives at `scripts/hyperagent/board_bridge.py` (one canonical copy, not here).
 
+## Remote MCP (`/mcp`, for claude.ai custom connectors)
+
+MCP `2025-06-18` Streamable HTTP (JSON) and OAuth 2.1 run in the existing worker, with durable state in `McpAuth` (`src/mcp-oauth.ts`). Ten tools call existing hub routes as `tim`, retaining hub validation, secret scanning and limits: `board_list`, `board_get`, `board_post`, `board_claim`, `board_update`, `board_done`, `board_answer`, `mailbox_read`, `mailbox_send`, `agents_list`.
+
+- **Consent:** Open DCR grants nothing. OTPAuth 9.6.0 verifies owner TOTP from `MCP_OWNER_TOTP_SECRET` (SHA-1, six digits, 30 s); an unset/invalid secret refuses authorization. Each step works once. Five wrong codes per 15 min or 20 per day lock consent.
+- **Scopes:** The owner chooses `mesh:read` or `mesh:read mesh:write`. Read-only grants cannot see or run writes.
+- **Tokens:** Public clients, PKCE S256 and exact redirect matching; single-use codes last 60 s, access tokens 1 h, rotating refresh tokens 30 d. Code/refresh reuse revokes the grant. Only SHA-256 hashes are stored.
+- **Revoke:** `POST /oauth/revoke`, or admin `GET /v1/admin/mcp/grants` and `POST /v1/admin/mcp/revoke {grantId}|{all:true}` with `HUB_ADMIN_TOKEN`.
+- **Limits:** 20 registrations/h, 200 clients, 100 pending approvals, 25 grants, 120 calls/min and 30 writes/min per grant, 64 KB bodies; JSON-RPC batches are refused (MCP `2025-06-18`). Oversized results fail explicitly; mailbox messages stay unacknowledged until a smaller page fits.
+- **Setup:** Generate 20+ random bytes as base32, add the secret to an authenticator, then use `wrangler secret put MCP_OWNER_TOTP_SECRET`. Connector: `https://<hub host>/mcp`.
+- **Live check:** `src/mcp.e2e.test.mjs` exercises `wrangler dev` when `MESH_E2E_URL` and `MESH_E2E_TOTP_SECRET` are set; otherwise it skips.
+
 ## Operate
 
 ```sh
