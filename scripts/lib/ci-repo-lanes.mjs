@@ -306,8 +306,14 @@ export function classifyCiRepoLanes(files) {
     runSummerOps: lanes.has(CI_LANES.SUMMER_OPS),
     // actionlint reads only checked-out .github/ sources (workflows, its
     // config, and the runner script), so heads without .github/ changes
-    // inherit the base's verdict and skip the lint job entirely.
-    runActionlint: changed.some(file => file.startsWith('.github/')),
+    // inherit the base's verdict and skip the lint job entirely. The runner
+    // script shells out to scripts/lib/github-release-asset.sh for the
+    // checksum-pinned downloads, so that helper is an input too.
+    runActionlint: changed.some(
+      file =>
+        file.startsWith('.github/') ||
+        file === 'scripts/lib/github-release-asset.sh'
+    ),
   };
 }
 
