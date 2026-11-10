@@ -24,7 +24,10 @@ export function SidebarCollapseButton({
       controlsId='shell-left-rail'
       open={!isCollapsed}
       previewTrigger={previewTrigger}
-      iconOverride={isPreview ? 'Pin' : pinned ? 'PinOff' : undefined}
+      // Pinned open, the control collapses the rail, so it shows the rail
+      // panel glyph (Pen canonical) rather than a crossed-out pin. Only the
+      // floating peek offers to pin.
+      iconOverride={isPreview ? 'Pin' : undefined}
       pinned={pinned}
       openLabel={isPreview ? 'Pin sidebar' : 'Collapse sidebar'}
       closedLabel='Expand sidebar'

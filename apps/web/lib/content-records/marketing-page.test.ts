@@ -20,7 +20,7 @@ function cleanSpec(): MarketingPageSpec {
   const hero = spec.sections[0];
   if (hero?.section !== 'hero') throw new Error('hero first');
   hero.copy.subhead =
-    'Your profile, every release, and the people who follow your work, in one quiet workspace.';
+    'Your profile, every release, and a link to each place the music is streaming.';
   return spec;
 }
 

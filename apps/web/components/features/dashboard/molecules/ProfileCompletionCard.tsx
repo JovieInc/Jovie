@@ -22,7 +22,10 @@ function getStorageKey(profileId: string, percentage: number): string {
 export const ProfileCompletionCard = memo(
   function ProfileCompletionCard(): React.ReactElement | null {
     const { selectedProfile, profileCompletion } = useDashboardData();
-    const [dismissed, setDismissed] = useState(false);
+    // null until localStorage is read after mount. A live profile can be
+    // dismissed, so it renders nothing until then; starting at false showed
+    // the card for a frame on every page load after a dismissal.
+    const [dismissed, setDismissed] = useState<boolean | null>(null);
 
     const completionPercentage = profileCompletion?.percentage ?? 0;
     const completionSteps = profileCompletion?.steps ?? [];
@@ -41,6 +44,7 @@ export const ProfileCompletionCard = memo(
       try {
         setDismissed(localStorage.getItem(storageKey) === '1');
       } catch {
+        setDismissed(false);
         captureWarning('[ProfileCompletionCard] Failed to read localStorage');
       }
     }, [storageKey]);
@@ -67,7 +71,7 @@ export const ProfileCompletionCard = memo(
     }
 
     // Only allow dismissal if profile is live (has essentials)
-    if (dismissed && profileIsLive) {
+    if (profileIsLive && dismissed !== false) {
       return null;
     }
 
@@ -82,75 +86,77 @@ export const ProfileCompletionCard = memo(
       : 'Complete these essentials so fans can find you.';
 
     return (
-      <ContentSurfaceCard className='mb-2 border-subtle p-3.5 sm:mb-3 sm:p-4'>
-        <div className='flex items-start justify-between gap-3'>
-          <div className='min-w-0 flex-1 space-y-2'>
-            <div className='flex items-center gap-1.5 text-2xs font-caption tracking-tight text-tertiary-token'>
-              {profileIsLive ? (
-                <Sparkles className='h-3 w-3' aria-hidden='true' />
-              ) : (
-                <AlertCircle className='h-3 w-3' aria-hidden='true' />
-              )}
-              {sectionLabel}
-            </div>
-            <div className='space-y-0.5'>
-              <p className='text-app font-semibold text-primary-token'>
-                {heading}
-              </p>
-              <p className='text-app text-secondary-token'>{subtext}</p>
+      <ContentSurfaceCard className='mb-2 sm:mb-3'>
+        <div className='p-3.5 sm:p-4'>
+          <div className='flex items-start justify-between gap-3'>
+            <div className='min-w-0 flex-1 space-y-2'>
+              <div className='flex items-center gap-1.5 text-2xs font-caption tracking-tight text-tertiary-token'>
+                {profileIsLive ? (
+                  <Sparkles className='h-3 w-3' aria-hidden='true' />
+                ) : (
+                  <AlertCircle className='h-3 w-3' aria-hidden='true' />
+                )}
+                {sectionLabel}
+              </div>
+              <div className='space-y-0.5'>
+                <p className='text-app font-semibold text-primary-token'>
+                  {heading}
+                </p>
+                <p className='text-app text-secondary-token'>{subtext}</p>
+              </div>
+
+              <div
+                className='h-1.5 w-full overflow-hidden rounded-full bg-surface-0'
+                role='progressbar'
+                aria-valuenow={completionPercentage}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label='Profile Completion'
+              >
+                <motion.div
+                  className='h-full rounded-full bg-accent'
+                  initial={{ width: 0 }}
+                  animate={{ width: `${completionPercentage}%` }}
+                  transition={SPRING}
+                />
+              </div>
+
+              <ul className='space-y-1.5'>
+                {primarySteps.map(step => (
+                  <li key={step.id}>
+                    <Link
+                      href={step.href}
+                      className='group flex items-center justify-between gap-3 rounded-md border border-transparent px-3 py-2 transition-[background-color,border-color] duration-subtle hover:border-subtle hover:bg-surface-0'
+                    >
+                      <div className='min-w-0'>
+                        <p className='text-app font-caption text-primary-token'>
+                          {step.label}
+                        </p>
+                        <p className='truncate text-app text-secondary-token'>
+                          {step.description}
+                        </p>
+                      </div>
+                      <ArrowRight
+                        className='h-4 w-4 shrink-0 text-tertiary-token transition-colors group-hover:text-secondary-token'
+                        aria-hidden='true'
+                      />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </div>
 
-            <div
-              className='h-1.5 w-full overflow-hidden rounded-full bg-surface-0'
-              role='progressbar'
-              aria-valuenow={completionPercentage}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label='Profile Completion'
-            >
-              <motion.div
-                className='h-full rounded-full bg-accent'
-                initial={{ width: 0 }}
-                animate={{ width: `${completionPercentage}%` }}
-                transition={SPRING}
-              />
-            </div>
-
-            <ul className='space-y-1.5'>
-              {primarySteps.map(step => (
-                <li key={step.id}>
-                  <Link
-                    href={step.href}
-                    className='group flex items-center justify-between gap-3 rounded-md border border-transparent px-3 py-2 transition-[background-color,border-color] duration-subtle hover:border-subtle hover:bg-surface-0'
-                  >
-                    <div className='min-w-0'>
-                      <p className='text-app font-caption text-primary-token'>
-                        {step.label}
-                      </p>
-                      <p className='truncate text-app text-secondary-token'>
-                        {step.description}
-                      </p>
-                    </div>
-                    <ArrowRight
-                      className='h-4 w-4 shrink-0 text-tertiary-token transition-colors group-hover:text-secondary-token'
-                      aria-hidden='true'
-                    />
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            {profileIsLive && (
+              <button
+                type='button'
+                onClick={handleDismiss}
+                aria-label='Dismiss Profile Completion Card'
+                className='shrink-0 rounded-lg border border-subtle p-1.5 text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-1 focus-visible:ring-ring'
+              >
+                <X className='h-4 w-4' aria-hidden='true' />
+              </button>
+            )}
           </div>
-
-          {profileIsLive && (
-            <button
-              type='button'
-              onClick={handleDismiss}
-              aria-label='Dismiss Profile Completion Card'
-              className='shrink-0 rounded-lg border border-subtle p-1.5 text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-1 focus-visible:ring-ring'
-            >
-              <X className='h-4 w-4' aria-hidden='true' />
-            </button>
-          )}
         </div>
       </ContentSurfaceCard>
     );

@@ -1,4 +1,18 @@
 import type { Page } from '@playwright/test';
+import { inspectBlankMedia } from './route-dom-blank-media';
+import { inspectMarketingOutcomeDom } from './route-dom-outcome-dom';
+
+export {
+  BLANK_MEDIA_DOMINANT_SHARE_MIN,
+  BLANK_MEDIA_EMPTY_CELL_SHARE_MAX,
+  BLANK_MEDIA_LUMA_STDDEV_MAX,
+  inspectBlankMedia,
+} from './route-dom-blank-media';
+export {
+  installLayoutShiftObserver,
+  LAYOUT_SHIFT_BUDGET,
+  measureLayoutShift,
+} from './route-dom-layout-shift';
 
 // Invariant consumer: JOV-INV-019 product-page-shows-product and
 // one-hero-per-story, plus the public-profile extension in JOV-6915.
@@ -23,7 +37,32 @@ export type RouteDomFindingKind =
   | 'misaligned-text-stack'
   | 'placeholder-copy'
   | 'orphaned-line'
+  // Outcome detectors (2026-11-07 homepage miss): see OUTCOME_DETECTOR_MODES.
+  | 'blank-media'
+  | 'axis-mixing'
+  | 'overlay-on-proof'
   | 'layout-shift';
+
+/**
+ * Outcome detectors added after the 2026-11-07 homepage shipped a blank
+ * product image, placeholder profile copy, mixed text axes and a cookie banner
+ * over proof. `blocking` kinds fail on any finding (strict zero) on marketing
+ * routes. `calibrating` kinds are ratcheted through the taste baseline until
+ * scripts/invariants/marketing-critic/calibrate.mjs shows precision >= 0.9
+ * (Wilson lower bound) over enough labeled routes; promoting one is a one-line
+ * change here plus its calibration evidence. Never advisory.
+ */
+export const OUTCOME_DETECTOR_MODES: Readonly<
+  Record<
+    'blank-media' | 'placeholder-copy' | 'axis-mixing' | 'overlay-on-proof',
+    'blocking' | 'calibrating'
+  >
+> = {
+  'blank-media': 'calibrating',
+  'placeholder-copy': 'calibrating',
+  'axis-mixing': 'calibrating',
+  'overlay-on-proof': 'calibrating',
+};
 
 export const MARKETING_TASTE_FINDING_KINDS: readonly RouteDomFindingKind[] = [
   'nested-decorative-surface',
@@ -31,8 +70,10 @@ export const MARKETING_TASTE_FINDING_KINDS: readonly RouteDomFindingKind[] = [
   'heading-hierarchy-inversion',
   'clipped-heading',
   'misaligned-text-stack',
-  'placeholder-copy',
   'orphaned-line',
+  ...(Object.entries(OUTCOME_DETECTOR_MODES)
+    .filter(([, mode]) => mode === 'calibrating')
+    .map(([kind]) => kind) as RouteDomFindingKind[]),
 ];
 
 export interface RouteDomFinding {
@@ -652,20 +693,6 @@ export async function inspectRouteDom(
             measurements: { lines: lines.length },
           });
         }
-
-        // 6. Placeholder content presented as the product.
-        const placeholder = /^(?:your name|lorem ipsum\b.*|placeholder)$/i;
-        for (const element of Array.from(
-          root.querySelectorAll('h1,h2,h3,h4,p,span,li,figcaption')
-        )) {
-          if (element.children.length > 0 || !visibleIn(element)) continue;
-          if (!placeholder.test(normalizedText(element.textContent))) continue;
-          findings.push({
-            kind: 'placeholder-copy',
-            message: 'Placeholder copy renders as product content.',
-            elements: [describe(element)],
-          });
-        }
       }
 
       if (surface === 'public-profile') {
@@ -818,82 +845,16 @@ export async function inspectRouteDom(
     page.locator('body').ariaSnapshot(),
   ]);
 
+  const outcomeDom =
+    options.surface === 'marketing'
+      ? await inspectMarketingOutcomeDom(page)
+      : [];
+  const blankMedia =
+    options.surface === 'marketing' ? await inspectBlankMedia(page) : [];
   return {
     ...dom,
+    findings: [...dom.findings, ...outcomeDom, ...blankMedia],
     ariaSnapshot,
     inspectedAt: new Date().toISOString(),
-  };
-}
-
-/**
- * Layout stability (DESIGN.md "Layout Shift Prevention"): cumulative layout
- * shift from load through a full scroll must stay under Google's "good"
- * threshold. Install before navigation; measure after inspection.
- */
-export const LAYOUT_SHIFT_BUDGET = 0.1;
-
-export async function installLayoutShiftObserver(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    const state = {
-      value: 0,
-      observed: false,
-      sessionValue: 0,
-      sessionStart: 0,
-      lastShift: 0,
-    };
-    Object.defineProperty(window, '__jovieLayoutShift', { value: state });
-    new PerformanceObserver(list => {
-      for (const entry of list.getEntries() as Array<
-        PerformanceEntry & { value: number; hadRecentInput: boolean }
-      >) {
-        if (entry.hadRecentInput) continue;
-        // CLS uses the largest session window (1s gap, at most 5s), not an
-        // unbounded sum of unrelated shifts during a long scroll.
-        if (
-          entry.startTime - state.lastShift > 1000 ||
-          entry.startTime - state.sessionStart > 5000
-        ) {
-          state.sessionStart = entry.startTime;
-          state.sessionValue = 0;
-        }
-        state.lastShift = entry.startTime;
-        state.sessionValue += entry.value;
-        state.value = Math.max(state.value, state.sessionValue);
-      }
-    }).observe({ type: 'layout-shift', buffered: true });
-    state.observed =
-      PerformanceObserver.supportedEntryTypes.includes('layout-shift');
-  });
-}
-
-export async function measureLayoutShift(
-  page: Page
-): Promise<RouteDomFinding | null> {
-  await page.evaluate(async () => {
-    const step = Math.max(200, Math.floor(window.innerHeight * 0.8));
-    for (let y = 0; y < document.documentElement.scrollHeight; y += step) {
-      window.scrollTo(0, y);
-      await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
-    }
-    window.scrollTo(0, 0);
-  });
-  await page.waitForTimeout(250);
-  const cls = await page.evaluate(() => {
-    const state = (
-      window as unknown as {
-        __jovieLayoutShift?: { value: number; observed: boolean };
-      }
-    ).__jovieLayoutShift;
-    if (!state?.observed || !Number.isFinite(state.value) || state.value < 0) {
-      throw new Error('Layout-shift observation is unavailable');
-    }
-    return state.value;
-  });
-  if (cls <= LAYOUT_SHIFT_BUDGET) return null;
-  return {
-    kind: 'layout-shift',
-    message: `Cumulative layout shift ${cls.toFixed(3)} exceeds ${LAYOUT_SHIFT_BUDGET}.`,
-    elements: ['document'],
-    measurements: { cls: Math.round(cls * 1000) / 1000 },
   };
 }

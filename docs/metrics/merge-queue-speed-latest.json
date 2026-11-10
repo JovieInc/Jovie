@@ -1,106 +1,125 @@
 {
   "schema": "jovie-merge-queue-speed/v1",
-  "generatedAt": "2026-11-01T00:02:14.905Z",
+  "generatedAt": "2026-11-07T14:05:38.603Z",
   "windowHours": 24,
+  "collection": {
+    "status": "collected",
+    "collectionId": "42379175042/1",
+    "prRunsComplete": true,
+    "groupRunsComplete": true,
+    "mergedPrsComplete": true,
+    "jobsComplete": true,
+    "queueEventsComplete": false
+  },
+  "criticalPathBasis": "bounded deterministic sample of latest-attempt jobs",
+  "timingBasis": "latest-attempt-start-to-workflow-update",
+  "runnerMinutesBasis": "latest-attempt-jobs; null unless all completed runs and job pages covered",
   "prCiSeconds": {
-    "n": 671,
-    "p50": 573,
-    "p95": 1443
+    "n": 62,
+    "p50": 509,
+    "p95": 1058
   },
   "mergeGroupCiSeconds": {
-    "n": 134,
-    "p50": 798,
-    "p95": 1439
+    "n": 20,
+    "p50": 496,
+    "p95": 613
   },
   "groupOutcomes": {
     "2h": {
-      "success": 11,
-      "failure": 10,
-      "cancelled": 16,
+      "success": 3,
+      "failure": 0,
+      "cancelled": 0,
       "other": 0,
-      "successRate": 0.524,
-      "successRateInclCancelled": 0.297
+      "successRate": 1,
+      "successRateInclCancelled": 1
     },
     "6h": {
-      "success": 54,
-      "failure": 32,
-      "cancelled": 47,
+      "success": 5,
+      "failure": 0,
+      "cancelled": 0,
       "other": 0,
-      "successRate": 0.628,
-      "successRateInclCancelled": 0.406
+      "successRate": 1,
+      "successRateInclCancelled": 1
     },
     "24h": {
-      "success": 134,
-      "failure": 194,
-      "cancelled": 263,
+      "success": 20,
+      "failure": 5,
+      "cancelled": 0,
       "other": 0,
-      "successRate": 0.409,
-      "successRateInclCancelled": 0.227
+      "successRate": 0.8,
+      "successRateInclCancelled": 0.8
     }
   },
-  "groupSuccessRate": 0.409,
-  "mergesPerHour": 4.08,
-  "merges": 98,
+  "groupSuccessRate": 0.8,
+  "mergesPerHour": 0.79,
+  "merges": 19,
   "queueWaitSeconds": {
-    "n": 96,
-    "p50": 3638,
-    "p95": 18624
+    "n": 19,
+    "p50": null,
+    "p95": null
   },
   "criticalPath": [
     {
-      "name": "iOS Fast Unit + Coverage (combined) / Fast Unit + Coverage",
-      "n": 1,
-      "p50": 702,
-      "p95": 702,
+      "name": "ci-fast (remaining)",
+      "n": 20,
+      "p50": 340,
+      "p95": 467,
       "lastShare": 0
     },
     {
-      "name": "ci-fast (remaining)",
-      "n": 16,
-      "p50": 515,
-      "p95": 620,
+      "name": "ci-fast (structural lanes)",
+      "n": 20,
+      "p50": 293,
+      "p95": 392,
+      "lastShare": 0
+    },
+    {
+      "name": "Storybook Surface Matrix (combined) (2)",
+      "n": 15,
+      "p50": 263,
+      "p95": 530,
       "lastShare": 0
     },
     {
       "name": "Storybook Surface Matrix (combined) (1)",
-      "n": 14,
-      "p50": 305,
-      "p95": 575,
-      "lastShare": 0.08
-    },
-    {
-      "name": "Storybook Surface Matrix (combined) (2)",
-      "n": 14,
-      "p50": 300,
-      "p95": 578,
-      "lastShare": 0.04
-    },
-    {
-      "name": "Mac Build + Test (combined) / Build + Test",
-      "n": 1,
-      "p50": 271,
-      "p95": 271,
+      "n": 15,
+      "p50": 236,
+      "p95": 527,
       "lastShare": 0
     },
     {
-      "name": "Lighthouse (dashboard gate)",
-      "n": 13,
-      "p50": 257,
-      "p95": 289,
-      "lastShare": 0.13
+      "name": "Storybook Surface Matrix (combined) (3)",
+      "n": 15,
+      "p50": 226,
+      "p95": 508,
+      "lastShare": 0
+    },
+    {
+      "name": "Unit Tests (9/14)",
+      "n": 15,
+      "p50": 215,
+      "p95": 231,
+      "lastShare": 0
+    },
+    {
+      "name": "Merge Suite Scope / full_web_units",
+      "n": 20,
+      "p50": 4,
+      "p95": 4,
+      "lastShare": 1
     }
   ],
-  "mergeGroupRunnerMinutesPerMerge": 398.9,
+  "mergeGroupRunnerMinutesPerMerge": 95.4,
   "sampled": {
-    "prRuns": 1000,
-    "groupRuns": 601,
-    "groupRunsWithJobs": 119,
-    "mergedPrs": 98
+    "prRuns": 99,
+    "groupRuns": 25,
+    "groupRunsWithJobs": 25,
+    "mergedPrs": 19
   },
   "batchSizeGate": {
     "target": 0.85,
-    "success2h": 0.524,
-    "eligible": false
+    "success2h": 1,
+    "eligible": true
   },
   "repo": "JovieInc/Jovie"
 }

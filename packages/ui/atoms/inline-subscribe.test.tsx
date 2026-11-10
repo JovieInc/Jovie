@@ -61,6 +61,32 @@ describe('InlineSubscribe', () => {
       'true'
     );
   });
+
+  it('keeps the email field and button focusable while pending', () => {
+    function Pending({ pending }: { pending: boolean }) {
+      return (
+        <InlineSubscribe
+          ariaLabel='Email address'
+          buttonLabel='Join'
+          value='fan@example.com'
+          onValueChange={() => undefined}
+          loading={pending}
+          pending={pending}
+        />
+      );
+    }
+    const { rerender } = render(<Pending pending={false} />);
+    const field = screen.getByLabelText('Email address');
+    field.focus();
+    rerender(<Pending pending />);
+    expect(field).not.toBeDisabled();
+    expect(field).toHaveAttribute('readonly');
+    expect(field).toHaveAttribute('aria-busy', 'true');
+    expect(field).toHaveValue('fan@example.com');
+    expect(field).toHaveFocus();
+    expect(screen.getByRole('button')).not.toBeDisabled();
+    expect(screen.getByRole('button')).toHaveAttribute('aria-busy', 'true');
+  });
 });
 
 function ControlledParent({ tick }: { readonly tick: number }) {
@@ -113,7 +139,8 @@ describe('InlineSubscribe states', () => {
         pending
       />
     );
-    expect(screen.getByLabelText('Email address')).toBeDisabled();
+    expect(screen.getByLabelText('Email address')).not.toBeDisabled();
+    expect(screen.getByLabelText('Email address')).toHaveAttribute('readonly');
     expect(screen.getByLabelText('Email address')).toHaveValue(
       'fan@example.com'
     );

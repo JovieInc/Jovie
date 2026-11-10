@@ -1,0 +1,4 @@
+{
+  "$comment": "Shrink-only floor for all-caps UI styling (uppercase utility, text-transform: uppercase, textTransform 'uppercase') in apps/web app/components/styles (ASR-022; Tim 2026-11-08 \"caps lock should be banned\"). Lower this when you remove one; never raise it. 145→142 at creation after the onboarding draft profile dropped its eyebrow and the Preview and Live badges dropped uppercase.",
+  "count": 142
+}

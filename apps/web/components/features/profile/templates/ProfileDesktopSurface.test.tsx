@@ -2,9 +2,13 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES,
+  HOMEPAGE_PROFILE_PREVIEW_RELEASES,
+} from '@/components/features/home/homepage-profile-preview-fixture';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PublicContact } from '@/types/contacts';
-import type { Artist } from '@/types/db';
+import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import {
   PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME,
@@ -1112,5 +1116,93 @@ describe('ProfileDesktopSurface', () => {
     );
 
     expect(screen.queryByTestId('profile-jovie-branding')).toBeNull();
+  });
+
+  it('locks the canonical D9kdx home grid (JOV-11623)', () => {
+    const onDrawerViewChange = vi.fn();
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[
+          {
+            id: 'venmo-1',
+            platform: 'venmo',
+            url: 'https://venmo.com/timwhite',
+          } as LegacySocialLink,
+        ]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={onDrawerViewChange}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        showPayButton
+        releases={[...HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES]}
+        latestRelease={HOMEPAGE_PROFILE_PREVIEW_RELEASES.live}
+      />
+    );
+
+    // The surface reports its mode the same way the compact surface does.
+    expect(screen.getByTestId('profile-desktop-surface')).toHaveAttribute(
+      'data-mode',
+      'profile'
+    );
+
+    // D9kdx grid: cover left, Selected work above Events center, the
+    // Get-updates/Payments rail right at >=1180px.
+    const overview = screen.getByTestId('profile-desktop-home-overview');
+    expect(overview).toHaveClass(
+      '[@media(min-width:1180px)]:grid-cols-[minmax(420px,520px)_minmax(0,1fr)_320px]'
+    );
+    expect(screen.getByTestId('profile-desktop-side-rail')).toHaveClass(
+      '[@media(min-width:1180px)]:col-start-3'
+    );
+
+    const secondary = screen.getByTestId('profile-desktop-secondary-grid');
+    const selectedWork = within(secondary).getByText('Selected work');
+    const events = within(secondary).getByText('Events');
+    expect(
+      selectedWork.compareDocumentPosition(events) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      within(secondary).getByRole('button', { name: 'View all' })
+    ).toBeInTheDocument();
+
+    // D9kdx "Card / Payments" on the rail when a pay destination exists.
+    expect(screen.getByTestId('profile-desktop-payments-card')).toBeVisible();
+    expect(screen.getByText('Pay Tim White directly.')).toBeVisible();
+    screen.getByTestId('profile-desktop-open-payments').click();
+    expect(onDrawerViewChange).toHaveBeenCalledWith('pay');
+  });
+
+  it('omits the D9kdx Payments card when no pay destination exists', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        showPayButton
+      />
+    );
+
+    expect(
+      screen.queryByTestId('profile-desktop-payments-card')
+    ).not.toBeInTheDocument();
   });
 });

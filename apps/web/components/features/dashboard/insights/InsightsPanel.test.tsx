@@ -1,6 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { useInsightsQueryMock, useGenerateInsightsMutationMock, generateMock } =
@@ -16,6 +17,7 @@ vi.mock('@/lib/queries', () => ({
   useUpdateInsightMutation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+import { FetchDeadlineError } from '@/lib/queries/fetch';
 import { InsightsPanel, InsightsPanelView } from './InsightsPanel';
 
 describe('InsightsPanelView', () => {
@@ -48,7 +50,7 @@ describe('InsightsPanelView', () => {
     const tablist = screen.getByRole('tablist', {
       name: 'Filter Insights By Category',
     });
-    expect(tablist).toHaveClass('flex-wrap', 'gap-1.5');
+    expect(tablist).toHaveClass('flex-wrap');
 
     const tabs = screen.getAllByRole('tab');
     expect(tabs).toHaveLength(9);
@@ -179,7 +181,274 @@ describe('InsightsPanelView', () => {
       limit: 50,
     });
 
-    await user.click(screen.getByRole('button', { name: 'Generate Insights' }));
+    // An empty category offers Show All; the toolbar still generates.
+    expect(screen.getByRole('button', { name: 'Show All' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Generate insights' }));
     expect(generateMock).toHaveBeenCalledOnce();
+  });
+
+  it('clears a failed press once the list loads again after it', () => {
+    const reset = vi.fn();
+    useGenerateInsightsMutationMock.mockReturnValue({
+      mutate: generateMock,
+      isPending: false,
+      isError: true,
+      error: new FetchDeadlineError('Request timed out'),
+      submittedAt: 1_000,
+      reset,
+    });
+    const query = {
+      data: { insights: [] },
+      dataUpdatedAt: 500,
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    useInsightsQueryMock.mockReturnValue(query);
+
+    const { rerender } = render(
+      <TooltipProvider>
+        <InsightsPanel />
+      </TooltipProvider>
+    );
+    expect(screen.getByText('Insights Are Still Generating')).toBeVisible();
+    expect(reset).not.toHaveBeenCalled();
+
+    // Check Again (or any refetch) lands after the failed press.
+    useInsightsQueryMock.mockReturnValue({ ...query, dataUpdatedAt: 2_000 });
+    rerender(
+      <TooltipProvider>
+        <InsightsPanel />
+      </TooltipProvider>
+    );
+    expect(reset).toHaveBeenCalledOnce();
+  });
+
+  it('names the click threshold up front instead of vague AI copy', () => {
+    render(
+      <TooltipProvider>
+        <InsightsPanelView
+          insights={[]}
+          isLoading={false}
+          error={null}
+          selectedCategory='all'
+          onCategoryChange={vi.fn()}
+          onGenerate={vi.fn()}
+          onRetry={vi.fn()}
+          isGenerating={false}
+        />
+      </TooltipProvider>
+    );
+
+    const empty = screen.getByTestId('insights-empty-state');
+    expect(empty).toHaveTextContent('at least 20 link clicks');
+    expect(empty).not.toHaveTextContent(/AI-powered|actionable trends/i);
+    expect(
+      screen.getByRole('link', { name: 'Share Your Profile' })
+    ).toHaveAttribute('href', '/app/chat?panel=profile');
+  });
+
+  it('explains a generate run that came back short of data, with the real count', () => {
+    const onGenerate = vi.fn();
+    render(
+      <TooltipProvider>
+        <InsightsPanelView
+          insights={[]}
+          isLoading={false}
+          error={null}
+          selectedCategory='all'
+          onCategoryChange={vi.fn()}
+          onGenerate={onGenerate}
+          onRetry={vi.fn()}
+          isGenerating={false}
+          lastRun={{ insightsGenerated: 0, dataPointsAnalyzed: 6 }}
+        />
+      </TooltipProvider>
+    );
+
+    expect(screen.getByText('Not Enough Activity Yet')).toBeVisible();
+    expect(screen.getByTestId('insights-empty-state')).toHaveTextContent(
+      'your profile has 6 link clicks so far'
+    );
+    // The one next step is sharing, not pressing Generate again.
+    expect(
+      screen.getByRole('link', { name: 'Share Your Profile' })
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Generate Insights' })
+    ).toBeNull();
+  });
+
+  it('offers a retry when generation failed', async () => {
+    const user = userEvent.setup();
+    const onGenerate = vi.fn();
+    render(
+      <TooltipProvider>
+        <InsightsPanelView
+          insights={[]}
+          isLoading={false}
+          error={null}
+          selectedCategory='all'
+          onCategoryChange={vi.fn()}
+          onGenerate={onGenerate}
+          onRetry={vi.fn()}
+          isGenerating={false}
+          generateFailed
+        />
+      </TooltipProvider>
+    );
+
+    expect(screen.getByText('Insights Did Not Generate')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Try Again' }));
+    expect(onGenerate).toHaveBeenCalledOnce();
+  });
+
+  function renderView(
+    props: Partial<React.ComponentProps<typeof InsightsPanelView>> = {}
+  ) {
+    const handlers = {
+      onGenerate: vi.fn(),
+      onCategoryChange: vi.fn(),
+    };
+    render(
+      <TooltipProvider>
+        <InsightsPanelView
+          insights={[]}
+          isLoading={false}
+          error={null}
+          selectedCategory='all'
+          onRetry={vi.fn()}
+          isGenerating={false}
+          {...handlers}
+          {...props}
+        />
+      </TooltipProvider>
+    );
+    return handlers;
+  }
+
+  it('after a run that found nothing, offers no Generate press the cooldown would refuse', () => {
+    renderView({ lastRun: { insightsGenerated: 0, dataPointsAnalyzed: 1240 } });
+    expect(screen.getByText('Nothing New To Report')).toBeVisible();
+    expect(screen.getByTestId('insights-empty-state')).toHaveTextContent(
+      'can run again in an hour'
+    );
+    expect(
+      screen.queryByRole('button', { name: /^Generate (Again|Insights)$/ })
+    ).toBeNull();
+    expect(
+      screen.getByRole('link', { name: 'Share Your Profile' })
+    ).toBeVisible();
+  });
+
+  it('a timeout reads as still working and only refetches the list', async () => {
+    const user = userEvent.setup();
+    const onRetry = vi.fn();
+    const { onGenerate } = renderView({
+      onRetry,
+      generateFailed: true,
+      generateFailure: { status: 408, kind: 'deadline' },
+    });
+    expect(screen.getByText('Insights Are Still Generating')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Try Again' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Check Again' }));
+    expect(onRetry).toHaveBeenCalledOnce();
+    expect(onGenerate).not.toHaveBeenCalled();
+  });
+
+  it('a 429 says the cooldown and offers no immediate retry', () => {
+    renderView({
+      generateFailed: true,
+      generateFailure: { status: 429, nextAllowedAt: null },
+    });
+    expect(screen.getByText('Insights Are Cooling Down')).toBeVisible();
+    expect(screen.getByTestId('insights-empty-state')).toHaveTextContent(
+      'Try again later.'
+    );
+    expect(screen.queryByRole('button', { name: 'Try Again' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Generate Insights' })
+    ).toBeNull();
+  });
+
+  it('a 403 names the plan and links to billing, not a retry', () => {
+    renderView({
+      generateFailed: true,
+      generateFailure: { status: 403 },
+    });
+    expect(screen.getByText(/^Insights Need /)).toBeVisible();
+    expect(screen.getByRole('link', { name: 'See Plans' })).toHaveAttribute(
+      'href',
+      '/app/settings/billing'
+    );
+    expect(screen.queryByRole('button', { name: 'Try Again' })).toBeNull();
+  });
+
+  it('any other failure keeps the generic retry', async () => {
+    const user = userEvent.setup();
+    const { onGenerate } = renderView({
+      generateFailed: true,
+      generateFailure: { status: 500 },
+    });
+    expect(screen.getByText('Insights Did Not Generate')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Try Again' }));
+    expect(onGenerate).toHaveBeenCalledOnce();
+  });
+
+  it('an empty category speaks to that filter and offers Show All', async () => {
+    const user = userEvent.setup();
+    const { onCategoryChange } = renderView({
+      selectedCategory: 'tour',
+      lastRun: { insightsGenerated: 0, dataPointsAnalyzed: 6 },
+    });
+    expect(screen.getByText('No Tour Insights Yet')).toBeVisible();
+    expect(screen.queryByText('Not Enough Activity Yet')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Show All' }));
+    expect(onCategoryChange).toHaveBeenCalledWith('all');
+  });
+
+  it('loads in the same rows as a loaded insight card, under the same filters', () => {
+    const { container } = render(
+      <TooltipProvider>
+        <InsightsPanelView
+          insights={[]}
+          isLoading
+          error={null}
+          selectedCategory='all'
+          onCategoryChange={vi.fn()}
+          onGenerate={vi.fn()}
+          onRetry={vi.fn()}
+          isGenerating={false}
+        />
+      </TooltipProvider>
+    );
+
+    expect(screen.getAllByRole('tab')).toHaveLength(9);
+    const rows = screen.getByTestId('insights-loading-rows');
+    const firstRow = rows.querySelector('.border-b');
+    expect(firstRow).toHaveClass('px-1', 'py-3.5');
+    expect(rows.querySelector('.h-7.w-7')).not.toBeNull();
+    expect(container.querySelector('.p-4')).toBeNull();
+    expect(screen.queryByTestId('insights-empty-state')).toBeNull();
+  });
+
+  it('uses the typographic ellipsis while generating', () => {
+    render(
+      <TooltipProvider>
+        <InsightsPanelView
+          insights={[]}
+          isLoading={false}
+          error={null}
+          selectedCategory='all'
+          onCategoryChange={vi.fn()}
+          onGenerate={vi.fn()}
+          onRetry={vi.fn()}
+          isGenerating
+        />
+      </TooltipProvider>
+    );
+
+    expect(screen.getByRole('button', { name: 'Generating…' })).toBeDisabled();
+    expect(document.body.textContent).not.toContain('...');
   });
 });

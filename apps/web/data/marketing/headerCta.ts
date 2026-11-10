@@ -1,4 +1,4 @@
-import { HOMEPAGE_INVITE_ANCHOR } from '@/data/homepageEditorialCopy';
+import { HOMEPAGE_INVITE_ANCHOR } from '@/data/homepageInviteAnchor';
 
 /**
  * Homepage header CTA. A plain data module so the server-rendered (home)

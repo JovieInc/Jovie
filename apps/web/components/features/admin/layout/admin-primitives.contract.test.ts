@@ -24,7 +24,6 @@ const REPORT_TABLES = [
   'app/app/(shell)/admin/shipping/ShippingMatrix.tsx',
   'app/app/(shell)/admin/shipping/ShippingStatistics.tsx',
   'components/features/admin/ShippingVelocityCanvas.tsx',
-  'components/features/admin/hud/FounderFunnelDrilldown.tsx',
 ];
 const OWNERS: Record<string, readonly string[]> = {
   EntitySidebarShell: ['components/features/admin/layout/AdminDetailRail.tsx'],

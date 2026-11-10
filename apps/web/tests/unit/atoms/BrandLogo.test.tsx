@@ -41,14 +41,14 @@ describe('BrandLogo', () => {
     const { container } = render(<BrandLogo tone='auto' />);
     const wrapper = container.querySelector('span');
     expect(wrapper).not.toHaveStyle({ color: 'var(--color-accent)' });
-    expect(wrapper).not.toHaveClass('text-white');
+    expect(wrapper).not.toHaveClass('text-on-media');
     expect(wrapper).not.toHaveClass('text-accent');
   });
 
   it('renders white tone with token-backed class on wrapper', () => {
     const { container } = render(<BrandLogo tone='white' />);
     const wrapper = container.querySelector('span');
-    expect(wrapper).toHaveClass('text-white');
+    expect(wrapper).toHaveClass('text-on-media');
   });
 
   it('renders color tone with accent token class on wrapper', () => {

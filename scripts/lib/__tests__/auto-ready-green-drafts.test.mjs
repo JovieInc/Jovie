@@ -64,6 +64,7 @@ function greenChecks(overrides = []) {
     { name: 'Migration Guard', bucket: 'pass', state: 'SUCCESS' },
     { name: 'Fork PR Gate', bucket: 'pass', state: 'SUCCESS' },
     { name: 'PR Size Guard', bucket: 'pass', state: 'SUCCESS' },
+    { name: 'Company guards', bucket: 'pass', state: 'SUCCESS' },
     ...overrides,
   ];
 }
@@ -461,15 +462,16 @@ describe('green-source shell controller (fake gh)', () => {
     checks: greenChecks(),
   });
 
+  const ready = {
+    TARGET_PR: '20874',
+    TARGET_HEAD: head,
+    MISSED_COHORT: '0',
+    DRY_RUN: '0',
+  };
   it('an active author without proof stays draft despite successful checks', () => {
     const result = runController(
       [listed({ body: 'Final qualification pending' })],
-      {
-        TARGET_PR: '20874',
-        TARGET_HEAD: head,
-        MISSED_COHORT: '0',
-        DRY_RUN: '0',
-      }
+      ready
     );
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('writer-proof-proof-missing');
@@ -492,20 +494,21 @@ describe('green-source shell controller (fake gh)', () => {
     expect(result.calls.some(call => call.startsWith('pr ready'))).toBe(false);
   });
 
-  it('a writer-qualified exact current head reaches verified ready without queue writes', () => {
-    const result = runController([listed()], {
-      TARGET_PR: '20874',
-      TARGET_HEAD: head,
-      MISSED_COHORT: '0',
-      DRY_RUN: '0',
-    });
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('marked #20874 ready');
-    expect(
-      result.calls.filter(call => call.startsWith('pr ready'))
-    ).toHaveLength(1);
-    expect(result.calls.some(call => /enqueue|merge/.test(call))).toBe(false);
-  });
+  it.each([
+    ['a writer-qualified', {}],
+    ['an on-green opted-in', { body: '<!-- jovie-auto-ready: on-green -->' }],
+  ])(
+    '%s exact current head reaches verified ready without queue writes',
+    (_n, patch) => {
+      const result = runController([listed(patch)], ready);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('marked #20874 ready');
+      expect(
+        result.calls.filter(call => call.startsWith('pr ready'))
+      ).toHaveLength(1);
+      expect(result.calls.some(call => /enqueue|merge/.test(call))).toBe(false);
+    }
+  );
 
   const botProof = writerBody(20874, head, 'jovie-bot[bot]');
   const botTarget = {
@@ -753,7 +756,6 @@ describe('green-source shell controller (fake gh)', () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('missed candidate #2');
     expect(result.stdout).not.toContain('#1 ');
-    // pr list + (state, checks) twice before the (dry-run) mutation.
-    expect(result.calls.length).toBeLessThanOrEqual(5);
+    expect(result.calls.length).toBeLessThanOrEqual(5); // pr list + (state, checks) x2
   });
 });
