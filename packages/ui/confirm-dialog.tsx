@@ -127,7 +127,7 @@ export function ConfirmDialog({
         </DialogHeader>
         {children}
         {errorMessage ? (
-          <p id={errorId} className='text-sm text-error' role='alert'>
+          <p id={errorId} className='text-sm text-error-text' role='alert'>
             {errorMessage}
           </p>
         ) : null}

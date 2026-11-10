@@ -9,7 +9,6 @@ import {
 import { expectNoDocumentOverflow } from './utils/mobile-overflow';
 import { observeProfileAdmissionFailure } from './utils/profile-admission-diagnostics.mjs';
 import {
-  expectCenteredPhoneColumn,
   expectDesktopSurfaceBuildMatches,
   expectedPublicProfileLayout,
   PROFILE_DESKTOP_SURFACE_SHIPPED,
@@ -22,9 +21,7 @@ import {
 } from './utils/public-surface-helpers';
 
 const DESKTOP_SURFACE_ONLY =
-  'Exercises the flagged wide desktop surface; set NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE=1 for the build and runner';
-const PHONE_COLUMN_ONLY =
-  'Exercises the default mobile-first desktop column; the build ships the desktop surface';
+  'Exercises the canonical desktop surface (default build); opt-out builds (NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE=0/false/empty) skip it';
 
 const diagnostics = new WeakMap<object, () => Promise<void>>();
 
@@ -169,14 +166,16 @@ test.describe('public profile browser admission', () => {
     expect(response?.status()).toBe(200);
     await waitForSettledProfileLayout(page, 'compact');
 
+    const compactShell = page.getByTestId('profile-compact-shell');
     const assertClaimIntent = async (mode: string) => {
-      await expect(page.getByTestId('claim-banner-copy')).toContainText(
+      // Scoped: the armed desktop shell's no-morph paint also renders the
+      // banner, so page-level locators resolve duplicates.
+      await expect(compactShell.getByTestId('claim-banner-copy')).toContainText(
         'Your profile is ready. Claim it to turn on release emails.'
       );
-      await expect(page.getByTestId('claim-banner-cta')).toHaveAttribute(
-        'href',
-        '/unfazed/claim?next=auth'
-      );
+      await expect(
+        compactShell.getByTestId('claim-banner-cta')
+      ).toHaveAttribute('href', '/unfazed/claim?next=auth');
       await expect(page).toHaveURL(
         url =>
           url.pathname === '/unfazed' &&
@@ -191,7 +190,11 @@ test.describe('public profile browser admission', () => {
     };
     await assertClaimIntent('profile');
 
-    const menu = page.getByRole('button', { name: 'Menu', exact: true });
+    const compactSurface = page.getByTestId('profile-compact-surface');
+    const menu = compactSurface.getByRole('button', {
+      name: 'Menu',
+      exact: true,
+    });
     await menu.click();
     await expect(page.getByTestId('profile-menu-drawer')).toBeVisible();
     await page.keyboard.press('Escape');
@@ -205,6 +208,56 @@ test.describe('public profile browser admission', () => {
     await nav.getByRole('button', { name: 'Home', exact: true }).click();
     await assertClaimIntent('profile');
     await captureStill(page, testInfo, 'direct-claim-intent-preserved.png');
+  });
+
+  test('keeps direct claim intent on the desktop surface', async ({
+    page,
+  }, testInfo) => {
+    await installPublicRouteMocks(page);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const response = await page.goto(
+      '/renders/profile-admission?layout=public&state=unclaimed-direct&claim=1&source=qr',
+      { waitUntil: 'domcontentloaded' }
+    );
+    expect(response?.status()).toBe(200);
+    await waitForSettledProfileLayout(page, 'desktop');
+
+    // The desktop banner (canonical chrome) carries the same claim intent.
+    const banner = page.getByTestId('profile-desktop-banner');
+    await expect(banner).toBeVisible();
+    const assertClaimIntent = async (mode: string) => {
+      await expect(banner.getByTestId('claim-banner-copy')).toContainText(
+        'Your profile is ready. Claim it to turn on release emails.'
+      );
+      await expect(banner.getByTestId('claim-banner-cta')).toHaveAttribute(
+        'href',
+        '/unfazed/claim?next=auth'
+      );
+      await expect(page).toHaveURL(
+        url =>
+          url.pathname === '/unfazed' &&
+          url.searchParams.get('claim') === '1' &&
+          url.searchParams.get('source') === 'qr' &&
+          url.searchParams.get('mode') === (mode === 'profile' ? null : mode)
+      );
+      await expect(page.getByTestId('profile-desktop-surface')).toHaveAttribute(
+        'data-mode',
+        mode
+      );
+    };
+    await assertClaimIntent('profile');
+
+    const surface = page.getByTestId('profile-desktop-surface');
+    const nav = surface.getByRole('navigation', { name: 'Profile Navigation' });
+    await nav.getByRole('button', { name: 'Events', exact: true }).click();
+    await assertClaimIntent('tour');
+    await nav.getByRole('button', { name: 'Home', exact: true }).click();
+    await assertClaimIntent('profile');
+    await captureStill(
+      page,
+      testInfo,
+      'direct-claim-intent-preserved-desktop.png'
+    );
   });
 
   for (const viewport of [1179, 1180].map(width => ({
@@ -344,50 +397,84 @@ test.describe('public profile browser admission', () => {
     });
   });
 
-  test('1512px public route centers the mobile profile in a phone column', async ({
+  test('1440px desktop surface locks the canonical Pen frame D9kdx presentation', async ({
     page,
   }, testInfo) => {
-    test.skip(PROFILE_DESKTOP_SURFACE_SHIPPED, PHONE_COLUMN_ONLY);
+    // Founder steer, Nov 9 2026 (JOV-11623): the Nov 8 design-first manifest
+    // (docs/pen-stills/golden-path/manifest.json, frame D9kdx "Public profile
+    // / Desktop ≥1180 — CANONICAL") supersedes the 2026-09-26 phone-column
+    // lock — the desktop presentation is the shipped one.
     await installPublicRouteMocks(page);
-    await page.setViewportSize({ width: 1512, height: 932 });
+    await page.setViewportSize({ width: 1440, height: 900 });
     const response = await page.goto(
       '/renders/profile-admission?layout=public&state=unclaimed',
       { waitUntil: 'domcontentloaded' }
     );
     expect(response?.status()).toBe(200);
-    await waitForSettledProfileLayout(page, 'compact');
-    await waitForSettledProfile(page);
+    await waitForSettledProfileLayout(page, 'desktop');
     await expectDesktopSurfaceBuildMatches(page);
 
-    // The wide surface never mounts; the compact profile owns every width.
-    await expect(page.getByTestId('profile-desktop-shell')).toHaveCount(0);
-    await expect(page.getByTestId('profile-desktop-surface')).toHaveCount(0);
-    await expectCenteredPhoneColumn(page);
+    // D9kdx "Top chrome": pill navigation with the four primary tabs plus the
+    // more menu; the phone bottom nav never presents at desktop widths.
+    const chrome = page.getByTestId('profile-desktop-top-chrome');
+    await expect(chrome).toBeVisible();
+    const nav = chrome.getByRole('navigation', { name: 'Profile Navigation' });
+    for (const label of ['Home', 'Music', 'Events', 'About']) {
+      await expect(
+        nav.getByRole('button', { name: label, exact: true })
+      ).toBeVisible();
+    }
+    await expect(
+      chrome.getByRole('button', { name: 'Menu', exact: true })
+    ).toBeVisible();
+    await expect(page.getByTestId('profile-bottom-nav')).toHaveCount(0);
+
+    // D9kdx "Home overview grid": 4:5 cover left with the name header and
+    // Selected work above Events in the center column. The admission fixture
+    // ships fan capture off, so the Get-updates/Payments side rail is
+    // legitimately absent here (rail-enabled=false) — the rail's own
+    // contract is pinned by the desktop-surface unit test with capture on.
+    const surface = page.getByTestId('profile-desktop-surface');
+    await expect(surface).toHaveAttribute('data-mode', 'profile');
+    const overview = page.getByTestId('profile-desktop-home-overview');
+    await expect(overview).toBeVisible();
+    await expect(overview).toHaveAttribute('data-side-rail-enabled', 'false');
+    const cover = page.getByTestId('profile-desktop-cover');
+    await expect(cover.getByTestId('profile-header')).toBeVisible();
+    const secondary = page.getByTestId('profile-desktop-secondary-grid');
+    await expect(
+      secondary.getByText('Selected work', { exact: true })
+    ).toBeVisible();
+    await expect(
+      secondary.getByRole('button', { name: 'View all', exact: true })
+    ).toBeVisible();
+
+    const geometry = await overview.evaluate(element => {
+      const box = (testId: string) => {
+        const rect = (
+          element.querySelector(
+            `[data-testid="${testId}"]`
+          ) as HTMLElement | null
+        )?.getBoundingClientRect();
+        return rect ? { left: rect.left, width: rect.width } : null;
+      };
+      return {
+        cover: box('profile-desktop-cover'),
+        cards: box('profile-desktop-secondary-grid'),
+        rail: box('profile-desktop-side-rail'),
+      };
+    });
+    expect(geometry.cover, 'cover must render').not.toBeNull();
+    expect(geometry.cards, 'cards column must render').not.toBeNull();
+    expect(geometry.cover!.left).toBeLessThan(geometry.cards!.left);
+
+    // The compact shell is fully unmounted at desktop widths.
+    await expect(page.getByTestId('profile-compact-shell')).toHaveCount(0);
 
     const audit = await auditPublicProfileLayout(page);
     expect(audit.claimCtaLineCount).toBe(1);
     expect(audit.violations, JSON.stringify(audit, null, 2)).toEqual([]);
-
-    // Banner, dock, and drawers stay inside the column instead of stretching
-    // to the viewport.
-    const column = await page
-      .getByTestId('profile-compact-shell')
-      .boundingBox();
-    expect(column).not.toBeNull();
-    const within = async (testId: string) => {
-      const box = await page.getByTestId(testId).first().boundingBox();
-      expect(box, `${testId} must render`).not.toBeNull();
-      expect(box!.x, testId).toBeGreaterThanOrEqual(column!.x - 1);
-      expect(box!.x + box!.width, testId).toBeLessThanOrEqual(
-        column!.x + column!.width + 1
-      );
-    };
-    await within('profile-shell-banner');
-    await within('profile-tab-bar');
-    await page.getByRole('button', { name: 'Menu', exact: true }).click();
-    await expect(page.getByTestId('profile-menu-drawer')).toBeVisible();
-    await within('profile-menu-drawer');
-    await testInfo.attach('public-profile-phone-column-1512.png', {
+    await testInfo.attach('public-profile-d9kdx-1440.png', {
       body: await page.screenshot({ fullPage: false }),
       contentType: 'image/png',
     });
@@ -650,7 +737,16 @@ test.describe('public profile browser admission', () => {
 
       await expect(page).toHaveURL(/\/unfazed\?mode=tour$/);
       await expect(eventsButton).toHaveAttribute('aria-current', 'page');
-      const selected = page.getByTestId('profile-primary-tab-tour');
+      // Scoped to the owning surface: the armed desktop surface also renders
+      // a primary-tab panel inside the display:none no-morph shell at compact
+      // widths, so page-level locators resolve duplicates.
+      // The desktop surface carries the SAME testid on the pill-nav tab
+      // button and the panel; the panel is the section.
+      const selected = surface.locator(
+        layout === 'desktop'
+          ? 'section[data-testid="profile-primary-tab-tour"]'
+          : '[data-testid="profile-primary-tab-tour"]'
+      );
       await expect(selected).toBeVisible();
       if (layout === 'desktop') {
         await expect(
@@ -767,30 +863,31 @@ test.describe('public profile browser admission', () => {
     expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
   });
 
-  test('live resize across 1180 keeps one compact column without remounting', async ({
+  test('live resize across desktop widths keeps one desktop surface mounted', async ({
     page,
   }) => {
-    test.skip(PROFILE_DESKTOP_SURFACE_SHIPPED, PHONE_COLUMN_ONLY);
+    // Desktop counterpart of the retired phone-column no-remount guarantee:
+    // resizing within desktop widths never swaps or remounts the surface.
     await installPublicRouteMocks(page);
-    await page.setViewportSize({ width: 1179, height: 932 });
+    await page.setViewportSize({ width: 1180, height: 932 });
     await page.goto('/renders/profile-admission?layout=public', {
       waitUntil: 'domcontentloaded',
     });
-    await waitForSettledProfileLayout(page, 'compact');
+    await waitForSettledProfileLayout(page, 'desktop');
     await page
-      .getByTestId('profile-compact-shell')
+      .getByTestId('profile-desktop-shell')
       .evaluate(element => element.setAttribute('data-resize-probe', '1'));
 
-    await page.setViewportSize({ width: 1180, height: 932 });
-    await waitForSettledProfileLayout(page, 'compact');
-    await expectCenteredPhoneColumn(page);
+    await page.setViewportSize({ width: 1512, height: 932 });
+    await waitForSettledProfileLayout(page, 'desktop');
     expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
+    await expect(page.getByTestId('profile-desktop-surface')).toHaveCount(1);
 
-    await page.setViewportSize({ width: 1179, height: 932 });
-    await waitForSettledProfileLayout(page, 'compact');
+    await page.setViewportSize({ width: 1180, height: 932 });
+    await waitForSettledProfileLayout(page, 'desktop');
     expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
     // Same DOM node throughout: resizing never swaps surfaces.
-    await expect(page.getByTestId('profile-compact-shell')).toHaveAttribute(
+    await expect(page.getByTestId('profile-desktop-shell')).toHaveAttribute(
       'data-resize-probe',
       '1'
     );
@@ -825,15 +922,9 @@ test.describe('public profile browser admission', () => {
           0
         );
         await expect(page.getByText('Loading profile…')).toHaveCount(0);
-        if (expectedPublicProfileLayout(width) === 'compact' && width >= 1180) {
-          // Default build: the server paints the centered phone column and
-          // never ships the desktop surface markup.
-          await expect(page.getByTestId('profile-compact-shell')).toBeVisible();
-          await expect(page.getByTestId('profile-desktop-surface')).toHaveCount(
-            0
-          );
-          await expectCenteredPhoneColumn(page);
-        } else if (width >= 1180) {
+        if (width >= 1180) {
+          // Canonical desktop build (JOV-11623 steer): the server paints the
+          // desktop surface and it owns the viewport at >=1180px.
           await expect(
             page.getByTestId('profile-desktop-surface')
           ).toBeVisible();

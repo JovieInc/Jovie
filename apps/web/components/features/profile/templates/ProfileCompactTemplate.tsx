@@ -1143,7 +1143,7 @@ export function ProfileCompactTemplate({
         previewExitHref={profileHref}
         compactSurface={
           <div
-            className='public-profile-compact-shell relative flex h-full min-w-0 w-full flex-col overflow-hidden bg-(--profile-content-bg) md:mx-auto md:rounded-(--profile-shell-card-radius) md:border md:border-(--profile-panel-border) md:shadow-(--profile-panel-shadow)'
+            className='public-profile-compact-shell relative mx-auto flex h-full min-w-0 w-full flex-col overflow-hidden bg-(--profile-content-bg) md:rounded-(--profile-shell-card-radius) md:border md:border-(--profile-panel-border) md:shadow-(--profile-panel-shadow)'
             data-testid='profile-compact-shell'
             data-interactive-ready={isHydrated ? 'true' : undefined}
             data-alert-opt-in-variant={resolvedAlertOptInVariant}
@@ -1260,7 +1260,7 @@ export function ProfileCompactTemplate({
               data-sheet-container
             >
               <ProfileDesktopSurface
-                presentation='modal'
+                presentation='embedded'
                 overlaysEnabled={isDesktopLayout}
                 onReady={handleDesktopSurfaceReady}
                 artist={artist}
@@ -1311,7 +1311,7 @@ export function ProfileCompactTemplate({
                 open={creditsOpen && isDesktopLayout}
                 onOpenChange={setCreditsOpen}
                 credits={visibleReleaseCredits}
-                presentation='modal'
+                presentation='embedded'
               />
             </div>
           ) : null

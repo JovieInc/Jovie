@@ -482,7 +482,14 @@ export function ProfileDesktopSurface({
   const homeOverview = (
     <div
       className={cn(
-        'grid min-h-0 min-w-0 flex-1 gap-4 [@media(min-width:1180px)]:grid-cols-[minmax(420px,520px)_minmax(0,1fr)]'
+        'grid min-h-0 min-w-0 flex-1 gap-4',
+        // Canonical Pen frame D9kdx ("Public profile / Desktop ≥1180 —
+        // CANONICAL", docs/pen-stills/golden-path/manifest.json): the 4:5
+        // cover left, the Selected-work/Events column center, and a narrow
+        // 320px side rail right. Without the rail the grid is two columns.
+        canGetUpdates
+          ? '[@media(min-width:1180px)]:grid-cols-[minmax(420px,520px)_minmax(0,1fr)_320px]'
+          : '[@media(min-width:1180px)]:grid-cols-[minmax(420px,520px)_minmax(0,1fr)]'
       )}
       data-testid='profile-desktop-home-overview'
       data-side-rail-enabled={canGetUpdates ? 'true' : 'false'}
@@ -594,9 +601,61 @@ export function ProfileDesktopSurface({
         </section>
 
         <div
-          className='grid gap-3.5 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)] [@media(min-width:1180px)]:col-start-2 [@media(min-width:1180px)]:row-start-1 [@media(min-width:1180px)]:self-start'
+          className='grid min-h-0 min-w-0 content-start gap-3.5 [@media(min-width:1180px)]:col-start-2 [@media(min-width:1180px)]:row-start-1'
           data-testid='profile-desktop-secondary-grid'
         >
+          <DesktopSurfaceCard
+            title='Selected work'
+            actionLabel={
+              musicSurface.kind === 'catalog' ? 'View all' : undefined
+            }
+            onAction={
+              musicSurface.kind === 'catalog'
+                ? () => onModeSelect('listen')
+                : undefined
+            }
+          >
+            <div className='space-y-2'>
+              {visibleReleases.length > 0 ? (
+                visibleReleases.slice(0, 4).map(release => (
+                  <a
+                    key={release.id}
+                    href={
+                      release.slug
+                        ? `/${artist.handle}/${release.slug}`
+                        : undefined
+                    }
+                    className='flex items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-3 transition-colors duration-subtle hover:bg-white/[0.04]'
+                  >
+                    <div className='relative h-14 w-14 overflow-hidden rounded-xl'>
+                      <ImageWithFallback
+                        src={release.artworkUrl}
+                        alt={release.title}
+                        fill
+                        sizes='56px'
+                        className='object-cover'
+                        fallbackVariant='release'
+                      />
+                    </div>
+                    <div className='min-w-0'>
+                      <p className='truncate text-base font-medium tracking-[-0.03em] text-white dark:text-white'>
+                        {release.title}
+                      </p>
+                      <p className='truncate text-app text-white/44'>
+                        {formatReleaseMeta(
+                          release.releaseType,
+                          release.releaseDate
+                        )}
+                      </p>
+                    </div>
+                  </a>
+                ))
+              ) : (
+                <EmptySurfaceBlock>{emptyState.release}</EmptySurfaceBlock>
+              )}
+            </div>
+          </DesktopSurfaceCard>
+
           <DesktopSurfaceCard
             title='Events'
             actionLabel={hasEventsDestination ? 'View Events' : undefined}
@@ -647,58 +706,6 @@ export function ProfileDesktopSurface({
               )}
             </div>
           </DesktopSurfaceCard>
-
-          <DesktopSurfaceCard
-            title='All Releases'
-            actionLabel={
-              musicSurface.kind === 'catalog' ? 'View all releases' : undefined
-            }
-            onAction={
-              musicSurface.kind === 'catalog'
-                ? () => onModeSelect('listen')
-                : undefined
-            }
-          >
-            <div className='space-y-2'>
-              {visibleReleases.length > 0 ? (
-                visibleReleases.slice(0, 4).map(release => (
-                  <a
-                    key={release.id}
-                    href={
-                      release.slug
-                        ? `/${artist.handle}/${release.slug}`
-                        : undefined
-                    }
-                    className='flex items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-3 transition-colors duration-subtle hover:bg-white/[0.04]'
-                  >
-                    <div className='relative h-14 w-14 overflow-hidden rounded-xl'>
-                      <ImageWithFallback
-                        src={release.artworkUrl}
-                        alt={release.title}
-                        fill
-                        sizes='56px'
-                        className='object-cover'
-                        fallbackVariant='release'
-                      />
-                    </div>
-                    <div className='min-w-0'>
-                      <p className='truncate text-base font-medium tracking-[-0.03em] text-white dark:text-white'>
-                        {release.title}
-                      </p>
-                      <p className='truncate text-app text-white/44'>
-                        {formatReleaseMeta(
-                          release.releaseType,
-                          release.releaseDate
-                        )}
-                      </p>
-                    </div>
-                  </a>
-                ))
-              ) : (
-                <EmptySurfaceBlock>{emptyState.release}</EmptySurfaceBlock>
-              )}
-            </div>
-          </DesktopSurfaceCard>
         </div>
       </div>
 
@@ -706,7 +713,7 @@ export function ProfileDesktopSurface({
         className={cn(
           'min-h-0 min-w-0 gap-3.5',
           canGetUpdates
-            ? 'grid [@media(min-width:1180px)]:col-span-2 [@media(min-width:1180px)]:row-start-2'
+            ? 'grid [@media(min-width:1180px)]:col-start-3 [@media(min-width:1180px)]:row-start-1'
             : 'hidden'
         )}
         data-testid='profile-desktop-side-rail'
@@ -774,6 +781,26 @@ export function ProfileDesktopSurface({
             ) : null}
           </div>
         </DesktopSurfaceCard>
+        {hasTip ? (
+          <DesktopSurfaceCard
+            title='Payments'
+            testId='profile-desktop-payments-card'
+          >
+            <div className='space-y-4'>
+              <p className='text-sm leading-5 text-white/48'>
+                Pay {artist.name} directly.
+              </p>
+              <button
+                type='button'
+                onClick={() => onDrawerViewChange('pay')}
+                data-testid='profile-desktop-open-payments'
+                className='inline-flex h-8 items-center rounded-full bg-white px-3 text-xs font-semibold text-black dark:bg-white dark:text-black'
+              >
+                Open payments
+              </button>
+            </div>
+          </DesktopSurfaceCard>
+        ) : null}
       </div>
     </div>
   );
@@ -987,6 +1014,7 @@ export function ProfileDesktopSurface({
         ref={setNotificationsPortalContainer}
         className='relative flex min-h-0 w-full flex-col'
         data-interactive-ready={isHydrated ? 'true' : undefined}
+        data-mode={activeMode}
         data-testid='profile-desktop-surface'
       >
         <div
@@ -1004,12 +1032,20 @@ export function ProfileDesktopSurface({
                 Release credits
               </button>
             ) : null}
-            {showBackChevron && onBack ? (
+            {onBack ? (
+              /* D9kdx "Back + nav": the back slot stays reserved so the
+                 pill nav never shifts between modes (the mode-history
+                 contract); it is visibility-hidden, not unmounted, at the
+                 profile root where there is nothing to go back to. */
               <CircleIconButton
-                onClick={onBack}
+                onClick={showBackChevron ? onBack : undefined}
                 size='lg'
                 variant='pearlQuiet'
-                className='profile-top-chrome-icon text-white dark:text-white'
+                aria-hidden={!showBackChevron}
+                className={cn(
+                  'profile-top-chrome-icon text-white dark:text-white',
+                  !showBackChevron && 'invisible'
+                )}
                 ariaLabel='Back'
               >
                 <ChevronLeft className='h-5 w-5' />
