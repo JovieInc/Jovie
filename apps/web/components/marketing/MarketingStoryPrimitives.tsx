@@ -116,9 +116,11 @@ export function ArtistNotificationFloatingCardView({
       )}
     >
       <div className='flex items-start gap-3'>
-        <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-primary-token'>
-          <Icon className='h-4 w-4' strokeWidth={1.9} />
-        </span>
+        <Icon
+          className='mt-0.5 h-4 w-4 shrink-0 text-primary-token'
+          strokeWidth={1.9}
+          aria-hidden='true'
+        />
         <div className='min-w-0 flex-1'>
           <ExampleLabel className='mb-1' />
           <p className='text-sm font-semibold leading-[1.35] tracking-tighter text-primary-token'>

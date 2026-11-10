@@ -39,11 +39,11 @@ describe('SettingsActionRow', () => {
     const row = title.closest('[data-tone="destructive"]');
 
     expect(row).toHaveAttribute('data-state', 'idle');
-    expect(title).toHaveClass('text-error');
+    expect(title).toHaveClass('text-error-text');
     expect(screen.getByTestId('row-icon').parentElement).toHaveClass(
       'border-error/20',
       'bg-error-subtle',
-      'text-error'
+      'text-error-text'
     );
     expect(screen.getByText('This action cannot be undone.')).toHaveClass(
       'text-secondary-token'

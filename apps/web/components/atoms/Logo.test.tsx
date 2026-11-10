@@ -31,6 +31,21 @@ describe('Logo', () => {
     );
   });
 
+  it('applies a named marketing mark size without changing the ordinary icon scale', () => {
+    const { rerender } = render(
+      <Logo variant='icon' size='sm' markSize='marketing' />
+    );
+    const assertMarkSize = (size: string) => {
+      const icon = screen.getByRole('img', { name: 'Jovie' });
+      expect(icon).toHaveAttribute('width', size);
+      expect(icon).toHaveAttribute('height', size);
+      expect(icon.parentElement).toHaveAttribute('data-brand-mark-size', size);
+    };
+    assertMarkSize('28');
+    rerender(<Logo variant='icon' size='sm' />);
+    assertMarkSize('20');
+  });
+
   it('renders the icon variant through the canonical brand mark', () => {
     render(<Logo variant='icon' size='lg' tone='muted' />);
 

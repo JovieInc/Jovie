@@ -48,3 +48,71 @@ export const RangeAndStates: Story = {
     </div>
   ),
 };
+
+export const Empty: Story = {
+  args: {
+    value: 0,
+    label: 'Waiting to start import',
+    showValue: true,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A determinate bar at 0% shows an empty track with its label and value, so nothing jumps when progress begins.',
+      },
+    },
+  },
+};
+
+export const Partial: Story = {
+  render: () => (
+    <div className='w-80'>
+      <ProgressBar value={64} aria-label='Uploading cover artwork' />
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Only a value and an accessible name: with no label or value text the header is omitted and just the track renders.',
+      },
+    },
+  },
+};
+
+export const LongContent: Story = {
+  render: () => (
+    <div className='w-56'>
+      <ProgressBar
+        value={73}
+        label='Importing the complete back catalog from every connected distributor'
+        showValue
+      />
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A long label in a narrow container truncates to one line while the percentage stays visible.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl' lang='ar' className='w-64'>
+      <ProgressBar value={42} label='جارٍ استيراد الإصدارات' showValue />
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'In a right-to-left container the label sits at the start edge, the value at the end, and the fill grows from the right.',
+      },
+    },
+  },
+};

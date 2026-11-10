@@ -236,6 +236,40 @@ describe('decideFallbackTurn', () => {
     expect(turn.text).toContain('12.3k');
     expect(turn.toolEvents[0]?.toolName).toBe('confirmSpotifyArtist');
     expect(turn.toolEvents[0]?.output.action).toBe('spotify_artist_confirmed');
+    // The handle card ships with the confirmation: no dead-end turn.
+    expect(turn.toolEvents[1]?.toolName).toBe('checkHandle');
+    expect(turn.toolEvents[1]?.input.handle).toBe('testartist');
+    expect(turn.text).not.toMatch(/enrichment|\(source:/i);
+  });
+
+  it('proposes the handle the visitor claimed on the homepage, not the artist slug', async () => {
+    hoisted.getSpotifyArtistMock.mockResolvedValue({
+      id: 'artist-1',
+      name: 'Test Artist',
+      images: [],
+      genres: [],
+      popularity: 10,
+      followers: { total: 97 },
+    });
+    const turn = await decide([
+      user('I want to claim jov.ie/testy.'),
+      assistant('Give me the artist name.', [
+        {
+          toolName: 'searchSpotifyArtist',
+          output: { action: 'open_artist_picker', query: null },
+        },
+      ]),
+      user('Selected: Test Artist', { spotifyArtistId: 'artist-1' }),
+    ]);
+    expect(turn.toolEvents[1]?.toolName).toBe('checkHandle');
+    expect(turn.toolEvents[1]?.input.handle).toBe('testy');
+  });
+
+  it('checks the handle typed before any handle card was shown', async () => {
+    const turn = await decide([...baseThroughArtist(), user('testy')]);
+    expect(turn.line.stepId).toBe('handle');
+    expect(turn.toolEvents[0]?.input.handle).toBe('testy');
+    expect(turn.text).toContain('@testy');
   });
 
   it('degrades to the no-data line when Spotify enrichment fails', async () => {
@@ -275,6 +309,33 @@ describe('decideFallbackTurn', () => {
     );
   });
 
+  it('checks a different handle the visitor types in chat', async () => {
+    for (const typed of ['@newname', 'newname', 'can I use @newname instead']) {
+      const turn = await decide([
+        ...baseThroughArtist(),
+        assistant('Claiming @testartist.', [HANDLE_CHECKED]),
+        user(typed),
+      ]);
+      expect(turn.guardedStep).toBe('handle');
+      expect(turn.toolEvents[0]?.toolName).toBe('checkHandle');
+      expect(turn.toolEvents[0]?.output).toMatchObject({
+        action: 'check_handle',
+        handle: 'newname',
+      });
+      expect(turn.text).toContain('@newname');
+    }
+  });
+
+  it('keeps the suggested handle when the reply is not a handle', async () => {
+    const turn = await decide([
+      ...baseThroughArtist(),
+      assistant('Claiming @testartist.', [HANDLE_CHECKED]),
+      user('what does a handle do here?'),
+    ]);
+    expect(turn.toolEvents).toEqual([]);
+    expect(turn.text).toContain('@testartist');
+  });
+
   it('advances on structured handle_confirmed widget event', async () => {
     const turn = await decide([
       ...baseThroughArtist(),
@@ -292,6 +353,8 @@ describe('decideFallbackTurn', () => {
     expect(turn.toolEvents.map(e => e.output.action)).toContain(
       'propose_social_link'
     );
+    // One ask per turn: the line asks for the link the card collects.
+    expect(turn.line.stepId).toBe('attach_social');
   });
 
   it('advances social on Attach Account widget event', async () => {

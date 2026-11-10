@@ -47,10 +47,25 @@ def fingerprint(title: str, labels=()) -> str:
     return hashlib.sha256(" ".join(words).encode()).hexdigest()[:12] if words else "unclassified"
 
 
+# Advisory checks never gate a merge. Kept equal to pr_events.NON_REQUIRED_CHECKS
+# (test_machine_gap asserts that). Tently beside Source Validation hashed as one
+# class, fix-red-a021af66a4, on five lane runs while head_red already ignored it.
+ADVISORY_CHECKS = frozenset({"tently"})
+
+
 def check_fingerprint(pr: dict) -> str:
-    names = sorted({str(c.get("name")) for c in pr.get("statusCheckRollup") or []
-                    if str(c.get("conclusion") or "").upper() in {"FAILURE", "TIMED_OUT", "CANCELLED"}
-                    and str(c.get("name") or "").lower() not in {"pr ready", "ci summary"}})
+    """Hash the failing check names. A CANCELLED sibling does not open a second class when a
+    FAILURE or TIMED_OUT is present: Fleet Rules Evidence cancelled beside Source Validation
+    recorded fix-red-6c3efaf400 on seven unrelated lane runs (2026-10-29..31). A rollup that
+    is only cancelled still fingerprints those names. Advisory names are always skipped."""
+    red = {"FAILURE", "TIMED_OUT", "CANCELLED"}
+    hard = {"FAILURE", "TIMED_OUT"}
+    skip = {"pr ready", "ci summary", *(name.lower() for name in ADVISORY_CHECKS)}
+    checks = [c for c in pr.get("statusCheckRollup") or []
+              if str(c.get("conclusion") or "").upper() in red and str(c.get("name") or "").lower() not in skip]
+    if any(str(c.get("conclusion") or "").upper() in hard for c in checks):
+        checks = [c for c in checks if str(c.get("conclusion") or "").upper() in hard]
+    names = sorted({str(c.get("name")) for c in checks})
     return "fix-red-" + hashlib.sha256("|".join(names).encode()).hexdigest()[:10]
 
 

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { Logo } from '@/components/atoms/Logo';
+import { Mark } from '@/lib/brand/primitives';
 import { cn } from '@/lib/utils';
 
 interface FooterBrandingProps {
@@ -10,7 +11,7 @@ interface FooterBrandingProps {
   readonly className?: string;
   readonly showCTA?: boolean;
   readonly size?: 'sm' | 'md';
-  readonly mark?: 'wordmark' | 'icon' | 'text';
+  readonly mark?: 'wordmark' | 'icon' | 'text' | 'brand';
 }
 
 function buildUtmLink(base: string, artistHandle?: string): string {
@@ -20,7 +21,7 @@ function buildUtmLink(base: string, artistHandle?: string): string {
 }
 
 function renderLogoMark(
-  mark: 'wordmark' | 'icon' | 'text',
+  mark: 'wordmark' | 'icon' | 'text' | 'brand',
   size: 'sm' | 'md',
   isLinear: boolean,
   logoClass: string
@@ -35,10 +36,22 @@ function renderLogoMark(
     );
   }
 
+  if (mark === 'brand') {
+    return (
+      <>
+        <Mark size={16} className='h-4 w-4' />
+        <span>Made with Jovie</span>
+      </>
+    );
+  }
+
   if (mark === 'text') {
     return (
       <>
-        <span>Powered by</span>
+        {/* Explicit trailing space: the two spans concatenate in the
+            accessible text, and the label-in-name contract needs the
+            visible text verbatim inside the link's name. */}
+        <span>{'Powered by '}</span>
         <span className='font-semibold'>Jovie</span>
       </>
     );
@@ -62,6 +75,13 @@ const LOGO_HIT_AREA_CLASS =
   'inline-flex min-h-11 min-w-11 items-center justify-center -mx-3 -my-2';
 
 function getLogoLinkClass(mark: string, isLinear: boolean): string {
+  if (mark === 'brand') {
+    // Same brand line as the smart-link footer: 14px medium, quiet token
+    // color. Real 44px box via padding; negative margins hand the extra box
+    // back to layout (pseudo-element hit areas are invisible to axe's
+    // target-size rule).
+    return 'relative inline-flex min-h-11 items-center gap-2 rounded-md py-3 -my-3 text-sm font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token focus-ring-themed';
+  }
   if (mark === 'text') {
     return 'inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-2 -mx-2 -my-3 focus-ring-themed text-3xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-white/70 dark:hover:text-white';
   }
@@ -109,7 +129,7 @@ export function FooterBranding({
       <Link
         href={logoHref}
         prefetch={false}
-        aria-label='Jovie Home'
+        aria-label={mark === 'brand' ? undefined : 'Powered by Jovie Home'}
         className={logoLinkClass}
       >
         {renderLogoMark(mark, size, isLinear, logoClass)}

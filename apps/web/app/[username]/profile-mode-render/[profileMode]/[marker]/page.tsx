@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getProfileModeRenderStaticParams } from '@/app/[username]/_lib/profile-static-params';
 import ArtistPage, {
@@ -10,9 +11,8 @@ import {
   RENDER_FIXTURE_METADATA,
 } from '@/lib/render-fixture-policy';
 
-// Query modes stay on the canonical page's one-hour ISR cadence. The tipping
-// seed is not in the featured/claimed prerender set, so the pay destination
-// has to be emitted here or the release runner fetches it across regions.
+// Rewritten profile modes share the canonical page's one-hour ISR cadence and
+// its per-request proxy publication gate (the proxy sees `/<username>`).
 export const revalidate = 3600;
 
 export function generateStaticParams() {
@@ -57,9 +57,17 @@ export default async function ProfileModeRenderPage({
 
 export async function generateMetadata({
   params,
-}: Readonly<ProfileModeRenderPageProps>) {
+}: Readonly<ProfileModeRenderPageProps>): Promise<Metadata> {
   const { username, profileMode, marker } = await params;
-  if (!resolvePrivateProfileMode(profileMode, marker)) notFound();
+  if (!resolvePrivateProfileMode(profileMode, marker)) {
+    // notFound() inside generateMetadata bypasses the app router's not-found
+    // boundary and renders Next's raw __next_error__ 404 shell (observed on
+    // production and in the workflow_dispatch CI lanes). Return miss metadata
+    // here and let the page's own notFound() below render the branded
+    // app/[username]/not-found.tsx boundary with its data-testid="not-found"
+    // sentinel and a real 404 status.
+    return { title: 'Not Found', robots: RENDER_FIXTURE_METADATA.robots };
+  }
 
   const profileMetadata = await generatePublicProfileMetadata({
     params: Promise.resolve({ username }),

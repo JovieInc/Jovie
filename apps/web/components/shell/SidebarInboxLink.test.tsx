@@ -23,6 +23,19 @@ vi.mock('./RuntimeUpdateProvider', () => ({
 import { SidebarInboxLink } from './SidebarInboxLink';
 
 describe('central Inbox bell', () => {
+  it.each([
+    [1, 'Inbox — 1 item needs attention'],
+    [2, 'Inbox — 2 items need attention'],
+  ])(
+    'agrees the attention label with %i pending items',
+    (pendingCount, name) => {
+      render(
+        <SidebarInboxLink availability={{ state: 'available', pendingCount }} />
+      );
+      expect(screen.getByRole('link', { name })).toBeVisible();
+    }
+  );
+
   it('keeps pending work on view and keyboard navigation', async () => {
     render(
       <SidebarInboxLink
@@ -30,7 +43,7 @@ describe('central Inbox bell', () => {
       />
     );
     const link = screen.getByRole('link', {
-      name: 'Inbox — 3 Items Need Attention',
+      name: 'Inbox — 3 items need attention',
     });
     expect(link.querySelector('svg')).toHaveClass(
       'size-(--app-shell-sidebar-icon-size)'
@@ -55,7 +68,7 @@ describe('central Inbox bell', () => {
         <SidebarInboxLink availability={{ state: 'empty', pendingCount: 0 }} />
       );
       const link = screen.getByRole('link', {
-        name: 'Inbox — All Caught Up; App Update Available',
+        name: 'Inbox — all caught up; app update available',
       });
       expect(link.querySelector('[data-runtime-update]')).toHaveClass(
         'absolute',
@@ -79,7 +92,7 @@ describe('central Inbox bell', () => {
         />
       );
       const link = screen.getByRole('link', {
-        name: 'Inbox — 3 Items Need Attention; App Update Available',
+        name: 'Inbox — 3 items need attention; app update available',
       });
       expect(link.querySelectorAll('[data-runtime-update]')).toHaveLength(1);
       expect(link.querySelector('[data-runtime-update]')).toHaveClass(
@@ -91,11 +104,8 @@ describe('central Inbox bell', () => {
   });
 
   it.each([
-    [{ state: 'empty' as const, pendingCount: 0 }, 'Inbox — All Caught Up'],
-    [
-      { state: 'unknown' as const, pendingCount: null },
-      'Inbox — Status Unavailable',
-    ],
+    [{ state: 'empty' as const, pendingCount: 0 }, 'Inbox — all caught up'],
+    [{ state: 'unknown' as const, pendingCount: null }, 'Inbox'],
   ])('keeps the destination available for %s', (availability, name) => {
     render(<SidebarInboxLink availability={availability} />);
     const link = screen.getByRole('link', { name });

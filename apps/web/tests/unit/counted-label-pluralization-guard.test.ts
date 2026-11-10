@@ -10,10 +10,7 @@ const COUNTED_PLURAL =
 
 // Ratchet: known violators that other open work is rewriting. An entry that
 // no longer violates fails the test so the list can only shrink.
-const KNOWN_VIOLATIONS = new Set([
-  // JOV-9018; being rewritten by the Inbox/shell PRs (#22972, #22998, #23003).
-  'components/shell/SidebarInboxLink.tsx',
-]);
+const KNOWN_VIOLATIONS = new Set<string>();
 
 function productSources(): string[] {
   const root = process.cwd();

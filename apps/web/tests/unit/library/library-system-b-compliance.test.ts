@@ -78,10 +78,13 @@ describe('library right-rail System B structural compliance', () => {
     expect(surface).not.toContain('library-card-status-stack-');
     expect(surface).not.toContain('ApprovalStatusCell');
     expect(surface).not.toContain("header: 'Approval'");
-    // Filter rail + pill search still expose approval as a filter axis.
+    // Filter rail + pill matching still expose approval as a filter axis.
+    // JOV-8792: the unmounted header-search adapter was the only
+    // `allowedFields` list that named approval. Views must not bring it back.
     expect(surface).toContain("label='Approval Status'");
     expect(surface).toContain("case 'approval':");
-    expect(surface).toMatch(/allowedFields:\s*\[[^\]]*['"]approval['"]/s);
+    expect(surface).toMatch(/case 'approval':[\s\S]*?asset\.approvalStatus/);
+    expect(surface).not.toContain('allowedFields:');
     // Editable approval lives only in ApprovalStatusEditor under Details.
     expect(surface).toContain('ApprovalStatusEditor');
   });

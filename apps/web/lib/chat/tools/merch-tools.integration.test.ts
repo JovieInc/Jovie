@@ -218,4 +218,21 @@ describe('merch chat tools converge on the canonical pipeline (JOV-4743)', () =>
     });
     expect(hoisted.generateMerchDesigns).not.toHaveBeenCalled();
   });
+
+  it('starts generation with the top catalog title instead of asking to run it', async () => {
+    hoisted.getMerchSourceCandidates.mockResolvedValue([VERIFIED_SOURCE]);
+    hoisted.generateMerchDesigns.mockResolvedValue(CANONICAL_RESULT);
+    const { createMerch } = makeTools();
+
+    const result = await createMerch.execute!(
+      { prompt: 'make me merch' },
+      {} as never
+    );
+
+    expect(hoisted.generateMerchDesigns).toHaveBeenCalledTimes(1);
+    expect(hoisted.generateMerchDesigns).toHaveBeenCalledWith(
+      expect.objectContaining({ source: VERIFIED_SOURCE })
+    );
+    expect(result).toMatchObject({ success: true, designs: expect.any(Array) });
+  });
 });

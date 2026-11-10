@@ -15,6 +15,8 @@ import {
   isTestAuthBypassEnabled,
   resolveTestBypassUserId,
 } from '@/lib/auth/test-mode';
+import { resolveDesktopMarketingRedirect } from '@/lib/desktop/desktop-marketing-guard';
+import { gateProfilePublicationAtEdge } from '@/lib/routing/profile-publication-edge';
 import { analyzeHost } from '@/lib/routing/proxy-routing';
 import {
   createFastNotFoundResponse,
@@ -188,6 +190,36 @@ export default async function middleware(
   }
 
   // ========================================================================
+  // The Mac app is a product surface. A desktop-shell request for a
+  // marketing page (document load, Next client navigation or prefetch) goes
+  // to the app home instead; signed-out visitors continue to sign-in from
+  // there. Browsers never carry the JovieDesktop/ user-agent token.
+  // ========================================================================
+  const desktopMarketingRedirect = resolveDesktopMarketingRedirect({
+    method: req.method,
+    pathname: req.nextUrl.pathname,
+    userAgent: req.headers.get('user-agent'),
+  });
+  if (desktopMarketingRedirect) {
+    const response = NextResponse.redirect(
+      new URL(desktopMarketingRedirect, req.url),
+      307
+    );
+    response.headers.set('Cache-Control', 'private, no-store');
+    return response;
+  }
+
+  // ========================================================================
+  // Public profiles are ISR-cached; publication is decided fresh here on
+  // every request so a cached body is never served after withdrawal,
+  // deletion, rename or a storage failure (JOV-8629 §6.2).
+  // ========================================================================
+  if (req.method !== 'OPTIONS') {
+    const profilePublicationResponse = await gateProfilePublicationAtEdge(req);
+    if (profilePublicationResponse) return profilePublicationResponse;
+  }
+
+  // ========================================================================
   // Better Auth catch-all endpoints (sign-in/social, OAuth callbacks, email
   // OTP send/verify, one-time-token verify, session endpoints) pass through
   // untouched so the BA handler at app/api/auth/[...all]/route.ts owns the
@@ -258,7 +290,7 @@ export const config = {
     // \\. which is a literal dot in the compiled regex. A single \\. in a
     // JS string becomes just . (any char), which would allow paths like
     // /wp-json or /a-css/foo to bypass middleware (JOV-2236).
-    '/((?!_next|monitoring(?:/|$)|\\.well-known|api/profile-alias-decision(?:/|$)|.*\\.(?:html?|css|js|json|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/((?!_next|monitoring(?:/|$)|\\.well-known|api/profile-alias-decision(?:/|$)|api/profile-publication(?:/|$)|.*\\.(?:html?|css|js|json|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     // Always run for API routes so the /api/auth/* early-return above and
     // the protected-API redirect logic in handleProxyRequest apply.
     // /api/profile-alias-decision is EXCLUDED: the proxy's alias fast path
@@ -268,6 +300,6 @@ export const config = {
     // alias redirect whenever the CDN-cached decision is not served fresh.
     // The endpoint is public, visitor-independent routing JSON that reads no
     // cookies, so it needs none of the proxy's gates (JOV-8338).
-    '/((?!api/profile-alias-decision(?:/|$))(?:api|trpc).*)',
+    '/((?!api/profile-alias-decision(?:/|$)|api/profile-publication(?:/|$))(?:api|trpc).*)',
   ],
 };

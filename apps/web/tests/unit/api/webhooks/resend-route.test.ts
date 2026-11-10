@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockHeaders = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
@@ -19,15 +19,14 @@ const mockLoggerError = vi.hoisted(() => vi.fn());
 const mockResendSecret = vi.hoisted(
   () => `whsec_${Buffer.from('resend-secret').toString('base64')}`
 );
+const mockWebhookConfig = vi.hoisted(() => ({ RESEND_WEBHOOK_SECRET: '' }));
 
 vi.mock('next/headers', () => ({
   headers: mockHeaders,
 }));
 
 vi.mock('@/lib/env-server', () => ({
-  env: {
-    RESEND_WEBHOOK_SECRET: mockResendSecret,
-  },
+  env: mockWebhookConfig,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -75,10 +74,14 @@ vi.mock('@/lib/utils/logger', () => ({
   },
 }));
 
-function signPayload(body: string, timestamp: number): string {
+function signPayload(
+  body: string,
+  timestamp: number,
+  eventId = 'evt_resend_123'
+): string {
   const secretBytes = Buffer.from(mockResendSecret.slice(6), 'base64');
   const signature = createHmac('sha256', secretBytes)
-    .update(`${timestamp}.${body}`)
+    .update(`${eventId}.${timestamp}.${body}`)
     .digest('base64');
   return `v1,${signature}`;
 }
@@ -88,7 +91,7 @@ function createSignedHeaders(body: string, eventId = 'evt_resend_123') {
   return new Headers({
     'svix-id': eventId,
     'svix-timestamp': String(timestamp),
-    'svix-signature': signPayload(body, timestamp),
+    'svix-signature': signPayload(body, timestamp, eventId),
   });
 }
 
@@ -135,6 +138,7 @@ describe('POST /api/webhooks/resend', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mockWebhookConfig.RESEND_WEBHOOK_SECRET = mockResendSecret;
     mockDatabase();
     mockGetCreatorByMessageId.mockResolvedValue(null);
     mockRecordBounce.mockResolvedValue({
@@ -152,6 +156,115 @@ describe('POST /api/webhooks/resend', () => {
     });
     mockLogDelivery.mockResolvedValue(undefined);
     mockStopEnrollmentsForEmail.mockResolvedValue(undefined);
+  });
+
+  describe('published Svix verification oracle', () => {
+    // Fixed external oracle, not produced by signPayload or the verifier:
+    // https://docs.svix.com/receiving/verifying-payloads/how-manual#example-signatures
+    const oracle = {
+      secret: 'whsec_plJ3nmyCDGBKInavdOK15jsl',
+      body: '{"event_type":"ping","data":{"success":true}}',
+      id: 'msg_loFOjxBNrRLzqYUf',
+      timestamp: '1731705121',
+      signature: 'v1,rAvfW3dJ/X/qxhsaXPOyyCGmRKsaKWcsNccKXlIktD0=',
+    };
+
+    beforeEach(() => {
+      mockWebhookConfig.RESEND_WEBHOOK_SECRET = oracle.secret;
+      vi.spyOn(Date, 'now').mockReturnValue(Number(oracle.timestamp) * 1000);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    async function deliver({
+      id = oracle.id,
+      body = oracle.body,
+      signature = oracle.signature,
+    } = {}) {
+      mockHeaders.mockResolvedValue(
+        new Headers({
+          'svix-id': id,
+          'svix-timestamp': oracle.timestamp,
+          'svix-signature': signature,
+        })
+      );
+      const { POST } = await import('@/app/api/webhooks/resend/route');
+      return POST(
+        new Request('https://example.com/api/webhooks/resend', {
+          method: 'POST',
+          body,
+        }) as never
+      );
+    }
+
+    it('accepts the independently published ID, timestamp and raw-body signature', async () => {
+      const response = await deliver();
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ received: true });
+      expect(mockInsert).toHaveBeenCalledTimes(1);
+      expect(mockCaptureCriticalError).not.toHaveBeenCalled();
+    });
+
+    it('accepts a valid signature among rotated signatures', async () => {
+      const response = await deliver({
+        signature: `v1,aW52YWxpZA== ${oracle.signature}`,
+      });
+      expect(response.status).toBe(200);
+      expect(mockInsert).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps a verified duplicate free of delivery and suppression effects', async () => {
+      mockDatabase({ processed: true });
+      const response = await deliver();
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        received: true,
+        status: 'already_processed',
+      });
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(mockLogDelivery).not.toHaveBeenCalled();
+      expect(mockAddSuppression).not.toHaveBeenCalled();
+      expect(mockStopEnrollmentsForEmail).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['changed message ID', { id: 'msg_different' }],
+      ['changed raw-body bytes', { body: `${oracle.body}\n` }],
+      [
+        'legacy signature omitting the message ID',
+        // Python stdlib HMAC over timestamp.body with the public oracle key.
+        { signature: 'v1,NBlQ6TW1KAk/5p6TCTppEu/l5TgB2n7nRs+hFLCLJRk=' },
+      ],
+      [
+        'unsupported signature version',
+        { signature: oracle.signature.replace('v1,', 'v2,') },
+      ],
+    ] as const)(
+      'rejects %s before persistence or business effects',
+      async (_name, changes) => {
+        const response = await deliver(changes);
+        expect(response.status).toBe(401);
+        expect(mockInsert).not.toHaveBeenCalled();
+        expect(mockUpdate).not.toHaveBeenCalled();
+        expect(mockLogDelivery).not.toHaveBeenCalled();
+        expect(mockAddSuppression).not.toHaveBeenCalled();
+        expect(mockStopEnrollmentsForEmail).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([-301, 301])(
+      'rejects a valid signature outside the clock tolerance (%s seconds)',
+      async offset => {
+        vi.mocked(Date.now).mockReturnValue(
+          (Number(oracle.timestamp) + offset) * 1000
+        );
+        const response = await deliver();
+        expect(response.status).toBe(401);
+        expect(mockInsert).not.toHaveBeenCalled();
+      }
+    );
   });
 
   it('returns 400 when required SVix headers are missing', async () => {
@@ -185,7 +298,7 @@ describe('POST /api/webhooks/resend', () => {
       new Headers({
         'svix-id': 'evt_stale',
         'svix-timestamp': String(staleTimestamp),
-        'svix-signature': signPayload(body, staleTimestamp),
+        'svix-signature': signPayload(body, staleTimestamp, 'evt_stale'),
       })
     );
 

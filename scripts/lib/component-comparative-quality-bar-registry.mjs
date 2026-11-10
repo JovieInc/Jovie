@@ -66,25 +66,26 @@ export const QUALITY_BAR_REFERENCES = deepFreeze({
  * Approved closed-world denominator. After an intentional component taxonomy
  * change, review the path-set diff and print proposed values with:
  * pnpm exec node scripts/component-comparative-quality-bar.mjs --print-inventory-ratchet
+ * Then regenerate this derived array with --write-inventory-ratchet.
  */
 export const ATOM_MOLECULE_INVENTORY_RATCHET = deepFreeze([
   {
     root: 'packages/ui/atoms',
-    total: 39,
+    total: 41,
     sourceSetSha256:
-      'd8e40eac1840ee47fc6d73a0474acb268795aee455acbe9fe87cdd28a8880e49',
+      'fafa4586e3f254203ca1c1d8415407eb78c0413dc55b1f9254589b1749af317c',
   },
   {
     root: 'apps/web/components/**/atoms',
-    total: 126,
+    total: 124,
     sourceSetSha256:
-      'eac13e1911504b2ac070f7d88f56939496f0964091b332342e7999f78171c931',
+      '9954e5d3c422e9bc11584e4a7e757ca90781cfd748b1aef9ba00a62fd7764051',
   },
   {
     root: 'apps/web/components/**/molecules',
-    total: 169,
+    total: 171,
     sourceSetSha256:
-      '2ac14fd2dc26f0feab63b6ce37475d9947ebe2c4c04b4d805a9f16f9defba2fb',
+      '00f4a45978cdd88a3cafed4188578dddf61b82353e0d564df74d865508d19a0e',
   },
   {
     root: 'registered-out-of-taxonomy/atoms',

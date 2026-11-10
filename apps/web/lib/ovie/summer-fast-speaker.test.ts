@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   createFallbackSummerSpeaker,
   fastChatEnabled,
   needsDurableWork,
+  parseSseFrames,
 } from './summer-fast-speaker';
 import type { SummerSpeakEvent, SummerSpeaker } from './summer-transport';
 
@@ -23,6 +24,95 @@ const eve: SummerSpeaker = {
   },
 };
 const turn = { userText: 'how is shipping', history: [] } as const;
+
+describe('Summer SSE framing and cleanup', () => {
+  it('releases the reader even when upstream cancellation stays pending', async () => {
+    const cancel = vi.fn(() => new Promise<void>(() => {}));
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('event:done\ndata:{}\n\n'));
+      },
+      cancel,
+    });
+    const frames = parseSseFrames(body);
+    expect((await frames.next()).value).toEqual({ event: 'done', data: {} });
+    await frames.return(undefined);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(body.locked).toBe(false);
+  }, 1000);
+
+  it('emits a complete lone-CR frame while the connection stays open', async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('event:done\rdata:{}\r\r'));
+      },
+      cancel,
+    });
+    const frames = parseSseFrames(body);
+    expect(await frames.next()).toEqual({
+      done: false,
+      value: { event: 'done', data: {} },
+    });
+    await frames.return(undefined);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(body.locked).toBe(false);
+  }, 1000);
+
+  it.each(['\n', '\r\n', '\r'])(
+    'decodes split UTF-8 and line endings %j with a final unterminated frame',
+    async ending => {
+      const bytes = new TextEncoder().encode(
+        `: keepalive${ending}event:delta${ending}data:{"text":"héllo"}${ending}${ending}event:done${ending}data:{}`
+      );
+      let index = 0;
+      const body = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (index < bytes.length)
+            controller.enqueue(bytes.slice(index, ++index));
+          else controller.close();
+        },
+      });
+      const frames = [];
+      for await (const frame of parseSseFrames(body)) frames.push(frame);
+      expect(frames).toEqual([
+        { event: 'delta', data: { text: 'héllo' } },
+        { event: 'done', data: {} },
+      ]);
+      expect(body.locked).toBe(false);
+    }
+  );
+
+  it('joins data lines and ignores malformed and non-object payloads', async () => {
+    const response = new Response(
+      'event: delta\ndata: {"text":\ndata: "pong"}\n\nevent: delta\ndata: null\n\nevent: delta\ndata: invalid\n\nevent: delta\ndata: []\n\n'
+    );
+    const frames = [];
+    for await (const frame of parseSseFrames(response.body!))
+      frames.push(frame);
+    expect(frames).toEqual([{ event: 'delta', data: { text: 'pong' } }]);
+  });
+
+  it.each([false, true])(
+    'cancels and unlocks on an early consumer return, even if cancel rejects: %s',
+    async rejects => {
+      const cancel = vi.fn(async () => {
+        if (rejects) throw new Error('cancel failed');
+      });
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(
+            new TextEncoder().encode('event: error\ndata: {}\n\n')
+          );
+        },
+        cancel,
+      });
+      for await (const _frame of parseSseFrames(body)) break;
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(body.locked).toBe(false);
+    }
+  );
+});
 async function collect(
   speaker: SummerSpeaker,
   userText: string = turn.userText
@@ -33,6 +123,20 @@ async function collect(
 }
 
 describe('fast Summer speaker', () => {
+  it('does not acknowledge a malformed error followed by a terminal ack', async () => {
+    const speaker = createFallbackSummerSpeaker({
+      eve,
+      fetchChat: async () =>
+        new Response(
+          'event:delta\ndata:{"text":"partial"}\n\nevent:error\ndata:{bad json\n\nevent:done\ndata:{"requestId":"chat_1","route":"chat","model":"m"}\n\n'
+        ),
+    });
+    expect(await collect(speaker)).toEqual([
+      { type: 'text-delta', text: 'partial' },
+      { type: 'error', state: 'failure' },
+    ]);
+  });
+
   it('streams deltas from the fast endpoint', async () => {
     const speaker = createFallbackSummerSpeaker({
       eve,

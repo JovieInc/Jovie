@@ -64,6 +64,15 @@ describe('external API guard', () => {
     ).toEqual([]);
   });
 
+  it('does not count the turbo hit-rate budget comment as a gh subprocess', () => {
+    const path = 'scripts/turbo-cache-hit-rate.mjs';
+    const text = readFileSync(resolve(repoRoot, path), 'utf8');
+    expect(scanSource(path, text, rules)['gh-subprocess']).toBeUndefined();
+    expect(text).toMatch(
+      /api-budget:\s*github-user-core\s+90\/hr\s+-\s+\S.{9,}/
+    );
+  });
+
   it('never fails a PR for call sites already on the base revision', () => {
     const path = 'scripts/landed-on-main.mjs';
     const two = scan(

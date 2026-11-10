@@ -21,7 +21,10 @@ vi.mock('@/lib/services/pitch/prompts', () => ({
 }));
 
 import { CopyFloorViolationError } from '@/lib/copy/outbound-floor';
-import { generatePitches } from '@/lib/services/pitch/pitch-generator';
+import {
+  generatePitchDraft,
+  generatePitches,
+} from '@/lib/services/pitch/pitch-generator';
 import type { PitchInput } from '@/lib/services/pitch/types';
 
 const INPUT: PitchInput = {
@@ -78,5 +81,35 @@ describe('pitch generator copy floor (JOV-6616)', () => {
     await expect(generatePitches(INPUT)).rejects.toBeInstanceOf(
       CopyFloorViolationError
     );
+  });
+
+  it('refuses a pitch draft that names someone the artist keeps out', async () => {
+    mockGenerateObject.mockResolvedValue({
+      object: { subjectLine: 'Neon Sky', body: 'Produced with Sammy Lane.' },
+      usage: { inputTokens: 10, outputTokens: 20 },
+    });
+    const draft = generatePitchDraft({
+      input: INPUT,
+      destination: {
+        target: 'playlist',
+        platform: null,
+        label: 'Playlist',
+        audience: 'curators',
+        guidance: '',
+        characterLimit: 500,
+      },
+      artistRules: [
+        {
+          id: 'rule-1',
+          category: 'people',
+          ruleKey: 'Sammy Lane',
+          instruction: 'Keep them out of anything public.',
+          strength: 'hard_constraint',
+        },
+      ],
+    });
+    await expect(draft).rejects.toMatchObject({
+      rules: ['artist-rule:people'],
+    });
   });
 });

@@ -13,6 +13,7 @@ import {
   BADGE_SHARED_GEOMETRY_CLASS,
   BADGE_SIZE_GEOMETRY,
 } from '../lib/badge-geometry-contract';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 import { Badge, badgeVariants } from './badge';
 import {
   BADGE_BLUE_HOVER_FIXTURE_SOURCE,
@@ -145,6 +146,41 @@ describe('Badge', () => {
       expect(badge.className).toContain('border-accent/20');
       expect(badge.className).toContain('text-accent');
       expect(badge).toHaveAttribute('data-tone', 'accent');
+    });
+
+    it('applies outline variant and the primary alias', () => {
+      render(
+        <>
+          <Badge variant='outline' data-testid='outline'>
+            Draft
+          </Badge>
+          <Badge variant='primary' data-testid='primary'>
+            Live
+          </Badge>
+        </>
+      );
+      const outline = screen.getByTestId('outline').className;
+      expect(outline).toContain('bg-transparent');
+      expect(outline).toContain('text-(--linear-text-secondary)');
+      const primary = screen.getByTestId('primary').className;
+      expect(primary).toContain('bg-(--color-bg-primary)');
+      expect(primary).toContain('text-(--linear-text-primary)');
+    });
+
+    it.each([
+      ['info', 'border-info/20', 'text-info'],
+      ['success', 'border-success/20', 'text-success-text'],
+      ['warning', 'border-warning/20', 'text-warning-text'],
+    ] as const)('applies %s tone overrides', (tone, border, text) => {
+      render(
+        <Badge tone={tone} data-testid='badge'>
+          Tone
+        </Badge>
+      );
+      const badge = screen.getByTestId('badge');
+      expect(badge.className).toContain(border);
+      expect(badge.className).toContain('bg-surface-1');
+      expect(badge.className).toContain(text);
     });
   });
 
@@ -319,6 +355,11 @@ describe('Badge', () => {
       expect(badge).toHaveAttribute('data-state', 'permission-restricted');
       expect(badge.className).toContain('bg-(--state-permission-bg)');
     });
+
+    it('sets no permission state on other variants', () => {
+      render(<Badge data-testid='badge'>Open</Badge>);
+      expect(screen.getByTestId('badge')).not.toHaveAttribute('data-state');
+    });
   });
 });
 
@@ -404,5 +445,33 @@ describe('Badge deliberate-red drift fixtures', () => {
       BADGE_GEOMETRY_SHIFT_FIXTURE_TEST_ID
     );
     expect(readSource(fixtureSourcePath)).toContain('data-deliberate-red');
+  });
+});
+
+describe('Badge status text contrast (JOV-8873)', () => {
+  it.each([
+    ['destructive', 'text-error-text'],
+    ['success', 'text-success-text'],
+    ['warning', 'text-warning-text'],
+    ['error', 'text-error-text'],
+  ] as const)('renders %s with the AA text token', (variant, token) => {
+    render(<Badge variant={variant}>Status</Badge>);
+    expect(screen.getByText('Status')).toHaveClass(token);
+  });
+});
+
+describe('Badge accessibility', () => {
+  it('has no axe violations across variants and a long RTL label', async () => {
+    const { container } = render(
+      <div>
+        <Badge>Beta</Badge>
+        <Badge variant='error'>Sync failed</Badge>
+        <Badge variant='permission-restricted'>Admin only</Badge>
+        <span dir='rtl'>
+          <Badge variant='success'>تم النشر على جميع المنصات</Badge>
+        </span>
+      </div>
+    );
+    await expectNoA11yViolations(container);
   });
 });

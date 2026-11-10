@@ -1,29 +1,17 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import {
-  MarketingContainer,
-  MarketingHeroPhoto,
-  MarketingPageShell,
-} from '@/components/marketing';
+import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
 import { APP_ROUTES } from '@/constants/routes';
 import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import { getSmartLinksHeroCopy } from '@/data/smartLinksHeroCopy';
 import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { SmartLinksDemo } from './SmartLinksDemo';
 
-const SMART_LINKS_HERO_PHOTO = {
-  src: '/images/marketing-hero/smart-links.webp',
-  width: 1600,
-  height: 686,
-} as const;
-
 const STEP_BODIES = [
   'Artwork and artist come first. Every available music app lives in one dial.',
-  'Slide, tap, or use the arrow keys. Stream Now follows the selected service.',
+  'Pick a service once. Stream Now follows that choice.',
   'Your choice follows the next release. You can always switch.',
 ] as const;
-
-const STEP_NUMBERS = ['01', '02', '03'] as const;
 
 export function SmartLinksLanding() {
   const hero = getSmartLinksHeroCopy(
@@ -32,28 +20,28 @@ export function SmartLinksLanding() {
 
   return (
     <MarketingPageShell className='bg-base text-primary-token'>
+      {/* Static matte hero: no photo or animated field behind the copy (Tim,
+          2026-10-29). One focal point: headline, one line, one primary CTA. */}
       <section
         aria-labelledby='smart-links-title'
-        className='marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden py-14 sm:py-24'
+        className='marketing-hero-dock marketing-hero-dock--inset relative py-14 sm:py-24'
         data-testid='marketing-section-hero'
         data-marketing-variant='split-screenshot-right'
         data-marketing-owner='apps/web/app/(marketing)/smart-links/SmartLinksLanding.tsx'
       >
-        <MarketingHeroPhoto {...SMART_LINKS_HERO_PHOTO} />
-        <MarketingContainer width='page' className='relative z-3'>
-          <div className='grid items-start gap-12 lg:grid-cols-2'>
+        <MarketingContainer width='page' className='relative'>
+          <div className='grid items-center gap-12 lg:grid-cols-2 lg:gap-16'>
             <div>
-              <p className='homepage-section-eyebrow'>SMART LINKS</p>
               <h1
                 id='smart-links-title'
-                className='marketing-h1-linear mt-5 max-w-3xl text-balance line-clamp-2'
+                className='marketing-h1-linear max-w-3xl text-balance line-clamp-2'
               >
                 {hero.title}
               </h1>
               <p className='mt-6 max-w-xl text-base leading-7 text-secondary-token sm:text-lg'>
                 {hero.intro}
               </p>
-              <div className='mt-8 flex flex-wrap gap-3'>
+              <div className='mt-8 flex flex-wrap items-center gap-x-6 gap-y-3'>
                 <Button asChild variant='primary' size='md'>
                   <Link
                     href={`${APP_ROUTES.SIGNUP}?source=smart-links`}
@@ -62,19 +50,14 @@ export function SmartLinksLanding() {
                     Create a Smart Link
                   </Link>
                 </Button>
-                <Button asChild variant='secondary' size='md'>
-                  <Link
-                    href='/tim/never-say-a-word?noredirect=1'
-                    prefetch={false}
-                  >
-                    Open the live example
-                  </Link>
-                </Button>
+                <Link
+                  href='/tim/never-say-a-word?noredirect=1'
+                  prefetch={false}
+                  className='focus-ring-themed rounded-full text-sm text-secondary-token underline-offset-4 hover:text-primary-token hover:underline'
+                >
+                  Open the live example
+                </Link>
               </div>
-              <p className='mt-5 text-xs leading-5 text-tertiary-token'>
-                Try the dial. Supported devices give a light haptic tick when
-                the selection changes.
-              </p>
             </div>
             <SmartLinksDemo />
           </div>
@@ -90,23 +73,16 @@ export function SmartLinksLanding() {
         data-marketing-owner='apps/web/app/(marketing)/smart-links/SmartLinksLanding.tsx'
       >
         <MarketingContainer width='page'>
-          <p className='homepage-section-eyebrow'>A THREE-BEAT HANDOFF</p>
           <h2
             id='smart-links-how'
-            className='mt-4 text-balance line-clamp-2 text-3xl font-semibold tracking-tight sm:text-4xl'
+            className='text-balance line-clamp-2 text-3xl font-semibold tracking-tight sm:text-4xl'
           >
             {hero.howTitle}
           </h2>
           <div className='mt-10 grid gap-6 md:grid-cols-3'>
             {hero.stepTitles.map((title, index) => (
-              <article
-                key={STEP_NUMBERS[index]}
-                className='border-t border-subtle pt-5'
-              >
-                <p className='font-mono text-xs text-tertiary-token'>
-                  {STEP_NUMBERS[index]}
-                </p>
-                <h3 className='mt-4 text-lg font-semibold'>{title}</h3>
+              <article key={title} className='border-t border-subtle pt-5'>
+                <h3 className='text-balance text-lg font-semibold'>{title}</h3>
                 <p className='mt-3 text-sm leading-6 text-secondary-token'>
                   {STEP_BODIES[index]}
                 </p>

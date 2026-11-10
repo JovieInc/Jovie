@@ -1,3 +1,5 @@
+import { resolveNewAccountClass } from '@/lib/accounts/internal-account';
+import { readRequestAccountClassHeader } from '@/lib/accounts/request-account-class.server';
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
@@ -279,6 +281,10 @@ async function upsertUser(
         email,
         userStatus,
         waitlistEntryId,
+        accountClass: resolveNewAccountClass({
+          email,
+          header: await readRequestAccountClassHeader(),
+        }),
       })
       .onConflictDoUpdate({
         target: users.betterAuthUserId,

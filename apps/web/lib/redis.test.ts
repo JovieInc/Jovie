@@ -41,6 +41,7 @@ vi.mock('@/lib/error-tracking', () => ({
 import {
   closeRedisQuotaCircuit,
   getRedis,
+  isRedisConfigured,
   isRedisQuotaCircuitOpen,
   resetRedisStateForTests,
 } from './redis';
@@ -230,5 +231,51 @@ describe('Redis quota circuit', () => {
 
     closeRedisQuotaCircuit();
     expect(getRedis()).not.toBeNull();
+  });
+});
+
+describe('isRedisConfigured (JOV-6743)', () => {
+  it('is true in production when the Upstash config is present and valid', () => {
+    expect(isRedisConfigured()).toBe(true);
+  });
+
+  it('is true while the quota circuit is open — configured is not unavailable', async () => {
+    mockRequest.mockRejectedValueOnce(
+      new Error('ERR max requests limit exceeded. Limit: 500000')
+    );
+    const redis = redisCommandClient();
+    await redis.request().catch(() => undefined);
+
+    // The circuit makes getRedis() return null, but the store is still
+    // configured — that distinction is the whole point of the helper.
+    expect(getRedis()).toBeNull();
+    expect(isRedisConfigured()).toBe(true);
+  });
+
+  it.each(['not-a-url', '', 'http://example.upstash.io', undefined] as const)(
+    'is false when the Upstash URL is invalid: %j',
+    url => {
+      mockEnv.UPSTASH_REDIS_REST_URL = url;
+      expect(isRedisConfigured()).toBe(false);
+    }
+  );
+
+  it('is false when the token is missing or blank', () => {
+    mockEnv.UPSTASH_REDIS_REST_TOKEN = '   ';
+    expect(isRedisConfigured()).toBe(false);
+  });
+
+  it('is true for loopback local Redis outside production', () => {
+    mockEnv.NODE_ENV = 'test';
+    mockEnv.VERCEL_ENV = 'preview';
+    mockEnv.REDIS_URL = 'redis://127.0.0.1:6379';
+    expect(isRedisConfigured()).toBe(true);
+  });
+
+  it('is false when the selected store is memory', () => {
+    mockEnv.NODE_ENV = 'test';
+    mockEnv.VERCEL_ENV = 'preview';
+    mockEnv.REDIS_URL = undefined;
+    expect(isRedisConfigured()).toBe(false);
   });
 });

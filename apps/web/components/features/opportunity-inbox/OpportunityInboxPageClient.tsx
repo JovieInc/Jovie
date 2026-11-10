@@ -519,16 +519,18 @@ export function OpportunityInboxPageClient({
           </div>
           <div className='mb-4' data-testid='opportunity-inbox-notes'>
             {notes.length === 0 ? (
-              <Button
-                ref={notesButtonRef}
-                size='sm'
-                variant='ghost'
-                aria-expanded={notesOpen}
-                aria-controls='opportunity-inbox-notes-panel'
-                onClick={() => setNotesOpen(open => !open)}
-              >
-                {notesOpen ? 'Hide Notes' : 'Add Notes'}
-              </Button>
+              <div className='flex justify-center'>
+                <Button
+                  ref={notesButtonRef}
+                  size='sm'
+                  variant='ghost'
+                  aria-expanded={notesOpen}
+                  aria-controls='opportunity-inbox-notes-panel'
+                  onClick={() => setNotesOpen(open => !open)}
+                >
+                  {notesOpen ? 'Hide Notes' : 'Add Notes'}
+                </Button>
+              </div>
             ) : null}
             <div
               id='opportunity-inbox-notes-panel'
@@ -583,7 +585,7 @@ export function OpportunityInboxPageClient({
                 <div className='system-b-opportunity-inbox-section-label'>
                   Tour Dates To Review
                 </div>
-                <div className='system-b-opportunity-inbox-feed-list'>
+                <ul className='system-b-opportunity-inbox-feed-list'>
                   {pendingTourDates.map(item => (
                     <OpportunityInboxTourDateRow
                       key={item.id}
@@ -593,7 +595,7 @@ export function OpportunityInboxPageClient({
                       isBusy={pendingTourDateActionId === item.id}
                     />
                   ))}
-                </div>
+                </ul>
               </section>
             ) : null}
 
@@ -669,9 +671,7 @@ export function OpportunityInboxPageClient({
             {!hasReviewableItems &&
             !runtimeUpdate?.available &&
             !inboxReadUnavailable ? (
-              <OpportunityInboxEmptyState
-                actionCards={inbox.emptyActionCards}
-              />
+              <OpportunityInboxEmptyState />
             ) : null}
 
             <OpportunityInboxConfirmedTourDates items={confirmedTourDates} />

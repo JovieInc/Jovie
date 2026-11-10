@@ -44,6 +44,11 @@ import {
 } from '@/lib/commands/palette-ranking';
 import type { NavCommand } from '@/lib/commands/registry';
 import { WORKSPACE_SWITCH_SHORTCUT } from '@/lib/keyboard-shortcuts';
+import {
+  buildOperatorCommands,
+  isOvieSurface,
+  type OperatorCommand,
+} from '@/lib/ovie/operator-commands';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import { isFormElement } from '@/lib/utils/keyboard';
 import {
@@ -209,10 +214,11 @@ function CommandPaletteInner({
 }: CommandPaletteInnerProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const operatorMode = isOvieSurface(pathname);
 
   const { data: conversations } = useChatConversationsQuery({
     limit: RECENT_CHAT_QUERY_LIMIT,
-    enabled: open,
+    enabled: open && !operatorMode,
   });
 
   // Recent chats are not part of the
@@ -220,6 +226,37 @@ function CommandPaletteInner({
   // entity section so the shared list+keyboard machinery picks them up.
   const additionalSections = useMemo<PaletteSection[]>(() => {
     const sections: PaletteSection[] = [];
+    if (operatorMode) {
+      // Ovie: operator destinations and web tools replace the customer rows.
+      const toItem = (command: OperatorCommand) => ({
+        kind: 'nav' as const,
+        nav: {
+          kind: 'nav' as const,
+          id: command.id,
+          label: command.label,
+          description: command.description,
+          iconName: command.external ? 'ExternalLink' : 'ArrowRight',
+          surfaces: ['cmdk' as const],
+          href: command.href,
+          ...(command.shortcutLabel
+            ? { shortcutLabel: command.shortcutLabel }
+            : {}),
+        } satisfies NavCommand,
+      });
+      const commands = buildOperatorCommands();
+      sections.push(
+        {
+          id: 'ovie-go',
+          label: 'Go To',
+          items: commands.filter(c => c.group === 'go').map(toItem),
+        },
+        {
+          id: 'ovie-open',
+          label: 'Open',
+          items: commands.filter(c => c.group === 'open').map(toItem),
+        }
+      );
+    }
     if (isAdmin) {
       const currentWorkspace = getCurrentAppShellWorkspace(pathname);
       const nextWorkspace = getNextAppShellWorkspace(
@@ -244,7 +281,7 @@ function CommandPaletteInner({
         });
       }
     }
-    if (conversations && conversations.length > 0) {
+    if (!operatorMode && conversations && conversations.length > 0) {
       const currentConversationId = getCurrentConversationId(pathname);
       const rankedConversations = rankPaletteConversations(
         conversations,
@@ -272,11 +309,23 @@ function CommandPaletteInner({
       });
     }
     return sections;
-  }, [conversations, isAdmin, pathname]);
+  }, [conversations, isAdmin, operatorMode, pathname]);
 
   const handleAdditionalSelect = useCallback(
     (id: string) => {
       // Recent-thread entity ids are namespaced; strip the prefix.
+      if (id.startsWith('ovie-go:')) {
+        router.push(id.slice('ovie-go:'.length));
+        return;
+      }
+      if (id.startsWith('ovie-open:')) {
+        globalThis.open(
+          id.slice('ovie-open:'.length),
+          '_blank',
+          'noopener,noreferrer'
+        );
+        return;
+      }
       if (id.startsWith('thread:')) {
         const threadId = id.slice('thread:'.length);
         router.push(`${APP_ROUTES.CHAT}/${threadId}`);
@@ -304,6 +353,7 @@ function CommandPaletteInner({
       onAdditionalSelect={handleAdditionalSelect}
       presentation={presentation}
       onHeaderChange={onHeaderChange}
+      operatorMode={operatorMode}
     />
   );
 }

@@ -341,6 +341,39 @@ test('the pinned oasdiff release is exact and sha-verified', () => {
   assert.match(result.error, /does not match the pinned/);
 });
 
+test('an HTTP 5xx download fails as a download, never as a sha mismatch', t => {
+  // The stub behaves like curl --fail: partial error bytes, status, exit 22.
+  const dir = mkdtempSync(join(tmpdir(), 'jovie-oasdiff-curl-'));
+  const argsLog = join(dir, 'args');
+  writeFileSync(
+    join(dir, 'curl'),
+    `#!/usr/bin/env bash\nprintf '%s\\n' "$@" >${JSON.stringify(argsLog)}\nwhile [[ $# -gt 0 ]]; do [[ "$1" == --output ]] && out="$2"; shift; done\necho '<html>504</html>' >"$out"\nprintf 504\nexit 22\n`
+  );
+  chmodSync(join(dir, 'curl'), 0o755);
+  const keys = ['PATH', 'OASDIFF_BIN', 'RELEASE_DOWNLOAD_ATTEMPTS'];
+  const tokens = ['RELEASE_DOWNLOAD_TOKEN', 'GH_TOKEN', 'GITHUB_TOKEN'];
+  const saved = Object.fromEntries(
+    [...keys, ...tokens].map(k => [k, process.env[k]])
+  );
+  process.env.PATH = `${dir}:${process.env.PATH}`;
+  process.env.RELEASE_DOWNLOAD_ATTEMPTS = '1';
+  for (const k of ['OASDIFF_BIN', ...tokens]) delete process.env[k];
+  t.after(() => {
+    for (const [k, v] of Object.entries(saved))
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    rmSync(dir, { recursive: true, force: true });
+  });
+  const result = ensureOasdiffBinary({ cacheDir: join(dir, 'cache') });
+  assert.equal(result.code, 1);
+  assert.match(
+    result.error,
+    /download failed: release download exit 1 \(last HTTP 504\)/
+  );
+  const args = readFileSync(argsLog, 'utf8').split('\n');
+  assert.ok(args.includes('--fail') && args.includes('--output'));
+});
+
 function specRepository(t) {
   const root = mkdtempSync(join(tmpdir(), 'jovie-oasdiff-tree-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -348,12 +381,16 @@ function specRepository(t) {
     Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
   );
   const git = (...args) =>
-    execFileSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], {
-      cwd: root,
-      env,
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
+    execFileSync(
+      'git',
+      ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', ...args],
+      {
+        cwd: root,
+        env,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }
+    ).trim();
   const spec = join(root, 'apps/web/lib/api/v1/openapi.json');
   mkdirSync(dirname(spec), { recursive: true });
   mkdirSync(join(root, 'apps/web/scripts'), { recursive: true });
@@ -366,6 +403,13 @@ function specRepository(t) {
     join(root, 'apps/web/node_modules'),
     'dir'
   );
+  // pnpm's .bin/tsx shim resolves tsx through <root>/node_modules/.pnpm.
+  if (existsSync(join(REPO_ROOT, 'node_modules')))
+    symlinkSync(
+      join(REPO_ROOT, 'node_modules'),
+      join(root, 'node_modules'),
+      'dir'
+    );
   writeFileSync(join(root, '.gitignore'), 'node_modules\n');
   writeFileSync(join(root, 'package.json'), '{"type":"module"}\n');
   writeFileSync(

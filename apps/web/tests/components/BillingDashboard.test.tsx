@@ -223,7 +223,7 @@ describe('BillingDashboard', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders plan comparison grid with Free, Pro, and Max columns', async () => {
+  it('renders plan comparison grid with Free and Pro, and no dead-end Max card', async () => {
     mockFetchResponses({
       '/api/billing/status': BILLING_STATUS_FREE,
       '/api/stripe/pricing-options': PRICING_OPTIONS,
@@ -238,7 +238,10 @@ describe('BillingDashboard', () => {
 
     expect(screen.getByText('Free')).toBeInTheDocument();
     expect(screen.getByText('Artist Presence')).toBeInTheDocument();
-    expect(screen.getByText('Max')).toBeInTheDocument();
+    // Max is contact-sales only; its early-access card is hidden by default
+    // (NEXT_PUBLIC_FEATURE_MAX_PLAN defaults off, JOV-INV-046).
+    expect(screen.queryByText('Max')).not.toBeInTheDocument();
+    expect(screen.queryByText('Request Early Access')).not.toBeInTheDocument();
   });
 
   it('shows Current Plan badge on the active plan', async () => {

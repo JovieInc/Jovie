@@ -20,6 +20,39 @@ const spotify: ProfileWorkspaceRow = {
 };
 
 describe('buildConnectionActions', () => {
+  it('offers contextual Ask Jovie on every entity and Edit only on the Jovie profile', () => {
+    const callbacks = {
+      onViewDetails: vi.fn(),
+      onOpen: vi.fn(),
+      onPrimaryAction: vi.fn(),
+      onAskJovie: vi.fn(),
+      onEditProfile: vi.fn(),
+    };
+    const jovie: ProfileWorkspaceRow = {
+      ...spotify,
+      id: 'jovie',
+      kind: 'jovie',
+      platform: 'jovie',
+    };
+    for (const row of [spotify, jovie]) {
+      const actions = buildConnectionActions(row, 'open', callbacks);
+      const ask = actions.find(
+        action => 'id' in action && action.id === 'ask-jovie'
+      );
+      if (!ask || !('onClick' in ask)) throw new Error('Missing Ask Jovie');
+      ask.onClick();
+      expect(callbacks.onAskJovie).toHaveBeenLastCalledWith(row);
+      const edit = actions.find(
+        action => 'id' in action && action.id === 'edit-profile'
+      );
+      if (row.kind === 'jovie') {
+        if (!edit || !('onClick' in edit))
+          throw new Error('Missing Edit Profile');
+        edit.onClick();
+        expect(callbacks.onEditProfile).toHaveBeenCalledWith(jovie);
+      } else expect(edit).toBeUndefined();
+    }
+  });
   it('builds one action contract for row, ellipsis, and right rail menus', () => {
     const callbacks = {
       onViewDetails: vi.fn(),
@@ -52,5 +85,25 @@ describe('buildConnectionActions', () => {
 
     expect(actions).toHaveLength(2);
     expect(actions).not.toContainEqual({ type: 'separator' });
+  });
+
+  it('adds Fix With Jovie only when a fix callback is supplied', () => {
+    const onFix = vi.fn();
+    const base = {
+      onViewDetails: vi.fn(),
+      onOpen: vi.fn(),
+      onPrimaryAction: vi.fn(),
+    };
+    const labels = (actions: ReturnType<typeof buildConnectionActions>) =>
+      actions.flatMap(a => ('label' in a ? [a.label] : []));
+    expect(labels(buildConnectionActions(spotify, 'open', base))).not.toContain(
+      'Fix With Jovie'
+    );
+    const withFix = buildConnectionActions(spotify, 'open', { ...base, onFix });
+    expect(labels(withFix)).toContain('Fix With Jovie');
+    const fix = withFix.find(a => 'id' in a && a.id === 'connection-fix');
+    if (!fix || !('onClick' in fix)) throw new Error('Expected fix action');
+    fix.onClick();
+    expect(onFix).toHaveBeenCalledWith(spotify);
   });
 });

@@ -9,6 +9,7 @@ import {
 } from '@/components/atoms/ArtworkFrame';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { track } from '@/lib/analytics';
+import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 import type { PublicRelease } from '../releases/types';
 
 const YEAR_HEADER_THRESHOLD = 15;
@@ -108,7 +109,7 @@ export function ReleasesView({
       : null;
 
     return [
-      collaborators.length > 0 ? collaborators.join(', ') : null,
+      collaborators.length > 0 ? formatReleaseArtistLine(collaborators) : null,
       formatReleaseType(release.releaseType),
       year,
     ]
@@ -191,7 +192,9 @@ export function ReleasesView({
                     </span>
                   ) : null}
                 </div>
-                <p className='truncate text-2xs font-medium tracking-tight text-white/42'>
+                {/* white/42 falls under WCAG AA on dark profile surfaces; white/64
+                    (already used by the Video badge above) clears 4.5:1. */}
+                <p className='truncate text-2xs font-medium tracking-tight text-white/64'>
                   {meta}
                 </p>
               </div>

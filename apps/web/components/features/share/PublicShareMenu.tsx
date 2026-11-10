@@ -56,14 +56,35 @@ function renderDestinationIcon(icon: string) {
   }
 }
 
+/**
+ * Rows on the profile drawer header grid. secondary: icons centred under the
+ * 44px back button (x=42 from the body edge), labels on the title edge
+ * (x=74). direct (no back button): icons start on the title edge (x=20).
+ */
+export const PUBLIC_SHARE_DRAWER_ITEM_CLASS =
+  PUBLIC_SHARE_MENU_ITEM_CLASS.replace('gap-3', 'gap-6').replace(
+    'px-4',
+    'px-3.5'
+  );
+export const PUBLIC_SHARE_DIRECT_ITEM_CLASS =
+  PUBLIC_SHARE_MENU_ITEM_CLASS.replace('px-4', '-mx-3 px-3');
+
+const DRAWER_ITEM_CLASS = {
+  secondary: PUBLIC_SHARE_DRAWER_ITEM_CLASS,
+  direct: PUBLIC_SHARE_DIRECT_ITEM_CLASS,
+} as const;
+
 interface PublicShareActionListProps {
   readonly context: ShareContext;
   readonly onActionComplete?: () => void;
+  /** Align rows to the ProfileDrawerShell header they sit under. */
+  readonly drawerHeader?: keyof typeof DRAWER_ITEM_CLASS;
 }
 
 export function PublicShareActionList({
   context,
   onActionComplete,
+  drawerHeader,
 }: PublicShareActionListProps) {
   const [helperText, setHelperText] = useState<string | null>(null);
 
@@ -110,7 +131,11 @@ export function PublicShareActionList({
           <button
             key={destination.id}
             type='button'
-            className={PUBLIC_SHARE_MENU_ITEM_CLASS}
+            className={
+              drawerHeader
+                ? DRAWER_ITEM_CLASS[drawerHeader]
+                : PUBLIC_SHARE_MENU_ITEM_CLASS
+            }
             onClick={() => {
               handleAction(destination);
             }}

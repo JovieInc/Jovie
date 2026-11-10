@@ -42,8 +42,8 @@ class SelectTests(unittest.TestCase):
                 row(8, description=BODY + "\n**Sequencing:** after LYB-138.\n"), row(9)]
         rows.append(row(138, state="In Progress"))
         picked, skipped = br.select(rows, 10, excluded=("hold",))
-        self.assertEqual([r["identifier"] for r in picked], ["LYB-9"])
-        self.assertEqual(skipped["LYB-1"], "not-agent-ready")
+        self.assertEqual([r["identifier"] for r in picked], ["LYB-1", "LYB-9"])  # agent-ready is retired as a requirement
+        self.assertNotIn("LYB-1", skipped)
         self.assertEqual(skipped["LYB-2"], "thin-description")
         self.assertEqual(skipped["LYB-3"], "label:type:epic")
         self.assertEqual(skipped["LYB-4"], "label:needs-tim")
@@ -51,6 +51,11 @@ class SelectTests(unittest.TestCase):
         self.assertEqual(skipped["LYB-6"], "no-acceptance-criteria")
         self.assertEqual(skipped["LYB-7"], "blocked-by:LYB-1")
         self.assertEqual(skipped["LYB-8"], "blocked-by:LYB-138")
+
+    def test_done_heading_counts_as_acceptance(self):
+        body = BODY.replace("## Acceptance criteria", "## Done")
+        picked, skipped = br.select([row(1, description=body)], 1)
+        self.assertEqual(len(picked), 1, skipped)
 
     def test_closed_blocker_does_not_block(self):
         picked, _ = br.select([row(7, description=BODY + "\nBlocked by LYB-99.\n")], 1)  # LYB-99 not open
@@ -141,11 +146,11 @@ class RefillTests(unittest.TestCase):
         self.assertFalse((self.state / "linear" / "outbox.json").exists())
 
     def test_nothing_ready_reports_why(self):
-        self.mirror([row(1, labels=()), row(2, description="short")])
+        self.mirror([row(1, labels=("hold",)), row(2, description="short")])
         receipt = br.refill(self.lane, self.host, self.binding, FakeClient(), now=1010.0)
         self.assertEqual(receipt["promoted"], [])
         self.assertEqual(receipt["short"], 4)
-        self.assertEqual(receipt["skipped"], {"LYB-1": "not-agent-ready", "LYB-2": "thin-description"})
+        self.assertEqual(receipt["skipped"], {"LYB-1": "label:hold", "LYB-2": "thin-description"})
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { and, asc, desc, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   getUserByClerkId,
@@ -307,7 +307,8 @@ export async function loadCanonicalSubmissionContext(params: {
           .where(
             and(
               eq(discogReleases.id, releaseId),
-              eq(discogReleases.creatorProfileId, profileId)
+              eq(discogReleases.creatorProfileId, profileId),
+              isNull(discogReleases.deletedAt)
             )
           )
           .limit(1)

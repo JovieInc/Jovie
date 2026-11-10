@@ -119,7 +119,7 @@ export const RULES = [
         /apps\/web\/(?:app\/\((?:marketing|home)\)\/|components\/(?:marketing|homepage|features\/(?:home|pricing|visibility-audit)\/)|components\/organisms\/(?:AboutPage|Blog|ComparisonPage|PricingRecipe|SupportPage|VoicePage)|components\/site\/Marketing)/;
       if (!marketing.test(file)) return false;
       const bleed =
-        /homepage-editorial-hero|marketing-editorial-hero-photo|marketing-hero-photo|marketing-hero-dock|marketing-route-hero__media|official-iphone-frame__bezel/;
+        /homepage-editorial-hero|marketing-editorial-hero-photo|marketing-hero-dock|marketing-route-hero__media|official-iphone-frame__bezel/;
       if (bleed.test(`${line}\n${nearby}`)) return false;
       if (/\brounded-none\b/.test(line)) return true;
       if (/border-radius\s*:\s*0(?:px|rem|em|%)?\b/.test(line)) return true;

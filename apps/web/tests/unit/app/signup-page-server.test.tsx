@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { resolveUserStateMock, redirectMock } = vi.hoisted(() => ({
   resolveUserStateMock: vi.fn(),
@@ -24,7 +24,11 @@ vi.mock('@/app/(auth)/signup/SignUpPageClient', () => ({
 }));
 
 describe('/signup page server redirect', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   beforeEach(() => {
+    // These fixtures exercise the explicit-reopen path; closed defaults are covered separately.
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'false');
     vi.resetModules();
     resolveUserStateMock.mockReset();
     redirectMock.mockClear();

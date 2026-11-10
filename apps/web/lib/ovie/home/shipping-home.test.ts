@@ -4,11 +4,6 @@ import type { OvieInbox, OvieInboxCase } from '@/lib/ovie/inbox';
 import { INTERACTION_CASE_CONTRACT } from '@/lib/ovie/interaction-case';
 import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 import {
-  type CountMeasurement,
-  type DeliverySummary,
-  emptyDeliverySummary,
-} from '@/lib/ovie/shipping-state/contract';
-import {
   buildConstraint,
   buildDoneToday,
   buildOvieAsks,
@@ -19,22 +14,20 @@ import {
   mergeDoneWithRecent,
   OVIE_NOT_MEASURED,
   OVIE_SHIP_STAGES,
-  rememberPulse,
   shipStageForTask,
   stageLabel,
 } from './shipping-home';
+import {
+  count,
+  delivery,
+  measuredDelivery,
+  onTargetDelivery,
+  SINCE,
+} from './shipping-home.test-fixtures';
 
 type Feed = ShippingCockpitProjection['operationalTasks'];
 type Task = Feed['tasks'][number];
 type Rollup = 'success' | 'failure' | 'pending' | 'unknown';
-
-const SINCE = '2026-10-20T07:00:00.000Z';
-
-function count(value: number | null): CountMeasurement {
-  if (value === null) return { state: 'not-measured', value: null };
-  if (value === 0) return { state: 'measured-zero', value: 0 };
-  return { state: 'measured-nonzero', value };
-}
 
 function task(
   id: number,
@@ -84,38 +77,6 @@ function feed(tasks: Task[], syncState: Feed['syncState'] = 'fresh'): Feed {
     tasks,
     deltas: [],
   };
-}
-
-function delivery(patch: Partial<DeliverySummary> = {}): DeliverySummary {
-  return { ...emptyDeliverySummary(), ...patch };
-}
-
-function measuredDelivery(): DeliverySummary {
-  const empty = emptyDeliverySummary();
-  return delivery({
-    lanes: {
-      ...empty.lanes,
-      running: count(3),
-      slots: count(4),
-      diskFreePct: 18.4,
-      heldByReason: { budget: 0 },
-      publishedAt: '2026-10-20T18:00:00.000Z',
-    },
-    merges: {
-      ...empty.merges,
-      since: SINCE,
-      today: count(7),
-      last7Days: count(40),
-      prior7Days: count(31),
-    },
-    mergeQueueDepth: count(2),
-    production: {
-      sha: 'c9b767a1234567890',
-      version: null,
-      deployedAt: null,
-      behindMain: count(0),
-    },
-  });
 }
 
 describe('shipStageForTask', () => {
@@ -222,20 +183,52 @@ describe('buildDoneToday', () => {
 });
 
 describe('buildPulse', () => {
+  it('discloses metric scope and the inner SLO snapshot even with a fresh lanes feed', () => {
+    const base = onTargetDelivery();
+    const pulse = buildPulse({
+      ...base,
+      lanes: {
+        ...base.lanes,
+        stale: false,
+        flow: {
+          ...base.lanes.flow!,
+          at: '2026-11-07T14:24:24.583Z',
+          ownerless: 11,
+        },
+      },
+    });
+    expect(
+      pulse.find(tile => tile.key === 'ejections')?.sourceCaption
+    ).toContain('Snapshot 2026-11-07 14:24 UTC');
+    expect(pulse.find(tile => tile.key === 'ownerless')).toMatchObject({
+      label: 'Ownerless issues',
+      value: '11',
+    });
+    expect(pulse.find(tile => tile.key === 'merges-day')?.label).toBe(
+      'Org merges / day (7d)'
+    );
+  });
+
+  it.each([null, 'invalid'])('does not invent a snapshot time for %s', at => {
+    const base = onTargetDelivery();
+    const pulse = buildPulse({
+      ...base,
+      lanes: { ...base.lanes, flow: { ...base.lanes.flow!, at } },
+    });
+    expect(
+      pulse.find(tile => tile.key === 'ejections')?.sourceCaption
+    ).toContain('Snapshot time unknown');
+  });
+
   it('shows Not measured, neutral tone, and no was for an empty summary', () => {
     const pulse = buildPulse(delivery());
     expect(pulse.map(tile => tile.key)).toEqual([
+      'merges-day',
+      'ejections',
       'prod',
-      'merges-hour',
-      'queue',
-      'red-prs',
+      'lyb-deploy',
       'lanes',
-      'eligible',
-      'held',
       'ownerless',
-      'merges-today',
-      'merges-7d',
-      'gem-disk',
     ]);
     for (const tile of pulse) {
       expect(tile.value).toBe(OVIE_NOT_MEASURED);
@@ -245,88 +238,144 @@ describe('buildPulse', () => {
     }
   });
 
-  it('formats measured values and uses the source comparison for 7d merges', () => {
-    const byKey = Object.fromEntries(
-      buildPulse(measuredDelivery()).map(tile => [tile.key, tile])
-    );
-    expect(byKey.prod).toMatchObject({ value: 'c9b767a', tone: 'good' });
-    expect(byKey['merges-today']).toMatchObject({ value: '7', tone: 'good' });
-    expect(byKey['merges-7d']).toMatchObject({
-      value: '40',
-      was: '31',
-      tone: 'good',
-    });
-    expect(byKey.lanes).toMatchObject({ value: '3/4', tone: 'good' });
-    expect(byKey.queue).toMatchObject({ value: '2', tone: 'neutral' });
-    expect(byKey.held).toMatchObject({ value: '0', tone: 'good' });
-    expect(byKey['gem-disk']).toMatchObject({ value: '18%', tone: 'good' });
+  it('gives every tile a target and a drill-down, never a raw counter', () => {
+    for (const tile of buildPulse(onTargetDelivery())) {
+      expect(tile.target, tile.key).toMatch(/^Target /);
+      expect(tile.href, tile.key).toMatch(/^\/app\/ov\//);
+    }
   });
 
-  it('flags falling throughput, held work, low disk, and stale lanes', () => {
-    const base = measuredDelivery();
+  it('judges each value against its target', () => {
+    const byKey = Object.fromEntries(
+      buildPulse(onTargetDelivery()).map(tile => [tile.key, tile])
+    );
+    expect(byKey['merges-day']).toMatchObject({
+      value: '25',
+      was: '20 prior 7d',
+      tone: 'good',
+      target: 'Target ≥ 20',
+    });
+    expect(byKey.ejections).toMatchObject({ value: '5%', tone: 'good' });
+    expect(byKey.prod).toMatchObject({ value: 'Current', tone: 'good' });
+    expect(byKey.lanes).toMatchObject({ value: '4 of 4', tone: 'good' });
+    expect(byKey.ownerless).toMatchObject({ value: '0', tone: 'good' });
+  });
+
+  it('turns warn when off target and bad when more than twice off', () => {
+    const base = onTargetDelivery();
+    const flow = base.lanes.flow;
+    if (!flow) throw new Error('fixture has flow');
     const byKey = Object.fromEntries(
       buildPulse(
         delivery({
           ...base,
           lanes: {
             ...base.lanes,
-            heldByReason: { budget: 2, auth: 1 },
-            diskFreePct: 3,
-            stale: true,
+            running: count(1),
+            flow: { ...flow, queueEjectionRate: 0.58, ownerless: 6 },
           },
-          merges: { ...base.merges, today: count(0), last7Days: count(10) },
-          production: { ...base.production, behindMain: count(4) },
+          merges: { ...base.merges, last7Days: count(105) },
+          production: { ...base.production, behindMain: count(1) },
         })
       ).map(tile => [tile.key, tile])
     );
-    expect(byKey.prod?.tone).toBe('warn');
-    expect(byKey['merges-today']).toMatchObject({ value: '0', tone: 'warn' });
-    expect(byKey['merges-7d']?.tone).toBe('warn');
-    expect(byKey.held).toMatchObject({ value: '3', tone: 'bad' });
-    expect(byKey['gem-disk']?.tone).toBe('bad');
-    expect(byKey.lanes?.tone).toBe('neutral');
+    expect(byKey['merges-day']).toMatchObject({ value: '15', tone: 'warn' });
+    expect(byKey.ejections).toMatchObject({ value: '58%', tone: 'bad' });
+    expect(byKey.prod).toMatchObject({
+      value: '1 behind',
+      tone: 'warn',
+    });
+    expect(byKey.lanes).toMatchObject({ value: '1 of 4', tone: 'bad' });
+    expect(byKey.ownerless).toMatchObject({ value: '6', tone: 'bad' });
   });
 
-  it('fills was from the last different observed value', () => {
-    const first = buildPulse(measuredDelivery());
-    let memory = rememberPulse({}, first);
-    expect(
-      buildPulse(measuredDelivery(), memory).find(t => t.key === 'prod')?.was
-    ).toBeNull();
-
+  it('shows LogYourBody production deploy health on Home, failing in bad tone', () => {
     const base = measuredDelivery();
-    const next = delivery({
-      ...base,
-      production: { ...base.production, sha: 'abc1234ffff' },
+    const withHealth = (
+      repo: Partial<{
+        status: 'ok' | 'failing' | 'unknown';
+        failedStreak: number;
+        behindMain: number | null;
+      }>
+    ) =>
+      Object.fromEntries(
+        buildPulse(
+          delivery({
+            ...base,
+            lanes: {
+              ...base.lanes,
+              deployHealth: {
+                observedAt: '2026-10-25T17:24:52.000Z',
+                healthy: false,
+                repos: [
+                  {
+                    repo: 'JovieInc/LogYourBody',
+                    status: 'ok',
+                    failedStreak: 0,
+                    behindMain: 0,
+                    oldestUnshippedAgeSeconds: null,
+                    lastSuccessAt: null,
+                    ...repo,
+                  },
+                ],
+              },
+            },
+          })
+        ).map(tile => [tile.key, tile])
+      );
+    expect(
+      withHealth({ status: 'failing', failedStreak: 21, behindMain: 87 })[
+        'lyb-deploy'
+      ]
+    ).toMatchObject({
+      label: 'LYB prod',
+      value: 'Failing, 87 behind',
+      tone: 'bad',
+      measured: true,
     });
-    const second = buildPulse(next, memory);
-    expect(second.find(t => t.key === 'prod')).toMatchObject({
-      value: 'abc1234',
-      was: 'c9b767a',
+    expect(withHealth({ behindMain: 4 })['lyb-deploy']).toMatchObject({
+      value: '4 behind',
+      tone: 'warn',
     });
-
-    memory = rememberPulse(memory, second);
-    expect(memory.prod).toEqual({ value: 'abc1234', was: 'c9b767a' });
-    // An unchanged observation keeps the remembered comparison.
-    expect(buildPulse(next, memory).find(t => t.key === 'prod')?.was).toBe(
-      'c9b767a'
-    );
+    expect(withHealth({ behindMain: 0 })['lyb-deploy']).toMatchObject({
+      value: 'Current',
+      tone: 'good',
+    });
+    expect(withHealth({ status: 'unknown' })['lyb-deploy']).toMatchObject({
+      value: OVIE_NOT_MEASURED,
+      measured: false,
+      tone: 'neutral',
+    });
+    // No published block is Not measured, never healthy.
+    expect(
+      Object.fromEntries(buildPulse(base).map(tile => [tile.key, tile]))[
+        'lyb-deploy'
+      ]
+    ).toMatchObject({ value: OVIE_NOT_MEASURED, tone: 'neutral' });
   });
 
-  it('never remembers or compares against unmeasured values', () => {
-    const memory = rememberPulse({}, buildPulse(delivery()));
-    expect(memory).toEqual({});
-    const unmeasured = buildPulse(delivery(), {
-      prod: { value: 'c9b767a', was: null },
+  it('compares against the value at the last visit', () => {
+    const base = onTargetDelivery();
+    const pulse = buildPulse(base, {
+      prod: { value: '3 behind', was: null },
+      ejections: { value: '5%', was: null },
     });
-    expect(unmeasured.find(t => t.key === 'prod')?.was).toBeNull();
+    expect(pulse.find(t => t.key === 'prod')?.was).toBe('3 behind');
+    // Unchanged since the last visit: nothing to compare.
+    expect(pulse.find(t => t.key === 'ejections')?.was).toBeNull();
+    // Unmeasured tiles never show a comparison.
+    expect(
+      buildPulse(delivery(), { prod: { value: 'Current', was: null } }).find(
+        t => t.key === 'prod'
+      )?.was
+    ).toBeNull();
   });
 });
 
 describe('buildConstraint', () => {
   const rows = (tasks: Task[]) => buildShipRows(feed(tasks));
 
-  it('prefers a published lanes alert', () => {
+  it('leads with a degraded fleet and links to it', () => {
     const base = measuredDelivery();
     expect(
       buildConstraint(
@@ -342,8 +391,8 @@ describe('buildConstraint', () => {
       )
     ).toEqual({
       tone: 'bad',
-      text: '0 of 28 Todo issues eligible',
-      detailsHref: APP_ROUTES.ADMIN_PRODUCT,
+      text: 'Shipping off target: fleet degraded (1 alert) · 6 merges/day (target 20) · +2 more',
+      detailsHref: APP_ROUTES.ADMIN_OPERATIONS,
     });
   });
 
@@ -362,61 +411,55 @@ describe('buildConstraint', () => {
       [],
       'fresh'
     );
-    expect(constraint).toEqual({
+    expect(constraint).toMatchObject({
       tone: 'bad',
-      text: 'Remediation alerts are not being acknowledged (45 failed delivery records)',
-      detailsHref: APP_ROUTES.ADMIN_PRODUCT,
+      detailsHref: APP_ROUTES.ADMIN_OPERATIONS,
     });
+    expect(constraint?.text).toContain('fleet degraded (1 alert)');
+    expect(constraint?.text).not.toMatch(/event-delivery|failed=45/);
   });
 
-  it('names blocked, failing, behind-main, and stale conditions in order', () => {
-    const base = measuredDelivery();
-    expect(
-      buildConstraint(
-        base,
-        rows([task(1, 'blocked'), task(2, 'blocked')]),
-        'fresh'
-      )
-    ).toEqual({ tone: 'bad', text: '2 items are blocked' });
-    expect(
-      buildConstraint(
-        base,
-        rows([task(1, 'running', { rollup: 'failure' })]),
-        'fresh'
-      )
-    ).toEqual({ tone: 'warn', text: '1 PR has failing checks' });
-    expect(
-      buildConstraint(
-        delivery({
-          ...base,
-          production: { ...base.production, behindMain: count(1) },
-        }),
-        [],
-        'fresh'
-      )
-    ).toEqual({ tone: 'warn', text: 'Production is 1 commit behind main' });
-    expect(
-      buildConstraint(
-        delivery({ ...base, lanes: { ...base.lanes, stale: true } }),
-        [],
-        'fresh'
-      )
-    ).toEqual({ tone: 'warn', text: 'Lanes feed is stale' });
-    expect(buildConstraint(base, [], 'failed')).toEqual({
+  it('never says shipping is fine without evidence (guard)', () => {
+    // Tim 2026-10-30: "Nothing is blocking shipping" sat beside a 58% queue
+    // ejection rate. The clear verdict now requires every input measured.
+    const verdict = buildConstraint(delivery(), [], 'fresh');
+    expect(verdict).not.toBeNull();
+    expect(verdict?.text).toMatch(/^Shipping health unknown: /);
+    expect(buildConstraint(onTargetDelivery(), [], 'syncing')).toMatchObject({
       tone: 'warn',
-      text: 'Work items are not current',
+      text: 'Shipping health unknown: work items not measured',
     });
   });
 
-  it('returns null when nothing needs attention', () => {
-    expect(buildConstraint(measuredDelivery(), [], 'fresh')).toBeNull();
+  it('names breaches worst first, from the same evidence as the tiles', () => {
+    const base = onTargetDelivery();
+    const flow = base.lanes.flow;
+    if (!flow) throw new Error('fixture has flow');
+    const verdict = buildConstraint(
+      delivery({
+        ...base,
+        lanes: { ...base.lanes, flow: { ...flow, queueEjectionRate: 0.58 } },
+        production: { ...base.production, behindMain: count(1) },
+      }),
+      rows([task(1, 'blocked'), task(2, 'running', { rollup: 'failure' })]),
+      'fresh'
+    );
+    expect(verdict).toEqual({
+      tone: 'bad',
+      text: 'Shipping off target: 58% of queue entries ejected (target 10%) · 1 item blocked · +2 more',
+      detailsHref: APP_ROUTES.ADMIN_SHIPPING,
+    });
+  });
+
+  it('is clear only when every input is measured and on target', () => {
+    expect(buildConstraint(onTargetDelivery(), [], 'fresh')).toBeNull();
   });
 });
 
 describe('buildOvieHomeShipping', () => {
   it('composes constraint, pulse, rows, and done today from one read', () => {
     const home = buildOvieHomeShipping({
-      delivery: measuredDelivery(),
+      delivery: onTargetDelivery(),
       operationalTasks: feed([
         task(1, 'running', { rollup: 'pending' }),
         task(2, 'production-verified'),
@@ -436,7 +479,7 @@ describe('buildOvieHomeShipping', () => {
     });
     expect(home.mergesToday).toBeNull();
     expect(home.done).toEqual([]);
-    expect(home.constraint).toBeNull();
+    expect(home.constraint?.text).toMatch(/^Shipping health unknown/);
   });
 });
 
