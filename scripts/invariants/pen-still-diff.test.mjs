@@ -5,6 +5,110 @@ import { tmpdir } from 'node:os'; import { join } from 'node:path'; import { tes
 compareImages, evaluateManifest, formatComment, frameCaptureUrl, parseManifest,
 selectFrames, syntheticComparison, validateManifest, } from './pen-still-diff.mjs';
 import { decodePng, encodePng, measureImage, ssim, stretchedPair, syntheticPair } from './pen-still-diff-lib.mjs';
+import { captureSurfacePng } from './clef-screenshot-capture.mjs';
+const CAPTURE_PNG = encodePng(syntheticPair().pen);
+async function assertCaptureGeometry(expectedPath) {
+  const calls = [];
+  const mockup = {
+    getBoundingClientRect: () => ({ x: 42, y: 104, width: 192, height: 256 }),
+  };
+  const heading = {
+    getBoundingClientRect: () => ({ x: 26, y: 36, width: 120, height: 24 }),
+  };
+  const root = {
+    getBoundingClientRect: () => ({ x: 10, y: 20, width: 320, height: 480 }),
+    querySelector: selector =>
+      selector === '[data-pen-mockup]' ? mockup : null,
+    querySelectorAll: () => [heading],
+  };
+  const documentElement = {
+    ownerDocument: {
+      querySelector: selector => (selector === '.hero' ? root : null),
+    },
+  };
+  const page = {
+    goto: async url => calls.push(['goto', url]),
+    url: () => 'http://127.0.0.1/fixture?source=capture',
+    waitForTimeout: async wait => calls.push(['wait', wait]),
+    locator: selector => ({
+      first: () => ({ screenshot: async () => CAPTURE_PNG }),
+      evaluate: async (callback, arg) => {
+        assert.equal(selector, 'html');
+        return callback(documentElement, arg);
+      },
+    }),
+    close: async () => calls.push(['close']),
+  };
+  const browser = /** @type {import('playwright').Browser} */ (
+    /** @type {unknown} */ ({
+      newPage: async options => {
+        calls.push(['newPage', options]);
+        return page;
+      },
+    })
+  );
+  const captured = await captureSurfacePng(browser, {
+    url: 'http://127.0.0.1/fixture',
+    viewport: 390,
+    selector: '.hero',
+    wait: 0,
+    expectedPath,
+  });
+  assert.equal(captured.png, CAPTURE_PNG);
+  assert.equal(captured.viewport, 390);
+  assert.equal(captured.mode, 'dark');
+  assert.equal(captured.finalUrl, 'http://127.0.0.1/fixture?source=capture');
+  assert.deepEqual(captured.geometry, {
+    section: { width: 320, height: 480 },
+    mockup: { x: 32, y: 84, width: 192, height: 256 },
+    textBlocks: [{ x: 16, y: 16, width: 120, height: 24 }],
+  });
+  assert.equal(calls[0][1].colorScheme, 'dark');
+  assert.deepEqual(calls.at(-1), ['close']);
+}
+
+for (const expectedPath of [undefined, '/fixture']) {
+  test(`capture measures browser-owned DOM geometry and closes its page (${expectedPath ?? 'unrestricted'})`, async () => {
+    await assertCaptureGeometry(expectedPath);
+  });
+}
+
+test('capture reports an off-route redirect before waiting or taking a screenshot', async () => {
+  const calls = [];
+  const finalUrl = 'https://example.test/signin?redirect_url=%2Fapp%2Fchat';
+  const browser = /** @type {import('playwright').Browser} */ (
+    /** @type {unknown} */ ({
+      newPage: async () => ({
+        goto: async url => calls.push(['goto', url]),
+        url: () => finalUrl,
+        waitForTimeout: async () => assert.fail('redirects must not wait'),
+        click: async () => assert.fail('redirects must not click'),
+        locator: () => assert.fail('redirects must not capture the wrong page'),
+        screenshot: async () => assert.fail('redirects must not screenshot'),
+        close: async () => calls.push(['close']),
+      }),
+    })
+  );
+  const captured = await captureSurfacePng(browser, {
+    url: 'https://example.test/app/chat',
+    expectedPath: '/app/chat',
+    selector: '[data-pen-section="chat/app-chat"]',
+    click: 'button',
+  });
+  assert.deepEqual(captured, {
+    png: null,
+    geometry: null,
+    viewport: 1440,
+    mode: 'dark',
+    finalUrl,
+    redirected: true,
+  });
+  assert.deepEqual(calls, [
+    ['goto', 'https://example.test/app/chat'],
+    ['close'],
+  ]);
+});
+
 // Inline fixture: the legacy homepage manifest was folded into docs/design-system/pen-bindings.json.
 const manifest = JSON.parse(`{"schema": "pen-still-manifest/v1", "surface": "homepage", "primaryMode": "dark", "penFile": {"name": "Jovie Homepage Profiles Claim \u2014 review copy 2026-10-01.pen", "sha256": null, "note": "The live Pen file is on the design machine and is not in this repo. Fill sha256 when canonical stills are exported."}, "frames": [{"sectionId": "hero", "penNodeId": "pending-canonical-hero", "fileHash": null, "stillPath": "docs/pen-stills/homepage/hero.dark.1440.png", "viewport": 1440, "mode": "dark", "status": "active", "route": "/", "story": "homepage--hero", "sectionSelector": "[data-pen-section='hero']", "mockupSelector": "[data-pen-mockup]"}, {"sectionId": "hero", "penNodeId": "pending-canonical-hero", "fileHash": null, "stillPath": "docs/pen-stills/homepage/hero.dark.390.png", "viewport": 390, "mode": "dark", "status": "active", "route": "/", "story": "homepage--hero", "sectionSelector": "[data-pen-section='hero']", "mockupSelector": "[data-pen-mockup]"}, {"sectionId": "hero", "penNodeId": "pending-canonical-hero", "fileHash": null, "stillPath": "docs/pen-stills/homepage/hero.light.1440.png", "viewport": 1440, "mode": "light", "status": "active", "route": "/", "story": "homepage--hero", "sectionSelector": "[data-pen-section='hero']", "mockupSelector": "[data-pen-mockup]"}, {"sectionId": "parked-exploration", "penNodeId": "parked-example", "fileHash": null, "stillPath": "docs/pen-stills/homepage/parked.dark.1440.png", "viewport": 1440, "mode": "dark", "status": "parked"}, {"sectionId": "taste-fork", "penNodeId": "fork-example", "fileHash": null, "stillPath": "docs/pen-stills/homepage/fork.dark.1440.png", "viewport": 1440, "mode": "dark", "status": "fork"}]}`);
 test('legacy frame manifest is valid, dark-first, and drops parked and fork frames', () => {

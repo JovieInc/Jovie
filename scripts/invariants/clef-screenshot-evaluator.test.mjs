@@ -16,7 +16,6 @@ import {
   CAPTURE_VIEWPORTS,
   CONNECT_ATTEMPT_TIMEOUT_MS,
   callClef,
-  captureSurfacePng,
   ensureConnectAttemptBudget,
   evaluateScreenshots,
   MAX_REVISIONS,
@@ -70,108 +69,6 @@ test('capture viewports stay 1440 and 390, and dark is the default scheme', () =
   assert.equal(resolveCaptureViewport('unknown'), CAPTURE_VIEWPORTS.desktop);
   assert.equal(CAPTURE_COLOR_SCHEME_DEFAULT, 'dark');
   assert.equal(resolveCaptureColorScheme('light'), 'light');
-});
-
-async function assertCaptureGeometry(expectedPath) {
-  const calls = [];
-  const mockup = {
-    getBoundingClientRect: () => ({ x: 42, y: 104, width: 192, height: 256 }),
-  };
-  const heading = {
-    getBoundingClientRect: () => ({ x: 26, y: 36, width: 120, height: 24 }),
-  };
-  const root = {
-    getBoundingClientRect: () => ({ x: 10, y: 20, width: 320, height: 480 }),
-    querySelector: selector =>
-      selector === '[data-pen-mockup]' ? mockup : null,
-    querySelectorAll: () => [heading],
-  };
-  const documentElement = {
-    ownerDocument: {
-      querySelector: selector => (selector === '.hero' ? root : null),
-    },
-  };
-  const page = {
-    goto: async url => calls.push(['goto', url]),
-    url: () => 'http://127.0.0.1/fixture?source=capture',
-    waitForTimeout: async wait => calls.push(['wait', wait]),
-    locator: selector => ({
-      first: () => ({ screenshot: async () => PNG }),
-      evaluate: async (callback, arg) => {
-        assert.equal(selector, 'html');
-        return callback(documentElement, arg);
-      },
-    }),
-    close: async () => calls.push(['close']),
-  };
-  const browser = /** @type {import('playwright').Browser} */ (
-    /** @type {unknown} */ ({
-      newPage: async options => {
-        calls.push(['newPage', options]);
-        return page;
-      },
-    })
-  );
-  const captured = await captureSurfacePng(browser, {
-    url: 'http://127.0.0.1/fixture',
-    viewport: 390,
-    selector: '.hero',
-    wait: 0,
-    expectedPath,
-  });
-  assert.equal(captured.png, PNG);
-  assert.equal(captured.viewport, 390);
-  assert.equal(captured.mode, 'dark');
-  assert.equal(captured.finalUrl, 'http://127.0.0.1/fixture?source=capture');
-  assert.deepEqual(captured.geometry, {
-    section: { width: 320, height: 480 },
-    mockup: { x: 32, y: 84, width: 192, height: 256 },
-    textBlocks: [{ x: 16, y: 16, width: 120, height: 24 }],
-  });
-  assert.equal(calls[0][1].colorScheme, 'dark');
-  assert.deepEqual(calls.at(-1), ['close']);
-}
-
-for (const expectedPath of [undefined, '/fixture']) {
-  test(`capture measures browser-owned DOM geometry and closes its page (${expectedPath ?? 'unrestricted'})`, async () => {
-    await assertCaptureGeometry(expectedPath);
-  });
-}
-
-test('capture reports an off-route redirect before waiting or taking a screenshot', async () => {
-  const calls = [];
-  const finalUrl = 'https://example.test/signin?redirect_url=%2Fapp%2Fchat';
-  const browser = /** @type {import('playwright').Browser} */ (
-    /** @type {unknown} */ ({
-      newPage: async () => ({
-        goto: async url => calls.push(['goto', url]),
-        url: () => finalUrl,
-        waitForTimeout: async () => assert.fail('redirects must not wait'),
-        click: async () => assert.fail('redirects must not click'),
-        locator: () => assert.fail('redirects must not capture the wrong page'),
-        screenshot: async () => assert.fail('redirects must not screenshot'),
-        close: async () => calls.push(['close']),
-      }),
-    })
-  );
-  const captured = await captureSurfacePng(browser, {
-    url: 'https://example.test/app/chat',
-    expectedPath: '/app/chat',
-    selector: '[data-pen-section="chat/app-chat"]',
-    click: 'button',
-  });
-  assert.deepEqual(captured, {
-    png: null,
-    geometry: null,
-    viewport: 1440,
-    mode: 'dark',
-    finalUrl,
-    redirected: true,
-  });
-  assert.deepEqual(calls, [
-    ['goto', 'https://example.test/app/chat'],
-    ['close'],
-  ]);
 });
 
 test('profiles select rules; app drops marketing-only rules', () => {
