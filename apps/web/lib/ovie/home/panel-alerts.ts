@@ -11,6 +11,7 @@ export type OvieHomePanel =
   | 'shipping-loop'
   | 'asks'
   | 'company'
+  | 'revenue-blocker'
   | 'shipping-projection';
 
 const reported = new Set<string>();

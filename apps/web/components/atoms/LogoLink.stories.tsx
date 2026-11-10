@@ -54,3 +54,22 @@ export const CustomHref: Story = {
     href: '/custom',
   },
 };
+
+/** The Latin wordmark and the icon reveal in a right-to-left Arabic header. */
+export const RtlArabicHeader: Story = {
+  args: {
+    variant: 'icon',
+    logoSize: 'md',
+    reveal: true,
+  },
+  render: args => (
+    <header
+      dir='rtl'
+      lang='ar'
+      className='flex w-80 items-center justify-between gap-4 rounded-lg border border-subtle bg-surface-1 px-4 py-3'
+    >
+      <LogoLink {...args} />
+      <span className='text-sm text-secondary-token'>الصفحة الرئيسية</span>
+    </header>
+  ),
+};

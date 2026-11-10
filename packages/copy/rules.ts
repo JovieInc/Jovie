@@ -300,7 +300,7 @@ export const COPY_RULES: readonly CopyRule[] = [
     severity: 'block',
     registers: ['jovie-marketing'],
     pattern:
-      /\b(?:unlock(?:s|ed|ing)?|reimagin(?:e|es|ed|ing)|all-in-one|one-stop shop)\b/i,
+      /\b(?:unlock(?:s|ed|ing)?|reimagin(?:e|es|ed|ing)|all-in-one|one-stop shop|quiet workspace|in one (?:quiet |simple |single |beautiful )?workspace)\b/i,
     message:
       'Generic promotion. Replace with a concrete action or consequence.',
   },

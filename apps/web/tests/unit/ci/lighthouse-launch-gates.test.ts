@@ -99,17 +99,50 @@ describe('Lighthouse identity admission', () => {
     );
     expect(probe.run).toContain('tests/e2e/shell-nav-click-through.spec.ts');
     expect(probe.run).toContain('tests/e2e/shell-route-health.spec.ts');
+    expect(probe.run).toContain(
+      'tests/e2e/releases-first-paint-visual.spec.ts'
+    );
     const lighthouse = probe.run.indexOf(
       'pnpm run test:lighthouse:dashboard:pr'
     );
     const serverReady = probe.run.indexOf('SERVER_READY" = "false"');
     expect(nav).toBeGreaterThan(serverReady);
     expect(lighthouse).toBeGreaterThan(nav);
+    // Chat and onboarding have no identity-free job of their own, so the
+    // dashboard gate holds them to their budgets on the same server.
+    const chat = probe.run.indexOf('pnpm run test:lighthouse:chat:pr');
+    const onboarding = probe.run.indexOf(
+      'LIGHTHOUSE_TEST_PERSONA=creator pnpm run test:lighthouse:onboarding:pr'
+    );
+    expect(chat).toBeGreaterThan(lighthouse);
+    expect(onboarding).toBeGreaterThan(lighthouse);
+    expect(probe.run).not.toMatch(/test:lighthouse:[a-z]+:pr[^\n]*\|\|\s*true/);
     expect(probe.run).not.toMatch(
       /click-(?:navigation|through)[^\n]*\|\|\s*true/
     );
     expect(probe['continue-on-error']).toBeUndefined();
     expect(job['continue-on-error']).toBeUndefined();
+  });
+
+  it('dashboard: a change to any Lighthouse config it runs turns its measuring steps on', () => {
+    // run_full_ci (from run_dashboard_lighthouse) gates every probe step, so a
+    // PR touching only one of these must not skip the measurement and pass.
+    const source = readFileSync(
+      join(REPO_ROOT, '.github/workflows/ci.yml'),
+      'utf8'
+    );
+    const match = source.match(/DASHBOARD_LIGHTHOUSE_PATTERN='([^']+)'/);
+    expect(match).not.toBeNull();
+    const pattern = new RegExp(match?.[1] ?? '$^');
+    for (const path of [
+      'apps/web/.lighthouserc.dashboard.pr.json',
+      'apps/web/.lighthouserc.chat.pr.json',
+      'apps/web/.lighthouserc.onboarding.pr.json',
+      'apps/web/scripts/lighthouse-dashboard-auth.cjs',
+    ]) {
+      expect(pattern.test(path), path).toBe(true);
+    }
+    expect(pattern.test('apps/web/.lighthouserc.admin.pr.json')).toBe(false);
   });
 
   for (const surface of ['onboarding'] as const) {

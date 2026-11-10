@@ -2033,7 +2033,7 @@ describe('TasksPageClient', () => {
       deleteItem?.onClick?.();
     });
 
-    const dialog = screen.getByRole('dialog', { name: 'Delete task?' });
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete task?' });
     expect(dialog).toHaveTextContent('Delete task?');
     expect(dialog).toHaveTextContent(mockTaskTwo.title);
 

@@ -888,8 +888,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:policy
-    jobCount: 1
+    terminalReceipt: job:bump
+    jobCount: 2
   - name: Publish @jovie/cli to npm
     path: .github/workflows/npm-publish.yml
     active: true
@@ -934,10 +934,23 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - pull_request
       - push
       - workflow_dispatch
     terminalReceipt: job:draft
     jobCount: 2
+  - name: Pen inspect frames
+    path: .github/workflows/pen-inspect.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - workflow_dispatch
+    terminalReceipt: job:inspect
+    jobCount: 1
   - name: Pen still diff (advisory)
     path: .github/workflows/pen-still-diff.yml
     active: true

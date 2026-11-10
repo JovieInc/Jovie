@@ -39,6 +39,34 @@ afterEach(() => {
 });
 
 describe('StageMotion', () => {
+  it('zooms each stage to the content box between 1024 and 1439', () => {
+    const zoomed = { value: true };
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((query: string) => ({
+        matches: query.includes('reduce') ? false : zoomed.value,
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }))
+    );
+    document.body.innerHTML = `
+      <section class="hv3"><div class="hv3-rule" style="padding-left: 96px"></div></section>`;
+    const section = document.querySelector('.hv3') as HTMLElement;
+    Object.defineProperty(section, 'clientWidth', { value: 1280 });
+    document.documentElement.style.fontSize = '16px';
+    render(<StageMotion paletteQuery='releases' paletteTarget='Releases' />);
+    // (1280 - 2 x 96) / (78 x 16) = 1088 / 1248
+    expect(Number(section.style.getPropertyValue('--hv3-z'))).toBeCloseTo(
+      1088 / 1248,
+      6
+    );
+    zoomed.value = false;
+    window.dispatchEvent(new Event('resize'));
+    expect(section.style.getPropertyValue('--hv3-z')).toBe('');
+    document.documentElement.style.fontSize = '';
+  });
+
   it('turns motion on, and off again on unmount', () => {
     mockReducedMotion(false);
     const { unmount } = render(
@@ -88,6 +116,59 @@ describe('StageMotion', () => {
     mockReducedMotion(true);
     render(<StageMotion paletteQuery='releases' paletteTarget='Releases' />);
     expect(document.documentElement).not.toHaveClass('hv3-motion');
+  });
+
+  it('keeps a callout label inside its section frame guides', () => {
+    mockReducedMotion(true);
+    document.body.innerHTML = `
+      <section class="hv3-chapter">
+        <div class="hv3-rule" style="padding-left: 96px"></div>
+        <div id="stage">
+          <i data-hv3-anchor="near"></i><i data-hv3-anchor="far"></i>
+          <div data-hv3-callout="near" class="hv3-callout hv3-callout--l">
+            <i class="hv3-callout__node"></i>
+            <span class="hv3-callout__leader"></span>
+            <span class="hv3-mono">row</span>
+          </div>
+          <div data-hv3-callout="far" class="hv3-callout">
+            <i class="hv3-callout__node"></i>
+            <span class="hv3-callout__leader"></span>
+            <span class="hv3-mono">one handle</span>
+          </div>
+        </div>
+      </section>`;
+    const section = document.querySelector('section') as HTMLElement;
+    const stage = document.getElementById('stage') as HTMLElement;
+    section.getBoundingClientRect = () => rect(0, 0, 1440, 900);
+    stage.getBoundingClientRect = () => rect(0, 0, 1440, 900);
+    Object.defineProperty(stage, 'offsetWidth', { value: 1440 });
+    const anchors = { near: 239, far: 1299 } as const;
+    for (const [id, left] of Object.entries(anchors)) {
+      (
+        document.querySelector(`[data-hv3-anchor="${id}"]`) as HTMLElement
+      ).getBoundingClientRect = () => rect(left, 399);
+    }
+    // Node 9px, a 48px leader by default, a 100px label.
+    for (const callout of document.querySelectorAll<HTMLElement>(
+      '[data-hv3-callout]'
+    )) {
+      const leader = callout.querySelector('span') as HTMLElement;
+      const leaderWidth = () =>
+        leader.style.width ? Number.parseFloat(leader.style.width) : 48;
+      Object.defineProperty(leader, 'offsetWidth', { get: leaderWidth });
+      Object.defineProperty(callout, 'offsetWidth', {
+        get: () => 9 + leaderWidth() + 100,
+      });
+      Object.defineProperty(callout, 'offsetParent', { value: stage });
+    }
+    render(<StageMotion paletteQuery='releases' paletteTarget='Releases' />);
+    const [near, far] =
+      document.querySelectorAll<HTMLElement>('[data-hv3-callout]');
+    // 9px past the left guide: the leader gives up 9px and the label starts on it.
+    expect(near.querySelector('span')?.style.width).toBe('39px');
+    expect(near.style.transform).toBe('translate(97px, 400px)');
+    // Far past the right guide: the leader shortens to its floor.
+    expect(far.querySelector('span')?.style.width).toBe('16px');
   });
 
   it('draws the connector between its two projected anchors', () => {

@@ -4,6 +4,8 @@
 // the route manifest, copy truth sources, the one primary action, product
 // imagery, and tokenized styles. Changing the page means changing its typed
 // records, not rewriting a dozen source-string guards.
+// Frame checks (labels, keycaps and edges inside their frames) live in
+// homepage-frames.test.tsx, so this file stays under the size limit.
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
@@ -213,14 +215,16 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     const sources = [...container.querySelectorAll('section img')].map(image =>
       (image.getAttribute('src') ?? '').replace(/\?v=\w+$/, '')
     );
-    // Tim, 2026-11-08: the homepage does not feature him. The live product UI
-    // shows an invented demo artist (procedural art, no people) until real
-    // artists opt in to be featured. No real person renders on `/`.
+    // Tim, 2026-11-08: the homepage does not feature him. Until a real artist
+    // opts in, the product UI is labeled Example artist (procedural art, no
+    // people, no verified badge). No real person renders on `/`.
     const allowed = [
       artist.avatarSrc,
       ...artist.releases.map(release => release.src),
     ];
     expect(artist.demo).toBe(true);
+    expect(artist.name).toBe('Example artist');
+    expect(container.querySelector('.hv3-pp__badge, .hv3-insp__ok')).toBeNull();
     expect(sources.length).toBeGreaterThan(0);
     expect(sources.filter(src => !allowed.includes(src))).toEqual([]);
     expect([...new Set(sources)].sort()).toEqual([...new Set(allowed)].sort());
@@ -236,7 +240,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     const lines = JSON.stringify(HOMEPAGE_EDITORIAL_COPY);
     expect(lines).not.toContain('—');
     expect(lines).not.toMatch(
-      /\b(seamless|unlock|elevate|world-class|all-in-one|supercharge)\b/i
+      /\b(seamless|unlock|elevate|world-class|all-in-one|supercharge|quiet workspace)\b/i
     );
     const component = read('components/homepage/HomepageEditorial.tsx');
     // Rendered text comes from props/copy, not JSX literals.
@@ -385,5 +389,79 @@ describe('homepage contract', { timeout: 60_000 }, () => {
       expect(new Set(props)).toEqual(new Set(['opacity', 'transform']));
       expect(body).not.toMatch(/opacity:\s*0(?:\.0+)?\s*;/);
     }
+  });
+
+  it('holds the premium bar: one grid, exact radii, no rings around the form', async () => {
+    const strip = (path: string) => read(path).replace(/\/\*[\s\S]*?\*\//g, '');
+    const cinema = strip('components/homepage/v3/cinema.css');
+    // Frame guides on both content edges, drawn as hard stops on the box.
+    expect(cinema).toMatch(
+      /\.hv3-hero,\s*\.hv3-chapter\s*\{\s*background-image: linear-gradient\([^;]*var\(--hv3-side\)[^;]*calc\(100% - var\(--hv3-side\)\)/
+    );
+    // Print-sheet crosses and gradient-clipped headlines are banned (ASR-033).
+    expect(cinema).not.toMatch(/\.hv3-rule::before/);
+    expect(cinema).not.toMatch(/--hv3-mark/);
+    expect(cinema).not.toMatch(/background-clip:\s*text/);
+    // The ion light stays on the chapter edge.
+    expect(cinema).toMatch(/\.hv3-chapter::before\s*\{[^}]*top:\s*0;/);
+    expect(cinema).toMatch(/\.hv3-chapter::after\s*\{[^}]*top:\s*0;/);
+    // One box: the camera is square to the page and no stage has depth, so
+    // every mockup's edges can sit on the frame guides.
+    const v3 = [
+      'stage',
+      'chapters',
+      'specs',
+      'surfaces',
+      'product-ui',
+      'responsive',
+    ].map(name => strip(`components/homepage/v3/${name}.css`));
+    expect(v3[0]).toMatch(/--hv3-cam: rotate\(0deg\);/);
+    expect(v3[0]).toMatch(/--hv3-box: 78rem;/);
+    for (const css of v3) {
+      expect(css).not.toMatch(
+        /perspective|translateZ|translate3d|rotate[XY]\(/
+      );
+    }
+    // Stages span exactly the content box, at every zoom.
+    const chapters = v3[1];
+    expect(chapters).toMatch(
+      /\.hv3-frame\s*\{\s*margin-inline: calc\(var\(--hv3-side\) \/ var\(--hv3-z\)\);/
+    );
+    expect(chapters).toMatch(
+      /\.hv3-stage--hero\s*\{[^}]*right: calc\(var\(--hv3-side\) \/ var\(--hv3-z\)\);\s*left: calc\(var\(--hv3-side\) \/ var\(--hv3-z\)\);/
+    );
+    for (const rig of ['hero', 'releases']) {
+      expect(chapters).toMatch(
+        new RegExp(
+          `\\.hv3-rig--${rig}\\s*\\{[^}]*left: 0;\\s*width: var\\(--hv3-box\\);`
+        )
+      );
+    }
+    // The hero rig scales from its top-left corner, so the 390 crop keeps the
+    // approved window region (the list, not the inspector) only with the
+    // offset recomputed for that origin.
+    expect(chapters).toMatch(/\.hv3-rig--hero\s*\{[^}]*transform-origin: 0 0;/);
+    expect(v3[5]).toMatch(
+      /\.hv3-rig--hero\s*\{[^}]*left: calc\(-9\.705rem - var\(--hv3-gutter\)\);[^}]*scale\(0\.72\)/
+    );
+    // The nav's backing runs edge to edge once scrolled.
+    expect(strip('components/homepage/v3/form.css')).toMatch(
+      /\.home-viewport \.header-nav--docked::before\s*\{\s*right: calc\(50% - 50vw\);\s*left: calc\(50% - 50vw\);/
+    );
+    // Controls are exact, never pills.
+    for (const path of [
+      'components/homepage/v3/chapters.css',
+      'components/homepage/v3/form.css',
+    ]) {
+      const css = strip(path);
+      for (const block of css.match(
+        /\.hv3-btn\s*\{[^}]*\}|waitlist-chip\s*\{[^}]*\}|inline-subscribe"\][^{]*\{[^}]*\}/g
+      ) ?? []) {
+        expect(block, path).not.toMatch(/radius-pill/);
+      }
+    }
+    // The invitation has no ring around its form.
+    const { container } = await renderHomePage();
+    expect(container.querySelector('.hv3-invite .hv3-orbit')).toBeNull();
   });
 });

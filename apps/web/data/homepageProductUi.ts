@@ -125,9 +125,9 @@ export const HOMEPAGE_PRODUCT_UI = {
 /** 03 specs copy. Its numbers are not copy: they derive from their sources. */
 export const HOMEPAGE_SPECS_COPY = {
   headline: 'The details.',
-  body: 'The numbers behind the page, read from the product source.',
+  body: 'The numbers behind every page.',
   meter: (listen: number, recognised: number) =>
-    `${listen} of ${recognised} recognised services are streaming`,
+    `${listen} of ${recognised} recognized services are streaming`,
   paletteCaption: {
     lead: 'Everything is one keystroke away.',
     body: 'Jump to a release, open your profile, or run a skill like drafting a pitch.',
@@ -141,7 +141,7 @@ export const HOMEPAGE_SPECS_COPY = {
     label: 'Services',
     listen: { title: 'Streaming services', detail: 'supported' },
     recognised: {
-      title: 'Services recognised',
+      title: 'Services recognized',
       detail: 'streaming, video and metadata',
     },
   },

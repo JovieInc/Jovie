@@ -453,7 +453,7 @@ describe('CommonDropdown', () => {
       ];
       render(<CommonDropdown items={items} open={true} />);
       const label = screen.getByText('Inset Label');
-      expect(label.className).toContain('pl-10');
+      expect(label.className).toContain('ps-10');
     });
   });
 

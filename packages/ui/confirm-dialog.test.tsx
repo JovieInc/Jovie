@@ -209,7 +209,9 @@ describe('ConfirmDialog', () => {
       />
     );
 
-    const ids = screen.getByRole('dialog').getAttribute('aria-describedby');
+    const ids = screen
+      .getByRole('alertdialog')
+      .getAttribute('aria-describedby');
     expect(ids).toBeTruthy();
     const described = (ids ?? '')
       .split(' ')
@@ -232,7 +234,7 @@ describe('ConfirmDialog', () => {
       />
     );
 
-    const dialog = screen.getByRole('dialog');
+    const dialog = screen.getByRole('alertdialog');
     expect(dialog).not.toHaveAttribute('aria-describedby');
 
     fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
@@ -240,6 +242,25 @@ describe('ConfirmDialog', () => {
     expect(dialog.getAttribute('aria-describedby')?.split(' ')).toContain(
       alert.id
     );
+  });
+
+  it('exposes the APG alertdialog role, not a plain dialog', () => {
+    render(
+      <ConfirmDialog
+        open
+        onOpenChange={() => undefined}
+        title='Cancel your plan?'
+        body='You keep access until the period ends.'
+        onConfirm={() => undefined}
+      />
+    );
+    const dialog = screen.getByRole('alertdialog', {
+      name: 'Cancel your plan?',
+    });
+    expect(dialog).toHaveAccessibleDescription(
+      'You keep access until the period ends.'
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
 
@@ -253,7 +274,7 @@ describe('ConfirmDialog accessibility', () => {
         onConfirm={vi.fn()}
       />
     );
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
     await expectNoA11yViolations(document.body);
   });
 
@@ -269,9 +290,11 @@ describe('ConfirmDialog accessibility', () => {
       />
     );
     fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Action failed. Please try again.'
-    );
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Action failed. Please try again.');
+    const classes = alert.className.split(/\s+/);
+    expect(classes).toContain('text-error-text');
+    expect(classes).not.toContain('text-error');
     await expectNoA11yViolations(document.body);
   });
 

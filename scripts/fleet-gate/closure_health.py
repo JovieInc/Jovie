@@ -142,7 +142,7 @@ GIT_OID = re.compile(r"^[0-9a-f]{40}$")
 # be classified as promotable; drift fails closed instead of silently dropping
 # a newly required check.
 EXPECTED_REQUIRED_CHECKS = frozenset(
-    {"Fork PR Gate", "Migration Guard", "PR Ready", "PR Size Guard"}
+    {"Fork PR Gate", "Migration Guard", "PR Ready", "PR Size Guard", "Company guards"}
 )
 CHECKABLE_MERGE_STATES = frozenset({"CLEAN", "HAS_HOOKS", "UNSTABLE"})
 ACCEPTED_CHECK_RUN_CONCLUSIONS = frozenset({"NEUTRAL", "SKIPPED", "SUCCESS"})

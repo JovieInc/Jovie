@@ -282,10 +282,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/releases/cells/ProviderCell.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/settings-artist-profile-section/SettingsArtistProfileSection.tsx",
       "linearIssue": "JOV-8847"
     },

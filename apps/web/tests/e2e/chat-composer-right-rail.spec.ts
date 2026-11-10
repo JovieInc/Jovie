@@ -13,8 +13,9 @@
  *   2. Close rail via header toggle → invariants. Reopen + close via the `]`
  *      keyboard shortcut → invariants.
  *   3. In-rail "Copy profile link" action → invariants.
- *   4. Close rail → composer width stays stable (the desktop rail is an
- *      overlay that never narrows the route) → type + submit end-to-end.
+ *   4. Open rail → the composer sits left of the rail (the desktop rail is a
+ *      column that pushes the route, never an overlay); close rail → the
+ *      composer widens back → type + submit end-to-end.
  *   5. Sub-lg viewport: mobile overlay branch (`fixed inset-0 z-50` in
  *      RightDrawer) legitimately covers the composer → Escape closes it and
  *      the composer recovers.
@@ -231,10 +232,22 @@ test.describe('chat composer × right-rail interaction matrix', () => {
     await assertComposerInteractive(page, 'after copy profile link');
   });
 
-  test('4: closing the rail returns composer full width and a message submits end-to-end', async ({
+  test('4: the open rail pushes the composer, closing returns full width and a message submits', async ({
     page,
   }) => {
     const textarea = page.locator(COMPOSER_TEXTAREA);
+    const surface = page.locator(COMPOSER_SURFACE);
+
+    // Founder call (2026-11-08): the open desktop rail pushes the route and
+    // never lays on top of it, so the composer ends at or before the rail.
+    const openSurface = await surface.boundingBox();
+    const openRail = await page.locator(PROFILE_RAIL).boundingBox();
+    expect(openSurface).not.toBeNull();
+    expect(openRail).not.toBeNull();
+    expect(
+      (openSurface?.x ?? 0) + (openSurface?.width ?? 0),
+      'composer right edge sits at or left of the rail'
+    ).toBeLessThanOrEqual((openRail?.x ?? 0) + 1);
 
     const openBox = await textarea.boundingBox();
     expect(openBox).not.toBeNull();
@@ -242,15 +255,13 @@ test.describe('chat composer × right-rail interaction matrix', () => {
     await page.locator(RAIL_TOGGLE).click();
     await expectRailClosed(page);
 
-    // Since #20813 the desktop right rail is an inspector overlay contained by
-    // the main surface (AppShellRightRail): it never narrows the route, so the
-    // composer keeps the same width while the rail opens and closes. Assert
-    // that stability instead of the retired column reflow.
+    // The rail gives its column back, so the composer never loses width
+    // (centered composers may hold their max width; they never shrink).
     await expect
       .poll(async () => (await textarea.boundingBox())?.width ?? 0, {
         timeout: 15_000,
       })
-      .toBeCloseTo(openBox?.width ?? 0, 0);
+      .toBeGreaterThanOrEqual((openBox?.width ?? 0) - 1);
 
     // Type + submit a message end-to-end: the composer clears on submit and
     // the user message renders in the thread.

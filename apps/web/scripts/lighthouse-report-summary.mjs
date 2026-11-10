@@ -70,6 +70,84 @@ export function summarizeReport(report) {
     );
   }
 
+  // lcp-breakdown-insight's details are a list: a table of the LCP's
+  // subparts, then the LCP element itself.
+  const lcpParts = report.audits?.['lcp-breakdown-insight']?.details?.items;
+  if (Array.isArray(lcpParts)) {
+    const element = lcpParts.find(part => part?.type === 'node');
+    if (element) {
+      lines.push(
+        `  LCP element: ${clip(element.snippet ?? element.selector ?? 'unknown element')}`
+      );
+    }
+    const subparts = lcpParts.find(part => part?.type === 'table')?.items;
+    if (Array.isArray(subparts) && subparts.length > 0) {
+      lines.push(
+        `  LCP breakdown: ${subparts
+          .map(
+            part =>
+              `${clip(part.label ?? part.subpart)} ${formatMs(
+                typeof part.duration === 'number' ? part.duration : null
+              )}`
+          )
+          .join(', ')}`
+      );
+    }
+  }
+
+  const scripts = tableItems(report, 'bootup-time')
+    .slice()
+    .sort((a, b) => (b.scripting ?? 0) - (a.scripting ?? 0))
+    .slice(0, MAX_ROWS);
+  if (scripts.length > 0) {
+    lines.push('  Main-thread script time:');
+    for (const item of scripts) {
+      lines.push(
+        `    ${stripOrigin(item.url)} ${formatMs(item.scripting ?? null)} running, ${formatMs(
+          item.scriptParseCompile ?? null
+        )} parsing`
+      );
+    }
+  }
+
+  // Name what is inside the dominant chunk. script-treemap-data carries a
+  // per-module tree only when the build ships source maps; without them the
+  // report can say the chunk is heavy but not which modules made it so.
+  const treemap = report.audits?.['script-treemap-data']?.details?.nodes;
+  const top = scripts[0];
+  if (treemap && top) {
+    const chunkUrl = stripOrigin(top.url);
+    const root = treemap.find(
+      node => stripOrigin(node.name ?? '') === chunkUrl
+    );
+    const leaves = [];
+    const walk = (node, depth) => {
+      if (!node || typeof node !== 'object') return;
+      if (Array.isArray(node.children) && node.children.length > 0) {
+        for (const child of node.children) walk(child, depth + 1);
+        return;
+      }
+      leaves.push({
+        name: stripOrigin(node.name ?? 'unknown module'),
+        bytes: typeof node.resourceBytes === 'number' ? node.resourceBytes : 0,
+        depth,
+      });
+    };
+    if (root) walk(root, 0);
+    const withDepth = leaves.filter(leaf => leaf.depth > 0);
+    if (withDepth.length > 0) {
+      const modules = withDepth.sort((a, b) => b.bytes - a.bytes).slice(0, 3);
+      lines.push('  Dominant chunk by module (largest first):');
+      for (const module of modules) {
+        lines.push(`    ${formatBytes(module.bytes)} ${module.name}`);
+      }
+    } else {
+      lines.push(
+        '  Dominant chunk attribution: report has no source-map depth; enable source maps for the Lighthouse build to name the modules.'
+      );
+    }
+  }
+
   const blocking = tableItems(report, 'render-blocking-insight')
     .slice()
     .sort((a, b) => (b.wastedMs ?? 0) - (a.wastedMs ?? 0))
