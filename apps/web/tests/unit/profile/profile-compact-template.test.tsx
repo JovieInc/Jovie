@@ -3269,21 +3269,21 @@ describe('ProfileCompactTemplate', () => {
       />
     );
     expect(html).not.toContain('data-interactive-ready="true"');
-    // Amends the JOV-6452 server-markup expectation: the desktop dashboard no
-    // longer rides the server HTML at all. The module is fetched only when a
-    // >=1180px viewport or an embedded preview can present it, so mobile
-    // loads never parse, hydrate, or preload it (JOV-12207/JOV-12208); the
-    // compact shell stays the server-rendered first paint and the desktop
-    // surface mounts client-side on activation. No loading interstitial is
-    // rendered at any width.
+    // JOV-6452 no-JS paint: server HTML includes the desktop surface test id
+    // so a desktop visitor without JavaScript still sees the surface. The
+    // interactive module stays a client import, so phones never parse,
+    // hydrate, or preload that graph (JOV-12207/JOV-12208). The paint carries
+    // no readiness flag and no loading interstitial. The real module still
+    // owns interaction readiness after it replaces this paint.
+    expect(html).toContain('data-testid="profile-desktop-surface"');
     expect(html).not.toContain('mock-profile-desktop-surface');
     expect(html).not.toContain('data-testid="profile-desktop-loading"');
     expect(html).not.toContain('Loading profile');
     expect(html).not.toContain('aria-busy="true"');
     expect(html).toContain('data-testid="profile-compact-shell"');
-    // The desktop hand-off shell still exists (empty) so >=1180px CSS keeps
-    // the compact surface clipped and the stage reserved for the client
-    // mount.
+    // The desktop shell wraps that paint so >=1180px CSS clips the compact
+    // slot and shows the reserved stage. The client module replaces the paint
+    // after it loads, and only that module publishes interaction readiness.
     expect(html).toContain('data-testid="profile-desktop-shell"');
     const view = render(
       <ProfileCompactTemplate
