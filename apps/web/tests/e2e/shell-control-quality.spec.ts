@@ -374,14 +374,14 @@ test('route navigation keeps the shell attached and inspects rendered materials 
         document.documentElement.classList.toggle('dark', value === 'dark'),
       theme
     );
-    // [sidebar link, page heading, pathname]. The root link is `Inbox` since
-    // #20840 (header still titles `/app` as Home via breadcrumb-labels), and
-    // the Identity destination is titled `Profiles` since #20953.
+    // [sidebar link, page heading, pathname]. The breadcrumb equals the
+    // active rail label (shell-ia.md), so the root is titled `Inbox` on
+    // both sides; the Identity destination is titled `Profiles` since #20953.
     for (const [linkName, heading, pathname] of [
       ['New Chat', 'New Chat', '/app/chat'],
       ['Identity', 'Profiles', '/app/presence'],
       ['Work', 'Work', '/app/library'],
-      ['Inbox', 'Home', '/app'],
+      ['Inbox', 'Inbox', '/app'],
     ] as const) {
       await page.getByRole('link', { name: linkName, exact: true }).click();
       await page.waitForURL(url => url.pathname === pathname);
@@ -472,7 +472,7 @@ test('resizing through narrow drawers clears stale locks and preserves the deskt
   await expect(
     page.getByRole('button', { name: 'More options', exact: true })
   ).toBeVisible();
-  await page.getByRole('heading', { name: 'Home', exact: true }).click();
+  await page.getByRole('heading', { name: 'Inbox', exact: true }).click();
   await page.keyboard.press('[');
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });

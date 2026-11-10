@@ -34,6 +34,17 @@ describe('AskJovieMark', () => {
     expect(trigger.className).not.toMatch(/(?:^|\s)-?(?:px|pl|ml)-/);
   });
 
+  it('keeps the mark at the rail icon scale of its bell and search siblings', () => {
+    render(<AskJovieMark />);
+    const mark = screen
+      .getByTestId('ask-jovie-trigger')
+      .querySelector('.ask-jovie-mark-icon [data-brand-mark-size]');
+    // Bell and search render at --app-shell-sidebar-icon-size (1rem = 16px);
+    // the brand mark sits on the locked ladder's 'compact' rung to match
+    // them instead of the old ad-hoc 24px.
+    expect(mark).toHaveAttribute('data-brand-mark-size', '16');
+  });
+
   it('opens the panel with suggested prompts on click', () => {
     render(<AskJovieMark />);
     fireEvent.click(screen.getByTestId('ask-jovie-trigger'));

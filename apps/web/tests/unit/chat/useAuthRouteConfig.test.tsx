@@ -32,13 +32,13 @@ describe('useAuthRouteConfig', () => {
     expect(result.current.isChatRoute).toBe(true);
   });
 
-  it('uses Home as the single shell title for the root opportunity surface', () => {
+  it('titles the root opportunity surface by its rail label, Inbox', () => {
     mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
 
     const { result } = renderHook(() => useAuthRouteConfig());
 
     expect(result.current.breadcrumbs).toEqual([
-      { label: 'Home', href: APP_ROUTES.DASHBOARD },
+      { label: 'Inbox', href: APP_ROUTES.DASHBOARD },
     ]);
   });
 
