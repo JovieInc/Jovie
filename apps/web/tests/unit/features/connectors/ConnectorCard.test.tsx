@@ -318,7 +318,9 @@ describe('ConnectorCard against real connector availability', () => {
       />
     );
     const detail = screen.getByTestId('connector-detail-gmail');
-    expect(detail).toHaveTextContent('Connection setup is unavailable.');
+    expect(detail).toHaveTextContent(
+      'Connection setup is unavailable. This connector cannot be connected yet.'
+    );
     // Absent setup is not transient, so the card must not promise a retry.
     expect(detail.textContent).not.toMatch(/try again later/i);
     // Credentials never cross the server boundary, even as context.
@@ -344,7 +346,9 @@ describe('ConnectorCard against real connector availability', () => {
       screen.getByRole('status', { name: 'Gmail status: Unavailable' })
     ).toBeInTheDocument();
     const detail = screen.getByTestId('connector-detail-gmail');
-    expect(detail).toHaveTextContent('Connection setup is unavailable.');
+    expect(detail).toHaveTextContent(
+      'Connection setup is unavailable. This connector cannot be connected yet.'
+    );
     expect(detail.textContent).not.toMatch(/try again later/i);
     const disconnect = screen.getByRole('button', { name: 'Disconnect Gmail' });
     expect(disconnect).toBeEnabled();

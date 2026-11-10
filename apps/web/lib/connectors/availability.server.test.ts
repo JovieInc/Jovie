@@ -11,6 +11,49 @@ const { credentials } = vi.hoisted(() => ({
 vi.mock('@/lib/env-server', () => ({ env: credentials }));
 
 import { getConnectorAvailability } from './availability.server';
+import { getConnectorDefinitions } from './registry';
+import type { ConnectorOAuthBundle } from './types';
+
+// The setup-unavailable copy under test: setup-specific, no retry promise.
+const SETUP_UNAVAILABLE_REASON =
+  'Connection setup is unavailable. This connector cannot be connected yet.';
+
+const MISSING_CREDENTIAL_CASES: ReadonlyArray<{
+  readonly bundle: ConnectorOAuthBundle;
+  readonly credential: keyof typeof credentials;
+  readonly sibling: keyof typeof credentials;
+}> = [
+  {
+    bundle: 'google',
+    credential: 'GOOGLE_OAUTH_CLIENT_ID',
+    sibling: 'GOOGLE_OAUTH_CLIENT_SECRET',
+  },
+  {
+    bundle: 'google',
+    credential: 'GOOGLE_OAUTH_CLIENT_SECRET',
+    sibling: 'GOOGLE_OAUTH_CLIENT_ID',
+  },
+  {
+    bundle: 'youtube',
+    credential: 'GOOGLE_OAUTH_CLIENT_ID',
+    sibling: 'GOOGLE_OAUTH_CLIENT_SECRET',
+  },
+  {
+    bundle: 'youtube',
+    credential: 'GOOGLE_OAUTH_CLIENT_SECRET',
+    sibling: 'GOOGLE_OAUTH_CLIENT_ID',
+  },
+  {
+    bundle: 'spotify',
+    credential: 'SPOTIFY_CLIENT_ID',
+    sibling: 'SPOTIFY_CLIENT_SECRET',
+  },
+  {
+    bundle: 'spotify',
+    credential: 'SPOTIFY_CLIENT_SECRET',
+    sibling: 'SPOTIFY_CLIENT_ID',
+  },
+];
 
 describe('connector configuration availability', () => {
   beforeEach(() => {
@@ -28,31 +71,30 @@ describe('connector configuration availability', () => {
     expect(state.spotify.available).toBe(false);
     expect(JSON.stringify(state)).not.toContain('secret');
   });
-  it('reports setup-unavailable for each missing credential without promising a retry', () => {
-    // Absent OAuth setup is not transient: retrying later cannot fix a missing
-    // credential, so the user-facing reason must not imply it can.
-    credentials.GOOGLE_OAUTH_CLIENT_SECRET = 'secret';
-    let state = getConnectorAvailability();
-    expect(state.gmail.available).toBe(false);
-    expect(state.gmail.reason).toBeTruthy();
-    expect(state.gmail.reason).not.toMatch(/try again later/i);
-    expect(state.youtube.reason).not.toMatch(/try again later/i);
-
-    credentials.GOOGLE_OAUTH_CLIENT_ID = 'id';
-    credentials.GOOGLE_OAUTH_CLIENT_SECRET = '';
-    state = getConnectorAvailability();
-    expect(state.gmail.available).toBe(false);
-    expect(state.gmail.reason).not.toMatch(/try again later/i);
-    expect(state.youtube.reason).not.toMatch(/try again later/i);
-
-    credentials.SPOTIFY_CLIENT_ID = 'id';
-    state = getConnectorAvailability();
-    expect(state.spotify.available).toBe(false);
-    expect(state.spotify.reason).not.toMatch(/try again later/i);
-
-    credentials.SPOTIFY_CLIENT_SECRET = 'secret';
-    expect(getConnectorAvailability().spotify.available).toBe(true);
-  });
+  it.each(MISSING_CREDENTIAL_CASES)(
+    'reports setup-unavailable for the $bundle bundle when $credential alone is missing',
+    ({ bundle, credential, sibling }) => {
+      // Absent OAuth setup is not transient: retrying later cannot fix a
+      // missing credential. Set the bundle's OTHER credential so exactly the
+      // named one is missing, then assert the copy for every provider in the
+      // bundle as resolved from the real registry.
+      expect(credential).not.toBe(sibling);
+      credentials[sibling] = 'fixture-value';
+      const state = getConnectorAvailability();
+      const bundleProviders = getConnectorDefinitions().filter(
+        definition => definition.oauthBundle === bundle
+      );
+      expect(bundleProviders.length).toBeGreaterThan(0);
+      for (const definition of bundleProviders) {
+        const availability = state[definition.id];
+        expect(availability.available).toBe(false);
+        // Positive copy assertion: the exact setup-specific message. A
+        // negative phrase assertion alone would accept many wrong messages.
+        expect(availability.reason).toBe(SETUP_UNAVAILABLE_REASON);
+        expect(availability.reason).not.toMatch(/try again later/i);
+      }
+    }
+  );
   it('keeps setup-failure copy distinct from transient read-failure copy and free of secret values', () => {
     credentials.GOOGLE_OAUTH_CLIENT_ID = 'id';
     credentials.GOOGLE_OAUTH_CLIENT_SECRET = 'secret';
