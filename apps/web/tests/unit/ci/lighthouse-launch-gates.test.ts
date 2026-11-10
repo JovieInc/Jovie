@@ -16,6 +16,7 @@ interface LighthouseStep {
   if?: string;
   run: string;
   env: Record<string, string>;
+  with?: Record<string, unknown>;
   'continue-on-error'?: unknown;
 }
 interface LighthouseJob {
@@ -28,6 +29,7 @@ interface SelectOptions {
   relevant?: boolean;
   failed?: boolean;
   branch?: string;
+  githubEvent?: string;
 }
 
 const REPO_ROOT = resolve(process.cwd(), '../..');
@@ -51,6 +53,7 @@ describe('Lighthouse identity admission', () => {
       relevant = true,
       failed = false,
       branch = 'fixture-branch',
+      githubEvent = 'merge_group',
     }: SelectOptions = {}
   ): boolean => {
     const expression = (step?.if ?? 'success()')
@@ -66,6 +69,7 @@ describe('Lighthouse identity admission', () => {
     return runInNewContext(expression, {
       success: () => !failed,
       always: () => true,
+      github: { event_name: githubEvent },
       steps: {
         'lighthouse-identity': { outputs: { available } },
         check_changes: { outputs: { run_full_ci: String(relevant) } },
@@ -122,6 +126,53 @@ describe('Lighthouse identity admission', () => {
     );
     expect(probe['continue-on-error']).toBeUndefined();
     expect(job['continue-on-error']).toBeUndefined();
+  });
+
+  it('dashboard: merge-group fallback build starts early, waits closed, and restores the shared build cache read-only', () => {
+    const job = workflow.jobs['ci-lighthouse-dashboard-pr'];
+    const byName = (name: string) => stepNamed(job, name);
+    const start = byName('Start fallback build in background (merge group)');
+    const wait = byName('Wait for background fallback build (merge group)');
+    // The background build starts on the merge-group path before the
+    // artifact download is even attempted, so it overlaps Playwright
+    // setup, the Neon branch and migrations.
+    expect(selected(start, 'true')).toBe(true);
+    expect(selected(start, 'true', { githubEvent: 'workflow_dispatch' })).toBe(
+      false
+    );
+    expect(selected(start, 'true', { download: 'success' })).toBe(true);
+    expect(selected(start, 'true', { relevant: false })).toBe(false);
+    // The wait step only runs when the artifact is missing, fails closed on
+    // the background exit code, and adds no continue-on-error anywhere.
+    expect(selected(wait, 'true')).toBe(true);
+    expect(selected(wait, 'true', { download: 'success' })).toBe(false);
+    expect(selected(wait, 'true', { githubEvent: 'workflow_dispatch' })).toBe(
+      false
+    );
+    expect(selected(wait, 'true', { relevant: false })).toBe(false);
+    expect(wait['continue-on-error']).toBeUndefined();
+    expect(start['continue-on-error']).toBeUndefined();
+    expect(wait.run).toContain('if [ "$status" != "0" ]; then');
+    expect((wait.run.match(/exit 1/g) ?? []).length).toBe(3);
+    // Same read-only Turbopack cache restore as Build + Layout: pinned
+    // restore-only action, compiler-state path, hour-suffixed key written
+    // only by trusted main (next-build-cache-warm), never saved here.
+    const cacheHour = byName('Resolve Next build cache hour');
+    const cacheRestore = byName('Restore Next build cache (read-only)');
+    expect(selected(cacheHour, 'true')).toBe(true);
+    expect(selected(cacheRestore, 'true')).toBe(true);
+    expect(selected(cacheRestore, 'true', { relevant: false })).toBe(false);
+    expect(cacheRestore.uses).toBe(
+      'actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
+    );
+    expect(cacheRestore.with?.path).toBe('apps/web/.next/cache/turbopack');
+    const source = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/ci.yml'),
+      'utf8'
+    );
+    expect(source).toContain(
+      "key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-hour.outputs.hour }}"
+    );
   });
 
   it('dashboard: a change to any Lighthouse config it runs turns its measuring steps on', () => {
@@ -202,9 +253,32 @@ describe('Lighthouse identity admission', () => {
     it(`${surface}: present identity preserves artifact fallback, real probes and failure cleanup`, () => {
       const byName = (name: string) => stepNamed(job, name);
       const fallback = byName(`Build app fallback for ${surface} Lighthouse`);
-      expect(selected(fallback, 'true')).toBe(true);
-      expect(selected(fallback, 'true', { failed: true })).toBe(false);
-      expect(selected(fallback, 'true', { download: 'success' })).toBe(false);
+      if (surface === 'dashboard') {
+        // Move 1 (merge-time): on merge_group the background build + wait
+        // steps own the fallback (the dispatch-only ci-build-public
+        // artifact never exists there); the synchronous build only covers
+        // dispatch runs, still gated on the artifact download and failure.
+        expect(selected(fallback, 'true')).toBe(false);
+        expect(
+          selected(fallback, 'true', { githubEvent: 'workflow_dispatch' })
+        ).toBe(true);
+        expect(
+          selected(fallback, 'true', {
+            githubEvent: 'workflow_dispatch',
+            failed: true,
+          })
+        ).toBe(false);
+        expect(
+          selected(fallback, 'true', {
+            githubEvent: 'workflow_dispatch',
+            download: 'success',
+          })
+        ).toBe(false);
+      } else {
+        expect(selected(fallback, 'true')).toBe(true);
+        expect(selected(fallback, 'true', { failed: true })).toBe(false);
+        expect(selected(fallback, 'true', { download: 'success' })).toBe(false);
+      }
       expect(
         selected(byName('Extract build artifact'), 'true', {
           download: 'success',
