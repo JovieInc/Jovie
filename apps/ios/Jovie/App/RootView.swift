@@ -891,15 +891,12 @@ struct JovieChangelogWhatsNewView: View {
   let unseen: WhatsNewUnseen
   @Environment(\.dismiss) private var dismiss
   @Environment(\.openURL) private var openURL
-
   private var linkTitle: String {
     unseen.unseenCount > 1 ? "See All Updates" : "Read the Post"
   }
-
   private var eyebrow: String {
     unseen.unseenCount > 1 ? "What’s New · \(unseen.unseenCount) updates" : "What’s New"
   }
-
   var body: some View {
     VStack(alignment: .leading, spacing: JovieSpacing.large) {
       ScrollView {
@@ -921,13 +918,11 @@ struct JovieChangelogWhatsNewView: View {
               .foregroundStyle(JovieColor.textTertiary)
               .accessibilityHidden(true)
           }
-
           Text(unseen.entry.summary)
             .font(JovieFont.body(size: 16))
             .foregroundStyle(JovieColor.textSecondary)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("whats-new-summary")
-
           if !unseen.entry.dogfood.isEmpty {
             VStack(alignment: .leading, spacing: JovieSpacing.small) {
               Text("Try This")
@@ -959,12 +954,17 @@ struct JovieChangelogWhatsNewView: View {
           dismiss()
         }
         .buttonStyle(JoviePillButtonStyle(filled: true))
+        // XCUITest reports the button's accessibility frame, which follows the
+        // content's natural bounds and ignores the style's flexible minHeight
+        // hit frames; pin the control to exactly 44pt so the reported frame
+        // matches the real hit target.
+        .frame(height: 44)
         .accessibilityIdentifier("whats-new-read-post")
-
         Button("Got It") {
           dismiss()
         }
         .buttonStyle(JoviePillButtonStyle(filled: false))
+        .frame(height: 44)
         .accessibilityIdentifier("whats-new-got-it")
       }
       .layoutPriority(1)
