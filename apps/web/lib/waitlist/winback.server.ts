@@ -62,7 +62,10 @@ export const defaultWinbackQualificationDecider: WinbackQualificationDecider =
       now,
       `winback: cone evidence not composed for ${capabilityKey} (qualification seam pending)`
     );
-    return { verdict: eligibility.verdict, detail: eligibility.instruction };
+    return {
+      verdict: eligibility.verdict,
+      detail: eligibility.policy.instruction,
+    };
   };
 
 // ---------------------------------------------------------------------------
@@ -171,7 +174,7 @@ export async function matchWinbackCandidates(
     if (!entry || !statuses.includes(entry.status)) continue;
 
     const [profile] = await tx
-      .select({ handle: creatorProfiles.handle })
+      .select({ handle: creatorProfiles.username })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.waitlistEntryId, entryId))
       .limit(1);
