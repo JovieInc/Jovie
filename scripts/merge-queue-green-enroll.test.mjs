@@ -113,17 +113,21 @@ async function fixture(
     env = {},
     queueEntries = [],
     files = [{ filename: 'apps/web/page.tsx' }],
+    mergeGroupRuns = [],
+    mergeGroupRunsError = undefined,
   } = {}
 ) {
   const mutations = [];
   const reads = [];
   const warnings = [];
   const notices = [];
+  const infos = [];
   const statusWrites = [];
   const inventories = [];
   const gets = [];
   const mainReads = [];
   const labelRemovals = [];
+  const actionsReads = [];
   const effects = {
     labelRemovals,
     mainReads,
@@ -131,13 +135,34 @@ async function fixture(
     mutations,
     warnings,
     notices,
+    infos,
     statusWrites,
     inventories,
     gets,
+    actionsReads,
   };
   if (effectSink) Object.assign(effectSink, effects);
   const github = {
     rest: {
+      actions: {
+        // Emulates the runs endpoint including its server-side `created` filter,
+        // so lookback-window semantics are tested against the real contract.
+        listWorkflowRunsForRepo: async params => {
+          actionsReads.push(params);
+          if (mergeGroupRunsError) throw mergeGroupRunsError;
+          const since =
+            typeof params.created === 'string' && params.created.startsWith('>=')
+              ? Date.parse(params.created.slice(2))
+              : 0;
+          const workflow_runs = mergeGroupRuns.filter(
+            run =>
+              !since ||
+              (typeof run.created_at === 'string' &&
+                Date.parse(run.created_at) >= since)
+          );
+          return { data: { workflow_runs } };
+        },
+      },
       git: {
         getRef: async params => {
           mainReads.push(params.ref);
@@ -239,7 +264,7 @@ async function fixture(
     github,
     { repo: { owner: 'JovieInc', repo: 'Jovie' }, eventName, payload },
     {
-      info() {},
+      info: message => infos.push(message),
       notice: message => notices.push(message),
       warning: message => warnings.push(message),
     },
@@ -750,7 +775,9 @@ test('the BLOCKED follow-up uses the job token, not the Jovie Bot app token', ()
     '${{ steps.app-token.outputs.token }}'
   );
   const token = enroll.steps.find(item => item.id === 'app-token');
-  assert.equal(token.with['permission-actions'], undefined);
+  // actions:read backs the jump-revocation lookback; write stays on the job
+  // GITHUB_TOKEN so the blocked-recheck dispatch is always the one audited.
+  assert.equal(token.with['permission-actions'], 'read');
   assert.equal(token.with['permission-workflows'], 'write');
   assert.equal(script.includes('actions.createWorkflowDispatch'), false);
   assert.equal(script.includes('blocked-recheck-exhausted'), true);
@@ -2506,6 +2533,7 @@ test('every enroll decision on a ready PR leaves a receipt (pr, head, reason)', 
     "receipt(pr, 'held', failure.reason)",
     "receipt(pr, 'skip', `head-unchanged-since-removal:",
     "receipt(pr, jump ? 'enqueued-jump' : 'enqueued',",
+    "receipt(pr, 'jump-revoked',",
     "receipt(pr, 'relabel-jump',",
     "receipt(pr, 'error',",
   ])
@@ -2664,6 +2692,171 @@ for (const priorityLabel of ['compounding', 'priority:marketing']) {
     assert.deepEqual(dry.mutations, []);
   });
 }
+
+test('a priority PR with a recent merge-group failure enqueues plainly with a jump-revoked receipt (JOV-10096)', async () => {
+  const labels = names => ({
+    labels: {
+      pageInfo: { hasNextPage: false },
+      nodes: names.map(name => ({ name })),
+    },
+  });
+  const failedRun = {
+    id: 42579020922,
+    conclusion: 'failure',
+    head_branch: `gh-readonly-queue/main/pr-1-${'e'.repeat(8)}`,
+    created_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+  };
+  const plain = { id: 'PR_1', oid: sha };
+  const jumped = { id: 'PR_1', oid: sha, jump: true };
+  // Label-based compounding: a failed combined head within the lookback revokes
+  // the jump, but the PR is never blocked from landing — plain tail enqueue.
+  const revoked = await fixture({
+    overrides: { 1: labels(['compounding']) },
+    mergeGroupRuns: [failedRun],
+  });
+  assert.deepEqual(revoked.mutations, [plain]);
+  assert.deepEqual(revoked.actionsReads, [{
+    owner: 'JovieInc',
+    repo: 'Jovie',
+    event: 'merge_group',
+    per_page: 100,
+    created: revoked.actionsReads[0].created,
+  }]);
+  assert.match(revoked.actionsReads[0].created, /^>=\d{4}-/);
+  const since = Date.parse(revoked.actionsReads[0].created.slice(2));
+  assert.ok(
+    Math.abs(Date.now() - 6 * 60 * 60 * 1000 - since) < 120_000,
+    'the lookback window is 6h'
+  );
+  const receiptLine = revoked.infos.find(line =>
+    line.startsWith('enroll-receipts ')
+  );
+  assert.ok(receiptLine, 'every decision leaves a receipt');
+  assert.ok(receiptLine.includes('"decision":"jump-revoked"'));
+  assert.ok(receiptLine.includes('42579020922'), 'the receipt names the failing run');
+  assert.ok(
+    revoked.notices.some(notice =>
+      /COMPOUNDING #1 jump revoked.*42579020922/.test(notice)
+    )
+  );
+  // The marketing label and path-based compounding revoke identically.
+  const marketing = await fixture({
+    overrides: { 1: labels(['priority:marketing']) },
+    mergeGroupRuns: [failedRun],
+  });
+  assert.deepEqual(marketing.mutations, [plain]);
+  const byPaths = await fixture({
+    files: [{ filename: '.github/workflows/lane-fix-relay.yml' }],
+    mergeGroupRuns: [failedRun],
+  });
+  assert.deepEqual(byPaths.mutations, [plain]);
+  // No recent failure: the existing caps decide, and the jump still happens.
+  const clear = await fixture({ overrides: { 1: labels(['compounding']) } });
+  assert.deepEqual(clear.mutations, [jumped]);
+  assert.deepEqual(clear.actionsReads.length, 1);
+  // A failure outside the lookback, another PR's failure, and a successful
+  // merge-group run never revoke.
+  const stale = await fixture({
+    overrides: { 1: labels(['compounding']) },
+    mergeGroupRuns: [{
+      ...failedRun,
+      created_at: new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(),
+    }],
+  });
+  assert.deepEqual(stale.mutations, [jumped]);
+  const otherPr = await fixture({
+    overrides: { 1: labels(['compounding']) },
+    mergeGroupRuns: [{
+      ...failedRun,
+      head_branch: `gh-readonly-queue/main/pr-999-${'e'.repeat(8)}`,
+    }],
+  });
+  assert.deepEqual(otherPr.mutations, [jumped]);
+  const passed = await fixture({
+    overrides: { 1: labels(['compounding']) },
+    mergeGroupRuns: [{ ...failedRun, conclusion: 'success' }],
+  });
+  assert.deepEqual(passed.mutations, [jumped]);
+  // Any API error fails open to a plain enqueue, matching the compounding
+  // check fallback.
+  const errored = await fixture({
+    overrides: { 1: labels(['compounding']) },
+    mergeGroupRunsError: new Error('Server error'),
+  });
+  assert.deepEqual(errored.mutations, [plain]);
+  assert.ok(
+    errored.warnings.some(warning =>
+      warning.includes('compounding check failed, plain enqueue')
+    )
+  );
+});
+
+test('the relabel-jump pass respects a recent merge-group failure revocation', async () => {
+  const queuedCompounding = {
+    isInMergeQueue: true,
+    labels: {
+      pageInfo: { hasNextPage: false },
+      nodes: [{ name: 'compounding' }],
+    },
+  };
+  const failedRun = {
+    id: 42581330047,
+    conclusion: 'failure',
+    head_branch: `gh-readonly-queue/main/pr-1-${'e'.repeat(8)}`,
+    created_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+  };
+  const iso = secondsAgo =>
+    new Date(Date.now() - secondsAgo * 1000).toISOString();
+  const entry = (number, position) => ({
+    state: 'QUEUED',
+    position,
+    enqueuedAt: iso(3600),
+    pullRequest: { number, labels: { nodes: [] } },
+  });
+  const behind = [entry(8, 1), entry(1, 2)];
+  // Revoked: no dequeue, no re-route. The PR is already admitted and lands in
+  // order; the receipt names the failing run.
+  const revoked = await fixture({
+    overrides: { 1: queuedCompounding },
+    queueEntries: behind,
+    mergeGroupRuns: [failedRun],
+  });
+  assert.deepEqual(revoked.mutations, []);
+  assert.ok(
+    revoked.notices.some(notice =>
+      /RELABEL-JUMP #1 revoked.*42581330047/.test(notice)
+    )
+  );
+  assert.ok(
+    revoked.infos.some(line =>
+      line.startsWith('enroll-receipts ') &&
+      line.includes('"decision":"jump-revoked"') &&
+      line.includes('42581330047')
+    )
+  );
+  // Without a recent failure the re-route runs exactly as before.
+  const rerouted = await fixture({
+    overrides: { 1: queuedCompounding },
+    queueEntries: behind,
+  });
+  assert.deepEqual(rerouted.mutations, [
+    { id: 'PR_1', dequeue: true },
+    { id: 'PR_1', oid: sha, jump: true },
+  ]);
+  // An API error fails open: the entry stays queued with an error receipt and
+  // no queue churn.
+  const errored = await fixture({
+    overrides: { 1: queuedCompounding },
+    queueEntries: behind,
+    mergeGroupRunsError: new Error('Server error'),
+  });
+  assert.deepEqual(errored.mutations, []);
+  assert.ok(
+    errored.infos.some(line =>
+      line.startsWith('enroll-receipts ') && line.includes('"decision":"error"')
+    )
+  );
+});
 
 test('marketing priority never bypasses draft, stale head, failure state or hold labels', async () => {
   const marketing = {
