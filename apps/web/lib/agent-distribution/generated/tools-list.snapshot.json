@@ -1,5 +1,5 @@
 {
-  "toolsListHash": "f4e2a3c3bda2ab32b743d1b35c41268e24a0eb4282fa34df201abcbe1602bc08",
+  "toolsListHash": "3b449a88fcfe63cfd959490228de4b89cedfabede3ba1561c63ead05990ad371",
   "tools": [
     {
       "name": "artist.search_or_import",
@@ -309,7 +309,7 @@
     {
       "name": "claim_handle",
       "title": "Claim a handle",
-      "description": "Check and reserve jov.ie/<username> for the draft artist. Returns availability with numbered suggested alternatives when taken. High-reach artists are routed to the existing verification path. The reservation completes when the artist signs in through claim_url; nothing is public until they publish.",
+      "description": "Check and reserve the draft artist’s jov.ie handle (the profile URL). Returns availability with numbered suggested alternatives when taken. High-reach artists are routed to the existing verification path. The reservation completes when the artist signs in through claim_url; nothing is public until they publish.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",

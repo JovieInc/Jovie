@@ -1,7 +1,7 @@
 {
   "_generated": {
-    "version": "ff993c18f063",
-    "toolsListHash": "f4e2a3c3bda2ab32b743d1b35c41268e24a0eb4282fa34df201abcbe1602bc08",
+    "version": "689a08dd9f17",
+    "toolsListHash": "3b449a88fcfe63cfd959490228de4b89cedfabede3ba1561c63ead05990ad371",
     "listingHash": "a7665b2f5a09882b4a03e68179c82c6e3651a971c63ad7dfb88cc10b9d213c6f",
     "regenerate": "pnpm --filter @jovie/web agent-distribution:generate"
   },
@@ -109,7 +109,7 @@
     {
       "name": "claim_handle",
       "title": "Claim a handle",
-      "description": "Check and reserve jov.ie/<username> for the draft artist. Returns availability with numbered suggested alternatives when taken. High-reach artists are routed to the existing verification path. The reservation completes when the artist signs in through claim_url; nothing is public until they publish.",
+      "description": "Check and reserve the draft artist’s jov.ie handle (the profile URL). Returns availability with numbered suggested alternatives when taken. High-reach artists are routed to the existing verification path. The reservation completes when the artist signs in through claim_url; nothing is public until they publish.",
       "annotations": {
         "title": "Claim a handle",
         "readOnlyHint": false,
