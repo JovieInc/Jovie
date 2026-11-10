@@ -10,6 +10,17 @@ import {
   storedZip,
 } from '../../scripts/lib/real-gh-harness.mjs';
 import {
+  addReservation,
+  CONTROLLER_HEAD,
+  fixture,
+  MAIN,
+  NEXT,
+  NOW,
+  REPOSITORY,
+  SOURCE,
+  TRANSPORT,
+} from './testflight-lease-fixture.mjs';
+import {
   annotationSink,
   command,
   comparisonReady,
@@ -18,17 +29,6 @@ import {
   readEvidence,
   validateLease,
 } from './testflight-release-lease.mjs';
-import {
-  SOURCE,
-  CONTROLLER_HEAD,
-  TRANSPORT,
-  MAIN,
-  NEXT,
-  REPOSITORY,
-  NOW,
-  fixture,
-  addReservation,
-} from './testflight-lease-fixture.mjs';
 
 // Mocked rate-limit refusals print `::error::` lines; swallow them so the runner's
 // log parser never turns a fixture into an annotation (2026-10-25).
@@ -37,7 +37,6 @@ annotationSink.emit = () => {};
 function subprocessNow() {
   return Number(execFileSync('date', ['+%s'], { encoding: 'utf8' })) * 1000;
 }
-
 
 test('continuous merges preserve one certified source through archive and final upload', () => {
   const f = fixture();
@@ -694,7 +693,6 @@ for (const change of [
         /policy changed|expired during|rewound/
       );
   });
-
 
 test('a late old receipt cannot hide a newer uncertain successor bucket', () => {
   const f = fixture();

@@ -4,7 +4,6 @@
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 
 export const SOURCE = 'a'.repeat(40);
 export const CONTROLLER_HEAD = 'b'.repeat(40);
