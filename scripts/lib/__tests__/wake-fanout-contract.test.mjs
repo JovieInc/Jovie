@@ -47,3 +47,19 @@ test('Merge Queue Green Enroll does not wake on pull_request_target synchronize'
   ])
     assert.ok(types[1].includes(kept), `${kept} stays`);
 });
+
+test('Merge Queue Green Enroll label wakes stay inside the admission-changing set (JOV-8594)', () => {
+  const text = read('merge-queue-green-enroll.yml');
+  // Unlabeled non-hold labels cannot change admission; only the blocking set
+  // (the same list dequeue-held acts on) may wake the enroll controller.
+  assert.match(
+    text,
+    /github\.event\.action != 'unlabeled' \|\|\s+contains\(fromJSON\('\["hold","gated","incident","queue-deferred","queue-poison","lane-fix-red"\]'\), github\.event\.label\.name\)/
+  );
+  // Hold-contract sweeps no longer run on merge-group successes: a successful
+  // merge group writes and releases nothing (JOV-6620 stays on failures).
+  assert.match(
+    text,
+    /github\.event\.workflow_run\.event == 'merge_group' &&\s+github\.event\.workflow_run\.conclusion != 'success'/
+  );
+});
