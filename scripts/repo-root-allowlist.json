@@ -94,6 +94,7 @@
     "VERSION",
     "version.json",
     "vitest.config.mts",
+    "warden.toml",
     "workers",
     "WORKFLOW.md"
   ]
