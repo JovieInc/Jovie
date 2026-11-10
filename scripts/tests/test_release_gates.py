@@ -198,12 +198,14 @@ class StormGitHub:
         elif "workflows/staging-controller.yml/runs" in path:
             body = {"workflow_runs": []}
         elif "/jobs?" in path:
-            body = {"jobs": [{"name": name, "id": 3100 + k, "html_url": f"https://github.com/job/{3100 + k}", "conclusion": "failure"}
+            run_id = int(path.split("/runs/")[1].split("/")[0])
+            body = {"jobs": [{"name": name, "id": run_id * 100 + k, "html_url": f"https://github.com/job/{run_id * 100 + k}", "conclusion": "failure"}
                              for k, (name, _) in enumerate(self.failing)]}
         elif path.endswith("/logs"):
             self.log_reads += 1
             job_id = int(path.split("/jobs/")[1].split("/")[0])
-            log = self.failing[job_id - 3100][1] if 0 <= job_id - 3100 < len(self.failing) else ""
+            run_id = job_id // 100
+            log = self.failing[job_id - run_id * 100][1] if 0 <= job_id - run_id * 100 < len(self.failing) else ""
             return SimpleNamespace(returncode=0, stdout=log, stderr="")
         elif "/commits?sha=main" in path:
             body = [{"sha": f"c{i}", "commit": {"committer": {"date": "2026-11-10T06:00:00Z"}}} for i in range(6)]
