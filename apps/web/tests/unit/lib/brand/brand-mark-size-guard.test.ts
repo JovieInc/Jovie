@@ -124,9 +124,11 @@ describe('brand mark size ladder', () => {
       const dropdownIndex = source.indexOf('<DropdownMenuContent');
       const rowSource =
         dropdownIndex === -1 ? source : source.slice(0, dropdownIndex);
+      // A raw pixel size (the old size={24}) is off-ladder on the brand row.
+      const pxSizes = [...rowSource.matchAll(RAW_SIZE_RE)].map(m => m[1]);
+      expect(pxSizes).toEqual([]);
       const tokens = [...rowSource.matchAll(TOKEN_SIZE_RE)].map(m => m[1]);
-      expect(tokens.length).toBeGreaterThan(0);
-      for (const token of tokens) expect(token).toBe('compact');
+      expect(tokens).toEqual(['compact']);
     }
   });
 
