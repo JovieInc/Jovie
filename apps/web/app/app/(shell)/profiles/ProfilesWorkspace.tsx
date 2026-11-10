@@ -1873,8 +1873,6 @@ function ProfilesWorkspaceContent({
         <PageToolbar
           data-testid='connections-workspace-toolbar'
           start={
-            // Shared toolbar count treatment (PAGE_TOOLBAR_META_TEXT_CLASS),
-            // same as the Work and Audience toolbars.
             <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
               {rows.length === 1 ? '1 profile' : `${rows.length} profiles`}
             </span>
@@ -1892,8 +1890,6 @@ function ProfilesWorkspaceContent({
                   ? 'Close Suggestions'
                   : `Review Suggestions (${connectionSuggestions.length})`}
               </Button>
-              {/* JOV-8964: moved out of the floating shell-header slot into
-                  the page toolbar where the table it targets lives. */}
               <DashboardHeaderActionButton
                 ariaLabel='Add Profile Or Site'
                 onClick={handleAddConnection}

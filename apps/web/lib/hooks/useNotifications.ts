@@ -1,11 +1,10 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import {
-  type ToastOptions as FeedbackToastOptions,
-  toast as feedbackToast,
-  TOAST_DURATIONS,
-} from '@/components/feedback';
+// Leaf imports: the hook must keep working when a test mocks the
+// '@/components/feedback' barrel without its re-exported constants.
+import { type ToastOptions as FeedbackToastOptions } from '@/components/feedback';
+import { toast as feedbackToast, TOAST_DURATIONS } from '@/components/feedback/toast';
 
 /**
  * Standard toast messages for consistent UX across the application
@@ -62,7 +61,7 @@ export const TOAST_MESSAGES = {
  * Duration presets re-exported from the canonical feedback system so
  * existing imports keep working.
  */
-export { TOAST_DURATIONS } from '@/components/feedback';
+export { TOAST_DURATIONS } from '@/components/feedback/toast';
 
 /**
  * Options for toast notifications (extends the canonical feedback
@@ -449,4 +448,4 @@ export function useNotifications() {
  * toast.success('Done!');
  * ```
  */
-export { toast } from '@/components/feedback';
+export { toast } from '@/components/feedback/toast';

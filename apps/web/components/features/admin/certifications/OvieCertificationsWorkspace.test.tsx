@@ -47,17 +47,6 @@ vi.mock('@/hooks/useRegisterRightPanel', () => ({
 }));
 vi.mock('@/components/feedback', () => ({
   toast: { success: mocks.toastSuccess, error: vi.fn() },
-  // useNotifications re-exports these message/duration constants through the
-  // feedback seam; the copy-on-click property rows consume the hook.
-  TOAST_DURATIONS: {
-    SHORT: 2000,
-    DEFAULT: 4000,
-    MEDIUM: 5000,
-    LONG: 6000,
-    ACTION: 8000,
-    PERSISTENT: Number.POSITIVE_INFINITY,
-  },
-  TOAST_MESSAGES: {},
 }));
 
 function render(ui: ReactNode) {

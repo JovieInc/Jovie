@@ -3,7 +3,6 @@
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { DrawerLinkSection } from '@/components/molecules/drawer';
 import { buildDspFindUrl, DspQuietRow } from '@/components/molecules/inspector';
-import type { EntityPopoverData } from '@/components/shell/EntityPopover';
 import { BASE_URL } from '@/constants/domains';
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import type { ProviderKey } from '@/lib/discography/types';
@@ -26,10 +25,17 @@ interface TrackPlatformLinksSectionProps {
   readonly findQuery?: string;
   readonly emptyMessage?: string;
   readonly title?: string;
-  /** Track summary for the destination-row hover preview card. */
-  readonly entity?: EntityPopoverData;
-  /** Track smart-link path for the menu's 'Copy Jovie link with UTM'. */
-  readonly jovieLinkPath?: string;
+  /**
+   * The sidebar's track. When present, rows get the full destination
+   * treatment: hover preview card, 'Copy Jovie link with UTM', and the
+   * find query derived from the track title.
+   */
+  readonly track?: {
+    readonly id: string;
+    readonly title: string;
+    readonly durationMs: number | null;
+    readonly smartLinkPath: string;
+  };
 }
 
 export function TrackPlatformLinksSection({
@@ -38,10 +44,10 @@ export function TrackPlatformLinksSection({
   findQuery,
   title = 'DSPs',
   emptyMessage = 'No DSP links available for this track.',
-  entity,
-  jovieLinkPath,
+  track,
 }: TrackPlatformLinksSectionProps) {
   const isEmpty = providers.length === 0 && missingProviders.length === 0;
+  const effectiveFindQuery = findQuery ?? track?.title;
 
   return (
     <DrawerLinkSection
@@ -63,12 +69,24 @@ export function TrackPlatformLinksSection({
             }
             label={PROVIDER_LABELS[provider.key] ?? provider.label}
             href={provider.url}
-            entity={entity}
+            entity={
+              track
+                ? {
+                    kind: 'track' as const,
+                    id: track.id,
+                    label: track.title,
+                    durationSec:
+                      track.durationMs != null
+                        ? Math.round(track.durationMs / 1000)
+                        : undefined,
+                  }
+                : undefined
+            }
             jovieLinkUrl={
-              jovieLinkPath
+              track
                 ? buildDestinationJovieLink({
                     baseUrl: BASE_URL,
-                    linkPath: jovieLinkPath,
+                    linkPath: track.smartLinkPath,
                     destinationKey: provider.key,
                     surface: 'track-sidebar',
                   })
@@ -79,8 +97,8 @@ export function TrackPlatformLinksSection({
         {missingProviders.map(provider => {
           const label =
             PROVIDER_LABELS[provider.key] ?? provider.label ?? provider.key;
-          const findUrl = findQuery
-            ? buildDspFindUrl(provider.key, findQuery)
+          const findUrl = effectiveFindQuery
+            ? buildDspFindUrl(provider.key, effectiveFindQuery)
             : null;
           return (
             <DspQuietRow

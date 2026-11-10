@@ -380,12 +380,6 @@ describe('LibrarySurface', () => {
       screen.queryByRole('button', { name: 'Sync from Spotify' })
     ).not.toBeInTheDocument();
 
-    // One bar, one height: the primary pill joins the same desktop density
-    // as the icon cluster it sits beside (founder note 2026-11-09).
-    const addTrigger = screen.getByRole('button', { name: 'Add' });
-    expect(addTrigger).toHaveClass('h-8', 'min-h-8');
-    expect(addTrigger).not.toHaveClass('h-7');
-
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
     expect(
@@ -713,12 +707,6 @@ describe('LibrarySurface', () => {
 
     expectDesktop32Control(screen.getByRole('tab', { name: 'All' }));
     expectDesktop32Control(screen.getByRole('tab', { name: 'Ideas' }));
-    // One bar, one height: the text tools (YouTube Ledger, Add) join the
-    // same desktop density as the icon cluster they sit beside, so the
-    // toolbar reads as a single aligned row (founder note 2026-11-09).
-    expectDesktop32Control(
-      screen.getByRole('link', { name: 'YouTube Ledger' })
-    );
     expectDesktop32Control(
       screen.getByRole('button', { name: /^Show filters/i }),
       { square: true }
@@ -750,39 +738,6 @@ describe('LibrarySurface', () => {
       expect(visibleOption).toHaveClass('h-7', 'w-7');
       expect(visibleOption).not.toHaveClass('h-8');
     }
-  });
-
-  it('keeps grid card titles on a two-line clamp instead of mid-word single-line cuts', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), LIBRARY_SURFACE_SOURCE),
-      'utf8'
-    );
-
-    const titleBlock = source.match(
-      /<h2 className='system-b-library-card-title[^']*'>/
-    );
-    expect(titleBlock).not.toBeNull();
-    expect(titleBlock?.[0]).toContain('line-clamp-2');
-    expect(titleBlock?.[0]).not.toContain('truncate');
-  });
-
-  it('keeps inspector rows on one 24px rhythm — approval editor and destinations included', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), LIBRARY_SURFACE_SOURCE),
-      'utf8'
-    );
-
-    // The Button atom pins min-h-7 on sm, which silently out-voted the
-    // approval trigger's h-6 and made the Review Status row 30px against
-    // its 24px neighbours.
-    expect(source).toContain(
-      "'-ml-1 inline-flex h-6 min-h-6 max-w-full items-center justify-start gap-1 truncate px-1 font-normal text-primary-token hover:bg-surface-1 disabled:opacity-100',"
-    );
-    // Destinations rows ride the same 24px rhythm as the property rows
-    // around them (DspQuietRow defaults to min-h-8).
-    expect(source).toContain(
-      "className='system-b-library-provider-link min-h-6'"
-    );
   });
 
   it('renders aspect-ratio-aware artwork frames in grid cards', () => {

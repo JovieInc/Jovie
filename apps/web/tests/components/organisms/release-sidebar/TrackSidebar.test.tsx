@@ -99,6 +99,35 @@ describe('TrackSidebar', () => {
     expect(screen.getByText(/Canonical DSPs/i)).toBeInTheDocument();
   });
 
+  it('gives canonical destination rows the full destination treatment from the track', async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+
+    render(
+      <TrackSidebar
+        track={buildTrack()}
+        isOpen={true}
+        onClose={() => {}}
+        onBackToRelease={() => {}}
+      />
+    );
+
+    await user.click(screen.getByTestId('drawer-tab-links'));
+
+    const menuName = 'Destination actions for Spotify';
+    await user.click(screen.getByRole('button', { name: menuName }));
+    await user.click(
+      screen.getByRole('menuitem', { name: 'Copy Jovie link with UTM' })
+    );
+    expect(writeText).toHaveBeenCalledWith(
+      expect.stringContaining('utm_medium=track-sidebar')
+    );
+  });
+
   it('renders empty platforms state when there are no provider links', async () => {
     const user = userEvent.setup();
 

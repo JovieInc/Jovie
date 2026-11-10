@@ -200,6 +200,65 @@ describe('ReleaseDspLinks interactions', () => {
     expect(screen.getByTestId('provider-icon-apple_music')).toBeInTheDocument();
   });
 
+  it('gives linked destination rows the action menu with the release UTM link and derived URI', async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    const release = createMockRelease({
+      smartLinkPath: '/example/midnight-drive',
+      providers: [
+        {
+          key: 'spotify',
+          url: 'https://open.spotify.com/track/7ouMYWpwJ422jRcDASZB7P',
+        },
+      ],
+    });
+
+    render(
+      <ReleaseDspLinks
+        release={release}
+        providerConfig={providerConfig}
+        isEditable={false}
+        isAddingLink={false}
+        newLinkUrl=''
+        selectedProvider={null}
+        isAddingDspLink={false}
+        isRemovingDspLink={null}
+        onSetIsAddingLink={vi.fn()}
+        onSetNewLinkUrl={vi.fn()}
+        onSetSelectedProvider={vi.fn()}
+        onAddLink={vi.fn().mockResolvedValue(undefined)}
+        onRemoveLink={vi.fn().mockResolvedValue(undefined)}
+        onNewLinkKeyDown={vi.fn()}
+      />
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Destination actions for Spotify' })
+    );
+    await user.click(
+      screen.getByRole('menuitem', { name: 'Copy platform URI' })
+    );
+    expect(writeText).toHaveBeenCalledWith(
+      'spotify:track:7ouMYWpwJ422jRcDASZB7P'
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Destination actions for Spotify' })
+    );
+    await user.click(
+      screen.getByRole('menuitem', { name: 'Copy Jovie link with UTM' })
+    );
+    expect(writeText).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'utm_source=spotify&utm_medium=release-sidebar'
+      )
+    );
+  });
+
   it('submits a valid link when the add form is already open', async () => {
     const user = userEvent.setup();
 

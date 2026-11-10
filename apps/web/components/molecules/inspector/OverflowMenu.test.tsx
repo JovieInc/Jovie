@@ -45,4 +45,24 @@ describe('OverflowMenu', () => {
       'l4'
     );
   });
+
+  it('passes triggerTabIndex through so closed drawers can pull the trigger from the tab order', async () => {
+    const user = userEvent.setup();
+    render(
+      <OverflowMenu
+        label='Destination actions for Spotify'
+        triggerTabIndex={-1}
+        items={[{ id: 'open', label: 'Open', onSelect: () => {} }]}
+      />
+    );
+
+    const trigger = screen.getByRole('button', {
+      name: 'Destination actions for Spotify',
+    });
+    expect(trigger).toHaveAttribute('tabindex', '-1');
+    await user.click(trigger);
+    expect(
+      screen.getByRole('menuitem', { name: 'Open' })
+    ).toBeInTheDocument();
+  });
 });

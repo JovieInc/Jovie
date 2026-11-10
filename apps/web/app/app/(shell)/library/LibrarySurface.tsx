@@ -139,7 +139,6 @@ import {
 import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { RowWaveform } from '@/components/shell/RowWaveform';
-import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
@@ -174,7 +173,7 @@ import {
   deriveWorkInspectorPresentation,
   scopeWorkInspectorBundle,
 } from '@/lib/library/work-inspector-read-model';
-import { buildDestinationJovieLink } from '@/lib/links/destination-links';
+import { workDestinationRowProps } from '@/lib/links/work-destination';
 import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries/useReleaseMutations';
 import {
   type ColumnDef,
@@ -1402,8 +1401,6 @@ function LibraryImportMenu({
         <Button
           type='button'
           size='sm'
-          // One bar, one height: the primary pill joins the same desktop
-          // density as the icon cluster it sits beside.
           className={LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS}
           disabled={isImportingYouTube || isSyncingSpotify}
         >
@@ -2002,9 +1999,6 @@ function YouTubeLedgerLink() {
       asChild
       variant='ghost'
       size='sm'
-      // Joins the toolbar's desktop density so the whole bar — text tools,
-      // primary pill, icon cluster and view slider — shares one height and
-      // baseline; at the bare 28px it read as loose text beside the cluster.
       className={cn(
         PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
         LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS,
@@ -2758,21 +2752,7 @@ function AssetDrawer({
                           label={provider.label}
                           href={provider.url}
                           closedTabIndex={closedTabIndex}
-                          entity={{
-                            kind: 'release',
-                            id: current.id,
-                            label: current.title,
-                            thumbnail: current.artworkUrl ?? undefined,
-                            artist: current.artist,
-                            releaseType: current.releaseType,
-                            releaseDate: current.releaseDate ?? undefined,
-                          }}
-                          jovieLinkUrl={buildDestinationJovieLink({
-                            baseUrl: BASE_URL,
-                            linkPath: current.smartLinkPath,
-                            destinationKey: provider.key,
-                            surface: 'work-inspector',
-                          })}
+                          {...workDestinationRowProps(current, provider.key)}
                           icon={
                             <ProviderIcon
                               provider={provider.key as ProviderKey}
