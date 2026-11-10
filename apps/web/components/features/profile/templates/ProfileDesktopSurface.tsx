@@ -1166,6 +1166,7 @@ export function ProfileDesktopSurface({
           tourDates={tourDates}
           hasReleases={hasReleases}
           releases={visibleReleases}
+          onOpenReleaseCredits={onOpenReleaseCredits}
           presentation={presentation}
         />
       </div>

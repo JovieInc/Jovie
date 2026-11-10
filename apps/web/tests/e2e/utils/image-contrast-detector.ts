@@ -59,6 +59,10 @@ interface CandidateRecord {
   readonly color: string;
   readonly fontSize: number;
   readonly fontWeight: number;
+  /** The candidate's testid-bearing ancestors, nearest first — where it lives. */
+  readonly ancestorChain: readonly string[];
+  /** The painted image layers behind it at push time, nearest first. */
+  readonly layerChain: readonly string[];
 }
 
 interface PageScan {
@@ -138,6 +142,26 @@ async function scanCandidates(page: Page): Promise<PageScan> {
         // divider or gradient rule (full width, genuinely painted) isn't
         // dropped as an image layer or a candidate.
         if (rect.width <= 1 && rect.height <= 1) return false;
+        // A descendant of a clip-hidden container (the same sr-only recipe
+        // applied to an ancestor — the desktop build's compact slot) is also
+        // never painted: the ancestor clip hides every child's ink, while
+        // each child's own layout rect stays full-size (JOV-11623).
+        for (
+          let node: Element | null = element;
+          node;
+          node = node.parentElement
+        ) {
+          if (node instanceof HTMLElement) {
+            const ancestorRect = node.getBoundingClientRect();
+            if (ancestorRect.width > 1 || ancestorRect.height > 1) continue;
+            const ancestorStyle = getComputedStyle(node);
+            if (
+              ancestorStyle.clip === 'rect(0px, 0px, 0px, 0px)' ||
+              ancestorStyle.clipPath === 'inset(50%)'
+            )
+              return false;
+          }
+        }
         const style = getComputedStyle(element);
         return (
           style.display !== 'none' &&
@@ -289,6 +313,15 @@ async function scanCandidates(page: Page): Promise<PageScan> {
         const index = candidates.length;
         element.setAttribute(hideAttribute, String(index));
         const style = getComputedStyle(element);
+        const ancestorChain: string[] = [];
+        for (
+          let node: Element | null = element.parentElement;
+          node;
+          node = node.parentElement
+        ) {
+          const id = node.getAttribute('data-testid');
+          if (id) ancestorChain.push(`${node.tagName.toLowerCase()}#${id}`);
+        }
         candidates.push({
           index,
           element: describe(element),
@@ -297,6 +330,10 @@ async function scanCandidates(page: Page): Promise<PageScan> {
           color: style.color,
           fontSize: Number.parseFloat(style.fontSize || '16'),
           fontWeight: Number.parseInt(style.fontWeight || '400', 10) || 400,
+          ancestorChain,
+          layerChain: layersBehind
+            .slice(0, 4)
+            .map(({ element: layer }) => describe(layer)),
         });
       };
 
@@ -371,6 +408,44 @@ async function sampleRegionLuminances(
   return luminances.sort((a, b) => a - b);
 }
 
+// Diagnostic: a coarse hex grid over the sampled box so a failing finding
+// names the actual painted pixels (JOV-11623 painter identification).
+async function sampleRegionPixelGrid(
+  screenshot: Buffer,
+  box: { x: number; y: number; width: number; height: number },
+  scale: number,
+  columns = 8,
+  rows = 3
+): Promise<string[]> {
+  const left = Math.max(0, Math.floor(box.x * scale));
+  const top = Math.max(0, Math.floor(box.y * scale));
+  const width = Math.max(1, Math.round(box.width * scale));
+  const height = Math.max(1, Math.round(box.height * scale));
+  const { data, info } = await sharp(screenshot)
+    .extract({ left, top, width, height })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const channels = info.channels;
+  const cells: string[] = [];
+  for (let row = 0; row < rows; row += 1) {
+    const py = Math.min(height - 1, Math.round(((row + 0.5) / rows) * height));
+    const line: string[] = [];
+    for (let column = 0; column < columns; column += 1) {
+      const px = Math.min(
+        width - 1,
+        Math.round(((column + 0.5) / columns) * width)
+      );
+      const offset = (py * width + px) * channels;
+      const hex = (value: number) => value.toString(16).padStart(2, '0');
+      line.push(
+        `#${hex(data[offset])}${hex(data[offset + 1])}${hex(data[offset + 2])}`
+      );
+    }
+    cells.push(line.join(' '));
+  }
+  return cells;
+}
+
 /**
  * Inspect the rendered page for text and interactive controls painted over
  * image layers, then measure real contrast by hiding the glyph ink and
@@ -442,6 +517,34 @@ export async function inspectImageContrast(
     }
   };
   let screenshot: Buffer;
+  // Fresh boxes at capture time: late-loading media (release artwork, hero
+  // imagery) reflows the page between the scan and this capture, so a
+  // scan-time box would sample whatever content slid into the old rectangle
+  // instead of the background behind the candidate (JOV-11623). The hide
+  // tags identify each candidate; re-derive its rect now.
+  const freshBoxes: Record<
+    string,
+    { x: number; y: number; width: number; height: number }
+  > = await page.evaluate(() => {
+    const boxes: Record<
+      string,
+      { x: number; y: number; width: number; height: number }
+    > = {};
+    for (const element of Array.from(
+      document.querySelectorAll('[data-image-contrast-hide]')
+    )) {
+      const index = element.getAttribute('data-image-contrast-hide');
+      if (index === null) continue;
+      const rect = element.getBoundingClientRect();
+      boxes[index] = {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      };
+    }
+    return boxes;
+  });
   try {
     screenshot = await captureScreenshot();
   } finally {
@@ -453,16 +556,19 @@ export async function inspectImageContrast(
   const imageHeight = metadata.height ?? 0;
 
   for (const candidate of candidates) {
+    // Sample where the element IS at capture time, not where the scan saw it.
+    const scannedBox = candidate.box;
+    const liveBox = freshBoxes[String(candidate.index)] ?? scannedBox;
     const box = {
-      x: candidate.box.x,
-      y: candidate.box.y,
+      x: liveBox.x,
+      y: liveBox.y,
       width: Math.min(
-        candidate.box.width,
-        imageWidth / deviceScaleFactor - candidate.box.x
+        liveBox.width,
+        imageWidth / deviceScaleFactor - liveBox.x
       ),
       height: Math.min(
-        candidate.box.height,
-        imageHeight / deviceScaleFactor - candidate.box.y
+        liveBox.height,
+        imageHeight / deviceScaleFactor - liveBox.y
       ),
     };
     if (box.width <= 0 || box.height <= 0) continue;
@@ -473,6 +579,12 @@ export async function inspectImageContrast(
       deviceScaleFactor
     );
     if (luminances.length === 0) continue;
+
+    const pixelGrid = await sampleRegionPixelGrid(
+      screenshot,
+      box,
+      deviceScaleFactor
+    );
 
     const color = parseCssColor(candidate.color);
     if (!color) continue;
@@ -510,11 +622,17 @@ export async function inspectImageContrast(
     if (!pass) {
       findings.push({
         kind: 'image-contrast',
-        message: `"${candidate.text}" on ${candidate.element} renders ${worstRatio.toFixed(2)}:1 against the worst-case sampled image background (requires ${requiredRatio}:1).`,
+        message: `"${candidate.text}" on ${candidate.element} [${(candidate.ancestorChain ?? []).join(' > ')}] renders ${worstRatio.toFixed(2)}:1 against the sampled background behind ${(candidate.layerChain ?? []).join(' > ') || 'no single layer'} at ${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)} (bg p10 ${Math.round(p10 * 1000) / 1000} / p90 ${Math.round(p90 * 1000) / 1000}; requires ${requiredRatio}:1).`,
         elements: [candidate.element],
         measurements: {
           worstContrastRatio: Math.round(worstRatio * 100) / 100,
           requiredRatio,
+          ancestorChain: candidate.ancestorChain.join(' > '),
+          layerChain: (candidate.layerChain ?? []).join(' > '),
+          sampledBox: `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)}`,
+          backgroundLuminanceP10: Math.round(p10 * 1000) / 1000,
+          backgroundLuminanceP90: Math.round(p90 * 1000) / 1000,
+          sampledPixelGrid: pixelGrid,
         },
       });
     }
