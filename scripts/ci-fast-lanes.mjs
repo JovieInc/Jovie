@@ -912,6 +912,31 @@ export const LANES_COVERAGE_GROUP_COMMANDS = Object.freeze(
 );
 
 /**
+ * The lanes-coverage evidence gate shared by the lanes matrix legs and the
+ * report job: the runner's own receipt decides. 'success' means the leg's
+ * suite executed (its combined data file is required); 'skipped' means the
+ * head selected no operations pool, so the suite was legitimately not
+ * applicable; anything else (failure, a missing structural lane) fails
+ * closed. Exported for tests; the workflow calls it through
+ * `node --input-type=module --eval` so the gate is the runner's own outcome,
+ * never a recomputed selection that could drift from what actually ran.
+ * @param {{lanes?: Array<{id?: string, status?: string}>}} receipt
+ */
+export function lanesReceiptRanSuite(receipt) {
+  const structural = (receipt?.lanes ?? []).find(
+    lane => lane.id === 'structural'
+  );
+  if (!structural) {
+    throw new Error('lanes receipt is missing the structural lane');
+  }
+  if (structural.status === 'success') return true;
+  if (structural.status === 'skipped') return false;
+  throw new Error(
+    `lanes coverage data missing but the structural lane reported ${structural.status}`
+  );
+}
+
+/**
  * Structural Python regressions, split so the pool can overlap them. Each
  * command keeps its original `&&` dependencies (coverage run → report).
  */
