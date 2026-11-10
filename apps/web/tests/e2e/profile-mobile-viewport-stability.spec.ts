@@ -30,7 +30,6 @@ test.use({
   storageState: { cookies: [], origins: [] },
 });
 test.describe.configure({ mode: 'serial' });
-
 const WEB_ROOT = process.cwd().endsWith('/apps/web')
   ? process.cwd()
   : path.resolve(process.cwd(), 'apps/web');
@@ -40,24 +39,20 @@ const PROFILE_MOBILE_OUTPUT_ROOT = path.join(
   PROFILE_MOBILE_OUTPUT_BASE,
   PROFILE_MOBILE_OUTPUT_SEGMENT
 );
-
 test.beforeAll(async () => {
   if (process.env.PROFILE_MOBILE_SCREENSHOTS !== '1') return;
-
   await resetOwnedOutputDirectory(
     PROFILE_MOBILE_OUTPUT_BASE,
     PROFILE_MOBILE_OUTPUT_SEGMENT,
     'PROFILE_MOBILE_SCREENSHOTS'
   );
 });
-
 type MobileProfileScreen = {
   readonly id: string;
   readonly path: string;
   readonly rootSelector: string;
   readonly readySelectors: readonly string[];
 };
-
 const PROFILE_MOBILE_SCREENS = [
   {
     id: 'home',
@@ -140,7 +135,6 @@ const PROFILE_MOBILE_SCREENS = [
     ],
   },
 ] as const satisfies readonly MobileProfileScreen[];
-
 type ViewportSnapshot = {
   readonly innerWidth: number;
   readonly innerHeight: number;
@@ -167,11 +161,9 @@ type ViewportSnapshot = {
     readonly clientHeight: number;
   };
 };
-
 type NavigationBudget = {
   readonly domContentLoaded: number;
 };
-
 const DEFAULT_NAVIGATION_BUDGET: NavigationBudget = {
   domContentLoaded: 8000,
 };
