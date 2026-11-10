@@ -36,7 +36,6 @@ describe('DrawerPropertyRow', () => {
     );
     // Brief in-place confirmation: the affordance flips to a check.
     expect(valueButton).toHaveAttribute('data-copy-value', 'success');
-    // A click on the value must not fall through to any row-level handler.
   });
 
   it('does not turn interactive values or interactive rows into copy buttons', () => {

@@ -28,7 +28,7 @@ const ACTIVITY_PREVIEW_LIMIT = 3;
 export interface EntityRailProperty {
   readonly label: string;
   readonly value: ReactNode;
-  /** When provided, the row reveals a trailing copy control in the right gutter. */
+  /** What clicking the value copies, when it differs from the display. */
   readonly copyValue?: string;
 }
 
