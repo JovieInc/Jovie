@@ -887,6 +887,18 @@ enum WhatsNewUITestFixture {
   }
 }
 
+/// Layout constants for the production What's New sheet.
+enum JovieWhatsNewLayout {
+  /// XCUITest measures a button's label layout box plus the pill style's
+  /// vertical paddings (8pt xSmall + 16pt hit inset); the style's minHeight
+  /// hit frames and any wrapper `.frame` never resize that box, which is why
+  /// the bare `Button("Got It")` label reported 18.25 + 24 = 42.25pt. Reserve
+  /// the label height here (same pattern as WaitlistPendingLayout's reserved
+  /// action height) so the reported accessibility frame is 24 + 24 = 48pt and
+  /// clears the 44pt touch target for every label font.
+  static let reservedActionMinHeight: CGFloat = 24
+}
+
 struct JovieChangelogWhatsNewView: View {
   let unseen: WhatsNewUnseen
   @Environment(\.dismiss) private var dismiss
@@ -949,22 +961,24 @@ struct JovieChangelogWhatsNewView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
       }
       VStack(spacing: JovieSpacing.small) {
-        Button(linkTitle) {
+        Button {
           openURL(unseen.link)
           dismiss()
+        } label: {
+          Text(linkTitle)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: JovieWhatsNewLayout.reservedActionMinHeight)
         }
         .buttonStyle(JoviePillButtonStyle(filled: true))
-        // XCUITest reports the button's accessibility frame, which follows the
-        // content's natural bounds and ignores the style's flexible minHeight
-        // hit frames; pin the control to exactly 44pt so the reported frame
-        // matches the real hit target.
-        .frame(height: 44)
         .accessibilityIdentifier("whats-new-read-post")
-        Button("Got It") {
+        Button {
           dismiss()
+        } label: {
+          Text("Got It")
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: JovieWhatsNewLayout.reservedActionMinHeight)
         }
         .buttonStyle(JoviePillButtonStyle(filled: false))
-        .frame(height: 44)
         .accessibilityIdentifier("whats-new-got-it")
       }
       .layoutPriority(1)
