@@ -29,7 +29,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import disk_guard  # noqa: E402
-import lifecycle, pr_wip, repair_order  # noqa: E402  (pr_wip: per-producer WIP census; repair_order: fair claims)
+import lifecycle, pr_wip, repair_order, repair_win  # noqa: E402  (pr_wip: per-producer WIP census; repair_order: fair claims)
 from label_episodes import RELAY_RED_LABELLER, label_episode_applier  # noqa: E402  (JOV-8492 provenance gate)
 
 HERE = Path(__file__).resolve().parent
@@ -1121,22 +1121,7 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
     if previous_win_section is not None and not win_section:
         raise ValueError("Win replacement requires explicit measured win evidence")
     if win_section is not None and win_section != "":
-        if not isinstance(win_section, str) or not re.match(r"\A## Win\s*\n", win_section):
-            raise ValueError("measured win requires a complete ## Win section")
-        if re.search(r"^#{1,6}\s+|customer-changelog/v1", win_section.split("\n", 1)[1], re.M):
-            raise ValueError("measured win must contain only Win evidence; use the dedicated repair fields")
-        # Use the same policy as Fleet; never publish a repair that will fail it again.
-        checked = subprocess.run(["node", "--input-type=module", "-e", """
-import { readFileSync } from 'node:fs';
-import { requiredWinErrors, winSectionErrors } from './scripts/lib/wins-ledger.mjs';
-const body = readFileSync(0, 'utf8');
-console.log(JSON.stringify([
-  ...requiredWinErrors({ labels: ['compounding'], body }), ...winSectionErrors(body),
-]));
-"""], cwd=HERE.parent.parent, input=win_section, text=True, capture_output=True, check=True, timeout=10)
-        problems = json.loads(checked.stdout)
-        if problems:
-            raise ValueError("measured win policy: " + "; ".join(problems))
+        repair_win.validate(win_section)
         lines = updated.split("\n")
         bounds = red_section_bounds(lines, re.compile(r"^#{2,3}\s*Win\s*$", re.I))
         if previous_win_section is not None:
