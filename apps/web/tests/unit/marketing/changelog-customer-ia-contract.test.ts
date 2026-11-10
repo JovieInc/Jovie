@@ -19,7 +19,7 @@ describe('customer changelog IA contract', () => {
 
     expect(page).toContain("What's new in Jovie");
     expect(page).toContain(
-      "title: documentTitle('Jovie Changelog: Product Updates & New Features')"
+      "title: documentTitle('Changelog: product updates and new features')"
     );
     expect(page).not.toContain('What shipped.');
     expect(page.match(/className='changelog-hero__kicker'/g)).toHaveLength(1);
@@ -32,11 +32,10 @@ describe('customer changelog IA contract', () => {
     expect(page).toContain('CustomerChangelogArchive');
     expect(page).not.toContain('ChangelogTimeline');
 
-    expect(signup).toContain('Get product updates');
-    expect(signup).toContain('New features and improvements from Jovie.');
+    expect(signup).toContain('Get updates');
     expect(signup).not.toContain('Stay in the loop');
     expect(signup).not.toContain('changelog-reveal-button');
-    expect(signup.match(/Subscribe/g)?.length).toBe(2);
+    expect(signup).toContain('InlineSubscribe');
 
     expect(archive).toContain('Load Earlier Updates');
     expect(archive).not.toContain('Show 5');

@@ -2,6 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { productionUpstashCredentials } from '@/lib/redis-store';
+import { issueGoldenPathInvitation } from '@/lib/testing/golden-path-invitation-fixture';
 import {
   ensureSignedInUser,
   fillControlledInputUntilEnabled,
@@ -9,13 +10,21 @@ import {
   hasAdminCredentials,
   prepareBetterAuthEmailOtp,
 } from '../helpers/auth';
+import {
+  releaseGoldenPathTestBindings,
+  selectGoldenPathArtist,
+  unpublishGoldenPathTestProfiles,
+} from './helpers/claim-dogfood-fixtures';
 import { completeGoldenPathBillingJourney } from './helpers/golden-path-billing';
 import { openHomeWelcome } from './helpers/golden-path-home-welcome';
 import {
   captureKeyframe,
   inspectEssentialViewport,
+  waitForStableGeometry,
   watchKeyframeErrors,
 } from './helpers/golden-path-keyframes';
+import { interceptGoldenPathTrackingCalls } from './helpers/golden-path-tracking';
+import { expectPreviewIsReal } from './helpers/preview-media-quality';
 import {
   installRuntimeAutomationBypass,
   resetAuthStatePreservingOnboardingSession,
@@ -35,7 +44,9 @@ import {
  * The profile first-value proof and post-activation Stripe persistence proof
  * intentionally share one identity, claim, catalog, and production build.
  *
- * Test artist: "UNMARKED" (public catalog, no known Jovie owner)
+ * Test artist: selected at run time from SHARED_E2E_ARTIST_POOL (first one with
+ * no bound creator_profiles row) and released in teardown, so a stale binding
+ * from an earlier run can never turn the claim step into ownership_conflict:v1.
  */
 
 /* ------------------------------------------------------------------ */
@@ -46,16 +57,16 @@ const REQUIRED_ENV = {
   DATABASE_URL: process.env.DATABASE_URL,
 } as const;
 
-const TEST_SPOTIFY_ARTIST = {
-  id: '1ZlSI1juLMMN1HU8X7RViN',
-  name: 'UNMARKED',
-  url: 'https://open.spotify.com/artist/1ZlSI1juLMMN1HU8X7RViN',
-} as const;
+let TEST_SPOTIFY_ARTIST: { id: string; name: string; url: string } = {
+  id: '',
+  name: '',
+  url: '',
+};
 
 const IS_LOCAL_AUTH_BYPASS =
   process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
-  process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
-  process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1';
+  process.env.NEXT_PUBLIC_AUTH_MOCK === '1' ||
+  process.env.NEXT_PUBLIC_AUTH_PROXY_DISABLED === '1';
 const IS_REQUIRED_GOLDEN_PATH = process.env.GOLDEN_PATH_REQUIRED === '1';
 
 /** Auth is real from this journey; Insight responses below are presentation fixtures. */
@@ -147,6 +158,9 @@ async function verifyHomeWelcome(page: Page) {
       };
     });
   const assertGeometry = async () => {
+    // Clearing the starter shrinks the composer through a Motion size layout
+    // transition; audit the settled box, not a mid-tween frame.
+    await waitForStableGeometry(page, '[data-testid="chat-composer-surface"]');
     const selectors = [
       '[data-testid="chat-empty-state-next-step"] button, [data-testid="chat-empty-state-next-step"] a',
     ];
@@ -214,8 +228,9 @@ async function verifyHomeWelcome(page: Page) {
       const after = await input.boundingBox();
       expect(before).not.toBeNull();
       expect(after).not.toBeNull();
-      if (before && after)
+      if (before && after) {
         expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1);
+      }
       await assertGeometry();
       if (viewport.width === 1440) {
         // Independent deliberate red: truthful content, wrong bottom placement.
@@ -329,7 +344,7 @@ async function ensureDbUser(betterAuthUserId: string) {
       async () => {
         const [user] = await sql`
           UPDATE users
-          SET user_status = 'waitlist_approved', updated_at = NOW()
+          SET user_status = 'waitlist_approved', name = COALESCE(NULLIF(BTRIM(name), ''), 'Golden Path Artist'), updated_at = NOW()
           WHERE better_auth_user_id = ${betterAuthUserId}
           RETURNING id
         `;
@@ -351,17 +366,6 @@ async function ensureDbUser(betterAuthUserId: string) {
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
 /* ------------------------------------------------------------------ */
-
-/** Block fire-and-forget tracking calls that trigger slow Turbopack cascades. */
-async function interceptTrackingCalls(page: Page) {
-  await page.route('**/api/profile/view', r =>
-    r.fulfill({ status: 200, body: '{}' })
-  );
-  await page.route('**/api/audience/visit', r =>
-    r.fulfill({ status: 200, body: '{}' })
-  );
-  await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
-}
 
 /** Exercise the Google handoff and its denied-provider recovery UI. */
 async function exerciseGoogleProviderRecovery(page: Page): Promise<void> {
@@ -489,16 +493,14 @@ async function exerciseGoogleProviderRecovery(page: Page): Promise<void> {
   });
 }
 
-/**
- * Create a brand-new Better Auth test user through the visible email-OTP
- * signup surface. E2E_TEST_MODE supplies the deterministic 424242 code only
- * for canonical +e2e test addresses.
- */
+/** Issued invitation, then visible email-OTP sign-in. E2E mode supplies 424242 for +e2e addresses. */
 async function createFreshUserOnce(page: import('@playwright/test').Page) {
   const email = `gp-${Date.now().toString(36)}+e2e@test.jovie.com`;
+  const sql = neon(process.env.DATABASE_URL!);
+  await issueGoldenPathInvitation(async (q, p) => sql.query(q, p), email);
   const preparedAuth = await prepareBetterAuthEmailOtp(page, {
     email,
-    entryPath: '/signup',
+    entryPath: `${APP_ROUTES.SIGNIN}?redirect_url=${encodeURIComponent(APP_ROUTES.START)}`,
     recovery: {
       initialEmail: email.replace('gp-', 'gp-abandoned-'),
       resendCode: true,
@@ -603,10 +605,35 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
     'Real Spotify artist confirmation did not render the resolved identity'
   ).toBeVisible({ timeout: 60_000 });
 
+  // JOV-9758 guard: value before paywall. The preview shows a real release,
+  // a painted portrait and artwork, and no forced caps, before any pricing.
+  const previewRail = page
+    .locator(
+      '[data-testid="onboarding-profile-rail"], [data-testid="onboarding-profile-rail-inline"]'
+    )
+    .filter({ visible: true })
+    .first();
+  await expect
+    .poll(
+      async () =>
+        Number((await previewRail.getAttribute('data-catalog-releases')) ?? 0),
+      { message: 'Preview showed no real catalog release', timeout: 60_000 }
+    )
+    .toBeGreaterThanOrEqual(1);
+  await expectPreviewIsReal(page.locator('main'), previewRail);
+  expect(
+    await page.locator('a[href^="/onboarding/checkout"]').count(),
+    'A pricing step rendered before the catalog preview'
+  ).toBe(0);
+  expect(new URL(page.url()).pathname).not.toBe('/onboarding/checkout');
+  await captureKeyframe(page, 'catalog-preview');
+
   const handleResponse = await sendChatMessage('Set my profile handle');
   expect(handleResponse.headers()['x-onboarding-fallback']).toMatch(/^handle:/);
   const handleCard = page.getByTestId('onboarding-handle-check');
   await expect(handleCard).toBeVisible({ timeout: 60_000 });
+  // Pen R6As7U: the field sits behind an explicit Change Handle action.
+  await handleCard.getByTestId('onboarding-edit-handle').click();
   await handleCard.getByLabel('Edit Proposed Handle').fill(handle);
   await expect(handleCard.getByText('is available')).toBeVisible({
     timeout: 30_000,
@@ -714,6 +741,7 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
       timeout: 30_000,
     })
     .toBe(handle);
+  await expect(input).toHaveAttribute('placeholder', 'Reply to Jovie…');
 
   return conversationId;
 }
@@ -810,7 +838,16 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
   // Fresh browser — no inherited auth state
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test.beforeEach(async ({ page }) => {
+  // Teardown: release the fixture binding this run created so the next run
+  // (or the prod-cert pool) starts from an unclaimed artist.
+  test.afterAll(async () => {
+    if (!process.env.DATABASE_URL) return;
+    const teardownSql = neon(process.env.DATABASE_URL);
+    await releaseGoldenPathTestBindings(teardownSql);
+    await unpublishGoldenPathTestProfiles(teardownSql);
+  });
+
+  test.beforeEach(() => {
     if (IS_LOCAL_AUTH_BYPASS) {
       if (IS_REQUIRED_GOLDEN_PATH) {
         throw new Error(
@@ -833,15 +870,18 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     if (IS_REQUIRED_GOLDEN_PATH && process.env.E2E_TEST_MODE !== '1') {
       throw new Error('Required Golden Path is missing deterministic OTP mode');
     }
-
-    await interceptTrackingCalls(page);
   });
 
   test('completes one identity from provider recovery through revoked return', async ({
     page,
     browser,
   }) => {
+    TEST_SPOTIFY_ARTIST = await selectGoldenPathArtist(
+      neon(process.env.DATABASE_URL!)
+    );
+
     test.setTimeout(900_000);
+    const trackingFixture = await interceptGoldenPathTrackingCalls(page);
     // JOV-5489: keyframes for the recorded visual review (no-op unless enabled).
     watchKeyframeErrors(page);
 
@@ -871,6 +911,31 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
       page,
       uniqueHandle
     );
+    // The real /start rail must expose its full preview at the hosted desktop
+    // viewport, regardless of the selected artist's optional enrichment copy.
+    const profilePreview = page.getByTestId('onboarding-profile-rail');
+    await expect(profilePreview).toBeInViewport({ ratio: 1 });
+    await profilePreview.focus();
+    await expect(profilePreview).toBeFocused();
+    await page.keyboard.press('End');
+    await expect
+      .poll(
+        () =>
+          profilePreview.evaluate(element =>
+            Math.abs(
+              element.scrollHeight - element.clientHeight - element.scrollTop
+            )
+          ),
+        { message: 'Preview bottom remains unreachable after pressing End' }
+      )
+      .toBeLessThanOrEqual(1);
+    await page.keyboard.press('Home');
+    await expect(
+      profilePreview.getByTestId('onboarding-profile-preview-badge')
+    ).toBeInViewport({ ratio: 1 });
+    await profilePreview.evaluate(element => {
+      if (element instanceof HTMLElement) element.blur();
+    });
     await captureKeyframe(page, 'anonymous-chat');
 
     // ──────────────────────────────────────────────────────────────────
@@ -1045,38 +1110,13 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     );
     await captureKeyframe(page, 'dashboard');
 
-    // Drive the canonical product import owner. The test never writes profile
-    // identity or catalog rows; the server action performs a real Spotify sync.
+    // JOV-9758 / JOV-9771: a real user never clicks "Sync from Spotify"
+    // after signing up. Onboarding itself must import the matched artist's
+    // catalog, so the journey only opens the releases page and waits for the
+    // real import to land. The test never writes profile or catalog rows.
     await page.goto(APP_ROUTES.RELEASES, {
       waitUntil: 'domcontentloaded',
       timeout: 90_000,
-    });
-    const syncButton = page
-      .locator(
-        '[data-testid="library-sync-spotify-empty-state"], [data-testid="sync-spotify-empty-state"], [data-testid="shell-releases-sync-empty-state"]'
-      )
-      .filter({ visible: true })
-      .first();
-    await expect(
-      syncButton,
-      'Claimed Spotify profile did not expose the canonical catalog import action'
-    ).toBeVisible({ timeout: 60_000 });
-    // A click that lands before hydration is silently dropped and no import
-    // ever starts (intermittent 180s timeouts, 2026-09-26/28). Prove the click
-    // registered: the button goes disabled while syncing, or leaves once the
-    // catalog exists. The import is idempotent, so a retried click is safe.
-    await expect(async () => {
-      if (await syncButton.isVisible()) await syncButton.click();
-      await expect
-        .poll(
-          async () =>
-            !(await syncButton.isVisible()) || (await syncButton.isDisabled()),
-          { timeout: 5_000 }
-        )
-        .toBe(true);
-    }, 'Spotify sync click never registered (button stayed enabled)').toPass({
-      timeout: 60_000,
-      intervals: [1_000, 2_000, 5_000],
     });
 
     await expect
@@ -1205,12 +1245,20 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     // with their music imported. Render it as an anonymous fan would —
     // fresh browser context, no auth — the way a real fan clicking a link
     // in bio would land here.
+    // Test-account profiles 404 publicly by policy (lib/profile/test-profile-policy).
+    // This run must render its own profile as a fan, so mark just this profile
+    // directly-viewable; afterAll teardown unpublishes it.
+    await sql`
+      UPDATE creator_profiles
+      SET settings = coalesce(settings, '{}'::jsonb) || '{"testProfileDirectUrlExempt": true}'::jsonb
+      WHERE username_normalized = ${uniqueHandle.toLowerCase()}
+    `;
     const fanContext = await browser.newContext({
       storageState: { cookies: [], origins: [] },
     });
     const fanPage = await fanContext.newPage();
     watchKeyframeErrors(fanPage);
-    await interceptTrackingCalls(fanPage);
+    await interceptGoldenPathTrackingCalls(fanPage);
 
     try {
       await expect(async () => {
@@ -1304,6 +1352,19 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     // Use this admitted identity for the actual Home shell. Controlled Insight
     // presentation does not certify Pro entitlement or a verified success claim.
     await verifyHomeWelcome(page);
+    await expect
+      .poll(trackingFixture.getAcceptedNavigationPostCount, {
+        message:
+          'Golden Path did not exercise its validated navigation telemetry sink',
+        timeout: 5_000,
+      })
+      .toBeGreaterThan(0);
+    await test.info().attach('golden-path-navigation-telemetry', {
+      contentType: 'application/json',
+      body: JSON.stringify({
+        acceptedPosts: trackingFixture.getAcceptedNavigationPostCount(),
+      }),
+    });
 
     // STEP 9: Reuse this exact identity and context for the post-activation
     // checkout, webhook, fresh-browser return, refund, and revoked-cookie proof.

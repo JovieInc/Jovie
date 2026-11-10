@@ -240,20 +240,36 @@ export async function approveWaitlistEntryInTx(
 
 /**
  * Records the acquisition journey on a waitlist entry's qualification inputs.
- * First write wins, so a later submit never rewrites the journey.
+ * First write wins, so a later submit never rewrites the journey. The cookie
+ * id is client-supplied, so it is stamped only when the journey is not
+ * revoked and is unlinked or already linked to the joining user. Returns
+ * whether the journey is eligible (caller records funnel stages only then).
  */
 export async function stampWaitlistAcquisitionId(
   entryId: string,
-  acquisitionId: string
-): Promise<void> {
-  await db.execute(drizzleSql`
-    UPDATE waitlist_entries
-    SET qualification_inputs =
-      COALESCE(qualification_inputs, '{}'::jsonb)
-      || jsonb_build_object('acquisitionId', ${acquisitionId}::text)
-    WHERE id = ${entryId}::uuid
-      AND NOT (COALESCE(qualification_inputs, '{}'::jsonb) ? 'acquisitionId')
+  acquisitionId: string,
+  appUserId: string
+): Promise<boolean> {
+  const result = await db.execute<{ eligible: boolean }>(drizzleSql`
+    WITH eligible AS (
+      SELECT 1 FROM acquisition_journeys
+      WHERE id = ${acquisitionId}::uuid
+        AND consent_revoked_at IS NULL
+        AND (user_id IS NULL OR user_id = ${appUserId}::uuid)
+    ),
+    stamped AS (
+      UPDATE waitlist_entries
+      SET qualification_inputs =
+        COALESCE(qualification_inputs, '{}'::jsonb)
+        || jsonb_build_object('acquisitionId', ${acquisitionId}::text)
+      WHERE id = ${entryId}::uuid
+        AND EXISTS (SELECT 1 FROM eligible)
+        AND NOT (COALESCE(qualification_inputs, '{}'::jsonb) ? 'acquisitionId')
+      RETURNING 1
+    )
+    SELECT EXISTS (SELECT 1 FROM eligible) AS eligible
   `);
+  return result.rows[0]?.eligible === true;
 }
 
 export async function finalizeWaitlistApproval(result: WaitlistApprovalResult) {

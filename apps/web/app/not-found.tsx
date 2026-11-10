@@ -4,8 +4,9 @@ import { Container } from '@/components/site/Container';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
 import { NotFoundPageContent } from '@/components/site/NotFoundPageContent';
-import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 
+// The 404 renders the code-default chrome synchronously: it is the fallback
+// page, so it must not depend on a store read to draw.
 export default function NotFound() {
   return (
     <div className='system-b-root-not-found-page system-b-marketing dark min-h-screen'>
@@ -23,9 +24,7 @@ export default function NotFound() {
         </Container>
       </main>
 
-      <MarketingFooter
-        genericCreatorNav={isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')}
-      />
+      <MarketingFooter />
     </div>
   );
 }

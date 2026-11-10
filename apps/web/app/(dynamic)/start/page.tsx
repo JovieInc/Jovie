@@ -12,6 +12,11 @@ import { resolveStartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 import { resolveStartEntryProfile } from '@/lib/onboarding/start-entry-profile.server';
 import { documentTitle } from '@/lib/seo/document-title';
 import { resolveSyntheticPassage } from '@/lib/synthetic/passage.server';
+import { resolveSyntheticPassageToken } from '@/lib/synthetic/passage-token.server';
+import {
+  isPublicSignupClosed,
+  PUBLIC_SIGNUP_CLOSED_REDIRECT,
+} from '@/lib/waitlist/public-signup-gate';
 
 /**
  * Canonical onboarding chat entry point.
@@ -42,14 +47,24 @@ export const metadata: Metadata = {
  * Approved synthetic principals (JOV-7697) get Cloudflare's test sitekey so
  * the widget mints the dummy token that `/api/chat` verifies in test mode.
  * The server decides passage again on every chat request; this only picks
- * which widget renders. Anonymous visitors never trigger a session read.
+ * which widget renders. Anonymous visitors never trigger a session read;
+ * only a request carrying a canary passage token is checked further.
  */
 async function resolveSyntheticTurnstileTestMode(
   isSignedIn: boolean
 ): Promise<boolean> {
-  if (!isSignedIn) return false;
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
+    const requestHeaders = await headers();
+    if (!isSignedIn) {
+      // Production certification canary token (JOV-9625). Verify-only here;
+      // /api/chat consumes it before accepting a test-mode token.
+      return (
+        (await resolveSyntheticPassageToken(requestHeaders, 'onboarding_chat', {
+          consume: false,
+        })) !== null
+      );
+    }
+    const session = await auth.api.getSession({ headers: requestHeaders });
     return (await resolveSyntheticPassage(session, 'onboarding_chat')) !== null;
   } catch (error) {
     await captureWarning(
@@ -75,12 +90,17 @@ export default async function StartPage(
 
   // JOV-7753: a handle-only entry (outreach, claim redirect) shows the
   // visitor's real page first. Explicit prompts and intents keep their flow.
-  const [authResult, entryProfile] = await Promise.all([
+  // A taken handle is the exception: it must say so even when a starter prompt
+  // rides along (JOV-9624), otherwise the visitor chats toward a name that is
+  // not theirs to claim.
+  const [authResult, resolvedEntryProfile] = await Promise.all([
     resolveUserState({ createDbUserIfMissing: false }),
-    starterHandoff || intentId
-      ? Promise.resolve(null)
-      : resolveStartEntryProfile(params),
+    intentId ? Promise.resolve(null) : resolveStartEntryProfile(params),
   ]);
+  const entryProfile =
+    starterHandoff && resolvedEntryProfile?.status !== 'claimed'
+      ? null
+      : resolvedEntryProfile;
   const startRedirect = getStartRouteRedirect(authResult.state);
   if (startRedirect) {
     redirect(startRedirect);
@@ -88,6 +108,13 @@ export default async function StartPage(
 
   const isSignedIn = authResult.state !== CanonicalUserState.UNAUTHENTICATED;
   const turnstileTestMode = await resolveSyntheticTurnstileTestMode(isSignedIn);
+  // Closed public signup (canon/PRODUCT.md, 2026-11-02): anonymous visitors
+  // join the waitlist. Signed-in users (including redeemed invitees) keep the
+  // golden path, and the production certification canary (verified passage
+  // token) still exercises anonymous /start.
+  if (!isSignedIn && !turnstileTestMode && isPublicSignupClosed()) {
+    redirect(PUBLIC_SIGNUP_CLOSED_REDIRECT);
+  }
   // No account and no onboarding cookie: there is nothing to restore, so the
   // client does not need to fetch an empty snapshot before showing the chat.
   const freshAnonymous =

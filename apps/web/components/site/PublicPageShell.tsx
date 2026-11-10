@@ -1,8 +1,10 @@
+import type { ReactNode } from 'react';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
 import type { MarketingHeaderBrand } from '@/data/marketing/headerBrand';
+import type { MarketingPageContract } from '@/data/marketing/pageContracts';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
-import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
+import type { ResolvedSiteChrome } from '@/lib/content-records/site-chrome.resolve';
 import { cn } from '@/lib/utils';
 import { MarketingFooter } from './MarketingFooter';
 import {
@@ -19,13 +21,25 @@ import {
 
 export interface PublicPageShellProps {
   readonly children: React.ReactNode;
+  /** Published site chrome from `getSiteChrome()`; code default when omitted. */
+  readonly chrome?: ResolvedSiteChrome;
   readonly className?: string;
   readonly footerClassName?: string;
+  /** Pen design-diff section id for the footer. */
+  readonly footerPenSection?: string;
+  /** Decorative art behind the footer content (the homepage Orbit horizon). */
+  readonly footerDecoration?: ReactNode;
+  /** Set false when the route owns its final CTA (the homepage). */
+  readonly footerShowCta?: boolean;
   readonly footerVariant?: 'auto' | 'expanded' | 'minimal';
   readonly headerVariant?: MarketingHeaderVariant;
   /** Overrides the per-page header brand config (icon-only vs lockup). */
   readonly headerBrand?: MarketingHeaderBrand;
   readonly headerCta?: MarketingHeaderCta;
+  /** Header shows Log in only, no primary CTA. */
+  readonly headerHidePrimaryCta?: boolean;
+  /** Wordmark at the left of the header (the homepage). */
+  readonly headerLeftWordmark?: boolean;
   readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   readonly logoVariant?: LogoVariant;
   readonly mainClassName?: string;
@@ -36,23 +50,36 @@ export interface PublicPageShellProps {
    */
   readonly mainOffset?: boolean;
   readonly navLinks?: readonly MarketingHeaderNavLink[];
+  /**
+   * Route-owned page contract for the hidden markers. Pass it from layouts
+   * whose SSR `usePathname()` is not the browser pathname (the homepage), so
+   * server and client render the same markers.
+   */
+  readonly pageContract?: MarketingPageContract;
   readonly showHomepageCenterNav?: boolean;
   readonly skipToContent?: boolean;
 }
 
 export function PublicPageShell({
   children,
+  chrome,
   className,
   footerClassName,
+  footerPenSection,
+  footerDecoration,
+  footerShowCta,
   footerVariant,
   headerBrand,
   headerCta,
+  headerHidePrimaryCta = false,
+  headerLeftWordmark = false,
   headerVariant = 'landing',
   logoSize = 'xs',
   logoVariant,
   mainClassName,
   mainOffset = true,
   navLinks,
+  pageContract,
   showHomepageCenterNav,
   skipToContent = true,
 }: Readonly<PublicPageShellProps>) {
@@ -66,10 +93,13 @@ export function PublicPageShell({
       {skipToContent ? <SkipToContent /> : null}
       <MarketingHeader
         brand={headerBrand}
+        chromeNav={chrome?.nav}
         logoSize={logoSize}
         logoVariant={logoVariant}
         navLinks={navLinks}
         primaryCta={headerCta}
+        hidePrimaryCta={headerHidePrimaryCta}
+        leftWordmark={headerLeftWordmark}
         showHomepageCenterNav={showHomepageCenterNav}
         variant={headerVariant}
       />
@@ -83,12 +113,16 @@ export function PublicPageShell({
           mainClassName
         )}
       >
-        <MarketingPageContractMarkers />
+        <MarketingPageContractMarkers contract={pageContract} />
         {children}
       </main>
       <MarketingFooter
         className={footerClassName}
-        genericCreatorNav={isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')}
+        columns={chrome?.footerColumns}
+        penSection={footerPenSection}
+        decoration={footerDecoration}
+        showCta={footerShowCta}
+        legalLinks={chrome?.legalLinks}
         variant={footerVariant}
       />
     </div>

@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { shouldSuppressCookieBannerForPathname } from '@/lib/cookies/banner-visibility';
 import type { Consent } from '@/lib/cookies/consent';
-import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
+import { isCookieBannerRequiredFromCookieString } from '@/lib/cookies/consent-regions';
 import { setConsentState } from '@/lib/tracking/consent';
 
 type CookieModalComponent = ComponentType<{
@@ -33,13 +33,7 @@ function shouldMountCookieBanner(pathname: string): boolean {
     return false;
   }
 
-  const bannerCookie = document.cookie
-    .split(';')
-    .find(cookie =>
-      cookie.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`)
-    );
-
-  if (!bannerCookie || bannerCookie.split('=')[1]?.trim() === '0') {
+  if (!isCookieBannerRequiredFromCookieString(document.cookie)) {
     return false;
   }
 
@@ -92,6 +86,10 @@ export function CookieBannerMount() {
   }, [openPreferences]);
 
   useEffect(() => {
+    // A page that server-renders the card (see
+    // resolveInitialCookieBannerVisible) already owns it; mounting a second
+    // one would double the dialog.
+    if (document.querySelector('[data-testid="cookie-banner"]')) return;
     if (shouldMountCookieBanner(globalThis.location.pathname)) {
       void import('@/components/organisms/CookieBannerSection').then(mod => {
         setBanner(() => mod.CookieBannerSection);

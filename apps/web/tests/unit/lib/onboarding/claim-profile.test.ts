@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  advanceOnboardingProfileDraft,
+  emptyOnboardingProfileDraft,
+} from '@/lib/onboarding/profile-draft';
 
 const mockRevenueFailure = vi.hoisted(() => vi.fn());
 const claimVerification = vi.hoisted(() => ({
@@ -175,6 +179,11 @@ vi.mock('@/lib/onboarding/reserved-handle', () => ({
   reserveOnboardingHandle: mockReserveOnboardingHandle,
 }));
 
+const mockScheduleCatalogImport = vi.hoisted(() => vi.fn(() => true));
+vi.mock('@/lib/onboarding/catalog-import.server', () => ({
+  scheduleOnboardingCatalogImport: mockScheduleCatalogImport,
+}));
+
 vi.mock('@/lib/tasks/chat-work-record', () => ({
   ensureChatWorkRecord: vi.fn().mockResolvedValue(null),
 }));
@@ -323,6 +332,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).rejects.toMatchObject({
       errorCode: 'SPOTIFY_IDENTITY_CONFLICT',
@@ -358,6 +368,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).rejects.toMatchObject({ errorCode: 'SPOTIFY_IDENTITY_CONFLICT' });
     expect(mockDbInsert).not.toHaveBeenCalled();
@@ -390,6 +401,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).rejects.toMatchObject({
       errorCode: 'FORBIDDEN',
@@ -416,6 +428,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).resolves.toEqual({
       profileId: null,
@@ -456,6 +469,7 @@ describe('materializeClaimedOnboardingProfile', () => {
           conversationId: 'conv_1',
           ipAddress: null,
           userAgent: null,
+          visibility: 'public',
         })
       ).resolves.toEqual({
         profileId: 'profile_new',
@@ -535,6 +549,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).resolves.toEqual({
       profileId: 'profile_new',
@@ -559,6 +574,15 @@ describe('materializeClaimedOnboardingProfile', () => {
         spotifyUrl: 'https://open.spotify.com/artist/spotify_1',
       })
     );
+    // JOV-9758 root cause: the chat claim attached the Spotify identity but
+    // never imported its catalog. The matched artist's releases and links
+    // must be imported as part of materializing the profile.
+    expect(mockScheduleCatalogImport).toHaveBeenCalledWith({
+      profileId: 'profile_new',
+      spotifyArtistId: 'spotify_1',
+      spotifyArtistUrl: 'https://open.spotify.com/artist/spotify_1',
+      userId: 'user_1',
+    });
   });
 
   it('holds a high-reach artist for verification instead of attaching it', async () => {
@@ -589,6 +613,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).resolves.toMatchObject({ profileId: 'profile_new', status: 'created' });
 
@@ -599,6 +624,8 @@ describe('materializeClaimedOnboardingProfile', () => {
     >;
     expect(inserted.spotifyId ?? null).toBeNull();
     expect(inserted.displayName).not.toBe('Famous Artist');
+    // A held identity is not attached, so its catalog is not imported yet.
+    expect(mockScheduleCatalogImport).not.toHaveBeenCalled();
     expect(claimVerification.request).toHaveBeenCalledWith(
       expect.objectContaining({
         profileId: 'profile_new',
@@ -640,6 +667,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).resolves.toEqual({
       profileId: 'profile_new',
@@ -678,6 +706,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).resolves.toEqual({
       profileId: 'profile_retried',
@@ -720,6 +749,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).resolves.toMatchObject({
       profileId: 'profile_reserved',
@@ -759,6 +789,7 @@ describe('materializeClaimedOnboardingProfile', () => {
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).resolves.toEqual({
       profileId: 'profile_existing',
@@ -783,6 +814,45 @@ describe('materializeClaimedOnboardingProfile — reserved waitlist hold (JOV-72
     mockReserveOnboardingHandle.mockResolvedValue('coolartist1');
     mockFetchArtistBySpotifyUrl.mockResolvedValue(null);
   });
+
+  it.each(['artist', 'author', 'creator', 'expert', 'founder'] as const)(
+    'reserves a %s draft without an invented artist classification',
+    async role => {
+      const profileDraft = advanceOnboardingProfileDraft(
+        emptyOnboardingProfileDraft(),
+        { id: 'role', text: `I am a ${role}. I want a useful profile` }
+      );
+      mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
+        artist: null,
+        handle: 'mywork',
+        socialLinks: [],
+        interviewSignals: [],
+        profileDraft,
+      });
+      setupOwnedConversationAndMessages();
+      setupExistingProfileSelect(null);
+      const [insertValues] = queueProfileInsert({ id: 'profile_reserved' });
+      queueReservedPostPersistWrites();
+      await materializeClaimedOnboardingProfile({
+        userId: 'user_1',
+        conversationId: 'conv_1',
+        ipAddress: null,
+        userAgent: null,
+        visibility: 'reserved',
+        waitlistEntryId: 'entry_1',
+      });
+      expect(insertValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          creatorType: role === 'artist' ? 'artist' : 'creator',
+          isPublic: false,
+          isClaimed: false,
+          settings: expect.objectContaining({
+            onboarding: expect.objectContaining({ profileDraft }),
+          }),
+        })
+      );
+    }
+  );
 
   it('creates a hidden, unclaimed profile that holds the handle for the waitlist entry', async () => {
     setupOwnedConversationAndMessages();
@@ -821,6 +891,43 @@ describe('materializeClaimedOnboardingProfile — reserved waitlist hold (JOV-72
     // Only the profile insert + audit log — no userProfileClaims row.
     expect(mockDbInsert).toHaveBeenCalledTimes(2);
     expect(mockRecordFunnelStep).not.toHaveBeenCalled();
+  });
+
+  it('imports the matched catalog for a reserved waitlist hold too (JOV-9758)', async () => {
+    mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
+      artist: {
+        id: 'spotify_pianist',
+        name: 'Canary Pianist',
+        url: 'https://open.spotify.com/artist/spotify_pianist',
+        imageUrl: null,
+        followers: 42,
+        popularity: 10,
+        genres: ['classical piano'],
+      },
+      handle: 'canarypianist',
+      socialLinks: [],
+      interviewSignals: [],
+    });
+    setupOwnedConversationAndMessages();
+    setupExistingProfileSelect(null);
+    queueProfileInsert({ id: 'profile_reserved' });
+    queueReservedPostPersistWrites();
+
+    await materializeClaimedOnboardingProfile({
+      userId: 'user_1',
+      conversationId: 'conv_1',
+      ipAddress: null,
+      userAgent: null,
+      visibility: 'reserved',
+      waitlistEntryId: 'entry_1',
+    });
+
+    expect(mockScheduleCatalogImport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: 'profile_reserved',
+        spotifyArtistId: 'spotify_pianist',
+      })
+    );
   });
 
   it('refuses a second claimant the held handle and reserves a fallback instead', async () => {
@@ -876,6 +983,7 @@ describe('materializeClaimedOnboardingProfile — reserved waitlist hold (JOV-72
         conversationId: 'conv_1',
         ipAddress: null,
         userAgent: null,
+        visibility: 'public',
       })
     ).resolves.toEqual({
       profileId: 'profile_held',
@@ -911,7 +1019,7 @@ describe('materializeClaimedOnboardingProfile — unproven admission (private un
     mockFetchArtistBySpotifyUrl.mockResolvedValue(null);
   });
 
-  it('creates a claimed but private profile, holds the Spotify identity and opens a proof request', async () => {
+  it('keeps a fresh self-serve claim private by default and opens a proof request', async () => {
     setupOwnedConversationAndMessages();
     setupExistingProfileSelect(null);
     const [insertValues] = queueProfileInsert({ id: 'profile_unproven' });
@@ -922,7 +1030,6 @@ describe('materializeClaimedOnboardingProfile — unproven admission (private un
       conversationId: 'conv_1',
       ipAddress: null,
       userAgent: null,
-      visibility: 'unproven',
     });
 
     expect(insertValues).toHaveBeenCalledWith(

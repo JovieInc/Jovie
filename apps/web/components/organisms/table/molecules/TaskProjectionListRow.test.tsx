@@ -35,7 +35,7 @@ describe('TaskProjectionListRow', () => {
     const { container: muted } = render(
       <TaskProjectionListRow {...baseProps} opacity='muted' />
     );
-    expect(muted.firstChild).toHaveClass('opacity-75');
+    expect(muted.firstChild).toHaveClass('opacity-90');
 
     const { container: quiet } = render(
       <TaskProjectionListRow {...baseProps} opacity='quiet' />

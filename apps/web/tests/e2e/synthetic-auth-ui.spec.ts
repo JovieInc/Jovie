@@ -29,6 +29,7 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 const SIGNIN_PATH = '/signin';
 const SIGNUP_PATH = '/signup';
+const WAITLIST_PATH = '/waitlist';
 const FRONT_DOOR_CONFIG_ERRORS = [
   'auth unavailable',
   'clerk is not configured',
@@ -81,6 +82,21 @@ async function assertIntentionalEmailAuthSurface(page: Page) {
   await expect(
     page.locator('input[name="password"]'),
     'No Clerk password input may render — email OTP is the supported credential path'
+  ).toHaveCount(0);
+}
+
+async function assertClosedSignupWaitlist(page: Page) {
+  await expect(
+    page.getByTestId('waitlist-role-form'),
+    'Closed signup must land on a visible waitlist form'
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.locator('[data-auth-shell-mode="sign-up"]'),
+    'Closed signup must not render a sign-up auth shell'
+  ).toHaveCount(0);
+  await expect(
+    page.locator('input[name="password"]'),
+    'No password input may render on the waitlist'
   ).toHaveCount(0);
 }
 
@@ -194,6 +210,16 @@ test.describe('Synthetic Monitoring — Layer A (auth UI, SSO + email)', () => {
     await waitForHydration(page);
 
     await assertNoFrontDoorConfigErrors(page);
+    // Invite-only GTM (PUBLIC_SIGNUP_CLOSED, canon/PRODUCT.md 2026-11-02):
+    // anonymous /signup redirects to /waitlist on purpose. That is the
+    // intended surface while signup is closed; it must be a working waitlist
+    // form and never an auth shell or a dead end. When signup reopens the
+    // full sign-up assertions below run unchanged.
+    if (new URL(page.url()).pathname === WAITLIST_PATH) {
+      await assertClosedSignupWaitlist(page);
+      console.log('[Synthetic][Layer A] Sign-up closed: waitlist surface OK');
+      return;
+    }
     await assertAuthShellReady(page, 'sign-up');
     await assertActiveAuthSurfaceContract(page);
     await assertIntentionalEmailAuthSurface(page);

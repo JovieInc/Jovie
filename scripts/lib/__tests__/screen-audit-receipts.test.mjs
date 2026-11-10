@@ -1,10 +1,21 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { readAssuranceMatrix } from '../../invariants/assurance-matrix.mjs';
+import {
+  auditScreens,
+  changedScreenManifest,
+  loadArtifacts,
+} from '../../invariants/screen-audit.mjs';
 import {
   decideScreenAuditReceipt,
   latestManifest,
   produceScreenAuditReceipts,
   rendersSameAs,
 } from '../screen-audit-receipts.mjs';
+import { deriveValidationManifest } from '../validation-lifecycle.mjs';
+import { mergedUiEvidence } from '../validation-sync.mjs';
 
 const OWED = {
   schema: 'jovie.validation-manifest/v1',
@@ -21,6 +32,14 @@ const ledger = verdicts => ({
 // SCREEN_REGISTRY; scripts/ paths own no screen.
 const SCREEN_PATH = 'apps/web/app/(dynamic)/legal/privacy/page.tsx';
 const NO_SCREEN = 'scripts/lib/example.mjs';
+// Actual merged paths from Switch #21808 / JOV-5582.
+const SWITCH_PATHS = [
+  'docs/design-system/design-conformance-manifest.json',
+  'packages/ui/atoms/switch.stories.tsx',
+  'packages/ui/atoms/switch.test.tsx',
+  'packages/ui/atoms/switch.tsx',
+];
+const TASTE_PATH = 'scripts/invariants/design-surfaces.mjs';
 
 describe('decideScreenAuditReceipt', () => {
   it('skips issues that owe no screen-audit receipt', () => {
@@ -66,6 +85,134 @@ describe('decideScreenAuditReceipt', () => {
     expect(untracked.action).toBe('hold');
     expect(untracked.detail).toContain('no remediation issue yet');
   });
+
+  it.each(['deterministic', 'mixed', 'unknown', undefined])(
+    'holds declared %s machine evidence even if the current paths owe none',
+    judgment => {
+      const decision = decideScreenAuditReceipt({
+        manifest: {
+          ...OWED,
+          uiEvidence: [{ row: 'AM-015', judgment, targets: [] }],
+        },
+        mergedFiles: [NO_SCREEN],
+        ledger: ledger({ 'web.homepage': 'green' }),
+        remediationCreatedAt: {},
+      });
+      expect(decision.action).toBe('hold');
+      expect(decision.detail).toContain('AM-015');
+    }
+  );
+
+  it.each([
+    { uiEvidence: undefined },
+    { uiEvidence: [] },
+    { uiEvidence: [{ row: 'AM-015', judgment: 'taste' }] },
+  ])(
+    'holds current machine obligations despite missing or stale declarations: $uiEvidence',
+    ({ uiEvidence }) => {
+      const decision = decideScreenAuditReceipt({
+        manifest: { ...OWED, uiEvidence },
+        mergedFiles: SWITCH_PATHS,
+        ledger: ledger({ 'web.homepage': 'green' }),
+        remediationCreatedAt: {},
+      });
+      expect(decision.action).toBe('hold');
+      expect(decision.detail).toContain('AM-015');
+      expect(decision.detail).toContain('AM-021');
+    }
+  );
+
+  it('does not erase declared machine evidence when that row is now taste-only', () => {
+    expect(
+      decideScreenAuditReceipt({
+        manifest: {
+          ...OWED,
+          uiEvidence: [{ row: 'AM-024', judgment: 'mixed' }],
+        },
+        mergedFiles: [TASTE_PATH],
+        ledger: ledger({}),
+        remediationCreatedAt: {},
+      }).action
+    ).toBe('hold');
+  });
+
+  it('preserves unknown UI obligations after the lifecycle serializes its manifest', () => {
+    const manifest = deriveValidationManifest({
+      issue: { identifier: 'JOV-5582' },
+      mergedPulls: [
+        {
+          number: 21808,
+          url: 'https://github.com/JovieInc/Jovie/pull/21808',
+          mergeSha: 'a'.repeat(40),
+          mergedAt: '2026-10-23T22:00:00Z',
+        },
+      ],
+      risk: {
+        riskLevel: 'medium',
+        blocksUnattendedAutoMerge: false,
+        matchedRules: [],
+      },
+      uiEvidence: null,
+    });
+    expect(manifest).not.toHaveProperty('uiEvidence');
+    expect(manifest.required.map(entry => entry.kind)).toEqual([
+      'deployment',
+      'screen-audit',
+    ]);
+    const unknownPath = 'apps/web/app/(marketing)/error.tsx';
+    expect(changedScreenManifest([unknownPath])).toMatchObject({
+      screens: [],
+      unregistered: [unknownPath],
+      requirements: [],
+    });
+    const decision = decideScreenAuditReceipt({
+      manifest: JSON.parse(JSON.stringify(manifest)),
+      mergedFiles: [unknownPath],
+      ledger: ledger({ 'web.homepage': 'green' }),
+      remediationCreatedAt: {},
+    });
+    expect(decision.action).toBe('hold');
+    expect(decision.detail).toContain('unknown UI evidence');
+  });
+
+  it.each([
+    { uiEvidence: null },
+    { uiEvidence: 'unreadable' },
+    { uiEvidence: [null] },
+  ])(
+    'holds explicitly unknown or malformed UI evidence: $uiEvidence',
+    ({ uiEvidence }) => {
+      expect(
+        decideScreenAuditReceipt({
+          manifest: { ...OWED, uiEvidence },
+          mergedFiles: [NO_SCREEN],
+          ledger: ledger({}),
+          remediationCreatedAt: {},
+        }).action
+      ).toBe('hold');
+    }
+  );
+
+  it.each([
+    TASTE_PATH,
+    'canon/invariants.jsonl',
+    'packages/ui/atoms/switch.test.tsx',
+  ])(
+    'preserves no-screen behavior when neither declaration nor current paths owe machine evidence: %s',
+    path => {
+      expect(
+        decideScreenAuditReceipt({
+          manifest: {
+            ...OWED,
+            uiEvidence: [{ row: 'AM-024', judgment: 'taste' }],
+          },
+          mergedFiles: [path],
+          ledger: ledger({}),
+          remediationCreatedAt: {},
+        }).action
+      ).toBe('pass');
+    }
+  );
 });
 
 describe('latestManifest', () => {
@@ -95,6 +242,120 @@ describe('latestManifest', () => {
 });
 
 describe('produceScreenAuditReceipts', () => {
+  it('writes no receipt for the real Switch obligations when only unrelated screen evidence exists', async () => {
+    const sha = 'a'.repeat(40);
+    const pullUrl = 'https://github.com/JovieInc/Jovie/pull/21808';
+    const manifest = deriveValidationManifest({
+      issue: { identifier: 'JOV-5582' },
+      mergedPulls: [
+        {
+          number: 21808,
+          url: pullUrl,
+          mergeSha: sha,
+          mergedAt: '2026-10-23T22:00:00Z',
+        },
+      ],
+      risk: {
+        riskLevel: 'medium',
+        blocksUnattendedAutoMerge: false,
+        matchedRules: [],
+      },
+      uiEvidence: mergedUiEvidence(SWITCH_PATHS, readAssuranceMatrix()),
+    });
+    expect(manifest.required.map(entry => entry.kind)).toEqual([
+      'deployment',
+      'screen-audit',
+    ]);
+    expect(manifest.uiEvidence.map(entry => entry.row)).toEqual([
+      'AM-015',
+      'AM-021',
+    ]);
+    expect(changedScreenManifest(SWITCH_PATHS).screens).toEqual([]);
+    const artifacts = mkdtempSync(join(tmpdir(), 'screen-receipt-switch-'));
+    const writes = [];
+    try {
+      writeFileSync(
+        join(artifacts, 'home.json'),
+        JSON.stringify({ findings: [] })
+      );
+      writeFileSync(
+        join(artifacts, 'receipt.json'),
+        JSON.stringify({
+          schemaVersion: 'jovie-route-dom-certification/v1',
+          sourceGitSha: sha,
+          receipts: [
+            {
+              route: '/',
+              viewport: 'desktop',
+              state: 'default',
+              snapshotPath: 'home.json',
+            },
+          ],
+        })
+      );
+      const inventory = auditScreens({
+        ...loadArtifacts(artifacts),
+        judge: null,
+      });
+      const tracked = inventory.screens
+        .filter(screen => screen.verdict === 'red')
+        .map(screen => ({
+          createdAt: '2026-10-23T22:00:00Z',
+          labels: {
+            nodes: [{ name: `remediation:screen-audit:${screen.id}` }],
+          },
+        }));
+      const result = await produceScreenAuditReceipts({
+        artifacts,
+        sha,
+        screensSha: sha,
+        runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/123456789',
+        log: () => {},
+        github: {
+          paginate: async endpoint => {
+            expect(endpoint).toContain('/pulls/21808/files?per_page=100');
+            return SWITCH_PATHS.map(filename => ({ filename }));
+          },
+        },
+        linear: {
+          graphql: async (query, variables) => {
+            if (query.includes('mutation')) {
+              writes.push(variables);
+              return { commentCreate: { success: true } };
+            }
+            return {
+              issues: {
+                pageInfo: { hasNextPage: false, endCursor: null },
+                nodes: query.includes('remediation:screen-audit:')
+                  ? tracked
+                  : [
+                      {
+                        id: 'switch-5582',
+                        identifier: 'JOV-5582',
+                        comments: {
+                          nodes: [
+                            {
+                              createdAt: '2026-10-23T22:59:48Z',
+                              body: `<!-- validation-manifest:v1\n${JSON.stringify(manifest)}\n-->`,
+                            },
+                          ],
+                        },
+                      },
+                    ],
+              },
+            };
+          },
+        },
+      });
+      expect(result.results).toEqual([
+        expect.objectContaining({ issue: 'JOV-5582', action: 'hold' }),
+      ]);
+      expect(writes).toEqual([]);
+    } finally {
+      rmSync(artifacts, { recursive: true, force: true });
+    }
+  });
+
   it('rejects a sha that is not a full commit', async () => {
     await expect(
       produceScreenAuditReceipts({

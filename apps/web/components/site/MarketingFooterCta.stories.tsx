@@ -21,18 +21,11 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-  args: {
-    title: 'Request Access to Jovie.',
-    body: 'Join the private launch list for presence, relationships, and growth.',
-    ctaLabel: 'Request Access',
-    ctaHref: '/signup',
-  },
+  args: {},
 };
 
 export const BinaryDownload: Story = {
   args: {
-    title: 'Ready to install Jovie?',
-    body: 'Download the desktop workspace for Mac.',
     ctaLabel: 'Download for Mac',
     ctaHref: '/api/desktop/download',
     ctaAnalyticsEvent: 'download_mac_dmg',
@@ -41,13 +34,12 @@ export const BinaryDownload: Story = {
   },
 };
 
-// The changelog terminal CTA anchors into the homepage hero claim input
-// (JOV-8798). Keep this story in lockstep with that id: the homepage
-// contract guard fails if any /#fragment anchor stops resolving on '/'.
+// The changelog terminal CTA anchors into the homepage invitation form
+// (signup is invite-only). Keep this story in lockstep with that id: the
+// homepage contract guard fails if any /#fragment anchor stops resolving on '/'.
 export const ChangelogClaimAnchor: Story = {
   args: {
-    title: 'Take control of your presence.',
-    ctaLabel: 'Find your profile',
-    ctaHref: '/#homepage-claim-handle',
+    ctaLabel: 'Request an Invite',
+    ctaHref: '/#request-invite',
   },
 };

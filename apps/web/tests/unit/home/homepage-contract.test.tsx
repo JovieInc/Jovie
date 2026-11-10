@@ -1,20 +1,18 @@
-// Homepage page contract (EVENT 2026-10-20, Tim: the homepage sells the
-// artist profile). One table-driven contract replaces the per-component
-// homepage locks: it renders the real `/` page module and checks the route
-// manifest, copy truth sources, the one primary action, product imagery, and
-// tokenized styles. Changing the page means changing its typed records, not
-// rewriting a dozen source-string guards.
+// Homepage page contract (Tim, 2026-11-03: "Jovie helps you move your music
+// forward." on `/`; invite-only, the story ends in the role waitlist form).
+// One table-driven contract: it renders the real `/` page module and checks
+// the route manifest, copy truth sources, the one primary action, product
+// imagery, and tokenized styles. Changing the page means changing its typed
+// records, not rewriting a dozen source-string guards.
+// Frame checks (labels, keycaps and edges inside their frames) live in
+// homepage-frames.test.tsx, so this file stays under the size limit.
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing';
 import { getMarketingRecipe } from '@/data/marketing/recipes';
-import {
-  formatPublicPriceDisplay,
-  getPublicPriceClaim,
-} from '@/lib/billing/offer-truth';
-import { PRICING_COMPARISON } from '@/lib/entitlements/registry';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { getEndUserPerfRouteById } from '@/scripts/performance-route-manifest';
 
 const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: true }));
@@ -32,6 +30,20 @@ vi.mock('@/lib/flags/marketing-static', async importOriginal => {
   };
 });
 vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
+vi.mock('@/lib/content-records/store.server', async () => {
+  const { MARKETING_PAGE_KIND } = await import(
+    '@/lib/content-records/marketing-page'
+  );
+  return {
+    getLiveContent: async () => ({
+      data: MARKETING_PAGE_KIND.defaultRecord('home'),
+      source: 'default',
+      versionId: null,
+      version: null,
+      publishedAt: null,
+    }),
+  };
+});
 vi.mock('next/navigation', async importOriginal => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({ push: vi.fn() }),
@@ -53,30 +65,32 @@ const read = (path: string) =>
 
 async function renderHomePage() {
   const { default: HomePage } = await import('@/app/(home)/page');
-  return render(HomePage());
+  return render(await HomePage());
 }
 
 async function loadCopy() {
-  const [{ HOMEPAGE_COPY }, { HOMEPAGE_FAN_STATES_COPY }] = await Promise.all([
-    import('@/data/homepageCopy'),
-    import('@/data/homepageFanStatesCopy'),
-  ]);
-  return { HOMEPAGE_COPY, HOMEPAGE_FAN_STATES_COPY };
+  return import('@/data/homepageEditorialCopy');
 }
 
 const HOMEPAGE_SOURCES = [
-  'data/homepageCopy.ts',
-  'data/homepageFanStatesCopy.ts',
-  'components/homepage/HomepageArtistProfile.tsx',
-  'components/marketing/MarketingOfferSummary.tsx',
-  'components/marketing/MarketingPhoneStateGallery.tsx',
+  'data/homepageEditorialCopy.ts',
+  'components/homepage/HomepageEditorial.tsx',
+  'components/homepage/HomepageSpecSections.tsx',
 ] as const;
 
 const HOMEPAGE_STYLES = [
-  'components/homepage/HomepageArtistProfile.css',
-  'components/homepage/HomepageAtmosphere.css',
-  'components/marketing/MarketingProductStates.css',
+  'components/homepage/v3/stage.css',
+  'components/homepage/v3/product-ui.css',
+  'components/homepage/v3/surfaces.css',
+  'components/homepage/v3/phone.css',
+  'components/homepage/v3/chapters.css',
+  'components/homepage/v3/specs.css',
+  'components/homepage/v3/form.css',
+  'components/homepage/v3/responsive.css',
+  'components/homepage/v3/cinema.css',
 ] as const;
+
+const PRICE_TEXT = /\$\s?\d|\d+\s?\/\s?mo\b|\bper month\b|\b\d+-day\b/i;
 
 describe('homepage contract', { timeout: 60_000 }, () => {
   beforeEach(() => {
@@ -118,59 +132,61 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     );
   });
 
-  it('mounts the hero light and keeps the canvas off until WebGL can run', async () => {
-    const { container } = await renderHomePage();
-    expect(
-      container.querySelector('[data-testid="homepage-hero-light"]')
-    ).not.toBeNull();
-    expect(container.querySelector('.homepage-hero-canvas')).not.toBeNull();
-    expect(container.querySelector('canvas')).toBeNull();
-  });
-
-  it('renders one h1 from the copy module and no stray headings', async () => {
-    const { HOMEPAGE_COPY, HOMEPAGE_FAN_STATES_COPY } = await loadCopy();
+  it('renders one h1, the locked line, and one h2 per chapter', async () => {
+    const { HOMEPAGE_EDITORIAL_COPY: copy } = await loadCopy();
+    const { HOMEPAGE_SPECS_COPY: specs } = await import(
+      '@/data/homepageProductUi'
+    );
     await renderHomePage();
 
     const h1s = screen.getAllByRole('heading', { level: 1 });
     expect(h1s).toHaveLength(1);
-    expect(h1s[0]).toHaveTextContent(HOMEPAGE_COPY.hero.headline);
+    expect(h1s[0]).toHaveTextContent('Move your music forward.');
+    expect(copy.hero.headline).toBe('Move your music forward.');
     expect(
       screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)
     ).toEqual([
-      HOMEPAGE_FAN_STATES_COPY.headline,
-      HOMEPAGE_COPY.offer.headline,
+      copy.profile.headline,
+      copy.releases.headline,
+      specs.headline,
+      copy.invite.headline,
     ]);
   });
 
   it.each([true, false])(
-    'keeps one primary action, the jov.ie/ claim into /start, with waitlist=%s',
+    'ends in the one role waitlist form and links nowhere near signup, waitlist=%s',
     async waitlist => {
       gate.WAITLIST_ENABLED = waitlist;
-      const { HOMEPAGE_COPY } = await loadCopy();
-      const { MARKETING_CTA_INTENTS } = await import(
-        '@/data/marketingCtaIntents'
-      );
+      const { HOMEPAGE_EDITORIAL_COPY: copy, HOMEPAGE_INVITE_ANCHOR } =
+        await loadCopy();
       const { container } = await renderHomePage();
 
+      // One conversion: the role waitlist form inside the closing section.
       const forms = [...container.querySelectorAll('form')];
-      expect(forms).toHaveLength(2); // hero + terminal CTA, same action
-      for (const form of forms) {
-        expect(form).toHaveAttribute('action', '/start');
-        expect(
-          within(form).getByRole('button', {
-            name: HOMEPAGE_COPY.hero.claim.action,
-          })
-        ).toHaveAttribute('type', 'submit');
-      }
-      expect(screen.queryByText('Request access')).toBeNull();
-      expect(screen.getByText(HOMEPAGE_COPY.hero.supportNote)).toBeVisible();
-      expect(HOMEPAGE_COPY.hero.supportNote).toBe(
-        MARKETING_CTA_INTENTS.claimProfile.support
+      expect(forms).toHaveLength(1);
+      expect(forms[0]).toHaveAttribute('data-testid', 'waitlist-role-form');
+      const close = container.querySelector(`#${HOMEPAGE_INVITE_ANCHOR}`);
+      expect(close).toHaveAttribute('data-testid', 'marketing-section-cta');
+      expect(close?.contains(forms[0] ?? null)).toBe(true);
+      expect(within(forms[0]!).getAllByRole('radio')).toHaveLength(6);
+
+      // The hero's primary action scrolls to that form; no public signup.
+      const primary = screen.getByTestId('homepage-primary-cta');
+      expect(primary).toHaveAttribute('href', `#${HOMEPAGE_INVITE_ANCHOR}`);
+      expect(primary).toHaveTextContent(copy.hero.primaryAction);
+      expect(
+        container.querySelectorAll('[data-primary-action="true"]')
+      ).toHaveLength(1);
+      const hrefs = [...container.querySelectorAll('a[href]')].map(
+        link => link.getAttribute('href') ?? ''
       );
+      expect(
+        hrefs.filter(href => /^\/(signup|sign-up|start|claim)\b/.test(href))
+      ).toEqual([]);
     }
   );
 
-  it('binds performance readiness to the rendered hero and claim', async () => {
+  it('binds performance readiness to the rendered hero and its action', async () => {
     const { container } = await renderHomePage();
     const selectors = getEndUserPerfRouteById('home')?.readySelectors.content;
     expect(selectors?.length).toBeGreaterThan(0);
@@ -179,57 +195,54 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     }
   });
 
-  it('states prices only through offer truth', async () => {
-    const { HOMEPAGE_COPY } = await loadCopy();
-    await renderHomePage();
-    const summary = screen.getByTestId('homepage-offer-summary');
-    const claim = getPublicPriceClaim(HOMEPAGE_COPY.offer.plan);
-
-    expect(summary).toHaveAttribute('data-offer-plan', claim.plan);
-    expect(summary).toHaveTextContent(formatPublicPriceDisplay(claim));
-    expect(summary).toHaveTextContent(claim.badge);
-    // No source file on the page may type a price, plan name, or trial.
-    for (const path of HOMEPAGE_SOURCES) {
-      expect(read(path), path).not.toMatch(
-        /\$\s?\d|\d+\s?\/\s?mo\b|\bper month\b/i
-      );
-      expect(read(path), path).not.toMatch(/\b\d+-day\b/i);
-    }
-  });
-
-  it('backs every free inclusion with a free entitlement row', async () => {
-    const { HOMEPAGE_COPY } = await loadCopy();
-    const features = new Map(
-      PRICING_COMPARISON.flatMap(category => category.features).map(feature => [
-        feature.name,
-        feature,
-      ])
-    );
-    for (const item of HOMEPAGE_COPY.offer.included) {
-      const feature = features.get(item.entitlement);
-      expect(feature, item.entitlement).toBeDefined();
-      expect(feature?.free, item.entitlement).not.toBe(false);
-    }
-  });
-
-  it('shows no person capture on the homepage (Tim, 2026-10-26)', async () => {
+  it('shows no prices on the page', async () => {
     const { container } = await renderHomePage();
-    const images = [...container.querySelectorAll('main img, section img')];
-
-    expect(images.map(image => image.getAttribute('src'))).toEqual([]);
+    const main = [...container.querySelectorAll('section')]
+      .map(section => section.textContent ?? '')
+      .join(' ');
+    expect(main).not.toMatch(PRICE_TEXT);
     for (const path of HOMEPAGE_SOURCES) {
-      expect(read(path), path).not.toContain('/product-screenshots/');
+      expect(read(path), path).not.toMatch(PRICE_TEXT);
     }
+  });
+
+  it('shows no real person: only the featured demo artist inside the product UI', async () => {
+    const { HOMEPAGE_EDITORIAL_COPY: copy } = await loadCopy();
+    const { HOMEPAGE_FEATURED_ARTIST: artist } = await import(
+      '@/data/demoArtists'
+    );
+    const { container } = await renderHomePage();
+    const sources = [...container.querySelectorAll('section img')].map(image =>
+      (image.getAttribute('src') ?? '').replace(/\?v=\w+$/, '')
+    );
+    // Tim, 2026-11-08: the homepage does not feature him. Until a real artist
+    // opts in, the product UI is labeled Example artist (procedural art, no
+    // people, no verified badge). No real person renders on `/`.
+    const allowed = [
+      artist.avatarSrc,
+      ...artist.releases.map(release => release.src),
+    ];
+    expect(artist.demo).toBe(true);
+    expect(artist.name).toBe('Example artist');
+    expect(container.querySelector('.hv3-pp__badge, .hv3-insp__ok')).toBeNull();
+    expect(sources.length).toBeGreaterThan(0);
+    expect(sources.filter(src => !allowed.includes(src))).toEqual([]);
+    expect([...new Set(sources)].sort()).toEqual([...new Set(allowed)].sort());
+    expect(sources.some(src => /tim-white|img\/releases\//.test(src))).toBe(
+      false
+    );
+    expect(container.textContent).not.toContain('Tim White');
+    expect(copy.profile.alt).toBeTruthy();
   });
 
   it('keeps copy in data and free of em dashes and stock promotion', async () => {
-    const { HOMEPAGE_COPY, HOMEPAGE_FAN_STATES_COPY } = await loadCopy();
-    const lines = JSON.stringify([HOMEPAGE_COPY, HOMEPAGE_FAN_STATES_COPY]);
+    const { HOMEPAGE_EDITORIAL_COPY } = await loadCopy();
+    const lines = JSON.stringify(HOMEPAGE_EDITORIAL_COPY);
     expect(lines).not.toContain('—');
     expect(lines).not.toMatch(
-      /\b(seamless|unlock|elevate|world-class|all-in-one|supercharge)\b/i
+      /\b(seamless|unlock|elevate|world-class|all-in-one|supercharge|quiet workspace)\b/i
     );
-    const component = read('components/homepage/HomepageArtistProfile.tsx');
+    const component = read('components/homepage/HomepageEditorial.tsx');
     // Rendered text comes from props/copy, not JSX literals.
     expect(component).not.toMatch(/>\s*[A-Z][a-z]+(?: [a-z]+){2,}[.!]?\s*</);
   });
@@ -242,7 +255,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
 
     // Every `/#fragment` href in app/components navigates to the homepage
     // root with an anchor, so the fragment must name an id the homepage
-    // actually renders. A renamed claim input (e.g. the old `handle-input`)
+    // actually renders. A renamed target (e.g. the old claim input)
     // otherwise silently dead-ends every dependent CTA at the top of `/`.
     const anchors = new Set<string>();
     const collectAnchors = (dir: string): void => {
@@ -343,5 +356,112 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     for (const path of HOMEPAGE_SOURCES) {
       expect(read(path), `${path}: uppercase`).not.toMatch(/\buppercase\b/);
     }
+  });
+
+  it('moves the cinema layer by transform and opacity only, behind reduced motion', () => {
+    const css = read('components/homepage/v3/cinema.css').replace(
+      /\/\*[\s\S]*?\*\//g,
+      ''
+    );
+    // Scroll-driven only, and only where the user has not asked for less motion.
+    expect(css).toMatch(
+      /@supports \(animation-timeline: view\(\)\)\s*\{\s*@media \(prefers-reduced-motion: no-preference\)/
+    );
+    expect(css).not.toMatch(/addEventListener|position:\s*(?:fixed|sticky)/);
+    // view() binds to the nearest scroll container, so the hero and chapters
+    // clip without becoming one (overflow: hidden would idle every timeline).
+    expect(css).toMatch(
+      /@supports \(animation-timeline: view\(\)\)\s*\{\s*\.hv3-hero,\s*\.hv3-chapter\s*\{\s*overflow: clip;\s*\}/
+    );
+    // The horizon line paints above the chapter rule's hairline, which would
+    // otherwise cover it; the glow stays behind the copy.
+    expect(css).toMatch(
+      /\.hv3-chapter::after\s*\{[^}]*z-index:\s*1;[^}]*height:\s*1px;/
+    );
+    expect(css).toMatch(/\.hv3-chapter::before\s*\{[^}]*z-index:\s*-1;/);
+    // Keyframes touch only compositor properties, and never fade to nothing.
+    for (const [, body] of css.matchAll(
+      /@keyframes [\w-]+\s*\{([\s\S]*?\})\s*\}/g
+    )) {
+      const props = [...body.matchAll(/([a-z-]+)\s*:/g)].map(
+        ([, prop]) => prop
+      );
+      expect(new Set(props)).toEqual(new Set(['opacity', 'transform']));
+      expect(body).not.toMatch(/opacity:\s*0(?:\.0+)?\s*;/);
+    }
+  });
+
+  it('holds the premium bar: one grid, exact radii, no rings around the form', async () => {
+    const strip = (path: string) => read(path).replace(/\/\*[\s\S]*?\*\//g, '');
+    const cinema = strip('components/homepage/v3/cinema.css');
+    // Frame guides on both content edges, drawn as hard stops on the box.
+    expect(cinema).toMatch(
+      /\.hv3-hero,\s*\.hv3-chapter\s*\{\s*background-image: linear-gradient\([^;]*var\(--hv3-side\)[^;]*calc\(100% - var\(--hv3-side\)\)/
+    );
+    // Print-sheet crosses and gradient-clipped headlines are banned (ASR-033).
+    expect(cinema).not.toMatch(/\.hv3-rule::before/);
+    expect(cinema).not.toMatch(/--hv3-mark/);
+    expect(cinema).not.toMatch(/background-clip:\s*text/);
+    // The ion light stays on the chapter edge.
+    expect(cinema).toMatch(/\.hv3-chapter::before\s*\{[^}]*top:\s*0;/);
+    expect(cinema).toMatch(/\.hv3-chapter::after\s*\{[^}]*top:\s*0;/);
+    // One box: the camera is square to the page and no stage has depth, so
+    // every mockup's edges can sit on the frame guides.
+    const v3 = [
+      'stage',
+      'chapters',
+      'specs',
+      'surfaces',
+      'product-ui',
+      'responsive',
+    ].map(name => strip(`components/homepage/v3/${name}.css`));
+    expect(v3[0]).toMatch(/--hv3-cam: rotate\(0deg\);/);
+    expect(v3[0]).toMatch(/--hv3-box: 78rem;/);
+    for (const css of v3) {
+      expect(css).not.toMatch(
+        /perspective|translateZ|translate3d|rotate[XY]\(/
+      );
+    }
+    // Stages span exactly the content box, at every zoom.
+    const chapters = v3[1];
+    expect(chapters).toMatch(
+      /\.hv3-frame\s*\{\s*margin-inline: calc\(var\(--hv3-side\) \/ var\(--hv3-z\)\);/
+    );
+    expect(chapters).toMatch(
+      /\.hv3-stage--hero\s*\{[^}]*right: calc\(var\(--hv3-side\) \/ var\(--hv3-z\)\);\s*left: calc\(var\(--hv3-side\) \/ var\(--hv3-z\)\);/
+    );
+    for (const rig of ['hero', 'releases']) {
+      expect(chapters).toMatch(
+        new RegExp(
+          `\\.hv3-rig--${rig}\\s*\\{[^}]*left: 0;\\s*width: var\\(--hv3-box\\);`
+        )
+      );
+    }
+    // The hero rig scales from its top-left corner, so the 390 crop keeps the
+    // approved window region (the list, not the inspector) only with the
+    // offset recomputed for that origin.
+    expect(chapters).toMatch(/\.hv3-rig--hero\s*\{[^}]*transform-origin: 0 0;/);
+    expect(v3[5]).toMatch(
+      /\.hv3-rig--hero\s*\{[^}]*left: calc\(-9\.705rem - var\(--hv3-gutter\)\);[^}]*scale\(0\.72\)/
+    );
+    // The nav's backing runs edge to edge once scrolled.
+    expect(strip('components/homepage/v3/form.css')).toMatch(
+      /\.home-viewport \.header-nav--docked::before\s*\{\s*right: calc\(50% - 50vw\);\s*left: calc\(50% - 50vw\);/
+    );
+    // Controls are exact, never pills.
+    for (const path of [
+      'components/homepage/v3/chapters.css',
+      'components/homepage/v3/form.css',
+    ]) {
+      const css = strip(path);
+      for (const block of css.match(
+        /\.hv3-btn\s*\{[^}]*\}|waitlist-chip\s*\{[^}]*\}|inline-subscribe"\][^{]*\{[^}]*\}/g
+      ) ?? []) {
+        expect(block, path).not.toMatch(/radius-pill/);
+      }
+    }
+    // The invitation has no ring around its form.
+    const { container } = await renderHomePage();
+    expect(container.querySelector('.hv3-invite .hv3-orbit')).toBeNull();
   });
 });

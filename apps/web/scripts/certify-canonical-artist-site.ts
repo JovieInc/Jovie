@@ -7,6 +7,7 @@ import {
   type CanonicalArtistSiteReceipt,
   evaluateCanonicalArtistSiteCertification,
 } from '@/lib/acquisition/canonical-artist-site-certification';
+import { countJourneyTests } from '../../../scripts/lib/journey-evidence-builder.mjs';
 
 export interface CanonicalArtistSiteCliOptions {
   readonly candidateId: string;
@@ -30,36 +31,6 @@ export interface CanonicalArtistSiteCliOptions {
    * so an unrelated spec (e.g. /start layout) cannot flip them.
    */
   readonly journeyReportPath?: string;
-}
-
-interface PlaywrightSpec {
-  readonly file?: string;
-  readonly ok?: boolean;
-}
-
-interface PlaywrightSuite {
-  readonly file?: string;
-  readonly specs?: readonly PlaywrightSpec[];
-  readonly suites?: readonly PlaywrightSuite[];
-}
-
-/** Per spec file: true when it ran at least one test and none failed. */
-export function summarizeJourneyReport(
-  report: unknown
-): ReadonlyMap<string, boolean> | null {
-  const root = report as { suites?: readonly PlaywrightSuite[] } | null;
-  if (!root || !Array.isArray(root.suites)) return null;
-  const byFile = new Map<string, boolean>();
-  const visit = (suite: PlaywrightSuite) => {
-    for (const spec of suite.specs ?? []) {
-      const file = (spec.file ?? suite.file ?? '').split('/').pop() ?? '';
-      if (!file) continue;
-      byFile.set(file, (byFile.get(file) ?? true) && spec.ok === true);
-    }
-    for (const child of suite.suites ?? []) visit(child);
-  };
-  for (const suite of root.suites) visit(suite);
-  return byFile.size > 0 ? byFile : null;
 }
 
 interface M2Receipt {
@@ -192,15 +163,29 @@ export function certifyCanonicalArtistSite(
     : null;
 
   const goldenPassed = options.goldenPathStatus === 'success';
-  const journeySpecs = options.journeyReportPath
-    ? summarizeJourneyReport(readJson(options.journeyReportPath))
+  const journeyReportRequested = options.journeyReportPath !== undefined;
+  const journeyReport = options.journeyReportPath
+    ? readJson(options.journeyReportPath)
     : null;
-  // Without a usable report the revenue checks keep reading the step outcome.
-  const specOk = (file: string) => journeySpecs?.get(file) === true;
-  const billingJourneyOk = journeySpecs
+  // Use the existing journey verifier's strict executed-test semantics.
+  // Explicitly requested evidence cannot fall back to a green aggregate.
+  const specOk = (file: string) => {
+    try {
+      const { tests } = countJourneyTests(journeyReport, file);
+      return (
+        tests.total > 0 &&
+        tests.passed === tests.total &&
+        tests.failed === 0 &&
+        tests.skipped === 0
+      );
+    } catch {
+      return false;
+    }
+  };
+  const billingJourneyOk = journeyReportRequested
     ? specOk('golden-path.spec.ts')
     : goldenPassed;
-  const freeStateOk = journeySpecs
+  const freeStateOk = journeyReportRequested
     ? specOk('claim-prebuilt.smoke.spec.ts') &&
       specOk('golden-path-home-welcome.spec.ts') &&
       specOk('golden-path.spec.ts')
@@ -391,8 +376,10 @@ export function certifyCanonicalArtistSite(
     ),
     row(
       'payment_entitlement',
-      billingJourneyOk && (journeySpecs ? proPassed && activationPassed : true),
-      billingJourneyOk && (journeySpecs ? proPassed && activationPassed : true)
+      billingJourneyOk &&
+        (journeyReportRequested ? proPassed && activationPassed : true),
+      billingJourneyOk &&
+        (journeyReportRequested ? proPassed && activationPassed : true)
         ? journeyDetail
         : 'Checkout, entitlement or activation proof failed (golden-path billing spec or revenue-path steps).',
       [...goldenEvidence, ...m2Evidence]

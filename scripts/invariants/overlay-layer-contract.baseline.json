@@ -10,7 +10,7 @@
     "packages/ui"
   ],
   "localStackingMax": 30,
-  "totalFindings": 73,
+  "totalFindings": 72,
   "files": {
     "apps/web/app/exp/component-checker/ComponentCheckerClient.tsx": {
       "z-50": 1
@@ -63,12 +63,6 @@
       "z-100": 1
     },
     "apps/web/components/features/dashboard/molecules/artist-search-mode/UniversalLinkInputArtistSearchMode.tsx": {
-      "z-50": 1
-    },
-    "apps/web/components/features/dashboard/molecules/FirstFanCelebration.tsx": {
-      "z-50": 1
-    },
-    "apps/web/components/features/dashboard/molecules/ProfileLiveCelebration.tsx": {
       "z-50": 1
     },
     "apps/web/components/features/dashboard/molecules/universal-link-input/UniversalLinkInput.tsx": {
@@ -131,9 +125,6 @@
     },
     "apps/web/components/organisms/combobox/ComboboxDropdown.tsx": {
       "z-50": 1
-    },
-    "apps/web/components/organisms/CookieBannerSection.tsx": {
-      "z-[60]": 1
     },
     "apps/web/components/organisms/HeaderNav.tsx": {
       "zIndex:100": 1

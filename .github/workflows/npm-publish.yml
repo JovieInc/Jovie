@@ -144,7 +144,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         # The engines floor, the next major, and the Node 22 line that still runs.
-        node: ['22.13.0', '24.22.1', '26']
+        node: ['22.13.0', '24.22.2', '26']
     # macOS cells try an idle self-hosted Mac first and fall back to hosted,
     # so the LYB-saturated hosted macOS pool never holds a CLI release.
     permissions:
@@ -204,8 +204,8 @@ jobs:
             echo "::error::This workflow may only publish from refs/heads/main."
             exit 1
           }
-          test "$(node --version)" = v24.22.1 || {
-            echo "::error::The release lane requires Node.js v24.22.1."
+          test "$(node --version)" = v24.22.2 || {
+            echo "::error::The release lane requires Node.js v24.22.2."
             exit 1
           }
 
@@ -511,7 +511,28 @@ jobs:
             npm pack --ignore-scripts --json > "$MCP_PACK_PATH"
           )
           node packages/jovie-cli/scripts/verify-published-package.mjs
-          npm audit signatures --prefix '${{ steps.public_release.outputs.install_root }}'
+          # npm's attestations endpoint can lag the published packument by
+          # minutes. The signature audit waits for that 404 only; every other
+          # audit failure still fails the publication.
+          audit_log="$RUNNER_TEMP/jovie-cli-signature-audit.log"
+          audit_deadline=$((SECONDS + 900))
+          until npm audit signatures --prefix '${{ steps.public_release.outputs.install_root }}' 2> "$audit_log"; do
+            # if/else, not `grep && grep || exit`: that form is shellcheck SC2015
+            # and actionlint rejects the workflow.
+            if grep -q 'code E404' "$audit_log" && grep -q -- '-/npm/v1/attestations/' "$audit_log"; then
+              (( SECONDS < audit_deadline )) || {
+                echo "::error::npm attestations did not propagate for the published release."
+                cat "$audit_log"
+                exit 1
+              }
+              echo "npm attestations not propagated yet; retrying the signature audit."
+              sleep 15
+            else
+              echo "::error::Signature audit failed outside the attestations 404 window."
+              cat "$audit_log"
+              exit 1
+            fi
+          done
 
       - name: Publish exact MCP listing using GitHub OIDC
         shell: bash

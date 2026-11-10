@@ -62,7 +62,7 @@ export const CLI_FAQ_ITEMS = [
   {
     question: 'Which Node.js version does it need?',
     answer:
-      'Node.js 24.22.1 or later, including Node 26. That matches the published package engines field.',
+      'Node.js 24.22.2 or later, including Node 26. That matches the published package engines field.',
   },
   {
     question: 'Can I point it at another Jovie deployment?',
@@ -129,11 +129,6 @@ export function CliLandingPage() {
           label: 'Public API',
           href: APP_ROUTES.DEVELOPERS,
           testId: 'cli-hero-developers',
-        }}
-        photo={{
-          src: '/images/marketing-hero/cli.webp',
-          width: 1600,
-          height: 901,
         }}
         logos={false}
         align='center'
@@ -253,8 +248,6 @@ export function CliLandingPage() {
 
       <MarketingFooterCta
         sectionVariant='final-single-claim'
-        title='Jovie, for your agents.'
-        body='Install the Jovie CLI and give a creator a profile from their Spotify link.'
         ctaLabel={CLI_PRIMARY_CTA_LABEL}
         ctaHref='#install'
         ctaAnalyticsEvent='cli_install_cta'

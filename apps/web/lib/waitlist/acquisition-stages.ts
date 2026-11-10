@@ -24,7 +24,13 @@ export function acquisitionIdFromCookieHeader(
   for (const part of header.split(';')) {
     const [name, ...rest] = part.trim().split('=');
     if (name === ACQUISITION_COOKIE_NAME) {
-      const value = decodeURIComponent(rest.join('='));
+      let value: string;
+      try {
+        value = decodeURIComponent(rest.join('='));
+      } catch {
+        // A malformed escape (%E0%A4%A) must not fail the waitlist submit.
+        return null;
+      }
       return isAcquisitionJourneyId(value) ? value : null;
     }
   }
@@ -35,15 +41,23 @@ export async function recordWaitlistJoin(params: {
   readonly entryId: string;
   readonly acquisitionId: string | null | undefined;
   readonly admitted: boolean;
+  /** Session user (app users.id); the journey must be unlinked or theirs. */
+  readonly appUserId: string;
 }): Promise<void> {
-  const { entryId, acquisitionId, admitted } = params;
+  const { entryId, acquisitionId, admitted, appUserId } = params;
   if (!isAcquisitionJourneyId(acquisitionId)) return;
   try {
     // Lazy: the registered admission module pulls in auth and claim code.
     const { stampWaitlistAcquisitionId } = await import(
       '@/lib/waitlist/approval'
     );
-    await stampWaitlistAcquisitionId(entryId, acquisitionId);
+    const owned = await stampWaitlistAcquisitionId(
+      entryId,
+      acquisitionId,
+      appUserId
+    );
+    // Someone else's or a revoked journey: record nothing against it.
+    if (!owned) return;
     await recordArtistOfferStage(acquisitionId, 'waitlist-join');
     if (admitted) await recordArtistOfferStage(acquisitionId, 'admitted');
   } catch (error) {

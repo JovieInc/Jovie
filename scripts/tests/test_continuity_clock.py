@@ -231,6 +231,50 @@ class CadenceClocksTest(unittest.TestCase):
     def posts(self):
         return [call[-1] for call in self.calls if "POST" in call]
 
+    @unittest.skipUnless(
+        (ROOT / ".github/workflows").is_dir()
+        and (ROOT / "canon/automation-registry.jsonl").is_file(),
+        "release trees carry no workflows or automation registry",
+    )
+    def test_daily_evidence_clocks_preserve_manual_runs_and_deadman_receipts(self):
+        registry = {row["id"]: row for row in map(json.loads,
+            (ROOT / "canon/automation-registry.jsonl").read_text().splitlines()) if "id" in row}
+        daily = {"nightlyTests", "e2eFullMatrix", "testCoverageAudit"}
+        selected = [c for c in clock.CLOCKS if c.name in daily]
+        self.assertEqual({c.name for c in selected}, daily)
+        for c in selected:
+            with self.subTest(workflow=c.workflow):
+                self.assertEqual(c.interval_s, 86400)
+                self.assertFalse(c.github_cron)
+                workflow = (ROOT / ".github/workflows" / c.workflow).read_text()
+                triggers = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+                self.assertIn("  workflow_dispatch:\n", triggers)
+                self.assertNotIn("  push:\n", triggers)
+                self.assertNotIn("  schedule:\n", triggers)
+                row = registry[f"lanes-clock:{c.workflow.removesuffix('.yml')}"]
+                self.assertEqual(row["trigger"]["clock"], c.name)
+                self.assertEqual(row["clock"]["scheduler"], "gem:lanes-tick")
+                self.assertGreaterEqual(len(row["clock"]["whyNotEvent"]), 30)
+                self.assertEqual(row["receipt"]["workflow"], c.workflow)
+                self.assertEqual(row["maxStalenessMinutes"], 36 * 60)
+                self.assertIn(c.state_file, row["receipt"]["location"])
+
+    def test_daily_evidence_dispatches_when_due_and_manual_run_refreshes_cadence(self):
+        for c in clock.CLOCKS:
+            if c.name not in {"nightlyTests", "e2eFullMatrix", "testCoverageAudit"}:
+                continue
+            with self.subTest(workflow=c.workflow):
+                self.calls.clear()
+                self.age[c.workflow] = 25 * 3600
+                result = clock.tick(self.path, "gem", self.api, NOW, clocks=(c,))
+                self.assertEqual(result["clocks"][c.name]["status"], "dispatch-requested")
+                self.assertEqual(self.posts(), [f"event_type={c.event_type}"])
+                self.assertTrue((self.path / c.state_file).exists())
+                page = lambda run, args: json.dumps({"workflow_runs": [
+                    run_row(30, event="workflow_dispatch")]})
+                with patch.object(clock, "api", side_effect=page):
+                    self.assertEqual(clock.observe(None, NOW, c)["status"], "current")
+
     @unittest.skipUnless((ROOT / ".github/workflows").is_dir(), "release trees carry no workflows")
     def test_each_workflow_has_a_listening_trigger_and_a_kept_backstop_cron(self):
         # Plain text, no PyYAML: the Gem release self-test runs this file too.
@@ -251,7 +295,10 @@ class CadenceClocksTest(unittest.TestCase):
                         self.assertIn("'repository_dispatch'", condition)
 
     def test_stale_workflows_are_dispatched_once_on_their_own_intervals(self):
-        self.age = {"stale-branch-sweep.yml": 8 * 86400}
+        self.age = {"stale-branch-sweep.yml": 8 * 86400, "vs-linktree-claims.yml": 8 * 86400,
+                    "postdeploy-probes.yml": 13 * 3600,
+                    "nightly-tests.yml": 25 * 3600, "e2e-full-matrix.yml": 25 * 3600,
+                    "test-coverage-audit.yml": 25 * 3600}
         result = clock.tick(self.path, "gem", self.api, NOW)
         self.assertEqual(result["status"], "dispatch-requested")
         self.assertEqual(set(result["clocks"]), {c.name for c in clock.CLOCKS[1:]})
@@ -282,6 +329,21 @@ class CadenceClocksTest(unittest.TestCase):
         self.assertEqual(result["clocks"]["runnerHeartbeat"]["status"], "current")
         self.assertEqual(result["clocks"]["costAnomaly"]["status"], "current")
         self.assertNotIn("event_type=clock_runner_heartbeat", self.posts())
+
+    def test_ignored_triggers_neither_refresh_nor_invalidate_a_clock(self):
+        cert = next(c for c in clock.CLOCKS if c.name == "prodGoldenPathCert")
+        page = lambda rows: (lambda run, args: json.dumps(
+            {"workflow_runs": []} if "status=in_progress" in args[-1]
+            else {"total_count": len(rows), "workflow_runs": rows}))
+        promotions = [run_row(age=60, id=7, event="workflow_run")]
+        with patch.object(clock, "api", side_effect=page(promotions)):
+            self.assertEqual(clock.observe(None, NOW, cert)["status"], "overdue")
+        with patch.object(clock, "api", side_effect=page(
+                promotions + [run_row(age=3600, id=8, event="repository_dispatch")])):
+            self.assertEqual(clock.observe(None, NOW, cert)["status"], "current")
+        with patch.object(clock, "api", side_effect=page(
+                promotions + [run_row(age=13 * 3600, id=9, event="repository_dispatch")])):
+            self.assertEqual(clock.observe(None, NOW, cert)["status"], "overdue")
 
     def test_one_broken_clock_state_leaves_the_others_running(self):
         (self.path / "cost-anomaly-clock.json").write_text("broken")
@@ -416,7 +478,8 @@ class SecretHygieneTest(unittest.TestCase):
             # "selftest-skipped" before running the job (merge group 40193646918, 12:42Z).
             os.environ.pop("LANES_SELFTEST", None)
             os.environ.pop("LANES_EXECUTION_BACKEND", None)
-            result = credentials_spend.tick(state, release, run=run, now=NOW, linear_token=lambda _s: FAKE_SECRET)
+            result = credentials_spend.tick(state, release, run=run, now=NOW,
+                                            home=Path(tmp.name), linear_token=lambda _s: FAKE_SECRET)
         self.assertEqual(result["status"], "ok")
         self.assertEqual(captured["env"]["LINEAR_ACCESS_TOKEN"], FAKE_SECRET)  # the child did get it
         for path in state.rglob("*"):

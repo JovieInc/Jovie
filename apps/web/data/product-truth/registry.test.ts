@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   getCapabilityRecord,
@@ -17,8 +19,6 @@ import {
 import type { DogfoodReceiptsFile } from './dogfood';
 import dogfoodReceipts from './dogfood-receipts.gen.json';
 import {
-  CapabilitySchema,
-  ClaimSchema,
   getCapabilityRoutes,
   getEntitlementCapabilityId,
   getProductCapability,
@@ -29,6 +29,7 @@ import {
   PRODUCT_FLAG_CAPABILITIES,
   ROUTE_CAPABILITY_BINDINGS,
 } from './registry';
+import { CapabilitySchema, ClaimSchema } from './registry.schema';
 
 const baseClaim = {
   id: 'fixture.claim',
@@ -324,5 +325,19 @@ describe('product-truth claims', () => {
     expect(slugifyClaimSegment(' Subscribe / follow page ')).toBe(
       'subscribe-follow-page'
     );
+  });
+});
+
+describe('product-truth registry bundle boundary', () => {
+  it('keeps zod out of the registry that every public page loads', () => {
+    // The marketing footer and navigation read registry.ts on every public
+    // page. Its zod schemas live in registry.schema.ts so those pages do not
+    // download zod.
+    const source = readFileSync(
+      resolve(process.cwd(), 'data/product-truth/registry.ts'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/from 'zod'/);
+    expect(source).not.toMatch(/import \{[^}]*\} from '\.\/registry\.schema'/);
   });
 });

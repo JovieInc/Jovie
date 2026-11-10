@@ -13,11 +13,13 @@ import {
   type NavigationItemId,
   type NavigationPlatform,
   type NavigationRouteBucket,
-  type NavigationTelemetryBatch,
   type NavigationTelemetryEvent,
-  type NavigationTelemetryPayload,
   type NavigationVariant,
 } from '@/lib/tracking/navigation-telemetry-contract';
+import type {
+  NavigationTelemetryBatch,
+  NavigationTelemetryPayload,
+} from '@/lib/tracking/navigation-telemetry-schema';
 
 export const NAVIGATION_DROP_OFF_MS = 10_000;
 export const NAVIGATION_SHORT_RETURN_MS = 15_000;

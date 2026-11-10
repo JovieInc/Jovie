@@ -84,6 +84,35 @@ describe('ReleasesView', () => {
     expect(olderArtwork).toHaveAttribute('data-priority', 'false');
   });
 
+  it('formats collaborator credits through the canonical conjunction formatter', () => {
+    render(
+      <ReleasesView
+        releases={[
+          {
+            id: 'collab-release',
+            title: 'Collab Song',
+            slug: 'collab-song',
+            releaseType: 'single',
+            releaseDate: '2026-02-01T00:00:00.000Z',
+            artworkUrl: 'https://example.com/collab-song.jpg',
+            artistNames: ['Tim White', 'Cosmic Gate', 'LYNX'],
+          },
+        ]}
+        artistId='artist-1'
+        artistHandle='tim'
+        artistName='Tim White'
+      />
+    );
+
+    // ds-cert:credit-format: the profile release meta never joins collaborator
+    // names locally — the owner name is dropped and the rest render as
+    // "A, B and C".
+    // The meta line joins credits, release type and year with a bullet.
+    expect(
+      screen.getByText(/Cosmic Gate and LYNX • Single/)
+    ).toBeInTheDocument();
+  });
+
   it('tracks release clicks with profile context', () => {
     render(
       <ReleasesView
@@ -109,5 +138,21 @@ describe('ReleasesView', () => {
         is_latest: true,
       })
     );
+  });
+});
+
+describe('ReleasesView text contrast contract (JOV-8873)', () => {
+  it('raises release metadata to white/64', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const webRoot = process.cwd().endsWith('/apps/web')
+      ? process.cwd()
+      : resolve(process.cwd(), 'apps/web');
+    const source = readFileSync(
+      resolve(webRoot, 'components/features/profile/views/ReleasesView.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('tracking-tight text-white/64');
+    expect(source).not.toContain('text-white/42');
   });
 });

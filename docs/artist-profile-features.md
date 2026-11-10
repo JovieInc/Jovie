@@ -25,7 +25,6 @@
 - Advanced analytics
 - AI
 - Export / CRM detail
-- Remove-branding or white-label detail
 
 ## Do Not Mention On This Page
 
@@ -35,7 +34,6 @@
 - Fake conversion stats
 - AI assistant positioning
 - Broad "all creators" language
-- White-label positioning
 - Anything that implies Jovie is a website builder
 
 ## Placement Defaults

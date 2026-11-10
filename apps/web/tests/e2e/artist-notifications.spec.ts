@@ -33,15 +33,18 @@ test.describe('Artist Notifications Landing', () => {
     await waitForHydration(page);
   });
 
-  test('hero renders with the new promise and Pro CTA', async ({ page }) => {
+  test('hero renders with the new promise and claim CTA', async ({ page }) => {
+    // One door (EVENT 2026-10-20): every marketing CTA claims a page and the
+    // trial is in-app only, so the hero sells the claim entry, not a trial.
+    const hero = page.getByTestId('artist-notifications-section-hero');
     await expect(
-      page.getByRole('heading', {
+      hero.getByRole('heading', {
         name: /reach listeners\.\s*on autopilot\./i,
       })
     ).toBeVisible();
     await expect(
-      page.getByRole('link', { name: /start artist presence trial/i }).first()
-    ).toBeVisible();
+      hero.getByRole('link', { name: 'Claim your page' })
+    ).toHaveAttribute('href', '/start');
   });
 
   test('shared sections render with notifications-specific copy', async ({

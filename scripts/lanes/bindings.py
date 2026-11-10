@@ -43,7 +43,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
-from atomic_state import atomic_write_text  # noqa: E402
+from atomic_state import append_json_object, atomic_write_text  # noqa: E402
 
 POLICY = Path(__file__).resolve().parent / "routing.json"
 REPAIR_STATES = frozenset({"BEHIND", "DIRTY"})
@@ -73,6 +73,10 @@ SETUP_RETRY_S = 3600                # a head whose checkout/install failed waits
 MAX_ACTIONS = 10                    # GitHub writes per maintenance pass
 DEPENDENCY = re.compile(r"(?i)\b(?:depends on|blocked by|waits? (?:on|for)|stacked on)\s+#(\d+)"
                         r"|#(\d+)\s+(?:must|has to|needs to)\s+(?:be merged|merge|land)")
+# Lanes never enroll a `compounding` PR: merge-queue-green-enroll.yml owns the reset-safe jump
+# policy (caps, batch window, build age), and a plain enqueue here beats it to the queue's back
+# (2026-11-01: #24141 was enqueued twice as jovie-ci-lane and sat 2h+). Green enroll picks it up.
+DEFERRED_ENQUEUE_LABELS = frozenset({"compounding"})
 ENQUEUE_MUTATION = ('mutation($id:ID!,$head:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,'
                     'expectedHeadOid:$head}){mergeQueueEntry{position}}}')
 MERGE_GROUP_LOG_CHARS = 6000        # tail of the failed merge-group jobs' log in a repair prompt
@@ -403,6 +407,8 @@ def maintenance_actions(binding: Binding, prs: list[dict], now: float) -> list[t
                 actions.append(("ready", pr))
             continue
         last = (pr.get("removals") or [{}])[-1]
+        if set(pr.get("labels") or ()) & DEFERRED_ENQUEUE_LABELS:
+            continue  # green enroll applies the compounding jump under its caps
         if state in ENQUEUE_STATES and not (last.get("reason") == "manual"
                                              and _age(last.get("at") or "", now) < MANUAL_QUIET_S):
             actions.append(("enqueue", pr))
@@ -839,8 +845,7 @@ def run(lane, host, binding: Binding, name: str, spec: dict, *, issue=None, pr=N
         finally:
             cleanup(lane, binding, worktree, branch if pr is None else None, receipt)
     receipt["endedAt"] = lane.now_iso()
-    with open(runs / "ledger.jsonl", "a") as ledger:
-        ledger.write(json.dumps(receipt) + "\n")
+    append_json_object(runs / "ledger.jsonl", receipt)
     return receipt
 
 
@@ -883,7 +888,8 @@ def publish(lane, binding: Binding, branch: str, worktree: Path, git, *, issue=N
     created = lane.sh(["gh", "pr", "create", "--repo", binding.slug, "--base", "main", "--head", branch,
                        "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
                        "--body", f"Refs {issue.identifier}.\n\n<!-- linear-issue-id:{issue.id} -->\n"
-                                 f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
+                                 f"<!-- linear-issue-identifier:{issue.identifier} -->\n"
+                                 '<!-- customer-changelog/v1 {"releaseWorthy":false} -->\n\n'
                                  f"Lane implementation (binding {binding.key}); {binding.slug} required checks "
                                  "gate merge."])
     url = (created.stdout or "").strip().splitlines()[-1:] if created.returncode == 0 else []

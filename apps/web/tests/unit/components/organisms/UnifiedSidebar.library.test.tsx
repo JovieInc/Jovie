@@ -94,9 +94,13 @@ vi.mock('@/components/organisms/user-button', () => ({
 vi.mock('@/components/organisms/SidebarDockBridge', () => ({
   SidebarDockBridge: (props: {
     readonly collapsed: boolean;
+    readonly userState?: { readonly hasClaimedHandle: boolean };
     readonly children: (status: undefined) => React.ReactNode;
   }) => {
-    nowPlayingBridgePropsMock({ collapsed: props.collapsed });
+    nowPlayingBridgePropsMock({
+      collapsed: props.collapsed,
+      userState: props.userState,
+    });
     return (
       <>
         <div data-sidebar-dock='true' className='shrink-0'>
@@ -320,16 +324,16 @@ describe('UnifiedSidebar library route', () => {
     expect(dock).toContainElement(
       screen.getByTestId('sidebar-now-playing-bridge')
     );
-    expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith({
-      collapsed: false,
-    });
+    expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ collapsed: false })
+    );
     const row = screen
-      .getByRole('link', { name: /Inbox —/ })
+      .getByRole('link', { name: 'Inbox' })
       .closest('[data-sidebar-brand-row]');
     expect(row).toContainElement(
       screen.getByRole('button', { name: 'Search Sidebar' })
     );
-    expect(screen.getByRole('link', { name: /Inbox —/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Inbox' })).toHaveAttribute(
       'href',
       '/app'
     );
@@ -354,7 +358,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.getByRole('button', { name: 'Switch Identity' })
+      screen.getByRole('button', { name: /Switch identity:/ })
     ).toBeInTheDocument();
   });
 
@@ -365,7 +369,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.queryByRole('button', { name: 'Switch Identity' })
+      screen.queryByRole('button', { name: /Switch identity:/ })
     ).not.toBeInTheDocument();
   });
 
@@ -388,6 +392,16 @@ describe('UnifiedSidebar library route', () => {
     );
     expect(whatsNew.compareDocumentPosition(nowPlaying)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
+    );
+  });
+
+  it('tells the dock whether the viewer already claimed a handle', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+    });
+    expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ userState: { hasClaimedHandle: true } })
     );
   });
 
@@ -592,7 +606,7 @@ describe('UnifiedSidebar library route', () => {
         logos[0].parentElement?.closest('[inert], [aria-hidden="true"]')
       ).toBeNull();
       expect(
-        screen.getByRole('button', { name: 'Switch Workspace' })
+        screen.getByRole('button', { name: /Switch Workspace:/ })
       ).toBeInTheDocument();
       expect(
         screen.getAllByRole('button', { name: 'Expand sidebar' })
@@ -608,7 +622,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.getByRole('button', { name: 'Switch Workspace' })
+      screen.getByRole('button', { name: /Switch Workspace:/ })
     ).toHaveTextContent('Jovie');
   });
 
@@ -620,7 +634,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.queryByRole('button', { name: 'Switch Workspace' })
+      screen.queryByRole('button', { name: /Switch Workspace:/ })
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Ask Jovie' })
@@ -635,7 +649,7 @@ describe('UnifiedSidebar library route', () => {
       variant: 'ov',
     });
 
-    const trigger = screen.getByRole('button', { name: 'Switch Workspace' });
+    const trigger = screen.getByRole('button', { name: /Switch Workspace:/ });
     expect(trigger).toHaveTextContent('OV');
     expect(trigger).toHaveClass('h-7');
     expect(container.querySelector('[data-brand-variant="ov"]')).not.toBeNull();
@@ -667,11 +681,10 @@ describe('UnifiedSidebar library route', () => {
     const link = within(nav).getByRole('link', { name: 'Shipping' });
     fireEvent.mouseOver(link);
     fireEvent.focus(link);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/hud/shipping-state',
-      expect.objectContaining({ signal: expect.any(AbortSignal) })
-    );
+    const shippingCalls = () =>
+      fetchMock.mock.calls.filter(([url]) => url === '/api/hud/shipping-state');
+    await waitFor(() => expect(shippingCalls()).toHaveLength(1));
+    expect(shippingCalls()[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
     fetchMock.mockRestore();
   });
 
@@ -696,7 +709,7 @@ describe('UnifiedSidebar library route', () => {
         href: link.getAttribute('href'),
       }))
     ).toEqual(
-      // Business is collapsed here; Tools is open because Ops is active.
+      // Company is collapsed here; Tools is open because Ops is active.
       ADMIN_NAV_REGISTRY.filter(item => item.section !== 'business').map(
         item => ({
           label: item.label,
@@ -794,7 +807,7 @@ describe('UnifiedSidebar library route', () => {
       within(operatorNavigation).getByRole('link', { name: 'Presence' })
     ).toBeVisible();
     const business = within(operatorNavigation).getByRole('button', {
-      name: 'Business',
+      name: 'Company',
     });
     expect(business).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(business);
@@ -855,5 +868,54 @@ describe('UnifiedSidebar library route', () => {
 
     renderUnifiedSidebar({ pathname: APP_ROUTES.CHAT, section: 'dashboard' });
     expect(screen.getAllByTestId('operator-lists-nav')).toHaveLength(1);
+  });
+});
+
+// JOV-8137: the completion widget persists in the sidebar on every page
+// until the profile hits 100%.
+describe('UnifiedSidebar profile completion widget (JOV-8137)', () => {
+  const incompleteCompletion = {
+    percentage: 50,
+    completedCount: 2,
+    totalCount: 4,
+    steps: [
+      {
+        id: 'avatar' as const,
+        label: 'Add A Profile Photo',
+        description: 'A recognizable photo makes your page feel personal.',
+        href: APP_ROUTES.SETTINGS_PROFILE,
+      },
+    ],
+    profileIsLive: false,
+  };
+
+  it('renders the completion widget while the profile is incomplete', () => {
+    renderUnifiedSidebar({
+      section: 'dashboard',
+      data: { profileCompletion: incompleteCompletion },
+    });
+
+    expect(
+      document.querySelector('[data-testid="sidebar-profile-completion"]')
+    ).not.toBeNull();
+  });
+
+  it('renders no completion widget once the profile is complete', () => {
+    renderUnifiedSidebar({
+      section: 'dashboard',
+      data: {
+        profileCompletion: {
+          ...incompleteCompletion,
+          percentage: 100,
+          completedCount: 4,
+          steps: [],
+          profileIsLive: true,
+        },
+      },
+    });
+
+    expect(
+      document.querySelector('[data-testid="sidebar-profile-completion"]')
+    ).toBeNull();
   });
 });

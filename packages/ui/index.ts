@@ -137,6 +137,12 @@ export {
   isSeparator,
   isSubmenu,
 } from './atoms/common-dropdown-types';
+// CompositeField
+export type {
+  CompositeFieldProps,
+  CompositeFieldShape,
+} from './atoms/composite-field';
+export { CompositeField } from './atoms/composite-field';
 // Context Menu
 export {
   ContextMenu,
@@ -211,7 +217,7 @@ export {
   type FounderPenVideoAtomId,
 } from './atoms/founder-pen-atoms';
 // IconButton
-export type { IconButtonProps } from './atoms/icon-button';
+export type { IconButtonName, IconButtonProps } from './atoms/icon-button';
 export { IconButton, iconButtonVariants } from './atoms/icon-button';
 export {
   ICON_BUTTON_FADE_CLASSNAME,
@@ -225,9 +231,13 @@ export {
 // Inline offline notice
 export type { InlineOfflineNoticeProps } from './atoms/inline-offline';
 export { InlineOfflineNotice } from './atoms/inline-offline';
+// InlineSubscribe
+export type { InlineSubscribeProps } from './atoms/inline-subscribe';
+export { InlineSubscribe } from './atoms/inline-subscribe';
 // Input
 export type { InputProps } from './atoms/input';
 export { Input, inputVariants } from './atoms/input';
+
 // InputGroup
 export type { InputGroupProps } from './atoms/input-group';
 export { InputGroup } from './atoms/input-group';
@@ -412,3 +422,5 @@ export {
   text,
   typography,
 } from './theme/tokens';
+
+export { UpdatingScreen, type UpdatingScreenProps } from './updating-screen';

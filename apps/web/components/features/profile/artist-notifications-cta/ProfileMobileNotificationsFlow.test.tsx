@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { COUNTRY_OPTIONS } from '@/features/profile/notifications';
@@ -82,6 +83,27 @@ describe('ProfileMobileNotificationsFlow', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('marks the root while the flow is open so the consent card cannot stack over it (JOV-3209)', () => {
+    const { unmount } = renderFlow({ presentation: 'inline', step: 'email' });
+
+    expect(
+      document.documentElement.getAttribute('data-profile-flow-open')
+    ).toBe('true');
+
+    unmount();
+    expect(
+      document.documentElement.hasAttribute('data-profile-flow-open')
+    ).toBe(false);
+  });
+
+  it('leaves the root unmarked when the flow is closed', () => {
+    renderFlow({ open: false, presentation: 'inline', step: 'email' });
+
+    expect(
+      document.documentElement.hasAttribute('data-profile-flow-open')
+    ).toBe(false);
+  });
+
   it('makes the capture screen immediately visible without a sliding transition', () => {
     renderFlow({ step: 'email' });
 
@@ -129,5 +151,22 @@ describe('ProfileMobileNotificationsFlow', () => {
     renderFlow({ showArtistEmailSection: true });
     expect(screen.getByText(/including ads/)).toBeTruthy();
     expect(screen.getByText(/Off unless you turn it on/)).toBeTruthy();
+  });
+});
+
+describe('contrast floor (WCAG 1.4.3)', () => {
+  it('renders no label or body text below text-white/60 on the dark hero', () => {
+    const source = readFileSync(
+      resolve(
+        dirname(fileURLToPath(import.meta.url)),
+        'ProfileMobileNotificationsFlow.tsx'
+      ),
+      'utf8'
+    );
+
+    // text-white/42 measured below 4.5:1 on the hero backdrop (axe
+    // color-contrast); 60% white is the floor for label/body text here.
+    expect(source).not.toMatch(/text-white\/(?:[0-4]\d|5[0-9])\b/);
+    expect(source).toMatch(/text-white\/60/);
   });
 });

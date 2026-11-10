@@ -1,0 +1,54 @@
+{
+  "schema": "jovie-duplicate-literals-ledger/v1",
+  "rule": "Shrink-only. Never add a row; derive the value from its owner instead (canon/SOURCES_OF_TRUTH.md).",
+  "ledger": {
+    "plan-prices": {
+      "apps/web/app/claim/start/route.ts": 2,
+      "apps/web/components/organisms/home-loop/fixtures.ts": 1,
+      "apps/web/data/marketing/renderedCopyCoverage.ts": 8,
+      "apps/web/lib/acquisition/artist-offer-funnel.ts": 2,
+      "apps/web/lib/acquisition/eligibility.ts": 9,
+      "apps/web/lib/agent-os/certification-inbox.ts": 7,
+      "apps/web/lib/billing/offer-truth.ts": 2,
+      "apps/web/lib/canaries/m2-revenue-path.ts": 5,
+      "apps/web/lib/claim/artist-offer-claim.ts": 2,
+      "apps/web/lib/claim/claim-verification-review.server.ts": 1,
+      "apps/web/lib/outbound/readiness.ts": 2,
+      "apps/web/lib/ovie/certifications/inventory.server.ts": 1,
+      "apps/web/lib/proof-briefs/fixtures.ts": 1,
+      "apps/web/lib/stripe/legacy-prices.ts": 2,
+      "apps/web/lib/stripe/test-price-contract.ts": 2,
+      "apps/web/lib/utils/format-number.ts": 1,
+      "apps/web/lib/visibility-audit/offer.ts": 2
+    },
+    "plan-names": {
+      "apps/web/app/app/(shell)/profiles/PresenceOutcomes.tsx": 1,
+      "apps/web/app/llms-full.txt/route.ts": 1,
+      "apps/web/app/onboarding/actions/upgrade-offer.ts": 1,
+      "apps/web/app/onboarding/checkout/page.tsx": 1,
+      "apps/web/components/features/auth/AuthOfferSummary.tsx": 2,
+      "apps/web/components/marketing/homepage-v2/HomepageV2Ctas.tsx": 1,
+      "apps/web/content/legal/terms.md": 2,
+      "apps/web/data/artistNotificationsCopy.ts": 3,
+      "apps/web/data/marketing/renderedCopyCoverage.ts": 6
+    },
+    "retention-days": {
+      "apps/web/app/app/(shell)/dashboard/actions/creator-profile.ts": 1,
+      "apps/web/app/exp/shell-v1/ShellV1ExperimentClient.tsx": 1,
+      "apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx": 1,
+      "apps/web/components/features/admin/FunnelMetricsStrip.tsx": 1,
+      "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab.tsx": 2,
+      "apps/web/components/features/library-share/LibraryShareDropCreator.tsx": 1,
+      "apps/web/components/organisms/billing/BillingActionsSection.tsx": 1,
+      "apps/web/content/investors/investor-memo.md": 1,
+      "apps/web/content/legal/privacy.md": 2,
+      "apps/web/data/product-truth/dogfood.ts": 3
+    },
+    "entitlement-limits": {
+      "apps/docs/app/docs/features/analytics/page.mdx": 2,
+      "apps/docs/app/docs/features/audience/page.mdx": 1,
+      "apps/web/app/onboarding/actions/activate-trial.ts": 1,
+      "apps/web/components/molecules/UsageLimitUpgradePrompt.tsx": 1
+    }
+  }
+}

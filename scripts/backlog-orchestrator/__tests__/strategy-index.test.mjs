@@ -16,6 +16,9 @@ import {
 } from '../strategy-index.mjs';
 import { contextEvidenceFor } from './pre-lease.mjs';
 
+// The real thesis index is private (JovieInc/Ops jovie-private/); tests use a synthetic fixture.
+process.env.JOVIE_PRIVATE_DIR = new URL('./fixtures/private-dir', import.meta.url).pathname;
+
 const NOW = new Date().toISOString();
 const THESIS_SLUG = 'strategy/sell-outcomes-replaceable-substrate';
 const THESIS_ID = 'STRAT-2026-10-02-01';
@@ -299,5 +302,30 @@ describe('context gate strategy binding', () => {
       validateContextEvidence(issue(), evidence, { now: NOW }),
       null
     );
+  });
+});
+
+describe('private strategy index unavailable', () => {
+  it('names the reason and path, and blocks strategy-sensitive issues', async () => {
+    const previous = process.env.JOVIE_PRIVATE_DIR;
+    process.env.JOVIE_PRIVATE_DIR = '/nonexistent/jovie-private';
+    try {
+      assert.throws(
+        () => loadStrategyIndex(),
+        /strategy-theses-index-unavailable: ENOENT at \/nonexistent\/jovie-private\/canon\/strategy\/theses\.jsonl; .*JOVIE_PRIVATE_DIR/
+      );
+      const result = await collectContextEvidence({
+        issue: issue(),
+        gbrain: gbrainStub(),
+        now: NOW,
+      });
+      assert.equal(result.reason, CONTEXT_BLOCKER.STRATEGY_MISS);
+      assert.match(
+        result.detail,
+        /^strategy-theses-index-unavailable: ENOENT at \/nonexistent\/jovie-private/
+      );
+    } finally {
+      process.env.JOVIE_PRIVATE_DIR = previous;
+    }
   });
 });

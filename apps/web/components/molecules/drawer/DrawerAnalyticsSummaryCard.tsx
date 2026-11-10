@@ -200,7 +200,7 @@ export function DrawerAnalyticsSummaryCard({
       <div
         className={cn(
           'transition-opacity duration-subtle',
-          dimmed && 'opacity-60'
+          dimmed && 'opacity-80'
         )}
       >
         <div

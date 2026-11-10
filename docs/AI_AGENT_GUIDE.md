@@ -211,6 +211,7 @@ no literal `fetch` call for their paths.
 | `/api/health/homepage` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous `{healthy:true,timestamp}` does not fetch featured creators |
 | `/api/health/keys` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous `{healthy,timestamp}` with no missing-key labels |
 | `/api/health/redis` | GET | Admin or CRON_SECRET | Redis write/read operability probe |
+| `/api/health/revenue-spine` | GET | Public | Runtime receipt for the revenue-spine failure contract (JOV-8249): all nine stages through the real contract builder, no user attribution, never cached |
 
 ### Library Documents (authenticated creator)
 

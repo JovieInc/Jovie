@@ -35,6 +35,8 @@ export interface AcquisitionFirstTouch {
   runId?: string;
   candidateId?: string;
   offerVersion?: string;
+  /** Probe traffic (automation UA or synthetic header); excluded from funnels. */
+  synthetic?: boolean;
 }
 
 /** Consent-scoped, first-party acquisition identity. No IP or fingerprint data. */

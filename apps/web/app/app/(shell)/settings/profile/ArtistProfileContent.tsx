@@ -3,11 +3,12 @@
 import { Button, Skeleton } from '@jovie/ui';
 import { ExternalLink, PanelRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { ArtistRulesSheet } from '@/app/app/(shell)/library/ArtistRulesSheet';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { ArtistProfileRailToggle } from '@/components/shell/ArtistProfileRailToggle';
+import { SHELL_RAIL_MOTION_MS } from '@/components/shell/rail-motion';
 import { SettingsPaySection } from '@/features/dashboard/organisms/SettingsPaySection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 import { SettingsProfileSection } from '@/features/dashboard/organisms/settings-profile-section';
@@ -50,23 +51,30 @@ function MobileProfilePanelTrigger() {
 }
 
 /**
- * Reserve the automatic companion from the server paint, then follow the
- * actual rail state. A manual close must reclaim the settings pane instead
- * of leaving an empty reservation. Artist/data reloads keep this lifecycle.
- * Transient previews never change the pane or its control's hit target.
+ * Reserve the automatic companion from the server paint until its first
+ * opening settles. The rail pushes the route, so once it is open its own
+ * width holds the space; keeping the marker longer would double-narrow the
+ * pane. A manual close before it settles releases the reservation too, and
+ * a later reopen is the rail's own animated push. Transient previews never
+ * change the pane or its control's hit target.
  */
 function CompanionRailReservation() {
   const { isPinned } = usePreviewPanelState();
-  const [hasPinned, setHasPinned] = useState(false);
+  const [released, setReleased] = useState(false);
+  const pinnedOnceRef = useRef(false);
   useEffect(() => {
-    if (isPinned) setHasPinned(true);
-  }, [isPinned]);
+    if (released) return;
+    if (!isPinned) {
+      if (pinnedOnceRef.current) setReleased(true);
+      return;
+    }
+    pinnedOnceRef.current = true;
+    const timer = setTimeout(() => setReleased(true), SHELL_RAIL_MOTION_MS);
+    return () => clearTimeout(timer);
+  }, [isPinned, released]);
 
   return (
-    <span
-      hidden
-      data-settings-companion-rail={isPinned || !hasPinned ? 'true' : undefined}
-    />
+    <span hidden data-settings-companion-rail={released ? undefined : 'true'} />
   );
 }
 
@@ -169,7 +177,7 @@ export function ArtistProfileContent({
             username={artist.handle}
           />
           <SettingsPanel
-            title='Artist Rules'
+            title='Artist rules'
             description='Confirmed rules guide every draft. Memory can suggest a rule, but it cannot activate one.'
             bodyClassName='px-4 py-4 sm:px-5'
           >

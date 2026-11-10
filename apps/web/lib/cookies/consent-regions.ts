@@ -52,17 +52,21 @@ const CONSENT_REQUIRED_REGIONS = new Map<string, ReadonlySet<string>>([
   ['CA', new Set(['QC'])],
 ]);
 
+/** Cloudflare/Vercel placeholders that carry no real geography. */
+const UNKNOWN_COUNTRY_CODES = new Set(['XX', 'T1']);
+
 export const COOKIE_BANNER_REQUIRED_COOKIE = 'jv_cc_required';
 
 export function isCookieBannerRequired(
   countryCode: string | null,
   regionCode?: string | null
 ): boolean {
-  if (!countryCode) {
-    return false;
+  // Fail closed: a missing, malformed or non-geographic country signal
+  // (empty, 'XX' unknown, 'T1' Tor) must never suppress the banner.
+  const country = countryCode?.trim().toUpperCase() ?? '';
+  if (!/^[A-Z]{2}$/.test(country) || UNKNOWN_COUNTRY_CODES.has(country)) {
+    return true;
   }
-
-  const country = countryCode.trim().toUpperCase();
 
   if (CONSENT_REQUIRED_COUNTRIES.has(country)) {
     return true;
@@ -91,16 +95,42 @@ export function resolveCookieBannerRequirement(params: {
   readonly countryCode: string | null;
   readonly regionCode?: string | null;
 }): boolean {
-  const cookieValue = params.cookieHeader
-    ?.split(';')
-    .find(cookie =>
-      cookie.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`)
-    )
-    ?.split('=')[1]
-    ?.trim();
+  const cookieValue = readCookieBannerRequirementValue(
+    params.cookieHeader ?? ''
+  );
 
   if (cookieValue === '0') return false;
   if (cookieValue === '1') return true;
 
   return isCookieBannerRequired(params.countryCode, params.regionCode);
+}
+
+/**
+ * Client-side read of the required flag from a `document.cookie` string.
+ * Fail closed: only an explicit `0` (set by the proxy for a known,
+ * non-consent geography) means "not required". Absent or malformed values
+ * mean required, so a missing geo signal never hides the banner or enables
+ * non-essential tracking.
+ */
+export function isCookieBannerRequiredFromCookieString(
+  cookieString: string
+): boolean {
+  return readCookieBannerRequirementValue(cookieString) !== '0';
+}
+
+/** Conflicting path/domain cookies cannot override a required-region flag. */
+function readCookieBannerRequirementValue(
+  cookieString: string
+): string | undefined {
+  const values = cookieString
+    .split(';')
+    .map(cookie => cookie.trim())
+    .filter(cookie => cookie.startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`))
+    .map(cookie =>
+      cookie.slice(COOKIE_BANNER_REQUIRED_COOKIE.length + 1).trim()
+    );
+  if (values.length > 1) {
+    return values.every(value => value === '0') ? '0' : '1';
+  }
+  return values[0];
 }

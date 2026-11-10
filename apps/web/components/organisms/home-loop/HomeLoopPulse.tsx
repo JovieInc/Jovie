@@ -38,30 +38,45 @@ const PLACEHOLDER_SLOTS = [
 ] as const;
 
 const TILE_FRAME =
-  'flex h-20 min-w-34 flex-1 basis-0 flex-col justify-between gap-0.5 rounded-lg bg-surface-1 px-3 py-2';
+  'flex h-full min-w-34 flex-1 basis-0 flex-col justify-between gap-0.5 rounded-lg bg-surface-1 px-3 py-2';
 
-/** The single highest-severity condition; a quiet line when there is none. */
+/**
+ * The single highest-severity condition; a quiet line when there is none.
+ * An unknown read renders as unknown (JOV-9019) — never the all-clear copy.
+ */
 export function HomeLoopConstraintBanner({
   constraint,
   emptyLabel,
   loading = false,
+  unknownLabel = null,
 }: Readonly<{
   readonly constraint: HomeLoopConstraint | null;
   readonly emptyLabel: string;
   readonly loading?: boolean;
+  /** Rendered instead of the all-clear while the loop read is unknown. */
+  readonly unknownLabel?: string | null;
 }>) {
-  const Icon = constraint
-    ? constraint.tone === 'bad'
+  // A named constraint wins over the unknown line, including its tone.
+  const unknown = !loading && constraint == null && unknownLabel != null;
+  const Icon =
+    constraint?.tone === 'bad'
       ? CircleAlert
-      : AlertTriangle
-    : CheckCircle2;
+      : constraint || unknown
+        ? AlertTriangle
+        : CheckCircle2;
   return (
     <div
       role='status'
       aria-live='polite'
       className='flex min-h-10 items-center gap-2 rounded-lg bg-surface-1 px-3 py-2 text-sm'
       data-testid='home-loop-constraint'
-      data-tone={loading ? 'loading' : (constraint?.tone ?? 'clear')}
+      data-tone={
+        loading
+          ? 'loading'
+          : unknown
+            ? 'unknown'
+            : (constraint?.tone ?? 'clear')
+      }
     >
       {loading ? (
         <LoadingSkeleton height='h-4' width='w-2/3' />
@@ -71,20 +86,22 @@ export function HomeLoopConstraintBanner({
             aria-hidden='true'
             className={cn(
               'size-4 shrink-0',
-              constraint
-                ? constraint.tone === 'bad'
-                  ? 'text-error'
-                  : 'text-warning'
-                : 'text-success'
+              constraint?.tone === 'bad'
+                ? 'text-error'
+                : constraint || unknown
+                  ? 'text-warning'
+                  : 'text-success'
             )}
           />
           <span
             className={cn(
               'min-w-0 truncate',
-              constraint ? 'text-primary-token' : 'text-secondary-token'
+              constraint || unknown
+                ? 'text-primary-token'
+                : 'text-secondary-token'
             )}
           >
-            {constraint ? constraint.text : emptyLabel}
+            {constraint?.text ?? unknownLabel ?? emptyLabel}
           </span>
           {constraint?.detailsHref ? (
             <a
@@ -104,14 +121,11 @@ export function HomeLoopConstraintBanner({
 export function HomeLoopTileCard({
   tile,
 }: Readonly<{ readonly tile: HomeLoopTile }>) {
-  return (
-    <div
-      className={TILE_FRAME}
-      data-fit-item
-      data-measured={tile.measured}
-      data-testid={`home-loop-tile-${tile.key}`}
-      data-tone={tile.tone}
-    >
+  const footer = [tile.target, tile.was ? `Was ${tile.was}` : null]
+    .filter(Boolean)
+    .join(' · ');
+  const body = (
+    <>
       <div className='flex items-center justify-between gap-2'>
         <span className='truncate text-2xs text-tertiary-token'>
           {tile.label}
@@ -133,8 +147,38 @@ export function HomeLoopTileCard({
         {tile.value}
       </span>
       <span className='truncate text-2xs tabular-nums text-tertiary-token'>
-        {tile.was ? `Was ${tile.was}` : '\u00a0'}
+        {footer || '\u00a0'}
       </span>
+      {tile.sourceCaption ? (
+        <span className='text-2xs tabular-nums text-tertiary-token'>
+          {tile.sourceCaption}
+        </span>
+      ) : null}
+    </>
+  );
+  const shared = {
+    'data-fit-item': true,
+    'data-measured': tile.measured,
+    'data-testid': `home-loop-tile-${tile.key}`,
+    'data-tone': tile.tone,
+    title: [tile.label, tile.value, footer, tile.sourceCaption]
+      .filter(Boolean)
+      .join(' · '),
+  } as const;
+  return tile.href ? (
+    <a
+      {...shared}
+      href={tile.href}
+      className={cn(
+        TILE_FRAME,
+        'transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+      )}
+    >
+      {body}
+    </a>
+  ) : (
+    <div {...shared} className={TILE_FRAME}>
+      {body}
     </div>
   );
 }
@@ -148,10 +192,14 @@ export function HomeLoopPulse({
   tiles,
   loading = false,
   placeholderCount = 7,
+  testId = 'home-loop-pulse',
+  reserveSourceCaption = false,
 }: Readonly<{
   readonly tiles: readonly HomeLoopTile[];
   readonly loading?: boolean;
   readonly placeholderCount?: number;
+  readonly testId?: string;
+  readonly reserveSourceCaption?: boolean;
 }>) {
   const { ref } = useFitList<HTMLDivElement>(
     loading
@@ -161,8 +209,11 @@ export function HomeLoopPulse({
   return (
     <div
       ref={ref}
-      className='relative flex h-20 shrink-0 flex-wrap gap-2 overflow-hidden'
-      data-testid='home-loop-pulse'
+      className={cn(
+        'relative flex shrink-0 flex-wrap gap-2 overflow-hidden',
+        reserveSourceCaption ? 'h-32' : 'h-20'
+      )}
+      data-testid={testId}
       aria-busy={loading}
     >
       {loading || tiles.length === 0

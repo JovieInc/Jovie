@@ -157,10 +157,7 @@ export const MarketingFooterCtaDefault: Story = {
   parameters: terminalCtaStoryParameters,
   render: () => (
     <div className='bg-base'>
-      <MarketingFooterCta
-        title='Request Access to Jovie.'
-        body='Join the private launch list for presence, relationships, and growth.'
-      />
+      <MarketingFooterCta />
     </div>
   ),
 };

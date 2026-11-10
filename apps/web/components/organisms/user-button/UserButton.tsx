@@ -26,7 +26,6 @@ import {
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { DesktopReleaseIdentity } from '@/components/organisms/DesktopTitlebar';
 import { SHELL_RAIL_STAGE } from '@/components/shell/rail-motion';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { APP_ROUTES } from '@/constants/routes';
@@ -34,9 +33,9 @@ import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { DESKTOP_UPDATE_COPY } from '@/data/supportDesktopUpdateCopy';
 import { track } from '@/lib/analytics';
 import { getCurrentAppShellWorkspace } from '@/lib/app-shell/workspaces';
-import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
+import { isCookieBannerRequiredFromCookieString } from '@/lib/cookies/consent-regions';
 import type { DesktopUpdateViewState } from '@/lib/desktop/desktop-updates';
-import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-runtime';
 import { GLYPH_CMD, GLYPH_OPT, GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { useFeedbackMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -48,6 +47,7 @@ import {
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
 import { useDesktopUpdateContext } from '../desktop-update/DesktopUpdateProvider';
+import { DesktopReleaseIdentity } from './desktop-release-identity.lazy';
 import { OviePrivacyLockControl } from './OviePrivacyLockControl';
 import type { UserButtonProps } from './types';
 import { UsageMenuItem } from './UsageMenuItem';
@@ -356,12 +356,9 @@ function buildDropdownItems({
 
   // Only show Cookie Settings in GDPR-regulated regions, matching footer behavior
   const ccRequired =
-    typeof document === 'undefined'
-      ? undefined
-      : document.cookie
-          .split(';')
-          .find(c => c.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`));
-  if (ccRequired && ccRequired.split('=')[1]?.trim() !== '0') {
+    typeof document !== 'undefined' &&
+    isCookieBannerRequiredFromCookieString(document.cookie);
+  if (ccRequired) {
     learnMoreItems.push({
       type: 'action',
       id: 'cookie-settings',
@@ -703,9 +700,6 @@ export function UserButton({
     (showUserInfo ? (
       <button
         type='button'
-        aria-label={
-          dockStatus ? `Open user menu · ${dockStatus.label}` : undefined
-        }
         className={cn(
           'relative group/user-button flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0',
           // Founder lock 2026-09-25: single compact 32px row — 20px avatar,
@@ -716,6 +710,9 @@ export function UserButton({
             'relative h-8 px-0.5 gap-(--space-2-5) before:absolute before:inset-x-0 before:top-1/2 before:h-11 before:-translate-y-1/2 before:content-[""]'
         )}
       >
+        {dockStatus ? (
+          <span className='sr-only'>Open user menu · {dockStatus.label} </span>
+        ) : null}
         {dockStatus?.badges}
         <Avatar
           src={userImageUrl}

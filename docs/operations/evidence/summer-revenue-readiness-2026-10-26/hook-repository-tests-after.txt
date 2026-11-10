@@ -1,0 +1,16 @@
+✔ pre-push-gate.sh is executable and documents escape hatch (1.756855ms)
+✔ pre-push-gate.sh skips when JOVIE_SKIP_PRE_PUSH_GATE=1 (8.237532ms)
+✔ pre-push-gate.sh rejects unknown mode (19.551863ms)
+✔ .no-mistakes.yaml points lint/test/format at pre-push-gate.sh (0.202271ms)
+✔ .husky/pre-push separates draft publication from qualification (0.19716ms)
+✔ publication remains policy gated without running affected tests (0.522735ms)
+✔ child Git fixtures cannot mutate the main repository that invoked the hook (93.266555ms)
+✔ child Git fixtures cannot mutate the linked worktree that invoked the hook (94.984249ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 281.864801

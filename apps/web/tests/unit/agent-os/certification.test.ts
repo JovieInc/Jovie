@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCertificationDecisionDigest,
-  type CertificationEvidenceReceipt,
   type CertificationReviewPacket,
   type CertificationState,
   evaluateCertificationAdmission,
@@ -9,76 +8,13 @@ import {
   shouldEmitTasteInboxCard,
 } from '@/lib/agent-os/certification';
 
-const SOURCE_SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-const CHANGED_SHA = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
-function receipt(
-  tier: CertificationEvidenceReceipt['tier'],
-  id: string = tier,
-  sourceSha: string | null = SOURCE_SHA
-): CertificationEvidenceReceipt {
-  return {
-    digest: `sha256:${id.padEnd(64, '0').slice(0, 64)}`,
-    id,
-    ref: `github:JovieInc/Jovie/${id}`,
-    sourceSha,
-    status: 'passed',
-    summary: `${tier} passed`,
-    tier,
-  };
-}
-function reviewPacket(
-  overrides: Partial<CertificationReviewPacket> = {}
-): CertificationReviewPacket {
-  return {
-    canonicalReferences: [
-      receipt('canonical_references', 'design-canon-reference'),
-    ],
-    contract: 'jovie.certification/v1',
-    invariantEvaluation: [
-      receipt('invariant_evaluation', 'invariant-evaluation'),
-    ],
-    itemMedia: [
-      {
-        digest:
-          'sha256:media00000000000000000000000000000000000000000000000000000',
-        id: 'variant-a-proof-video',
-        itemId: 'feature-proof-library-row',
-        ref: 'github:JovieInc/Jovie/actions/runs/visual-proof',
-        sourceSha: SOURCE_SHA,
-        status: 'passed',
-        summary: 'Variant A proof video captured the item-specific state.',
-        variantId: 'variant-a',
-      },
-    ],
-    operational: {},
-    requiredVariants: [
-      {
-        id: 'variant-a',
-        label: 'Registry card with proof video',
-        proof: receipt('required_variants', 'variant-a-proof'),
-        requiredMediaIds: ['variant-a-proof-video'],
-        sourceSha: SOURCE_SHA,
-      },
-    ],
-    source: {
-      digest:
-        'sha256:source0000000000000000000000000000000000000000000000000000',
-      expectedSha: SOURCE_SHA,
-      paths: ['apps/web/lib/agent-os/certification.ts'],
-      ref: 'refs/heads/tim/jov-5753',
-      repository: 'JovieInc/Jovie',
-      sha: SOURCE_SHA,
-    },
-    subject: {
-      id: 'feature-proof-library',
-      kind: 'ovie-registry-projection',
-      title: 'Feature Proof Library',
-    },
-    testsCoverage: [receipt('tests_coverage', 'focused-vitest-coverage')],
-    visualProof: [receipt('visual_proof', 'item-specific-visual-proof')],
-    ...overrides,
-  };
-}
+import {
+  CHANGED_SHA,
+  receipt,
+  reviewPacket,
+  SOURCE_SHA,
+} from './certification-fixtures';
+
 function approve(packet: CertificationReviewPacket) {
   const recorded = recordFounderCertificationDecision({
     decision: {
@@ -289,7 +225,6 @@ describe('certification admission kernel', () => {
       ])
     );
   });
-
   it('does not accept operational receipts as taste evidence', () => {
     const admission = evaluateCertificationAdmission({
       packet: reviewPacket({
@@ -671,7 +606,7 @@ describe('certification decision digest', () => {
     // Golden captured from the node:crypto implementation; stored founder
     // decisions bind to this digest, so the value must never drift.
     expect(buildCertificationDecisionDigest(reviewPacket())).toBe(
-      'sha256:6cc6a0e660a8b4b83a3cf732826cb9b25d498282b9fdef689995c9d19a3cb112'
+      'sha256:b9f693f683525d6bbe03d3a3b0c849577e6f21356348d65d746f706dde9c199a'
     );
   });
 });

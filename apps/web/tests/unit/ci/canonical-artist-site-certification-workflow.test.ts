@@ -1,6 +1,13 @@
-import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as parseYaml } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
@@ -44,6 +51,7 @@ describe('JOV-6572 canonical artist-site certification workflow', () => {
     expect(command).toContain('golden-path-home-welcome.spec.ts');
     expect(command).toContain('golden-path.spec.ts');
     expect(command).toContain('start-entry-continuity.spec.ts');
+    expect(command).toContain('entry-first-html-visual.spec.ts');
     expect(command).toContain('GOLDEN_PATH_REQUIRED=1');
     expect(command).not.toContain('money-path-persistence.spec.ts');
     expect(ci).toContain('Seed required premade profile claim fixture');
@@ -139,7 +147,11 @@ node -e 'process.stdout.write(process.env.URL_ENCRYPTION_KEY)'`,
     );
     expect(certify).toContain('for page in 1 2 3 4 5; do');
     // Rate-limit guard: page only until the live build is found, never past a failure.
-    expect(certify).toContain('https://jov.ie/api/version');
+    expect(certify).toContain('"$CERT_DIR/profile-result.json"');
+    expect(certify).not.toContain('curl ');
+    expect(certify).toContain(
+      'node packages/api-client/cli.ts gh --priority deploy -- api'
+    );
     expect(certify).toContain('grep -q "^$LIVE_BUILD" "$HISTORY"');
     expect(certify).toContain('if [ "$failed" -ne 0 ]; then break; fi');
     expect(certify).toContain('>> "$HISTORY" || failed=1');
@@ -159,6 +171,94 @@ node -e 'process.stdout.write(process.env.URL_ENCRYPTION_KEY)'`,
     expect(ci).toContain('steps.canonical_revenue.outcome');
     expect(ci).toContain('steps.canonical_profile.outcome');
   });
+
+  it.each([false, true])(
+    'executes the real history reader with one page when first-page failure is %s',
+    failFirstPage => {
+      const directory = mkdtempSync(join(tmpdir(), 'certification-history-'));
+      try {
+        const source = 'a'.repeat(40);
+        const live = 'b'.repeat(40);
+        const certDir = join(directory, 'certificate');
+        const bin = join(directory, 'bin');
+        const client = join(directory, 'packages/api-client');
+        for (const target of [certDir, bin, client]) {
+          mkdirSync(target, { recursive: true });
+        }
+        const profileReport = join(directory, 'profile-report.json');
+        writeFileSync(
+          profileReport,
+          JSON.stringify({ snapshot: { releaseSha: live } })
+        );
+        writeFileSync(
+          join(certDir, 'profile-result.json'),
+          JSON.stringify({ reportPath: profileReport })
+        );
+        writeFileSync(
+          join(client, 'cli.ts'),
+          `const fs = require('node:fs');
+fs.appendFileSync(process.env.CALL_LOG, JSON.stringify(process.argv.slice(2)) + '\\n');
+if (process.env.FAIL_FIRST_PAGE === '1') process.exit(75);
+process.stdout.write('${source}\\n${live}\\n');
+`
+        );
+        writeFileSync(
+          join(bin, 'gh'),
+          '#!/bin/sh\nexec node packages/api-client/cli.ts gh --priority deploy -- "$@"\n',
+          { mode: 0o700 }
+        );
+        writeFileSync(
+          join(bin, 'pnpm'),
+          '#!/bin/sh\nprintf "%s\\n" "$@" > "$PNPM_ARGS"\n',
+          { mode: 0o700 }
+        );
+        writeFileSync(
+          join(bin, 'curl'),
+          '#!/bin/sh\necho unexpected-production-read >&2\nexit 97\n',
+          { mode: 0o700 }
+        );
+        const script = parsedCi.jobs['ci-golden-path'].steps?.find(
+          step => step.id === 'canonical_certification'
+        )?.run;
+        expect(script).toBeTruthy();
+        const run = script!.replace(
+          /\$\{\{\s*([^}]+)\s*\}\}/g,
+          (_match, key: string) => {
+            if (key.trim() === 'github.sha') return source;
+            if (key.trim() === 'github.repository') return 'fixture/repository';
+            if (key.trim() === 'runner.temp') return directory;
+            return 'fixture';
+          }
+        );
+        const callLog = join(directory, 'calls.jsonl');
+        const pnpmArgs = join(directory, 'pnpm-args');
+        const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', run], {
+          cwd: directory,
+          encoding: 'utf8',
+          timeout: 10000,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            CERT_DIR: certDir,
+            CALL_LOG: callLog,
+            PNPM_ARGS: pnpmArgs,
+            FAIL_FIRST_PAGE: failFirstPage ? '1' : '0',
+          },
+        });
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stderr).not.toContain('unexpected-production-read');
+        const calls = readFileSync(callLog, 'utf8').trim().split('\n');
+        expect(calls).toHaveLength(1);
+        expect(calls[0]).toContain('per_page=100&page=1');
+        expect(readFileSync(join(certDir, 'source-history.txt'), 'utf8')).toBe(
+          failFirstPage ? '' : `${source}\n${live}\n`
+        );
+        expect(readFileSync(pnpmArgs, 'utf8')).toContain('--journey-report\n');
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
+  );
 
   it('always persists the certificate and fails the job on RED', () => {
     const steps = parsedCi.jobs['ci-golden-path']?.steps ?? [];
