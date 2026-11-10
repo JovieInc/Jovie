@@ -3,9 +3,13 @@
 # "Start fallback build in background") to finish and fails closed on every
 # abnormal end. Invoked as:
 #   wait-background-build.sh <pid> <exit-file> <log-file>
-# The builder writes its exit status to <exit-file> atomically (tmp + mv).
-# NEXT_BUILD_WAIT_TIMEOUT_SECONDS (default 720) bounds the total wait; the
-# job's own timeout-minutes stays the hard ceiling. Executable-tested by
+# The builder is setsid'd into its own process group, so <pid> is both the
+# wrapper pid and the process-group id; on timeout the whole group (pnpm,
+# next, workers) is TERMed with a bounded window and then KILLed, with a
+# single-pid fallback for non-group launches. The builder writes its exit
+# status to <exit-file> atomically (tmp + mv). NEXT_BUILD_WAIT_TIMEOUT_SECONDS
+# (default 720) bounds the total wait; the job's own timeout-minutes stays
+# the hard ceiling. Executable-tested by
 # apps/web/tests/unit/ci/lighthouse-launch-gates.test.ts.
 set -euo pipefail
 
@@ -21,6 +25,8 @@ timeout_seconds="${NEXT_BUILD_WAIT_TIMEOUT_SECONDS:-720}"
 # Grace period after the pid disappears: the builder may be between its
 # final mv and process exit, or the status file may be one poll behind.
 grace_seconds="${NEXT_BUILD_WAIT_GRACE_SECONDS:-5}"
+# Bounded window between TERM and KILL on timeout.
+term_seconds="${NEXT_BUILD_WAIT_TERM_SECONDS:-3}"
 
 if ! [[ "$pid" =~ ^[0-9]+$ ]]; then
   echo "::error::wait-background-build.sh: pid must be an integer, got '$pid'" >&2
@@ -43,8 +49,13 @@ while [[ ! -f "$exit_file" ]]; do
     break
   fi
   if [[ "$SECONDS" -ge "$deadline" ]]; then
-    echo "::error::Background build did not finish within ${timeout_seconds}s; killing pid $pid." >&2
-    kill "$pid" 2>/dev/null || true
+    echo "::error::Background build did not finish within ${timeout_seconds}s; killing the build process group." >&2
+    kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+    term_deadline=$((SECONDS + term_seconds))
+    while kill -0 -- "-$pid" 2>/dev/null && [[ "$SECONDS" -lt "$term_deadline" ]]; do
+      sleep 1
+    done
+    kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
     tail -n 100 "$log_file" >&2 2>/dev/null || true
     exit 1
   fi

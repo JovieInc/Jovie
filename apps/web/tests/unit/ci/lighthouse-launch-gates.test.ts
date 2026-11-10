@@ -135,10 +135,35 @@ describe('Lighthouse identity admission', () => {
     const extract = byName('Extract build artifact');
     const start = byName('Start fallback build in background');
     const wait = byName('Wait for background fallback build');
-    // The artifact decision precedes every build path (Move 1, merge-time):
-    // ci-build-public is dispatch-only, so on merge_group the download fails
-    // and the background build always runs, overlapping Playwright setup,
-    // the Neon branch and migrations. When the artifact exists it wins.
+    const probe = byName(PROBE_NAMES.dashboard);
+    // Wiring and order: the artifact decision precedes every build path
+    // (Move 1, merge-time), the background build launches only when the
+    // artifact is missing, and the wait runs after migrations, exactly
+    // when a build was launched, before the probes.
+    const indexOf = (name: string) =>
+      job.steps.findIndex(step => step.name === name);
+    expect(indexOf('Download build artifact')).toBeLessThan(
+      indexOf('Extract build artifact')
+    );
+    expect(indexOf('Extract build artifact')).toBeLessThan(
+      indexOf('Start fallback build in background')
+    );
+    expect(indexOf('Start fallback build in background')).toBeLessThan(
+      indexOf('Run migrations (ephemeral Neon)')
+    );
+    expect(indexOf('Run migrations (ephemeral Neon)')).toBeLessThan(
+      indexOf('Wait for background fallback build')
+    );
+    expect(indexOf('Wait for background fallback build')).toBeLessThan(
+      indexOf(PROBE_NAMES.dashboard)
+    );
+    expect(start.run).toContain('started=true" >> "$GITHUB_OUTPUT');
+    expect(start.if).toContain("steps.download-build.outcome != 'success'");
+    expect(wait.if).toContain(
+      "steps.background-build-start.outputs.started == 'true'"
+    );
+    // Artifact hit: extraction is the only build path; no background build,
+    // no wait, no cache restore.
     expect(selected(download, 'true')).toBe(true);
     expect(selected(download, 'true', { relevant: false })).toBe(false);
     expect(selected(extract, 'true', { download: 'success' })).toBe(true);
@@ -146,14 +171,22 @@ describe('Lighthouse identity admission', () => {
     expect(selected(start, 'true')).toBe(true);
     expect(selected(start, 'true', { download: 'success' })).toBe(false);
     expect(selected(start, 'true', { relevant: false })).toBe(false);
-    // The wait runs exactly when a build was launched (the started output),
-    // regardless of why, and no new step may absorb failures.
+    // Artifact miss: the background build and its wait run, gated on the
+    // started output, and neither can absorb a failure.
     expect(selected(wait, 'true')).toBe(true);
     expect(selected(wait, 'true', { started: 'false' })).toBe(false);
     expect(selected(wait, 'true', { relevant: false })).toBe(false);
     expect(wait['continue-on-error']).toBeUndefined();
     expect(start['continue-on-error']).toBeUndefined();
     expect(wait.run).toContain('scripts/ci/wait-background-build.sh');
+    // Failed extraction: the extract step is fail-closed (no
+    // continue-on-error), and because the background build requires the
+    // download to have failed, it never launched on the artifact path — a
+    // failed extraction reds the job instead of racing a second build.
+    expect(extract['continue-on-error']).toBeUndefined();
+    expect(selected(start, 'true', { download: 'success' })).toBe(false);
+    expect(selected(wait, 'true', { failed: true })).toBe(false);
+    expect(selected(probe, 'true', { failed: true })).toBe(false);
     // Same read-only Turbopack cache restore as Build + Layout: pinned
     // restore-only action, compiler-state path, hour-suffixed key written
     // only by trusted main (next-build-cache-warm), never saved here — and
@@ -169,6 +202,16 @@ describe('Lighthouse identity admission', () => {
       'actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
     );
     expect(cacheRestore.with?.path).toBe('apps/web/.next/cache/turbopack');
+    // Job-end backstop: a best-effort always() kill of the build process
+    // group, only when a build was launched, that cannot fail the job.
+    const groupKill = byName(
+      'Kill background build process group (if still alive)'
+    );
+    expect(groupKill.if).toContain('always()');
+    expect(groupKill.if).toContain(
+      "steps.background-build-start.outputs.started == 'true'"
+    );
+    expect(groupKill.run).toContain('next-build-fallback.pid');
     const source = readFileSync(
       resolve(REPO_ROOT, '.github/workflows/ci.yml'),
       'utf8'
@@ -193,10 +236,30 @@ describe('Lighthouse identity admission', () => {
       'apps/web/.lighthouserc.chat.pr.json',
       'apps/web/.lighthouserc.onboarding.pr.json',
       'apps/web/scripts/lighthouse-dashboard-auth.cjs',
+      // Helper-only change regression: the wait script the job invokes must
+      // select this gate on its own, without any app-side change.
+      'scripts/ci/wait-background-build.sh',
     ]) {
       expect(pattern.test(path), path).toBe(true);
     }
     expect(pattern.test('apps/web/.lighthouserc.admin.pr.json')).toBe(false);
+  });
+
+  it('launch gate: a helper-only change keeps selecting the golden-path launch gate', () => {
+    const source = readFileSync(
+      join(REPO_ROOT, '.github/workflows/ci.yml'),
+      'utf8'
+    );
+    const match = source.match(/LAUNCH_GATE_PATTERN='([^']+)'/);
+    expect(match).not.toBeNull();
+    const pattern = new RegExp(match?.[1] ?? '$^');
+    expect(pattern.test('scripts/ci/wait-background-build.sh')).toBe(true);
+    // Established selectors must keep selecting alongside the helper.
+    expect(pattern.test('apps/web/tests/e2e/shell-route-health.spec.ts')).toBe(
+      true
+    );
+    expect(pattern.test('docs/launch/LAUNCH_GATES.md')).toBe(true);
+    expect(pattern.test('docs/unrelated.md')).toBe(false);
   });
 
   for (const surface of ['onboarding'] as const) {
@@ -377,12 +440,14 @@ describe('dashboard Lighthouse background build wait protocol', () => {
     });
   }
 
-  it('passes only on an atomic zero status and reports the tail of the log', () => {
+  it('passes only when a wrapper with a real child publishes an atomic zero status', () => {
     const dir = mkdtempSync(join(tmpdir(), 'wait-bg-build-'));
     const exitFile = join(dir, 'build.exit');
     const logFile = join(dir, 'build.log');
+    // Mirrors the real launcher: a wrapper with a real child that publishes
+    // the child's exit status (atomically) only after the child exits.
     const builder = startBuilder(
-      `sleep 1; printf 'started\n' > '${logFile}'; printf '%s' 0 > '${exitFile}.tmp'; mv '${exitFile}.tmp' '${exitFile}'`
+      `sleep 1 & child=\$!; wait \$child; status=\$?; printf 'started\n' > '${logFile}'; printf '%s' "\$status" > '${exitFile}.tmp'; mv '${exitFile}.tmp' '${exitFile}'`
     );
     try {
       const result = runWait(String(builder.pid), exitFile, logFile);
@@ -396,12 +461,12 @@ describe('dashboard Lighthouse background build wait protocol', () => {
     }
   });
 
-  it('fails closed on a nonzero status', () => {
+  it('fails closed on a nonzero child status published by the wrapper', () => {
     const dir = mkdtempSync(join(tmpdir(), 'wait-bg-build-'));
     const exitFile = join(dir, 'build.exit');
     const logFile = join(dir, 'build.log');
     const builder = startBuilder(
-      `sleep 1; printf 'boom\n' > '${logFile}'; printf '%s' 3 > '${exitFile}.tmp'; mv '${exitFile}.tmp' '${exitFile}'`
+      `bash -c 'sleep 1; exit 3' & child=\$!; wait \$child; status=\$?; printf 'boom\n' > '${logFile}'; printf '%s' "\$status" > '${exitFile}.tmp'; mv '${exitFile}.tmp' '${exitFile}'`
     );
     try {
       const result = runWait(String(builder.pid), exitFile, logFile);
@@ -454,24 +519,53 @@ describe('dashboard Lighthouse background build wait protocol', () => {
     }
   });
 
-  it('times out, kills the builder, and fails closed', async () => {
+  it('times out, kills the whole build process group, and fails closed', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'wait-bg-build-'));
     const exitFile = join(dir, 'build.exit');
     const logFile = join(dir, 'build.log');
-    const child = spawn('bash', ['-c', 'sleep 300'], { stdio: 'ignore' });
+    const childPidFile = join(dir, 'child.pid');
+    // setsid mirrors the real launcher: the wrapper leads its own process
+    // group with a real grandchild, so the timeout path must kill the group
+    // — killing only the wrapper pid would leak the grandchild.
+    const child = spawn(
+      'setsid',
+      ['bash', '-c', `sleep 300 & echo \$! > '${childPidFile}'; wait`],
+      { stdio: 'ignore' }
+    );
     if (typeof child.pid !== 'number') throw new Error('builder had no pid');
-    // Resolves once node has reaped the killed builder, which is the real
-    // proof it is dead (kill -0 keeps succeeding on an unreaped zombie).
     const reaped = new Promise<void>(resolve => {
       child.on('exit', () => resolve());
     });
     try {
       const result = runWait(String(child.pid), exitFile, logFile, {
         NEXT_BUILD_WAIT_TIMEOUT_SECONDS: '2',
+        NEXT_BUILD_WAIT_TERM_SECONDS: '2',
       });
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('did not finish within 2s');
+      expect(result.stderr).toContain('process group');
+      // The wrapper itself must be dead and reaped.
       await reaped;
+      // And the grandchild too: a zombie or missing /proc entry is dead;
+      // a live S/R state means the group kill leaked it.
+      const grandchildPid = Number(readFileSync(childPidFile, 'utf8').trim());
+      expect(Number.isInteger(grandchildPid)).toBe(true);
+      let grandchildDead = false;
+      for (let attempt = 0; attempt < 25; attempt += 1) {
+        let state: string | null = null;
+        try {
+          const stat = readFileSync(`/proc/${grandchildPid}/stat`, 'utf8');
+          state = stat.split(') ')[1]?.split(' ')[0] ?? null;
+        } catch {
+          state = null; // pid gone entirely
+        }
+        if (state === null || state === 'Z') {
+          grandchildDead = true;
+          break;
+        }
+        spawnSync('sleep', ['0.2']);
+      }
+      expect(grandchildDead).toBe(true);
     } finally {
       try {
         child.kill('SIGKILL');
