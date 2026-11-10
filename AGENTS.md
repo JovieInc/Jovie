@@ -87,6 +87,16 @@ and required checks. Auth/payment edits use CI + Migration Guard, not an extra
 human merge gate. Sensitive surfaces: proxy, migrations, billing, entitlements,
 onboarding, canonical tokens, and generated files.
 
+Local AI review runs through Sentry Warden (`warden.toml`): the husky
+pre-commit hook reviews staged changes (`warden --staged`) and pre-push
+reviews the branch against `main` via `scripts/hooks/warden-local-review.sh`.
+It is advisory — a missing `warden` CLI or model credentials warn and the
+commit/push proceeds. Warden is local-only in this repo: never commit
+`.github/workflows/warden.yml`, and never add Warden as a status check,
+branch-protection rule, or merge gate. Configure it locally with
+`WARDEN_MODEL` plus the matching provider key (`WARDEN_OPENAI_API_KEY` or
+`WARDEN_ANTHROPIC_API_KEY`); never commit keys.
+
 ## Finish line
 
 Done means the user's outcome works, not that a PR exists.

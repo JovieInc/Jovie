@@ -21,3 +21,6 @@ if git diff --cached --name-only --diff-filter=ACM | grep -qE '^apps/ios/.*\.swi
   echo "[gate-ladder] ios format-lint rung (staged Swift)"
   pnpm run ios:lint
 fi
+
+# Advisory local AI review (Sentry Warden): reports findings, never blocks.
+bash scripts/hooks/warden-local-review.sh staged
