@@ -18,6 +18,7 @@ import {
   listProfileApprovals,
   revokeProfileApproval,
 } from '@/lib/team/approvals';
+import { fixtureSchemaUrl as fixtureUrl } from './fixtures/fixture-schema-url';
 
 vi.mock('@/lib/error-tracking', () => ({
   captureWarning: vi.fn().mockResolvedValue(undefined),
@@ -34,7 +35,7 @@ function resolveTarget(env: Record<string, string | undefined>) {
     ) {
       throw new Error('Only dedicated loopback approval fixtures are allowed');
     }
-    return { url: local, certification: false };
+    return { url: parsed.toString(), certification: false };
   }
   if (env.DB_CERTIFICATION !== 'true') return null;
   if (!env.DATABASE_URL)
@@ -131,12 +132,11 @@ describe.skipIf(!target)(
     let schemaCreated = false;
     beforeAll(async () => {
       if (!target) throw new Error('Approval fixture target missing');
-      client = postgres(target.url, {
+      client = postgres(fixtureUrl(target.url, fixtureSchema), {
         ...(target.certification ? { ssl: 'require' } : {}),
         max: 4,
         connection: {
           TimeZone: 'UTC',
-          search_path: fixtureSchema,
           application_name: 'jov-approval-contention',
           statement_timeout: 3000,
           idle_in_transaction_session_timeout: 5000,
@@ -198,18 +198,34 @@ describe.skipIf(!target)(
         isolationLevel: 'read committed',
       });
 
-    it('isolates all concurrent connections from canonical tables', async () => {
+    it('isolates all concurrent connections despite URL overrides and retains unrelated options', async () => {
+      const url = new URL(target!.url);
+      url.searchParams.set('search_path', 'public');
+      url.searchParams.set(
+        'options',
+        '-c work_mem=2048kB -c search_path=public'
+      );
+      const probe = postgres(fixtureUrl(url.toString(), fixtureSchema), {
+        max: 4,
+        ...(target!.certification ? { ssl: 'require' as const } : {}),
+      });
       const connections = [];
       try {
         for (let index = 0; index < 4; index++)
-          connections.push(await client.reserve());
+          connections.push(await probe.reserve());
         for (const connection of connections) {
-          const [scope] = await connection`SELECT current_schema() AS name,
+          const [scope] =
+            await connection`SELECT current_schema() AS name, current_setting('work_mem') AS work_mem,
             to_regclass('profile_action_approvals') = to_regclass(${`${fixtureSchema}.profile_action_approvals`}) AS isolated`;
-          expect(scope).toMatchObject({ name: fixtureSchema, isolated: true });
+          expect(scope).toMatchObject({
+            name: fixtureSchema,
+            isolated: true,
+            work_mem: '2MB',
+          });
         }
       } finally {
         for (const connection of connections) connection.release();
+        await probe.end();
       }
     });
 
@@ -415,6 +431,19 @@ describe.skipIf(!target)(
 );
 
 describe('approval database target admission', () => {
+  it('pins schema last without discarding unrelated URL options', () => {
+    const url = new URL(
+      fixtureUrl(
+        'postgres://127.0.0.1/jov12105_approvals?search_path=public&options=-c%20work_mem%3D2048kB%20-c%20search_path%3Dpublic',
+        'fixture_only'
+      )
+    );
+    expect(url.searchParams.has('search_path')).toBe(false);
+    expect(url.searchParams.get('options')).toBe(
+      '-c work_mem=2048kB -c search_path=public -c search_path=fixture_only'
+    );
+  });
+
   it('does not opt into a database from DATABASE_URL alone', () => {
     expect(
       resolveTarget({ DATABASE_URL: 'postgres://example.test/db' })
