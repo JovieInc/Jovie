@@ -390,24 +390,46 @@ export function assertVisualCompareWorkflowContract({
       break;
     }
   }
-  // Listing the needs is not enough: the merge-group aggregate must also
-  // validate each selected suite's result, or a failing/skipped suite rides
-  // through on the shared build's success.
+  // Listing the needs — or merely assigning each suite's result to a shell
+  // variable — is not enough: the merge-group aggregate must route every
+  // selected suite's result through the enforcing selected-gate loop, or a
+  // failing/skipped suite rides through on the shared build's success.
   const mergeReadySuiteValidations = [
-    ['needs.ci-visual-snapshot-homepage.result', 'VISUAL_HOMEPAGE_RESULT'],
-    ['needs.ci-visual-marketing-dom.result', 'VISUAL_MARKETING_DOM_RESULT'],
+    [
+      'needs.ci-visual-snapshot-homepage.result',
+      '"Homepage Visual Compare:$RUN_HOMEPAGE_VISUAL:$VISUAL_HOMEPAGE_RESULT"',
+    ],
+    [
+      'needs.ci-visual-marketing-dom.result',
+      '"Marketing DOM Certification:$RUN_MARKETING_DOM:$VISUAL_MARKETING_DOM_RESULT"',
+    ],
     [
       'needs.ci-visual-marketing-routes.result',
-      'VISUAL_MARKETING_ROUTES_RESULT',
+      '"Marketing Route Capture:$RUN_MARKETING_DOM:$VISUAL_MARKETING_ROUTES_RESULT"',
     ],
   ];
-  for (const [needRef, resultVar] of mergeReadySuiteValidations) {
-    if (!mergeReady.includes(needRef) || !mergeReady.includes(resultVar)) {
+  for (const [needRef, gateEntry] of mergeReadySuiteValidations) {
+    if (!mergeReady.includes(needRef) || !mergeReady.includes(gateEntry)) {
       issues.push(
         'merge-group PR Ready must validate every selected visual suite result'
       );
       break;
     }
+  }
+  // The selected-gate entries must feed a loop that actually exits nonzero on
+  // a selected failure/skip and on an unselected run.
+  const mergeReadyEnforcingLoop = [
+    'for selected_gate in',
+    '"$selected" == "true" && "$result" != "success"',
+    '"$selected" != "true" && "$result" != "skipped"',
+    'exit 1',
+  ];
+  if (
+    mergeReadyEnforcingLoop.some(fragment => !mergeReady.includes(fragment))
+  ) {
+    issues.push(
+      'merge-group PR Ready must validate every selected visual suite result'
+    );
   }
   const sourceReady = extractJobBlock(ciYaml, 'ci-pr-ready');
   for (const jobId of mergeReadyRequiredJobs) {

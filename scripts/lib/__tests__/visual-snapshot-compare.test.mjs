@@ -255,6 +255,7 @@ describe('visual snapshot compare (JOV-5459)', () => {
       '            "Marketing DOM Certification:$RUN_MARKETING_DOM:$VISUAL_MARKETING_DOM_RESULT" \\',
       '            "Marketing Route Capture:$RUN_MARKETING_DOM:$VISUAL_MARKETING_ROUTES_RESULT"; do',
       '            if [[ "$selected" == "true" && "$result" != "success" ]]; then exit 1; fi',
+      '            if [[ "$selected" != "true" && "$result" != "skipped" ]]; then exit 1; fi',
       '          done',
     ].join('\n');
     const gatedSourceReady = [
@@ -303,29 +304,36 @@ describe('visual snapshot compare (JOV-5459)', () => {
         /\n *if \[\[ "\$RUN_MARKETING_DOM" == "true" && "\$VISUAL_MARKETING_ROUTES_RESULT" != "success" \]\]; then exit 1; fi/,
         ''
       );
-    // Merge-group side: an aggregate that lists all four needs but drops any
-    // single suite's result validation must be rejected — per suite.
-    const dropSuiteValidation = needle =>
-      fullyWiredMergeReady.replace(needle, '');
+    // Merge-group side: assignments and needs alone must not satisfy the
+    // validator — each suite's selected-gate entry must survive, and the
+    // enforcing loop must exist. Per-suite negatives keep the assignments and
+    // drop only that suite's gate entry; a final one drops the whole loop.
+    const dropLine = needle => fullyWiredMergeReady.replace(needle, '');
+    const dropLoop = () =>
+      fullyWiredMergeReady.replace(
+        /\n *for selected_gate in [\s\S]*?\n *done/,
+        '\n'
+      );
     const mergeReadyNegatives = [
       [
-        'homepage',
-        dropSuiteValidation(
-          '          VISUAL_HOMEPAGE_RESULT="${{ needs.ci-visual-snapshot-homepage.result }}"\n'
+        'homepage gate entry',
+        dropLine(
+          '            "Homepage Visual Compare:$RUN_HOMEPAGE_VISUAL:$VISUAL_HOMEPAGE_RESULT" \\\n'
         ),
       ],
       [
-        'marketing DOM',
-        dropSuiteValidation(
-          '          VISUAL_MARKETING_DOM_RESULT="${{ needs.ci-visual-marketing-dom.result }}"\n'
+        'marketing DOM gate entry',
+        dropLine(
+          '            "Marketing DOM Certification:$RUN_MARKETING_DOM:$VISUAL_MARKETING_DOM_RESULT" \\\n'
         ),
       ],
       [
-        'marketing routes',
-        dropSuiteValidation(
-          '          VISUAL_MARKETING_ROUTES_RESULT="${{ needs.ci-visual-marketing-routes.result }}"\n'
+        'marketing routes gate entry',
+        dropLine(
+          '            "Marketing Route Capture:$RUN_MARKETING_DOM:$VISUAL_MARKETING_ROUTES_RESULT"; do\n'
         ),
       ],
+      ['entire enforcing loop', dropLoop()],
     ];
     for (const [label, crippledMergeReady] of mergeReadyNegatives) {
       expect(crippledMergeReady, label).not.toBe(fullyWiredMergeReady);
