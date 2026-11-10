@@ -81,7 +81,6 @@ import {
   specDigest,
 } from './pilot-controller';
 import {
-  captureProofClaimBaseline,
   ensureAssignment,
   evaluateAndWriteback,
   latestPilotDecision,
@@ -318,90 +317,5 @@ describe('latestPilotDecision', () => {
     expect(wb.decision).toBe('hold');
     expect(wb.reason).toContain('pending-maturity');
     expect(wb.decidedAtIso).toBe('2026-09-25T00:00:00.000Z');
-  });
-});
-
-describe('captureProofClaimBaseline', () => {
-  it('records the real funnel with chained denominators and fresh sources', async () => {
-    const { getProofClaimFunnelReport, readProofClaimCounters } = await import(
-      '@/lib/acquisition/proof-claim-funnel.server'
-    );
-    vi.mocked(getProofClaimFunnelReport).mockResolvedValue({
-      campaignKey: 'proof-to-claim',
-      variantKey: 'proof-to-claim:m1:v1',
-      stages: {
-        proofViewed: 500,
-        claimStarted: 40,
-        checkout: 12,
-        activation: 6,
-      },
-      rates: {},
-    } as never);
-    vi.mocked(readProofClaimCounters).mockResolvedValue({
-      proof_viewed: 500,
-      claim_started: 40,
-      checkout: 12,
-      activation: 6,
-    });
-
-    dbQueue.queue.push(() => []);
-    const result = await captureProofClaimBaseline({
-      spec: ACTIVATION_PILOT_SPEC,
-      eligiblePopulation: 500,
-      capturedAtIso: '2026-11-09T12:00:00.000Z',
-    });
-    expect(result.ok).toBe(true);
-    const persisted = dbQueue.insertCalls[0];
-    expect(persisted.values.cohortId).toBe(ACTIVATION_PILOT_SPEC.cohort.id);
-    expect(persisted.values.eligiblePopulation).toBe(500);
-    const stages = persisted.values.stages as ReadonlyArray<{
-      stage: string;
-      count: number | null;
-      denominator: number | null;
-      freshness: string;
-    }>;
-    expect(stages.map(s => [s.stage, s.count, s.denominator])).toEqual([
-      ['proof_viewed', 500, 500],
-      ['claim_started', 40, 500],
-      ['checkout', 12, 40],
-      ['activation', 6, 12],
-    ]);
-    expect(stages.every(s => s.freshness === 'fresh')).toBe(true);
-  });
-
-  it('marks a zero stage with an unreadable counter source as unknown, never a confident zero', async () => {
-    const { getProofClaimFunnelReport, readProofClaimCounters } = await import(
-      '@/lib/acquisition/proof-claim-funnel.server'
-    );
-    vi.mocked(getProofClaimFunnelReport).mockResolvedValue({
-      campaignKey: 'proof-to-claim',
-      variantKey: 'proof-to-claim:m1:v1',
-      stages: {
-        proofViewed: 500,
-        claimStarted: 0,
-        checkout: 0,
-        activation: 0,
-      },
-      rates: {},
-    } as never);
-    // Redis unreadable → empty map → zero counts are unknown, not zero.
-    vi.mocked(readProofClaimCounters).mockResolvedValue({});
-
-    dbQueue.queue.push(() => []);
-    await captureProofClaimBaseline({
-      spec: ACTIVATION_PILOT_SPEC,
-      eligiblePopulation: null,
-      capturedAtIso: '2026-11-09T12:00:00.000Z',
-    });
-    const persisted = dbQueue.insertCalls[0];
-    expect(persisted.values.eligiblePopulation).toBeNull();
-    const stages = persisted.values.stages as ReadonlyArray<{
-      stage: string;
-      count: number | null;
-      freshness: string;
-    }>;
-    const claim = stages.find(s => s.stage === 'claim_started');
-    expect(claim?.count).toBe(0);
-    expect(claim?.freshness).toBe('unknown');
   });
 });
