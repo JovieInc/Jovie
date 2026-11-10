@@ -1115,9 +1115,28 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
     if locking_pr is not None:
         if type(locking_pr) is not int or locking_pr < 1:
             raise ValueError("locking PR requires an explicit positive PR number")
-        visible = re.sub(r"<!--[\s\S]*?-->", "", updated)
-        if not re.search(r"^#{1,6}\s+Locked areas\s*$", visible, re.I | re.M):
+        lines = updated.split("\n")
+        bounds = red_section_bounds(lines, re.compile(r"^#{1,6}\s+Locked areas\s*$", re.I))
+        if bounds is None:
             updated = updated.rstrip("\n") + f"\n\n## Locked areas\n\nLocking PR: #{locking_pr}\n"
+        else:
+            start, end = bounds
+            original = "\n".join(lines[start + 1:end])
+            content = re.sub(r"<!--[\s\S]*?-->", "", original).strip()
+            # Fill explicit template declarations, preserving existing citations and
+            # unrelated notes/footer text. Never replace text inside hidden comments.
+            placeholder = r"(?:[-*][ \t]*)?(?:none|n/?a|not applicable|todo|tbd)[.!]?"
+            if not content:
+                updated = "\n".join(lines[:end] + [f"Locking PR: #{locking_pr}", ""] + lines[end:])
+            elif (re.fullmatch(placeholder, content.splitlines()[0].strip(), re.I)
+                  and not re.search(r"\b(?:GBrain|Locking PR)\s*:", content, re.I)):
+                parts = re.split(r"(<!--[\s\S]*?-->)", original)
+                for index in range(0, len(parts), 2):
+                    parts[index], count = re.subn(r"(?im)^[ \t]*" + placeholder + r"[ \t]*$",
+                                                  f"Locking PR: #{locking_pr}", parts[index], count=1)
+                    if count:
+                        break
+                updated = "\n".join(lines[:start + 1] + "".join(parts).split("\n") + lines[end:])
     if previous_win_section is not None and not win_section:
         raise ValueError("Win replacement requires explicit measured win evidence")
     if win_section is not None and win_section != "":
