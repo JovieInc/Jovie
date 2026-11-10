@@ -15,7 +15,7 @@ export const MARKER =
   /(seer|warden|ai[ _-]?review|llm[ _-]?review|openrouter|claude[ _-]?review|codex[ _-]?review|copilot[ _-]?review|review[ _-]?(agent|bot))/i;
 
 export const BLOCKING =
-  /(request[ _-]?changes|--fail-on\b|failcheck|fail[ _-]?check|fail[ _-]?level)/i;
+  /(request[ _-]?changes|fail-on\b|failcheck|fail[ _-]?check|fail[ _-]?level)/i;
 
 const TEXT = /\.(ya?ml|mjs|cjs|js|py|sh)$/;
 // The guard must not flag its own source or tests (they name the banned signals).
