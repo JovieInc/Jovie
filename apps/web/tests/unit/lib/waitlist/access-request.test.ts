@@ -296,7 +296,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
             biggestBlocker: 'I cannot get my release links out to my fans',
           },
         });
-        expect(result.status).toBe('waitlisted');
+        expect(result.status).toBe('queued');
         expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
         expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
         expect(finalizeWaitlistApproval).not.toHaveBeenCalled();
@@ -314,7 +314,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
         ...baseInput,
         goldenPathAdmission: admit,
       });
-      expect(result.status).toBe('waitlisted');
+      expect(result.status).toBe('queued');
       expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
       expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
     });
@@ -345,7 +345,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
         ...baseInput,
         goldenPathAdmission: admit,
       });
-      expect(result.status).toBe('waitlisted');
+      expect(result.status).toBe('queued');
       expect(withSystemIngestionSession).toHaveBeenCalledTimes(2);
       expect(readCachedAcquisitionEligibility).toHaveBeenCalledTimes(2);
       expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
@@ -389,7 +389,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
         });
         expect(tryReserveAutoAcceptSlot).toHaveBeenCalledTimes(1);
         expect(result.status).toBe(
-          reservationReason === 'reserved' ? 'approved' : 'waitlisted'
+          reservationReason === 'reserved' ? 'approved' : 'queued'
         );
         if (reservationReason === 'capacity_full') {
           expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
@@ -448,7 +448,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
         goldenPathAdmission: admit,
       });
 
-      expect(result.status).toBe('waitlisted');
+      expect(result.status).toBe('queued');
       expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
       expect(
         updatedRows.find(row => row.statusReason === 'waitlist_capacity_full')
@@ -469,7 +469,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
         goldenPathAdmission: admit,
       });
 
-      expect(result.status).toBe('waitlisted');
+      expect(result.status).toBe('queued');
       expect(releaseAutoAcceptSlot).toHaveBeenCalledTimes(1);
     });
 
@@ -527,7 +527,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
         }),
       });
 
-      expect(result.status).toBe('waitlisted');
+      expect(result.status).toBe('queued');
       expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
       expect(
         updatedRows.find(row => {
@@ -555,7 +555,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
         },
       });
 
-      expect(result.status).toBe('waitlisted');
+      expect(result.status).toBe('queued');
       expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
       expect(
         updatedRows.find(row => {
@@ -588,7 +588,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     const result = await submitWaitlistAccessRequest(baseInput);
 
     expect(result.outcome).toBe('waitlisted_gate_on');
-    expect(result.status).toBe('waitlisted');
+    expect(result.status).toBe('queued');
     expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
     expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
     expect(notifySlackWaitlist).toHaveBeenCalledTimes(1);
@@ -614,7 +614,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     // already_waitlisted short-circuit.
     expect(result).toMatchObject({
       entryId: 'entry-signup',
-      status: 'waitlisted',
+      status: 'queued',
       outcome: 'waitlisted_gate_on',
     });
     expect(
@@ -782,7 +782,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     });
 
     expect(result).toMatchObject({
-      status: 'waitlisted',
+      status: 'queued',
       outcome: 'waitlisted_gate_on',
     });
     expect(

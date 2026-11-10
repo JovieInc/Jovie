@@ -765,7 +765,7 @@ describe('Waitlist API', { timeout: 20_000 }, () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.status).toBe('waitlisted');
+      expect(data.status).toBe('queued');
       expect(mockTryReserveAutoAcceptSlot).not.toHaveBeenCalled();
       expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
       expect(mockSendNotification).not.toHaveBeenCalled();
@@ -831,7 +831,7 @@ describe('Waitlist API', { timeout: 20_000 }, () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.status).toBe('waitlisted');
+      expect(data.status).toBe('queued');
       expect(mockTryReserveAutoAcceptSlot).not.toHaveBeenCalled();
       expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
       expect(mockSendNotification).not.toHaveBeenCalled();
