@@ -107,3 +107,40 @@ describe('buildConnectionActions', () => {
     expect(onFix).toHaveBeenCalledWith(spotify);
   });
 });
+
+describe('saved link removal actions', () => {
+  const callbacks = {
+    onViewDetails: vi.fn(),
+    onOpen: vi.fn(),
+    onPrimaryAction: vi.fn(),
+    onRemoveLink: vi.fn(),
+  };
+  const removable = {
+    ...spotify,
+    removalTarget: { linkId: 'saved-link', url: spotify.url, version: 2 },
+  };
+  it('uses the same exact source target across menu consumers', () => {
+    const actions = buildConnectionActions(removable, 'open', callbacks);
+    const action = actions.find(
+      item => 'id' in item && item.id === 'remove-profile-link'
+    );
+    expect(action).toMatchObject({
+      label: 'Remove From Jovie Profile',
+      destructive: true,
+    });
+    if (!action || !('onClick' in action)) throw new Error('Missing removal');
+    action.onClick();
+    expect(callbacks.onRemoveLink).toHaveBeenCalledWith(removable);
+  });
+  it.each([
+    spotify,
+    { ...removable, kind: 'jovie' as const },
+    { ...removable, id: 'preview:link' },
+  ])('excludes non-removable row $id', row => {
+    expect(
+      buildConnectionActions(row, 'open', callbacks).some(
+        item => 'id' in item && item.id === 'remove-profile-link'
+      )
+    ).toBe(false);
+  });
+});
