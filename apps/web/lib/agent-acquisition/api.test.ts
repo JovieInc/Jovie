@@ -281,11 +281,25 @@ describe('shared anonymous REST/MCP draft boundary', () => {
       'Find artist',
       'Create artist draft',
       'Prepare release launch',
+      'Claim a handle',
+      'Record a Mom Test answer',
+      'Get qualification',
+      'Build profile preview',
+      'Publish profile',
+      'Share a profile',
+      'Start upgrade',
     ]);
     expect(tools.map(tool => tool.name)).toEqual([
       'artist.search_or_import',
       'workspace.create_draft',
       'release.prepare_launch',
+      'claim_handle',
+      'answer_onboarding_question',
+      'get_qualification',
+      'build_profile',
+      'publish_profile',
+      'share_profile',
+      'start_upgrade',
     ]);
     const ping = await mcpPost(request(rpc('ping', undefined, 0)));
     expect(await ping.json()).toEqual({ jsonrpc: '2.0', id: 0, result: {} });
