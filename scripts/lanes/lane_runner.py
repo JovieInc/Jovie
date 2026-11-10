@@ -76,6 +76,7 @@ import escalation_reconcile  # noqa: E402  (lane-fix-escalating is consumed, nev
 import board_intake  # noqa: E402  (mesh board work for codex, closed on verified outcomes)
 import ownership  # noqa: E402  (started-state live-owner invariant)
 import fleet_ledger  # noqa: E402  (external agent claims, stranded-claim view)
+import cloud_lane  # noqa: E402  (JOV-10357 dormant adapter; every effect gated by LANES_CLOUD_ENABLED)
 import pr_events  # noqa: E402
 import repair_order  # noqa: E402  (one fair claim order for event and polling repair)
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
@@ -3526,6 +3527,43 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear: Linear | 
     return receipt
 
 
+def _cloud_execution_gate(host: Host, issue: Issue, linear: Linear, name: str,
+                           claimed: dict) -> dict | None:
+    """JOV-10357: the single cloud chokepoint in the claimed execution path.
+
+    Runs after the durable execution claim and before any lane launch (worktree take,
+    install, prompt, agent). Fully dormant unless LANES_CLOUD_ENABLED is set: the gate
+    returns None and the local lane runs unchanged. A live cloud claim blocks every
+    ordinary intake and recovery path before any provider call (R4); the claim is
+    retained asynchronously and only a human clears it.
+    """
+    if not cloud_lane.enabled():
+        return None
+    live = cloud_lane.live_claim(issue.identifier)
+    if live is not None:
+        return {"verdict": live["stage"], "reason": f"cloud-claim-live:{live.get('reason', 'active')}",
+                "pr": live.get("pr"), "prUrl": live.get("prUrl"), "issue": issue.identifier}
+    labels = {str(label).lower() for label in issue.labels}
+    if cloud_lane.OPT_IN_LABEL not in labels:
+        return None
+    ok, _why = cloud_lane.eligible(issue.labels, issue.title + "\n" + (issue.description or ""))
+    if not ok:
+        return None
+    prompt = render_prompt(issue, "main", context_pack(issue), provider=name,
+                           prior_attempts=prior_attempts_context(host, linear, issue),
+                           machine=machine_gate(host, issue.identifier, issue.title, issue.labels,
+                                                issue.description or "", name))
+    route = cloud_lane.route(issue.identifier, "codex", issue.labels,
+                             issue.title + "\n" + (issue.description or ""), prompt,
+                             fencing_token=claimed.get("fencingToken"))
+    if route.get("route") == "gem":
+        return None  # headroom or provider configuration fell back: the local lane runs
+    if route.get("route") == "cloud":
+        return {"verdict": "cloud-pending", "reason": f"submitted:{route['remote']}",
+                "remote": route["remote"], "branch": route["branch"], "issue": issue.identifier}
+    return {"verdict": "cloud-held", "reason": route.get("reason", "unknown"), "issue": issue.identifier}
+
+
 def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -> dict:
     if name == "hyperagent":
         return run_hyperagent_issue(host, spec, issue, linear)
@@ -3581,6 +3619,16 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
         verdict = receipt["verdict"]
         receipt.update(endedAt=now_iso(),
                        result={"verdict": verdict, "commit": None, "pr": None, "prUrl": None})
+        append_json_object(runs / "ledger.jsonl", receipt)
+        return receipt
+    cloud = _cloud_execution_gate(host, issue, linear, name, claimed)
+    if cloud is not None:
+        # JOV-10357 (R4): cloud dispositions are explicit and never return to Todo; the
+        # durable execution claim stays live with the cloud claim so cleanup and retry skip.
+        receipt.update(verdict=cloud["verdict"], reasons=[cloud["reason"]], cloud=cloud,
+                       endedAt=now_iso(),
+                       result={"verdict": cloud["verdict"], "pr": cloud.get("pr"),
+                               "commit": cloud.get("commitSha"), "prUrl": cloud.get("prUrl")})
         append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
     receipt["offer"]["accepted"] = True
@@ -3971,6 +4019,11 @@ def gate_timeouts(host: Host, pr: dict, change: int = 0) -> int:
 def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False,
             claim: GateClaim | None = None) -> dict:
     """One host-local gate per exact head, from reservation through durable result."""
+    if cloud_lane.is_cloud_origin(pr):
+        # JOV-10357: cloud-origin drafts never reach the gate, its checks, sensitive_review
+        # or the llm-review it can run; a held refusal is the only outcome (draft-only, R3).
+        return {"pr": pr["number"], "prUrl": pr.get("url"), "headSha": pr["headRefOid"],
+                "verdict": "held", "reasons": ["cloud-origin-draft-only"], "stage": "before-gate"}
     owned = claim is None
     claim = reserve_gate(host, pr) if owned else claim
     result = {"pr": pr["number"], "prUrl": pr.get("url"), "headSha": pr["headRefOid"]}
@@ -4153,6 +4206,9 @@ def source_publication_authority(pr: dict, *, before_ready: bool, log=None) -> s
 
 def publish_verified(host: Host, pr: dict, *, claim: GateClaim | None = None, log=None) -> str:
     """One receipt consumer for gate completion and fallback publication; never runs a gate."""
+    if cloud_lane.is_cloud_origin(pr):
+        # JOV-10357: a cloud-origin PR is draft-only; promotion is human-only (R3).
+        return "held:cloud-origin-draft-only"
     owned = claim is None
     claim = reserve_gate(host, pr) if owned else claim
     if claim is None:
@@ -7928,6 +7984,9 @@ def archive_unresumable_preserved(host: Host, path: Path, reason: str, *, observ
 
 
 def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
+    if cloud_lane.is_cloud_origin(pr):
+        # JOV-10357: no lane repair ever checks out or mutates a cloud-origin PR (R3).
+        return {"verdict": "skipped", "reasons": ["cloud-origin-draft-only"], "pr": pr["number"]}
     lock = Locked(host.state / "locks" / f"repair-pr-{pr['number']}.lock", blocking=False)
     opened: dict = {}
     try:
@@ -8325,6 +8384,13 @@ def unverified_pr(prs: list[dict], verified: dict, pending: dict | None = None, 
 
 
 def adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim | None = None, *, sensitive: bool = False) -> dict:
+    if cloud_lane.is_cloud_origin(pr):
+        # JOV-10357: cloud-origin drafts are never adopted by a lane (draft-only, R3).
+        if claim is not None:
+            claim.lock.release()
+        return {"schema": "jovie-lane-run/v1", "provider": name, "kind": "adopt", "pr": pr["number"],
+                "verdict": "skipped", "reasons": ["cloud-origin-draft-only"],
+                "startedAt": now_iso(), "endedAt": now_iso()}
     if not provider_may_run(name, "adopt"):
         if claim is not None:
             claim.lock.release()
@@ -8662,7 +8728,9 @@ def reclaimable_drafts(*, inventory: list[dict] | None = None) -> list[dict]:
     """Abandoned drafts the lanes reclaim (Tim, 2026-10-10/11): any same-repo non-lane draft
     past the age floor with no commit for 48h, red or conflicting, and not held."""
     now = time.time()
+    origin = cloud_lane.read_evidence()  # one read; cloud-origin drafts are never reclaimed
     return [pr for pr in (inventory if inventory is not None else open_prs_summary()) if not pr.get("isCrossRepository")
+            and not cloud_lane.is_cloud_origin(pr, origin)
             and pr_events.abandoned_agent_draft(pr, now)
             and not {label["name"].lower() for label in pr.get("labels", [])} & pr_events.HOLD_LABELS]
 
@@ -9578,6 +9646,14 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     # Publication can await canonical policy and native queue reads. Keep those
     # outside the global claim lock, then refresh inventory for ordinary admission.
     requeue_verified(host, lane_prs(name))
+    if cloud_lane.enabled():
+        # JOV-10357 reconciliation turn (R7): the worker slot's reconciliation step
+        # (requeue_verified above) is immediately followed by the cloud lane's
+        # status -> collect -> authorize -> draft-publish pass. Dormant by default.
+        try:
+            cloud_lane.reconcile(repo_dir=host.repo)
+        except Exception as error:
+            print(f"cloud reconcile failed: {type(error).__name__}: {error}"[:300], file=sys.stderr)
     repair_inventory = capture_repair_inventory(name) if spec.get("repairs") is not False else None
     scan_summary = repair_inventory["summary"] if repair_inventory is not None else _SUMMARY
     # Scope-only evidence is optional. Never fetch it while holding claim.lock or
@@ -9799,13 +9875,32 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     _RUN_LEASES.append(ownership.acquire_run_lease(host.state, issue.id, issue.identifier, name))
     linear = linear_sync.Outboxed(host.state, linear)  # every disposition write waits in the outbox
     notify_issue_claim(linear, issue, name, spec)
+    receipt = {}
     try:
-        receipt = (epics.run_epic(THIS, host, name, spec, linear, issue, host.repo) if epics.is_epic(issue)
+        # A live cloud claim blocks the epic path too (JOV-10357 R4): run_issue's gate
+        # then returns the retained disposition instead of a second provider call.
+        cloud_blocked = cloud_lane.enabled() and cloud_lane.live_claim(issue.identifier) is not None
+        receipt = (epics.run_epic(THIS, host, name, spec, linear, issue, host.repo)
+                   if epics.is_epic(issue) and not cloud_blocked
                    else run_issue(host, name, spec, linear, issue))
     finally:
-        file_overlap.release_task(host.state, issue.identifier)
+        if receipt.get("verdict") != "cloud-pending":
+            # R4: an overlap reservation is not released while an issue is cloud-pending.
+            file_overlap.release_task(host.state, issue.identifier)
     verdict = receipt.get("verdict")
     note_event_outcome(host, issue, verdict, receipt=receipt)
+    if verdict in cloud_lane.RETAINED_VERDICTS:
+        # JOV-10357 (R4): cloud-pending / cloud-held / cloud-draft-created never fall
+        # through to the failure handler, never return to Todo, and never fail over to
+        # another lane; the durable cloud claim is the hold until a human clears it.
+        if verdict == "cloud-held":
+            held = receipt.get("cloud") or {}
+            paths = "".join(f"\n- `{path}`" for path in held.get("paths", []))
+            linear.comment(issue.id, f"🤖 cloud lane held {issue.identifier} "
+                                     f"({', '.join(receipt.get('reasons', []))}); retained for a human "
+                                     f"decision.{paths}")
+        slot.release()
+        return 1
     if verdict in epics.SETTLED_VERDICTS:
         slot.release()
         return reexec(host, name)

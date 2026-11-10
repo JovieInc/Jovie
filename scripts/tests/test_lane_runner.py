@@ -17831,3 +17831,112 @@ class FixNowTest(unittest.TestCase):
             lane.post_claim(22868, "a" * 40, "fix")
         self.assertNotIn("red_at=", calls[0][-1])
         self.assertFalse((self.state / "runs/red-dispatch.jsonl").exists())
+
+
+class CloudLaneGateTest(unittest.TestCase):
+    """JOV-10357: the claimed-execution cloud gate and the draft-only origin guards (R3/R4/R7)."""
+
+    def setUp(self):
+        disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
+        self.real_verify = lane.verify_and_land
+        self.addCleanup(setattr, lane, "verify_and_land", self.real_verify)
+        self.real_next, self.real_pack = lane.next_provider, lane.context_pack
+        lane.next_provider = lambda *a, **k: None
+        lane.context_pack = lambda issue: "ctx"
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
+        self.ledger = Path(self.tmp.name) / "cloud-lane.jsonl"
+        self.env = patch.dict(os.environ, {"CLOUD_LANE_LEDGER": str(self.ledger),
+                                           "LANES_CLOUD_ENABLED": "1",
+                                           "CODEX_CLOUD_ENV": "env_test",
+                                           "CODEX_CLOUD_BINARY": "/real/codex"})
+        self.env.start()
+        self.addCleanup(self.env.stop)
+        self.calls = []
+
+        def fake_sh(args, cwd=None, timeout=600, env=None, log=None):
+            self.calls.append(list(args))
+            if args[:3] == ["git", "worktree", "add"]:
+                Path(args[-2]).mkdir(parents=True)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        self.real_sh = lane.sh
+        lane.sh = fake_sh
+
+    def tearDown(self):
+        lane.sh = self.real_sh
+        lane.next_provider, lane.context_pack = self.real_next, self.real_pack
+
+    def test_disabled_by_default_runs_the_local_lane_with_zero_cloud_side_effects(self):
+        with patch.dict(os.environ, {"LANES_CLOUD_ENABLED": ""}):
+            lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 9, "reasons": []}
+            receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]),
+                                     issue("JOV-10357", labels=["cloud-lane"]))
+            self.assertEqual(receipt["verdict"], "landing")
+        self.assertFalse(self.ledger.exists(), "no cloud ledger write while disabled")
+        self.assertFalse(any("/real/codex" in " ".join(c) for c in self.calls),
+                         "the pinned cloud binary is never invoked while disabled")
+
+    def test_opted_in_issue_submits_to_cloud_and_stays_pending(self):
+        submitted = subprocess.CompletedProcess([], 0, "https://chatgpt.com/codex/tasks/task_abc12345\n", "")
+        with patch.object(lane.cloud_lane, "ls_remote_main", lambda *a, **k: "f" * 40), \
+                patch.object(lane.cloud_lane, "stream_run", lambda *a, **k: submitted):
+            receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]),
+                                     issue("JOV-10357", labels=["cloud-lane"]))
+        self.assertEqual(receipt["verdict"], "cloud-pending")
+        self.assertEqual(receipt["cloud"]["branch"], "cloud/jov-10357-task_abc")
+        stages = [json.loads(line)["stage"] for line in self.ledger.read_text().splitlines()]
+        self.assertEqual(stages, ["submitted", "cloud-pending"])
+        self.assertFalse(any(c[:3] == ["git", "worktree", "add"] for c in self.calls),
+                         "no worktree is taken for a cloud issue")
+
+    def test_a_live_cloud_claim_blocks_every_provider_call(self):
+        lane.cloud_lane.append({"issue": "JOV-10357", "task": "task_abc12345", "provider": "codex",
+                                "stage": "cloud-pending", "reason": "submitted",
+                                "repo": lane.cloud_lane.REPO, "env": "env_test",
+                                "branch": "cloud/jov-10357-task_abc1", "baseSha": "f" * 40,
+                                "fencingToken": "tok", "at": 1}, self.ledger)
+        receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]),
+                                 issue("JOV-10357", labels=["cloud-lane"]))
+        self.assertEqual(receipt["verdict"], "cloud-pending")
+        self.assertIn("cloud-claim-live", receipt["reasons"][0])
+        self.assertFalse(any(c[:3] == ["git", "worktree", "add"] for c in self.calls))
+        held = lane.cloud_lane.append if False else None  # no extra writes expected
+        self.assertEqual(len(self.ledger.read_text().splitlines()), 1)
+
+    def test_publish_verified_and_gate_pr_refuse_cloud_origin(self):
+        cloud = {"number": 7, "headRefName": "cloud/jov-1-task_abc1", "headRefOid": "abc",
+                 "isDraft": True, "url": "https://github.com/JovieInc/Jovie/pull/7",
+                 "labels": []}
+        path = self.host.state / "verified.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"7:abc": gate_proof("abc")}))
+        with patch.object(lane, "sh", side_effect=lambda *a, **k: (_ for _ in ()).throw(
+                AssertionError("no gh call for a cloud PR"))):
+            self.assertEqual(lane.publish_verified(self.host, cloud),
+                             "held:cloud-origin-draft-only")
+        seen = []
+        with patch.object(lane, "sensitive_review", side_effect=seen.append):
+            verdict = lane.gate_pr(self.host, cloud, self.host.state / "wt", log=None)
+        self.assertEqual((verdict["verdict"], verdict["reasons"][0]),
+                         ("held", "cloud-origin-draft-only"))
+        self.assertEqual(seen, [], "a cloud PR never reaches sensitive_review or llm-review")
+        self.assertEqual(json.loads(path.read_text()), {"7:abc": gate_proof("abc")},
+                         "the guard leaves even a stale pre-existing receipt untouched")
+
+    def test_adoption_repair_and_reclaim_skip_cloud_drafts(self):
+        cloud = {"number": 7, "headRefName": "cloud/jov-1-task_abc1", "headRefOid": "abc",
+                 "isDraft": True, "labels": [], "updatedAt": lane.now_iso(),
+                 "createdAt": "2020-01-01T00:00:00Z", "statusCheckRollup": [], "eventKinds": []}
+        self.assertEqual(lane.fix_red_pr(self.host, "devin", {}, cloud)["reasons"],
+                         ["cloud-origin-draft-only"])
+        self.assertFalse((self.host.state / "locks" / "repair-pr-7.lock").exists())
+        adopted = lane.adopt_pr(self.host, "devin", cloud)
+        self.assertEqual((adopted["verdict"], adopted["reasons"]), ("skipped", ["cloud-origin-draft-only"]))
+        with patch.object(lane.pr_events, "abandoned_agent_draft", return_value=True):
+            kept = lane.reclaimable_drafts(inventory=[cloud, {"number": 8, "isCrossRepository": False,
+                                                              "headRefName": "devin/jov-1-1",
+                                                              "isDraft": True, "labels": []}])
+        self.assertEqual([row["number"] for row in kept], [8])

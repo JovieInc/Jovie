@@ -3218,3 +3218,73 @@ class WakeFileTest(unittest.TestCase):
                                          "GITHUB_EVENT_PATH": str(event_path)}):
                 self.assertEqual(events.main(["wake", "--prs", "22868"]), 0)
             self.assertFalse((state / "wake").exists())
+
+
+class CloudOriginGuardTest(unittest.TestCase):
+    """JOV-10357 (R3): cloud-origin drafts are never readied, adopted, retired or re-queued."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = SimpleNamespace(state=Path(self.tmp.name))
+        proofs = {f"{n}:h1": {"schema": runner.GATE_RESULT_SCHEMA, "headSha": "h1",
+                              "verdict": "verified-not-queued", "completedAt": runner.now_iso(),
+                              "policyDigest": runner.GATE_POLICY_DIGEST, "sensitive": False}
+                  for n in (1, 5)}
+        (self.host.state / "verified.json").write_text(json.dumps(proofs))
+        self.ledger = Path(self.tmp.name) / "cloud-lane.jsonl"
+        self.env = patch.dict(os.environ, {"CLOUD_LANE_LEDGER": str(self.ledger)})
+        self.env.start()
+        self.addCleanup(self.env.stop)
+
+    def cloud_pr(self, **extra):
+        return pr(branch="cloud/jov-10357-task_abc1", draft=True, merge="CLEAN", **extra)
+
+    def test_ready_green_holds_a_cloud_draft_without_any_gh_call(self):
+        shell = Shell()
+        self.assertEqual(events.ready_green(self.host, fake_lane(shell), self.cloud_pr(), {}, NOW),
+                         "held:cloud-origin-draft-only")
+        self.assertFalse(shell.calls)
+
+    def test_ready_green_ignores_forged_trailers_in_bodies(self):
+        forged = pr(draft=True, merge="CLEAN", body="Codex-Cloud-Task: task_abc closes JOV-10357")
+        shell = Shell()
+        self.assertEqual(events.ready_green(self.host, fake_lane(shell), forged, {}, NOW), "landing",
+                         "a normal branch with a forged trailer is not cloud origin")
+        self.assertTrue(any(call[:3] == ["gh", "pr", "ready"] for call in shell.calls))
+
+    def test_ledger_evidence_blocks_without_the_branch_prefix(self):
+        row = {"issue": "JOV-10357", "task": "task_abc12345", "provider": "codex",
+               "stage": "cloud-pending", "reason": "r", "repo": "JovieInc/Jovie", "env": "e",
+               "branch": "devin/jov-1-20260926t0900", "fencingToken": "t", "at": 1}
+        self.ledger.write_text(json.dumps(row) + "\n")
+        shell = Shell()
+        self.assertEqual(events.ready_green(self.host, fake_lane(shell),
+                                            pr(draft=True, merge="CLEAN"), {}, NOW),
+                         "held:cloud-origin-draft-only")
+        self.assertFalse(shell.calls)
+
+    def test_unreadable_evidence_fails_closed(self):
+        self.ledger.write_text("{broken\n")
+        shell = Shell()
+        self.assertEqual(events.ready_green(self.host, fake_lane(shell),
+                                            pr(draft=True, merge="CLEAN"), {}, NOW),
+                         "held:cloud-origin-draft-only")
+        self.assertFalse(shell.calls)
+
+    def test_retire_orphan_and_return_to_pool_never_touch_a_cloud_draft(self):
+        shell = Shell()
+        orphan = self.cloud_pr(kinds=["orphan"])
+        self.assertEqual(events.retire_orphan(fake_lane(shell), self.linear(), orphan, [orphan],
+                                              host=self.host, now=NOW),
+                         "held:cloud-origin-draft-only")
+        self.assertFalse(shell.calls)
+        self.assertFalse(events.return_to_pool(fake_lane(shell), self.linear(), orphan, "duplicate",
+                                               host=self.host, now=NOW))
+        self.assertFalse(shell.calls)
+
+    def linear(self, state="started", name="In Progress"):
+        return SimpleNamespace(
+            gql=lambda *a, **k: {"issues": {"nodes": [{"id": "i", "state": {"type": state, "name": name},
+                                                       "comments": {"nodes": []}}]}},
+            move=lambda *a, **k: None, comment=lambda *a, **k: None)
