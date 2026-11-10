@@ -9,7 +9,9 @@ const mocks = vi.hoisted(() => ({
     skipCoreProviders?: boolean;
   }>,
   resolveStartRouteFlagNames: vi.fn(() => ['CHAT_JANK_MONITOR']),
-  getRequestSession: vi.fn(async () => null),
+  getRequestSession: vi.fn<() => Promise<Record<string, unknown> | null>>(
+    async () => null
+  ),
 }));
 
 vi.mock('@/lib/auth/request-session', () => ({
