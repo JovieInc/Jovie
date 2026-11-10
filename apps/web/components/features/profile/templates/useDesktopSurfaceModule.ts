@@ -1,13 +1,16 @@
 'use client';
 
-import { type ComponentType, useEffect, useState } from 'react';
-import type { ProfileDesktopSurfaceProps } from './ProfileDesktopSurface';
+import { useEffect, useState } from 'react';
 
 /**
- * The desktop profile surface component: forwards to the real surface once
- * its module has loaded, renders nothing until then.
+ * The desktop profile surface's concrete component type, resolved at the
+ * type level so this module never imports the surface at runtime.
  */
-export type DesktopSurfaceComponent = ComponentType<ProfileDesktopSurfaceProps>;
+type DesktopSurfaceModule =
+  typeof import('@/features/profile/templates/ProfileDesktopSurface');
+
+export type DesktopSurfaceComponent =
+  DesktopSurfaceModule['ProfileDesktopSurface'];
 
 /**
  * Loads the desktop profile surface WITHOUT a lazy Suspense boundary, and
@@ -24,15 +27,12 @@ export type DesktopSurfaceComponent = ComponentType<ProfileDesktopSurfaceProps>;
  *
  * Importing on mount keeps the module a separate chunk (mirroring
  * `useProfileUnifiedDrawerModule`) with no suspend/retry lane: the module
- * lands in state and the same component instance renders the real surface in
- * the commit after the fetch resolves. Once loaded it stays loaded, so
- * crossing the 1180px breakpoint does not refetch or remount it. The caller
- * renders the slot conditionally while null — the component is state-held,
- * never created during render.
+ * lands in state — a stable, state-held component, never one created during
+ * render — and renders the real surface once the fetch resolves. Once loaded
+ * it stays loaded, so crossing the 1180px breakpoint does not refetch or
+ * remount it. The caller renders the slot conditionally while null.
  */
-export function useDesktopSurfaceModule(
-  enabled: boolean
-): DesktopSurfaceComponent | null {
+export function useDesktopSurfaceModule(enabled: boolean) {
   const [Surface, setSurface] = useState<DesktopSurfaceComponent | null>(null);
 
   useEffect(() => {
