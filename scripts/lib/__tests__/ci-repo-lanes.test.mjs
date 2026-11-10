@@ -220,6 +220,10 @@ describe('JOV-5288 CI repo lanes', () => {
     expect(classifyCiRepoLanes(['.github/actionlint.yaml']).runActionlint).toBe(
       true
     );
+    // The lint runner's release-download helper is part of its input surface.
+    expect(
+      classifyCiRepoLanes(['scripts/lib/github-release-asset.sh']).runActionlint
+    ).toBe(true);
     expect(classifyCiRepoLanes([]).runActionlint).toBe(false);
   });
 
