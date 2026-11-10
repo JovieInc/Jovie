@@ -20,7 +20,7 @@ import {
 import {
   recordWinbackResumeClick,
   resolveWinbackResumeToken,
-} from '@/lib/waitlist/winback.server';
+} from '@/lib/waitlist/winback-resume.server';
 
 /**
  * Canonical onboarding chat entry point.

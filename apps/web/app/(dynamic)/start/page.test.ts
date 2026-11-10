@@ -66,7 +66,7 @@ const winbackMocks = vi.hoisted(() => ({
   recordWinbackResumeClick: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/lib/waitlist/winback.server', () => ({
+vi.mock('@/lib/waitlist/winback-resume.server', () => ({
   resolveWinbackResumeToken: winbackMocks.resolveWinbackResumeToken,
   recordWinbackResumeClick: winbackMocks.recordWinbackResumeClick,
 }));
