@@ -341,12 +341,30 @@ export function assertValidPerfRouteDefinition(route: PerfRouteDefinition) {
       );
     }
     if (
+      !route.readySelectors.shell?.includes(
+        '[data-testid="profile-desktop-top-chrome"]'
+      )
+    ) {
+      throw new TypeError(
+        `Alias usable-result route "${route.id}" must require the desktop top chrome.`
+      );
+    }
+    if (
       !route.readySelectors.content?.includes(
         '[data-testid="profile-compact-shell"][data-interactive-ready="true"]'
       )
     ) {
       throw new TypeError(
         `Alias usable-result route "${route.id}" must require the interactive compact shell.`
+      );
+    }
+    if (
+      !route.readySelectors.content?.includes(
+        '[data-testid="profile-desktop-surface"][data-interactive-ready="true"]'
+      )
+    ) {
+      throw new TypeError(
+        `Alias usable-result route "${route.id}" must require the interactive desktop surface.`
       );
     }
     if (route.aliasUsableResult.destinationAffordances.length === 0) {
@@ -554,6 +572,26 @@ const HOME_ROUTE = {
   seedProfile: 'tim',
 } as const satisfies PerfRouteDefinition;
 
+/**
+ * JOV-8737: shared readiness selectors for the public-profile alias
+ * usable-result routes. #24709 made the desktop surface (>=1180px) the
+ * canonical public profile and unmounts the compact shell there, so alias
+ * readiness must accept whichever surface the visitor's viewport actually
+ * mounts. Both lists stay additive: the compact selectors keep the 390x844
+ * contract intact, and the desktop selectors cover Playwright's default
+ * 1280x720 context. Kept as one shared constant per group so the two
+ * surfaces cannot drift apart across the six alias routes.
+ */
+const PROFILE_ALIAS_READY_SHELL_SELECTORS = [
+  '[data-testid="profile-header"]',
+  '[data-testid="profile-desktop-top-chrome"]',
+] as const;
+
+const PROFILE_ALIAS_READY_CONTENT_SELECTORS = [
+  '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
+  '[data-testid="profile-desktop-surface"][data-interactive-ready="true"]',
+] as const;
+
 const PUBLIC_PROFILE_CORE_ROUTES = [
   {
     id: 'public-profile-main',
@@ -643,10 +681,8 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'redirect',
     readySelectors: {
-      shell: ['[data-testid="profile-header"]'],
-      content: [
-        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
-      ],
+      shell: PROFILE_ALIAS_READY_SHELL_SELECTORS,
+      content: PROFILE_ALIAS_READY_CONTENT_SELECTORS,
       redirectDestinations: ['/[username]?mode=listen'],
     },
     timings: [
@@ -674,10 +710,8 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'redirect',
     readySelectors: {
-      shell: ['[data-testid="profile-header"]'],
-      content: [
-        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
-      ],
+      shell: PROFILE_ALIAS_READY_SHELL_SELECTORS,
+      content: PROFILE_ALIAS_READY_CONTENT_SELECTORS,
       redirectDestinations: ['/[username]?mode=listen'],
     },
     timings: [
@@ -747,10 +781,8 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'redirect',
     readySelectors: {
-      shell: ['[data-testid="profile-header"]'],
-      content: [
-        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
-      ],
+      shell: PROFILE_ALIAS_READY_SHELL_SELECTORS,
+      content: PROFILE_ALIAS_READY_CONTENT_SELECTORS,
       redirectDestinations: ['/[username]?mode=subscribe'],
     },
     timings: [
@@ -759,7 +791,11 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     ],
     aliasUsableResult: {
       canonicalPath: '/[username]?mode=subscribe',
-      destinationAffordances: ['[data-testid="profile-primary-tab-subscribe"]'],
+      destinationAffordances: [
+        '[data-testid="profile-primary-tab-subscribe"]',
+        '[data-testid="profile-desktop-get-updates"]',
+        '[data-testid="profile-desktop-manage-updates"]',
+      ],
     },
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
     priority: 7,
@@ -775,10 +811,8 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'redirect',
     readySelectors: {
-      shell: ['[data-testid="profile-header"]'],
-      content: [
-        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
-      ],
+      shell: PROFILE_ALIAS_READY_SHELL_SELECTORS,
+      content: PROFILE_ALIAS_READY_CONTENT_SELECTORS,
       redirectDestinations: ['/[username]?mode=pay'],
     },
     timings: [
@@ -787,7 +821,10 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     ],
     aliasUsableResult: {
       canonicalPath: '/[username]?mode=pay',
-      destinationAffordances: ['[data-testid="profile-mode-drawer-pay"]'],
+      destinationAffordances: [
+        '[data-testid="profile-mode-drawer-pay"]',
+        '[data-testid="profile-desktop-open-payments"]',
+      ],
     },
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
     priority: 8,
@@ -803,10 +840,8 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'redirect',
     readySelectors: {
-      shell: ['[data-testid="profile-header"]'],
-      content: [
-        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
-      ],
+      shell: PROFILE_ALIAS_READY_SHELL_SELECTORS,
+      content: PROFILE_ALIAS_READY_CONTENT_SELECTORS,
       redirectDestinations: ['/[username]?mode=tour'],
     },
     timings: [
@@ -831,10 +866,8 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'redirect',
     readySelectors: {
-      shell: ['[data-testid="profile-header"]'],
-      content: [
-        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
-      ],
+      shell: PROFILE_ALIAS_READY_SHELL_SELECTORS,
+      content: PROFILE_ALIAS_READY_CONTENT_SELECTORS,
       redirectDestinations: ['/[username]?mode=releases'],
     },
     timings: [
