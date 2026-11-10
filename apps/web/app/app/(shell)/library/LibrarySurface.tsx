@@ -140,9 +140,11 @@ import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { RowWaveform } from '@/components/shell/RowWaveform';
 import { APP_ROUTES } from '@/constants/routes';
+import { useFounderDoor } from '@/contexts/FounderDoorContext';
 import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import { openChatWithDraft } from '@/lib/chat/open-chat-with-prompt';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import type { ProviderKey } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
@@ -173,7 +175,7 @@ import {
   deriveWorkInspectorPresentation,
   scopeWorkInspectorBundle,
 } from '@/lib/library/work-inspector-read-model';
-import { workDestinationRowProps } from '@/lib/links/work-destination';
+import { getCacheScope } from '@/lib/queries/cache-isolation';
 import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries/useReleaseMutations';
 import {
   type ColumnDef,
@@ -230,6 +232,12 @@ import {
   persistLibrarySavedView,
   readPersistedLibrarySavedView,
 } from './library-saved-views';
+import {
+  compareAssets,
+  countBy,
+  type LibrarySortKey,
+  uniqueSorted,
+} from './library-sort-helpers';
 import { PostReleasePanel, RightsholdersList } from './PostReleasePanel';
 import {
   YouTubeMerchRelationshipEditor,
@@ -244,12 +252,13 @@ const LIBRARY_CARD_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface) outline-none';
 const LIBRARY_BUTTON_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface) outline-none';
-// The toolbar rides the app-wide PageToolbar control scale (28px buttons,
-// 30px tabs); the former 32px local density is retired with the rest of the
-// one-bar unification.
-const LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS = 'w-7 min-w-7';
+const LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS =
+  'h-8 min-h-8 lg:before:h-8 lg:before:min-w-0';
+const LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS = cn(
+  LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS,
+  'w-8 min-w-8'
+);
 
-type LibrarySortKey = 'releaseDate' | 'title' | 'status' | 'providers';
 type LibraryPresetId = LibraryView;
 type LibraryPreviewToggle = (
   asset: LibraryReleaseAsset,
@@ -278,8 +287,6 @@ type LibraryFilters = {
   readonly assetKinds: Set<LibraryAssetKind>;
   readonly providers: Set<string>;
 };
-
-type CountMap<T extends string> = ReadonlyMap<T, number>;
 
 const ASSET_KIND_LABELS: Record<LibraryAssetKind, string> = {
   artwork: 'Artwork',
@@ -488,38 +495,6 @@ function hasActiveFilters(filters: LibraryFilters): boolean {
       filters.providers.size >
     0
   );
-}
-
-function releaseDateTime(asset: LibraryReleaseAsset): number {
-  if (!asset.releaseDate) return 0;
-  const date = new Date(asset.releaseDate);
-  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
-}
-
-function compareAssets(sort: LibrarySortKey) {
-  return (a: LibraryReleaseAsset, b: LibraryReleaseAsset) => {
-    if (sort === 'releaseDate') return releaseDateTime(b) - releaseDateTime(a);
-    if (sort === 'title') return a.title.localeCompare(b.title);
-    if (sort === 'status') return a.status.localeCompare(b.status);
-    return b.providerCount - a.providerCount;
-  };
-}
-
-function uniqueSorted<T extends string>(values: readonly T[]): T[] {
-  return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
-}
-
-function countBy<T extends string>(
-  assets: readonly LibraryReleaseAsset[],
-  getValues: (asset: LibraryReleaseAsset) => readonly T[]
-): CountMap<T> {
-  const counts = new Map<T, number>();
-  for (const asset of assets) {
-    for (const value of getValues(asset)) {
-      counts.set(value, (counts.get(value) ?? 0) + 1);
-    }
-  }
-  return counts;
 }
 
 const LibraryDependencyContext = createContext<
@@ -809,6 +784,7 @@ function LibraryStageTabs({
           ariaControls='library-catalog-panel'
           onKeyDown={handleTabKeyDown}
           onClick={() => onStage(tab)}
+          className={LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS}
         />
       ))}
     </div>
@@ -1649,7 +1625,7 @@ const AssetCard = memo(function AssetCard({
           </div>
           <div className='min-w-0 px-3 pb-3 pt-2'>
             <div className='flex min-w-0 items-center gap-1.5'>
-              <h2 className='system-b-library-card-title line-clamp-2 min-w-0 flex-1'>
+              <h2 className='system-b-library-card-title min-w-0 flex-1 truncate'>
                 {asset.title}
               </h2>
               <LibraryStatusGlyph asset={asset} className='shrink-0' />
@@ -2166,7 +2142,7 @@ function ApprovalStatusEditor({
           disabled={isDisabled}
           data-testid={`library-approval-status-select-${asset.id}`}
           className={cn(
-            '-ml-1 inline-flex h-6 min-h-6 max-w-full items-center justify-start gap-1 truncate px-1 font-normal text-primary-token hover:bg-surface-1 disabled:opacity-100',
+            '-ml-1 inline-flex h-6 max-w-full items-center justify-start gap-1 truncate px-1 font-normal text-primary-token hover:bg-surface-1 disabled:opacity-100',
             LIBRARY_BUTTON_FOCUS_CLASS
           )}
         >
@@ -2390,6 +2366,11 @@ function AssetDrawer({
     },
     [onClose]
   );
+  const askJovieAction = current
+    ? getContextMenuItems(current).find(
+        item => 'id' in item && item.id === 'ask-jovie'
+      )
+    : undefined;
   const drawerHeaderActions = current ? (
     // The shared header shows the visible mobile Close for every drawer.
     <DrawerHeaderActions
@@ -2489,6 +2470,13 @@ function AssetDrawer({
                       canPublish={profileId !== null}
                       disabled={!open}
                       onSharePrivately={openPrivateShare}
+                      onAskJovie={
+                        askJovieAction &&
+                        'onClick' in askJovieAction &&
+                        !askJovieAction.disabled
+                          ? askJovieAction.onClick
+                          : undefined
+                      }
                       preview={
                         hasVerifiedLibraryAudioPreview(current) ? (
                           <PreviewActionButton
@@ -2740,11 +2728,10 @@ function AssetDrawer({
                       {current.providers.map(provider => (
                         <DspQuietRow
                           key={`${current.id}-${provider.key}`}
-                          className='system-b-library-provider-link min-h-6'
+                          className='system-b-library-provider-link'
                           label={provider.label}
                           href={provider.url}
                           closedTabIndex={closedTabIndex}
-                          {...workDestinationRowProps(current, provider.key)}
                           icon={
                             <ProviderIcon
                               provider={provider.key as ProviderKey}
@@ -2901,6 +2888,7 @@ export function LibrarySurface({
   readonly workLaunches?: readonly WorkLaunchSummary[];
 }) {
   const router = useRouter();
+  const { chatMode: founderChatMode } = useFounderDoor();
   const searchParams = useSearchParams();
   const { mutate: syncSpotify, isPending: isSyncingSpotify } =
     useSyncReleasesFromSpotifyMutation(profileId ?? '');
@@ -3494,6 +3482,22 @@ export function LibrarySurface({
     [profileId]
   );
 
+  const handleAskJovie = useCallback(
+    (draft: string, targetProfileId: string) => {
+      if (founderChatMode === 'ov') {
+        toast.error('Switch to Jovie, then ask about this item again.');
+        return;
+      }
+      if (
+        getCacheScope().profileId !== targetProfileId ||
+        !openChatWithDraft(draft, router)
+      ) {
+        toast.error('Chat is unavailable. Reopen this item and try again.');
+      }
+    },
+    [router, founderChatMode]
+  );
+
   const getContextMenuItems = useCallback<LibraryContextMenuBuilder>(
     asset =>
       libraryEntityActionsToContextMenuItems(
@@ -3512,12 +3516,14 @@ export function LibrarySurface({
             isSaving: lifecycleSavingIds.has(asset.id),
             onChange: handleLifecycleChange,
           },
+          onAskJovie: handleAskJovie,
           onTogglePreview: handleTogglePreview,
           onApprovalStatusChange: handleApprovalStatusChange,
         })
       ),
     [
       approvalSavingIds,
+      handleAskJovie,
       handleApprovalStatusChange,
       handleLifecycleChange,
       handleProfileVisibilityChange,
