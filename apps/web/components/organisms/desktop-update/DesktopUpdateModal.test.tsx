@@ -86,6 +86,8 @@ describe('DesktopUpdateModalView', () => {
     expect(screen.getByText('Downloading Jovie 26.9.16')).toBeInTheDocument();
     expect(screen.getByText('84 MB of 200 MB')).toBeInTheDocument();
     expect(screen.getByText('12 MB/s')).toBeInTheDocument();
+    expect(screen.getByText('84 MB of 200 MB')).toHaveClass('tabular-nums');
+    expect(screen.getByText('12 MB/s')).toHaveClass('tabular-nums');
     expect(screen.getByRole('button', { name: 'Hide' })).toBeInTheDocument();
     expect(props.onDownload).not.toHaveBeenCalled();
   });

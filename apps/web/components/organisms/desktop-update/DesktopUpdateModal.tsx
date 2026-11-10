@@ -119,7 +119,7 @@ export function DesktopUpdateModalView({
           details={
             <div className='flex flex-wrap items-center justify-center gap-x-3 gap-y-1'>
               {state.totalBytes > 0 ? (
-                <span>
+                <span className='tabular-nums'>
                   {COPY.transferred(
                     formatDownloadSize(state.transferredBytes),
                     formatDownloadSize(state.totalBytes)
@@ -127,7 +127,7 @@ export function DesktopUpdateModalView({
                 </span>
               ) : null}
               {state.bytesPerSecond > 0 ? (
-                <span>
+                <span className='tabular-nums'>
                   {COPY.speed(formatDownloadSize(state.bytesPerSecond))}
                 </span>
               ) : null}
