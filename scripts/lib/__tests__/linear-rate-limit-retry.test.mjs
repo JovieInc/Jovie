@@ -9,6 +9,7 @@ import {
   deferLinearRateLimited,
   withLinearRateLimitRetry,
 } from '../../lib/linear-issue-intake.mjs';
+import { runSyntheticMonitoringIntake } from '../../synthetic-monitoring-intake.mjs';
 import { runWebAiHealthIntake } from '../../web-ai-health-intake.mjs';
 
 const FAR_RESET = Date.now() + 60 * 60 * 1000;
@@ -337,6 +338,77 @@ describe('sibling scheduled monitors share the deferred-not-failed behavior', ()
     } finally {
       vi.unstubAllEnvs();
       rmSync(responseFile, { force: true });
+    }
+  });
+
+  it('synthetic monitoring: a real comment failure after filing stays best-effort', async () => {
+    vi.stubEnv('LINEAR_API_KEY', 'lin_api_test');
+    vi.stubEnv('REMEDIATION_TRIGGERS_DISABLED', '');
+    vi.stubEnv(
+      'LINEAR_COOLDOWN_STATE_DIR',
+      join(tmpdir(), `linear-cd-${Date.now()}`)
+    );
+    vi.stubEnv(
+      'LINEAR_COOLDOWN_FALLBACK_DIR',
+      join(tmpdir(), `linear-cd-fb-${Date.now()}`)
+    );
+    try {
+      const fetchByQuery = async (url, init) => {
+        const query = String(JSON.parse(init?.body ?? '{}')?.query ?? '');
+        if (query.includes('FindIssueByFingerprint'))
+          return response(200, {
+            data: {
+              team: { states: { nodes: [] }, labels: { nodes: [] } },
+              issues: { nodes: [] },
+            },
+          });
+        if (query.includes('FindIssueByRemediationLabel'))
+          return response(200, { data: { issues: { nodes: [] } } });
+        if (query.includes('issueLabelCreate'))
+          return response(200, {
+            data: {
+              issueLabelCreate: {
+                success: true,
+                issueLabel: { id: 'label-1' },
+              },
+            },
+          });
+        if (query.includes('issueCreate'))
+          return response(200, {
+            data: {
+              issueCreate: {
+                success: true,
+                issue: {
+                  id: 'lin-1',
+                  identifier: 'JOV-1',
+                  url: 'https://linear.app/jovie/issue/JOV-1',
+                },
+              },
+            },
+          });
+        if (query.includes('commentCreate'))
+          return response(500, { errors: [{ message: 'boom' }] });
+        throw new Error(`unexpected ${query.slice(0, 60)}`);
+      };
+      // The issue is filed; a failing evidence comment must not red the job.
+      const result = await runSyntheticMonitoringIntake({
+        env: {
+          TEST_STATUS: 'failed',
+          FAILED_TESTS: 'spec crashed',
+          PREVIOUS_CONCLUSION: 'failure',
+          GITHUB_RUN_ID: 'run-1',
+        },
+        fetchImpl: fetchByQuery,
+      });
+      expect(result).toEqual({
+        ok: true,
+        action: 'created',
+        id: 'lin-1',
+        identifier: 'JOV-1',
+        url: 'https://linear.app/jovie/issue/JOV-1',
+      });
+    } finally {
+      vi.unstubAllEnvs();
     }
   });
 

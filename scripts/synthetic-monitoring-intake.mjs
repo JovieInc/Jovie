@@ -3,6 +3,7 @@
 import {
   addLinearIssueComment,
   closeLinearIssueByFingerprint,
+  isLinearRateLimited,
   logRemediationDryRun,
   remediationTriggersEnabled,
   upsertLinearIssueByTitleFingerprint,
@@ -168,7 +169,9 @@ export async function runSyntheticMonitoringIntake({
   }
   // Filing and the failed-test evidence comment are one idempotent unit: the
   // upsert dedupes by fingerprint, so a rate-limited comment retries the
-  // whole unit instead of red on a bookkeeping delay.
+  // whole unit instead of red on a bookkeeping delay. A real comment
+  // failure after a successful filing stays best-effort (the issue exists);
+  // only a rate-limited comment propagates so it can retry or defer.
   const result = await withLinearRateLimitRetry(
     async () => {
       const filed = await fileSyntheticMonitoringLinearIssue({
@@ -183,7 +186,7 @@ export async function runSyntheticMonitoringIntake({
           body: `Failed tests (${env.GITHUB_RUN_ID ?? 'unknown'}):\n\n\`\`\`\n${failedTests || 'unknown'}\n\`\`\`\n${env.RUN_URL ?? ''}`,
           fetchImpl,
         });
-        if (!commented.ok) return commented;
+        if (!commented.ok && isLinearRateLimited(commented)) return commented;
       }
       return filed;
     },
