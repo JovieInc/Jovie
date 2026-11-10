@@ -417,19 +417,19 @@ export async function inspectImageContrast(
   }
 
   // Hide glyph ink only; control backgrounds stay painted so the sampled
-  // region is exactly what sits behind each glyph. The hide stylesheet is
-  // injected AT the screenshot (Playwright's `style` option guarantees it
-  // applies to the copied frame): an addStyleTag + rAF capture could still
-  // copy a stale compositor frame carrying pre-hide ink — the identical
-  // bright pixels every dispatch kept sampling behind the desktop footer
-  // credit (JOV-11623).
+  // region is exactly what sits behind each glyph.
   // `background-image: none` is part of the hide: a candidate whose glyphs
   // are painted by a clipped background gradient (bg-clip-text) or that sits
   // on a gradient wash paints ink the color transparent cannot remove, and
   // the sample would read that ink as "background". Solid backgrounds
   // (background-color) stay painted, so control surfaces keep their fill.
-  // `text-decoration`/`fill`/`stroke` strip the link's underline and SVG
-  // ink painted by the control or its siblings rather than the candidate.
+  // The hide stylesheet is injected AT the screenshot (Playwright's `style`
+  // option guarantees it applies to the copied frame): an addStyleTag + rAF
+  // capture can copy a stale compositor frame still carrying pre-hide ink —
+  // the identical bright pixels every dispatch kept sampling behind the
+  // desktop footer credit (JOV-11623). The control joins the hide scope
+  // (its underline and the SVG ink of its other children do not belong in
+  // the sample), and `text-decoration` joins the stripped properties.
   const freshBoxes = await readContrastHideBoxes(
     page,
     CANDIDATE_ATTRIBUTE
