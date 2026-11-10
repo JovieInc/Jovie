@@ -8,7 +8,7 @@ import { isTransientAdmissionFailureMessage } from './lib/merge-group-admission.
 import {
   attributeAgainstAheadRun,
   attributeAgainstPeerRuns,
-  CI_FAST_REMAINING_JOB,
+  selectCiFastEvidenceJobs,
 } from './lib/merge-group-ahead-attribution.mjs';
 import {
   DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS,
@@ -1568,15 +1568,14 @@ function ciFastRemainingLog(
   jobs,
   { includeSuccessful = false } = {}
 ) {
-  const job = jobs.find(item => item?.name === CI_FAST_REMAINING_JOB);
-  const accepted = includeSuccessful ? ['failure', 'success'] : ['failure'];
-  if (
-    !job ||
-    !accepted.includes(job.conclusion) ||
-    !Number.isSafeInteger(job.id)
-  )
-    return null;
-  return gh(['api', `repos/${repository}/actions/jobs/${job.id}/logs`]);
+  // The structural matrix legs (ci-fast (structural core N/2)) carry the same
+  // evidence as ci-fast (remaining); collect every selected leg's log so
+  // command-level comparison below works across shards.
+  const selected = selectCiFastEvidenceJobs(jobs, { includeSuccessful });
+  if (!selected.length) return null;
+  return selected
+    .map(job => gh(['api', `repos/${repository}/actions/jobs/${job.id}/logs`]))
+    .join('\n');
 }
 
 // Shadow only (canon/MERGE_QUEUE_STEWARD.md invariant 4): did this group's
