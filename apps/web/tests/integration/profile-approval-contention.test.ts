@@ -22,7 +22,39 @@ import {
 vi.mock('@/lib/error-tracking', () => ({
   captureWarning: vi.fn().mockResolvedValue(undefined),
 }));
-const url = process.env.APPROVAL_TEST_DATABASE_URL;
+const DIRECT_NEON_HOST = /^ep-[a-z0-9-]+\..*\.neon\.tech$/i;
+
+function resolveTarget(env: Record<string, string | undefined>) {
+  const local = env.APPROVAL_TEST_DATABASE_URL?.trim();
+  if (local) {
+    const parsed = new URL(local);
+    if (
+      parsed.hostname !== '127.0.0.1' ||
+      parsed.pathname !== '/jov12105_approvals'
+    ) {
+      throw new Error('Only dedicated loopback approval fixtures are allowed');
+    }
+    return { url: local, certification: false };
+  }
+  if (env.DB_CERTIFICATION !== 'true') return null;
+  if (!env.DATABASE_URL)
+    throw new Error('Isolated certification requires DATABASE_URL');
+  const parsed = new URL(env.DATABASE_URL);
+  parsed.hostname = parsed.hostname.replace(
+    /^(ep-[a-z0-9-]+?)-pooler\./,
+    '$1.'
+  );
+  parsed.searchParams.delete('channel_binding');
+  if (
+    !DIRECT_NEON_HOST.test(parsed.hostname) ||
+    parsed.hostname.includes('-pooler.')
+  ) {
+    throw new Error('Isolated certification requires a direct Neon endpoint');
+  }
+  return { url: parsed.toString(), certification: true };
+}
+
+const target = resolveTarget(process.env);
 const owner = randomUUID();
 const manager = randomUUID();
 const profile = randomUUID();
@@ -90,29 +122,33 @@ function pauseApprovalRead<T extends object>(
   });
 }
 
-describe.skipIf(!url)(
+describe.skipIf(!target)(
   'profile approval transitions on isolated real Postgres',
   () => {
     let client: ReturnType<typeof postgres>;
     let db: ReturnType<typeof drizzle>;
+    const fixtureSchema = `approval_fixture_${randomUUID().replaceAll('-', '')}`;
+    let schemaCreated = false;
     beforeAll(async () => {
-      const parsed = new URL(url!);
-      if (
-        parsed.hostname !== '127.0.0.1' ||
-        parsed.pathname !== '/jov12105_approvals'
-      )
-        throw new Error(
-          'Only dedicated loopback approval fixtures are allowed'
-        );
-      client = postgres(url!, {
+      if (!target) throw new Error('Approval fixture target missing');
+      client = postgres(target.url, {
+        ...(target.certification ? { ssl: 'require' } : {}),
         max: 4,
         connection: {
           TimeZone: 'UTC',
+          search_path: fixtureSchema,
           application_name: 'jov-approval-contention',
           statement_timeout: 3000,
           idle_in_transaction_session_timeout: 5000,
         },
       });
+      // A schema shared by this fixture's connections is required for real lock
+      // contention. No public fallback: a missing fixture table fails closed.
+      await client`CREATE SCHEMA ${client(fixtureSchema)}`;
+      schemaCreated = true;
+      const [scope] = await client`SELECT current_schema() AS name`;
+      if (scope.name !== fixtureSchema)
+        throw new Error('Fixture schema isolation failed');
       db = drizzle(client);
       await client.unsafe(`
       CREATE TABLE IF NOT EXISTS creator_profiles (id uuid PRIMARY KEY, user_id uuid);
@@ -133,7 +169,12 @@ describe.skipIf(!url)(
       await client`INSERT INTO user_profile_claims VALUES (${manager}, ${profile}, 'manager'), (${owner}, ${profile}, 'owner')`;
     });
     afterAll(async () => {
-      await client?.end({ timeout: 1 });
+      try {
+        if (schemaCreated)
+          await client`DROP SCHEMA ${client(fixtureSchema)} CASCADE`;
+      } finally {
+        await client?.end({ timeout: 1 });
+      }
     });
     const seed = async (status: string) => {
       await client`INSERT INTO profile_action_approvals (id, creator_profile_id, action, status, requested_by, expires_at) VALUES (${approval}, ${profile}, 'links.mutate', ${status}, ${manager}, now() + interval '1 hour')`;
@@ -156,6 +197,21 @@ describe.skipIf(!url)(
       db.transaction(tx => operation(tx as unknown as DbOrTransaction), {
         isolationLevel: 'read committed',
       });
+
+    it('isolates all concurrent connections from canonical tables', async () => {
+      const connections = [];
+      try {
+        for (let index = 0; index < 4; index++)
+          connections.push(await client.reserve());
+        for (const connection of connections) {
+          const [scope] = await connection`SELECT current_schema() AS name,
+            to_regclass('profile_action_approvals') = to_regclass(${`${fixtureSchema}.profile_action_approvals`}) AS isolated`;
+          expect(scope).toMatchObject({ name: fixtureSchema, isolated: true });
+        }
+      } finally {
+        for (const connection of connections) connection.release();
+      }
+    });
 
     it('allows one consumption and one audit event after competing stale reads', async () => {
       await seed('approved');
@@ -357,3 +413,49 @@ describe.skipIf(!url)(
     });
   }
 );
+
+describe('approval database target admission', () => {
+  it('does not opt into a database from DATABASE_URL alone', () => {
+    expect(
+      resolveTarget({ DATABASE_URL: 'postgres://example.test/db' })
+    ).toBeNull();
+  });
+  it('keeps the dedicated loopback restriction', () => {
+    expect(
+      resolveTarget({
+        APPROVAL_TEST_DATABASE_URL: 'postgres://127.0.0.1/jov12105_approvals',
+      })
+    ).toMatchObject({ certification: false });
+    expect(() =>
+      resolveTarget({
+        APPROVAL_TEST_DATABASE_URL:
+          'postgres://example.test/jov12105_approvals',
+      })
+    ).toThrow('loopback');
+    expect(() =>
+      resolveTarget({
+        APPROVAL_TEST_DATABASE_URL: 'postgres://127.0.0.1/other',
+      })
+    ).toThrow('loopback');
+  });
+  it('requires an explicit certification endpoint and adapts only the canonical Neon pooler', () => {
+    expect(() => resolveTarget({ DB_CERTIFICATION: 'true' })).toThrow(
+      'DATABASE_URL'
+    );
+    expect(() =>
+      resolveTarget({
+        DB_CERTIFICATION: 'true',
+        DATABASE_URL: 'postgres://example.test/db',
+      })
+    ).toThrow('Neon');
+    const result = resolveTarget({
+      DB_CERTIFICATION: 'true',
+      DATABASE_URL:
+        'postgres://ep-fixture-pooler.us-east-2.aws.neon.tech/db?channel_binding=require',
+    });
+    expect(result).toEqual({
+      url: 'postgres://ep-fixture.us-east-2.aws.neon.tech/db',
+      certification: true,
+    });
+  });
+});
