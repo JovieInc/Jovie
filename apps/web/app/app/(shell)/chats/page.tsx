@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { APP_ROUTES } from '@/constants/routes';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState } from '@/lib/queries/server';
@@ -5,6 +6,11 @@ import { loadAppShellRouteContext } from '../app-shell-route-context';
 import { ChatsPageClient } from '../threads/ThreadsPageClient';
 
 export const runtime = 'nodejs';
+
+export const metadata: Metadata = {
+  title: 'Chats',
+  description: 'Continue your chats with Jovie.',
+};
 
 export default async function ChatsPage() {
   const routeContext = await loadAppShellRouteContext({
