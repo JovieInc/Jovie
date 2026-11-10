@@ -360,6 +360,18 @@ describe('share_profile', () => {
     const result = await shareProfile({ username: 'ghost' });
     expect(result.status).toBe('not_public');
   });
+
+  it('never shares a public profile the discovery policy excludes', async () => {
+    mocks.profileByUsername.mockResolvedValue({
+      username: 'tmoc0g1x9dwmk71',
+      usernameNormalized: 'tmoc0g1x9dwmk71',
+      isPublic: true,
+      displayName: 'gp moc…+clerk test',
+    });
+    mocks.creatorName.mockReturnValue('gp moc…+clerk test');
+    const result = await shareProfile({ username: 'tmoc0g1x9dwmk71' });
+    expect(result.status).toBe('not_public');
+  });
 });
 
 describe('start_upgrade', () => {

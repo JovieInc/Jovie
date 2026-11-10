@@ -244,6 +244,41 @@ describe('claimAgentDraft', () => {
     );
   });
 
+  it('honors an availability-checked golden-path handle request when still free', async () => {
+    const base = draftRow();
+    const row = draftRow({
+      preview: { ...base.preview, golden_path: { handle: 'signalandartist' } },
+    });
+    // draft, prior profile, spotify profiles, tx owned, existing release, providers
+    mocks.selects = [[row], [], [], [], [], [{ id: 'spotify' }]];
+    mocks.handle.mockResolvedValue('signalandartist');
+    expect(await claim(row)).toEqual({
+      status: 'claimed',
+      handle: 'signalandartist',
+    });
+    expect(mocks.handle).toHaveBeenCalledWith(
+      expect.anything(),
+      'signalandartist'
+    );
+  });
+
+  it('falls back to the derived handle when the requested one is taken since check', async () => {
+    const base = draftRow();
+    const row = draftRow({
+      preview: { ...base.preview, golden_path: { handle: 'signalandartist' } },
+    });
+    mocks.selects = [[row], [], [], [], [], [{ id: 'spotify' }]];
+    // findAvailableHandle can only return the base or a suffixed variant;
+    // anything but the exact requested handle is a silent swap -> derived.
+    mocks.handle
+      .mockResolvedValueOnce('signalandartist1')
+      .mockResolvedValueOnce('signalartist');
+    expect(await claim(row)).toEqual({
+      status: 'claimed',
+      handle: 'signalartist',
+    });
+  });
+
   it('drops artwork from hosts outside the provider image CDN allowlist', async () => {
     const row = draftRow();
     const launch = row.preview.launch.result.release;
