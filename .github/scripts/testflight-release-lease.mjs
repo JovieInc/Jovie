@@ -376,13 +376,7 @@ export function validateLease({
     const bucket = buckets.shift();
     if (visited.has(bucket)) continue;
     visited.add(bucket);
-    // Every visited bucket beyond the root is the sourceSha of an intent
-    // already read, so this traversal is bounded by MAX_INTENTS + 1 by
-    // construction and MAX_INTENTS below is the real runaway guard. The
-    // former fixed 64-bucket cap was structurally exceeded once repeated
-    // failed upload attempts accumulated 64 distinct-source receipts in the
-    // unchanged baseline bucket (run 42590625900, 2026-11-09); the enumeration
-    // itself is unchanged and still reaches every reachable intent.
+    // Bounded by construction: root + <=1 bucket per read intent; MAX_INTENTS is the runaway guard.
     assert(visited.size <= MAX_INTENTS + 1, 'upload intent traversal limit');
     const intentName = `${INTENT}-${bucket || 'bootstrap'}`;
     const intents = listing(
