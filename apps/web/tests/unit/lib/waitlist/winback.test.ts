@@ -287,6 +287,7 @@ vi.mock('@/lib/server-analytics', () => ({
   trackServerEvent: mockTrackServerEvent,
 }));
 
+import type { DbOrTransaction } from '@/lib/db';
 import {
   trackWinbackEvent,
   WINBACK_ANALYTICS_EVENTS,
@@ -314,7 +315,7 @@ function createKvTxMock(value: unknown) {
         onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
       })),
     })),
-  } as never;
+  } as unknown as DbOrTransaction;
 }
 
 describe('trackWinbackEvent', () => {
@@ -384,13 +385,16 @@ describe('winback-signals.server kv ledger', () => {
     });
     const insertFn = vi.fn<() => unknown>();
     insertFn.mockReturnValue({ values: valuesFn });
+    const insert = tx.insert as unknown;
     const marked = {
       ...tx,
-      insert: insertFn as unknown as typeof tx.insert,
-    };
+      insert: insertFn as unknown as typeof insert,
+    } as DbOrTransaction;
     await markWinbackShippedWatermark(marked, ['a', 'b'], now);
     expect(valuesFn).toHaveBeenCalledOnce();
-    const [row] = valuesFn.mock.calls[0] as [Record<string, unknown>];
+    const row = (
+      valuesFn.mock.calls as unknown as [[Record<string, unknown>]]
+    )[0][0];
     expect(row.key).toBe('jovie:winback:shipped-watermark:v1');
     expect(row.value).toEqual({
       keys: ['a', 'b'],
