@@ -47,7 +47,11 @@ const {
         return { rows: [] };
       }),
       select: vi.fn(() => {
-        const outcome = outcomes.shift() ?? (() => ({ rows: [] }));
+        // Annotated so the fallback widens to QueryOutcome; the un-annotated
+        // form infers a narrower { rows: never[] } union member that makes
+        // result.error a TS2339 (the pinned original baselines that error).
+        const outcome: QueryOutcome =
+          outcomes.shift() ?? (() => ({ rows: [] }));
         const builder: Record<string, unknown> = {};
         const chain = () => builder;
         builder.from = chain;
