@@ -2409,6 +2409,7 @@ jobs:
             echo "desktop_update=false"
             echo "dsp=false"
             echo "smart_link=false"
+            echo "onboarding=false"
             echo "run=false"
           } >> "$GITHUB_OUTPUT"
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
@@ -2421,12 +2422,19 @@ jobs:
           DESKTOP_UPDATE_STORYBOOK_PATTERN='^apps/web/(components/organisms/desktop-update/DesktopUpdateModal(\.stories)?\.tsx|tests/e2e/storybook-desktop-update-modal\.spec\.ts)$'
           DSP_STORYBOOK_PATTERN='^apps/web/(components/shell/DspAvatarStack(\.mobile-drawer)?(\.stories|\.test)?\.tsx|components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow(\.stories)?\.tsx|components/organisms/release-sidebar/ReleaseSidebarSections\.tsx|components/molecules/drawer/RightDrawer\.tsx|lib/a11y/modal-focus-boundary\.ts|tests/e2e/storybook-dsp-details\.spec\.ts)$'
           SMART_LINK_STORYBOOK_PATTERN='^apps/web/(components/features/release/(SmartLinkShell|MusicServiceDial|ActionDial)(\.stories|\.test)?\.tsx|components/organisms/public-surface/PublicSurface(Shell|Stage)(\.stories|\.test)?\.tsx|components/organisms/ReleaseLandingPage\.stories\.tsx|app/r/\[slug\]/ReleaseLandingPage\.tsx|app/globals\.css|styles/design-system\.css|tests/e2e/storybook-smart-link-reachability\.spec\.ts)$'
+          ONBOARDING_STORYBOOK_PATTERN='^apps/web/(components/features/onboarding/.*\.[tj]sx?|tests/e2e/storybook-onboarding-recovery\.spec\.ts)$'
           # Overlay primitives, their layer tokens, and the
           # collision harness re-prove stacking, focus, and viewport fit.
           OVERLAY_STORYBOOK_PATTERN='^(packages/ui/atoms/(dialog|alert-dialog|sheet|popover|dropdown-menu|context-menu|select|tooltip)\.tsx|packages/ui/lib/(overlay-styles|overlay-focus|dropdown-styles|utils)\.ts|apps/web/styles/tailwind-foundation\.css|apps/web/\.storybook/stories/overlay-collisions\.stories\.tsx|apps/web/tests/e2e/storybook-overlay-collisions\.spec\.ts)$'
           PRIVACY_STORYBOOK_PATTERN='^apps/web/(app/app/\(shell\)/DashboardShellPrivacyBoundary(\.test)?\.tsx|lib/workspace-lock/workspace-lock\.ts|components/features/workspace-lock/WorkspaceLockScreen\.tsx|components/organisms/user-button/OviePrivacyLockControl(\.test)?\.tsx|\.storybook/main\.ts|tests/unit/storybook/dashboard-layout-client-mock\.test\.tsx|\.storybook/stories/ovie-privacy-boundary\.stories\.tsx|tests/e2e/storybook-ovie-privacy-boundary\.spec\.ts)$'
           changed_files="$RUNNER_TEMP/storybook-changed-files.txt"
           git diff --name-only "origin/${{ github.base_ref }}" HEAD > "$changed_files"
+          if grep -qE "$ONBOARDING_STORYBOOK_PATTERN" "$changed_files"; then
+            {
+              echo "onboarding=true"
+              echo "run=true"
+            } >> "$GITHUB_OUTPUT"
+          fi
           if grep -qE "$SPOTIFY_STORYBOOK_PATTERN" "$changed_files"; then
             {
               echo "spotify=true"
@@ -2562,6 +2570,7 @@ jobs:
           RUN_DESKTOP_UPDATE: ${{ steps.storybook-browser.outputs.desktop_update }}
           RUN_DSP: ${{ steps.storybook-browser.outputs.dsp }}
           RUN_SMART_LINK: ${{ steps.storybook-browser.outputs.smart_link }}
+          RUN_ONBOARDING: ${{ steps.storybook-browser.outputs.onboarding }}
           STORYBOOK_BASE_URL: http://localhost:6006
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
@@ -2570,6 +2579,9 @@ jobs:
         run: |
           set -euo pipefail
           specs=()
+          if [[ "${RUN_ONBOARDING:-false}" == 'true' ]]; then
+            specs+=(tests/e2e/storybook-onboarding-recovery.spec.ts)
+          fi
           if [[ "$RUN_SPOTIFY" == 'true' ]]; then
             specs+=(tests/e2e/storybook-spotify-connect.spec.ts)
           fi

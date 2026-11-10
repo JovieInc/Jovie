@@ -133,9 +133,15 @@ for (const scenario of cases) {
       page.getByRole('textbox', { name: 'Proposed handle' })
     ).toBeVisible();
     await expect(input).toHaveValue('');
-    await expect(
-      page.getByRole('link', { name: 'Sign in', exact: true })
-    ).toBeVisible();
+    const options = page.getByRole('button', { name: 'Onboarding options' });
+    await options.click();
+    const signIn = page.getByRole('menuitem', { name: 'Sign in', exact: true });
+    await expect(signIn).toBeVisible();
+    await expect(signIn).toHaveAttribute('href', '/signin');
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toBeHidden();
+    await expect(options).toBeFocused();
+    await expect(input).toHaveValue('');
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth
