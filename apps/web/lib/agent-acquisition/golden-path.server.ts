@@ -13,7 +13,7 @@ import {
 } from '@/lib/onboarding/catalog-preview.server';
 import { checkOnboardingHandleAvailability } from '@/lib/onboarding/reserved-handle';
 import { isPublicProfileIndexable } from '@/lib/profile/public-profile-indexing-policy';
-import { getProfileByUsername } from '@/lib/services/profile';
+import { getProfileByUsername } from '@/lib/services/profile/queries';
 import { decideGoldenPathAdmissionForArtist } from '@/lib/waitlist/golden-path-admission.server';
 import { PROMO_SPEND_BANDS } from '@/lib/waitlist/role-qualification';
 import { agentClaimUrl } from './claim-handoff';

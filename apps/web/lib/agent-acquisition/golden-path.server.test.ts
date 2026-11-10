@@ -60,7 +60,7 @@ vi.mock('@/lib/onboarding/catalog-preview.server', () => ({
   fetchOnboardingCatalogPreview: mocks.catalogPreview,
   isValueBeforePaywallEnabled: mocks.valueBeforePaywall,
 }));
-vi.mock('@/lib/services/profile', () => ({
+vi.mock('@/lib/services/profile/queries', () => ({
   getProfileByUsername: mocks.profileByUsername,
 }));
 vi.mock('@/lib/agent/public-catalog', () => ({

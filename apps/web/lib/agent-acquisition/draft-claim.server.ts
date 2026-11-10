@@ -39,6 +39,7 @@ import {
   reserveAgentDraft,
 } from './draft-reservation.server';
 import type { AgentDraftRow } from './draft-store';
+import { goldenPathHandleFromPreview } from './golden-path';
 
 /**
  * Person-side completion of an agent-created draft (JOV-9760).
@@ -211,16 +212,6 @@ function attribution(row: AgentDraftRow, now: Date) {
   };
 }
 
-/** The handle requested through the golden-path claim_handle tool, if any. */
-function goldenPathHandleOf(row: AgentDraftRow): string | null {
-  const goldenPath = (
-    row.preview as {
-      golden_path?: { readonly handle?: string };
-    }
-  ).golden_path;
-  return goldenPath?.handle ?? null;
-}
-
 async function chooseHandle(
   tx: DbOrTransaction,
   artistName: string,
@@ -291,7 +282,7 @@ async function claimInTransaction(
     tx,
     artist.display_name,
     row.id,
-    goldenPathHandleOf(row)
+    goldenPathHandleFromPreview(row.preview)
   );
   const [created] = await tx
     .insert(creatorProfiles)

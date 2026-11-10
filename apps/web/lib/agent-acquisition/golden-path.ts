@@ -151,3 +151,14 @@ export function shareTextFor(displayName: string, url: string): string {
   const name = displayName.trim() || 'This artist';
   return `${name} on Jovie: ${url}`;
 }
+
+/**
+ * The handle requested through claim_handle, read from a stored draft
+ * preview. Lives here so the person-side claim (draft-claim.server) can
+ * honor it without importing the server tool module.
+ */
+export function goldenPathHandleFromPreview(preview: unknown): string | null {
+  const goldenPath = (preview as { golden_path?: { readonly handle?: string } })
+    .golden_path;
+  return goldenPath?.handle ?? null;
+}
