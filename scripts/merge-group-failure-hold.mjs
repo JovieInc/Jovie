@@ -1640,7 +1640,12 @@ export function readPeerRecurrence(repository, prNumber, run, jobs) {
           parseMergeQueueBranch(peer.head_branch)?.prNumber,
           prNumber
         ),
-        ciFastLog: ciFastRemainingLog(repository, peerJobs),
+        ciFastLog: (logs =>
+          // Peer witnesses are positive-only evidence; a peer's entries
+          // combine the way ahead-run shards do.
+          Array.isArray(logs) ? logs.map(entry => entry.log).join('\n') : logs)(
+          ciFastRemainingLog(repository, peerJobs)
+        ),
       };
     });
     return {
