@@ -23,7 +23,7 @@ GH_BIN = "gh"
 
 LABEL_EPISODE_QUERY = """query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){
 pullRequest(number:$number){timelineItems(last:100,itemTypes:[LABELED_EVENT]){nodes{... on LabeledEvent{createdAt
-label{name} actor{__typename login}}}}}}}}"""
+label{name} actor{__typename login}}}}}}}"""
 
 # The relay's own GITHUB_TOKEN identity: the only applier whose reds its rollup can evaluate.
 RELAY_RED_LABELLER = "github-actions[bot]"
