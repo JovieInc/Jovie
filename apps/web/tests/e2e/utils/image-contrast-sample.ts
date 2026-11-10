@@ -172,7 +172,10 @@ export async function readContrastHideBoxes(
   }, hideAttribute);
 }
 
-export async function captureContrastScreenshot(page: Page): Promise<Buffer> {
+export async function captureContrastScreenshot(
+  page: Page,
+  hideStyle: string
+): Promise<Buffer> {
   // Headless Chromium rejects a capture with "Protocol error
   // (Page.captureScreenshot): Unable to capture screenshot" when the view has
   // no compositor frame to copy yet. Deliberate-red fixtures call
@@ -199,7 +202,14 @@ export async function captureContrastScreenshot(page: Page): Promise<Buffer> {
   for (let attempt = 1; ; attempt++) {
     await waitForCommittedFrame();
     try {
-      return await page.screenshot({ type: 'png' });
+      // `style` injects the hide AT the capture: Playwright guarantees the
+      // stylesheet applies to the frame being copied, so the screenshot can
+      // never show pre-hide ink from a stale compositor frame (JOV-11623).
+      return await page.screenshot({
+        type: 'png',
+        style: hideStyle,
+        animations: 'disabled',
+      });
     } catch (error) {
       if (
         attempt >= 4 ||

@@ -25,6 +25,10 @@ export const IMAGE_CONTRAST_CERTIFICATION_SCHEMA =
   'jovie-image-contrast/v1' as const;
 
 const HIDE_ATTRIBUTE = 'data-image-contrast-hide';
+// The candidate's own marker: the hide attribute also lands on the control
+// and its other children sharing the same index, so the capture-time box
+// reader must key on the candidate itself.
+const CANDIDATE_ATTRIBUTE = 'data-image-contrast-candidate';
 
 export interface ImageContrastReceipt {
   readonly element: string;
@@ -83,8 +87,13 @@ interface PageScan {
   readonly deviceScaleFactor: number;
 }
 
-async function scanCandidates(page: Page): Promise<PageScan> {
-  return page.evaluate(hideAttribute => {
+async function scanCandidates(
+  page: Page,
+  hideAttribute: string,
+  candidateAttribute: string
+): Promise<PageScan> {
+  return page.evaluate(
+    ({ hideAttribute, candidateAttribute }) => {
     const root = document.querySelector('main') ?? document.body;
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
@@ -289,7 +298,22 @@ async function scanCandidates(page: Page): Promise<PageScan> {
         if (layersBehind.length === 0) return;
         seen.add(element);
         const index = candidates.length;
-        element.setAttribute(hideAttribute, String(index));
+        // Hide the whole control's content, not just the candidate: a
+        // sibling subtree inside the same interactive control (the brand
+        // mark beside the credit text, a bold wordmark span) paints ink the
+        // candidate's own hide cannot remove, and the sample would read
+        // that ink as background (JOV-11623).
+        const control = element.closest(
+          'a, button, [role="button"], [role="link"], [role="menuitem"], [role="tab"], summary'
+        );
+        const hideScope =
+          control && control.contains(element)
+            ? [control, ...Array.from(control.children)]
+            : [element];
+        for (const sibling of hideScope) {
+          sibling.setAttribute(hideAttribute, String(index));
+        }
+        element.setAttribute(candidateAttribute, String(index));
         const style = getComputedStyle(element);
         const ancestorChain: string[] = [];
         for (
@@ -357,8 +381,9 @@ async function scanCandidates(page: Page): Promise<PageScan> {
         candidates,
         deviceScaleFactor: window.devicePixelRatio || 1,
       };
-    }
-  }, HIDE_ATTRIBUTE);
+      },
+    { hideAttribute, candidateAttribute }
+  );
 }
 
 /**
@@ -374,7 +399,11 @@ async function scanCandidates(page: Page): Promise<PageScan> {
 export async function inspectImageContrast(
   page: Page
 ): Promise<ImageContrastSnapshot> {
-  const { candidates, deviceScaleFactor } = await scanCandidates(page);
+  const { candidates, deviceScaleFactor } = await scanCandidates(
+    page,
+    HIDE_ATTRIBUTE,
+    CANDIDATE_ATTRIBUTE
+  );
   const findings: ImageContrastFinding[] = [];
   const receipts: ImageContrastReceipt[] = [];
 
@@ -388,24 +417,27 @@ export async function inspectImageContrast(
   }
 
   // Hide glyph ink only; control backgrounds stay painted so the sampled
-  // region is exactly what sits behind each glyph.
+  // region is exactly what sits behind each glyph. The hide stylesheet is
+  // injected AT the screenshot (Playwright's `style` option guarantees it
+  // applies to the copied frame): an addStyleTag + rAF capture could still
+  // copy a stale compositor frame carrying pre-hide ink — the identical
+  // bright pixels every dispatch kept sampling behind the desktop footer
+  // credit (JOV-11623).
   // `background-image: none` is part of the hide: a candidate whose glyphs
   // are painted by a clipped background gradient (bg-clip-text) or that sits
   // on a gradient wash paints ink the color transparent cannot remove, and
   // the sample would read that ink as "background". Solid backgrounds
   // (background-color) stay painted, so control surfaces keep their fill.
-  const styleTag = await page.addStyleTag({
-    content: `[${HIDE_ATTRIBUTE}], [${HIDE_ATTRIBUTE}] * { color: transparent !important; text-shadow: none !important; -webkit-text-stroke: transparent !important; caret-color: transparent !important; background-image: none !important; }`,
-  });
-  // Fresh boxes at capture time: late-loading media reflows the page between
-  // the scan and this capture (JOV-11623). The hide tags identify candidates.
-  const freshBoxes = await readContrastHideBoxes(page, HIDE_ATTRIBUTE);
-  let screenshot: Buffer;
-  try {
-    screenshot = await captureContrastScreenshot(page);
-  } finally {
-    await styleTag.evaluate(tag => tag.remove());
-  }
+  // `text-decoration`/`fill`/`stroke` strip the link's underline and SVG
+  // ink painted by the control or its siblings rather than the candidate.
+  const freshBoxes = await readContrastHideBoxes(
+    page,
+    CANDIDATE_ATTRIBUTE
+  );
+  const screenshot = await captureContrastScreenshot(
+    page,
+    `[${HIDE_ATTRIBUTE}], [${HIDE_ATTRIBUTE}] * { color: transparent !important; text-shadow: none !important; -webkit-text-stroke: transparent !important; caret-color: transparent !important; background-image: none !important; fill: transparent !important; stroke: transparent !important; text-decoration: none !important; text-decoration-color: transparent !important; }`
+  );
 
   const metadata = await sharp(screenshot).metadata();
   const imageWidth = metadata.width ?? 0;
