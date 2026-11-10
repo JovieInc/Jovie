@@ -1,3 +1,5 @@
+// Load the real lazy rail before assertions, independent of classification tests.
+import './AddConnectionRail';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -10,18 +12,13 @@ import {
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  PRESENCE_BUTTON_DESKTOP_DENSITY,
-  PresenceSignalList,
-  PresenceStatusBadge,
-} from '@/components/features/presence/PresenceStatusParts';
+import { PRESENCE_BUTTON_DESKTOP_DENSITY } from '@/components/features/presence/PresenceStatusParts';
 import {
   HeaderActionsProvider,
   useHeaderActions,
 } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
-import { classifyConnectionInput } from './AddConnectionRail';
-import type { ProfilesWorkspaceData } from './data';
+import type { ProfilesWorkspaceData, ProfileWorkspaceSurfaceRow } from './data';
 import { ProfilesWorkspace } from './ProfilesWorkspace';
 
 const navigationMock = vi.hoisted(() => ({
@@ -42,91 +39,6 @@ vi.mock('next/navigation', () => ({
   }),
   useSearchParams: () => navigationMock.searchParams,
 }));
-
-describe('shared Presence status vocabulary', () => {
-  it.each(['success', 'warning', 'error', 'neutral'] as const)(
-    'shows the %s status and explains the next action',
-    async tone => {
-      const user = userEvent.setup();
-      render(
-        <TooltipProvider>
-          <PresenceStatusBadge
-            status={{
-              label: 'Source status',
-              tone,
-              needsAttention: tone !== 'success',
-              nextAction: 'Reconnect this source.',
-              sortPriority: 1,
-            }}
-          />
-        </TooltipProvider>
-      );
-
-      await user.hover(screen.getByText('Source status'));
-      const tooltip = await screen.findByRole('tooltip');
-      expect(tooltip).toHaveTextContent('Reconnect this source.');
-    }
-  );
-
-  it('does not invent evidence for an empty signal list', () => {
-    render(<PresenceSignalList signals={[]} />);
-    expect(screen.getByTestId('presence-signal-list')).toBeEmptyDOMElement();
-  });
-});
-
-describe('classifyConnectionInput', () => {
-  it('normalizes and classifies a bare provider domain', () => {
-    const result = classifyConnectionInput('Instagram.com/timwhite', [], 'Tim');
-
-    expect(result.error).toBeNull();
-    expect(result.candidate).toMatchObject({
-      platformId: 'instagram',
-      platformName: 'Instagram',
-      url: 'https://instagram.com/timwhite',
-    });
-  });
-
-  it('offers ranked handle-capable platforms for an at-handle', () => {
-    const result = classifyConnectionInput('@timwhite', [], 'Tim');
-
-    expect(result.candidate).toBeNull();
-    expect(result.suggestions.slice(0, 4).map(item => item.platformId)).toEqual(
-      ['instagram', 'tiktok', 'youtube', 'twitter']
-    );
-    expect(result.suggestions[0]).toMatchObject({
-      handle: '@timwhite',
-      url: 'https://instagram.com/timwhite',
-    });
-  });
-
-  it('fuzzy filters a platform-qualified username', () => {
-    const result = classifyConnectionInput('insta timwhite', [], 'Tim');
-
-    expect(result.suggestions[0]).toMatchObject({
-      platformId: 'instagram',
-      handle: '@timwhite',
-    });
-  });
-
-  it('does not suggest a platform that already exists', () => {
-    const result = classifyConnectionInput('@timwhite', ['instagram'], 'Tim');
-
-    expect(result.suggestions.map(item => item.platformId)).not.toContain(
-      'instagram'
-    );
-  });
-
-  it('rejects credential-bearing URLs', () => {
-    const credentialBearingUrl = [
-      'https://user',
-      'pass@instagram.com/timwhite',
-    ].join(':');
-    const result = classifyConnectionInput(credentialBearingUrl, [], 'Tim');
-
-    expect(result.candidate).toBeNull();
-    expect(result.error).toMatch(/without credentials/i);
-  });
-});
 
 vi.mock('@/hooks/useRegisterRightPanel', () => ({
   useRegisterRightPanel: vi.fn(),
@@ -1023,15 +935,15 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(screen.getByText('Jovie Profile')).toBeInTheDocument();
   });
 
-  it('keeps outage diagnostics available by keyboard without repeating them across the inspector', async () => {
+  it('keeps a connected identity Connected during a search outage, with diagnostics reachable by keyboard (JOV-9021)', async () => {
     const user = userEvent.setup();
     const instagram = data.rows.find(row => row.id === 'instagram');
     if (!instagram) throw new Error('Missing profile fixture');
     renderWorkspace({ ...data, providerAvailable: false, rows: [instagram] });
-    for (const status of screen.getAllByLabelText(
-      'Monitoring Unknown: Search Unavailable'
-    ))
-      expect(status).toHaveTextContent('Unknown');
+    // A connected profile never reads Unknown while the search provider is
+    // down; the outage is reported as the status's next action instead.
+    expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Connected').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('row', { name: /Instagram/ }));
     const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
     render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
@@ -1048,16 +960,86 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     );
     const details = screen.getByRole('button', { name: 'Monitoring details' });
     expect(details).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByText(/Search Unavailable\./)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Search checks are unavailable/)
+    ).not.toBeInTheDocument();
     details.focus();
     await user.keyboard('{Enter}');
     expect(details).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText(/Search Unavailable\./)).toHaveTextContent(
-      'Search checks are unavailable'
+    expect(screen.getByText(/Search checks are unavailable/)).toHaveTextContent(
+      'Connected. Search checks are unavailable; this connection is unaffected.'
     );
     expect(
       within(screen.getByTestId('profiles-monitoring-details')).getByText('—')
     ).toBeInTheDocument();
+  });
+
+  it('shows Connected for every connected platform during a search outage and never Unknown (JOV-9021)', () => {
+    const dogfoodPlatforms = [
+      'Spotify',
+      'Apple Music',
+      'YouTube Music',
+      'YouTube',
+      'SoundCloud',
+      'Beatport',
+      'Amazon',
+      'Audius',
+      'Gaana',
+    ];
+    const connectedRow = (
+      label: string,
+      overrides: Partial<ProfileWorkspaceSurfaceRow> = {}
+    ): ProfileWorkspaceSurfaceRow => ({
+      id: label.toLowerCase().replaceAll(' ', '-'),
+      rowType: 'surface',
+      kind: 'dsp',
+      platform: label.toLowerCase().replaceAll(' ', '_'),
+      label,
+      handle: null,
+      url: `https://example.com/${label.toLowerCase().replaceAll(' ', '-')}`,
+      trackedUrl: null,
+      qualificationStatus: 'qualified',
+      isOfficial: true,
+      monitoringState: 'active',
+      rank: 4,
+      previousRank: 5,
+      lastObservedAt: '2026-07-16T00:00:00.000Z',
+      ...overrides,
+    });
+    renderWorkspace({
+      ...data,
+      providerAvailable: false,
+      rows: [
+        ...dogfoodPlatforms.map(label => connectedRow(label)),
+        connectedRow('7digital', {
+          qualificationStatus: 'suggested',
+          kind: 'authority',
+        }),
+        connectedRow('Genius', { monitoringState: 'locked', rank: null }),
+      ],
+    });
+
+    expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
+    // Mobile and desktop both render the status label. Select the Status
+    // cell, then verify each platform belongs to exactly one connected row.
+    const connectedRows = screen.getAllByRole('row').filter(
+      row =>
+        within(row).queryByRole('cell', {
+          name: 'Connected',
+        }) !== null
+    );
+    expect(connectedRows).toHaveLength(dogfoodPlatforms.length);
+    for (const label of dogfoodPlatforms) {
+      expect(
+        connectedRows.filter(
+          row => within(row).queryByText(label, { exact: true }) !== null
+        )
+      ).toHaveLength(1);
+    }
+    expect(screen.getAllByText('Needs Qualification').length).toBeGreaterThan(
+      0
+    );
+    expect(screen.getAllByText('Limit Reached').length).toBeGreaterThan(0);
   });
 
   it('uses the row action registry to open connection-specific details', async () => {

@@ -953,7 +953,6 @@ struct JovieChangelogWhatsNewView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
       }
-
       VStack(spacing: JovieSpacing.small) {
         Button(linkTitle) {
           openURL(unseen.link)
@@ -968,6 +967,7 @@ struct JovieChangelogWhatsNewView: View {
         .buttonStyle(JoviePillButtonStyle(filled: false))
         .accessibilityIdentifier("whats-new-got-it")
       }
+      .layoutPriority(1)
     }
     .padding(JovieSpacing.large)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

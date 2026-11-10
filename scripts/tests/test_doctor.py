@@ -464,9 +464,9 @@ class PublicFeedSizeTest(unittest.TestCase):
         self.assertLessEqual(len(overlap["pairsSummary"]["topHotspots"]), doctor.PUBLIC_OVERLAP_TOP)
         self.assertEqual(overlap["pairsSummary"]["topHotspots"][0]["file"], "apps/web/data/shared.ts")
         self.assertEqual(overlap["pairsSummary"]["pairsRef"]["jsonPointer"], "/fileOverlap/pairs")
-        rows = public["remediation"]["byFingerprint"]
-        self.assertEqual(len(rows), 312)
-        self.assertEqual(set(rows["remediation-fingerprint-2"]), set(doctor.PUBLIC_REMEDIATION_FIELDS))
+        self.assertNotIn("byFingerprint", public["remediation"])
+        self.assertEqual(public["remediation"]["byFingerprintSummary"], {
+            "recordCount": 312, "byState": {"done": 78, "exhausted": 78, "claimed": 78, "human": 78}})
         self.assertEqual(public["remediation"]["byFingerprintRef"]["recordCount"], 312)
         self.assertEqual(len(public["remediation"]["surfaced"]), 131)  # ownership arrays stay whole
         # Nothing is lost: the complete evidence is what the details file carries, byte for byte.

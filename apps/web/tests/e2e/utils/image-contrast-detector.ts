@@ -1,5 +1,16 @@
 import type { Page } from '@playwright/test';
 import sharp from 'sharp';
+import {
+  captureContrastScreenshot,
+  contrastRatio,
+  parseCssColor,
+  percentile,
+  readContrastHideBoxes,
+  relativeLuminance,
+  sampleRegionLuminances,
+  sampleRegionPixelGrid,
+  sampleRegionStacks,
+} from './image-contrast-sample';
 
 // Invariant consumer: JOV-INV-019 `text-aware-contrast` (JOV-6916).
 // Unlike the token-pair ratchet (scripts/lint-contrast-ratchet.mjs), this
@@ -41,7 +52,9 @@ export interface ImageContrastFinding {
   readonly kind: 'image-contrast';
   readonly message: string;
   readonly elements: readonly string[];
-  readonly measurements?: Readonly<Record<string, number>>;
+  readonly measurements?: Readonly<
+    Record<string, number | string | readonly string[]>
+  >;
 }
 
 export interface ImageContrastSnapshot {
@@ -59,46 +72,15 @@ interface CandidateRecord {
   readonly color: string;
   readonly fontSize: number;
   readonly fontWeight: number;
+  /** The candidate's testid-bearing ancestors, nearest first — where it lives. */
+  readonly ancestorChain: readonly string[];
+  /** The painted image layers behind it at push time, nearest first. */
+  readonly layerChain: readonly string[];
 }
 
 interface PageScan {
   readonly candidates: readonly CandidateRecord[];
   readonly deviceScaleFactor: number;
-}
-
-function relativeLuminance(r: number, g: number, b: number): number {
-  const channel = (value: number): number => {
-    const c = value / 255;
-    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  };
-  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
-}
-
-function contrastRatio(l1: number, l2: number): number {
-  const lighter = Math.max(l1, l2);
-  const darker = Math.min(l1, l2);
-  return (lighter + 0.05) / (darker + 0.05);
-}
-
-function parseCssColor(
-  color: string
-): { r: number; g: number; b: number } | null {
-  const match = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(color);
-  if (!match) return null;
-  return {
-    r: Number(match[1]),
-    g: Number(match[2]),
-    b: Number(match[3]),
-  };
-}
-
-function percentile(sorted: readonly number[], p: number): number {
-  if (sorted.length === 0) return 0;
-  const index = Math.min(
-    sorted.length - 1,
-    Math.max(0, Math.floor((p / 100) * (sorted.length - 1)))
-  );
-  return sorted[index];
 }
 
 async function scanCandidates(page: Page): Promise<PageScan> {
@@ -138,6 +120,26 @@ async function scanCandidates(page: Page): Promise<PageScan> {
         // divider or gradient rule (full width, genuinely painted) isn't
         // dropped as an image layer or a candidate.
         if (rect.width <= 1 && rect.height <= 1) return false;
+        // A descendant of a clip-hidden container (the same sr-only recipe
+        // applied to an ancestor — the desktop build's compact slot) is also
+        // never painted: the ancestor clip hides every child's ink, while
+        // each child's own layout rect stays full-size (JOV-11623).
+        for (
+          let node: Element | null = element;
+          node;
+          node = node.parentElement
+        ) {
+          if (node instanceof HTMLElement) {
+            const ancestorRect = node.getBoundingClientRect();
+            if (ancestorRect.width > 1 || ancestorRect.height > 1) continue;
+            const ancestorStyle = getComputedStyle(node);
+            if (
+              ancestorStyle.clip === 'rect(0px, 0px, 0px, 0px)' ||
+              ancestorStyle.clipPath === 'inset(50%)'
+            )
+              return false;
+          }
+        }
         const style = getComputedStyle(element);
         return (
           style.display !== 'none' &&
@@ -287,8 +289,32 @@ async function scanCandidates(page: Page): Promise<PageScan> {
         if (layersBehind.length === 0) return;
         seen.add(element);
         const index = candidates.length;
+        // Hide the whole control's content, not just the candidate: a
+        // sibling subtree inside the same interactive control (the brand
+        // mark beside the credit text, a bold wordmark span) paints ink the
+        // candidate's own hide cannot remove, and the sample would read
+        // that ink as background (JOV-11623).
+        const control = element.closest(
+          'a, button, [role="button"], [role="link"], [role="menuitem"], [role="tab"], summary'
+        );
+        const hideScope =
+          control && control.contains(element)
+            ? Array.from(control.children)
+            : [element];
+        for (const sibling of hideScope) {
+          sibling.setAttribute(hideAttribute, String(index));
+        }
         element.setAttribute(hideAttribute, String(index));
         const style = getComputedStyle(element);
+        const ancestorChain: string[] = [];
+        for (
+          let node: Element | null = element.parentElement;
+          node;
+          node = node.parentElement
+        ) {
+          const id = node.getAttribute('data-testid');
+          if (id) ancestorChain.push(`${node.tagName.toLowerCase()}#${id}`);
+        }
         candidates.push({
           index,
           element: describe(element),
@@ -297,6 +323,10 @@ async function scanCandidates(page: Page): Promise<PageScan> {
           color: style.color,
           fontSize: Number.parseFloat(style.fontSize || '16'),
           fontWeight: Number.parseInt(style.fontWeight || '400', 10) || 400,
+          ancestorChain,
+          layerChain: layersBehind
+            .slice(0, 4)
+            .map(({ element: layer }) => describe(layer)),
         });
       };
 
@@ -346,31 +376,6 @@ async function scanCandidates(page: Page): Promise<PageScan> {
   }, HIDE_ATTRIBUTE);
 }
 
-async function sampleRegionLuminances(
-  screenshot: Buffer,
-  box: { x: number; y: number; width: number; height: number },
-  scale: number
-): Promise<number[]> {
-  const left = Math.max(0, Math.floor(box.x * scale));
-  const top = Math.max(0, Math.floor(box.y * scale));
-  const width = Math.max(1, Math.round(box.width * scale));
-  const height = Math.max(1, Math.round(box.height * scale));
-  const { data, info } = await sharp(screenshot)
-    .extract({ left, top, width, height })
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  const luminances: number[] = [];
-  const stride = Math.max(1, Math.floor((width * height) / 20000));
-  const channels = info.channels;
-  for (let pixel = 0; pixel < width * height; pixel += stride) {
-    const offset = pixel * channels;
-    luminances.push(
-      relativeLuminance(data[offset], data[offset + 1], data[offset + 2])
-    );
-  }
-  return luminances.sort((a, b) => a - b);
-}
-
 /**
  * Inspect the rendered page for text and interactive controls painted over
  * image layers, then measure real contrast by hiding the glyph ink and
@@ -399,51 +404,20 @@ export async function inspectImageContrast(
 
   // Hide glyph ink only; control backgrounds stay painted so the sampled
   // region is exactly what sits behind each glyph.
+  // `background-image: none` is part of the hide: a candidate whose glyphs
+  // are painted by a clipped background gradient (bg-clip-text) or that sits
+  // on a gradient wash paints ink the color transparent cannot remove, and
+  // the sample would read that ink as "background". Solid backgrounds
+  // (background-color) stay painted, so control surfaces keep their fill.
   const styleTag = await page.addStyleTag({
-    content: `[${HIDE_ATTRIBUTE}], [${HIDE_ATTRIBUTE}] * { color: transparent !important; text-shadow: none !important; -webkit-text-stroke: transparent !important; caret-color: transparent !important; }`,
+    content: `[${HIDE_ATTRIBUTE}], [${HIDE_ATTRIBUTE}] * { color: transparent !important; text-shadow: none !important; -webkit-text-stroke: transparent !important; caret-color: transparent !important; background-image: none !important; fill: transparent !important; stroke: transparent !important; }`,
   });
-  // Headless Chromium rejects a capture with "Protocol error
-  // (Page.captureScreenshot): Unable to capture screenshot" when the view has
-  // no compositor frame to copy yet. Deliberate-red fixtures call
-  // page.setContent on a fresh page and capture within milliseconds, racing
-  // that first frame; on a contended Linux runner the frame can lag long
-  // enough that three back-to-back retries all lose (merge group, 10-12).
-  // Wait for a committed frame before every capture, and retry only that
-  // transient with backoff, at most three times; any other error, or a
-  // fourth failure, fails.
-  const waitForCommittedFrame = () =>
-    page.evaluate(
-      () =>
-        new Promise<void>(resolve => {
-          // A hidden page never runs rAF; the timer keeps this bounded.
-          const fallback = setTimeout(resolve, 1_000);
-          requestAnimationFrame(() =>
-            requestAnimationFrame(() => {
-              clearTimeout(fallback);
-              resolve();
-            })
-          );
-        })
-    );
-  const captureScreenshot = async (): Promise<Buffer> => {
-    for (let attempt = 1; ; attempt++) {
-      await waitForCommittedFrame();
-      try {
-        return await page.screenshot({ type: 'png' });
-      } catch (error) {
-        if (
-          attempt >= 4 ||
-          !String(error).includes('Unable to capture screenshot')
-        ) {
-          throw error;
-        }
-        await page.waitForTimeout(250 * 2 ** (attempt - 1));
-      }
-    }
-  };
+  // Fresh boxes at capture time: late-loading media reflows the page between
+  // the scan and this capture (JOV-11623). The hide tags identify candidates.
+  const freshBoxes = await readContrastHideBoxes(page, HIDE_ATTRIBUTE);
   let screenshot: Buffer;
   try {
-    screenshot = await captureScreenshot();
+    screenshot = await captureContrastScreenshot(page);
   } finally {
     await styleTag.evaluate(tag => tag.remove());
   }
@@ -453,16 +427,19 @@ export async function inspectImageContrast(
   const imageHeight = metadata.height ?? 0;
 
   for (const candidate of candidates) {
+    // Sample where the element IS at capture time, not where the scan saw it.
+    const scannedBox = candidate.box;
+    const liveBox = freshBoxes[String(candidate.index)] ?? scannedBox;
     const box = {
-      x: candidate.box.x,
-      y: candidate.box.y,
+      x: liveBox.x,
+      y: liveBox.y,
       width: Math.min(
-        candidate.box.width,
-        imageWidth / deviceScaleFactor - candidate.box.x
+        liveBox.width,
+        imageWidth / deviceScaleFactor - liveBox.x
       ),
       height: Math.min(
-        candidate.box.height,
-        imageHeight / deviceScaleFactor - candidate.box.y
+        liveBox.height,
+        imageHeight / deviceScaleFactor - liveBox.y
       ),
     };
     if (box.width <= 0 || box.height <= 0) continue;
@@ -473,6 +450,13 @@ export async function inspectImageContrast(
       deviceScaleFactor
     );
     if (luminances.length === 0) continue;
+
+    const pixelGrid = await sampleRegionPixelGrid(
+      screenshot,
+      box,
+      deviceScaleFactor
+    );
+    const sampledStacks = await sampleRegionStacks(page, box);
 
     const color = parseCssColor(candidate.color);
     if (!color) continue;
@@ -510,11 +494,18 @@ export async function inspectImageContrast(
     if (!pass) {
       findings.push({
         kind: 'image-contrast',
-        message: `"${candidate.text}" on ${candidate.element} renders ${worstRatio.toFixed(2)}:1 against the worst-case sampled image background (requires ${requiredRatio}:1).`,
+        message: `"${candidate.text}" on ${candidate.element} [${(candidate.ancestorChain ?? []).join(' > ')}] renders ${worstRatio.toFixed(2)}:1 against the sampled background behind ${(candidate.layerChain ?? []).join(' > ') || 'no single layer'} at ${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)} (bg p10 ${Math.round(p10 * 1000) / 1000} / p90 ${Math.round(p90 * 1000) / 1000}; requires ${requiredRatio}:1).`,
         elements: [candidate.element],
         measurements: {
           worstContrastRatio: Math.round(worstRatio * 100) / 100,
           requiredRatio,
+          ancestorChain: candidate.ancestorChain.join(' > '),
+          layerChain: (candidate.layerChain ?? []).join(' > '),
+          sampledBox: `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)}`,
+          backgroundLuminanceP10: Math.round(p10 * 1000) / 1000,
+          backgroundLuminanceP90: Math.round(p90 * 1000) / 1000,
+          sampledPixelGrid: pixelGrid,
+          sampledStacks,
         },
       });
     }
