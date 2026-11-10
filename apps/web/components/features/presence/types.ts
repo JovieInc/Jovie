@@ -12,6 +12,12 @@ export type ProfilesWorkspaceFilter =
   | 'catalog'
   | 'connector';
 
+export interface PresenceRemovalTarget {
+  readonly linkId: string;
+  readonly url: string;
+  readonly version: number;
+}
+
 export interface ProfileWorkspaceSurfaceRow {
   readonly id: string;
   readonly rowType: 'surface';
@@ -35,6 +41,7 @@ export interface ProfileWorkspaceSurfaceRow {
     readonly confidence: number | null;
   };
   readonly identityPhoto?: PresenceIdentityPhoto;
+  readonly removalTarget?: PresenceRemovalTarget;
 }
 
 export interface ProfileWorkspaceConnectorRow {
