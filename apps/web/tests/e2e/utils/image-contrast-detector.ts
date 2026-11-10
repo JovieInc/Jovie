@@ -8,6 +8,7 @@ import {
   readContrastHideBoxes,
   relativeLuminance,
   sampleRegionLuminances,
+  sampleRegionPainters,
   sampleRegionPixelGrid,
   sampleRegionStacks,
 } from './image-contrast-sample';
@@ -492,6 +493,13 @@ export async function inspectImageContrast(
     });
 
     if (!pass) {
+      const painterCensus = await sampleRegionPainters(
+        screenshot,
+        page,
+        box,
+        deviceScaleFactor,
+        HIDE_ATTRIBUTE
+      );
       findings.push({
         kind: 'image-contrast',
         message: `"${candidate.text}" on ${candidate.element} [${(candidate.ancestorChain ?? []).join(' > ')}] renders ${worstRatio.toFixed(2)}:1 against the sampled background behind ${(candidate.layerChain ?? []).join(' > ') || 'no single layer'} at ${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)} (bg p10 ${Math.round(p10 * 1000) / 1000} / p90 ${Math.round(p90 * 1000) / 1000}; requires ${requiredRatio}:1).`,
@@ -506,6 +514,7 @@ export async function inspectImageContrast(
           backgroundLuminanceP90: Math.round(p90 * 1000) / 1000,
           sampledPixelGrid: pixelGrid,
           sampledStacks,
+          painterCensus,
         },
       });
     }
