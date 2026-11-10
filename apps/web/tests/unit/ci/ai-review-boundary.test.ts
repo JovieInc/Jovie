@@ -50,27 +50,27 @@ jobs:
       - run: echo posting a failing check run for the PR head
 `;
 
-let tmp;
+let tmp: string;
 
-function writeWorkflow(name, content) {
+function writeWorkflow(name: string, content: string): void {
   mkdirSync(resolve(tmp, '.github/workflows'), { recursive: true });
   writeFileSync(resolve(tmp, '.github/workflows', name), content);
 }
 
-function runScanner(root) {
+function runScanner(root: string): string {
   return execFileSync('node', [scanner, '--root', root], { encoding: 'utf8' });
 }
 
-function runScannerExpectFailure(root) {
+function runScannerExpectFailure(root: string): { stderr: string } | null {
   try {
     execFileSync('node', [scanner, '--root', root], {
       encoding: 'utf8',
       stdio: 'pipe',
     });
+    return null;
   } catch (error) {
-    return error;
+    return error as { stderr: string };
   }
-  return null;
 }
 
 beforeAll(() => {
@@ -91,8 +91,8 @@ describe('ai-review boundary scanner', () => {
     writeWorkflow('warden.yml', WARDEN_BLOCKING);
     const error = runScannerExpectFailure(tmp);
     expect(error).not.toBeNull();
-    expect(error.stderr).toContain('warden.yml');
-    expect(error.stderr).toContain('request-changes');
+    expect(error?.stderr).toContain('warden.yml');
+    expect(error?.stderr).toContain('request-changes');
     rmSync(resolve(tmp, '.github/workflows/warden.yml'));
   });
 
@@ -100,7 +100,7 @@ describe('ai-review boundary scanner', () => {
     writeWorkflow('seer.yml', SEER_FAILCHECK);
     const error = runScannerExpectFailure(tmp);
     expect(error).not.toBeNull();
-    expect(error.stderr).toContain('seer.yml');
+    expect(error?.stderr).toContain('seer.yml');
     rmSync(resolve(tmp, '.github/workflows/seer.yml'));
   });
 
