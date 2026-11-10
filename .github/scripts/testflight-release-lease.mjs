@@ -16,7 +16,6 @@ const SHA = /^[0-9a-f]{40}$/;
 const ID = /^[1-9][0-9]*$/;
 const POLICY = '.github/testflight-release-policy.json';
 const INTENT = 'testflight-upload-intent';
-const MAX_INTENT_BUCKETS = 64;
 const MAX_INTENTS = 1000;
 const TESTFLIGHT = '.github/workflows/ios-testflight.yml';
 const CONTROLLER = '.github/workflows/production-controller.yml';
@@ -377,7 +376,8 @@ export function validateLease({
     const bucket = buckets.shift();
     if (visited.has(bucket)) continue;
     visited.add(bucket);
-    assert(visited.size <= MAX_INTENT_BUCKETS, 'upload intent traversal limit');
+    // Bounded by construction: root + <=1 bucket per read intent; MAX_INTENTS is the runaway guard.
+    assert(visited.size <= MAX_INTENTS + 1, 'upload intent traversal limit');
     const intentName = `${INTENT}-${bucket || 'bootstrap'}`;
     const intents = listing(
       api,
