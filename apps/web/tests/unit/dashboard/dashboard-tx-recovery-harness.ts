@@ -97,8 +97,11 @@ export async function withDbSessionTx(
     }
     const tx = {
       select: () => {
-        const outcome =
-          state.outcomes.shift() ?? ((): { rows: unknown[] } => ({ rows: [] }));
+        // Annotated so the fallback widens to QueryOutcome; the un-annotated
+        // form infers a narrower { rows: ... } union member that makes
+        // result.error a TS2339 (same trap the pinned original baselines).
+        const outcome: QueryOutcome =
+          state.outcomes.shift() ?? (() => ({ rows: [] }));
         const builder: Record<string, unknown> = {};
         const chain = () => builder;
         builder.from = chain;
