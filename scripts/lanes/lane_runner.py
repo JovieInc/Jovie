@@ -65,17 +65,19 @@ import hyperagent_repair  # noqa: E402
 import migration_renumber  # noqa: E402  (no-model fix for migration number collisions)
 import fix_red_rewrite  # noqa: E402
 import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
+import sourced_shell_conflict  # noqa: E402  (source-vs-inline shell conflict; ports retry into the helper)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
 import machine_gap  # noqa: E402
 import slot_yield  # noqa: E402  (slot ceilings from measured merged-per-dollar)  (abstraction gate: build the machine on the 3rd repeat or a costly task)
 import update_drain  # noqa: E402  (drain gate admission while an update waits)
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
-import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
+import linear_sync, urgent_sla  # noqa: E402  (local issue mirror, claim ledger, write outbox; Urgent SLA rank)
 import escalation_reconcile  # noqa: E402  (lane-fix-escalating is consumed, never parked)
 import board_intake  # noqa: E402  (mesh board work for codex, closed on verified outcomes)
 import ownership  # noqa: E402  (started-state live-owner invariant)
 import fleet_ledger  # noqa: E402  (external agent claims, stranded-claim view)
 import pr_events  # noqa: E402
+import repair_order  # noqa: E402  (one fair claim order for event and polling repair)
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import shipping_attribution  # noqa: E402  (receipt-first merged-PR provenance)
 import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
@@ -145,9 +147,9 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
-              "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
+              "scripts/tests/test_doctor.py", "scripts/tests/test_public_feed.py", "scripts/tests/test_pr_events.py", "scripts/tests/test_pr_events_repair_evidence.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py", "scripts/tests/test_linear_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_qualification_guard.py",
@@ -157,7 +159,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_worktree_pool.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
-              "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py", "scripts/tests/test_pr_wip.py",
+              "scripts/tests/test_remediation.py", "scripts/tests/test_repair_order.py", "scripts/tests/test_autoscale.py", "scripts/tests/test_pr_wip.py",
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
@@ -208,7 +210,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-ho
                   "scripts/invariants/screen-certification.mjs", "scripts/invariants/screen-decision-routing.mjs",
                   "scripts/invariants/screen-proof-resolver.mjs", "scripts/invariants/product-reference-coherence.mjs",
                   "scripts/invariants/browser-owned-input.mjs", "scripts/invariants/browser-owned-input-matrix.json",
-                  "scripts/lib/playwright-png.mjs",
+                  "scripts/lib/playwright-png.mjs", "scripts/invariants/screen-proof-final-paths.mjs", "scripts/invariants/screen-proof-attempt-checks.mjs",
                   # Six-hourly credentials/spend check (credentials_spend.py) reads the reviewed registry.
                   "scripts/credentials-spend-check.mjs", "scripts/lib/credentials-live-reads.mjs",
                   "scripts/lib/credentials-registry.mjs", "scripts/lib/linear-issue-intake.mjs",
@@ -873,7 +875,7 @@ def admission_order(issue: Issue, now: float) -> tuple:
             else 0 if effective_priority == 1 or workstreams.compounding(stream) else 1)
     # Summer's signed rank comes first, then Urgent, marketing, tier, aged priority, age (JOV-7073).
     return (*priority_admission.claim_key(issue.identifier, priority_admission.summer_ranks(now=now)),
-            0 if priority == 1 else 1, not priority_admission.marketing_priority(issue.labels),
+            urgent_sla.rank(issue.title, priority), not priority_admission.marketing_priority(issue.labels),
             tier, effective_priority, workstreams.rank(stream),
             created_at if created_at is not None else float("inf"))
 
@@ -4605,10 +4607,11 @@ def record_held(host: Host, number: int, head: str, evidence: list[str]) -> None
 def red_pr(prs: list[dict], attempts: dict, held: dict | None = None, capped=frozenset()) -> dict | None:
     """A lane PR that is stuck at a head we have not tried twice: checks settled red, or
     merge conflicts with main (GitHub drops auto-merge on those, so nothing else frees them).
-    Oldest first, except PRs of a producer at its WIP cap go first: they block that producer's
-    intake (2026-11-08: codex sat at 8/8 with 6 DIRTY PRs queued behind ~120 older ones)."""
+    PRs of a producer at its WIP cap go first: they block that producer's intake (2026-11-08:
+    codex sat at 8/8 with 6 DIRTY PRs queued behind ~120 older ones). Then the event path's
+    repair_order: fewest claims on the current head, oldest wait, PR number."""
     for pr in sorted(best_per_issue(prs), key=lambda item: (pr_wip.producer_of(item.get("headRefName")) not in capped,
-                                                           item["number"])):
+                                                           *repair_order.key(item, attempts))):
         if pr.get("isInMergeQueue") is True:
             continue  # Native landing owns this head; cached absence still needs a fresh claim read.
         if (pr.get("headRefName") or "").startswith("dependabot/"):
@@ -6439,11 +6442,9 @@ def resolve_narrowed_preflight_conflict(worktree: Path, branch: str, log, *, gua
 
 
 def resolve_and_chain_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
-    """Union shell && chains when every conflict hunk with main is that shape.
-
-    Base order, then head-only prefixes. node --test and vitest paths follow the
-    same rule. A hunk the union cannot read aborts and leaves the PR to the model.
-    The push is a fast-forward of the PR branch; this never rebases or force-pushes."""
+    """Union shell && chains, or port an inlined fetcher into its sourced helper.
+    Base order, then head-only prefixes; node --test and vitest paths union too.
+    Unknown hunks abort. The push fast-forwards; this never rebases or force-pushes."""
     guard()
     merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
     if merged.returncode != 0:
@@ -6451,25 +6452,31 @@ def resolve_and_chain_conflict(worktree: Path, branch: str, log, *, guard=lambda
         if not conflicted:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
+        extras: list[str] = []
         resolved_texts: dict[Path, str] = {}
+        helper_updates: dict[Path, str] = {}
         for rel in conflicted:
             target = worktree / rel
             try:
-                outcome = fix_red_classes.resolve_and_chain_text(target.read_text())
+                outcome = sourced_shell_conflict.resolve_shell_conflict(
+                    target.read_text(), worktree, extras, helper_updates=helper_updates)
             except (OSError, UnicodeError):
                 outcome = None
             if outcome is None:
                 sh(["git", "merge", "--abort"], cwd=worktree, log=log)
                 return False
             resolved_texts[target] = outcome
+        resolved_texts.update(helper_updates)
         try:
             for target, outcome in resolved_texts.items():
+                mode = target.stat().st_mode
                 atomic_write_text(target, outcome)
+                target.chmod(mode)
         except OSError:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
         guard()
-        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
+        if sh(["git", "add", "--", *conflicted, *extras], cwd=worktree, log=log).returncode != 0 \
                 or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
@@ -6478,41 +6485,9 @@ def resolve_and_chain_conflict(worktree: Path, branch: str, log, *, guard=lambda
 
 
 def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
-    """Union quoted list entries when every conflict hunk with main is only those lines.
-
-    Main's order stays, then head-only lines. A prose hunk or any other shape aborts
-    and leaves the PR to the model. The push is a fast-forward of the PR branch."""
-    guard()
-    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
-    if merged.returncode != 0:
-        conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
-        if not conflicted:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-            return False
-        resolved: dict[str, str] = {}
-        for path in conflicted:
-            target = worktree / path
-            try:
-                text = fix_red_classes.resolve_additive_quoted_list_text(target.read_text())
-            except OSError:
-                text = None
-            if text is None:
-                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-                return False
-            resolved[path] = text
-        try:
-            for path, text in resolved.items():
-                atomic_write_text(worktree / path, text)
-        except OSError:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-            return False
-        guard()
-        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
-                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-            return False
-    guard()
-    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+    return fix_red_classes.resolve_additive_list_conflict(
+        worktree, branch, log, sh=sh, guard=guard,
+        merge_entries=fix_red_classes.resolve_additive_quoted_list_text)
 
 
 def resolve_identifier_list_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
@@ -8089,11 +8064,11 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                            "model": spec.get("model"), "tool": "fix_red_pr", "accountPool": name},
                                           {"attempts": MAX_FIX_ATTEMPTS, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FIX_ATTEMPTS,
                                            "spend": MAX_FIX_ATTEMPTS,
-                                           "mutations": max(MAX_FIX_ATTEMPTS * 2, len(conflict_resolvers()) + 1),
+                                           "mutations": MAX_FIX_ATTEMPTS * (len(conflict_resolvers()) + 1),  # each attempt: resolvers + dispatch
                                            "leaseSeconds": host.agent_timeout + 900, "version": "lanes-v1"},
                                           {"triggerId": run_id, "correlationId": f"pr-{pr['number']}",
                                            "causationId": pr["headRefOid"]}, coordination=coordination,
-                                          min_reservation={"spend": 1, "mutations": 1})
+                                          min_reservation={"spend": 1, "mutations": 1 + (len(conflict_resolvers()) if pr.get("mergeStateStatus") == "DIRTY" else 0)})
     except Exception as error:
         # Same contract as run_issue (JOV-7191): a claim failure must leave a ledger
         # receipt instead of a worker exit the doctor can only see as spawn-exit.
