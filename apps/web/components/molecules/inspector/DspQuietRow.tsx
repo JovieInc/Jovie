@@ -219,7 +219,6 @@ export function DspQuietRow({
           ) : null}
         </a>
         <span
-          aria-hidden={!showUrl || undefined}
           className={cn(
             'flex shrink-0 transition-opacity duration-subtle',
             !showUrl &&
