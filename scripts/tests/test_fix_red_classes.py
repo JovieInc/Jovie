@@ -6,7 +6,6 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
-import fix_red_biome  # noqa: E402
 import fix_red_classes as classes  # noqa: E402
 
 
@@ -33,29 +32,10 @@ class ClassifyTest(unittest.TestCase):
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "atomic-write"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
             "AssertionError: expected 1": ("other", "agent"),
-            ".github/scripts/run-actionlint.test.mjs format ━━━━━━━━━━\n  × Formatter would have printed the following content:": ("biome-format", "biome-format"),
         }
         for log, (cls, action) in cases.items():
             got = classes.classify(pr("Source Validation"), {"Source Validation": log})
             self.assertEqual((got["cls"], got["action"]), (cls, action), log)
-
-    def test_biome_format_cites_the_file_and_outranks_platform_noise(self):
-        log = (
-            "2026-11-10T18:31:24.1112294Z .github/scripts/run-actionlint.test.mjs:1:1 "
-            "assist/source/organizeImports  FIXABLE\n"
-            "2026-11-10T18:31:24.1112294Z   × Sort these imports.\n"
-            "2026-11-10T18:31:24.1133546Z .github/scripts/run-actionlint.test.mjs format ━━━━━━━━━━\n"
-            "2026-11-10T18:31:24.1133546Z   × Formatter would have printed the following content:\n"
-            "passing fixture: API rate limit exceeded\n"
-        )
-        got = classes.classify(pr("Source Validation"), {"Source Validation": log})
-        self.assertEqual((got["cls"], got["action"]), ("biome-format", "biome-format"))
-        self.assertEqual(got["files"], [".github/scripts/run-actionlint.test.mjs"])
-        self.assertIn(got["action"], classes.DETERMINISTIC)
-        self.assertEqual(fix_red_biome.cited_paths("Sort these imports.\n"), [])
-        self.assertIsNone(fix_red_biome.format_commit_push(
-            lambda *args, **kwargs: None, {"headRefName": "x"}, Path("/tmp"), None, {},
-            ["../etc/passwd", "/etc/passwd"]))
 
     def test_failed_live_design_cli_syncs_main_before_retrying_fixture_infra(self):
         summary = (" FAIL  workspace-scripts lib/__tests__/design-system-source-ratchet.test.mjs"

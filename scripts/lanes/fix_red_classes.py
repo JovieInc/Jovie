@@ -39,8 +39,7 @@ SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
 RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, BIOME_FORMAT, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write",
-    "biome-format", "agent")
+    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "biome-format", "agent")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
     REGISTER_DOMAIN, ATOMIC_WRITE, BIOME_FORMAT})
@@ -96,12 +95,8 @@ SPACING_RATCHET_TEXT = re.compile(
 # raise the ceiling. Checked before platform text: the count can look like HTTP 5xx.
 CACHE_SURFACE_TEXT = re.compile(
     r"legacy Cache Components surface grew to \d+ \(maximum \d+\)")
-# Source Validation's merge probe. Deterministic unions:
-# - NARROWED vitest command in scripts/preflight-changed.mjs
-# - shell && chains (node --test or vitest paths, plus added prefixes)
-# - quoted list entries (both sides only add 'path', lines, or one NAME = ["a", "b", line)
-# - one-line comma-separated identifier lists (main order, then head-only tokens)
-# Any other hunk stays a model fix.
+# Source Validation's merge probe unions a NARROWED vitest command, shell && chains,
+# quoted list entries, and one-line identifier lists. Any other hunk stays a model fix.
 NARROWED_PREFLIGHT = "scripts/preflight-changed.mjs"
 NARROWED_CONFLICT = re.compile(
     r"This PR conflicts with \S+ in: scripts/preflight-changed\.mjs\s*\. "
@@ -145,8 +140,7 @@ _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
     ("component-test-evidence", COMPONENT_TEST_TEXT, AGENT),
-    # Before platform/quota text: a formatted fixture can echo those lines.
-    ("biome-format", BIOME_FORMAT_TEXT, BIOME_FORMAT),
+    ("biome-format", BIOME_FORMAT_TEXT, BIOME_FORMAT),  # before platform text; fixtures echo it
     ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),
     # Before platform-infra: a Source Validation log can carry passing-test rate-limit lines beside the guard error that actually failed the job.
     ("domain-write", DOMAIN_WRITE, REGISTER_DOMAIN),
