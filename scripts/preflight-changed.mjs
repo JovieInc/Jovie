@@ -511,6 +511,17 @@ function biomeTargets(files) {
     .map(f => f.filename);
 }
 
+/** Format the same branch changes that the later Biome check validates. */
+export function formatChangedFiles(cwd, base, env) {
+  const touched = biomeTargets(changedFiles(cwd, base).files);
+  if (!touched.length) return Promise.resolve({ code: 0, out: '', ms: 0 });
+  const targets = touched.map(f => `'${f.replaceAll("'", "'\\''")}'`).join(' ');
+  return sh(
+    `pnpm exec biome check --write --no-errors-on-unmatched -- ${targets}`,
+    { cwd, env }
+  );
+}
+
 /** Workspace packages whose typecheck the diff touches. */
 export function typecheckTargets(files, cwd) {
   const out = new Set();
@@ -891,17 +902,9 @@ export async function main({
       }
     };
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-    if (phase === 0 && args.write && results.length) {
-      // Commit hooks (lint-staged) format staged files; match that so the
-      // generated output is committable as written.
-      const touched = git(cwd, ['diff', '--name-only'])
-        .split('\n')
-        .filter(f => /\.(?:[cm]?[jt]sx?|json)$/.test(f));
-      if (touched.length)
-        await sh(
-          `pnpm exec biome check --write --no-errors-on-unmatched ${touched.map(f => JSON.stringify(f)).join(' ')}`,
-          { cwd, env: childEnv }
-        );
+    if (phase === 0 && args.write) {
+      // Recompute after generators so newly written outputs are included too.
+      await formatChangedFiles(cwd, baseRef, childEnv);
     }
     if (phase === 0 && args.write) {
       const changedByGen = git(cwd, ['status', '--porcelain'])

@@ -29,8 +29,9 @@ describe('writer-proof head guard (JOV-10216 follow-up)', () => {
   });
 
   it('still attaches when the live head was not read (trusted transport)', () => {
-    expect(
-      releasePrEligibleForWriterProof(base)
-    ).toMatchObject({ eligible: true, reason: 'release-pr-shape' });
+    expect(releasePrEligibleForWriterProof(base)).toMatchObject({
+      eligible: true,
+      reason: 'release-pr-shape',
+    });
   });
 });
