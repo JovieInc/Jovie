@@ -45,6 +45,31 @@ if (typeof window !== 'undefined') {
   });
 }
 
+// Merge-time pilot (VITEST_ISOLATE=false, one CI shard): with per-file
+// isolation off, state that used to vanish with the fork survives across every
+// test file the worker runs, so the baseline unwind below runs for EVERY test
+// in a pilot shard instead of being left to each file. It restores what Vitest
+// primitives own (spies, env/global stubs, fake timers) and wipes storage/DOM
+// residue the previous file left behind. This does NOT cover custom mutations:
+// a test that mutates a module-level singleton, registers listeners on
+// window/document, or leaks a server/connection must still clean up after
+// itself (or mock-via-vi.mock so it never imports real state).
+if (process.env.VITEST_ISOLATE === 'false') {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+  if (typeof window !== 'undefined') {
+    afterEach(() => {
+      document.body.innerHTML = '';
+      window.localStorage.clear();
+      window.sessionStorage.clear();
+    });
+  }
+}
+
 // Baseline env vars for fast/unit tests (see `tests/setup.ts` for details).
 process.env.VITEST ??= 'true';
 (process.env as Record<string, string | undefined>).NODE_ENV = 'test';
