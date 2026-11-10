@@ -938,6 +938,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/shell-ia.test.mjs',
   'scripts/ci-rounds-report.test.mjs',
   'scripts/preflight-changed.test.mjs',
+  'scripts/preflight-source-size.test.mjs',
   'scripts/preflight-remote.test.mjs',
   'scripts/lib/__tests__/prepush-offload.test.mjs',
   'scripts/preflight-install.test.mjs',
