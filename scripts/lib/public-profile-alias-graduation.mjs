@@ -15,7 +15,12 @@ export const ALIAS_ROUTES = [
 export const ALIAS_SURFACES = {
   production: {
     surface: 'production-canonical-alias',
-    job: 'Production Release / Production public-profile alias usable-result gate',
+    // The post-promote gate moved out of the reusable Production Release
+    // workflow into this repo's Production Controller (#24006, 2026-10-31):
+    // reusable-workflow jobs render as "Production Release / <job>", while a
+    // controller-native job renders under its own name. Read the live shape
+    // from the runs being enumerated, never a retired workflow's prefix.
+    job: 'Production public-profile alias usable-result gate',
     step: 'Gate canonical public-profile aliases on usable results',
   },
   staging: {
@@ -233,7 +238,7 @@ export async function collectAliasGraduation({
       const matches = jobs.filter(job => job.name === surface.job);
       if (matches.length > 1) throw new Error('Duplicate surface job');
       const job = matches[0];
-      const step = job?.steps.find(item => item.name === surface.step);
+      const step = job?.steps?.find(item => item.name === surface.step);
       row[key] = job
         ? {
             jobId: job.id,
