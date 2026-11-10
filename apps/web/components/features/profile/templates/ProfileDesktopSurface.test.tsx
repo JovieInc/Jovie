@@ -88,10 +88,12 @@ vi.mock('@/features/profile/ProfileUnifiedDrawer', () => ({
     open,
     presentation,
     creditSegments,
+    onOpenReleaseCredits,
   }: {
     readonly open: boolean;
     readonly presentation?: string;
     readonly creditSegments?: readonly { readonly type: string }[];
+    readonly onOpenReleaseCredits?: () => void;
   }) => (
     <div
       data-testid='mock-desktop-drawer'
@@ -100,6 +102,7 @@ vi.mock('@/features/profile/ProfileUnifiedDrawer', () => ({
       data-credit-segments={(creditSegments ?? [])
         .map(segment => segment.type)
         .join('|')}
+      data-release-credits={onOpenReleaseCredits ? 'true' : 'false'}
     />
   ),
 }));
@@ -456,10 +459,7 @@ describe('ProfileDesktopSurface', () => {
     expect(screen.getByTestId('profile-desktop-surface')).toBeInTheDocument();
   });
 
-  // JOV-7412: the document scrolls at desktop widths, so the card's inner
-  // scroll pane must chain overscroll to the page instead of trapping the
-  // wheel at its own edges.
-  it('chains overscroll to the document instead of trapping the wheel', () => {
+  it('chains overscroll to the document instead of trapping the wheel (JOV-7412)', () => {
     render(
       <ProfileDesktopSurface
         artist={artist}
@@ -931,9 +931,7 @@ describe('ProfileDesktopSurface', () => {
     expect(within(releaseLink).queryByRole('button')).not.toBeInTheDocument();
   });
 
-  // JOV-6452: while the desktop surface is server-rendered but clip-hidden on
-  // mobile, portaled overlays must stay closed so they cannot flash open.
-  it('keeps portaled overlays closed while overlays are disabled', () => {
+  it('keeps portaled overlays closed while overlays are disabled (JOV-6452)', () => {
     render(
       <ProfileDesktopSurface
         artist={artist}
@@ -1051,6 +1049,7 @@ describe('ProfileDesktopSurface', () => {
         onOpenMenu={vi.fn()}
         onPlayClick={vi.fn()}
         profileHref='/timwhite'
+        onOpenReleaseCredits={vi.fn()}
         creditSegments={[
           { type: 'text', text: 'Credited on "' },
           {
@@ -1066,6 +1065,10 @@ describe('ProfileDesktopSurface', () => {
     expect(screen.getByTestId('mock-desktop-drawer')).toHaveAttribute(
       'data-credit-segments',
       'text|release|text'
+    );
+    expect(screen.getByTestId('mock-desktop-drawer')).toHaveAttribute(
+      'data-release-credits',
+      'true'
     );
   });
 
@@ -1147,14 +1150,11 @@ describe('ProfileDesktopSurface', () => {
       />
     );
 
-    // The surface reports its mode the same way the compact surface does.
     expect(screen.getByTestId('profile-desktop-surface')).toHaveAttribute(
       'data-mode',
       'profile'
     );
 
-    // D9kdx grid: cover left, Selected work above Events center, the
-    // Get-updates/Payments rail right at >=1180px.
     const overview = screen.getByTestId('profile-desktop-home-overview');
     expect(overview).toHaveClass(
       '[@media(min-width:1180px)]:grid-cols-[minmax(420px,520px)_minmax(0,1fr)_320px]'
