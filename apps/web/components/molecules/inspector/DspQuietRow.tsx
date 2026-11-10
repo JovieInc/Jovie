@@ -9,11 +9,11 @@ import {
   useRef,
   useState,
 } from 'react';
-import { notifications } from '@/components/feedback';
 import {
   EntityPopover,
   type EntityPopoverData,
 } from '@/components/shell/EntityPopover';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import { deriveNativeUri } from '@/lib/links/destination-links';
 import { cn } from '@/lib/utils';
 import { OverflowMenu, type OverflowMenuItem } from './OverflowMenu';
@@ -59,13 +59,16 @@ const DSP_QUIET_ROW_CLASS =
 const HOVER_OPEN_MS = 200;
 const HOVER_CLOSE_MS = 120;
 
-async function copyText(value: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(value);
-    return true;
-  } catch {
-    return false;
-  }
+/** Copy to the clipboard; toast the outcome either way. */
+function copyText(
+  value: string,
+  notifications: ReturnType<typeof useNotifications>,
+  successMessage: string
+): void {
+  navigator.clipboard
+    .writeText(value)
+    .then(() => notifications.success(successMessage))
+    .catch(() => notifications.error('Could not copy to the clipboard'));
 }
 
 /** Track/release DSP row: name + actions, or Find when the provider is not found.
@@ -89,6 +92,7 @@ export function DspQuietRow({
   entity,
   jovieLinkUrl,
 }: DspQuietRowProps) {
+  const notifications = useNotifications();
   const hasHref = Boolean(href?.trim());
 
   // Hover-anchored summary card state (left of the row).
@@ -129,6 +133,8 @@ export function DspQuietRow({
 
   if (hasHref && href) {
     const nativeUri = deriveNativeUri(href);
+    const copyRow = (value: string, successMessage: string) => () =>
+      copyText(value, notifications, successMessage);
     const menuItems: OverflowMenuItem[] = [
       {
         id: 'open',
@@ -147,22 +153,14 @@ export function DspQuietRow({
       {
         id: 'copy-link',
         label: 'Copy link',
-        onSelect: () => {
-          void copyText(href).then(ok => {
-            if (ok) notifications.success(`${label} link copied`);
-          });
-        },
+        onSelect: copyRow(href, `${label} link copied`),
       },
       ...(jovieLinkUrl
         ? [
             {
               id: 'copy-jovie-link',
               label: 'Copy Jovie link with UTM',
-              onSelect: () => {
-                void copyText(jovieLinkUrl).then(ok => {
-                  if (ok) notifications.success('Jovie link copied');
-                });
-              },
+              onSelect: copyRow(jovieLinkUrl, 'Jovie link copied'),
             },
           ]
         : []),
@@ -171,11 +169,7 @@ export function DspQuietRow({
             {
               id: 'copy-native-uri',
               label: 'Copy platform URI',
-              onSelect: () => {
-                void copyText(nativeUri).then(ok => {
-                  if (ok) notifications.success(`${label} URI copied`);
-                });
-              },
+              onSelect: copyRow(nativeUri, `${label} URI copied`),
             },
           ]
         : []),
