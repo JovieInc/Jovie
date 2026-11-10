@@ -1098,6 +1098,35 @@ describe('ProfileDesktopSurface', () => {
     );
   });
 
+  it('sizes the home overview to its content and pins the branding clear of it (JOV-11623)', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+      />
+    );
+
+    // The overview sits inside the scrolling content pane, so it must not
+    // flex-squeeze to the pane's viewport height: a squeezed box lets the
+    // taller secondary column (Events) paint past it over the branding.
+    const overview = screen.getByTestId('profile-desktop-home-overview');
+    expect(overview.className).not.toContain('flex-1');
+    expect(overview).toHaveClass('flex-none');
+    // The branding keeps the bottom-of-fold pinning for short content via
+    // mt-auto instead of the overview's flex-1 stretch.
+    expect(screen.getByTestId('profile-jovie-branding')).toHaveClass('mt-auto');
+  });
+
   it('omits Jovie footer branding when hideJovieBranding is set (JOV-8777)', () => {
     render(
       <ProfileDesktopSurface

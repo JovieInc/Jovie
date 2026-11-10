@@ -242,8 +242,12 @@ export async function sampleRegionPainters(
     const hex = (value: number) => value.toString(16).padStart(2, '0');
     return `#${hex(data[offset])}${hex(data[offset + 1])}${hex(data[offset + 2])}`;
   };
-  const bright: Array<{ cssX: number; cssY: number; lum: number; hex: string }> =
-    [];
+  const bright: Array<{
+    cssX: number;
+    cssY: number;
+    lum: number;
+    hex: string;
+  }> = [];
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const pixel = y * width + x;
