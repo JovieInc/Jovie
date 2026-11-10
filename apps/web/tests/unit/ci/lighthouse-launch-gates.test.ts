@@ -212,6 +212,7 @@ describe('Lighthouse identity admission', () => {
       "steps.background-build-start.outputs.started == 'true'"
     );
     expect(groupKill.run).toContain('next-build-fallback.pid');
+    expect(groupKill.run).toContain('"$pid" -ge 1');
     const source = readFileSync(
       resolve(REPO_ROOT, '.github/workflows/ci.yml'),
       'utf8'
@@ -260,6 +261,37 @@ describe('Lighthouse identity admission', () => {
     );
     expect(pattern.test('docs/launch/LAUNCH_GATES.md')).toBe(true);
     expect(pattern.test('docs/unrelated.md')).toBe(false);
+  });
+
+  it('dashboard: a helper-only change still reaches the helper contract tests', () => {
+    const job = workflow.jobs['ci-lighthouse-dashboard-pr'];
+    const byName = (name: string) => stepNamed(job, name);
+    const helperTests = byName('Run background-build helper contract tests');
+    // The unit shards require run_web and the product-lane classifier
+    // routes scripts/** to operations lanes, so a change limited to
+    // scripts/ci/wait-background-build.sh would otherwise never execute
+    // its tests. The targeted step runs them on the no-artifact path such
+    // a change always takes — selected with the job, between the build
+    // launch and the wait, and fail-closed like every other step.
+    expect(helperTests.run).toContain(
+      'pnpm --filter @jovie/web exec vitest run'
+    );
+    expect(helperTests.run).toContain(
+      'tests/unit/ci/lighthouse-launch-gates.test.ts'
+    );
+    expect(selected(helperTests, 'true')).toBe(true);
+    expect(selected(helperTests, 'true', { download: 'success' })).toBe(false);
+    expect(selected(helperTests, 'true', { relevant: false })).toBe(false);
+    expect(selected(helperTests, 'true', { failed: true })).toBe(false);
+    expect(helperTests['continue-on-error']).toBeUndefined();
+    const indexOf = (name: string) =>
+      job.steps.findIndex(step => step.name === name);
+    expect(indexOf('Start fallback build in background')).toBeLessThan(
+      indexOf('Run background-build helper contract tests')
+    );
+    expect(indexOf('Run background-build helper contract tests')).toBeLessThan(
+      indexOf('Wait for background fallback build')
+    );
   });
 
   for (const surface of ['onboarding'] as const) {
