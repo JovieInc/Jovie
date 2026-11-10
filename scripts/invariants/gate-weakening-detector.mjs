@@ -166,10 +166,11 @@ function inspectGateFile(file, config) {
     }
   }
   if (file.path === config.sourceGuardPath) {
-    for (const name of removedNames(guardIds(file.before), guardIds(file.after))) {
-      add('source-guard-removed', name);
-    }
+    const removed = removedNames(guardIds(file.before), guardIds(file.after));
+    for (const name of removed) add('source-guard-removed', name);
+    if (removed.includes(config.jumpPolicyPin?.guardId)) add('jump-policy-changed', `${config.jumpPolicyPin.guardId} guard removed`);
   }
+  if ((config.jumpPolicyPin?.paths ?? []).includes(file.path) && file.before != null && file.after !== file.before) add('jump-policy-changed', 'jump policy pin changed');
   if (isCiYaml(file.path)) {
     for (const line of added) {
       if (/^\s*#/.test(line)) continue;
@@ -184,9 +185,7 @@ function inspectGateFile(file, config) {
   }
   // A brand-new ledger (no prior version) introduces a ratchet; it is not a
   // loosening. Growth of an existing ledger still trips this.
-  if (isShrinkOnly(file.path) && file.before != null && file.after != null && grew(file.before, file.after)) {
-    add('shrink-only-growth', 'count increased');
-  }
+  if (isShrinkOnly(file.path) && file.before != null && file.after != null && grew(file.before, file.after)) add('shrink-only-growth', 'count increased');
   if (isThresholdPath(file.path) && file.before != null && file.after != null) {
     findings.push(...thresholdFindings(file, config));
   }
