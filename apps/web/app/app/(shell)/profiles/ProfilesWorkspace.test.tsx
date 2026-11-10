@@ -679,6 +679,51 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(screen.queryByText('Next Best Action')).not.toBeInTheDocument();
   });
 
+  // Dogfood 2026-11-10: a DSP row carrying the generic "/artist?id=…" path
+  // rendered the invented handle "@artist", and non-registry platforms
+  // title-cased naively ("Line" instead of "LINE").
+  it('renders canonical platform names and never infers a handle from a generic /artist path', () => {
+    const spotifyBase = data.rows[1];
+    if (spotifyBase.rowType !== 'surface') {
+      throw new Error('Missing DSP fixture');
+    }
+    renderWorkspace({
+      ...data,
+      rows: [
+        {
+          ...spotifyBase,
+          id: 'spotify-artist-id',
+          label: 'spotify',
+          handle: null,
+          url: 'https://open.spotify.com/artist?id=06HL4z0CvFAxyc27GXpf02',
+          trackedUrl: null,
+        },
+        {
+          id: 'line',
+          rowType: 'surface',
+          kind: 'social',
+          platform: 'line',
+          label: 'Line',
+          handle: null,
+          url: 'https://line.me/timwhite',
+          trackedUrl: null,
+          qualificationStatus: 'qualified',
+          isOfficial: true,
+          monitoringState: 'active',
+          rank: null,
+          previousRank: null,
+          lastObservedAt: null,
+        },
+      ],
+    });
+
+    // The generic DSP path names a resource kind, not a handle.
+    expect(screen.queryByText('@artist')).not.toBeInTheDocument();
+    // Canonical display names render for registry and non-registry platforms.
+    expect(screen.getAllByText('Spotify').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('LINE').length).toBeGreaterThan(0);
+  });
+
   it('renders persisted suggestions without fabricating profile surface suggestions', async () => {
     const user = userEvent.setup();
     mockPersistedSuggestions([

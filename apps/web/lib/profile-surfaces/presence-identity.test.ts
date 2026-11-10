@@ -6,6 +6,7 @@ import {
   getPresenceHandle,
   getPresenceObservation,
   getPresenceOutcomeGroup,
+  getPresencePlatformLabel,
   getPresenceRowTitle,
   identityPhotoAlt,
   isPresenceObservationStale,
@@ -335,6 +336,109 @@ describe('presence identity', () => {
     expect(summaries[1]?.value).toBe('1 Page');
     expect(summaries[2]?.value).toBe('0 Pages');
     expect(summaries[3]?.value).toBe('#2');
+  });
+});
+
+describe('canonical platform names and valid handles', () => {
+  it.each([
+    ['youtube', 'YouTube'],
+    ['instagram', 'Instagram'],
+    ['tiktok', 'TikTok'],
+    ['line', 'LINE'],
+    ['website', 'Website'],
+  ])('renders the canonical platform name for %s', (platform, expected) => {
+    expect(getPresencePlatformLabel({ platform })).toBe(expected);
+  });
+
+  it('collapses platform-derived labels to the canonical platform name', () => {
+    expect(
+      getPresenceRowTitle({ platform: 'tiktok', label: 'tiktok' }, 'Tim White')
+    ).toBe('TikTok');
+    expect(
+      getPresenceRowTitle({ platform: 'line', label: 'Line' }, 'Tim White')
+    ).toBe('LINE');
+    expect(
+      getPresenceRowTitle(
+        { platform: 'spotify', label: 'SPOTIFY' },
+        'Tim White'
+      )
+    ).toBe('Spotify');
+    // Custom titles are never rewritten.
+    expect(
+      getPresenceRowTitle(
+        { platform: 'line', label: 'Tim on LINE' },
+        'Tim White'
+      )
+    ).toBe('Tim on LINE');
+    expect(
+      getPresenceRowTitle(
+        { platform: 'venmo', label: 'Tip on Venmo' },
+        'Tim White'
+      )
+    ).toBe('Tip on Venmo');
+  });
+
+  it('normalizes a platform-restating connector label without touching custom titles', () => {
+    expect(
+      getPresenceEntityName(
+        { kind: 'connector', platform: 'gmail', label: 'GMAIL' },
+        'Tim White'
+      )
+    ).toBe('Gmail');
+    expect(
+      getPresenceEntityName(
+        { kind: 'connector', platform: 'gmail', label: "Tim's email" },
+        'Tim White'
+      )
+    ).toBe("Tim's email");
+  });
+
+  it('never infers a handle from a generic DSP /artist path', () => {
+    expect(
+      getPresenceHandle({
+        kind: 'dsp',
+        handle: null,
+        url: 'https://open.spotify.com/artist?id=06HL4z0CvFAxyc27GXpf02',
+      })
+    ).toBeNull();
+    expect(
+      getPresenceHandle({
+        kind: 'dsp',
+        handle: null,
+        url: 'https://music.apple.com/artist?id=1539',
+      })
+    ).toBeNull();
+    expect(
+      getPresenceHandle({
+        kind: 'dsp',
+        handle: null,
+        url: 'https://unknown-provider.example/artist',
+      })
+    ).toBeNull();
+  });
+
+  it('still infers handles from legitimate social profile paths', () => {
+    expect(
+      getPresenceHandle({
+        kind: 'social',
+        handle: null,
+        url: 'https://instagram.com/timwhite',
+      })
+    ).toBe('@timwhite');
+    expect(
+      getPresenceHandle({
+        kind: 'social',
+        handle: null,
+        url: 'https://www.tiktok.com/@timwhite',
+      })
+    ).toBe('@timwhite');
+    expect(
+      getPresenceHandle({
+        kind: 'social',
+        handle: null,
+        url: 'https://youtube.com/@timwhite',
+      })
+    ).toBe('@timwhite');
   });
 });
 

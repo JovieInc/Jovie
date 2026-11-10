@@ -78,7 +78,18 @@ const PROFILE_METADATA_KEYS = [
   'profileImageUrl',
 ] as const;
 
+/**
+ * Canonical product-facing names for non-DSP platforms that surface in the
+ * presence workspace. The DSP registry owns streaming platforms; a naive
+ * title-case fallback mangles the rest ("line" → "Line", not "LINE").
+ */
+const NON_DSP_PLATFORM_NAMES: Record<string, string> = {
+  line: 'LINE',
+};
+
 function platformDisplayName(platform: string): string {
+  const canonical = NON_DSP_PLATFORM_NAMES[platform.trim().toLowerCase()];
+  if (canonical) return canonical;
   return (
     getDspDisplayName(platform) ??
     platform
@@ -224,7 +235,19 @@ export function getPresenceEntityName(
   const label = subject.label.trim();
   const platformName = platformDisplayName(subject.platform);
   const artist = artistName.trim();
-  if (subject.kind === 'connector') return label || platformName;
+  if (subject.kind === 'connector') {
+    if (!label) return platformName;
+    const normalized = normalizeLabel(label);
+    if (
+      // A label restating the platform ("gmail", "GMAIL") is platform-
+      // derived; only a custom title stays as written.
+      normalized === normalizeLabel(platformName) ||
+      normalized === normalizeLabel(subject.platform)
+    ) {
+      return platformName;
+    }
+    return label;
+  }
   if (!label) return artist || platformName;
   const normalized = normalizeLabel(label);
   if (
@@ -257,14 +280,25 @@ export function getPresenceRowTitle(
   if (!label) return platformName;
   const normalized = normalizeLabel(label);
   if (
-    artist &&
-    (normalized === normalizeLabel(`${artist} on ${platformName}`) ||
-      normalized === normalizeLabel(`${artist} on ${subject.platform}`))
+    // A label that merely restates the platform ("spotify", "TikTok") is
+    // platform-derived, not a custom title: render the canonical name.
+    normalized === normalizeLabel(platformName) ||
+    normalized === normalizeLabel(subject.platform) ||
+    (artist &&
+      (normalized === normalizeLabel(`${artist} on ${platformName}`) ||
+        normalized === normalizeLabel(`${artist} on ${subject.platform}`)))
   ) {
     return platformName;
   }
   return label;
 }
+
+/**
+ * Generic DSP path segments name a resource kind ("/artist?id=…", "/search"),
+ * not a profile handle — a single-segment match on one must never be
+ * presented as "@artist".
+ */
+const GENERIC_PATH_SEGMENTS = new Set(['artist']);
 
 export function getPresenceHandle(
   subject: Pick<PresenceIdentitySubject, 'kind' | 'handle' | 'url'>
@@ -287,7 +321,9 @@ export function getPresenceHandle(
     if (atSegment) return decodeURIComponent(atSegment);
     if (segments.length === 1) {
       const value = decodeURIComponent(segments[0] ?? '').replace(/^@/, '');
-      if (value) return `@${value}`;
+      if (value && !GENERIC_PATH_SEGMENTS.has(value.toLowerCase())) {
+        return `@${value}`;
+      }
     }
   } catch {
     return handle || null;
