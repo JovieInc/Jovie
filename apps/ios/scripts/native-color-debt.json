@@ -1,0 +1,33 @@
+{
+  "note": "Existing raw paint outside this slice; exact statement shrink-only debt, not an exemption or full design certification. Locked Chat and image/camera families remain under JOV-5331. No new identity or count is allowed.",
+  "source": "7ca2a55f458804f8d6ae6c4f9a1d36c943b4f660",
+  "identities": {
+    "apps/ios/Jovie/Features/AppShell/AppShellView.swift :: .background(Color.black)": 1,
+    "apps/ios/Jovie/Features/AppShell/TalkOverlayView.swift :: .fill(Color.white)": 1,
+    "apps/ios/Jovie/Features/Auth/AuthScreen.swift :: .fill(isDisabled ? JovieColor.surface2 : Color.white)": 1,
+    "apps/ios/Jovie/Features/Chat/ChatComposerBar.swift :: ? Color.white": 1,
+    "apps/ios/Jovie/Features/Chat/MobileChatMerchOptionsView.swift :: .foregroundStyle(Color.white)": 1,
+    "apps/ios/Jovie/Features/Chat/MobileChatMerchOptionsView.swift :: .background(Color.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 6, style: .continuous))": 1,
+    "apps/ios/Jovie/Features/Chat/MobileChatMerchOptionsView.swift :: .background(Color.white.opacity(configuration.isPressed ? 0.88 : 1), in: Capsule())": 1,
+    "apps/ios/Jovie/Features/Chat/MobileChatMessageViews.swift :: .background(Color.white, in: RoundedRectangle(cornerRadius: 22, style: .continuous))": 1,
+    "apps/ios/Jovie/Features/Chat/MobileChatMessageViews.swift :: return Color.white.opacity(0.035)": 1,
+    "apps/ios/Jovie/Features/Chat/MobileChatMessageViews.swift :: return Color.black.opacity(0.055)": 1,
+    "apps/ios/Jovie/Features/Chat/MobileChatMessageViews.swift :: return Color.white.opacity(0.085)": 1,
+    "apps/ios/Jovie/Features/Chat/MobileChatMessageViews.swift :: return Color.black.opacity(0.10)": 1,
+    "apps/ios/Jovie/Features/Chat/MobileChatMessageViews.swift :: return Color.black.opacity(0.45)": 1,
+    "apps/ios/Jovie/Features/Dashboard/DashboardView.swift :: .tint(.white)": 1,
+    "apps/ios/Jovie/Features/Library/LibrarySurfaceView.swift :: .background(isSelected ? Color.white : JovieColor.surface1, in: Capsule())": 1,
+    "apps/ios/Jovie/Features/Library/LibrarySurfaceView.swift :: Color.black": 1,
+    "apps/ios/Jovie/Features/Teleprompter/TeleprompterOverlayView.swift :: private let teleprompterControlScrim = Color.black.opacity(0.58)": 1,
+    "apps/ios/Jovie/Features/Teleprompter/TeleprompterOverlayView.swift :: .stroke(Color.white.opacity(0.22), lineWidth: 1)": 1,
+    "apps/ios/Jovie/Features/Teleprompter/TeleprompterOverlayView.swift :: colors: [Color.black.opacity(0.72), Color.black.opacity(0)],": 2,
+    "apps/ios/Jovie/Features/Teleprompter/TeleprompterOverlayView.swift :: colors: [Color.black.opacity(0), Color.black.opacity(0.82)],": 2,
+    "apps/ios/Jovie/Features/Teleprompter/TeleprompterOverlayView.swift :: .fill(viewModel.isRecording ? Color.red : Color.clear)": 2,
+    "apps/ios/Jovie/Features/Teleprompter/TeleprompterOverlayView.swift :: viewModel.contentMode == mode ? Color.white : Color.clear,": 1,
+    "apps/ios/Jovie/Features/Teleprompter/TeleprompterOverlayView.swift :: .background(Color.black.opacity(0.46))": 1,
+    "apps/ios/Jovie/Features/Teleprompter/TeleprompterOverlayView.swift :: .fill(Color.white)": 1,
+    "apps/ios/Jovie/Features/Teleprompter/TeleprompterOverlayView.swift :: .fill(Color.red)": 4,
+    "apps/ios/Jovie/Features/Teleprompter/TeleprompterOverlayView.swift :: .stroke(Color.white, lineWidth: 3)": 1,
+    "apps/ios/Jovie/Features/Teleprompter/TeleprompterOverlayView.swift :: .background(Color.black.opacity(0.35), in: Circle())": 1
+  }
+}

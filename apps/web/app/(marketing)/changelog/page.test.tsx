@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChangelogParseResult } from '@/lib/changelog-parser';
+import { applyRootTitleTemplate } from '@/lib/seo/document-title';
 
 const SNAPSHOT: ChangelogParseResult = {
   releases: [
@@ -164,19 +165,20 @@ describe('public changelog page', () => {
   });
 
   it('uses a descriptive product-update title for search and sharing', () => {
-    expect(metadata.title).toBe(
-      'Jovie Changelog: Product Updates & New Features'
+    expect(applyRootTitleTemplate(metadata.title)).toBe(
+      'Changelog: product updates and new features | Jovie'
     );
   });
 
-  it('renders the unique docked hero photo and exactly one footer CTA', async () => {
+  it('renders a matte hero and exactly one footer CTA', async () => {
     render(await ChangelogPage());
 
-    const heroPhoto = screen.getByTestId('changelog-hero-photo');
-    expect(heroPhoto).toBeInTheDocument();
-    expect(heroPhoto.querySelector('img')?.getAttribute('src')).toContain(
-      'changelog-index.webp'
-    );
+    expect(
+      screen.queryByTestId('changelog-hero-photo')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 1, name: "What's new in Jovie" })
+    ).toBeVisible();
     // Route owns its final CTA (MarketingFooterCta) instead of stacking
     // the generic footer request-access banner on top of it (spec rule 2).
     expect(screen.getAllByTestId('marketing-footer-cta')).toHaveLength(1);

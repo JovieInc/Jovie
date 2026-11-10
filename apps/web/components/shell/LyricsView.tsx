@@ -149,7 +149,7 @@ export function LyricsView({
                 <button
                   type='button'
                   onClick={onTranscribe}
-                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full bg-white dark:bg-surface-1 text-black dark:text-white text-xs font-caption transition-[filter] duration-subtle ease-subtle hover:brightness-110'
+                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full border border-btn-primary bg-btn-primary text-btn-primary-foreground shadow-button-inset text-xs font-caption transition-colors duration-subtle ease-subtle hover:border-(--color-btn-primary-hover) hover:bg-(--color-btn-primary-hover)'
                 >
                   <Sparkles className='h-3.5 w-3.5' strokeWidth={2.25} />
                   Transcribe with Jovie

@@ -1,7 +1,7 @@
 /* Locked Pen header GTcgO → master eoUUU, re-seated as a docked bar
    (Tim direction 2026-09-26; supersedes the Floating Bar capsule).
    Overrides live on MarketingHeader only so HeaderNav.css (#17511) stays put.
-   Optical grid: outer 64 / row 44 / CTA 28 / chrome mark 20. Noir-ion atoms.
+   Optical grid: outer 64 / row 44 / CTA 28 / marketing mark 28. Noir-ion atoms.
    Selector stays more specific than HeaderNav.css so tokens win the cascade.
 
    Docked contract:
@@ -14,7 +14,7 @@
 .marketing-glass-header[data-presentation="marketing-glass"] {
   --marketing-glass-top: var(--space-2-5);
   --marketing-glass-height: 2.75rem;
-  --marketing-glass-gutter: var(--space-6);
+  --marketing-glass-gutter: var(--ds-public-gutter);
   --marketing-glass-text: var(--noir-ion-text-primary);
   --marketing-glass-muted: var(--noir-ion-text-muted);
   /* The reserved main offset is the header border box, including the 1px
@@ -40,6 +40,18 @@
     transparent
   );
   --marketing-dock-rim: var(--noir-ion-border-subtle);
+  /* Keep both the sticky bar and its glass rim inside the public box. */
+  width: min(
+    calc(100% - var(--ds-public-gutter) * 2),
+    var(--ds-public-content-max)
+  ) !important;
+  margin-inline: auto;
+  border: 0 !important;
+}
+
+.header-nav--docked > nav {
+  /* The header owns the gutter; do not apply it a second time to its row. */
+  width: 100% !important;
 }
 
 .header-nav--docked::before {
@@ -98,7 +110,7 @@
   /* Fill the offset floor minus the header's bottom border. */
   min-height: calc(var(--public-shell-header-offset) - var(--space-px));
   padding-block: var(--marketing-glass-top);
-  padding-inline: var(--marketing-glass-gutter) !important;
+  padding-inline: 0 !important;
 }
 
 .marketing-glass-header[data-presentation="marketing-glass"]
@@ -215,7 +227,7 @@
   .marketing-glass-header[data-presentation="marketing-glass"] {
     --marketing-glass-top: var(--space-2-5);
     --marketing-glass-height: 2.75rem;
-    --marketing-glass-gutter: var(--space-6);
+    --marketing-glass-gutter: var(--ds-public-gutter);
   }
 }
 

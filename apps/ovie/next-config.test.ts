@@ -1,3 +1,7 @@
+import {
+  getRedirectUrl,
+  unstable_getResponseFromNextConfig,
+} from 'next/experimental/testing/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const { withWorkflow } = vi.hoisted(() => ({
@@ -12,6 +16,22 @@ afterEach(() => {
 });
 
 describe('Ovie deployment configuration', () => {
+  it.each(['/app/ov/needs-you', '/app/admin/needs-you'])(
+    'redirects legacy %s links to Inbox with their decision intact',
+    async pathname => {
+      vi.stubEnv('AGENT_OS_WORKFLOWS_ENABLED', 'false');
+      const { default: config } = await import('./next.config.mjs');
+      const response = await unstable_getResponseFromNextConfig({
+        url: `https://ovie.jov.ie${pathname}?case=decision-123`,
+        nextConfig: { redirects: config.redirects },
+      });
+      expect(response.status).toBe(307);
+      expect(getRedirectUrl(response)).toBe(
+        'https://ovie.jov.ie/app/ov/inbox?case=decision-123'
+      );
+    }
+  );
+
   it('compiles shared workflows while preserving the artist switch destination', async () => {
     vi.stubEnv('AGENT_OS_WORKFLOWS_ENABLED', 'false');
     const { default: config } = await import('./next.config.mjs');

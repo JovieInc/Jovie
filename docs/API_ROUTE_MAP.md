@@ -42,6 +42,7 @@ sibling deployments, machine publishers, or source-repository automation.
 | `/api/hud/hermes-events` | GET, POST | HUD auth (GET); `HERMES_HUD_API_KEY` bearer (POST) | Hermes laptop publisher writes Agent OS events; HUD clients read the current feed |
 | `/api/ovie/certifications/metrics` | GET | Ovie principal + Summer control | Ovie/Summer clients use the shared certification and receipt-backed product-quality projection |
 | `/api/ovie/ingest` | POST | Ovie principal + Summer control | Ovie/Summer clients submit durable operating-store dumps through the shared Ovie route projection |
+| `/api/internal/ovie/pipeline-bottleneck/contributions` | POST | `cron` | Hourly loop publishes a validated `pipeline-bottleneck-contribution/v1` (maximum 16 KiB) to `summer-bottleneck/contributions/hourly-loop.json` |
 | `/api/internal/ovie/lyb-mrr` | GET | `CRON_SECRET` + trusted origin | Ovie and Summer company tools read the LogYourBody RevenueCat MRR record |
 | `/api/internal/release-communications/merge-events` | POST | HMAC `x-jovie-signature-256` | Source-repository merge automation submits verified release events |
 
@@ -49,6 +50,7 @@ sibling deployments, machine publishers, or source-repository automation.
 
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
+| `/api/internal/ovie/pipeline-bottleneck` | GET | `admin` via `requireAdmin`, including Ovie privacy | Home/HUD projection of `summer-bottleneck/current.json` plus the hourly-loop contribution; no-store, null for unknown/stale Summer |
 | `/api/admin/batch-ingest` | POST | `admin` | Batch ingest creator profiles |
 | `/api/admin/campaigns/invites` | GET, POST | `admin` | Campaign invite management |
 | `/api/admin/campaigns/settings` | GET, PUT | `admin` | Campaign settings |
@@ -117,6 +119,14 @@ sibling deployments, machine publishers, or source-repository automation.
 | `/api/v1/[username]` | GET | `public` | Public read-only artist profile with releases, events, merch, durable 100/min/IP artist-profile limit, RateLimit headers, and typed 429/503 paths |
 | `/api/v1/openapi.json` | GET | `public` | Canonical OpenAPI 3.1 contract for the public artist API |
 | `/openapi.json` | GET | `public` | Conventional discovery surface; identical contract to `/api/v1/openapi.json` |
+
+**Breaking-change enforcement.** The contract above is generated from source
+(`ARTIST_OPENAPI_DOCUMENT` in `apps/web/lib/api/v1/openapi.ts`).
+`scripts/invariants/oasdiff-breaking-change.mjs` is a blocking Source
+Validation guard: on PRs touching the contract sources it renders the document
+at the head and the merge base, diffs them with a pinned, sha-verified oasdiff
+release, and fails on breaking changes. Additions pass; an intentional break
+needs an auditable PR-body marker line — `api-breaking: <reason>`.
 
 ### Audience
 
@@ -187,6 +197,14 @@ sibling deployments, machine publishers, or source-repository automation.
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/create-tip-intent` | POST | `public` | Create Stripe payment intent for tip |
+
+### Content Records
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/content-records/stage-events` | GET | public (rows carry only kind/key@version and timestamps) | NDJSON `marketing-change` stage feed (data-edit, data-live; rolling 28 d) read by the shipping SLO collector. |
+| `/api/content-records/[kind]/[key]` | GET, POST | `admin` or `CONTENT_PUBLISH_SECRET` bearer + `x-content-actor` | Versioned content-as-data store: history (GET); validate, draft (returns signed preview URL), publish, rollback (POST). Every publish/rollback writes an audit row. See `lib/content-records/`. |
+| `/api/internal/proof-stats` | GET, POST | `admin` or `CONTENT_PUBLISH_SECRET` bearer + `x-content-actor` | Proof-stat feed for Summer (GET: resolved stats, loop metrics, milestone/published/withdrawn events) and intake for stats measured outside the web app (POST: benchmark, wins ledger, security, engineering). Production counts are refused (measured by the hourly refresh); approvals must be founder-approved Summer cards. See `lib/proof-stats/`. |
 
 ### Creator
 
@@ -319,6 +337,7 @@ sibling deployments, machine publishers, or source-repository automation.
 | `/api/health/homepage` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous is `{healthy:true,timestamp}` and does not fetch featured creators |
 | `/api/health/keys` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous is `{healthy,timestamp}` (503 when a required key is missing) with no key labels |
 | `/api/health/redis` | GET | `admin` or `CRON_SECRET` | Redis write/read operability (protected to prevent quota burn) |
+| `/api/health/revenue-spine` | GET | `public` | Runtime receipt for the revenue-spine failure contract (JOV-8249). Executes the real contract builder for all nine stages in the serving process; no user attribution, no Sentry probe emission, never cached |
 
 ### HUD
 
@@ -527,6 +546,7 @@ sibling deployments, machine publishers, or source-repository automation.
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/waitlist` | GET, POST | `auth` | Get waitlist status or join |
+| `/api/waitlist/join` | POST | `public` | Closed-signup waitlist join (role + email, Turnstile, 404 unless `PUBLIC_SIGNUP_CLOSED`) |
 
 ### Webhooks
 

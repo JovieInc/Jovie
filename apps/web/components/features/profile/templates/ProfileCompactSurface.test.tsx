@@ -1,6 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import type { DynamicOptions } from 'next/dist/shared/lib/app-dynamic';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -228,7 +235,9 @@ describe('ProfileCompactSurface', () => {
     mockUseIsAuthenticated.mockReturnValue(false);
   });
 
-  it.each(['drawer', 'notifications'])(
+  // Drawer no longer lazy-loads (JOV-7973): its same-commit render contract
+  // lives in ProfileCompactSurface.drawer-import.test.tsx.
+  it.each(['notifications'])(
     'keeps the mounted profile and focused claim available while the %s module loads',
     async kind => {
       let releaseModule!: (value: { default: React.ComponentType }) => void;
@@ -306,25 +315,70 @@ describe('ProfileCompactSurface', () => {
     expect(screen.getByTestId('profile-bottom-nav')).toBeTruthy();
   });
 
-  it('shows the phone claim bar above the dock on proof profiles (JOV-7114)', () => {
-    renderSurface({ proofClaimCta: { href: '/start', label: 'Claim yours' } });
+  it.each(['Claim yours', 'Get yours', 'Request access'])(
+    'keeps the phone claim bar label and name aligned for %s (JOV-10711)',
+    label => {
+      renderSurface({ proofClaimCta: { href: '/start', label } });
 
-    const bar = screen.getByTestId('profile-proof-claim-bar');
-    expect(bar).toHaveClass('md:hidden');
-    expect(screen.getByTestId('profile-proof-claim-bar-cta')).toHaveAttribute(
-      'href',
-      '/start'
-    );
-    // Rides inside the dock, directly above the nav, so it moves with it.
-    expect(bar.nextElementSibling).toBe(
-      screen.getByTestId('profile-bottom-nav')
-    );
+      const bar = screen.getByTestId('profile-proof-claim-bar');
+      const cta = screen.getByTestId('profile-proof-claim-bar-cta');
+      expect(bar).toHaveClass('md:hidden');
+      expect(cta).toHaveAttribute('href', '/start');
+      // WCAG 2.5.3 / axe label-content-name-mismatch: the accessible name
+      // starts with the visible "jov.ie/you" text.
+      expect(cta.getAttribute('aria-label')).toBe(`jov.ie/you ${label}`);
+      expect(cta.textContent).toBe(`jov.ie/you ${label}`);
+      // Rides inside the dock, directly above the nav, so it moves with it.
+      expect(bar.nextElementSibling).toBe(
+        screen.getByTestId('profile-bottom-nav')
+      );
+    }
+  );
+
+  it('puts a 44pt share control in the header next to the menu', async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: share,
+    });
+    renderSurface();
+
+    const button = screen.getByTestId('profile-header-share');
+    expect(button).toHaveAccessibleName(/^Share .+'s profile$/);
+    expect(button).toHaveClass('h-11', 'w-11');
+    fireEvent.click(button);
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    expect(share.mock.calls[0][0].url).toMatch(/\/[^/]+$/);
+
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: undefined,
+    });
   });
 
   it('omits the claim bar on regular profiles', () => {
     renderSurface();
 
     expect(screen.queryByTestId('profile-proof-claim-bar')).toBeNull();
+  });
+
+  it('renders Jovie footer branding on the free public profile (JOV-8777)', () => {
+    renderSurface();
+
+    const branding = screen.getByTestId('profile-jovie-branding');
+    const link = within(branding).getByRole('link', {
+      name: /Made with Jovie/i,
+    });
+    expect(link).toHaveAttribute(
+      'href',
+      `/?utm_source=profile&utm_artist=${artist.handle}`
+    );
+  });
+
+  it('omits Jovie footer branding when hideJovieBranding is set (JOV-8777)', () => {
+    renderSurface({ hideJovieBranding: true });
+
+    expect(screen.queryByTestId('profile-jovie-branding')).toBeNull();
   });
 
   it('hides the bottom tab bar in static previews so it cannot cover clipped content (JOV-7192)', () => {

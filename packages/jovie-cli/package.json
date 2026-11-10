@@ -32,7 +32,7 @@
     "registry": "https://registry.npmjs.org"
   },
   "bin": {
-    "jovie": "./dist/cli.js"
+    "jovie": "dist/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -48,7 +48,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=24.22.1"
+    "node": ">=24.22.2"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

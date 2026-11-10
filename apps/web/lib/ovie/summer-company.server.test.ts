@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   stripeMetrics: vi.fn(),
+  mercuryMetrics: vi.fn(),
   lybMrr: vi.fn(),
   founderAccounts: vi.fn(),
   sessionsList: vi.fn(),
@@ -12,6 +13,9 @@ const hoisted = vi.hoisted(() => ({
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/admin/stripe-metrics', () => ({
   getAdminStripeOverviewMetrics: hoisted.stripeMetrics,
+}));
+vi.mock('@/lib/admin/mercury-metrics', () => ({
+  getAdminMercuryMetrics: hoisted.mercuryMetrics,
 }));
 vi.mock('./lyb-mrr.server', () => ({ getLybDailyMrr: hoisted.lybMrr }));
 vi.mock('./summer-founder-cohort.server', () => ({
@@ -54,6 +58,10 @@ describe('getSummerRevenue', () => {
     vi.clearAllMocks();
     hoisted.dbResults.length = 0;
     hoisted.lybMrr.mockResolvedValue(lybRecord);
+    hoisted.mercuryMetrics.mockResolvedValue({
+      isConfigured: false,
+      isAvailable: false,
+    });
   });
 
   it('reports Jovie Stripe MRR and passes the LYB record through', async () => {
@@ -80,14 +88,47 @@ describe('getSummerRevenue', () => {
         source: 'stripe',
       },
       lyb: lybRecord,
+      cash: { status: 'unavailable', reason: 'mercury_not_configured' },
     });
   });
 
-  it('passes an internal-customer classifier to the Stripe metrics read', async () => {
-    hoisted.dbResults.push([
-      { stripeCustomerId: 'cus_internal' },
-      { stripeCustomerId: null },
-    ]);
+  it('reports Mercury cash from the read-only token and never turns a failure into $0', async () => {
+    hoisted.dbResults.push([]);
+    hoisted.stripeMetrics.mockResolvedValue({
+      mrrUsd: 0,
+      activeSubscribers: 0,
+      excludedInternalSubscribers: 0,
+      excludedInternalMrrUsd: 0,
+      isConfigured: true,
+      isAvailable: true,
+    });
+    hoisted.mercuryMetrics.mockResolvedValue({
+      balanceUsd: 812.5,
+      burnRateUsd: 4100,
+      burnWindowDays: 30,
+      burnRateAvailable: true,
+      observedAtIso: '2026-09-26T11:59:00.000Z',
+      isConfigured: true,
+      isAvailable: true,
+      defaultStatus: 'dead',
+    });
+    await expect(getSummerRevenue(NOW)).resolves.toMatchObject({
+      cash: {
+        balanceUsd: 812.5,
+        burnRateUsd: 4100,
+        burnWindowDays: 30,
+        defaultStatus: 'dead',
+        observedAt: '2026-09-26T11:59:00.000Z',
+        source: 'mercury',
+      },
+    });
+    hoisted.mercuryMetrics.mockRejectedValue(new Error('boom'));
+    await expect(getSummerRevenue(NOW)).resolves.toMatchObject({
+      cash: { status: 'unavailable', reason: 'mercury_request_failed' },
+    });
+  });
+
+  it('reads Stripe metrics through the shared internal-customer default', async () => {
     hoisted.stripeMetrics.mockResolvedValue({
       mrrUsd: 0,
       activeSubscribers: 0,
@@ -97,17 +138,9 @@ describe('getSummerRevenue', () => {
       isAvailable: true,
     });
     await getSummerRevenue(NOW);
-    const { isInternalCustomer } = hoisted.stripeMetrics.mock.calls[0][0];
-    expect(isInternalCustomer({ id: 'cus_internal', email: null })).toBe(true);
-    expect(isInternalCustomer({ id: 'cus_ext', email: 'tim@jov.ie' })).toBe(
-      true
-    );
-    expect(
-      isInternalCustomer({ id: 'cus_ext2', email: 'e2e-1@example.com' })
-    ).toBe(true);
-    expect(
-      isInternalCustomer({ id: 'cus_real', email: 'artist@band.com' })
-    ).toBe(false);
+    // No private classifier: the default in stripe-metrics applies the email
+    // rules and the account_class lookup for every surface alike.
+    expect(hoisted.stripeMetrics).toHaveBeenCalledWith();
   });
 
   it.each([
@@ -251,7 +284,7 @@ describe('getSummerCohort', () => {
     });
   });
 
-  it('maps expired subscription checkouts to unconverted users', async () => {
+  it('maps expired checkouts while preserving external QA-like customer addresses', async () => {
     const created = Math.floor(NOW.getTime() / 1000) - 3600;
     hoisted.sessionsList.mockResolvedValue({
       has_more: false,
@@ -259,6 +292,7 @@ describe('getSummerCohort', () => {
         { id: 'cs_1', mode: 'subscription', customer: 'cus_1', created },
         { id: 'cs_2', mode: 'payment', customer: 'cus_2', created },
         { id: 'cs_3', mode: 'subscription', customer: null, created },
+        { id: 'cs_4', mode: 'subscription', customer: 'cus_3', created },
       ],
     });
     hoisted.dbResults.push([
@@ -278,7 +312,7 @@ describe('getSummerCohort', () => {
         id: 'u3',
         name: null,
         email: 'qa-fan@gmail.com',
-        stripeCustomerId: 'cus_2',
+        stripeCustomerId: 'cus_3',
       },
     ]);
     const cohort = await getSummerCohort('checkout_abandoned', 10, NOW);
@@ -287,16 +321,22 @@ describe('getSummerCohort', () => {
     );
     expect(cohort).toEqual({
       metricScope: 'customer_only',
-      total: 1,
-      excludedInternal: 2,
-      customerTotal: 1,
+      total: 2,
+      excludedInternal: 1,
+      customerTotal: 2,
       rawTotal: 3,
-      syntheticHealth: { total: 2 },
+      syntheticHealth: { total: 1 },
       rows: [
         {
           id: 'u1',
           displayName: 'a@band.com',
           email: 'a@band.com',
+          detail: `checkout expired ${new Date(created * 1000).toISOString()}`,
+        },
+        {
+          id: 'u3',
+          displayName: 'qa-fan@gmail.com',
+          email: 'qa-fan@gmail.com',
           detail: `checkout expired ${new Date(created * 1000).toISOString()}`,
         },
       ],

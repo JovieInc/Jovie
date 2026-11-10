@@ -81,7 +81,7 @@ describe('submission-agent/email-package.ts', () => {
     expect(result.html).toContain('<li>cover-art.png</li><li>bio.txt</li>');
   });
 
-  it('falls back to placeholder values when release and reply-to are missing', () => {
+  it('uses clear labels when release and reply-to are missing', () => {
     const result = buildSubmissionPackage({
       canonical: createCanonical({
         artistContactEmail: null,
@@ -95,10 +95,10 @@ describe('submission-agent/email-package.ts', () => {
       monitoringBaseline: {},
     });
 
-    expect(result.text).toContain('Release: Untitled release');
+    expect(result.text).toContain('Release: Release');
     expect(result.text).toContain('Release Date: Unknown');
     expect(result.text).toContain('Reply-To: Not provided');
-    expect(result.html).toContain('Untitled release');
+    expect(result.html).toContain('<td>Release</td>');
     expect(result.html).toContain('Unknown');
     expect(result.html).toContain('Not provided');
   });

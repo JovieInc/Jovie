@@ -8,21 +8,42 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   checkMainQueueProvenance,
   describeProvenance,
   findExactQueueProof,
   hasExactSuccessfulMergeGroupProof,
   MAX_REST_HOLD_MS,
+  MERGE_SUITE_SCOPE_FULL,
+  MERGE_SUITE_SCOPE_ORDINARY,
+  mergeSuiteScopeJobName,
   PROVENANCE_JOB_TIMEOUT_MINUTES,
   planGitHubRestHold,
   resolveMainSha,
+  resolveMergeSuiteScope,
   restHoldBudgetMs,
 } from '../../../.github/scripts/verify-main-release-readiness.mjs';
 
 const SHA = 'a'.repeat(40);
 const SUPERSEDING_SHA = 'b'.repeat(40);
+
+// The fake reset and the child shell must share a clock. A loaded host can
+// otherwise consume the entire four-second fixture window before bash runs.
+const HOLD_FIXTURE_EPOCH = 1_800_000_000;
+function installHoldClock(root) {
+  writeFileSync(
+    join(root, 'date'),
+    `#!/bin/sh
+if [ "$*" = "+%s" ]; then
+  printf '%s\\n' '${HOLD_FIXTURE_EPOCH}'
+else
+  exec /bin/date "$@"
+fi
+`
+  );
+  chmodSync(join(root, 'date'), 0o755);
+}
 
 function jsonResponse(body, { ok = true, status = 200 } = {}) {
   return {
@@ -45,6 +66,20 @@ function exactSuccessfulRun(id = 41) {
 }
 
 describe('main release readiness', () => {
+  // In-process holds write `::warning::Holding ...` to stderr. Capture it so the
+  // runner never parses a mocked rate-limit hold as a workflow annotation.
+  /** @type {import('vitest').MockInstance[]} */
+  let spies = [];
+  beforeEach(() => {
+    spies = [
+      vi.spyOn(console, 'error').mockImplementation(() => {}),
+      vi.spyOn(process.stderr, 'write').mockImplementation(() => true),
+    ];
+  });
+  afterEach(() => {
+    for (const spy of spies) spy.mockRestore();
+  });
+
   it('accepts only an exact successful merge-group PR Ready proof', () => {
     const run = exactSuccessfulRun();
     const successJobs = new Map([
@@ -83,6 +118,98 @@ describe('main release readiness', () => {
           [
             run.id,
             [{ name: 'PR Ready', status: 'completed', conclusion: 'failure' }],
+          ],
+        ]),
+      })
+    ).toBe(false);
+  });
+
+  it('keeps legacy unscoped PR Ready as full-suite proof', () => {
+    const run = exactSuccessfulRun();
+    expect(
+      resolveMergeSuiteScope([
+        { name: 'PR Ready', status: 'completed', conclusion: 'success' },
+      ])
+    ).toBe('legacy_unscoped');
+    expect(
+      hasExactSuccessfulMergeGroupProof({
+        sha: SHA,
+        runs: [run],
+        jobsByRun: new Map([
+          [
+            run.id,
+            [{ name: 'PR Ready', status: 'completed', conclusion: 'success' }],
+          ],
+        ]),
+      })
+    ).toBe(true);
+  });
+
+  it('accepts explicit full_web_units scope with PR Ready', () => {
+    const run = exactSuccessfulRun();
+    const jobs = [
+      { name: 'PR Ready', status: 'completed', conclusion: 'success' },
+      {
+        name: mergeSuiteScopeJobName(MERGE_SUITE_SCOPE_FULL),
+        status: 'completed',
+        conclusion: 'success',
+      },
+    ];
+    expect(resolveMergeSuiteScope(jobs)).toBe(MERGE_SUITE_SCOPE_FULL);
+    expect(
+      hasExactSuccessfulMergeGroupProof({
+        sha: SHA,
+        runs: [run],
+        jobsByRun: new Map([[run.id, jobs]]),
+      })
+    ).toBe(true);
+  });
+
+  it('rejects ordinary_admission scope for full-suite main skip', () => {
+    const run = exactSuccessfulRun();
+    const jobs = [
+      { name: 'PR Ready', status: 'completed', conclusion: 'success' },
+      {
+        name: mergeSuiteScopeJobName(MERGE_SUITE_SCOPE_ORDINARY),
+        status: 'completed',
+        conclusion: 'success',
+      },
+    ];
+    expect(resolveMergeSuiteScope(jobs)).toBe(MERGE_SUITE_SCOPE_ORDINARY);
+    expect(
+      hasExactSuccessfulMergeGroupProof({
+        sha: SHA,
+        runs: [run],
+        jobsByRun: new Map([[run.id, jobs]]),
+      })
+    ).toBe(false);
+    expect(
+      hasExactSuccessfulMergeGroupProof({
+        sha: SHA,
+        runs: [run],
+        jobsByRun: new Map([[run.id, jobs]]),
+        requiredScope: MERGE_SUITE_SCOPE_ORDINARY,
+      })
+    ).toBe(true);
+  });
+
+  it('rejects a failed or missing successful scope claim when a scope job exists', () => {
+    const run = exactSuccessfulRun();
+    expect(
+      hasExactSuccessfulMergeGroupProof({
+        sha: SHA,
+        runs: [run],
+        jobsByRun: new Map([
+          [
+            run.id,
+            [
+              { name: 'PR Ready', status: 'completed', conclusion: 'success' },
+              {
+                name: mergeSuiteScopeJobName(MERGE_SUITE_SCOPE_FULL),
+                status: 'completed',
+                conclusion: 'failure',
+              },
+            ],
           ],
         ]),
       })
@@ -624,7 +751,7 @@ esac
     const described = describeProvenance(result, tipSha);
     expect(described.level).toBe('info');
     expect(described.line).toContain(
-      `Exact merge-group provenance found for ${tipSha} (run ${proofRunId}).`
+      `Exact merge-group provenance found for ${tipSha} (run ${proofRunId}; suite scope full_web_units or legacy).`
     );
     expect(described.line).not.toContain('rate-limit-hold');
   });
@@ -704,11 +831,11 @@ esac
     const runHold = (resetOffset, budget) => {
       const root = mkdtempSync(join(tmpdir(), 'gh-api-hold-'));
       try {
+        installHoldClock(root);
         const calls = join(root, 'calls');
         writeFileSync(calls, '0');
         const slept = join(root, 'slept');
         writeFileSync(slept, '');
-        const reset = Math.floor(Date.now() / 1000) + resetOffset;
         writeFileSync(
           join(root, 'sleep'),
           `#!/bin/sh
@@ -724,7 +851,7 @@ n="$(cat "${calls}")"
 n=$((n + 1))
 printf '%s' "$n" > "${calls}"
 case "$*" in
-  *rate_limit*) printf '%s\\n' "${reset}"; exit 0 ;;
+  *rate_limit*) printf '%s\\n' "$(( $(date +%s) + ${resetOffset} ))"; exit 0 ;;
 esac
 if [ "$n" -eq 1 ]; then
   echo "API rate limit exceeded for installation" >&2
@@ -762,14 +889,14 @@ exit 0
     expect(held.status, held.stderr).toBe(0);
     expect(held.stdout).toContain('PR Ready');
     expect(held.stderr).toContain('Holding');
+    expect(held.slept).toBe('0');
     expect(held.calls).toBeGreaterThan(1);
 
     const fullWindow = runHold(60 * 60, null);
     expect(fullWindow.status, fullWindow.stderr).toBe(0);
     expect(fullWindow.stdout).toContain('PR Ready');
     expect(fullWindow.stderr).toContain('Holding');
-    expect(Number(fullWindow.slept)).toBeGreaterThanOrEqual(60 * 60);
-    expect(Number(fullWindow.slept)).toBeLessThanOrEqual(3900);
+    expect(Number(fullWindow.slept)).toBe(60 * 60 + 1);
     expect(fullWindow.calls).toBeGreaterThan(1);
 
     const refused = runHold(100_000, null);
@@ -779,5 +906,138 @@ exit 0
     expect(refused.stderr).toContain('Not passing');
     expect(refused.calls).toBe(2);
     expect(refused.slept).toBe('');
+  });
+
+  it('announces a GitHub API hold on stderr and in the step summary', () => {
+    const script = new URL(
+      '../../../.github/scripts/gh-api-hold.sh',
+      import.meta.url
+    );
+    /**
+     * @param {{resetOffset: number | null, firstError: string, label?: string, rateJq?: boolean}} options
+     */
+    const runVisible = ({ resetOffset, firstError, label }) => {
+      const root = mkdtempSync(join(tmpdir(), 'gh-api-hold-vis-'));
+      try {
+        installHoldClock(root);
+        const calls = join(root, 'calls');
+        writeFileSync(calls, '0');
+        const slept = join(root, 'slept');
+        writeFileSync(slept, '');
+        const summary = join(root, 'summary.md');
+        writeFileSync(summary, '');
+        writeFileSync(
+          join(root, 'sleep'),
+          `#!/bin/sh\nprintf '%s\\n' "$1" >> "${slept}"\nexit 0\n`
+        );
+        chmodSync(join(root, 'sleep'), 0o755);
+        const reset =
+          resetOffset === null ? '' : String(HOLD_FIXTURE_EPOCH + resetOffset);
+        writeFileSync(
+          join(root, 'gh'),
+          `#!/bin/sh
+n="$(cat "${calls}")"
+n=$((n + 1))
+printf '%s' "$n" > "${calls}"
+case "$*" in
+  *rate_limit*) [ -n "${reset}" ] && printf '%s\\n' '${reset}'; exit 0 ;;
+esac
+if [ "$n" -eq 1 ]; then
+  printf '%s\\n' '${firstError}' >&2
+  exit 1
+fi
+printf '%s\\n' '{"ok":true}'
+exit 0
+`
+        );
+        chmodSync(join(root, 'gh'), 0o755);
+        /** @type {NodeJS.ProcessEnv} */
+        const env = {
+          ...process.env,
+          PATH: `${root}${delimiter}${process.env.PATH}`,
+          GH_TOKEN: 'ghs_SECRETTOKENVALUE123',
+          GITHUB_STEP_SUMMARY: summary,
+          GH_API_HOLD_BUDGET_SECONDS: '30',
+        };
+        if (label) env.GH_API_HOLD_LABEL = label;
+        const result = spawnSync(
+          'bash',
+          [
+            script.pathname,
+            'api',
+            'repos/JovieInc/Jovie/actions/runs/1/jobs?per_page=100',
+          ],
+          { encoding: 'utf8', timeout: 10_000, env }
+        );
+        return {
+          ...result,
+          calls: Number(readFileSync(calls, 'utf8')),
+          slept: readFileSync(slept, 'utf8').trim(),
+          summary: readFileSync(summary, 'utf8'),
+        };
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    };
+
+    const held = runVisible({
+      resetOffset: 4,
+      firstError:
+        'gh: API rate limit exceeded for installation (HTTP 403)\nx-ratelimit-resource: core\nx-ratelimit-limit: 15000\nx-ratelimit-remaining: 0',
+      label: 'cross-prove: step=1',
+    });
+    expect(held.status).toBe(0);
+    expect(held.calls).toBeGreaterThan(1);
+    expect(Number(held.slept)).toBe(5);
+    for (const channel of [held.stderr, held.summary]) {
+      expect(channel).toContain('GitHub API hold');
+      expect(channel).toContain('label=cross-prove_ step_1');
+      expect(channel).toContain('http=403');
+      expect(channel).toContain('wait_s=5 ');
+      expect(channel).toMatch(/reset_epoch=\d{10}/);
+      expect(channel).toMatch(/reset_iso=\d{4}-\d{2}-\d{2}T[\d:]{8}Z/);
+      expect(channel).toContain(
+        'bucket=core bucket_source=x-ratelimit-resource'
+      );
+      expect(channel).toContain('limit=15000');
+      expect(channel).toContain('remaining=0');
+      expect(channel).not.toContain('ghs_SECRETTOKENVALUE123');
+      expect(channel).not.toContain('per_page=100');
+    }
+    expect(held.stderr).toContain('::notice title=GitHub API hold::');
+
+    const sparse = runVisible({
+      resetOffset: 4,
+      firstError: 'API rate limit exceeded for installation',
+    });
+    expect(sparse.status).toBe(0);
+    expect(sparse.stderr).toContain('http=unknown');
+    expect(sparse.stderr).toContain(
+      'bucket=core bucket_source=rate_limit.resources.core'
+    );
+    expect(sparse.stderr).not.toContain('limit=');
+    expect(sparse.stderr).not.toContain('remaining=');
+
+    // Missing reset refuses exactly as before: no hold, no notice, no sleep.
+    const noReset = runVisible({
+      resetOffset: null,
+      firstError: 'API rate limit exceeded for installation (HTTP 403)',
+    });
+    expect(noReset.status).toBe(1);
+    expect(noReset.stderr).toContain('had no x-ratelimit-reset');
+    expect(noReset.stderr).not.toContain('GitHub API hold');
+    expect(noReset.slept).toBe('');
+    expect(noReset.calls).toBe(2);
+    expect(noReset.summary).toBe('');
+
+    const refused = runVisible({
+      resetOffset: 100_000,
+      firstError: 'API rate limit exceeded for installation',
+    });
+    expect(refused.status).toBe(1);
+    expect(refused.slept).toBe('');
+    expect(refused.calls).toBe(2);
+    expect(refused.stderr).not.toContain('GitHub API hold');
+    expect(refused.summary).toBe('');
   });
 });

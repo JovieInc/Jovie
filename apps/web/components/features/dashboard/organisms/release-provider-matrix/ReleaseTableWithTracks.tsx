@@ -1,5 +1,5 @@
 'use client';
-// @coverage-via apps/web/tests/components/release-provider-matrix/release-table-system-b-style-guard.test.ts
+// @coverage-via apps/web/tests/components/release-provider-matrix/ReleaseTable.test.tsx
 
 import { lazy, Suspense, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
@@ -53,7 +53,8 @@ export function ReleaseTableWithTracks({
   onGeneratePitch,
   onChangeStatus,
   columnVisibility,
-  rowHeight = TABLE_ROW_HEIGHTS.STANDARD + 4,
+  rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
+  rowMode,
   onFocusedRowChange,
   groupByYear = false,
   selectedReleaseId,
@@ -283,7 +284,7 @@ export function ReleaseTableWithTracks({
         <div className='system-b-release-table-empty-state mx-4 my-3 flex flex-col'>
           <TableEmptyState
             icon={<Icon name='Layers' className='h-6 w-6' />}
-            heading='No releases found'
+            heading='No Releases Found'
             description='Use the toolbar to create a release, sync from Spotify, or clear filters.'
           />
         </div>
@@ -319,7 +320,8 @@ export function ReleaseTableWithTracks({
       getRowTestId={getRowTestId}
       getRowClassName={getRowClassName}
       enableVirtualization={!hasExpandedRows && !groupByYear}
-      rowHeight={rowHeight}
+      rowHeight={rowMode ? undefined : rowHeight}
+      rowMode={rowMode}
       minWidth='0'
       hideHeader
       className='text-app text-primary-token'
@@ -343,7 +345,7 @@ export function ReleaseTableWithTracks({
         <div className='system-b-release-table-empty-state m-3 flex flex-col'>
           <TableEmptyState
             icon={<Icon name='Layers' className='h-6 w-6' />}
-            heading='No releases found'
+            heading='No Releases Found'
             description='Use the toolbar to create a release, sync from Spotify, or clear filters.'
           />
         </div>

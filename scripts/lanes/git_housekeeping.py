@@ -9,11 +9,14 @@ running and only then deletes. A directory that stays occupied still raises.
 """
 from __future__ import annotations
 
+import ctypes
 import errno
 import os
+import platform
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -208,6 +211,115 @@ def _settled_absent(root: Path, seconds: float) -> bool:
     return not root.exists() and not root.is_symlink() and not processes_under(root)
 
 
+class _DarwinStatFS64(ctypes.Structure):
+    """Darwin SDK sys/mount.h __DARWIN_STRUCT_STATFS64, not legacy statfs.
+
+    Verified with SDK sizeof/offsetof on arm64 and x86_64 compilation:
+    size2168, alignment8, mount-name offset88, and MAXPATHLEN1024.
+    """
+    _fields_ = [
+        ("f_bsize", ctypes.c_uint32), ("f_iosize", ctypes.c_int32),
+        ("f_blocks", ctypes.c_uint64), ("f_bfree", ctypes.c_uint64),
+        ("f_bavail", ctypes.c_uint64), ("f_files", ctypes.c_uint64),
+        ("f_ffree", ctypes.c_uint64), ("f_fsid", ctypes.c_int32 * 2),
+        ("f_owner", ctypes.c_uint32), ("f_type", ctypes.c_uint32),
+        ("f_flags", ctypes.c_uint32), ("f_fssubtype", ctypes.c_uint32),
+        ("f_fstypename", ctypes.c_char * 16),
+        ("f_mntonname", ctypes.c_char * 1024),
+        ("f_mntfromname", ctypes.c_char * 1024),
+        ("f_flags_ext", ctypes.c_uint32), ("f_reserved", ctypes.c_uint32 * 7),
+    ]
+
+
+def _darwin_mount_points() -> tuple[Path, ...]:
+    """Copy a lossless kernel snapshot; unavailable/invalid evidence refuses deletion."""
+    symbols = {"arm64": "getmntinfo_r_np", "x86_64": "getmntinfo_r_np$INODE64"}
+    architecture = platform.machine()
+    if (sys.platform != "darwin" or architecture not in symbols
+            or ctypes.sizeof(ctypes.c_void_p) != 8
+            or ctypes.sizeof(_DarwinStatFS64) != 2168
+            or ctypes.alignment(_DarwinStatFS64) != 8
+            or _DarwinStatFS64.f_mntonname.offset != 88
+            or _DarwinStatFS64.f_reserved.offset != 2140):
+        raise OSError(errno.ENOTSUP, "unsupported Darwin mount snapshot ABI")
+    try:
+        library = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
+        snapshot_type = ctypes.POINTER(_DarwinStatFS64)
+        read_snapshot = getattr(library, symbols[architecture])
+        read_snapshot.argtypes = [ctypes.POINTER(snapshot_type), ctypes.c_int]
+        read_snapshot.restype = ctypes.c_int
+        release = library.free
+        release.argtypes = [ctypes.c_void_p]
+        release.restype = None
+    except (AttributeError, OSError) as error:
+        raise OSError(errno.ENOSYS, "Darwin mount snapshot API unavailable") from error
+
+    snapshot = snapshot_type()
+    try:
+        ctypes.set_errno(0)
+        count = read_snapshot(ctypes.byref(snapshot), 2)  # SDK MNT_NOWAIT
+        if count <= 0:
+            raise OSError(ctypes.get_errno() or errno.EIO, "Darwin mount snapshot failed")
+        if not snapshot or count > 4096:
+            raise OSError(errno.EIO, "invalid Darwin mount snapshot count or pointer")
+        paths = []
+        for index in range(count):
+            raw = ctypes.string_at(ctypes.addressof(snapshot[index])
+                                   + _DarwinStatFS64.f_mntonname.offset, 1024)
+            end = raw.find(b"\0")
+            if end <= 0 or not raw.startswith(b"/"):
+                raise OSError(errno.EIO, "invalid Darwin mount path")
+            path = Path(os.fsdecode(raw[:end]))
+            if ".." in path.parts:
+                raise OSError(errno.EIO, "noncanonical Darwin mount path")
+            paths.append(path)
+        if Path("/") not in paths:
+            raise OSError(errno.EIO, "Darwin mount snapshot is missing root")
+        return tuple(paths)
+    finally:
+        if snapshot:
+            release(snapshot)
+
+
+def _darwin_mounted_inside(root: Path) -> Path | None:
+    mounts = _darwin_mount_points()
+    root_stat = root.stat()
+    root_identity = (root_stat.st_dev, root_stat.st_ino)
+    identities = {}
+    for mount in mounts:
+        mount = mount.resolve()
+        if mount == root or root in mount.parents:
+            return mount
+        # APFS firmlinks (/Users and /System/Volumes/Data/Users, for example)
+        # have equal filesystem identities but remain distinct after realpath.
+        for ancestor in (mount, *mount.parents):
+            if ancestor not in identities:
+                stat = ancestor.stat()
+                identities[ancestor] = (stat.st_dev, stat.st_ino)
+            if identities[ancestor] == root_identity:
+                return mount
+    return None
+
+
+def mounted_inside(path: Path | str, mountinfo: Path | str | None = None) -> Path | None:
+    """The first mount point equal to `path` or beneath it, else None. Unreadable mount
+    table raises OSError: a delete must fail closed when it cannot prove the tree is local."""
+    root = Path(path).resolve()
+    if mountinfo is None:
+        if sys.platform == "darwin":
+            return _darwin_mounted_inside(root)
+        if not sys.platform.startswith("linux"):
+            raise OSError(errno.ENOTSUP, "mount snapshot unsupported on this platform")
+        mountinfo = "/proc/self/mountinfo"
+    for line in Path(mountinfo).read_text().splitlines():
+        fields = line.split()
+        if len(fields) > 4:
+            mount = Path(fields[4].replace("\\040", " "))
+            if mount == root or root in mount.parents:
+                return mount
+    return None
+
+
 def remove_tree(path: Path | str) -> None:
     """Delete `path`. Retry only while a departing git process refills it.
 
@@ -216,6 +328,10 @@ def remove_tree(path: Path | str) -> None:
     on the first successful remove.
     """
     root = Path(path)
+    # 2026-10-25: an rm -rf of a bind-mounted retired workspace deleted another volume's data.
+    mount = mounted_inside(root) if root.exists() else None
+    if mount is not None:
+        raise OSError(errno.EBUSY, f"refusing to delete {root}: mount point {mount} is at or inside it")
     last: OSError | None = None
     repository = _repository(root)
     for attempt in range(12):
@@ -369,12 +485,29 @@ def install_isolated_tempdirs() -> None:
     if getattr(tempfile, "_jovie_isolated_temp", False):
         return
     original = tempfile.TemporaryDirectory
+    # CI runs 3.12+, where TemporaryDirectory accepts ignore_cleanup_errors
+    # (3.10+) and delete (3.12). The lanes host qualifies locally on its own
+    # ambient python3 (3.9), which accepts neither: forwarding both
+    # unconditionally raised TypeError inside every TemporaryDirectory fixture
+    # before any assertion ran (JOV-8913). Forward only what this interpreter
+    # supports and refuse the delete=False semantics it cannot honor.
+    forwards_ignore_cleanup_errors = sys.version_info >= (3, 10)
+    forwards_delete = sys.version_info >= (3, 12)
 
     class IsolatedTemporaryDirectory(original):
         def __init__(self, suffix=None, prefix=None, dir=None,
                      ignore_cleanup_errors=False, *, delete=True):
             prefix = f"jovie-lanes-{os.getpid()}-" + (prefix or "")
-            super().__init__(suffix, prefix, dir, ignore_cleanup_errors, delete=delete)
+            if delete is False and not forwards_delete:
+                raise NotImplementedError(
+                    "delete=False needs the 3.12 TemporaryDirectory contract")
+            if forwards_ignore_cleanup_errors and forwards_delete:
+                super().__init__(suffix, prefix, dir, ignore_cleanup_errors,
+                                 delete=delete)
+            elif forwards_ignore_cleanup_errors:
+                super().__init__(suffix, prefix, dir, ignore_cleanup_errors)
+            else:
+                super().__init__(suffix, prefix, dir)
 
         @classmethod
         def _rmtree(cls, name, ignore_errors=False, repeated=False):

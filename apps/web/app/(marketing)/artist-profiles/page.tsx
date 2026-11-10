@@ -3,6 +3,7 @@ import { ArtistProfileLandingRoute } from '@/components/marketing/artist-profile
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 export const revalidate = false;
@@ -42,8 +43,8 @@ export const metadata: Metadata = {
     title: ARTIST_PROFILES_OG_TITLE,
     description: ARTIST_PROFILES_DESCRIPTION,
     images: [ARTIST_PROFILES_OG_IMAGE],
-    creator: '@meetjovie',
-    site: '@meetjovie',
+    creator: COMPANY_IDENTITY.xHandle,
+    site: COMPANY_IDENTITY.xHandle,
   },
 };
 

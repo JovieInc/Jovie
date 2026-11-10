@@ -20,6 +20,7 @@ import {
 import {
   createCheckoutSession,
   createSignedStripeWebhook,
+  detachCustomerPaymentMethods,
   ensureUserIsFree,
   expireRunOwnedTestCheckoutSession,
   getBillingStatus,
@@ -29,6 +30,7 @@ import {
   postStripeWebhook,
   sendSubscriptionWebhook,
 } from './helpers/stripe-helpers';
+import { measureWebVitals } from './utils/performance-test-utils';
 
 /**
  * $12/month self-serve artist profile (EVENT: Tim, 2026-10-20):
@@ -41,6 +43,18 @@ import {
  * with Stripe's documented test PaymentMethod and the signed event goes
  * through the real webhook route.
  */
+// A paying artist must not watch the claim or unlock screen jump around.
+// 0.1 is the Web Vitals "good" ceiling for cumulative layout shift.
+async function expectStableLayout(page: Page, screen: string): Promise<void> {
+  await page.waitForTimeout(1500); // let late shifts land
+  const { cls = 0 } = await measureWebVitals(page);
+  test
+    .info()
+    .annotations.push({ type: 'cls', description: `${screen} ${cls}` });
+  // Soft, so a shift is reported without hiding the payment checks after it.
+  expect.soft(cls, `${screen} layout shift`).toBeLessThan(0.1);
+}
+
 test.describe('Self-serve artist profile checkout', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -70,6 +84,13 @@ test.describe('Self-serve artist profile checkout', () => {
     await interceptTrackingRoutes(page);
     await setTestAuthBypassSession(page, 'creator');
     await ensureUserIsFree(page, stripeClient);
+    // JOV-8805: the persona's Stripe customer persists across runs; clear
+    // attached test PaymentMethods so checkout.sessions.create stays under
+    // Stripe's per-customer cap.
+    await detachCustomerPaymentMethods(
+      stripeClient,
+      DEFAULT_DEV_TEST_AUTH_EMAILS.creator
+    );
 
     // Claim start captures Pro monthly intent and the claim-flow marker.
     const start = await page.request.get('/claim/start?new=1', {
@@ -83,6 +104,7 @@ test.describe('Self-serve artist profile checkout', () => {
     );
 
     await page.goto('/claim', { waitUntil: 'domcontentloaded' });
+    await expectStableLayout(page, '/claim');
     const { sessionId } = await createCheckoutSession(page, priceId, {
       source: 'onboarding',
       returnTo: '/chat?from=onboarding',
@@ -125,6 +147,31 @@ test.describe('Self-serve artist profile checkout', () => {
         .toBe(true);
       expect((await getBillingStatus(page)).plan).toBe('pro');
 
+      // Paid value (golden-path step): the buyer lands on the unlock screen,
+      // not a bare receipt. This is the only run that can pay, so it asserts it.
+      // ponytail: Stripe forbids automating hosted Checkout, so this session
+      // never reaches status 'complete' and /api/billing/checkout-session
+      // answers { plan: null }. The paid entitlement is already proven by the
+      // signed webhook above; stub only that read to render the paid screen.
+      await page.route('**/api/billing/checkout-session**', route =>
+        route.fulfill({
+          json: {
+            plan: 'pro',
+            priceId,
+            needsProfile: false,
+            proofPending: false,
+            profileShareUrl: null,
+          },
+        })
+      );
+      await page.goto(`/billing/success?session_id=${sessionId}`, {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(page.getByText(/You're on .+: unlocked/)).toBeVisible({
+        timeout: 30_000,
+      });
+      await expectStableLayout(page, '/billing/success');
+
       // An existing subscriber is never charged twice.
       const again = await page.request.get('/claim/start?new=1', {
         maxRedirects: 0,
@@ -136,6 +183,10 @@ test.describe('Self-serve artist profile checkout', () => {
       // The persona keeps its Stripe customer; only the test subscription
       // is canceled so the next run starts free.
       await ensureUserIsFree(page, stripeClient);
+      await detachCustomerPaymentMethods(
+        stripeClient,
+        DEFAULT_DEV_TEST_AUTH_EMAILS.creator
+      );
     }
   });
 });
@@ -252,6 +303,7 @@ test.describe('Claim checkout dogfood', () => {
     await ensureUserIsFree(page, stripeClient).catch(async () => {
       await resetDogfoodBilling(buyerEmail);
     });
+    await detachCustomerPaymentMethods(stripeClient, buyerEmail);
     const { profileId } = await readActiveClaimVerification(buyerEmail);
     await clearDogfoodClaim(profileId, artist);
 
@@ -400,6 +452,9 @@ test.describe('Claim checkout dogfood', () => {
       await ensureUserIsFree(page, stripeClient).catch(async () => {
         await resetDogfoodBilling(buyerEmail);
       });
+      await detachCustomerPaymentMethods(stripeClient, buyerEmail).catch(
+        () => undefined
+      );
       if (openSession) {
         await expireRunOwnedTestCheckoutSession(
           stripeClient,

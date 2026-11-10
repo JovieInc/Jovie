@@ -306,10 +306,20 @@ describe('delivery state machine', () => {
         }),
       /exact deployed SHA/
     );
+    assert.throws(
+      () =>
+        transitionDeliveryReceipt(receipt, {
+          stage: 'production-proven',
+          deployedSha: HEAD,
+        }),
+      /merge_group/
+    );
     const proven = transitionDeliveryReceipt(receipt, {
       stage: 'production-proven',
       deployedSha: HEAD,
+      mergeGroupRun: { event: 'merge_group', id: 123 },
     });
+    assert.equal(proven.transition.mergeGroupRun.id, 123);
     assert.equal(proven.terminal, true);
   });
 
@@ -1162,4 +1172,19 @@ describe('delivery state machine', () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+});
+
+it('rejects a forged Done receipt at durable persistence, including dry-run', async () => {
+  const receipt = buildDeliveryReceipt({
+    delivery_key: 'forged-done',
+    pr_number: 1,
+    head_sha: HEAD,
+  });
+  await assert.rejects(
+    persistDeliveryOutcome(
+      { ...receipt, stage: 'production-proven' },
+      { dryRun: true }
+    ),
+    /merge_group/
+  );
 });

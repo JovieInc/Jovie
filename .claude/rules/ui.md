@@ -52,6 +52,10 @@ Do not hide a primary action behind hover, a gesture, a magic shortcut, or a
 second surface when a direct visible control fits. Touch and pointer controls
 remain available even when a keyboard accelerator is useful.
 
+Follow [tooltip eligibility and input](../../DESIGN.md#tooltip-eligibility-and-input):
+measure title clipping, preserve mouse/keyboard hints on hybrids, let touch
+activate immediately, and retain rail-owned interactive portals until dismissal.
+
 ### Input, Shortcuts, and Discoverability
 
 - Prefer semantic native controls. Use ARIA composite roles only when the
@@ -249,6 +253,21 @@ Scene Palette v1 from `apps/web/data/marketing/imageColorPolicy.ts`. The
 softened scene references are for set design, light, material, wardrobe, and
 prompt contracts only; they do not replace the shipped Noir Ion UI anchors.
 
+Marketing page sections and those images follow
+[Imagery and color](../../canon/MARKETING.md#imagery-and-color). One primary
+color per image, never mixed. Each section gets exactly one accent, chosen
+per section and image: Ion `#3FAFF3`, Ultra `#A789F0`, or Pulse `#EB6AC6`,
+never blended. A gradient's key color is that accent hue; other tones are
+only neutral black falloff. Fades and light reveals are strongly asymmetric:
+a lit wedge, and the rest to black. Image-generation prompt templates name
+the single hue and forbid secondary hues. Orange as a scene or cue color, and
+a literal triad, stay forbidden. The orange, red, and green rotation above
+does not apply to these marketing images or section accents. The prose
+frontend skill is not in this repo (`~/.codex/skills/frontend-skill`); this
+contract is the in-repo copy. Blocking source checks are
+`scripts/invariants/art-direction/accent.mjs` and `hue.mjs`; they ratchet
+source violations without certifying generated pixels or prompt compliance.
+
 ### Do not fuck with art (founder-locked 2026-08-13)
 
 Hard product and marketing rules from `DESIGN.md`. Not aesthetic taste.
@@ -278,6 +297,14 @@ Hard product and marketing rules from `DESIGN.md`. Not aesthetic taste.
   uses `.marketing-type-display` / `-section` / `-lede`.
 - Marketing plan prices render only through `MarketingOfferSummary` or
   `getPublicPriceClaim` from offer truth; never type a price into copy.
+- Marketing images and cards use a radius token. The wide cinematic corner
+  is `.marketing-rounded-frame` (`--system-b-radius-panel` / `--radius-3xl`).
+  Exempt only the full-bleed hero start (it rounds as it zooms out), logos,
+  icons, SVG marks, and already-round avatars. See MKT-D17.
+- Marketing and public pages have one boxed width (`.public-container`, via
+  `MarketingContainer` or `Container`) and one full-bleed override (`bleed`).
+  Header, hero, sections and footer share it. No other page `max-w-*`, no
+  container padding of your own. See MKT-D18.
 
 ### No Duplicate Page Titles (Breadcrumb + Toolbar)
 
@@ -301,7 +328,37 @@ padding. Optional selection columns may occupy their own reserved track, but
 the primary content column must return to the shared seam when that track is
 absent.
 
+### No dead ends (JOV-INV-046)
+
+- Every control you render must work in the current runtime. Decide with a capability check (`isDesktopApp`, speech/mic support, entitlement) and render nothing when it fails.
+- Banned UI: "not available", "unavailable", "not supported", "coming soon", "check back", "use X instead", "only available on Y"; `disabled` with no reason (`title`, `disabledReason`, `aria-describedby`); empty or no-op handlers; `href="#"`; links to routes that do not exist.
+- Allowed: permission or entitlement prompts that lead to a working path (Allow microphone, a real checkout) and transient errors that offer retry. Mark a deliberate exception with a `dead-end-ok: <reason>` comment on the same or previous line.
+- `pnpm design:no-dead-ends:check` fails on new violations; grandfathered ones live in `packages/copy/dead-ends.baseline.json` and only shrink (`pnpm design:no-dead-ends:update` locks a shrink). If a dead end can still reach a user, call `trackDeadEndShown(surface, reason)` so Summer can find it.
+
 ## Taste Rules (Hard Invariants)
+
+### No ICP-specific language on general pages
+
+- Homepage, pricing, about, brand, and other general marketing routes stay generic. Jovie is an identity product for any creator.
+- Do not write segment copy there: music, artist, musician, DJ, producer, label, founder, investor, fan, author, or a creator-type niche. “Creator” is the generic word.
+- Dedicated audience routes may use that language. The allowlist is `scripts/invariants/icp-language/config.json`.
+- The headline “Be found. Be understood.” is locked.
+- `scripts/invariants/icp-language/check.mjs` is a blocking PR Ready check. Existing hits are a shrink-only baseline. See MKT-D16 in `docs/marketing/DESIGN_INVARIANTS.md`.
+
+### Quiet Surfaces: Hard Bans (founder, 2026-10-28)
+
+- **No bordered or filled containers around icons or emoji.** Show the bare icon at the right size and colour token, aligned to the text grid. `IconBadge`, `IconTile` and `IconGlyphFrame` are retired. `apps/web/scripts/lint-design-noise.mjs` (`icon-tile`) ratchets existing debt; new sites fail.
+- **Cards carry at most title + body + one optional bare visual.** Labels that restate structure ("Step 1", "Feature") are never visible text. Order comes from an `<ol>`; keep the count `sr-only`, or art-direct an oversized faded numeral.
+- **One email-capture control: `InlineSubscribe`** (`@jovie/ui/atoms/inline-subscribe`, built on `CompositeField`). One short title, one attached field and button, at most one microcopy line. No visible label (aria-label), no subtitle, no helper that restates the title or CTA.
+- **A primary button is never grey-disabled by field validity.** Validate on submit. Disable only for a genuinely unavailable service.
+- **Composite fields (prefix/suffix, search pill, composer) use `CompositeField`**, which owns the radius-following focus ring. Never a raw `outline`/`ring-0` on the inner input (`lint-composite-field.mjs`).
+- Rendered counterpart: `tests/e2e/marketing-noise-budget.spec.ts` (text-layer budget, icon tiles, "Step N") with deliberate-red cases for the vision critic.
+
+### Copy Is the Message, Never the Brief
+
+Reject AI instructions, editing rules, and unfinished text in every user-visible string, including metadata, accessibility labels, emails, errors, empty states, and demos. Use the copy system.
+Run `node scripts/invariants/copy-leak/check.mjs` before review: it blocks PR Ready and merge groups. Fix real leaks; its baseline only shrinks.
+Exact exceptions in `scripts/invariants/copy-leak/config.json` require reasons.
 
 ### No Emoji in UI — Use Icons
 
@@ -343,6 +400,8 @@ absent.
 - During refactors and polish passes, explicitly audit for what can be deleted, merged, flattened, or simplified before introducing anything new.
 
 ### No AI-Slop Product UI
+
+The machine-readable rule list is `docs/design-system/anti-slop-rules.json` (ASR ids; `node scripts/anti-slop/run.mjs list`). Run `node scripts/anti-slop/run.mjs check --files <paths>` before showing UI. Agent-first default for app and admin: ASR-031. Redundant chrome: ASR-035. Eyebrows: ASR-022.
 
 - Jovie product UI must feel closer to Linear than generic AI-generated dashboards: compact, quiet, precise, and premium.
 - Default to small typography, restrained weight changes, and clean spacing before adding decorative treatment.

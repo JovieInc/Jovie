@@ -124,6 +124,7 @@ export const BUTTON_PEN_PROPAGATION_FIXTURES = [
   {
     route: '/download',
     source: 'apps/web/app/(marketing)/download/page.tsx',
+    labelSource: 'apps/web/data/downloadCopy.ts',
     label: 'Download for Mac',
     variant: 'primary',
     size: 'lg',

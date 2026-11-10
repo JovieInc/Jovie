@@ -56,6 +56,7 @@ const mockMembers: AudienceMember[] = [
     ],
     utmParams: {},
     email: 'sasha@example.com',
+    emailVisibleToArtist: true,
     phone: null,
     spotifyConnected: false,
     purchaseCount: 0,
@@ -81,6 +82,7 @@ const mockMembers: AudienceMember[] = [
     referrerHistory: [],
     utmParams: {},
     email: null,
+    emailVisibleToArtist: true,
     phone: null,
     spotifyConnected: false,
     purchaseCount: 0,
@@ -109,6 +111,7 @@ const mockMembers: AudienceMember[] = [
     ],
     utmParams: {},
     email: null,
+    emailVisibleToArtist: true,
     phone: '+15555555555',
     spotifyConnected: false,
     purchaseCount: 0,
@@ -131,16 +134,6 @@ const meta: Meta<typeof DashboardAudienceTable> = {
         { name: 'light', value: '#ffffff' },
         { name: 'dark', value: '#0D0E12' },
       ],
-    },
-    a11y: {
-      config: {
-        rules: [
-          {
-            id: 'color-contrast',
-            enabled: true,
-          },
-        ],
-      },
     },
   },
   tags: ['autodocs', 'audience-a11y'],
@@ -381,6 +374,7 @@ function generateMockMembers(count: number): AudienceMember[] {
       referrerHistory,
       utmParams: {},
       email,
+      emailVisibleToArtist: true,
       phone,
       spotifyConnected: type === 'spotify',
       purchaseCount: Math.floor((i * 3) % 5),

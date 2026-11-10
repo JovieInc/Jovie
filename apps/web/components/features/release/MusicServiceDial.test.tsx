@@ -65,8 +65,8 @@ describe('MusicServiceDial', () => {
         onStream={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Select Apple Music' }));
-    act(() => vi.advanceTimersByTime(180));
+    fireEvent.click(screen.getByRole('option', { name: 'Apple Music' }));
+    act(() => vi.advanceTimersByTime(1000));
     expect(document.cookie).toContain(`${LISTEN_COOKIE}=apple_music`);
     expect(
       screen.getByRole('link', { name: 'Stream Now with Apple Music' })

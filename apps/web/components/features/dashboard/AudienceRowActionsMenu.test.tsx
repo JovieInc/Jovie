@@ -21,6 +21,7 @@ const row = {
   referrerHistory: [],
   utmParams: {},
   email: 'ada@example.com',
+  emailVisibleToArtist: true,
   phone: null,
   spotifyConnected: false,
   purchaseCount: 0,
@@ -32,11 +33,35 @@ const row = {
 } as AudienceMember;
 
 describe('AudienceRowActionsMenu', () => {
+  it('removes the background trigger from navigation only while its modal is open', () => {
+    const { container, rerender } = render(
+      <AudienceRowActionsMenu row={row} open />
+    );
+    const trigger = container.querySelector('button');
+    expect(trigger).toHaveAttribute('inert');
+    rerender(<AudienceRowActionsMenu row={row} open={false} />);
+    expect(trigger).not.toHaveAttribute('inert');
+  });
+
   it('offers copy actions and hides the unfinished id action', () => {
     render(<AudienceRowActionsMenu row={row} open />);
 
     expect(screen.getByRole('menuitem', { name: 'Copy email' })).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: 'Copy phone' })).toBeTruthy();
     expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument();
+  });
+
+  it('defaults to a modal menu and can render non-modal for catalogs', () => {
+    const { container, rerender } = render(
+      <AudienceRowActionsMenu row={row} open modal={false} />
+    );
+
+    // The `modal` passthrough exists so Storybook catalogs can render the
+    // open menu without Radix `hideOthers` ARIA-hiding the canvas.
+    expect(container.firstChild).not.toBeNull();
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+
+    rerender(<AudienceRowActionsMenu row={row} open />);
+    expect(screen.getByRole('menu')).toBeInTheDocument();
   });
 });

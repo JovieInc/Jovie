@@ -80,10 +80,81 @@ class Isolated(unittest.TestCase):
         profile(codex.ACCOUNTS_ROOT, "beta")
         profile(codex.ACCOUNTS_ROOT, "openrouter", kind="apikey")
         (codex.ACCOUNTS_ROOT / "locks").mkdir()
+        # JOV-8763: the orchestration host may export CODEX_LANE_AUTH_MODE
+        # (subscription-pool). Inheriting it would route accounts()/state reads
+        # down the subscription-pool path instead of the fixtures above. Tests
+        # needing a mode (CurrentLoginTest, SubscriptionPoolTest) start their own
+        # patch after super().setUp(), and cleanup order restores theirs first.
+        self.host_env = patch.dict(os.environ)
+        self.host_env.start()
+        self.addCleanup(self.host_env.stop)
+        os.environ.pop("CODEX_LANE_AUTH_MODE", None)
+        # Capacity tests may enter worker() on the real Gem host. Never discover
+        # production repository bindings or reexec into the installed worker.
+        os.environ["LANES_EXECUTION_BACKEND"] = "local-test"
 
     def tearDown(self):
         codex.ACCOUNTS_ROOT, codex.STATE = self.saved
         self.tmp.cleanup()
+
+
+class IsolatedSetUpHostModeTest(unittest.TestCase):
+    """JOV-8763: the orchestration host may export CODEX_LANE_AUTH_MODE=subscription-pool.
+
+    Isolated.setUp builds alpha/beta fixture accounts for the legacy ACCOUNTS_ROOT
+    scan. Inheriting the host's auth mode sends accounts() down the subscription-pool
+    path (profile validation, real CLI probes) instead, so the fixtures never decide
+    the result and tests pass or fail with the host's environment. The base setUp
+    must neutralize the inherited mode; tests that need a mode pin it themselves
+    (CurrentLoginTest, SubscriptionPoolTest).
+    """
+
+    def test_isolated_setUp_neutralizes_inherited_host_auth_mode(self):
+        with patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "subscription-pool"}):
+            case = AccountsTest("test_only_chatgpt_profiles_are_accounts")
+            case.setUp()
+            try:
+                self.assertIsNone(os.environ.get("CODEX_LANE_AUTH_MODE"))
+                self.assertFalse(codex.subscription_pool_mode())
+                self.assertEqual(codex.accounts(), ["alpha", "beta"])
+            finally:
+                case.tearDown()
+                case.doCleanups()
+            self.assertEqual(os.environ.get("CODEX_LANE_AUTH_MODE"), "subscription-pool")
+
+    def test_fixture_disables_live_bindings_even_when_host_is_gem(self):
+        from scripts.lanes import lane_runner as runner
+        with patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "production"}):
+            case = AccountsTest("test_only_chatgpt_profiles_are_accounts")
+            case.setUp()
+            try:
+                with patch.object(runner, "HOST", "gem"), \
+                        patch.object(runner, "read_json", side_effect=AssertionError("no production policy read")), \
+                        patch.object(runner, "sh", side_effect=AssertionError("no GitHub or worktree command")), \
+                        patch.object(runner.os, "execv", side_effect=AssertionError("no process replacement")):
+                    self.assertEqual(runner.bindings.extra_bindings(runner), [])
+            finally:
+                case.tearDown()
+                case.doCleanups()
+            self.assertEqual(os.environ["LANES_EXECUTION_BACKEND"], "production")
+
+    def test_mode_pinned_by_a_subclass_restores_inherited_host_mode_on_cleanup(self):
+        class Pinned(Isolated):
+            def setUp(self):
+                super().setUp()
+                self.env = patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "current-login"})
+                self.env.start()
+                self.addCleanup(self.env.stop)
+
+        with patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "subscription-pool"}):
+            case = Pinned()
+            case.setUp()
+            try:
+                self.assertEqual(os.environ.get("CODEX_LANE_AUTH_MODE"), "current-login")
+            finally:
+                case.tearDown()
+                case.doCleanups()
+            self.assertEqual(os.environ.get("CODEX_LANE_AUTH_MODE"), "subscription-pool")
 
 
 class AccountsTest(Isolated):
@@ -122,8 +193,12 @@ class CurrentLoginTest(Isolated):
         super().setUp()
         self.root = Path(self.tmp.name)
         self.cli = self.root / "codex"
+        # Pin one slot. An ambient CODEX_LANE_LOGIN_SLOTS above 1 makes
+        # test_real_metadata_child_retains_lease_until_delayed_reap loop in
+        # reap_current_metadata. Collection also scrubs the host value.
         self.env = patch.dict(os.environ, {
             "CODEX_LANE_AUTH_MODE": "current-login", "CODEX_LANE_CLI": str(self.cli),
+            "CODEX_LANE_LOGIN_SLOTS": "1",
             "CODEX_HOME": str(self.root / "existing-login"), "OPENAI_API_KEY": "must-not-reach-child",
             "OPENAI_BASE_URL": "https://unavailable.invalid", "CODEX_API_KEY": "must-not-reach-child",
         })
@@ -294,7 +369,7 @@ class CurrentLoginTest(Isolated):
             self.assertTrue(codex.reconcile(1_000_000, 0)["reconciled"])
         calls.assert_called_once_with('current-login', [
             ('account/read', {'refreshToken': False}), ('account/rateLimits/read', None),
-            ('model/list', {'limit': 100, 'includeHidden': False})], lease_handle=ANY)
+            ('model/list', {'limit': 100, 'includeHidden': False})], timeout=codex.CURRENT_METADATA_TIMEOUT_S, lease_handle=ANY)
         value = codex.read_state()['current-login']['capacityLease']
         self.assertEqual(value['usableCapacityRemaining']['primary']['remainingPercent'], 50)
         self.assertEqual(value['compatibility']['models'], ['gpt-6.1-sol'])
@@ -336,6 +411,172 @@ for line in sys.stdin:
                     patch.object(codex.subprocess, 'Popen', side_effect=AssertionError('private launch')):
                 with self.assertRaises(ValueError):
                     codex.app_server_calls(name, calls)
+
+    def test_metadata_notifications_do_not_hide_a_buffered_response(self):
+        self.cli.write_text(f'''#!{sys.executable}
+import json, os, sys
+for line in sys.stdin:
+    request = json.loads(line)
+    if 'id' not in request:
+        continue
+    messages = [{{'method': 'account/updated', 'params': {{}}}},
+                {{'id': request['id'], 'result': {{'method': request['method'], 'label': 'café'}}}}]
+    os.write(sys.stdout.fileno(), ''.join(json.dumps(message, ensure_ascii=False) + '\\n'
+                                        for message in messages).encode())
+''')
+        self.cli.chmod(0o700)
+        with codex.lease('current-login') as handle:
+            result = codex.app_server_calls('current-login', codex.CURRENT_METADATA_CALLS,
+                                            timeout=2, lease_handle=handle)
+        self.assertEqual(result, [{'method': method, 'label': 'café'}
+                                  for method, _ in codex.CURRENT_METADATA_CALLS])
+
+    def test_metadata_frames_can_split_utf8_and_keep_unrelated_ids_separate(self):
+        writes = []
+        chunks = []
+        class Input:
+            def write(self, value):
+                writes.append(json.loads(value))
+                request = writes[-1]
+                if 'id' not in request:
+                    return
+                payload = (json.dumps({'id': -1, 'result': {'unrelated': True}}) + '\n' +
+                           json.dumps({'id': request['id'], 'result': {'label': 'café'}},
+                                      ensure_ascii=False) + '\n').encode()
+                split = payload.index('é'.encode()) + 1
+                chunks.extend([payload[:3], payload[3:split], payload[split:]])
+            def flush(self): pass
+            def close(self): pass
+        proc = SimpleNamespace(stdin=Input(), stdout=SimpleNamespace(fileno=lambda: 123, close=lambda: None))
+        with codex.lease('current-login') as handle, \
+                patch.object(codex.subprocess, 'Popen', return_value=proc), \
+                patch.object(codex.select, 'select', return_value=([proc.stdout], [], [])), \
+                patch.object(codex.os, 'read', side_effect=lambda *_: chunks.pop(0)), \
+                patch.object(codex, 'reap_current_metadata') as reap:
+            result = codex.app_server_calls('current-login', codex.CURRENT_METADATA_CALLS,
+                                            timeout=.5, lease_handle=handle)
+        self.assertEqual(result, [{'label': 'café'}] * 3)
+        self.assertEqual([row['method'] for row in writes],
+                         ['initialize', 'initialized', *[method for method, _ in codex.CURRENT_METADATA_CALLS]])
+        reap.assert_called_once_with(proc)
+
+    def test_incomplete_metadata_frame_at_eof_still_reaps_the_lease_holder(self):
+        proc = SimpleNamespace(stdin=io.StringIO(), stdout=SimpleNamespace(fileno=lambda: 123, close=lambda: None))
+        with codex.lease('current-login') as handle, \
+                patch.object(codex.subprocess, 'Popen', return_value=proc), \
+                patch.object(codex.select, 'select', return_value=([proc.stdout], [], [])), \
+                patch.object(codex.os, 'read', side_effect=[b'{"id":1', b'']), \
+                patch.object(codex, 'reap_current_metadata') as reap:
+            with self.assertRaisesRegex(TimeoutError, 'initialize: app-server response unavailable'):
+                codex.app_server_calls('current-login', codex.CURRENT_METADATA_CALLS,
+                                       timeout=.5, lease_handle=handle)
+            self.assertFalse(handle.closed, 'the caller retains the account lease')
+        reap.assert_called_once_with(proc)
+
+    def test_metadata_keeps_a_partial_notification_between_requests(self):
+        chunks, requests = [], []
+        class Input:
+            def write(self, value):
+                request = json.loads(value)
+                if 'id' not in request:
+                    return
+                requests.append(request['method'])
+                response = json.dumps({'id': request['id'], 'result': {'method': request['method']}}).encode() + b'\n'
+                if request['id'] == 1:
+                    chunks.append(response + b'{"method":"account/')
+                elif request['id'] == 2:
+                    chunks.append(b'updated","params":{}}\n' + response)
+                else:
+                    chunks.append(response)
+            def flush(self): pass
+            def close(self): pass
+        proc = SimpleNamespace(stdin=Input(), stdout=SimpleNamespace(fileno=lambda: 123, close=lambda: None))
+        with codex.lease('current-login') as handle, \
+                patch.object(codex.subprocess, 'Popen', return_value=proc), \
+                patch.object(codex.select, 'select', return_value=([proc.stdout], [], [])), \
+                patch.object(codex.os, 'read', side_effect=lambda *_: chunks.pop(0)), \
+                patch.object(codex, 'reap_current_metadata') as reap:
+            result = codex.app_server_calls('current-login', codex.CURRENT_METADATA_CALLS,
+                                            timeout=.5, lease_handle=handle)
+        self.assertEqual(result, [{'method': method} for method, _ in codex.CURRENT_METADATA_CALLS])
+        self.assertEqual(requests, ['initialize', *[method for method, _ in codex.CURRENT_METADATA_CALLS]])
+        self.assertEqual(chunks, [])
+        reap.assert_called_once_with(proc)
+
+    def test_metadata_uses_one_deadline_across_all_requests(self):
+        now, chunks, waits = [0.0], [], []
+        class Input:
+            def write(self, value):
+                request = json.loads(value)
+                if 'id' in request:
+                    chunks.append(json.dumps({'id': request['id'], 'result': {}}).encode() + b'\n')
+            def flush(self): pass
+            def close(self): pass
+        proc = SimpleNamespace(stdin=Input(), stdout=SimpleNamespace(fileno=lambda: 123, close=lambda: None))
+        def wait(_read, _write, _error, timeout):
+            waits.append(timeout)
+            now[0] += min(.4, timeout)
+            return ([proc.stdout] if timeout >= .4 else [], [], [])
+        with codex.lease('current-login') as handle, \
+                patch.object(codex.subprocess, 'Popen', return_value=proc), \
+                patch.object(codex.time, 'monotonic', side_effect=lambda: now[0]), \
+                patch.object(codex.select, 'select', side_effect=wait), \
+                patch.object(codex.os, 'read', side_effect=lambda *_: chunks.pop(0)), \
+                patch.object(codex, 'reap_current_metadata') as reap:
+            with self.assertRaisesRegex(TimeoutError, 'account/rateLimits/read: app-server response unavailable'):
+                codex.app_server_calls('current-login', codex.CURRENT_METADATA_CALLS,
+                                       timeout=1, lease_handle=handle)
+            self.assertFalse(handle.closed)
+        self.assertEqual(len(waits), 3)
+        for actual, expected in zip(waits, [1, .6, .2]):
+            self.assertAlmostEqual(actual, expected)
+        self.assertEqual(now, [1.0])
+        reap.assert_called_once_with(proc)
+
+    def test_metadata_partial_record_waits_only_to_the_deadline(self):
+        now, waits = [0.0], []
+        stdout = SimpleNamespace(fileno=lambda: 123, close=lambda: None)
+        proc = SimpleNamespace(stdin=io.StringIO(), stdout=stdout)
+        def wait(_read, _write, _error, timeout):
+            waits.append(timeout)
+            if len(waits) == 1:
+                now[0] = .2
+                return ([stdout], [], [])
+            now[0] += timeout
+            return ([], [], [])
+        with codex.lease('current-login') as handle, \
+                patch.object(codex.subprocess, 'Popen', return_value=proc), \
+                patch.object(codex.time, 'monotonic', side_effect=lambda: now[0]), \
+                patch.object(codex.select, 'select', side_effect=wait), \
+                patch.object(codex.os, 'read', return_value=b'{"id":1') as read, \
+                patch.object(codex, 'reap_current_metadata') as reap:
+            with self.assertRaisesRegex(TimeoutError, 'initialize: app-server response unavailable'):
+                codex.app_server_calls('current-login', codex.CURRENT_METADATA_CALLS,
+                                       timeout=1, lease_handle=handle)
+            self.assertFalse(handle.closed)
+        self.assertEqual(waits, [1, .8])
+        self.assertEqual(now, [1.0])
+        read.assert_called_once()
+        reap.assert_called_once_with(proc)
+
+    def test_metadata_eof_protocol_errors_and_invalid_json_fail_closed_and_reap(self):
+        cases = [(b'', TimeoutError), (b'not-json\n', json.JSONDecodeError),
+                 (b'{"id":1,"error":{"message":"private payload"}}\n', RuntimeError)]
+        for frame, error in cases:
+            with self.subTest(frame=frame):
+                proc = SimpleNamespace(stdin=io.StringIO(), stdout=SimpleNamespace(fileno=lambda: 123, close=lambda: None))
+                with codex.lease('current-login') as handle, \
+                        patch.object(codex.subprocess, 'Popen', return_value=proc), \
+                        patch.object(codex.select, 'select', return_value=([proc.stdout], [], [])), \
+                        patch.object(codex.os, 'read', return_value=frame), \
+                        patch.object(codex, 'reap_current_metadata') as reap:
+                    with self.assertRaises(error) as raised:
+                        codex.app_server_calls('current-login', codex.CURRENT_METADATA_CALLS,
+                                               timeout=.5, lease_handle=handle)
+                    self.assertNotIn('private payload', str(raised.exception))
+                    self.assertFalse(handle.closed)
+                self.assertTrue(proc.stdin.closed)
+                reap.assert_called_once_with(proc)
 
     def test_observer_preserves_all_auth_quota_and_execution_banks(self):
         before = {'exhaustedUntil': 1_100_000, 'lastKind': 'auth', 'runs': 12, 'lastUsed': 999_999,
@@ -1063,7 +1304,7 @@ class SubscriptionPoolTest(Isolated):
                     patch.object(codex.subprocess, "Popen", side_effect=AssertionError("no depleted execution")):
                 self.assertEqual(codex.run_account("current-login", handle, ["fake"], "fixture",
                                                   self.tmp.name, self.NOW),
-                                 (codex.NO_ACCOUNT_EXIT, "limit", self.NOW + 7200))
+                                 (codex.NO_ACCOUNT_EXIT, "held", self.NOW + 7200))
             self.assertTrue(handle.closed)
             state = codex.read_state()
             self.assertEqual(codex.pick(state, self.NOW, ["current-login"]), (None, None))
@@ -1094,7 +1335,10 @@ class SubscriptionPoolTest(Isolated):
                     patch.object(host, "slots", return_value=5) as provider_cap, \
                     patch.object(host, "intake_slots", return_value=5), \
                     patch.object(runner.autoscale, "host_ceiling", return_value=5) as global_cap, \
-                    patch.object(runner, "worker_with_slot", side_effect=admitted) as work:
+                    patch.object(runner, "worker_with_slot", side_effect=admitted) as work, \
+                    patch.object(runner, "sh", side_effect=AssertionError("no GitHub or worktree command")), \
+                    patch.object(runner.bindings, "_work_one", side_effect=AssertionError("no production binding")), \
+                    patch.object(runner.os, "execv", side_effect=AssertionError("no process replacement")):
                 self.assertEqual(runner.worker(host, "codex"), 0)  # Other providers consume the same ceiling.
                 work.assert_not_called()
                 other.release()
@@ -1204,12 +1448,12 @@ class SubscriptionPoolTest(Isolated):
     def test_invalid_configuration_fails_closed_without_discovery(self):
         invalid = ["", "[]", "{}", "null", "{bad"]
         for mutate in (lambda p: p.pop("current-login"),
-                       lambda p: p.update(third=p["lyb-pro"]),
+                       lambda p: p.update(third=p["lyb-pro"]),  # duplicate home and identity
                        lambda p: p.update({"current-login.1": p.pop("lyb-pro")}),
                        lambda p: p.update({"_ledger": p.pop("lyb-pro")}),
                        lambda p: p["lyb-pro"].update(home=p["current-login"]["home"]),
                        lambda p: p["lyb-pro"].update(emailSha256=p["current-login"]["emailSha256"]),
-                       lambda p: p["lyb-pro"].update(slots=2),
+                       lambda p: p["lyb-pro"].update(slots=0),
                        lambda p: p["lyb-pro"].update(slots=True),
                        lambda p: p["current-login"].update(slots=2),
                        lambda p: p["current-login"].update(home=p["lyb-pro"]["home"]),
@@ -1223,6 +1467,18 @@ class SubscriptionPoolTest(Isolated):
                 with self.subTest(raw=raw), patch.dict(os.environ, {"CODEX_LANE_SUBSCRIPTION_PROFILES": raw}):
                     with self.assertRaises(ValueError):
                         codex.accounts()
+
+    def test_pool_accepts_more_than_two_distinct_bound_accounts_with_measured_seats(self):
+        home = Path(self.tmp.name) / "third"; home.mkdir()
+        value = json.loads(json.dumps(self.profiles))
+        value["jovie-pro"] = {"home": str(home), "slots": 2, "emailSha256": "ab" * 32}
+        with patch.dict(os.environ, {"CODEX_LANE_SUBSCRIPTION_PROFILES": json.dumps(value)}):
+            self.assertEqual(sorted(codex.subscription_profiles()), ["current-login", "jovie-pro", "lyb-pro"])
+            self.assertEqual(codex.subscription_profiles()["jovie-pro"]["slots"], 2)
+            value["fourth-pro"] = {"home": str(home), "slots": 1, "emailSha256": "cd" * 32}
+            with patch.dict(os.environ, {"CODEX_LANE_SUBSCRIPTION_PROFILES": json.dumps(value)}):
+                with self.assertRaises(ValueError):
+                    codex.subscription_profiles()  # a home may be bound to one alias only
 
     def test_three_primary_plus_one_extra_preserve_existing_slot_paths(self):
         self.reconcile()
@@ -1340,9 +1596,39 @@ class SubscriptionPoolTest(Isolated):
         with patch.object(codex,"current_subscription_snapshot",return_value=value), \
                 patch.object(codex.subprocess,"Popen",side_effect=AssertionError("no exhausted execution")):
             self.assertEqual(codex.run_account("lyb-pro",handle,["fake"],"fixture",self.tmp.name,self.NOW),
-                             (codex.NO_ACCOUNT_EXIT,"limit",self.NOW+7200))
+                             (codex.NO_ACCOUNT_EXIT,"held",self.NOW+7200))
         self.assertTrue(codex.available("current-login",codex.read_state(),self.NOW))
         self.assertFalse(codex.available("lyb-pro",codex.read_state(),self.NOW))
+
+    def test_verified_headroom_releases_a_quota_hold_left_by_an_outside_reset(self):
+        self.reconcile()
+        codex.update_state(lambda st: st["current-login"].update(exhaustedUntil=self.NOW + 86400, lastKind="limit",
+                                                                     lastError=codex.METADATA_HOLD))
+        self.assertFalse(codex.available("current-login", codex.read_state(), self.NOW))
+        self.reconcile()
+        state = codex.read_state()
+        self.assertNotIn("exhaustedUntil", state["current-login"])
+        self.assertEqual(state["current-login"]["staleHoldWas"], self.NOW + 86400)
+        self.assertTrue(codex.available("current-login", state, self.NOW))
+
+    def test_depleted_window_auth_bank_or_pending_reset_keeps_the_hold(self):
+        meta = {"lastKind": "limit", "lastError": codex.METADATA_HOLD}
+        cases = (("depleted", meta, 100), ("auth", {"lastKind": "auth"}, 1),
+                 ("run-error-bank", {"lastKind": "limit", "lastError": "usage limit"}, 1),
+                 ("pending", {**meta, "pendingReset": {"before": {}}}, 1))
+        for label, extra, used in cases:
+            with self.subTest(label=label):
+                self.reconcile()
+                codex.update_state(lambda st: st["current-login"].update(exhaustedUntil=self.NOW + 86400, **extra))
+
+                def fetch(name, used=used):
+                    value = self.snapshot(name)
+                    value["rateLimits"]["rateLimits"]["primary"]["usedPercent"] = used
+                    return value
+                codex.reconcile(self.NOW, if_due=0, fetch=fetch)
+                self.assertEqual(codex.read_state()["current-login"]["exhaustedUntil"], self.NOW + 86400)
+                codex.update_state(lambda st: [st["current-login"].pop(k, None)
+                                               for k in ("exhaustedUntil", "pendingReset", "lastKind", "lastError")])
 
     def test_failed_observation_keeps_its_own_cadence_without_suppressing_other_profile(self):
         seen = []
@@ -1478,6 +1764,175 @@ class SubscriptionPoolTest(Isolated):
         codex.reconcile(self.NOW+31,fetch=fail);codex.reconcile(self.NOW+32,fetch=fail)
         self.assertEqual(seen,["lyb-pro"])
 
+
+    # ---- burn before reset (Tim 2026-11-01): use-it-or-lose-it order, 1% floor, failover, one proposal
+
+    def set_capacity(self, name, remaining, resets_in, banked=None, last_used=0):
+        def change(state):
+            row = state[name]
+            row["capacityLease"]["usableCapacityRemaining"] = {
+                "primary": {"remainingPercent": remaining, "resetsAt": self.NOW + resets_in, "windowDurationMins": 10080}}
+            row["capacityLease"]["credits"] = {"availableCount": banked}
+            row["lastUsed"] = last_used
+        codex.update_state(change)
+
+    def test_floor_policy_comes_from_routing_json(self):
+        policy = codex.subsidy_policy()
+        self.assertEqual(policy["source"], "routing.json")
+        self.assertEqual(policy["floorPercent"], 1)
+        self.assertEqual(policy["aliases"], ["current-login", "jovie-pro", "lyb-pro"])
+
+    def test_burn_order_takes_most_left_with_soonest_reset_first(self):
+        self.reconcile()
+        names = list(self.profiles)
+        # lyb-pro: 40% left, resets in a day -> 1.6%/h to burn; current-login: 60% over six days -> 0.4%/h.
+        self.set_capacity("current-login", 60, 6 * 86400)
+        self.set_capacity("lyb-pro", 40, 86400, last_used=self.NOW)
+        name, handle = codex.pick(codex.read_state(), self.NOW, names, deltas={})
+        handle.close()
+        self.assertEqual(name, "lyb-pro", "the window that expires soonest with the most left burns first")
+        self.set_capacity("lyb-pro", 5, 6 * 86400)
+        name, handle = codex.pick(codex.read_state(), self.NOW, names, deltas={})
+        handle.close()
+        self.assertEqual(name, "current-login")
+        ledger = codex.status(self.NOW, names=names)["subsidyLedger"]
+        self.assertEqual(ledger["burnOrder"], ["current-login", "lyb-pro"])
+        self.assertFalse(ledger["allAtFloor"])
+
+    def test_one_percent_floor_takes_no_new_run_and_no_fifteen_percent_pause(self):
+        self.reconcile()
+        for remaining, expected in ((15, True), (2, True), (1.5, True), (1, False), (0, False)):
+            with self.subTest(remaining=remaining):
+                self.set_capacity("lyb-pro", remaining, 86400)
+                self.assertEqual(codex.available("lyb-pro", codex.read_state(), self.NOW), expected)
+        row = codex.status(self.NOW, names=list(self.profiles))["accounts"]["lyb-pro"]
+        self.assertTrue(row["atFloor"])
+        self.assertEqual(row["floorUntil"], codex.iso(self.NOW + 86400))
+
+    def test_run_at_floor_holds_before_launch(self):
+        self.reconcile()
+        value = self.snapshot("lyb-pro")
+        value["rateLimits"]["rateLimits"]["primary"]["usedPercent"] = 99
+        handle = codex.lease("lyb-pro")
+        with patch.object(codex, "current_subscription_snapshot", return_value=value), \
+                patch.object(codex.subprocess, "Popen", side_effect=AssertionError("no run at the floor")):
+            self.assertEqual(codex.run_account("lyb-pro", handle, ["fake"], "fixture", self.tmp.name, self.NOW),
+                             (codex.NO_ACCOUNT_EXIT, "held", self.NOW + 7200))
+        row = codex.read_state()["lyb-pro"]
+        self.assertEqual((row["lastKind"], row["lastError"]), ("limit", codex.METADATA_HOLD))
+
+    def test_alias_at_floor_fails_over_to_the_next_signed_in_alias_on_the_same_job(self):
+        self.reconcile()
+        codex.update_state(lambda st: st["lyb-pro"].update(lastUsed=self.NOW))
+
+        def snapshot(name, **_):
+            value = self.snapshot(name)
+            if name == "current-login":  # live reading: this alias reached the floor since the last reconcile
+                value["rateLimits"]["rateLimits"]["primary"]["usedPercent"] = 99
+            return value
+        prompt = Path(self.tmp.name) / "prompt.txt"; prompt.write_text("fixture")
+        proc = SimpleNamespace(pid=123, stdin=io.StringIO(), stdout=io.StringIO("OK\n"), wait=lambda: 0)
+        with patch.object(codex, "current_login_available", return_value=True), \
+                patch.object(codex, "pace_deltas", return_value={}), \
+                patch.object(codex, "current_subscription_snapshot", side_effect=snapshot), \
+                patch.object(codex, "maybe_redeem", side_effect=AssertionError("no reset authority")), \
+                patch.object(codex.subprocess, "Popen", return_value=proc) as spawn, redirect_stdout(io.StringIO()):
+            code = codex.run(SimpleNamespace(prompt_file=str(prompt), cwd=self.tmp.name, model=None, reasoning_effort=None))
+        self.assertEqual(code, 0)
+        self.assertEqual(spawn.call_count, 1)
+        self.assertEqual(spawn.call_args.kwargs["env"]["CODEX_HOME"], str(self.homes["lyb-pro"]))
+        self.assertNotIn("OPENAI_API_KEY", spawn.call_args.kwargs["env"])
+        self.assertFalse(codex.available("current-login", codex.read_state(), self.NOW))
+
+    def test_every_alias_at_floor_records_one_reset_proposal_instead_of_redeeming(self):
+        self.reconcile()
+        self.set_capacity("current-login", 1, 2 * 86400, banked=2)
+        self.set_capacity("lyb-pro", 0, 5 * 86400, banked=1)
+        quiet = {"reconciled": False, "reason": "cadence"}
+        with patch.object(codex, "reconcile_current_subscription", return_value=quiet), \
+                patch.object(codex, "maybe_redeem", side_effect=AssertionError("never redeem")), \
+                patch.object(codex, "app_server_calls", side_effect=AssertionError("no provider call")):
+            first = codex.reconcile(self.NOW)["resetProposal"]
+            second = codex.reconcile(self.NOW + 60)["resetProposal"]
+        self.assertEqual(first["id"], second["id"])
+        rows = codex.read_reset_proposals()
+        self.assertEqual(len(rows), 1, "one card per situation, not one per tick")
+        card = rows[0]
+        self.assertEqual(card["pools"], [
+            {"alias": "current-login", "remainingPercent": 1, "resetsAt": codex.iso(self.NOW + 2 * 86400), "bankedResets": 2},
+            {"alias": "lyb-pro", "remainingPercent": 0, "resetsAt": codex.iso(self.NOW + 5 * 86400), "bankedResets": 1}])
+        self.assertEqual(card["recommendation"], {"alias": "lyb-pro", "action": "redeem-one-banked-reset"})
+        self.assertEqual((card["autoRedeem"], card["neverBuy"], card["deadlineAt"]),
+                         (False, True, codex.iso(self.NOW + 2 * 86400)))
+        self.assertIn("current-login 1% left", card["body"])
+        ledger = codex.status(self.NOW, names=list(self.profiles))["subsidyLedger"]
+        self.assertTrue(ledger["allAtFloor"])
+        self.assertEqual(ledger["resetProposal"]["id"], card["id"])
+        self.assertEqual(ledger["metrics"]["resetProposals7d"], 1)
+        self.assertIsNone(ledger["metrics"]["costAvoidedUsd"])
+
+    def test_no_proposal_while_any_alias_is_above_the_floor_or_unmeasured(self):
+        self.reconcile()
+        self.set_capacity("current-login", 2, 2 * 86400, banked=2)
+        self.set_capacity("lyb-pro", 0, 5 * 86400, banked=1)
+        self.assertIsNone(codex.propose_reset_if_all_at_floor(self.NOW))
+        self.set_capacity("current-login", 1, 2 * 86400, banked=2)
+        codex.update_state(lambda st: st["lyb-pro"].pop("capacityLease"))
+        self.assertIsNone(codex.propose_reset_if_all_at_floor(self.NOW))
+        self.assertEqual(codex.read_reset_proposals(), [])
+
+    def test_all_at_floor_run_hands_off_and_proposes_without_launching(self):
+        self.reconcile()
+        self.set_capacity("current-login", 1, 2 * 86400, banked=2)
+        self.set_capacity("lyb-pro", 1, 5 * 86400, banked=0)
+        prompt = Path(self.tmp.name) / "prompt.txt"; prompt.write_text("fixture")
+        with patch.object(codex, "current_login_available", return_value=True), \
+                patch.object(codex, "reconcile", return_value={}), \
+                patch.object(codex, "current_subscription_snapshot", side_effect=AssertionError("no lease at the floor")), \
+                patch.object(codex.subprocess, "Popen", side_effect=AssertionError("nothing launches")), \
+                redirect_stdout(io.StringIO()), patch("sys.stderr", io.StringIO()):
+            code = codex.run(SimpleNamespace(prompt_file=str(prompt), cwd=self.tmp.name, model=None, reasoning_effort=None))
+        self.assertEqual(code, codex.NO_ACCOUNT_EXIT)
+        self.assertEqual(len(codex.read_reset_proposals()), 1)
+
+    def test_window_use_before_reset_is_measured_from_capacity_observations(self):
+        self.reconcile()
+
+        def rolled(name):
+            value = self.snapshot(name)
+            limits = value["rateLimits"]["rateLimits"]
+            limits["primary"].update(usedPercent=3, resetsAt=self.NOW + 7200 + 604800)
+            limits["secondary"].update(usedPercent=0, resetsAt=self.NOW + 7300 + 18000)
+            return value
+        codex.reconcile(self.NOW + 7300, if_due=0, fetch=rolled)
+        history = codex.read_state()["lyb-pro"]["windowHistory"]
+        self.assertEqual(sorted((w["window"], w["usedBeforeResetPercent"], w["endedBy"]) for w in history),
+                         [("primary", 50, "natural-reset"), ("secondary", 80, "natural-reset")])
+        metrics = codex.status(self.NOW + 7300, names=list(self.profiles))["subsidyLedger"]["metrics"]
+        self.assertEqual((metrics["windowsClosed"], metrics["windowUsedBeforeResetPercentMean"],
+                          metrics["windowsAtOrAboveTarget"], metrics["targetPercent"]), (4, 65.0, 0, 90))
+        early = codex.closed_windows({"usableCapacityRemaining": {"primary": {"remainingPercent": 30, "resetsAt": self.NOW + 99}}},
+                                     {"usableCapacityRemaining": {"primary": {"remainingPercent": 100, "resetsAt": self.NOW + 604800}}},
+                                     self.NOW)
+        self.assertEqual(early[0]["endedBy"], "early-reset", "a redeemed reset is not a natural window close")
+        drift = codex.closed_windows(
+            {"usableCapacityRemaining": {"primary": {"remainingPercent": 100, "resetsAt": self.NOW + 604800,
+                                                     "windowDurationMins": 10080}}},
+            {"usableCapacityRemaining": {"primary": {"remainingPercent": 100, "resetsAt": self.NOW + 605386}}},
+            self.NOW)
+        self.assertEqual(drift, [], "a re-reported reset that drifts by minutes is the same window")
+
+    def test_window_history_replays_capacity_events(self):
+        path = Path(self.tmp.name) / "capacity-events.jsonl"
+        lease = lambda used, reset: {"account": "lyb-pro", "usableCapacityRemaining": {
+            "primary": {"remainingPercent": 100 - used, "resetsAt": reset, "windowDurationMins": 10080}}}
+        rows = [{"at": codex.iso(self.NOW), "lease": lease(40, self.NOW + 100)},
+                {"at": codex.iso(self.NOW + 50), "lease": lease(93, self.NOW + 100)},
+                {"at": codex.iso(self.NOW + 200), "lease": lease(1, self.NOW + 604900)}]
+        path.write_text("\n".join(json.dumps(r) for r in rows) + "\nnot json\n")
+        history = codex.window_history_from_events(path)
+        self.assertEqual([(w["usedBeforeResetPercent"], w["endedBy"]) for w in history["lyb-pro"]],
+                         [(93, "natural-reset")])
 
 class LaunchIdentityTest(Isolated):
     """Exercise the real pipe/receipt boundary with a model-free CLI stand-in."""
@@ -1667,5 +2122,45 @@ class LaunchIdentityTest(Isolated):
         self.assertEqual(report["providers"]["codex"]["accountLeases"], 1)
 
 
+class LaneConnectorsDisabledTest(unittest.TestCase):
+    def test_exec_command_disables_plugin_connectors(self):
+        source = (ROOT / "scripts/lanes/codex_lane.py").read_text()
+        for feature in ("plugins", "remote_plugin", "apps"):
+            self.assertIn(f'"--disable", "{feature}"', source)
+
+
 if __name__ == "__main__":
     unittest.main()
+
+
+
+class CurrentMetadataRetryTest(unittest.TestCase):
+    def test_retries_timeouts_with_backoff_and_longer_budget(self):
+        budgets, sleeps = [], []
+        def fake(name, calls, timeout=15, *, lease_handle=None):
+            budgets.append(timeout)
+            if len(budgets) < 3:
+                raise TimeoutError("account/read: app-server response unavailable")
+            return [{"account": {}}, {"rateLimits": {}}, {"data": []}]
+        with patch.object(codex, "app_server_calls", fake):
+            snap = codex.current_subscription_snapshot("current-login", sleep=sleeps.append)
+        self.assertEqual(snap["models"], {"data": []})
+        self.assertEqual(budgets, [codex.CURRENT_METADATA_TIMEOUT_S] * 3)
+        self.assertGreater(codex.CURRENT_METADATA_TIMEOUT_S, 15)
+        self.assertEqual(sleeps, [2.0, 6.0])
+
+    def test_gives_up_after_bounded_attempts(self):
+        n = []
+        def fake(*a, **k):
+            n.append(1); raise TimeoutError("x")
+        with patch.object(codex, "app_server_calls", fake), self.assertRaises(TimeoutError):
+            codex.current_subscription_snapshot("current-login", sleep=lambda s: None)
+        self.assertEqual(len(n), codex.CURRENT_METADATA_ATTEMPTS)
+
+    def test_does_not_retry_non_timeouts(self):
+        n = []
+        def fake(*a, **k):
+            n.append(1); raise RuntimeError("account/read: app-server error")
+        with patch.object(codex, "app_server_calls", fake), self.assertRaises(RuntimeError):
+            codex.current_subscription_snapshot("current-login", sleep=lambda s: None)
+        self.assertEqual(n, [1])

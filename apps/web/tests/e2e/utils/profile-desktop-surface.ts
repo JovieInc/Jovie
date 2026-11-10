@@ -1,14 +1,17 @@
 import { expect, type Page } from '@playwright/test';
 
 /**
- * The wide public-profile desktop surface ships behind the build-time flag
- * NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE (default off, Tim 2026-09-26).
- * Without it, desktop widths keep the compact profile centered in a
- * phone-width column. Run Playwright with the same value the server was built
- * with; `expectDesktopSurfaceBuildMatches` fails loudly on a mismatch.
+ * The wide public-profile desktop surface ships by default (canonical Pen
+ * frame D9kdx); a build opts out with the build-time flag
+ * NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE=0 / `false` / empty. Run
+ * Playwright with the same value the server was built with (unset counts
+ * as shipped);
+ * `expectDesktopSurfaceBuildMatches` fails loudly on a mismatch.
  */
-export const PROFILE_DESKTOP_SURFACE_SHIPPED = ['1', 'true'].includes(
-  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE ?? ''
+export const PROFILE_DESKTOP_SURFACE_SHIPPED = !(
+  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE === '0' ||
+  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE === 'false' ||
+  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE === ''
 );
 
 export const PROFILE_DESKTOP_BREAKPOINT = 1180;
@@ -32,7 +35,8 @@ export async function expectDesktopSurfaceBuildMatches(page: Page) {
 
 /**
  * Geometry of the compact shell relative to the viewport, used to prove the
- * flag-off desktop presentation is a centered phone column.
+ * flag-off presentation is a centered column (phone column below 1024px, the
+ * two-column desktop composition at or above it).
  */
 export async function readCompactColumnGeometry(page: Page) {
   return page.evaluate(() => {
@@ -41,9 +45,15 @@ export async function readCompactColumnGeometry(page: Page) {
     );
     if (!shell) return null;
     const rect = shell.getBoundingClientRect();
+    // >= 1024px the flag-off profile is the two-column desktop composition
+    // (--profile-desktop-max-width); below it, the phone column.
+    const rootStyle = getComputedStyle(document.documentElement);
+    const desktopComposition = window.innerWidth >= 1024;
     const maxWidth = Number.parseFloat(
-      getComputedStyle(document.documentElement).getPropertyValue(
-        '--profile-shell-max-width'
+      rootStyle.getPropertyValue(
+        desktopComposition
+          ? '--profile-desktop-max-width'
+          : '--profile-shell-max-width'
       )
     );
     return {

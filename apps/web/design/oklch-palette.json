@@ -68,6 +68,14 @@
     "red": {
       "light": { "oklch": "oklch(62.96% 0.2349 25.09)", "hex": "#F72A36" },
       "dark": { "oklch": "oklch(62.96% 0.2349 25.09)", "hex": "#F72A36" }
+    },
+    "verified": {
+      "light": { "oklch": "oklch(59.33% 0.1505 245.37)", "hex": "#0084D1" },
+      "dark": { "oklch": "oklch(74.84% 0.1551 233.25)", "hex": "#00BCFF" }
+    },
+    "on-media": {
+      "light": { "oklch": "oklch(100.00% 0 0)", "hex": "#FFFFFF" },
+      "dark": { "oklch": "oklch(100.00% 0 0)", "hex": "#FFFFFF" }
     }
   },
   "energyBands": {
@@ -97,7 +105,9 @@
     { "name": "text-primary / surface-1", "fg": "text-primary", "bg": "surface-1", "minRatio": 4.5, "themes": ["light", "dark"] },
     { "name": "mint / surface-0 dark", "fg": "mint", "bg": "surface-0", "minRatio": 4.5, "themes": ["dark"] },
     { "name": "orange / surface-0 dark", "fg": "orange", "bg": "surface-0", "minRatio": 4.5, "themes": ["dark"] },
-    { "name": "red / surface-0 dark", "fg": "red", "bg": "surface-0", "minRatio": 4.5, "themes": ["dark"] }
+    { "name": "red / surface-0 dark", "fg": "red", "bg": "surface-0", "minRatio": 4.5, "themes": ["dark"] },
+    { "name": "verified / surface-1 light", "fg": "verified", "bg": "surface-1", "minRatio": 3, "themes": ["light"] },
+    { "name": "verified / canvas dark", "fg": "verified", "bg": "canvas", "minRatio": 3, "themes": ["dark"] }
   ],
   "cssBindings": {
     "darkHex": {
@@ -105,18 +115,21 @@
       "--noir-ion-text-primary": "text-primary", "--noir-ion-ion": "ion", "--noir-ion-ultra": "ultra", "--noir-ion-pulse": "pulse",
       "--noir-ion-aqua": "aqua", "--noir-ion-mint": "mint", "--noir-ion-gold": "orange", "--noir-ion-flare": "red",
       "--color-accent-blue": "ion", "--color-accent-purple": "ultra", "--color-accent-pink": "pulse", "--color-accent-teal": "aqua",
-      "--color-accent-green": "mint", "--color-accent-orange": "orange", "--color-accent-red": "red"
+      "--color-accent-green": "mint", "--color-accent-orange": "orange", "--color-accent-red": "red",
+      "--color-verified": "verified", "--color-on-media": "on-media"
     },
     "lightHex": {
       "--noir-ion-canvas": "canvas", "--noir-ion-shell": "surface-0", "--noir-ion-card": "surface-1", "--noir-ion-elevated": "surface-2", "--noir-ion-floating": "surface-3",
       "--noir-ion-ion": "ion", "--noir-ion-ultra": "ultra", "--noir-ion-pulse": "pulse",
       "--noir-ion-aqua": "aqua", "--noir-ion-mint": "mint", "--noir-ion-gold": "orange", "--noir-ion-flare": "red",
       "--color-accent": "ion", "--color-accent-purple": "ultra", "--color-accent-pink": "pulse", "--color-accent-teal": "aqua",
-      "--color-accent-green": "mint", "--color-accent-orange": "orange", "--color-accent-red": "red"
+      "--color-accent-green": "mint", "--color-accent-orange": "orange", "--color-accent-red": "red",
+      "--color-verified": "verified", "--color-on-media": "on-media"
     },
     "aliases": {
       "--color-success": "--color-accent-green", "--color-warning": "--color-accent-orange",
-      "--color-error": "--color-accent-red", "--color-danger": "--color-error"
+      "--color-error": "--color-accent-red", "--color-danger": "--color-error",
+      "--color-verified-backing": "--color-on-media"
     }
   },
   "tokensJsonBindings": {

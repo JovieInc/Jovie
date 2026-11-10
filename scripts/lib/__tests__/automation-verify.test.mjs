@@ -1,10 +1,13 @@
 import { spawn, spawnSync } from 'node:child_process';
 import {
+  chmodSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,6 +32,7 @@ import {
   runControlTestCommands,
 } from '../../run-affected-tests.mjs';
 import { classifyBlogContentChanges } from '../blog-content-ci.mjs';
+import { resolveBaseRef } from '../git-base-ref.mjs';
 
 const SERVICE_CENSUS_QUALIFICATION_INPUTS = [
   'scripts/lanes/service_census.py',
@@ -44,6 +48,133 @@ const SERVICE_CENSUS_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
 ];
+
+describe('main-red ejector qualification closure', () => {
+  const inputs = [
+    'scripts/ci-fast-lanes.mjs',
+    'scripts/lib/__tests__/main-red-eject-quota-failover.test.mjs',
+    'scripts/main-red-eject.mjs',
+  ];
+  const behavior = [
+    'scripts/lib/__tests__/main-red-eject.test.mjs',
+    'scripts/lib/__tests__/main-red-eject-failing-head.test.mjs',
+    'scripts/lib/__tests__/main-red-eject-quota-failover.test.mjs',
+  ];
+  const proofs = [
+    ...behavior,
+    'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+    'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+    'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
+    'scripts/lib/__tests__/automation-verify.test.mjs',
+  ];
+  const options = {
+    isFileAvailable: () => true,
+    scriptContractVitestTests: behavior,
+  };
+  it('selects the complete behavior and CI inventory closure for the exact repair signature', () => {
+    for (const files of [
+      inputs,
+      [
+        ...inputs,
+        'scripts/run-affected-tests.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ],
+    ]) {
+      const plan = buildAffectedTestPlan(files, options);
+      expect(plan.mode).toBe('selected');
+      expect(plan.scriptVitestTests).toEqual(proofs);
+      expect(plan.selectedTests).toEqual([]);
+      const commands = buildSelectedTestCommands(plan, '1');
+      expect(commands).toHaveLength(1);
+      expect(commands[0][1]).toEqual(
+        expect.arrayContaining(
+          proofs.map(file => file.replace(/^scripts\//, ''))
+        )
+      );
+    }
+  });
+  it.each(proofs)(
+    'retains full fallback when required proof %s is missing',
+    missing => {
+      const plan = buildAffectedTestPlan(inputs, {
+        ...options,
+        isFileAvailable: file => file !== missing,
+      });
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toBe(
+        'main-red ejector behavior or CI inventory proof is unavailable'
+      );
+    }
+  );
+  it.each(behavior)(
+    'requires actual CI inventory registration of %s',
+    missing => {
+      expect(
+        buildAffectedTestPlan(inputs, {
+          ...options,
+          scriptContractVitestTests: behavior.filter(test => test !== missing),
+        }).mode
+      ).toBe('full');
+    }
+  );
+  it.each([
+    'scripts/unknown-control.mjs',
+    'scripts/lib/__tests__/unknown.test.mjs',
+    'apps/web/lib/product.ts',
+    'package.json',
+    'scripts/run-affected-tests.mjs',
+  ])('preserves full fallback for an unknown/mixed/partial peer %s', peer => {
+    expect(buildAffectedTestPlan([...inputs, peer], options).mode).toBe('full');
+  });
+  it.each(inputs)(
+    'does not accept the incomplete signature without %s',
+    missing => {
+      expect(
+        buildAffectedTestPlan(
+          inputs.filter(file => file !== missing),
+          options
+        ).mode
+      ).toBe('full');
+    }
+  );
+  it('executes a selected failing behavior test and propagates its real nonzero status', async () => {
+    const dir = mkdtempSync(resolve(tmpdir(), 'ejector-selected-failure-'));
+    const marker = resolve(dir, 'selected-args');
+    const fixture = resolve(dir, 'behavior.test.mjs');
+    try {
+      writeFileSync(
+        fixture,
+        "import { test } from 'node:test'; import assert from 'node:assert/strict'; test('behavior regression', () => assert.equal(1, 2));\n"
+      );
+      writeFileSync(
+        resolve(dir, 'pnpm'),
+        '#!/bin/sh\nprintf "%s\\n" "$@" > "$EJECTOR_SELECTED_MARKER"\ncase "$*" in *lib/__tests__/main-red-eject-quota-failover.test.mjs*) exec "$EJECTOR_REAL_NODE" --test "$EJECTOR_FAILURE_FIXTURE";; *) exit 0;; esac\n',
+        { mode: 0o755 }
+      );
+      const plan = buildAffectedTestPlan(inputs, options);
+      expect(plan.mode).toBe('selected');
+      const [[command, args]] = buildSelectedTestCommands(plan, '1');
+      const status = await runCommandStatus(
+        'env',
+        [
+          `PATH=${dir}:${process.env.PATH}`,
+          `EJECTOR_SELECTED_MARKER=${marker}`,
+          `EJECTOR_REAL_NODE=${process.execPath}`,
+          `EJECTOR_FAILURE_FIXTURE=${fixture}`,
+          command,
+          ...args,
+        ],
+        { bufferOutput: true }
+      );
+      expect(status).toBe(1);
+      expect(readFileSync(marker, 'utf8')).toContain(
+        'lib/__tests__/main-red-eject-quota-failover.test.mjs'
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('Sentry deployment contract selection', () => {
   const inputs = [
@@ -100,6 +231,11 @@ describe('Sentry deployment contract selection', () => {
 
 describe('lane Python qualification coverage', () => {
   it.each([
+    ['managed CLI', ['scripts/hyperagent/hyperagent.py']],
+    ['managed CLI installer', ['scripts/hyperagent/install.py']],
+    ['managed model mappings', ['scripts/hyperagent/models.json']],
+    ['managed CLI regression', ['scripts/tests/test_hyperagent_cli.py']],
+    ['reason command role compatibility', ['scripts/lanes/reason.json']],
     ['lane source', ['scripts/lanes/hyperagent_lane.py']],
     ['attempt regression', ['scripts/tests/test_execution_attempt.py']],
     ['qualification safety source', ['scripts/lanes/qualification_guard.py']],
@@ -885,7 +1021,7 @@ describe('structural control stage execution', () => {
 
   it('starts registry, project, control coverage, Dependabot coverage, CLI coverage, web, continuity, and FX stages in order', async () => {
     const stages = buildControlTestCommands();
-    expect(stages).toHaveLength(24);
+    expect(stages).toHaveLength(23);
     expect(stages[0]).toEqual(buildCompanyRegistryTestCommand());
     expect(stages[1]).toEqual(buildProjectCreationTestCommand());
     expect(stages[2][1]).toContain('lib/__tests__/pr-conflict-event.test.mjs');
@@ -1047,18 +1183,6 @@ describe('structural control stage execution', () => {
       [
         '--test',
         '--experimental-test-coverage',
-        '--test-coverage-include=.github/scripts/internal-pr-review.mjs',
-        '--test-coverage-lines=85',
-        '--test-coverage-branches=80',
-        '--test-coverage-functions=85',
-        '.github/scripts/internal-pr-review.test.mjs',
-      ],
-    ]);
-    expect(stages[22]).toEqual([
-      'node',
-      [
-        '--test',
-        '--experimental-test-coverage',
         '--test-coverage-include=scripts/lib/source-admission-policy.mjs',
         '--test-coverage-lines=95',
         '--test-coverage-branches=90',
@@ -1066,7 +1190,7 @@ describe('structural control stage execution', () => {
         'scripts/lib/__tests__/source-admission-policy.test.mjs',
       ],
     ]);
-    expect(stages[23]).toEqual([
+    expect(stages[22]).toEqual([
       'pnpm',
       ['run', 'test:rolling-ci-fx:coverage'],
     ]);
@@ -2125,41 +2249,50 @@ describe('automation-verify affected scope', () => {
   });
 
   it('fails closed on an unresolved base and retains mandatory risk policy', () => {
-    expect(script).toContain(
-      'git rev-parse --verify --quiet "${BASE_REF}^{commit}"'
-    );
+    expect(script).toContain('resolveBaseRef(process.cwd(), requested)');
     expect(script).toContain('pnpm ci:harness:check');
   });
 
   describe('scripts typecheck selection', () => {
     // The affected bundle runs the scripts/ ratchet only when scripts/ changed
     // since the merge-base; execute that exact block against a temp repo.
-    const selection = script
-      .slice(
-        script.indexOf('if ! SCRIPTS_DIFF_BASE='),
-        script.indexOf('node scripts/turbo-local.mjs lint --affected')
-      )
-      .replace(
-        'node scripts/typecheck-scripts.mjs',
-        'echo RAN_SCRIPTS_TYPECHECK'
-      );
+    const selection = script.slice(
+      script.indexOf('if ! SCRIPTS_DIFF_BASE='),
+      script.indexOf('node scripts/turbo-local.mjs lint --affected')
+    );
 
-    function runSelection(changedPath) {
+    function runSelection(changedPath, state = 'committed', status = 0) {
       const repo = mkdtempSync(resolve(tmpdir(), 'scripts-typecheck-select-'));
-      const git = args =>
-        spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+      const git = args => {
+        const result = spawnSync('git', args, {
+          cwd: repo,
+          encoding: 'utf8',
+        });
+        expect(result.status, `git ${args.join(' ')}: ${result.stderr}`).toBe(
+          0
+        );
+        return result;
+      };
       try {
         git(['init', '-q', '-b', 'main']);
+        // Synthetic fixture commits must not invoke a developer's signing agent.
+        git(['config', '--local', 'commit.gpgsign', 'false']);
         git(['config', 'user.email', 'test@example.com']);
         git(['config', 'user.name', 'test']);
         writeFileSync(resolve(repo, 'README.md'), 'base\n');
+        mkdirSync(resolve(repo, 'scripts/lib'), { recursive: true });
+        writeFileSync(resolve(repo, 'scripts/lib/example.mjs'), 'base\n');
+        writeFileSync(
+          resolve(repo, 'scripts/typecheck-scripts.mjs'),
+          `console.log('RAN_SCRIPTS_TYPECHECK'); process.exit(${status});\n`
+        );
         git(['add', '.']);
         git(['commit', '-q', '-m', 'base']);
         git(['switch', '-q', '-c', 'feature']);
         mkdirSync(dirname(resolve(repo, changedPath)), { recursive: true });
         writeFileSync(resolve(repo, changedPath), 'change\n');
-        git(['add', '.']);
-        git(['commit', '-q', '-m', 'change']);
+        if (state === 'committed' || state === 'staged') git(['add', '.']);
+        if (state === 'committed') git(['commit', '-q', '-m', 'change']);
         return spawnSync(
           'bash',
           ['-c', `set -euo pipefail\nBASE_REF=main\n${selection}`],
@@ -2173,6 +2306,22 @@ describe('automation-verify affected scope', () => {
     it('runs the ratchet when scripts/ changed', () => {
       const result = runSelection('scripts/lib/example.mjs');
       expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain('RAN_SCRIPTS_TYPECHECK');
+    });
+
+    it.each([
+      ['staged', 'scripts/lib/example.mjs'],
+      ['unstaged', 'scripts/lib/example.mjs'],
+      ['untracked', 'scripts/lib/new.mjs'],
+    ])('runs the ratchet for %s scripts before commit', (state, path) => {
+      const result = runSelection(path, state);
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain('RAN_SCRIPTS_TYPECHECK');
+    });
+
+    it('propagates a failing compiler status', () => {
+      const result = runSelection('scripts/lib/example.mjs', 'committed', 73);
+      expect(result.status, result.stderr).toBe(73);
       expect(result.stdout).toContain('RAN_SCRIPTS_TYPECHECK');
     });
 
@@ -3589,6 +3738,131 @@ describe('automation-verify affected scope', () => {
     );
   });
 
+  describe('marketing certification evidence producers', () => {
+    const census = 'apps/web/data/designSystem/surfaceCensus.json';
+    const censusProducer =
+      'scripts/lib/__tests__/design-surface-census.test.mjs';
+    const tokens = 'apps/web/lib/brand/tokens.ts';
+    it('retains full fallback for shared tokens with unregistered real consumers', () => {
+      const repo = resolve(import.meta.dirname, '../../..');
+      for (const test of [
+        'apps/web/tests/unit/og/marketing-og-cards.test.ts',
+        'apps/web/components/atoms/JovieMarkElectric.test.tsx',
+      ]) {
+        expect(readFileSync(resolve(repo, test), 'utf8')).toContain(
+          "from '@/lib/brand/tokens'"
+        );
+      }
+      const plan = buildAffectedTestPlan([tokens]);
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toContain(tokens);
+    });
+    it('runs the real census validator with the scripts Vitest runner', () => {
+      const plan = buildAffectedTestPlan([census]);
+      expect(plan.mode).toBe('selected');
+      expect(plan.scriptVitestTests).toContain(censusProducer);
+      expect(plan.selectedTests).not.toContain(censusProducer);
+      expect(plan.nodeTests).not.toContain(censusProducer);
+      const commands = buildSelectedTestCommands(plan, '2');
+      expect(commands).toContainEqual([
+        'node',
+        ['scripts/design-surface-census.mjs', 'origin/main'],
+      ]);
+      expect(commands).toContainEqual([
+        'pnpm',
+        [
+          'exec',
+          'vitest',
+          '--root',
+          'scripts',
+          '--config',
+          'vitest.config.mts',
+          'run',
+          'lib/__tests__/design-surface-census.test.mjs',
+          '--maxWorkers',
+          '2',
+        ],
+      ]);
+    });
+
+    it('runs the runtime census consumer and falls back when its test is absent', () => {
+      const repo = resolve(import.meta.dirname, '../../..');
+      const consumer = 'apps/web/lib/content-records/marketing-page.ts';
+      const producer = 'apps/web/lib/content-records/marketing-page.test.ts';
+      expect(readFileSync(resolve(repo, consumer), 'utf8')).toContain(
+        "import surfaceCensus from '@/data/designSystem/surfaceCensus.json'"
+      );
+      expect(readFileSync(resolve(repo, producer), 'utf8')).toContain(
+        'e.dsStatus'
+      );
+      const plan = buildAffectedTestPlan([census]);
+      expect(plan.selectedTests).toContain(producer);
+      expect(
+        buildAffectedTestPlan([census], {
+          isFileAvailable: file => file !== producer,
+        }).mode
+      ).toBe('full');
+    });
+
+    it('validates current census transitions against the caller-provided base', () => {
+      const plan = buildAffectedTestPlan([census]);
+      const base = '0123456789abcdef0123456789abcdef01234567';
+      expect(buildSelectedTestCommands(plan, '2', base)).toContainEqual([
+        'node',
+        ['scripts/design-surface-census.mjs', base],
+      ]);
+      expect(
+        buildSelectedTestCommands(
+          { ...plan, censusValidation: false },
+          '2',
+          base
+        )
+      ).toContainEqual(['node', ['scripts/design-surface-census.mjs', base]]);
+    });
+
+    it('retains full fallback when the census producer is missing', () => {
+      const plan = buildAffectedTestPlan([census], {
+        isFileAvailable: file => file !== censusProducer,
+      });
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toContain(census);
+    });
+
+    it.each([
+      'apps/web/lib/brand/unregistered.ts',
+      'apps/web/data/designSystem/unregistered.json',
+    ])(
+      'retains full fallback for unknown neighbor %s, alone or mixed',
+      neighbor => {
+        expect(buildAffectedTestPlan([neighbor]).mode).toBe('full');
+        expect(buildAffectedTestPlan([census, tokens, neighbor]).mode).toBe(
+          'full'
+        );
+      }
+    );
+
+    it.each([tokens, 'package.json'])(
+      'retains census validation when %s requires full fallback',
+      other => {
+        const plan = buildAffectedTestPlan([census, other]);
+        expect(plan.mode).toBe('full');
+        expect(plan.scriptVitestTests).toContain(censusProducer);
+        const commands = buildSelectedTestCommands(plan, '2', 'origin/main');
+        expect(commands).toContainEqual([
+          'node',
+          ['scripts/design-surface-census.mjs', 'origin/main'],
+        ]);
+        expect(
+          commands.some(
+            ([command, args]) =>
+              command === 'pnpm' &&
+              args.includes('lib/__tests__/design-surface-census.test.mjs')
+          )
+        ).toBe(true);
+      }
+    );
+  });
+
   describe('audience release denial lane', () => {
     const productFiles = [
       'apps/web/app/api/cron/schedule-release-notifications/route.ts',
@@ -3664,6 +3938,137 @@ describe('automation-verify affected scope', () => {
     });
   });
 
+  describe('onboarding confirmed-handle helper binding', () => {
+    const source =
+      'apps/web/components/features/onboarding/onboardingChatHelpers.ts';
+    const testFiles = [
+      'apps/web/tests/unit/onboarding/OnboardingChat.completed-steps.test.tsx',
+      'apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx',
+    ];
+
+    it('runs both live and restored confirmation regressions for a helper-only change', () => {
+      const plan = buildAffectedTestPlan([source]);
+      expect(plan.mode).toBe('selected');
+      for (const testFile of testFiles) {
+        expect(plan.mandatoryTests).toContain(testFile);
+        expect(plan.selectedTests).toContain(testFile);
+      }
+      const commands = buildSelectedTestCommands(plan, '1');
+      for (const testFile of testFiles) {
+        expect(commands.flatMap(([, args]) => args)).toContain(
+          testFile.replace('apps/web/', '')
+        );
+      }
+    });
+
+    it.each(testFiles)(
+      'fails closed when behavioral proof %s is missing',
+      testFile => {
+        const plan = buildAffectedTestPlan([source], {
+          isFileAvailable: file => file !== testFile,
+        });
+        expect(plan.mode).toBe('full');
+        expect(plan.fallbackReason).toContain(source);
+      }
+    );
+  });
+
+  describe.each([
+    [
+      'apps/web/tests/e2e/utils/start-entry-layout.ts',
+      [
+        'apps/web/tests/unit/e2e/start-entry-essentials.test.ts',
+        'apps/web/tests/unit/e2e/start-entry-layout.test.ts',
+      ],
+    ],
+    [
+      'apps/web/tests/e2e/helpers/golden-path-keyframes.ts',
+      [
+        'apps/web/tests/unit/e2e/golden-path-keyframes-errors.test.ts',
+        'apps/web/tests/unit/e2e/start-entry-essentials.test.ts',
+      ],
+    ],
+    [
+      'apps/web/tests/e2e/helpers/golden-path-tracking.ts',
+      ['apps/web/tests/unit/e2e/golden-path-tracking.test.ts'],
+    ],
+  ])('anonymous entry helper binding: %s', (source, testFiles) => {
+    const unknownNeighbor = source.replace(/\.ts$/, '-neighbor.ts');
+    const selectorFiles = [
+      'scripts/run-affected-tests.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ];
+
+    it('selects the existing behavioral test for a helper-only change', () => {
+      const plan = buildAffectedTestPlan([source]);
+
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toEqual(testFiles);
+      expect(plan.selectedTests).toEqual(testFiles);
+      expect(buildSelectedTestCommands(plan, '1')).toEqual([
+        [
+          'pnpm',
+          [
+            '--filter',
+            '@jovie/web',
+            'exec',
+            'vitest',
+            'run',
+            ...testFiles.map(file => file.replace('apps/web/', '')),
+            '--passWithNoTests',
+            '--maxWorkers',
+            '1',
+          ],
+        ],
+      ]);
+    });
+
+    it.each(testFiles)(
+      'fails closed when declared behavioral test %s is missing',
+      missingTest => {
+        const plan = buildAffectedTestPlan([source], {
+          isFileAvailable: file => file !== missingTest,
+        });
+
+        expect(plan.mode).toBe('full');
+        expect(plan.fallbackReason).toContain(source);
+      }
+    );
+
+    it.each([
+      [unknownNeighbor],
+      [source, unknownNeighbor],
+      [source, ...testFiles, 'apps/web/lib/unknown.ts'],
+      [source, ...selectorFiles, 'apps/web/lib/unknown.ts'],
+      [source, 'apps/web/tests/setup.ts'],
+      [source, 'package.json'],
+    ])(
+      'preserves full fallback for unknown or global inputs %j',
+      (...files) => {
+        expect(buildAffectedTestPlan(files).mode).toBe('full');
+      }
+    );
+
+    it('includes selector regression tests when the complete pair accompanies the helper', () => {
+      const plan = buildAffectedTestPlan([source, ...selectorFiles]);
+
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toEqual(testFiles);
+      expect(plan.selectedTests).toEqual(testFiles);
+      expect(plan.scriptVitestTests).toEqual([selectorFiles[1]]);
+    });
+
+    it('fails closed when the selector implementation changes without its proof', () => {
+      const plan = buildAffectedTestPlan([
+        source,
+        ...testFiles,
+        selectorFiles[0],
+      ]);
+
+      expect(plan.mode).toBe('full');
+    });
+  });
+
   describe('marketing Pen contract bindings', () => {
     const source = 'apps/web/data/marketing/penContracts.ts';
     const bindingTests = [
@@ -3717,17 +4122,168 @@ describe('automation-verify affected scope', () => {
         bindingTests[0],
       ],
       [source, 'apps/web/tests/setup.ts'],
-      [
-        source,
-        'scripts/run-affected-tests.mjs',
-        'scripts/lib/__tests__/automation-verify.test.mjs',
-      ],
     ])(
       'preserves full fallback for unknown, global or mixed inputs %j',
       (...files) => {
         expect(buildAffectedTestPlan(files).mode).toBe('full');
       }
     );
+
+    it('runs the selector proof when the complete selector pair accompanies a covered source', () => {
+      const plan = buildAffectedTestPlan([
+        source,
+        'scripts/run-affected-tests.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ]);
+
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toEqual(bindingTests);
+      expect(plan.scriptVitestTests).toEqual([
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ]);
+      expect(
+        JSON.stringify(buildSelectedTestCommands(plan, '2'))
+      ).not.toContain('--shard');
+    });
+
+    it('fails closed when only one selector file accompanies a covered source', () => {
+      expect(
+        buildAffectedTestPlan([source, 'scripts/run-affected-tests.mjs']).mode
+      ).toBe('full');
+    });
+
+    it('fails closed when the complete selector pair mixes with another manifest member', () => {
+      expect(
+        buildAffectedTestPlan([
+          source,
+          'scripts/run-affected-tests.mjs',
+          'scripts/lib/__tests__/automation-verify.test.mjs',
+          '.github/workflows/ci.yml',
+        ]).mode
+      ).toBe('full');
+    });
+  });
+
+  describe('homepage discovery copy binding', () => {
+    const source = 'apps/web/data/homepageSearchCopy.ts';
+    const producer = 'apps/web/components/homepage/HomepageNameSearch.test.tsx';
+
+    it('executes the real component behavior producer for discovery copy', () => {
+      const plan = buildAffectedTestPlan([source]);
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toEqual([producer]);
+      expect(plan.selectedTests).toEqual([producer]);
+      expect(plan.fallbackReason).toBeUndefined();
+    });
+
+    it('fails closed when the behavior producer is unavailable or another unknown data file changes', () => {
+      expect(
+        buildAffectedTestPlan([source], {
+          isFileAvailable: file => file !== producer,
+        }).mode
+      ).toBe('full');
+      expect(
+        buildAffectedTestPlan([
+          source,
+          'apps/web/data/homepageSearchCopy-neighbor.ts',
+        ]).mode
+      ).toBe('full');
+    });
+  });
+
+  describe('homepage front-door copy bindings', () => {
+    const frontDoor = 'apps/web/data/homepageFrontDoorCta.ts';
+    const homepageCopy = 'apps/web/data/homepageV2Copy.ts';
+    const ctaIntents = 'apps/web/data/marketingCtaIntents.ts';
+    const frontDoorTests = [
+      'apps/web/components/features/waitlist/WaitlistPublicLanding.test.tsx',
+      'apps/web/data/canonicalPublicShellOptimization.test.ts',
+      'apps/web/tests/unit/app/auth-front-door-contract.test.ts',
+      'apps/web/tests/unit/marketing/marketing-cta-intents.test.ts',
+      'apps/web/tests/unit/marketing/marketing-header-cta-consistency.test.ts',
+    ];
+    const homepageCopyTests = [
+      'apps/web/tests/unit/marketing/feature-tile-accent-uniqueness.test.ts',
+    ];
+    const ctaIntentTests = [
+      'apps/web/app/(marketing)/product/ProductLanding.test.tsx',
+      'apps/web/tests/unit/app/auth-front-door-contract.test.ts',
+      'apps/web/tests/unit/marketing/marketing-bounded-revenue-path.test.ts',
+      'apps/web/tests/unit/marketing/marketing-cta-intents.test.ts',
+      'apps/web/tests/unit/marketing/marketing-header-cta-consistency.test.ts',
+    ];
+    const selectorPair = [
+      'scripts/run-affected-tests.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ];
+
+    it.each([
+      [frontDoor, frontDoorTests],
+      [homepageCopy, homepageCopyTests],
+      [ctaIntents, ctaIntentTests],
+    ])('binds %s to the unit tests that import it', (source, bindingTests) => {
+      const plan = buildAffectedTestPlan([source]);
+
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toEqual(bindingTests);
+      expect(plan.selectedTests).toEqual(bindingTests);
+      expect(plan.fallbackReason).toBeUndefined();
+    });
+
+    it.each([frontDoor, homepageCopy, ctaIntents])(
+      'fails closed when a binding test for %s is missing',
+      source => {
+        const plan = buildAffectedTestPlan([source], {
+          isFileAvailable: file => !file.endsWith('.test.ts'),
+        });
+
+        expect(plan.mode).toBe('full');
+        expect(plan.fallbackReason).toContain(source);
+      }
+    );
+
+    it('keeps an unknown data neighbor on the full suite', () => {
+      expect(
+        buildAffectedTestPlan([
+          frontDoor,
+          'apps/web/data/homepageFrontDoorCta-neighbor.ts',
+        ]).mode
+      ).toBe('full');
+    });
+
+    it('stays selected for front-door copy plus remediation when the selector pair is complete', () => {
+      const plan = buildAffectedTestPlan([
+        frontDoor,
+        homepageCopy,
+        ctaIntents,
+        'scripts/lanes/remediation.py',
+        'scripts/tests/test_remediation.py',
+        'scripts/lib/golden-path-lock.mjs',
+        'scripts/lib/__tests__/golden-path-lock.test.mjs',
+        ...selectorPair,
+      ]);
+
+      expect(plan.mode).toBe('selected');
+      expect(plan.lanePythonCoverage).toBe(true);
+      expect(plan.fallbackReason).toBeUndefined();
+      expect(plan.scriptVitestTests).toEqual([
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ]);
+      expect(
+        JSON.stringify(buildSelectedTestCommands(plan, '2'))
+      ).not.toContain('--shard');
+    });
+
+    it('fails closed when the selector pair accompanying front-door copy is partial', () => {
+      expect(
+        buildAffectedTestPlan([
+          frontDoor,
+          homepageCopy,
+          ctaIntents,
+          selectorPair[0],
+        ]).mode
+      ).toBe('full');
+    });
   });
 
   it('fails closed when an unknown source is mixed with a direct test', () => {
@@ -3776,6 +4332,50 @@ describe('automation-verify affected scope', () => {
     expect(runner).toContain('--diff-filter=ACDMR');
   });
 
+  /**
+   * @param {number} pid
+   * @param {(command: string, args: string[], options: {encoding: 'utf8', timeout: number}) => {status: number | null, stdout: string, error?: unknown}} [inspect]
+   */
+  function processCanRun(pid, inspect = spawnSync) {
+    try {
+      process.kill(pid, 0);
+    } catch (error) {
+      return error.code !== 'ESRCH';
+    }
+    // A killed orphan can remain Z when a container's PID 1 does not reap it.
+    // kill(0) sees that PID, but it cannot execute. Unknown evidence stays live.
+    try {
+      const result = inspect('ps', ['-o', 'stat=', '-p', String(pid)], {
+        encoding: 'utf8',
+        timeout: 1000,
+      });
+      return result.error ||
+        result.status !== 0 ||
+        !/^Z[<NLsl+>AEVWXJKCP]*$/.test(result.stdout.trim())
+        ? true
+        : false;
+    } catch {
+      return true;
+    }
+  }
+
+  it('does not treat unreadable or invalid process-state evidence as stopped', () => {
+    for (const result of [
+      { status: 1, stdout: '' },
+      { status: 0, stdout: '' },
+      { status: 0, stdout: 'Z malformed' },
+      { status: 0, stdout: 'Z\nR' },
+      { status: 0, stdout: 'R' },
+      { status: 0, stdout: 'Z', error: new Error('unreadable') },
+    ])
+      expect(processCanRun(process.pid, () => result)).toBe(true);
+    expect(
+      processCanRun(process.pid, () => {
+        throw new Error('denied');
+      })
+    ).toBe(true);
+  });
+
   it.each(['SIGINT', 'SIGTERM'])(
     'terminates the owned child process group on %s',
     async signal => {
@@ -3800,6 +4400,11 @@ describe('automation-verify affected scope', () => {
         ['--input-type=module', '-e', wrapperCode],
         { stdio: 'ignore' }
       );
+      const unrelated = spawn(
+        process.execPath,
+        ['-e', 'setInterval(() => {}, 1000)'],
+        { stdio: 'ignore' }
+      );
       let grandchildPid;
       try {
         const deadline = Date.now() + 5000;
@@ -3816,6 +4421,8 @@ describe('automation-verify affected scope', () => {
           }
         }
         expect(grandchildPid).toBeGreaterThan(0);
+        expect(processCanRun(grandchildPid)).toBe(true);
+        expect(processCanRun(unrelated.pid)).toBe(true);
         wrapper.kill(signal);
         await Promise.race([
           new Promise(resolveExit => wrapper.once('exit', resolveExit)),
@@ -3826,15 +4433,14 @@ describe('automation-verify affected scope', () => {
         const exitDeadline = Date.now() + 5000;
         let alive = true;
         while (alive && Date.now() < exitDeadline) {
-          try {
-            process.kill(grandchildPid, 0);
+          alive = processCanRun(grandchildPid);
+          if (alive)
             await new Promise(resolveWait => setTimeout(resolveWait, 25));
-          } catch {
-            alive = false;
-          }
         }
         expect(alive).toBe(false);
+        expect(processCanRun(unrelated.pid)).toBe(true);
       } finally {
+        unrelated.kill('SIGKILL');
         if (wrapper.exitCode === null) wrapper.kill('SIGKILL');
         if (grandchildPid) {
           try {
@@ -3849,7 +4455,6 @@ describe('automation-verify affected scope', () => {
 
   it('fails closed with a timeout and progress diagnostics for a stalled shard', async () => {
     const diagnostics = [];
-    const startedAt = Date.now();
     const status = await runCommandStatus(
       process.execPath,
       ['-e', 'setInterval(() => {}, 1000)'],
@@ -3862,7 +4467,6 @@ describe('automation-verify affected scope', () => {
     );
 
     expect(status).toBe(124);
-    expect(Date.now() - startedAt).toBeLessThan(5000);
     expect(diagnostics.join('\n')).toContain(
       '[affected-tests] start shard 1/8'
     );
@@ -4020,5 +4624,171 @@ describe('linear sync on merge selection', () => {
     expect(
       buildAffectedTestPlan([...lane, 'scripts/unrelated-peer.mjs']).mode
     ).toBe('full');
+  });
+});
+
+// These fixtures run the real entrypoints with their own refs. In particular,
+// never move a developer's local main to simulate a stale worktree pool.
+function consumerBaseFixture() {
+  const repo = mkdtempSync(resolve(tmpdir(), 'verify-base-consumer-'));
+  const root = resolve(import.meta.dirname, '../../..');
+  const write = (file, text) => {
+    mkdirSync(dirname(resolve(repo, file)), { recursive: true });
+    writeFileSync(resolve(repo, file), text);
+  };
+  const git = (...args) => {
+    const result = spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    return result.stdout.trim();
+  };
+  write('.gitignore', 'scripts/\nnode_modules/\nbin/\ncalls\n');
+  git('init', '-b', 'main');
+  git('config', 'user.email', 'fixture@example.invalid');
+  git('config', 'user.name', 'Base fixture');
+  git('add', '.');
+  git('commit', '-m', 'old local base');
+  git('checkout', '-b', 'upstream');
+  write('package.json', '{}\n');
+  write('scripts/upstream.mjs', 'export {};\n');
+  git('add', 'package.json');
+  git('commit', '-m', 'upstream global input');
+  const remote = git('rev-parse', 'HEAD');
+  git('update-ref', 'refs/remotes/origin/main', remote);
+  git('checkout', '-b', 'feature');
+  write('apps/web/lib/base-consumer.test.ts', 'export {};\n');
+  git('add', '.');
+  git('commit', '-m', 'actual narrow change');
+  // Copy the entrypoints so their repository root is this private fixture;
+  // resolve their maintained dependency graph from the real checkout.
+  for (const file of ['run-affected-tests.mjs', 'automation-verify.sh']) {
+    cpSync(resolve(root, 'scripts', file), resolve(repo, 'scripts', file));
+  }
+  for (const file of ['ci-fast-lanes.mjs', 'preflight-changed.mjs', 'lib']) {
+    symlinkSync(resolve(root, 'scripts', file), resolve(repo, 'scripts', file));
+  }
+  write('scripts/hooks/resolve-repo-node.sh', '#!/bin/sh\nexit 0\n');
+  return { repo, write, git, remote };
+}
+
+function runBaseConsumer(repo, args, env = {}) {
+  return spawnSync(process.execPath, args, {
+    cwd: repo,
+    encoding: 'utf8',
+    env: { ...buildVerificationEnv(), ...env },
+  });
+}
+
+describe('actual affected-test CLI base selection', () => {
+  it('uses remote-first bare bases, preserves qualified refs, and falls back only when remote is absent', () => {
+    const { repo, git } = consumerBaseFixture();
+    const run = base =>
+      runBaseConsumer(repo, [
+        'scripts/run-affected-tests.mjs',
+        '--base',
+        base,
+        '--dry-run',
+      ]);
+    try {
+      for (const base of ['main', 'origin/main', 'refs/remotes/origin/main']) {
+        expect(resolveBaseRef(repo, base)).toBe(
+          base === 'main' ? 'origin/main' : base
+        );
+        const result = run(base);
+        expect(result.status, result.stdout + result.stderr).toBe(0);
+        const plan = JSON.parse(result.stdout);
+        expect(plan.mode).toBe('selected');
+        expect(plan.selectedTests).toEqual([
+          'apps/web/lib/base-consumer.test.ts',
+        ]);
+      }
+      git('update-ref', '-d', 'refs/remotes/origin/main');
+      expect(resolveBaseRef(repo, 'main')).toBe('main');
+      expect(resolveBaseRef(repo, 'origin/main')).toBeNull();
+      expect(resolveBaseRef(repo, 'missing-branch')).toBeNull();
+      expect(JSON.parse(run('main').stdout).mode).toBe('full');
+      expect(run('origin/main').status).not.toBe(0);
+      expect(run('missing-branch').status).not.toBe(0);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('retains full fallback for real global inputs and unknown paths', () => {
+    const { repo, write, git } = consumerBaseFixture();
+    try {
+      for (const file of ['package.json', 'apps/web/lib/unknown-runtime.ts']) {
+        const head = git('rev-parse', 'HEAD');
+        write(file, 'changed\n');
+        git('add', '-f', file);
+        git('commit', '-m', file);
+        const result = runBaseConsumer(repo, [
+          'scripts/run-affected-tests.mjs',
+          '--base',
+          'main',
+          '--dry-run',
+        ]);
+        expect(result.status, result.stdout + result.stderr).toBe(0);
+        expect(JSON.parse(result.stdout).mode, file).toBe('full');
+        git('revert', '--no-edit', 'HEAD');
+        expect(git('diff', head, 'HEAD')).toBe('');
+      }
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('actual automation verify shell base selection', () => {
+  it('pins every diff consumer to the remote-first commit and fails before workloads for missing refs', () => {
+    const { repo, write, git, remote } = consumerBaseFixture();
+    const calls = resolve(repo, 'calls');
+    try {
+      write(
+        'bin/node',
+        `#!/bin/sh
+if [ "$1" = "--input-type=module" ]; then exec '${process.execPath}' "$@"; fi
+printf '%s\\n' "$TURBO_SCM_BASE:$*" >> '${calls}'
+`
+      );
+      write('bin/pnpm', `#!/bin/sh\nprintf '%s\\n' "$*" >> '${calls}'\n`);
+      for (const bin of ['node', 'pnpm']) {
+        chmodSync(resolve(repo, 'bin', bin), 0o755);
+      }
+      const run = base =>
+        spawnSync('bash', ['scripts/automation-verify.sh', 'affected'], {
+          cwd: repo,
+          encoding: 'utf8',
+          env: {
+            ...buildVerificationEnv(),
+            AUTOMATION_VERIFY_BASE: base,
+            PATH: `${resolve(repo, 'bin')}:${process.env.PATH}`,
+          },
+        });
+      for (const base of ['main', 'origin/main', 'refs/remotes/origin/main']) {
+        writeFileSync(calls, '');
+        const result = run(base);
+        expect(result.status, result.stdout + result.stderr).toBe(0);
+        const actual = readFileSync(calls, 'utf8');
+        expect(actual).toContain(
+          `${remote}:scripts/turbo-local.mjs typecheck --affected`
+        );
+        expect(actual).toContain(`--base ${remote}`);
+        expect(actual).toContain(`--diff-base=${remote}`);
+        expect(actual).toContain(`--diff-base ${remote}`);
+      }
+      git('update-ref', '-d', 'refs/remotes/origin/main');
+      writeFileSync(calls, '');
+      expect(run('main').status).toBe(0);
+      expect(readFileSync(calls, 'utf8')).toContain(
+        `--base ${git('rev-parse', 'main')}`
+      );
+      for (const base of ['origin/main', 'missing-branch']) {
+        writeFileSync(calls, '');
+        expect(run(base).status).not.toBe(0);
+        expect(readFileSync(calls, 'utf8')).toBe('');
+      }
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 });

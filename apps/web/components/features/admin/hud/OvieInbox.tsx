@@ -1,10 +1,14 @@
 'use client';
 
+import { LoadingSkeleton } from '@jovie/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FounderReviewRecorder } from '@/components/features/opportunity-inbox/FounderReviewRecorder';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
+import { EmptyState } from '@/components/molecules/EmptyState';
+import { APP_ROUTES } from '@/constants/routes';
+import { decisionCardView } from '@/lib/ovie/decision-card-view';
 import {
   redactFilesystemPaths,
   summarizeSourceIssues,
@@ -12,9 +16,14 @@ import {
 import {
   type OvieInbox as Inbox,
   inboxDecisionRequest,
+  type OvieInboxCase,
 } from '@/lib/ovie/inbox';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
 import { CertificationReviewCard } from '../certifications/CertificationReviewCard';
+import {
+  DecisionCard,
+  type DecisionCardStatus,
+} from '../decision-card/DecisionCard';
 
 const FOUNDER_NOTE_TARGET = {
   type: 'founder-note',
@@ -24,6 +33,30 @@ const FOUNDER_NOTE_TARGET = {
   category: 'note',
 } as const;
 
+/** Opens Ovie chat with a Summer conversation about one inbox decision. */
+export function discussDecisionHref(caseId: string): string {
+  return `${APP_ROUTES.ADMIN_CHAT}?discuss=${encodeURIComponent(caseId)}`;
+}
+
+/** Minute-resolution clock for deadline countdowns. */
+function useNowMinute(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
+}
+
+interface Receipt {
+  readonly item: OvieInboxCase;
+  readonly decision: 'approve' | 'reject';
+}
+
+interface Failure extends Receipt {
+  readonly message: string;
+}
+
 export function OvieInbox({ caseId }: { readonly caseId?: string }) {
   const [captureOpen, setCaptureOpen] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -31,6 +64,11 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
+  const now = useNowMinute();
+  // Swipe-binary cards advance optimistically; the last decision stays as a
+  // receipt and a failed write comes back with Retry.
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [failure, setFailure] = useState<Failure | null>(null);
   const query = useQuery<Inbox>({
     queryKey: ['ovie', 'inbox'],
     queryFn: async ({ signal }) => {
@@ -106,6 +144,64 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
     }
   }
 
+  function removeCase(id: string) {
+    queryClient.setQueryData<Inbox>(['ovie', 'inbox'], current =>
+      current
+        ? { ...current, cases: current.cases.filter(entry => entry.id !== id) }
+        : current
+    );
+  }
+
+  function restoreCase(target: OvieInboxCase) {
+    queryClient.setQueryData<Inbox>(['ovie', 'inbox'], current =>
+      current && !current.cases.some(entry => entry.id === target.id)
+        ? { ...current, cases: [target, ...current.cases] }
+        : current
+    );
+  }
+
+  /** Optimistic: the next card shows at once; a failure restores this one. */
+  async function decideNow(
+    target: OvieInboxCase,
+    decision: 'approve' | 'reject'
+  ) {
+    if (!target.decisionTarget || submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    setError(null);
+    setFailure(null);
+    setReceipt({ item: target, decision });
+    removeCase(target.id);
+    try {
+      const request = inboxDecisionRequest(
+        target.decisionTarget,
+        decision,
+        '',
+        crypto.randomUUID()
+      );
+      const response = await fetch(request.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+      if (response.status === 409) {
+        // Already decided elsewhere: the refreshed inbox is the truth.
+        setReceipt(null);
+        setError('This decision was already recorded. The inbox is current.');
+        return;
+      }
+      if (!response.ok) throw new Error('Not recorded.');
+    } catch {
+      setReceipt(null);
+      restoreCase(target);
+      setFailure({ item: target, decision, message: 'Not recorded. Retry.' });
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+      void query.refetch();
+    }
+  }
+
   return (
     <ContentSurfaceCard data-testid='ovie-inbox'>
       <div
@@ -128,7 +224,21 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
         <div className='mt-3 min-h-0 flex-1 overflow-y-auto'>
           <div className='space-y-3' aria-busy={query.isPending || submitting}>
             {query.isPending ? (
-              <p role='status'>Loading decisions…</p>
+              <div role='status' aria-label='Loading Decisions…'>
+                <LoadingSkeleton announce={false} height='h-5' width='w-48' />
+                <LoadingSkeleton announce={false} className='mt-2' />
+                <LoadingSkeleton
+                  announce={false}
+                  className='mt-3'
+                  width='w-3/4'
+                />
+                <LoadingSkeleton
+                  announce={false}
+                  className='mt-3'
+                  height='h-8'
+                  width='w-24'
+                />
+              </div>
             ) : query.isError ? (
               <div role='alert'>
                 <p>{query.error.message}</p>
@@ -139,6 +249,21 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
                 >
                   Retry
                 </DrawerButton>
+              </div>
+            ) : item && isSwipeDecision(item) ? (
+              <div data-testid='ovie-inbox-decision' key={item.id}>
+                <DecisionCard
+                  view={decisionCardView(item, now)}
+                  status={cardStatus(item, failure)}
+                  discussHref={discussDecisionHref(item.id)}
+                  onApprove={() => void decideNow(item, 'approve')}
+                  onReject={() => void decideNow(item, 'reject')}
+                  onRetry={
+                    failure?.item.id === item.id
+                      ? () => void decideNow(item, failure.decision)
+                      : undefined
+                  }
+                />
               </div>
             ) : item ? (
               <article data-testid='ovie-inbox-decision' key={item.id}>
@@ -237,17 +362,36 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
                 )}
               </article>
             ) : caseId !== undefined ? (
-              <p role='status'>
-                This decision is not in the current inbox. Refresh to check its
-                status.
-              </p>
+              <EmptyState
+                presentation='quiet'
+                heading='This decision is not in the current inbox. Refresh to check its status.'
+                action={{
+                  label: 'Refresh',
+                  onClick: () => void query.refetch(),
+                }}
+              />
             ) : (
-              <p role='status'>
-                {query.data?.issues.length
-                  ? 'No pending decisions in connected sources.'
-                  : 'No pending founder decisions.'}
-              </p>
+              <EmptyState
+                presentation='quiet'
+                heading={
+                  query.data?.issues.length
+                    ? 'No pending decisions in connected sources.'
+                    : 'No pending founder decisions.'
+                }
+              />
             )}
+            {receipt ? (
+              <p
+                role='status'
+                className='truncate text-xs text-tertiary-token'
+                data-testid='ovie-inbox-receipt'
+              >
+                <span className='text-secondary-token'>
+                  {receipt.decision === 'approve' ? 'Approved' : 'Rejected'}
+                </span>{' '}
+                {receipt.item.title}
+              </p>
+            ) : null}
             {error ? (
               <p role='alert' className='text-xs text-error'>
                 {error}
@@ -274,6 +418,28 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
       </div>
     </ContentSurfaceCard>
   );
+}
+
+/**
+ * Summer cards, design proposals and visual changes are binary: Approve or
+ * Reject, with Discuss for anything else. Linear asks (typed answers) and
+ * certifications (evidence notes) keep their own forms.
+ */
+function isSwipeDecision(item: OvieInboxCase): boolean {
+  const kind = item.decisionTarget?.kind;
+  return (
+    !item.certification &&
+    (kind === 'summer' || kind === 'design' || kind === 'visual')
+  );
+}
+
+function cardStatus(
+  item: OvieInboxCase,
+  failure: Failure | null
+): DecisionCardStatus {
+  return failure?.item.id === item.id
+    ? { kind: 'error', message: failure.message }
+    : { kind: 'pending' };
 }
 
 /**

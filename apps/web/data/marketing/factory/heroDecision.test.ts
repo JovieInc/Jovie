@@ -219,7 +219,7 @@ describe('route hero audit', () => {
     // mismatch means the route chose a hero the table does not allow.
     expect(summary).toMatchInlineSnapshot(`
       {
-        "/": "wrong-variant: split-claim-card -> centered-homepage",
+        "/": "wrong-variant: left-none -> centered-homepage",
         "/about": "ok: left-content",
         "/alternatives/*": "ok: left-content",
         "/artist-notifications": "ok: f-layout-desktop-screenshot",
@@ -235,6 +235,13 @@ describe('route hero audit', () => {
         "/pay": "ok: split-link-claim",
         "/pricing": "unlocked-code-variant: centered-none -> left-buttons",
         "/product": "ok: split-link-claim",
+        "/product/command-palette": "ok: f-layout-desktop-screenshot",
+        "/product/dsp-links": "ok: f-layout-desktop-screenshot",
+        "/product/isrc": "ok: f-layout-desktop-screenshot",
+        "/product/link-analytics": "ok: f-layout-desktop-screenshot",
+        "/product/pre-save": "ok: f-layout-desktop-screenshot",
+        "/product/release-scheduling": "ok: f-layout-desktop-screenshot",
+        "/product/utm-links": "ok: f-layout-desktop-screenshot",
         "/smart-links": "ok: f-layout-desktop-screenshot",
         "/solutions/*": "unlocked-code-variant: centered-phone -> split-link-claim",
         "/support": "ok: left-content",

@@ -34,6 +34,16 @@ const KNOWN_SAFE = [
   /^apps\/web\/app\/(?!api\/)/,
   /^apps\/web\/public\//,
   /^apps\/web\/(hooks|types|constants)\//,
+  // CI and dev tooling that cannot change the deployed app or its config.
+  // Risk rules are matched first, so pinned scripts (e.g.
+  // agent-control-plane's check-agent-gate-evidence.ts) keep their rule class.
+  /^apps\/web\/\.storybook\//,
+  /^apps\/web\/scripts\//,
+  /^apps\/web\/lib\/a11y-gates\//,
+  // Generated CI performance pack; sibling generated files under
+  // lib/ovie/generated/ (e.g. preview-env-exceptions.json) are runtime-read
+  // and stay unclassified-by-default.
+  /^apps\/web\/lib\/ovie\/generated\/performance-invariants-v1\.json$/,
 ];
 
 const AFFECTS = {

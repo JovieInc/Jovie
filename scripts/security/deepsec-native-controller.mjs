@@ -182,7 +182,12 @@ export function nativeGithubStore({ token, fetchImpl = fetch }) {
       matches.push(
         ...comments.filter(
           comment =>
-            comment.user?.login === 'jovie-bot[bot]' &&
+            [
+              'jovie-bot[bot]',
+              'jovie-ci-lane[bot]',
+              'jovie-symphony-lane[bot]',
+              'jovie-agents-lane[bot]',
+            ].includes(comment.user?.login) &&
             comment.body?.startsWith(NATIVE_COMMENT_MARKER)
         )
       );

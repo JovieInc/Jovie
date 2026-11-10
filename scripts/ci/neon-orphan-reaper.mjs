@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 
-const NEON_API = 'https://console.neon.tech/api/v2';
+import {
+  evaluateBranchDeletion,
+  evaluateBranchNameAgainstInventory,
+} from './neon-branch-guard.mjs';
+
+export const NEON_API = 'https://console.neon.tech/api/v2';
 const GITHUB_API = process.env.GITHUB_API_URL || 'https://api.github.com';
 
 export const EPHEMERAL_BRANCH_PATTERNS = [
@@ -117,6 +122,22 @@ export async function proveCompletedWorkflowBranch({
   };
 }
 
+/**
+ * `response.json()` is `unknown` under scripts checkJs (lib es2022). This is
+ * the read surface for Neon list pages and the other JSON bodies this file
+ * fetches. Callers narrow with Array.isArray before reading list fields.
+ * @typedef {{
+ *   branches?: Array<{ id?: string, name?: string, default?: boolean, protected?: boolean }>,
+ *   endpoints?: Array<{ branch_id?: string, current_state?: string }>,
+ *   pagination?: { next?: string | null },
+ * }} NeonJsonEnvelope
+ */
+
+/**
+ * @param {string} url
+ * @param {{ method?: string, headers?: Record<string, string> }=} options
+ * @returns {Promise<NeonJsonEnvelope | null>}
+ */
 async function requestJson(url, options = {}) {
   const response = await fetch(url, options);
   if (!response.ok) {
@@ -124,7 +145,8 @@ async function requestJson(url, options = {}) {
       `${options.method || 'GET'} ${url} returned ${response.status}`
     );
   }
-  return response.status === 204 ? null : response.json();
+  if (response.status === 204) return null;
+  return /** @type {NeonJsonEnvelope} */ (await response.json());
 }
 
 export async function reapCompletedWorkflowBranches({
@@ -221,6 +243,15 @@ export async function reapCompletedWorkflowBranches({
     const activeEndpointCount = activeEndpointsByBranch.get(branch.id) || 0;
     if (protectedBranches.has(branch.name)) {
       unknown += activeEndpointCount;
+      continue;
+    }
+    // Neon's own default/protected flags and the reserved names are the
+    // authority, whatever the caller's protectedBranches list says.
+    const guard = evaluateBranchDeletion(branch);
+    if (!guard.deletable) {
+      skipped.push(branch.name);
+      unknown += activeEndpointCount;
+      log(`Keeping ${branch.name}: never deletable (${guard.reason}).`);
       continue;
     }
     if (!runId) {
@@ -330,7 +361,68 @@ export async function awaitEndpointTeardown({
   }
 }
 
+// Lists every branch with Neon's default/protected flags, following cursors.
+// Any error or malformed page throws so callers fail closed.
+export async function listAllBranches({
+  neonApiKey,
+  neonProjectId,
+  request = requestJson,
+}) {
+  const headers = { Authorization: `Bearer ${neonApiKey}` };
+  const branches = [];
+  let cursor = null;
+  for (let page = 0; page < 50; page += 1) {
+    const query = `limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
+    const payload = await request(
+      `${NEON_API}/projects/${encodeURIComponent(neonProjectId)}/branches?${query}`,
+      { headers }
+    );
+    const batch = Array.isArray(payload) ? payload : payload?.branches;
+    if (!Array.isArray(batch)) throw new Error('malformed branch inventory');
+    branches.push(...batch);
+    cursor = Array.isArray(payload) ? null : payload?.pagination?.next || null;
+    if (!cursor) return branches;
+  }
+  throw new Error('branch inventory pagination did not terminate');
+}
+
+export async function assertBranchDeletable({
+  branchName,
+  neonApiKey,
+  neonProjectId,
+  request = requestJson,
+}) {
+  if (!branchName || !neonApiKey || !neonProjectId) {
+    return { deletable: false, reason: 'missing-configuration' };
+  }
+  let branches;
+  try {
+    branches = await listAllBranches({ neonApiKey, neonProjectId, request });
+  } catch {
+    return { deletable: false, reason: 'inventory-unreadable' };
+  }
+  return evaluateBranchNameAgainstInventory(branches, branchName);
+}
+
 async function main() {
+  if (process.argv[2] === '--assert-deletable') {
+    const result = await assertBranchDeletable({
+      branchName: process.argv[3],
+      neonApiKey: process.env.NEON_API_KEY,
+      neonProjectId: process.env.NEON_PROJECT_ID,
+    });
+    if (!result.deletable) {
+      console.error(
+        `Neon branch ${process.argv[3] ?? '(none)'} is never-delete or unverifiable (${result.reason}); keeping it.`
+      );
+      process.exitCode = 1;
+      return;
+    }
+    console.log(
+      `Neon branch ${process.argv[3]} is deletable (${result.reason}).`
+    );
+    return;
+  }
   if (process.argv[2] === '--prove-completed-owner') {
     const branchName = process.argv[3];
     if (!branchName) {
@@ -358,7 +450,7 @@ async function main() {
   const protectedBranches = new Set(
     (
       process.env.PROTECTED_BRANCHES ||
-      'main,development,preview,br-main,br-production'
+      'main,production,prod,development,preview,br-main,br-production'
     )
       .split(',')
       .map(value => value.trim())

@@ -26,9 +26,22 @@ const EXPECTED_DEGRADED_RESPONSES = new Map<string, number>([
   ['/api/chat/conversations', 500],
 ]);
 
+/**
+ * Chrome-widget fetches expected to be cancelled mid-flight (navigation
+ * aborts, never failed responses). The sidebar What's New widget starts
+ * this fetch ~1.5s after mount on a plain `fetch` (WhatsNewBanner); the
+ * proof spec's next viewport navigation aborts it in flight with
+ * net::ERR_ABORTED (JOV-8486). The widget already treats any failure as
+ * "nothing new" (loadUnseenWhatsNew), so the abort is silent in the
+ * product. Only the abort is tolerated: a real failed response from the
+ * same path is NOT admitted here and still fails the proof.
+ */
+const EXPECTED_ABORTED_PATHS = new Set(['/changelog/whats-new.json']);
+
 export function createAppShellDegradedTolerance(proofRoute: string) {
   const expectedAbortedPaths = new Set([
     proofRoute,
+    ...EXPECTED_ABORTED_PATHS,
     ...EXPECTED_DEGRADED_RESPONSES.keys(),
   ]);
 

@@ -29,6 +29,16 @@ export interface EntityTabbedRailProps<T extends string> {
   readonly testId?: string;
   readonly tabDistribution?: 'intrinsic' | 'fill';
   readonly tabOverflowMode?: 'collapse' | 'wrap' | 'scroll';
+  /**
+   * Contacts and audience-member rails stay flat. Analytics opts into the
+   * shared rounded drawer card so live and demo match.
+   */
+  readonly tabbedSurfaceVariant?: 'card' | 'flat';
+  /**
+   * Hide the tabbed card while keeping the entity header and close control,
+   * for rails whose header carries the whole empty state.
+   */
+  readonly hideTabbedCard?: boolean;
 }
 
 /**
@@ -61,6 +71,8 @@ export function EntityTabbedRail<T extends string>({
   testId,
   tabDistribution = 'fill',
   tabOverflowMode = 'collapse',
+  tabbedSurfaceVariant = 'flat',
+  hideTabbedCard = false,
 }: EntityTabbedRailProps<T>) {
   return (
     <EntitySidebarShell
@@ -78,11 +90,11 @@ export function EntityTabbedRail<T extends string>({
       emptyMessage={emptyMessage}
       entityHeader={entityHeader}
     >
-      {!isEmpty ? (
+      {!isEmpty && !hideTabbedCard ? (
         <DrawerTabbedCard
           testId={tabbedCardTestId}
           sectionKind={sectionKind}
-          surfaceVariant='flat'
+          surfaceVariant={tabbedSurfaceVariant}
           controls={controls}
           tabsContainerClassName={tabsContainerClassName}
           tabs={

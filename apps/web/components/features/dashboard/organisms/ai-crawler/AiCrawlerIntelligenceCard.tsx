@@ -116,7 +116,7 @@ export function AiCrawlerIntelligenceCard({
       </span>
       <span className='sr-only'>{CRAWLER_READ_DISCLOSURE.description}</span>
       {model.status ? (
-        <span className='inline-flex shrink-0 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-3xs font-medium uppercase tracking-wide text-secondary-token'>
+        <span className='inline-flex shrink-0 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-3xs font-medium text-secondary-token'>
           <span
             className='h-1.5 w-1.5 shrink-0 rounded-full'
             style={{ background: statusDotVar(model.status.tone) }}
@@ -155,8 +155,11 @@ export function AiCrawlerIntelligenceCard({
         className
       )}
       data-testid='ai-crawler-intelligence-card'
-      aria-label='View AI Crawler Read Details'
     >
+      {/* No aria-label: the visible row text must be part of the accessible
+          name (axe label-content-name-mismatch). The sr-only prefix keeps the
+          action first; the row's own text follows it. */}
+      <span className='sr-only'>View AI Crawler Read Details:</span>
       {rowContent}
       <ChevronRight
         className='h-4 w-4 shrink-0 text-tertiary-token'

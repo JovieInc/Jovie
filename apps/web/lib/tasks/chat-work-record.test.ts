@@ -128,7 +128,7 @@ describe('ensureChatWorkRecord', () => {
     expect(result).toEqual({ taskId: 'task-5', created: false });
   });
 
-  it('falls back to Untitled chat when the conversation has no title', async () => {
+  it('uses a clear fallback when the conversation has no title', async () => {
     hoisted.selectLimitMock
       .mockResolvedValueOnce([{ id: 'conv-1', title: null }])
       .mockResolvedValueOnce([]);
@@ -141,7 +141,7 @@ describe('ensureChatWorkRecord', () => {
     });
 
     expect(hoisted.insertValuesMock).toHaveBeenCalledWith(
-      expect.objectContaining({ title: 'Untitled chat' })
+      expect.objectContaining({ title: 'Conversation' })
     );
   });
 });

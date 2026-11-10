@@ -18,6 +18,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import { formatReleaseDateShort } from '@/lib/discography/formatting';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 
@@ -102,7 +103,7 @@ export function ReleaseEditDialog({
                   >
                     {release.releaseDate
                       ? formatReleaseDateShort(release.releaseDate)
-                      : 'Date TBD'}
+                      : COPY_FALLBACKS.date}
                   </Badge>
                 }
               />
@@ -140,7 +141,7 @@ export function ReleaseEditDialog({
                       {existing?.source === 'manual' ? (
                         <Badge
                           variant='secondary'
-                          className='rounded-md border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-3xs text-amber-700 dark:text-amber-300'
+                          className='rounded-md px-1.5 py-0.5 text-3xs'
                         >
                           Manual
                         </Badge>

@@ -3,6 +3,7 @@
 import { Sheet, SheetContent } from '@jovie/ui';
 import React from 'react';
 import { SHELL_RAIL_ALLOCATION } from '@/components/shell/rail-motion';
+import { moveSidebarNavFocus } from '@/components/shell/sidebar-arrow-navigation';
 import { useRailMotionPhase } from '@/components/shell/useRailMotionPhase';
 import { cn } from '@/lib/utils';
 import { useSidebar } from './context';
@@ -38,6 +39,17 @@ export const Sidebar = React.forwardRef<
     // Shared rail lifecycle: certification samples data-rail-phase to prove
     // opening/closing resolve toward the latest requested state (JOV-4522).
     const railPhase = useRailMotionPhase(state === 'open');
+    const navRootRef = React.useRef<HTMLDivElement>(null);
+    // Native listener: arrow roaming is an accelerator on top of Tab order.
+    React.useEffect(() => {
+      const root = navRootRef.current;
+      if (!root) return;
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (moveSidebarNavFocus(root, event)) event.preventDefault();
+      };
+      root.addEventListener('keydown', onKeyDown);
+      return () => root.removeEventListener('keydown', onKeyDown);
+    }, []);
 
     if (collapsible === 'none') {
       return (
@@ -70,6 +82,15 @@ export const Sidebar = React.forwardRef<
             id={isMobile ? 'shell-left-rail' : undefined}
             className='w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground'
             hideClose
+            // Opening the phone drawer moves focus into it, onto the drawer
+            // itself rather than its first control: auto-focusing the brand
+            // switcher painted its focus fill as a stuck pill on every open.
+            onOpenAutoFocus={event => {
+              event.preventDefault();
+              (event.currentTarget as HTMLElement | null)?.focus({
+                preventScroll: true,
+              });
+            }}
             style={
               {
                 '--sidebar-width': 'var(--app-shell-sidebar-width)',
@@ -124,7 +145,9 @@ export const Sidebar = React.forwardRef<
           <div
             className={cn(
               'h-full w-(--sidebar-width) overflow-hidden',
-              isFloating ? 'absolute top-0 left-0 z-30 shadow-xl' : 'relative',
+              isFloating
+                ? 'absolute top-0 left-0 z-30 shadow-(--app-shell-drawer-shadow)'
+                : 'relative',
               SHELL_RAIL_ALLOCATION,
               'group-data-[collapsible=offcanvas]:w-0',
               state === 'closed' &&
@@ -150,6 +173,7 @@ export const Sidebar = React.forwardRef<
           >
             <div
               data-sidebar='sidebar'
+              ref={navRootRef}
               className='pointer-events-auto flex h-full w-full flex-col overflow-clip bg-sidebar transition-[background-color] duration-normal ease-interactive lg:rounded-(--app-shell-radius) lg:shadow-(--app-shell-sidebar-shadow) group-data-[variant=floating]:rounded-sidebar-floating group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
             >
               {children}

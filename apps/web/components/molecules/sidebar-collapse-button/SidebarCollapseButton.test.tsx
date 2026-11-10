@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 vi.mock('@jovie/ui', async importOriginal => ({
   ...(await importOriginal<typeof import('@jovie/ui')>()),
@@ -7,18 +8,27 @@ vi.mock('@jovie/ui', async importOriginal => ({
     children,
 }));
 
+const sidebar = vi.hoisted(() => ({ isPreview: false }));
 vi.mock('@/components/shell/SidebarContext', () => ({
   useSidebar: () => ({
     toggleSidebar: vi.fn(),
     state: 'open' as const,
+    isPreview: sidebar.isPreview,
+    open: !sidebar.isPreview,
   }),
 }));
 
 import { SidebarCollapseButton } from './SidebarCollapseButton';
 
 describe('SidebarCollapseButton', () => {
-  it('routes the shell control through the canonical icon-button contract (JOV-3959)', () => {
-    render(<SidebarCollapseButton />);
+  it('routes the shell control through the canonical icon-button contract (JOV-3959)', async () => {
+    // The shell renders the rail this control names in aria-controls.
+    const { container } = render(
+      <>
+        <nav id='shell-left-rail' aria-label='Sidebar' />
+        <SidebarCollapseButton />
+      </>
+    );
 
     const button = screen.getByRole('button', { name: /collapse sidebar/i });
 
@@ -36,5 +46,24 @@ describe('SidebarCollapseButton', () => {
     expect(button.className).not.toMatch(/\bborder-(?:default|subtle|\[)/);
     expect(button.className).not.toContain('rounded-md');
     expect(button.className).not.toContain('hover:border-default');
+    await expectNoA11yViolations(container);
+  });
+
+  it('shows the panel glyph from Pen while pinned, never a pin-off mark', () => {
+    render(<SidebarCollapseButton />);
+    const button = screen.getByRole('button', { name: /collapse sidebar/i });
+    const icon = screen.getByTestId('sidebar-rail-toggle-icon');
+    expect(button).toContainElement(icon);
+    expect(icon).toHaveClass('lucide-rail-left-open');
+    expect(icon.getAttribute('class') ?? '').not.toMatch(/pin/i);
+  });
+
+  it('offers Pin sidebar during a flyout peek and can opt out of peek triggers', () => {
+    sidebar.isPreview = true;
+    render(<SidebarCollapseButton previewTrigger={false} />);
+    const button = screen.getByRole('button', { name: 'Pin sidebar' });
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+    expect(button).toHaveAttribute('data-rail-preview-trigger', 'false');
+    sidebar.isPreview = false;
   });
 });

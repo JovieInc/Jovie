@@ -314,6 +314,20 @@ If removing an element makes the screen clearer and does not reduce comprehensio
 
 ---
 
+## No dead ends
+
+JOV-INV-046. Every rendered control works in the current runtime. A control that cannot work here is not rendered.
+
+- Decide with a capability check: desktop or web or iOS, browser support, entitlement. Render nothing when the check fails.
+- Do not explain the absence. Banned copy: "not available", "unavailable", "not supported", "coming soon", "check back", "use X instead", "only available on Y".
+- Do not ship a disabled control with no actionable reason (`title`, `disabledReason`, or `aria-describedby`), an empty or no-op handler, `href="#"`, or a link to a route that does not exist.
+- Allowed: a permission or entitlement prompt that leads to a working path, and a transient error that offers retry. Mark a deliberate exception with a `dead-end-ok: <reason>` comment on the same or previous line.
+- `pnpm design:no-dead-ends:check` fails new violations. Grandfathered findings live in `packages/copy/dead-ends.baseline.json` and only shrink (`pnpm design:no-dead-ends:update`). If a dead end can still reach a user, call `trackDeadEndShown(surface, reason)`.
+
+The agent checklist is `.claude/rules/ui.md`. The canon statement is JOV-INV-046 and `canon/PRODUCT.md`.
+
+---
+
 ## Color System
 
 > **Canonical source:** Pen node **ZiaWI** (`ziawi-color-sot-v1` in
@@ -1008,6 +1022,22 @@ Quiet tool-call / streaming activity in the chat transcript is a first-class Sys
 
 ---
 
+## Tooltip eligibility and input
+
+A tooltip supplies a hidden label, an actionable explanation, or a shortcut.
+Do not repeat an already readable row title. Recheck rendered title overflow
+when its container, fonts, title or typography changes, and close a hint that
+becomes ineligible. List hints open below/start; sidebar hints retain their seam.
+Mouse and hardware-keyboard hints remain available on hybrid devices. Actual
+touch activates the control first and leaves no sticky hint. Essential actions
+remain visible for coarse/no-hover input.
+
+An open interactive menu belongs to its rail through the trigger's ARIA control
+relationship, including nested portals. Retain that rail's presentation until
+dismissal or detachment, without changing persisted pin intent. Unrelated
+portals and the opposite rail do not acquire ownership. Existing warm traversal,
+delays, dismissal, focus restoration and rail geometry remain canonical.
+
 ## Full-Screen Status Screens
 
 All full-screen takeover screens (offline, global error, root error, public error fallback) share identical layout geometry to prevent layout shift when transitioning between states.
@@ -1229,3 +1259,9 @@ for the canonical CSS + Tailwind references.
 | `apps/web/app/(home)/layout.tsx` | Homepage shell — `PublicPageShell` |
 
 ---
+## No text on text (founder-locked 2026-10-25)
+
+Our text never overlays artwork that carries text. Release heroes show clean
+square art and render title and artist below it in normal flow, aligned to the
+art edges; the h1 stays in the DOM. Guard:
+`apps/web/components/features/release/SmartLinkShell.test.tsx` ("no text on text").

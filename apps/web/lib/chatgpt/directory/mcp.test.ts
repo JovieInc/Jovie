@@ -84,6 +84,7 @@ function artist(overrides: Record<string, unknown> = {}) {
 function chain() {
   const builder = {
     from: () => builder,
+    leftJoin: () => builder,
     where: () => builder,
     limit: () => Promise.resolve(rows),
   };
@@ -220,6 +221,20 @@ describe('ChatGPT artist directory MCP', () => {
         'radio'
       ).map(item => item.username)
     ).toEqual(['radiohead']);
+  });
+
+  it('omits unlisted identities from search while allowing exact public fetch', () => {
+    const unlisted = artist({ settings: { searchable: false } });
+    expect(rankPublicArtists([unlisted], 'radio')).toEqual([]);
+    expect(toPublicArtistProfile(unlisted)?.username).toBe('radiohead');
+    for (const searchable of [null, 'true', 1, {}, []]) {
+      expect(
+        rankPublicArtists([artist({ settings: { searchable } })], 'radio')
+      ).toEqual([]);
+    }
+    expect(
+      rankPublicArtists([artist({ settings: { searchable: true } })], 'radio')
+    ).toHaveLength(1);
   });
 
   it('returns 404 until the flag is on and does not query profiles', async () => {

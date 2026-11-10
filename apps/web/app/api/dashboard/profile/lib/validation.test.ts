@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PUBLIC_PROFILE_ELEMENTS } from '@/lib/profile/public-profile-elements';
 import { ProfileUpdateSchema, parseProfileUpdates } from './validation';
 
 describe('dashboard profile username updates', () => {
@@ -43,5 +44,46 @@ describe('dashboard profile username updates', () => {
     );
 
     expect(result.ok).toBe(false);
+  });
+});
+
+describe('owner searchability choice validation', () => {
+  it.each([true, false])(
+    'accepts the explicit boolean choice %s',
+    searchable => {
+      expect(
+        ProfileUpdateSchema.parse({ settings: { searchable } }).settings
+      ).toEqual({ searchable });
+    }
+  );
+
+  it('does not insert a discovery choice when saving unrelated profile settings', () => {
+    const parsed = ProfileUpdateSchema.parse({
+      settings: { marketing_emails: false },
+    });
+    expect(parsed.settings).toEqual({ marketing_emails: false });
+    expect(Object.hasOwn(parsed.settings ?? {}, 'searchable')).toBe(false);
+  });
+
+  it.each([null, 'false', 1, [], {}])(
+    'rejects a malformed searchability choice %s',
+    searchable => {
+      expect(
+        ProfileUpdateSchema.safeParse({ settings: { searchable } }).success
+      ).toBe(false);
+    }
+  );
+});
+
+describe('staged public element policy', () => {
+  it('does not accept a stored choice before all public readers enforce it', () => {
+    const fields = Object.fromEntries(
+      PUBLIC_PROFILE_ELEMENTS.map(key => [key, false])
+    );
+    expect(
+      ProfileUpdateSchema.safeParse({
+        settings: { public_fields: { version: 1, fields } },
+      }).success
+    ).toBe(false);
   });
 });

@@ -61,14 +61,15 @@ describe('AiCrawlerIntelligenceCard', () => {
   it('renders the readiness disclosure in the populated compact row', () => {
     render(<AiCrawlerIntelligenceCard onOpenDetail={() => undefined} />);
 
-    expect(screen.getByTestId('ai-crawler-intelligence-card')).toHaveAttribute(
-      'aria-label',
-      'View AI Crawler Read Details'
-    );
+    expect(
+      screen.getByRole('button', { name: /View AI Crawler Read Details/ })
+    ).toBeInTheDocument();
     expect(screen.getByText('AI Crawler Reads')).toBeInTheDocument();
     expect(
       screen.getByText('420 reads · 2 services tracked')
     ).toBeInTheDocument();
+    // Linear-scale status pill: quiet Title Case, no all-caps treatment.
+    expect(screen.getByText('Active').className).not.toContain('uppercase');
     expect(
       screen.getByText(/They do not show an AI answer mention/)
     ).toBeInTheDocument();

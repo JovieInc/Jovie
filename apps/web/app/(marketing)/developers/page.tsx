@@ -6,23 +6,30 @@ import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { DOCS_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { marketingOgImage } from '@/data/marketingOgCards';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
+import { documentTitle } from '@/lib/seo/document-title';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: `Developers - ${APP_NAME}`,
+  title: documentTitle('Developers'),
   description:
     'Jovie’s public, anonymous, read-only profile API pairs with machine-readable site resources.',
   alternates: {
     canonical: `${BASE_URL}${APP_ROUTES.DEVELOPERS}`,
   },
   openGraph: {
-    title: `Developers - ${APP_NAME}`,
+    title: `Developers | ${APP_NAME}`,
     description:
       'Jovie’s public, anonymous, read-only profile API pairs with machine-readable site resources.',
     url: `${BASE_URL}${APP_ROUTES.DEVELOPERS}`,
     type: 'website',
+    images: [marketingOgImage('developers')],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: [marketingOgImage('developers').url],
   },
 };
 
@@ -54,17 +61,19 @@ const RESOURCE_LINKS = [
       'Anonymous `jovie` commands for agents: read public profile data and create claimable profiles.',
   },
   {
+    href: APP_ROUTES.DEVELOPERS_AGENTS,
+    label: 'Agent Connector',
+    description:
+      'The connector for assistants: tools, authentication, limits and draft expiry.',
+  },
+  {
     href: '/api-versioning',
-    label: 'API Versioning And Deprecation Policy',
+    // ui-casing-allow: sentence-case labels per marketing plan phase 1
+    label: 'API versioning and deprecation policy',
     description:
       // "Deprecation" and "Sunset" are the literal RFC 9745/8594 HTTP header
       // names (ui-casing-allow: literal HTTP header names)
       'Active v1 lifecycle boundary, additive versus breaking changes, and future Deprecation and Sunset signals.',
-  },
-  {
-    href: APP_ROUTES.INTEGRATIONS,
-    label: 'Integrations',
-    description: 'Account integrations and the capabilities each supports.',
   },
   {
     href: '/llms.txt',

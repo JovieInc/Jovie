@@ -130,6 +130,13 @@ describe('public surface guardrails', () => {
   });
 
   it('marks sensitive utility and investor routes as noindex', async () => {
+    // Earlier cases in this file stub `@/constants/app` with only BASE_URL.
+    // That mock stays installed for later imports, so route modules must load
+    // against the real constants.
+    vi.doUnmock('@/constants/app');
+    vi.doUnmock('@/lib/env-server');
+    vi.resetModules();
+
     const modules = await Promise.all([
       import('../../../app/demo/layout'),
       import('../../../app/ui/layout'),

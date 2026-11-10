@@ -1,4 +1,5 @@
 import type { MarketingCopyClaim } from '@/data/marketing/copy';
+import { COMPARATIVE_CLAIM_RECEIPTS } from './comparative-claims';
 
 /**
  * Publish-safe evidence receipts for the factual claims on the comparison,
@@ -353,6 +354,7 @@ export const PUBLISHED_CLAIM_RECEIPTS = {
     verifiedAt: '2026-10-01',
     reviewAfter: '2026-12-15',
   },
+  ...COMPARATIVE_CLAIM_RECEIPTS,
 } as const satisfies Readonly<Record<string, PublishedClaimReceipt>>;
 
 export type PublishedClaimId = keyof typeof PUBLISHED_CLAIM_RECEIPTS;
@@ -456,15 +458,15 @@ export function validatePublishedClaimReceipts(
  */
 export const SCOPED_CLAIM_SURFACE_HASHES = {
   '/compare/linktree':
-    '515e0a4c0437680b5b264fb2b3829a8b9486eb1371d3a20112811396911e4cd7',
+    '619c43d020a32655b2b473bc3b83dca49877465d509d2c28f55e420b3f39eff5',
   '/compare/linkfire':
-    '0b2d66dc78d69d39852ecd247f4e7b28c8243ea471cd65b56b7e6ded91d421d5',
+    '0974d7e2ab63e31a3048640fc074e08dd686994eaf18f25ed3d336338e0177b1',
   '/alternatives/linktree':
-    'c679a7b4cf862784e81151d5df2472f0c81530328e44beec1e4bd85f390ce286',
+    'f921a9800b1dde66eb234a14d7bab3b59c52b3bd11f0b490b9d1fddd95be0160',
   '/alternatives/link-in-bio':
-    '67847983a3ac9762697e6b3d9f5a33733c2157e2799b17565f729fba41393e22',
+    'bd6abd37bd0b7e84d3d409434203227f60cf1096449ad8dc706d077456c9cb15',
   '/llms.txt':
-    '42a226db249467579df5487aaa5b265d6c417bcef4dd5b0c5b82da89c003c2d0',
+    '2bc4a4c5e14ec0e63d188d161392bb104d807118a74cedad5b03dc3144aa2bc1',
   '/llms-full.txt':
-    '9c2760ea00009e0e0fcae14e920e2fefb17dc027320da422bfd05c6eae4ce399',
+    'f7a5901a15cb4cb68f5552bb6d8862c1dcc0353f6624fe19b01834868725757b',
 } as const;

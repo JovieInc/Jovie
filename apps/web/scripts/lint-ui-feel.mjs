@@ -23,7 +23,9 @@
  * Rules:
  *   - Each count must NEVER exceed the baseline in
  *     ui-feel-ratchet.baseline.json.
- *   - If a count drops below baseline, update it with `--update` and commit.
+ *   - A count BELOW its baseline passes with a notice (`::notice` in CI),
+ *     so improvements never fail a PR or merge group (JOV-8878). Run
+ *     `--update` and commit the file to lock the gain in.
  *
  * PR time: the CI workflow (and this ratchet) only runs in the merge group,
  * so Source Validation's lint:eslint:changed calls `--changed <baseRef>`,
@@ -37,7 +39,8 @@
  *   node scripts/lint-ui-feel.mjs --list     # print file:line locations
  *   node scripts/lint-ui-feel.mjs --update   # lower the baseline
  *
- * Exit 0 = all counts <= baseline. Exit 1 = regression detected.
+ * Exit 0 = no count exceeds the baseline (shrink prints a notice). Exit 1 =
+ * regression beyond the baseline.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -268,6 +271,26 @@ export function regressions(current, baseline) {
     .filter(entry => entry.current > entry.baseline);
 }
 
+/**
+ * Baseline entries whose debt shrank below the committed floor. Stale
+ * headroom: reported as a notice, never a failure; the gate
+ * passes with a notice; `--update` re-locks the floor to the measured debt.
+ * @param {Record<string, number>} current
+ * @param {Record<string, number>} baseline
+ * @returns {Array<{check: string, baseline: number, current: number}>}
+ */
+export function staleBaseline(current, baseline) {
+  const keys = new Set([...Object.keys(baseline), ...Object.keys(current)]);
+  return [...keys]
+    .filter(key => key !== '_comment')
+    .map(key => ({
+      check: key,
+      baseline: baseline[key] ?? 0,
+      current: current[key] ?? 0,
+    }))
+    .filter(entry => entry.current < entry.baseline);
+}
+
 export function writeBaseline(counts, path = BASELINE_PATH) {
   const sorted = Object.fromEntries(
     Object.keys(counts)
@@ -279,7 +302,7 @@ export function writeBaseline(counts, path = BASELINE_PATH) {
     `${JSON.stringify(
       {
         _comment:
-          'UI-feel ratchet baseline — per-check counts of @jovie/ui-feel violations (JOV-8197). To reduce: fix violations then run `pnpm --filter web lint:ui-feel -- --update` (or `node scripts/lint-ui-feel.mjs --update`) and commit this file. CI fails if any count exceeds its baseline.',
+          'UI-feel ratchet baseline — per-check counts of @jovie/ui-feel violations (JOV-8197). To change: fix violations then run `pnpm --filter web lint:ui-feel -- --update` (or `node scripts/lint-ui-feel.mjs --update`) and commit this file. CI fails if any count grows past its baseline; a shrink passes with a notice until this file is updated.',
         ...sorted,
       },
       null,
@@ -347,9 +370,24 @@ export async function main(
 
   const baseline = readBaseline(baselinePath);
   const failures = regressions(counts, baseline);
+  const stale = staleBaseline(counts, baseline);
+  if (stale.length > 0) {
+    const detail = stale
+      .map(
+        entry => `${entry.check}: ${entry.current} < baseline ${entry.baseline}`
+      )
+      .join('; ');
+    const notice = `[lint:ui-feel] debt shrank below the committed baseline (${detail}). Great - run \`pnpm --filter web lint:ui-feel -- --update\` and commit ui-feel-ratchet.baseline.json to lock the gain in (JOV-8197).`;
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      log(`::notice title=ui-feel ratchet improved::${notice}`);
+    } else {
+      log(notice);
+    }
+  }
+
   if (failures.length === 0) {
     log(
-      `[lint:ui-feel] ok — counts within baseline: ${JSON.stringify(counts)}`
+      `[lint:ui-feel] ok - counts within baseline: ${JSON.stringify(counts)}`
     );
     return 0;
   }

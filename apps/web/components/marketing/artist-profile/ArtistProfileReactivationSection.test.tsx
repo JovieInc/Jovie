@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
@@ -25,5 +27,17 @@ describe('ArtistProfileReactivationSection', () => {
     expect(
       screen.getByTestId('marketing-section-feature-split')
     ).toHaveAttribute('data-marketing-variant', 'editorial');
+  });
+});
+
+const OWN_WIDTH_CAP =
+  /max-w-(?:300|315|280|4xl|6xl|linear-content)|--homepage-section-max/;
+
+describe('single container width', () => {
+  it.each([
+    'components/marketing/artist-profile/ArtistProfileReactivationSection.tsx',
+  ])('%s takes its width from the shared container, not its own cap', file => {
+    const source = readFileSync(join(process.cwd(), file), 'utf8');
+    expect(source).not.toMatch(OWN_WIDTH_CAP);
   });
 });

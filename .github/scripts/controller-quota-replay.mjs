@@ -13,19 +13,25 @@
  * jovie-stage-event/v1 rows (entity `release-replay`).
  *
  * Decision rules (pure, see decideReplay):
- *   - only failure/timed_out conclusions on main, attempt < maxAttempts
+ *   - only failure/timed_out conclusions of controller attempt 1 on main
  *   - only when a failed job's log carries a transient signature; a
  *     deterministic failure (red check, blocked gate) is never retried
- *   - only the newest run of that controller: a newer run owns the release
- *   - not when production already serves current main
+ *   - only for the generation at current main, and only the newest run of
+ *     that controller: a newer generation owns the release
+ *   - never after a Production Release job started (controller-health owns
+ *     post-mutation recovery); not when production already serves main
+ *   - the source CI attempt must be unchanged and below maxAttempts
+ * Replay = rerun the exact source CI run, the same recovery
+ * production-controller-health uses. A controller rerun cannot work: attempt
+ * > 1 without marker evidence is refused at authorization by design
+ * (2026-10-21 15:49Z, run 39626740948 attempt 2). The new CI attempt drives
+ * fresh Staging and Production Controller attempt-1 runs through every gate.
  * Backoff: wait for the token's quota reset when it is low, and at least
- * baseBackoff * 2^(attempt-1); the total wait is capped below the job timeout.
- * The rerun uses `gh run rerun --failed`, so the controller's own lineage and
- * authorization gates decide again against current main.
+ * baseBackoff * 2^(ciAttempt-1); the total wait is capped below the job timeout.
  */
 
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -83,6 +89,16 @@ export function classifyFailure(logTexts = []) {
   return [...kinds].sort();
 }
 
+/** Classify this observer's failed read separately from the controller's logs. */
+export function classifyObservationFailure(error) {
+  const text = `${error?.stderr ?? ''}\n${error?.message ?? error ?? ''}`;
+  const known = classifyFailure([text]);
+  if (known.includes('quota')) return 'quota';
+  if (/\bHTTP 5\d\d\b/.test(text)) return 'upstream-5xx';
+  if (/\bHTTP (401|403)\b/.test(text)) return 'permission-denied';
+  return known[0] ?? 'unknown';
+}
+
 /**
  * Seconds to wait before rerunning. Waits for the quota reset when remaining
  * is below the floor, and never less than the exponential backoff. Returns
@@ -111,46 +127,75 @@ export function computeWaitSeconds({
   return wait > options.maxWaitSeconds ? null : wait;
 }
 
+const TITLE = /([0-9a-f]{40}) from CI ([1-9][0-9]*) attempt ([1-9][0-9]*)$/;
+
 /**
- * Pure replay decision. `runs` is the controller workflow's run listing
- * (newest first or any order); `run` is the completed run from the event.
+ * The generation and source CI attempt from a controller run title:
+ * "<sha> from CI <id> attempt <n>" (staging) or "Production Controller <same>".
+ */
+export function parseControllerTitle(title) {
+  const match = TITLE.exec(String(title ?? ''));
+  if (!match) return null;
+  return {
+    sha: match[1],
+    ciRunId: Number(match[2]),
+    ciAttempt: Number(match[3]),
+  };
+}
+
+const abandon = reason => ({ replay: false, outcome: 'abandoned', reason });
+
+/**
+ * Pure replay decision. `run` is the completed controller run from the event,
+ * `runs` that controller's run listing, `source` its parsed title, `ciRun` the
+ * live source CI run, `mutationStarted` whether a Production Release job ran.
  */
 export function decideReplay({
   run,
   runs = [],
+  source = null,
+  ciRun = null,
+  mutationStarted = false,
   transientKinds = [],
   liveSha = '',
   mainSha = '',
   options = DEFAULTS,
 }) {
   if (!['failure', 'timed_out'].includes(run.conclusion)) {
-    return {
-      replay: false,
-      outcome: 'abandoned',
-      reason: `conclusion ${run.conclusion} is not a failure`,
-    };
+    return abandon(`conclusion ${run.conclusion} is not a failure`);
   }
   if (run.head_branch !== 'main') {
-    return {
-      replay: false,
-      outcome: 'abandoned',
-      reason: 'not a main-branch controller run',
-    };
+    return abandon('not a main-branch controller run');
   }
-  if (run.run_attempt >= options.maxAttempts) {
+  if (run.run_attempt !== 1) {
+    return abandon(
+      `controller attempt ${run.run_attempt} is a manual rerun; only attempt 1 is replayed`
+    );
+  }
+  if (!source) {
+    return abandon('controller title names no source CI run');
+  }
+  if (source.ciAttempt >= options.maxAttempts) {
     return {
       replay: false,
       outcome: 'failed',
-      reason: `attempt cap reached (${run.run_attempt}/${options.maxAttempts})`,
+      reason: `source CI attempt cap reached (${source.ciAttempt}/${options.maxAttempts})`,
     };
   }
   if (transientKinds.length === 0) {
-    return {
-      replay: false,
-      outcome: 'abandoned',
-      reason:
-        'no transient failure signature; deterministic failures are not retried',
-    };
+    return abandon(
+      'no transient failure signature; deterministic failures are not retried'
+    );
+  }
+  if (mutationStarted) {
+    return abandon(
+      'a Production Release job started; production-controller-health owns post-mutation recovery'
+    );
+  }
+  if (mainSha && source.sha !== mainSha) {
+    return abandon(
+      `main moved to ${mainSha.slice(0, 10)}; the newer generation owns the release`
+    );
   }
   // A newer generation that ran or is running owns the release. Newer runs
   // that were skipped or cancelled (duplicate wakes) do not.
@@ -163,23 +208,32 @@ export function decideReplay({
       )
   );
   if (newer.length > 0) {
-    return {
-      replay: false,
-      outcome: 'abandoned',
-      reason: `newer controller run ${Math.min(...newer.map(r => r.id))} owns the release`,
-    };
+    return abandon(
+      `newer controller run ${Math.min(...newer.map(r => r.id))} owns the release`
+    );
   }
   if (liveSha && mainSha && liveSha === mainSha) {
-    return {
-      replay: false,
-      outcome: 'abandoned',
-      reason: `production already serves main ${mainSha.slice(0, 10)}`,
-    };
+    return abandon(`production already serves main ${mainSha.slice(0, 10)}`);
+  }
+  if (
+    !ciRun ||
+    ciRun.id !== source.ciRunId ||
+    ciRun.run_attempt !== source.ciAttempt ||
+    ciRun.status !== 'completed' ||
+    ciRun.conclusion !== 'success' ||
+    ciRun.head_sha !== source.sha ||
+    ciRun.head_branch !== 'main' ||
+    ciRun.event !== 'push' ||
+    ciRun.path !== '.github/workflows/ci.yml'
+  ) {
+    return abandon(
+      'source CI run changed or was already replayed; not replaying it again'
+    );
   }
   return {
     replay: true,
     outcome: 'advanced',
-    reason: `transient failure (${transientKinds.join(', ')})`,
+    reason: `transient failure (${transientKinds.join(', ')}); replaying source CI ${source.ciRunId}`,
   };
 }
 
@@ -202,11 +256,13 @@ export function buildStageEvents({
     exitedAt: decidedAt,
     actor: 'controller-quota-replay',
     outcome:
-      decision.replay && replayedAt
-        ? 'advanced'
-        : decision.replay
-          ? 'failed'
-          : decision.outcome,
+      decision.requestOutcome === 'pending'
+        ? 'open'
+        : decision.replay && replayedAt
+          ? 'advanced'
+          : decision.replay
+            ? 'failed'
+            : decision.outcome,
     sourceReceipt,
   };
   if (!decision.replay || !replayedAt) return [blocked];
@@ -264,21 +320,35 @@ function snapshot({ gh, repository, workflowFile }) {
   return { runs, mainSha };
 }
 
-function failedJobLogs({ gh, repository, run, options }) {
-  const jobs =
+function readJobs({ gh, repository, run }) {
+  return (
     readJson(gh, [
       `repos/${repository}/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`,
-    ]).jobs ?? [];
+    ]).jobs ?? []
+  );
+}
+
+/** A reusable Production Release job ran (anything but skipped). */
+export function productionMutationStarted(jobs) {
+  return jobs.some(
+    job =>
+      String(job.name ?? '').startsWith('Production Release /') &&
+      job.conclusion !== 'skipped'
+  );
+}
+
+function failedJobLogs({ gh, repository, jobs, options }) {
   const failed = jobs
     .filter(job => ['failure', 'timed_out'].includes(job.conclusion))
     .slice(0, options.maxLogJobs);
   return failed.map(job => {
-    try {
-      return gh(['api', `repos/${repository}/actions/jobs/${job.id}/logs`]);
-    } catch (error) {
-      // An unreadable log counts as transient only if gh's own error says so.
-      return String(error?.stderr ?? error?.message ?? '');
-    }
+    // A failed read is unknown source evidence, never a controller log.
+    // Let runCli retain the observation failure before any replay request.
+    return gh([
+      'api',
+      '--allow-escape-sequences',
+      `repos/${repository}/actions/jobs/${job.id}/logs`,
+    ]);
   });
 }
 
@@ -293,6 +363,7 @@ export async function runReplay({
   sleep = defaultSleep,
   now = () => Date.now(),
   liveSha = () => defaultLiveSha('https://jov.ie/api/health/build-info'),
+  recordDecision = () => {},
   options = DEFAULTS,
 }) {
   const run = event.workflow_run;
@@ -308,9 +379,21 @@ export async function runReplay({
   const iso = ms => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
 
   // Cheap gates first (no API calls); rate_limit does not count against quota.
+  const source = parseControllerTitle(run.display_title ?? run.name);
   const precheck = decideReplay({
     run,
     runs: [],
+    source,
+    ciRun: source && {
+      id: source.ciRunId,
+      run_attempt: source.ciAttempt,
+      status: 'completed',
+      conclusion: 'success',
+      head_sha: source.sha,
+      head_branch: 'main',
+      event: 'push',
+      path: '.github/workflows/ci.yml',
+    },
     transientKinds: ['pending'],
     options,
   });
@@ -328,7 +411,7 @@ export async function runReplay({
 
   const rateLimit = readJson(gh, ['rate_limit']).resources?.core ?? null;
   const wait = computeWaitSeconds({
-    attempt: run.run_attempt,
+    attempt: source.ciAttempt,
     rateLimit,
     nowSeconds: Math.floor(now() / 1000),
     options,
@@ -351,13 +434,20 @@ export async function runReplay({
   }
   if (wait > 0) await sleep(wait);
 
+  const jobs = readJobs({ gh, repository, run });
   const transientKinds = classifyFailure(
-    failedJobLogs({ gh, repository, run, options })
+    failedJobLogs({ gh, repository, jobs, options })
   );
   const { runs, mainSha } = snapshot({ gh, repository, workflowFile });
+  const ciRun = readJson(gh, [
+    `repos/${repository}/actions/runs/${source.ciRunId}`,
+  ]);
   const decision = decideReplay({
     run,
     runs,
+    source,
+    ciRun,
+    mutationStarted: productionMutationStarted(jobs),
     transientKinds,
     liveSha: await liveSha(),
     mainSha,
@@ -378,11 +468,31 @@ export async function runReplay({
     };
   }
   let replayedAt = null;
+  // A durable pending request must precede the sole mutation. A failed write
+  // throws before gh runs, and an uncertain response is never replayed here.
+  decision.requestOutcome = 'pending';
+  decision.outcome = 'open';
+  await recordDecision({
+    decision: { ...decision },
+    events: buildStageEvents({
+      workflow: workflowFile,
+      run,
+      decision,
+      decidedAt: null,
+    }),
+  });
   try {
-    gh(['run', 'rerun', String(run.id), '--failed', '--repo', repository]);
+    gh(['run', 'rerun', String(source.ciRunId), '--repo', repository]);
+    decision.requestOutcome = 'accepted';
+    decision.outcome = 'advanced';
     replayedAt = iso(now());
   } catch (error) {
-    decision.reason = `rerun request failed: ${String(error?.message ?? error).slice(0, 200)}`;
+    decision.requestOutcome =
+      classifyObservationFailure(error) === 'permission-denied'
+        ? 'rejected'
+        : 'unknown';
+    decision.outcome = 'failed';
+    decision.reason = `rerun request failed; outcome ${decision.requestOutcome}: ${String(error?.message ?? error).slice(0, 200)}`;
   }
   return {
     decision,
@@ -396,12 +506,20 @@ export async function runReplay({
   };
 }
 
+function replayDisposition(decision) {
+  if (decision.requestOutcome === 'accepted') return 'replayed';
+  if (decision.requestOutcome === 'rejected') return 'replay rejected';
+  if (decision.requestOutcome === 'unknown') return 'replay outcome unknown';
+  if (decision.requestOutcome === 'pending') return 'replay requested';
+  return 'not replayed';
+}
+
 export function renderSummary({ run, decision }) {
   return [
     '### Controller replay',
     '',
     `Run [${run.path} ${run.id} attempt ${run.run_attempt}](${run.html_url ?? ''}) concluded \`${run.conclusion}\`.`,
-    `Decision: **${decision.replay ? 'replayed' : 'not replayed'}** (${decision.reason}).`,
+    `Decision: **${replayDisposition(decision)}** (${decision.reason}).`,
     decision.waitedSeconds
       ? `Waited ${decision.waitedSeconds}s for backoff/quota reset.`
       : '',
@@ -413,28 +531,85 @@ export async function runCli({ env = process.env, deps = {} } = {}) {
   const { readFileSync } = await import('node:fs');
   const event = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
   const repository = env.GITHUB_REPOSITORY;
-  const result = await runReplay({ event, repository, ...deps });
   const outPath =
     env.REPLAY_EVENTS_PATH || 'release-replay-receipts/stage-events.ndjson';
   mkdirSync(dirname(outPath), { recursive: true });
-  writeFileSync(
-    outPath,
-    result.events.map(e => JSON.stringify(e)).join('\n') +
-      (result.events.length ? '\n' : '')
-  );
-  writeFileSync(
-    `${dirname(outPath)}/decision.json`,
-    JSON.stringify(
-      {
-        schema: DECISION_SCHEMA,
-        runId: event.workflow_run.id,
-        attempt: event.workflow_run.run_attempt,
-        ...result.decision,
-      },
-      null,
-      2
-    ) + '\n'
-  );
+  const writeReceipt = (path, contents) => {
+    writeFileSync(`${path}.tmp`, contents);
+    renameSync(`${path}.tmp`, path);
+  };
+  const persist = result => {
+    writeReceipt(
+      outPath,
+      result.events.map(e => JSON.stringify(e)).join('\n') +
+        (result.events.length ? '\n' : '')
+    );
+    writeReceipt(
+      `${dirname(outPath)}/decision.json`,
+      JSON.stringify(
+        {
+          schema: DECISION_SCHEMA,
+          runId: event.workflow_run.id,
+          attempt: event.workflow_run.run_attempt,
+          ...result.decision,
+        },
+        null,
+        2
+      ) + '\n'
+    );
+  };
+  const run = event.workflow_run;
+  const workflow = CONTROLLER_WORKFLOWS[run.path];
+  const pending = {
+    replay: false,
+    outcome: 'open',
+    requestOutcome: 'not-attempted',
+    reason: 'source observation pending',
+  };
+  // Even the first quota read can fail. Preserve an open observation before
+  // any remote work so the existing always-upload artifact has a receipt.
+  persist({
+    decision: pending,
+    events: workflow
+      ? buildStageEvents({
+          workflow,
+          run,
+          decision: pending,
+          decidedAt: null,
+        })
+      : [],
+  });
+  let result;
+  try {
+    result = await runReplay({
+      event,
+      repository,
+      ...deps,
+      recordDecision: persist,
+    });
+  } catch (error) {
+    const failureKind = classifyObservationFailure(error);
+    const decision = {
+      replay: false,
+      outcome: 'failed',
+      requestOutcome: 'not-attempted',
+      failureKind,
+      reason: `source observation failed (${failureKind}); replay not attempted`,
+    };
+    persist({
+      decision,
+      events: workflow
+        ? buildStageEvents({
+            workflow,
+            run,
+            decision,
+            decidedAt: new Date((deps.now ?? Date.now)()).toISOString(),
+          })
+        : [],
+    });
+    throw error;
+  }
+  persist(result);
   if (env.GITHUB_STEP_SUMMARY) {
     appendFileSync(
       env.GITHUB_STEP_SUMMARY,
@@ -442,8 +617,11 @@ export async function runCli({ env = process.env, deps = {} } = {}) {
     );
   }
   console.log(
-    `controller-quota-replay: ${result.decision.replay ? 'replayed' : 'skipped'} (${result.decision.reason})`
+    `controller-quota-replay: ${replayDisposition(result.decision)} (${result.decision.reason})`
   );
+  if (['rejected', 'unknown'].includes(result.decision.requestOutcome)) {
+    throw new Error(result.decision.reason);
+  }
   return result;
 }
 

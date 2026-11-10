@@ -88,7 +88,7 @@
       }
     ]
   },
-  "registryRevision": "2026-09-02.1",
+  "registryRevision": "2026-11-06.1",
   "issue": "JOV-5853",
   "owner": "Summer runtime / Eve integration",
   "environment": "repository and Tim White local macOS host",
@@ -100,9 +100,9 @@
   "canonicalRecord": "docs/operations/SUMMER_RUNTIME_RETIREMENT.md",
   "runtimeTarget": {
     "name": "Eve",
-    "state": "blocked-source-only",
+    "state": "deployed-not-certified",
     "certified": false,
-    "blocker": "No exact deployed Summer identity, durable session, failure, or recurrence receipt exists."
+    "blocker": "This registry is not a live health record. Eve runs as apps/summer on Vercel project jovie-eve-shadow. Read https://summer.jov.ie/runtime/v1/health before claiming it is up. refreshBy stays in the past so this record fails closed."
   },
   "retiredComponents": [
     {
@@ -136,11 +136,6 @@
       "path": "docs/operations/SUMMER_RUNTIME_RETIREMENT.md",
       "classification": "current",
       "requiredMarker": "Hermes and Trigger.dev are retired Jovie tooling"
-    },
-    {
-      "path": "STRATEGY.md",
-      "classification": "current",
-      "requiredMarker": "Eve target unavailable until proven"
     },
     {
       "path": "docs/OVIE_PROGRAM.md",

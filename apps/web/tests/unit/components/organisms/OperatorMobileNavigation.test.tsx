@@ -101,33 +101,12 @@ describe('OperatorMobileNavigation', () => {
     });
     expect(within(menu).getByRole('link', { name: 'Home' })).toHaveFocus();
 
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Growth' })).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Product' })).toHaveFocus();
-
-    await user.tab();
-    expect(
-      within(menu).getByRole('link', { name: 'Operations' })
-    ).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Ops' })).toHaveFocus();
-
-    await user.tab();
-    expect(
-      within(menu).getByRole('link', { name: 'Certifications' })
-    ).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Outbound' })).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Shipping' })).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'People' })).toHaveFocus();
+    for (const item of ADMIN_NAV_REGISTRY.slice(1, 10)) {
+      await user.tab();
+      expect(
+        within(menu).getByRole('link', { name: item.label })
+      ).toHaveFocus();
+    }
 
     await user.keyboard('{Escape}');
     expect(
@@ -195,6 +174,22 @@ describe('OperatorMobileNavigation', () => {
     expect(
       expandedNavigation.querySelectorAll('[aria-current="page"]')
     ).toHaveLength(1);
+  });
+
+  it('exposes Inbox directly and selects it without selecting Home', () => {
+    pathnameMock.mockReturnValue(APP_ROUTES.ADMIN_INBOX);
+    render(<OperatorMobileNavigation />);
+    const tabs = screen.getByRole('navigation', {
+      name: 'OV Mobile Navigation',
+    });
+    const inbox = within(tabs).getByRole('link', { name: 'Inbox' });
+    expect(inbox).toHaveAttribute('href', APP_ROUTES.ADMIN_INBOX);
+    expect(inbox).toHaveAttribute('aria-current', 'page');
+    expect(
+      within(tabs).getByRole('link', { name: 'Home' })
+    ).not.toHaveAttribute('aria-current');
+    expect(tabs.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+    expect(screen.queryByRole('link', { name: 'Needs You' })).toBeNull();
   });
 
   it('keeps five 44px bottom-bar targets within the 320px contract', () => {

@@ -4,23 +4,32 @@ import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getComparison, getComparisonSlugs } from '@/content/comparisons';
+import { marketingOgImage } from '@/data/marketingOgCards';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
+import { documentTitle } from '@/lib/seo/document-title';
+import { NOINDEX_FOLLOW_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: `Compare — ${APP_NAME}`,
+  robots: NOINDEX_FOLLOW_ROBOTS,
+  title: documentTitle('Compare'),
   description:
     'See how Jovie compares with the tools musicians already use to share music.',
   alternates: {
     canonical: `${BASE_URL}${APP_ROUTES.COMPARE}`,
   },
   openGraph: {
-    title: `Compare — ${APP_NAME}`,
+    title: `Compare | ${APP_NAME}`,
     description:
       'See how Jovie compares with the tools musicians already use to share music.',
     url: `${BASE_URL}${APP_ROUTES.COMPARE}`,
     type: 'website',
+    images: [marketingOgImage('compare')],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: [marketingOgImage('compare').url],
   },
 };
 

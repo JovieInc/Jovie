@@ -7,19 +7,6 @@ import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 import { MarketingContainer } from './MarketingContainer';
-import { MarketingHeroPhoto } from './MarketingHeroPhoto';
-
-/**
- * Unique per-route hero photograph (marketing-routes-code-spec, 2026-09-26).
- * Passed to Content/Landing mode to render behind the hero copy — see
- * `MarketingHeroPhoto` for the scrim contract that keeps text legible.
- */
-export interface MarketingHeroPhotoInput {
-  readonly src: string;
-  readonly width: number;
-  readonly height: number;
-  readonly opacity?: number;
-}
 
 export interface MarketingHeroCta {
   readonly label: ReactNode;
@@ -97,8 +84,6 @@ export interface MarketingHeroContentProps extends MarketingHeroBaseProps {
    * Defaults to `next/link`.
    */
   readonly linkComponent?: ElementType;
-  /** Unique per-route decorative hero photograph. See `MarketingHeroPhoto`. */
-  readonly photo?: MarketingHeroPhotoInput;
 }
 
 /**
@@ -133,8 +118,6 @@ export interface MarketingHeroLandingProps extends MarketingHeroBaseProps {
   readonly titleClassName?: string;
   readonly mediaClassName?: string;
   readonly gridClassName?: string;
-  /** Unique per-route decorative hero photograph. See `MarketingHeroPhoto`. */
-  readonly photo?: MarketingHeroPhotoInput;
 }
 
 export type MarketingHeroProps =
@@ -143,11 +126,10 @@ export type MarketingHeroProps =
   | MarketingHeroLandingProps;
 
 const shellVariantClasses = {
-  centered:
-    'mx-auto flex max-w-300 flex-col items-center px-6 text-center sm:px-8 lg:px-10',
-  left: 'mx-auto flex max-w-300 flex-col items-start px-6 text-left sm:px-8 lg:px-10',
+  centered: 'public-container flex flex-col items-center text-center',
+  left: 'public-container flex flex-col items-start text-left',
   split:
-    'mx-auto grid max-w-320 grid-cols-1 items-center gap-10 px-6 sm:px-8 md:grid-cols-2 md:gap-16 lg:px-10',
+    'public-container grid grid-cols-1 items-center gap-10 md:grid-cols-2 md:gap-16',
 } as const;
 
 function MarketingHeroFrame({
@@ -315,7 +297,6 @@ function MarketingHeroContent({
   sectionOwner,
   headlineMaxLines = 2,
   linkComponent = Link,
-  photo,
 }: MarketingHeroContentProps) {
   const layout = media ? 'split' : align;
 
@@ -324,7 +305,6 @@ function MarketingHeroContent({
       className={cn(
         'marketing-hero marketing-hero-dock',
         `marketing-hero--${layout}`,
-        photo && 'relative overflow-hidden',
         className
       )}
       headingId={headingId}
@@ -332,7 +312,6 @@ function MarketingHeroContent({
       sectionVariant={sectionVariant}
       sectionOwner={sectionOwner}
     >
-      {photo ? <MarketingHeroPhoto {...photo} /> : null}
       <MarketingContainer width='page'>
         <div className='marketing-hero-inner'>
           <div className='marketing-hero-copy'>
@@ -392,7 +371,6 @@ function MarketingHeroLanding({
   titleClassName,
   mediaClassName,
   gridClassName,
-  photo,
   sectionVariant,
   sectionOwner,
 }: MarketingHeroLandingProps) {
@@ -404,89 +382,83 @@ function MarketingHeroLanding({
       sectionVariant={sectionVariant}
       sectionOwner={sectionOwner}
     >
-      {photo ? <MarketingHeroPhoto {...photo} /> : null}
       <div
         aria-hidden='true'
         className='marketing-hero-backdrop pointer-events-none absolute inset-0'
       />
       <div className='hero-glow pointer-events-none absolute inset-x-0 top-0 h-[36rem]' />
 
-      {/* Padding override preserves the legacy landing-hero spacing
-          (px-5 sm:px-6 lg:px-8) while the max-width comes from the
-          canonical MarketingContainer token. */}
-      <MarketingContainer width='page' className='px-5 sm:px-6 lg:px-8'>
-        <div className='mx-auto max-w-300'>
-          <div
-            className={cn(
-              'grid items-center gap-12 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:gap-10',
-              gridClassName
-            )}
-          >
-            <div className={cn('max-w-[34rem]', copyClassName)}>
-              {eyebrow ? (
-                <span className='homepage-section-eyebrow'>{eyebrow}</span>
-              ) : null}
-              <MarketingHeroTitle
-                id={headingId}
-                testId={titleTestId}
-                maxLines={headlineMaxLines}
-                className={cn(
-                  'marketing-h1-linear mt-5 text-primary-token',
-                  headlineMaxLines === 2 && 'marketing-h1-max-two-lines',
-                  titleClassName
-                )}
-              >
-                {title}
-              </MarketingHeroTitle>
-              <div className='mt-5 max-w-[34rem] text-base leading-[1.7] text-secondary-token sm:text-lg'>
-                {body}
-              </div>
-
-              <div className='mt-8 flex flex-wrap items-center gap-x-3 gap-y-4'>
-                <LandingCtaLink
-                  href={primaryCtaHref}
-                  label={primaryCtaLabel}
-                  eventName={ctaEventName}
-                  section='hero'
-                  testId={primaryCtaTestId}
-                />
-
-                {secondaryCtaLabel && secondaryCtaHref ? (
-                  <MarketingHeroCtaLink
-                    cta={{ label: secondaryCtaLabel, href: secondaryCtaHref }}
-                    intent='secondary'
-                    linkComponent={Link}
-                    presentation='landing-secondary'
-                  />
-                ) : null}
-
-                {subcopy ? (
-                  <span className='text-xs text-tertiary-token'>{subcopy}</span>
-                ) : null}
-              </div>
-
-              {proofPoints.length > 0 ? (
-                <div className='mt-7 flex flex-wrap gap-2.5'>
-                  {proofPoints.map(label => (
-                    <span
-                      key={label}
-                      className='inline-flex items-center rounded-full border border-subtle bg-surface-1 px-3.5 py-1.5 text-xs font-medium tracking-tight text-secondary-token'
-                    >
-                      {label}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-
-            <div
+      <MarketingContainer width='page' className='relative z-1'>
+        <div
+          className={cn(
+            'grid items-center gap-12 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:gap-10',
+            gridClassName
+          )}
+        >
+          <div className={cn('max-w-[34rem]', copyClassName)}>
+            {eyebrow ? (
+              <span className='homepage-section-eyebrow'>{eyebrow}</span>
+            ) : null}
+            <MarketingHeroTitle
+              id={headingId}
+              testId={titleTestId}
+              maxLines={headlineMaxLines}
               className={cn(
-                'lg:justify-self-center xl:justify-self-end',
-                mediaClassName
+                'marketing-h1-linear mt-5 text-primary-token',
+                headlineMaxLines === 2 && 'marketing-h1-max-two-lines',
+                titleClassName
               )}
             >
-              {media}
+              {title}
+            </MarketingHeroTitle>
+            <div className='mt-5 max-w-[34rem] text-base leading-[1.7] text-secondary-token sm:text-lg'>
+              {body}
             </div>
+
+            <div className='mt-8 flex flex-wrap items-center gap-x-3 gap-y-4'>
+              <LandingCtaLink
+                href={primaryCtaHref}
+                label={primaryCtaLabel}
+                eventName={ctaEventName}
+                section='hero'
+                testId={primaryCtaTestId}
+              />
+
+              {secondaryCtaLabel && secondaryCtaHref ? (
+                <MarketingHeroCtaLink
+                  cta={{ label: secondaryCtaLabel, href: secondaryCtaHref }}
+                  intent='secondary'
+                  linkComponent={Link}
+                  presentation='landing-secondary'
+                />
+              ) : null}
+
+              {subcopy ? (
+                <span className='text-xs text-tertiary-token'>{subcopy}</span>
+              ) : null}
+            </div>
+
+            {proofPoints.length > 0 ? (
+              <div className='mt-7 flex flex-wrap gap-2.5'>
+                {proofPoints.map(label => (
+                  <span
+                    key={label}
+                    className='inline-flex items-center rounded-full border border-subtle bg-surface-1 px-3.5 py-1.5 text-xs font-medium tracking-tight text-secondary-token'
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div
+            className={cn(
+              'lg:justify-self-center xl:justify-self-end',
+              mediaClassName
+            )}
+          >
+            {media}
           </div>
         </div>
       </MarketingContainer>

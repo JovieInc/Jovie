@@ -49,7 +49,10 @@ export const SidebarHeader = React.forwardRef<
     <div
       ref={ref}
       data-sidebar='header'
-      className={cn('flex flex-col gap-1.5 px-2.5 py-2', className)}
+      className={cn(
+        'flex flex-col gap-1.5 px-(--app-shell-sidebar-inset) py-2',
+        className
+      )}
       {...props}
     />
   );
@@ -65,7 +68,7 @@ export const SidebarFooter = React.forwardRef<
       ref={ref}
       data-sidebar='footer'
       className={cn(
-        'shrink-0 flex flex-col gap-1.5 overflow-hidden px-2.5 py-2 transition-[padding] duration-normal ease-interactive',
+        'shrink-0 flex flex-col gap-1.5 overflow-hidden px-(--app-shell-sidebar-inset) py-2 transition-[padding] duration-normal ease-interactive',
         'group-data-[collapsible=icon]:px-0',
         className
       )}
@@ -82,7 +85,10 @@ export function SidebarSeparator({
   return (
     <Divider
       data-sidebar='separator'
-      className={cn('mx-2.5 w-auto border-sidebar-border', className)}
+      className={cn(
+        'mx-(--app-shell-sidebar-inset) w-auto border-sidebar-border',
+        className
+      )}
       {...props}
     />
   );

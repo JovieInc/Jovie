@@ -49,6 +49,18 @@ describe('AuthBrandPanel', () => {
     expect(backdrop).toHaveClass('forced-colors:hidden');
   });
 
+  it('keeps the stage headline on the canonical token scale (glm/auth-focal-polish)', () => {
+    render(<AuthBrandPanel />);
+
+    const heading = screen.getByRole('heading', { level: 2 });
+    expect(heading).toHaveClass('text-balance');
+    expect(heading).toHaveClass('text-2xl');
+    expect(heading).toHaveClass('font-semibold');
+    expect(heading).toHaveClass('leading-tight');
+    expect(heading).toHaveClass('tracking-tight');
+    expect(heading.className).not.toMatch(/clamp|font-bold|tracking-\[/);
+  });
+
   it('renders optional auth shell copy without changing the panel owner', () => {
     render(
       <AuthBrandPanel

@@ -228,8 +228,12 @@ export const DrawerEditableTextField = React.memo(
                 'border border-transparent bg-transparent shadow-none',
                 !hasValue && 'text-tertiary-token'
               )}
-              aria-label={`Edit ${label}`}
             >
+              {/* No aria-label on the trigger: it shadowed the visible value
+                  (WCAG 2.5.3 label-in-name). The sr-only prefix comes first so
+                  the accessible name ("Edit <label>: <value>") still contains
+                  the visible text. */}
+              <span className='sr-only'>{`Edit ${label}:`}</span>
               <span
                 className={cn(
                   'block truncate text-app text-primary-token',

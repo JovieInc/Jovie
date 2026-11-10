@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import {
   createContext,
   type ReactNode,
@@ -14,9 +15,20 @@ import {
   type DesktopUpdateViewState,
   useDesktopUpdate,
 } from '@/lib/desktop/desktop-updates';
-import { DesktopUpdateModal } from './DesktopUpdateModal';
 
 const DISMISSED_VERSION_KEY = 'jovie:desktop-update:dismissed';
+
+/**
+ * JOV-12023: the update modal (radix dialog, download progress, lucide icons)
+ * is desktop-only; #24725 named this provider the other remaining eager edge.
+ * Deferring the import keeps that graph out of every browser tab's initial
+ * chunks. The modal renders only when the update bridge is supported.
+ */
+const DesktopUpdateModal = dynamic(() =>
+  import('./DesktopUpdateModal').then(mod => ({
+    default: mod.DesktopUpdateModal,
+  }))
+);
 
 export interface DesktopUpdateContextValue {
   readonly state: DesktopUpdateViewState;
@@ -93,9 +105,17 @@ export function DesktopUpdateProvider({
 
   const later = () => {
     setOpen(false);
-    if (availableVersion) {
-      setDismissedVersion(availableVersion);
-      writeDismissedVersion(availableVersion);
+    // JOV-9023: the ready prompt names the version too. Later on it must
+    // record that version, or the next re-check replays available for the
+    // same build (a workspace switch remounts this provider) and the modal
+    // interrupts again minutes after the person said Later.
+    const deferredVersion =
+      state.state === 'available' || state.state === 'ready'
+        ? state.version
+        : null;
+    if (deferredVersion) {
+      setDismissedVersion(deferredVersion);
+      writeDismissedVersion(deferredVersion);
     }
   };
 

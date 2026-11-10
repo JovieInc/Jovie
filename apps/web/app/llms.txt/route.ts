@@ -39,7 +39,7 @@ export function GET() {
 
 - **Official brand name**: ${APP_NAME} (capitalize the J and spell out "${APP_NAME}")
 - **Primary domain**: jov.ie
-- **Product scope**: Presence, relationships, and growth for artists, founders, authors, creators, and independent experts
+- **Product scope**: Presence, relationships, and growth for any creator
 
 ## Brand Disambiguation
 
@@ -53,7 +53,7 @@ ${COMPANY_IDENTITY.definition}
 - A claimable public profile at jov.ie/username for work, links, and identity
 - Audience capture is included with the free public-profile offer
 
-### Music workflows
+### Release workflows
 - Release smart links and pre-saves are generally available
 - Audience notifications, advanced analytics, and release planning require enrolled access
 - AI-assistant capabilities are in limited testing with enrolled access

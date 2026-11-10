@@ -1,0 +1,45 @@
+● JOVIE · SYMPHONY · lanes fe27f07 on gem · hud=release · tick 3m ago                             GitHub 4526/5000 · Linear mirror 2m ago · outbox 1 · 18:29:30Z
+ CONSTRAINT ! WARN   deploy · 7 merged PR(s) not in production · oldest 1h41m · prod 060037d is 18 commits behind main 661de44
+ PRODUCTION  ! WARN    serves 060037d · ✓ verified 5h13m ago · main 661de44 · behind 18 commits · 7 undeployed · oldest 1h41m
+ FLOW 24h    draft 6 → prepared 2 → queued 3 → merged 10 → deployed 3 → verified 3 · merges 5/h · opened 11/h (1h) · claim→merge p50 24m · p95 codex 10h30m
+ SLOTS       1 running / 4 (codex 1/3 · grok 0/1) · auto:apply · gate seats 2
+  ● codex      PR21774   fix-red agent             3m   feat(marketing): unify public reading shells (JOV-5763)
+  ○ codex      worker polling ×2 · new issues unknown (doctor stale)
+  ○ grok       worker polling · new issues unknown (doctor stale)
+ CAPACITY    2 leases · 0 reported incident(s) · show-only
+  lyb-pro 98% · banked 1 · natural reset 6d12h · drain ? @ ? · unused ? · coverage 0 · NORMAL · JOV-4670 · fresh
+  current-login 99% · banked 1 · natural reset 6d14h · drain ? @ ? · unused ? · coverage 0 · NORMAL · JOV-7559 · fresh
+  top blocker: drain evidence stale or missing
+ PIPELINE    open lane PRs 8 · draft 6 · non-draft 2 · merge queue 3 · PR read 41s ago
+  #21748 codex  JOV-6226  fix(auth): honor provider branding and isolate auth targe… DRAFT dirty     merge conflict
+  #21774 codex  JOV-5763  feat(marketing): unify public reading shells (JOV-5763)    DRAFT dirty     merge conflict · held: fix-exhausted
+  #21946 codex  JOV-8384  fix(ui): restore aa contrast for primary destructive butt… OPEN  clean     clean
+  #22138 grok   JOV-8535  fix(onboarding): follow active cards and cover states (JO… DRAFT clean     held: gate-check-failed
+  #21826 codex  JOV-8237  fix(ci): preserve production release evidence across retr… OPEN  dirty     merge conflict
+  #21824 codex  JOV-5885  feat(marketing): lock youtube artist mvp homepage (JOV-58… DRAFT clean     draft · awaiting gate
+  #22011 codex  JOV-6246  feat(marketing): bind approved media recipes to sources (… DRAFT clean     draft · awaiting gate
+  #21903 codex  JOV-8119  feat(agents): attest observed routes and reject opaque co… DRAFT blocked   held: fix-exhausted
+ MERGED 24h  verified 2/10 · inferred 8 · unknown 0 · total 10 in 24h · last lane gate 27m ago
+  ✓     5m  #22307 fix(ci): set up Playwright when proof reuse still runs browser guards  inferred unknown
+  ✓     9m  #22304 fix(connectors): preserve Google OAuth ownership and return recovery  inferred unknown
+  ✓    24m  #22253 fix(lanes): keep the public status feed within its reader limit  inferred unknown
+  ✓    35m  #21869 feat(playbooks): bind growth preparation to launch evidence (JOV-7811)  inferred unknown
+  ✓    47m  #22301 fix(lanes): stop Gem lane cleanup from leaking checkouts  inferred unknown
+  ✓  1h05m  #21834 feat(observability): add revenue-spine failure fingerprints (JOV-8249)  inferred unknown
+  ✓  1h41m  #21956 feat(evals): add held-out revision quality replay (JOV-8414)  inferred unknown
+  ✓ 21h48m  #22166 ci: catalog the workflow writes the enqueue check skips  inferred unknown
+  ✓ 22h23m  #22290 fix(ovie): preserve Home snapshot freshness (JOV-8348)  unknown
+  ✓ 22h27m  #22292 fix(ci): restore merge queue victim enrollment (JOV-7747)  autonomous None
+ PROMO 8h    first-pass 65% · ejected→back p75 0.7m (2 waiting) · open→enqueue p75 54.3m · opens/h 1.5 vs merges/h 2.1 · CLEAN not queued 2 · keys >1 PR 0 · qu…
+ OVERLAP     enforce · active 0 · prevented 0 · flags 0 · rebases 0
+ ATTENTION   hold records 3 · failures 0 · ✕ remediation-delivery: remediation action lacks authoritative acknowledgement; failed=41, exhausted=4, next retry=1…
+  24h verdicts: failed 15 · fix-no-change 15 · fix-pushed 12 · recovery-handoff 108 · revisit-failed 46 · sync-failed 14
+  THROUGHPUT 24h · codex offer 12 start 7 productive 2 PR 2 first-pass 50% repair 65 landed 1 │ grok offer 0 start 0 productive 0 PR 0 first-pass n/a repair 74…
+ NEW ISSUES  codex · grok  new issues unknown (doctor stale)
+ BACKLOG     Todo candidates 26 (agent-ready 15 · devin 1 · codex 1) · in progress 0 · triage returns 11
+ SYSTEM      load 1.1 / 16 cores · mem 90% free · disk 19.9% free · runs 24h 251
+
+
+
+
+ ● running  ○ idle  ✓ ok  ✕ problem   │   sources: lane state + run logs (this host) · runs/ledger · Linear · GitHub · /proc

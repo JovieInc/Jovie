@@ -7,16 +7,14 @@ import * as React from 'react';
 import { memo, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
-import {
-  EmptyState,
-  type EmptyStateProps,
-} from '@/components/molecules/EmptyState';
+import type { EmptyStateProps } from '@/components/molecules/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   AudienceMobileCard,
   type ContextMenuItemType,
   convertToCommonDropdownItems,
   TableBulkActionsToolbar,
+  TableEmptyState,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { columnPrioritySpecsFromDefs } from '@/components/organisms/table/column-priority';
@@ -28,15 +26,19 @@ import {
   DashboardHeaderActionButton,
 } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
-import {
-  AnalyticsSidebar,
-  StaticAnalyticsSidebar,
-} from '@/features/dashboard/organisms/AnalyticsSidebar';
 import { useAudiencePanel } from '@/features/dashboard/organisms/AudiencePanelContext';
 import { AiCrawlerDetailPanel } from '@/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel';
 import { AiCrawlerIntelligenceCard } from '@/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard';
+import {
+  AnalyticsSidebar,
+  StaticAnalyticsSidebar,
+} from '@/features/dashboard/organisms/analytics-sidebar-lazy';
 import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-member-sidebar';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import {
+  canShareContactOut,
+  redactUnsharedContact,
+} from '@/lib/audience/share-gate';
 import { captureError } from '@/lib/error-tracking';
 import { queryKeys } from '@/lib/queries';
 import type {
@@ -73,7 +75,7 @@ import { copyTextToClipboard, downloadVCard } from './utils';
 
 function getSrDescription(isEmpty: boolean): string {
   if (isEmpty) {
-    return 'Track visitors and grow your fan base';
+    return 'Track visitors and grow your audience';
   }
   return 'Every visitor, anonymous or identified, lives in this table.';
 }
@@ -88,8 +90,8 @@ function AudienceCrmEmptyState({
   'heading' | 'description' | 'action' | 'secondaryAction'
 >) {
   return (
-    <EmptyState
-      icon={<Users className='h-6 w-6' aria-hidden='true' />}
+    <TableEmptyState
+      icon={<Users className='h-5 w-5' aria-hidden='true' />}
       heading={heading}
       description={description}
       action={action}
@@ -305,7 +307,11 @@ export const DashboardAudienceTableUnified = memo(
     );
 
     const defaultExportMember = React.useCallback((member: AudienceMember) => {
-      downloadVCard(member);
+      if (!canShareContactOut(member)) {
+        toast.error('This person has not shared their contact with you');
+        return;
+      }
+      downloadVCard(redactUnsharedContact(member));
       toast.success('Contact exported as vCard');
     }, []);
 
@@ -350,7 +356,9 @@ export const DashboardAudienceTableUnified = memo(
 
     const defaultSendNotification = React.useCallback(
       (member: AudienceMember) => {
-        const contact = member.email ?? member.phone;
+        const contact = canShareContactOut(member)
+          ? (member.email ?? member.phone)
+          : null;
         if (!contact) {
           return;
         }
@@ -572,7 +580,7 @@ export const DashboardAudienceTableUnified = memo(
         return buildAudienceActions(member, {
           onViewDetails: setSelectedMember,
           onCopyEmail: m => {
-            if (m.email) {
+            if (m.email && canShareContactOut(m)) {
               void copyTextToClipboard(m.email).then(success => {
                 if (success) {
                   toast.success('Copied');
@@ -583,7 +591,7 @@ export const DashboardAudienceTableUnified = memo(
             }
           },
           onCopyPhone: m => {
-            if (m.phone) {
+            if (m.phone && canShareContactOut(m)) {
               void copyTextToClipboard(m.phone).then(success => {
                 if (success) {
                   toast.success('Copied');

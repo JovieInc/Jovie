@@ -1,7 +1,9 @@
 'use client';
 
-import { Globe, Link2, MapPin } from 'lucide-react';
-import { type ComponentType, useState } from 'react';
+// @coverage-via apps/web/components/features/dashboard/organisms/AnalyticsSidebar.test.tsx
+
+import { ChartColumn, Globe, Link2, MapPin } from 'lucide-react';
+import { useState } from 'react';
 import {
   DrawerStatGrid,
   DrawerSurfaceCard,
@@ -9,8 +11,14 @@ import {
   StatTile,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { TimeRangeSelector } from '@/components/molecules/TimeRangeSelector';
+import { APP_ROUTES } from '@/constants/routes';
+import {
+  describeNoAudienceActivity,
+  hasAudienceActivity,
+} from '@/lib/analytics/audience-activity';
 import { CANONICAL_METRICS } from '@/lib/analytics/metrics';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -19,17 +27,13 @@ import type {
   AnalyticsRange,
   DashboardAnalyticsResponse,
 } from '@/types/analytics';
+import { AnalyticsRankedList as RankedList } from './AnalyticsRankedList';
 
 /**
  * Calculate conversion rate between two funnel stages.
  * Suppresses misleading percents on small bases — see formatAnalyticsStageRate.
  */
-export function calculateConversionRate(
-  current: number,
-  previous: number
-): string | null {
-  return formatAnalyticsStageRate(current, previous);
-}
+export const calculateConversionRate = formatAnalyticsStageRate;
 
 const RANGE_VALUES: readonly AnalyticsRange[] = ['7d', '30d'];
 
@@ -43,6 +47,45 @@ const ANALYTICS_TAB_OPTIONS = [
 ];
 
 const numberFormatter = new Intl.NumberFormat();
+
+const RANKED_TAB_ICONS = {
+  cities: MapPin,
+  countries: Globe,
+  sources: Globe,
+  links: Link2,
+} as const;
+
+const RANKED_TAB_EMPTY = {
+  cities: 'No City Data Yet',
+  countries: 'No country data yet',
+  sources: 'No source data yet',
+  links: 'No link data yet',
+} as const;
+
+/** Top rows for one tab as [key, label, count]. */
+function rankedRows(
+  data: DashboardAnalyticsResponse | null | undefined,
+  tab: AnalyticsTab
+): readonly (readonly [string, string, number])[] {
+  switch (tab) {
+    case 'cities':
+      return (data?.top_cities ?? []).map(r => [r.city, r.city, r.count]);
+    case 'countries':
+      return (data?.top_countries ?? []).map(r => [
+        r.country,
+        r.country,
+        r.count,
+      ]);
+    case 'sources':
+      return (data?.top_referrers ?? []).map(r => [
+        r.referrer || 'direct',
+        r.referrer || 'Direct',
+        r.count,
+      ]);
+    default:
+      return (data?.top_links ?? []).map(r => [r.id, r.url, r.clicks]);
+  }
+}
 
 function formatMetricValue(
   loading: boolean,
@@ -61,14 +104,6 @@ const BAR_OPACITY = [
 ] as const;
 
 const TRACK_BG = 'bg-surface-2';
-
-function formatRankedLabel(label: string): string {
-  try {
-    return decodeURIComponent(label);
-  } catch {
-    return label;
-  }
-}
 
 /**
  * Shared outer + metric-row chrome for FunnelStage loading/loaded.
@@ -132,7 +167,7 @@ export function FunnelStage({
             'h-full rounded-full transition-[width] duration-cinematic ease-out',
             BAR_OPACITY[barIndex] ?? BAR_OPACITY.at(-1)
           )}
-          style={{ width: `${Math.max(barPercent, 2)}%` }}
+          style={{ width: `${value > 0 ? Math.max(barPercent, 2) : 0}%` }}
         />
       </div>
     </div>
@@ -151,7 +186,7 @@ function FunnelCard({
 
   return (
     <DrawerSurfaceCard
-      variant='flat'
+      variant='card'
       data-right-rail-section='status'
       className='divide-y divide-subtle overflow-hidden py-1'
     >
@@ -178,76 +213,6 @@ function FunnelCard({
   );
 }
 
-interface RankedItem {
-  readonly key: string;
-  readonly label: string;
-  readonly value: string;
-}
-
-function RankedList({
-  icon: IconComponent,
-  items,
-  loading,
-  emptyMessage,
-}: {
-  readonly icon: ComponentType<{ className?: string }>;
-  readonly items: readonly RankedItem[];
-  readonly loading: boolean;
-  readonly emptyMessage: string;
-}) {
-  if (loading) {
-    return (
-      <ul className='min-h-49 space-y-1'>
-        {[1, 2, 3, 4, 5].map(i => (
-          <li
-            key={i}
-            className='flex h-9 items-center justify-between rounded-lg px-2.5'
-          >
-            <div className='flex items-center gap-2'>
-              <LoadingSkeleton height='h-3' width='w-3' rounded='sm' />
-              <LoadingSkeleton height='h-3' width='w-32' rounded='sm' />
-            </div>
-            <LoadingSkeleton height='h-3' width='w-8' rounded='sm' />
-          </li>
-        ))}
-      </ul>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <div className='flex min-h-49 flex-col items-center justify-center text-center'>
-        <IconComponent className='mb-1.5 h-4 w-4 text-quaternary-token' />
-        <p className='text-xs text-tertiary-token'>{emptyMessage}</p>
-      </div>
-    );
-  }
-
-  return (
-    <ul className='min-h-49 space-y-0.5'>
-      {items.map((item, index) => (
-        <li
-          key={item.key}
-          className='group flex h-9 items-center justify-between rounded-lg px-2.5 transition-colors hover:bg-surface-1'
-        >
-          <div className='flex min-w-0 flex-1 items-center gap-1.5'>
-            <span className='w-3 text-2xs font-caption text-tertiary-token tabular-nums'>
-              {index + 1}
-            </span>
-            <IconComponent className='h-3.5 w-3.5 text-tertiary-token' />
-            <span className='truncate text-app text-secondary-token transition-colors group-hover:text-primary-token'>
-              {formatRankedLabel(item.label)}
-            </span>
-          </div>
-          <span className='ml-2 text-app font-semibold text-primary-token tabular-nums'>
-            {item.value}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 export interface AnalyticsSidebarProps {
   readonly isOpen: boolean;
   readonly onClose: () => void;
@@ -258,8 +223,10 @@ export interface AnalyticsSidebarViewProps extends AnalyticsSidebarProps {
   readonly loading: boolean;
   readonly isFetching?: boolean;
   readonly range: AnalyticsRange;
-  readonly onRangeChange: (range: AnalyticsRange) => void;
-  readonly showRangeControl?: boolean;
+  /** Omit to hide the range control (static demo rails have one window). */
+  readonly onRangeChange?: (range: AnalyticsRange) => void;
+  /** Set only when the fetch failed; with no data the rail shows the error state. */
+  readonly onRetry?: () => void;
   readonly activeTab: AnalyticsTab;
   readonly onActiveTabChange: (tab: AnalyticsTab) => void;
   readonly testId?: string;
@@ -274,13 +241,17 @@ export function AnalyticsSidebarView({
   isFetching = false,
   range,
   onRangeChange,
-  showRangeControl = true,
+  onRetry,
   activeTab,
   onActiveTabChange,
   testId = 'analytics-sidebar',
   tabbedCardTestId = 'analytics-sidebar-tabbed-card',
 }: AnalyticsSidebarViewProps) {
   const showTipLinkVisits = (data?.tip_link_visits ?? 0) > 0;
+  // A failed fetch has no data, so it must never read as "no visits yet".
+  const showError = !loading && onRetry != null && data == null;
+  const isEmpty = !loading && data != null && !hasAudienceActivity(data);
+  const hideMetrics = showError || isEmpty;
   const stages = [
     {
       label: CANONICAL_METRICS.profile_views.label,
@@ -307,6 +278,8 @@ export function AnalyticsSidebarView({
       tabsAriaLabel='Analytics data tabs'
       tabDistribution='fill'
       tabbedCardTestId={tabbedCardTestId}
+      tabbedSurfaceVariant='card'
+      hideTabbedCard={hideMetrics}
       sectionKind='details'
       contentClassName='pt-2'
       entityHeader={
@@ -328,7 +301,7 @@ export function AnalyticsSidebarView({
                   Views, clicks, and top traffic sources.
                 </p>
               </div>
-              {showRangeControl ? (
+              {onRangeChange ? (
                 <TimeRangeSelector
                   value={range}
                   onValueChange={onRangeChange}
@@ -350,90 +323,103 @@ export function AnalyticsSidebarView({
             )}
             data-right-rail-section='status'
           >
+            {/* A failed fetch must never read as "no visits yet"; a first
+                look shows one empty state instead of a funnel of zeros. */}
+            {hideMetrics ? (
+              <EmptyState
+                variant={showError ? 'error' : undefined}
+                icon={
+                  showError ? undefined : (
+                    <ChartColumn className='h-5 w-5' strokeWidth={1.75} />
+                  )
+                }
+                heading={
+                  showError ? 'Analytics Did Not Load' : 'No Profile Visits Yet'
+                }
+                description={
+                  showError ? undefined : describeNoAudienceActivity(range)
+                }
+                action={
+                  showError
+                    ? { label: 'Retry', onClick: onRetry }
+                    : {
+                        label: 'Share Your Profile',
+                        href: APP_ROUTES.CHAT_PROFILE_PANEL,
+                      }
+                }
+                className='min-h-80'
+                testId={`analytics-rail-${showError ? 'error' : 'empty'}-state`}
+              />
+            ) : null}
             {/* Funnel waterfall — vertical bars show dropoff at a glance */}
-            <FunnelCard stages={stages} loading={loading} />
+            {hideMetrics ? null : (
+              <FunnelCard stages={stages} loading={loading} />
+            )}
 
             {/* Engagement — compact 2-col, secondary to the funnel */}
-            <DrawerStatGrid
-              variant='flush'
-              className={cn(
-                'gap-1 divide-x-0 border-t border-subtle pt-2',
-                showTipLinkVisits ? 'grid-cols-3' : 'grid-cols-2'
-              )}
-            >
-              <div className='rounded-lg px-2 py-2'>
-                <StatTile
-                  label='Link Clicks'
-                  value={formatMetricValue(loading, data?.total_clicks)}
-                />
-              </div>
-              <div className='rounded-lg px-2 py-2'>
-                <StatTile
-                  label='Listen Clicks'
-                  value={formatMetricValue(loading, data?.listen_clicks)}
-                />
-              </div>
-              {showTipLinkVisits ? (
+            {hideMetrics ? null : (
+              <DrawerStatGrid
+                variant='flush'
+                className={cn(
+                  'gap-1 divide-x-0 border-t border-subtle pt-2',
+                  showTipLinkVisits ? 'grid-cols-3' : 'grid-cols-2'
+                )}
+              >
                 <div className='rounded-lg px-2 py-2'>
                   <StatTile
-                    label='Tip Link Visits'
-                    value={formatMetricValue(loading, data?.tip_link_visits)}
+                    label='Link Clicks'
+                    state={loading ? 'loading' : undefined}
+                    value={formatMetricValue(loading, data?.total_clicks)}
                   />
                 </div>
-              ) : null}
-            </DrawerStatGrid>
+                <div className='rounded-lg px-2 py-2'>
+                  <StatTile
+                    label='Listen Clicks'
+                    state={loading ? 'loading' : undefined}
+                    value={formatMetricValue(loading, data?.listen_clicks)}
+                  />
+                </div>
+                {showTipLinkVisits ? (
+                  <div className='rounded-lg px-2 py-2'>
+                    <StatTile
+                      label='Tip Link Visits'
+                      state={loading ? 'loading' : undefined}
+                      value={formatMetricValue(loading, data?.tip_link_visits)}
+                    />
+                  </div>
+                ) : null}
+              </DrawerStatGrid>
+            )}
           </div>
         </div>
       }
     >
-      {activeTab === 'cities' && (
-        <RankedList
-          icon={MapPin}
-          loading={loading}
-          items={(data?.top_cities ?? []).slice(0, 5).map(city => ({
-            key: city.city,
-            label: city.city,
-            value: numberFormatter.format(city.count),
+      <RankedList
+        icon={RANKED_TAB_ICONS[activeTab]}
+        loading={loading}
+        items={rankedRows(data, activeTab)
+          .slice(0, 5)
+          .map(([key, label, count]) => ({
+            key,
+            label,
+            value: numberFormatter.format(count),
           }))}
-          emptyMessage='No city data yet'
-        />
-      )}
-      {activeTab === 'countries' && (
-        <RankedList
-          icon={Globe}
-          loading={loading}
-          items={(data?.top_countries ?? []).slice(0, 5).map(country => ({
-            key: country.country,
-            label: country.country,
-            value: numberFormatter.format(country.count),
-          }))}
-          emptyMessage='No country data yet'
-        />
-      )}
-      {activeTab === 'sources' && (
-        <RankedList
-          icon={Globe}
-          loading={loading}
-          items={(data?.top_referrers ?? []).slice(0, 5).map(referrer => ({
-            key: referrer.referrer || 'direct',
-            label: referrer.referrer || 'Direct',
-            value: numberFormatter.format(referrer.count),
-          }))}
-          emptyMessage='No source data yet'
-        />
-      )}
-      {activeTab === 'links' && (
-        <RankedList
-          icon={Link2}
-          loading={loading}
-          items={(data?.top_links ?? []).slice(0, 5).map(link => ({
-            key: link.id,
-            label: link.url,
-            value: numberFormatter.format(link.clicks),
-          }))}
-          emptyMessage='No link data yet'
-        />
-      )}
+        emptyMessage={RANKED_TAB_EMPTY[activeTab]}
+        emptyState={
+          activeTab === 'cities'
+            ? {
+                description:
+                  'Cities appear as visitors with a known location open your profile.',
+                action: data?.top_countries?.length
+                  ? {
+                      label: 'View Countries',
+                      onClick: () => onActiveTabChange('countries'),
+                    }
+                  : undefined,
+              }
+            : undefined
+        }
+      />
     </EntityTabbedRail>
   );
 }
@@ -442,19 +428,23 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
   const [range, setRange] = useState<AnalyticsRange>('30d');
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('cities');
 
-  const { data, isLoading, isFetching } = useDashboardAnalyticsQuery({
-    range,
-    view: 'full',
-    enabled: true,
-  });
+  const { data, isPending, isFetching, isError, refetch } =
+    useDashboardAnalyticsQuery({
+      range,
+      view: 'full',
+      enabled: true,
+    });
 
   return (
     <AnalyticsSidebarView
       isOpen={isOpen}
       onClose={onClose}
       data={data}
-      loading={isLoading}
+      // isPending, not isLoading: a fetch paused offline has no data and must
+      // show the skeleton, not zeros. Disabled queries never reach this rail.
+      loading={isPending}
       isFetching={isFetching}
+      onRetry={isError ? refetch : undefined}
       range={range}
       onRangeChange={setRange}
       activeTab={activeTab}
@@ -483,8 +473,6 @@ export function StaticAnalyticsSidebar({
       data={data}
       loading={false}
       range='30d'
-      onRangeChange={() => {}}
-      showRangeControl={false}
       activeTab={activeTab}
       onActiveTabChange={setActiveTab}
       testId={testId}

@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -52,6 +58,39 @@ function fixture() {
 describe('merge-group dependency workspace', () => {
   it('accepts an installed tree bound to the exact dependency inputs', () => {
     const root = fixture();
+    prepareDependencyWorkspace(root, runtime);
+    expect(validateDependencyWorkspace(root, runtime)).toMatchObject(runtime);
+  });
+  it('accepts the repository lockfile exactly as written by the frozen install', () => {
+    const root = fixture();
+    for (const path of ['pnpm-lock.yaml', 'node_modules/.pnpm/lock.yaml']) {
+      writeFileSync(
+        join(root, path),
+        readFileSync(new URL(`../../../${path}`, import.meta.url))
+      );
+    }
+    prepareDependencyWorkspace(root, runtime);
+    expect(validateDependencyWorkspace(root, runtime)).toMatchObject(runtime);
+  });
+  it('rejects source-only orphan dependencies pruned by a frozen install', () => {
+    const root = fixture();
+    const installedLock = readFileSync(
+      new URL('../../../node_modules/.pnpm/lock.yaml', import.meta.url),
+      'utf8'
+    );
+    writeFileSync(join(root, 'node_modules/.pnpm/lock.yaml'), installedLock);
+    // Frozen pnpm prunes unreachable entries even when importers match.
+    // Preserve all installed entries and add only an orphan to the source.
+    const sourceWithOrphan = installedLock.replace(
+      /^packages:$/m,
+      'packages:\n\n  orphaned-packaging-dependency@1.0.0: {}'
+    );
+    expect(sourceWithOrphan).not.toBe(installedLock);
+    writeFileSync(join(root, 'pnpm-lock.yaml'), sourceWithOrphan);
+    expect(() => prepareDependencyWorkspace(root, runtime)).toThrow(
+      'installed dependency lock does not match pnpm-lock.yaml'
+    );
+    writeFileSync(join(root, 'pnpm-lock.yaml'), installedLock);
     prepareDependencyWorkspace(root, runtime);
     expect(validateDependencyWorkspace(root, runtime)).toMatchObject(runtime);
   });

@@ -617,14 +617,13 @@ test.describe('Tasks layout', () => {
     });
   }
 
+  // Rapid same-task edits are serialized per task in useTaskMutations (each
+  // write is stamped with the version the previous write committed), so the
+  // burst no longer depends on browser event ordering. Firefox runs this
+  // like every other browser — see JOV-8793.
   test('persists board item edits after rapid title and metadata changes', async ({
     page,
-    browserName,
   }, testInfo) => {
-    test.fixme(
-      browserName === 'firefox',
-      'JOV-8793: Firefox loses rapid task edits (title/status/assignee revert)'
-    );
     const { id: taskId, title: taskTitle } = await ensureTaskExists();
     const editedTitle = `${LAYOUT_TASK_TITLE} ${Date.now()}`;
 

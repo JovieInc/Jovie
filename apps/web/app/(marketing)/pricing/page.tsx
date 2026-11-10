@@ -9,6 +9,7 @@ import {
 } from '@/data/marketingPricingPlans';
 import { PricingComparisonChart } from '@/features/pricing/PricingComparisonChart';
 import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
+import { documentTitle } from '@/lib/seo/document-title';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 export const revalidate = false;
@@ -22,7 +23,7 @@ const PRICING_DESCRIPTION = `Jovie profiles are free forever. ${PRO_NAME} is ${P
 const requestAccessCopy = `${PRO_NAME} is ${PRO_MONTHLY_PRICE}. Claim your profile.`;
 
 export const metadata: Metadata = {
-  title: PRICING_TITLE,
+  title: documentTitle(PRICING_TITLE),
   description: PRICING_DESCRIPTION,
   keywords: [
     'Jovie pricing',
@@ -32,7 +33,7 @@ export const metadata: Metadata = {
     'link in bio platform pricing',
   ],
   openGraph: {
-    title: `Pricing - ${APP_NAME}`,
+    title: PRICING_TITLE,
     description: PRICING_DESCRIPTION,
     url: `${BASE_URL}/pricing`,
     siteName: APP_NAME,
@@ -43,7 +44,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: `Pricing - ${APP_NAME}`,
+    title: PRICING_TITLE,
     description: PRICING_DESCRIPTION,
     images: [PRICING_OG_IMAGE],
   },
@@ -94,7 +95,7 @@ function getPublicOfferSchema(plan: MarketingPricingPlan) {
 const PRICING_SCHEMA = {
   '@context': 'https://schema.org',
   '@type': 'WebPage',
-  name: `Pricing - ${APP_NAME}`,
+  name: PRICING_TITLE,
   description: PRICING_DESCRIPTION,
   url: `${BASE_URL}/pricing`,
   mainEntity: {

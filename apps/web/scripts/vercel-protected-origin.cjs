@@ -945,6 +945,64 @@ async function bootstrapAliasBoundAccess(
   }
 }
 
+// Golden path: every release linked from the canonical artist profile must open
+// as a live release page. A profile that renders while its releases 404 or show
+// the "Coming soon" placeholder is a broken fan journey that the page-level
+// surface checks above cannot see. Mode routes are not releases.
+const NON_RELEASE_PROFILE_SEGMENTS = new Set([
+  'about',
+  'contact',
+  'listen',
+  'music',
+  'pay',
+  'releases',
+  'share',
+  'subscribe',
+  'tip',
+  'tour',
+]);
+const LINKED_RELEASE_HANDLE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
+
+function extractLinkedReleasePaths(html, handle) {
+  const rendered = stripInlineScriptContent(html);
+  const prefix = `/${handle.toLowerCase()}/`;
+  const paths = new Set();
+  for (const match of rendered.matchAll(/href\s*=\s*"([^"]+)"/gi)) {
+    const href = match[1].split(/[?#]/)[0];
+    if (!href.toLowerCase().startsWith(prefix)) continue;
+    const slug = href.slice(prefix.length);
+    if (!slug || slug.includes('/')) continue;
+    if (NON_RELEASE_PROFILE_SEGMENTS.has(slug.toLowerCase())) continue;
+    paths.add(href);
+  }
+  return [...paths].sort();
+}
+
+function assertLiveReleaseDocument(surface, body) {
+  const rendered = stripInlineScriptContent(body);
+  const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(rendered)?.[1] ?? '';
+  if (/^\s*coming soon/i.test(title)) {
+    throw new Error(`${surface.label} rendered the Coming soon placeholder.`);
+  }
+  const heading = /<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(rendered)?.[1];
+  const headingText = (heading ?? '').replace(/<[^>]*>/g, '').trim();
+  if (!headingText) {
+    throw new Error(`${surface.label} has no release title.`);
+  }
+  if (
+    /content not found|profile not found|get alerts first/i.test(headingText)
+  ) {
+    throw new Error(`${surface.label} rendered a not-found heading.`);
+  }
+}
+
+// JOV-7973: the surface verifier lives in ./vercel-surface-verifier.cjs so
+// the closed-entry reconciliation can evolve without growing this
+// size-baselined script. Platform primitives are injected; no state moves.
+const {
+  verifyPublicSurfaceOnce: verifyPublicSurfaceWithClosedEntry,
+} = require('./vercel-surface-verifier.cjs');
+
 async function verifyPublicSurfaceOnce(
   surface,
   targetUrl,
@@ -953,100 +1011,53 @@ async function verifyPublicSurfaceOnce(
   deadline,
   cacheBust
 ) {
-  const url = new URL(surface.path, targetUrl.origin);
-  url.searchParams.set('_cb', cacheBust);
-  const request = buildOriginBoundCookieRequest(url, {
+  return verifyPublicSurfaceWithClosedEntry(
+    surface,
+    targetUrl,
     cookieHeader,
-    headers: {
-      Accept: surface.json ? 'application/json' : 'text/html',
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      Pragma: 'no-cache',
-      'User-Agent': 'Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)',
-    },
-  });
-  const response = await fetchWithinDeadline(
-    deadline,
     fetchImpl,
-    request.url,
-    request.options
+    deadline,
+    cacheBust,
+    {
+      buildOriginBoundCookieRequest,
+      fetchWithinDeadline,
+      discardResponseBody,
+      readResponseText,
+      assertExactProbeResponse,
+      parseProbeUrl,
+      publicErrorContent: PUBLIC_ERROR_CONTENT,
+      stripInlineScriptContent,
+      assertLiveReleaseDocument,
+    }
   );
-  assertExactProbeResponse(response, request.url);
-  if (response.status !== 200) {
-    await deadline.run(() => discardResponseBody(response));
-    throw new Error(`${surface.label} returned HTTP ${response.status}.`);
-  }
+}
 
-  const contentType = (
-    response.headers.get('content-type') ?? ''
-  ).toLowerCase();
-  const body = await readResponseText(response, deadline);
-  if (surface.json) {
-    if (!contentType.includes('application/json')) {
-      throw new Error(`${surface.label} did not return JSON.`);
-    }
-    let payload;
+async function verifySurfaceWithRetries(
+  surface,
+  targetUrl,
+  cookieHeader,
+  fetchImpl,
+  deadline,
+  attempts,
+  index
+) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      payload = JSON.parse(body);
-    } catch {
-      throw new Error(`${surface.label} returned invalid JSON.`);
-    }
-    const reportsAnonymousLiveness =
-      surface.acceptsAnonymousLiveness === true &&
-      payload &&
-      typeof payload === 'object' &&
-      payload.healthy === true &&
-      typeof payload.timestamp === 'string' &&
-      Object.keys(payload).every(
-        key => key === 'healthy' || key === 'timestamp'
+      return await verifyPublicSurfaceOnce(
+        surface,
+        targetUrl,
+        cookieHeader,
+        fetchImpl,
+        deadline,
+        `${Date.now()}-${index}-${attempt}`
       );
-    if (reportsAnonymousLiveness) return;
-    if (
-      !payload ||
-      typeof payload !== 'object' ||
-      payload.status !== surface.expectedStatus
-    ) {
-      throw new Error(`${surface.label} did not report healthy status.`);
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) await deadline.pause(1_000 * attempt);
     }
-    for (const check of surface.requiredChecks ?? []) {
-      if (payload.checks?.[check]?.ok !== true) {
-        throw new Error(
-          `${surface.label} did not report healthy ${check} state.`
-        );
-      }
-    }
-    if (
-      Object.hasOwn(payload, 'database') &&
-      payload.database !== 'ok' &&
-      !(
-        payload.database &&
-        typeof payload.database === 'object' &&
-        payload.database.ok === true
-      )
-    ) {
-      throw new Error(
-        `${surface.label} did not report healthy database state.`
-      );
-    }
-    return;
   }
-
-  if (!contentType.includes('text/html')) {
-    throw new Error(`${surface.label} did not return HTML.`);
-  }
-  if (
-    Buffer.byteLength(body) < surface.minimumBytes ||
-    !/<html(?:\s|>)/i.test(body) ||
-    !/<body(?:\s|>)/i.test(body)
-  ) {
-    throw new Error(`${surface.label} returned an incomplete document.`);
-  }
-  // Scan the rendered markup only. Inline <script> RSC flight payloads echo
-  // component copy (including error-branch strings), so testing the raw body
-  // here false-fails healthy deploys. Visible error/not-found copy lives outside
-  // <script> tags and is still caught.
-  if (PUBLIC_ERROR_CONTENT.test(stripInlineScriptContent(body))) {
-    throw new Error(`${surface.label} returned error or not-found content.`);
-  }
+  throw lastError;
 }
 
 async function verifyPublicDeploymentSurfaces(
@@ -1057,8 +1068,15 @@ async function verifyPublicDeploymentSurfaces(
     deadline: suppliedDeadline,
     timeoutMs = process.env.VERCEL_PROBE_TIMEOUT_MS ?? DEFAULT_PROBE_TIMEOUT_MS,
     attempts = 3,
+    linkedReleaseHandle,
   } = {}
 ) {
+  if (
+    linkedReleaseHandle !== undefined &&
+    !LINKED_RELEASE_HANDLE.test(linkedReleaseHandle)
+  ) {
+    throw new Error('Linked release handle is malformed.');
+  }
   const targetUrl = parseProbeUrl(rawTargetUrl, 'Public deployment target');
   if (
     !isExactVercelDeploymentUrl(targetUrl) ||
@@ -1115,6 +1133,46 @@ async function verifyPublicDeploymentSurfaces(
         }
       }
       if (lastError) throw lastError;
+    }
+    if (linkedReleaseHandle) {
+      const profile = await verifySurfaceWithRetries(
+        {
+          label: `Release catalog (${linkedReleaseHandle})`,
+          path: `/${linkedReleaseHandle}`,
+          minimumBytes: 500,
+        },
+        targetUrl,
+        exactCookieHeader,
+        fetchImpl,
+        deadline,
+        attempts,
+        surfaces.length
+      );
+      const releasePaths = extractLinkedReleasePaths(
+        profile,
+        linkedReleaseHandle
+      );
+      if (releasePaths.length === 0) {
+        throw new Error(
+          `Release catalog (${linkedReleaseHandle}) links to no release pages.`
+        );
+      }
+      for (const [offset, releasePath] of releasePaths.entries()) {
+        await verifySurfaceWithRetries(
+          {
+            label: `Release page ${releasePath}`,
+            path: releasePath,
+            minimumBytes: 500,
+            release: true,
+          },
+          targetUrl,
+          exactCookieHeader,
+          fetchImpl,
+          deadline,
+          attempts,
+          surfaces.length + 1 + offset
+        );
+      }
     }
   } finally {
     if (ownsDeadline) deadline.dispose();
@@ -1458,6 +1516,8 @@ async function bootstrapAndVerifyFromEnvironment() {
       await verifyPublicDeploymentSurfaces(access.targetUrl, {
         cookieHeader: access.cookieHeader,
         deadline,
+        linkedReleaseHandle:
+          process.env.VERCEL_VERIFY_LINKED_RELEASES || undefined,
       });
     }
     console.log(
@@ -1502,6 +1562,7 @@ module.exports = {
   validateBuildInfo,
   validateBuildIdentity,
   verifyPublicDeploymentSurfaces,
+  extractLinkedReleasePaths,
   writeExactHostCookieJar,
 };
 

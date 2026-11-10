@@ -230,7 +230,6 @@ describe('sitemap', () => {
         'https://jov.ie/artist-profiles',
         'https://jov.ie/solutions/artists',
         'https://jov.ie/product',
-        'https://jov.ie/youtube-thumbnails',
         'https://jov.ie/tim',
         'https://jov.ie/tim/album',
         'https://jov.ie/tim/album/album',
@@ -321,7 +320,7 @@ describe('sitemap', () => {
 
     expect(entries.length).toBeGreaterThan(0);
     expect(artist?.lastModified).toEqual(new Date('2026-01-01'));
-    expect(about?.lastModified).toBeUndefined();
+    expect(about?.lastModified).toEqual(new Date('2026-10-23'));
   });
 
   it('excludes automatic unclaimed structured-credit profiles', async () => {
@@ -371,6 +370,45 @@ describe('sitemap', () => {
 
     expect(urls).toContain('https://jov.ie/claimed-artist');
     expect(urls).not.toContain('https://jov.ie/a_unclaimed');
+  });
+
+  it('removes an unlisted profile and all of its release and track URLs', async () => {
+    getBlogPosts.mockResolvedValue([]);
+    whereMock
+      .mockResolvedValueOnce([
+        {
+          username: 'hidden-choice',
+          displayName: 'Hidden Choice',
+          isClaimed: true,
+          updatedAt: new Date('2026-01-01'),
+          settings: { searchable: false },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          username: 'hidden-choice',
+          slug: 'hidden-release',
+          updatedAt: new Date('2026-01-02'),
+          artworkUrl: null,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          username: 'hidden-choice',
+          slug: 'hidden-track',
+          releaseSlug: 'hidden-release',
+          updatedAt: new Date('2026-01-03'),
+        },
+      ])
+      .mockResolvedValueOnce([]);
+    const {
+      default: sitemap,
+      dynamic,
+      revalidate,
+    } = await import('../../app/sitemap');
+    expect(dynamic).toBe('force-dynamic');
+    expect(revalidate).toBe(0);
+    expect(JSON.stringify(await sitemap())).not.toContain('hidden-choice');
   });
 
   it('excludes synthetic profiles and their content without hiding similar real handles', async () => {
@@ -719,18 +757,18 @@ describe('sitemap', () => {
 describe('sitemap publication inventory fixtures (JOV-6263)', () => {
   const generatedAt = new Date('2026-09-16T20:30:02.784Z');
   const manifest: SitemapManifestRoute[] = [
-    { url: '/youtube-thumbnails', status: 'active', recipeId: 'feature' },
+    { url: '/smart-links', status: 'active', recipeId: 'feature' },
     { url: '/artist-profiles', status: 'active', recipeId: 'artist-lp' },
   ];
   const hubs = [
     { url: 'https://jov.ie/artist-profiles' },
-    { url: 'https://jov.ie/youtube-thumbnails' },
+    { url: 'https://jov.ie/smart-links' },
   ];
 
   it('flags an omitted commercial page, QA identity, and request-time lastmod', () => {
     expect(
       collectSitemapInventoryViolations(hubs.slice(0, 1), { manifest })
-    ).toContain('omitted commercial page: /youtube-thumbnails');
+    ).toContain('omitted commercial page: /smart-links');
     expect(
       collectSitemapInventoryViolations(
         [...hubs, { url: 'https://jov.ie/tmoc0g1x9dwmk71' }],
@@ -756,7 +794,7 @@ describe('sitemap publication inventory fixtures (JOV-6263)', () => {
       collectSitemapInventoryViolations(
         [
           { url: 'https://jov.ie/artist-profiles' },
-          { url: 'https://jov.ie/youtube-thumbnails' },
+          { url: 'https://jov.ie/smart-links' },
           { url: 'https://jov.ie/music' },
           { url: 'https://jov.ie/privacy' },
         ],

@@ -9,12 +9,15 @@
  * - API queries: 5 seconds
  *
  * PostgreSQL statement_timeout:
- * - Pool-level opt-in: set `DB_STATEMENT_TIMEOUT_MS` to apply on every new
- *   Neon pool connection (see `resolvePoolConfig` in `lib/db/client/connection.ts`).
+ * - Pool-level enforced default (JOV-3775 slice 2 / JOV-8527): every new Neon
+ *   pool connection applies statement_timeout (default 8s); the
+ *   DB_STATEMENT_TIMEOUT_MS env var tunes it within [1s, 30s] but can never
+ *   disable it (see `resolvePoolConfig` in `lib/db/client/connection.ts`).
  * - Query-wrapper opt-in: pass `{ db }` to `dashboardQuery` / `apiQuery` /
- *   `executeWithTimeout` to SET statement_timeout on that client before the query.
+ *   `executeWithTimeout` to SET a tighter statement_timeout on that client.
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql } from 'drizzle-orm';
 import type { DbOrTransaction } from './client/types';
 
@@ -92,6 +95,14 @@ function assertPositiveTimeoutMs(timeoutMs: number): number {
  * Uses parameterized `set_config` instead of `SET statement_timeout = $1`.
  * PostgreSQL rejects bind parameters on SET, which surfaced in production as
  * "Failed query: SET statement_timeout = $1".
+ *
+ * Best-effort (JOV-8761): this is a guard, not a business statement. When it
+ * fails — most often because an earlier statement already aborted the
+ * surrounding transaction (25P02) — throwing from here surfaces in Sentry as
+ * "Failed query: SELECT set_config('statement_timeout', $1, true)" and masks
+ * the real first error (or fails an otherwise-fine read). Log the failure as
+ * a breadcrumb and let the guarded statement report its own, more actionable
+ * error.
  */
 export async function setStatementTimeout(
   db: DbOrTransaction,
@@ -99,9 +110,20 @@ export async function setStatementTimeout(
 ): Promise<void> {
   const safeMs = assertPositiveTimeoutMs(timeoutMs);
 
-  await db.execute(
-    drizzleSql`SELECT set_config('statement_timeout', ${String(safeMs)}, true)`
-  );
+  try {
+    await db.execute(
+      drizzleSql`SELECT set_config('statement_timeout', ${String(safeMs)}, true)`
+    );
+  } catch (error) {
+    Sentry.addBreadcrumb({
+      category: 'database',
+      level: 'error',
+      message: `statement_timeout_guard: set_config failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      data: { timeoutMs: safeMs },
+    });
+  }
 }
 
 /**

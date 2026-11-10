@@ -5,7 +5,17 @@ import { describe, expect, it } from 'vitest';
 const webRoot = path.resolve(__dirname, '../../..');
 const pagePath = 'app/(home)/page.tsx';
 const cssPath = 'app/(home)/home.css';
-const componentPath = 'components/homepage/HomepageArtistProfile.tsx';
+const componentPath = 'components/homepage/HomepageEditorial.tsx';
+const componentCssPaths = [
+  'components/homepage/v3/stage.css',
+  'components/homepage/v3/product-ui.css',
+  'components/homepage/v3/surfaces.css',
+  'components/homepage/v3/phone.css',
+  'components/homepage/v3/chapters.css',
+  'components/homepage/v3/specs.css',
+  'components/homepage/v3/form.css',
+  'components/homepage/v3/responsive.css',
+];
 
 const forbiddenPageChromePatterns = [
   /#[0-9a-fA-F]{3,8}/,
@@ -59,15 +69,24 @@ describe('mounted homepage grid spine System B source contract', () => {
 
   it('mounts each homepage section exactly once', () => {
     const pageSource = readFileSync(path.join(webRoot, pagePath), 'utf8');
+    // The page renders the published spec; the spec renderer owns the one
+    // mount point per registered section (lib/content-records).
+    expect(countOccurrences(pageSource, '<HomepageSpecSections')).toBe(1);
+    const rendererPath = 'components/homepage/HomepageSpecSections.tsx';
+    const rendererSource = readFileSync(
+      path.join(webRoot, rendererPath),
+      'utf8'
+    );
 
     for (const mount of [
-      '<HomepageArtistHero',
-      '<HomepageFanStates',
-      '<HomepageOfferClose',
+      '<HomepageStoryHero',
+      '<HomepageProfileChapter',
+      '<HomepageReleasesChapter',
+      '<HomepageInviteClose',
     ]) {
       expect(
-        countOccurrences(pageSource, mount),
-        `${pagePath} must mount ${mount} exactly once`
+        countOccurrences(rendererSource, mount),
+        `${rendererPath} must mount ${mount} exactly once`
       ).toBe(1);
     }
 
@@ -76,17 +95,24 @@ describe('mounted homepage grid spine System B source contract', () => {
   });
 
   it('aligns the homepage sections to the shared content column', () => {
-    const css = readFileSync(
-      path.join(webRoot, 'components/homepage/HomepageArtistProfile.css'),
-      'utf8'
-    );
+    const css = componentCssPaths
+      .map(cssFile => readFileSync(path.join(webRoot, cssFile), 'utf8'))
+      .join('\n');
     // The hero shares the section shell's container: one gutter, one width.
     const component = readFileSync(path.join(webRoot, componentPath), 'utf8');
-    expect(component).toContain(
-      "className='ap-section-container homepage-artist-hero__inner'"
-    );
+    // Approved v3 (receipt home-canonical-v3) owns its sections: each root
+    // carries the section marker the design-diff gate crops by.
+    for (const section of ['hero', 'profile', 'releases', 'invite']) {
+      expect(component).toContain(`data-pen-section='${section}'`);
+    }
+    expect(component).not.toContain('SHOW_HOMEPAGE_HERO_LIGHT');
     expect(css).not.toMatch(/--homepage-page-gutter|--ds-public-content-max/);
-    for (const pattern of forbiddenSpineCssPatterns) {
+    // The approved design lights its product stages with token-colour
+    // gradients and casts token-colour shadows under them, so those two
+    // patterns are the only ones these files are allowed.
+    for (const pattern of forbiddenSpineCssPatterns.filter(
+      pattern => !/gradient|box-shadow/.test(pattern.source)
+    )) {
       expect(css, `homepage CSS leaked ${pattern}`).not.toMatch(pattern);
     }
   });
@@ -99,32 +125,19 @@ describe('mounted homepage grid spine System B source contract', () => {
       expect(spine, `${cssPath} spine leaked ${pattern}`).not.toMatch(pattern);
     }
 
-    // The spine block itself speaks only in shared column + gutter tokens.
+    // The spine block speaks only in the shared column + gutter tokens. The
+    // legacy per-page aliases (--homepage-grid-max / --homepage-grid-gutter /
+    // --homepage-section-max) are gone: one boxed width, one gutter.
     expect(spine).toContain('var(--ds-public-content-max)');
     expect(spine).toContain('var(--homepage-page-gutter)');
-    expect(spine).toContain(
-      '--homepage-grid-max: var(--ds-public-content-max);'
-    );
-    expect(spine).toContain(
-      '--homepage-grid-gutter: var(--homepage-page-gutter);'
-    );
+    expect(cssSource).not.toMatch(/--homepage-grid-(max|gutter)/);
+    expect(cssSource).not.toMatch(/--homepage-section-max/);
 
-    // The canonical gutter is tokenized on the space scale — one gutter for
-    // header, hero, and every story-stack chapter at every breakpoint.
+    // One gutter for header, hero, and every story-stack chapter at every
+    // breakpoint: the page gutter is the shared public gutter token.
     expect(cssSource).toContain(
-      '--homepage-page-gutter: clamp(var(--space-5), 2.2vw, var(--space-8));'
+      '--homepage-page-gutter: var(--ds-public-gutter);'
     );
-
-    // No divergent chapter gutter may survive anywhere on the page: every
-    // grid-gutter declaration resolves to the shared page gutter.
-    const gutterDeclarations =
-      cssSource.match(/--homepage-grid-gutter:[^;]+;/g) ?? [];
-    expect(gutterDeclarations.length).toBeGreaterThan(0);
-    for (const declaration of gutterDeclarations) {
-      expect(declaration).toBe(
-        '--homepage-grid-gutter: var(--homepage-page-gutter);'
-      );
-    }
 
     // homepage-optical-polish-v1: editorial sections reuse the shared
     // 12-column desktop spans. 34rem is a reading-width limit, not a

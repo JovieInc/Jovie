@@ -53,6 +53,11 @@ interface EmailCodeAuthFormProps {
    * it transitions back to `'email'`.
    */
   readonly onOtpStepChange?: (active: boolean) => void;
+  /**
+   * Full-page shells read left-aligned and tight; overlay captures keep
+   * their centered presentation.
+   */
+  readonly align?: 'left' | 'center';
 }
 
 // ============================================================================
@@ -124,6 +129,7 @@ export function EmailCodeAuthForm({
   redirectUrl,
   initialEmailAddress,
   onOtpStepChange,
+  align = 'center',
 }: EmailCodeAuthFormProps) {
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuthSafe();
   // Match SSR on the first client pass. Better Auth can expose a cached
@@ -351,15 +357,19 @@ export function EmailCodeAuthForm({
         role='alert'
         aria-live='assertive'
       >
-        <p className='text-center text-app text-primary-token'>
+        <p
+          className={`text-app text-primary-token ${align === 'left' ? 'text-left' : 'text-center'}`}
+        >
           Too many incorrect attempts.
         </p>
-        <p className='text-center text-app text-secondary-token'>
+        <p
+          className={`text-app text-secondary-token ${align === 'left' ? 'text-left' : 'text-center'}`}
+        >
           Request a new code to try again.
         </p>
         <Button
           type='button'
-          className={`${AUTH_CLASSES.authCta} my-2`}
+          className={AUTH_CLASSES.authEntryCta}
           static
           onClick={handleRequestNewCode}
         >
@@ -376,13 +386,20 @@ export function EmailCodeAuthForm({
         onSubmit={handleCodeSubmit}
         className='flex flex-col gap-3'
       >
-        <p className='text-center text-app text-secondary-token'>
-          Enter the code sent to{' '}
-          <span className='break-all font-medium text-primary-token'>
+        <p
+          className={`text-app text-secondary-token ${align === 'left' ? 'text-left' : 'text-center'}`}
+        >
+          Enter the code sent to
+          <span
+            data-auth-email-address
+            title={emailAddress.trim()}
+            className='block max-w-full truncate whitespace-nowrap font-medium text-primary-token'
+          >
             {emailAddress.trim()}
           </span>
         </p>
         <OtpInput
+          size='hero'
           value={code}
           onChange={setCode}
           onComplete={verifyCode}
@@ -393,23 +410,25 @@ export function EmailCodeAuthForm({
         <FormError id='auth-email-code-error' message={errorMessage} />
         <Button
           type='submit'
-          className={`${AUTH_CLASSES.authCta} my-2`}
+          className={AUTH_CLASSES.authEntryCta}
           static
           disabled={isPending || code.length < 6}
         >
           {isPending ? 'Verifying…' : 'Verify Code'}
         </Button>
-        <div className='grid grid-cols-2 items-stretch gap-3 text-center'>
+        <div
+          className={`grid grid-cols-2 items-stretch gap-3 ${align === 'left' ? 'text-left' : 'text-center'}`}
+        >
           <button
             type='button'
             onClick={handleBackToEmail}
-            className='auth-quiet-target focus-ring-themed rounded-md text-app text-secondary-token underline underline-offset-2'
+            className='auth-quiet-target focus-ring-themed rounded-md text-app font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token'
           >
             {AUTH_EMAIL_CHANGE_LABEL}
           </button>
           {resendCooldown > 0 ? (
             <span
-              className='auth-quiet-target text-app text-tertiary-token'
+              className='auth-quiet-target text-app font-medium text-tertiary-token'
               aria-live='polite'
             >
               Resend in {resendCooldown}s
@@ -420,7 +439,7 @@ export function EmailCodeAuthForm({
               onClick={handleResendCode}
               disabled={isPending}
               aria-label='Resend Verification Code'
-              className='auth-quiet-target focus-ring-themed rounded-md text-app text-secondary-token underline underline-offset-2 disabled:opacity-50'
+              className='auth-quiet-target focus-ring-themed rounded-md text-app font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token disabled:opacity-50'
             >
               Resend code
             </button>
@@ -465,7 +484,7 @@ export function EmailCodeAuthForm({
       </div>
       <Button
         type='submit'
-        className={`${AUTH_CLASSES.authCta} my-2`}
+        className={AUTH_CLASSES.authEntryCta}
         static
         disabled={isPending || !isHydrated}
         aria-busy={isPending || undefined}

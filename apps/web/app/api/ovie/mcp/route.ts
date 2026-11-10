@@ -9,6 +9,7 @@ import { getOvieOperatingStore } from '@/lib/ovie/mcp/runtime-store';
 export const dynamic = 'force-dynamic';
 
 const CORS = {
+  'Cache-Control': 'private, no-store',
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, POST, OPTIONS',
   'access-control-allow-headers':

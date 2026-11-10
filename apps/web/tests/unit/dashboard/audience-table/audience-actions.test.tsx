@@ -16,6 +16,7 @@ const baseMember: AudienceMember = {
   referrerHistory: [],
   utmParams: {},
   email: 'tim@example.com',
+  emailVisibleToArtist: true,
   phone: null,
   spotifyConnected: false,
   purchaseCount: 0,
@@ -78,7 +79,7 @@ describe('buildAudienceActions', () => {
     );
   });
 
-  it('keeps notification enabled when a visible fallback channel exists', () => {
+  it('does not offer messaging for a member who has not shared with the artist', () => {
     const items = buildAudienceActions(
       {
         ...baseMember,
@@ -92,6 +93,10 @@ describe('buildAudienceActions', () => {
     expect(items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: 'copy-email', disabled: true }),
+      ])
+    );
+    expect(items).not.toEqual(
+      expect.arrayContaining([
         expect.objectContaining({ id: 'send-notification' }),
       ])
     );

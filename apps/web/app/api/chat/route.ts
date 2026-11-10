@@ -1,3 +1,4 @@
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 /**
  * AI Chat Route — POST /api/chat
  *
@@ -40,7 +41,7 @@ import {
   tool,
   type UIMessageChunk,
 } from 'ai';
-import { and, count, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { tryHandleAnonymousOnboardingChat } from '@/app/api/chat/onboarding-handler';
@@ -53,13 +54,12 @@ import {
   classifyGatewayAlert,
   resolveChatStreamErrorMessage,
 } from '@/lib/ai/gateway-errors';
+import { createReleaseTool } from '@/lib/ai/tools/create-release';
 import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
 import { createInspectPressSourceTool } from '@/lib/ai/tools/inspect-press-source';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
 import { createVoicePromoTool } from '@/lib/ai/tools/voice-promo';
-import { readAuthorizedProfileViews } from '@/lib/analytics/authorized-read';
 import { getOptionalAuth } from '@/lib/auth/cached';
-import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import { getSessionContext } from '@/lib/auth/session';
 import { resolveChatAccountContext } from '@/lib/chat/account-context';
 import { createAccountChatTools } from '@/lib/chat/account-tools';
@@ -68,6 +68,8 @@ import {
   detectAlbumArtGenerationIntent,
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
+import { fetchArtistContext } from '@/lib/chat/artist-context.server';
+import { fetchCatalogTrackTitlesForChat } from '@/lib/chat/catalog-titles';
 import { assertChatToolsRegistered } from '@/lib/chat/chat-tool-inventory';
 import {
   buildLockedToolPromptInfo,
@@ -98,6 +100,7 @@ import {
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
 import { isShowTopInsightsTurnRelevant } from '@/lib/chat/show-top-insights-relevance';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
+import { resolveSummerHandoff } from '@/lib/chat/summer-summon';
 import {
   canUsePaidChatTools,
   resolveChatTurnPlanLimits,
@@ -137,13 +140,9 @@ import {
 import { gateAssistantReply } from '@/lib/chat/voice-lint';
 import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
 import { loadCustomerChatPinnedOpportunity } from '@/lib/connectors/customer-pinned-opportunity';
+import { isArtistRuleViolation } from '@/lib/copy/outbound-floor';
 import { db } from '@/lib/db';
-import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { socialLinks } from '@/lib/db/schema/links';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { sqlAny } from '@/lib/db/sql-helpers';
-import { upsertRelease } from '@/lib/discography/queries';
-import { generateUniqueSlug } from '@/lib/discography/slug';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
@@ -172,10 +171,12 @@ import {
   OVIE_PROGRAM,
 } from '@/lib/ovie/program';
 import { bindEveSummerSpeaker } from '@/lib/ovie/summer-eve-speaker';
+import { createFallbackSummerSpeaker } from '@/lib/ovie/summer-fast-speaker';
 import {
   authorizeFounderSummerUser,
   founderPrincipalHash,
 } from '@/lib/ovie/summer-founder-auth';
+import { fetchSummerShadow } from '@/lib/ovie/summer-shadow-client';
 import { createSummerAssistantStreamResponse } from '@/lib/ovie/summer-stream';
 import {
   getBoundSummerSpeaker,
@@ -223,7 +224,7 @@ import {
   resolvePitchDestination,
 } from '@/lib/services/pitch';
 import { isRetouchConfigured } from '@/lib/services/retouching/provider-gemini';
-import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
+import { isWeeklyQuotaExemptCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
@@ -249,109 +250,6 @@ const CHAT_KILL_SWITCH_GATES = {
   DISABLED: 'ai_chat_disabled',
   FORCE_LIGHT: 'ai_chat_force_light',
 } as const;
-
-/**
- * Fetches artist context server-side from the database.
- * Validates that the authenticated user can manage the profile.
- */
-async function fetchArtistContext(
-  profileId: string,
-  appUserId: string
-): Promise<ArtistContext | null> {
-  const access = await getExactProfileAccess(db, appUserId, profileId);
-  if (!access.ok) {
-    return null;
-  }
-
-  const [result] = await db
-    .select({
-      displayName: creatorProfiles.displayName,
-      username: creatorProfiles.username,
-      bio: creatorProfiles.bio,
-      genres: creatorProfiles.genres,
-      spotifyFollowers: creatorProfiles.spotifyFollowers,
-      spotifyPopularity: creatorProfiles.spotifyPopularity,
-      spotifyUrl: creatorProfiles.spotifyUrl,
-      appleMusicUrl: creatorProfiles.appleMusicUrl,
-    })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, profileId))
-    .limit(1);
-
-  if (!result) {
-    return null;
-  }
-
-  // Fetch link counts and tipping stats in parallel
-  const startOfMonth = new Date();
-  startOfMonth.setUTCDate(1);
-  startOfMonth.setUTCHours(0, 0, 0, 0);
-  const startOfMonthISO = startOfMonth.toISOString();
-
-  const [linkCounts, tipTotals, clickStats, profileViews] = await Promise.all([
-    db
-      .select({
-        totalActive: count(),
-        musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
-      })
-      .from(socialLinks)
-      .where(
-        and(
-          eq(socialLinks.creatorProfileId, profileId),
-          eq(socialLinks.state, 'active')
-        )
-      )
-      .then(r => r[0]),
-    db
-      .select({
-        totalReceived: drizzleSql<number>`COALESCE(SUM(${tips.amountCents}), 0)`,
-        monthReceived: drizzleSql<number>`COALESCE(SUM(CASE WHEN ${tips.createdAt} >= ${startOfMonthISO}::timestamp THEN ${tips.amountCents} ELSE 0 END), 0)`,
-        tipsSubmitted: drizzleSql<number>`COALESCE(COUNT(${tips.id}), 0)`,
-      })
-      .from(tips)
-      .where(eq(tips.creatorProfileId, profileId))
-      .then(r => r[0]),
-    db
-      .select({
-        total: drizzleSql<number>`count(*)`,
-      })
-      .from(clickEvents)
-      .where(
-        and(
-          eq(clickEvents.creatorProfileId, profileId),
-          eq(clickEvents.linkType, 'tip')
-        )
-      )
-      .then(r => r[0]),
-    readAuthorizedProfileViews(appUserId).catch(error => {
-      logger.warn('Authorized analytics unavailable for chat context', {
-        profileId,
-        error,
-      });
-      return 0;
-    }),
-  ]);
-
-  return {
-    displayName: result.displayName ?? result.username,
-    username: result.username,
-    bio: result.bio,
-    genres: result.genres ?? [],
-    spotifyFollowers: result.spotifyFollowers,
-    spotifyPopularity: result.spotifyPopularity,
-    spotifyUrl: result.spotifyUrl,
-    appleMusicUrl: result.appleMusicUrl,
-    profileViews,
-    hasSocialLinks: Number(linkCounts?.totalActive ?? 0) > 0,
-    hasMusicLinks: Number(linkCounts?.musicActive ?? 0) > 0,
-    tippingStats: {
-      tipClicks: Number(clickStats?.total ?? 0),
-      tipsSubmitted: Number(tipTotals?.tipsSubmitted ?? 0),
-      totalReceivedCents: Number(tipTotals?.totalReceived ?? 0),
-      monthReceivedCents: Number(tipTotals?.monthReceived ?? 0),
-    },
-  };
-}
 
 /**
  * Find a release by title (exact match first, then partial).
@@ -1127,7 +1025,7 @@ function createGenerateAlbumArtTool(params: {
             ? target.release
             : {
                 id: null,
-                title: releaseTitle?.trim() || 'Untitled Release',
+                title: releaseTitle?.trim() || COPY_FALLBACKS.release,
                 artworkUrl: null,
               };
         const providerPrompt = buildAlbumArtBackgroundPrompt({
@@ -1581,94 +1479,6 @@ function createMarkCanvasUploadedTool(
 }
 
 /**
- * Creates the createRelease tool for the AI to add new releases to the artist's discography.
- * This tool directly creates the release in the database and returns the result.
- */
-function createReleaseTool(resolvedProfileId: string) {
-  const createReleaseSchema = chatToolSchema({
-    title: z.string().min(1).max(200).describe('The title of the release'),
-    releaseType: z
-      .enum([
-        'single',
-        'ep',
-        'album',
-        'compilation',
-        'live',
-        'mixtape',
-        'other',
-      ])
-      .describe('The type of release'),
-    releaseDate: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
-      .optional()
-      .describe(
-        'Release date in ISO 8601 format (YYYY-MM-DD). Use the date the music was or will be released.'
-      ),
-    label: z.string().max(200).optional().describe('Record label name, if any'),
-    upc: z
-      .string()
-      .max(20)
-      .optional()
-      .describe('UPC/EAN barcode for the release, if known'),
-  });
-
-  return tool({
-    description:
-      "Create a new release in the artist's discography. Use this when the artist wants to add a release that isn't synced from Spotify — for example, a new single, EP, or album they want to set up smart links for. Ask for the title and release type at minimum before calling this tool.",
-    inputSchema: createReleaseSchema,
-    execute: async ({ title, releaseType, releaseDate, label, upc }) => {
-      try {
-        // Validate date if provided
-        let parsedDate: Date | null = null;
-        if (releaseDate) {
-          parsedDate = new Date(releaseDate);
-          if (Number.isNaN(parsedDate.getTime())) {
-            return {
-              success: false,
-              error: 'Invalid date. Please use YYYY-MM-DD format.',
-            };
-          }
-        }
-
-        const slug = await generateUniqueSlug(
-          resolvedProfileId,
-          title,
-          'release'
-        );
-
-        const release = await upsertRelease({
-          creatorProfileId: resolvedProfileId,
-          title,
-          slug,
-          releaseType,
-          releaseDate: parsedDate,
-          label: label ?? null,
-          upc: upc ?? null,
-          sourceType: 'manual',
-        });
-
-        return {
-          success: true,
-          release: {
-            id: release.id,
-            title: release.title,
-            slug: release.slug,
-            releaseType: release.releaseType,
-            releaseDate: release.releaseDate?.toISOString() ?? null,
-            label: release.label,
-          },
-        };
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Failed to create release';
-        return { success: false, error: message };
-      }
-    },
-  });
-}
-
-/**
  * Creates the writeWorldClassBio tool.
  * Produces an AllMusic-style draft using profile + DSP context.
  */
@@ -1818,7 +1628,8 @@ function createSubmitFeedbackTool(clerkUserId: string) {
 function createGenerateReleasePitchTool(
   resolvedProfileId: string,
   identity: { clerkUserId: string; conversationId: string | null },
-  releases: ReleaseContext[]
+  releases: ReleaseContext[],
+  artistRules?: ArtistContext['artistRules']
 ) {
   return tool({
     description: `Generate one copy-paste-ready release pitch for a specific destination. Use for playlist, radio, Sirius XM, install, playback/music supervisor, editorial post, record label, or collaborator pitching. Ask the artist where they want to pitch it before calling this tool unless a task or user message clearly maps to one of these destinations: ${PITCH_TARGET_OPTIONS_TEXT}. Ask which release they want to pitch if unclear. If the artist provides custom guidance, pass it via instructions. ${PITCH_GRILL_PROCEDURE}`,
@@ -1921,6 +1732,7 @@ function createGenerateReleasePitchTool(
             userId: identity.clerkUserId,
             sessionId: identity.conversationId,
           },
+          artistRules,
         });
 
         const updated = await updateOwnedReleaseGeneratedPitches({
@@ -1954,7 +1766,9 @@ function createGenerateReleasePitchTool(
 
         return {
           success: false as const,
-          error: 'Failed to generate pitches. Please try again.',
+          error: isArtistRuleViolation(error)
+            ? 'That pitch broke one of your artist rules, so I held it back.'
+            : 'Failed to generate pitches. Please try again.',
         };
       }
     },
@@ -2074,14 +1888,15 @@ function buildChatTools(
       : {}),
     ...(resolvedProfileId
       ? {
-          createRelease: createReleaseTool(resolvedProfileId),
+          createRelease: createReleaseTool(resolvedProfileId, clerkUserId),
           generateReleasePitch: createGenerateReleasePitchTool(
             resolvedProfileId,
             {
               clerkUserId,
               conversationId: reservedTurn?.conversationId ?? null,
             },
-            releases
+            releases,
+            artistContext.artistRules
           ),
         }
       : {}),
@@ -2455,7 +2270,14 @@ export async function POST(req: Request) {
       { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
-  const chatMode = chatModeResult.chatMode;
+  // Typing "Summer" (any spelling, @summer) in the founder's chat hands the
+  // operator account to Summer instead of the artist agent (Tim, 2026-10-25).
+  const chatMode = resolveSummerHandoff({
+    chatMode: chatModeResult.chatMode,
+    text: extractLastUserText(uiMessages),
+    founderAuthorized: authorizeFounderSummerUser(userId) === 'authorized',
+    transportEnabled: isSummerTransportEnabled(),
+  });
   if (chatMode === 'ov' && !(await canUseOvChatMode(userId))) {
     return NextResponse.json(
       { error: 'Admin role required for OV chat mode', requestId },
@@ -2776,7 +2598,23 @@ export async function POST(req: Request) {
       destination: receipt.destination,
       ack: receipt.ack,
     }));
-    const speaker = getBoundSummerSpeaker();
+    const eveSpeaker = getBoundSummerSpeaker();
+    // Interactive turns stream from Summer's fast chat endpoint; durable work
+    // and any fast-path outage fall back to the Eve conversation (still Summer).
+    const speaker = eveSpeaker
+      ? createFallbackSummerSpeaker({
+          eve: eveSpeaker,
+          fetchChat: (chatBody, signal) =>
+            fetchSummerShadow('/ovie/v1/summer-chat/stream', {
+              method: 'POST',
+              body: JSON.stringify(chatBody),
+              signal,
+              headers: {
+                'x-jovie-summer-principal-hash': founderPrincipalHash(userId),
+              },
+            }),
+        })
+      : null;
     const summerSession = generation.session;
     const summerLive =
       summerSession !== null &&
@@ -2845,7 +2683,9 @@ export async function POST(req: Request) {
 
   // Rate limiting - plan-aware weekly quota + burst protection. For clients
   // that send clientTurnId, reservation/replay happens before quota charging.
-  const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan);
+  const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan, {
+    skipWeeklyQuota: isWeeklyQuotaExemptCanaryEmail(accountContext.email),
+  });
   if (!rateLimitResult.success) {
     const rateLimitMessage =
       accountContext.billingVerification === 'unavailable'
@@ -2955,6 +2795,9 @@ export async function POST(req: Request) {
   const artistContext = contextResult.context;
 
   const releases = await fetchOptionalReleases(resolvedProfileId);
+  const catalogTrackTitles = resolvedProfileId
+    ? await fetchCatalogTrackTitlesForChat(resolvedProfileId)
+    : null;
   const dispatchConversationId =
     reservedTurn?.conversationId ?? resolvedConversationId;
 
@@ -3066,7 +2909,7 @@ export async function POST(req: Request) {
       const failure = classifyChatStreamFailure(error);
       await markChatTurnTerminal({
         turnId: reservedTurn.turnId,
-        status: 'failed_model_error',
+        status: failure.terminalStatus,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,
       });
@@ -3123,6 +2966,7 @@ export async function POST(req: Request) {
       uiMessages,
       artistContext,
       releases,
+      catalogTrackTitles,
       resolvedProfileId,
       resolvedConversationId: dispatchConversationId,
       userId,
@@ -3166,6 +3010,8 @@ export async function POST(req: Request) {
     }
 
     return turn.streamResult.toUIMessageStreamResponse({
+      // Model reasoning restates prompt rules and is never rendered.
+      sendReasoning: false,
       headers: {
         ...corsHeaders,
         'x-request-id': requestId,
@@ -3207,10 +3053,10 @@ export async function POST(req: Request) {
             responseMessage.parts as Array<{ type: string; text?: string }>
           )
         ).text;
-        // Copy floor (canon/VOICE.md): a streamed reply can't be blocked
-        // mid-flight, so gate the completed text before it persists. A floor
-        // violation swaps in a safe fallback and logs the rules that fired.
-        const gatedReply = gateAssistantReply(assistantText);
+        // Copy floor (canon/VOICE.md) and artist rules: a streamed reply can't
+        // be blocked mid-flight, so gate the completed text before it persists.
+        // A violation swaps in a safe fallback and logs the rules that fired.
+        const gatedReply = gateAssistantReply(assistantText, artistContext);
         if (gatedReply.violations.length > 0) {
           logger.warn(
             'Assistant reply failed copy floor; persisting fallback',
@@ -3289,7 +3135,7 @@ export async function POST(req: Request) {
       const failure = classifyChatStreamFailure(error);
       await markChatTurnTerminal({
         turnId: reservedTurn.turnId,
-        status: 'failed_model_error',
+        status: failure.terminalStatus,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,
       }).catch(() => null);

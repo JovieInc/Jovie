@@ -8,6 +8,7 @@ import {
   type TestInfo,
   test,
 } from '@playwright/test';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 
 const SHEET_MATRIX_STORY_ID = 'ui-atoms-sheet--conformance-matrix';
 const STORYBOOK_THEME_STORAGE_KEY = 'jovie-theme-storybook';
@@ -60,7 +61,7 @@ async function attachScreenshot(testInfo: TestInfo, name: string, page: Page) {
 async function attachA11yResult(page: Page, testInfo: TestInfo, name: string) {
   const results = await new AxeBuilder({ page })
     .include('body')
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .options(wcag22AaAxeOptions())
     .analyze();
   const evidence = JSON.stringify(
     {
@@ -395,4 +396,58 @@ test.describe('Sheet atom Storybook conformance', () => {
     );
     await closeAndRestoreFocus(page, content, trigger);
   });
+});
+
+// JOV-6929: test keyboard entry through the real, asynchronously mounted Vaul
+// portal. Focusing an item before Tab would conceal the production failure.
+test.describe('Public profile Menu keyboard entry', () => {
+  for (const width of [390, 768]) {
+    test(`focus stays in the Menu after opening at ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.goto(
+        '/iframe.html?id=profile-profilecompacttemplate--profile&viewMode=story'
+      );
+      const fixture = page.getByTestId('profile-compact-shell');
+      const trigger = page.getByRole('button', { name: 'Menu', exact: true });
+      const menu = page.getByTestId('profile-menu-drawer');
+      await expect(fixture).toHaveAttribute('data-interactive-ready', 'true');
+
+      for (let cycle = 0; cycle < 2; cycle += 1) {
+        await trigger.focus();
+        await page.keyboard.press('Enter');
+        await expect(menu).toBeVisible();
+        for (const key of ['Tab', 'Tab', 'Shift+Tab', 'Shift+Tab']) {
+          await page.keyboard.press(key);
+          await expect
+            .poll(() =>
+              menu.evaluate(node => node.contains(document.activeElement))
+            )
+            .toBe(true);
+        }
+        await page.keyboard.press('Escape');
+        await expect(menu).toBeHidden();
+        await expect(trigger).toBeFocused();
+      }
+
+      await page.keyboard.press('Enter');
+      await expect(menu).toBeVisible();
+      await page.setViewportSize({
+        width: width === 390 ? 768 : 390,
+        height: 844,
+      });
+      await expect(menu).toBeVisible();
+      await page.keyboard.press('Tab');
+      await expect
+        .poll(() =>
+          menu.evaluate(node => node.contains(document.activeElement))
+        )
+        .toBe(true);
+      await page.keyboard.press('Escape');
+      await expect(menu).toBeHidden();
+      await expect(trigger).toBeFocused();
+    });
+  }
 });

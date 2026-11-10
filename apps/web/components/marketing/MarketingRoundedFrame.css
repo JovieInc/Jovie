@@ -1,0 +1,6 @@
+/* Settled homepage hero: a wide cinematic rounded editorial card.
+   `--system-b-radius-panel` is `--radius-3xl` on the shared scale. */
+.marketing-rounded-frame {
+  overflow: hidden;
+  border-radius: var(--system-b-radius-panel);
+}

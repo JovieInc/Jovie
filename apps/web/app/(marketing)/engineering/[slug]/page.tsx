@@ -8,6 +8,7 @@ import {
   findEngineeringStory,
   getPublishedEngineeringStories,
 } from '@/lib/engineering-publication';
+import { documentTitle } from '@/lib/seo/document-title';
 
 export const revalidate = false;
 export const dynamicParams = false;
@@ -34,7 +35,7 @@ export async function generateMetadata({
 
   const canonical = `${BASE_URL}${APP_ROUTES.ENGINEERING}/${story.slug}`;
   return {
-    title: `${story.source.title} | ${APP_NAME}`,
+    title: documentTitle(`${story.source.title} | ${APP_NAME}`),
     description: story.source.summary,
     alternates: { canonical },
     openGraph: {

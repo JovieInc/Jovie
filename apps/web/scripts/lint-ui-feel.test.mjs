@@ -28,6 +28,7 @@ import {
   main,
   readBaseline,
   regressions,
+  staleBaseline,
   violationsOnAddedLines,
 } from './lint-ui-feel.mjs';
 
@@ -70,6 +71,25 @@ describe('ui-feel ratchet baseline math', () => {
     expect(regressions({ newCheck: 1 }, {})).toEqual([
       { check: 'newCheck', baseline: 0, current: 1 },
     ]);
+  });
+
+  it('staleBaseline reports only checks that shrank below the baseline', () => {
+    const stale = staleBaseline(
+      { headingNeedsBalance: 265, missingTabularNums: 71 },
+      { headingNeedsBalance: 267, missingTabularNums: 71 }
+    );
+    expect(stale).toEqual([
+      { check: 'headingNeedsBalance', baseline: 267, current: 265 },
+    ]);
+  });
+
+  it('staleBaseline is empty when counts equal or exceed the baseline', () => {
+    expect(
+      staleBaseline({ headingNeedsBalance: 5 }, { headingNeedsBalance: 5 })
+    ).toEqual([]);
+    expect(
+      staleBaseline({ headingNeedsBalance: 6 }, { headingNeedsBalance: 5 })
+    ).toEqual([]);
   });
 
   it('countByCheck buckets violations by messageId', () => {
@@ -218,11 +238,48 @@ describe('ui-feel cli gate', () => {
       errors.mockRestore();
     }
   });
+
+  it('exits 0 with a notice when debt shrank without regenerating the baseline', async () => {
+    const baselinePath = tmpBaseline();
+    // Baseline locks in 5 heading violations; the tree now measures 3.
+    await main(['--update'], silent, {
+      loadRule: () => fakeRule,
+      collect: async () => [
+        { file: 'a.tsx', line: 1, messageId: 'headingNeedsBalance' },
+        { file: 'a.tsx', line: 2, messageId: 'headingNeedsBalance' },
+        { file: 'b.tsx', line: 3, messageId: 'headingNeedsBalance' },
+        { file: 'b.tsx', line: 4, messageId: 'headingNeedsBalance' },
+        { file: 'b.tsx', line: 5, messageId: 'headingNeedsBalance' },
+      ],
+      baselinePath,
+    });
+    const shrunk = async () => [
+      { file: 'a.tsx', line: 1, messageId: 'headingNeedsBalance' },
+      { file: 'a.tsx', line: 2, messageId: 'headingNeedsBalance' },
+      { file: 'a.tsx', line: 3, messageId: 'headingNeedsBalance' },
+    ];
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logs = [];
+    try {
+      const code = await main([], message => logs.push(message), {
+        loadRule: () => fakeRule,
+        collect: shrunk,
+        baselinePath,
+      });
+      expect(code).toBe(0);
+      expect(errors).not.toHaveBeenCalled();
+      const text = logs.join('\n');
+      expect(text).toContain('headingNeedsBalance: 3 < baseline 5');
+      expect(text).toContain('--update');
+    } finally {
+      errors.mockRestore();
+    }
+  });
 });
 
 describe('ui-feel rule wiring', () => {
   it.skipIf(!RULE_PRESENT)(
-    'committed baseline matches current debt without regression headroom',
+    'committed baseline is never exceeded by current debt (shrink passes)',
     async () => {
       const rule = loadUiFeelRule();
       expect(rule).toBeTruthy();
@@ -230,7 +287,9 @@ describe('ui-feel rule wiring', () => {
       expect(violations.length).toBeGreaterThan(0);
       const counts = countByCheck(violations);
       const baseline = readBaseline();
-      expect(counts).toEqual(baseline);
+      for (const [check, count] of Object.entries(counts)) {
+        expect(count, check).toBeLessThanOrEqual(baseline[check] ?? 0);
+      }
     },
     300_000
   );

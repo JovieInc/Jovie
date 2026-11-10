@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
@@ -91,6 +92,46 @@ describe('public CTA guard', () => {
     // in cookies.spec.ts hit-testing; JSDOM cannot certify rendered dimensions.
   });
 
+  it('forwards the marketing mark size without changing the default header mark or CTA', () => {
+    const props: HeaderNavProps = {
+      authMode: 'public-static',
+      presentation: 'marketing-glass',
+      logoVariant: 'icon',
+      publicCta: { href: '/start', label: 'Find yourself' },
+    };
+    const { rerender } = render(
+      createElement<HeaderNavProps>(HeaderNav, {
+        ...props,
+        logoMarkSize: 'marketing',
+      })
+    );
+    expect(document.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '28'
+    );
+    expect(screen.getByRole('link', { name: 'Find yourself' })).toHaveAttribute(
+      'href',
+      '/start'
+    );
+    rerender(createElement<HeaderNavProps>(HeaderNav, props));
+    expect(document.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '20'
+    );
+  });
+
+  it('puts the glass header content on the single public container', () => {
+    render(
+      createElement<HeaderNavProps>(HeaderNav, {
+        authMode: 'public-static',
+        presentation: 'marketing-glass',
+      })
+    );
+    const shell = document.querySelector('.marketing-glass-header__shell');
+    expect(shell).toHaveClass('public-container');
+    expect(shell?.className).not.toMatch(/\bpx-|\bmax-w-/);
+  });
+
   it('adds no competing CTA through the compact Customers flyout', () => {
     render(
       createElement<HeaderNavProps>(HeaderNav, {
@@ -119,6 +160,27 @@ describe('public CTA guard', () => {
     ).toHaveLength(1);
   });
 
+  it('keeps deferred user-menu copy reachable from the public header language audit', () => {
+    const files = JSON.parse(
+      execFileSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `import { collectScanFiles } from './scripts/invariants/icp-language/scan.mjs';
+           import { loadConfig } from './scripts/invariants/icp-language/match.mjs';
+           const config = { ...loadConfig(), pageRoots: [], seeds: ['apps/web/components/organisms/HeaderNav.tsx'] };
+           console.log(JSON.stringify(collectScanFiles(undefined, config)));`,
+        ],
+        { cwd: join(ROOT, '..', '..'), encoding: 'utf8' }
+      )
+    ) as string[];
+
+    expect(files).toContain(
+      'apps/web/components/organisms/user-button/useUserButton.ts'
+    );
+  });
+
   it('audits the exact public CTA owner modules', () => {
     const authActionsSource = readFileSync(
       join(ROOT, 'components/molecules/AuthActions.tsx'),
@@ -131,6 +193,25 @@ describe('public CTA guard', () => {
 
     expect(authActionsSource).toContain('export function AuthActions');
     expect(headerNavSource).toContain('export function HeaderNav');
+    expect(headerNavSource).toContain('getHomepageFrontDoorCtaContract(');
+    expect(headerNavSource).toContain('FEATURE_FLAGS.WAITLIST_ENABLED');
+    expect(headerNavSource).toContain('publicCta = DEFAULT_PUBLIC_CTA');
+    expect(headerNavSource).not.toContain("label: 'Request Access'");
+  });
+
+  it('keeps the nav variant resolvers in the extracted variants module', () => {
+    const variantsSource = readFileSync(
+      join(ROOT, 'components/organisms/header-nav-variants.ts'),
+      'utf8'
+    );
+    const headerNavSource = readFileSync(
+      join(ROOT, 'components/organisms/HeaderNav.tsx'),
+      'utf8'
+    );
+
+    expect(variantsSource).toContain('export function getNavLinkVariantClass');
+    expect(variantsSource).toContain('export function getNavGroupVariantClass');
+    expect(headerNavSource).toContain("from './header-nav-variants'");
   });
 
   it('keeps legacy public CTA classnames out of production marketing and key public feature surfaces', () => {
@@ -299,3 +380,16 @@ it.each(['marketing-glass', 'default'] as const)(
     );
   }
 );
+
+it('marketing-glass header can render Log in without the primary CTA', () => {
+  render(
+    createElement<HeaderNavProps>(HeaderNav, {
+      authMode: 'public-static',
+      presentation: 'marketing-glass',
+      publicCta: { href: '/pricing', label: 'See plans' },
+      hidePublicCta: true,
+    })
+  );
+  expect(screen.getByRole('link', { name: 'Log in' })).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'See plans' })).toBeNull();
+});

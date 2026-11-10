@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+from contextvars import ContextVar
 import fcntl
 import hashlib
 import json
@@ -32,6 +33,7 @@ from typing import Any
 
 
 HERMES_DIR = str(Path(__file__).resolve().parent)
+_WORK_OBSERVATION_ONLY = ContextVar("fleet_work_observation_only", default=False)
 if HERMES_DIR not in sys.path:
     sys.path.insert(0, HERMES_DIR)
 
@@ -75,6 +77,12 @@ LANE_CAPACITY_SCHEMA = "jovie-lane-capacity/v2"
 QUEUE_SNAPSHOT_TTL = timedelta(minutes=10)
 CONTROLLER_SNAPSHOT_SCHEMA = "jovie-controller-snapshot/v1"
 CONTROLLER_SNAPSHOT_TTL = timedelta(minutes=10)
+# A working tick can hold tick.json's start-of-tick stamp past CONTROLLER_SNAPSHOT_TTL
+# (dispatch ticks were measured at 25-60 minutes on 2026-10-26). Liveness for that
+# in-flight window is the controller's own heartbeat: lifecycle.beat touches
+# tick-heartbeat while the tick runs tracked children, the same signal the stay-up
+# watchdog consumes. Past this bound the heartbeat is silence, not progress.
+NATIVE_HEARTBEAT_ALIVE_S = 3 * 60  # factory_watchdog.HEARTBEAT_ALIVE_S
 # Schema-padding sentinel for evaluation-failed receipts. Auto-Enroll jq
 # requires a 40-hex main SHA; this value never authorizes promotion.
 UNKNOWN_MAIN_SHA = "0" * 40
@@ -422,7 +430,7 @@ def _gh_json_retrying(repo: str, endpoint: str, *, revalidate: bool) -> dict[str
 
 
 def _gh_json(repo: str, endpoint: str, *, revalidate: bool) -> dict[str, Any]:
-    cache = _github_cache_path(repo, endpoint)
+    cache = None if _WORK_OBSERVATION_ONLY.get() else _github_cache_path(repo, endpoint)
     etag, cached = _read_github_cache(cache) if revalidate and cache is not None else (None, None)
     result = _gh_api(f"repos/{repo}/{endpoint}", etag)
     if result.returncode != 0 and "unknown flag" in result.stderr and "--include" in result.args:
@@ -980,6 +988,22 @@ def native_user_bus_environment(home: Path, *, runtime_root: Path = Path("/run/u
     return {**env, **canonical}
 
 
+def native_heartbeat_age(state_dir: Path, now: datetime) -> float | None:
+    """Age (seconds) of the controller's tick-heartbeat, or None when absent/irregular.
+
+    The heartbeat is regular-file liveness evidence written by the same tracked
+    lifecycle helper the tick receipt comes from; a symlink or special file is
+    not evidence.
+    """
+    try:
+        info = (state_dir / "tick-heartbeat").lstat()
+    except OSError:
+        return None
+    if not stat.S_ISREG(info.st_mode):
+        return None
+    return now.timestamp() - info.st_mtime
+
+
 def observe_native_controller(state_dir: Path, now: datetime) -> dict[str, Any]:
     """Observe the installed lanes runtime; a retired HTTP endpoint is not authority."""
     failed = {"status": "failed", "kind": "native-lanes", "source": "native-runtime",
@@ -1026,8 +1050,24 @@ def observe_native_controller(state_dir: Path, now: datetime) -> dict[str, Any]:
         observed = (datetime.fromisoformat(tick_at.replace("Z", "+00:00"))
                     if isinstance(tick_at, str) else None)
         tick_revision = tick.get("release")
+        tick_age = (now - observed) if observed is not None else None
+        # A tick stamp older than CONTROLLER_SNAPSHOT_TTL is not by itself a dead
+        # controller: a working dispatch holds tick.json's start-of-tick stamp past
+        # that bound (ticks ran 25-60 minutes on 2026-10-26), exactly while the
+        # service keeps spawning workers. For that in-flight window the tick's own
+        # heartbeat is the liveness evidence — lifecycle.beat touches
+        # tick-heartbeat while the tick runs tracked children. A missing,
+        # irregular or stale heartbeat still fails closed, as does a failed tick,
+        # an unbound release identity or a future-dated stamp: the heartbeat
+        # never manufactures health, it only certifies an in-flight tick.
+        heartbeat_age = native_heartbeat_age(state, now)
+        receipt_fresh = (tick_age is not None
+                         and -timedelta(seconds=30) <= tick_age <= CONTROLLER_SNAPSHOT_TTL)
+        heartbeat_fresh = (tick_age is not None and tick_age >= -timedelta(seconds=30)
+                           and heartbeat_age is not None
+                           and heartbeat_age <= NATIVE_HEARTBEAT_ALIVE_S)
         if (observed is None or observed.tzinfo is None or observed.utcoffset() is None
-                or not -timedelta(seconds=30) <= now - observed <= CONTROLLER_SNAPSHOT_TTL
+                or not (receipt_fresh or heartbeat_fresh)
                 or not isinstance(tick_revision, str) or not re.fullmatch(r"[0-9a-f]{7,40}", tick_revision)
                 or not str(objects.get("scripts/lanes", "")).startswith(tick_revision) or "error" not in tick or tick["error"] is not None):
             raise ValueError("native controller tick is stale, failed or unbound")
@@ -1064,6 +1104,7 @@ def observe_native_controller(state_dir: Path, now: datetime) -> dict[str, Any]:
         return {"status": "green", "kind": "native-lanes", "source": "native-runtime",
                 "observedAt": isoformat(now), "tickAt": tick["at"],
                 "sourceCommit": revision, "bundleDigest": parts[0],
+                "heartbeatAgeS": round(heartbeat_age, 1) if heartbeat_age is not None else None,
                 "service": "jovie-lanes.service", "timer": "jovie-lanes.timer"}
     except (OSError, ValueError, TypeError, IndexError, AttributeError, subprocess.SubprocessError):
         return {**failed, "error": "native-controller-evidence-unavailable"}
@@ -1248,12 +1289,22 @@ def observe_lease(guard_bin: str) -> dict[str, Any]:
     }
 
 
+DATABASE_PROBE_ATTEMPTS = 3
+
+
 def observe_database(production_url: str) -> dict[str, str]:
     """Observe public DB liveness on the configured production origin only.
 
     Deploy liveness deliberately omits private dependency diagnostics. Never
     infer database readiness from that aggregate response or carry diagnostics
     into a fleet receipt. Uncertain DB evidence remains unknown.
+
+    A transport blip (connection error, timeout, or an edge error page) is
+    not a database verdict, so transport-class failures get the same bounded
+    three-attempt retry as the other live observers. Authoritative verdicts
+    (a parseable liveness document in any state, a redirect, an unexpected
+    status) return immediately and are never retried. Pass conditions,
+    freshness bounds, and the unknown-blocks-visibly rule are unchanged.
     """
     def unknown(reason: str) -> dict[str, str]:
         return {"status": "unknown", "detail": f"database health probe: {reason}"}
@@ -1267,33 +1318,60 @@ def observe_database(production_url: str) -> dict[str, str]:
         # Validate the port before constructing the credential-free same-origin URL.
         origin.port
         url = urllib.parse.urlunsplit((origin.scheme, origin.netloc, "/api/health/db", "", ""))
+    except (OSError, ValueError, OverflowError):
+        return unknown("untrusted production origin")
+
+    last_transport_reason = ""
+    for attempt in range(DATABASE_PROBE_ATTEMPTS):
         try:
-            with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - configured origin
-                status, final_url = response.status, response.geturl()
-                value = json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as error:
-            status, final_url = error.code, error.geturl()
-            value = json.loads(error.read().decode("utf-8"))
-        if final_url != url:
-            return unknown("redirected away from the configured database endpoint")
-        if not isinstance(value, dict) or not isinstance(value.get("healthy"), bool):
-            return unknown("malformed public liveness schema")
-        timestamp = value.get("timestamp")
-        if not isinstance(timestamp, str):
-            return unknown("missing observation timestamp")
-        observed_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-        if observed_at.tzinfo is None:
-            return unknown("timestamp has no timezone")
-        age = utc_now() - observed_at.astimezone(UTC)
-        if not timedelta(0) <= age <= timedelta(minutes=10):
-            return unknown("stale or future-dated observation")
-        if value["healthy"] is False and status in (200, 503):
-            return {"status": "red", "detail": "same-origin database health check failed"}
-        if value["healthy"] is True and status == 200:
-            return {"status": "green", "detail": "same-origin database health check passed"}
-        return unknown("unexpected HTTP status or contradictory liveness")
-    except (OSError, ValueError, OverflowError, urllib.error.URLError):
-        return unknown("transport or malformed response")
+            try:
+                with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - configured origin
+                    status, final_url = response.status, response.geturl()
+                    body = response.read().decode("utf-8")
+            except urllib.error.HTTPError as error:
+                status, final_url = error.code, error.geturl()
+                body = error.read().decode("utf-8", "replace")
+            try:
+                value = json.loads(body)
+            except ValueError:
+                # An HTML edge/error page is a transport-class blip, not a
+                # liveness verdict; retry it like any other blip.
+                last_transport_reason = f"attempt {attempt + 1}: edge returned a non-JSON body"
+                if attempt + 1 < DATABASE_PROBE_ATTEMPTS:
+                    time.sleep(attempt + 1)
+                continue
+        except (OSError, urllib.error.URLError) as error:
+            last_transport_reason = f"attempt {attempt + 1}: {error}"
+            if attempt + 1 < DATABASE_PROBE_ATTEMPTS:
+                time.sleep(attempt + 1)
+            continue
+        try:
+            if final_url != url:
+                return unknown("redirected away from the configured database endpoint")
+            if not isinstance(value, dict) or not isinstance(value.get("healthy"), bool):
+                return unknown("malformed public liveness schema")
+            timestamp = value.get("timestamp")
+            if not isinstance(timestamp, str):
+                return unknown("missing observation timestamp")
+            observed_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            if observed_at.tzinfo is None:
+                return unknown("timestamp has no timezone")
+            age = utc_now() - observed_at.astimezone(UTC)
+            if not timedelta(0) <= age <= timedelta(minutes=10):
+                return unknown("stale or future-dated observation")
+            if value["healthy"] is False and status in (200, 503):
+                return {"status": "red", "detail": "same-origin database health check failed"}
+            if value["healthy"] is True and status == 200:
+                return {"status": "green", "detail": "same-origin database health check passed"}
+            return unknown("unexpected HTTP status or contradictory liveness")
+        except ValueError:
+            # A parseable response with unparseable evidence is authoritative
+            # brokenness, not a transport blip: return it, never retry it.
+            return unknown("transport or malformed response")
+    return unknown(
+        f"transport or malformed response after {DATABASE_PROBE_ATTEMPTS} "
+        f"attempts: {last_transport_reason or 'no response'}"
+    )
 
 
 def observe_production(url: str) -> dict[str, Any]:
@@ -3708,6 +3786,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--evaluate-json")
+    parser.add_argument("--observe-work-admission", action="store_true")
     parser.add_argument(
         "--consumer",
         choices=("direct-gem", "fleet", "remediation", "promotion", "deployment"),
@@ -3754,6 +3833,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--independent-review-receipt", type=Path)
     parser.add_argument("--model-registry", type=Path)
     args = parser.parse_args()
+    if args.observe_work_admission and (args.dry_run or args.evaluate_json):
+        parser.error("work observation cannot use cached evaluation or publishing modes")
     if not args.production_url:
         # Sibling lanes have no jov.ie deploy; without an explicit override
         # they bind production to their own main head (JOV-5340).
@@ -3788,7 +3869,7 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
     controller_options = {"native_state_dir": native_state} if native_state is not None else {}
     controller = observe_controller(
         args.symphony_url,
-        snapshot_path=fleet_sidecar_path(
+        snapshot_path=None if _WORK_OBSERVATION_ONLY.get() else fleet_sidecar_path(
             args.state_dir, args.repo, "controller-snapshot.json"
         ),
         now=now,
@@ -3811,12 +3892,14 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
             args.repo,
             args.queue_target,
             default_lane_budget,
-            snapshot_path=fleet_sidecar_path(
+            snapshot_path=None if _WORK_OBSERVATION_ONLY.get() else fleet_sidecar_path(
                 args.state_dir, args.repo, "queue-snapshot.json"
             ),
             now=now,
         ),
-        "capacityWorkpad": observe_capacity_workpad(
+        "capacityWorkpad": {"schema": CAPACITY_WORKPAD_SCHEMA, "selected": [],
+            "reason": "not-observed-work-only", "mainSha": main.get("sha")}
+        if _WORK_OBSERVATION_ONLY.get() else observe_capacity_workpad(
             runner=getattr(args, "capacity_workpad_runner", None)
             or CAPACITY_WORKPAD_RUNNER,
             main_sha_value=main.get("sha"),
@@ -3825,19 +3908,105 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
         "ciAudit": observe_ci_audit(args.repo, main.get("sha"), gh_json,
                                     targets=closure.get("lifecycleActions", []) if isinstance(closure, dict) else []),
         "concurrencyEvidence": concurrency,
-        "fallbackSeats": observe_fallback_seats(
+        "fallbackSeats": _unavailable_fallback_seats("not-observed-work-only")
+        if _WORK_OBSERVATION_ONLY.get() else observe_fallback_seats(
             now, registry_path=getattr(args, "model_registry", None)
         ),
-        "independentReview": refresh_independent_review_receipt(
+        "independentReview": observe_work_review(review_path, main, now)
+        if _WORK_OBSERVATION_ONLY.get() else refresh_independent_review_receipt(
             review_path, main, now
         ),
-        "lease": observe_lease(args.lease_guard_bin),
+        "lease": {"status": "unknown", "reason": "not-observed-work-only"}
+        if _WORK_OBSERVATION_ONLY.get() else observe_lease(args.lease_guard_bin),
     }
+
+
+def observe_work_review(path: Path, main: dict[str, Any], now: datetime) -> dict[str, Any]:
+    """The maintained exact-main review projection, without publishing a receipt."""
+    if main.get("status") == "green" and valid_commit_sha(main.get("sha"), exact=True):
+        receipt = build_independent_review_receipt(main, now)
+        if validate_independent_review(receipt, main["sha"], now).get("accepted"):
+            return receipt
+    return observe_independent_review(path, main.get("sha"), now)
+
+
+def _work_input_digest(path: Path) -> str | None:
+    """Bound raw-byte evidence to one stable regular inode, without blocking FIFO opens.
+
+    Same bounded descriptor pattern as lane_runner.maintenance_json. The raw
+    bytes (not reserialized JSON) remain the preimage. Missing is evidence only
+    when the initial lstat was missing, never after an observed inode disappears.
+    """
+    limit = 1024 * 1024
+    try:
+        before = path.lstat()
+    except FileNotFoundError:
+        return None
+    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+    try:
+        opened = os.fstat(fd)
+        identity = lambda info: (info.st_dev, info.st_ino, info.st_size,
+                                 info.st_mtime_ns, info.st_ctime_ns)
+        if (not stat.S_ISREG(opened.st_mode) or opened.st_size > limit
+                or identity(before) != identity(opened)):
+            raise ValueError("fleet-work-input-not-bounded-regular")
+        with os.fdopen(fd, "rb", closefd=False) as handle:
+            raw = handle.read(limit + 1)
+        if (len(raw) > limit or len(raw) != opened.st_size
+                or identity(os.fstat(fd)) != identity(opened)
+                or identity(path.lstat()) != identity(opened)):
+            raise ValueError("fleet-work-input-changed-during-read")
+        return hashlib.sha256(raw).hexdigest()
+    finally:
+        os.close(fd)
+
+def work_observation_inputs(args: argparse.Namespace) -> dict[str, str | None]:
+    paths = {args.integrity_receipt or args.state_dir.parent / "integrity.json",
+             args.concurrency_evidence or args.state_dir.parent / "concurrency.json",
+             args.independent_review_receipt or fleet_sidecar_path(args.state_dir, args.repo, "independent-review.json"),
+             args.state_dir / "latest.json"}
+    if args.symphony_url.rstrip("/") == "http://127.0.0.1:4041/api/v1/state" and args.native_controller_state_dir is not None:
+        paths.add(args.native_controller_state_dir / "tick.json")
+    values = {}
+    for path in sorted(paths):
+        values[str(path)] = _work_input_digest(path)
+    return values
+
+
+def observe_work_admission(args: argparse.Namespace) -> dict[str, Any]:
+    """Private work-only evidence. No capacity, promotion or dispatch authority.
+
+    Display-only backlog cohorts and provider probes are deliberately unobserved;
+    evaluate receives their typed unavailable forms, never fabricated passes.
+    """
+    started = utc_now()
+    before = work_observation_inputs(args)
+    token = _WORK_OBSERVATION_ONLY.set(True)
+    try:
+        signals = observe_signals(args, started)
+        receipt = evaluate(signals, isoformat(started))
+        if work_observation_inputs(args) != before:
+            raise ValueError("work-observation-input-changed")
+        return {"schema": "jovie.fleet-work-observation/v1", "observedAt": isoformat(started),
+                "completedAt": isoformat(utc_now()), "mainSha": signals.get("main", {}).get("sha"),
+                "repo": args.repo, "statePath": str(args.state_dir),
+                "nativeStatePath": str(args.native_controller_state_dir),
+                "gateSHA256": _work_input_digest(Path(__file__)),
+                "localInputs": before,
+                "workAdmission": {key: receipt["workAdmission"][key] for key in
+                    ("allowed", "newImplementationAllowed", "newIssueLeaseAllowed", "productNewIssueLeaseAllowed")},
+                "closureAdmission": {"newIssueIntakeAllowed": receipt["closureAdmission"]["newIssueIntakeAllowed"]},
+                "authorizesTransition": False, "authorizesDispatch": False}
+    finally:
+        _WORK_OBSERVATION_ONLY.reset(token)
 
 
 def main() -> int:
     try:
         args = parse_args()
+        if args.observe_work_admission:
+            print(json.dumps(observe_work_admission(args), sort_keys=True))
+            return 0
         if args.evaluate_json:
             signals = json.loads(args.evaluate_json)
             if not isinstance(signals, dict):

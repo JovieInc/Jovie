@@ -37,7 +37,7 @@ export function ArtistProfileCaptureSection({
         id={id}
         penContractId={MARKETING_PEN_CONTRACT_IDS.section.capture}
       >
-        <div className='mx-auto max-w-280'>
+        <div>
           <ArtistProfileSectionHeader
             align='center'
             headline={capture.headline}

@@ -1,0 +1,321 @@
+{
+  "schema": "jovie-review-escapes/v1",
+  "windowDays": 30,
+  "mergedPrs": 866,
+  "escapedPrs": 36,
+  "escapeRate": 0.0416,
+  "byLayer": {
+    "preflight": 0,
+    "unit_test": 13,
+    "ci_guard": 17,
+    "risk_tier_review": 5,
+    "production_cert": 2
+  },
+  "guardRate": 0.973,
+  "unguarded": [
+    {
+      "originPr": 23990,
+      "fixPr": 24141,
+      "layer": "risk_tier_review"
+    }
+  ],
+  "escapes": [
+    {
+      "originPr": 23503,
+      "fixPr": 24407,
+      "kind": "fix",
+      "hours": 1.5,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 23930,
+      "fixPr": 24323,
+      "kind": "fix",
+      "hours": 2.6,
+      "layer": "unit_test",
+      "guardAdded": true
+    },
+    {
+      "originPr": 24006,
+      "fixPr": 24212,
+      "kind": "fix",
+      "hours": 5.3,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 24200,
+      "fixPr": 24204,
+      "kind": "fix",
+      "hours": 4.1,
+      "layer": "unit_test",
+      "guardAdded": true
+    },
+    {
+      "originPr": 24006,
+      "fixPr": 24201,
+      "kind": "fix",
+      "hours": 1.6,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 23990,
+      "fixPr": 24141,
+      "kind": "fix",
+      "hours": 5.6,
+      "layer": "risk_tier_review",
+      "guardAdded": false
+    },
+    {
+      "originPr": 23956,
+      "fixPr": 23986,
+      "kind": "fix",
+      "hours": 12,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 23936,
+      "fixPr": 24038,
+      "kind": "fix",
+      "hours": 1.6,
+      "layer": "risk_tier_review",
+      "guardAdded": true
+    },
+    {
+      "originPr": 23703,
+      "fixPr": 24014,
+      "kind": "fix",
+      "hours": 2.9,
+      "layer": "unit_test",
+      "guardAdded": true
+    },
+    {
+      "originPr": 23743,
+      "fixPr": 23887,
+      "kind": "fix",
+      "hours": 24,
+      "layer": "risk_tier_review",
+      "guardAdded": true
+    },
+    {
+      "originPr": 23883,
+      "fixPr": 23900,
+      "kind": "fix",
+      "hours": 2,
+      "layer": "production_cert",
+      "guardAdded": true
+    },
+    {
+      "originPr": 23586,
+      "fixPr": 23648,
+      "kind": "fix",
+      "hours": 1.2,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 23336,
+      "fixPr": 23380,
+      "kind": "fix",
+      "hours": 1.5,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 23277,
+      "fixPr": 23293,
+      "kind": "fix",
+      "hours": 3.3,
+      "layer": "production_cert",
+      "guardAdded": true
+    },
+    {
+      "originPr": 23257,
+      "fixPr": 23272,
+      "kind": "fix",
+      "hours": 4.6,
+      "layer": "unit_test",
+      "guardAdded": true
+    },
+    {
+      "originPr": 23036,
+      "fixPr": 23060,
+      "kind": "fix",
+      "hours": 2.6,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 23052,
+      "fixPr": 23060,
+      "kind": "fix",
+      "hours": 2.7,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 22711,
+      "fixPr": 22808,
+      "kind": "fix",
+      "hours": 3,
+      "layer": "unit_test",
+      "guardAdded": true
+    },
+    {
+      "originPr": 22656,
+      "fixPr": 22521,
+      "kind": "fix",
+      "hours": 2.9,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 22766,
+      "fixPr": 22741,
+      "kind": "fix",
+      "hours": 2.5,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 22739,
+      "fixPr": 22735,
+      "kind": "fix",
+      "hours": 0.6,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 22328,
+      "fixPr": 22456,
+      "kind": "fix",
+      "hours": 47.1,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 22331,
+      "fixPr": 22456,
+      "kind": "fix",
+      "hours": 42.9,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 22180,
+      "fixPr": 22538,
+      "kind": "fix",
+      "hours": 44.2,
+      "layer": "risk_tier_review",
+      "guardAdded": true
+    },
+    {
+      "originPr": 22447,
+      "fixPr": 22451,
+      "kind": "fix",
+      "hours": 3.8,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 22324,
+      "fixPr": 22435,
+      "kind": "fix",
+      "hours": 3.9,
+      "layer": "unit_test",
+      "guardAdded": true
+    },
+    {
+      "originPr": 22337,
+      "fixPr": 22435,
+      "kind": "fix",
+      "hours": 3.8,
+      "layer": "unit_test",
+      "guardAdded": true
+    },
+    {
+      "originPr": 22354,
+      "fixPr": 22427,
+      "kind": "fix",
+      "hours": 6.1,
+      "layer": "unit_test",
+      "guardAdded": true
+    },
+    {
+      "originPr": 22320,
+      "fixPr": 22448,
+      "kind": "fix",
+      "hours": 0.8,
+      "layer": "unit_test",
+      "guardAdded": true
+    },
+    {
+      "originPr": 21956,
+      "fixPr": 22307,
+      "kind": "fix",
+      "hours": 1.7,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 21536,
+      "fixPr": 21608,
+      "kind": "fix",
+      "hours": 6.3,
+      "layer": "risk_tier_review",
+      "guardAdded": true
+    },
+    {
+      "originPr": 21539,
+      "fixPr": 21592,
+      "kind": "fix",
+      "hours": 4.3,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 21360,
+      "fixPr": 21434,
+      "kind": "fix",
+      "hours": 0.6,
+      "layer": "unit_test",
+      "guardAdded": true
+    },
+    {
+      "originPr": 21304,
+      "fixPr": 21323,
+      "kind": "fix",
+      "hours": 3.5,
+      "layer": "unit_test",
+      "guardAdded": true
+    },
+    {
+      "originPr": 20767,
+      "fixPr": 21267,
+      "kind": "fix",
+      "hours": 4.2,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 21207,
+      "fixPr": 21214,
+      "kind": "fix",
+      "hours": 0.8,
+      "layer": "unit_test",
+      "guardAdded": true
+    },
+    {
+      "originPr": 21081,
+      "fixPr": 21089,
+      "kind": "fix",
+      "hours": 1.3,
+      "layer": "unit_test",
+      "guardAdded": true
+    }
+  ],
+  "generatedAt": "2026-11-07T14:04:42.739Z"
+}

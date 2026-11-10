@@ -6,6 +6,8 @@
  * correct entitlement tier per ENTITLEMENT_REGISTRY (founding -> pro).
  */
 
+import { LEGACY_STRIPE_PRICE_IDS } from './price-id-mapping';
+
 /** Entitlement tier for legacy prices (founding maps to pro per ENTITLEMENT_REGISTRY). */
 export type LegacyEntitlementPlan = 'pro' | 'max';
 
@@ -25,7 +27,7 @@ export interface LegacyPriceDefinition {
 export const HARDCODED_LEGACY_PRICES: readonly LegacyPriceDefinition[] = [
   {
     // JOV-1769: founding member monthly — removed from checkout Mar 2026
-    priceId: 'price_1T1DegAAI1NrDqJSTtjAwLBi',
+    priceId: LEGACY_STRIPE_PRICE_IDS.foundingMonthly,
     plan: 'pro',
     amount: 1200,
     interval: 'month',
@@ -33,7 +35,7 @@ export const HARDCODED_LEGACY_PRICES: readonly LegacyPriceDefinition[] = [
   },
   {
     // Pre-rebrand Standard monthly (Dec 2025 .env.example)
-    priceId: 'price_1Sde6QRSmm9B6YB5F8V7suAG',
+    priceId: LEGACY_STRIPE_PRICE_IDS.standardMonthly,
     plan: 'pro',
     amount: 2000,
     interval: 'month',
@@ -41,7 +43,7 @@ export const HARDCODED_LEGACY_PRICES: readonly LegacyPriceDefinition[] = [
   },
   {
     // Pre-rebrand Standard yearly (Dec 2025 .env.example)
-    priceId: 'price_1Sde6iRSmm9B6YB5PSxXPVdy',
+    priceId: LEGACY_STRIPE_PRICE_IDS.standardYearly,
     plan: 'pro',
     amount: 19200,
     interval: 'year',
@@ -50,7 +52,7 @@ export const HARDCODED_LEGACY_PRICES: readonly LegacyPriceDefinition[] = [
   {
     // Artist Presence $199/month limited-access price (JOV-6257, live).
     // Retired from checkout 2026-10-20 when Pro became $12/month self-serve.
-    priceId: 'price_1UFL1xAAI1NrDqJS0eIWHFMn',
+    priceId: LEGACY_STRIPE_PRICE_IDS.artistPresenceLimitedMonthly,
     plan: 'pro',
     amount: 19900,
     interval: 'month',
@@ -58,7 +60,7 @@ export const HARDCODED_LEGACY_PRICES: readonly LegacyPriceDefinition[] = [
   },
   {
     // Same retired $199 offer in the Stripe test account (JOV-6218).
-    priceId: 'price_1UEyImASl9B9udHv1kDNLG8C',
+    priceId: LEGACY_STRIPE_PRICE_IDS.artistPresenceLimitedTestMonthly,
     plan: 'pro',
     amount: 19900,
     interval: 'month',

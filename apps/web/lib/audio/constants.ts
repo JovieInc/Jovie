@@ -4,6 +4,7 @@ import {
   isSupportedAudioFile,
   SUPPORTED_AUDIO_FORMAT_LABELS,
 } from '@jovie/audio-contracts';
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 
 export type {
   AudioFileDescriptor,
@@ -141,5 +142,5 @@ export function parseAudioTitleFromFileName(fileName: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 
-  return normalized.length > 0 ? normalized : 'Untitled track';
+  return normalized.length > 0 ? normalized : COPY_FALLBACKS.track;
 }

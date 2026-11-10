@@ -1,0 +1,4 @@
+{
+  "schema": "pen-token-parity-baseline/v1",
+  "allowed": ["incomplete-export"]
+}

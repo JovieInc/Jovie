@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ComponentPropsWithoutRef, forwardRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -72,6 +72,24 @@ function fakeRelease(
 }
 
 describe('ShellReleaseRow audio affordance', () => {
+  it('renders multi-artist credits through the canonical conjunction formatter', () => {
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r-credits',
+          title: 'Neon Hearts',
+          artistNames: ['Vigel', 'Tim White'],
+        })}
+        isSelected={false}
+        onSelect={vi.fn()}
+      />
+    );
+
+    // ds-cert:credit-format: the release row never joins artist names
+    // locally — "Vigel and Tim White", matching the release drawer.
+    expect(screen.getByText('Vigel and Tim White')).toBeInTheDocument();
+  });
+
   it('opens the smart link without prefetching or selecting the row', async () => {
     const onSelect = vi.fn();
     render(
@@ -105,7 +123,15 @@ describe('ShellReleaseRow audio affordance', () => {
     );
 
     const row = container.querySelector('[data-shell-release-row]');
-    expect(row).toHaveAttribute('aria-selected', 'true');
+    // Rows ARE native list items inside `role="list"` (implicit listitem —
+    // no explicit role, no wrapper element): an ARIA `option` cannot contain
+    // the row's real controls (axe nested-interactive), so selection stays
+    // visual (`data-selected` + selected tokens), not `aria-selected`.
+    expect(row?.tagName).toBe('LI');
+    expect(row).not.toHaveAttribute('role');
+    // name-from-author: the row announces its release title.
+    expect(row).toHaveAttribute('aria-label', 'Lost in the Light');
+    expect(row).not.toHaveAttribute('aria-selected');
     expect(row).toHaveAttribute('data-selected', 'true');
     expect(row?.className).toContain('system-b-table-row-selected');
     expect(row?.className).toContain('system-b-table-row-focus-visible');
@@ -132,7 +158,7 @@ describe('ShellReleaseRow audio affordance', () => {
     });
 
     expect(row?.className).toContain('system-b-table-row-shell');
-    expect(row?.className).toContain('h-14');
+    expect(row?.className).toContain('h-8');
     expect(slot).toHaveClass('system-b-table-contextual-action');
     expect(slot.className).not.toContain('group-hover/row');
     expect(trigger.className).not.toContain('group-hover/row');
@@ -159,6 +185,26 @@ describe('ShellReleaseRow audio affordance', () => {
       'leading-[1.2]'
     );
     expect(screen.getByText('Bahamas').className).toContain('text-2xs');
+  });
+
+  it('keeps the title target at the 24px WCAG 2.5.8 floor in the dense row', () => {
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r-target-size',
+          title: 'Lost in the Light',
+          previewUrl: null,
+        })}
+        isSelected={false}
+        onSelect={() => undefined}
+      />
+    );
+
+    // The h-8 dense row renders the title as the EntityHoverLink button;
+    // axe target-size (WCAG 2.2 AA, not allowlistable) measures its box.
+    expect(screen.getByText('Lost in the Light').className).toContain(
+      'min-h-6'
+    );
   });
 
   it('omits the play overlay when the release has no preview URL', () => {
@@ -338,6 +384,62 @@ describe('ShellReleaseRow audio affordance', () => {
   });
 });
 
+describe('ShellReleaseRow DSP interaction', () => {
+  it.each(['pointer', 'Enter', 'Space'] as const)(
+    'keeps %s activation on the DSP trigger separate from row selection',
+    async activation => {
+      const user = userEvent.setup();
+      const onSelect = vi.fn();
+      render(
+        <ul>
+          <ShellReleaseRow
+            release={fakeRelease({
+              id: 'r-dsp',
+              title: 'Distribution Details',
+            })}
+            isSelected={false}
+            onSelect={onSelect}
+          />
+        </ul>
+      );
+
+      const trigger = screen.getByRole('button', {
+        name: /^View DSP Distribution Details/i,
+      });
+      const row = screen.getByRole('listitem', {
+        name: 'Distribution Details',
+      });
+      const key = activation === 'Enter' ? '{Enter}' : ' ';
+
+      if (activation === 'pointer') {
+        await user.click(trigger);
+      } else {
+        act(() => trigger.focus());
+        await user.keyboard(key);
+      }
+
+      const details = screen.getByRole('dialog', {
+        name: 'DSP Distribution Details',
+      });
+      expect(details).toHaveFocus();
+      expect(onSelect).not.toHaveBeenCalled();
+
+      await user.click(screen.getByText('Spotify'));
+      act(() => details.focus());
+      await user.keyboard('{Enter} ');
+      expect(onSelect).not.toHaveBeenCalled();
+
+      if (activation === 'pointer') {
+        await user.click(row);
+      } else {
+        act(() => row.focus());
+        await user.keyboard(key);
+      }
+      expect(onSelect).toHaveBeenCalledTimes(1);
+    }
+  );
+});
+
 describe('ShellReleaseRow enrichment', () => {
   it('renders a release-type badge derived from real release data', () => {
     render(
@@ -436,7 +538,7 @@ describe('ShellReleaseRow enrichment', () => {
       />
     );
     const idleRow = idle.container.querySelector('[data-shell-release-row]');
-    expect(idleRow?.className).toContain('h-14');
+    expect(idleRow?.className).toContain('h-8');
     idle.unmount();
 
     const syncing = render(
@@ -453,7 +555,7 @@ describe('ShellReleaseRow enrichment', () => {
     // Same fixed row height token in both states — the sync chrome lives
     // inside the existing single-line subtitle and an absolutely-positioned
     // pulse, so adding it cannot reflow the row.
-    expect(syncingRow?.className).toContain('h-14');
+    expect(syncingRow?.className).toContain('h-8');
   });
 });
 

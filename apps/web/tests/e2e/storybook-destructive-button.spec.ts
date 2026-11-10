@@ -7,6 +7,7 @@ import {
   type TestInfo,
   test,
 } from '@playwright/test';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 
 const VIEWPORTS = [
   { width: 390, height: 844 },
@@ -69,7 +70,7 @@ for (const theme of ['light', 'dark'] as const) {
       const evidence = await audit(page, confirm);
       const result = await new AxeBuilder({ page })
         .include('[role="alertdialog"]')
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .options(wcag22AaAxeOptions())
         .analyze();
       expect(result.violations).toEqual([]);
       await attachJson(testInfo, 'contrast.json', evidence);
@@ -123,7 +124,7 @@ for (const theme of ['light', 'dark'] as const) {
       // the audit to verify that Axe still recognizes their disabled state.
       const result = await new AxeBuilder({ page })
         .include('[data-destructive="true"]')
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .options(wcag22AaAxeOptions())
         .analyze();
       expect(result.violations).toEqual([]);
     }

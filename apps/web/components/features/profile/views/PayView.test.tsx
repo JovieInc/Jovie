@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { PayView } from './PayView';
 
 vi.mock('@/components/feedback', () => ({
@@ -25,17 +26,52 @@ describe('PayView', () => {
       ok: true,
       json: async () => ({ available: false }),
     });
-    render(<PayView {...props} />);
+    const { container } = render(<PayView {...props} />);
     expect(
       await screen.findByRole('button', { name: 'Continue with Venmo' })
     ).toBeInTheDocument();
+    // Plain, specific hint: the amount to send, not an instruction to retype.
+    expect(screen.getByText(/^Send \$\d+ in Venmo\.$/)).toBeInTheDocument();
     expect(
-      screen.getByText('Enter the amount in Venmo before sending.')
-    ).toBeInTheDocument();
+      screen.queryByText(/Enter the amount in Venmo/)
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('group', { name: 'Choose a payment method' })
     ).toBeInTheDocument();
     expect(screen.queryByText('Apple Pay / Card')).not.toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps Venmo when the checkout lookup fails', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: 'Checkout temporarily unavailable' }),
+    });
+    const { container } = render(<PayView {...props} />);
+    expect(
+      await screen.findByRole('button', { name: 'Continue with Venmo' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Apple Pay / Card')).not.toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('says plainly when the lookup fails and the Venmo link is broken', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValue(new TypeError('Failed to fetch'));
+    globalThis.fetch = fetchMock;
+    const { container } = render(
+      <PayView
+        {...props}
+        venmoLink='https://venmo-payments.example.net/artist'
+      />
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(
+      screen.getByText('Payments are not available for this artist yet.')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 
   it('offers eligible Stripe checkout without creating a session on selection', async () => {
@@ -53,17 +89,17 @@ describe('PayView', () => {
     });
     globalThis.fetch = fetchMock;
     render(<PayView {...props} profileId={undefined} />);
-    await screen.findByRole('button', { name: 'Select Venmo' });
+    await screen.findByRole('option', { name: 'Venmo' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/tips/create-checkout?handle=artist',
       expect.objectContaining({ cache: 'no-store' })
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Select Venmo' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Venmo' }));
     expect(fetchMock).toHaveBeenCalledTimes(1);
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Select Apple Pay / Card' })
+      await screen.findByRole('option', { name: 'Apple Pay / Card' })
     );
     fireEvent.click(
       await screen.findByRole('button', {

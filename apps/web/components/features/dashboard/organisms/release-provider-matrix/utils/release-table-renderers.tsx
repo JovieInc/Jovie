@@ -38,12 +38,13 @@ export function createReleaseCellRenderer(
           <ArtworkThumb
             src={row.original.artworkUrl ?? ''}
             title={row.original.title}
-            size={34}
+            size={20}
           />
           <ReleaseCell
             release={row.original}
             artistName={artistName}
             showType={false}
+            artistPlacement='inline'
             onSelect={onOpen}
           />
         </div>
@@ -91,12 +92,13 @@ export function createExpandableReleaseCellRenderer(
             <ArtworkThumb
               src={release.artworkUrl ?? ''}
               title={release.title}
-              size={34}
+              size={20}
             />
             <ReleaseCell
               release={release}
               artistName={artistName}
               showType={false}
+              artistPlacement='inline'
               onSelect={onOpen}
             />
           </div>

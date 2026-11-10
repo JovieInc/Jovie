@@ -137,6 +137,16 @@ export {
   type EntityHeaderThumbnailVariant,
 } from './EntityHeader';
 export {
+  EntityRail,
+  type EntityRailProperty,
+  type EntityRailProps,
+} from './EntityRail';
+export {
+  EntityRailActivityFeed,
+  type EntityRailActivityFeedProps,
+  type EntityRailActivityItem,
+} from './EntityRailActivityFeed';
+export {
   EntitySidebarShell,
   type EntitySidebarShellProps,
 } from './EntitySidebarShell';
@@ -145,8 +155,22 @@ export {
   type EntityTabbedRailProps,
 } from './EntityTabbedRail';
 export {
+  ENTITY_RAIL_ENTITY_TABLE,
+  type EntityRailEntityConfig,
+  type EntityRailEntityType,
+  type EntityRailStat,
+  type EntityRailTab,
+  RAIL_WIDTH,
+  RAIL_WIDTH_WIDE,
+} from './entityRailConfig';
+export {
   ShareableLinkRow,
   type ShareableLinkRowProps,
 } from './ShareableLinkRow';
 export { SidebarLinkRow, type SidebarLinkRowProps } from './SidebarLinkRow';
+export {
+  type EntityRailStatValue,
+  StatRow,
+  type StatRowProps,
+} from './StatRow';
 export { StatTile, type StatTileProps } from './StatTile';

@@ -46,7 +46,7 @@ describe('locked Pen marketing chrome (JOV-6179)', () => {
     expect(headerCss).toContain('min-width: 2.75rem');
     expect(headerCss).toContain('outline: 2px solid var(--noir-ion-ion)');
     expect(headerCss).toContain('var(--space-2-5)');
-    expect(headerCss).toContain('var(--space-6)');
+    expect(headerCss).toContain('var(--ds-public-gutter)');
     expect(header).toContain("? 'sm'");
     const primaryAuthLink = headerNav.match(
       /function HeaderPrimaryAuthLink\([\s\S]*?(?=function GlassAuthActions)/

@@ -210,9 +210,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
 
   it('rejects stale product names, versions, destinations, locales, and disabled-feature screenshot claims', () => {
     const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.presence');
-    const current = readProductReferenceOwner().getProductProjection({
-      PROFILES_WORKSPACE: true,
-    });
+    const current = readProductReferenceOwner().getProductProjection({});
     const proof = { ...validExternalProof(screen), productReferences: current };
     const errors = candidate =>
       evaluateScreenProof(candidate, { screen, headSha: HEAD }).filter(
@@ -238,12 +236,6 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         snapshot.features[0].destination = '/app/profiles';
       },
       snapshot => {
-        snapshot.flags.PROFILES_WORKSPACE = false;
-      },
-      snapshot => {
-        delete snapshot.flags.PROFILES_WORKSPACE;
-      },
-      snapshot => {
         snapshot.features = [];
       },
     ]) {
@@ -258,6 +250,32 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       'coherent labels do not grant artifact trust'
     );
   });
+  it('registers each profile representation without borrowing canonical profile proof', () => {
+    const routes = ['alerts', 'notifications', 'shop'];
+    const paths = routes.map(
+      route => `apps/web/app/[username]/${route}/page.tsx`
+    );
+    for (const [index, path] of paths.entries()) {
+      const classified = classifyScreenPath(path);
+      assert.equal(classified.kind, 'registered');
+      assert.equal(classified.entry.id, `web.public-profile-${routes[index]}`);
+      assert.equal(classified.entry.owner, 'public-profile');
+      assert.deepEqual(classified.entry.viewports, ['desktop', 'mobile']);
+    }
+    const result = evaluateChangedScreens({
+      changedFiles: paths,
+      headSha: HEAD,
+      requireExternalEvidence: true,
+    });
+    assert.deepEqual(
+      result.issues,
+      routes.map(
+        route => `missing exact-head proof for web.public-profile-${route}`
+      )
+    );
+    assert.deepEqual(result.excludedChanges, []);
+  });
+
   it('registers integrations while requiring separate public and operator proofs', () => {
     for (const [path, id] of [
       [
@@ -424,20 +442,20 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     );
   });
 
-  it('registers provider-host layouts that ship with start and public profile', () => {
+  it('registers live provider-host layouts and retires the deleted start loading screen', () => {
     assert.equal(
       kindOf('apps/web/app/(dynamic)/start/layout.tsx'),
       'registered'
     );
     assert.equal(
       kindOf('apps/web/app/(dynamic)/start/loading.tsx'),
-      'registered'
+      'unregistered'
     );
     assert.equal(kindOf('apps/web/app/[username]/layout.tsx'), 'registered');
     const result = evaluateChangedScreens({
       changedFiles: [
         { path: 'apps/web/app/(dynamic)/start/layout.tsx', status: 'M' },
-        { path: 'apps/web/app/(dynamic)/start/loading.tsx', status: 'M' },
+        { path: 'apps/web/app/(dynamic)/start/loading.tsx', status: 'D' },
         { path: 'apps/web/app/[username]/layout.tsx', status: 'M' },
       ],
       headSha: HEAD,
@@ -448,6 +466,35 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       'web.public-profile',
       'web.start',
     ]);
+    assert.deepEqual(result.removedScreens, [
+      'apps/web/app/(dynamic)/start/loading.tsx',
+    ]);
+    const missingProof = evaluateChangedScreens({
+      changedFiles: [
+        { path: 'apps/web/app/(dynamic)/start/layout.tsx', status: 'M' },
+        { path: 'apps/web/app/[username]/layout.tsx', status: 'M' },
+      ],
+      headSha: HEAD,
+      proofs: [],
+      requireExternalEvidence: true,
+    });
+    assert.deepEqual(missingProof.issues, [
+      'missing exact-head proof for web.start',
+      'missing exact-head proof for web.public-profile',
+    ]);
+    for (const status of ['A', 'M']) {
+      const reintroduced = evaluateChangedScreens({
+        changedFiles: [
+          { path: 'apps/web/app/(dynamic)/start/loading.tsx', status },
+        ],
+        headSha: HEAD,
+        proofs: [],
+        requireExternalEvidence: true,
+      });
+      assert.deepEqual(reintroduced.issues, [
+        'missing registration for changed in-scope screen apps/web/app/(dynamic)/start/loading.tsx',
+      ]);
+    }
   });
 
   it('registers the artist pay page when that screen changes', () => {
@@ -470,6 +517,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
   it('registers every founder cockpit route for changed-surface certification', () => {
     const sources = [
       'apps/web/app/app/(shell)/admin/activity/page.tsx',
+      'apps/web/app/app/(shell)/admin/activity/loading.tsx',
       'apps/web/app/app/(shell)/admin/growth/page.tsx',
       'apps/web/app/app/(shell)/admin/operations/page.tsx',
       'apps/web/app/app/(shell)/admin/product/page.tsx',
@@ -485,7 +533,21 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       sources,
       viewports: ['desktop', 'mobile'],
     });
-    for (const source of sources) assert.equal(kindOf(source), 'registered');
+    for (const source of sources) {
+      assert.equal(kindOf(source), 'registered');
+      const result = evaluateChangedScreens({
+        changedFiles: [{ path: source, status: 'M' }],
+        headSha: HEAD,
+      });
+      assert.deepEqual(result.issues, []);
+      assert.deepEqual(result.changedScreens, [
+        {
+          id: 'web.ov-founder-cockpit',
+          verdict: 'evidence-required',
+          findings: [],
+        },
+      ]);
+    }
   });
 
   it('registers the public artists directory for changed-surface certification', () => {
@@ -1207,13 +1269,15 @@ if (p.endsWith('/zip')) {
       'utf8'
     );
     // These screens were registered but uncovered (no rendered producer).
-    // Two bind to already-captured marketing routes; the rest share one
-    // multi-screen proof spec whose entries must match these bindings.
-    assert.equal(SCREEN_MARKETING_ROUTES['web.marketing-renders'], '/renders');
-    assert.equal(
-      SCREEN_MARKETING_ROUTES['web.profile-admission'],
-      '/renders/profile-admission'
-    );
+    // They all share one multi-screen proof spec whose entries must match
+    // these bindings. web.marketing-renders and web.profile-admission are
+    // intentionally NOT marketing-bound: /renders* are render-fixture routes
+    // excluded from MARKETING_EXACT_PUBLIC_ROUTE_TARGETS, so the shared
+    // marketing artifact can never carry their evidence (binding them made
+    // every certification invocation reject that artifact — JOV-INV-018
+    // incident 2026-10-30, run 41106813919).
+    assert.equal(SCREEN_MARKETING_ROUTES['web.marketing-renders'], undefined);
+    assert.equal(SCREEN_MARKETING_ROUTES['web.profile-admission'], undefined);
     const batchScreens = [
       'web.root-document',
       'web.root-layout',
@@ -1762,10 +1826,8 @@ if (p.endsWith('/zip')) {
         producerRunAttempt: 3,
         producerJobId: 99,
         environment: 'local-production-build',
-        sourcePaths: [
-          'apps/web/app/(home)/page.tsx',
-          'apps/web/app/(home)/layout.tsx',
-        ],
+        // The producer emits the registered screen sources (screen-proof-emit).
+        sourcePaths: [...home().sources],
         capturedAt: iso(-60_000),
         artifactDigest: `sha256:${'0'.repeat(64)}`,
         activeFlow: { disclosure: false },
@@ -2067,7 +2129,7 @@ if (p.endsWith('/zip')) {
       assert.equal(wrongName.receipt.certified, false);
       assert.match(
         wrongName.receipt.issues.join('\n'),
-        /artifact run, workflow, or exact producer attempt is not trusted/
+        /exact producer attempt is not trusted; failed checks artifact name/
       );
     } finally {
       process.env.PATH = priorPath;
@@ -2333,10 +2395,8 @@ if (p.endsWith('/zip')) {
         producerRunAttempt: 3,
         producerJobId: 99,
         environment: 'local-production-build',
-        sourcePaths: [
-          'apps/web/app/(home)/page.tsx',
-          'apps/web/app/(home)/layout.tsx',
-        ],
+        // The producer emits the registered screen sources (screen-proof-emit).
+        sourcePaths: [...home().sources],
         capturedAt: iso(-60_000),
         artifactDigest: `sha256:${'0'.repeat(64)}`,
         activeFlow: { disclosure: false },
@@ -2643,10 +2703,7 @@ if (p.endsWith('/zip')) {
         context: {
           headSha: head,
           screenId: 'web.homepage',
-          sourcePaths: [
-            'apps/web/app/(home)/page.tsx',
-            'apps/web/app/(home)/layout.tsx',
-          ],
+          sourcePaths: [...home().sources],
           viewports: home().viewports,
           marketingRoute: '/',
         },
@@ -3715,6 +3772,20 @@ if (p.endsWith('/zip')) {
     );
   });
 
+  it('registers the YouTube thumbnails billing screens independently', () => {
+    assert.equal(
+      classifyScreenPath('apps/web/app/billing/youtube-thumbnails/page.tsx')
+        .entry?.id,
+      'web.billing-youtube-thumbnails'
+    );
+    assert.equal(
+      classifyScreenPath(
+        'apps/web/app/billing/youtube-thumbnails/success/page.tsx'
+      ).entry?.id,
+      'web.billing-youtube-thumbnails-success'
+    );
+  });
+
   it('registers the waitlist error boundary with the waitlist screen', () => {
     const result = evaluateChangedScreens({
       changedFiles: [{ path: 'apps/web/app/waitlist/error.tsx', status: 'M' }],
@@ -3807,10 +3878,13 @@ if (p.endsWith('/zip')) {
       sources: [source],
       viewports: ['desktop', 'mobile'],
     });
-    assert.equal(
-      SCREEN_MARKETING_ROUTES['web.engineering-preview'],
-      '/engineering/preview'
-    );
+    // NOT marketing-bound: /engineering/preview is production-blocked and
+    // noindex, so it renders not-found in this workflow's production build
+    // and MARKETING_EXACT_PUBLIC_ROUTE_TARGETS excludes it. Binding it made
+    // every certification invocation reject the shared marketing artifact
+    // (JOV-INV-018 incident 2026-10-30, run 41106813919) instead of the
+    // honest "missing exact-head proof" for this screen.
+    assert.equal(SCREEN_MARKETING_ROUTES['web.engineering-preview'], undefined);
 
     const result = evaluateChangedScreens({
       changedFiles: [
@@ -4007,6 +4081,7 @@ if (p.endsWith('/zip')) {
   it('registers the marketing pricing page for changed-surface certification', () => {
     const source = 'apps/web/app/(marketing)/pricing/page.tsx';
     const layoutSource = 'apps/web/app/(marketing)/pricing/layout.tsx';
+    const loadingSource = 'apps/web/app/(marketing)/pricing/loading.tsx';
     const screen = SCREEN_REGISTRY.find(
       entry => entry.id === 'web.marketing-pricing'
     );
@@ -4015,9 +4090,15 @@ if (p.endsWith('/zip')) {
       id: 'web.marketing-pricing',
       platform: 'web',
       owner: 'marketing-pricing',
-      sources: [source, layoutSource],
+      sources: [source, layoutSource, loadingSource],
       viewports: ['desktop', 'mobile'],
     });
+
+    const loadingResult = evaluateChangedScreens({
+      changedFiles: [{ path: loadingSource, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(loadingResult.issues, []);
 
     const result = evaluateChangedScreens({
       changedFiles: [{ path: source, status: 'M' }],
@@ -4222,6 +4303,34 @@ if (p.endsWith('/zip')) {
     ]);
   });
 
+  it('registers the app shell root loading boundary for changed-surface certification', () => {
+    const source = 'apps/web/app/app/loading.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.app-loading'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.app-loading',
+      platform: 'web',
+      owner: 'app-shell',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.app-loading',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
   it('registers the app shell root not-found page for changed-surface certification', () => {
     const source = 'apps/web/app/app/not-found.tsx';
     const screen = SCREEN_REGISTRY.find(
@@ -4305,6 +4414,27 @@ if (p.endsWith('/zip')) {
     });
     assert.deepEqual(result.issues, []);
     assert.ok(result.excludedChanges.length >= 4);
+  });
+
+  it('registers the existing sounds page and still requires exact-head rendered evidence', () => {
+    const changedFiles = ['apps/web/app/[username]/[slug]/sounds/page.tsx'];
+    const registration = evaluateChangedScreens({
+      changedFiles,
+      headSha: HEAD,
+    });
+    assert.deepEqual(registration.issues, []);
+    assert.deepEqual(
+      registration.changedScreens.map(screen => screen.id),
+      ['web.smartlink-sounds']
+    );
+    const certification = evaluateChangedScreens({
+      changedFiles,
+      headSha: HEAD,
+      requireExternalEvidence: true,
+    });
+    assert.deepEqual(certification.issues, [
+      'missing exact-head proof for web.smartlink-sounds',
+    ]);
   });
 
   it('rejects missing registration for a changed in-scope screen', () => {

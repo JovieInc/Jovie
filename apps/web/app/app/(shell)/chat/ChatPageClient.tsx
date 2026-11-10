@@ -158,6 +158,9 @@ export function ChatProfileFallback({
         <div className='flex h-full items-center justify-center p-6'>
           <ContentSurfaceCard className='max-w-sm'>
             <div className='flex flex-col items-center gap-3 px-6 py-8 text-center'>
+              <p className='sr-only' role='status'>
+                Loading your profile…
+              </p>
               <div
                 className='h-8 w-8 rounded-full skeleton motion-reduce:animate-none'
                 aria-hidden='true'
@@ -201,6 +204,9 @@ export function ChatProfileFallback({
       <div className='flex h-full items-center justify-center p-6'>
         <ContentSurfaceCard className='max-w-sm'>
           <div className='flex flex-col items-center gap-3 px-6 py-8 text-center'>
+            <p className='sr-only' role='status'>
+              Finishing your dashboard setup…
+            </p>
             <div
               className='h-8 w-8 rounded-full skeleton motion-reduce:animate-none'
               aria-hidden='true'
@@ -518,11 +524,20 @@ export function ChatPageClient({
     [searchParams]
   );
 
-  // Auto-open the profile drawer when redirected from /dashboard/profile (?panel=profile)
+  // Auto-open the profile drawer when redirected from /dashboard/profile
+  // (?panel=profile). Below lg the rail presents as a full-screen modal
+  // sheet, so the deep link only auto-opens where the desktop overlay rail
+  // fits; on mobile the rail stays closed until its next explicit action
+  // (the closed-by-default chat contract, JOV-7150). Live matchMedia, not
+  // the breakpoint hook: the hook's server snapshot is false through
+  // hydration and would drop a desktop deep link entirely.
   useEffect(() => {
     if (!enablePreviewPanel) return;
     if (panelParam === 'profile') {
-      openPreviewPanel();
+      const desktop =
+        typeof globalThis.matchMedia === 'function' &&
+        globalThis.matchMedia('(min-width: 1024px)').matches;
+      if (desktop) openPreviewPanel();
     }
   }, [enablePreviewPanel, openPreviewPanel, panelParam]);
 

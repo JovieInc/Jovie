@@ -2,6 +2,7 @@ import { writeFile } from 'node:fs/promises';
 import { expect, type Page, type TestInfo, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
+import { readPaneGeometry } from './utils/settings-profile-pane-geometry';
 
 test.use({
   storageState: { cookies: [], origins: [] },
@@ -31,116 +32,39 @@ async function enterProfileSettings(page: Page, desktop = true) {
   );
 }
 
-async function readPaneGeometry(page: Page) {
-  return page.evaluate(() => {
-    const visible = (selector: string) =>
-      [...document.querySelectorAll<HTMLElement>(selector)].filter(element => {
-        const box = element.getBoundingClientRect();
-        const style = getComputedStyle(element);
-        return (
-          box.width > 0 &&
-          box.height > 0 &&
-          style.display !== 'none' &&
-          style.visibility !== 'hidden' &&
-          Number(style.opacity) > 0 &&
-          !element.closest('[hidden], [inert], [aria-hidden="true"]')
-        );
-      });
-    const selectors = {
-      route: '[data-testid="app-shell-scroll"]',
-      pane: '[data-testid="settings-shell-content"]',
-      column: '[data-settings-layout-column="true"]',
-      field: '#displayName',
-      rail: '#shell-artist-profile-rail',
-    };
-    const elements = Object.fromEntries(
-      Object.entries(selectors).map(([name, selector]) => [
-        name,
-        visible(selector),
-      ])
-    );
-    const counts = Object.fromEntries(
-      Object.entries(elements).map(([name, matches]) => [name, matches.length])
-    );
-    if (Object.values(counts).some(count => count !== 1)) {
-      return { counts, geometry: null };
-    }
-    const box = (element: HTMLElement) => {
-      const rect = element.getBoundingClientRect();
-      return { left: rect.left, right: rect.right, width: rect.width };
-    };
-    const route = box(elements.route[0]);
-    const pane = box(elements.pane[0]);
-    const column = box(elements.column[0]);
-    const field = box(elements.field[0]);
-    const rail = box(elements.rail[0]);
-    // The overlay's painted/hit-test allocation is independent of the route
-    // pane marker. A narrowed empty marker cannot certify an overflowing form.
-    const railMount = elements.rail[0].closest<HTMLElement>(
-      '.shell-inspector-overlay'
-    );
-    if (!railMount) return { counts, geometry: null };
-    const occupiedRail = box(railMount);
-    const fieldRect = elements.field[0].getBoundingClientRect();
-    const hit = document.elementFromPoint(
-      fieldRect.left + fieldRect.width / 2,
-      fieldRect.top + fieldRect.height / 2
-    );
-    return {
-      counts,
-      geometry: {
-        route,
-        pane,
-        column,
-        field,
-        rail,
-        occupiedRail,
-        relationships: {
-          routeContainsPane: elements.route[0].contains(elements.pane[0]),
-          paneContainsColumn: elements.pane[0].contains(elements.column[0]),
-          columnContainsField: elements.column[0].contains(elements.field[0]),
-          sameShell:
-            railMount.closest('[data-app-shell-main-content="true"]') ===
-            elements.route[0].closest('[data-app-shell-main-content="true"]'),
-          fieldHit:
-            hit === elements.field[0] || elements.field[0].contains(hit),
-        },
-        columnOverflow:
-          elements.column[0].scrollWidth - elements.column[0].clientWidth,
-        paneOverflow:
-          elements.pane[0].scrollWidth - elements.pane[0].clientWidth,
-        overflowingElements: [
-          ...elements.column[0].querySelectorAll<HTMLElement>('*'),
-        ]
-          .filter(element => {
-            const rect = element.getBoundingClientRect();
-            const style = getComputedStyle(element);
-            return (
-              rect.width > 0 &&
-              rect.height > 0 &&
-              style.visibility !== 'hidden' &&
-              (rect.right > column.right + 1 || rect.left < column.left - 1)
-            );
-          })
-          .slice(0, 30)
-          .map(element => {
-            const rect = element.getBoundingClientRect();
-            return {
-              tag: element.tagName,
-              id: element.id,
-              className: element.className,
-              left: rect.left,
-              right: rect.right,
-              width: rect.width,
-            };
-          }),
-        centerDelta: Math.abs(
-          (column.left + column.right - pane.left - pane.right) / 2
+/** Bounded idle-window sampler. `page.evaluate` has no deadline, so an
+ * unbounded rAF await here turns any renderer-side frame starvation into an
+ * opaque 180s test timeout at the test declaration; the in-page timer turns
+ * the same stall into a named 15s failure instead. */
+async function sampleIdleFrames(
+  page: Page,
+  frameBudget: number
+): Promise<void> {
+  await page.evaluate(
+    budget =>
+      Promise.race([
+        new Promise<void>(resolve => {
+          let frames = 0;
+          const sample = () => {
+            if (++frames >= budget) resolve();
+            else requestAnimationFrame(sample);
+          };
+          requestAnimationFrame(sample);
+        }),
+        new Promise((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  `renderer stopped servicing animation frames during the ${budget}-frame idle sample`
+                )
+              ),
+            15_000
+          )
         ),
-        pageOverflow: document.documentElement.scrollWidth - window.innerWidth,
-      },
-    };
-  });
+      ]),
+    frameBudget
+  );
 }
 
 async function assertOpenPane(page: Page, testInfo: TestInfo, name: string) {
@@ -149,7 +73,7 @@ async function assertOpenPane(page: Page, testInfo: TestInfo, name: string) {
   const samples = [];
   for (let frame = 0; frame < 12; frame += 1) {
     samples.push(await readPaneGeometry(page));
-    await page.evaluate(() => new Promise(requestAnimationFrame));
+    await sampleIdleFrames(page, 1);
   }
   const result = samples.at(-1)!;
   const geometryPath = testInfo.outputPath(`${name}.json`);
@@ -208,6 +132,10 @@ async function assertOpenPane(page: Page, testInfo: TestInfo, name: string) {
   expect(geometry.occupiedRail.right).toBeGreaterThanOrEqual(
     geometry.route.right
   );
+  expect(
+    geometry.route.right,
+    'the open rail pushes the route; it never lays on top of it'
+  ).toBeLessThanOrEqual(geometry.rail.left + 1);
   expect(
     geometry.pane.right,
     'pane ends before occupied rail bounds'
@@ -272,17 +200,7 @@ async function assertReachable(page: Page) {
     scroll: element.closest('[data-testid="settings-shell-content"]')!
       .scrollTop,
   }));
-  await page.evaluate(
-    () =>
-      new Promise<void>(resolve => {
-        let frames = 0;
-        const sample = () => {
-          if (++frames >= 120) resolve();
-          else requestAnimationFrame(sample);
-        };
-        requestAnimationFrame(sample);
-      })
-  );
+  await sampleIdleFrames(page, 120);
   await expect(field).toBeFocused();
   expect(
     await field.evaluate((element: HTMLInputElement) => ({
@@ -343,17 +261,7 @@ async function assertMobileEditorAvailable(page: Page) {
   await expect(field).toBeFocused();
   // A ready document alone does not prove the opener's mount effect has run.
   // Keep the field focused through a bounded idle window and late renders.
-  await page.evaluate(
-    () =>
-      new Promise<void>(resolve => {
-        let frames = 0;
-        const sample = () => {
-          if (++frames >= 120) resolve();
-          else requestAnimationFrame(sample);
-        };
-        requestAnimationFrame(sample);
-      })
-  );
+  await sampleIdleFrames(page, 120);
   await expect(field).toBeFocused();
   await expect(
     page.getByRole('dialog', { name: 'Profile Preview' })
@@ -576,6 +484,28 @@ test('Account keeps its full pane after Profile navigation and browser history',
   await assertFullSettingsPane(page);
   await page.goBack({ waitUntil: 'domcontentloaded' });
   await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.SETTINGS_PROFILE}$`));
+  // Durable receipt for the Back leg: the exact observed rail lifecycle at
+  // assertion time. The phase the drawer is actually in (and whether the
+  // element exists at all) was the missing diagnostic in run 40027215925.
+  const backRailObserved = await page.evaluate(() => {
+    const element = document.querySelector('#shell-artist-profile-rail');
+    return {
+      present: element !== null,
+      railPhase: element?.getAttribute('data-rail-phase') ?? null,
+      ariaHidden: element?.getAttribute('aria-hidden') ?? null,
+      modalSheet:
+        element?.getAttribute('role') === 'dialog' &&
+        element?.getAttribute('aria-modal') === 'true',
+      // Guard-level receipts from lib/testing/runtime-trace (rail input
+      // flips + settles, in order) — names why the phase is stuck.
+      runtimeTrace:
+        (window as unknown as { __JOVIE_RUNTIME_TRACE__?: unknown })
+          .__JOVIE_RUNTIME_TRACE__ ?? null,
+    };
+  });
+  process.stdout.write(
+    `${JSON.stringify({ name: 'history-profile-rail', observed: backRailObserved })}\n`
+  );
   await expect(page.locator('#shell-artist-profile-rail')).toHaveAttribute(
     'data-rail-phase',
     'open'
@@ -602,17 +532,7 @@ test('manual preview control keeps its pointer target and restores rail focus', 
     before.x + before.width / 2,
     before.y + before.height / 2
   );
-  await page.evaluate(
-    () =>
-      new Promise<void>(resolve => {
-        let frames = 0;
-        const sample = () => {
-          if (++frames >= 60) resolve();
-          else requestAnimationFrame(sample);
-        };
-        requestAnimationFrame(sample);
-      })
-  );
+  await sampleIdleFrames(page, 60);
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(toggle).toHaveAttribute('data-rail-pinned', 'false');
   const after = (await toggle.boundingBox())!;

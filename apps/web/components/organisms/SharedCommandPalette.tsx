@@ -227,10 +227,10 @@ function CmdKPaletteRow({
         onCommit(index);
       }}
       chrome='shell'
-      density='standard'
+      density='dense'
       isSelected={isActive}
       interactive
-      className='flex w-full items-center gap-2 px-3 text-left'
+      className='flex h-8 w-full items-center gap-2 overflow-hidden px-3 py-0 text-left'
     >
       <RowVisual item={item} variant='dense' />
       <RowBody item={item} variant='dense' />
@@ -255,7 +255,13 @@ export function PaletteList({
 }: PaletteListProps) {
   if (sections.length === 0) {
     return (
-      <div className='px-3 py-6 text-center text-xs text-tertiary-token'>
+      <div
+        role='option'
+        tabIndex={-1}
+        aria-selected='false'
+        aria-disabled='true'
+        className='px-3 py-6 text-center text-xs text-tertiary-token'
+      >
         {emptyHint}
       </div>
     );

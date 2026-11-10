@@ -2,8 +2,6 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { and, asc, sql as drizzleSql, eq, exists } from 'drizzle-orm';
-import { unstable_cache } from 'next/cache';
-import { CACHE_TAGS } from '@/lib/cache/tags';
 import { db, withRetry } from '@/lib/db';
 import { QUERY_TIMEOUTS } from '@/lib/db/query-timeout';
 import { users } from '@/lib/db/schema/auth';
@@ -41,6 +39,7 @@ export interface ArtistsDirectoryCatalogProfile {
 export interface ArtistsDirectoryCatalogRow
   extends ArtistsDirectoryCatalogProfile {
   readonly isPublic?: boolean | null;
+  readonly settings?: unknown;
   readonly ownerEmail?: string | null;
   readonly handle?: string | null;
   readonly hasPublicRelease?: boolean | null;
@@ -121,6 +120,7 @@ function selectDirectoryRows() {
     .select({
       id: creatorProfiles.id,
       username: creatorProfiles.username,
+      settings: creatorProfiles.settings,
       displayName: creatorProfiles.displayName,
       avatarUrl: creatorProfiles.avatarUrl,
       bio: creatorProfiles.bio,
@@ -235,32 +235,14 @@ async function queryArtistsDirectoryCount(): Promise<number> {
   ).length;
 }
 
-const cachedArtistsDirectoryProfiles = unstable_cache(
-  queryArtistsDirectoryCatalog,
-  ['artists-directory-v3'],
-  {
-    revalidate: 3600,
-    tags: [CACHE_TAGS.ARTISTS_DIRECTORY, CACHE_TAGS.PUBLIC_PROFILE],
-  }
-);
-
-const cachedArtistsDirectoryCount = unstable_cache(
-  queryArtistsDirectoryCount,
-  ['artists-directory-count-v2'],
-  {
-    revalidate: 3600,
-    tags: [CACHE_TAGS.ARTISTS_DIRECTORY, CACHE_TAGS.PUBLIC_PROFILE],
-  }
-);
-
-// Keep transient failures outside the shared cache. A failed refresh can retain
-// the last good value, while a cold failure is retried on the next request.
+// Discovery consent is authoritative on every request. Never serve a previously
+// listed identity when storage is unavailable or an invalidation failed.
 export async function loadArtistsDirectoryProfiles(
   cursorParam?: string
 ): Promise<ArtistsDirectoryCatalogResult> {
   if (!process.env.DATABASE_URL) return { status: 'unavailable' };
   try {
-    return await cachedArtistsDirectoryProfiles(cursorParam);
+    return await queryArtistsDirectoryCatalog(cursorParam);
   } catch (error) {
     Sentry.captureException(error);
     return { status: 'unavailable' };
@@ -270,7 +252,7 @@ export async function loadArtistsDirectoryProfiles(
 export async function loadArtistsDirectoryCount(): Promise<number | null> {
   if (!process.env.DATABASE_URL) return null;
   try {
-    return await cachedArtistsDirectoryCount();
+    return await queryArtistsDirectoryCount();
   } catch (error) {
     Sentry.captureException(error);
     return null;

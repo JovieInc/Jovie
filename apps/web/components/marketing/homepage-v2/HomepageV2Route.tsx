@@ -244,7 +244,7 @@ export function HomepageV2Spotlight() {
       className='homepage-story-section relative overflow-hidden'
     >
       <MarketingContainer width='page'>
-        <div className='mx-auto grid max-w-6xl gap-10 lg:grid-cols-[minmax(16rem,0.36fr)_minmax(0,0.64fr)] lg:items-center xl:gap-16'>
+        <div className='grid gap-10 lg:grid-cols-[minmax(16rem,0.36fr)_minmax(0,0.64fr)] lg:items-center xl:gap-16'>
           <div className='homepage-v2-spotlight__copy lg:self-center'>
             <div className='homepage-v2-spotlight__copy'>
               <h2 className='homepage-story-heading homepage-v2-spotlight__heading line-clamp-2'>

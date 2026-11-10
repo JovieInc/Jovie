@@ -1,4 +1,4 @@
-import { globSync, readFileSync } from 'node:fs';
+import { existsSync, globSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -180,10 +180,6 @@ describe('surface elevation guardrails', () => {
       ),
       'utf-8'
     );
-    const onboardingLoading = readFileSync(
-      join(ROOT, 'app/onboarding/loading.tsx'),
-      'utf-8'
-    );
     const demoOnboarding = readFileSync(
       join(ROOT, 'components/features/demo/OnboardingDemoContent.tsx'),
       'utf-8'
@@ -194,8 +190,9 @@ describe('surface elevation guardrails', () => {
     );
 
     expect(onboardingForm).toContain('OnboardingExperienceShell');
-    expect(onboardingLoading).toContain('OnboardingExperienceShell');
-    expect(onboardingLoading).toContain("stageVariant='flat'");
+    // app/onboarding/loading.tsx is gone: /onboarding only redirects to
+    // /start, and its setup skeleton flashed before the checkout.
+    expect(existsSync(join(ROOT, 'app/onboarding/loading.tsx'))).toBe(false);
     expect(demoOnboarding).toContain('OnboardingExperienceShell');
     expect(demoOnboarding).toContain('OnboardingHandleStep');
     expect(demoOnboarding).toContain('OnboardingDspStep');
@@ -246,10 +243,10 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'app/app/(shell)/shell-route-matches.ts'),
       'utf-8'
     );
-    const appShellLayout = readFileSync(
-      join(ROOT, 'app/app/(shell)/layout.tsx'),
-      'utf-8'
-    );
+    // The shell boot fallback picks its route skeleton in shell-route-skeleton.
+    const appShellLayout = ['layout.tsx', 'shell-route-skeleton.tsx']
+      .map(file => readFileSync(join(ROOT, 'app/app/(shell)', file), 'utf-8'))
+      .join('\n');
 
     expect(tasksPage).toContain('WorkspacePage');
     expect(tasksPage).toContain("frame='none'");
@@ -258,7 +255,6 @@ describe('surface elevation guardrails', () => {
     expect(tasksPage).toContain('TaskDataTable');
     expect(tasksPage).not.toMatch(/<UnifiedTable\b/);
     expect(shellRouteMatches).toContain('isTasksShellRoute');
-    expect(appShellLayout).toContain('TasksRouteSkeleton');
     expect(appShellLayout).toContain('TasksRouteSkeleton');
   });
 
@@ -314,9 +310,12 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
 
-    expect(shellReleasesView).toContain('useRegisterHeaderSearch');
-    expect(shellReleasesView).toContain("key: 'shell-releases'");
-    expect(shellReleasesView).toContain('Filter Releases');
+    // JOV-8792: the header search adapter has no renderer since search moved
+    // to the command palette — registering one renders nothing. Keep views
+    // off the retired registration path.
+    expect(shellReleasesView).not.toContain('useRegisterHeaderSearch');
+    expect(shellReleasesView).not.toContain("key: 'shell-releases'");
+    expect(shellReleasesView).not.toContain('Filter Releases');
     expect(shellReleasesView).not.toMatch(
       /const\s*\[\s*searchOpen\s*,\s*setSearchOpen\s*\]\s*=\s*useState/
     );
@@ -372,14 +371,16 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'app/app/(shell)/library/LibrarySurface.tsx'),
       'utf-8'
     );
-    const appShellLayout = readFileSync(
-      join(ROOT, 'app/app/(shell)/layout.tsx'),
-      'utf-8'
-    );
+    // The shell boot fallback picks its route skeleton in shell-route-skeleton.
+    const appShellLayout = ['layout.tsx', 'shell-route-skeleton.tsx']
+      .map(file => readFileSync(join(ROOT, 'app/app/(shell)', file), 'utf-8'))
+      .join('\n');
 
-    expect(librarySurface).toContain('useRegisterHeaderSearch');
-    expect(librarySurface).toContain("key: 'library'");
-    expect(librarySurface).toContain('Filter Work');
+    // JOV-8792: the library keeps its own live filter pills; the retired
+    // header search adapter registration must stay gone.
+    expect(librarySurface).not.toContain('useRegisterHeaderSearch');
+    expect(librarySurface).not.toContain("key: 'library'");
+    expect(librarySurface).not.toContain('Filter Work');
     expect(librarySurface).not.toContain('OPEN_COMMAND_PALETTE_EVENT');
     expect(appShellLayout).toContain('isLibraryShellRoute');
     expect(appShellLayout).toContain('LibraryLoadingState');
@@ -398,16 +399,17 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
 
-    expect(tasksPageClient).toContain('useRegisterHeaderSearch');
-    expect(tasksPageClient).toContain("key: 'tasks'");
-    expect(tasksPageClient).toContain('Filter Tasks');
+    // JOV-8792: the header search adapter has no renderer since search moved
+    // to the command palette — registering one renders nothing.
+    expect(tasksPageClient).not.toContain('useRegisterHeaderSearch');
+    expect(tasksPageClient).not.toContain("key: 'tasks'");
+    expect(tasksPageClient).not.toContain('Filter Tasks');
     expect(tasksPageClient).not.toContain('HeaderSearchAction');
     expect(taskWorkspaceHeaderBar).not.toContain('HeaderSearchAction');
   });
 
   it('keeps task and preview cards off the shell canvas token', () => {
     const files = [
-      'components/features/dashboard/layout/PreviewPanel.tsx',
       'components/features/dashboard/organisms/ProfileEditPreviewCard.tsx',
       'components/features/dashboard/release-tasks/ReleaseTaskEmptyState.tsx',
       'components/features/dashboard/release-tasks/ReleaseTaskExplainerPopover.tsx',

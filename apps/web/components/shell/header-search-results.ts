@@ -1,4 +1,6 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
+import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 import type { ChatConversation } from '@/lib/queries/useChatConversationsQuery';
 
 export type HeaderSearchGroupKind = 'threads' | 'entities' | 'library-assets';
@@ -60,13 +62,13 @@ export function buildHeaderSearchGroups(
   const groups: HeaderSearchResultGroup[] = [];
   const threads = catalog.conversations
     .filter(conversation =>
-      includesQuery(query, conversation.title ?? 'Untitled chat')
+      includesQuery(query, conversation.title ?? COPY_FALLBACKS.conversation)
     )
     .slice(0, RESULT_LIMIT_PER_GROUP)
     .map(conversation => ({
       id: `thread:${conversation.id}`,
       kind: 'threads' as const,
-      label: conversation.title?.trim() || 'Untitled chat',
+      label: conversation.title?.trim() || COPY_FALLBACKS.conversation,
       description: 'Chat thread',
       href: `${APP_ROUTES.CHAT}/${encodeURIComponent(conversation.id)}`,
     }));
@@ -105,7 +107,8 @@ export function buildHeaderSearchGroups(
       id: `library:${release.id}`,
       kind: 'library-assets' as const,
       label: release.title,
-      description: release.artistNames?.join(', ') || 'Work release',
+      description:
+        formatReleaseArtistLine(release.artistNames) ?? 'Work release',
       href: release.smartLinkPath,
       provider: release.provider,
     }));

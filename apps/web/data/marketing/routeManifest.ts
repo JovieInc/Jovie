@@ -20,6 +20,7 @@ import {
   type ProductCapabilityId,
   ROUTE_CAPABILITY_BINDINGS,
 } from '@/data/product-truth/registry';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { isRenderFixturePathname } from '@/lib/render-fixture-policy';
 import type { ProposedSectionId } from './designGaps';
 import type { RecipeId } from './recipes';
@@ -291,36 +292,25 @@ export interface RouteManifestEntry {
  * Exemptions are sanctioned (carry linearId + approvedBy + prUrl) per DX2.
  * The baseline exemption count for the ratchet = current sanctioned count.
  */
+const EDITORIAL_HOME = 'apps/web/components/homepage/HomepageEditorial.tsx';
+
 export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   // ── Proven recipes ────────────────────────────────────────────────────────
   {
     glob: '(home)/page.tsx',
     recipeId: 'homepage',
     renderedSections: [
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageArtistProfile.tsx',
-        'hero',
-        'split-claim-card'
-      ),
-      // The unsupported adoption strip is intentionally omitted until it has
-      // an attributable permission or adoption receipt.
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageArtistProfile.tsx',
-        'product-gallery',
-        'profile-grid'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageArtistProfile.tsx',
-        'cta',
-        'final-single-claim'
-      ),
+      approvedVariantBinding(EDITORIAL_HOME, 'hero', 'left-none'),
+      approvedVariantBinding(EDITORIAL_HOME, 'feature-split', 'phone-right'),
+      approvedVariantBinding(EDITORIAL_HOME, 'product-gallery', 'release-rail'),
+      approvedVariantBinding(EDITORIAL_HOME, 'cta', 'final-single-claim'),
     ],
     bindingEvidence: {
       status: 'verified',
       source:
-        'EVENT 2026-10-20 artist-profile homepage (HomepageArtistProfile.tsx); homepage-contract render test; marketing-route-health observer on the reviewed head',
+        'Tim 2026-11-03 music-line homepage, invite-only close (HomepageEditorial.tsx); homepage-contract render test; marketing-route-health observer on the reviewed head',
       notes:
-        'One source owner for hero, product gallery, and the offer close. Deployment, visual certification, and Tim Taste remain separate receipts.',
+        'One source owner for the hero, the profile and releases chapters, and the invitation close. Deployment, visual certification, and Tim Taste remain separate receipts.',
     },
     status: 'active',
     specVersion: '1.4.0',
@@ -908,6 +898,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'split-claim-card'
       ),
       approvedVariantBinding(
+        'apps/web/components/marketing/ConnectedComponentsGallery.tsx',
+        'product-gallery',
+        'release-rail',
+        'connected-components'
+      ),
+      approvedVariantBinding(
         'apps/web/app/(marketing)/product/ProductLanding.tsx',
         'cta',
         'editorial-search'
@@ -929,6 +925,222 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
     healthCheck: {
       path: '/product',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
+    glob: '(marketing)/product/link-analytics/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/link-analytics/LinkAnalyticsLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'Link analytics ships on /product/link-analytics',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live smart-link analytics panel. Each click is counted, with the provider that received it and the time of the last click. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/link-analytics',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/features/link-analytics/LinkAnalyticsPanel.tsx',
+      testId: 'release-smart-link-analytics',
+    },
+    healthCheck: {
+      path: '/product/link-analytics',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
+    glob: '(marketing)/product/utm-links/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/utm-links/UtmLinksLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'UTM builder ship on /product/utm-links',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live UTM builder with a filled tracking link. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/utm-links',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/features/profile/UtmBuilderDialog.tsx',
+      testId: 'utm-builder',
+    },
+    healthCheck: {
+      path: '/product/utm-links',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
+    glob: '(marketing)/product/command-palette/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/command-palette/CommandPaletteLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'Command palette ships on /product/command-palette',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live command palette. Cmd+K filters routes and skills from the workspace registry. An empty query shows five items in each group. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/command-palette',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/features/commands/CommandPalettePanel.tsx',
+      testId: 'shared-command-palette',
+    },
+    healthCheck: {
+      path: '/product/command-palette',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
+    glob: '(marketing)/product/release-scheduling/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/release-scheduling/ReleaseSchedulingLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source:
+        'Release date and reveal date fields ship on /product/release-scheduling',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live release date and reveal date fields. A future release date is stored as scheduled. A blank reveal date keeps the page off the public profile until release day. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/release-scheduling',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath: 'apps/web/components/molecules/DatePicker.tsx',
+      testId: 'release-schedule-fields',
+    },
+    healthCheck: {
+      path: '/product/release-scheduling',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
+    glob: '(marketing)/product/dsp-links/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/dsp-links/DspLinksLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'DSP link rows ship on /product/dsp-links',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live DSP rows: a saved URL opens that service, and a missing service stays on Find. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/dsp-links',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath: 'apps/web/components/molecules/inspector/DspQuietRow.tsx',
+      testId: 'dsp-links',
+    },
+    healthCheck: {
+      path: '/product/dsp-links',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
+    glob: '(marketing)/product/isrc/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/isrc/IsrcLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'ISRC field ship on /product/isrc',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live ISRC field with a release code and a track code. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/isrc',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/molecules/drawer/DrawerEditableTextField.tsx',
+      testId: 'isrc-editor',
+    },
+    healthCheck: {
+      path: '/product/isrc',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
+    glob: '(marketing)/product/pre-save/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/pre-save/PreSaveLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'Pre-save countdown ship on /product/pre-save',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live countdown for a dated release. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/pre-save',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/features/release/ReleaseCountdown.tsx',
+      testId: 'pre-save-countdown',
+    },
+    healthCheck: {
+      path: '/product/pre-save',
       expected: 'page',
       waitFor: '[data-testid="marketing-section-hero"]',
     },
@@ -1068,11 +1280,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       ),
       approvedVariantBinding(
         'apps/web/app/(marketing)/launch/page.tsx',
-        'stats',
-        '3-stat-band'
-      ),
-      approvedVariantBinding(
-        'apps/web/app/(marketing)/launch/page.tsx',
         'comparison',
         'feature-matrix'
       ),
@@ -1086,7 +1293,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     bindingEvidence: {
       status: 'verified',
       source:
-        'mounted stamps 2026-10-15: profile-stage hero, platform strip, pillar grid, editorial splits, deeplink grid, three-stat band, dual-path close',
+        'mounted stamps 2026-10-15: profile-stage hero, platform strip, pillar grid, editorial splits, deeplink grid, dual-path close',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -1108,11 +1315,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       ),
       approvedVariantBinding(
         'apps/web/components/organisms/AboutPageContent.tsx',
-        'feature-grid',
-        'two-column-text'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/marketing/FaqSection.tsx',
         'faq',
         'objection-handler'
       ),
@@ -1126,7 +1328,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     bindingEvidence: {
       status: 'verified',
       source:
-        'AboutPageContent mounts left-none, article-body, two-column-text, objection-handler, and the footer final-single-claim (2026-10-15)',
+        'AboutPageContent mounts left-none, article-body, objection-handler, and the footer final-single-claim; the plain-company page change (#23332) removed the feature grid (2026-10-30)',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -1189,6 +1391,54 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     url: '/developers',
     healthCheck: {
       path: '/developers',
+      expected: 'page',
+    },
+  },
+  {
+    glob: '(marketing)/developers/agents/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-9762 agent connector docs',
+      notes:
+        'Agent connector docs page is generated from the listing and tools/list snapshot; prose-led, not recipe-composable.',
+    },
+    exempt: {
+      reason:
+        'public agent connector documentation — generated reference; not recipe-composable',
+      linearId: 'JOV-9762',
+      approvedBy: 'autonomous-shipping-policy (agent)',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/23608',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/developers/agents',
+    healthCheck: {
+      path: '/developers/agents',
+      expected: 'page',
+    },
+  },
+  {
+    glob: '(marketing)/proof/methodology/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'proof-stat registry methodology',
+      notes:
+        'Methodology page is generated from apps/web/data/proof-stats/registry.json; prose-led reference, not recipe-composable.',
+    },
+    exempt: {
+      reason:
+        'public proof methodology — generated from the stat registry; not recipe-composable',
+      linearId: 'JOV-9911',
+      approvedBy: 'autonomous-shipping-policy (agent)',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/23666',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/proof/methodology',
+    healthCheck: {
+      path: '/proof/methodology',
       expected: 'page',
     },
   },
@@ -1634,6 +1884,15 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     specVersion: '1.0.0',
     url: '/demo/video',
     noindex: true,
+    ...(!FEATURE_FLAGS.SHOW_PRODUCT_DEMO_VIDEO
+      ? {
+          healthCheck: {
+            path: '/demo/video',
+            expected: 'redirect' as const,
+            allowedFinalPaths: ['/product'],
+          },
+        }
+      : {}),
   },
   {
     glob: '(marketing)/demovideo/page.tsx',
@@ -1652,6 +1911,15 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     specVersion: '1.0.0',
     url: '/demovideo',
     noindex: true,
+    ...(!FEATURE_FLAGS.SHOW_PRODUCT_DEMO_VIDEO
+      ? {
+          healthCheck: {
+            path: '/demovideo',
+            expected: 'redirect' as const,
+            allowedFinalPaths: ['/product'],
+          },
+        }
+      : {}),
   },
   {
     glob: '(marketing)/renders/page.tsx',
@@ -1797,6 +2065,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/engineering/preview',
+    // Production-blocked (lib/security/production-blocked-routes.ts): renders
+    // only under explicit development, so it is never a certified public page.
+    healthCheck: {
+      path: '/engineering/preview',
+      expected: 'not-found',
+    },
     noindex: true,
   },
   {
@@ -1818,9 +2092,10 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/engineering/preview/*',
+    // Production-blocked like the index above.
     healthCheck: {
       path: '/engineering/preview/verified-changelog',
-      expected: 'page',
+      expected: 'not-found',
     },
     noindex: true,
   },
@@ -1905,27 +2180,66 @@ export interface MarketingExactPublicRouteTarget {
   readonly sourceSha: 'capture-time-git-sha';
 }
 
-/** Exact, non-internal active page routes consumed by both capture systems. */
-export const MARKETING_EXACT_PUBLIC_ROUTE_TARGETS: readonly MarketingExactPublicRouteTarget[] =
-  MARKETING_ROUTE_MANIFEST.filter(
-    entry =>
-      entry.status === 'active' &&
-      (entry.healthCheck?.expected ?? 'page') === 'page' &&
-      !entry.url.includes('*') &&
-      !isRenderFixturePathname(entry.url)
-  ).map(entry => ({
-    url: entry.url,
-    glob: entry.glob,
-    fixturePath: entry.healthCheck?.path ?? entry.url,
-    expectedPath: entry.healthCheck?.path ?? entry.url,
-    sourcePath: `apps/web/app/${entry.glob}`,
-    disposition: getRouteDisposition(entry),
-    viewports: ['desktop', 'mobile'],
-    stateMatrix:
-      entry.url === '/waitlist' ? ['anonymous-public'] : ['anonymous-default'],
-    expectedRuntimeSelector: entry.healthCheck?.waitFor ?? 'main',
-    sourceSha: 'capture-time-git-sha',
-  }));
+/** Exact active public pages and single-hop recoveries consumed by both captures. */
+export function getMarketingExactPublicRouteTargets(
+  manifest: readonly RouteManifestEntry[] = MARKETING_ROUTE_MANIFEST
+): readonly MarketingExactPublicRouteTarget[] {
+  return manifest.flatMap<MarketingExactPublicRouteTarget>(entry => {
+    if (
+      entry.status !== 'active' ||
+      entry.url.includes('*') ||
+      isRenderFixturePathname(entry.url)
+    )
+      return [];
+    const expected = entry.healthCheck?.expected ?? 'page';
+    let expectedPath = entry.healthCheck?.path ?? entry.url;
+    if (expected === 'redirect') {
+      const destinations = entry.healthCheck?.allowedFinalPaths;
+      if (destinations?.length !== 1) return [];
+      const destination = destinations[0]!;
+      const origin = 'https://route-contract.invalid';
+      const parsed = new URL(destination, origin);
+      if (
+        parsed.origin !== origin ||
+        parsed.pathname !== destination ||
+        !destination.startsWith('/') ||
+        destination.includes('*')
+      )
+        return [];
+      const canonical = manifest.find(
+        candidate => candidate.url === destination
+      );
+      if (
+        !canonical ||
+        canonical.status !== 'active' ||
+        (canonical.healthCheck?.expected ?? 'page') !== 'page' ||
+        isRenderFixturePathname(destination)
+      )
+        return [];
+      expectedPath = destination;
+    } else if (expected !== 'page') return [];
+    return [
+      {
+        url: entry.url,
+        glob: entry.glob,
+        fixturePath: entry.healthCheck?.path ?? entry.url,
+        expectedPath,
+        sourcePath: `apps/web/app/${entry.glob}`,
+        disposition: getRouteDisposition(entry),
+        viewports: ['desktop', 'mobile'],
+        stateMatrix:
+          entry.url === '/waitlist'
+            ? ['anonymous-public']
+            : ['anonymous-default'],
+        expectedRuntimeSelector: entry.healthCheck?.waitFor ?? 'main',
+        sourceSha: 'capture-time-git-sha',
+      },
+    ];
+  });
+}
+
+export const MARKETING_EXACT_PUBLIC_ROUTE_TARGETS =
+  getMarketingExactPublicRouteTargets();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lookup helpers (used by the manifest gate)

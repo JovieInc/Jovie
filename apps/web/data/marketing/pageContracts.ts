@@ -38,6 +38,13 @@ const START_CTA = {
   label: 'Find yourself',
 } as const;
 
+// Invite-only homepage (PUBLIC_SIGNUP_CLOSED): the one action is the
+// on-page role waitlist form.
+const HOME_INVITE_CTA = {
+  href: '/#request-invite',
+  label: 'Request an Invite',
+} as const;
+
 const CLAIM_PROFILE_CTA = {
   href: APP_ROUTES.SIGNUP,
   label: 'Claim your profile',
@@ -48,10 +55,10 @@ export const MARKETING_PAGE_CONTRACTS = {
     routeGlob: '(home)/page.tsx',
     copyScope: 'shared',
     url: APP_ROUTES.HOME,
-    job: 'help visitors understand their public presence and start with their profile',
-    proof: 'published profile and relationship examples',
-    successEvent: 'visitor starts the onboarding handoff',
-    primaryCta: START_CTA,
+    job: 'tell the Jovie story and take an invitation request',
+    proof: 'the template profile and the real releases workspace',
+    successEvent: 'visitor requests an invitation',
+    primaryCta: HOME_INVITE_CTA,
   },
   '(marketing)/new/page.tsx': {
     routeGlob: '(marketing)/new/page.tsx',
@@ -179,6 +186,69 @@ export const MARKETING_PAGE_CONTRACTS = {
       href: PRODUCT_CLAIM_HREF,
       label: PRODUCT_COPY.claimCard.cta,
     },
+  },
+  '(marketing)/product/utm-links/page.tsx': {
+    routeGlob: '(marketing)/product/utm-links/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_UTM_LINKS,
+    job: 'build a tracked link on an existing destination',
+    proof: 'live UTM builder with source, medium, campaign, and content filled',
+    successEvent: 'visitor copies a tracked link',
+    primaryCta: START_CTA,
+  },
+  '(marketing)/product/command-palette/page.tsx': {
+    routeGlob: '(marketing)/product/command-palette/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_COMMAND_PALETTE,
+    job: 'filter workspace routes and skills from one search field',
+    proof: 'live command palette with registry routes and skills',
+    successEvent: 'visitor filters the command palette and commits a command',
+    primaryCta: START_CTA,
+  },
+  '(marketing)/product/release-scheduling/page.tsx': {
+    routeGlob: '(marketing)/product/release-scheduling/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_RELEASE_SCHEDULING,
+    job: 'store a future release date as scheduled and hold the public page until the reveal date',
+    proof: 'live release date and reveal date fields',
+    successEvent: 'visitor sets a release date and a reveal date',
+    primaryCta: START_CTA,
+  },
+  '(marketing)/product/dsp-links/page.tsx': {
+    routeGlob: '(marketing)/product/dsp-links/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_DSP_LINKS,
+    job: 'store one outbound link per service',
+    proof: 'live service rows with saved links and a Find action',
+    successEvent: 'visitor opens a saved service link',
+    primaryCta: START_CTA,
+  },
+  '(marketing)/product/isrc/page.tsx': {
+    routeGlob: '(marketing)/product/isrc/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_ISRC,
+    job: 'store one primary ISRC on a release and one code on each track',
+    proof: 'live ISRC field with a release code and a track code',
+    successEvent: 'visitor saves a valid ISRC',
+    primaryCta: START_CTA,
+  },
+  '(marketing)/product/link-analytics/page.tsx': {
+    routeGlob: '(marketing)/product/link-analytics/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_LINK_ANALYTICS,
+    job: 'show click totals, the recent window, and the top provider for a smart link',
+    proof: 'live smart-link analytics panel with a fixed click count',
+    successEvent: 'visitor reads the click total and the top provider',
+    primaryCta: START_CTA,
+  },
+  '(marketing)/product/pre-save/page.tsx': {
+    routeGlob: '(marketing)/product/pre-save/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_PRE_SAVE,
+    job: 'show a countdown to the release date and save the release into a Spotify library after that date',
+    proof: 'live countdown for a dated release',
+    successEvent: 'visitor reads the countdown for the fixture release',
+    primaryCta: START_CTA,
   },
   '(marketing)/card/page.tsx': {
     routeGlob: '(marketing)/card/page.tsx',

@@ -15,7 +15,10 @@ import {
 } from '@/components/organisms/table';
 import { TypeBadge } from '@/components/shell/TypeBadge';
 import { mobileReleaseTokens } from '@/features/dashboard/tokens/mobile-tokens';
-import { formatCompactReleaseArtistLine } from '@/lib/discography/formatting';
+import {
+  formatCompactReleaseArtistLine,
+  formatReleaseArtistLine,
+} from '@/lib/discography/formatting';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
@@ -228,6 +231,16 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
     artistName,
     1
   );
+  // ds-cert:credit-format - expose the full credit list when the row line
+  // truncates to A and N more.
+  const fullArtistLine = formatReleaseArtistLine(
+    release.artistNames,
+    artistName
+  );
+  const artistLineTitle =
+    artistLine && fullArtistLine && artistLine !== fullArtistLine
+      ? fullArtistLine
+      : undefined;
 
   const typeStyle = getReleaseTypeStyle(release.releaseType);
   const isLocked = isSmartLinkLocked?.(release.id) ?? false;
@@ -264,7 +277,7 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
           <div className='flex items-center gap-1.5'>
             <TruncatedText
               lines={1}
-              className={shellReleaseRowTypography.title}
+              className={shellReleaseRowTypography.titleClassName}
             >
               {release.title}
             </TruncatedText>
@@ -274,8 +287,10 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
               className={mobileReleaseTokens.row.typeBadge}
             />
           </div>
-          <div className={shellReleaseRowTypography.subtitle}>
-            {artistLine && <span>{artistLine}</span>}
+          <div className={shellReleaseRowTypography.subtitleClassName}>
+            {artistLine && (
+              <span title={artistLineTitle ?? undefined}>{artistLine}</span>
+            )}
             {artistLine && year && (
               <span className={mobileReleaseTokens.row.dot}>{' \u00B7 '}</span>
             )}

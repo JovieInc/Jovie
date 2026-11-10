@@ -216,6 +216,43 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     ).not.toBeNull();
   });
 
+  it('renders the full-page shell as the Pen oaz9c column: no card, centered identity', () => {
+    const { container } = render(<AuthShell mode='sign-in' />);
+    const card = container.querySelector('[data-auth-surface-card]');
+    expect(card).not.toBeNull();
+    expect(card).not.toHaveClass('bg-surface-1');
+    expect(card).not.toHaveClass('border');
+    const identity = container.querySelector('[data-auth-shell-identity]');
+    expect(identity).toHaveClass('items-center');
+    expect(identity).toHaveClass('text-center');
+    expect(container.querySelector('[aria-label="Go to homepage"]')).toBeNull();
+    const divider = container.querySelector('[data-auth-method-divider]');
+    expect(divider?.textContent).toContain('or use email');
+    expect(divider?.textContent).toBe('or use email');
+  });
+
+  it('renders the page-surface headline at the Pen oaz9c scale', () => {
+    const { container } = render(<AuthShell mode='sign-in' />);
+    const heading = container.querySelector(
+      '[data-auth-shell-identity] h1'
+    ) as HTMLElement | null;
+    expect(heading).not.toBeNull();
+    expect(heading?.textContent).toBe('Log in to Jovie');
+    expect(heading?.className).toContain('text-xl');
+    expect(heading?.className).toContain('font-semibold');
+    expect(heading?.className).toContain('tracking-tight');
+  });
+
+  it('keeps intercepted modal and marketing captures centered without the card', () => {
+    const { container } = render(<AuthShell mode='sign-in' compact />);
+    const modalCard = container.querySelector('[data-auth-surface-card]');
+    expect(modalCard).not.toBeNull();
+    expect(modalCard).not.toHaveClass('bg-surface-1');
+    expect(container.querySelector('[data-auth-shell-identity]')).toHaveClass(
+      'items-center'
+    );
+  });
+
   it('keeps OAuth buttons disabled until client hydration attaches handlers', async () => {
     const serverMarkup = renderToStaticMarkup(<AuthShell mode='sign-in' />);
     expect(serverMarkup).toContain('data-auth-shell-hydrated="false"');
@@ -237,7 +274,6 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
 
   it('does not call the proxy-backed One Tap route when the plugin is unconfigured', async () => {
     render(<AuthShell mode='sign-up' />);
-
     await waitFor(() => {
       expect(oneTapMock).not.toHaveBeenCalled();
     });
@@ -501,7 +537,6 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     expect(
       screen.getByRole('heading', { name: 'Log in to Jovie' })
     ).toBeInTheDocument();
-    expect(screen.getByLabelText('Go to homepage')).toBeInTheDocument();
     expect(screen.getByText('or use email')).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Trouble signing in?' })

@@ -15,11 +15,7 @@ import {
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import {
-  MarketingContainer,
-  MarketingEditorialHeroPhoto,
-  MarketingHero,
-} from '@/components/marketing';
+import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { ChangelogTimeline } from '@/components/marketing/changelog/ChangelogTimeline';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -32,7 +28,7 @@ import {
   buildArticleSchema,
   buildBreadcrumbSchema,
 } from '@/lib/constants/schemas';
-import { resolveCustomerChangelogHero } from '@/lib/customer-changelog';
+import { documentTitle } from '@/lib/seo/document-title';
 import '../changelog-editorial.css';
 
 export const revalidate = false;
@@ -69,7 +65,7 @@ export async function generateMetadata({
   const label = changelogVersionLabel(version);
   const description = releaseDescription(label, release.summary);
   return {
-    title: `${APP_NAME} ${label}`,
+    title: documentTitle(`${APP_NAME} ${label}`),
     description,
     alternates: { canonical },
     openGraph: {
@@ -159,7 +155,6 @@ export default async function ChangelogReleasePage({
     0
   );
 
-  const hero = resolveCustomerChangelogHero(release.version);
   const canonical = `${BASE_URL}/changelog/${encodeURIComponent(version)}`;
   // Undated releases get breadcrumbs only: Article requires datePublished.
   const label = changelogVersionLabel(version);
@@ -185,11 +180,6 @@ export default async function ChangelogReleasePage({
       ) : null}
       <script type='application/ld+json'>{breadcrumbSchema}</script>
       <div className='marketing-hero-dock relative overflow-hidden'>
-        <MarketingEditorialHeroPhoto
-          src={hero.src}
-          opacity={0.22}
-          testId='changelog-version-hero-photo'
-        />
         <div
           aria-hidden='true'
           className='hero-glow pointer-events-none absolute inset-0'

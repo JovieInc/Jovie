@@ -12,12 +12,24 @@ import {
   NATIVE_QUEUE_POLICY,
 } from './lib/merge-queue-guard.mjs';
 
-// The live repository variable and active ruleset both use GitHub native.
-// Keep bare read-only/local callers aligned with that canon; mutations still
-// require the dedicated native authorization below.
+// The live repository variable and active ruleset both use GitHub native; keep bare
+// read-only/local callers on that canon; mutations need the dedicated native auth below.
 export const DEFAULT_MERGE_QUEUE_BACKEND = 'native';
 export const MERGE_QUEUE_BACKENDS = Object.freeze(['native']);
 export const CANONICAL_NATIVE_MUTATION_ACTOR = 'jovie-bot[bot]';
+// Lane apps (jovie-ci/symphony/agents-lane) share jovie-bot trust; jovie-bot stays the fallback.
+export const TRUSTED_NATIVE_MUTATION_ACTORS = Object.freeze([
+  'jovie-bot[bot]',
+  'jovie-ci-lane[bot]',
+  'jovie-symphony-lane[bot]',
+  'jovie-agents-lane[bot]',
+]);
+const TRUSTED_NATIVE_GRAPHQL_LOGINS = Object.freeze([
+  'jovie-bot',
+  'jovie-ci-lane',
+  'jovie-symphony-lane',
+  'jovie-agents-lane',
+]);
 
 const DEFAULT_REPOSITORY = 'JovieInc/Jovie';
 const DEFAULT_RULESET_ID = '10512119';
@@ -31,6 +43,7 @@ const REQUIRED_CHECKS = Object.freeze([
   'Migration Guard',
   'Fork PR Gate',
   'PR Size Guard',
+  'Company guards',
 ]);
 const NATIVE_QUEUE_ENTRY_STATES = new Set([
   'QUEUED',
@@ -500,7 +513,7 @@ function validateBypassActorAggregate(proof, ruleset, repository, rulesetId) {
     freshBypassAggregateTimestamp(proof.observedAt) &&
     (response?.errors === undefined ||
       (Array.isArray(response.errors) && response.errors.length === 0)) &&
-    data?.viewer?.login === CANONICAL_NATIVE_MUTATION_ACTOR &&
+    TRUSTED_NATIVE_MUTATION_ACTORS.includes(data?.viewer?.login) &&
     liveRepository?.nameWithOwner === repository &&
     ruleset?.source_type === 'Repository' &&
     ruleset.source === repository &&
@@ -850,7 +863,7 @@ async function assertCanonicalNativeMutationActor(runner) {
     description
   );
   const observedActor = payload?.data?.viewer?.login;
-  if (observedActor !== CANONICAL_NATIVE_MUTATION_ACTOR) {
+  if (!TRUSTED_NATIVE_MUTATION_ACTORS.includes(observedActor)) {
     throw backendError(
       'native_mutation_actor_unauthorized',
       `Native queue mutation requires authenticated actor ${CANONICAL_NATIVE_MUTATION_ACTOR}; observed ${JSON.stringify(observedActor ?? null)}`,
@@ -1393,10 +1406,14 @@ export async function proveCanonicalMembership({
     addedEvent: event?.__typename === 'AddedToMergeQueueEvent',
     eventId: typeof event?.id === 'string' && event.id.length > 0,
     entryBotType: state.mergeQueueEntry?.enqueuer?.__typename === 'Bot',
-    entryBotLogin: state.mergeQueueEntry?.enqueuer?.login === 'jovie-bot',
+    entryBotLogin: TRUSTED_NATIVE_GRAPHQL_LOGINS.includes(
+      state.mergeQueueEntry?.enqueuer?.login
+    ),
     eventBotType: event?.actor?.__typename === 'Bot',
-    eventBotLogin: event?.actor?.login === 'jovie-bot',
-    eventEnqueuer: event?.enqueuer?.login === CANONICAL_NATIVE_MUTATION_ACTOR,
+    eventBotLogin: TRUSTED_NATIVE_GRAPHQL_LOGINS.includes(event?.actor?.login),
+    eventEnqueuer: TRUSTED_NATIVE_MUTATION_ACTORS.includes(
+      event?.enqueuer?.login
+    ),
     entryTimestamp: Number.isFinite(entryTime),
     eventTimestamp:
       UTC_TIMESTAMP_PATTERN.test(event?.createdAt ?? '') &&
@@ -1496,6 +1513,12 @@ function assertEnrollCandidate(state, expectedHeadOid) {
     throw backendError(
       'ineligible_pull_request',
       `PR #${state.number} must be open and ready for review before enrollment`
+    );
+  }
+  if (state.baseRefName !== 'main') {
+    throw backendError(
+      'non_main_base',
+      `PR #${state.number} targets ${state.baseRefName ?? 'an unknown base'}, not main; auto-merge and enqueue are refused (a stacked child would merge into its parent branch)`
     );
   }
   if (state.headRefOid.toLowerCase() !== expectedHeadOid) {

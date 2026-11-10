@@ -144,8 +144,8 @@ export const LIBRARY_CATALOG_SKELETON_COLUMNS = [
   {
     id: 'artist',
     header: 'Artist',
-    size: 160,
-    minSize: 120,
+    size: 220,
+    minSize: 160,
     meta: { className: 'px-2', priority: 5, minWidth: 160 },
   },
   {

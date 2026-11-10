@@ -41,6 +41,7 @@ else
     --body "Integration train PR — local verify only. Full CI runs on integration→main train.
 
 <!-- linear-issue-identifier:$(echo "$FEATURE_BRANCH" | sed -n 's/.*jov-\([0-9]*\).*/JOV-\1/p' | tr '[:lower:]' '[:upper:]') -->
+<!-- customer-changelog/v1 {"releaseWorthy":false} -->
 ")"
   echo "==> Created PR #$PR_NUM"
 fi

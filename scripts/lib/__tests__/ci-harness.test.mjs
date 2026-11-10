@@ -26,6 +26,7 @@ import { extractWorkflowJobBlock } from '../merge-queue-guard.mjs';
 
 const manifest = loadCiHarnessManifest();
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
+
 /** Locked PR merge-gate set (manifest is source of truth for harness docs + artifact). */
 const EXPECTED_MERGE_GATE_NAMES = [
   'Path Changes',
@@ -118,7 +119,7 @@ describe('ci-harness manifest', () => {
     const nonGates = (manifest.jobs ?? []).filter(job => !job.mergeGate);
     expect(nonGates.map(job => job.name)).toEqual([
       'Component Ship Gate (via ci-fast structural)',
-      'UI Story Coverage Audit (shadow)',
+      'UI Story Coverage Audit',
       'Lighthouse (public routes manual)',
       'Lighthouse (admin manual)',
       'Lighthouse (chat manual)',
@@ -194,10 +195,10 @@ describe('ci-harness manifest', () => {
       'Migration Guard',
       'Fork PR Gate',
       'PR Size Guard',
+      'Company guards',
     ]);
-    // Individual harness merge-gate job names must stay in the forbidden pin list
-    // so a batch failure bisects instead of evicting siblings. ci-fast is a real
-    // collapsed job (JOV-3464) but must never be pinned alone — only PR Ready is.
+    // Individual harness merge-gate job names must stay in the forbidden pin list so
+    // a batch failure bisects. ci-fast (JOV-3464) is real but never pinned alone.
     for (const name of EXPECTED_MERGE_GATE_NAMES) {
       if (REQUIRED_MERGE_STATUSES.includes(name)) continue;
       expect(
@@ -222,7 +223,7 @@ describe('ci-harness manifest', () => {
     const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
 
     expect(prReady).toContain(
-      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare]'
+      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-pen-diff, ci-slop-guard]'
     );
     expect(prReady).toContain('needs.ci-exact-head-coverage.result');
     expect(prReady).toContain('Evaluate deterministic source PR checks');
@@ -393,7 +394,7 @@ describe('ci-harness manifest', () => {
     expect(sentryGate).not.toContain(
       'uses: ./.github/workflows/sentry-error-gate.yml'
     );
-    expect(sentryGate).toContain('runs-on: ubuntu-latest');
+    expect(sentryGate).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(sentryGate).toContain('name: Production – jovie');
     expect(sentryGate).toContain('uses: ./.github/actions/sentry-error-gate');
     expect(sentryGate).toContain(
@@ -602,7 +603,7 @@ describe('ci-harness manifest', () => {
     );
     const unitTests = extractWorkflowJobBlock(workflow, 'ci-unit-tests');
 
-    expect(buildLayout).toContain('runs-on: ubuntu-latest');
+    expect(buildLayout).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(buildLayout).toContain('Build exact combined head');
     expect(buildLayout).toContain('Run deterministic layout behavior guard');
     expect(buildLayout).not.toContain('actions/upload-artifact');

@@ -18,6 +18,13 @@ import { isLegacyProfileModeAlias } from '@/app/[username]/_lib/mode-route-redir
  */
 
 const PROFILE_ALIAS_DECISION_BUDGET_MS = 250;
+// A cold decision lambda on a fresh staged deployment often needs longer
+// than the response budget. Aborting the subrequest at that budget cancelled
+// the origin response before the CDN could store it, so /listen (the first
+// alias the gate measures) repeated the miss. The budget still decides
+// whether THIS navigation uses the fast path; the in-flight fetch is allowed
+// to finish so the next sample is a CDN hit.
+const PROFILE_ALIAS_DECISION_CACHE_FILL_MS = 3_000;
 
 interface AliasDecisionPayload {
   readonly href?: unknown;
@@ -45,6 +52,25 @@ export function buildProfileAliasDecisionUrl(
   return decisionUrl;
 }
 
+function budgetDecisionFetch<T>(pending: Promise<T>): Promise<T | null> {
+  return new Promise(resolve => {
+    const timer = setTimeout(
+      () => resolve(null),
+      PROFILE_ALIAS_DECISION_BUDGET_MS
+    );
+    pending.then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(null);
+      }
+    );
+  });
+}
+
 function aliasDecisionResponse(
   req: NextRequest,
   href: string,
@@ -59,7 +85,8 @@ function aliasDecisionResponse(
 export async function resolveProfileModeAliasAtEdge(
   req: NextRequest,
   username: string,
-  aliasSlug: string
+  aliasSlug: string,
+  waitUntil?: (promise: Promise<unknown>) => void
 ): Promise<NextResponse | null> {
   // Tests and local dev exercise the resolver page directly (matching the
   // page's own test/dev cache-bypass policy); the fast path is a hosted-
@@ -76,20 +103,29 @@ export async function resolveProfileModeAliasAtEdge(
 
   let payload: AliasDecisionPayload | null = null;
   try {
-    const response = await fetch(decisionUrl, {
+    const pending = fetch(decisionUrl, {
       // Forward the visitor cookie header so protected deployments (Vercel
       // deployment protection + bypass cookie) can resolve the decision; the
       // endpoint is public, visitor-independent, and reads no cookies.
       headers: req.headers.get('cookie')
         ? { cookie: req.headers.get('cookie') as string }
         : undefined,
-      signal: AbortSignal.timeout(PROFILE_ALIAS_DECISION_BUDGET_MS),
+      // Longer than the response budget on purpose. See
+      // PROFILE_ALIAS_DECISION_CACHE_FILL_MS.
+      signal: AbortSignal.timeout(PROFILE_ALIAS_DECISION_CACHE_FILL_MS),
+    }).then(async response => {
+      const body = await response.text();
+      return { body, response };
     });
-    if (!response.ok) return null;
-    payload = (await response.json()) as AliasDecisionPayload;
+    const outcome = await budgetDecisionFetch(pending);
+    if (!outcome) {
+      waitUntil?.(pending.then(() => undefined).catch(() => undefined));
+      return null;
+    }
+    if (!outcome.response.ok) return null;
+    payload = JSON.parse(outcome.body) as AliasDecisionPayload;
   } catch {
-    // Timeout, network failure, or malformed body — the resolver page owns
-    // the request.
+    // Network failure or malformed body — the resolver page owns the request.
     return null;
   }
 

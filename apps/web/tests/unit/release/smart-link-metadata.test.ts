@@ -369,10 +369,11 @@ describe('smart-link metadata', () => {
       'music',
       { onError: 'throw' }
     );
+    // Mode aliases opt out of the superseded-base-slug fallback.
     expect(findRedirectByOldSlugMock).toHaveBeenCalledWith(
       'creator-1',
       'music',
-      { onError: 'throw' }
+      { includeSuperseded: false, onError: 'throw' }
     );
     expect(getContentBySlugMock).not.toHaveBeenCalled();
     expect(redirectMock).toHaveBeenCalledWith('/dualipa?mode=listen&source=qr');

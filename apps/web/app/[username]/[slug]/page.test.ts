@@ -14,6 +14,7 @@ const hoisted = vi.hoisted(() => ({
   getFeaturedSmartLinkStaticParams: vi.fn(),
   getReleaseTrackList: vi.fn(),
   getUnpublishedReleasePresence: vi.fn(),
+  findRedirectByOldSlug: vi.fn(),
   checkPromoDownloads: vi.fn(),
   resolveOpaqueInternalProfileUsername: vi.fn(),
   getArtistEntitySameAs: vi.fn(),
@@ -45,6 +46,9 @@ vi.mock('./_lib/data', () => ({
   getReleaseTrackList: hoisted.getReleaseTrackList,
   getUnpublishedReleasePresence: hoisted.getUnpublishedReleasePresence,
   checkPromoDownloads: hoisted.checkPromoDownloads,
+}));
+vi.mock('@/lib/discography/slug', () => ({
+  findRedirectByOldSlug: hoisted.findRedirectByOldSlug,
 }));
 vi.mock('@/constants/app', async importOriginal => {
   const actual = await importOriginal<typeof import('@/constants/app')>();
@@ -256,5 +260,101 @@ describe('smartlink screen-cert fixture branch (JOV-7127)', () => {
       'ordinary-artist'
     );
     expect(hoisted.getContentBySlug).not.toHaveBeenCalled();
+  });
+});
+
+describe('superseded base slug route resolution', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.resolveOpaqueInternalProfileUsername.mockResolvedValue({
+      action: 'serve',
+    });
+    hoisted.getCreatorByUsername.mockResolvedValue({
+      id: 'creator-1',
+      username: 'tim',
+      usernameNormalized: 'tim',
+      displayName: 'Tim White',
+      userId: 'user-1',
+      avatarUrl: null,
+      settings: {},
+    });
+    hoisted.getContentBySlug.mockResolvedValue(null);
+    hoisted.findRedirectByOldSlug.mockResolvedValue(null);
+    hoisted.getUnpublishedReleasePresence.mockResolvedValue(null);
+  });
+
+  async function loadPage(slug: string) {
+    const { default: Page } = await import('./page');
+    return Page({ params: Promise.resolve({ username: 'tim', slug }) });
+  }
+
+  it('308s /tim/take-me-over to /tim/take-me-over-2 when the resolver finds the single published sibling', async () => {
+    hoisted.findRedirectByOldSlug.mockResolvedValue({
+      type: 'release',
+      currentSlug: 'take-me-over-2',
+    });
+    await expect(loadPage('take-me-over')).rejects.toThrow(
+      'permanentRedirect:/tim/take-me-over-2'
+    );
+    // Default call: superseded fallback is on for the public content route.
+    expect(hoisted.findRedirectByOldSlug).toHaveBeenCalledWith(
+      'creator-1',
+      'take-me-over'
+    );
+  });
+
+  it('falls through to the placeholder lookup / 404 when the resolver declines (seaside-heights, multi-candidate)', async () => {
+    await expect(loadPage('seaside-heights')).rejects.toThrow('notFound');
+    expect(hoisted.getUnpublishedReleasePresence).toHaveBeenCalledWith(
+      'creator-1',
+      'seaside-heights'
+    );
+  });
+});
+
+describe('release share metadata (JOV-9626)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.resolveOpaqueInternalProfileUsername.mockResolvedValue({
+      action: 'serve',
+    });
+    hoisted.getCreatorByUsername.mockResolvedValue({
+      id: 'creator-1',
+      username: 'tim',
+      usernameNormalized: 'tim',
+      displayName: 'Tim White',
+      userId: 'user-1',
+      avatarUrl: null,
+      settings: {},
+    });
+    hoisted.getContentBySlug.mockResolvedValue({
+      type: 'release',
+      id: 'content-1',
+      slug: 'midnight-signal',
+      title: 'Midnight Signal',
+      releaseDate: new Date('2026-01-01'),
+      revealDate: null,
+      artworkUrl: 'https://i.scdn.co/image/cover',
+      artworkSizes: null,
+      providerLinks: [],
+      primaryArtists: [],
+    });
+  });
+
+  it('delegates og/twitter images to the collocated branded share-card route', async () => {
+    const { generateMetadata } = await import('./page');
+    const metadata = await generateMetadata({
+      params: Promise.resolve({ username: 'tim', slug: 'midnight-signal' }),
+    });
+    // No explicit images: file-based metadata serves the branded
+    // 1200x630 /{username}/{slug}/opengraph-image card for both og:image
+    // and twitter:image.
+    expect(metadata.openGraph?.images).toBeUndefined();
+    expect(metadata.twitter?.images).toBeUndefined();
+    expect(metadata.twitter).toMatchObject({
+      card: 'summary_large_image',
+    });
+    expect(metadata.openGraph?.title).toContain('Midnight Signal');
+    expect(metadata.openGraph?.title).toContain('Tim White');
   });
 });

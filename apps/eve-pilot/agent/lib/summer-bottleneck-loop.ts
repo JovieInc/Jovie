@@ -174,6 +174,32 @@ const ciAuditSchema = z
     }
   });
 
+// Mirrors the bridge route's optional bottleneck status publication. Absent
+// means the sender has nothing to add — never a rejection of the snapshot.
+const bottleneckStatusSchema = z
+  .object({
+    schema: z.literal('jovie.eve.summer-bottleneck-status/v1'),
+    status: z.enum(['agentic', 'needs-you']),
+    metric: z.string().trim().min(1).max(140),
+    statusLink: z.url({ protocol: /^https?$/u }).max(2048),
+    monthlyCostUsd: z.number().finite().nonnegative().optional(),
+    expectedImpact: z.string().trim().min(1).max(200).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.status === 'needs-you' &&
+      (value.monthlyCostUsd === undefined || value.expectedImpact === undefined)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'needs-you bottleneck status requires monthlyCostUsd and expectedImpact',
+        path: ['monthlyCostUsd'],
+      });
+    }
+  });
+
 export const summerBottleneckSnapshotSchema = z
   .object({
     schema: z.literal('jovie.eve.summer-bottleneck-snapshot/v1'),
@@ -243,6 +269,7 @@ export const summerBottleneckSnapshotSchema = z
         existingRepair: existingRepairAssignmentSchema.optional(),
         taskAdmissions: taskAdmissionsSchema.optional(),
         admissions: z.record(z.string(), z.unknown()).optional(),
+        bottleneckStatus: bottleneckStatusSchema.optional(),
       })
       .strict(),
   })

@@ -320,6 +320,41 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     },
   ]),
   ...defineScenarios('marketing', ADMIN_MARKETING_AND_INVESTOR, [
+    // Profile-state crops for /artist-profiles "The profile in action":
+    // one idea per shot, captured as the real component that changes per
+    // state (no repeated identity header, nothing clipped mid-element).
+    {
+      id: 'profile-state-release-mobile',
+      title: 'Profile State — Release First',
+      route: '/demo/showcase/tim-white-profile?release=live',
+      waitFor: '[data-testid="profile-pac"]',
+      captureTarget: 'locator',
+      captureSelector: '[data-testid="profile-pac"]',
+      viewport: 'mobile',
+      publicExportPath: 'profile-state-release.png',
+    },
+    {
+      id: 'profile-state-shows-mobile',
+      title: 'Profile State — Upcoming Shows',
+      route: '/demo/showcase/tim-white-profile?mode=tour',
+      waitFor: '[data-testid="profile-events-card"]',
+      captureTarget: 'locator',
+      captureSelector: '[data-testid="profile-events-card"]',
+      viewport: 'mobile',
+      // Show dates read against today: recapture with this week's clock.
+      fixedNow: 'capture-week',
+      publicExportPath: 'profile-state-shows.png',
+    },
+    {
+      id: 'profile-state-capture-mobile',
+      title: 'Profile State — Audience Capture',
+      route: '/demo/showcase/tim-white-profile?mode=subscribe',
+      waitFor: '[data-testid="profile-mobile-notifications-flow"]',
+      captureTarget: 'locator',
+      captureSelector: '[data-testid="profile-mobile-notifications-flow"]',
+      viewport: 'mobile',
+      publicExportPath: 'profile-state-capture.png',
+    },
     ...TIM_WHITE_PROFILE_MOBILE_VARIANTS.map(timWhiteProfileMobile),
     {
       id: 'tim-white-profile-tour-nearby-mobile',
@@ -363,6 +398,20 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       viewport: 'mobile',
       publicExportPath: 'tim-white-profile-presave-phone.png',
       fixedNow: '2026-04-15T12:00:00.000Z',
+    },
+    {
+      // Homepage hero product shot. The template identity (jov.ie/you,
+      // monogram avatar, abstract release art) keeps every person off `/`.
+      id: 'template-profile-live-mobile',
+      title: 'Template Profile — Latest Release',
+      // Locator crop of the top of the screen (identity, links, featured
+      // release); the tab bar and the empty run above it stay out of frame.
+      route: '/demo/showcase/tim-white-profile?archetype=template&capture=hero',
+      waitFor: '[data-testid="demo-template-hero-capture"]',
+      captureTarget: 'locator',
+      captureSelector: '[data-testid="demo-template-hero-capture"]',
+      viewport: 'mobile',
+      publicExportPath: 'template-profile-live-phone.png',
     },
     {
       id: 'release-presave-mobile',
@@ -444,14 +493,18 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       route: '/demo',
       waitFor: '[data-testid="releases-matrix"]',
       publicExportPath: 'releases-dashboard-full.png',
+      playerTimestamp: '1:18',
+      fixedNow: '2026-06-12T16:00:00.000Z',
     },
     {
       id: 'dashboard-releases-sidebar-desktop',
       title: 'Releases With Sidebar',
       route: '/demo',
       waitFor: '[data-testid="release-sidebar"]',
-      interaction: 'open-first-release',
+      interaction: 'open-first-release-dsps',
       publicExportPath: 'releases-dashboard-sidebar.png',
+      playerTimestamp: '1:42',
+      fixedNow: '2026-06-12T16:00:00.000Z',
     },
     {
       id: 'dashboard-release-sidebar-detail-desktop',
@@ -479,6 +532,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       route: '/demo/audience',
       waitFor: 'table, [role="grid"], [data-testid="unified-table"]',
       publicExportPath: 'audience-crm.png',
+      playerTimestamp: '0:56',
     },
   ]),
   ...defineScenarios('dashboard', ADMIN_AND_INVESTOR, [
@@ -487,12 +541,14 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       title: 'Analytics Overview',
       route: '/demo/showcase/analytics',
       waitFor: '[data-testid="demo-showcase-analytics"]',
+      playerTimestamp: '2:06',
     },
     {
       id: 'dashboard-earnings-desktop',
       title: 'Earnings Overview',
       route: '/demo/showcase/earnings',
       waitFor: '[data-testid="demo-showcase-earnings"]',
+      playerTimestamp: '0:32',
     },
   ]),
   ...defineScenarios('settings', ADMIN_ONLY, [
@@ -621,6 +677,9 @@ const PUBLIC_EXPORT_DIMENSIONS: Record<
   'audience-crm.png': { width: 2880, height: 1800 },
   'profile-desktop.png': { width: 2880, height: 1800 },
   'profile-phone.png': { width: 780, height: 1688 },
+  'profile-state-capture.png': { width: 716, height: 824 },
+  'profile-state-release.png': { width: 716, height: 640 },
+  'profile-state-shows.png': { width: 716, height: 1366 },
   'release-deep-end-phone.png': { width: 780, height: 1688 },
   'release-landing-desktop.png': { width: 2880, height: 1800 },
   'release-sidebar-detail.png': { width: 776, height: 1690 },
@@ -629,6 +688,7 @@ const PUBLIC_EXPORT_DIMENSIONS: Record<
   'release-tasks-active.png': { width: 1624, height: 1428 },
   'releases-dashboard-full.png': { width: 2880, height: 1800 },
   'releases-dashboard-sidebar.png': { width: 2880, height: 1800 },
+  'template-profile-live-phone.png': { width: 780, height: 1264 },
   'tim-white-profile-contact-phone.png': { width: 780, height: 1688 },
   'tim-white-profile-listen-phone.png': { width: 780, height: 1688 },
   'tim-white-profile-live-phone.png': { width: 780, height: 1688 },

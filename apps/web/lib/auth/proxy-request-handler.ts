@@ -172,7 +172,9 @@ export async function handleProxyRequest(
           shouldAllowProductScreenshotCaptureRoutes(req),
       })
     ) {
-      return NextResponse.rewrite(new URL('/404', req.url));
+      // status 404: a bare rewrite serves the prerendered /404 body as HTTP 200
+      // (soft 404), which crawlers and uptime checks read as a live page.
+      return NextResponse.rewrite(new URL('/404', req.url), { status: 404 });
     }
 
     // Allow sidebar demo to bypass authentication
@@ -300,10 +302,15 @@ export async function handleProxyRequest(
       const aliasUsername = aliasSegments[0];
       const aliasSlug = aliasSegments[1];
       if (aliasUsername && aliasSlug && aliasSegments.length === 2) {
+        // waitUntil lets a cold decision finish and be stored after this
+        // navigation has already fallen through. Aborting that fetch at the
+        // response budget left the CDN empty, so the first alias (/listen)
+        // repeated the slow resolver hop.
         const aliasResponse = await resolveProfileModeAliasAtEdge(
           req,
           aliasUsername,
-          aliasSlug
+          aliasSlug,
+          event ? promise => event.waitUntil(promise) : undefined
         );
         if (aliasResponse) return aliasResponse;
       }

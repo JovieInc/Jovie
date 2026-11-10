@@ -1,0 +1,19 @@
+{
+  "schema": "jovie.art-direction-vision-judges/v1",
+  "mode": "shadow",
+  "promoteToBlocking": false,
+  "hamelFloors": {
+    "precisionMin": 0.9,
+    "recallMin": 0.8
+  },
+  "judges": ["polish", "hierarchy", "mockup-quality"],
+  "judgeModes": {
+    "polish": "shadow",
+    "hierarchy": "shadow",
+    "mockup-quality": "shadow"
+  },
+  "minimums": {
+    "definedIn": "vision-calibration.mjs",
+    "note": "A judge may block only with >=20 labeled defects and >=20 labeled clean frames, precision >=0.9 (95% Wilson lower bound too) and recall >=0.8."
+  }
+}

@@ -48,6 +48,7 @@ vi.mock('@/lib/utils/logger', () => ({
 describe('GET /api/admin/hud/shipping-velocity', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
     hoisted.env.HUD_GITHUB_TOKEN = undefined;
     hoisted.env.HUD_GITHUB_OWNER = undefined;
     hoisted.env.HUD_GITHUB_REPO = undefined;
@@ -893,6 +894,158 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
       errorMessage: expect.stringContaining('GitHub rate limit exceeded'),
       data: [expect.objectContaining({ merged: 3 })],
     });
+    expect(hoisted.captureError).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])(
+    'serves the scan-exhaustion cooldown without re-running a doomed scan (verified cache: %s)',
+    async hasVerifiedCache => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-08-30T12:00:00.000Z'));
+      hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
+      hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
+      hoisted.env.HUD_GITHUB_REPO = 'jovie';
+      const cachedAt = '2026-08-30T11:55:00.000Z';
+      const verifiedData = [
+        {
+          date: '2026-08-30',
+          merged: 3,
+          opened: 1,
+          closed: 0,
+          mergeP50Hours: 2,
+        },
+      ];
+      const set = vi.fn();
+      hoisted.getRedis.mockReturnValue({
+        get: vi.fn().mockResolvedValue(
+          hasVerifiedCache
+            ? {
+                data: verifiedData,
+                range: '7d',
+                cachedAt,
+                observation: 'fresh',
+              }
+            : null
+        ),
+        set,
+      });
+      const nodes = Array.from({ length: 100 }, () => ({
+        state: 'MERGED',
+        merged: true,
+        createdAt: '2026-08-30T08:00:00.000Z',
+        updatedAt: '2026-08-30T10:00:00.000Z',
+        mergedAt: '2026-08-30T10:00:00.000Z',
+        closedAt: '2026-08-30T10:00:00.000Z',
+      }));
+      let page = 0;
+      const fetchMock = vi.fn(async () => {
+        page += 1;
+        return Response.json({
+          data: {
+            repository: {
+              pullRequests: {
+                nodes,
+                pageInfo: {
+                  hasNextPage: true,
+                  endCursor: `cursor-${page}`,
+                },
+              },
+            },
+          },
+        });
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const { GET } = await import(
+        '@/app/api/admin/hud/shipping-velocity/route'
+      );
+      const exhausted = await GET(
+        new Request('http://localhost/api/admin/hud/shipping-velocity?range=7d')
+      );
+      expect(exhausted.status).toBe(200);
+      await expect(exhausted.json()).resolves.toMatchObject({
+        data: hasVerifiedCache ? verifiedData : [],
+        range: '7d',
+        cachedAt: hasVerifiedCache ? cachedAt : '2026-08-30T12:00:00.000Z',
+        observation: hasVerifiedCache ? 'stale' : 'unavailable',
+        errorMessage: 'Shipping velocity scan limit reached for this range.',
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(30);
+
+      const cooldown = await GET(
+        new Request('http://localhost/api/admin/hud/shipping-velocity?range=7d')
+      );
+      expect(cooldown.status).toBe(200);
+      await expect(cooldown.json()).resolves.toMatchObject({
+        data: hasVerifiedCache ? verifiedData : [],
+        cachedAt: hasVerifiedCache ? cachedAt : '2026-08-30T12:00:00.000Z',
+        observation: hasVerifiedCache ? 'stale' : 'unavailable',
+        errorMessage: 'Shipping velocity scan limit reached for this range.',
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(30);
+      expect(set).not.toHaveBeenCalled();
+      expect(hoisted.captureError).not.toHaveBeenCalled();
+      expect(hoisted.logger.error).not.toHaveBeenCalled();
+    }
+  );
+
+  it('re-attempts the scan after the scan-exhaustion cooldown expires', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-30T12:00:00.000Z'));
+    hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
+    hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
+    hoisted.env.HUD_GITHUB_REPO = 'jovie';
+    hoisted.getRedis.mockReturnValue({
+      get: vi.fn().mockResolvedValue(null),
+      set: vi.fn(),
+    });
+    const nodes = Array.from({ length: 100 }, () => ({
+      state: 'MERGED',
+      merged: true,
+      createdAt: '2026-08-30T08:00:00.000Z',
+      updatedAt: '2026-08-30T10:00:00.000Z',
+      mergedAt: '2026-08-30T10:00:00.000Z',
+      closedAt: '2026-08-30T10:00:00.000Z',
+    }));
+    let page = 0;
+    const fetchMock = vi.fn(async () => {
+      page += 1;
+      return Response.json({
+        data: {
+          repository: {
+            pullRequests: {
+              nodes,
+              pageInfo: {
+                hasNextPage: true,
+                endCursor: `cursor-${page}`,
+              },
+            },
+          },
+        },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { GET } = await import('@/app/api/admin/hud/shipping-velocity/route');
+    const exhausted = await GET(
+      new Request('http://localhost/api/admin/hud/shipping-velocity?range=7d')
+    );
+    expect(exhausted.status).toBe(200);
+    await expect(exhausted.json()).resolves.toMatchObject({
+      observation: 'unavailable',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(30);
+
+    await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 1);
+    const retried = await GET(
+      new Request('http://localhost/api/admin/hud/shipping-velocity?range=7d')
+    );
+    expect(retried.status).toBe(200);
+    await expect(retried.json()).resolves.toMatchObject({
+      observation: 'unavailable',
+      errorMessage: 'Shipping velocity scan limit reached for this range.',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(60);
     expect(hoisted.captureError).not.toHaveBeenCalled();
   });
 

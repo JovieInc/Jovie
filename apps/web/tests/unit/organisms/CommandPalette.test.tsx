@@ -22,6 +22,22 @@ import {
   CommandPaletteMainSurface,
 } from '@/components/organisms/CommandPalette';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
+
+const preloadCommandPaletteChunk = vi.hoisted(() =>
+  vi.fn(() => Promise.resolve())
+);
+
+vi.mock(
+  '@/components/organisms/command-palette-events',
+  async importOriginal => {
+    const actual =
+      await importOriginal<
+        typeof import('@/components/organisms/command-palette-events')
+      >();
+    return { ...actual, preloadCommandPaletteChunk };
+  }
+);
+
 import {
   HeaderActionsProvider,
   useHeaderActions,
@@ -54,6 +70,19 @@ vi.mock('@jovie/ui', () => ({
   DialogContent: ({ children }: { children: ReactNode }) => (
     <div>{children}</div>
   ),
+  Button: ({
+    children,
+    onClick,
+    disabled,
+  }: {
+    children: ReactNode;
+    onClick?: () => void;
+    disabled?: boolean;
+  }) => (
+    <button type='button' onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
+  ),
 }));
 
 vi.mock('@radix-ui/react-dialog', () => ({
@@ -61,8 +90,15 @@ vi.mock('@radix-ui/react-dialog', () => ({
   Description: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
+const releasesState = vi.hoisted(() => ({
+  data: [] as unknown[],
+  isLoading: false,
+  isFetching: false,
+  isError: false,
+  refetch: () => Promise.resolve(),
+}));
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
-  useReleasesQuery: () => ({ data: [], isLoading: false }),
+  useReleasesQuery: () => releasesState,
 }));
 
 vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
@@ -236,7 +272,7 @@ describe('CommandPalette', () => {
 
   it('opens on Cmd+K in the main plane and focuses the breadcrumb input', async () => {
     render(withDashboard(<CommandPalette />));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
     const input = await screen.findByLabelText('Command Palette Search');
     expect(input).toBeInTheDocument();
@@ -289,7 +325,7 @@ describe('CommandPalette', () => {
 
   it('continues to open on Ctrl+K independently of sidebar Search', async () => {
     render(withDashboard(<CommandPalette />));
-    fireEvent.keyDown(globalThis, { key: 'k', ctrlKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', ctrlKey: true });
     await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
   });
@@ -345,6 +381,22 @@ describe('CommandPalette', () => {
     await waitFor(() => expect(origin).toHaveFocus());
   });
 
+  it('opens on Cmd+K from a non-editor control that stops bubbling', async () => {
+    render(
+      withDashboard(
+        <>
+          <button type='button'>Drawer action</button>
+          <CommandPalette />
+        </>
+      )
+    );
+    const button = screen.getByRole('button', { name: 'Drawer action' });
+    button.addEventListener('keydown', event => event.stopPropagation());
+    button.focus();
+    fireEvent.keyDown(button, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
+  });
+
   it('opens the same main plane from the sidebar Search trigger', async () => {
     render(
       withDashboard(
@@ -355,7 +407,7 @@ describe('CommandPalette', () => {
       )
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+    fireEvent.click(screen.getByRole('button', { name: /Search Jovie$/ }));
     await screen.findByTestId('cmdk-main-plane');
 
     expect(screen.getByTestId('cmdk-main-plane')).toBeInTheDocument();
@@ -372,7 +424,7 @@ describe('CommandPalette', () => {
       )
     );
 
-    const trigger = screen.getByRole('button', { name: 'Search Jovie' });
+    const trigger = screen.getByRole('button', { name: /Search Jovie$/ });
     fireEvent.click(trigger);
     await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByTestId('cmdk-main-plane')).toBeInTheDocument();
@@ -392,7 +444,7 @@ describe('CommandPalette', () => {
       )
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+    fireEvent.click(screen.getByRole('button', { name: /Search Jovie$/ }));
     await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByTestId('cmdk-main-plane')).toBeInTheDocument();
 
@@ -411,7 +463,7 @@ describe('CommandPalette', () => {
       )
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+    fireEvent.click(screen.getByRole('button', { name: /Search Jovie$/ }));
     await screen.findByTestId('cmdk-main-plane');
     const input = screen.getByLabelText('Command Palette Search');
     fireEvent.change(input, { target: { value: 'Calendar' } });
@@ -432,11 +484,11 @@ describe('CommandPalette', () => {
 
   it('lists recent chats with safe fallback titles', async () => {
     render(withDashboard(<CommandPalette />));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByText('Recent Chats')).toBeInTheDocument();
     expect(screen.getByText('Q1 release plan')).toBeInTheDocument();
-    expect(screen.getByText('Untitled chat')).toBeInTheDocument();
+    expect(screen.getByText('Conversation')).toBeInTheDocument();
     expect(screen.getByText('Active chat')).toBeVisible();
     expect(screen.getByText('Needs attention')).toBeVisible();
     expect(screen.queryByText('Hidden default chat')).toBeNull();
@@ -445,7 +497,7 @@ describe('CommandPalette', () => {
   it('prioritizes the current chat and still finds chats outside the default five', async () => {
     pathnameMock.mockReturnValue('/app/chat/thread-d');
     const { container } = render(withDashboard(<CommandPalette />));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
 
     const recentSection = container.querySelector(
@@ -466,7 +518,7 @@ describe('CommandPalette', () => {
   it('shows the admin workspace action and its shortcut', async () => {
     pathnameMock.mockReturnValue('/app');
     render(withDashboard(<CommandPalette />, true));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
 
     const action = screen
@@ -480,7 +532,7 @@ describe('CommandPalette', () => {
     pushMock.mockClear();
     pathnameMock.mockReturnValue('/app');
     render(withDashboard(<CommandPalette />, true));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
 
     const action = screen
@@ -496,7 +548,7 @@ describe('CommandPalette', () => {
     pushMock.mockClear();
     pathnameMock.mockReturnValue('/app/ov/ops');
     render(withDashboard(<CommandPalette />, true));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
 
     const action = screen
@@ -508,9 +560,76 @@ describe('CommandPalette', () => {
     expect(pushMock).not.toHaveBeenCalled();
   });
 
+  it('offers only operator destinations and tools on Ovie, with G-key hints', async () => {
+    pushMock.mockClear();
+    pathnameMock.mockReturnValue('/app/ov/shipping');
+    render(withDashboard(<CommandPalette />, true));
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
+
+    const options = screen.getAllByRole('option');
+    const text = options.map(el => el.textContent ?? '').join('|');
+    for (const label of ['Home', 'Inbox', 'Shipping', 'Fleet', 'Capacity']) {
+      expect(text).toContain(label);
+    }
+    expect(text).toContain('G then F');
+    expect(text).toContain('Open Linear');
+    // Customer rows must not leak into the operator palette.
+    expect(text).not.toContain('Generate album art');
+    expect(text).not.toContain('Contacts');
+    expect(screen.queryByText('Recent Chats')).not.toBeInTheDocument();
+    expect(screen.queryByText('Q1 release plan')).not.toBeInTheDocument();
+
+    const fleet = options.find(el => el.textContent?.includes('Fleet'));
+    fireEvent.mouseDown(fleet!);
+    expect(pushMock).toHaveBeenCalledWith('/app/ov/operations');
+  });
+
+  it('never shows a customer query failure in the operator palette (JOV-9020)', async () => {
+    releasesState.isError = true;
+    try {
+      pathnameMock.mockReturnValue('/app/ov');
+      const ov = render(withDashboard(<CommandPalette />, true));
+      fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
+      await screen.findByTestId('cmdk-main-plane');
+      expect(screen.queryByText(/could not load/i)).not.toBeInTheDocument();
+      ov.unmount();
+
+      // The same failure still surfaces for customers.
+      pathnameMock.mockReturnValue('/app');
+      render(withDashboard(<CommandPalette />, true));
+      fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
+      await screen.findByTestId('cmdk-main-plane');
+      expect(screen.getByText(/could not load/i)).toBeInTheDocument();
+    } finally {
+      releasesState.isError = false;
+    }
+  });
+
+  it('opens external operator tools in a new tab, never in the shell', async () => {
+    const openMock = vi.spyOn(globalThis, 'open').mockReturnValue(null);
+    pushMock.mockClear();
+    pathnameMock.mockReturnValue('/app/ov');
+    render(withDashboard(<CommandPalette />, true));
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
+
+    const linear = screen
+      .getAllByRole('option')
+      .find(el => el.textContent?.includes('Open Linear'));
+    fireEvent.mouseDown(linear!);
+    expect(openMock).toHaveBeenCalledWith(
+      'https://linear.app/jovie',
+      '_blank',
+      'noopener,noreferrer'
+    );
+    expect(pushMock).not.toHaveBeenCalled();
+    openMock.mockRestore();
+  });
+
   it('does not leak the workspace action to non-admins', async () => {
     render(withDashboard(<CommandPalette />));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
 
     expect(screen.queryByText('Switch to OV')).not.toBeInTheDocument();
@@ -520,7 +639,7 @@ describe('CommandPalette', () => {
   it('routes a recent-chat commit to the chat route', async () => {
     pushMock.mockClear();
     render(withDashboard(<CommandPalette />));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
     const threadRow = screen
       .getAllByRole('option')
@@ -570,7 +689,7 @@ describe('CommandPalette', () => {
         </>
       )
     );
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByLabelText('Command Palette Search');
     pushMock.mockClear();
     const sidebar = screen.getByRole('button', { name: 'Sidebar action' });
@@ -597,7 +716,7 @@ describe('CommandPalette', () => {
     );
     const origin = screen.getByRole('button', { name: 'Return target' });
     origin.focus();
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
     fireEvent.keyDown(screen.getByLabelText('Command Palette Search'), {
@@ -605,5 +724,12 @@ describe('CommandPalette', () => {
     });
     expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
     await waitFor(() => expect(origin).toHaveFocus());
+  });
+});
+
+describe('CommandPalette preload', () => {
+  it('warms the palette chunk at idle so the first open is instant', async () => {
+    render(withDashboard(<CommandPalette />));
+    await waitFor(() => expect(preloadCommandPaletteChunk).toHaveBeenCalled());
   });
 });

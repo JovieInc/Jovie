@@ -66,6 +66,33 @@ describe('EntityTabbedRail', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('opts the tabbed card into the shared rounded drawer card without raising the rail', () => {
+    render(
+      <EntityTabbedRail
+        isOpen
+        ariaLabel='Analytics'
+        activeTab='details'
+        onTabChange={() => undefined}
+        tabOptions={TABS}
+        tabsAriaLabel='Analytics tabs'
+        tabbedCardTestId='analytics-tabbed-card'
+        tabbedSurfaceVariant='card'
+        testId='analytics-rail'
+      >
+        <div>Ranked cities</div>
+      </EntityTabbedRail>
+    );
+
+    const rail = screen.getByTestId('analytics-rail');
+    expect(rail.querySelector('[data-right-rail-workspace]')).toHaveAttribute(
+      'data-surface-variant',
+      'flat'
+    );
+    const card = screen.getByTestId('analytics-tabbed-card');
+    expect(card).toHaveAttribute('data-surface-variant', 'card');
+    expect(card.className).toContain('rounded-lg');
+  });
+
   it('places the empty state directly on the flat rail and omits tab chrome', () => {
     const { container } = render(
       <EntityTabbedRail
@@ -90,5 +117,30 @@ describe('EntityTabbedRail', () => {
     expect(
       container.querySelectorAll('[data-surface-variant="card"]')
     ).toHaveLength(0);
+  });
+
+  it('keeps the entity header but drops the tab chrome when hideTabbedCard is set', () => {
+    render(
+      <EntityTabbedRail
+        isOpen
+        ariaLabel='Analytics'
+        activeTab='details'
+        onTabChange={() => undefined}
+        tabOptions={TABS}
+        tabsAriaLabel='Analytics tabs'
+        entityHeader={<div>Header with its own empty state</div>}
+        tabbedCardTestId='entity-tabbed-card'
+        hideTabbedCard
+      >
+        <div>Hidden ranked list</div>
+      </EntityTabbedRail>
+    );
+
+    expect(
+      screen.getByText('Header with its own empty state')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('entity-tabbed-card')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hidden ranked list')).not.toBeInTheDocument();
   });
 });

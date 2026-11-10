@@ -508,7 +508,7 @@ describe('InlineChatArea tool invocation rendering', () => {
     expect(mockHandleRetry).toHaveBeenCalledTimes(1);
   });
 
-  it('renders a compact status row for unknown tools', () => {
+  it('never renders raw bookkeeping for an unconfirmed tool (default view)', () => {
     mockMessages = [
       {
         id: 'msg-1',
@@ -529,12 +529,35 @@ describe('InlineChatArea tool invocation rendering', () => {
 
     renderInlineChat();
 
-    const statusRow = screen.getByTestId('tool-status-row');
-    expect(statusRow.getAttribute('data-tool-name')).toBe('summarizeAudience');
-    expect(statusRow).toHaveAttribute('data-operation-status', 'unknown');
-    expect(
-      screen.getByText('Completion has not been confirmed.')
-    ).toBeDefined();
+    expect(screen.queryByTestId('tool-status-row')).toBeNull();
+    expect(screen.queryByText(/Completion has not been confirmed/)).toBeNull();
+    expect(screen.queryByText(/status unknown/)).toBeNull();
+  });
+
+  it('shows the unconfirmed row only in verbose mode', () => {
+    window.localStorage.setItem('jovie:chat-verbose', '1');
+    try {
+      mockMessages = [
+        {
+          id: 'msg-1',
+          role: 'assistant',
+          parts: [
+            {
+              type: 'dynamic-tool',
+              toolName: 'summarizeAudience',
+              toolCallId: 'tool-5',
+              state: 'output-available',
+              output: { summary: 'Audience summary complete.' },
+            },
+          ],
+        },
+      ];
+      renderInlineChat();
+      const statusRow = screen.getByTestId('tool-status-row');
+      expect(statusRow).toHaveAttribute('data-operation-status', 'unknown');
+    } finally {
+      window.localStorage.removeItem('jovie:chat-verbose');
+    }
   });
 });
 

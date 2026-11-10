@@ -1,12 +1,18 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { getAuthenticatedAuthEntryRedirectFromParams } from '@/lib/auth/access-route-redirect';
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
 import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
+import { documentTitle } from '@/lib/seo/document-title';
 import { SignInPageClient } from './SignInPageClient';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: documentTitle('Log in to Jovie'),
+};
 
 export default async function SignInPage({
   searchParams,

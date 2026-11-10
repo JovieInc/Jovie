@@ -67,6 +67,24 @@ describe('LibraryPageClient stages', () => {
     );
   });
 
+  it.each([
+    'all',
+    'releases',
+    'merch',
+    'images',
+    'videos',
+    'audio',
+    'documents',
+    'archived',
+  ])('keeps the asset catalog for the %s preset', preset => {
+    search.value = `preset=${preset}&mode=table`;
+    render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
+    expect(screen.getByText('Catalog panel')).toHaveAttribute(
+      'data-catalog-view',
+      'assets'
+    );
+  });
+
   it('keeps the asset catalog for other library view filters', () => {
     search.value = 'view=merch';
     render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);

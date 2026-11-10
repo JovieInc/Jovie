@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/SuggestedDspMatches.test.tsx
+
 import { Button, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import { Check, ExternalLink, Loader2, X } from 'lucide-react';
 import Image from 'next/image';
@@ -125,9 +127,7 @@ export function SuggestedDspMatches({ profileId }: SuggestedDspMatchesProps) {
 function SectionHeading({ count }: { readonly count: number }) {
   return (
     <div className='flex items-center gap-2 px-2'>
-      <span className='text-2xs font-book uppercase tracking-widest text-tertiary-token'>
-        Suggested
-      </span>
+      <span className='text-2xs font-book text-tertiary-token'>Suggested</span>
       {count > 0 && (
         <span className='inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-surface-1 px-1 text-3xs font-caption text-tertiary-token'>
           {count}
@@ -186,47 +186,47 @@ function SuggestedMatchRow({
     >
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
         <PopoverTrigger asChild>
-          <span className='contents'>
+          <button type='button' className='contents'>
             <DspProviderIcon provider={match.providerId} size='sm' />
             <span className='min-w-0 flex-1 truncate text-app font-book text-primary-token'>
               {match.externalArtistName || label}
             </span>
-            <div className='flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 max-lg:opacity-100'>
-              <button
-                type='button'
-                onClick={e => {
-                  e.stopPropagation();
-                  onConfirm();
-                }}
-                disabled={isLoading}
-                className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-success focus-visible:bg-surface-2 focus-visible:text-success focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus'
-                aria-label={`Confirm ${label} match for ${match.externalArtistName || 'Unknown'}`}
-              >
-                {isConfirming ? (
-                  <Loader2 className='h-3.5 w-3.5 animate-spin' />
-                ) : (
-                  <Check className='h-3.5 w-3.5' />
-                )}
-              </button>
-              <button
-                type='button'
-                onClick={e => {
-                  e.stopPropagation();
-                  onReject();
-                }}
-                disabled={isLoading}
-                className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-error focus-visible:bg-surface-2 focus-visible:text-error focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus'
-                aria-label={`Reject ${label} match for ${match.externalArtistName || 'Unknown'}`}
-              >
-                {isRejecting ? (
-                  <Loader2 className='h-3.5 w-3.5 animate-spin' />
-                ) : (
-                  <X className='h-3.5 w-3.5' />
-                )}
-              </button>
-            </div>
-          </span>
+          </button>
         </PopoverTrigger>
+        <div className='flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 max-lg:opacity-100'>
+          <button
+            type='button'
+            onClick={e => {
+              e.stopPropagation();
+              onConfirm();
+            }}
+            disabled={isLoading}
+            className='relative inline-flex h-7 w-7 items-center before:absolute before:inset-x-0 before:top-1/2 before:h-10 before:-translate-y-1/2 justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-success focus-visible:bg-surface-2 focus-visible:text-success focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus'
+            aria-label={`Confirm ${label} match for ${match.externalArtistName || 'Unknown'}`}
+          >
+            {isConfirming ? (
+              <Loader2 className='h-3.5 w-3.5 animate-spin' />
+            ) : (
+              <Check className='h-3.5 w-3.5' />
+            )}
+          </button>
+          <button
+            type='button'
+            onClick={e => {
+              e.stopPropagation();
+              onReject();
+            }}
+            disabled={isLoading}
+            className='relative inline-flex h-7 w-7 items-center before:absolute before:inset-x-0 before:top-1/2 before:h-10 before:-translate-y-1/2 justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-error focus-visible:bg-surface-2 focus-visible:text-error focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus'
+            aria-label={`Reject ${label} match for ${match.externalArtistName || 'Unknown'}`}
+          >
+            {isRejecting ? (
+              <Loader2 className='h-3.5 w-3.5 animate-spin' />
+            ) : (
+              <X className='h-3.5 w-3.5' />
+            )}
+          </button>
+        </div>
         <PopoverContent
           side='left'
           sideOffset={8}

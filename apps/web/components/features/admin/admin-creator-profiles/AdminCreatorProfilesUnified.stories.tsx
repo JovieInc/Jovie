@@ -157,16 +157,6 @@ const meta: Meta<typeof AdminCreatorProfilesUnified> = {
         { name: 'dark', value: '#0D0E12' },
       ],
     },
-    a11y: {
-      config: {
-        rules: [
-          {
-            id: 'color-contrast',
-            enabled: true,
-          },
-        ],
-      },
-    },
   },
   tags: ['autodocs', 'creators-a11y'],
   decorators: [

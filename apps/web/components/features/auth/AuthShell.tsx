@@ -4,7 +4,6 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthProviderButtonSlot } from '@/features/auth/AuthProviderButtons';
 import { track } from '@/lib/analytics';
@@ -46,6 +45,7 @@ import {
   MOBILE_RETURN_PARAM,
   sanitizeMobileReturnRoute,
 } from '@/lib/mobile/auth-return';
+import { cn } from '@/lib/utils';
 import { logger } from '@/lib/utils/logger';
 import { preserveAuthTouchOwnership } from './constants';
 import { EmailCodeAuthForm } from './EmailCodeAuthForm';
@@ -230,8 +230,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     },
     [trackOfferAuthStarted]
   );
-  // Return through a server auth entry for canonical access/subscriber resolution.
-  // Native and explicit callback destinations retain their existing precedence.
+  // Return via a server auth entry; native/explicit callbacks keep precedence.
   const offerCallback =
     handoff &&
     !searchParams.get('auth_state') &&
@@ -409,6 +408,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
           redirectUrl={resolvedRedirect}
           initialEmailAddress={props.initialValues?.emailAddress}
           onOtpStepChange={handleOtpStepChange}
+          isPageSurface={!compact && !marketingCapture}
         />
       </div>
     );
@@ -440,6 +440,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
           otpStepActive
         }
         callbackURL={offerCallback ?? fallbackRedirectUrl}
+        inDialog={compact}
       />
       <AuthOAuthStartSurface
         mode={mode}
@@ -457,6 +458,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
         redirectUrl={resolvedRedirect}
         initialEmailAddress={props.initialValues?.emailAddress}
         onOtpStepChange={handleOtpStepChange}
+        isPageSurface={!compact && !marketingCapture}
       />
     </div>
   );
@@ -484,25 +486,25 @@ function AuthShellIdentity({
   intent,
   claimHandle,
   back,
+  align = 'center',
 }: Readonly<{
   intent: AuthShellIntent;
   claimHandle?: string;
   back: AuthShellBackLink | null;
+  /** Full-page shells read left-aligned and tight (Linear/Frame.io benchmark). */
+  align?: 'left' | 'center';
 }>) {
   return (
     <div
       data-auth-shell-identity
-      className='mb-6 flex flex-col items-center text-center'
+      className={cn(
+        'mb-6 flex flex-col',
+        align === 'left' ? 'items-start text-left' : 'items-center text-center'
+      )}
     >
       {back ? <AuthQuietBackLink href={back.href} label={back.label} /> : null}
-      <Link
-        href={APP_ROUTES.HOME}
-        aria-label='Go to homepage' // ui-casing-allow: matches AuthLayout logo link
-        className='auth-quiet-target focus-ring-themed mb-2 rounded-sm text-primary-token'
-      >
-        <BrandLogo size='chrome' tone='white' aria-hidden />
-      </Link>
-      <h1 className='max-w-full wrap-anywhere text-balance text-xl font-semibold leading-tight tracking-tight text-primary-token'>
+      {/* Pen oaz9c: the O-mark is off; the heading alone opens the column. */}
+      <h1 className='max-w-full wrap-anywhere text-balance text-xl font-semibold leading-6 tracking-tight text-primary-token'>
         {getAuthShellHeading(intent, claimHandle)}
       </h1>
     </div>
@@ -525,6 +527,7 @@ function AuthOAuthStartSurface({
   redirectUrl,
   initialEmailAddress,
   onOtpStepChange,
+  isPageSurface = false,
 }: Readonly<{
   mode: AuthShellMode;
   intent: AuthShellIntent;
@@ -545,76 +548,93 @@ function AuthOAuthStartSurface({
   redirectUrl: string;
   initialEmailAddress?: string;
   onOtpStepChange?: (active: boolean) => void;
+  /**
+   * Full-page routes render one hairline-bordered focal card with tight
+   * left-aligned type. Intercepted modals and the marketing email capture
+   * keep their centered overlay presentation.
+   */
+  isPageSurface?: boolean;
 }>) {
   const hasProviders = providers.length > 0;
   const providersBusy = !interactive || Boolean(pendingProvider);
+  // Pen oaz9c (Route /signin, auth column): one centered 360 column on the
+  // canvas, no card, on the page and in the dialog alike.
+  const align = 'center';
 
   return (
     <div data-auth-sso-surface>
-      <AuthShellIdentity
-        intent={intent}
-        claimHandle={claimHandle}
-        back={back}
-      />
-      {offerSummary ? (
-        <div
-          data-auth-offer-summary
-          className='mb-4 text-center text-secondary-token'
-        >
-          <p>{offerSummary.title}</p>
-          {offerSummary.detail ? <p>{offerSummary.detail}</p> : null}
+      <div
+        data-auth-surface-card
+        data-auth-surface={isPageSurface ? 'page' : 'overlay'}
+      >
+        <AuthShellIdentity
+          intent={intent}
+          claimHandle={claimHandle}
+          back={back}
+          align={align}
+        />
+        {offerSummary ? (
+          <div
+            data-auth-offer-summary
+            className={cn('mb-4 text-center text-secondary-token')}
+          >
+            <p>{offerSummary.title}</p>
+            {offerSummary.detail ? <p>{offerSummary.detail}</p> : null}
+          </div>
+        ) : null}
+
+        {hasProviders ? (
+          <fieldset
+            data-auth-provider-slots
+            className='grid grid-cols-1 gap-1'
+            aria-busy={providersBusy ? 'true' : undefined}
+          >
+            <legend className='sr-only'>Social sign-in options</legend>
+            {providers.map(provider => (
+              <AuthProviderButtonSlot
+                key={provider}
+                provider={provider}
+                disabled={!interactive || Boolean(pendingProvider)}
+                pending={interactive && pendingProvider === provider}
+                onClick={() => onProviderSelect(provider)}
+              />
+            ))}
+          </fieldset>
+        ) : null}
+
+        <div data-auth-email-form-slot className='mt-6'>
+          {hasProviders ? <AuthMethodDivider /> : null}
+          <EmailCodeAuthForm
+            mode={mode}
+            redirectUrl={redirectUrl}
+            initialEmailAddress={initialEmailAddress}
+            onOtpStepChange={onOtpStepChange}
+            align={align}
+          />
         </div>
-      ) : null}
 
-      {hasProviders ? (
-        <fieldset
-          data-auth-provider-slots
-          className='grid grid-cols-1 gap-3'
-          aria-busy={providersBusy ? 'true' : undefined}
+        <div
+          data-auth-oauth-error-slot
+          className={cn('mt-3 min-h-5 text-center')}
+          aria-live='polite'
         >
-          <legend className='sr-only'>Social sign-in options</legend>
-          {providers.map(provider => (
-            <AuthProviderButtonSlot
-              key={provider}
-              provider={provider}
-              disabled={!interactive || Boolean(pendingProvider)}
-              pending={interactive && pendingProvider === provider}
-              onClick={() => onProviderSelect(provider)}
-            />
-          ))}
-        </fieldset>
-      ) : null}
+          {errorMessage ? (
+            <p
+              className='text-caption font-caption text-destructive'
+              role='alert'
+            >
+              {errorMessage}
+            </p>
+          ) : null}
+        </div>
 
-      <div data-auth-email-form-slot className='mt-4'>
-        {hasProviders ? <AuthMethodDivider /> : null}
-        <EmailCodeAuthForm
+        <AuthModeSwitchLink
           mode={mode}
-          redirectUrl={redirectUrl}
-          initialEmailAddress={initialEmailAddress}
-          onOtpStepChange={onOtpStepChange}
+          oppositeModeUrl={oppositeModeUrl}
+          forceHardNavigation={forceHardNavigation}
+          align={align}
         />
       </div>
-
-      <div
-        data-auth-oauth-error-slot
-        className='mt-3 min-h-5 text-center'
-        aria-live='polite'
-      >
-        {errorMessage ? (
-          <p
-            className='text-caption font-caption text-destructive'
-            role='alert'
-          >
-            {errorMessage}
-          </p>
-        ) : null}
-      </div>
-
-      <AuthModeSwitchLink
-        mode={mode}
-        oppositeModeUrl={oppositeModeUrl}
-        forceHardNavigation={forceHardNavigation}
-      />
 
       <AuthLegalText mode={mode} />
     </div>
@@ -623,12 +643,12 @@ function AuthOAuthStartSurface({
 
 function AuthMethodDivider() {
   return (
-    <div data-auth-method-divider className='mb-4 flex items-center gap-3'>
+    <div data-auth-method-divider className='mb-6 flex items-center gap-3'>
       <span
         className='h-px flex-1 bg-(--linear-border-subtle)'
         aria-hidden='true'
       />
-      <span className='text-2xs uppercase tracking-wide text-secondary-token'>
+      <span className='text-2xs font-medium text-tertiary-token'>
         or use email
       </span>
       <span
@@ -643,20 +663,25 @@ function AuthModeSwitchLink({
   mode,
   oppositeModeUrl,
   forceHardNavigation,
+  align = 'center',
 }: Readonly<{
   mode: AuthShellMode;
   oppositeModeUrl: string;
   forceHardNavigation: boolean;
+  align?: 'left' | 'center';
 }>) {
   const isSignUp = mode === 'sign-up';
   const className =
-    'auth-quiet-target focus-ring-themed rounded-sm text-primary-token underline underline-offset-2';
+    'auth-quiet-target focus-ring-themed rounded-sm text-app font-medium text-primary-token transition-opacity hover:opacity-80';
   const troubleHref = APP_ROUTES.SUPPORT;
 
   return (
     <div
       data-auth-mode-switch
-      className='mt-5 flex flex-col items-center gap-2 text-center text-app text-secondary-token'
+      className={cn(
+        'mt-1 flex flex-col text-app text-secondary-token',
+        align === 'left' ? 'items-start text-left' : 'items-center text-center'
+      )}
     >
       {isSignUp ? (
         <span>
@@ -698,7 +723,7 @@ function AuthLegalText({ mode }: Readonly<{ mode: AuthShellMode }>) {
   return (
     <p
       data-auth-legal-copy
-      className='mx-auto mt-8 max-w-sm text-center text-2xs leading-5 text-secondary-token'
+      className='mx-auto mt-6 max-w-sm text-center text-2xs leading-normal text-tertiary-token'
     >
       <span data-auth-legal-prefix className='block'>
         By {mode === 'sign-up' ? 'signing up' : 'continuing'}, you agree to our
@@ -706,14 +731,14 @@ function AuthLegalText({ mode }: Readonly<{ mode: AuthShellMode }>) {
       <span data-auth-legal-links className='block'>
         <Link
           href={termsHref}
-          className='focus-ring-themed whitespace-nowrap rounded-md py-0.5 text-primary-token underline underline-offset-2 transition-colors hover:text-primary-token'
+          className='focus-ring-themed whitespace-nowrap rounded-md py-0.5 text-primary-token transition-opacity hover:opacity-80'
         >
           Terms of Service
         </Link>{' '}
         and{' '}
         <Link
           href={privacyHref}
-          className='focus-ring-themed whitespace-nowrap rounded-md py-0.5 text-primary-token underline underline-offset-2 transition-colors hover:text-primary-token'
+          className='focus-ring-themed whitespace-nowrap rounded-md py-0.5 text-primary-token transition-opacity hover:opacity-80'
         >
           Privacy Policy
         </Link>

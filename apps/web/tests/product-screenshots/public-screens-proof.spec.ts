@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 import { installPublicRouteMocks } from '../e2e/utils/public-surface-helpers';
 import { waitForHydration } from '../e2e/utils/smoke-test-utils';
 import { collectBrowserErrors } from '../visual-qa/route-quality';
@@ -104,7 +105,15 @@ test('emits exact-head public screen evidence', async ({ page }) => {
         200
       );
       const finalUrl = new URL(page.url());
-      expect(finalUrl.pathname).toBe(screen.route);
+      // Closed public signup (canon/PRODUCT.md, 2026-11-02) hands the
+      // anonymous /start entry to the waitlist role form; the proof follows
+      // the real anonymous journey and certifies the page that actually
+      // renders. Every other screen keeps its exact-route contract.
+      const allowedPaths =
+        screen.screenId === 'web.start'
+          ? [screen.route, '/waitlist']
+          : [screen.route];
+      expect(allowedPaths).toContain(finalUrl.pathname);
       expect(finalUrl.search).toBe('');
       expect(finalUrl.hash).toBe('');
       await waitForHydration(page);
@@ -121,7 +130,7 @@ test('emits exact-head public screen evidence', async ({ page }) => {
       });
 
       const accessibility = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .options(wcag22AaAxeOptions())
         .analyze();
       expect(accessibility.violations).toEqual([]);
 

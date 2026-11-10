@@ -1464,6 +1464,11 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
       expect(readFileSync(join(artifactDir, 'prompt.txt'), 'utf8')).toContain(
         'Conflicting files: safe.txt'
       );
+      const prompt = readFileSync(join(artifactDir, 'prompt.txt'), 'utf8');
+      expect(prompt).toContain('retain base-added destinations');
+      expect(prompt).toContain("preserve the PR's explicit retirements");
+      expect(prompt).toContain('keep current base labels');
+      expect(prompt).toContain('desktop and mobile navigation');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -1613,6 +1618,7 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
     expect(fxJob).toContain('FX_MODEL: zai/glm-5.3');
     expect(fxJob).not.toContain('actions/create-github-app-token@');
     expect(fxJob).not.toContain('JOVIE_BOT_PRIVATE_KEY');
+    expect(fxJob).not.toContain('SYMPHONY_APP_PRIVATE_KEY');
     const preSpendStep = workflowStep(
       'Recheck live PR identity and queue before FX spend'
     );
@@ -1634,6 +1640,7 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
     expect(modelStep).not.toMatch(/\b(?:git|gh|pnpm|npm|yarn)\s/u);
     expect(modelStep).not.toMatch(/--(?:auto|yolo)\b/u);
     expect(modelStep).not.toContain('JOVIE_BOT_PRIVATE_KEY');
+    expect(modelStep).not.toContain('SYMPHONY_APP_PRIVATE_KEY');
     expect(modelStep).not.toContain('GH_TOKEN');
     for (const runBody of workflowRunBodies()) {
       expect(runBody).not.toMatch(/\$\{\{\s*(?:matrix\.|github\.event)/u);
@@ -1665,9 +1672,9 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
     expect(writerTokenStep).toMatch(
       /if:\s*[^\n]*steps\.prevalidate\.outputs\.(?:trusted|validated|deliverable)[^\n]*==\s*['"]true['"]/u
     );
-    expect(WORKFLOW).toContain('app-id: ${{ vars.JOVIE_BOT_APP_ID }}');
+    expect(WORKFLOW).toContain('app-id: ${{ vars.SYMPHONY_APP_ID }}');
     expect(WORKFLOW).toContain(
-      'private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}'
+      'private-key: ${{ secrets.SYMPHONY_APP_PRIVATE_KEY }}'
     );
     expect(WORKFLOW).toContain(
       'GH_TOKEN: ${{ steps.app-token.outputs.token }}'
@@ -1675,10 +1682,10 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
     expect(WORKFLOW).toContain('expected-merge-manifest.json');
     expect(WORKFLOW).toContain('candidate-merge-manifest.json');
     expect(WORKFLOW).toContain(
-      'git show "$BASE_HEAD:scripts/lib/blog-content-ci.mjs"'
+      'git --no-replace-objects show "$BASE_HEAD:scripts/lib/trusted-test-planner-snapshot.mjs"'
     );
     expect(WORKFLOW).toContain(
-      'trusted-blog-content-ci.mjs:/workspace/scripts/lib/blog-content-ci.mjs:ro'
+      'trusted-planner/files/$path:/workspace/$path:ro'
     );
     expect(WORKFLOW).toContain('live_conflict_files');
     expect(WORKFLOW).toMatch(
@@ -1702,6 +1709,7 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
       expect(step).not.toContain('git config --global');
     }
     expect(prepare).not.toContain('JOVIE_BOT_PRIVATE_KEY');
+    expect(prepare).not.toContain('SYMPHONY_APP_PRIVATE_KEY');
     expect(prepare).not.toContain('GH_TOKEN');
   });
 

@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  capabilityDraftSchema,
+  compileOutcomeCommandSchema,
+} from './outcome-contract';
 
 const ref = z.string().trim().min(1).max(1000);
 const id = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/u);
@@ -89,6 +93,7 @@ export const demandAllocationPlanSchema = z
   .object({
     id,
     kind,
+    capabilityDraft: capabilityDraftSchema.optional(),
     observations: z.array(observation).min(1).max(100),
     context: z
       .object({
@@ -134,14 +139,12 @@ export const demandAllocationPlanSchema = z
 export type DemandAllocationPlan = z.infer<typeof demandAllocationPlanSchema>;
 
 export const demandAllocationCommandSchema = z.discriminatedUnion('op', [
-  z
-    .object({ op: z.literal('submit'), plan: demandAllocationPlanSchema })
-    .strict(),
-  z.object({ op: z.literal('reconcile') }).strict(),
   z.object({ op: z.literal('claim'), id, worker: id }).strict(),
+  compileOutcomeCommandSchema,
   z
     .object({ op: z.literal('complete'), id, worker: id, executionRef: ref })
     .strict(),
+  z.object({ op: z.literal('reconcile') }).strict(),
   z
     .object({
       op: z.literal('review'),
@@ -153,6 +156,9 @@ export const demandAllocationCommandSchema = z.discriminatedUnion('op', [
       metrics: demandMetricsSchema,
       evidenceRefs: z.array(ref).min(1).max(20),
     })
+    .strict(),
+  z
+    .object({ op: z.literal('submit'), plan: demandAllocationPlanSchema })
     .strict(),
 ]);
 export type DemandAllocationCommand = z.infer<

@@ -2,6 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { evaluateFleetRules } from '../pr-fleet-rules.mjs';
 import {
   evaluateForkMemberPolicy,
   githubRequest,
@@ -149,6 +150,7 @@ export function evaluateSourceAdmission({
       body: pr.body,
     }).blockers
   );
+  blockers.push(...evaluateFleetRules({ pr, files, repository }).errors);
   for (const label of pr.labels)
     if (HOLDS.has(label.name)) blockers.push(`hold:${label.name}`);
   try {
@@ -208,7 +210,12 @@ export function evaluateSourceAdmission({
     }
     if (
       status.creator.type !== 'Bot' ||
-      status.creator.login !== 'jovie-bot[bot]'
+      ![
+        'jovie-bot[bot]',
+        'jovie-ci-lane[bot]',
+        'jovie-symphony-lane[bot]',
+        'jovie-agents-lane[bot]',
+      ].includes(status.creator.login)
     )
       continue;
     if (

@@ -31,7 +31,9 @@ import { ChatUsageAlert } from './components/ChatUsageAlert';
 import type { PendingAudio } from './hooks/useChatAudioAttachments';
 import type { PendingFile } from './hooks/useChatFileAttachments';
 import { type ComposerDraft, useComposerDraft } from './hooks/useComposerDraft';
+import { useSourceFactsByMessage } from './source-evidence-context';
 import type { ChatError, MessagePart } from './types';
+import { isWeeklyPlanLimitError } from './utils';
 
 interface ChatComposerSurfaceProps {
   readonly chatInputProps: ChatInputProps;
@@ -197,6 +199,7 @@ export function ChatInlineError({
   isSubmitting,
   chatMode,
 }: ChatInlineErrorProps) {
+  if (isWeeklyPlanLimitError(chatError)) return null;
   return (
     <div
       className={`${CHAT_CONTENT_SHELL_CLASSNAME} pb-4`}
@@ -284,6 +287,7 @@ export function ChatThreadMessages({
     messages.length > 0 &&
     virtualizedMinHeight > 0;
   const renderVirtualWindow = shouldVirtualizeMessages && !virtualizerStuck;
+  const sourceFacts = useSourceFactsByMessage(messages);
   const renderMessage = (message: ChatThreadMessage, index: number) => {
     const isThinking =
       message.role === 'assistant' && message.status === 'pending';
@@ -297,6 +301,7 @@ export function ChatThreadMessages({
           id={message.id}
           role={message.role}
           parts={message.parts}
+          sourceFacts={sourceFacts.get(message.id)}
           isStreaming={isStreaming && index === lastAssistantIndex}
           isThinking={isThinking}
           avatarUrl={message.role === 'user' ? avatarUrl : undefined}
@@ -327,6 +332,14 @@ export function ChatThreadMessages({
               : `${collapsedFailureCount} earlier messages went unanswered. Show them`}
           </Button>
         </div>
+      ) : null}
+      {messages.length === 0 && !isStreaming ? (
+        <p
+          data-testid='chat-thread-empty'
+          className={`${CHAT_MESSAGE_CONTENT_SHELL_CLASSNAME} text-sm text-secondary-token`}
+        >
+          Nothing in this thread yet.
+        </p>
       ) : null}
       {renderVirtualWindow ? (
         <div

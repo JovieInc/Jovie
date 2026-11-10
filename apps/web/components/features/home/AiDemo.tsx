@@ -219,11 +219,11 @@ export function AiDemo({
   return (
     <figure
       ref={containerRef}
-      aria-label='AI writing demo'
+      aria-label='AI Writing Demo'
       className={cn(
         'overflow-hidden font-sans',
         isPremium
-          ? 'rounded-[1.35rem] border border-subtle bg-surface-1 shadow-panel-ring'
+          ? 'rounded-3xl border border-subtle bg-surface-1 shadow-panel-ring'
           : 'rounded-t-xl rounded-b-none bg-surface-0 shadow-panel-ring',
         className
       )}

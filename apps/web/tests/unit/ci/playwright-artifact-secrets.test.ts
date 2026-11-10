@@ -40,6 +40,7 @@ import {
   MAX_PLAYWRIGHT_PNG_WIDTH,
   validPlaywrightPng,
 } from '../../../../../scripts/lib/playwright-png.mjs';
+import productionSmokeProducers from './fixtures/production-smoke-producers.json';
 
 const webRoot = resolve(import.meta.dirname, '../../..');
 const repoRoot = resolve(webRoot, '../..');
@@ -66,7 +67,7 @@ function isPlaywrightConfigModule(
   );
 }
 const localTrace = Object.fromEntries(
-  'playwright.config.docs-guides.ts=off|playwright.config.dropdown.ts=retain-on-failure|playwright.config.screenshots.ts=off|playwright.config.visual-qa.ts=off|playwright.synthetic.config.ts=retain-on-failure'
+  'playwright.config.chat-comparison.ts=off|playwright.config.docs-guides.ts=off|playwright.config.dropdown.ts=retain-on-failure|playwright.config.screenshots.ts=off|playwright.config.visual-qa.ts=off|playwright.synthetic.config.ts=retain-on-failure'
     .split('|')
     .map(value => value.split('='))
 );
@@ -116,7 +117,7 @@ const producerStageExempt = new Set([
 ]);
 // Jobs that must keep the receipt even if their uploads move elsewhere.
 const producerStageRequired = [
-  ...'ci-fast-remaining ci-visual-snapshot-compare ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'
+  ...'ci-fast-remaining ci-visual-snapshot-compare ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-lighthouse-dashboard-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'
     .split(' ')
     .map(job => `ci.yml:${job}`),
   'e2e-full-matrix.yml:e2e-full-matrix',
@@ -155,6 +156,7 @@ const markdownAllowedJobs = new Set([
   'ci.yml:ci-e2e-smoke',
   'ci.yml:ci-e2e-tests',
   'ci.yml:ci-fast-remaining',
+  'ci.yml:ci-golden-path',
   'ci.yml:ci-smoke-required',
   'ci.yml:ci-storybook-surfaces',
   'ci.yml:ci-visual-snapshot-compare',
@@ -168,7 +170,14 @@ const markdownAllowedJobs = new Set([
   'claim-checkout-dogfood.yml:dogfood',
 ]);
 // Workflow-level secrets a Playwright child may inherit (remote build cache).
-const inheritedSecretAllowlist = new Set(['TURBO_TOKEN', 'TURBO_TEAM']);
+const inheritedSecretAllowlist = new Set([
+  'TURBO_TOKEN',
+  'TURBO_TEAM',
+  'CF_TURBO_CACHE_URL',
+  'CF_TURBO_CACHE_RO_TOKEN',
+  'CF_TURBO_CACHE_RW_TOKEN',
+  'CF_TURBO_SIGNATURE_KEY',
+]);
 const policyWorkflow = (file: string) =>
   parseYaml(readFileSync(join(workflowsRoot, file), 'utf8')) as PolicyWorkflow;
 const policyJob = (source: string): PolicyJob =>
@@ -682,6 +691,7 @@ function baseEnv(
 ): NodeJS.ProcessEnv {
   return {
     NODE_ENV: process.env.NODE_ENV,
+    NODE_V8_COVERAGE: process.env.NODE_V8_COVERAGE,
     PATH: process.env.PATH,
     HOME: process.env.HOME,
     GITHUB_WORKSPACE: workspace,
@@ -1264,6 +1274,14 @@ ${fixtureCheckout}
           ].map(name => `${file}:${id}:${name}`)
     );
     expect(violations).toEqual([]);
+    expect([...inheritedSecretAllowlist].sort()).toEqual([
+      'CF_TURBO_CACHE_RO_TOKEN',
+      'CF_TURBO_CACHE_RW_TOKEN',
+      'CF_TURBO_CACHE_URL',
+      'CF_TURBO_SIGNATURE_KEY',
+      'TURBO_TEAM',
+      'TURBO_TOKEN',
+    ]);
     expect(
       secretNames({ A: '${{ secrets.OPENAI_API_KEY }}', B: 'literal' })
     ).toEqual(['OPENAI_API_KEY']);
@@ -1306,20 +1324,18 @@ ${fixtureCheckout}
     expect(violations).toEqual([]);
     const reportJob = policyWorkflow('nightly-testing-agent.yml').jobs?.report;
     expect(reportJob?.permissions).toEqual({ contents: 'read' });
-    const reportToken = reportJob?.steps?.find(
-      step => step.id === 'report-token'
-    );
-    expect(reportToken?.with).toMatchObject({
-      'permission-contents': 'write',
-      'permission-pull-requests': 'write',
-    });
-    const commitReport = reportJob?.steps?.find(
-      step => step.name === 'Open nightly evidence PR'
-    );
-    expect(commitReport?.env?.GH_TOKEN).toBe(
-      '${{ steps.report-token.outputs.token }}'
-    );
-    expect(String(commitReport?.run)).not.toMatch(/\bgit\s+(?:pull|push)\b/);
+    // Evidence is data: the nightly report ships as a run artifact, never as
+    // a PR (#23906). The report job must not mint a publication token at all,
+    // so no bot credentials can reach it in any order.
+    expect(
+      reportJob?.steps?.some(step =>
+        /create-github-app-token@/.test(step.uses ?? '')
+      )
+    ).toBe(false);
+    expect(
+      reportJob?.steps?.some(step => step.name === 'Open nightly evidence PR')
+    ).toBe(false);
+    expect(JSON.stringify(reportJob)).not.toContain('JOVIE_BOT_PRIVATE_KEY');
     expect(reportJob?.env?.GH_TOKEN).toBeUndefined();
     for (const [file, jobId, stepName] of [
       ['screenshots.yml', 'publish', 'Create or update screenshot PR'],
@@ -1347,10 +1363,7 @@ ${fixtureCheckout}
       Object.entries(generate?.env ?? {})
         .filter(([name]) => isCredentialBearingName(name))
         .map(([name, value]) => `${name}: ${value}`)
-    ).toEqual([
-      'DATABASE_URL: postgresql://localhost/noop',
-      'CLERK_SECRET_KEY: sk_test_mock',
-    ]);
+    ).toEqual(['DATABASE_URL: postgresql://localhost/noop']);
     const publishSteps = publish?.steps ?? [];
     const tokenIndex = publishSteps.findIndex(step =>
       /create-github-app-token@/.test(step.uses ?? '')
@@ -1550,11 +1563,7 @@ ${fixtureCheckout}
   );
 
   it('requires step-scoped Markdown allowance for every production smoke producer', () => {
-    const expected = [
-      'postdeploy-probes.yml:auth-smoke:Run production auth smoke tests',
-      'production-controller.yml:ci-post-deploy-auth-smoke:Run production auth smoke tests',
-      'production-release.yml:promote-production:Prove canonical navigation budgets on exact staged build',
-    ];
+    const expected = productionSmokeProducers;
     const discovered = readdirSync(workflowsRoot)
       .filter(name => /\.ya?ml$/.test(name))
       .flatMap(file => {
@@ -2264,7 +2273,7 @@ ${fixtureCheckout}
     });
     expect(diagnostic.status).toBe(1);
     expect(`${diagnostic.stdout}\n${diagnostic.stderr}`).toContain(
-      'image-policy:"fake.png"'
+      'file-classes=image:1'
     );
     const sensitiveFile = join(workspace, 'person@example.com.png');
     write(sensitiveFile, invalid[0]);
@@ -2286,7 +2295,7 @@ ${fixtureCheckout}
     ).not.toContain('person@example.com');
     expect(
       `${sensitiveDiagnostic.stdout}\n${sensitiveDiagnostic.stderr}`
-    ).toContain('image-policy:"[sensitive]"');
+    ).toContain('file-classes=image:1');
     const outsideWorkspace = fixture();
     const outsideFile = join(outsideWorkspace, 'outside.png');
     write(outsideFile, invalid[0]);
@@ -2449,6 +2458,161 @@ ${fixtureCheckout}
     expect(() => resolveArtifactFiles(['real/safe.json'], rootAlias)).toThrow();
   });
 
+  it.each([
+    [
+      'report.json',
+      '{"headers":{"authorization":"Bearer fixture-only-value"}}',
+      'json',
+      'credential-text',
+    ],
+    [
+      'events.JSONL',
+      '{"env":[["API_KEY","fixture-only-value"]]}\n',
+      'jsonl',
+      'credential-text',
+    ],
+    [
+      'error-context.md',
+      '# Page snapshot\nAPI_KEY=fixture-only-value',
+      'markdown',
+      'credential-text',
+    ],
+    [
+      'broken.json',
+      '{"private-fragment":fixture-only-value',
+      'json',
+      'malformed-structured-text',
+    ],
+    [
+      'broken.jsonl',
+      '{}\n{"private-fragment":fixture-only-value',
+      'jsonl',
+      'malformed-structured-text',
+    ],
+    [
+      'broken.md',
+      Buffer.from([0xff, 0xfe]),
+      'markdown',
+      'malformed-structured-text',
+    ],
+    ['capture.png', 'not a PNG', 'image', 'image-policy'],
+    [
+      'trace.zip',
+      'private container payload',
+      'container',
+      'forbidden-container',
+    ],
+    [
+      'unrecognized.bin',
+      'private unknown payload',
+      'unknown',
+      'unknown-binary',
+    ],
+  ])(
+    'emits bounded rejection diagnostics for %s',
+    (name, contents, fileClass, category) => {
+      const workspace = fixture();
+      const runner = fixture();
+      // Identity-like text, a credential-like fragment, control characters and
+      // Actions syntax belong only to the fixture path, never to diagnostics.
+      const adversarial = join(
+        workspace,
+        'person@example.invalid',
+        'token=fixture-only-value',
+        '::error::injected\n%0A',
+        name
+      );
+      write(adversarial, contents);
+      const expected = `PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=${category}:1; file-classes=${fileClass}:1\n`;
+      for (const reportPaths of ['false', 'true']) {
+        const result = spawnSync(process.execPath, [guardScript, adversarial], {
+          cwd: workspace,
+          encoding: 'utf8',
+          env: baseEnv(workspace, runner, {
+            GITHUB_ACTIONS: 'false',
+            PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+            PLAYWRIGHT_ARTIFACT_REPORT_PATHS: reportPaths,
+            PLAYWRIGHT_ARTIFACT_STAGE_DIR: join(runner, 'must-not-stage'),
+          }),
+        });
+        expect(result.status).toBe(1);
+        expect(result.stdout).toBe('');
+        expect(result.stderr).toBe(expected);
+        expect(existsSync(join(runner, 'must-not-stage'))).toBe(false);
+      }
+    }
+  );
+
+  it('aggregates rejected file classes without listing files or counting secret occurrences', () => {
+    const workspace = fixture();
+    const runner = fixture();
+    for (let index = 0; index < 120; index++) {
+      write(
+        join(workspace, 'out', `person-${index}@example.invalid.json`),
+        JSON.stringify({
+          API_KEY: 'fixture-only-value',
+          PASSWORD: 'another-fixture-value',
+        })
+      );
+    }
+    write(
+      join(workspace, 'out/error-context.md'),
+      'API_KEY=fixture-only-value'
+    );
+    write(join(workspace, 'out/trace.har'), '{}');
+    write(join(workspace, 'out/unknown.custom-extension'), 'private');
+    write(join(workspace, 'out/safe.json'), '{}');
+    const result = runChild(workspace, runner, 'process.exit(23)', {
+      GITHUB_ACTIONS: 'false',
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+      PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true',
+    });
+    expect(result.status).toBe(23);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe(
+      'PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 123 unsafe or unverifiable Playwright artifact file(s); categories=credential-text:121,forbidden-container:1,unknown-binary:1; file-classes=container:1,json:120,markdown:1,unknown:1\n'
+    );
+    expect(result.stderr.length).toBeLessThan(512);
+    expect(existsSync(join(runner, 'safe-playwright-producer/blocked'))).toBe(
+      true
+    );
+    expect(existsSync(join(runner, 'safe-playwright-producer/current'))).toBe(
+      false
+    );
+    const retry = runChild(
+      workspace,
+      runner,
+      "require('node:fs').writeFileSync('child-ran','1')",
+      { GITHUB_ACTIONS: 'false' }
+    );
+    expect(retry.status).toBe(1);
+    expect(existsSync(join(workspace, 'child-ran'))).toBe(false);
+    expect(retry.stderr).toBe(
+      'PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=inspection-error:1; file-classes=unknown:1\n'
+    );
+  });
+
+  it('uses unknown for inspection failures without exposing raw errors or requested paths', () => {
+    const workspace = fixture();
+    const result = spawnSync(
+      process.execPath,
+      [guardScript, 'missing-person@example.invalid.json'],
+      {
+        cwd: workspace,
+        encoding: 'utf8',
+        env: baseEnv(workspace, fixture(), {
+          PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true',
+        }),
+      }
+    );
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe(
+      'PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=inspection-error:1; file-classes=unknown:1\n' +
+        '::error::PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=inspection-error:1; file-classes=unknown:1\n'
+    );
+  });
+
   it.each([undefined, 'false'])(
     'does not print mask commands outside GitHub Actions (%s)',
     githubActions => {
@@ -2472,6 +2636,37 @@ ${fixtureCheckout}
       );
     }
   );
+
+  it('surfaces the bounded rejection counts as an Actions error annotation', () => {
+    const workspace = fixture();
+    const runner = fixture();
+    const leakChild =
+      "const f=require('node:fs');f.mkdirSync('out',{recursive:true});f.writeFileSync('out/report.json',JSON.stringify({leak:process.env.FLAGS_SECRET}));console.log('ANNOTATION_CHILD')";
+    const counts =
+      'blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=credential-text:1; file-classes=json:1';
+
+    // In Actions the counts-only line is duplicated as a step error annotation
+    // so a fresh failing step is diagnosable from check annotations without
+    // admin job-log access (run 39820205877 class). Content is identical to
+    // the stderr line — never paths, file names, or values.
+    const annotated = runChild(workspace, runner, leakChild, {
+      FLAGS_SECRET: 'annotation-sentinel-secret',
+    });
+    expect(annotated.status).toBe(1);
+    expect(annotated.stdout).toContain('ANNOTATION_CHILD');
+    expect(annotated.stderr).toBe(
+      `PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: ${counts}\n::error::PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: ${counts}\n`
+    );
+
+    const plain = runChild(fixture(), fixture(), leakChild, {
+      FLAGS_SECRET: 'annotation-sentinel-secret',
+      GITHUB_ACTIONS: 'false',
+    });
+    expect(plain.status).toBe(1);
+    expect(plain.stderr).toBe(
+      `PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: ${counts}\n`
+    );
+  });
 
   it('masks before the child, scans after failure, and permanently poisons leaks', () => {
     const workspace = fixture();

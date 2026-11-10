@@ -7,6 +7,7 @@
 
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-server';
+import { PUBLIC_SUBMISSION_RATE_LIMITERS } from './public-submission-config';
 import type { RateLimitConfig } from './types';
 
 // ============================================================================
@@ -47,9 +48,15 @@ const ALBUM_ART_GENERATION_BURST_LIMIT = parseIntEnv(
 // Rate Limiter Configurations
 // ============================================================================
 
-/**
- * All rate limiter configurations in the application
- */
+const UNVERIFIED_ONBOARDING_LIMIT = {
+  window: '1 h',
+  analytics: false,
+  algorithm: 'fixed-window',
+  trafficClass: 'anonymous',
+  requireRedis: true,
+} as const;
+
+/** All rate limiter configurations in the application */
 export const RATE_LIMITERS = {
   // ---------------------------------------------------------------------------
   // Authentication & User Operations
@@ -183,6 +190,23 @@ export const RATE_LIMITERS = {
    * outage rather than hard-failing a new visitor's first message. Subsequent
    * turns stay fail-closed via the IP/ASN/session limiters below.
    */
+  /**
+   * Canary passage tokens for the /start bot check (JOV-9625): 12 granted
+   * passages per hour across all canary runs. A production certification
+   * run uses one. Fail closed without Redis: when exceeded or unavailable the
+   * request falls back to the real Turnstile verification.
+   */
+  syntheticPassageToken: {
+    name: 'Synthetic Passage Token',
+    limit: 12,
+    window: '1 h',
+    prefix: 'synthetic_passage_token',
+    requireRedis: true,
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'internal',
+  } satisfies RateLimitConfig,
+
   anonymousOnboardingChatFirstTouch: {
     name: 'Anonymous Onboarding Chat (First Touch)',
     limit: 20,
@@ -193,6 +217,20 @@ export const RATE_LIMITERS = {
     trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
+  /** Fail-open /start: fresh chats whose Turnstile check failed, per IP. */
+  anonymousOnboardingChatUnverifiedIp: {
+    name: 'Anonymous Onboarding Chat (Unverified, IP)',
+    limit: 4,
+    prefix: 'anon_onb_chat_unverified_ip',
+    ...UNVERIFIED_ONBOARDING_LIMIT,
+  } satisfies RateLimitConfig,
+  /** Global hourly AI cost ceiling on unverified fresh chats. */
+  anonymousOnboardingChatUnverifiedGlobal: {
+    name: 'Anonymous Onboarding Chat (Unverified, Global)',
+    limit: 120,
+    prefix: 'anon_onb_chat_unverified_global',
+    ...UNVERIFIED_ONBOARDING_LIMIT,
+  } satisfies RateLimitConfig,
   /** Anonymous onboarding chat: 20 messages per hour per IP */
   anonymousOnboardingChatIp: {
     name: 'Anonymous Onboarding Chat (IP)',
@@ -456,6 +494,22 @@ export const RATE_LIMITERS = {
   } satisfies RateLimitConfig,
 
   /**
+   * Global ceiling for agent draft writes (MCP + REST), keyed by a constant.
+   * Bounds total write volume when per-caller keys (session/installation) are
+   * spoofed. Sized for marketplace traffic from many shared egress IPs.
+   */
+  agentWriteGlobal: {
+    name: 'Agent Write Global',
+    limit: 600,
+    window: '1 h',
+    prefix: 'public:agent-write-global',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
+  /**
    * Anonymous creator extraction (GET /api/agents/creator-lookup): 60 per hour
    * per IP. Each request performs one bounded fetch to a supported platform.
    */
@@ -625,17 +679,7 @@ export const RATE_LIMITERS = {
     requireRedis: true,
   } satisfies RateLimitConfig,
 
-  /** Changelog subscribe: 1 request per 10 seconds per IP */
-  changelogSubscribe: {
-    name: 'Changelog Subscribe',
-    limit: 1,
-    window: '10 s',
-    prefix: 'changelog:subscribe',
-    analytics: false,
-    algorithm: 'fixed-window',
-    trafficClass: 'anonymous',
-    requireRedis: true,
-  } satisfies RateLimitConfig,
+  ...PUBLIC_SUBMISSION_RATE_LIMITERS,
 
   // ---------------------------------------------------------------------------
   // Spotify Ingest Operations

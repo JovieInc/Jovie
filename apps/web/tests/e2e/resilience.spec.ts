@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Route, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { ensureSignedInUser, hasClerkCredentials } from '../helpers/auth';
 
@@ -70,9 +70,7 @@ test.describe('Slow network resilience', () => {
     await ensureSignedInUser(page);
   });
 
-  // JOV-8791: no visible loading/error state; spec also targets a stale
-  // audience endpoint. Re-enable with the fix.
-  test.fixme('dashboard profile page shows content or loading state under API delay', async ({
+  test('dashboard profile page shows content or loading state under API delay', async ({
     page,
   }) => {
     test.skip(
@@ -137,24 +135,45 @@ test.describe('API failure resilience', () => {
     await ensureSignedInUser(page);
   });
 
-  // JOV-8791: no visible loading/error state; spec also targets a stale
-  // audience endpoint. Re-enable with the fix.
-  test.fixme('audience page shows error UI (not blank) when audience API returns 500', async ({
+  test('audience page shows error UI (not blank) when audience API returns 500', async ({
     page,
-  }) => {
+  }, testInfo) => {
     test.skip(
       FAST_ITERATION,
       'Injected API-failure resilience runs in the slower resilience lane'
     );
     test.setTimeout(120_000);
 
-    await page.route('**/api/audience/**', route => {
-      route.fulfill({
+    // Failure-path receipts: on a red run, attach what the page actually
+    // showed (body text, page errors, failed responses) so the failure names
+    // its own mechanism (chromium-only blank, run 41161376382).
+    const pageErrors: string[] = [];
+    const failedResponses: string[] = [];
+    page.on('pageerror', error =>
+      pageErrors.push(String(error).split('\n')[0]?.slice(0, 300) ?? '')
+    );
+    page.on('response', response => {
+      if (response.status() >= 400) {
+        failedResponses.push(`${response.status()} ${response.url()}`);
+      }
+    });
+
+    // Legacy audience endpoints (visit/click/opt-in) and the current audience
+    // list data endpoint (/api/dashboard/audience/** used by
+    // useAudienceInfiniteQuery) both fail — the page must show error UI, not
+    // a blank surface (JOV-8791).
+    // routedRequests 0 in a red receipt: the failure path never ran.
+    let routedRequests = 0;
+    const fail500 = (route: Route) => {
+      routedRequests += 1;
+      return route.fulfill({
         status: 500,
         contentType: 'application/json',
         body: JSON.stringify({ error: 'Service unavailable' }),
       });
-    });
+    };
+    await page.route('**/api/audience/**', fail500);
+    await page.route('**/api/dashboard/audience/**', fail500);
 
     const response = await gotoWithRetry(page, APP_ROUTES.AUDIENCE, {
       waitUntil: 'domcontentloaded',
@@ -183,13 +202,37 @@ test.describe('API failure resilience', () => {
         .innerText()
         .catch(() => '')) ?? '';
 
-    expect(
-      bodyText.trim().length,
-      'Audience page is completely blank after API 500 — error boundary missing'
-    ).toBeGreaterThan(100);
+    try {
+      expect(
+        bodyText.trim().length,
+        'Audience page is completely blank after API 500 — error boundary missing'
+      ).toBeGreaterThan(100);
 
-    expect(bodyText.toLowerCase()).not.toContain('unhandled runtime error');
-    expect(bodyText.toLowerCase()).not.toContain('minified react error');
+      expect(bodyText.toLowerCase()).not.toContain('unhandled runtime error');
+      expect(bodyText.toLowerCase()).not.toContain('minified react error');
+    } catch (error) {
+      await testInfo
+        .attach('audience-failure-receipts.json', {
+          body: JSON.stringify(
+            {
+              url: page.url(),
+              bodyTextExcerpt: bodyText.slice(0, 2000),
+              bodyTextLength: bodyText.trim().length,
+              routedRequests,
+              pageErrors,
+              failedResponses,
+            },
+            null,
+            2
+          ),
+          contentType: 'application/json',
+        })
+        .catch(() => undefined);
+      process.stdout.write(
+        `${JSON.stringify({ name: 'audience-api-500', url: page.url(), bodyTextLength: bodyText.trim().length, bodyTextExcerpt: bodyText.trim().slice(0, 200), routedRequests, pageErrors, failedResponses: failedResponses.slice(0, 20) })}\n`
+      );
+      throw error;
+    }
   });
 });
 

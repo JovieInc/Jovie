@@ -1167,7 +1167,7 @@
         "requiredEvidence": ["web-desktop", "web-mobile", "macos-electron"],
         "blindSpots": [
           "Rendered screen certification runs only after merge (screenshots.yml) and is red on main; nothing blocks before merge.",
-          "Header/title alignment tolerance in storybook-elevation equals 2px + content inset; title x has only a lower bound (JOV-7207 audit).",
+          "storybook-elevation bounds the desktop title to ±1px of the controls' right edge on both sides, with no content-inset allowance. Packaged macOS traffic-light certification remains JOV-7710 and is not a pre-merge gate.",
           "Zoom/text-resize never exercised."
         ],
         "remediationOwner": "JOV-7710"
@@ -1805,7 +1805,8 @@
       "id": "ESC-UI-002",
       "summary": "Old chevron/arrow-style rail controls re-entered the shell",
       "issue": "JOV-7207",
-      "caught": false,
+      "caught": true,
+      "fixture": "apps/web/tests/unit/design-system/rail-icon-family.test.tsx",
       "row": "AM-015"
     },
     {
@@ -1855,14 +1856,16 @@
       "id": "ESC-UI-009",
       "summary": "Titlebar/top-row grid seam: header origin inside an extra content inset",
       "issue": "JOV-7207",
-      "caught": false,
+      "caught": true,
+      "fixture": "apps/web/tests/unit/components/organisms/AppShellFrame.test.tsx",
       "row": "AM-016"
     },
     {
       "id": "ESC-UI-010",
       "summary": "Inset dark header strip inside rounded main surface (header/body seam)",
       "issue": "JOV-7207",
-      "caught": false,
+      "caught": true,
+      "fixture": "apps/web/tests/product-screenshots/route-dom-certification.spec.ts",
       "row": "AM-017"
     }
   ]

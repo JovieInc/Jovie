@@ -204,6 +204,45 @@ describe('Auto-Ready provenance selector', () => {
     ).toEqual({ eligible: false, reason: 'writer-proof-proof-missing' });
   });
 
+  it('lets a trusted writer opt in to ship on green instead of a receipt', () => {
+    const marker = '<!-- jovie-auto-ready: on-green -->';
+    // The writer-proof path readies drafts with checks still pending, so the
+    // opt-in must never pass there; only green-source sets greenSource.
+    expect(promotion({ body: marker })).toEqual({
+      eligible: false,
+      reason: 'writer-proof-proof-missing',
+    });
+    const body = marker;
+    const greenSource = true;
+    expect(promotion({ body, greenSource })).toEqual({
+      eligible: true,
+      reason: 'writer-on-green-opt-in',
+    });
+    expect(
+      promotion({ body, greenSource, authorLogin: 'jovie-bot[bot]' })
+    ).toEqual({
+      eligible: true,
+      reason: 'writer-on-green-opt-in',
+    });
+    expect(
+      promotion({ body, greenSource, authorLogin: 'outside-contributor' })
+    ).toEqual({
+      eligible: false,
+      reason: 'writer-proof-proof-missing',
+    });
+    expect(promotion({ body, greenSource, labels: ['hold'] })).toEqual({
+      eligible: false,
+      reason: 'held',
+    });
+    expect(
+      promotion({
+        body,
+        greenSource,
+        title: '[canary] prove the gate stays red',
+      })
+    ).toEqual({ eligible: false, reason: 'controlled-proof' });
+  });
+
   it('allows an exact author-owned proof receipt on any branch', () => {
     expect(promotion()).toEqual({
       eligible: true,
@@ -393,9 +432,9 @@ describe('Auto-Ready App-token workflow', () => {
       'actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510';
     expect(workflow).toContain(tokenAction);
     expect(workflow).toContain('id: app-token');
-    expect(workflow).toContain('app-id: ${{ vars.JOVIE_BOT_APP_ID }}');
+    expect(workflow).toContain('app-id: ${{ vars.CI_APP_ID }}');
     expect(workflow).toContain(
-      'private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}'
+      'private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}'
     );
     expect(workflow).toContain(
       'GH_TOKEN: ${{ steps.app-token.outputs.token }}'

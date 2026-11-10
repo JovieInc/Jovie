@@ -1,9 +1,28 @@
 import { TooltipProvider } from '@jovie/ui';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { SettingsToggleRow } from '@/components/molecules/settings/SettingsToggleRow';
 
 describe('SettingsToggleRow', () => {
+  it('keeps a busy switch focused while blocking another change', () => {
+    const change = vi.fn();
+    render(
+      <SettingsToggleRow
+        title='Discovery'
+        checked={false}
+        onCheckedChange={change}
+        busy
+        ariaLabel='Discovery'
+      />
+    );
+    const control = screen.getByRole('switch');
+    control.focus();
+    fireEvent.click(control);
+    expect(control).toHaveFocus();
+    expect(control).toHaveAttribute('aria-disabled', 'true');
+    expect(control).toHaveAttribute('aria-busy', 'true');
+    expect(change).not.toHaveBeenCalled();
+  });
   it('retains compact title typography alongside semantic color classes', () => {
     render(
       <SettingsToggleRow

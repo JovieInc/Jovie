@@ -80,6 +80,14 @@ async function resolveProfileContactsForOwner(
     throw new Error('Unauthorized');
   }
 
+  // Authorization must run on every request, including persistent cache hits.
+  await withDbSessionTx(
+    async (tx, sessionUserId) => {
+      await assertProfileOwnership(tx, profileId, sessionUserId);
+    },
+    { clerkUserId: userId }
+  );
+
   return unstable_cache(
     () => fetchContactsCore(profileId, userId),
     ['contacts', userId, profileId],

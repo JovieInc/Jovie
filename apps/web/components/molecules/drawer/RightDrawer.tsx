@@ -45,13 +45,21 @@ function useActiveMobileDrawer(
   isMobile: boolean,
   drawerId: string
 ) {
-  const [isActive, setIsActive] = useState(isOpen && isMobile);
+  // Mobile rails behave as one modal surface. The last opened rail wins
+  // focus ownership, while any previously mounted rail is made inert and
+  // visually closed without requiring each route to duplicate coordination
+  // logic. Superseded-by is state; activation is DERIVED from it plus the
+  // live open/breakpoint inputs, so there is no one-render lag between the
+  // viewport crossing below lg and the rail presenting as the active
+  // mobile drawer — Escape must never fall into that gap with this rail's
+  // document keydown listener unarmed.
+  const [supersededById, setSupersededById] = useState<string | null>(null);
 
   useEffect(() => {
     const handleDrawerOpen = (event: Event) => {
       const openedDrawerId = (event as CustomEvent<string>).detail;
       if (openedDrawerId !== drawerId) {
-        setIsActive(false);
+        setSupersededById(openedDrawerId);
       }
     };
 
@@ -62,11 +70,11 @@ function useActiveMobileDrawer(
 
   useEffect(() => {
     if (!isOpen || !isMobile) {
-      setIsActive(false);
+      setSupersededById(null);
       return;
     }
 
-    setIsActive(true);
+    setSupersededById(null);
     document.dispatchEvent(
       new CustomEvent<string>('jovie:right-drawer-open', {
         detail: drawerId,
@@ -74,7 +82,7 @@ function useActiveMobileDrawer(
     );
   }, [drawerId, isMobile, isOpen]);
 
-  return isActive;
+  return isOpen && isMobile && supersededById === null;
 }
 
 function isRestorableFocusTarget(
@@ -262,6 +270,12 @@ export interface RightDrawerProps
   readonly ariaLabel?: string;
   readonly onKeyDown?: (event: KeyboardEvent) => void;
   readonly contextMenuItems?: CommonDropdownItem[];
+  /**
+   * Desktop placement request for the shared shell rail slot. `push` (the
+   * default) allocates a column that narrows the route; `overlay` is only for
+   * a transient hover/focus preview, which floats over the route instead.
+   */
+  readonly presentation?: 'push' | 'overlay';
 }
 
 export function RightDrawer({
@@ -272,6 +286,7 @@ export function RightDrawer({
   ariaLabel,
   onKeyDown,
   contextMenuItems,
+  presentation = 'push',
   ...rest
 }: RightDrawerProps) {
   const asideRef = useRef<HTMLElement>(null);
@@ -354,7 +369,7 @@ export function RightDrawer({
     // above this modal. React context and the existing focus boundary survive
     // the portal; dialogs opened from the sheet retain their higher layer.
     return createPortal(
-      <aside
+      <section
         {...rest}
         ref={asideRef}
         aria-hidden={!isOpen || !isActiveMobileDrawer}
@@ -379,12 +394,13 @@ export function RightDrawer({
         )}
       >
         {content}
-      </aside>,
+      </section>,
       document.body
     );
   }
 
-  // Desktop: the shared shell contains this inspector as an overlay.
+  // Desktop: the shared shell rail slot (AppShellRightRail) places this
+  // inspector as a column that pushes the route, or as a transient preview.
   return (
     <aside
       {...rest}
@@ -394,9 +410,11 @@ export function RightDrawer({
       tabIndex={isOpen ? -1 : undefined}
       inert={isOpen ? undefined : true}
       data-rail-phase={railPhase}
+      data-rail-presentation={presentation}
       className={cn(
-        // The shell owns overlay placement and bounds. The drawer owns its
-        // raised surface, interrupted reveal, focus and interaction lifecycle.
+        // The shell owns placement, the gap and the route's yield. The drawer
+        // owns its raised surface, interrupted reveal, focus and interaction
+        // lifecycle; its width transition is the allocation the route follows.
         'z-10 shrink-0 h-full min-h-0 flex flex-col rounded-(--app-shell-radius) border border-(--app-shell-frame-seam) bg-surface-1 shadow-(--app-shell-drawer-shadow)',
         'outline-none focus:outline-none focus-visible:ring-0',
         'overflow-hidden',
@@ -421,7 +439,9 @@ export function RightDrawer({
       style={{
         width: isOpen ? width : 0,
         borderWidth: isOpen ? 1 : 0,
-        maxWidth: 'calc(100cqw - var(--space-3))',
+        // Resolved against the shell main plane: the rail never takes more
+        // than half of it, so the pushed route always keeps a usable column.
+        maxWidth: 'calc(50cqw - var(--app-shell-gap))',
         transitionDuration: hasAnimated ? undefined : '0ms',
         willChange:
           railPhase === 'opening' || railPhase === 'closing'
@@ -436,7 +456,7 @@ export function RightDrawer({
         // the outer allocation clips/reveals them; no rewrapping per frame.
         style={{
           width: Math.max(0, width - 2),
-          maxWidth: 'calc(100cqw - var(--space-3) - 2px)',
+          maxWidth: 'calc(50cqw - var(--app-shell-gap) - 2px)',
           flexShrink: 0,
         }}
       >

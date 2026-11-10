@@ -1,0 +1,181 @@
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PRODUCT_COPY } from '@/data/productCopy';
+import { HomepageHeroCanvas } from './HomepageHeroCanvas';
+import { HomepageHeroLight } from './HomepageHeroLight';
+import { startHeroLight } from './hero-light-gl';
+
+vi.mock('./hero-light-gl', () => ({ startHeroLight: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('next/image', () => ({
+  default: (props: Record<string, unknown>) => {
+    const { fill, priority, quality, ...rest } = props;
+    void fill;
+    void quality;
+    return (
+      <img alt='' data-priority={priority ? 'true' : undefined} {...rest} />
+    );
+  },
+}));
+vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
+
+function stubMotion(reduced: boolean) {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: reduced && query.includes('reduce'),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
+}
+
+describe('HomepageHeroLight', () => {
+  beforeEach(() => {
+    vi.mocked(startHeroLight).mockReset();
+    vi.mocked(startHeroLight).mockReturnValue({ stop: vi.fn() });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('renders a decorative CSS poster with no canvas and no copy', () => {
+    render(<HomepageHeroLight />);
+    const light = screen.getByTestId('homepage-hero-light');
+
+    expect(light).toHaveAttribute('aria-hidden', 'true');
+    expect(light).toHaveAttribute('data-animate', 'false');
+    expect(light).toHaveAttribute('data-renderer', 'css');
+    expect(light).toHaveAttribute('data-live', 'false');
+    expect(light.querySelector('canvas')).toBeNull();
+    expect(light.querySelector('.homepage-hero-light__edge')).not.toBeNull();
+    expect(light.querySelector('.homepage-hero-light__grid')).not.toBeNull();
+    expect(light).toHaveTextContent('');
+  });
+
+  it('stays a static poster on a capable device unless the budget enables it', () => {
+    const idle = vi.fn();
+    vi.stubGlobal('requestIdleCallback', idle);
+    stubMotion(false);
+    vi.stubGlobal('WebGL2RenderingContext', function WebGL2() {});
+
+    render(<HomepageHeroLight />);
+
+    const light = screen.getByTestId('homepage-hero-light');
+    expect(light).toHaveAttribute('data-animate', 'false');
+    expect(light).toHaveAttribute('data-renderer', 'css');
+    expect(light.querySelector('canvas')).toBeNull();
+    expect(idle).not.toHaveBeenCalled();
+    expect(startHeroLight).not.toHaveBeenCalled();
+  });
+
+  it('does not create a canvas when reduced motion is on', () => {
+    const idle = vi.fn();
+    vi.stubGlobal('requestIdleCallback', idle);
+    stubMotion(true);
+    vi.stubGlobal('WebGL2RenderingContext', function WebGL2() {});
+
+    render(<HomepageHeroLight animate />);
+
+    expect(
+      screen.getByTestId('homepage-hero-light').querySelector('canvas')
+    ).toBeNull();
+    expect(idle).not.toHaveBeenCalled();
+    expect(startHeroLight).not.toHaveBeenCalled();
+  });
+
+  it('loads the GL chunk after idle on a capable device when enabled', async () => {
+    let idleCallback: (() => void) | undefined;
+    vi.stubGlobal('WebGL2RenderingContext', function WebGL2() {});
+    stubMotion(false);
+    Object.defineProperty(navigator, 'deviceMemory', {
+      configurable: true,
+      value: 8,
+    });
+    Object.defineProperty(navigator, 'hardwareConcurrency', {
+      configurable: true,
+      value: 8,
+    });
+    vi.stubGlobal('requestIdleCallback', (callback: () => void) => {
+      idleCallback = callback;
+      return 1;
+    });
+    vi.stubGlobal('cancelIdleCallback', vi.fn());
+
+    render(<HomepageHeroLight animate />);
+    expect(startHeroLight).not.toHaveBeenCalled();
+    expect(
+      screen.getByTestId('homepage-hero-light').querySelector('canvas')
+    ).not.toBeNull();
+
+    idleCallback?.();
+    await waitFor(() => expect(startHeroLight).toHaveBeenCalledTimes(1));
+    const [glCanvas, onFirstFrame] = vi.mocked(startHeroLight).mock.calls[0];
+    expect(glCanvas).toBeInstanceOf(HTMLCanvasElement);
+    act(() => {
+      onFirstFrame();
+    });
+    expect(screen.getByTestId('homepage-hero-light')).toHaveAttribute(
+      'data-live',
+      'true'
+    );
+    expect(screen.getByTestId('homepage-hero-light')).toHaveAttribute(
+      'data-renderer',
+      'webgl'
+    );
+
+    act(() => {
+      glCanvas.dispatchEvent(
+        new Event('webglcontextlost', { cancelable: true })
+      );
+    });
+    expect(screen.getByTestId('homepage-hero-light')).toHaveAttribute(
+      'data-live',
+      'false'
+    );
+    expect(screen.getByTestId('homepage-hero-light')).toHaveAttribute(
+      'data-renderer',
+      'css'
+    );
+    expect(glCanvas.isConnected).toBe(true);
+  });
+});
+
+describe('HomepageHeroCanvas as mounted by /product', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('ships the cinematic hero and the CSS poster', () => {
+    const { hero, claimCard } = PRODUCT_COPY;
+    render(
+      <HomepageHeroCanvas
+        headingId='product-hero-heading'
+        headline={hero.headline}
+        subhead={hero.support}
+        claim={{
+          domain: claimCard.domain,
+          placeholder: claimCard.handle,
+          action: claimCard.cta,
+        }}
+        supportNote={claimCard.proof}
+        profile={hero.profile}
+        sectionOwner='apps/web/app/(marketing)/product/ProductLanding.tsx'
+        claimTestId='product-claim-card'
+        claimTestIdPrefix='product'
+      />
+    );
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      hero.headline
+    );
+    // MarketingPageShell owns navigation; the hero keeps one claim form.
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
+    expect(screen.getAllByTestId('product-claim-card')).toHaveLength(1);
+    const light = screen.getByTestId('homepage-hero-light');
+    expect(light).toHaveAttribute('data-renderer', 'css');
+    expect(light.querySelector('canvas')).toBeNull();
+    // No real person's face in the hero capture (Tim, 2026-10-26).
+    expect(document.querySelector('.homepage-artist-hero__phone')).toBeNull();
+  });
+});

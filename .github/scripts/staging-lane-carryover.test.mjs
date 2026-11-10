@@ -214,7 +214,7 @@ test('controller preserves sealed CI routing and consumes the qualified carryove
   assert.match(workflow, /if \[ "\$outcome" = not_applicable \]/);
   assert.match(workflow, /\.carryover=\$proof\[0\]/);
   assert.match(workflow, /persist-credentials: false/);
-  assert.match(workflow, /node-version: 24\.22\.1/);
+  assert.match(workflow, /node-version: 24\.22\.2/);
 });
 
 test('actual routing Bash handles no-op, stale generation, failed identity and wrong lineage', () => {
@@ -247,6 +247,13 @@ test('actual routing Bash handles no-op, stale generation, failed identity and w
     writeFileSync(
       join(root, 'git'),
       '#!/bin/sh\ncase "$*" in\n  *ls-remote*) printf \'%s\\n\' "$TEST_MAIN" ;;\n  *) exec /usr/bin/git "$@" ;;\nesac\n'
+    );
+    // Fresh production: the anti-starvation policy keeps the old supersession
+    // (its stale-production carryover is covered by
+    // staging-supersession-policy.test.mjs and staging-controller-supersession.test.mjs).
+    writeFileSync(
+      join(root, 'staging-supersession-policy.mjs'),
+      'console.log(JSON.stringify({outcome:"superseded",replacementSha:process.env.CURRENT_MAIN_SHA,reason:"production is fresh"}));\n'
     );
     chmodSync(join(root, 'gh'), 0o755);
     chmodSync(join(root, 'curl'), 0o755);

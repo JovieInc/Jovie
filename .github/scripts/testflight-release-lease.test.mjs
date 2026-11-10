@@ -10,6 +10,18 @@ import {
   storedZip,
 } from '../../scripts/lib/real-gh-harness.mjs';
 import {
+  addReservation,
+  CONTROLLER_HEAD,
+  fixture,
+  MAIN,
+  NEXT,
+  NOW,
+  REPOSITORY,
+  SOURCE,
+  TRANSPORT,
+} from './testflight-lease-fixture.mjs';
+import {
+  annotationSink,
   command,
   comparisonReady,
   evidenceFailureKind,
@@ -18,176 +30,12 @@ import {
   validateLease,
 } from './testflight-release-lease.mjs';
 
-const SOURCE = 'a'.repeat(40);
-const CONTROLLER_HEAD = 'b'.repeat(40);
-const TRANSPORT = 'c'.repeat(40);
-const MAIN = 'd'.repeat(40);
-const NEXT = 'e'.repeat(40);
-const REPOSITORY = 'JovieInc/Jovie';
-const NOW = Date.parse('2026-10-16T08:00:00Z');
+// Mocked rate-limit refusals print `::error::` lines; swallow them so the runner's
+// log parser never turns a fixture into an annotation (2026-10-25).
+annotationSink.emit = () => {};
 
-// Shell date and the isolated CLI do not inherit the parent Node clock shim.
 function subprocessNow() {
   return Number(execFileSync('date', ['+%s'], { encoding: 'utf8' })) * 1000;
-}
-
-function fixture() {
-  const policy = JSON.parse(
-    readFileSync(new URL('../testflight-release-policy.json', import.meta.url))
-  );
-  const run = {
-    id: 80,
-    run_attempt: 1,
-    workflow_id: 2,
-    path: '.github/workflows/ios-testflight.yml',
-    event: 'workflow_run',
-    head_branch: 'main',
-    head_sha: TRANSPORT,
-    head_repository: { full_name: REPOSITORY },
-    status: 'in_progress',
-  };
-  const controller = {
-    ...run,
-    id: 70,
-    workflow_id: 1,
-    path: '.github/workflows/production-controller.yml',
-    head_sha: CONTROLLER_HEAD,
-    status: 'completed',
-    conclusion: 'success',
-    display_title: `Production Controller ${SOURCE} from CI 60 attempt 1`,
-  };
-  const marker = {
-    sha: SOURCE,
-    controllerRun: '70',
-    controllerAttempt: '1',
-    deploymentId: 'dpl_fixture',
-  };
-  const artifacts = [
-    {
-      id: 5,
-      name: `production-generation-verified-${SOURCE}`,
-      expired: false,
-      workflow_run: { id: 70, head_sha: CONTROLLER_HEAD },
-    },
-  ];
-  const jobs = [
-    {
-      id: 9,
-      name: 'Production Verified',
-      head_sha: CONTROLLER_HEAD,
-      status: 'completed',
-      conclusion: 'success',
-      completed_at: '2026-10-16T07:59:00Z',
-    },
-  ];
-  const intents = [];
-  const payloads = new Map([[5, marker]]);
-  let main = MAIN;
-  const table = new Map([
-    [
-      'actions/workflows/ios-testflight.yml',
-      { id: 2, name: 'iOS TestFlight', path: run.path, state: 'active' },
-    ],
-    [
-      'actions/workflows/production-controller.yml',
-      {
-        id: 1,
-        name: 'Production Controller',
-        path: controller.path,
-        state: 'active',
-      },
-    ],
-    [
-      'actions/workflows/ci.yml',
-      { id: 3, name: 'CI', path: '.github/workflows/ci.yml', state: 'active' },
-    ],
-    ['actions/runs/80', run],
-    ['actions/runs/80/attempts/1', run],
-    ['actions/runs/70', controller],
-    ['actions/runs/70/attempts/1', controller],
-    [
-      'actions/runs/60/attempts/1',
-      {
-        ...controller,
-        id: 60,
-        workflow_id: 3,
-        path: '.github/workflows/ci.yml',
-        event: 'push',
-        head_sha: SOURCE,
-      },
-    ],
-  ]);
-  table.set('actions/runs/60', table.get('actions/runs/60/attempts/1'));
-  const order = [SOURCE, CONTROLLER_HEAD, TRANSPORT, MAIN, NEXT];
-  const api = route => {
-    const path = route.replace(`repos/${REPOSITORY}/`, '');
-    if (path === 'commits/main') return { sha: main };
-    if (path === 'actions/artifacts/5') return artifacts[0];
-    if (path.startsWith('contents/'))
-      return {
-        encoding: 'base64',
-        content: Buffer.from(JSON.stringify(policy)).toString('base64'),
-      };
-    if (path.startsWith('compare/')) {
-      const [older, newer] = path.slice(8).split('...');
-      return {
-        status:
-          order.indexOf(older) < order.indexOf(newer) ? 'ahead' : 'behind',
-        merge_base_commit: { sha: older },
-      };
-    }
-    if (
-      path.startsWith(`actions/artifacts?name=production-generation-verified-`)
-    )
-      return { total_count: artifacts.length, artifacts };
-    if (path.startsWith('actions/artifacts?name=testflight-upload-intent'))
-      return {
-        total_count: intents.filter(a => path.includes(`name=${a.name}&`))
-          .length,
-        artifacts: intents.filter(a => path.includes(`name=${a.name}&`)),
-      };
-    if (path === 'actions/runs/70/attempts/1/jobs?per_page=100')
-      return { total_count: jobs.length, jobs };
-    assert.ok(table.has(path), `Unexpected API request ${path}`);
-    return table.get(path);
-  };
-  const input = {
-    repository: REPOSITORY,
-    sourceSha: SOURCE,
-    transportSha: TRANSPORT,
-    workflowRun: '80',
-    workflowAttempt: '1',
-    controllerRun: '70',
-    controllerAttempt: '1',
-    now: NOW,
-    api,
-    readArtifact: id => payloads.get(id),
-  };
-  const reserve = lease => {
-    intents.push({
-      id: 6,
-      name: `testflight-upload-intent-${lease.baselineSha || 'bootstrap'}`,
-      expired: false,
-      workflow_run: { id: 80 },
-    });
-    payloads.set(6, structuredClone(lease));
-  };
-  return {
-    input,
-    policy,
-    run,
-    controller,
-    marker,
-    artifacts,
-    jobs,
-    intents,
-    payloads,
-    table,
-    reserve,
-    moveMain: sha => {
-      main = sha;
-    },
-  };
 }
 
 test('continuous merges preserve one certified source through archive and final upload', () => {
@@ -450,6 +298,9 @@ printf '%s\\n' '{"ok":true}'
         assert.match(error.message, /; rate limited: /);
         assert.match(error.message, /outside the 30s budget/);
         assert.match(error.message, /Not passing/);
+        // Mocked resets are labelled so they cannot pass for a live refusal.
+        assert.match(error.message, /\[fixture\] GitHub rate limit resets at/);
+        assert.match(error.message, /\(resource=core\)/);
         assert.doesNotMatch(error.message, /rewound or diverged/);
         assert.doesNotMatch(
           error.message,
@@ -754,6 +605,38 @@ for (const attempt of ['another run', 'another attempt'])
     assert.throws(() => validateLease(f.input), /duplicate or uncertain/);
   });
 
+test('a baseline bucket saturated with failed-attempt receipts still admits', () => {
+  const f = fixture();
+  // Advance the certified source to NEXT so the unchanged older baseline
+  // bucket (SOURCE) is the walk root, mirroring a real admission where the
+  // frontier marker predates every failed attempt.
+  f.input.baselineSha = SOURCE;
+  f.input.sourceSha = NEXT;
+  f.input.transportSha = NEXT;
+  f.run.head_sha = NEXT;
+  f.controller.head_sha = NEXT;
+  f.controller.display_title = `Production Controller ${NEXT} from CI 60 attempt 1`;
+  f.marker.sha = NEXT;
+  f.artifacts[0].name = `production-generation-verified-${NEXT}`;
+  f.artifacts[0].workflow_run.head_sha = NEXT;
+  f.jobs[0].head_sha = NEXT;
+  f.table.get('actions/runs/60/attempts/1').head_sha = NEXT;
+  f.moveMain(NEXT);
+  // 70 failed release attempts shared the unchanged baseline bucket, each on
+  // its own newer main, so each receipt contributes a distinct successor
+  // bucket. Admit must still enumerate all of them and find no duplicate or
+  // divergent upload (the former fixed 64-bucket traversal cap rejected this).
+  for (let i = 0; i < 70; i += 1) {
+    addReservation(f, {
+      id: 100 + i,
+      source: `${String(i).padStart(2, '0')}${'f'.repeat(38)}`,
+      baseline: SOURCE,
+      run: 100 + i,
+    });
+  }
+  assert.equal(validateLease(f.input).sourceSha, NEXT);
+});
+
 test('a successful source watermark retires expired predecessor buckets', () => {
   const f = fixture();
   const prior = validateLease(f.input);
@@ -810,31 +693,6 @@ for (const change of [
         /policy changed|expired during|rewound/
       );
   });
-
-function addReservation(f, { id, source, baseline = '', run = id }) {
-  const prior = {
-    schema: 'jovie-testflight-release-lease/v1',
-    repository: REPOSITORY,
-    sourceSha: source,
-    transportSha: TRANSPORT,
-    baselineSha: baseline,
-    intentName: `testflight-upload-intent-${baseline || 'bootstrap'}`,
-    workflowRun: String(run),
-    workflowAttempt: '1',
-  };
-  f.intents.push({
-    id,
-    name: prior.intentName,
-    expired: false,
-    workflow_run: { id: run },
-  });
-  f.payloads.set(id, prior);
-  f.table.set(`actions/runs/${run}/attempts/1`, {
-    ...f.run,
-    id: run,
-    head_sha: TRANSPORT,
-  });
-}
 
 test('a late old receipt cannot hide a newer uncertain successor bucket', () => {
   const f = fixture();

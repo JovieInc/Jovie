@@ -3,6 +3,7 @@
 // @coverage-via apps/web/tests/unit/components/features/admin/hud/OvieLauncherRail.test.tsx
 
 import { Button, Input } from '@jovie/ui';
+import { useRouter } from 'next/navigation';
 import {
   type ReactNode,
   useCallback,
@@ -12,14 +13,19 @@ import {
 } from 'react';
 import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { launchOperatorControl } from '@/lib/desktop/electron-bridge';
+import {
+  launchOperatorControl,
+  useIsElectronRuntime,
+} from '@/lib/desktop/electron-bridge';
 import {
   filterLaunchers,
+  isLocalOnlyLauncher,
   OVIE_LAUNCHER_CATALOG,
   type OvieLauncherControl,
   type OvieLauncherGroup,
   type OvieLauncherInventory,
   type OvieLauncherStatus,
+  reachableLaunchers,
 } from '@/lib/hud/ovie-launchers';
 
 const FETCH_URL = '/api/admin/hud/ovie-launchers';
@@ -31,17 +37,50 @@ const STATUS_LABEL: Record<OvieLauncherStatus, string> = {
   not_configured: 'Not configured', error: 'Error',
 };
 
+/** Server preflight cannot see the Mac's loopback or SSH aliases, so a local-only launcher's server status is not shown. */
+function statusFor(control: OvieLauncherControl): string {
+  return isLocalOnlyLauncher(control) ? 'Local' : STATUS_LABEL[control.status];
+}
+
+function useLaunch() {
+  const router = useRouter();
+  return useCallback(
+    (control: OvieLauncherControl) => {
+      if (control.kind === 'route' && control.href) {
+        router.push(control.href);
+        return;
+      }
+      void launchOperatorControl({
+        id: control.id,
+        kind: control.kind === 'ssh' ? 'ssh' : 'web',
+        href: control.href,
+        sshHost: control.sshHost,
+      });
+    },
+    [router]
+  );
+}
+
 function LaunchControl({
   control,
-}: Readonly<{ readonly control: OvieLauncherControl }>) {
-  const disabled = control.status !== 'ready';
+  onLaunch,
+}: Readonly<{
+  readonly control: OvieLauncherControl;
+  readonly onLaunch: (control: OvieLauncherControl) => void;
+}>) {
+  const disabled = isLocalOnlyLauncher(control)
+    ? false
+    : control.status !== 'ready';
   return (
     <Button
       type='button'
       variant='secondary'
       size='sm'
       disabled={disabled}
-      aria-label={`${control.label}, ${STATUS_LABEL[control.status]}`}
+      // Named from content: the visible label + status spans are the
+      // accessible name (WCAG 2.5.3 Label in Name). An overriding
+      // aria-label failed axe 4.14 label-content-name-mismatch on the
+      // /hud?fs=1 capture once the truncated label text rendered visibly.
       title={`${control.label}. ${control.why}`}
       data-testid={`ovie-launcher-${control.id}`}
       data-group={control.group}
@@ -49,17 +88,12 @@ function LaunchControl({
       className='min-h-8 justify-start'
       onClick={() => {
         if (disabled) return;
-        void launchOperatorControl({
-          id: control.id,
-          kind: control.kind,
-          href: control.href,
-          sshHost: control.sshHost,
-        });
+        onLaunch(control);
       }}
     >
       <span className='truncate'>{control.label}</span>
       <span className='ml-auto shrink-0 text-2xs text-tertiary-token'>
-        {STATUS_LABEL[control.status]}
+        {statusFor(control)}
       </span>
     </Button>
   );
@@ -97,15 +131,17 @@ function LauncherGroupFrame({
 function LauncherGroup({
   group,
   controls,
+  onLaunch,
 }: Readonly<{
   readonly group: OvieLauncherGroup;
   readonly controls: readonly OvieLauncherControl[];
+  readonly onLaunch: (control: OvieLauncherControl) => void;
 }>) {
   if (controls.length === 0) return null;
   return (
     <LauncherGroupFrame group={group} testId={`ovie-launcher-group-${group}`}>
       {controls.map(control => (
-        <LaunchControl key={control.id} control={control} />
+        <LaunchControl key={control.id} control={control} onLaunch={onLaunch} />
       ))}
     </LauncherGroupFrame>
   );
@@ -165,7 +201,7 @@ function AllToolsList({
           <p className='flex items-center justify-between gap-2 text-xs font-medium text-primary-token'>
             {c.label}
             <span className='text-2xs font-normal text-tertiary-token'>
-              {STATUS_LABEL[c.status]}
+              {statusFor(c)}
             </span>
           </p>
           <p className='mt-1 text-2xs text-secondary-token'>
@@ -184,11 +220,13 @@ function AllToolsList({
  * or empty — an empty launcher rail carries no information.
  */
 function OvieLauncherRailCompact({
-  inventory,
-}: Readonly<{ readonly inventory: OvieLauncherInventory | null }>) {
-  const ready = (inventory?.primary ?? []).filter(
-    control => control.status === 'ready'
-  );
+  controls,
+  onLaunch,
+}: Readonly<{
+  readonly controls: readonly OvieLauncherControl[];
+  readonly onLaunch: (control: OvieLauncherControl) => void;
+}>) {
+  const ready = controls.filter(control => control.status === 'ready');
   if (ready.length === 0) return null;
   return (
     <>
@@ -201,14 +239,7 @@ function OvieLauncherRailCompact({
           title={control.why}
           data-testid={`ovie-launcher-${control.id}`}
           data-group={control.group}
-          onClick={() =>
-            void launchOperatorControl({
-              id: control.id,
-              kind: control.kind,
-              href: control.href,
-              sshHost: control.sshHost,
-            })
-          }
+          onClick={() => onLaunch(control)}
         >
           {control.label}
         </Button>
@@ -264,19 +295,27 @@ export function OvieLauncherRail({
         : inventory
           ? 'fresh'
           : 'empty';
-  const primaryInternal =
-    inventory?.primary.filter(item => item.group === 'internal') ?? [];
-  const primaryExternal =
-    inventory?.primary.filter(item => item.group === 'external') ?? [];
+  // Never render a launcher this surface cannot reach (Hermes/GBrain loopback,
+  // SSH aliases): they exist only on the operator's Mac.
+  const inMacApp = useIsElectronRuntime();
+  const onLaunch = useLaunch();
+  const primary = useMemo(
+    () => reachableLaunchers(inventory?.primary ?? [], inMacApp),
+    [inventory, inMacApp]
+  );
+  const primaryInternal = primary.filter(item => item.group === 'internal');
+  const primaryExternal = primary.filter(item => item.group === 'external');
   const filteredAll = useMemo(
-    () => filterLaunchers(inventory?.all ?? [], query),
-    [inventory, query]
+    () =>
+      filterLaunchers(
+        reachableLaunchers(inventory?.all ?? [], inMacApp),
+        query
+      ),
+    [inventory, inMacApp, query]
   );
 
   if (compact) {
-    if (
-      !(inventory?.primary ?? []).some(control => control.status === 'ready')
-    ) {
+    if (!primary.some(control => control.status === 'ready')) {
       return null;
     }
     return (
@@ -284,7 +323,7 @@ export function OvieLauncherRail({
         className='flex flex-wrap items-center gap-2'
         data-testid='ovie-launcher-rail'
       >
-        <OvieLauncherRailCompact inventory={inventory} />
+        <OvieLauncherRailCompact controls={primary} onLaunch={onLaunch} />
       </div>
     );
   }
@@ -299,8 +338,16 @@ export function OvieLauncherRail({
         {isLoading && !inventory ? <LauncherRailSkeleton /> : null}
         {inventory ? (
           <div className='flex flex-col gap-3 lg:flex-row'>
-            <LauncherGroup group='internal' controls={primaryInternal} />
-            <LauncherGroup group='external' controls={primaryExternal} />
+            <LauncherGroup
+              group='internal'
+              controls={primaryInternal}
+              onLaunch={onLaunch}
+            />
+            <LauncherGroup
+              group='external'
+              controls={primaryExternal}
+              onLaunch={onLaunch}
+            />
           </div>
         ) : null}
         {observation === 'unavailable' ? (

@@ -14,7 +14,7 @@ import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   LibrarySurface,
-  resolveLibraryReviewStep,
+  PRESETS,
   workPrimaryActionLabel,
 } from '@/app/app/(shell)/library/LibrarySurface';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
@@ -32,11 +32,27 @@ import {
   useShellSidebarOverride,
 } from '@/contexts/ShellSidebarOverrideContext';
 import {
+  consumePendingChatDraft,
+  consumePendingChatPrompt,
+} from '@/lib/chat/open-chat-with-prompt';
+import {
   type LibraryPostReleaseBundle,
   withInspectorScope,
 } from '@/lib/library/post-release-types';
+import {
+  applyCacheScope,
+  resetCacheIsolationForTests,
+} from '@/lib/queries/cache-isolation';
+import { buildAsset } from './library-surface-fixtures';
 
 Element.prototype.scrollIntoView = vi.fn();
+
+const founderDoor = vi.hoisted(() => ({
+  chatMode: undefined as 'ov' | undefined,
+}));
+vi.mock('@/contexts/FounderDoorContext', () => ({
+  useFounderDoor: () => founderDoor,
+}));
 
 const LIBRARY_SURFACE_SOURCE = 'app/app/(shell)/library/LibrarySurface.tsx';
 const legacyGeistAccentPattern = new RegExp(
@@ -65,6 +81,7 @@ const librarySurfaceLocalVisualRecipePatterns = [
 ] as const;
 
 const navigationMock = vi.hoisted(() => ({
+  push: vi.fn(),
   refresh: vi.fn(),
   replace: vi.fn(),
   searchParams: new URLSearchParams(),
@@ -145,7 +162,7 @@ vi.mock('@/lib/queries/useReleaseMutations', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
-    push: vi.fn(),
+    push: navigationMock.push,
     replace: navigationMock.replace,
     refresh: navigationMock.refresh,
   }),
@@ -164,50 +181,6 @@ vi.mock('next/image', () => ({
     return <img alt='' {...imgProps} />;
   },
 }));
-
-function buildAsset(
-  overrides: Partial<LibraryReleaseAsset> = {}
-): LibraryReleaseAsset {
-  return {
-    id: 'release-1',
-    title: 'Take Me Over',
-    artist: 'Tim White',
-    artworkUrl: 'https://cdn.example.com/artwork.jpg',
-    previewUrl: 'https://cdn.example.com/preview.mp3',
-    previewVerification: 'verified',
-    videoUrl: null,
-    waveformSeed: 17,
-    smartLinkPath: '/tim/take-me-over',
-    releaseDate: '2026-04-28T00:00:00.000Z',
-    releaseType: 'single',
-    status: 'released',
-    approvalStatus: 'draft',
-    profileVisibility: 'visible',
-    lifecycleStatus: 'active',
-    trackCount: 1,
-    providerCount: 1,
-    providers: [
-      {
-        key: 'spotify',
-        label: 'Spotify',
-        url: 'https://open.spotify.com/album/take-me-over',
-      },
-    ],
-    hasLyrics: true,
-    hasArtwork: true,
-    hasVideoLinks: false,
-    assetKinds: ['artwork', 'preview', 'lyrics', 'providers'],
-    genres: ['Progressive House'],
-    spotifyPopularity: 68,
-    targetPlaylistCount: 2,
-    isExplicit: false,
-    label: 'Jovie',
-    upc: '123456789012',
-    distributor: 'Jovie',
-    totalDurationMs: 212_000,
-    ...overrides,
-  };
-}
 
 function RightPanelOutlet() {
   return useRightPanel();
@@ -396,6 +369,7 @@ describe('LibrarySurface', () => {
   );
 
   beforeEach(() => {
+    founderDoor.chatMode = undefined;
     window.localStorage.clear();
     // Grid is the shipped default view mode; most tests below exercise the
     // list renderer, so seed the persisted preference explicitly instead of
@@ -452,7 +426,7 @@ describe('LibrarySurface', () => {
     // Status renders as the shared glyph everywhere; the approval editor in
     // Details keeps its semantic accent helper.
     expect(source).toContain('LibraryStatusGlyph');
-    expect(source).toContain('libraryApprovalStatusClasses');
+    expect(source).toContain('libraryApprovalStatusDotClasses');
     expect(source).toContain('PageToolbarTabButton');
     expect(source).toContain("variant={active ? 'secondary' : 'tertiary'}");
     expect(source).toContain('system-b-library-card--selected');
@@ -498,9 +472,9 @@ describe('LibrarySurface', () => {
       ),
     ].map(match => match[0]);
 
-    // Status is a glyph on tiles, rows, table and inspector; only the
-    // approval editor in Details still renders as a word pill.
-    expect(statusPillClasses).toHaveLength(1);
+    // Status is a glyph on tiles, rows, table and inspector; the approval
+    // editor in Details is an inline menu, so no word pill remains.
+    expect(statusPillClasses).toHaveLength(0);
     for (const className of statusPillClasses ?? []) {
       expect(className).toContain('truncate');
       expect(className).toContain('rounded-full');
@@ -544,22 +518,21 @@ describe('LibrarySurface', () => {
     renderLibrary([]);
 
     const emptyState = screen.getByTestId('library-workspace-empty-state');
-    expect(screen.getByText('No work yet')).toBeDefined();
+    expect(screen.getByText('No Work Yet')).toBeDefined();
     expect(
       screen.getByText(
-        'Releases, merch, images, videos, and audio will appear here as they land.'
+        'Your releases, videos, images, audio, and merch live here.'
       )
     ).toBeDefined();
+    // One next step: the toolbar no longer repeats the empty state's action.
     const firstActions = screen.getAllByRole('link', {
       name: 'Open Releases',
     });
-    expect(firstActions).toHaveLength(2);
-    for (const action of firstActions) {
-      expect(action).toHaveAttribute('href', APP_ROUTES.RELEASES);
-    }
+    expect(firstActions).toHaveLength(1);
+    expect(firstActions[0]).toHaveAttribute('href', APP_ROUTES.RELEASES);
     expect(emptyState).toHaveClass('py-16', 'min-h-90');
-    expect(screen.getByRole('heading', { name: 'No work yet' })).toHaveClass(
-      'text-2xl',
+    expect(screen.getByRole('heading', { name: 'No Work Yet' })).toHaveClass(
+      'text-sm',
       'font-semibold',
       'text-primary-token'
     );
@@ -988,19 +961,19 @@ describe('LibrarySurface', () => {
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
 
     const drawer = within(screen.getByTestId('library-asset-drawer'));
-    // Hero shows the same glyph as the tile, with its words beside it.
+    // Hero shows lifecycle once; approval lives only in the Details editor.
     expect(
       drawer.getByTestId('library-status-glyph-release-1')
-    ).toHaveTextContent('Released · Not approved');
+    ).toHaveTextContent(/^Released$/);
     expect(
       drawer.queryByTestId('library-approval-status-release-1')
     ).not.toBeInTheDocument();
     // Editable approval lives exactly once under Details.
     expect(
-      drawer.getByRole('button', { name: 'Approval Status' })
+      drawer.getByRole('button', { name: /^Approval Status: / })
     ).toBeInTheDocument();
     expect(
-      drawer.getAllByRole('button', { name: 'Approval Status' })
+      drawer.getAllByRole('button', { name: /^Approval Status: / })
     ).toHaveLength(1);
   });
 
@@ -1012,7 +985,7 @@ describe('LibrarySurface', () => {
     const trigger = screen.getByTestId(
       'library-approval-status-select-release-1'
     );
-    expect(trigger).toHaveAccessibleName('Approval Status');
+    expect(trigger).toHaveAccessibleName('Approval Status: Draft');
     expect(trigger.tagName).toBe('BUTTON');
   });
 
@@ -1038,7 +1011,7 @@ describe('LibrarySurface', () => {
     ).toBeInTheDocument();
     // Approval status stays a single accessible editor on the Overview tab.
     expect(
-      drawer.getByRole('button', { name: 'Approval Status' })
+      drawer.getByRole('button', { name: /^Approval Status: / })
     ).toBeInTheDocument();
     expect(drawer.getByRole('link', { name: /Spotify/u })).toHaveAttribute(
       'href',
@@ -1149,6 +1122,54 @@ describe('LibrarySurface', () => {
 
     expect(writeText).toHaveBeenCalledWith('https://jov.ie/p/token-1');
   });
+
+  it.each([false, true, 'ovie'] as const)(
+    'opens selected work as an unsent draft, rejecting a changed profile: %s',
+    async changedProfile => {
+      founderDoor.chatMode = changedProfile === 'ovie' ? 'ov' : undefined;
+      resetCacheIsolationForTests();
+      applyCacheScope({
+        userId: 'user-1',
+        sessionId: 'session-1',
+        profileId: 'profile-1',
+        ready: true,
+      });
+      const user = userEvent.setup();
+      render(
+        <TooltipProvider>
+          <RightPanelProvider>
+            <LibrarySurface assets={[buildAsset()]} profileId='profile-1' />
+            <RightPanelOutlet />
+          </RightPanelProvider>
+        </TooltipProvider>
+      );
+      const actions = within(
+        screen.getByTestId('library-row-actions-release-1')
+      );
+      await user.click(actions.getByRole('button', { name: 'More actions' }));
+      if (changedProfile === true) applyCacheScope({ profileId: 'profile-2' });
+      await user.click(screen.getByRole('menuitem', { name: 'Ask Jovie' }));
+      expect(consumePendingChatPrompt()).toBeNull();
+      const draft = consumePendingChatDraft('profile-1');
+      if (changedProfile === 'ovie') {
+        expect(draft).toBeNull();
+        expect(navigationMock.push).not.toHaveBeenCalled();
+        expect(feedbackMocks.error).toHaveBeenCalledWith(
+          'Switch to Jovie, then ask about this item again.'
+        );
+      } else if (changedProfile) {
+        expect(draft).toBeNull();
+        expect(feedbackMocks.error).toHaveBeenCalledWith(
+          'Chat is unavailable. Reopen this item and try again.'
+        );
+      } else {
+        expect(draft).toContain('"kind":"release"');
+        expect(draft).toContain('"id":"release-1"');
+        expect(draft).toContain('"profileId":"profile-1"');
+      }
+      resetCacheIsolationForTests();
+    }
+  );
 
   it('rolls back profile visibility when the canonical mutation fails', async () => {
     const user = userEvent.setup();
@@ -1430,15 +1451,19 @@ describe('LibrarySurface', () => {
     expect(
       drawer.getByRole('link', { name: 'View Public Page' })
     ).toHaveAttribute('href', '/tim/take-me-over');
-    expect(presentation.getByText('Released')).toBeInTheDocument();
+    expect(
+      drawer.getByTestId('library-status-glyph-release-1')
+    ).toHaveTextContent(/^Released$/);
+    expect(presentation.queryByText('Released')).not.toBeInTheDocument();
     expect(presentation.getByText('Not public')).toBeInTheDocument();
     expect(presentation.getByText('Hidden from profile')).toBeInTheDocument();
     expect(presentation.getByText('Listen')).toBeInTheDocument();
-    expect(presentation.getByText('Spotify')).toBeInTheDocument();
+    // Destinations render once, as their own section, not also as a row.
+    expect(presentation.queryByText('Destinations')).not.toBeInTheDocument();
+    expect(drawer.getAllByText('Destinations')).toHaveLength(1);
+    expect(drawer.getByText('Spotify')).toBeInTheDocument();
     expect(about.getByText('Single')).toBeInTheDocument();
-    expect(
-      about.getByText('Discography · catalog-release-1')
-    ).toBeInTheDocument();
+    expect(about.getByText('Discography')).toBeInTheDocument();
     expect(about.queryByText('68/100')).not.toBeInTheDocument();
   });
 
@@ -1832,7 +1857,7 @@ describe('LibrarySurface', () => {
       screen.getByTestId('library-catalog-waveform-release-1')
     ).toBeInTheDocument();
     expect(
-      screen.getByLabelText('View DSP Distribution Details')
+      screen.getByRole('button', { name: /View DSP Distribution Details/ })
     ).toBeInTheDocument();
 
     // Metrics the production schema does not carry render a stable em-dash
@@ -1842,6 +1867,28 @@ describe('LibrarySurface', () => {
         screen.getByTestId(`library-catalog-${metric}-release-1`)
       ).toHaveTextContent('—');
     }
+  });
+
+  it('renders full artist values and the EP type label in table rows (JOV-8963)', () => {
+    const longBilling =
+      'A Really Long Collaborative Artist Billing That Must Stay Visible';
+    renderLibrary([
+      buildAsset({
+        artist: longBilling,
+        releaseType: 'ep',
+      }),
+    ]);
+    fireEvent.click(screen.getByRole('radio', { name: 'Table View' }));
+
+    const row = screen.getByTestId('library-catalog-row-release-1');
+    // The artist column shows the whole value on one line instead of
+    // truncating it.
+    const artistCell = within(row).getByTitle(longBilling);
+    expect(artistCell.textContent).toBe(longBilling);
+    expect(artistCell.className).toContain('whitespace-nowrap');
+    expect(artistCell.className).not.toContain('truncate');
+    // EP is the data label, never title-cased to "Ep".
+    expect(within(row).getByTitle('EP').textContent).toBe('EP');
   });
 
   it('keeps asset-type tabs and smart filters working in table mode (JOV-4846)', () => {
@@ -2101,7 +2148,7 @@ describe('LibrarySurface', () => {
       /^Album · 2026$/u
     );
     expect(screen.getByTestId('library-card-meta-release-2')).toHaveTextContent(
-      /^Ep$/u
+      /^EP$/u
     );
   });
 
@@ -2266,7 +2313,7 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Search Jovie/ }));
 
     expect(screen.queryByLabelText('Filter work')).toBeNull();
     expect(
@@ -2431,9 +2478,9 @@ describe('LibrarySurface', () => {
 
     expect(screen.queryByLabelText('Search library by title')).toBeNull();
     expect(
-      screen.getByRole('button', { name: 'Search Jovie' })
+      screen.getByRole('button', { name: /^Search Jovie/ })
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Search Jovie/ }));
     expect(
       screen.queryByRole('searchbox', { name: 'Command Palette Search' })
     ).toBeNull();
@@ -2652,48 +2699,121 @@ describe('LibrarySurface', () => {
     ).toBeInTheDocument();
   });
 
-  it('restores URL presets and persisted smart filters without changing their contracts', async () => {
-    navigationMock.searchParams = new URLSearchParams('view=audio');
-    window.localStorage.setItem(
-      LIBRARY_SAVED_VIEW_STORAGE_KEY,
-      'needs-attention'
-    );
+  it.each(PRESETS)(
+    'keeps the toolbar and table mode when applying $label',
+    async ({ id, label }) => {
+      const user = userEvent.setup();
+      navigationMock.searchParams = new URLSearchParams(
+        'view=audio&mode=table&stage=all'
+      );
+      navigationMock.replace.mockImplementationOnce((url: string) => {
+        navigationMock.searchParams = new URL(
+          url,
+          'https://jov.ie'
+        ).searchParams;
+      });
+      renderLibrary([buildAsset()]);
+      const surface = screen.getByTestId('library-surface');
+      const slider = screen.getByTestId('library-view-mode-slider');
 
-    const user = userEvent.setup();
-    renderLibrary([
-      buildAsset(),
-      buildAsset({
-        id: 'release-2',
-        title: 'Missing Audio',
-        previewUrl: null,
-        assetKinds: ['artwork', 'providers'],
-      }),
-    ]);
+      fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
+      fireEvent.click(
+        within(screen.getByTestId('library-view-filter-chips')).getByRole(
+          'button',
+          {
+            name: new RegExp(`^${label}\\s*\\d+$`, 'u'),
+          }
+        )
+      );
 
-    await user.click(screen.getByRole('button', { name: /^Show filters/i }));
-    const kindFilters = screen.getByTestId('library-view-filter-chips');
-    expect(
-      within(kindFilters).getByRole('button', { name: /Audio/u })
-    ).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
-    expect(screen.queryByText('Missing Audio')).not.toBeInTheDocument();
+      const expected = new URLSearchParams('mode=table&stage=all');
+      if (id !== 'all') expected.set('preset', id);
+      expect(navigationMock.replace).toHaveBeenLastCalledWith(
+        `${APP_ROUTES.LIBRARY}?${expected}`,
+        { scroll: false }
+      );
+      expect(screen.getByTestId('library-surface')).toBe(surface);
+      expect(screen.getByTestId('library-view-mode-slider')).toBe(slider);
+      expect(window.localStorage.getItem(LIBRARY_VIEW_MODE_STORAGE_KEY)).toBe(
+        'table'
+      );
+      await user.keyboard('{Escape}');
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId('library-filter-sheet')
+        ).not.toBeInTheDocument();
+      });
+      expect(
+        screen.getByRole('button', {
+          name: id === 'all' ? 'Show filters' : 'Show filters (1)',
+        })
+      ).toBeInTheDocument();
+    }
+  );
 
-    await user.click(
-      within(kindFilters).getByRole('button', { name: /^All/u })
-    );
-    expect(navigationMock.replace).toHaveBeenCalledWith(APP_ROUTES.LIBRARY, {
-      scroll: false,
-    });
-    expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
-    expect(screen.getByText('Missing Audio')).toBeInTheDocument();
-
-    expect(
-      within(screen.getByTestId('library-saved-filter-views')).getByRole(
+  it('applies the Releases suggestion without navigating to the releases matrix', () => {
+    renderLibrary([buildAsset()]);
+    fireEvent.click(
+      within(screen.getByTestId('library-filter-suggestions')).getByRole(
         'button',
-        { name: /Needs Attention/u }
+        { name: /Type.*Releases/u }
       )
-    ).toHaveAttribute('aria-pressed', 'true');
+    );
+    expect(navigationMock.replace).toHaveBeenLastCalledWith(
+      `${APP_ROUTES.LIBRARY}?preset=releases`,
+      { scroll: false }
+    );
+    expect(screen.getByTestId('library-surface')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Show filters (1)' })
+    ).toBeInTheDocument();
   });
+
+  it.each(['view=audio', 'preset=audio', 'view=merch&preset=audio'])(
+    'restores URL presets (%s) and persisted smart filters without changing their contracts',
+    async query => {
+      navigationMock.searchParams = new URLSearchParams(query);
+      window.localStorage.setItem(
+        LIBRARY_SAVED_VIEW_STORAGE_KEY,
+        'needs-attention'
+      );
+
+      const user = userEvent.setup();
+      renderLibrary([
+        buildAsset(),
+        buildAsset({
+          id: 'release-2',
+          title: 'Missing Audio',
+          previewUrl: null,
+          assetKinds: ['artwork', 'providers'],
+        }),
+      ]);
+
+      await user.click(screen.getByRole('button', { name: /^Show filters/i }));
+      const kindFilters = screen.getByTestId('library-view-filter-chips');
+      expect(
+        within(kindFilters).getByRole('button', { name: /Audio/u })
+      ).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
+      expect(screen.queryByText('Missing Audio')).not.toBeInTheDocument();
+
+      await user.click(
+        within(kindFilters).getByRole('button', { name: /^All/u })
+      );
+      expect(navigationMock.replace).toHaveBeenCalledWith(APP_ROUTES.LIBRARY, {
+        scroll: false,
+      });
+      expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
+      expect(screen.getByText('Missing Audio')).toBeInTheDocument();
+
+      expect(
+        within(screen.getByTestId('library-saved-filter-views')).getByRole(
+          'button',
+          { name: /Needs Attention/u }
+        )
+      ).toHaveAttribute('aria-pressed', 'true');
+    }
+  );
 
   it('uses a mobile overlay without moving content, losing scroll, or hiding the asset drawer', async () => {
     const user = userEvent.setup();
@@ -2748,62 +2868,5 @@ describe('LibrarySurface', () => {
     });
     expect(trigger).toHaveFocus();
     expect(globalThis.scrollY).toBe(320);
-  });
-});
-
-describe('resolveLibraryReviewStep', () => {
-  const page = document.body;
-
-  it('moves one item on J/K and one row of tiles on up/down in the grid', () => {
-    expect(resolveLibraryReviewStep('j', page, 5)).toEqual({
-      kind: 'move',
-      delta: 1,
-    });
-    expect(resolveLibraryReviewStep('k', page, 5)).toEqual({
-      kind: 'move',
-      delta: -1,
-    });
-    expect(resolveLibraryReviewStep('ArrowDown', page, 5)).toEqual({
-      kind: 'move',
-      delta: 5,
-    });
-    expect(resolveLibraryReviewStep('ArrowUp', page, 5)).toEqual({
-      kind: 'move',
-      delta: -5,
-    });
-    expect(resolveLibraryReviewStep('ArrowLeft', page, 5)).toEqual({
-      kind: 'move',
-      delta: -1,
-    });
-    // Lists and tables move one row and leave left/right to scrolling.
-    expect(resolveLibraryReviewStep('ArrowDown', page, null)).toEqual({
-      kind: 'move',
-      delta: 1,
-    });
-    expect(resolveLibraryReviewStep('ArrowRight', page, null)).toBeNull();
-    expect(resolveLibraryReviewStep('End', page, null)).toEqual({
-      kind: 'edge',
-      to: 'last',
-    });
-  });
-
-  it('plays on Space and inspects on Enter without stealing native controls', () => {
-    const tile = document.createElement('button');
-    tile.dataset.libraryItemFocus = '';
-    const control = document.createElement('button');
-    const slider = document.createElement('div');
-    slider.setAttribute('role', 'slider');
-    const input = document.createElement('input');
-
-    expect(resolveLibraryReviewStep(' ', page, 4)).toEqual({ kind: 'play' });
-    expect(resolveLibraryReviewStep(' ', tile, 4)).toEqual({ kind: 'play' });
-    expect(resolveLibraryReviewStep(' ', control, 4)).toBeNull();
-    expect(resolveLibraryReviewStep('Enter', page, 4)).toEqual({
-      kind: 'open',
-    });
-    expect(resolveLibraryReviewStep('Enter', tile, 4)).toBeNull();
-    expect(resolveLibraryReviewStep('j', slider, 4)).toBeNull();
-    expect(resolveLibraryReviewStep('j', input, 4)).toBeNull();
-    expect(resolveLibraryReviewStep('ArrowLeft', input, 4)).toBeNull();
   });
 });

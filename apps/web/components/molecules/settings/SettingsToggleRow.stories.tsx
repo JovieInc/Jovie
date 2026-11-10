@@ -34,6 +34,10 @@ export const Disabled: Story = {
   },
 };
 
+export const Saving: Story = {
+  args: { ...Interactive.args, gated: false, busy: true },
+};
+
 export const Gated: Story = {
   args: {
     gated: true,

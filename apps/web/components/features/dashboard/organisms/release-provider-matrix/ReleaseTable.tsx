@@ -53,7 +53,8 @@ export function ReleaseTable({
   onGeneratePitch,
   onChangeStatus,
   columnVisibility,
-  rowHeight = TABLE_ROW_HEIGHTS.STANDARD + 4,
+  rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
+  rowMode,
   onFocusedRowChange,
   showTracks = false,
   groupByYear = false,
@@ -226,7 +227,8 @@ export function ReleaseTable({
           onGeneratePitch={onGeneratePitch}
           onChangeStatus={onChangeStatus}
           columnVisibility={columnVisibility}
-          rowHeight={rowHeight}
+          rowHeight={rowMode ? undefined : rowHeight}
+          rowMode={rowMode}
           onFocusedRowChange={onFocusedRowChange}
           showTracks={showTracks}
           groupByYear={groupByYear}
@@ -251,7 +253,7 @@ export function ReleaseTable({
         <div className='system-b-release-table-empty-state mx-4 my-3 flex flex-col'>
           <TableEmptyState
             icon={<Icon name='Layers' className='h-6 w-6' />}
-            heading='No releases found'
+            heading='No Releases Found'
             description='Use the toolbar to create a release, sync from Spotify, or clear filters.'
           />
         </div>
@@ -287,7 +289,8 @@ export function ReleaseTable({
       getRowTestId={getRowTestId}
       getRowClassName={getRowClassName}
       enableVirtualization={!groupByYear}
-      rowHeight={rowHeight}
+      rowHeight={rowMode ? undefined : rowHeight}
+      rowMode={rowMode}
       minWidth={minWidth}
       hideHeader
       caption='Releases'
@@ -309,7 +312,7 @@ export function ReleaseTable({
         <div className='system-b-release-table-empty-state m-3 flex flex-col'>
           <TableEmptyState
             icon={<Icon name='Layers' className='h-6 w-6' />}
-            heading='No releases found'
+            heading='No Releases Found'
             description='Use the toolbar to create a release, sync from Spotify, or clear filters.'
           />
         </div>

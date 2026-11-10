@@ -1,0 +1,271 @@
+/* Homepage v3: the invitation form (WaitlistRoleForm, chips) and the footer
+   (MarketingFooter) in the approved presentation. */
+
+.hv3-form {
+  display: flex;
+  justify-content: center;
+  margin-top: 2.5rem;
+}
+
+.hv3-form form {
+  gap: 1rem;
+}
+
+/* The role group keeps its label for assistive tech; the design shows chips only. */
+.hv3-form .waitlist-chips__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.hv3-form .waitlist-chips__row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.hv3-form .waitlist-chips__break {
+  display: none;
+}
+
+.hv3-form .waitlist-chip {
+  display: grid;
+  place-items: center;
+  height: 2rem;
+  padding: 0 0.875rem;
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 0 0 1px var(--hv3-b2);
+  color: var(--hv3-t2);
+  cursor: pointer;
+  font-size: 0.8125rem;
+}
+
+.hv3-form .waitlist-chip[data-selected="true"] {
+  background: var(--hv3-floating);
+  box-shadow: inset 0 0 0 1px var(--hv3-b3);
+  color: var(--hv3-t1);
+}
+
+.hv3-form .waitlist-chip:has(:focus-visible) {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.hv3-form [data-slot="inline-subscribe"] {
+  width: 28.75rem;
+  min-height: 0;
+  margin: 0 auto;
+  padding: 0.375rem;
+  border: 0;
+  /* Concentric with the button inside it: its radius plus the padding. */
+  border-radius: calc(var(--radius-sm) + var(--space-1-5));
+  background: var(--hv3-panel);
+  box-shadow: inset 0 0 0 1px var(--hv3-b2);
+}
+
+.hv3-form [data-slot="inline-subscribe"] input {
+  padding: 0 1rem;
+  color: var(--hv3-t1);
+  font-size: 0.9375rem;
+}
+
+.hv3-form [data-slot="inline-subscribe"] input::placeholder {
+  color: var(--hv3-t4);
+}
+
+.hv3-form [data-slot="inline-subscribe"] button {
+  height: 2.75rem;
+  padding: 0 1.375rem;
+  border-radius: var(--radius-sm);
+  background: var(--hv3-t1);
+  color: var(--hv3-canvas);
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+/* From tablet up, the email field spans exactly the role chips above it, so
+   both rows share their left and right edges. */
+@media (min-width: 48rem) {
+  .hv3-form > div {
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  .hv3-form [data-slot="inline-subscribe"] {
+    width: 100%;
+  }
+}
+
+.hv3-form .waitlist-chips__error:empty {
+  display: none;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────── */
+
+.hv3-footer.marketing-footer-premium {
+  background: var(--hv3-canvas);
+}
+
+.hv3-footer .public-container {
+  position: relative;
+  padding: 4rem 0 2rem;
+}
+
+.hv3-footer .public-container > div:first-child {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 1.5rem;
+}
+
+.hv3-footer .public-container > div:first-child > nav {
+  display: grid;
+  grid-column: 2 / span 3;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 1.5rem;
+}
+
+.hv3-footer .mf-logo-link {
+  margin: 0;
+  padding: 0;
+}
+
+.hv3-footer .mf-logo-link svg {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.hv3-footer nav[aria-label="Footer"] ul {
+  gap: 0.625rem;
+}
+
+.hv3-footer nav[aria-label="Footer"] li {
+  display: flex;
+}
+
+.hv3-footer.marketing-footer-premium .mf-link {
+  color: var(--hv3-t2);
+  font-size: 0.875rem;
+  line-height: 1.0625rem;
+}
+
+.hv3-footer.marketing-footer-premium .mf-copyright,
+.hv3-footer.marketing-footer-premium .mf-legal-link {
+  letter-spacing: 0;
+  color: var(--hv3-t4);
+  font-size: 0.8125rem;
+  line-height: 1rem;
+}
+
+/* The approved footer has no theme or language controls on the homepage. */
+.hv3-footer .mf-preferences {
+  display: none;
+}
+
+@media (max-width: 47.9375rem) {
+  .hv3-form [data-slot="inline-subscribe"] {
+    width: calc(100% - 2rem);
+  }
+
+  .hv3-form [data-slot="inline-subscribe"] input {
+    min-width: 0;
+  }
+
+  .hv3-form [data-slot="inline-subscribe"] button {
+    padding: 0 1rem;
+  }
+
+  .hv3-form .waitlist-chips__row {
+    padding: 0 var(--hv3-gutter);
+  }
+
+  .hv3-footer .public-container {
+    padding-top: 3rem;
+  }
+
+  .hv3-footer .public-container > div:first-child {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 2rem;
+  }
+
+  .hv3-footer .public-container > div:first-child > div {
+    grid-column: 1 / -1;
+  }
+
+  .hv3-footer .public-container > div:first-child > nav {
+    display: contents;
+  }
+}
+
+/* ── Page container (header and footer share the v3 page margins) ── */
+
+.home-viewport .public-container {
+  /* container-width-allow: home-canonical-v3 header and footer sit on the approved 96px page margins (1248px content at 1440), like every v3 section */
+  width: min(100% - 12rem, 78rem);
+}
+
+/* The docked header owns its own gutter (the shared public gutter). On the
+   homepage it sits on the same v3 column as every section: 96px margins and
+   1248px of content at 1440, centred beyond. */
+.home-viewport .header-nav--docked {
+  /* container-width-allow: home-canonical-v3 header on the approved 96px page margins, the v3 section column */
+  --ds-public-gutter: max(6rem, calc((100% - 78rem) / 2));
+}
+
+/* Once scrolled, the bar's backing runs the full width of the screen and is
+   opaque, so no stage or display heading scrolls into view beside the bar or
+   ghosts through it. The row itself stays on the content box. The viewport
+   clips the overshoot of 100vw past a scrollbar. */
+.home-viewport .header-nav--docked {
+  --marketing-dock-glass: var(--noir-ion-shell);
+}
+
+.home-viewport .header-nav--docked::before {
+  right: calc(50% - 50vw);
+  left: calc(50% - 50vw);
+}
+
+/* Brand: the 28px mark with the Jovie wordmark beside it, always shown. */
+.home-viewport .header-nav .logo-reveal {
+  gap: 0.625rem;
+}
+
+.home-viewport .header-nav .logo-reveal__wordmark {
+  position: static;
+  color: var(--color-text-primary-token);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  opacity: 1;
+  clip-path: none;
+  translate: none;
+}
+
+@media (max-width: 79.9375rem) {
+  .home-viewport .public-container {
+    width: calc(100% - 6rem);
+  }
+
+  .home-viewport .header-nav--docked {
+    --ds-public-gutter: 3rem;
+  }
+}
+
+@media (max-width: 47.9375rem) {
+  .home-viewport .public-container {
+    width: calc(100% - 2rem);
+  }
+
+  .home-viewport .header-nav--docked {
+    --ds-public-gutter: 1rem;
+  }
+}

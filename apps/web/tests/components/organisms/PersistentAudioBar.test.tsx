@@ -254,6 +254,25 @@ describe('PersistentAudioBar', () => {
     expect(artwork).not.toHaveClass('object-cover');
   });
 
+  it('keeps track identity visible in the open desktop player', () => {
+    setPlaying({
+      trackTitle: 'The Deep End',
+      artistName: 'Tim White & Cosmic Gate',
+      artworkUrl: '/img/releases/the-deep-end.jpg',
+    });
+    render(<PersistentAudioBar />);
+    const identity = within(screen.getByTestId('desktop-player-track'));
+    expect(identity.getByText('The Deep End')).toBeVisible();
+    expect(identity.getByText('Tim White & Cosmic Gate')).toBeVisible();
+    expect(identity.getByTestId('artwork-img')).toHaveAttribute(
+      'src',
+      '/img/releases/the-deep-end.jpg'
+    );
+    fireEvent.error(identity.getByTestId('artwork-img'));
+    expect(identity.queryByTestId('artwork-img')).toBeNull();
+    expect(identity.getByText('The Deep End')).toBeVisible();
+  });
+
   it('does not toggle the player from a form control keydown', () => {
     setPlaying();
     render(<PersistentAudioBar />);
@@ -500,14 +519,14 @@ describe('PersistentAudioBar', () => {
     );
   });
 
-  it('keeps track identity out of the desktop controls and timeline dock', () => {
+  it('keeps track identity beside desktop controls and timeline', () => {
     setPlaying({ artistName: 'DJ Cool' });
 
     render(<PersistentAudioBar />);
 
     const desktopDock = screen.getByTestId('audio-surface-expanded-shell');
-    expect(within(desktopDock).queryByText('Midnight Drive')).toBeNull();
-    expect(within(desktopDock).queryByText('DJ Cool')).toBeNull();
+    expect(within(desktopDock).getByText('Midnight Drive')).toBeVisible();
+    expect(within(desktopDock).getByText('DJ Cool')).toBeVisible();
     expect(
       within(desktopDock).getByRole('button', { name: 'Pause (space)' })
     ).toBeInTheDocument();

@@ -54,11 +54,8 @@ export const metadata: Metadata = {
     'personal website',
     'control your presence',
     'name search',
-    'artists',
-    'founders',
-    'authors',
     'creators',
-    'independent experts',
+    'identity',
   ],
   authors: [{ name: APP_NAME }],
   creator: APP_NAME,
@@ -93,8 +90,8 @@ export const metadata: Metadata = {
     title: APP_NAME,
     description: COMPANY_IDENTITY.seoDescription,
     images: [`${BASE_URL}/og/default.png`],
-    creator: '@jovieapp',
-    site: '@jovieapp',
+    creator: COMPANY_IDENTITY.xHandle,
+    site: COMPANY_IDENTITY.xHandle,
   },
   robots: {
     index: true,
@@ -166,12 +163,8 @@ export default async function RootLayout({
     process.env.VERCEL_ENV === 'preview';
   const isPublicNoAuthSmokeRuntime =
     process.env.PUBLIC_NOAUTH_SMOKE === '1' && !isSecureVercelDeployment;
-  const authMockEnabled =
-    process.env.NEXT_PUBLIC_AUTH_MOCK === '1' ||
-    process.env.NEXT_PUBLIC_CLERK_MOCK === '1';
-  const authProxyDisabled =
-    process.env.NEXT_PUBLIC_AUTH_PROXY_DISABLED === '1' ||
-    process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1';
+  const authMockEnabled = process.env.NEXT_PUBLIC_AUTH_MOCK === '1';
+  const authProxyDisabled = process.env.NEXT_PUBLIC_AUTH_PROXY_DISABLED === '1';
   const devEnv =
     process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development';
   const devSha = (process.env.NEXT_PUBLIC_BUILD_SHA ?? '').slice(0, 7);
@@ -251,8 +244,8 @@ export default async function RootLayout({
         <script id='jovie-theme-route-policy' type='application/json'>
           {JSON.stringify(THEME_ROUTE_POLICY)}
         </script>
-        {/* eslint-disable-next-line @next/next/no-sync-scripts -- Must run before React hydration; next/script nonce drift causes local E2E console errors. */}
-        <script src='/electron-runtime-init.js' />
+        {/* Runs before React hydration (async executes well ahead of bundle eval); next/script nonce drift causes local E2E console errors. Async keeps this browser no-op off the render-blocking chain (JOV-12023). */}
+        <script async src='/electron-runtime-init.js' />
         {/* eslint-disable-next-line @next/next/no-sync-scripts -- Must run before React hydration; next/script nonce drift causes local E2E console errors. */}
         <script src='/theme-init.js' />
         {shouldMountGa && isValidGaMeasurementId(gaMeasurementId) ? (

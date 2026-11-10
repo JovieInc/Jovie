@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { withSignedInSession } from '@/.storybook/signed-in-session';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { ChatsPageClient } from '@/app/app/(shell)/threads/ThreadsPageClient';
 import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
@@ -276,4 +277,46 @@ export const ComposedEmptyHistory: Story = {
   ...EmptyHistory,
   ...ComposedHistory,
   decorators: EmptyHistory.decorators,
+};
+
+const chatsClient = new QueryClient({
+  defaultOptions: { queries: { retry: false } },
+});
+chatsClient.setQueryData(queryKeys.chat.conversations(), [
+  {
+    id: 'readable',
+    title: 'All This Noise EP',
+    createdAt: '2026-10-13T12:00:00Z',
+    updatedAt: '2026-10-13T12:00:00Z',
+    latestTurnStatus: 'completed',
+  },
+  {
+    id: 'clipped',
+    title:
+      'Plan the autumn release campaign with audience insights, touring updates, distribution timelines, press coverage, artwork approvals and every important milestone for the full team',
+    createdAt: '2026-10-12T12:00:00Z',
+    updatedAt: '2026-10-12T12:00:00Z',
+    latestTurnStatus: 'completed',
+  },
+]);
+
+export const ComposedChats: Story = {
+  parameters: {
+    composedShell: true,
+    nextjs: { navigation: { pathname: APP_ROUTES.CHATS } },
+  },
+  decorators: [
+    Story => (
+      <QueryClientProvider client={chatsClient}>
+        <Story />
+      </QueryClientProvider>
+    ),
+  ],
+  render: args => (
+    <AppShellFrame
+      sidebar={<UnifiedSidebar {...args} />}
+      header={<DashboardHeader breadcrumbs={[{ label: 'Chats' }]} />}
+      main={<ChatsPageClient />}
+    />
+  ),
 };

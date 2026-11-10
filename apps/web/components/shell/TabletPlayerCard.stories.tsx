@@ -20,3 +20,9 @@ const meta = {
 
 export default meta;
 export const Default: StoryObj<typeof meta> = {};
+
+// The token shadow and ring are lighter in light mode; this story keeps
+// that theme in the visual matrix.
+export const Light: StoryObj<typeof meta> = {
+  parameters: { themes: { themeOverride: 'light' } },
+};

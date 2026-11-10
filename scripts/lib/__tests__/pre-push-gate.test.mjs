@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,6 +15,18 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { buildAffectedTestPlan } from '../../run-affected-tests.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
+
+function sourcedSecurityHelpers() {
+  const scanner = readFileSync(
+    resolve(repoRoot, 'scripts/security/scan-secrets.sh'),
+    'utf8'
+  );
+  return [
+    ...scanner.matchAll(
+      /^(?:\.|source) "\$REPO_ROOT\/(scripts\/security\/[^"]+)"/gm
+    ),
+  ].map(match => match[1]);
+}
 const resolverPath = resolve(repoRoot, 'scripts/hooks/resolve-repo-node.sh');
 const pinnedVersion = readFileSync(resolve(repoRoot, '.nvmrc'), 'utf8').trim();
 const gate = readFileSync(
@@ -76,6 +89,7 @@ describe('resolve-repo-node.sh', () => {
         PATH: `${nodeBin}:/usr/bin:/bin`,
         NVM_DIR: nvmRoot,
         HOME: nvmRoot,
+        JOVIE_NODE_AUTOFETCH: '0',
       },
     });
     return { nvmRoot, result };
@@ -177,6 +191,10 @@ describe('pre-push gate Node and fanout wiring (JOV-4329)', () => {
     expect(huskyPrePush).toContain(
       'export AUTOMATION_VERIFY_SHARD_CONCURRENCY="${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-1}"'
     );
+    expect(huskyPrePush).toContain(
+      'export JOVIE_PREFLIGHT_JOBS="${JOVIE_PREFLIGHT_JOBS:-1}"'
+    );
+    expect(huskyPrePush).not.toMatch(/^JOVIE_PREFLIGHT_JOBS=1$/m);
   });
 
   it('keeps the documented max-workers knob in the verify bundle', () => {
@@ -223,6 +241,10 @@ describe('publication range failures', () => {
     const env = {
       PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`,
       HOME: root,
+      // HOME is the fixture so scanners cannot write into the user home.
+      // The node pin still has to resolve from the host nvm, or a machine
+      // whose ambient Node is behind .nvmrc exits before the scan.
+      NVM_DIR: process.env.NVM_DIR ?? resolve(process.env.HOME ?? '', '.nvm'),
       GIT_CONFIG_COUNT: '3',
       GIT_CONFIG_KEY_0: 'maintenance.auto',
       GIT_CONFIG_VALUE_0: 'false',
@@ -254,7 +276,11 @@ describe('publication range failures', () => {
     for (const file of [
       'scripts/hooks/pre-push-gate.sh',
       'scripts/hooks/resolve-repo-node.sh',
+      'scripts/hooks/biome-pre-push.sh',
       'scripts/security/scan-secrets.sh',
+      ...sourcedSecurityHelpers(),
+      'scripts/security/scanner-pins.txt',
+      'biome.json',
       '.nvmrc',
     ]) {
       mkdirSync(dirname(resolve(root, file)), { recursive: true });
@@ -262,12 +288,20 @@ describe('publication range failures', () => {
     }
     for (const file of [
       'scripts/ci-branching-guard.mjs',
+      'scripts/component-ship-gate.mjs',
       'scripts/lib/policy-gate-liveness.mjs',
       'scripts/hooks/pre-push-gate.test.mjs',
+      'scripts/preflight-changed.mjs',
+      'scripts/hooks/prepush-preflight.mjs',
     ]) {
       mkdirSync(dirname(resolve(root, file)), { recursive: true });
       writeFileSync(resolve(root, file), '');
     }
+    symlinkSync(
+      resolve(repoRoot, 'node_modules'),
+      resolve(root, 'node_modules'),
+      'dir'
+    );
     git('init', '-q');
     git('config', 'user.name', 'Fixture');
     git('config', 'user.email', 'fixture@example.invalid');
@@ -356,6 +390,9 @@ describe('publication range failures', () => {
     expect(f.scanLog()).toContain('trufflehog');
     expect(f.scanLog()).toContain('candidate.txt');
     expect(f.scanLog()).not.toContain('seed.txt');
+    expect(sourcedSecurityHelpers()).toContain(
+      'scripts/security/fetch-scanner.sh'
+    );
   });
 
   it('accepts a verified empty range without confusing it with failed enumeration', () => {

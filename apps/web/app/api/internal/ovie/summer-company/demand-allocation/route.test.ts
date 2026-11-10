@@ -25,6 +25,7 @@ vi.mock('@/lib/demand/allocation-governor', async importOriginal => ({
 }));
 
 import { DemandAllocationError } from '@/lib/demand/allocation-governor';
+import { OutcomeCompilerError } from '@/lib/demand/outcome-compiler';
 import { POST } from './route';
 
 const url = 'https://jov.ie/api/internal/ovie/summer-company/demand-allocation';
@@ -125,4 +126,58 @@ it('returns conflict for rejected allocation and fails closed when persistence f
   mocks.govern.mockRejectedValueOnce(new Error('database unavailable'));
   expect((await POST(request({ op: 'reconcile' }))).status).toBe(503);
   expect(mocks.capture).toHaveBeenCalledOnce();
+});
+
+it('does not accept source text or unauthenticated outcome compilation', async () => {
+  mocks.verify.mockResolvedValue(false);
+  expect((await POST(request({ op: 'compile_outcome' }))).status).toBe(401);
+  expect(mocks.govern).not.toHaveBeenCalled();
+  mocks.verify.mockResolvedValue(true);
+  expect(
+    (
+      await POST(
+        request({ op: 'compile_outcome', rawSourceText: 'restricted' })
+      )
+    ).status
+  ).toBe(400);
+  mocks.govern.mockRejectedValueOnce(
+    new OutcomeCompilerError('capability-receipt-conflict')
+  );
+  expect((await POST(request({ op: 'reconcile' }))).status).toBe(409);
+});
+
+it('accepts the bounded compiler command through the existing authenticated durable boundary', async () => {
+  const command = {
+    op: 'compile_outcome',
+    outcome: 'presence.profile-current/v1',
+    scope: {
+      tenantId: '11111111-1111-4111-8111-111111111111',
+      subjectId: '22222222-2222-4222-8222-222222222222',
+    },
+    demand: [
+      {
+        id: 'authenticated-demand',
+        observedAt: '2026-10-20T00:00:00.000Z',
+        evidenceRef: 'request:1',
+        provenance: { kind: 'founder', sourceKey: 'founder' },
+      },
+    ],
+    facts: [],
+    suppliers: [],
+    trials: [],
+    budget: {
+      maxTrialCostCents: 0,
+      maxConcurrentTrials: 0,
+      valuePerUsefulOutcomeCents: 0,
+      minCorrectness: 0.99,
+      maxFalseMatchRate: 0.01,
+      minCoverage: 0.5,
+      maxFreshnessSeconds: 86400,
+      maxLatencyMs: 1000,
+    },
+  };
+  expect((await POST(request(command))).status).toBe(200);
+  expect(mocks.govern).toHaveBeenCalledWith(
+    expect.objectContaining({ command })
+  );
 });

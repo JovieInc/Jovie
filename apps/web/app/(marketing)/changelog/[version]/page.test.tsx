@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ChangelogRelease } from '@/lib/changelog-parser';
+import { resolveCustomerChangelogHero } from '@/lib/customer-changelog';
+import { applyRootTitleTemplate } from '@/lib/seo/document-title';
 import { parseWhatsNewFeed, projectWhatsNew } from '@/lib/whats-new';
 
 const mocks = vi.hoisted(() => ({
@@ -75,11 +77,9 @@ describe('ChangelogReleasePage', () => {
   it('renders the release header, body sections, resources, and navigation', async () => {
     await renderVersion('26.9.0');
 
-    const heroPhoto = screen.getByTestId('changelog-version-hero-photo');
-    expect(heroPhoto).toBeInTheDocument();
-    expect(heroPhoto.querySelector('img')?.getAttribute('src')).toContain(
-      'changelog-version.webp'
-    );
+    expect(
+      screen.queryByTestId('changelog-version-hero-photo')
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('heading', { level: 1, name: 'v26.9.0' })
     ).toBeVisible();
@@ -184,7 +184,7 @@ describe('ChangelogReleasePage', () => {
     const metadata = await generateMetadata({
       params: Promise.resolve({ version: '26.8.0' }),
     });
-    expect(metadata.title).toBe('Jovie v26.8.0');
+    expect(applyRootTitleTemplate(metadata.title)).toBe('Jovie v26.8.0');
     expect(metadata.description).toBe('Chat shell refinements.');
     expect(metadata.alternates).toEqual({
       canonical: 'https://jov.ie/changelog/26.8.0',
@@ -204,7 +204,7 @@ describe('ChangelogReleasePage', () => {
   });
 });
 
-it('uses the same published hero descriptor as the validated update feed', async () => {
+it('preserves validated update-feed artwork while the article hero stays matte', async () => {
   const release = RELEASES[0]!;
   const reviewed = {
     ...release,
@@ -226,13 +226,9 @@ it('uses the same published hero descriptor as the validated update feed', async
     projectWhatsNew([reviewed], 'https://jov.ie')
   )?.entries[0];
   await renderVersion(release.version);
-  const hero = screen.getByTestId('changelog-version-hero-photo');
-  const image = hero.querySelector('img');
-  expect(update?.hero?.postId).toBe(release.version);
-  expect(decodeURIComponent(image?.getAttribute('src') ?? '')).toContain(
-    update?.hero?.src
-  );
-  expect(image).toHaveAttribute('alt', update?.hero?.alt);
-  expect(hero).toHaveAttribute('aria-hidden', 'true');
+  expect(
+    screen.queryByTestId('changelog-version-hero-photo')
+  ).not.toBeInTheDocument();
+  expect(update?.hero).toEqual(resolveCustomerChangelogHero(release.version));
   expect(update?.url).toBe('https://jov.ie/changelog/26.9.0');
 });

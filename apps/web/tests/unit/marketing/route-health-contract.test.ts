@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   getMarketingRouteHealthTarget,
   getRouteManifestEntry,
@@ -12,6 +12,8 @@ import {
   MARKETING_ROUTE_HEALTH_TARGETS,
   MARKETING_ROUTE_MANIFEST,
 } from '@/data/marketing';
+import { getMarketingExactPublicRouteTargets } from '@/data/marketing/routeManifest';
+import { isProductionBlockedDebugPath } from '@/lib/security/production-blocked-routes';
 
 const PRODUCT_UPDATE_OWNER =
   'apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx';
@@ -171,6 +173,46 @@ describe('marketing route health contract', () => {
     expect(getRouteRecipeParity(pricing).matches).toBe(false);
   });
 
+  it.each([false, true])(
+    'keeps demo route disposition aligned with video availability %s',
+    async enabled => {
+      vi.resetModules();
+      vi.doMock('@/lib/flags/marketing-static', async importOriginal => {
+        const original =
+          await importOriginal<typeof import('@/lib/flags/marketing-static')>();
+        return {
+          ...original,
+          FEATURE_FLAGS: {
+            ...original.FEATURE_FLAGS,
+            SHOW_PRODUCT_DEMO_VIDEO: enabled,
+          },
+        };
+      });
+      try {
+        const manifest = await import('@/data/marketing/routeManifest');
+        const { sweepTargets } = await import('@/lib/seo/seo-certify-sweep');
+        const swept = sweepTargets(manifest.MARKETING_ROUTE_MANIFEST).map(
+          target => target.pathname
+        );
+        expect(swept).toContain('/product');
+        for (const path of ['/demo/video', '/demovideo']) {
+          const entry = manifest.MARKETING_ROUTE_MANIFEST.find(
+            entry => entry.url === path
+          )!;
+          expect(swept.includes(path)).toBe(enabled);
+          expect(manifest.getMarketingRouteHealthTarget(entry)).toMatchObject({
+            path,
+            expected: enabled ? 'page' : 'redirect',
+            allowedFinalPaths: enabled ? [] : ['/product'],
+          });
+        }
+      } finally {
+        vi.doUnmock('@/lib/flags/marketing-static');
+        vi.resetModules();
+      }
+    }
+  );
+
   it('tracks intentional redirects and keeps public pages renderable', () => {
     const redirects = MARKETING_ROUTE_HEALTH_TARGETS.filter(
       target => target.expected === 'redirect'
@@ -192,6 +234,14 @@ describe('marketing route health contract', () => {
         allowsAuthShell: false,
         requiresSharedChrome: false,
       },
+      ...['/demo/video', '/demovideo'].map(path => ({
+        glob: `(marketing)${path}/page.tsx`,
+        path,
+        expected: 'redirect',
+        allowedFinalPaths: ['/product'],
+        allowsAuthShell: false,
+        requiresSharedChrome: false,
+      })),
     ]);
 
     expect(
@@ -285,15 +335,31 @@ describe('marketing route health contract', () => {
     // JOV-6859: an active route must never silently 404 — its resolved health
     // target cannot be declared not-found. Wildcard routes keep their explicit
     // fixture probes (e.g. the unpublished engineering article check).
+    // Development-only routes that the proxy blocks in production are the
+    // one exception: they must declare not-found (never a certified page).
     for (const entry of MARKETING_ROUTE_MANIFEST) {
       const target = getMarketingRouteHealthTarget(entry);
+      const productionBlocked = isProductionBlockedDebugPath(target.path);
+      if (entry.status === 'active' && target.expected === 'redirect') {
+        expect(target.allowedFinalPaths.length).toBeGreaterThan(0);
+        for (const path of target.allowedFinalPaths) {
+          const destination = MARKETING_ROUTE_MANIFEST.find(
+            entry => entry.url === path
+          );
+          expect(destination?.status).toBe('active');
+          expect(getMarketingRouteHealthTarget(destination!).expected).toBe(
+            'page'
+          );
+        }
+        continue;
+      }
       if (entry.status === 'active' && !entry.url.includes('*')) {
         expect(
           target.expected,
           `${entry.glob} is active but declares ${target.expected}`
-        ).toBe('page');
+        ).toBe(productionBlocked ? 'not-found' : 'page');
       }
-      if (target.expected === 'not-found') {
+      if (target.expected === 'not-found' && !productionBlocked) {
         expect(
           entry.url,
           `${entry.glob} declares a not-found probe on a concrete route`
@@ -302,7 +368,7 @@ describe('marketing route health contract', () => {
     }
   });
 
-  it('generates exact capture targets only for active public pages', () => {
+  it('generates exact captures for active pages and source-bound demo recoveries', () => {
     const expectedGlobs = MARKETING_ROUTE_MANIFEST.filter(
       entry =>
         entry.status === 'active' &&
@@ -313,8 +379,88 @@ describe('marketing route health contract', () => {
     ).map(entry => entry.glob);
 
     expect(
-      MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.map(entry => entry.glob)
-    ).toEqual(expectedGlobs);
+      MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.map(entry => entry.glob).sort()
+    ).toEqual(
+      [
+        ...expectedGlobs,
+        '(marketing)/demo/video/page.tsx',
+        '(marketing)/demovideo/page.tsx',
+      ].sort()
+    );
+    for (const path of ['/demo/video', '/demovideo']) {
+      expect(
+        MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.find(target => target.url === path)
+      ).toMatchObject({
+        fixturePath: path,
+        expectedPath: '/product',
+        sourcePath: `apps/web/app/(marketing)${path}/page.tsx`,
+      });
+    }
+  });
+
+  it('excludes ambiguous, malformed and unavailable redirect capture targets', () => {
+    const alias = MARKETING_ROUTE_MANIFEST.find(
+      entry => entry.url === '/demo/video'
+    )!;
+    const product = MARKETING_ROUTE_MANIFEST.find(
+      entry => entry.url === '/product'
+    )!;
+    for (const destinations of [
+      [],
+      ['/product', '/pricing'],
+      ['//evil.example/product'],
+      ['https://evil.example/product'],
+      ['/product?x=1'],
+      ['/product#x'],
+      ['/a/../product'],
+      ['/missing'],
+      ['/renders'],
+    ]) {
+      expect(
+        getMarketingExactPublicRouteTargets([
+          {
+            ...alias,
+            healthCheck: {
+              path: alias.url,
+              expected: 'redirect',
+              allowedFinalPaths: destinations,
+            },
+          },
+          product,
+        ]).some(target => target.url === alias.url),
+        destinations.join(',')
+      ).toBe(false);
+    }
+    for (const entry of [
+      { ...alias, status: 'deprecated' as const },
+      {
+        ...alias,
+        healthCheck: { path: alias.url, expected: 'not-found' as const },
+      },
+    ]) {
+      expect(
+        getMarketingExactPublicRouteTargets([entry, product]).some(
+          target => target.url === alias.url
+        )
+      ).toBe(false);
+    }
+    for (const target of [
+      { ...product, status: 'removed' as const },
+      {
+        ...product,
+        healthCheck: {
+          path: '/product',
+          expected: 'redirect' as const,
+          allowedFinalPaths: ['/pricing'],
+        },
+      },
+    ]) {
+      expect(
+        getMarketingExactPublicRouteTargets([alias, target]).some(
+          target => target.url === alias.url
+        )
+      ).toBe(false);
+    }
   });
 
   it('records an exact not-found probe when no published dynamic fixture exists', () => {

@@ -29,7 +29,16 @@ describe('DrawerEditableTextField', () => {
     expect(screen.getByText('QMT671400005')).toBeInTheDocument();
     expect(screen.getByLabelText('Copy ISRC')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText('Edit ISRC'));
+    const trigger = screen.getByRole('button', { name: /Edit ISRC/ });
+    // Named from content (WCAG 2.5.3 Label in Name): the accessible name
+    // must contain the visible value or axe 4.14 flags
+    // label-content-name-mismatch on the /product/isrc marketing capture.
+    expect(trigger).not.toHaveAttribute('aria-label');
+    expect(trigger).toHaveTextContent('QMT671400005');
+    // The sr-only prefix comes first so the accessible name still contains
+    // the visible value (WCAG 2.5.3 label-in-name).
+    expect(trigger).toHaveAccessibleName(/^Edit ISRC:/);
+    fireEvent.click(trigger);
 
     const input = screen.getByLabelText('Edit ISRC');
     fireEvent.change(input, { target: { value: ' QMT671400006 ' } });
@@ -76,7 +85,7 @@ describe('DrawerEditableTextField', () => {
       <DrawerEditableTextField label='Label' value='Original' editable />
     );
 
-    fireEvent.click(screen.getByLabelText('Edit Label'));
+    fireEvent.click(screen.getByRole('button', { name: /Edit Label/ }));
     fireEvent.change(screen.getByLabelText('Edit Label'), {
       target: { value: 'Unsaved draft' },
     });
@@ -108,7 +117,7 @@ describe('DrawerEditableTextField', () => {
       />
     );
 
-    fireEvent.click(screen.getByLabelText('Edit Spotify URL'));
+    fireEvent.click(screen.getByRole('button', { name: /Edit Spotify URL/ }));
 
     screen.getByRole('textbox', { name: 'Edit Spotify URL' });
     const actionSlot = document.querySelector(

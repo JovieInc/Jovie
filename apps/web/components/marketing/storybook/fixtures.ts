@@ -11,7 +11,7 @@ export const STORY_FAQ_ITEMS = [
   {
     question: 'What is Jovie?',
     answer:
-      'Jovie is one product for presence, relationships, and growth. It helps artists, founders, authors, creators, and independent experts control how they are found and turn attention into relationships.',
+      'Jovie is one product for presence, relationships, and growth. It helps any creator control how they are found and turn attention into relationships.',
   },
   {
     question: 'Is Jovie free?',
@@ -21,7 +21,7 @@ export const STORY_FAQ_ITEMS = [
   {
     question: 'Who is Jovie for?',
     answer:
-      'Artists, founders, authors, creators, and independent experts who want a living profile and a way to turn attention into relationships.',
+      'Any creator who wants a living profile and a way to turn attention into relationships.',
   },
 ] as const;
 

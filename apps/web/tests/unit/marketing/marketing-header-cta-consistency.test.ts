@@ -3,7 +3,6 @@ import { resolveMarketingHeaderPrimaryCta } from '@/components/site/MarketingHea
 import { APP_ROUTES } from '@/constants/routes';
 import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { MARKETING_PAGE_CONTRACTS } from '@/data/marketing/pageContracts';
-import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
 
 /**
  * JOV-6860: the marketing header's primary CTA label must come from the one
@@ -38,23 +37,22 @@ describe('marketing header CTA consistency', () => {
     });
   }
 
-  it('keeps the homepage header on the claim-profile intent → /start in both modes', () => {
+  it('keeps the homepage header on the on-page invitation form in both modes', () => {
+    // Signup is invite-only (PUBLIC_SIGNUP_CLOSED): the homepage header
+    // scrolls to the homepage's own role waitlist form, like the hero.
     for (const waitlistEnabled of [true, false]) {
       expect(
         resolveMarketingHeaderPrimaryCta(APP_ROUTES.HOME, waitlistEnabled)
-      ).toEqual({
-        label: MARKETING_CTA_INTENTS.claimProfile.label,
-        href: MARKETING_CTA_INTENTS.claimProfile.href,
-      });
+      ).toEqual({ label: 'Request an Invite', href: '/#request-invite' });
     }
   });
 
   it('keeps artist-profiles on the shared waitlist CTA', () => {
     expect(
       resolveMarketingHeaderPrimaryCta(APP_ROUTES.ARTIST_PROFILES, true)
-    ).toEqual({ label: 'Request access', href: APP_ROUTES.SIGNUP });
+    ).toEqual({ label: 'Claim your profile', href: APP_ROUTES.SIGNUP });
     expect(
       resolveMarketingHeaderPrimaryCta(APP_ROUTES.ARTIST_PROFILE_LEGACY, true)
-    ).toEqual({ label: 'Request access', href: APP_ROUTES.SIGNUP });
+    ).toEqual({ label: 'Claim your profile', href: APP_ROUTES.SIGNUP });
   });
 });

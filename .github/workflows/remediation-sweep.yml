@@ -42,6 +42,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
         with:
@@ -57,10 +60,23 @@ jobs:
           repositories: |
             Jovie
             summer-config
+            Ops
+          permission-contents: read
           permission-checks: read
           permission-issues: read
           permission-pull-requests: read
           permission-statuses: read
+
+      # The credentials check reads private grants from JovieInc/Ops
+      # (jovie-private/). Without them it fails loudly and files an alert.
+      - name: Checkout private Ops data
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: JovieInc/Ops
+          token: ${{ steps.github-read-token.outputs.token }}
+          path: ops-private
+          sparse-checkout: jovie-private
+          persist-credentials: false
 
       - name: Resolve dry run
         id: mode
@@ -80,6 +96,14 @@ jobs:
           # Credentials/spend registry live reads: Gateway credit balance only.
           AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
           CREDENTIALS_RUN_RECEIPT: ${{ runner.temp }}/credentials-spend-run.json
+          JOVIE_PRIVATE_DIR: ${{ github.workspace }}/ops-private/jovie-private
+          # Source-of-truth drift: Stripe prices need a restricted read-only key; absent, that check is skipped with a warning.
+          STRIPE_READONLY_KEY: ${{ secrets.STRIPE_READONLY_KEY }}
+          DRIFT_RUN_RECEIPT: ${{ runner.temp }}/source-drift-run.json
+          SWIFT_ARCH_METRICS_OUT: ${{ runner.temp }}/swift-arch-metrics.json
+          # Proof-stat loop: production feed (content writer secret; absent, the feed-based stages are skipped with a warning).
+          CONTENT_PUBLISH_SECRET: ${{ secrets.CONTENT_PUBLISH_SECRET }}
+          PROOF_LOOP_RUN_RECEIPT: ${{ runner.temp }}/proof-loop-run.json
           DRY_RUN: ${{ steps.mode.outputs.dry_run }}
           EVENT_NAME: ${{ github.event_name }}
           SCHEDULE: ${{ github.event.schedule }}
@@ -93,7 +117,10 @@ jobs:
           if [ "$SCHEDULE" = "17 8 * * 1" ]; then weekly=true; fi
           if [ "$SCHEDULE" = "11 8 * * *" ]; then daily=true; fi
           run_mode() { node scripts/remediation-sweep.mjs --mode "$1" $flag; }
-          if [ "$weekly" = true ]; then run_mode drafts; fi
+          if [ "$weekly" = true ]; then
+            run_mode drafts
+            run_mode swift-arch
+          fi
           if [ "$daily" = true ]; then
             run_mode exhausted
             run_mode holds
@@ -102,6 +129,8 @@ jobs:
             run_mode vercel
             run_mode domains
             run_mode credentials
+            run_mode drift
+            run_mode proof
           fi
 
       # Measure-everything: each credentials/spend run's stage timestamps.
@@ -111,6 +140,38 @@ jobs:
         with:
           name: credentials-spend-run
           path: ${{ runner.temp }}/credentials-spend-run.json
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Upload source drift run record
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: source-drift-run
+          path: ${{ runner.temp }}/source-drift-run.json
+          if-no-files-found: ignore
+          retention-days: 90
+
+      # Measure-everything: weekly Swift architecture debt count (ADR
+      # docs/architecture/swift-architecture-adr-2026-10-29.md), schema
+      # jovie.swift-arch-metrics/v1, timestamped by generatedAt.
+      - name: Upload Swift architecture metrics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: swift-arch-metrics
+          path: ${{ runner.temp }}/swift-arch-metrics.json
+          if-no-files-found: ignore
+          retention-days: 90
+
+      # Proof-stat loop: stage timestamps, published/stale/bound-share
+      # metrics, ranked ideas, founder approval cards and win texts for Summer.
+      - name: Upload proof loop run record
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: proof-loop-run
+          path: ${{ runner.temp }}/proof-loop-run.json
           if-no-files-found: ignore
           retention-days: 90
 
@@ -172,6 +233,7 @@ jobs:
           - { suite: web, shard: 5/6 }
           - { suite: web, shard: 6/6 }
           - { suite: scripts, shard: all }
+          - { suite: research, shard: all }
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -198,7 +260,7 @@ jobs:
             # shellcheck disable=SC2086 # UNIT_EXCLUDES is a list of --exclude flags.
             node scripts/time-bomb/scan.mjs run --suite web --shard "$SHARD" --out "$out" -- $UNIT_EXCLUDES
           else
-            node scripts/time-bomb/scan.mjs run --suite scripts --out "$out"
+            node scripts/time-bomb/scan.mjs run --suite "$SUITE" --out "$out"
           fi
 
       - name: Upload findings
@@ -223,6 +285,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
         with:

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  type BrowserChatProbe,
   installBrowserChatProbe,
   roundTripCopy,
   roundTripFromRequest,
@@ -42,17 +43,9 @@ describe('chat performance fixtures', () => {
   });
 });
 
-type Probe = {
-  start: number;
-  fetchStartedMs?: number;
-  dataReadyMs?: number;
-  firstFeedbackMs?: number;
-  usableStateMs?: number;
-  renderToInteractiveMs?: number;
-  frameId?: number;
-  observer: MutationObserver;
+const probeWindow = window as Window & {
+  __jovieChatPerformanceProbe?: BrowserChatProbe;
 };
-const probeWindow = window as Window & { __jovieChatPerformanceProbe?: Probe };
 
 describe('chat performance presentation probe (synthetic DOM/clock)', () => {
   let now = 100;
@@ -74,7 +67,7 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
   });
 
   afterEach(() => {
-    probeWindow.__jovieChatPerformanceProbe?.observer.disconnect();
+    probeWindow.__jovieChatPerformanceProbe?.stop();
     delete probeWindow.__jovieChatPerformanceProbe;
     document.body.replaceChildren();
     vi.restoreAllMocks();
@@ -110,11 +103,12 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
       assistant: 'Received reply',
     });
     const probe = probeWindow.__jovieChatPerformanceProbe!;
+    probe.markSend();
     probe.start = 1000;
-    now = 1007;
-    await window.fetch('/api/chat');
-    expect(probe.fetchStartedMs).toBe(7);
-    expect(probe.dataReadyMs).toBe(7);
+    now = 1014;
+    await window.fetch('/api/chat', { method: 'POST' });
+    expect(probe.fetchStartedMs).toBe(14);
+    expect(probe.dataReadyMs).toBe(14);
 
     const hidden = row('chat-user-bubble', 'Sent message');
     hidden.style.display = 'none';
@@ -125,6 +119,8 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
     expect(probe.firstFeedbackMs).toBeUndefined();
     expect(probe.usableStateMs).toBeUndefined();
 
+    if (probeWindow.__jovieChatPerformanceProbe!.sendMs === undefined)
+      probeWindow.__jovieChatPerformanceProbe!.markSend();
     row('chat-user-bubble', 'Sent message');
     row('chat-message-reply', 'Received reply');
     const composer = document.createElement('textarea');
@@ -152,6 +148,7 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
       user: 'Sent message',
       assistant: 'Received reply',
     });
+    probeWindow.__jovieChatPerformanceProbe!.markSend();
     const hiddenParent = document.createElement('div');
     hiddenParent.style.opacity = '0';
     hiddenParent.append(row('chat-user-bubble', 'Sent message'));
@@ -178,7 +175,10 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
       assistant: 'Received reply',
     });
     const probe = probeWindow.__jovieChatPerformanceProbe!;
+    probe.markSend();
     probe.start = 1000;
+    if (probeWindow.__jovieChatPerformanceProbe!.sendMs === undefined)
+      probeWindow.__jovieChatPerformanceProbe!.markSend();
     row('chat-user-bubble', 'Sent message');
     row('chat-message-reply', 'Received reply');
     const composer = document.createElement('textarea');
@@ -200,6 +200,8 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
       user: 'Sent message',
       assistant: 'Received reply',
     });
+    if (probeWindow.__jovieChatPerformanceProbe!.sendMs === undefined)
+      probeWindow.__jovieChatPerformanceProbe!.markSend();
     row('chat-user-bubble', 'Sent message');
     row('chat-message-reply', 'Received reply');
     const composer = document.createElement('textarea');
@@ -224,6 +226,7 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
       user: 'Sent message',
       assistant: 'Received reply',
     });
+    probeWindow.__jovieChatPerformanceProbe!.markSend();
     const horizontal = document.createElement('div');
     horizontal.style.overflowX = 'hidden';
     vi.spyOn(horizontal, 'getBoundingClientRect').mockReturnValue({
@@ -254,5 +257,153 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
     const probe = probeWindow.__jovieChatPerformanceProbe!;
     expect(probe.firstFeedbackMs).toBeUndefined();
     expect(probe.usableStateMs).toBeUndefined();
+  });
+  function mockObservers() {
+    const instances: {
+      type: string;
+      pending: PerformanceEntry[];
+      disconnect: ReturnType<typeof vi.fn>;
+      deliver: (entries: PerformanceEntry[]) => void;
+    }[] = [];
+    vi.stubGlobal(
+      'PerformanceObserver',
+      class {
+        static supportedEntryTypes = ['longtask', 'long-animation-frame'];
+        type = '';
+        pending: PerformanceEntry[] = [];
+        disconnect = vi.fn();
+        constructor(private callback: PerformanceObserverCallback) {
+          instances.push(this);
+        }
+        observe(options: PerformanceObserverInit) {
+          this.type = options.type!;
+        }
+        takeRecords() {
+          return this.pending.splice(0);
+        }
+        deliver(entries: PerformanceEntry[]) {
+          this.callback(
+            { getEntries: () => entries } as PerformanceObserverEntryList,
+            this as unknown as PerformanceObserver
+          );
+        }
+      }
+    );
+    return instances;
+  }
+  const task = (startTime: number, duration: number) =>
+    ({ entryType: 'longtask', startTime, duration }) as PerformanceEntry;
+
+  it('keeps tasks overlapping send and stop, drains late records, and excludes setup and later tasks', () => {
+    const observers = mockObservers();
+    installBrowserChatProbe({ user: 'Sent', assistant: 'Reply' });
+    const probe = probeWindow.__jovieChatPerformanceProbe!;
+    observers[0].pending.push(task(10, 60));
+    now = 200;
+    probe.markSend();
+    observers[0].deliver([task(100, 60), task(180, 80), task(230, 100)]);
+    observers[0].pending.push(task(260, 55), task(400, 60));
+    now = 300;
+    const receipt = probe.stop();
+    expect(receipt.longTasks).toEqual([
+      { startMs: -20, durationMs: 80, sourceBucket: 'unknown' },
+      { startMs: 30, durationMs: 100, sourceBucket: 'unknown' },
+      { startMs: 60, durationMs: 55, sourceBucket: 'unknown' },
+    ]);
+    expect(receipt.longTaskCount).toBe(3);
+    expect(receipt.maxLongTaskMs).toBe(100);
+    observers[0].deliver([task(250, 90)]);
+    expect(probe.stop()).toBe(receipt);
+    expect(
+      observers.every(observer => observer.disconnect.mock.calls.length === 1)
+    ).toBe(true);
+  });
+
+  it('reduces supported script evidence to buckets without guessing script attribution from a long task', () => {
+    const observers = mockObservers();
+    installBrowserChatProbe({ user: 'Sent', assistant: 'Reply' });
+    probeWindow.__jovieChatPerformanceProbe!.markSend();
+    observers[1].pending.push({
+      entryType: 'long-animation-frame',
+      startTime: 100,
+      duration: 80,
+      scripts: [
+        {
+          startTime: 105,
+          duration: 30,
+          sourceURL: `${location.origin}/_next/static/private.js?token=secret`,
+        },
+        {
+          startTime: 135,
+          duration: 30,
+          sourceURL: 'https://other.example/private.js',
+        },
+        { startTime: 165, duration: 5 },
+      ],
+    } as unknown as PerformanceEntry);
+    now = 200;
+    const receipt = probeWindow.__jovieChatPerformanceProbe!.stop();
+    expect(receipt.scripts.map(script => script.sourceBucket)).toEqual([
+      'first-party-next',
+      'third-party',
+      'unknown',
+    ]);
+    expect(JSON.stringify(receipt)).not.toMatch(/secret|private|https:/);
+  });
+
+  it('treats missing and rejected observer APIs as unsupported, with usable fetch checkpoints', async () => {
+    for (const implementation of [
+      undefined,
+      class {
+        static supportedEntryTypes = ['longtask'];
+        disconnect() {}
+        observe() {
+          throw new Error('not supported');
+        }
+      },
+    ]) {
+      vi.stubGlobal('PerformanceObserver', implementation);
+      installBrowserChatProbe({ user: 'Sent', assistant: 'Reply' });
+      const probe = probeWindow.__jovieChatPerformanceProbe!;
+      probe.markSend();
+      now += 10;
+      await window.fetch('/api/chat', { method: 'POST' });
+      expect(probe.stop()).toMatchObject({
+        longTaskSupported: false,
+        scriptTimingSupported: false,
+        longTasks: [],
+        dataReadyMs: 10,
+      });
+    }
+  });
+
+  it('repeated installation cancels callbacks, restores fetch, and ignores a prior pending response', async () => {
+    const observers = mockObservers();
+    let respond!: (response: Response) => void;
+    const originalFetch = vi.fn(
+      () =>
+        new Promise<Response>(resolve => {
+          respond = resolve;
+        })
+    );
+    window.fetch = originalFetch;
+    installBrowserChatProbe({ user: 'Old', assistant: 'Old' });
+    const old = probeWindow.__jovieChatPerformanceProbe!;
+    old.markSend();
+    const pending = window.fetch('/api/chat', { method: 'POST' });
+    row('chat-user-bubble', 'Old');
+    await Promise.resolve();
+    frame(110); // Inner animation callback is now queued.
+    expect(frames.size).toBe(1);
+    installBrowserChatProbe({ user: 'New', assistant: 'New' });
+    const current = probeWindow.__jovieChatPerformanceProbe!;
+    expect(frames.size).toBe(0);
+    expect(observers[0].disconnect).toHaveBeenCalledOnce();
+    respond(new Response(''));
+    await pending;
+    expect(old.dataReadyMs).toBeUndefined();
+    expect(current.dataReadyMs).toBeUndefined();
+    current.stop();
+    expect(window.fetch).toBe(originalFetch);
   });
 });

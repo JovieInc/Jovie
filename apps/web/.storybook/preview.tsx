@@ -1,24 +1,25 @@
 import { TooltipProvider } from '@jovie/ui/atoms/tooltip';
-import type { Preview } from '@storybook/nextjs-vite';
+import type { Preview, StoryContext } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MotionGlobalConfig } from 'motion/react';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import React from 'react';
 import { ToastProvider } from '../components/providers/ToastProvider';
+import { STORYBOOK_A11Y_PARAMETERS } from '../lib/a11y-gates/wcag-22-aa.ts';
 import { ThemeProvider } from './next-themes-mock';
 import '../app/globals.css';
 
 /**
  * Deterministic Storybook fixtures (Phase 2 visual-testing policy).
- * Fixed clock, stable IDs, disabled animations, seeded data — prevent
- * Chromatic false positives that burn the free-tier snapshot budget.
- * @see https://www.chromatic.com/docs/snapshots/
+ * Fixed clock, stable IDs, disabled animations, seeded data — keep Storybook
+ * and Playwright visual evidence stable.
  * @see docs/VISUAL_TESTING_POLICY.md
  */
 const FIXED_NOW = new Date('2026-01-15T12:00:00.000Z');
 const STABLE_ID_PREFIX = 'sb-stable';
 
 function installProcessPolyfill(): void {
-  // Chromatic story extraction runs in a browser. Vite `define` rewrites most
+  // Storybook runs in a browser. Vite `define` rewrites most
   // process.env.* references, but a global fallback prevents hard crashes if
   // any residual bare `process` access remains in the story graph.
   const g = globalThis as unknown as {
@@ -87,6 +88,12 @@ function installDeterministicFixtures(): void {
     }
   `;
   document.head.appendChild(style);
+
+  // JS-driven (motion) enter animations start at opacity 0 and are still
+  // mid-fade when the axe pass runs, so axe measures a half-transparent
+  // foreground and reports false color-contrast failures. Settle them at once,
+  // exactly like the CSS freeze above; real UI motion is untouched.
+  MotionGlobalConfig.skipAnimations = true;
 
   // Keep responsive media queries real; only motion is deterministic.
   const nativeMatchMedia = window.matchMedia.bind(window);
@@ -196,15 +203,33 @@ if (typeof window !== 'undefined') {
   };
 }
 
+/**
+ * The theme a story explicitly requests, if any: story `parameters.themes.`
+ * `themeOverride` wins over the `themes` global, which wins over a bare
+ * `theme` global. `undefined` means "no request" — the story then renders
+ * whatever the harness seeded into storage (Surface Matrix seeds the theme
+ * per variant) or `defaultTheme` when nothing was seeded.
+ */
+export function resolveStoryTheme(
+  context: Pick<StoryContext, 'globals' | 'parameters'> | undefined
+): 'light' | 'dark' | undefined {
+  const parameterOverride = context?.parameters?.themes?.themeOverride;
+  if (parameterOverride === 'light' || parameterOverride === 'dark') {
+    return parameterOverride;
+  }
+  const themesGlobal =
+    (context?.globals as
+      | { themes?: { value?: unknown }; theme?: unknown }
+      | undefined) ?? {};
+  const globalValue = themesGlobal.themes?.value ?? themesGlobal.theme;
+  if (globalValue === 'light' || globalValue === 'dark') return globalValue;
+  return undefined;
+}
+
 const preview: Preview = {
+  // Explicit story themes are applied through forcedTheme below. Keep them
+  // out of storage so later stories retain their harness seed or default.
   parameters: {
-    // Chromatic: pause animations (defense in depth vs CSS above)
-    chromatic: {
-      pauseAnimationAtEnd: true,
-      delay: 0,
-      // One Chrome viewport by free-tier policy unless layout truly changes.
-      modes: undefined,
-    },
     controls: {
       matchers: {
         color: /(background|color)$/i,
@@ -229,24 +254,12 @@ const preview: Preview = {
         { name: 'gray', value: '#f3f4f6' },
       ],
     },
-    a11y: {
-      config: {
-        rules: [
-          {
-            id: 'color-contrast',
-            enabled: true,
-          },
-        ],
-      },
-      options: {
-        runOnly: ['wcag2a', 'wcag2aa'],
-      },
-    },
+    a11y: STORYBOOK_A11Y_PARAMETERS,
   },
   tags: ['autodocs'],
   decorators: [
     (Story, context) => {
-      const themeOverride = context.parameters?.themes?.themeOverride;
+      const themeOverride = resolveStoryTheme(context);
       const [queryClient] = React.useState(
         () =>
           new QueryClient({

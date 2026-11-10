@@ -125,7 +125,7 @@
 }
 
 .homepage-v2-hero__shot-a-frame {
-  border-radius: 1.15rem;
+  border-radius: var(--radius-2xl);
 }
 
 .homepage-v2-hero__card--a {

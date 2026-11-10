@@ -3,11 +3,10 @@ import '../../../styles/system-b-app.css';
 import { headers } from 'next/headers';
 import { redirect, unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
+import { OvieRouteUsageBeacon } from '@/components/features/admin/OvieRouteUsageBeacon';
 import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
 import { PersistentAudioBar } from '@/components/organisms/PersistentAudioBar';
 import { NuqsProvider } from '@/components/providers/NuqsProvider';
-import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
-import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { RECOVERY_COPY } from '@/features/feedback/recovery-contract';
@@ -19,20 +18,13 @@ import { canAccessAppShell } from '@/lib/auth/access-route-redirect';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { resolveUserState } from '@/lib/auth/gate';
-import ChatLoading from './chat/ChatLoadingState';
 import { DashboardShellContent } from './DashboardShellContent';
-import { ReleaseTableSkeleton } from './dashboard/releases/loading';
-import { LibraryLoadingState } from './library/LibraryLoadingState';
 import { requireAppShellModeAccess } from './shell-mode';
 import {
-  isChatShellRoute,
-  isLibraryShellRoute,
-  isLyricsShellRoute,
-  isReleasesShellRoute,
-  isTasksShellRoute,
   resolveAppShellLoadingPath,
   resolveAppShellRequestPath,
 } from './shell-route-matches';
+import { resolveShellRouteSkeleton } from './shell-route-skeleton';
 
 export const runtime = 'nodejs';
 
@@ -116,18 +108,7 @@ export default async function AppShellLayout({
     const audioPlayer = <PersistentAudioBar />;
 
     // Pick the route-specific skeleton main slot.
-    let routeMain: React.ReactNode = undefined;
-    if (isChatShellRoute(loadingPathname)) {
-      routeMain = <ChatLoading />;
-    } else if (isReleasesShellRoute(loadingPathname)) {
-      routeMain = <ReleaseTableSkeleton showHeader={false} />;
-    } else if (isLibraryShellRoute(loadingPathname)) {
-      routeMain = <LibraryLoadingState />;
-    } else if (isLyricsShellRoute(loadingPathname)) {
-      routeMain = <LyricsRouteSkeleton />;
-    } else if (isTasksShellRoute(loadingPathname)) {
-      routeMain = <TasksRouteSkeleton />;
-    }
+    const routeMain = resolveShellRouteSkeleton(loadingPathname);
 
     // This fallback is for the first authenticated shell boot. The shell
     // segment intentionally has no loading.tsx: App Router then keeps the
@@ -154,6 +135,7 @@ export default async function AppShellLayout({
     // during SSR and hydration, regardless of how CoreProviders resolves above.
     return (
       <NuqsProvider>
+        {mode === 'ov' ? <OvieRouteUsageBeacon /> : null}
         <Suspense fallback={shellFallback}>
           <DashboardShellContent
             userId={auth.userId}

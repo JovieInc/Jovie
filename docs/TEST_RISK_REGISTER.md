@@ -151,7 +151,7 @@ surfaces:
     last_reviewed: 2026-05-10
 
   - id: public-profile-isr
-    surface: Public profile ISR rendering
+    surface: Public profile publication and rendering
     glob: apps/web/app/[username]/**
     key_ranges: []
     blast_radius: 4
@@ -163,10 +163,11 @@ surfaces:
     last_incident: null
     lessons_ref: null
     notes: >-
-      1h revalidate with cache-tag invalidation. SSR/ISR rendering must not
-      crash on minimal/maximal profile shapes. Visual regression already covers
+      Fresh publication per request; shared cached successes cannot authorize
+      profile disclosure after withdrawal or storage failure (JOV-8629).
+      Rendering must handle minimal/maximal profile shapes. Visual regression already covers
       public/[username] light/dark/mobile in tests/e2e/visual-regression.spec.ts.
-    last_reviewed: 2026-05-10
+    last_reviewed: 2026-10-24
 
   - id: claim-onboarding
     surface: Onboarding & profile claim flow
@@ -222,6 +223,31 @@ surfaces:
       currently describe.skip'd. Must run against a non-BYPASSRLS role on a real
       Neon ephemeral branch. Covers owner-read, owner-write, cross-user denial.
     last_reviewed: 2026-05-10
+
+  - id: app-shell-navigation
+    surface: App shell navigation
+    glob: apps/web/components/features/dashboard/dashboard-nav/**
+    key_ranges:
+      - apps/web/components/features/dashboard/dashboard-nav/NavMenuItem.tsx:194-300
+    blast_radius: 5
+    reversibility: 2
+    visibility: 5
+    target_coverage: 80
+    target_e2e: 3
+    owner: '@itstimwhite'
+    last_incident: 2026-11-08
+    lessons_ref: null
+    notes: >-
+      Production dashboard links stopped navigating on 2026-11-08 with every
+      pre-merge check green: unit tests mock next/link, and the only
+      signed-in browser specs ran on manual dispatch. The blocking proof is
+      the merge-group Lighthouse (dashboard gate) job, which runs
+      tests/e2e/dashboard-click-navigation.spec.ts (desktop sidebar),
+      tests/e2e/shell-nav-click-through.spec.ts (mobile tabs) and
+      tests/e2e/shell-route-health.spec.ts (every sidebar destination by
+      full load and by click, failing on console errors and error
+      boundaries).
+    last_reviewed: 2026-11-08
 ---
 
 # Test Risk Register
@@ -254,6 +280,7 @@ The heatmap generator computes a numeric priority score and joins it with measur
 | Onboarding & claim | `apps/web/app/(onboarding)/**` | 4 | 3 | 5 | 75% | 2 |
 | Marketing (static) | `apps/web/app/(marketing)/**` | 2 | 1 | 5 | 30% | 4 |
 | RLS access control | `apps/web/lib/db/schema/**` | 5 | 5 | 3 | 80% | 0 |
+| App shell navigation | `apps/web/components/features/dashboard/dashboard-nav/**` | 5 | 2 | 5 | 80% | 2 |
 
 ## Maintenance
 

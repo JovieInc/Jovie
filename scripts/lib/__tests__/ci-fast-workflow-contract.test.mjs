@@ -11,6 +11,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { load as loadYaml } from 'js-yaml';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
@@ -35,6 +36,7 @@ import {
   NODE_RUNTIME_CONTRACT_COMMAND,
   NODE_RUNTIME_CONTRACT_PATHS,
   OFFLINE_FAILURE_COVERAGE_COMMAND,
+  PEN_TOKEN_PARITY_COMMAND,
   runBiome,
   runCopyGate,
   runEslintServerBoundaries,
@@ -50,12 +52,15 @@ import {
   selectLanes,
   selectNodeRuntimeContractCommands,
   structuralLocks,
+  typecheckEnvironment,
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
+import { buildWebVitestFastArgs } from '../ci-web-vitest-fast-args.mjs';
+import { defineStorybookBrowserSelectionTests } from './ci-storybook-browser-selection.cases.mjs';
+import { assertProfileClaimProof } from './profile-claim-proof.support.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
-
 // JOV-6837: the structural control paths are data, one ERE alternative per line.
 const STRUCTURAL_CONTROL_PATHS = readFileSync(
   resolve(REPO_ROOT, '.github/ci-harness/structural-control-paths.ere'),
@@ -78,7 +83,6 @@ const CI_FAST_SOURCE = readFileSync(
 const PACKAGE_JSON = JSON.parse(
   readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8')
 );
-
 const HOSTED_GROUP_JOBS = [
   {
     jobId: 'ci-fast-typecheck',
@@ -92,7 +96,7 @@ const HOSTED_GROUP_JOBS = [
   },
   {
     jobId: 'ci-fast-structural-web',
-    nextJobId: 'ci-knip',
+    nextJobId: 'ci-fast-structural-lanes',
     jobName: 'ci-fast (structural web)',
   },
 ];
@@ -111,7 +115,95 @@ function jobBlock(jobId, nextJobId) {
   return WORKFLOW.slice(start, end);
 }
 
+/**
+ * @typedef {{run?: string, uses?: string, if?: string | boolean,
+ *   with?: {'go-version'?: string, cache?: boolean}}} ActionlintWorkflowStep
+ * @typedef {{jobs: Record<string, {steps?: ActionlintWorkflowStep[]}>}} ActionlintWorkflow
+ */
+function assertActionlintCompiler(steps) {
+  const lintIndex = steps.findIndex(step =>
+    step.run?.includes('bash .github/scripts/run-actionlint.sh')
+  );
+  expect(lintIndex, 'actionlint caller must exist').toBeGreaterThanOrEqual(0);
+  const setup = steps
+    .slice(0, lintIndex)
+    .filter(step => step.uses?.startsWith('actions/setup-go@'));
+  expect(setup, 'compiler setup must precede actionlint').toHaveLength(1);
+  expect(setup[0].uses).toBe(
+    'actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e'
+  );
+  expect(setup[0].with).toMatchObject({
+    'go-version': '1.26.10',
+    cache: false,
+  });
+  expect(setup[0].if).toBe(steps[lintIndex].if);
+}
+
 describe('ci-fast bounded parallel workflow', () => {
+  defineStorybookBrowserSelectionTests(jobBlock);
+
+  it('selects both critical and interaction files for non-main manual units', () => {
+    const unitJob = jobBlock('ci-unit-tests', 'ci-exact-head-coverage-shard');
+    const command = unitJob
+      .split('\n')
+      .find(
+        line =>
+          line.includes('pnpm turbo test:fast --affected --') &&
+          /--passWithNoTests(?:\s|$)/u.test(line)
+      );
+    const selectors = command?.match(
+      /unit_excludes \}\}\s+(.+?)\s+\$OUTPUT_FLAG$/u
+    )?.[1];
+    expect(selectors, 'manual unit filename selectors').toBeTruthy();
+    const parsed = spawnSync('bash', ['-c', `printf '%s\\0' ${selectors}`], {
+      encoding: 'utf8',
+      timeout: 1000,
+    });
+    expect(parsed.status, parsed.stderr).toBe(0);
+    const [, ...runnerArgs] = buildWebVitestFastArgs(
+      parsed.stdout.split('\0').filter(Boolean)
+    );
+    const webRoot = resolve(REPO_ROOT, 'apps/web');
+    const outputDir = mkdtempSync(join(tmpdir(), 'manual-unit-selection-'));
+    try {
+      const report = join(outputDir, 'files.json');
+      // --filesOnly uses the real config/project selection without importing
+      // or executing test bodies. One unsharded list checks the intended union.
+      const selected = spawnSync(
+        process.execPath,
+        [
+          resolve(webRoot, 'node_modules/vitest/vitest.mjs'),
+          'list',
+          ...runnerArgs,
+          '--filesOnly',
+          `--json=${report}`,
+        ],
+        {
+          cwd: webRoot,
+          encoding: 'utf8',
+          env: { ...process.env, CI: 'true' },
+          timeout: 20_000,
+        }
+      );
+      expect(selected.error).toBeUndefined();
+      expect(selected.status, selected.stdout + selected.stderr).toBe(0);
+      const files = JSON.parse(readFileSync(report, 'utf8')).map(
+        entry => entry.file
+      );
+      expect(files).toContain(
+        resolve(webRoot, 'tests/unit/lib/auth/gate.critical.test.ts')
+      );
+      expect(files).toContain(
+        resolve(webRoot, 'tests/unit/chat/ChatInput.interaction.test.tsx')
+      );
+      expect(files).not.toContain(
+        resolve(webRoot, 'tests/unit/utils/capitalizeFirst.test.ts')
+      );
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
   it('discovers assurance behavior tests and executes them once with structural coverage', async () => {
     const test = 'scripts/invariants/assurance-matrix.test.mjs';
     expect(SCRIPT_CONTRACT_NODE_TESTS).toContain(test);
@@ -279,13 +371,18 @@ describe('ci-fast bounded parallel workflow', () => {
     // select the identical files with complementary -k expressions so every
     // collected test runs in exactly one shard (never zero, never twice).
     expect(STRUCTURAL_PYTEST_FILES).toEqual([
+      'scripts/prod-errors/test_prod_errors.py',
       'scripts/tests/test_gh_retry.py',
       'scripts/tests/test_vercel_prebuilt_deploy.py',
       'scripts/tests/test_brand_scrub.py',
       'scripts/tests/test_agent_workflow_hygiene.py',
+      'scripts/tests/test_fleet_audit.py',
       'scripts/tests/test_runner_routing.py',
       'scripts/tests/test_signal_watch.py',
       'scripts/tests/test_x_grok.py',
+      'scripts/tests/test_pr_remediation_swarm.py',
+      'scripts/tests/test_codex_launcher.py',
+      'scripts/tests/test_loose_exec_guard.py',
     ]);
     const shards = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command => {
       const [, keyword, files] = /-k "([^"]+)" (.+)$/u.exec(command) ?? [];
@@ -352,8 +449,24 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(28);
+    expect(LANES_PYTEST_FILES).toHaveLength(41);
+    expect(whole).toContain('scripts/tests/test_pr_events_repair_evidence.py');
+    expect(whole).toContain('scripts/tests/test_board_intake.py');
+    expect(whole).toContain('scripts/tests/test_priority_admission.py');
+    expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS.join(' ')).toContain(
+      'priority_admission.py" --fail-under=80'
+    );
+    expect(whole).toContain('scripts/tests/test_factory_signals.py');
+    expect(whole).toContain('scripts/tests/test_factory_intake.py');
+    expect(whole).toContain('scripts/tests/test_cloud_lane.py');
+    expect(command).toContain(
+      'coverage report --include="*/scripts/lanes/cloud_lane.py" --fail-under=90'
+    );
+    expect(whole).toContain('scripts/tests/test_hyperagent_cli.py');
     expect(whole).toContain('scripts/tests/test_model_radar.py');
+    expect(command).toContain(
+      'coverage report --include="*/scripts/lanes/model_radar.py" --fail-under=90'
+    );
     expect(new Set(shards.map(shard => shard.basetemp)).size).toBe(4);
     expect(new Set(shards.map(shard => shard.data)).size).toBe(4);
     const combine = command.indexOf(
@@ -362,6 +475,9 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(combine).toBeGreaterThan(-1);
     expect(command.indexOf('python3 -m coverage report')).toBeGreaterThan(
       combine
+    );
+    expect(command).toContain(
+      'python3 -m coverage report --include="*/scripts/hyperagent/*.py" --fail-under=90'
     );
   });
 
@@ -402,6 +518,69 @@ describe('ci-fast bounded parallel workflow', () => {
         rmSync(root, { recursive: true, force: true });
       }
     }
+  });
+
+  describe('lanes pytest retry-once', () => {
+    // Timing-sensitive lanes tests ejected unrelated product PRs from merge
+    // groups (test_update_installs_tested_release_and_only_moves_the_symlink,
+    // 7 distinct PRs). A deterministic failure must still fail the shard.
+    const run = ({ failedLines, retryRc }) => {
+      const root = mkdtempSync(join(tmpdir(), 'lanes-retry-'));
+      try {
+        const bin = join(root, 'bin');
+        mkdirSync(bin);
+        const failures = failedLines
+          .map(line => `echo "FAILED ${line} - boom"`)
+          .join('\n');
+        writeFileSync(
+          join(bin, 'python3'),
+          `#!/bin/sh\necho "$COVERAGE_FILE $*" >> "${root}/calls.log"\ncase "$*" in *"coverage run -a --branch"*) exit ${retryRc} ;; esac\ncase "$COVERAGE_FILE" in *jovie-lanes-a.coverage) ${failures || ':'}; [ -n "${failedLines.length}" ] && [ "${failedLines.length}" != 0 ] && exit 1 ;; esac\nexit 0\n`,
+          { mode: 0o755 }
+        );
+        const [command] = STRUCTURAL_PYTHON_REGRESSION_COMMANDS;
+        const result = spawnSync('sh', ['-c', command], {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            RUNNER_TEMP: root,
+          },
+        });
+        return { result, calls: readFileSync(join(root, 'calls.log'), 'utf8') };
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    };
+    it('passes the shard when its one failed node passes on retry, and says so', () => {
+      const { result, calls } = run({
+        failedLines: ['scripts/tests/test_x.py::T::flaky'],
+        retryRc: 0,
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain(
+        '::warning title=lanes pytest retry::shard a retried 1 failed node(s) once: scripts/tests/test_x.py::T::flaky'
+      );
+      expect(calls).toContain(
+        'coverage run -a --branch -m pytest scripts/tests/test_x.py::T::flaky'
+      );
+      expect(calls).toContain('-m coverage combine');
+    });
+    it('still fails when the retry fails too (deterministic regression)', () => {
+      const { result, calls } = run({
+        failedLines: ['scripts/tests/test_x.py::T::real'],
+        retryRc: 4,
+      });
+      expect(result.status).toBe(4);
+      expect(calls).not.toContain('-m coverage report');
+    });
+    it('never retries a wide failure', () => {
+      const { result, calls } = run({
+        failedLines: [1, 2, 3, 4].map(n => `scripts/tests/test_x.py::T::t${n}`),
+        retryRc: 0,
+      });
+      expect(result.status).toBe(1);
+      expect(calls).not.toContain('coverage run -a');
+    });
   });
 
   it('runs the scanner-heavy invariant suites outside the V8-coverage node --test batch', () => {
@@ -458,7 +637,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/desktop-release-guard.test.mjs',
       'scripts/desktop-release-publisher.test.mjs',
       'apps/desktop/electron-builder.yml',
-      'apps/desktop/electron-builder.staging.yml',
       'apps/desktop/scripts/notarize-release-dmg.cjs',
     ]) {
       expect(
@@ -495,111 +673,6 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain(
       "'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-include=scripts/security/deepsec-loop.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs scripts/security/deepsec-loop.test.mjs'"
     );
-  });
-
-  it('selects the crawler state proof through the maintained Storybook browser path', () => {
-    const remaining = jobBlock(
-      'ci-fast-remaining',
-      'ci-profile-admission-browser'
-    );
-    const pattern = remaining.match(/CRAWLER_STORYBOOK_PATTERN='([^']+)'/)?.[1];
-    expect(pattern).toBeTruthy();
-    for (const path of [
-      'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.tsx',
-      'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.stories.tsx',
-      'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard.tsx',
-      'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard.stories.tsx',
-      'apps/web/tests/e2e/storybook-ai-crawler.spec.ts',
-    ]) {
-      expect(
-        spawnSync('grep', ['-qE', pattern], {
-          input: `${path}\n`,
-          encoding: 'utf8',
-        }).status,
-        path
-      ).toBe(0);
-    }
-    expect(
-      spawnSync('grep', ['-qE', pattern], {
-        input:
-          'apps/web/components/features/dashboard/organisms/OtherDialog.tsx\n',
-        encoding: 'utf8',
-      }).status
-    ).not.toBe(0);
-
-    const selector = remaining
-      .split('id: storybook-browser\n')[1]
-      .split('      - name: Start ci-fast lanes')[0];
-    const command = selector
-      .split('run: |\n')[1]
-      .replaceAll('${{ github.event_name }}', 'pull_request')
-      .replaceAll('${{ github.base_ref }}', 'main');
-    const root = mkdtempSync(join(tmpdir(), 'crawler-storybook-selection-'));
-    try {
-      const output = join(root, 'output');
-      const result = spawnSync(
-        'bash',
-        ['-c', 'git() { printf "%s\\n" "$CHANGED_PATHS"; }\n' + command],
-        {
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            CHANGED_PATHS:
-              'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.stories.tsx',
-            RUNNER_TEMP: root,
-            GITHUB_OUTPUT: output,
-          },
-        }
-      );
-      expect(result.status, result.stderr).toBe(0);
-      expect(
-        Object.fromEntries(
-          readFileSync(output, 'utf8')
-            .trim()
-            .split('\n')
-            .map(line => line.split('='))
-        )
-      ).toEqual({
-        run: 'true',
-        spotify: 'false',
-        kbd: 'false',
-        crawler: 'true',
-        desktop_update: 'false',
-        overlay: 'false',
-        privacy: 'false',
-        tasks: 'false',
-      });
-
-      const runner = remaining
-        .split('id: storybook-browser-test')[1]
-        .split('      - name: Upload Storybook browser evidence')[0];
-      const selection = runner.slice(
-        runner.indexOf('          specs=()'),
-        runner.indexOf('          pnpm exec storybook dev')
-      );
-      const chosen = spawnSync(
-        'bash',
-        ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
-        {
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            RUN_SPOTIFY: 'false',
-            RUN_KBD: 'false',
-            RUN_CRAWLER: 'true',
-            RUN_OVERLAY: 'false',
-            RUN_TASKS: 'false',
-            RUN_PRIVACY: 'false',
-          },
-        }
-      );
-      expect(chosen.status, chosen.stderr).toBe(0);
-      expect(chosen.stdout.trim().split('\n')).toEqual([
-        'tests/e2e/storybook-ai-crawler.spec.ts',
-      ]);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
   });
 
   it('selects the overlay collision proof when overlay primitives change', () => {
@@ -698,40 +771,34 @@ describe('ci-fast bounded parallel workflow', () => {
     ).toContain('tests/e2e/storybook-desktop-update-modal.spec.ts');
   });
 
-  it('selects the Tasks row geometry proof for its shared cell and feature surfaces', () => {
+  it('selects DSP details only for its real consumers and runs the maintained browser proof', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const pattern = remaining.match(/TASKS_STORYBOOK_PATTERN='([^']+)'/)?.[1];
+    const pattern = remaining.match(/DSP_STORYBOOK_PATTERN='([^']+)'/)?.[1];
     expect(pattern).toBeTruthy();
-    for (const path of [
-      'apps/web/components/features/dashboard/tasks/TaskDataTable.tsx',
-      'apps/web/components/features/dashboard/tasks/TaskDataTable.stories.tsx',
-      'apps/web/components/features/dashboard/tasks/TaskListRow.tsx',
-      'apps/web/components/features/dashboard/tasks/TasksPageClient.tsx',
-      'apps/web/components/organisms/table/atoms/TableCell.tsx',
-      'apps/web/components/organisms/table/table.types.ts',
-      'apps/web/components/organisms/table/organisms/VirtualizedTableRow.tsx',
-      'apps/web/components/organisms/table/molecules/TaskProjectionListRow.tsx',
-      'apps/web/tests/e2e/storybook-task-row-geometry.spec.ts',
-    ]) {
-      expect(
-        spawnSync('grep', ['-qE', pattern], {
-          input: `${path}\n`,
-          encoding: 'utf8',
-        }).status,
-        path
-      ).toBe(0);
-    }
-    expect(
-      spawnSync('grep', ['-qE', pattern], {
-        input:
-          'apps/web/components/features/dashboard/releases/ReleaseList.tsx\n',
+    const affected = [
+      'apps/web/components/shell/DspAvatarStack.tsx',
+      'apps/web/components/shell/DspAvatarStack.test.tsx',
+      'apps/web/components/shell/DspAvatarStack.stories.tsx',
+      'apps/web/components/shell/DspAvatarStack.mobile-drawer.test.tsx',
+      'apps/web/components/shell/DspAvatarStack.mobile-drawer.stories.tsx',
+      'apps/web/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow.tsx',
+      'apps/web/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow.stories.tsx',
+      'apps/web/components/organisms/release-sidebar/ReleaseSidebarSections.tsx',
+      'apps/web/components/molecules/drawer/RightDrawer.tsx',
+      'apps/web/lib/a11y/modal-focus-boundary.ts',
+      'apps/web/tests/e2e/storybook-dsp-details.spec.ts',
+    ];
+    const unrelated = 'apps/web/components/shell/Other.tsx';
+    for (const path of [...affected, unrelated, `${affected[0]}.bak`]) {
+      const match = spawnSync('grep', ['-qE', pattern ?? 'a^'], {
+        input: `${path}\n`,
         encoding: 'utf8',
-      }).status
-    ).not.toBe(0);
-
+      });
+      expect(match.status, path).toBe(affected.includes(path) ? 0 : 1);
+    }
     const selector = remaining
       .split('id: storybook-browser\n')[1]
       .split('      - name: Start ci-fast lanes')[0];
@@ -739,42 +806,36 @@ describe('ci-fast bounded parallel workflow', () => {
       .split('run: |\n')[1]
       .replaceAll('${{ github.event_name }}', 'pull_request')
       .replaceAll('${{ github.base_ref }}', 'main');
-    const root = mkdtempSync(join(tmpdir(), 'tasks-storybook-selection-'));
+    const root = mkdtempSync(join(tmpdir(), 'dsp-storybook-selection-'));
     try {
-      const output = join(root, 'output');
-      const result = spawnSync(
-        'bash',
-        ['-c', 'git() { printf "%s\\n" "$CHANGED_PATHS"; }\n' + command],
-        {
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            CHANGED_PATHS:
-              'apps/web/components/organisms/table/organisms/VirtualizedTableRow.tsx',
-            RUNNER_TEMP: root,
-            GITHUB_OUTPUT: output,
-          },
-        }
-      );
-      expect(result.status, result.stderr).toBe(0);
-      expect(
-        Object.fromEntries(
+      for (const [changed, selected] of [
+        [affected.join('\n'), 'true'],
+        [unrelated, 'false'],
+      ]) {
+        const output = join(root, `output-${selected}`);
+        const result = spawnSync(
+          'bash',
+          ['-c', 'git() { printf "%s\\n" "$CHANGED_PATHS"; }\n' + command],
+          {
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              CHANGED_PATHS: changed,
+              RUNNER_TEMP: root,
+              GITHUB_OUTPUT: output,
+            },
+          }
+        );
+        expect(result.status, result.stderr).toBe(0);
+        const values = Object.fromEntries(
           readFileSync(output, 'utf8')
             .trim()
             .split('\n')
             .map(line => line.split('='))
-        )
-      ).toEqual({
-        run: 'true',
-        spotify: 'false',
-        kbd: 'false',
-        crawler: 'false',
-        overlay: 'false',
-        tasks: 'true',
-        desktop_update: 'false',
-        privacy: 'false',
-      });
-
+        );
+        expect(values.dsp).toBe(selected);
+        expect(values.run).toBe(selected);
+      }
       const runner = remaining
         .split('id: storybook-browser-test')[1]
         .split('      - name: Upload Storybook browser evidence')[0];
@@ -793,22 +854,37 @@ describe('ci-fast bounded parallel workflow', () => {
             RUN_KBD: 'false',
             RUN_CRAWLER: 'false',
             RUN_OVERLAY: 'false',
-            RUN_TASKS: 'true',
             RUN_PRIVACY: 'false',
+            RUN_TASKS: 'false',
+            RUN_DESKTOP_UPDATE: 'false',
+            RUN_DSP: 'true',
           },
         }
       );
+      const spec = 'tests/e2e/storybook-dsp-details.spec.ts';
       expect(chosen.status, chosen.stderr).toBe(0);
-      expect(chosen.stdout.trim().split('\n')).toEqual([
-        'tests/e2e/storybook-task-row-geometry.spec.ts',
-      ]);
+      expect(chosen.stdout.trim().split('\n')).toEqual([spec]);
+      expect(remaining).toContain(
+        'RUN_DSP: ${{ steps.storybook-browser.outputs.dsp }}'
+      );
+      const surfaces = jobBlock(
+        'ci-storybook-surfaces',
+        'ci-cross-product-integration'
+      );
+      const invocation = surfaces.match(
+        /pnpm exec playwright test ([\s\S]*?)--config=playwright\.config\.storybook\.ts/
+      );
+      expect(invocation).not.toBeNull();
       expect(
-        jobBlock('ci-storybook-surfaces', 'ci-cross-product-integration')
-      ).toContain('tests/e2e/storybook-task-row-geometry.spec.ts');
+        invocation[1].match(/tests\/e2e\/storybook-dsp-details\.spec\.ts/g)
+      ).toHaveLength(1);
+      expect(existsSync(resolve(REPO_ROOT, 'apps/web', spec))).toBe(true);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('registers mobile claim proof in web CI', assertProfileClaimProof);
 
   it('selects real Ovie privacy browser proof for its boundary and keeps combined coverage', () => {
     const remaining = jobBlock(
@@ -902,7 +978,10 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('selects physical-pointer onboarding recovery through the guarded Storybook matrix', () => {
+  it.each([
+    'tests/e2e/storybook-onboarding-recovery.spec.ts',
+    'tests/e2e/storybook-onboarding-dsp-strip-clearance.spec.ts',
+  ])('selects %s through the guarded Storybook matrix', spec => {
     const surfaces = jobBlock(
       'ci-storybook-surfaces',
       'ci-cross-product-integration'
@@ -916,9 +995,8 @@ describe('ci-fast bounded parallel workflow', () => {
     ).not.toBeNull();
     const selected =
       invocation[1].match(/tests\/e2e\/storybook-[a-z0-9-]+\.spec\.ts/g) ?? [];
-    const recovery = 'tests/e2e/storybook-onboarding-recovery.spec.ts';
-    expect(selected.filter(path => path === recovery)).toHaveLength(1);
-    expect(existsSync(resolve(REPO_ROOT, 'apps/web', recovery))).toBe(true);
+    expect(selected.filter(path => path === spec)).toHaveLength(1);
+    expect(existsSync(resolve(REPO_ROOT, 'apps/web', spec))).toBe(true);
     expect(surfaces).toContain('guard-playwright-artifacts.mjs" --run --');
     expect(surfaces).toContain('--project=chromium --reporter=line');
     expect(surfaces).toContain('--workers=2');
@@ -1061,6 +1139,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'ios-fast',
       'merge-group-guards',
       'node-runtime-contracts',
+      'pen-token-parity',
       'profile-admission',
       'scripts-typecheck',
       'shadcn-lint-contracts',
@@ -1232,7 +1311,9 @@ describe('ci-fast bounded parallel workflow', () => {
       relativePath: '.github/scripts/product-tool.mjs',
     },
   ])('runs scripts typecheck when $name', ({ relativePath }) => {
-    const repo = mkdtempSync(join(tmpdir(), 'ci-fast-product-script-'));
+    const fixture = mkdtempSync(join(tmpdir(), 'ci-fast-product-script-'));
+    const repo = join(fixture, 'repo');
+    const origin = join(fixture, 'origin.git');
     const binDir = join(repo, 'bin');
     const outPath = join(repo, 'ci-fast-lanes.json');
     const changedPath = join(repo, relativePath);
@@ -1256,6 +1337,12 @@ describe('ci-fast bounded parallel workflow', () => {
         ].join('\n')
       );
       chmodSync(join(binDir, 'pnpm'), 0o755);
+      // The source-read guard parses the real release inventory in its merged tree.
+      mkdirSync(join(repo, 'scripts/lanes'), { recursive: true });
+      writeFileSync(
+        join(repo, 'scripts/lanes/lane_runner.py'),
+        readFileSync(resolve(REPO_ROOT, 'scripts/lanes/lane_runner.py'))
+      );
       writeFileSync(changedPath, 'export const value = 1;\n');
       expect(runGit(['init', '--initial-branch=main']).status).toBe(0);
       expect(
@@ -1265,9 +1352,19 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(runGit(['add', '.']).status).toBe(0);
       expect(runGit(['commit', '-m', 'base']).status).toBe(0);
       const baseSha = runGit(['rev-parse', 'HEAD']).stdout.trim();
+      // Keep the bare origin outside the working repo so git add cannot stage it.
+      expect(
+        runGit(['init', '--bare', '--initial-branch=main', origin]).status
+      ).toBe(0);
+      expect(runGit(['remote', 'add', 'origin', origin]).status).toBe(0);
+      expect(runGit(['push', 'origin', 'HEAD:refs/heads/main']).status).toBe(0);
       writeFileSync(changedPath, 'export const value = 2;\n');
       expect(runGit(['add', '.']).status).toBe(0);
       expect(runGit(['commit', '-m', 'change product tool']).status).toBe(0);
+      const remoteBase = runGit(['ls-remote', 'origin', 'refs/heads/main']);
+      expect(remoteBase.status).toBe(0);
+      expect(remoteBase.stdout.trim()).toBe(`${baseSha}\trefs/heads/main`);
+      expect(runGit(['rev-parse', 'HEAD']).stdout.trim()).not.toBe(baseSha);
 
       const result = spawnSync(
         process.execPath,
@@ -1295,6 +1392,21 @@ describe('ci-fast bounded parallel workflow', () => {
 
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
       const payload = JSON.parse(readFileSync(outPath, 'utf8'));
+      if (relativePath.startsWith('scripts/')) {
+        const sourceGuards = payload.lanes.find(
+          lane => lane.id === 'source-guards'
+        );
+        expect(sourceGuards.status).toBe('success');
+        expect(sourceGuards.logExcerpt).toContain(
+          '[source-guards] lanes-selftest-changed-tests: exit 0'
+        );
+        expect(sourceGuards.logExcerpt).toContain(
+          'no changed release self-test lanes tests'
+        );
+        expect(runGit(['rev-parse', 'origin/main']).stdout.trim()).toBe(
+          baseSha
+        );
+      }
       expect(payload.lanes).toContainEqual(
         expect.objectContaining({
           id: 'scripts-typecheck',
@@ -1303,7 +1415,7 @@ describe('ci-fast bounded parallel workflow', () => {
         })
       );
     } finally {
-      rmSync(repo, { recursive: true, force: true });
+      rmSync(fixture, { recursive: true, force: true });
     }
   });
 
@@ -1501,6 +1613,36 @@ describe('ci-fast bounded parallel workflow', () => {
     ].map(marker => warm.indexOf(marker));
     expect(order.every((at, i) => at > (order[i - 1] ?? 0))).toBe(true);
 
+    // Source Validation typechecks the same three web programs but previously
+    // started cold. It may only restore the main-scoped buildinfo (same
+    // fallbacks as tsc-cache-warm). It must not save: PR caches are invisible
+    // to merge_group and fill the Actions cache cap.
+    const sourceValidation = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/source-validation.yml'),
+      'utf8'
+    );
+    const svRestoreStart = sourceValidation.indexOf(
+      '- name: Restore web tsc incremental state'
+    );
+    const svContract = sourceValidation.indexOf(
+      '- name: Run deterministic source contract'
+    );
+    expect(svRestoreStart).toBeGreaterThan(-1);
+    expect(svRestoreStart).toBeLessThan(svContract);
+    const svRestore = sourceValidation.slice(svRestoreStart, svContract);
+    expect(svRestore).toContain(`uses: actions/cache/restore@${cacheSha}`);
+    expect(svRestore).toContain('path: apps/web/.cache/tsbuildinfo*\n');
+    expect(svRestore).toContain('id: web-tsbuildinfo');
+    expect(svRestore).not.toContain('actions/cache/save');
+    const [svKey, ...svFallbacks] = keys(svRestore).map(line => line.trim());
+    expect(svFallbacks).toEqual(warmFallbacks);
+    expect(
+      svKey.replace(/h\$\{\{ steps\.tsc-cache-hour\.outputs\.hour }}$/, '')
+    ).toBe(ciKey.replace('${{ github.sha }}', ''));
+    expect(
+      sourceValidation.match(/uses: actions\/cache\/save@/g) ?? []
+    ).toHaveLength(0);
+
     // The gate itself is unchanged: turbo never replays a cached verdict.
     expect(CI_FAST_SOURCE).toContain('pnpm turbo typecheck --affected --force');
   });
@@ -1595,6 +1737,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-system-source-ratchet',
       'design-exception-registry',
       'design-governance-enforcement',
+      'pen-token-parity',
       'design-conformance',
       'ios-fast',
       'profile-admission',
@@ -1633,7 +1776,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-system-source-ratchet': 'pnpm design:source-count-ratchet',
       'design-exception-registry': 'pnpm design:exception-registry:check',
       'design-governance-enforcement':
-        'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel',
+        'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel && pnpm --filter @jovie/web run lint:composite-field && pnpm --filter @jovie/web run lint:design-noise',
       'ios-fast': 'pnpm run ios:lint && pnpm run ios:app-store:test',
       'merge-group-guards':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
@@ -1643,6 +1786,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'copy-gate': COPY_GATE_COMMAND,
       'source-guards': SOURCE_GUARDS_COMMAND,
       'node-runtime-contracts': NODE_RUNTIME_CONTRACT_COMMAND,
+      'pen-token-parity': PEN_TOKEN_PARITY_COMMAND,
       structural:
         'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
         ' && ' +
@@ -1863,7 +2007,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/tests/',
       'apps/web/styles/',
       'packages/ui/',
-      'chromatic\\.config\\.json$',
       'package\\.json$',
       'DESIGN\\.md$',
       'design\\.tokens\\.json$',
@@ -1989,7 +2132,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('keeps workflow contracts in the bounded CI control suite', () => {
     expect(PACKAGE_JSON.scripts['ci:control:test']).toBe(
-      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check'
+      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs scripts/workflow-runner-pin-check.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs && node scripts/invariants/duplicate-literals.mjs'
     );
     expect(PACKAGE_JSON.scripts['ownership:check']).toBe(
       'node --test scripts/ownership-registry.test.mjs && node scripts/ownership-registry.mjs --report'
@@ -2316,10 +2459,11 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('runs actionlint from checksum-pinned binaries instead of a Docker action', () => {
+  it('runs the verified upstream actionlint fix without Docker rebuilds', () => {
     // A Docker action's image is built at job start even when its step is
     // skipped (~30s on the merge-queue critical path). The script pins the
-    // exact toolchain the image shipped and must fail closed on any drift.
+    // shellcheck/pyflakes versions the image shipped, plus actionlint's
+    // exact upstream stdin fix, must fail closed on any verification drift.
     const script = readFileSync(
       resolve(REPO_ROOT, '.github/scripts/run-actionlint.sh'),
       'utf8'
@@ -2337,13 +2481,24 @@ describe('ci-fast bounded parallel workflow', () => {
     ).toContain('run: bash .github/scripts/run-actionlint.sh');
 
     expect(script).toMatch(/^set -euo pipefail$/m);
-    expect(script).toContain("readonly ACTIONLINT_VERSION='1.7.12'");
+    expect(script).toContain(
+      "readonly ACTIONLINT_VERSION='1.7.12+fd33e9f582a0.queue644076a59742'"
+    );
+    expect(script).toContain(
+      "readonly ACTIONLINT_COMMIT='fd33e9f582a01a02885c93ae3775e1190cf63653'"
+    );
+    expect(script).toContain('GOTOOLCHAIN=local GOWORK=off');
+    expect(script).toContain('-mod=readonly');
+    expect(script).toContain('^TestProcessConcurrentStdinDoesNotDeadlock$');
+    expect(script).toContain('upstream stdin regression did not cover the fix');
     expect(script).toContain("readonly SHELLCHECK_VERSION='0.11.0'");
     expect(script).toContain("readonly PYFLAKES_VERSION='3.4.0'");
-    // Release-download 5xx bursts outlast a 3-retry window (10-12 ejection).
-    expect(script).toMatch(/--retry 6 --retry-all-errors --max-time 120/);
+    // Release-download 5xx bursts outlast six retries (10-12, 11-08 outages).
+    expect(script).toMatch(/--retry 8 --retry-all-errors --max-time 120/);
+    // GitHub release assets also fall back to the authenticated API (11-08).
+    expect(script).toContain('/scripts/lib/github-release-asset.sh');
     for (const name of [
-      'ACTIONLINT_SHA256',
+      'ACTIONLINT_SOURCE_SHA256',
       'SHELLCHECK_TARBALL_SHA256',
       'SHELLCHECK_BINARY_SHA256',
       'PYFLAKES_WHEEL_SHA256',
@@ -2356,6 +2511,60 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(script).toContain('--fail');
     expect(script).toContain('-shellcheck="$tool_dir/shellcheck"');
     expect(script).toContain('-pyflakes="$tool_dir/pyflakes"');
+  });
+
+  it('provisions a verified compiler before every actual actionlint caller', () => {
+    const workflowsDir = resolve(REPO_ROOT, '.github/workflows');
+    const callers = [];
+    for (const file of readdirSync(workflowsDir)) {
+      if (!/\.ya?ml$/.test(file)) continue;
+      const source = readFileSync(join(workflowsDir, file), 'utf8');
+      if (!source.includes('bash .github/scripts/run-actionlint.sh')) continue;
+      const workflow = /** @type {ActionlintWorkflow} */ (loadYaml(source));
+      for (const [jobId, job] of Object.entries(workflow.jobs)) {
+        if (
+          !job.steps?.some(step =>
+            step.run?.includes('bash .github/scripts/run-actionlint.sh')
+          )
+        ) {
+          continue;
+        }
+        assertActionlintCompiler(job.steps);
+        callers.push(`${file}:${jobId}`);
+      }
+    }
+    expect(callers.sort()).toEqual([
+      'actionlint.yml:actionlint',
+      'ci.yml:ci-fast-remaining',
+      'source-validation.yml:deterministic',
+    ]);
+  });
+
+  it.each([
+    'missing setup',
+    'setup after lint',
+    'wrong action pin',
+    'wrong compiler version',
+    'implicit dependency cache',
+    'different condition',
+  ])('rejects an actionlint compiler prerequisite with %s', fault => {
+    const workflow = /** @type {ActionlintWorkflow} */ (loadYaml(WORKFLOW));
+    const steps = structuredClone(workflow.jobs['ci-fast-remaining'].steps);
+    const setupIndex = steps.findIndex(step =>
+      step.uses?.startsWith('actions/setup-go@')
+    );
+    const setup = steps[setupIndex];
+    if (fault === 'missing setup') steps.splice(setupIndex, 1);
+    if (fault === 'setup after lint') {
+      steps.splice(setupIndex, 1);
+      steps.push(setup);
+    }
+    if (fault === 'wrong action pin') setup.uses = 'actions/setup-go@main';
+    if (fault === 'wrong compiler version')
+      setup.with['go-version'] = '1.24.13';
+    if (fault === 'implicit dependency cache') delete setup.with.cache;
+    if (fault === 'different condition') setup.if = 'false';
+    expect(() => assertActionlintCompiler(steps)).toThrow();
   });
 
   it('keeps structural setup out of typecheck and fails closed in the aggregate', () => {
@@ -2372,7 +2581,7 @@ describe('ci-fast bounded parallel workflow', () => {
     // actionlint reads only checked-out workflows, so it runs unconditionally
     // in the idle wait for the background base-branch fetch.
     expect(remaining).toMatch(
-      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Run actionlint\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
+      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Set up Go for source-pinned actionlint\n\s+uses: actions\/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\.0\.0\n\s+with:\n\s+go-version: '1\.26\.10'\n\s+cache: false\n\s+- name: Run actionlint\n\s+env:\n(?:\s+#.*\n)+\s+RELEASE_DOWNLOAD_TOKEN: \$\{\{ github\.token \}\}\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
     );
     expect(remaining.match(/run-actionlint\.sh/g)).toHaveLength(1);
     expect(remaining).toMatch(/actions\/setup-python/);
@@ -2381,7 +2590,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(remaining).not.toContain('ci-fast-typecheck');
 
     expect(aggregate).toMatch(
-      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*\]/s
+      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*ci-fast-structural-lanes,\s*\]/s
     );
     expect(aggregate).toMatch(/^  ci-fast:\n    name: ci-fast$/m);
     expect(aggregate).toMatch(/if: >-\s+always\(\)/);
@@ -2400,7 +2609,7 @@ describe('ci-fast bounded parallel workflow', () => {
       /PROFILE_BROWSER_RESULT: \$\{\{ needs\.ci-profile-admission-browser\.result \}\}/
     );
     expect(aggregate).toMatch(
-      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \]\]/
+      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \|\| "\$STRUCTURAL_LANES_RESULT" != "success" \]\]/
     );
     expect(aggregate).toMatch(
       /STRUCTURAL_WEB_RESULT: \$\{\{ needs\.ci-fast-structural-web\.result \}\}/
@@ -2426,12 +2635,31 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(python).not.toContain('CI_FAST_STRUCTURAL_WEB');
   });
 
+  it('runs the lanes coverage pytest alone in an aliased ci-fast job', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const lanes = jobBlock('ci-fast-structural-lanes', 'ci-knip');
+    expect(lanes).toMatch(
+      /^ {2}ci-fast-structural-lanes:\n {4}name: ci-fast \(structural lanes\)$/m
+    );
+    const aliases = lanes.match(/(?<= \*)[\w-]+/g);
+    expect(aliases).toHaveLength(10);
+    for (const name of aliases) expect(remaining).toContain(`&${name}`);
+    expect(remaining).toContain('CI_FAST_STRUCTURAL_LANES: skip');
+    expect(lanes).toContain('CI_FAST_STRUCTURAL_LANES: only');
+    expect(lanes).not.toContain('CI_FAST_STRUCTURAL_PYTEST');
+    expect(lanes).not.toContain('CI_FAST_STRUCTURAL_WEB');
+    expect(lanes).toContain('runs-on: ubuntu-24.04');
+  });
+
   it('runs the structural web commands in an aliased ci-fast job', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const web = jobBlock('ci-fast-structural-web', 'ci-knip');
+    const web = jobBlock('ci-fast-structural-web', 'ci-fast-structural-lanes');
     expect(web).toMatch(
       /^ {2}ci-fast-structural-web:\n {4}name: ci-fast \(structural web\)$/m
     );
@@ -2449,7 +2677,7 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('moves the slowest cheap lanes into a background web group without dropping any', () => {
-    const web = jobBlock('ci-fast-structural-web', 'ci-knip');
+    const web = jobBlock('ci-fast-structural-web', 'ci-fast-structural-lanes');
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
@@ -2730,7 +2958,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/.storybook/main.ts',
       'apps/web/.storybook/preview.tsx',
       'apps/web/.storybook/stories/elevation-matrix.stories.tsx',
-      'chromatic.config.json',
     ]) {
       expect(selectsStructural.test(storybookHarnessPath)).toBe(true);
     }
@@ -2772,7 +2999,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(selectsStructural.test('.claude/rules/auth.md')).toBe(false);
   });
 
-  it('runs hosted structural CI for Storybook, Chromatic, and token-guard inputs', () => {
+  it('runs hosted structural CI for Storybook and token-guard inputs', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
@@ -2804,7 +3031,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(
       uiRe.test('apps/web/.storybook/stories/elevation-matrix.stories.tsx')
     ).toBe(true);
-    expect(uiRe.test('chromatic.config.json')).toBe(true);
+    expect(uiRe.test('chromatic.config.json')).toBe(false);
     expect(uiRe.test('scripts/shared-ui-visual-arbitrary-audit.mjs')).toBe(
       true
     );
@@ -3061,14 +3288,33 @@ describe('CI diff selection on a divergent PR', () => {
         all: ['notes.md', 'pr-only.ts'],
         ts: ['pr-only.ts'],
       });
-      expect(select('merge_group', 'origin/main')).toEqual({
+      // Preserve exact two-tree removal coverage: the divergent head removes
+      // main-only.ts relative to main, but it is not part of the PR delta.
+      expect(select('push', 'origin/main')).toEqual({
         all: ['main-only.ts', 'notes.md', 'pr-only.ts'],
         ts: ['main-only.ts', 'pr-only.ts'],
+      });
+      expect(select('merge_group', 'origin/main')).toEqual({
+        all: ['notes.md', 'pr-only.ts'],
+        ts: ['pr-only.ts'],
       });
       expect(select('push')).toEqual({
         all: ['notes.md', 'pr-only.ts'],
         ts: ['pr-only.ts'],
       });
+      // A docs-only tail must still typecheck the preceding queue entry.
+      const precedingEntry = git('rev-parse', 'HEAD');
+      writeFileSync(join(repository, 'notes.md'), 'docs-only tail\n');
+      git('add', '.');
+      git('commit', '-m', 'docs-only tail');
+      expect(select('merge_group', precedingEntry).ts).toEqual(['pr-only.ts']);
+      expect(typecheckEnvironment(repository).TURBO_SCM_BASE).toBe(base);
+      expect(typecheckEnvironment(repository).TURBO_SCM_HEAD).toBe('HEAD');
+      // Other events retain their existing affected range.
+      vi.stubEnv('GITHUB_EVENT_NAME', 'pull_request');
+      expect(typecheckEnvironment(repository).TURBO_SCM_BASE).toBe(
+        precedingEntry
+      );
       git('update-ref', '-d', 'refs/remotes/origin/main');
       expect(select('pull_request', base)).toEqual({
         all: ['notes.md', 'pr-only.ts'],

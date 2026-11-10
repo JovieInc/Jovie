@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 interface SectionProps {
   readonly children: React.ReactNode;
   readonly className?: string;
-  readonly containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  readonly containerSize?: 'page' | 'bleed';
   readonly containerClassName?: string;
   readonly padding?: 'sm' | 'md' | 'lg' | 'xl' | 'none';
   readonly withGridBg?: boolean;
@@ -25,7 +25,7 @@ const paddingVariants = {
 export function Section({
   children,
   className,
-  containerSize = 'lg',
+  containerSize = 'page',
   containerClassName,
   padding = 'lg',
   withGridBg = false,

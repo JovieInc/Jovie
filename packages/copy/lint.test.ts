@@ -55,6 +55,7 @@ describe('slop tells', () => {
     ['banned-phrase', "Here's the thing: fans forget."],
     ['banned-phrase', 'Excited to announce our new feature.'],
     ['corporate-verb', 'Leverage a seamless, robust workflow.'],
+    ['marketing-hype', 'Your catalog, in one quiet workspace.'],
     ['style-as-outcome', 'A modern, elegant, seamless experience.'],
     ['cheerleading', 'You are crushing it, superstar.'],
     ['emoji', 'New release out now 🎵'],
@@ -155,5 +156,23 @@ describe('passing controls: concrete language survives', () => {
     'One adaptive premium profile for every fan.',
   ])('%s', text => {
     expect(blocks(text)).toEqual([]);
+  });
+});
+
+describe('pipeline-jargon', () => {
+  it('blocks pipeline words in Jovie persona copy', () => {
+    const { blocking } = lintCopy(
+      'Pulled up this artist. 97 Spotify followers (source: enrichment).',
+      { register: 'jovie-persona' }
+    );
+    expect(blocking.map(f => f.rule)).toContain('pipeline-jargon');
+  });
+
+  it('allows the plain source name', () => {
+    const { blocking } = lintCopy(
+      'Found Unmarked Pavement on Spotify: 97 followers.',
+      { register: 'jovie-persona' }
+    );
+    expect(blocking.map(f => f.rule)).not.toContain('pipeline-jargon');
   });
 });

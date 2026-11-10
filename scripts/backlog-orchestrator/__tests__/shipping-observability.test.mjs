@@ -68,7 +68,11 @@ function completeChain() {
   );
   const production = transitionShippingReceipt(
     merged,
-    { stage: 'production-proven', deployedSha: HEAD },
+    {
+      stage: 'production-proven',
+      deployedSha: HEAD,
+      mergeGroupRun: { event: 'merge_group', id: 123 },
+    },
     shipping('deploymentActor', 'vercel-production'),
     { now: NOW }
   );

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pen-still-manifest/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "surface", "primaryMode", "frames"],
+  "properties": {
+    "schema": { "const": "pen-still-manifest/v1" },
+    "surface": { "type": "string", "minLength": 1 },
+    "primaryMode": { "const": "dark" },
+    "penFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "sha256": { "type": ["string", "null"] },
+        "note": { "type": "string" }
+      }
+    },
+    "frames": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sectionId",
+          "penNodeId",
+          "fileHash",
+          "stillPath",
+          "viewport",
+          "mode",
+          "status"
+        ],
+        "properties": {
+          "sectionId": { "type": "string", "minLength": 1 },
+          "penNodeId": { "type": "string", "minLength": 1 },
+          "fileHash": { "type": ["string", "null"] },
+          "stillPath": { "type": "string", "minLength": 1 },
+          "viewport": { "enum": [1440, 390] },
+          "mode": { "enum": ["dark", "light"] },
+          "status": { "enum": ["active", "parked", "fork"] },
+          "route": { "type": "string" },
+          "story": { "type": "string" },
+          "sectionSelector": { "type": "string" },
+          "mockupSelector": { "type": "string" }
+        }
+      }
+    }
+  }
+}

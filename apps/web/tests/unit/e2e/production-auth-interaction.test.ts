@@ -1,7 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   prepareProductionAuthEmailForm,
+  waitForCheckoutEntryContent,
   waitForProductionDashboardContent,
+  waitForProductionOnboardingLanding,
 } from '../../e2e/utils/production-auth-interaction';
 
 // Keep Playwright's assertion adapter local to this DOM-based unit fixture.
@@ -166,6 +170,189 @@ describe('production auth interaction hydration gate', () => {
       expect.any(Function),
       { selector: 'main', minimumLength: 30 },
       { timeout: 20_000 }
+    );
+  });
+
+  it('waits for the billing heading instead of sampling an empty main once', async () => {
+    document.body.innerHTML = '<main></main>';
+
+    const page = {
+      waitForFunction: vi.fn(
+        async (
+          predicate: (options: {
+            selector: string;
+            minimumLength: number;
+          }) => string | false,
+          options: { selector: string; minimumLength: number }
+        ) => {
+          // The pre-render sample is what failed the 2026-10-29 promotion.
+          expect(predicate(options)).toBe(false);
+          const main = document.querySelector('main');
+          if (main) main.textContent = 'Billing Current plan status only';
+          return { jsonValue: vi.fn(async () => predicate(options)) };
+        }
+      ),
+    };
+
+    await expect(
+      waitForCheckoutEntryContent(page as never, 20_000)
+    ).resolves.toBe('billing current plan status only');
+    expect(page.waitForFunction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { selector: 'main', minimumLength: 5 },
+      { timeout: 20_000 }
+    );
+  });
+});
+
+describe('fresh production signup landing', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function onboardingFixture(url = 'https://jov.ie/start?fresh_signup=true') {
+    vi.stubGlobal('location', new URL(url));
+    document.body.innerHTML = `<main data-testid="onboarding-chat">
+      <textarea aria-label="Chat message input"></textarea>
+    </main>`;
+    const shell = document.querySelector('main') as HTMLElement;
+    const input = document.querySelector('textarea') as HTMLTextAreaElement;
+    for (const element of [shell, input]) {
+      vi.spyOn(element, 'getClientRects').mockReturnValue([
+        new DOMRect(0, 0, 100, 40),
+      ] as unknown as DOMRectList);
+    }
+    return { shell, input };
+  }
+
+  type LandingOptions = {
+    origin: string;
+    pathname: string;
+    shellSelector: string;
+    inputSelector: string;
+  };
+
+  it('waits across the intermediate app landing until onboarding is usable', async () => {
+    const { input } = onboardingFixture('https://jov.ie/app');
+    input.disabled = true;
+    const dispose = vi.fn();
+    const page = {
+      waitForFunction: vi.fn(
+        async (
+          predicate: (options: LandingOptions) => boolean,
+          options: LandingOptions
+        ) => {
+          expect(predicate(options)).toBe(false);
+          vi.stubGlobal(
+            'location',
+            new URL('https://jov.ie/start?fresh_signup=true')
+          );
+          expect(predicate(options)).toBe(false);
+          input.disabled = false;
+          expect(predicate(options)).toBe(true);
+          return { dispose };
+        }
+      ),
+    };
+    await waitForProductionOnboardingLanding(page as never, 'https://jov.ie');
+    expect(page.waitForFunction).toHaveBeenCalledWith(
+      expect.any(Function),
+      {
+        origin: 'https://jov.ie',
+        pathname: '/start',
+        shellSelector: '[data-testid="onboarding-chat"]',
+        inputSelector: '[aria-label="Chat message input" i]',
+      },
+      { timeout: 30_000 }
+    );
+    expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    'wrong origin',
+    'wrong path',
+    'hidden shell',
+    'hidden input',
+    'disabled input',
+    'readonly input',
+    'missing onboarding',
+  ])('rejects a %s rather than accepting an off-signin URL', async failure => {
+    const { shell, input } = onboardingFixture();
+    if (failure === 'wrong origin')
+      vi.stubGlobal('location', new URL('https://other.example/start'));
+    if (failure === 'wrong path')
+      vi.stubGlobal('location', new URL('https://jov.ie/app'));
+    if (failure === 'hidden shell') shell.style.display = 'none';
+    if (failure === 'hidden input') input.style.visibility = 'hidden';
+    if (failure === 'disabled input') input.disabled = true;
+    if (failure === 'readonly input') input.readOnly = true;
+    if (failure === 'missing onboarding') shell.removeAttribute('data-testid');
+    const page = {
+      waitForFunction: vi.fn(
+        async (
+          predicate: (options: LandingOptions) => boolean,
+          options: LandingOptions
+        ) => {
+          expect(predicate(options)).toBe(false);
+          throw new Error('Fresh onboarding is not ready');
+        }
+      ),
+    };
+    await expect(
+      waitForProductionOnboardingLanding(page as never, 'https://jov.ie')
+    ).rejects.toThrow('Fresh onboarding is not ready');
+  });
+
+  it.each(['missing', 'disabled'])(
+    'ignores a writable input outside onboarding when its own input is %s',
+    async state => {
+      const { shell, input } = onboardingFixture();
+      const decoy = document.createElement('textarea');
+      decoy.setAttribute('aria-label', 'Chat message input');
+      document.body.prepend(decoy);
+      vi.spyOn(decoy, 'getClientRects').mockReturnValue([
+        new DOMRect(0, 0, 100, 40),
+      ] as unknown as DOMRectList);
+      if (state === 'missing') input.remove();
+      else input.disabled = true;
+
+      const dispose = vi.fn();
+      const page = {
+        waitForFunction: vi.fn(
+          async (
+            predicate: (options: LandingOptions) => boolean,
+            options: LandingOptions
+          ) => {
+            expect(predicate(options)).toBe(false);
+            if (state === 'missing') shell.append(input);
+            else input.disabled = false;
+            expect(predicate(options)).toBe(true);
+            return { dispose };
+          }
+        ),
+      };
+
+      await waitForProductionOnboardingLanding(page as never, 'https://jov.ie');
+      expect(dispose).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('keeps the fresh signup and first reply on the same naturally reached page', () => {
+    const source = readFileSync(
+      resolve(__dirname, '../../e2e/smoke-prod-auth.spec.ts'),
+      'utf8'
+    );
+    const start = source.indexOf("test('new user signs up with an email code'");
+    expect(start).toBeGreaterThan(0);
+    const signup = source.slice(start);
+    const afterCode = signup.slice(
+      signup.indexOf('await codeInput.fill(code);')
+    );
+    expect(afterCode).toContain('await waitForProductionOnboardingLanding(');
+    expect(afterCode).not.toContain('page.goto(');
+    expect(afterCode).toContain(
+      "await assertAssistantReply(page, 'fresh-user onboarding first value')"
     );
   });
 });

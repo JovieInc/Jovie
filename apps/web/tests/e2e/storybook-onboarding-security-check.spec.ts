@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 
 for (const viewport of [
   { width: 390, height: 844 },
@@ -80,7 +81,7 @@ for (const viewport of [
     await state.selectOption('error');
     const results = await new AxeBuilder({ page })
       .include('[data-testid="recovery-surface"]')
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+      .options(wcag22AaAxeOptions())
       .analyze();
     expect(results.violations).toEqual([]);
   });

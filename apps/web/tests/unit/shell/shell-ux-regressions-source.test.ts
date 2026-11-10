@@ -6,6 +6,24 @@ import { BREAKPOINTS } from '@/hooks/useBreakpoint';
 const webRoot = path.resolve(__dirname, '../../..');
 
 describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
+  it('keeps the left flyout peek wired with hover intent and an uncoverable in-content toggle', () => {
+    // #22207 removed the left hover peek because the pointer landed on a
+    // control the flyout then covered. The flyout returns only with both
+    // guards: a hover-intent dwell, and the in-content toggle opting out of
+    // peek triggers. Dropping either reintroduces the bug.
+    const read = (file: string) =>
+      readFileSync(path.join(webRoot, file), 'utf8');
+    const provider = read('components/organisms/sidebar/context.tsx');
+    expect(provider).toMatch(/useRailPreview\(\{[\s\S]*?side: 'left'/);
+    expect(provider).toContain('enterIntentMs: SHELL_RAIL_PREVIEW_INTENT_MS');
+    expect(read('components/organisms/AuthShell.tsx')).toContain(
+      '<SidebarCollapseButton previewTrigger={false} />'
+    );
+    expect(read('components/organisms/sidebar/sidebar.tsx')).toContain(
+      'shadow-(--app-shell-drawer-shadow)'
+    );
+  });
+
   it('anchors sidebar footer on a full-height flex chain (JOV-3960)', () => {
     const sidebar = readFileSync(
       path.join(webRoot, 'components/organisms/sidebar/sidebar.tsx'),
@@ -52,26 +70,37 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
     expect(previewHost).toContain('height: 100%');
     expect(previewHost).not.toContain('box-shadow');
     expect(previewHost).not.toContain('border:');
-    expect(rail).toContain('shell-inspector-overlay');
+    // Founder call (2026-11-08): the open rail pushes content and never lays
+    // on top of it. The slot is an in-flow column at lg+, never absolute.
+    expect(rail).toContain('shell-inspector-rail');
+    expect(rail).not.toContain('shell-inspector-overlay');
     const foundation = readFileSync(
       path.join(webRoot, 'styles/tailwind-foundation.css'),
       'utf8'
     );
-    const overlay = foundation.slice(
-      foundation.indexOf('@utility shell-inspector-overlay')
+    expect(foundation).not.toContain('@utility shell-inspector-overlay');
+    const slot = foundation.slice(
+      foundation.indexOf('@utility shell-inspector-rail')
     );
-    expect(overlay).toMatch(
-      /height: 0;[\s\S]*width: 0;[\s\S]*overflow: visible;/
+    expect(slot).toMatch(/height: 0;[\s\S]*width: 0;[\s\S]*overflow: visible;/);
+    const desktop = slot.slice(
+      slot.indexOf(`@media (min-width: ${BREAKPOINTS.lg}px)`)
     );
-    expect(overlay).toMatch(
-      new RegExp(
-        `@media \\(min-width: ${BREAKPOINTS.lg}px\\)[\\s\\S]*position: absolute;[\\s\\S]*inset-inline-end: 0;`
-      )
+    expect(desktop.indexOf('@media')).toBe(0);
+    const desktopBase = desktop.slice(0, desktop.indexOf('&:has('));
+    expect(desktopBase).not.toContain('position: absolute');
+    expect(desktopBase).not.toContain('inset-inline-end');
+    expect(desktopBase).toContain('flex: none;');
+    expect(desktopBase).toContain('width: auto;');
+    // A rail with no phased drawer (still loading) reserves no gap.
+    expect(desktopBase).toContain('padding-inline-start: 0;');
+    expect(desktopBase).not.toContain('var(--app-shell-gap)');
+    expect(slot).toContain(
+      '&:has([data-rail-phase="open"], [data-rail-phase="opening"])'
     );
-    expect(overlay).toContain('width: fit-content;');
-    expect(overlay).toContain('&:has([data-rail-phase="closed"])');
-    expect(overlay).toMatch(
-      /&:has\(\[data-rail-phase="closed"\]\)[\s\S]*width: 0;[\s\S]*padding: 0;/
+    // Only a transient preview drawer may float over the route.
+    expect(slot).toContain(
+      '&:has([data-rail-presentation="overlay"]:not([data-rail-phase="closed"]))'
     );
     expect(rail).not.toMatch(/lg:flex-col lg:self-start lg:overflow-hidden/);
   });

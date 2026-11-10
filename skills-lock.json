@@ -7,6 +7,7 @@
     "gstack",
     "make-it-feel-better",
     "nightly-test-agent",
+    "throughput-diagnosis",
     "vercel-composition-patterns",
     "vercel-react-best-practices",
     "youtube-thumbnail-growth"
@@ -23,10 +24,10 @@
     "copywriting",
     "cso",
     "design-canonical",
-    "design-consultation",
     "design-html",
     "design-review",
     "design-shotgun",
+    "design-system",
     "document-release",
     "find-skills",
     "freeze",
@@ -54,6 +55,7 @@
     "setup-gbrain",
     "ship",
     "sync-gbrain",
+    "throughput-diagnosis",
     "tool-discovery",
     "unfreeze",
     "youtube-thumbnail-growth"
@@ -70,7 +72,7 @@
       "source": "vercel/eve",
       "sourceType": "github",
       "skillPath": "skills/eve/SKILL.md",
-      "computedHash": "79a1e606ecf33eed33c1f3adc1cc266de391e19aa9237ca37e4f3aa3fba6b228"
+      "computedHash": "7fe39c2a6c1a624090b5c1e1d5c2557f1ea5abdddcd40a4cdacefb246147e30e"
     },
     "last30days": {
       "source": "mvanhorn/last30days-skill",

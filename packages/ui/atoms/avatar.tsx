@@ -28,9 +28,16 @@ export {
 
 export type AvatarStatus = 'online' | 'away' | 'offline';
 
+/** Load state of a composed AvatarImage; `idle` means no image is mounted. */
+type AvatarImageStatus = 'idle' | 'loading' | 'loaded' | 'error';
+
 interface AvatarContextValue {
   readonly size: AvatarSize;
   readonly shape: AvatarShape;
+  readonly imageStatus: AvatarImageStatus;
+  readonly setImageStatus: (status: AvatarImageStatus) => void;
+  readonly hasFallback: boolean;
+  readonly setHasFallback: (present: boolean) => void;
 }
 
 const AvatarContext = React.createContext<AvatarContextValue | null>(null);
@@ -62,7 +69,20 @@ const Avatar = React.forwardRef<HTMLSpanElement, AvatarProps>(
   ) => {
     const px = getAvatarSizePx(size);
     const isPerson = shape === 'person';
-    const contextValue = React.useMemo(() => ({ size, shape }), [size, shape]);
+    const [imageStatus, setImageStatus] =
+      React.useState<AvatarImageStatus>('idle');
+    const [hasFallback, setHasFallback] = React.useState(false);
+    const contextValue = React.useMemo(
+      () => ({
+        size,
+        shape,
+        imageStatus,
+        setImageStatus,
+        hasFallback,
+        setHasFallback,
+      }),
+      [size, shape, imageStatus, hasFallback]
+    );
     return (
       <span
         ref={ref}
@@ -99,23 +119,72 @@ export interface AvatarImageProps
 
 /**
  * `AvatarImage` — rendered inside `Avatar`.
- * Hides itself via CSS if the image fails to load (browser default for broken imgs).
+ * Composed with `AvatarFallback`, it stays out of view until it loads and is
+ * hidden on error, so the fallback shows instead of a broken image (Radix
+ * Avatar behaviour). On its own it renders as a plain image.
  */
 const AvatarImage = React.forwardRef<HTMLImageElement, AvatarImageProps>(
-  ({ className, alt = '', size, shape, ...props }, ref) => {
+  ({ className, alt = '', size, shape, src, ...props }, ref) => {
     const context = React.useContext(AvatarContext);
     const resolvedSize = context?.size ?? size ?? 'md';
     const resolvedShape = context?.shape ?? shape ?? 'person';
+    const px = getAvatarSizePx(resolvedSize);
+    const setImageStatus = context?.setImageStatus;
+    const imgRef = React.useRef<HTMLImageElement | null>(null);
+    const setRefs = React.useCallback(
+      (node: HTMLImageElement | null) => {
+        imgRef.current = node;
+        if (typeof ref === 'function') ref(node);
+        else if (ref) ref.current = node;
+      },
+      [ref]
+    );
+
+    React.useLayoutEffect(() => {
+      if (!setImageStatus) return undefined;
+      const img = imgRef.current;
+      if (!src || !img) {
+        setImageStatus('error');
+        return () => setImageStatus('idle');
+      }
+      // Native listeners keep the caller's onLoad/onError props untouched.
+      const handleLoad = () => setImageStatus('loaded');
+      const handleError = () => setImageStatus('error');
+      img.addEventListener('load', handleLoad);
+      img.addEventListener('error', handleError);
+      if (img.complete) {
+        // Cached or already-decoded images fire no load event after mount.
+        setImageStatus(img.naturalWidth > 0 ? 'loaded' : 'error');
+      } else {
+        setImageStatus('loading');
+      }
+      return () => {
+        img.removeEventListener('load', handleLoad);
+        img.removeEventListener('error', handleError);
+        setImageStatus('idle');
+      };
+    }, [src, setImageStatus]);
+
+    const status = context?.imageStatus ?? 'idle';
+    const composed = Boolean(context?.hasFallback);
 
     return (
       <img
-        ref={ref}
+        ref={setRefs}
         alt={alt}
+        src={src}
+        // Intrinsic dimensions reserve the frame before the image decodes;
+        // the h-full/w-full classes still size it to the Avatar root.
+        width={px}
+        height={px}
+        hidden={composed && status === 'error' ? true : undefined}
         className={cn(
           'h-full w-full',
+          // Keep loading off-screen behind the fallback until it is ready.
+          composed && status !== 'loaded' && 'absolute inset-0 opacity-0',
           className,
           resolvedShape === 'artwork' ? 'object-contain' : 'object-cover',
-          getAvatarShapeClassName(resolvedShape, getAvatarSizePx(resolvedSize))
+          getAvatarShapeClassName(resolvedShape, px)
         )}
         {...props}
       />
@@ -133,13 +202,23 @@ export interface AvatarFallbackProps
 }
 
 /**
- * `AvatarFallback` — shown when no image is provided. Styled as initials.
+ * `AvatarFallback` — shown when no image is provided, while a composed
+ * `AvatarImage` loads, and after it fails. Styled as initials.
  */
 const AvatarFallback = React.forwardRef<HTMLSpanElement, AvatarFallbackProps>(
   ({ size, shape, className, ...props }, ref) => {
     const context = React.useContext(AvatarContext);
     const resolvedSize = context?.size ?? size ?? 'md';
     const resolvedShape = context?.shape ?? shape ?? 'person';
+    const setHasFallback = context?.setHasFallback;
+
+    React.useLayoutEffect(() => {
+      if (!setHasFallback) return undefined;
+      setHasFallback(true);
+      return () => setHasFallback(false);
+    }, [setHasFallback]);
+
+    if (context?.imageStatus === 'loaded') return null;
 
     return (
       <span

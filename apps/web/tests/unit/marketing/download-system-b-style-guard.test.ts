@@ -82,7 +82,7 @@ describe('download page System B source contract', () => {
     expect(source).not.toMatch(/authenticated releases|release details/i);
   });
 
-  it('lets platform titles wrap without stranding a single word', () => {
+  it('lets platform titles wrap balanced without stranding a single word', () => {
     const source = readFileSync(resolve(process.cwd(), pageSourcePath), 'utf8');
     const headings = [
       ...source.matchAll(
@@ -92,7 +92,7 @@ describe('download page System B source contract', () => {
 
     expect(headings.length).toBeGreaterThan(0);
     for (const heading of headings) {
-      expect(heading[1]).toContain('text-pretty');
+      expect(heading[1]).toContain('text-balance');
       expect(heading[1]).not.toMatch(/max-w-xs/);
     }
   });
@@ -103,5 +103,32 @@ describe('download page System B source contract', () => {
       'utf8'
     );
     expect(source).not.toContain('system-b-download');
+  });
+
+  it('lights the hero focal from the shared layer with a reduced-motion-safe entrance', () => {
+    const source = readFileSync(resolve(process.cwd(), pageSourcePath), 'utf8');
+    const homeCss = readFileSync(
+      resolve(process.cwd(), 'app/(home)/home.css'),
+      'utf8'
+    );
+
+    // The page applies the shared lit-focal wash and the one entrance
+    // moment to the hero focal column (class names only, no page CSS).
+    expect(source).toContain('marketing-lit-focal');
+    expect(source).toContain('marketing-lit-enter');
+
+    // The shared layer owns the definitions, token-sourced (accent mix,
+    // no raw hex) and pointer-transparent.
+    expect(homeCss).toMatch(/\.marketing-lit-focal\s*\{/);
+    expect(homeCss).toMatch(
+      /color-mix\(in oklab, var\(--color-accent\) \d+%, transparent\)/
+    );
+
+    // One entrance moment: a single named keyframes pair, disabled under
+    // reduced motion with the settled state.
+    expect(homeCss).toMatch(/@keyframes marketing-lit-rise/);
+    expect(homeCss).toMatch(
+      /prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\.marketing-lit-enter\s*\{\s*animation: none;\s*\}\s*\}/
+    );
   });
 });

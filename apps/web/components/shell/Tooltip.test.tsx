@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { getSeamSideOffset, SEAM_GAP, Tooltip } from './Tooltip';
 
 function mockRect(el: HTMLElement, rect: Partial<DOMRect>) {
@@ -119,5 +120,123 @@ describe('Tooltip (shell)', () => {
     expect(label?.textContent).toBe(
       'Ask Jovie about my audience trends and engagement over the last quarter'
     );
+  });
+});
+
+it('touch activates once without a stuck hint, then restores mouse and keyboard hints', async () => {
+  const activate = vi.fn();
+  render(
+    <Tooltip label='Action hint'>
+      <button type='button' onClick={activate}>
+        Action
+      </button>
+    </Tooltip>
+  );
+  const trigger = screen.getByRole('button', { name: 'Action' });
+  fireEvent.focus(trigger);
+  expect(screen.getByTestId('tooltip-content')).toBeInTheDocument();
+  const touch = new Event('pointerdown', { bubbles: true });
+  Object.defineProperty(touch, 'pointerType', { value: 'touch' });
+  fireEvent(trigger, touch);
+  fireEvent.pointerUp(trigger);
+  fireEvent.click(trigger);
+  expect(activate).toHaveBeenCalledTimes(1);
+  expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+  fireEvent.blur(trigger);
+  fireEvent.focus(trigger);
+  expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+  fireEvent.keyDown(document.body, { key: 'Tab' });
+  fireEvent.blur(trigger);
+  fireEvent.focus(trigger);
+  expect(screen.getByTestId('tooltip-content')).toBeInTheDocument();
+  fireEvent(trigger, touch);
+  fireEvent.pointerUp(trigger);
+  fireEvent.blur(trigger);
+  const mouse = new Event('pointerover', { bubbles: true });
+  Object.defineProperty(mouse, 'pointerType', { value: 'mouse' });
+  fireEvent(trigger, mouse);
+  fireEvent.focus(trigger);
+  expect(screen.getByTestId('tooltip-content')).toBeInTheDocument();
+});
+
+describe('Tooltip (shell) accessibility', () => {
+  async function expectOpenLayersClean(container: HTMLElement) {
+    // Audit the trigger subtree and every portalled tooltip layer on its own;
+    // the bare test page has no landmarks.
+    const layers = document.body.querySelectorAll(
+      '[data-radix-popper-content-wrapper]'
+    );
+    expect(layers.length).toBeGreaterThan(0);
+    for (const node of [container, ...layers]) {
+      await expectNoA11yViolations(node);
+    }
+  }
+
+  it('opens on keyboard focus with a label and shortcut, without axe violations', async () => {
+    const { container } = render(
+      <Tooltip
+        label='Open audience'
+        shortcut={{ keys: 'G A', description: 'Open audience' }}
+      >
+        <button type='button'>Audience</button>
+      </Tooltip>
+    );
+    expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+
+    fireEvent.focus(screen.getByRole('button', { name: 'Audience' }));
+
+    const content = screen.getByTestId('tooltip-content');
+    expect(content).toHaveTextContent('Open audience');
+    expect(content).toHaveTextContent('G A');
+    await expectOpenLayersClean(container);
+  });
+
+  it('renders a label-only hint for an icon trigger without a keycap', async () => {
+    const { container } = render(
+      <Tooltip label='Inbox' side='right' defaultOpen>
+        <button type='button' aria-label='Inbox'>
+          <svg aria-hidden='true' />
+        </button>
+      </Tooltip>
+    );
+
+    const content = screen.getByTestId('tooltip-content');
+    expect(content).toHaveTextContent('Inbox');
+    expect(content.querySelector('kbd')).toBeNull();
+    await expectOpenLayersClean(container);
+  });
+
+  it('keeps an RTL label and shortcut intact', async () => {
+    const { container } = render(
+      <div dir='rtl'>
+        <Tooltip
+          label='افتح صفحة الجمهور لمراجعة التفاعل خلال الربع الأخير'
+          shortcut={{ keys: 'G A', description: 'افتح الجمهور' }}
+          defaultOpen
+        >
+          <button type='button'>الجمهور</button>
+        </Tooltip>
+      </div>
+    );
+
+    const label = screen
+      .getByTestId('tooltip-content')
+      .querySelector('span.min-w-0');
+    expect(label?.textContent).toBe(
+      'افتح صفحة الجمهور لمراجعة التفاعل خلال الربع الأخير'
+    );
+    await expectOpenLayersClean(container);
+  });
+
+  it('stays closed while disabled', async () => {
+    const { container } = render(
+      <Tooltip label='Open audience' disabled>
+        <button type='button'>Audience</button>
+      </Tooltip>
+    );
+
+    fireEvent.focus(screen.getByRole('button', { name: 'Audience' }));
+    expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 });

@@ -1,5 +1,7 @@
 'use client';
 
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
+
 /**
  * PromoDownloadGate — email-gated download UI for DJ promos.
  *
@@ -49,7 +51,7 @@ function formatExtension(mimeType: string): string {
     'audio/mp4': 'M4A',
     'audio/x-m4a': 'M4A',
   };
-  return map[mimeType] ?? '???';
+  return map[mimeType] ?? COPY_FALLBACKS.fileFormat;
 }
 
 export function PromoDownloadGate({

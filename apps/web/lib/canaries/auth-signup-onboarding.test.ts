@@ -111,7 +111,7 @@ describe('bodyContainsOnboardingSessionBoundary', () => {
     // boundary shell, not the init markers.
     expect(
       bodyContainsOnboardingSessionBoundary(
-        '<div data-testid="onboarding-session-boundary" data-restore-state="restoring"><p>Restoring your conversation…</p></div>'
+        '<div data-testid="onboarding-session-boundary" data-restore-state="restoring"><h1>Restoring your conversation…</h1></div>'
       )
     ).toBe(true);
   });
@@ -170,6 +170,18 @@ describe('evaluateOnboardingChatProbe', () => {
     ).toEqual({ ok: true });
   });
 
+  it('accepts a 200 admitted on the unverified budget (JOV-10194)', () => {
+    expect(evaluateOnboardingChatProbe(200, '0:"hi"')).toEqual({ ok: true });
+  });
+
+  it('rejects a 200 that carries an error envelope', () => {
+    const result = evaluateOnboardingChatProbe(
+      200,
+      JSON.stringify({ errorCode: 'BOT_GATE_OFF' })
+    );
+    expect(result.ok).toBe(false);
+  });
+
   it('rejects ONBOARDING_CHAT_DISABLED', () => {
     const result = evaluateOnboardingChatProbe(
       503,
@@ -180,7 +192,7 @@ describe('evaluateOnboardingChatProbe', () => {
   });
 
   it('rejects unexpected status codes', () => {
-    const result = evaluateOnboardingChatProbe(200, '{}');
+    const result = evaluateOnboardingChatProbe(500, 'server error');
     expect(result.ok).toBe(false);
     expect(result.detail).toContain('403');
   });

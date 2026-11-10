@@ -1,5 +1,8 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { Link } from './link';
 
@@ -24,6 +27,7 @@ describe('Link', () => {
     expect(link).toHaveAttribute('data-variant', 'link');
     expect(link).toHaveAttribute('data-appearance', 'default');
     expect(link).toHaveAttribute('data-state', 'idle');
+    expect(link).not.toHaveAttribute('data-reserved-label');
     expect(link.className).toContain('text-app');
     expect(link.className).toContain('font-medium');
     expect(link.className).toContain('text-(--color-link-default)');
@@ -52,6 +56,93 @@ describe('Link', () => {
     expect(link.className).toContain('before:min-w-11');
     expect(link.className).not.toMatch(/(?:^|\s)h-11(?:\s|$)/);
   });
+
+  it.each([false, true])(
+    'reserves a label on the real anchor while preserving focus, refs and events (asChild=%s)',
+    asChild => {
+      const ref = createRef<HTMLAnchorElement>();
+      const childRef = createRef<HTMLAnchorElement>();
+      const onClick = vi.fn(event => event.preventDefault());
+      const childClick = vi.fn(event => event.preventDefault());
+      render(
+        asChild ? (
+          <Link asChild ref={ref} reserveLabel='Sign in' onClick={onClick}>
+            <a ref={childRef} href='/signin' onClick={childClick}>
+              Sign in
+            </a>
+          </Link>
+        ) : (
+          <Link
+            ref={ref}
+            href='/signin'
+            reserveLabel='Sign in'
+            onClick={onClick}
+          >
+            Sign in
+          </Link>
+        )
+      );
+      const link = screen.getByRole('link', { name: 'Sign in' });
+      expect(link).toHaveAttribute('data-reserved-label', 'Sign in');
+      expect(link).toHaveAttribute('href', '/signin');
+      expect(ref.current).toBe(link);
+      if (asChild) expect(childRef.current).toBe(link);
+      const labelNodes = Array.from(link.childNodes);
+      link.replaceChildren();
+      expect(screen.getByRole('link', { name: 'Sign in' })).toBe(link);
+      link.focus();
+      expect(link).toHaveFocus();
+      link.append(...labelNodes);
+      expect(link).toHaveTextContent('Sign in');
+      expect(link).toHaveFocus();
+      link.click();
+      expect(onClick).toHaveBeenCalledTimes(1);
+      expect(childClick).toHaveBeenCalledTimes(asChild ? 1 : 0);
+    }
+  );
+
+  it('keeps an explicit accessible name when reserving a shorter visible label', () => {
+    render(
+      <Link href='/artist' reserveLabel='Open' aria-label='Open artist profile'>
+        Open
+      </Link>
+    );
+    expect(
+      screen.getByRole('link', { name: 'Open artist profile' })
+    ).toHaveTextContent('Open');
+  });
+
+  it.each([false, true])(
+    'preserves disabled navigation and handler behavior with a reserved label (asChild=%s)',
+    asChild => {
+      const onClick = vi.fn();
+      render(
+        asChild ? (
+          <Link asChild reserveLabel='Sign in' disabled onClick={onClick}>
+            <a href='/signin'>Sign in</a>
+          </Link>
+        ) : (
+          <Link
+            href='/signin'
+            reserveLabel='Sign in'
+            disabled
+            onClick={onClick}
+          >
+            Sign in
+          </Link>
+        )
+      );
+      const link = screen.getByRole('link', { name: 'Sign in' });
+      const click = new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+      });
+      expect(link.dispatchEvent(click)).toBe(false);
+      expect(click.defaultPrevented).toBe(true);
+      expect(onClick).not.toHaveBeenCalled();
+      expect(link).toHaveAttribute('aria-disabled', 'true');
+    }
+  );
 
   it('marks visited preview state', () => {
     render(
@@ -189,5 +280,75 @@ describe('Link', () => {
     expect(link).toHaveAttribute('data-appearance', 'unstyled');
     expect(link.className).not.toContain('text-(--color-link-default)');
     expect(link.className).not.toContain('visited:text-(--color-link-visited)');
+  });
+});
+
+describe('Link interaction', () => {
+  it('activates on click and on Enter from the keyboard', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn(event => event.preventDefault());
+    render(
+      <Link href='/docs' onClick={onClick}>
+        Documentation
+      </Link>
+    );
+
+    const link = screen.getByRole('link', { name: 'Documentation' });
+    await user.click(link);
+    expect(onClick).toHaveBeenCalledTimes(1);
+
+    link.blur();
+    await user.tab();
+    expect(link).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(onClick).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores click and Enter while disabled', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(
+      <Link href='/off' disabled onClick={onClick}>
+        Unavailable destination
+      </Link>
+    );
+
+    const link = screen.getByRole('link', { name: 'Unavailable destination' });
+    await user.click(link);
+    link.focus();
+    await user.keyboard('{Enter}');
+    expect(onClick).not.toHaveBeenCalled();
+  });
+});
+
+describe('Link accessibility', () => {
+  it('has no axe violations across variants, states, reserved label and RTL', async () => {
+    const { container } = render(
+      <div>
+        <Link href='#default'>Default destination</Link>
+        <Link href='#subtle' variant='subtle'>
+          Subtle destination
+        </Link>
+        <Link href='#inline' variant='inline'>
+          Inline destination
+        </Link>
+        <Link href='#current' active aria-current='page'>
+          Current destination
+        </Link>
+        <Link href='#disabled' disabled>
+          Unavailable destination
+        </Link>
+        <Link
+          href='#sign-in'
+          variant='compact'
+          touchTarget
+          reserveLabel='Sign in'
+        />
+        <span dir='rtl'>
+          <Link href='#rtl'>اقرأ ملاحظات الإصدار الكاملة</Link>
+        </span>
+      </div>
+    );
+    await expectNoA11yViolations(container);
   });
 });

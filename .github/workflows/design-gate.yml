@@ -1,7 +1,6 @@
-# controller-hop-exception: jovie-controller-hop/v1
-# accountable-writer: Cursor
-# necessary-trust-boundary: Read-only pull_request evaluation from a pinned full-history git checkout; complete changed paths come from the proven event merge parents and exact PR head, without GitHub API pagination or quota-dependent reads. Permissions remain contents:read + pull-requests:read; no merge, deploy, or release authority is added.
-# revisit-trigger: Remove this workflow (and the exception) once the design gate is enforced by an existing controller or required check rather than a standalone pull_request hop; otherwise revisit if DESIGN_GATE_ENFORCE graduates to a merge-queue required check.
+# Changed paths come from the exact pull_request merge and source ancestry.
+# A complete local diff retains renamed and deleted gated paths without
+# depending on GitHub API pagination or installation quota.
 name: Design gate
 
 # Warns when a PR touches a marketing or landing surface without a completed
@@ -31,7 +30,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 concurrency:
   group: design-gate-${{ github.event.pull_request.number }}
@@ -47,8 +45,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
-          # Complete ancestry proves the PR merge-base without API pagination.
+          # Complete ancestry proves the event merge-base and source head.
           fetch-depth: 0
+          filter: blob:none
           persist-credentials: false
 
       - name: Check the design brief

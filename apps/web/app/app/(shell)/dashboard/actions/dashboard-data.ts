@@ -17,10 +17,14 @@ import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { resolveUserState } from '@/lib/auth/gate';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
+import { isProofBlockingPublication } from '@/lib/claim/claim-verification';
+import {
+  type LegacyNudge,
+  legacyNudgeForDashboard,
+} from '@/lib/claim/legacy-verification';
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import type { DbOrTransaction } from '@/lib/db';
 import { DB_CONFIG, isRetryableError } from '@/lib/db/client/retry';
-import { getDeepErrorMessage, unwrapPgError } from '@/lib/db/errors';
 import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
 import {
   dashboardQuery,
@@ -73,6 +77,11 @@ import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { executeWithRetry } from '@/lib/resilience/primitives';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { isMissingTourDatesConfirmationStatusError } from '@/lib/tour-dates/queries';
+import {
+  degradeAvatarQualityRead,
+  isCommitTransportFailure,
+  isIdleTransactionTermination,
+} from './avatar-quality-degrade';
 import { mapSocialLinkExistence } from './social-link-utils';
 
 const { logger } = Sentry;
@@ -163,10 +172,15 @@ export interface DashboardData {
   isFirstSession?: boolean;
   /** Settled server-derived Inbox availability for conditional shell navigation. */
   inboxNavigation?: InboxNavigationAvailability;
+  /**
+   * Grandfathered claim waiting for a real proof (claim-verify spec Q2).
+   * Null when the selected profile is not a legacy claim. No UI reads it yet.
+   */
+  legacyNudge?: LegacyNudge | null;
 }
 
 export interface ProfileCompletionStep {
-  id: 'name' | 'avatar' | 'email' | 'music-links';
+  id: 'name' | 'avatar' | 'handle' | 'music-links';
   label: string;
   description: string;
   href: string;
@@ -184,7 +198,6 @@ interface SocialLinkExistenceQueryOptions {
   context: string;
   operation: string;
   profileId: string;
-  queryLabel: string;
   userId: string;
 }
 
@@ -214,15 +227,6 @@ const BIO_LINK_ACTIVATION_EVENT_TYPES = [
 
 type BioLinkActivationEventType =
   (typeof BIO_LINK_ACTIVATION_EVENT_TYPES)[number];
-
-function isIdleTransactionTermination(error: unknown): boolean {
-  const { code } = unwrapPgError(error);
-  return code
-    ? code === '25P03'
-    : /terminating connection due to idle-in-transaction timeout/i.test(
-        getDeepErrorMessage(error)
-      );
-}
 
 async function buildBioLinkActivation(
   clerkUserId: string,
@@ -340,20 +344,20 @@ async function buildBioLinkActivation(
 }
 
 async function fetchSocialLinkExistence(
-  tx: DbOrTransaction,
-  {
-    context,
-    operation,
-    profileId,
-    queryLabel,
-    userId,
-  }: SocialLinkExistenceQueryOptions
+  clerkUserId: string,
+  { context, operation, profileId, userId }: SocialLinkExistenceQueryOptions
 ): Promise<{ hasLinks: boolean; hasMusicLinks: boolean }> {
-  return dashboardQuery(
+  // Bound retry admission, including cleanup, without replaying sibling reads.
+  const retryDeadline = performance.now() + QUERY_TIMEOUTS.dashboard;
+  return executeWithRetry(
     () =>
-      tx
-        .select({
-          hasLinks: drizzleSql<boolean>`
+      withDbSessionTx(
+        async tx => {
+          // Await PostgreSQL cancellation before rollback/release or recovery.
+          await setStatementTimeout(tx, QUERY_TIMEOUTS.dashboard);
+          return tx
+            .select({
+              hasLinks: drizzleSql<boolean>`
             exists (
               select 1
               from ${socialLinks}
@@ -364,7 +368,7 @@ async function fetchSocialLinkExistence(
               )}
             )
           `,
-          hasMusicLinks: drizzleSql<boolean>`
+              hasMusicLinks: drizzleSql<boolean>`
             exists (
               select 1
               from ${socialLinks}
@@ -379,14 +383,24 @@ async function fetchSocialLinkExistence(
               )}
             )
           `,
-        })
-        .from(users)
-        .where(eq(users.id, userId))
-        .limit(1),
-    queryLabel
+            })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+        },
+        { clerkUserId }
+      ),
+    {
+      maxRetries: 1,
+      baseDelayMs: 0,
+      isRetryable: error =>
+        isIdleTransactionTermination(error) &&
+        performance.now() < retryDeadline,
+    }
   )
     .then(result => mapSocialLinkExistence(result?.[0]))
     .catch((error: unknown) => {
+      // Cleanup has finished before tolerated failures become fallback data.
       const migrationResult = handleMigrationErrors(error, {
         userId,
         operation,
@@ -409,7 +423,6 @@ async function fetchSocialLinkExistence(
 
 function buildProfileCompletion(
   selectedProfile: CreatorProfile | null,
-  email: string | null | undefined,
   hasMusicLinks: boolean
 ): ProfileCompletion {
   if (!selectedProfile) {
@@ -435,7 +448,7 @@ function buildProfileCompletion(
   const completion = calculateRequiredProfileCompletion({
     displayName: selectedProfile.displayName,
     avatarUrl: selectedProfile.avatarUrl,
-    email,
+    handle: selectedProfile.username,
     hasMusicLinks: hasMusicPresence,
   });
 
@@ -459,11 +472,12 @@ function buildProfileCompletion(
     });
   }
 
-  if (!completion.hasEmail) {
+  if (!completion.hasHandle) {
     steps.push({
-      id: 'email',
-      label: 'Add Your Account Email',
-      description: 'Email keeps your account recoverable and mission-critical.',
+      id: 'handle',
+      label: 'Claim Your Handle',
+      description:
+        'Your jov.ie handle is how fans find and share your profile.',
       href: APP_ROUTES.SETTINGS_PROFILE,
     });
   }
@@ -481,7 +495,10 @@ function buildProfileCompletion(
     completion.hasName &&
     completion.hasAvatar &&
     hasText(selectedProfile.username) &&
-    hasMusicPresence;
+    hasMusicPresence &&
+    // A private page waiting for ownership proof is set up, not public.
+    (selectedProfile.isPublic !== false ||
+      isProofBlockingPublication(selectedProfile.settings));
 
   return {
     percentage: completion.percentage,
@@ -725,11 +742,7 @@ function createE2EDashboardCoreData(clerkUserId: string): CoreData {
     hasSocialLinks: false,
     hasMusicLinks: true,
     tippingStats: createEmptyTippingStats(),
-    profileCompletion: buildProfileCompletion(
-      profile,
-      'e2e-chat-smoke@example.test',
-      true
-    ),
+    profileCompletion: buildProfileCompletion(profile, true),
     bioLinkActivation: null,
     isFirstSession: false,
   };
@@ -747,7 +760,7 @@ function createEmptyCoreData(overrides?: Partial<CoreData>): CoreData {
     hasSocialLinks: false,
     hasMusicLinks: false,
     tippingStats: createEmptyTippingStats(),
-    profileCompletion: buildProfileCompletion(null, null, false),
+    profileCompletion: buildProfileCompletion(null, false),
     bioLinkActivation: null,
     isFirstSession: false,
     ...overrides,
@@ -902,15 +915,26 @@ async function fetchDashboardBaseWithSession(
     hasSocialLinks: false,
     hasMusicLinks: false,
     tippingStats: createEmptyTippingStats(),
-    profileCompletion: buildProfileCompletion(selected, userData.email, false),
+    profileCompletion: buildProfileCompletion(selected, false),
     bioLinkActivation: null,
     inboxNavigation,
+    legacyNudge: legacyNudgeForDashboard(selected.settings, new Date()),
     dashboardLoadError: undefined,
     isFirstSession: deriveIsFirstSession(selected),
   };
 }
 
-/** Retry only this pure read after an idle-terminated setup has closed. */
+/**
+ * Retry only this pure read after an idle-terminated setup or a dropped
+ * connection has closed (JOV-8837).
+ *
+ * A read-only transaction's COMMIT can die on the wire after a Neon
+ * idle-in-transaction timeout without a 25P03 SQLSTATE or idle text —
+ * Drizzle then surfaces `Failed query: commit` wrapping a lost connection,
+ * which the idle-only predicate never recovers. The callback already
+ * succeeded and wrote nothing, so replaying this side-effect-free read once
+ * is unambiguous (JOV-3775 forbids replay only for uncertain writes).
+ */
 async function fetchAvatarQualityWithSession(
   clerkUserId: string,
   profileId: string
@@ -930,11 +954,16 @@ async function fetchAvatarQualityWithSession(
   try {
     return await read();
   } catch (error) {
-    if (
-      !isIdleTransactionTermination(error) ||
-      performance.now() >= retryDeadline
-    )
-      throw error;
+    // Same recovery admission as the distribution read: idle termination, a
+    // commit-wrapped transport failure (the `Failed query: commit` wrapper
+    // proves the callback succeeded and only the commit died — JOV-12096),
+    // or a transient transport failure that is not a PostgreSQL timeout (a
+    // statement timeout replaying immediately would only double the wait).
+    const recoverable =
+      isIdleTransactionTermination(error) ||
+      (isCommitTransportFailure(error) && !isPostgresTimeoutError(error)) ||
+      (isRetryableError(error) && !isPostgresTimeoutError(error));
+    if (!recoverable || performance.now() >= retryDeadline) throw error;
 
     // The first wrapper has completed rollback/release. RLS reporting remains
     // intact; only this side-effect-free avatar read gets one fresh attempt.
@@ -988,31 +1017,17 @@ async function fetchDashboardCoreWithSession(
     // Supplementary reads stay sequential — parallel dispatch would just
     // queue on the pool while starting all timeout timers simultaneously —
     // but each is isolated in its own transaction (see the docstring above).
-    const linkCounts = await withDbSessionTx(
-      async tx =>
-        fetchSocialLinkExistence(tx, {
-          context: 'dashboard_data_settled',
-          operation: 'social_links_existence',
-          profileId: selected.id,
-          queryLabel: 'Social links existence query',
-          userId,
-        }),
-      { clerkUserId }
-    );
+    const linkCounts = await fetchSocialLinkExistence(clerkUserId, {
+      context: 'dashboard_data_settled',
+      operation: 'social_links_existence',
+      profileId: selected.id,
+      userId,
+    });
 
     const avatarQuality = await fetchAvatarQualityWithSession(
       clerkUserId,
       selected.id
-    ).catch((error: unknown) => {
-      Sentry.captureException(error, {
-        level: 'warning',
-        tags: {
-          query: 'avatar_quality',
-          context: 'dashboard_data_settled',
-        },
-      });
-      return UNKNOWN_AVATAR_QUALITY;
-    });
+    ).catch((error: unknown) => degradeAvatarQualityRead(error, selected.id));
 
     const tippingStats = await withDbSessionTx(
       async tx => fetchTippingStatsWithSession(tx, selected.id),
@@ -1026,24 +1041,13 @@ async function fetchDashboardCoreWithSession(
 
     const hasMusicLinks = linkCounts.hasMusicLinks;
 
-    // base.user contains { id, email, activeProfileId } at runtime,
-    // but CoreData.user is typed as { id: string }. Cast to access email
-    // for profileCompletion without an extra DB query.
-    const userEmail =
-      (base.user as { id: string; email?: string | null } | null)?.email ??
-      null;
-
     return {
       ...base,
       avatarQuality,
       hasSocialLinks: linkCounts.hasLinks,
       hasMusicLinks,
       tippingStats,
-      profileCompletion: buildProfileCompletion(
-        selected,
-        userEmail,
-        hasMusicLinks
-      ),
+      profileCompletion: buildProfileCompletion(selected, hasMusicLinks),
       bioLinkActivation,
     };
   } catch (error) {

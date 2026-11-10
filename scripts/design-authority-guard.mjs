@@ -2,6 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 import { checkCensus } from './design-surface-census.mjs';
 
 import {
@@ -80,6 +81,56 @@ export function hasExactSerifException(exceptions, relativePath, line) {
   );
 }
 
+export function rawInteractiveCounts(file, source) {
+  const counts = {};
+  if (
+    !/^apps\/web\/(?:app\/app\/\(shell\)\/settings\/|components\/shell\/|components\/features\/dashboard\/.*[Ss]ettings)/.test(
+      file
+    ) ||
+    !file.endsWith('.tsx') ||
+    /\.(?:test|spec|stories)\./.test(file)
+  )
+    return counts;
+  const { Latest } = ts.ScriptTarget;
+  const { TSX } = ts.ScriptKind;
+  const ast = ts.createSourceFile(file, source, Latest, true, TSX);
+  function visit(node) {
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+      const tag = node.tagName.getText(ast);
+      if (['button', 'input', 'select'].includes(tag))
+        counts[tag] = (counts[tag] ?? 0) + 1;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(ast);
+  return counts;
+}
+
+export function interactiveRatchetViolations(sources, baseline) {
+  const violations = [];
+  const current = Object.fromEntries(
+    Object.entries(sources).flatMap(([file, source]) =>
+      Object.entries(rawInteractiveCounts(file, source)).map(([tag, count]) => [
+        `${file}:<${tag}>`,
+        count,
+      ])
+    )
+  );
+  for (const key of Object.keys({ ...current, ...baseline })) {
+    const actual = current[key] ?? 0;
+    const limit = baseline[key] ?? 0;
+    if (actual > limit)
+      violations.push(
+        `${key}: raw control count ${actual} exceeds baseline ${limit}; use shared primitives`
+      );
+    if (actual < limit)
+      violations.push(
+        `${key}: shrink raw control baseline from ${limit} to ${actual}`
+      );
+  }
+  return violations;
+}
+
 function readSerifExceptions(repoRoot) {
   const exceptionPath = path.join(
     repoRoot,
@@ -114,6 +165,18 @@ export function findDesignManifestProjectionViolations(
 export function findDesignAuthorityViolations(repoRoot = process.cwd()) {
   const violations = [];
   const serifExceptions = readSerifExceptions(repoRoot);
+  const baseline = JSON.parse(
+    readFileSync(
+      path.join(repoRoot, 'scripts/design-authority-interactive-baseline.json'),
+      'utf8'
+    )
+  );
+  const sources = Object.fromEntries(
+    trackedFiles(repoRoot)
+      .filter(file => file.startsWith('apps/web/') && file.endsWith('.tsx'))
+      .map(file => [file, readFileSync(path.join(repoRoot, file), 'utf8')])
+  );
+  violations.push(...interactiveRatchetViolations(sources, baseline));
   for (const relativePath of ACTIVE_AUTHORITY_FILES) {
     const source = readFileSync(path.join(repoRoot, relativePath), 'utf8');
     for (const pattern of STALE_ACTIVE_PATTERNS) {

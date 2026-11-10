@@ -17,12 +17,9 @@ import {
   X,
 } from 'lucide-react';
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
-import {
-  MarketingContainer,
-  MarketingHeroPhoto,
-  MarketingPageShell,
-} from '@/components/marketing';
+import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
@@ -30,6 +27,10 @@ import { AiDemo } from '@/features/home/AiDemo';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { ProfileMockup } from '@/features/home/ProfileMockup';
 import { TIM_WHITE_PROFILE } from '@/features/home/tim-white';
+import {
+  formatCatalogRelease,
+  HOMEPAGE_PROFILE_PREVIEW_CATALOG,
+} from '@/features/home/tim-white-catalog';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
@@ -194,44 +195,41 @@ const PROFILE_FEATURES = [
   { label: '1.4', title: 'Custom domains' },
 ] as const;
 
-const RELEASES = [
-  {
-    title: 'The Sound',
-    type: 'Single',
-    date: 'Mar 2018',
-    badge: 'Smart Link',
-    tone: 'live',
-    active: true,
-  },
-  {
-    title: 'Fading Light',
-    type: 'EP',
-    date: 'Nov 2019',
-    badge: 'Smart Link',
-    tone: 'blue',
-    active: false,
-  },
-  {
-    title: 'Where It Goes',
-    type: 'Single',
-    date: 'Jun 2020',
-    badge: 'Pro',
-    tone: 'green',
-    active: false,
-  },
-  {
-    title: 'Signals',
-    type: 'Album',
-    date: 'Feb 2022',
-    badge: 'Pro',
-    tone: 'purple',
-    active: false,
-  },
-] as const;
+const MONTH_YEAR = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+const LONG_DATE = new Intl.DateTimeFormat('en-US', {
+  month: 'long',
+  day: 'numeric',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+
+/** The same catalog the profile card shows, newest first, dated from now. */
+const RELEASE_BADGES = ['Smart Link', 'Smart Link', 'Pro'] as const;
+const RELEASES = HOMEPAGE_PROFILE_PREVIEW_CATALOG.map((release, index) => ({
+  title: release.title,
+  type: release.releaseType,
+  artworkUrl: release.artworkUrl,
+  date: MONTH_YEAR.format(new Date(release.releaseDate)),
+  badge: RELEASE_BADGES[index] ?? 'Pro',
+  active: index === 0,
+}));
+const LEAD_RELEASE = HOMEPAGE_PROFILE_PREVIEW_CATALOG[0];
+/** Formatted on the server so the client card hydrates the same text. */
+const PROFILE_RELEASES =
+  HOMEPAGE_PROFILE_PREVIEW_CATALOG.map(formatCatalogRelease);
+const LEAD_RELEASE_SLUG = LEAD_RELEASE.title.toLowerCase().replaceAll(' ', '-');
 
 const RELEASE_FIELDS = [
-  { label: 'Smart Link', value: 'jov.ie/tim/the-sound', isLink: true },
-  { label: 'Tracklist', value: '1. The Sound', isLink: false },
+  {
+    label: 'Smart Link',
+    value: `jov.ie/tim/${LEAD_RELEASE_SLUG}`,
+    isLink: true,
+  },
+  { label: 'Tracklist', value: `1. ${LEAD_RELEASE.title}`, isLink: false },
   {
     label: 'Matched Platforms',
     value: 'Spotify, Apple Music, YouTube Music, Tidal, Amazon Music, Deezer',
@@ -319,7 +317,7 @@ const AUDIENCE_ROWS = [
     intent: 'High',
     status: 'Returning',
     source: 'Instagram',
-    action: 'Played Signals',
+    action: `Played ${LEAD_RELEASE.title}`,
   },
   {
     visitor: 'jordan_beats',
@@ -341,24 +339,6 @@ const AUDIENCE_ROWS = [
     status: 'Returning',
     source: 'Spotify',
     action: 'Paid $5',
-  },
-] as const;
-
-const STATS = [
-  {
-    value: '7M',
-    label: 'Tracks Generated Per Day On Suno Alone',
-    source: 'Source: Suno, 2025',
-  },
-  {
-    value: '$60.4B',
-    label: 'projected AI music market by 2034, up from $5.2B today',
-    source: 'Source: Market Research Future',
-  },
-  {
-    value: '$100',
-    label: 'Estimated Lifetime Value For Each Owned Fan Relationship',
-    source: 'Internal direct-to-fan estimate',
   },
 ] as const;
 
@@ -470,19 +450,13 @@ export default function LaunchPage() {
           className='system-b-launch-hero marketing-hero-dock relative overflow-hidden'
           {...launchStamp('hero', 'split-screenshot-right')}
         >
-          <MarketingHeroPhoto
-            src='/images/marketing-hero/launch.webp'
-            width={1600}
-            height={901}
-          />
           <MarketingContainer width='page' className='relative z-3'>
             <div className='system-b-launch-hero-grid'>
               <div className='system-b-launch-hero-copy'>
                 <p className='system-b-launch-kicker'>Launch</p>
                 <h1
                   id='hero-heading'
-                  data-wrap='editorial-title'
-                  className='system-b-launch-hero-title text-balance'
+                  className='system-b-launch-hero-title marketing-h1-max-two-lines text-balance'
                 >
                   {/* ui-casing-allow: marketing display headline */}
                   Your entire music career. One intelligent link.
@@ -518,6 +492,7 @@ export default function LaunchPage() {
                   name={TIM_WHITE_PROFILE.name}
                   handle='tim'
                   avatarUrl={TIM_WHITE_PROFILE.avatarSrc}
+                  releases={PROFILE_RELEASES}
                 />
               </div>
             </div>
@@ -625,10 +600,12 @@ export default function LaunchPage() {
                         className='system-b-launch-release-row'
                         data-active={release.active}
                       >
-                        <span
-                          className='system-b-launch-art'
-                          data-tone={release.tone}
-                          aria-hidden='true'
+                        <Image
+                          src={release.artworkUrl}
+                          alt=''
+                          width={40}
+                          height={40}
+                          className='system-b-launch-art rounded-md object-cover'
                         />
                         <div>
                           <strong>{release.title}</strong>
@@ -647,8 +624,11 @@ export default function LaunchPage() {
                       <span>Links</span>
                       <span>Details</span>
                     </div>
-                    <h3 className='text-balance'>The Sound</h3>
-                    <p>Single / March 22, 2018</p>
+                    <h3 className='text-balance'>{LEAD_RELEASE.title}</h3>
+                    <p>
+                      {LEAD_RELEASE.releaseType} /{' '}
+                      {LONG_DATE.format(new Date(LEAD_RELEASE.releaseDate))}
+                    </p>
                     {RELEASE_FIELDS.map(field => (
                       <div key={field.label} className='system-b-launch-field'>
                         <span>{field.label}</span>
@@ -826,30 +806,6 @@ export default function LaunchPage() {
                   </section>
                 </div>
               </div>
-            </div>
-          </MarketingContainer>
-        </section>
-
-        <section
-          aria-labelledby='whynow-heading'
-          className='system-b-launch-section'
-          {...launchStamp('stats', '3-stat-band')}
-        >
-          <MarketingContainer width='page'>
-            <SectionIntro
-              headingId='whynow-heading'
-              eyebrow='Why now'
-              title='More creators than ever. More noise than ever.'
-              body='AI is creating more music and more competition for fan attention. Owned fan context is the edge.'
-            />
-            <div className='system-b-launch-stat-grid'>
-              {STATS.map(({ value, label, source }) => (
-                <article key={value}>
-                  <strong className='tabular-nums'>{value}</strong>
-                  <p>{label}</p>
-                  <span>{source}</span>
-                </article>
-              ))}
             </div>
           </MarketingContainer>
         </section>

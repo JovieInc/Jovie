@@ -43,6 +43,16 @@ describe('SmartLinkArtworkCard', () => {
 });
 
 describe('SmartLinkPoweredByFooter', () => {
+  it('tracks the Made with Jovie link with the via-jovie-footer loop id', () => {
+    render(<SmartLinkPoweredByFooter />);
+    const href = screen
+      .getByRole('link', { name: /Made with Jovie/i })
+      .getAttribute('href');
+    expect(href).toContain('utm_campaign=via-jovie-footer');
+    expect(href).toContain('utm_source=via_jovie');
+    expect(href).toContain('utm_medium=footer');
+  });
+
   it('keeps every dark footer link above AA on the real base tokens', () => {
     render(<SmartLinkPoweredByFooter />);
     const webRoot = resolve(import.meta.dirname, '../../..');
@@ -88,15 +98,39 @@ describe('SmartLinkPoweredByFooter', () => {
     const { rerender } = render(<SmartLinkPoweredByFooter />);
     const link = screen.getByRole('link', { name: 'Report' });
     expect(link).toHaveAttribute('href', '/report?type=smart_link');
-    expect(screen.getByRole('link', { name: /Powered by/i })).toHaveAttribute(
+    expect(
+      screen.getByRole('link', { name: /Made with Jovie/i })
+    ).toHaveAttribute(
       'href',
-      '/'
+      '/?utm_source=via_jovie&utm_medium=footer&utm_campaign=via-jovie-footer'
     );
 
     rerender(<SmartLinkPoweredByFooter reportTarget='/tim/never-say-a-word' />);
     expect(link).toHaveAttribute(
       'href',
       '/report?type=smart_link&target=%2Ftim%2Fnever-say-a-word'
+    );
+  });
+
+  it('gives every footer link a 44px hit container and has brand-first hierarchy with no separators', () => {
+    render(<SmartLinkPoweredByFooter />);
+    for (const link of screen.getAllByRole('link')) {
+      expect(link.className).toContain('before:h-11');
+      expect(link.className).toContain('before:min-w-11');
+    }
+    const brand = screen.getByRole('link', { name: /Made with Jovie/i });
+    const report = screen.getByRole('link', { name: 'Report' });
+    expect(brand.className).toContain('text-sm');
+    expect(report.className).toContain('text-xs');
+    expect(
+      screen.getByRole('contentinfo').textContent?.includes('\u00b7')
+    ).toBe(false);
+    expect(screen.getByRole('link', { name: 'Report' }).textContent).toBe(
+      'Report'
+    );
+    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
+      'href',
+      '/legal/privacy'
     );
   });
 

@@ -29,6 +29,8 @@ export interface EntitySidebarShellProps {
   readonly 'data-testid'?: string;
   /** Optional surface override applied to the outer RightDrawer. */
   readonly drawerClassName?: string;
+  /** Desktop placement request forwarded to RightDrawer. */
+  readonly presentation?: 'push' | 'overlay';
 
   /** Header title — string or ReactNode */
   readonly title?: ReactNode;
@@ -127,6 +129,7 @@ export function EntitySidebarShell({
   contextMenuItems,
   'data-testid': testId,
   drawerClassName,
+  presentation,
   title,
   onClose,
   headerActions,
@@ -236,6 +239,7 @@ export function EntitySidebarShell({
       contextMenuItems={contextMenuItems}
       data-testid={testId}
       className={drawerClassName}
+      presentation={presentation}
     >
       <div
         data-right-rail-workspace
@@ -295,7 +299,8 @@ export function EntitySidebarShell({
                   {!isMinimalHeader && tabs ? (
                     <div
                       className={cn(
-                        'overflow-visible border-t border-(--app-shell-frame-seam) px-3 py-2.5 [&>*]:w-full',
+                        // Preserve the 1px geometry; the card owns the seam.
+                        'overflow-visible border-t border-transparent px-3 py-2.5 [&>*]:w-full',
                         tabsContainerClassName
                       )}
                     >
@@ -306,8 +311,7 @@ export function EntitySidebarShell({
                   {renderMinimalTabsInHeader && tabs ? (
                     <div
                       className={cn(
-                        showMinimalHeaderBar &&
-                          'border-t border-(--app-shell-frame-seam)',
+                        showMinimalHeaderBar && 'border-t border-transparent',
                         'overflow-visible px-3 py-2.5 [&>*]:w-full',
                         tabsContainerClassName
                       )}
