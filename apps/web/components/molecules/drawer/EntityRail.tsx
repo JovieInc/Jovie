@@ -2,12 +2,8 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Button } from '@jovie/ui';
-import { Check, Copy } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
-import { useClipboard } from '@/hooks/useClipboard';
-import { cn } from '@/lib/utils';
 import { DrawerPropertyRow } from './DrawerPropertyRow';
 import { DrawerTabs } from './DrawerTabs';
 import { EntityHeader } from './EntityHeader';
@@ -63,36 +59,6 @@ export interface EntityRailProps {
   readonly 'data-testid'?: string;
 }
 
-function PropertyCopyButton({
-  label,
-  copyValue,
-}: {
-  readonly label: string;
-  readonly copyValue: string;
-}) {
-  const { copy, isSuccess } = useClipboard();
-  return (
-    <InlineIconButton
-      type='button'
-      size='sm'
-      fadeOnParentHover
-      aria-label={`Copy ${label}`}
-      onClick={() => {
-        copy(copyValue).catch(() => {
-          // Copy failures are non-critical; useClipboard reports the error.
-        });
-      }}
-      className={cn(isSuccess && 'text-success')}
-    >
-      {isSuccess ? (
-        <Check className='h-3.5 w-3.5' aria-hidden='true' />
-      ) : (
-        <Copy className='h-3.5 w-3.5' aria-hidden='true' />
-      )}
-    </InlineIconButton>
-  );
-}
-
 function RailPropertyList({
   properties,
 }: {
@@ -111,14 +77,13 @@ function RailPropertyList({
               label={property.label}
               value={property.value}
               labelWidth={RAIL_PROPERTY_LABEL_WIDTH}
+              copyText={property.copyValue}
+              copyable={
+                property.copyValue !== undefined &&
+                typeof property.value === 'string'
+              }
             />
           </div>
-          {property.copyValue ? (
-            <PropertyCopyButton
-              label={property.label}
-              copyValue={property.copyValue}
-            />
-          ) : null}
         </div>
       ))}
     </div>

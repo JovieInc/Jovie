@@ -47,3 +47,19 @@ export const Compact: Story = {
     value: 'A short release summary.',
   },
 };
+
+export const CopyOnClick: Story = {
+  args: {
+    label: 'ISRC',
+    value: 'NLD681903043',
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // The value itself is the control: click copies, the affordance flips
+    // to a check for a moment (founder note 2026-11-09).
+    const value = canvas.getByRole('button', {
+      name: 'Copy ISRC: NLD681903043',
+    });
+    await expect(value).toHaveAttribute('title', 'Click to copy');
+  },
+};
