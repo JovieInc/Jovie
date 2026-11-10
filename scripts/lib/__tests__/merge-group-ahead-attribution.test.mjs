@@ -246,7 +246,7 @@ describe('attributeAgainstAheadRun', () => {
         currentJobs: failedCiFastJobs,
         currentCiFastLog: 'no lane output',
       }).reason
-    ).toBe('ci-fast-failure-unparsed');
+    ).toBe('ci-fast-failure-unparsed:ci-fast (remaining)');
     expect(
       attributeAgainstAheadRun({
         ...base,
@@ -411,7 +411,12 @@ describe('structural core matrix jobs (Move 3)', () => {
         { name: CORE_2, conclusion: 'success' },
       ],
       aheadConclusion: 'failure',
-      currentCiFastLog: structuralLog(['pnpm ci:merge-queue:check'], [COMMAND]),
+      currentCiFastLog: [
+        {
+          name: CORE_1,
+          log: structuralLog(['pnpm ci:merge-queue:check'], [COMMAND]),
+        },
+      ],
       aheadCiFastLog:
         structuralLog(['pnpm ci:merge-queue:check']) +
         structuralLog([COMMAND, 'pnpm doc:garden']),
@@ -419,6 +424,55 @@ describe('structural core matrix jobs (Move 3)', () => {
     expect(result).toEqual({
       attributable: true,
       reason: 'failing-signals-passed-on-ahead-run',
+    });
+  });
+
+  it('refuses attribution when a second failed shard has no parsed lane evidence', () => {
+    // Astra's 3R repro: core 1 fails a parsed command, core 2 dies during
+    // the base fetch (no lane output at all). The parsed failure can never
+    // speak for the unparsed one.
+    const result = attributeAgainstAheadRun({
+      currentJobs: [
+        { name: CORE_1, conclusion: 'failure' },
+        { name: CORE_2, conclusion: 'failure' },
+        { name: 'PR Ready', conclusion: 'failure' },
+      ],
+      aheadJobs: [
+        { name: CORE_1, conclusion: 'success' },
+        { name: CORE_2, conclusion: 'success' },
+      ],
+      aheadConclusion: 'failure',
+      currentCiFastLog: [
+        { name: CORE_1, log: structuralLog([], [COMMAND]) },
+        { name: CORE_2, log: 'fetch: waiting for the base branch\n' },
+      ],
+      aheadCiFastLog:
+        structuralLog([COMMAND]) + structuralLog(['pnpm ci:merge-queue:check']),
+    });
+    expect(result).toEqual({
+      attributable: false,
+      reason: `ci-fast-failure-unparsed:${CORE_2}`,
+    });
+  });
+
+  it('refuses attribution when a failed shard log is missing entirely', () => {
+    const result = attributeAgainstAheadRun({
+      currentJobs: [
+        { name: CORE_1, conclusion: 'failure' },
+        { name: CORE_2, conclusion: 'failure' },
+        { name: 'PR Ready', conclusion: 'failure' },
+      ],
+      aheadJobs: [
+        { name: CORE_1, conclusion: 'success' },
+        { name: CORE_2, conclusion: 'success' },
+      ],
+      aheadConclusion: 'failure',
+      currentCiFastLog: [{ name: CORE_1, log: structuralLog([], [COMMAND]) }],
+      aheadCiFastLog: structuralLog([COMMAND]),
+    });
+    expect(result).toEqual({
+      attributable: false,
+      reason: `ci-fast-log-missing:${CORE_2}`,
     });
   });
 
@@ -433,7 +487,7 @@ describe('structural core matrix jobs (Move 3)', () => {
         { name: CORE_2, conclusion: 'success' },
       ],
       aheadConclusion: 'failure',
-      currentCiFastLog: structuralLog([], [COMMAND]),
+      currentCiFastLog: [{ name: CORE_1, log: structuralLog([], [COMMAND]) }],
       aheadCiFastLog: structuralLog(['pnpm ci:merge-queue:check']),
     });
     expect(result.attributable).toBe(false);
