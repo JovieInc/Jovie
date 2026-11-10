@@ -75,7 +75,8 @@ import type { PublicRelease } from '../releases/types';
 /**
  * JOV-6201 listen-mode desktop split. Apply on every desktop listen branch
  * (JOV-6197 `listenTabContent` copies). Reuses the grandfathered 360px track;
- * only the 1180px hand-off and min-w-0 are new. Do not invent a new grid-cols identity or revert the listen split to `xl:` only.
+ * only the 1180px hand-off and min-w-0 are new. Do not invent a new grid-cols
+ * identity or revert the listen split to `xl:` only.
  */
 export const PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME =
   'grid min-h-0 min-w-0 flex-1 items-start gap-3.5 [@media(min-width:1180px)]:grid-cols-[minmax(0,1.3fr)_360px]';
@@ -1008,7 +1009,14 @@ export function ProfileDesktopSurface({
     );
 
   return (
-    <div className='profile-desktop-surface relative flex w-full overflow-hidden rounded-3xl bg-(--color-bg-surface-0)'>
+    <div
+      className='profile-desktop-surface relative flex w-full overflow-hidden rounded-3xl bg-(--color-bg-surface-0)'
+      // Canonical Pen frame D9kdx region marker: the pen-still-diff gate
+      // captures [data-pen-section='public-profile/profile']; without this
+      // marker the capture falls back to the full page (dashboard + AEO +
+      // claim sections, 2146px at 1440) and the height ratio reads ~2.58.
+      data-pen-section='public-profile/profile'
+    >
       <div
         ref={setNotificationsPortalContainer}
         className='relative flex min-h-0 w-full flex-col'
@@ -1165,7 +1173,6 @@ export function ProfileDesktopSurface({
           tourDates={tourDates}
           hasReleases={hasReleases}
           releases={visibleReleases}
-          onOpenReleaseCredits={onOpenReleaseCredits}
           presentation={presentation}
         />
       </div>
