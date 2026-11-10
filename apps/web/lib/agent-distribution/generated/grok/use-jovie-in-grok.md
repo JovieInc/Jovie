@@ -1,4 +1,4 @@
-<!-- generated: version 1f9c780fb50b, tools/list 1678b10d77ae1f99156b23fc7f9bb9937c726e2fa46222b9931da08ad36db7e3 -->
+<!-- generated: version 32c72aaa5b91, tools/list 0bdef0c8bab6e7e411739ab1846c6f404353db27dc20a86345d1e4a5bfcae777 -->
 
 # Jovie in Grok
 
@@ -27,7 +27,7 @@ Server URL: `https://jov.ie/api/mcp`
 - `workspace.create_draft`: Create or resume an unpublished visibility draft using the exact artist_id and draft_token from artist.search_or_import. Retrying the same token resumes the same draft; a token for another artist is rejected. Returns claim_url: show it to the user so they can sign in on Jovie and claim the draft; the artist is matched to its Spotify identity and stays private until the user publishes. Never share draft_token. Never claims ownership, publishes or purchases.
 - `release.prepare_launch`: Resolve public release facts and create or resume an unpublished artist, release-page, and smart-link draft. Requires the draft capability. Returns only unresolved questions plus claim_url; when next_action is send_user_claim_url, show claim_url to the user so they can claim it on Jovie, where it stays private until they publish. Never claims, publishes, or purchases.
 - `claim_handle`: Check and reserve jov.ie/<handle> for the draft artist. Returns availability with numbered suggested alternatives when taken. High-reach artists are routed to the existing verification path. The reservation completes when the artist signs in through claim_url; nothing is public until they publish.
-- `answer_onboarding_question`: Record one onboarding question answer on the draft: lastGrowthAttempt ("What's the last thing you did to grow your fans, and how did it go?") or promoSpend ("What do you pay each month to promote your music?", one of none, under_50, 50_plus). Ask in your own voice; never lead or ask willingness-to-pay.
+- `answer_onboarding_question`: Record one onboarding Mom Test answer on the draft: lastGrowthAttempt (the artist's most recent growth attempt and how it went) or promoSpend (what they pay each month to promote their music, one of none, under_50, 50_plus). The exact question wording ships in the Jovie skill. Ask in your own voice; never lead or ask willingness-to-pay.
 - `get_qualification`: Run the shared onboarding qualification for the draft artist. Returns qualified or queued with a reason; queued carries the locked line "Your handle is reserved. You're on the waitlist."
 - `build_profile`: Build the draft profile from the artist's public data, including the real catalog preview when available. Read-only preview for the artist; nothing is published.
 - `publish_profile`: Publish step. Agents never publish: show claim_url so the artist signs in on Jovie and publishes from their dashboard. Returns claim_required until the draft is claimed.

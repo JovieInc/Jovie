@@ -1,5 +1,5 @@
 {
-  "toolsListHash": "1678b10d77ae1f99156b23fc7f9bb9937c726e2fa46222b9931da08ad36db7e3",
+  "toolsListHash": "0bdef0c8bab6e7e411739ab1846c6f404353db27dc20a86345d1e4a5bfcae777",
   "tools": [
     {
       "name": "artist.search_or_import",
@@ -348,7 +348,7 @@
     {
       "name": "answer_onboarding_question",
       "title": "Record a Mom Test answer",
-      "description": "Record one onboarding question answer on the draft: lastGrowthAttempt (\"What's the last thing you did to grow your fans, and how did it go?\") or promoSpend (\"What do you pay each month to promote your music?\", one of none, under_50, 50_plus). Ask in your own voice; never lead or ask willingness-to-pay.",
+      "description": "Record one onboarding Mom Test answer on the draft: lastGrowthAttempt (the artist's most recent growth attempt and how it went) or promoSpend (what they pay each month to promote their music, one of none, under_50, 50_plus). The exact question wording ships in the Jovie skill. Ask in your own voice; never lead or ask willingness-to-pay.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "oneOf": [

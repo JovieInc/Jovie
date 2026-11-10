@@ -143,7 +143,10 @@ describe('claim_handle', () => {
       available: true,
       reason: 'available',
     });
-    const result = await claimHandle({ ...REF, handle: 'signalandartist' });
+    const result: Record<string, unknown> = await claimHandle({
+      ...REF,
+      handle: 'signalandartist',
+    });
     expect(result.status).toBe('reserved');
     expect(result.reason).toBe('available');
     expect(result.claim_url).toBe(
@@ -168,7 +171,10 @@ describe('claim_handle', () => {
       reason: 'taken',
       suggestedAlternatives: ['radiohead1', 'radiohead2'],
     });
-    const result = await claimHandle({ ...REF, handle: 'radiohead' });
+    const result: Record<string, unknown> = await claimHandle({
+      ...REF,
+      handle: 'radiohead',
+    });
     expect(result.status).toBe('unavailable');
     expect(result.reason).toBe('taken');
     expect(result.suggested_alternatives).toEqual(['radiohead1', 'radiohead2']);
@@ -182,14 +188,20 @@ describe('claim_handle', () => {
       reason: 'available',
     });
     mocks.lookupReach.mockResolvedValue({ followers: 50_000, name: 'Big' });
-    const result = await claimHandle({ ...REF, handle: 'signalandartist' });
+    const result: Record<string, unknown> = await claimHandle({
+      ...REF,
+      handle: 'signalandartist',
+    });
     expect(result.requires_verification).toBe(true);
     expect(result.next_action).toBe('send_user_claim_url_verification');
   });
 
   it('is unavailable without a live draft capability', async () => {
     mocks.loadDraft.mockResolvedValue(null);
-    const result = await claimHandle({ ...REF, handle: 'x' });
+    const result: Record<string, unknown> = await claimHandle({
+      ...REF,
+      handle: 'x',
+    });
     expect(result.status).toBe('error');
     expect(result.code).toBe('DRAFT_UNAVAILABLE');
   });
@@ -197,7 +209,7 @@ describe('claim_handle', () => {
 
 describe('answer_onboarding_question', () => {
   it('records a growth answer and reports the remaining question', async () => {
-    const result = await answerOnboardingQuestion({
+    const result: Record<string, unknown> = await answerOnboardingQuestion({
       ...REF,
       question: 'lastGrowthAttempt',
       answer: 'Ran a pre-save. About 40 signups.',
@@ -214,7 +226,7 @@ describe('answer_onboarding_question', () => {
         answers: { lastGrowthAttempt: 'Posted reels weekly.' },
       },
     });
-    const result = await answerOnboardingQuestion({
+    const result: Record<string, unknown> = await answerOnboardingQuestion({
       ...REF,
       question: 'promoSpend',
       answer: 'under_50',
@@ -224,7 +236,7 @@ describe('answer_onboarding_question', () => {
   });
 
   it('rejects a spend answer outside the locked bands', async () => {
-    const result = await answerOnboardingQuestion({
+    const result: Record<string, unknown> = await answerOnboardingQuestion({
       ...REF,
       question: 'promoSpend',
       answer: 'all the money',
@@ -241,7 +253,7 @@ describe('get_qualification', () => {
       admit: true,
       reason: 'admit_resolved_artist',
     });
-    const result = await getQualification(REF);
+    const result: Record<string, unknown> = await getQualification(REF);
     expect(result.status).toBe('qualified');
     expect(result.reason).toBe('admit_resolved_artist');
     expect(result.message).toBeUndefined();
@@ -258,7 +270,7 @@ describe('get_qualification', () => {
       admit: false,
       reason: 'hold_golden_path_not_green',
     });
-    const result = await getQualification(REF);
+    const result: Record<string, unknown> = await getQualification(REF);
     expect(result.status).toBe('queued');
     expect(result.reason).toBe('hold_golden_path_not_green');
     expect(result.message).toBe(GOLDEN_PATH_WAITLIST_COPY);
@@ -275,7 +287,7 @@ describe('get_qualification', () => {
         answers: { promoSpend: '50_plus' },
       },
     });
-    const result = await getQualification(REF);
+    const result: Record<string, unknown> = await getQualification(REF);
     expect(result.answers_recorded).toEqual({
       lastGrowthAttempt: null,
       promoSpend: '50_plus',
@@ -299,7 +311,7 @@ describe('build_profile', () => {
         },
       ],
     });
-    const result = await buildProfile(REF);
+    const result: Record<string, unknown> = await buildProfile(REF);
     expect(result.status).toBe('draft_ready');
     expect(result.catalog).toEqual({
       total: 12,
@@ -312,7 +324,7 @@ describe('build_profile', () => {
   it('stays identity-only when the preview is disabled or unreachable', async () => {
     mocks.valueBeforePaywall.mockReturnValue(false);
     mocks.catalogPreview.mockResolvedValue(null);
-    const result = await buildProfile(REF);
+    const result: Record<string, unknown> = await buildProfile(REF);
     expect(result.catalog).toBeNull();
     expect(result.value_enabled).toBe(false);
   });
@@ -320,7 +332,7 @@ describe('build_profile', () => {
 
 describe('publish_profile', () => {
   it('routes the unclaimed draft to the person via claim_url', async () => {
-    const result = await publishProfile(REF);
+    const result: Record<string, unknown> = await publishProfile(REF);
     expect(result.status).toBe('claim_required');
     expect(result.claim_url).toBe(
       `https://jov.ie/claim/agent/${DRAFT_ID}?h=handoff`
@@ -332,7 +344,7 @@ describe('publish_profile', () => {
     // Claimed drafts are invisible to the unclaimed-only mutation loader;
     // publish reads both states and still refuses to publish agent-side.
     state.draft = draftRow({ claimedAt: new Date() });
-    const result = await publishProfile(REF);
+    const result: Record<string, unknown> = await publishProfile(REF);
     expect(result.status).toBe('claimed');
     expect(result.next_action).toBe('share_profile');
   });
@@ -347,7 +359,9 @@ describe('share_profile', () => {
       displayName: 'Signal Artist',
     });
     mocks.creatorName.mockReturnValue('Signal Artist');
-    const result = await shareProfile({ username: 'signalartist' });
+    const result: Record<string, unknown> = await shareProfile({
+      username: 'signalartist',
+    });
     expect(result.status).toBe('ok');
     expect(result.profile_url).toBe('https://jov.ie/signalartist');
     expect(result.share_text).toBe(
@@ -357,7 +371,9 @@ describe('share_profile', () => {
 
   it('never shares a private or excluded profile', async () => {
     mocks.profileByUsername.mockResolvedValue({ isPublic: false });
-    const result = await shareProfile({ username: 'ghost' });
+    const result: Record<string, unknown> = await shareProfile({
+      username: 'ghost',
+    });
     expect(result.status).toBe('not_public');
   });
 
@@ -369,14 +385,16 @@ describe('share_profile', () => {
       displayName: 'gp moc…+clerk test',
     });
     mocks.creatorName.mockReturnValue('gp moc…+clerk test');
-    const result = await shareProfile({ username: 'tmoc0g1x9dwmk71' });
+    const result: Record<string, unknown> = await shareProfile({
+      username: 'tmoc0g1x9dwmk71',
+    });
     expect(result.status).toBe('not_public');
   });
 });
 
 describe('start_upgrade', () => {
   it('returns the existing claim/start checkout entry for a Spotify draft', async () => {
-    const result = await startUpgrade(REF);
+    const result: Record<string, unknown> = await startUpgrade(REF);
     expect(result.status).toBe('ok');
     expect(result.checkout_url).toBe(
       'https://jov.ie/claim/start?spotify=4Z8W4fKeB5YxbusR9QnbSa'
@@ -393,7 +411,7 @@ describe('start_upgrade', () => {
         })
       )
     );
-    const result = await startUpgrade(REF);
+    const result: Record<string, unknown> = await startUpgrade(REF);
     expect(result.checkout_url).toBe('https://jov.ie/claim/start?new=1');
   });
 });

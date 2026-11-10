@@ -69,7 +69,7 @@ const GOLDEN_PATH_DRAFT_TOOLS = [
     name: 'answer_onboarding_question' as const,
     title: 'Record a Mom Test answer',
     description:
-      'Record one onboarding question answer on the draft: lastGrowthAttempt ("What\'s the last thing you did to grow your fans, and how did it go?") or promoSpend ("What do you pay each month to promote your music?", one of none, under_50, 50_plus). Ask in your own voice; never lead or ask willingness-to-pay.',
+      "Record one onboarding Mom Test answer on the draft: lastGrowthAttempt (the artist's most recent growth attempt and how it went) or promoSpend (what they pay each month to promote their music, one of none, under_50, 50_plus). The exact question wording ships in the Jovie skill. Ask in your own voice; never lead or ask willingness-to-pay.",
     inputSchema: z.toJSONSchema(answerQuestionSchema),
     annotations: {
       title: 'Record a Mom Test answer',
