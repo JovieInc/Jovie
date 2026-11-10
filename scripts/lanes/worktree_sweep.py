@@ -53,9 +53,8 @@ from disk_headroom import (HEADROOM_CRIT_PCT, HEADROOM_WARN_PCT, REPORT_INTERVAL
 
 PRESERVED_REPAIR = ".jovie-preserved-repair.json"
 IDLE_S = 12 * 3600
-# A clean, fully published checkout retires earlier (JOV-10172): there is nothing to
-# preserve, so the only cost of waiting is the disk it holds. Dirty or unpushed work
-# never uses this tier — it keeps the full IDLE_S window plus the snapshot path below.
+# A clean, fully published checkout retires earlier (JOV-10172). Dirty or unpushed
+# work keeps the full IDLE_S window plus the snapshot path below.
 CLEAN_IDLE_S = float(os.environ.get("LANES_SWEEP_CLEAN_IDLE_S", str(3 * 3600)))
 CLOSED_GRACE_S = 3600
 # Regenerable build dirs (node_modules is ~7 GB per Jovie checkout) of a checkout that stays on disk

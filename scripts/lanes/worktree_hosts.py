@@ -36,19 +36,24 @@ def _short(name: str) -> str:
     return str(name or "").split(".")[0].strip().lower()
 
 
+def _env(environ):
+    """None selects the process environment. An explicit mapping, including {}, does not."""
+    return os.environ if environ is None else environ
+
+
 def hosts(environ=None) -> list[str]:
     """Hosts allowed to create lane worktrees, primary first; default `gem` only.
 
     Entries are normalized to short lowercased names (a `Tims-MacBook-Pro.local`
     listing matches the host that reports itself as `Tims-MacBook-Pro`). An unset,
     empty or unreadable value is the default, never open: fail closed."""
-    raw = (environ or os.environ).get(HOSTS_ENV) or DEFAULT_HOSTS
+    raw = _env(environ).get(HOSTS_ENV) or DEFAULT_HOSTS
     names = [name for name in (_short(part) for part in _SPLIT.split(str(raw))) if name]
     return list(dict.fromkeys(names)) or [DEFAULT_HOSTS]
 
 
 def _selftest(environ=None) -> bool:
-    env = environ or os.environ
+    env = _env(environ)
     return env.get("LANES_SELFTEST") == "1" or env.get("LANES_EXECUTION_BACKEND") == "local-test"
 
 
@@ -77,7 +82,7 @@ def max_worktrees(host_name: str, environ=None):
     the cap exists so an explicitly added fallback host cannot fill its own disk."""
     if role(host_name, environ) != "fallback":
         return None
-    raw = str((environ or os.environ).get(MAX_WORKTREES_ENV) or DEFAULT_MAX_WORKTREES)
+    raw = str(_env(environ).get(MAX_WORKTREES_ENV) or DEFAULT_MAX_WORKTREES)
     try:
         cap = int(raw)
     except ValueError:

@@ -8,10 +8,12 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("worktree_hosts", ROOT / "scripts/lanes/worktree_hosts.py")
@@ -97,6 +99,15 @@ class HostPolicyTest(unittest.TestCase):
                          "worktree-host-not-allowed:mac")
         self.assertEqual(policy.admission("", "/repo", lambda a, **k: worktree_list(0), {}),
                          "worktree-host-not-allowed:unknown")
+
+    def test_explicit_empty_environ_ignores_process_selftest_flags(self):
+        # LANES_SELFTEST=1 on the process must not leak into a caller that passed {}.
+        with patch.dict(os.environ, {"LANES_SELFTEST": "1", "LANES_EXECUTION_BACKEND": "local-test",
+                                      policy.HOSTS_ENV: "air"}):
+            self.assertEqual(policy.role("mac", {}), "not-owner")
+            self.assertEqual(policy.hosts({}), ["gem"])
+            self.assertEqual(policy.role("mac", None), "primary")
+            self.assertEqual(policy.hosts(None), ["air"])
 
     def test_selftest_environments_run_as_primary_off_gem(self):
         # CI and the release self-test execute the lane suite on arbitrary hostnames.

@@ -100,7 +100,7 @@ import binding_refill, pr_wip  # noqa: E401,E402  (Backlog -> Todo refill per ex
 import priority_admission  # noqa: E402  (Urgent/Summer-ranked admission, Todo WIP sanity, claim rank; JOV-7073)
 import macos_pool  # noqa: E402  (shared hosted-macOS pool: measure, record, gate LYB iOS intake)
 import decompose_pass  # noqa: E402  (standing epic decomposition when Todo < half target)
-import worktree_hosts  # noqa: E402  (gem-default hosts for lane worktree creation, JOV-10172)
+import worktree_hosts, size_baseline_repair  # noqa: E401,E402  (gem-default hosts; size-500 peel)
 import epics  # noqa: E402  (epic decomposition/closure and the expiring hold)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
@@ -148,7 +148,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_worktree_hosts.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_worktree_hosts.py", "scripts/tests/test_size_baseline_repair.py", "scripts/tests/test_lane_runner_overflow.py", "scripts/tests/test_worktree_sweep_overflow.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_public_feed.py", "scripts/tests/test_pr_events.py", "scripts/tests/test_pr_events_repair_evidence.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -3263,7 +3263,6 @@ class DiskAdmissionError(RuntimeError):
 
 
 def worktree_count_run(args, **kwargs):
-    """Subprocess-shaped adapter for worktree_hosts: lane sh already captures text output."""
     return sh(args, timeout=kwargs.get("timeout", 60))
 
 
@@ -3565,8 +3564,6 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
         return receipt
     host_held = worktree_hosts.admission(HOST, host.repo, worktree_count_run)
     if host_held:
-        # This host may not create another lane worktree (JOV-10172): gem by default, an
-        # explicitly listed fallback host only under its cap. No execution attempt is charged.
         receipt.update(verdict="worktree-host-held", reasons=[host_held], endedAt=now_iso(),
                        result={"verdict": "worktree-host-held", "pr": None, "commit": None})
         append_json_object(runs / "ledger.jsonl", receipt)
@@ -3619,8 +3616,6 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                                                            log=log, sh=sh)
             # Always installed: the gate's checks need it even when the provider works remotely.
             install_dependencies(host, worktree, log)
-            # Pre-installed pool slots are idle disk; only the primary worktree host refills
-            # (JOV-10172). A fallback host takes a ready slot if one exists, else creates fresh.
             if worktree_hosts.role(HOST) == "primary":
                 worktree_pool.refill_in_background(host.repo)
             brain_context = context_pack(issue)
@@ -7995,9 +7990,6 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                "startedAt": now_iso()}
     repair_held = worktree_hosts.admission(HOST, host.repo, worktree_count_run)
     if repair_held:
-        # Repair checkouts are worktrees too: a host that may not create one (not a worktree
-        # host, or a fallback at its cap) returns the PR untouched (JOV-10172). No attempt,
-        # no label consumption, nothing charged.
         receipt.update(verdict="worktree-host-held", reasons=[repair_held], endedAt=now_iso())
         append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
@@ -8204,7 +8196,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                          fix_red_classes.SNAP_SPACING: snap_spacing_fix,
                          fix_red_classes.STRIP_CACHE: strip_cache_exports_fix,
                          fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix,
-                         fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix}.get((route or {}).get("action"))
+                         fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix, fix_red_classes.SHRINK_SIZE: size_baseline_repair.shrink_size_fix}.get((route or {}).get("action"))
                 agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
                 agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
