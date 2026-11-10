@@ -3,7 +3,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { downloadingUpdate } from '@/lib/desktop/desktop-updates.test-utils';
+import {
+  availableUpdate,
+  downloadingUpdate,
+} from '@/lib/desktop/desktop-updates.test-utils';
 import { DesktopUpdateModalView } from './DesktopUpdateModal';
 
 function renderDownload(transferredBytes: number, bytesPerSecond: number) {
@@ -83,14 +86,7 @@ describe('Desktop update download feedback', () => {
       onLater: vi.fn(),
     };
     const { rerender } = render(
-      <DesktopUpdateModalView
-        {...props}
-        state={{
-          state: 'available',
-          version: '26.9.16',
-          notesUrl: '/changelog',
-        }}
-      />
+      <DesktopUpdateModalView {...props} state={availableUpdate('26.9.16')} />
     );
     expect(screen.getByRole('button', { name: 'Download' })).toHaveFocus();
     rerender(
