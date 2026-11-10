@@ -535,7 +535,7 @@ export function ProfileDesktopSurface({
                   {/* The height-bounded cover can stay narrow on a wide screen.
                       Size from its content box and wrap unbroken names rather
                       than clipping a glyph inside the two-line name span. */}
-                  <span className='min-w-0 line-clamp-2 [overflow-wrap:anywhere]'>
+                  <span className='min-w-0 line-clamp-2 wrap-anywhere'>
                     {artist.name}
                   </span>
                   {artist.is_verified ? (

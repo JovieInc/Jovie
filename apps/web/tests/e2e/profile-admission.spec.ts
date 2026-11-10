@@ -972,7 +972,6 @@ test.describe('public profile browser admission', () => {
   test('UNMARKED stays readable inside the desktop cover at short and tall heights', async ({
     page,
   }, testInfo) => {
-    test.skip(!PROFILE_DESKTOP_SURFACE_SHIPPED, DESKTOP_SURFACE_ONLY);
     await installPublicRouteMocks(page);
     for (const viewport of [
       { width: 1280, height: 720 },
@@ -1016,7 +1015,6 @@ test.describe('public profile browser admission', () => {
   test('desktop names wrap without horizontal clipping for enlarged and unbroken text', async ({
     page,
   }) => {
-    test.skip(!PROFILE_DESKTOP_SURFACE_SHIPPED, DESKTOP_SURFACE_ONLY);
     await installPublicRouteMocks(page);
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto(
@@ -1053,7 +1051,6 @@ test.describe('public profile browser admission', () => {
   test('deliberate red detects text clipped inside a contained desktop name box', async ({
     page,
   }) => {
-    test.skip(!PROFILE_DESKTOP_SURFACE_SHIPPED, DESKTOP_SURFACE_ONLY);
     await installPublicRouteMocks(page);
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto('/renders/profile-admission?layout=public&state=claimed', {
