@@ -29,6 +29,7 @@ import {
   certificationScope,
   deploymentId,
   exactBaseUrl,
+  expectAtomicContrastCapture,
   expectDeliberateRed,
   flatImg,
   isTasteKind,
@@ -471,9 +472,7 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     expect(snapshot.findings).toEqual([]);
   });
 
-  // JOV-6916: text-aware-contrast deliberate-red. R01 painted a bright
-  // upper-right corner exactly where the docked header renders Log in and
-  // the primary CTA; light glyphs over that corner must reproduce red.
+  // JOV-6916: light glyphs over R01's bright header corner must reproduce red.
   test('reproduces the R01 bright header corner behind Log in and the CTA', async ({
     page,
   }) => {
@@ -498,6 +497,12 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     expect(snapshot.findings).toEqual([]);
     expect(snapshot.receipts.length).toBeGreaterThan(0);
     expect(snapshot.receipts.every(receipt => receipt.pass)).toBe(true);
+  });
+
+  test('hides control ink at capture while retaining each candidate box (JOV-11623)', async ({
+    page,
+  }) => {
+    await expectAtomicContrastCapture(page);
   });
 
   // JOV-INV-019 (2026-09-29): a real /unfazed pass surfaced three detector

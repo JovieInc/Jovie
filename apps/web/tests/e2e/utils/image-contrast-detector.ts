@@ -1,11 +1,10 @@
 import type { Page } from '@playwright/test';
 import sharp from 'sharp';
 import {
-  captureContrastScreenshot,
+  captureContrastEvidence,
   contrastRatio,
   parseCssColor,
   percentile,
-  readContrastHideBoxes,
   relativeLuminance,
   sampleRegionLuminances,
   sampleRegionPixelGrid,
@@ -438,7 +437,8 @@ export async function inspectImageContrast(
 
   for (const candidate of candidates) {
     // Sample where the element IS at capture time, not where the scan saw it.
-    const liveBox = freshBoxes[String(candidate.index)] ?? candidate.box;
+    const scannedBox = candidate.box;
+    const liveBox = freshBoxes[String(candidate.index)] ?? scannedBox;
     const box = {
       x: liveBox.x,
       y: liveBox.y,
