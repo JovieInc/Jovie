@@ -6,8 +6,8 @@ import { loadAppShellRouteContext } from '../app-shell-route-context';
 export const runtime = 'nodejs';
 
 export const metadata: Metadata = {
+  // Bare route name; the root layout template supplies the single brand suffix.
   title: 'Insights',
-  description: 'Review insights across your workspace.',
 };
 
 export default async function InsightsPage() {

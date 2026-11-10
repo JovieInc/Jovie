@@ -337,6 +337,9 @@ web.presence|web|presence|apps/web/app/app/(shell)/presence/page.tsx|desktop,mob
 web.profiles|web|profiles|apps/web/app/app/(shell)/profiles/page.tsx|desktop,mobile
 web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
 web.links|web|links|apps/web/app/app/(shell)/links/page.tsx,apps/web/app/app/(shell)/dashboard/links/page.tsx|desktop,mobile
+web.tour-dates|web|tour-dates|apps/web/app/app/(shell)/tour-dates/page.tsx|desktop,mobile
+web.chats|web|chats|apps/web/app/app/(shell)/chats/page.tsx|desktop,mobile
+web.insights|web|insights|apps/web/app/app/(shell)/insights/page.tsx|desktop,mobile
 web.library-private-share|web|library-asset-share|apps/web/app/p/[token]/|desktop,mobile
 web.settings-admin-redirect|web|settings-admin-redirect|apps/web/app/app/(shell)/settings/admin/page.tsx|desktop,mobile
 web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/profile/page.tsx,apps/web/app/app/(shell)/settings/artist-profile/page.tsx,apps/web/app/app/(shell)/tipping/page.tsx|desktop,mobile

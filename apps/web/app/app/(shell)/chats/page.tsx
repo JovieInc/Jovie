@@ -8,8 +8,8 @@ import { ChatsPageClient } from '../threads/ThreadsPageClient';
 export const runtime = 'nodejs';
 
 export const metadata: Metadata = {
+  // Bare route name; the root layout template supplies the single brand suffix.
   title: 'Chats',
-  description: 'Continue your chats with Jovie.',
 };
 
 export default async function ChatsPage() {
