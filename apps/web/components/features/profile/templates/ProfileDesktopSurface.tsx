@@ -522,7 +522,7 @@ export function ProfileDesktopSurface({
           </div>
           <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,8,0.14)_0%,rgba(7,8,10,0.38)_42%,rgba(7,8,10,0.98)_100%)]' />
           <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_22%)]' />
-          <div className='relative z-10 flex h-full flex-col justify-between p-7'>
+          <div className='@container relative z-10 flex h-full flex-col justify-between p-7'>
             <div aria-hidden='true' />
 
             <div className='space-y-5'>
@@ -530,9 +530,14 @@ export function ProfileDesktopSurface({
                 <Link
                   href={profileHref}
                   data-testid='profile-header'
-                  className='inline-flex min-w-0 max-w-full items-start gap-2 rounded-md text-[clamp(3rem,6vw,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                  className='inline-flex min-w-0 max-w-full items-start gap-2 rounded-md text-[clamp(2.5rem,16cqi,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 >
-                  <span className='min-w-0 line-clamp-2'>{artist.name}</span>
+                  {/* The height-bounded cover can stay narrow on a wide screen.
+                      Size from its content box and wrap unbroken names rather
+                      than clipping a glyph inside the two-line name span. */}
+                  <span className='min-w-0 line-clamp-2 [overflow-wrap:anywhere]'>
+                    {artist.name}
+                  </span>
                   {artist.is_verified ? (
                     <BadgeCheck
                       className='h-7 w-7 shrink-0'
