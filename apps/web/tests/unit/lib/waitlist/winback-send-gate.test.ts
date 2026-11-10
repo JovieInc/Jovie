@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { processWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
 import { WINBACK_EMAIL_TEMPLATE_VERSION } from '@/lib/waitlist/winback';
+import { processWaitlistWinbackEmailJob } from '@/lib/waitlist/winback-email-job';
 
 // ---------------------------------------------------------------------------
 // Send-path impossibility: without an approval record NOTHING can send.
@@ -14,7 +13,7 @@ vi.mock('@/lib/notifications/service', () => ({
 
 const mockGetApproval = vi.hoisted(() => vi.fn());
 const mockGetLastUnanswered = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/waitlist/winback.server', () => ({
+vi.mock('@/lib/waitlist/winback-approval.server', () => ({
   getWinbackApprovalRecord: mockGetApproval,
   getLastUnansweredWinbackSentAt: mockGetLastUnanswered,
 }));
@@ -76,6 +75,7 @@ function winbackPayload(overrides: Record<string, unknown> = {}) {
     wants: ['sell vinyl', 'tour dates'],
     handle: 'moonrunner',
     batchId: 'batch-2026-11-09-a',
+    cohort: 'waitlisted',
     origin: 'https://jov.ie',
     templateVersion: WINBACK_EMAIL_TEMPLATE_VERSION,
     encryptedResumeToken: 'x'.repeat(40),
@@ -83,7 +83,7 @@ function winbackPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe('processWaitlistEmailJob winback_capability_shipped', () => {
+describe('processWaitlistWinbackEmailJob winback_capability_shipped', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -92,7 +92,7 @@ describe('processWaitlistEmailJob winback_capability_shipped', () => {
     mockGetApproval.mockResolvedValue(undefined);
     const { tx } = createEntryTxMock();
 
-    const result = await processWaitlistEmailJob(tx, winbackPayload());
+    const result = await processWaitlistWinbackEmailJob(tx, winbackPayload());
 
     expect(result.status).toBe('skipped');
     expect(result.detail).toMatch(/no valid approval record/);
@@ -104,7 +104,7 @@ describe('processWaitlistEmailJob winback_capability_shipped', () => {
     mockGetLastUnanswered.mockResolvedValue(null);
     const { tx } = createEntryTxMock();
 
-    const result = await processWaitlistEmailJob(
+    const result = await processWaitlistWinbackEmailJob(
       tx,
       winbackPayload({ entryId: '22222222-2222-4222-8222-222222222222' })
     );
@@ -120,7 +120,7 @@ describe('processWaitlistEmailJob winback_capability_shipped', () => {
     mockGetLastUnanswered.mockResolvedValue(new Date());
     const { tx } = createEntryTxMock();
 
-    const result = await processWaitlistEmailJob(tx, winbackPayload());
+    const result = await processWaitlistWinbackEmailJob(tx, winbackPayload());
 
     expect(result.status).toBe('skipped');
     expect(result.detail).toMatch(/JOV-6655/);
@@ -135,7 +135,7 @@ describe('processWaitlistEmailJob winback_capability_shipped', () => {
     });
     const { tx } = createEntryTxMock();
 
-    const result = await processWaitlistEmailJob(tx, winbackPayload());
+    const result = await processWaitlistWinbackEmailJob(tx, winbackPayload());
 
     expect(result.status).toBe('sent');
     expect(mockSendNotification).toHaveBeenCalledOnce();
@@ -156,7 +156,7 @@ describe('processWaitlistEmailJob winback_capability_shipped', () => {
     const { tx } = createEntryTxMock();
 
     await expect(
-      processWaitlistEmailJob(tx, winbackPayload({ wants: [] }))
+      processWaitlistWinbackEmailJob(tx, winbackPayload({ wants: [] }))
     ).rejects.toThrow(/Invalid winback email job payload/);
     expect(mockSendNotification).not.toHaveBeenCalled();
   });

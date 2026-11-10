@@ -216,12 +216,8 @@ export const ingestionJobStatusEnum = pgEnum('ingestion_job_status', [
   'processing',
   'succeeded',
   'failed',
-  // Win-back drafts (founder dispatch 2026-11-09): created held and never
-  // drained by the worker; only an admin-approved batch promotes them to
-  // `pending`.
   'held_for_approval',
 ]);
-
 export const scraperStrategyEnum = pgEnum('scraper_strategy', [
   'http',
   'browser',
