@@ -64,6 +64,7 @@ import {
 import type {
   ArtistContext,
   ChatTelemetry,
+  ReleaseCatalogMeta,
   ReleaseContext,
 } from '@/lib/chat/types';
 import {
@@ -229,6 +230,12 @@ export interface ExecuteChatTurnInput {
    */
   artistContext: ArtistContext | null;
   releases: ReleaseContext[];
+  /**
+   * Catalog read health + whole-catalog count for the discography prompt
+   * (dogfood 2026-11-10). Omitted: the loaded `releases` are treated as the
+   * whole catalog, preserving legacy behavior for eval scripts and tests.
+   */
+  releaseCatalog?: ReleaseCatalogMeta;
   /** Recording titles for the grounding guard; null/undefined = unknown (title rule skipped). */
   catalogTrackTitles?: readonly string[] | null;
   /** Internal creator-profile UUID. Null when anonymous (`mode='onboarding'`). */
@@ -438,6 +445,10 @@ export async function executeChatTurn(
       referencedEntities,
       pinnedOpportunity: pinnedOpportunityBlock,
       lockedTools,
+      releaseCatalog: input.releaseCatalog ?? {
+        status: 'ok',
+        total: releases.length,
+      },
     });
     systemPromptParts = identity
       ? {

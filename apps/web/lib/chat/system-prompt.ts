@@ -38,6 +38,21 @@ interface ReleasePromptContext {
   readonly spotifyPopularity?: number | null;
 }
 
+/**
+ * Catalog read health + whole-catalog count for the discography section.
+ * `status: 'unavailable'` means the read failed this turn: the artist may
+ * still have releases, so the prompt must say the catalog is unreadable —
+ * never that no releases exist. `total` is the full catalog size (not just
+ * the loaded slice); null when unknown.
+ */
+interface ReleaseCatalogPromptMeta {
+  readonly status: 'ok' | 'unavailable';
+  readonly total: number | null;
+}
+
+/** Rows of the discography rendered in the prompt before truncation. */
+const DISCOGRAPHY_PROMPT_ROW_LIMIT = 25;
+
 interface AccountPromptContext {
   readonly plan: string;
   readonly displayPlan: string;
@@ -111,24 +126,39 @@ function formatReleaseLine(release: ReleasePromptContext, now: Date): string {
 
 function buildDiscographySection(
   releases: ReleasePromptContext[],
-  now: Date
+  now: Date,
+  catalog?: ReleaseCatalogPromptMeta
 ): string {
+  if (catalog?.status === 'unavailable') {
+    return [
+      '- The release catalog could not be read this turn.',
+      '- Do not say the artist has no releases and do not guess a release count. If asked, say the catalog is temporarily unavailable and to try again shortly.',
+    ].join('\n');
+  }
+
   if (releases.length === 0) {
     return '- No releases found in the connected discography yet.';
   }
 
+  const total = catalog?.total ?? releases.length;
   const releaseLines = releases
-    .slice(0, 25)
+    .slice(0, DISCOGRAPHY_PROMPT_ROW_LIMIT)
     .map(release => formatReleaseLine(release, now))
     .join('\n');
-  const overflowCount = releases.length - 25;
+  const overflowCount = total - DISCOGRAPHY_PROMPT_ROW_LIMIT;
   const releasePlural = overflowCount === 1 ? '' : 's';
   const overflowLine =
     overflowCount > 0
-      ? `\n- ...and ${overflowCount} more release${releasePlural} in the catalog.`
+      ? total > releases.length
+        ? `\n- ...and ${overflowCount} more release${releasePlural} in the catalog (${total} total, ${DISCOGRAPHY_PROMPT_ROW_LIMIT} most recent shown).`
+        : `\n- ...and ${overflowCount} more release${releasePlural} in the catalog.`
+      : '';
+  const truncationNote =
+    total > releases.length
+      ? '\n- This list is truncated. If the artist names a release that is not shown, never claim it is not theirs; tool calls resolve titles against the full catalog.'
       : '';
 
-  return `${releaseLines}${overflowLine}`;
+  return `${releaseLines}${overflowLine}${truncationNote}`;
 }
 
 /**
@@ -179,6 +209,12 @@ export function buildSystemPromptParts(
      * releases and music links already in this context.
      */
     segment?: ResolvedSegment;
+    /**
+     * Release catalog read health + whole-catalog count (dogfood 2026-11-10).
+     * Omitted: the loaded releases are treated as the whole catalog (legacy
+     * behavior for eval scripts and tests).
+     */
+    releaseCatalog?: ReleaseCatalogPromptMeta;
     /** Clock for release timing. Defaults to now; tests and evals pin it. */
     now?: Date;
   }
@@ -213,8 +249,12 @@ Everything you say about this artist's own accounts, connections, releases, song
 - **Has Music Links (DSPs):** ${context.hasMusicLinks ? 'Yes (the public profile shows streaming links)' : 'No'}
 
 ## Discography Context
-- **Total Releases:** ${releases.length}
-${buildDiscographySection(releases, now)}
+- **Total Releases:** ${
+    options?.releaseCatalog?.status === 'unavailable'
+      ? 'unknown (catalog temporarily unavailable)'
+      : (options?.releaseCatalog?.total ?? releases.length)
+  }
+${buildDiscographySection(releases, now, options?.releaseCatalog)}
 
 ${buildSegmentPromptSection(segment)}
 

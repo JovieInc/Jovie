@@ -69,6 +69,7 @@ import {
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
 import { fetchArtistContext } from '@/lib/chat/artist-context.server';
+import { findOwnedReleaseForChat } from '@/lib/chat/catalog-query';
 import { fetchCatalogTrackTitlesForChat } from '@/lib/chat/catalog-titles';
 import { assertChatToolsRegistered } from '@/lib/chat/chat-tool-inventory';
 import {
@@ -87,7 +88,7 @@ import {
   updateOwnedReleaseGeneratedPitches,
   updateOwnedReleaseMetadata,
 } from '@/lib/chat/release-writes';
-import { fetchReleasesForChat } from '@/lib/chat/releases';
+import { fetchReleaseCatalogForChat } from '@/lib/chat/releases';
 import {
   extractUIMessageText,
   parseChatRequestBody,
@@ -135,6 +136,8 @@ import {
   type ArtistContext,
   artistContextSchema,
   type ChatTelemetry,
+  type ReleaseCatalogMeta,
+  type ReleaseCatalogSnapshot,
   type ReleaseContext,
 } from '@/lib/chat/types';
 import { gateAssistantReply } from '@/lib/chat/voice-lint';
@@ -267,6 +270,30 @@ function findReleaseByTitle(
   );
 }
 
+/**
+ * Resolve a release the artist referenced by id or title: the per-turn
+ * loaded slice first (no extra query), then the owned-catalog lookup for
+ * titles/ids beyond the slice (dogfood 2026-11-10: a release past the slice
+ * used to be reported as "not found"). DB failures propagate so the tool
+ * errors visibly instead of answering a false "not found".
+ */
+async function resolveChatRelease(
+  profileId: string | null,
+  releases: ReleaseContext[],
+  input: { releaseId?: string; releaseTitle?: string }
+): Promise<ReleaseContext | null> {
+  const local = input.releaseId
+    ? (releases.find(item => item.id === input.releaseId) ?? null)
+    : input.releaseTitle?.trim()
+      ? findReleaseByTitle(releases, input.releaseTitle)
+      : null;
+  if (local) return local;
+
+  if (!profileId) return null;
+  if (!input.releaseId && !input.releaseTitle?.trim()) return null;
+  return findOwnedReleaseForChat(profileId, input);
+}
+
 function normalizeReleaseTitle(value: string): string {
   return value
     .trim()
@@ -287,18 +314,24 @@ function toSuggestedReleaseTarget(
   };
 }
 
-function resolveAlbumArtReleaseTarget(
+async function resolveAlbumArtReleaseTarget(
+  profileId: string | null,
   releases: ReleaseContext[],
   input: { releaseId?: string; releaseTitle?: string }
-):
+): Promise<
   | { status: 'resolved'; release: ReleaseContext }
   | {
       status: 'needs_target';
       suggestedReleases: readonly SuggestedReleaseTarget[];
-    } {
+    }
+> {
   if (input.releaseId) {
-    const release = releases.find(item => item.id === input.releaseId);
-    if (release) return { status: 'resolved', release };
+    const local = releases.find(item => item.id === input.releaseId);
+    if (local) return { status: 'resolved', release: local };
+
+    // Owned id lookup beyond the prompt slice.
+    const owned = await resolveChatRelease(profileId, releases, input);
+    if (owned) return { status: 'resolved', release: owned };
   }
 
   if (!input.releaseTitle?.trim()) {
@@ -313,6 +346,15 @@ function resolveAlbumArtReleaseTarget(
     release => normalizeReleaseTitle(release.title) === normalized
   );
   if (exact) return { status: 'resolved', release: exact };
+
+  // Owned title lookup beyond the prompt slice: resolve an exact-titled
+  // release the per-turn slice does not carry.
+  const owned = await resolveChatRelease(profileId, releases, {
+    releaseTitle: input.releaseTitle,
+  });
+  if (owned && normalizeReleaseTitle(owned.title) === normalized) {
+    return { status: 'resolved', release: owned };
+  }
 
   const fuzzy = releases.filter(release => {
     const title = normalizeReleaseTitle(release.title);
@@ -734,7 +776,8 @@ function createSocialLinkRemovalTool(profileId: string | null) {
  */
 function createCheckCanvasStatusTool(
   profileId: string | null,
-  releases: ReleaseContext[]
+  releases: ReleaseContext[],
+  releaseCatalog?: ReleaseCatalogMeta
 ) {
   return tool({
     description:
@@ -756,6 +799,18 @@ function createCheckCanvasStatusTool(
       }
 
       if (releases.length === 0) {
+        // A failed catalog read must not masquerade as "no releases" (dogfood
+        // 2026-11-10).
+        if (releaseCatalog?.status === 'unavailable') {
+          return {
+            success: true,
+            summary: {
+              total: 0,
+              message:
+                'The release catalog is temporarily unavailable. Try again in a moment.',
+            },
+          };
+        }
         return {
           success: true,
           summary: {
@@ -872,7 +927,9 @@ function createGenerateCanvasPlanTool(
         return { success: false, error: 'Profile ID required' };
       }
 
-      const release = findReleaseByTitle(releases, releaseTitle);
+      const release = await resolveChatRelease(profileId, releases, {
+        releaseTitle,
+      });
 
       if (!release) {
         return {
@@ -963,10 +1020,14 @@ function createGenerateAlbumArtTool(params: {
         };
       }
 
-      const target = resolveAlbumArtReleaseTarget(params.releases, {
-        releaseId,
-        releaseTitle,
-      });
+      const target = await resolveAlbumArtReleaseTarget(
+        params.profileId,
+        params.releases,
+        {
+          releaseId,
+          releaseTitle,
+        }
+      );
 
       if (target.status === 'needs_target' && !createRelease) {
         return {
@@ -1345,7 +1406,7 @@ function createPromoStrategyTool(
     execute: async ({ releaseTitle, budget, platforms }) => {
       const targetRelease = profileId
         ? releaseTitle
-          ? findReleaseByTitle(releases, releaseTitle)
+          ? await resolveChatRelease(profileId, releases, { releaseTitle })
           : (releases[0] ?? null)
         : null;
 
@@ -1440,7 +1501,9 @@ function createMarkCanvasUploadedTool(
         return { success: false, error: 'Profile ID required' };
       }
 
-      const release = findReleaseByTitle(releases, releaseTitle);
+      const release = await resolveChatRelease(profileId, releases, {
+        releaseTitle,
+      });
 
       if (!release) {
         return {
@@ -1485,7 +1548,8 @@ function createMarkCanvasUploadedTool(
 function createWorldClassBioTool(
   context: ArtistContext,
   profileId: string | null,
-  releases: ReleaseContext[]
+  releases: ReleaseContext[],
+  releaseCatalog?: ReleaseCatalogMeta
 ) {
   return tool({
     description:
@@ -1518,7 +1582,9 @@ function createWorldClassBioTool(
         spotifyUrl: context.spotifyUrl ?? null,
         appleMusicUrl: context.appleMusicUrl ?? null,
         profileViews: context.profileViews,
-        releaseCount: releases.length,
+        // Whole-catalog count, not just the loaded slice (dogfood 2026-11-10):
+        // bios for catalogs larger than the per-turn slice understated the count.
+        releaseCount: releaseCatalog?.total ?? releases.length,
         notableReleases: releases.slice(0, 3).map(release => release.title),
       });
 
@@ -1629,7 +1695,8 @@ function createGenerateReleasePitchTool(
   resolvedProfileId: string,
   identity: { clerkUserId: string; conversationId: string | null },
   releases: ReleaseContext[],
-  artistRules?: ArtistContext['artistRules']
+  artistRules?: ArtistContext['artistRules'],
+  releaseCatalog?: ReleaseCatalogMeta
 ) {
   return tool({
     description: `Generate one copy-paste-ready release pitch for a specific destination. Use for playlist, radio, Sirius XM, install, playback/music supervisor, editorial post, record label, or collaborator pitching. Ask the artist where they want to pitch it before calling this tool unless a task or user message clearly maps to one of these destinations: ${PITCH_TARGET_OPTIONS_TEXT}. Ask which release they want to pitch if unclear. If the artist provides custom guidance, pass it via instructions. ${PITCH_GRILL_PROCEDURE}`,
@@ -1683,18 +1750,25 @@ function createGenerateReleasePitchTool(
     }) => {
       try {
         if (releases.length === 0) {
+          // A failed catalog read must not masquerade as "no releases" (dogfood
+          // 2026-11-10): tell the model the catalog is unreadable instead.
+          if (releaseCatalog?.status === 'unavailable') {
+            return {
+              success: false as const,
+              error:
+                'The release catalog is temporarily unavailable. Try the pitch again in a moment.',
+            };
+          }
           return {
             success: false as const,
             error: "You don't have any releases yet. Add a release first.",
           };
         }
 
-        const release =
-          releaseId !== undefined
-            ? releases.find(candidate => candidate.id === releaseId)
-            : releaseTitle !== undefined
-              ? findReleaseByTitle(releases, releaseTitle)
-              : null;
+        const release = await resolveChatRelease(resolvedProfileId, releases, {
+          releaseId,
+          releaseTitle,
+        });
 
         if (!release) {
           return {
@@ -1820,7 +1894,8 @@ function buildChatTools(
     readonly sourceImageUrl: string | null;
     readonly conversationId: string | null;
   },
-  lastUserText = ''
+  lastUserText = '',
+  releaseCatalog?: ReleaseCatalogMeta
 ) {
   return {
     ...(insightsEnabled
@@ -1834,12 +1909,17 @@ function buildChatTools(
     proposeProfileEdit: createProfileEditTool(artistContext),
     importBioFromUrl: createImportBioFromUrlTool({ userId: clerkUserId }),
     inspectPressSource: createInspectPressSourceTool({ userId: clerkUserId }),
-    checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId, releases),
+    checkCanvasStatus: createCheckCanvasStatusTool(
+      resolvedProfileId,
+      releases,
+      releaseCatalog
+    ),
     suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
     writeWorldClassBio: createWorldClassBioTool(
       artistContext,
       resolvedProfileId,
-      releases
+      releases,
+      releaseCatalog
     ),
     generateCanvasPlan: createGenerateCanvasPlanTool(
       resolvedProfileId,
@@ -1896,7 +1976,8 @@ function buildChatTools(
               conversationId: reservedTurn?.conversationId ?? null,
             },
             releases,
-            artistContext.artistRules
+            artistContext.artistRules,
+            releaseCatalog
           ),
         }
       : {}),
@@ -2011,16 +2092,15 @@ function toNullableString(value: unknown): string | null {
 
 async function fetchOptionalReleases(
   profileId: string | null
-): Promise<ReleaseContext[]> {
+): Promise<ReleaseCatalogSnapshot> {
   if (!profileId) {
-    return [];
+    return { status: 'ok', total: 0, releases: [] };
   }
 
-  try {
-    return await fetchReleasesForChat(profileId);
-  } catch {
-    return [];
-  }
+  // Never throws: a failed read returns `status: 'unavailable'` so the
+  // prompt and tools can say the catalog is unreadable instead of asserting
+  // the artist has no releases (dogfood 2026-11-10).
+  return fetchReleaseCatalogForChat(profileId);
 }
 
 /**
@@ -2794,7 +2874,8 @@ export async function POST(req: Request) {
   }
   const artistContext = contextResult.context;
 
-  const releases = await fetchOptionalReleases(resolvedProfileId);
+  const releaseCatalog = await fetchOptionalReleases(resolvedProfileId);
+  const releases = [...releaseCatalog.releases];
   const catalogTrackTitles = resolvedProfileId
     ? await fetchCatalogTrackTitlesForChat(resolvedProfileId)
     : null;
@@ -2829,7 +2910,8 @@ export async function POST(req: Request) {
             conversationId:
               reservedTurn?.conversationId ?? resolvedConversationId,
           },
-          userText
+          userText,
+          releaseCatalog
         )
       : {};
     // Plan-locked stubs stay VISIBLE to the model so free users who ask for
@@ -2966,6 +3048,7 @@ export async function POST(req: Request) {
       uiMessages,
       artistContext,
       releases,
+      releaseCatalog,
       catalogTrackTitles,
       resolvedProfileId,
       resolvedConversationId: dispatchConversationId,
