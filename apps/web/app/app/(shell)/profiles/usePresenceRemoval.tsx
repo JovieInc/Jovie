@@ -31,6 +31,8 @@ import { FetchError, fetchWithTimeout } from '@/lib/queries/fetch';
 import { queryKeys } from '@/lib/queries/keys';
 import { useRemoveSocialLinkMutation } from '@/lib/queries/useRemoveSocialLinkMutation';
 
+import type { PresenceRemovalPrincipal } from './removal-principal';
+
 interface RemovalIntent {
   readonly rowId: string;
   readonly profileId: string;
@@ -41,13 +43,18 @@ interface RemovalIntent {
 
 function ownerKey(
   scope: PresenceWorkspaceScope,
-  profileId: string | undefined
+  profileId: string | undefined,
+  principal: PresenceRemovalPrincipal | null | undefined
 ) {
   const cache = getCacheScope();
   if (
+    !principal ||
+    principal.appActorId !== scope.actorId ||
     !cache.ready ||
     !cache.sessionId ||
-    cache.userId !== scope.actorId ||
+    cache.userId !== principal.authUserId ||
+    cache.sessionId !== principal.sessionId ||
+    cache.impersonationSubject !== principal.impersonationSubject ||
     cache.profileId !== profileId ||
     scope.target !== 'creator' ||
     scope.workspaceId !== profileId
@@ -55,6 +62,7 @@ function ownerKey(
     return null;
   return JSON.stringify([
     presenceWorkspaceScopeKey(scope),
+    principal,
     getCacheGeneration(),
     cache,
   ]);
@@ -72,7 +80,8 @@ export function usePresenceRemoval(
   data: ProfilesWorkspaceData | null,
   scope: PresenceWorkspaceScope,
   selection: string | null,
-  clearSelection?: (selection: null) => void
+  clearSelection?: (selection: null) => void,
+  principal?: PresenceRemovalPrincipal | null
 ) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -91,10 +100,10 @@ export function usePresenceRemoval(
   const intent = useRef<RemovalIntent | null>(null);
   const mounted = useRef(true);
   const submitting = useRef(false);
-  const current = useRef({ data, scope, selection });
+  const current = useRef({ data, scope, selection, principal });
   useLayoutEffect(() => {
-    current.current = { data, scope, selection };
-  }, [data, scope, selection]);
+    current.current = { data, scope, selection, principal };
+  }, [data, scope, selection, principal]);
   // An uncertain write cannot be retried against the same stale server snapshot.
   const awaitingRefresh = useRef<ProfilesWorkspaceData | null>(null);
   const isCurrent = useCallback(() => {
@@ -103,7 +112,8 @@ export function usePresenceRemoval(
     if (
       !mounted.current ||
       !snapshot ||
-      snapshot.owner !== ownerKey(latest.scope, latest.data?.profileId) ||
+      snapshot.owner !==
+        ownerKey(latest.scope, latest.data?.profileId, latest.principal) ||
       snapshot.selection !== latest.selection
     )
       return false;
@@ -139,7 +149,7 @@ export function usePresenceRemoval(
   }, [cancel]);
   useEffect(() => {
     if (pending && !isCurrent()) cancel();
-  }, [data, scope, selection, pending, isCurrent, cancel]);
+  }, [data, scope, selection, principal, pending, isCurrent, cancel]);
 
   const request = useCallback(
     (row: ProfileWorkspaceRow) => {
@@ -154,7 +164,11 @@ export function usePresenceRemoval(
         !latest.data
       )
         return;
-      const owner = ownerKey(latest.scope, latest.data.profileId);
+      const owner = ownerKey(
+        latest.scope,
+        latest.data.profileId,
+        latest.principal
+      );
       const authoritative = latest.data.rows.find(
         candidate => candidate.id === row.id
       );
@@ -216,7 +230,11 @@ export function usePresenceRemoval(
     const reconcile = () => {
       if (
         snapshot.owner !==
-        ownerKey(current.current.scope, current.current.data?.profileId)
+        ownerKey(
+          current.current.scope,
+          current.current.data?.profileId,
+          current.current.principal
+        )
       )
         return;
       for (const queryKey of [
@@ -319,7 +337,11 @@ export function usePresenceRemoval(
             target &&
             isAvailable(target) &&
             focusOwner.current ===
-              ownerKey(current.current.scope, current.current.data?.profileId)
+              ownerKey(
+                current.current.scope,
+                current.current.data?.profileId,
+                current.current.principal
+              )
           ) {
             event.preventDefault();
             target.focus();
