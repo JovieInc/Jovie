@@ -119,4 +119,25 @@ describe('ProfileEditPreviewCard', () => {
     expect(screen.getByText('Cancelled')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /apply/i })).toBeNull();
   });
+
+  it('names the Jovie bio as the apply destination for bio edits (regression)', () => {
+    renderCard({
+      field: 'bio',
+      fieldLabel: 'Artist bio/description',
+      currentValue: 'Old bio',
+      newValue: 'New bio about the artist',
+    });
+
+    // The apply affordance must name Jovie explicitly: a Spotify drafting
+    // request must not read as if Apply pushes the bio to Spotify.
+    expect(
+      screen.getByRole('button', { name: 'Apply to Jovie bio' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the generic Apply label for non-bio fields', () => {
+    renderCard();
+
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeInTheDocument();
+  });
 });

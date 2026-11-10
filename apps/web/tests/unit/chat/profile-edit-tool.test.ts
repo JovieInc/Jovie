@@ -180,3 +180,24 @@ describe('EDITABLE_FIELDS', () => {
     expect(EDITABLE_FIELDS.blocked).toContain('genres');
   });
 });
+
+describe('proposeProfileEdit destination clarity (regression)', () => {
+  function descriptionOf(context: ProfileEditContext): string {
+    const { description } = createProfileEditTool(context);
+    if (typeof description === 'function') {
+      return description({ context: {} as never });
+    }
+    return description ?? '';
+  }
+
+  it('names the Jovie profile as the apply destination in the tool description', () => {
+    expect(descriptionOf(testContext)).toContain("artist's Jovie profile");
+  });
+
+  it('distinguishes drafting for Spotify from updating Jovie', () => {
+    const description = descriptionOf(testContext).toLowerCase();
+    expect(description).toContain('spotify');
+    expect(description).toContain('draft');
+    expect(description).toContain('cannot write to spotify');
+  });
+});
