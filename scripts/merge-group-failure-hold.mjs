@@ -1568,14 +1568,15 @@ function ciFastRemainingLog(
   jobs,
   { includeSuccessful = false } = {}
 ) {
-  // The structural matrix legs (ci-fast (structural core N/2)) carry the same
-  // evidence as ci-fast (remaining); collect every selected leg's log so
-  // command-level comparison below works across shards.
+  // Per-job entries: the structural matrix legs (ci-fast (structural core
+  // N/2)) carry the same evidence as ci-fast (remaining), and each failed
+  // job's log must stay separable for the per-job evidence rule.
   const selected = selectCiFastEvidenceJobs(jobs, { includeSuccessful });
   if (!selected.length) return null;
-  return selected
-    .map(job => gh(['api', `repos/${repository}/actions/jobs/${job.id}/logs`]))
-    .join('\n');
+  return selected.map(job => ({
+    name: job.name,
+    log: gh(['api', `repos/${repository}/actions/jobs/${job.id}/logs`]),
+  }));
 }
 
 // Shadow only (canon/MERGE_QUEUE_STEWARD.md invariant 4): did this group's
