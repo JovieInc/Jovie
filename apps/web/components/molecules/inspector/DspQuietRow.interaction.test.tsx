@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { EntityPopover } from '@/components/shell/EntityPopover';
 import { DspQuietRow } from './DspQuietRow';
 
 const providers = [
@@ -230,6 +231,19 @@ describe('Destinations row invariant (JOV-8955)', () => {
     await waitFor(() =>
       expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
     );
+  });
+
+  it('renders no preview card once the anchor is cleared on the close path', () => {
+    // EntityPopover's widened HTMLElement | null anchor: clearing the anchor
+    // (the close path) renders nothing rather than crashing.
+    const view = render(
+      <EntityPopover
+        entity={{ kind: 'release', id: 'x', label: 'Seaside Heights' }}
+        anchor={null}
+      />
+    );
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    view.unmount();
   });
 
   it('does not preview when no entity summary is provided', () => {
