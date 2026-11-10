@@ -1054,9 +1054,10 @@ jobs:
       # trusts that workflow's RUNS, never a commit status: any branch can post
       # a status named anything, but only main's copy of the workflow can
       # produce a pull_request_target run of fleet-rules-evidence.yml. The
-      # newest run for this head must have completed after this PR event
-      # (stale pre-edit verdicts read as missing). Missing, in-flight or
-      # deferred evidence exits 75 with github-quota-deferred; the evidence
+      # newest run for this head or the base sha (an edited event) must have
+      # completed after this PR event. A superseded head is not a verdict.
+      # Missing, in-flight or deferred evidence exits 75 with
+      # github-quota-deferred; the evidence
       # workflow re-runs this job when it finishes, so nothing polls.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ always() && github.event_name == 'pull_request' }}
@@ -1087,10 +1088,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
           EVENT_UPDATED_AT: ${{ github.event.pull_request.updated_at }}
         run: |
           set -euo pipefail
-          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::Fleet rule evidence needs an exact head sha'; exit 1; }
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::Fleet rule evidence needs an exact head sha'; exit 1; }
           # Bootstrap: pull_request_target runs the evidence workflow from main, so
           # until it exists on main no PR can have a run. main's checkout (above)
           # decides this, never the PR's tree. Once the file lands this branch is dead.
@@ -1099,12 +1101,13 @@ jobs:
             exit 0
           fi
           floor="$(date -u -d "$EVENT_UPDATED_AT" +%s)"
-          # Never filter by head_sha: a pull_request_target run for an `edited` event
-          # carries the BASE sha as its head_sha (#24184), so the head_sha filter hid
-          # every post-edit verdict. Bind by PR title, head branch/repo and the floor.
+          # The API stays branch-scoped. An `edited` pull_request_target run stores
+          # the BASE sha as head_sha (#24184), so ?head_sha= hides that verdict.
+          # Keep this head or that base sha only. A superseded head's later id
+          # must not beat them (PR #23179, run 42876227380, 2026-11-10).
           ref_q="$(jq -rn --arg r "$HEAD_REF" '$r | @uri')"
           runs="$(node packages/api-client/cli.ts gh --priority default -- api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?branch=$ref_q&event=pull_request_target&per_page=20")" || runs='{"workflow_runs":[]}'
-          row="$(jq -r --argjson floor "$floor" --arg title "fleet-rules #$PR_NUMBER base=main" --arg ref "$HEAD_REF" --argjson repo "$HEAD_REPO_ID" '[.workflow_runs[] | select(.path == ".github/workflows/fleet-rules-evidence.yml" and .display_title == $title and .head_branch == $ref and .head_repository.id == $repo and (.created_at | fromdateiso8601) >= ($floor - 10) and .conclusion != "cancelled")] | sort_by([.created_at, .id]) | last // {status: "missing"} | "\(.status)\t\(.conclusion // "")\t\(.html_url // "")"' <<<"$runs" 2>/dev/null || echo 'missing')"
+          row="$(jq -r --argjson floor "$floor" --arg title "fleet-rules #$PR_NUMBER base=main" --arg ref "$HEAD_REF" --argjson repo "$HEAD_REPO_ID" --arg head "$HEAD_SHA" --arg base "$BASE_SHA" '[.workflow_runs[] | select(.path == ".github/workflows/fleet-rules-evidence.yml" and .display_title == $title and .head_branch == $ref and .head_repository.id == $repo and (.created_at | fromdateiso8601) >= ($floor - 10) and .conclusion != "cancelled" and (.head_sha == $head or .head_sha == $base))] | sort_by([.created_at, .id]) | last // {status: "missing"} | "\(.status)\t\(.conclusion // "")\t\(.html_url // "")"' <<<"$runs" 2>/dev/null || echo 'missing')"
           IFS=$'\t' read -r status conclusion url <<<"$row"
           case "$status/$conclusion" in
             completed/success) echo "Fleet rules passed: $url" ;;
