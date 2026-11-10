@@ -13,6 +13,10 @@
  */
 
 import { z } from 'zod';
+import type {
+  NotificationMessage,
+  NotificationTarget,
+} from '@/types/notifications';
 
 /**
  * Founder-locked draft copy (dispatch 2026-11-09, quoted verbatim). The
@@ -55,7 +59,9 @@ export const winbackApprovalRecordSchema = z.object({
   contract: z.literal('jovie.winback-approval/v1'),
   batchId: z.string().min(1),
   capabilityKey: z.string().min(1),
-  templateVersion: z.literal(WINBACK_EMAIL_TEMPLATE_VERSION),
+  // Shape only — the VALUE comparison that produces the specific
+  // 'template' refusal lives in winbackSendApprovalError below.
+  templateVersion: z.string().min(1),
   /** Exact entry ids approved for this batch. */
   entryIds: z.array(z.string().uuid()).min(1),
   approvedBy: z.string().min(1),
@@ -226,11 +232,6 @@ export function buildWinbackDraftCopy(params: {
 export function buildWinbackResumeUrl(origin: string, token: string): string {
   return `${origin}/start?resume=winback&w=${token}`;
 }
-
-import type {
-  NotificationMessage,
-  NotificationTarget,
-} from '@/types/notifications';
 
 /**
  * Founder-locked win-back email (dispatch 2026-11-09). Body copy is built
