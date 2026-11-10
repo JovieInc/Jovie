@@ -233,6 +233,16 @@ test('validator rejects each structural defect', () => {
   assert.deepEqual(validateBindings(base()), []);
 });
 
+test('a frame may cite a .pen file or an approved HTML art-direction page', () => {
+  const doc = base();
+  doc.routes['/'].viewports['1440'] = [
+    { ...frame('/', 1440, 'hero'), penFile: 'home-canonical-v3/index.html' },
+  ];
+  assert.deepEqual(validateBindings(doc), []);
+  doc.routes['/'].viewports['1440'][0].penFile = 'hero.png';
+  assert.match(validateBindings(doc).join('\n'), /penFile must be a \.pen or/);
+});
+
 test('filesystem checks: dead source globs, missing stills and hash drift', () => {
   const root = mkdtempSync(join(tmpdir(), 'pen-bind-'));
   execFileSync('git', ['init', '-q'], { cwd: root });

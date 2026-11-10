@@ -39,6 +39,14 @@ export const Default: Story = {
   args: {
     state: EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
   },
+  // JOV-12045: the side rail's height chain is definite now (the preview
+  // fits the rail at rest), so the story mounts it in a fixed-height
+  // surface like the other side stories.
+  render: () => (
+    <div style={{ height: 692, width: 380 }}>
+      <OnboardingProfileRail state={EMPTY_ONBOARDING_PROFILE_BUILDER_STATE} />
+    </div>
+  ),
 };
 
 // The clearance stories need a real release: with streaming destinations

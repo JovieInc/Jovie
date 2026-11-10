@@ -205,25 +205,41 @@ describe('Auto-Ready provenance selector', () => {
   });
 
   it('lets a trusted writer opt in to ship on green instead of a receipt', () => {
-    const body = '<!-- jovie-auto-ready: on-green -->';
-    expect(promotion({ body })).toEqual({
-      eligible: true,
-      reason: 'writer-on-green-opt-in',
-    });
-    expect(promotion({ body, authorLogin: 'jovie-bot[bot]' })).toEqual({
-      eligible: true,
-      reason: 'writer-on-green-opt-in',
-    });
-    expect(promotion({ body, authorLogin: 'outside-contributor' })).toEqual({
+    const marker = '<!-- jovie-auto-ready: on-green -->';
+    // The writer-proof path readies drafts with checks still pending, so the
+    // opt-in must never pass there; only green-source sets greenSource.
+    expect(promotion({ body: marker })).toEqual({
       eligible: false,
       reason: 'writer-proof-proof-missing',
     });
-    expect(promotion({ body, labels: ['hold'] })).toEqual({
+    const body = marker;
+    const greenSource = true;
+    expect(promotion({ body, greenSource })).toEqual({
+      eligible: true,
+      reason: 'writer-on-green-opt-in',
+    });
+    expect(
+      promotion({ body, greenSource, authorLogin: 'jovie-bot[bot]' })
+    ).toEqual({
+      eligible: true,
+      reason: 'writer-on-green-opt-in',
+    });
+    expect(
+      promotion({ body, greenSource, authorLogin: 'outside-contributor' })
+    ).toEqual({
+      eligible: false,
+      reason: 'writer-proof-proof-missing',
+    });
+    expect(promotion({ body, greenSource, labels: ['hold'] })).toEqual({
       eligible: false,
       reason: 'held',
     });
     expect(
-      promotion({ body, title: '[canary] prove the gate stays red' })
+      promotion({
+        body,
+        greenSource,
+        title: '[canary] prove the gate stays red',
+      })
     ).toEqual({ eligible: false, reason: 'controlled-proof' });
   });
 

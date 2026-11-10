@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { OverflowMenuTrigger } from './overflow-menu-trigger';
 
@@ -122,8 +123,11 @@ describe('OverflowMenuTrigger', () => {
     const trigger = screen.getByRole('button', {
       name: 'More tabs, current tab hidden',
     });
-    expect(trigger).toBeDisabled();
+    // Loading keeps the trigger focusable; activation is cancelled instead.
+    expect(trigger).not.toBeDisabled();
+    expect(trigger).toHaveAttribute('aria-disabled', 'true');
     expect(trigger).toHaveAttribute('aria-busy', 'true');
+    expect(fireEvent.click(trigger)).toBe(false);
   });
 
   it('forwards refs, custom classes, and click behavior', async () => {
@@ -143,5 +147,32 @@ describe('OverflowMenuTrigger', () => {
     expect(trigger).toHaveClass('custom-trigger');
     await user.click(trigger);
     expect(onClick).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('OverflowMenuTrigger accessibility', () => {
+  it('has no axe violations across default, active, disabled and RTL states', async () => {
+    const { container } = render(
+      <div>
+        <OverflowMenuTrigger />
+        <OverflowMenuTrigger hasActiveOverflow aria-label='More actions' />
+        <OverflowMenuTrigger disabled aria-label='More actions' />
+        <div dir='rtl'>
+          <OverflowMenuTrigger
+            hasActiveOverflow
+            aria-label='المزيد من علامات التبويب، علامة التبويب الحالية مخفية'
+          />
+        </div>
+      </div>
+    );
+    expect(screen.getAllByRole('button')).toHaveLength(4);
+    await expectNoA11yViolations(container);
+  });
+
+  it('anchors the active-overflow dot to the inline end', () => {
+    const { container } = render(<OverflowMenuTrigger hasActiveOverflow />);
+    const dot = container.querySelector('.rounded-full.bg-accent');
+    expect(dot).toHaveClass('-end-0.5');
+    expect(dot?.className).not.toContain('-right-');
   });
 });

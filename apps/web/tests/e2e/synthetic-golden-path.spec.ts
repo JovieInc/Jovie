@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 /**
@@ -19,6 +19,30 @@ test.use({ storageState: { cookies: [], origins: [] } });
 const HOMEPAGE_PRIMARY_CTA_TEST_ID = 'homepage-primary-cta';
 const SIGNUP_PATH = '/signup';
 const START_PATH = '/start';
+const WAITLIST_PATH = '/waitlist';
+
+function isClosedSignupRedirect(page: Page, requestedPath: string) {
+  return (
+    [START_PATH, SIGNUP_PATH].includes(requestedPath) &&
+    new URL(page.url()).pathname === WAITLIST_PATH
+  );
+}
+
+async function assertClosedSignupWaitlist(page: Page) {
+  await expect(
+    page.getByTestId('waitlist-role-form'),
+    'Closed signup must land on a visible waitlist form'
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.locator('[data-auth-shell-mode="sign-up"]'),
+    'Closed signup must not render a sign-up auth shell'
+  ).toHaveCount(0);
+  await expect(
+    page.getByText(
+      /couldn.t start your chat|cannot complete the security check|taking longer than expected/i
+    )
+  ).toHaveCount(0);
+}
 const TURNSTILE_CONFIG_ERROR = 'turnstile is not configured';
 const TURNSTILE_DOMAIN_ERROR = 'verification failed (110200)';
 
@@ -62,10 +86,16 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
       });
       await waitForHydration(page);
 
-      // Basic health checks
-      await expect(page).toHaveURL(
-        new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-      );
+      // Basic health checks. Invite-only GTM (PUBLIC_SIGNUP_CLOSED,
+      // canon/PRODUCT.md 2026-11-02): anonymous /start and /signup redirect
+      // to /waitlist on purpose. Accept that only as a working waitlist form.
+      if (isClosedSignupRedirect(page, path)) {
+        await assertClosedSignupWaitlist(page);
+      } else {
+        await expect(page).toHaveURL(
+          new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        );
+      }
 
       // Check for critical errors
       const criticalErrorSelectors = [
@@ -108,6 +138,11 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
     await waitForHydration(page);
+    if (isClosedSignupRedirect(page, START_PATH)) {
+      // No chat or Turnstile exists while signup is closed; the waitlist is the surface.
+      await assertClosedSignupWaitlist(page);
+      return;
+    }
 
     // The Turnstile widget must be fully invisible (appearance: 'execute').
     // No "Security Check" heading, no visible bordered widget frame, no

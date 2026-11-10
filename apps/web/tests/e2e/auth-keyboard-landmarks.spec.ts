@@ -22,13 +22,11 @@ for (const route of ['/signup', '/signin']) {
       ).toBeFocused();
       await page.keyboard.press('Enter');
       await expect(page.locator('#auth-form')).toBeFocused();
+      // Pen oaz9c: the column opens on its heading (no O-mark link) and
+      // lists Google before Apple.
       await page.keyboard.press('Tab');
       await expect(
-        page.getByRole('link', { name: 'Go to homepage' })
-      ).toBeFocused();
-      await page.keyboard.press('Tab');
-      await expect(
-        page.getByRole('button', { name: 'Continue with Apple' })
+        page.getByRole('button', { name: 'Continue with Google' })
       ).toBeFocused();
 
       // Repeated activation must work when the URL already has the fragment.

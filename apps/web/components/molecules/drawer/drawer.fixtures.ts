@@ -18,6 +18,7 @@ export const MockRightDrawer = (
       id: props.id,
       'data-testid': props['data-testid'] ?? 'right-drawer',
       'aria-label': props.ariaLabel,
+      'data-rail-presentation': props.presentation,
       style: { width: props.width },
       onKeyDown: (event: KeyboardEvent) => props.onKeyDown?.(event.nativeEvent),
     },

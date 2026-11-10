@@ -122,6 +122,53 @@ describe('performance auth bootstrap', () => {
     expect(browser.close).toHaveBeenCalledOnce();
   });
 
+  it('sends the onboarding creator persona to /start', async () => {
+    const creatorState = {
+      ...storageState,
+      cookies: storageState.cookies.map(cookie =>
+        cookie.name === '__e2e_test_persona'
+          ? { ...cookie, value: 'creator' }
+          : cookie
+      ),
+    };
+    const goto = vi.fn().mockResolvedValue({ status: () => 303 });
+    const context = {
+      close: vi.fn().mockResolvedValue(undefined),
+      newPage: vi.fn().mockResolvedValue({
+        evaluate: vi.fn().mockResolvedValue({
+          status: 200,
+          userId: 'ba_user_123',
+        }),
+        goto,
+        url: vi.fn(() => 'http://127.0.0.1:4111/start'),
+      }),
+      storageState: vi.fn().mockResolvedValue(creatorState),
+    };
+    const browser = {
+      close: vi.fn().mockResolvedValue(undefined),
+      newContext: vi.fn().mockResolvedValue(context),
+    };
+
+    await expect(
+      bootstrapPerformanceAuth(
+        {
+          baseUrl: 'http://127.0.0.1:4111',
+          json: false,
+          outPath: '/tmp/perf-auth.json',
+          persona: 'creator',
+        },
+        {
+          launchBrowser: vi.fn().mockResolvedValue(browser),
+          persistStorageState: vi.fn(),
+        }
+      )
+    ).resolves.toMatchObject({ persona: 'creator' });
+    expect(goto).toHaveBeenCalledWith(
+      'http://127.0.0.1:4111/api/dev/test-auth/enter?persona=creator&redirect=%2Fstart&session=better-auth',
+      { timeout: 60_000, waitUntil: 'domcontentloaded' }
+    );
+  });
+
   it('fails when the enter route lands outside the authenticated target', async () => {
     const context = {
       close: vi.fn().mockResolvedValue(undefined),

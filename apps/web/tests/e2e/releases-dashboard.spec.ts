@@ -142,8 +142,8 @@ function extractSmartLinkHandle(url: string) {
 }
 
 /**
- * Pre-check helper for releases tests.
- * Waits for page to load and fails explicitly when the seeded creator route is not populated.
+ * Pre-check: waits for release rows or a known fallback state, then fails
+ * unless rows are visible. A blank matrix (neither) is a failure, never a pass.
  */
 async function ensureReleasesVisible(
   page: Page
@@ -153,11 +153,9 @@ async function ensureReleasesVisible(
   const matrix = page.getByTestId('releases-matrix');
   await expect(matrix).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
 
-  const surface = await resolveReleasesSurface(page);
-  if (surface) {
-    return { matrix, surface };
-  }
-
+  const releaseRows = page.locator(
+    '[data-testid^="mobile-release-row-"], tbody tr, [data-shell-release-row]'
+  );
   const knownFallbackStates = [
     ['disconnected', page.getByTestId('releases-empty-state-disconnected')],
     ['connected-empty', page.getByText('No releases yet')],
@@ -166,23 +164,25 @@ async function ensureReleasesVisible(
     ['partial', page.getByTestId('releases-empty-state-partial')],
   ] as const;
 
+  const anyContent = knownFallbackStates.reduce<Locator>(
+    (combined, [, locator]) => combined.or(locator),
+    releaseRows
+  );
+  await expect(
+    anyContent.first(),
+    `Expected release rows or a known empty state on ${RELEASES_ROUTE}; the matrix rendered neither`
+  ).toBeVisible({ timeout: TIMEOUTS.MATRIX_VISIBLE });
+
+  const surface = await resolveReleasesSurface(page);
+  if (surface) return { matrix, surface };
+
   const visibleStates: string[] = [];
   for (const [state, locator] of knownFallbackStates) {
-    if (
-      await locator
-        .isVisible({ timeout: TIMEOUTS.QUICK_CHECK })
-        .catch(() => false)
-    ) {
-      visibleStates.push(state);
-    }
+    if (await locator.isVisible().catch(() => false)) visibleStates.push(state);
   }
-
-  expect(
-    visibleStates,
-    `Expected populated seeded releases on ${RELEASES_ROUTE}, found ${visibleStates.join(', ') || 'no rows'}`
-  ).toHaveLength(0);
-
-  return { matrix, surface: 'desktop' };
+  throw new Error(
+    `Expected populated seeded releases on ${RELEASES_ROUTE}, found ${visibleStates.join(', ') || 'neither rows nor a known empty state'}`
+  );
 }
 
 async function openFirstReleaseSidebar(page: Page) {

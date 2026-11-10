@@ -123,7 +123,7 @@ describe('OutboundRail', () => {
     const props = renderRail();
     act(() => sendOutboundRailCommand('reject'));
     expect(props.onReject).not.toHaveBeenCalled();
-    const dialog = await screen.findByRole('dialog');
+    const dialog = await screen.findByRole('alertdialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Reject' }));
     expect(props.onReject).toHaveBeenCalledWith('not_a_fit');
   });

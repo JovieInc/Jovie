@@ -74,4 +74,41 @@ describe('component certificate companion files', () => {
     assert.equal(after.a11y, 'pass');
     assert.equal(after.tests, 'pass');
   });
+
+  it('gates an app-route component named by an exact gate key', () => {
+    const app = 'apps/web/app/[slug]/_components';
+    mkdirSync(join(root, app), { recursive: true });
+    mkdirSync(join(root, 'docs/design-system'), { recursive: true });
+    const gate = file =>
+      writeFileSync(
+        join(root, 'docs/design-system/component-certification.json'),
+        JSON.stringify({ gates: { [file]: ['tests', 'a11y'] } })
+      );
+    const run = () =>
+      spawnSync(process.execPath, [cli, '--repo-root', root, '--gate'], {
+        encoding: 'utf8',
+      });
+    const source = `${app}/Banner.tsx`;
+    writeFileSync(
+      join(root, source),
+      "export function Banner() {\n  return <p className='text-sm'>Hi</p>;\n}\n"
+    );
+    gate(source);
+    const red = run();
+    assert.equal(red.status, 1, red.stdout);
+    assert.match(red.stdout, /Banner\.tsx \[tests\] fail/);
+
+    writeFileSync(
+      join(root, `${app}/Banner.test.tsx`),
+      "import { expectNoA11yViolations } from 'x';\nit('axe', async () => { expect(1).toBe(1); await expectNoA11yViolations(document.body); });\n"
+    );
+    const green = run();
+    assert.equal(green.status, 0, green.stdout);
+    assert.match(green.stdout, /1 gated component\(s\) pass/);
+
+    gate(`${app}/Missing.tsx`);
+    const missing = run();
+    assert.equal(missing.status, 1);
+    assert.match(missing.stdout, /matches no component/);
+  });
 });

@@ -22,8 +22,11 @@ import {
   type SpotifyArtistReader,
   spotifyArtistIdSchema,
 } from '@/lib/waitlist/role-qualification';
-import { waitlistRoleSchema } from '@/lib/waitlist/roles';
+import { WAITLIST_ROLE_VALUES } from '@/lib/waitlist/roles';
 
+// Kept here, not in lib/waitlist/roles.ts, so the homepage's waitlist form
+// does not download zod.
+const waitlistRoleSchema = z.enum(WAITLIST_ROLE_VALUES);
 /**
  * Anonymous closed-signup waitlist join (canon/PRODUCT.md, 2026-11-02).
  *

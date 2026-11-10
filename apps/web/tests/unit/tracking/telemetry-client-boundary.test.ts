@@ -80,6 +80,24 @@ describe('telemetry client boundary (JOV-6585)', () => {
     expect(contract).toContain('NAVIGATION_TELEMETRY_MAX_BATCH_SIZE = 8');
   });
 
+  it('keeps zod out of the navigation telemetry that ships in the dashboard shell', () => {
+    // Every dashboard page loads these modules. The zod schemas live in
+    // navigation-telemetry-schema.ts, which only the server route and tests
+    // load as a value, so the shell does not download zod.
+    const contract = readWebSource(
+      'lib/tracking/navigation-telemetry-contract.ts'
+    );
+    expect(contract).not.toMatch(/from 'zod'/);
+    expect(contract).not.toMatch(/from '[^']*navigation-telemetry-schema'/);
+
+    const client = readWebSource('lib/tracking/navigation-telemetry.ts');
+    expect(client).not.toMatch(/from 'zod'/);
+    // Types only: a value import would pull the schemas, and zod, back in.
+    expect(client).not.toMatch(
+      /^import \{[^}]*\} from '[^']*navigation-telemetry-schema'/m
+    );
+  });
+
   it('preserves consent gating and data-minimization in the shared tracking helpers', () => {
     const consent = readWebSource('lib/tracking/consent.ts');
     // GPC/DNT signals keep precedence; analytics consent stays explicit-choice.

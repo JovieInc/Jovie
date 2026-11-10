@@ -92,6 +92,9 @@ export function EntityChipPopover({
   const label = sourceFact
     ? 'Inspect source'
     : (entity?.label ?? 'Unavailable reference');
+  const srOnlyName = sourceFact
+    ? `Inspect source: ${sourceFact.subject.displayName ?? 'Reference'} — `
+    : `${KIND_PREFIX[kind]}: ${label} — `;
   const mobile = useMediaQuery('(max-width: 639px)');
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -282,11 +285,6 @@ export function EntityChipPopover({
           type='button'
           aria-haspopup='dialog'
           aria-expanded={open}
-          aria-label={
-            sourceFact
-              ? `Inspect source: ${sourceFact.subject.displayName ?? 'Reference'}`
-              : `${KIND_PREFIX[kind]}: ${label}`
-          }
           onPointerDown={() => {
             pointerDown.current = true;
           }}
@@ -310,6 +308,9 @@ export function EntityChipPopover({
           className='system-b-entity-chip-trigger focus-ring'
           data-testid='entity-chip-popover-trigger'
         >
+          {/* Acc name = sr-only prefix + rendered chip: the visible text must
+              stay in the name (label-content-name-mismatch). */}
+          <span className='sr-only'>{srOnlyName}</span>
           {entity || sourceFact || pending ? (
             children
           ) : (

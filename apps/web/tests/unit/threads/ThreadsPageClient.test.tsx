@@ -177,12 +177,17 @@ describe('ChatsPageClient', () => {
       target: { value: 'Missing' },
     });
 
-    expect(screen.getByText('No chats match "Missing".')).toBeInTheDocument();
+    expect(screen.getByText('No Chats Match "Missing"')).toBeInTheDocument();
     expect(screen.getByTestId('chats-empty-state').tagName).toBe('OUTPUT');
     expect(screen.getByTestId('chats-empty-state')).not.toHaveClass(
       'border-dashed'
     );
-    expect(screen.getAllByRole('link', { name: 'New Chat' })).toHaveLength(2);
+    // The search miss offers the one useful step; the toolbar keeps New Chat.
+    expect(screen.getAllByRole('link', { name: 'New Chat' })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Search' }));
+    const search = screen.getByRole('searchbox', { name: 'Search Chats' });
+    expect(search).toHaveValue('');
+    expect(search).toHaveFocus();
   });
 
   it('opens per-chat actions from the hover menu and right-click', async () => {

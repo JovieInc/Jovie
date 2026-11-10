@@ -16,7 +16,7 @@ import {
 import {
   navigationTelemetryBatchSchema,
   navigationTelemetryPayloadSchema,
-} from '@/lib/tracking/navigation-telemetry-contract';
+} from '@/lib/tracking/navigation-telemetry-schema';
 
 const ROUTE = '/api/analytics/navigation';
 const MAX_BODY_BYTES = 8192;

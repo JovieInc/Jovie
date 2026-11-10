@@ -1,0 +1,30 @@
+{
+  "id": "pricing",
+  "route": "/pricing",
+  "shots": [
+    {
+      "width": 1440,
+      "file": "_pricing-1440.png",
+      "status": 200,
+      "finalPath": "/pricing",
+      "bytes": 443216,
+      "sha256": "1ad4e73fca1e4e47677dda1151478465722b609d9137298b0799a8ad478e5b00",
+      "pageErrors": [],
+      "scrollWidth": 1440,
+      "clientWidth": 1440
+    },
+    {
+      "width": 390,
+      "file": "_pricing-390.png",
+      "status": 200,
+      "finalPath": "/pricing",
+      "bytes": 359386,
+      "sha256": "bb17f0cb68249158672f31f7000f71fa0abffedc2e9131b9cd253591a1deb00a",
+      "pageErrors": [],
+      "scrollWidth": 390,
+      "clientWidth": 390
+    }
+  ],
+  "sourceSha": "6b5ff3996f1682fe08116a08be230d085cd43010",
+  "sourceDigest": "8e1f02b52a252450cd190bb9589ae781969333c2cc7d837790a7a8b651185642"
+}

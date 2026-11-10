@@ -1,8 +1,8 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
+import { Button, buttonVariants, Input } from '@jovie/ui';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { Avatar } from '@/components/molecules/Avatar/Avatar';
 import { APP_ROUTES } from '@/constants/routes';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
@@ -27,34 +27,61 @@ interface ArtistRowProps {
 
 function ArtistRow({ artist }: ArtistRowProps) {
   const followers = formatFollowers(artist.followers);
+  const owned = artist.isClaimedByCurrentUser === true;
+  const takenByOther = artist.isClaimed === true && !owned;
+
+  let trailing: ReactNode;
+  if (owned) {
+    trailing = (
+      <span className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+        Open
+      </span>
+    );
+  } else if (takenByOther) {
+    trailing = (
+      <span className='text-xs font-medium text-tertiary-token'>Claimed</span>
+    );
+  } else {
+    trailing = (
+      <span
+        className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+        data-testid='claim-artist-option-cta'
+      >
+        Claim
+      </span>
+    );
+  }
+
   const content = (
     <>
       <Avatar
         src={artist.imageUrl ?? null}
         alt={artist.name}
         name={artist.name}
-        size='sm'
+        size='md'
       />
       <span className='min-w-0 flex-1'>
         <span className='block truncate text-app font-medium text-primary-token'>
           {artist.name}
         </span>
-        {followers ? (
+        {owned ? (
+          <span className='block text-xs text-tertiary-token'>
+            Your profile
+          </span>
+        ) : followers ? (
           <span className='block text-xs tabular-nums text-tertiary-token'>
             {followers}
           </span>
         ) : null}
       </span>
-      <span className='text-xs font-medium text-secondary-token'>
-        {artist.isClaimed ? 'Claimed' : 'Claim'}
-      </span>
+      {trailing}
     </>
   );
 
   const rowClassName =
     'flex min-h-11 items-center gap-3 rounded-xl border border-subtle bg-surface-1 px-3 py-2';
 
-  if (artist.isClaimed) {
+  if (takenByOther) {
     return (
       <li>
         <div
@@ -68,13 +95,14 @@ function ArtistRow({ artist }: ArtistRowProps) {
     );
   }
 
+  // The whole row is the link; the trailing pill only shows the action.
   return (
     <li>
       <Link
-        href={claimStartHref(artist.id)}
+        href={owned ? APP_ROUTES.DASHBOARD : claimStartHref(artist.id)}
         prefetch={false}
         className={`${rowClassName} focus-ring-themed hover:bg-surface-2`}
-        data-testid='claim-artist-option'
+        data-testid={owned ? 'claim-artist-owned' : 'claim-artist-option'}
       >
         {content}
       </Link>
