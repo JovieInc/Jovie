@@ -61,6 +61,8 @@ interface CandidateRecord {
   readonly fontWeight: number;
   /** The candidate's testid-bearing ancestors, nearest first — where it lives. */
   readonly ancestorChain: readonly string[];
+  /** The painted image layers behind it at push time, nearest first. */
+  readonly layerChain: readonly string[];
 }
 
 interface PageScan {
@@ -329,6 +331,9 @@ async function scanCandidates(page: Page): Promise<PageScan> {
           fontSize: Number.parseFloat(style.fontSize || '16'),
           fontWeight: Number.parseInt(style.fontWeight || '400', 10) || 400,
           ancestorChain,
+          layerChain: layersBehind
+            .slice(0, 4)
+            .map(({ element: layer }) => describe(layer)),
         });
       };
 
@@ -548,6 +553,10 @@ export async function inspectImageContrast(
           worstContrastRatio: Math.round(worstRatio * 100) / 100,
           requiredRatio,
           ancestorChain: candidate.ancestorChain.join(' > '),
+          layerChain: (candidate.layerChain ?? []).join(' > '),
+          sampledBox: `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)}`,
+          backgroundLuminanceP10: Math.round(p10 * 1000) / 1000,
+          backgroundLuminanceP90: Math.round(p90 * 1000) / 1000,
         },
       });
     }
