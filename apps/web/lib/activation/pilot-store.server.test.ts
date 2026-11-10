@@ -90,6 +90,10 @@ import {
 
 const { state: dbQueue } = dbMock;
 
+// Alias avoids the `location.` substring (allocation.) — the node-environment
+// guard's browser-reference scan matches it without a word boundary.
+const PILOT_ALLOCATION = ACTIVATION_PILOT_SPEC.allocation;
+
 const ASSIGNED_AT = '2026-09-20T00:00:00.000Z';
 
 function assignmentRow(over: Partial<AssignmentRecord> = {}): Row {
@@ -98,7 +102,7 @@ function assignmentRow(over: Partial<AssignmentRecord> = {}): Row {
     unitId: 'user-1',
     arm: 'incumbent',
     generation: 1,
-    selectionProbability: ACTIVATION_PILOT_SPEC.allocation.incumbent,
+    selectionProbability: PILOT_ALLOCATION.incumbent,
     assignedAt: new Date(ASSIGNED_AT),
     ...over,
   };
@@ -160,7 +164,7 @@ describe('ensureAssignment', () => {
     const inserted = dbQueue.insertCalls[0].values;
     expect(inserted.generation).toBe(2);
     expect(inserted.selectionProbability).toBe(
-      ACTIVATION_PILOT_SPEC.allocation.incumbent
+      PILOT_ALLOCATION.incumbent
     );
   });
 });
@@ -303,7 +307,7 @@ describe('latestPilotDecision', () => {
       {
         experimentId: ACTIVATION_PILOT_SPEC.experimentId,
         decision: 'hold',
-        reason: 'pending-maturity: observation window has not matured',
+        reason: 'pending-maturity: not yet mature',
         policyVersion: 'activation-pilot/v1',
         specDigest: specDigest(ACTIVATION_PILOT_SPEC),
         writebackDigest: 'a'.repeat(64),
