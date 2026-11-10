@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { OperationalTaskPullRequest } from './operational-task';
 import {
@@ -20,6 +18,7 @@ import {
   workflowStateDetail,
   workflowStateToTrackingStatus,
 } from './tracking';
+import schemaJson from './tracking-task.schema.json';
 
 describe('workflowStateToTrackingStatus', () => {
   it('maps every operational workflow state', () => {
@@ -397,10 +396,8 @@ describe('sort and group order', () => {
 });
 
 describe('tracking-task.schema.json', () => {
-  const schemaPath = resolve(__dirname, 'tracking-task.schema.json');
-
   it('parses and mirrors the tracking enums', () => {
-    const schema = JSON.parse(readFileSync(schemaPath, 'utf8')) as {
+    const schema = schemaJson as {
       $defs: Record<string, { enum?: string[] }>;
       required: string[];
     };
