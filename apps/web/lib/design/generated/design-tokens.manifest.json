@@ -24,13 +24,13 @@
     },
     {
       "cssVar": "--brand-mask-reveal",
-      "value": "#ffffff",
+      "value": "white",
       "status": "canonical",
       "emittedBy": "styles/generated/design-tokens.css"
     },
     {
       "cssVar": "--brand-mask-conceal",
-      "value": "#000000",
+      "value": "black",
       "status": "canonical",
       "emittedBy": "styles/generated/design-tokens.css"
     },

@@ -84,8 +84,8 @@ function textTokenMismatches(
 describe('design tokens — single machine-readable source', () => {
   it('keeps SVG mask luminance controls fixed and independent of the theme', () => {
     const tokens = loadSource();
-    expect(tokens.brand['mask-reveal']).toBe('#ffffff');
-    expect(tokens.brand['mask-conceal']).toBe('#000000');
+    expect(tokens.brand['mask-reveal']).toBe('white');
+    expect(tokens.brand['mask-conceal']).toBe('black');
     const generated = generate(tokens);
     const root = customPropertiesForSelector(generated.css, ':root');
     expect(root.get('--brand-mask-reveal')).toBe(tokens.brand['mask-reveal']);

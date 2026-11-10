@@ -4,8 +4,8 @@ export const DESIGN_TOKENS = {
     "$description": "Canonical monochrome colors for generated Jovie marks, wordmarks, lockups, and app icons. Product and marketing UI continue to use semantic color tokens. Mask values are fixed SVG luminance controls, not visible pigment; never theme or tint them.",
     "ink": "#08090a",
     "cream": "#F5F4F0",
-    "mask-reveal": "#ffffff",
-    "mask-conceal": "#000000"
+    "mask-reveal": "white",
+    "mask-conceal": "black"
   },
   "gray": {
     "1": "hsl(0, 0%, 99%)",
