@@ -356,7 +356,7 @@ describe('ProfileDesktopSurface', () => {
     expect(profileHeader).toHaveClass('min-w-0', 'max-w-full');
     expect(within(profileHeader).getByText('Tim White')).toHaveClass(
       'min-w-0',
-      'line-clamp-2'
+      'line-clamp-2 wrap-anywhere'
     );
     expect(
       screen.getByText('Producer, songwriter, and after-hours romantic.')
@@ -1096,6 +1096,7 @@ describe('ProfileDesktopSurface', () => {
       'href',
       `/?utm_source=profile&utm_artist=${artist.handle}`
     );
+    expect(branding).toHaveClass('mt-auto'); // JOV-11623
   });
 
   it('omits Jovie footer branding when hideJovieBranding is set (JOV-8777)', () => {
