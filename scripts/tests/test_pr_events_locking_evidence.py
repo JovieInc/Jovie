@@ -37,4 +37,3 @@ class LockingEvidenceTests(unittest.TestCase):
         self.assertTrue(updated.startswith(example))
         self.assertIn("Locking PR: #22331", updated)
         self.assertTrue(updated.endswith("## Review\nKeep verdict.\n"))
-
