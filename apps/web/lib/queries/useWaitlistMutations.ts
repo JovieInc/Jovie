@@ -26,7 +26,14 @@ export interface DisapproveWaitlistInput {
 
 export interface UpdateWaitlistStatusInput {
   entryId: string;
-  status: 'new' | 'chat_started' | 'qualified' | 'waitlisted' | 'rejected';
+  status:
+    | 'new'
+    | 'chat_started'
+    | 'qualified'
+    | 'queued'
+    | 'disqualified'
+    | 'waitlisted'
+    | 'rejected';
 }
 
 export interface ResendWaitlistInviteInput {

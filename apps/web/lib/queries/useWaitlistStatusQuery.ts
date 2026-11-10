@@ -11,6 +11,8 @@ export interface WaitlistStatusResponse {
     | 'chat_started'
     | 'qualified'
     | 'waitlisted'
+    | 'disqualified'
+    | 'queued'
     | 'invited'
     | 'approved'
     | 'claimed'
