@@ -394,7 +394,7 @@ export async function collectLinearIssues({
   const slice = sliceLinearIdentifiers(identifiers);
   const issues = {};
   const deadline = now() + LINEAR_SHED_WAIT_BUDGET_MS;
-  let admissionCalls = 0;
+  let admittedBatches = 0;
   let fetched = 0;
   let missing = 0;
   let failed = 0;
@@ -422,7 +422,7 @@ export async function collectLinearIssues({
               }),
         { deadline, now, sleep }
       );
-      admissionCalls += 1;
+      admittedBatches += 1;
     } catch (batchFailure) {
       failed += 1;
       error = String(batchFailure?.message ?? batchFailure).slice(0, 300);
@@ -487,7 +487,9 @@ export async function collectLinearIssues({
       missing,
       failed,
       historyTruncated,
-      admissionCalls,
+      // Batches that completed an admission (incl. shed retries); failed
+      // batches are counted in `failed`.
+      admittedBatches,
     },
     ...(error ? { error } : {}),
   };
