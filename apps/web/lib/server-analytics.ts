@@ -52,8 +52,7 @@ interface ServerAnalyticsEventDefinition {
     | 'notification'
     | 'entitlement'
     | 'funnel'
-    | 'billing'
-    | 'winback';
+    | 'billing';
   readonly properties: readonly string[];
   readonly source?: {
     readonly property: string;
@@ -338,62 +337,6 @@ export const SERVER_ANALYTICS_EVENTS = {
     properties: ['profileId', 'plan'],
     source: { property: 'profileId', type: 'creator_profile' },
   },
-  // Win-back loop plumbing (founder dispatch 2026-11-09): the person's own
-  // waitlist cohort (queued/waitlisted/disqualified) rides winback_cohort;
-  // entry ids are pseudonymous uuids under the first-party consent policy.
-  requalify_matched: {
-    category: 'winback',
-    properties: ['entry_id', 'capability_key', 'winback_cohort'],
-  },
-  data_certified: {
-    category: 'winback',
-    properties: ['entry_id', 'capability_key'],
-  },
-  winback_drafted: {
-    category: 'winback',
-    properties: [
-      'entry_id',
-      'capability_key',
-      'batch_id',
-      'template_version',
-      'winback_cohort',
-    ],
-  },
-  winback_approved: {
-    category: 'winback',
-    properties: [
-      'batch_id',
-      'capability_key',
-      'template_version',
-      'winback_cohort',
-    ],
-  },
-  winback_sent: {
-    category: 'winback',
-    properties: [
-      'entry_id',
-      'capability_key',
-      'batch_id',
-      'template_version',
-      'winback_cohort',
-    ],
-  },
-  winback_opened: {
-    category: 'winback',
-    properties: ['entry_id', 'batch_id'],
-  },
-  winback_clicked: {
-    category: 'winback',
-    properties: ['entry_id', 'capability_key', 'batch_id', 'winback_cohort'],
-  },
-  returned: {
-    category: 'winback',
-    properties: ['entry_id', 'batch_id'],
-  },
-  paid: {
-    category: 'winback',
-    properties: ['entry_id', 'batch_id'],
-  },
 } as const satisfies Record<string, ServerAnalyticsEventDefinition>;
 
 export type ServerAnalyticsEventName = keyof typeof SERVER_ANALYTICS_EVENTS;
@@ -553,21 +496,6 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     invocations: 1,
     events: LIMITED_DROP_EVENT_NAMES,
   },
-  {
-    path: 'lib/waitlist/winback-analytics.ts',
-    invocations: 1,
-    events: [
-      'requalify_matched',
-      'data_certified',
-      'winback_drafted',
-      'winback_approved',
-      'winback_sent',
-      'winback_opened',
-      'winback_clicked',
-      'returned',
-      'paid',
-    ],
-  },
 ] as const satisfies ReadonlyArray<{
   readonly path: string;
   readonly invocations: number;
@@ -580,7 +508,6 @@ const UUID_PROPERTY_NAMES = new Set([
   'artist_id',
   'asset_id',
   'drop_id',
-  'entry_id',
   'eventId',
   'event_id',
   'profileId',
@@ -589,9 +516,7 @@ const UUID_PROPERTY_NAMES = new Set([
   'tourDateId',
 ]);
 const SAFE_TOKEN_PROPERTY_NAMES = new Set([
-  'batch_id',
   'billingReason',
-  'capability_key',
   'campaign_id',
   'classifier',
   'client_status',
@@ -614,11 +539,9 @@ const SAFE_TOKEN_PROPERTY_NAMES = new Set([
   'share_id',
   'source',
   'stripeEventId',
-  'template_version',
   'toolName',
   'ua_class',
   'variant_id',
-  'winback_cohort',
 ]);
 const ENUM_PROPERTY_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
   card_placement: new Set(LIMITED_DROP_CARD_PLACEMENTS),
