@@ -34,4 +34,3 @@ class MeasuredWinPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "measured win policy"):
             events.ensure_red_before_green(self.PR, sh=shell, win_section="## Win\n\nnone\n")
         self.assertEqual(writes, [])
-
