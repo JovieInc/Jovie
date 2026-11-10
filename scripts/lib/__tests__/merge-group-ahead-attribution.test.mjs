@@ -515,3 +515,63 @@ describe('structural core matrix jobs (Move 3)', () => {
     );
   });
 });
+
+describe('collector entries array (Move 3 3R)', () => {
+  const CORE_2 = 'ci-fast (structural core 2/2)';
+  const COMMAND = 'pnpm doc:freshness:check';
+  const failingLog =
+    [
+      '======== lane: structural ========',
+      '[ci-fast] structural: failure (10.0s)',
+      `| 1 | 1.0s | exit 1 | \`${COMMAND}\` |`,
+      `Structural command 1/1 failed (exit 1). Command: ${COMMAND} | tail`,
+      'FAIL scripts/lib/__tests__/doc-freshness.test.mjs > stale doc',
+    ].join('\n') + '\n';
+
+  it('accepts a single-entry collector array on the peer path', () => {
+    const result = attributeAgainstPeerRuns({
+      currentJobs: [
+        { name: CORE_2, conclusion: 'failure' },
+        { name: 'PR Ready', conclusion: 'failure' },
+      ],
+      currentCiFastLog: [{ name: CORE_2, log: failingLog }],
+      peers: [
+        {
+          runId: 77,
+          conclusion: 'failure',
+          containsPr: false,
+          ciFastLog: failingLog,
+        },
+      ],
+    });
+    expect(result).toEqual({
+      recurring: true,
+      reason: 'failing-signals-recurred-without-pr',
+      signals: ['scripts/lib/__tests__/doc-freshness.test.mjs > stale doc'],
+      peerRunIds: [77],
+    });
+  });
+
+  it('refuses a multi-entry collector array on the single-failure peer path', () => {
+    const result = attributeAgainstPeerRuns({
+      currentJobs: [
+        { name: CORE_2, conclusion: 'failure' },
+        { name: 'PR Ready', conclusion: 'failure' },
+      ],
+      currentCiFastLog: [
+        { name: CORE_2, log: failingLog },
+        { name: 'ci-fast (structural core 1/2)', log: failingLog },
+      ],
+      peers: [
+        {
+          runId: 77,
+          conclusion: 'failure',
+          containsPr: false,
+          ciFastLog: failingLog,
+        },
+      ],
+    });
+    expect(result.recurring).toBe(false);
+    expect(result.reason).toBe('ci-fast-log-missing');
+  });
+});
