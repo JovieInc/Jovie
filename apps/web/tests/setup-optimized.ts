@@ -73,23 +73,46 @@ if (typeof window !== 'undefined') {
 // mock/global/env/timer restore -> residual DOM/storage clear. Beyond this
 // baseline, a test file must still unwind anything custom it mutates (module
 // singletons, listeners on window/document, servers/connections).
+// Runs each unwind step in order; a throwing step never skips the later
+// ones — the first error is rethrown only after every step has run.
+// Exported for the unwind regression tests.
+export function runUnwindSteps(steps: Array<() => void>): void {
+  const errors: unknown[] = [];
+  for (const runStep of steps) {
+    try {
+      runStep();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length > 0) throw errors[0];
+}
+
 if (isolationOff) {
   afterEach(() => {
-    // 1-2. Testing Library unmounts, then the auth client is disposed while
-    // jsdom's `window` still exists.
-    if (domCleanup) domCleanup();
-    if (typeof window !== 'undefined') releaseIdleAuthClient();
-    // 3. Restore what Vitest primitives own.
-    vi.restoreAllMocks();
-    vi.unstubAllEnvs();
-    vi.unstubAllGlobals();
-    vi.useRealTimers();
-    // 4. Residual DOM/storage from the previous test's leftovers.
-    if (typeof window !== 'undefined') {
-      document.body.innerHTML = '';
-      window.localStorage.clear();
-      window.sessionStorage.clear();
-    }
+    runUnwindSteps([
+      // 1-2. Testing Library unmounts, then the auth client is disposed while
+      // jsdom's `window` still exists.
+      () => {
+        if (domCleanup) domCleanup();
+        if (typeof window !== 'undefined') releaseIdleAuthClient();
+      },
+      // 3. Restore what Vitest primitives own.
+      () => vi.restoreAllMocks(),
+      () => vi.unstubAllEnvs(),
+      () => vi.unstubAllGlobals(),
+      // A file that calls vi.useFakeTimers() at MODULE scope is incompatible
+      // with pilot mode — move fake timers into beforeEach (leak-fix follow-up).
+      () => vi.useRealTimers(),
+      // 4. Residual DOM/storage from the previous test's leftovers.
+      () => {
+        if (typeof window !== 'undefined') {
+          document.body.innerHTML = '';
+          window.localStorage.clear();
+          window.sessionStorage.clear();
+        }
+      },
+    ]);
   });
 }
 
