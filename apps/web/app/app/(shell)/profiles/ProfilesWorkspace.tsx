@@ -50,6 +50,7 @@ import {
   PresenceStatusBadge,
 } from '@/components/features/presence/PresenceStatusParts';
 import styles from '@/components/features/presence/presence-workspace.module.css';
+import type { PresenceRemovalPrincipal } from '@/components/features/presence/types';
 import { CREATOR_PRESENCE_ADAPTER } from '@/components/features/presence/workspace-adapters';
 import {
   PresenceWorkspaceBoundary,
@@ -1134,13 +1135,20 @@ function SuggestedConnectionsReview({
 export function ProfilesWorkspace({
   data,
   scope,
+  removalPrincipal,
 }: Readonly<{
   data: ProfilesWorkspaceData | null;
   scope: PresenceWorkspaceScope;
+  removalPrincipal?: PresenceRemovalPrincipal | null;
 }>) {
   return (
     <PresenceWorkspaceBoundary scope={scope}>
-      <ProfilesWorkspaceContent data={data} scope={scope} />
+      <ProfilesWorkspaceContent
+        key={JSON.stringify(removalPrincipal ?? null)}
+        data={data}
+        scope={scope}
+        removalPrincipal={removalPrincipal}
+      />
     </PresenceWorkspaceBoundary>
   );
 }
@@ -1148,9 +1156,11 @@ export function ProfilesWorkspace({
 function ProfilesWorkspaceContent({
   data,
   scope,
+  removalPrincipal,
 }: Readonly<{
   data: ProfilesWorkspaceData | null;
   scope: PresenceWorkspaceScope;
+  removalPrincipal?: PresenceRemovalPrincipal | null;
 }>) {
   const sourceIdentityQueries = useQueries({
     combine: combineSourceIdentityQueries,
@@ -1270,7 +1280,13 @@ function ProfilesWorkspaceContent({
     registerTrigger: registerRemovalTrigger,
     hasIntent: hasRemovalIntent,
     dialog: removalDialog,
-  } = usePresenceRemoval(data, scope, selected?.id ?? null, setSelected);
+  } = usePresenceRemoval(
+    data,
+    scope,
+    selected?.id ?? null,
+    setSelected,
+    removalPrincipal
+  );
   const router = useRouter();
   const { chatMode: founderChatMode } = useFounderDoor();
   const searchParams = useSearchParams();
