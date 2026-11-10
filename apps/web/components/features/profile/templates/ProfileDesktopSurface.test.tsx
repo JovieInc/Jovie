@@ -246,20 +246,6 @@ describe('ProfileDesktopSurface', () => {
     );
   });
 
-  it('keeps the full artist name and verification badge inside its sizing container', () => {
-    renderDesktopSurface({ artist: { ...artist, name: 'UNMARKED' } });
-    const header = screen.getByTestId('profile-header');
-    expect(header).toHaveAccessibleName('UNMARKED');
-    expect(header).toHaveClass('min-w-0', 'max-w-full');
-    expect(within(header).getByText('UNMARKED')).toHaveClass(
-      'min-w-0',
-      'line-clamp-2',
-      'wrap-anywhere'
-    );
-    expect(header.closest('.\\@container')).not.toBeNull();
-    expect(header.querySelector('svg')).toHaveClass('shrink-0');
-  });
-
   it('shows the desktop back control for a signed-in session', () => {
     mockUseIsAuthenticated.mockReturnValue(true);
     const onBack = vi.fn();
@@ -370,7 +356,7 @@ describe('ProfileDesktopSurface', () => {
     expect(profileHeader).toHaveClass('min-w-0', 'max-w-full');
     expect(within(profileHeader).getByText('Tim White')).toHaveClass(
       'min-w-0',
-      'line-clamp-2'
+      'line-clamp-2 wrap-anywhere'
     );
     expect(
       screen.getByText('Producer, songwriter, and after-hours romantic.')

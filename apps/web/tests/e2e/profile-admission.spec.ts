@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, type Page, type TestInfo, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 import { HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES } from '../../components/features/home/homepage-profile-preview-fixture';
 import {
@@ -9,11 +9,17 @@ import {
 import { expectNoDocumentOverflow } from './utils/mobile-overflow';
 import { observeProfileAdmissionFailure } from './utils/profile-admission-diagnostics.mjs';
 import {
+  captureStill,
+  waitForSettledProfile,
+  waitForSettledProfileLayout,
+} from './utils/profile-admission-layout';
+import {
   expectDesktopSurfaceBuildMatches,
   expectedPublicProfileLayout,
   PROFILE_DESKTOP_SURFACE_SHIPPED,
 } from './utils/profile-desktop-surface';
 import { certifyProfileModeHistory } from './utils/profile-mode-history';
+import { registerProfileNameAdmissionTests } from './utils/profile-name-admission';
 import { auditPublicProfileLayout } from './utils/public-profile-layout-invariant';
 import {
   installPublicRouteMocks,
@@ -86,71 +92,6 @@ function intersectionArea(
       Math.max(left.y, right.y)
   );
   return width * height;
-}
-
-async function waitForSettledProfile(page: Page) {
-  await page.evaluate(async () => {
-    await document.fonts.ready;
-    const nextFrame = () =>
-      new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-    const readBoxes = () =>
-      [
-        '[data-testid="public-profile-layout-shell"]',
-        '[data-testid="profile-compact-shell"]',
-        '[data-testid="profile-desktop-shell"]',
-        '[data-testid="claim-banner-cta"]',
-      ].map(selector => {
-        const element = document.querySelector<HTMLElement>(selector);
-        if (!element) return null;
-        const rect = element.getBoundingClientRect();
-        return [rect.x, rect.y, rect.width, rect.height];
-      });
-
-    await nextFrame();
-    await nextFrame();
-    let previous = JSON.stringify(readBoxes());
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      await nextFrame();
-      const current = JSON.stringify(readBoxes());
-      if (current === previous) return;
-      previous = current;
-    }
-  });
-}
-
-async function captureStill(
-  page: Page,
-  testInfo: TestInfo,
-  name: string,
-  fullPage = false
-) {
-  const path = testInfo.outputPath(name);
-  const body = await page.screenshot({ fullPage, path });
-  await testInfo.attach(name, { contentType: 'image/png', path });
-  return body;
-}
-
-async function waitForSettledProfileLayout(
-  page: import('@playwright/test').Page,
-  expectedLayout: 'compact' | 'desktop'
-) {
-  const shell = page.getByTestId('public-profile-layout-shell');
-  await expect(shell).toHaveAttribute('data-layout', expectedLayout);
-  const visibleSurface = page.getByTestId(
-    expectedLayout === 'desktop'
-      ? 'profile-desktop-surface'
-      : 'profile-compact-shell'
-  );
-  await expect(visibleSurface).toBeVisible();
-  await expect(visibleSurface).toHaveAttribute(
-    'data-interactive-ready',
-    'true'
-  );
-  await page.evaluate(async () => {
-    await document.fonts.ready;
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-  });
 }
 
 test.describe('public profile browser admission', () => {
@@ -969,108 +910,7 @@ test.describe('public profile browser admission', () => {
     );
   });
 
-  test('UNMARKED stays readable inside the desktop cover at short and tall heights', async ({
-    page,
-  }, testInfo) => {
-    await installPublicRouteMocks(page);
-    for (const viewport of [
-      { width: 1280, height: 720 },
-      { width: 1440, height: 900 },
-      { width: 1920, height: 600 },
-    ]) {
-      await page.setViewportSize(viewport);
-      await page.goto(
-        '/renders/profile-admission?layout=public&state=claimed&name=unmarked',
-        {
-          waitUntil: 'domcontentloaded',
-        }
-      );
-      await waitForSettledProfileLayout(page, 'desktop');
-      const header = page
-        .getByTestId('profile-desktop-cover')
-        .getByTestId('profile-header');
-      await expect(header).toHaveText('UNMARKED');
-      const nameLineCount = await header.evaluate(element => {
-        const name = element.querySelector('span');
-        if (!name) throw new Error('desktop name missing');
-        const range = document.createRange();
-        range.selectNodeContents(name);
-        return Array.from(range.getClientRects()).filter(rect => rect.width > 0)
-          .length;
-      });
-      expect(
-        nameLineCount,
-        'the final D must not be stranded on its own line'
-      ).toBe(1);
-      const audit = await auditPublicProfileLayout(page);
-      await captureStill(
-        page,
-        testInfo,
-        `unmarked-${viewport.width}x${viewport.height}.png`
-      );
-      expect(audit.violations, JSON.stringify(audit, null, 2)).toEqual([]);
-    }
-  });
-
-  test('desktop names wrap without horizontal clipping for enlarged and unbroken text', async ({
-    page,
-  }) => {
-    await installPublicRouteMocks(page);
-    await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto(
-      '/renders/profile-admission?layout=public&state=claimed&name=unmarked',
-      {
-        waitUntil: 'domcontentloaded',
-      }
-    );
-    await waitForSettledProfileLayout(page, 'desktop');
-    await page.evaluate(() => {
-      document.documentElement.style.fontSize = '200%';
-    });
-    await waitForSettledProfile(page);
-    expect(
-      (await auditPublicProfileLayout(page)).violations.filter(
-        violation => violation.code === 'artist_name_clipped'
-      )
-    ).toEqual([]);
-    await page.getByTestId('profile-header').evaluate(header => {
-      const name = header.querySelector('span');
-      if (!name) throw new Error('desktop name missing');
-      name.textContent = 'UNMARKEDUNMARKEDUNMARKEDUNMARKED';
-    });
-    await waitForSettledProfile(page);
-    // The existing two-line clamp may elide later lines, but never clip
-    // a visible line horizontally through a letter.
-    expect(
-      (await auditPublicProfileLayout(page)).violations.filter(
-        violation => violation.code === 'artist_name_clipped'
-      )
-    ).toEqual([]);
-  });
-
-  test('deliberate red detects text clipped inside a contained desktop name box', async ({
-    page,
-  }) => {
-    await installPublicRouteMocks(page);
-    await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto('/renders/profile-admission?layout=public&state=claimed', {
-      waitUntil: 'domcontentloaded',
-    });
-    await waitForSettledProfileLayout(page, 'desktop');
-    expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
-    await page.getByTestId('profile-header').evaluate(header => {
-      const name = header.querySelector('span');
-      if (!name) throw new Error('desktop name missing');
-      name.textContent = 'UNMARKED';
-      name.style.fontSize = '160px';
-      name.style.whiteSpace = 'nowrap';
-    });
-    expect(
-      (await auditPublicProfileLayout(page)).violations.map(
-        violation => violation.code
-      )
-    ).toContain('artist_name_clipped');
-  });
+  registerProfileNameAdmissionTests();
 
   test('deliberate red detects a desktop artist name escaping its cover', async ({
     page,
