@@ -68,17 +68,25 @@ describe('TrackPlatformLinksSection', () => {
     await user.click(
       screen.getByRole('button', { name: 'Destination actions for Spotify' })
     );
-    expect(screen.getAllByRole('menuitem').map(m => m.textContent?.trim()))
-      .toEqual(['Open', 'Copy link', 'Copy Jovie link with UTM', 'Copy platform URI']);
+    expect(
+      screen.getAllByRole('menuitem').map(m => m.textContent?.trim())
+    ).toEqual([
+      'Open',
+      'Copy Link',
+      'Copy Jovie Link With UTM',
+      'Copy Platform URI',
+    ]);
 
-    await user.click(screen.getByRole('menuitem', { name: 'Copy platform URI' }));
+    await user.click(
+      screen.getByRole('menuitem', { name: 'Copy Platform URI' })
+    );
     expect(writeText).toHaveBeenCalledWith('spotify:track:example');
 
     await user.click(
       screen.getByRole('button', { name: 'Destination actions for Spotify' })
     );
     await user.click(
-      screen.getByRole('menuitem', { name: 'Copy Jovie link with UTM' })
+      screen.getByRole('menuitem', { name: 'Copy Jovie Link With UTM' })
     );
     expect(writeText).toHaveBeenCalledWith(
       'https://jov.ie/example/take-me-over?utm_source=spotify&utm_medium=track-sidebar'

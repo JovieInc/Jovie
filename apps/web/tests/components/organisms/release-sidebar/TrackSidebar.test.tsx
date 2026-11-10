@@ -121,7 +121,7 @@ describe('TrackSidebar', () => {
     const menuName = 'Destination actions for Spotify';
     await user.click(screen.getByRole('button', { name: menuName }));
     await user.click(
-      screen.getByRole('menuitem', { name: 'Copy Jovie link with UTM' })
+      screen.getByRole('menuitem', { name: 'Copy Jovie Link With UTM' })
     );
     expect(writeText).toHaveBeenCalledWith(
       expect.stringContaining('utm_medium=track-sidebar')

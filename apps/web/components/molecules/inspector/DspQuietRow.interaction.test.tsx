@@ -11,7 +11,7 @@ const providers = [
 
 // Destination-row interaction contract (JOV-8955, extended 2026-11-09):
 // a linked destination row keeps its data order, uniform geometry, and one
-// reserved trailing control — now the action menu (Open / Copy link / …),
+// reserved trailing control — now the action menu (Open / Copy Link / …),
 // never a bare open-link icon — plus an optional hover preview card.
 describe('Destinations row invariant (JOV-8955)', () => {
   it('preserves data order, labels, destinations and uniform row geometry', () => {
@@ -114,7 +114,7 @@ describe('Destinations row invariant (JOV-8955)', () => {
     ).toBe('-1');
   });
 
-  it('carries the destination action menu: Open, Copy link, Copy Jovie link, Copy platform URI', async () => {
+  it('carries the destination action menu: Open, Copy Link, Copy Jovie Link, Copy Platform URI', async () => {
     const user = userEvent.setup();
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', {
@@ -141,13 +141,13 @@ describe('Destinations row invariant (JOV-8955)', () => {
       .map(item => item.textContent?.trim());
     expect(names).toEqual([
       'Open',
-      'Copy link',
-      'Copy Jovie link with UTM',
-      'Copy platform URI',
+      'Copy Link',
+      'Copy Jovie Link With UTM',
+      'Copy Platform URI',
     ]);
     expect(screen.queryByRole('menuitem', { name: 'Open' })).toBeEnabled();
 
-    await user.click(screen.getByRole('menuitem', { name: 'Copy link' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Copy Link' }));
     expect(writeText).toHaveBeenCalledWith(
       'https://open.spotify.com/album/abc123'
     );
@@ -156,7 +156,7 @@ describe('Destinations row invariant (JOV-8955)', () => {
       screen.getByRole('button', { name: 'Destination actions for Spotify' })
     );
     await user.click(
-      screen.getByRole('menuitem', { name: 'Copy platform URI' })
+      screen.getByRole('menuitem', { name: 'Copy Platform URI' })
     );
     expect(writeText).toHaveBeenCalledWith('spotify:album:abc123');
 
@@ -164,14 +164,14 @@ describe('Destinations row invariant (JOV-8955)', () => {
       screen.getByRole('button', { name: 'Destination actions for Spotify' })
     );
     await user.click(
-      screen.getByRole('menuitem', { name: 'Copy Jovie link with UTM' })
+      screen.getByRole('menuitem', { name: 'Copy Jovie Link With UTM' })
     );
     expect(writeText).toHaveBeenCalledWith(
       'https://jov.ie/tim/seaside-heights?utm_source=spotify&utm_medium=work-inspector'
     );
   });
 
-  it('offers only Open and Copy link when the network has no native URI and no Jovie link is given', async () => {
+  it('offers only Open and Copy Link when the network has no native URI and no Jovie link is given', async () => {
     const user = userEvent.setup();
     render(
       <DspQuietRow
@@ -190,7 +190,7 @@ describe('Destinations row invariant (JOV-8955)', () => {
     const names = screen
       .getAllByRole('menuitem')
       .map(item => item.textContent?.trim());
-    expect(names).toEqual(['Open', 'Copy link']);
+    expect(names).toEqual(['Open', 'Copy Link']);
   });
 
   it('previews the item on a hover card rendered from the row anchor', async () => {

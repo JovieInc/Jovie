@@ -240,7 +240,7 @@ describe('ReleaseDspLinks interactions', () => {
       screen.getByRole('button', { name: 'Destination actions for Spotify' })
     );
     await user.click(
-      screen.getByRole('menuitem', { name: 'Copy platform URI' })
+      screen.getByRole('menuitem', { name: 'Copy Platform URI' })
     );
     expect(writeText).toHaveBeenCalledWith(
       'spotify:track:7ouMYWpwJ422jRcDASZB7P'
@@ -250,12 +250,10 @@ describe('ReleaseDspLinks interactions', () => {
       screen.getByRole('button', { name: 'Destination actions for Spotify' })
     );
     await user.click(
-      screen.getByRole('menuitem', { name: 'Copy Jovie link with UTM' })
+      screen.getByRole('menuitem', { name: 'Copy Jovie Link With UTM' })
     );
     expect(writeText).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'utm_source=spotify&utm_medium=release-sidebar'
-      )
+      expect.stringContaining('utm_source=spotify&utm_medium=release-sidebar')
     );
   });
 

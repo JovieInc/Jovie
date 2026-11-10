@@ -496,7 +496,6 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
 
 interface EntityPopoverProps {
   readonly entity: EntityPopoverData;
-  /** The anchor may disappear on the close path; the surface null-checks. */
   readonly anchor: HTMLElement | null;
   readonly onPointerEnter?: () => void;
   readonly onPointerLeave?: () => void;

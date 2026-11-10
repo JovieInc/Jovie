@@ -76,7 +76,7 @@ function copyText(
  * Destination-row interaction contract (founder note 2026-11-09): a linked
  * destination row never shows a bare open-link icon as its only control.
  * Hovering previews the item on a card to the left (when `entity` is given),
- * and the trailing menu carries Open / Copy link / Copy Jovie link (UTM) /
+ * and the trailing menu carries Open / Copy Link / Copy Jovie Link (UTM) /
  * Copy the platform-native URI when the network has one.
  */
 export function DspQuietRow({
@@ -152,14 +152,14 @@ export function DspQuietRow({
       },
       {
         id: 'copy-link',
-        label: 'Copy link',
+        label: 'Copy Link',
         onSelect: copyRow(href, `${label} link copied`),
       },
       ...(jovieLinkUrl
         ? [
             {
               id: 'copy-jovie-link',
-              label: 'Copy Jovie link with UTM',
+              label: 'Copy Jovie Link With UTM',
               onSelect: copyRow(jovieLinkUrl, 'Jovie link copied'),
             },
           ]
@@ -168,7 +168,7 @@ export function DspQuietRow({
         ? [
             {
               id: 'copy-native-uri',
-              label: 'Copy platform URI',
+              label: 'Copy Platform URI',
               onSelect: copyRow(nativeUri, `${label} URI copied`),
             },
           ]
