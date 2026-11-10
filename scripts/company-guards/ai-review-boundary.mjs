@@ -8,8 +8,8 @@
 // check. This guard fails when a file under .github/workflows or
 // .github/scripts pairs an AI-reviewer marker with a blocking signal.
 // Wired as a step in the required Company Guards job.
-import { readFileSync, readdirSync } from 'node:fs';
-import { basename, join, relative } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 
 export const MARKER =
   /(seer|warden|ai[ _-]?review|llm[ _-]?review|openrouter|claude[ _-]?review|codex[ _-]?review|copilot[ _-]?review|review[ _-]?(agent|bot))/i;
