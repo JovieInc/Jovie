@@ -263,7 +263,6 @@ function EmptySurfaceBlock({
   );
 }
 
-// @coverage-via apps/web/tests/unit/profile/profile-desktop-surface-layout-regression.test.ts
 export function ProfileDesktopSurface({
   presentation = 'modal',
   artist,

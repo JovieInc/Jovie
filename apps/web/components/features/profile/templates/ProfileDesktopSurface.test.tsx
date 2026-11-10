@@ -1096,6 +1096,7 @@ describe('ProfileDesktopSurface', () => {
       'href',
       `/?utm_source=profile&utm_artist=${artist.handle}`
     );
+    expect(branding).toHaveClass('mt-auto'); // JOV-11623
   });
 
   it('omits Jovie footer branding when hideJovieBranding is set (JOV-8777)', () => {
