@@ -274,3 +274,127 @@ describe('winbackSendApprovalError', () => {
     ).toMatch(/does not match job batch/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The kv-backed signals ledger and the single emit helper (executed for the
+// exact-head coverage gate; behavior asserted through mocked collaborators).
+// ---------------------------------------------------------------------------
+
+import { vi } from 'vitest';
+
+const mockTrackServerEvent = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/server-analytics', () => ({
+  trackServerEvent: mockTrackServerEvent,
+}));
+
+import {
+  trackWinbackEvent,
+  WINBACK_ANALYTICS_EVENTS,
+} from '@/lib/waitlist/winback-analytics';
+import {
+  getCertifiedCapabilityKeys,
+  getWinbackShippedWatermark,
+  markWinbackShippedWatermark,
+} from '@/lib/waitlist/winback-signals.server';
+
+function createKvTxMock(value: unknown) {
+  return {
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({
+          limit: vi
+            .fn()
+            .mockResolvedValue(value === undefined ? [] : [{ value }]),
+        })),
+      })),
+    })),
+    insert: vi.fn(() => ({
+      values: vi.fn(() => ({
+        onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+        onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+      })),
+    })),
+  } as never;
+}
+
+describe('trackWinbackEvent', () => {
+  it('emits registered winback events through the single pinned call site', async () => {
+    mockTrackServerEvent.mockResolvedValue({ ok: true, eventId: 'e1' });
+    await trackWinbackEvent('winback_drafted', {
+      entry_id: '11111111-1111-4111-8111-111111111111',
+      capability_key: 'public-profile-pages',
+      batch_id: 'b1',
+      winback_cohort: 'waitlisted',
+    });
+    expect(mockTrackServerEvent).toHaveBeenCalledOnce();
+    expect(mockTrackServerEvent).toHaveBeenCalledWith('winback_drafted', {
+      entry_id: '11111111-1111-4111-8111-111111111111',
+      capability_key: 'public-profile-pages',
+      batch_id: 'b1',
+      winback_cohort: 'waitlisted',
+    });
+  });
+
+  it('registers every winback funnel event name', () => {
+    expect(WINBACK_ANALYTICS_EVENTS).toEqual([
+      'requalify_matched',
+      'data_certified',
+      'winback_drafted',
+      'winback_approved',
+      'winback_sent',
+      'winback_opened',
+      'winback_clicked',
+      'returned',
+      'paid',
+    ]);
+  });
+});
+
+describe('winback-signals.server kv ledger', () => {
+  it('reads certified keys and tolerates an absent record', async () => {
+    expect(await getCertifiedCapabilityKeys(createKvTxMock(undefined))).toEqual(
+      []
+    );
+    expect(
+      await getCertifiedCapabilityKeys(createKvTxMock(['a', 1, 'b', '']))
+    ).toEqual(['a', 'b']);
+  });
+
+  it('reads the shipped watermark and rejects junk shapes', async () => {
+    expect(
+      await getWinbackShippedWatermark(createKvTxMock(undefined))
+    ).toBeNull();
+    expect(await getWinbackShippedWatermark(createKvTxMock('junk'))).toBeNull();
+    const good = await getWinbackShippedWatermark(
+      createKvTxMock({ keys: ['a'], checkedAt: '2026-11-09T00:00:00.000Z' })
+    );
+    expect(good).toEqual({
+      keys: ['a'],
+      checkedAt: '2026-11-09T00:00:00.000Z',
+    });
+  });
+
+  it('writes the watermark with the checkedAt stamp', async () => {
+    const tx = createKvTxMock(undefined);
+    const now = new Date('2026-11-09T12:00:00.000Z');
+    const valuesFn = vi.fn<() => unknown>();
+    valuesFn.mockReturnValue({
+      onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+      onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+    });
+    const insertFn = vi.fn<() => unknown>();
+    insertFn.mockReturnValue({ values: valuesFn });
+    const marked = {
+      ...tx,
+      insert: insertFn as unknown as typeof tx.insert,
+    };
+    await markWinbackShippedWatermark(marked, ['a', 'b'], now);
+    expect(valuesFn).toHaveBeenCalledOnce();
+    const [row] = valuesFn.mock.calls[0] as [Record<string, unknown>];
+    expect(row.key).toBe('jovie:winback:shipped-watermark:v1');
+    expect(row.value).toEqual({
+      keys: ['a', 'b'],
+      checkedAt: '2026-11-09T12:00:00.000Z',
+    });
+  });
+});
