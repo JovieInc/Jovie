@@ -380,6 +380,12 @@ describe('LibrarySurface', () => {
       screen.queryByRole('button', { name: 'Sync from Spotify' })
     ).not.toBeInTheDocument();
 
+    // One bar, one height: the primary pill joins the same desktop density
+    // as the icon cluster it sits beside (founder note 2026-11-09).
+    const addTrigger = screen.getByRole('button', { name: 'Add' });
+    expect(addTrigger).toHaveClass('h-8', 'min-h-8');
+    expect(addTrigger).not.toHaveClass('h-7');
+
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
     expect(
@@ -707,6 +713,12 @@ describe('LibrarySurface', () => {
 
     expectDesktop32Control(screen.getByRole('tab', { name: 'All' }));
     expectDesktop32Control(screen.getByRole('tab', { name: 'Ideas' }));
+    // One bar, one height: the text tools (YouTube Ledger, Add) join the
+    // same desktop density as the icon cluster they sit beside, so the
+    // toolbar reads as a single aligned row (founder note 2026-11-09).
+    expectDesktop32Control(
+      screen.getByRole('link', { name: 'YouTube Ledger' })
+    );
     expectDesktop32Control(
       screen.getByRole('button', { name: /^Show filters/i }),
       { square: true }

@@ -1400,6 +1400,9 @@ function LibraryImportMenu({
         <Button
           type='button'
           size='sm'
+          // One bar, one height: the primary pill joins the same desktop
+          // density as the icon cluster it sits beside.
+          className={LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS}
           disabled={isImportingYouTube || isSyncingSpotify}
         >
           <Plus className={PAGE_TOOLBAR_ICON_CLASS} aria-hidden='true' />
@@ -1997,7 +2000,14 @@ function YouTubeLedgerLink() {
       asChild
       variant='ghost'
       size='sm'
-      className={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
+      // Joins the toolbar's desktop density so the whole bar — text tools,
+      // primary pill, icon cluster and view slider — shares one height and
+      // baseline; at the bare 28px it read as loose text beside the cluster.
+      className={cn(
+        PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+        LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS,
+        'text-secondary-token'
+      )}
     >
       {/* Viewport prefetch of this dynamic route is two RSC requests on every
           Work visit and pushes the shell persistence budget over its cap. */}
