@@ -510,4 +510,12 @@ describe('EntityPopover positioning', () => {
       fixture.dispose();
     }
   });
+
+  it('accepts a null anchor on the close path without crashing', () => {
+    // The anchor may be cleared/unmounted while the surface closes; the
+    // widened HTMLElement | null prop must render nothing, not throw.
+    const view = fastRender(<EntityPopover entity={release} anchor={null} />);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    view.unmount();
+  });
 });
