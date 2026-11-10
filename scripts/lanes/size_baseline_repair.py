@@ -14,6 +14,8 @@ import subprocess
 import types
 from pathlib import Path
 
+from atomic_state import atomic_write_text
+
 GREW = re.compile(r"size-500: (?P<path>\S+): grew (?P<old>\d+) -> (?P<new>\d+)")
 _CLASS = re.compile(r"(?m)^class ([A-Za-z_][A-Za-z0-9_]*)\(([^)\n]*)\):\s*$")
 _MAIN = re.compile(r"""(?m)^if __name__ == ['"]__main__['"]:\s*$""")
@@ -188,10 +190,10 @@ def apply_root(root, rels) -> list[str]:
                 existing = dest.read_text()
                 if not existing.endswith("\n"):
                     existing += "\n"
-                dest.write_text(existing + "\n" + piece)
+                atomic_write_text(dest, existing + "\n" + piece)
             else:
-                dest.write_text(preamble(rel) + piece)
-            path.write_text(kept)
+                atomic_write_text(dest, preamble(rel) + piece)
+            atomic_write_text(path, kept)
             written.extend([rel, dest_rel])
     finally:
         if baseline_path.read_bytes() != before:
