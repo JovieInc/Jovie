@@ -1,0 +1,149 @@
+import { execFileSync } from 'node:child_process';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+const testDir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
+const scanner = resolve(
+  repoRoot,
+  'scripts/company-guards/ai-review-boundary.mjs'
+);
+
+const CLEAN_ADVISORY = `# Advisory AI review — comments only, never blocks a merge.
+name: Advisory AI Review
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+jobs:
+  review:
+    steps:
+      - run: node .github/scripts/advisory-ai-review.mjs
+`;
+
+const WARDEN_BLOCKING = `name: Warden
+on: [pull_request]
+permissions:
+  pull-requests: write
+jobs:
+  review:
+    steps:
+      - run: gh pr review $PR --request-changes --body "$VERDICT"
+      - run: warden --fail-on findings "$PR"
+`;
+
+const SEER_FAILCHECK = `name: Sentry Seer code review
+on: [pull_request]
+jobs:
+  review:
+    steps:
+      - run: exit 1 # failCheck on findings
+      - run: echo posting a failing check run for the PR head
+`;
+
+let tmp: string;
+
+function writeWorkflow(name: string, content: string): void {
+  mkdirSync(resolve(tmp, '.github/workflows'), { recursive: true });
+  writeFileSync(resolve(tmp, '.github/workflows', name), content);
+}
+
+function runScanner(root: string): string {
+  return execFileSync('node', [scanner, '--root', root], { encoding: 'utf8' });
+}
+
+function runScannerExpectFailure(root: string): { stderr: string } | null {
+  try {
+    execFileSync('node', [scanner, '--root', root], {
+      encoding: 'utf8',
+      stdio: 'pipe',
+    });
+    return null;
+  } catch (error) {
+    return error as { stderr: string };
+  }
+}
+
+beforeAll(() => {
+  tmp = mkdtempSync(resolve(tmpdir(), 'ai-review-boundary-'));
+});
+
+afterAll(() => {
+  rmSync(tmp, { recursive: true, force: true });
+});
+
+describe('ai-review boundary scanner', () => {
+  it('passes an advisory, comment-only AI reviewer', () => {
+    writeWorkflow('advisory.yml', CLEAN_ADVISORY);
+    expect(runScanner(tmp)).toContain('ai-review-boundary: ok');
+  });
+
+  it('fails a Warden-style review that requests changes', () => {
+    writeWorkflow('warden.yml', WARDEN_BLOCKING);
+    const error = runScannerExpectFailure(tmp);
+    expect(error).not.toBeNull();
+    expect(error?.stderr).toContain('warden.yml');
+    expect(error?.stderr).toContain('request-changes');
+    rmSync(resolve(tmp, '.github/workflows/warden.yml'));
+  });
+
+  it('fails a Warden-style action input that gates on findings', () => {
+    writeWorkflow(
+      'warden-action.yml',
+      `name: Warden
+on: [pull_request]
+jobs:
+  review:
+    steps:
+      - uses: warden/ai-review@v1
+        with:
+          fail-on: findings
+`
+    );
+    const error = runScannerExpectFailure(tmp);
+    expect(error).not.toBeNull();
+    expect(error?.stderr).toContain('warden-action.yml');
+    expect(error?.stderr).toContain('fail-on');
+    rmSync(resolve(tmp, '.github/workflows/warden-action.yml'));
+  });
+
+  it('fails a Seer-style review that fails a check', () => {
+    writeWorkflow('seer.yml', SEER_FAILCHECK);
+    const error = runScannerExpectFailure(tmp);
+    expect(error).not.toBeNull();
+    expect(error?.stderr).toContain('seer.yml');
+    rmSync(resolve(tmp, '.github/workflows/seer.yml'));
+  });
+
+  it('ignores non-AI files that merely mention the signals', () => {
+    writeWorkflow(
+      'pr-labels.yml',
+      '# a maintainer may request changes; see CONTRIBUTING\n'
+    );
+    expect(runScanner(tmp)).toContain('ai-review-boundary: ok');
+  });
+
+  it('leaves the checked-in .github tree clean', () => {
+    expect(runScanner(repoRoot)).toContain('ai-review-boundary: ok');
+  });
+
+  it('stays wired into the workflow topology contract (runs on every PR)', () => {
+    const topology = readFileSync(
+      resolve(repoRoot, 'scripts/ci-workflow-topology.mjs'),
+      'utf8'
+    );
+    expect(topology).toContain(
+      "from './company-guards/ai-review-boundary.mjs'"
+    );
+    expect(topology).toContain('scanAiReviewBoundary(repoRoot)');
+  });
+});
