@@ -10,7 +10,7 @@ import {
 } from '@/lib/canaries/production-waitlist';
 import { type DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
-import { waitlistEntries } from '@/lib/db/schema/waitlist';
+import { capabilityWants, waitlistEntries } from '@/lib/db/schema/waitlist';
 import { withSerializableRetry } from '@/lib/db/serializable-retry';
 import { env } from '@/lib/env';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -412,7 +412,10 @@ async function decideAccess(params: {
     };
   }
 
-  if (qualification.status === 'waitlisted') {
+  if (
+    qualification.status === 'queued' ||
+    qualification.status === 'waitlisted'
+  ) {
     return {
       outcome: 'waitlisted_gate_on',
       approval: null,
@@ -431,7 +434,7 @@ async function decideAccess(params: {
     if (reservedAdmissionSlot) await releaseAutoAcceptSlot(params.tx);
     const failedQualification: QualificationDecision = {
       ...qualification,
-      status: 'waitlisted',
+      status: 'queued',
       reasonCode: 'waitlist_capacity_full',
       details: {
         ...qualification.details,
@@ -666,6 +669,10 @@ export async function submitWaitlistAccessRequest(
             .set({
               status: nextStatus,
               statusReason: decision.qualification.reasonCode,
+              decisionReason: decision.qualification.reasonCode,
+              decisionRuleVersion: 'qualify/2026-11-v1',
+              decidedAt: now,
+              decidedBy: 'rules',
               qualificationResult: {
                 qualified: decision.qualification.qualified,
                 status: decision.qualification.status,
@@ -692,6 +699,30 @@ export async function submitWaitlistAccessRequest(
               ...(syntheticCanary ? { syntheticCanary } : {}),
             },
           });
+
+          // Their words at the decision point (JOV-6655): wants, objections,
+          // current tools. Evidence refs stay turn-scoped, never transcripts.
+          const chatWants = [
+            input.interviewResponses?.currentWorkflow,
+            input.interviewResponses?.biggestBlocker,
+            input.interviewResponses?.launchGoal,
+          ]
+            .map(answer => (answer ?? '').trim())
+            .filter(answer => answer.length > 0);
+          if (chatWants.length > 0) {
+            await tx.insert(capabilityWants).values(
+              chatWants.map(answer => ({
+                waitlistEntryId: entry.id,
+                kind:
+                  answer === input.interviewResponses?.biggestBlocker
+                    ? 'objection'
+                    : 'want',
+                text: answer,
+                capabilityKey: null,
+                source: 'onboarding_chat',
+              }))
+            );
+          }
 
           if (nextStatus === 'waitlisted' && !suppressCanaryCommunications) {
             await enqueueWaitlistEmailJob(tx, {
