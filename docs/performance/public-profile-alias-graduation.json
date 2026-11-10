@@ -1,12 +1,12 @@
 {
   "schema": "jovie-public-profile-alias-graduation/v2",
   "repository": "JovieInc/Jovie",
-  "measuredAt": "2026-10-31T06:00:00Z",
+  "measuredAt": "2026-11-09T22:40:00Z",
   "selection": {
     "workflowPath": ".github/workflows/production-controller.yml",
-    "since": "2026-10-27T06:00:00Z",
-    "cutoff": "2026-10-31T06:00:00Z",
-    "enumeratedControllers": 246,
+    "since": "2026-11-05T00:00:00Z",
+    "cutoff": "2026-11-09T22:40:00Z",
+    "enumeratedControllers": 267,
     "windowSize": 14,
     "eligibility": "completed controllers and completed measurement steps by cutoff, regardless of controller conclusion; partial measurements consume a nonqualifying slot",
     "order": "measurement job completedAt descending, controllerRunId descending"
@@ -17,24 +17,24 @@
     "p95Estimator": "nearest-rank",
     "thresholdMs": 1500,
     "requiredConsecutiveRuns": 14,
-    "nextReviewAt": "2026-11-07T06:00:00Z",
+    "nextReviewAt": "2026-11-16T22:40:00Z",
     "trackingIssue": "JOV-8737"
   },
   "evidence": {
     "inventory": "generated/public-profile-alias-controller-inventory.jsonl",
-    "inventorySha256": "297a8c4d6c2eba1388d670fd309edd968373f593f1e093dc81f683541dc1cfd7",
+    "inventorySha256": "a9df48732f6d0cc98b53c7f78f091ca2f3d30ad66e1877aca620c53ef9dbb0dd",
     "measurements": "generated/public-profile-alias-measurements.jsonl",
-    "measurementsSha256": "6527e35e8d17f4ca2901808e1515afadb9fd584835cef6623d181114d3ce706f"
+    "measurementsSha256": "1b366d375e00f327e94e2657beea03adb94f66bb18fc17c994f180dcb4449bf9"
   },
   "windows": {
     "production": {
       "surface": "production-canonical-alias",
-      "job": "Production Release / Production public-profile alias usable-result gate",
+      "job": "Production public-profile alias usable-result gate",
       "step": "Gate canonical public-profile aliases on usable results",
       "selectedJobIds": [
-        124441088711, 124435712092, 124428732384, 124422006319, 124405991691,
-        124397752926, 124386959341, 124376821256, 124297883322, 124281270957,
-        124266641702, 124233559202, 124214309172, 124183449382
+        129451897734, 129329831974, 129308710256, 129267098596, 129243898317,
+        129221809684, 129202245126, 129171626997, 129156038849, 129143581321,
+        129067365966, 129054101610, 129044713299, 128988057356
       ],
       "qualifyingRunsInWindow": 14,
       "consecutiveQualifyingRuns": 14,
@@ -46,9 +46,9 @@
       "job": "Production Release / Promote to Production",
       "step": "Prove canonical navigation budgets on exact staged build",
       "selectedJobIds": [
-        124432228621, 124425163168, 124402028788, 124393150007, 124382912242,
-        124371862405, 124364879243, 124357617142, 124350903624, 124342955112,
-        124333982929, 124325177217, 124288207842, 124274291981
+        129438560380, 129318284294, 129295421543, 129230094244, 129209691032,
+        129131490373, 129037183284, 128982081551, 128962278372, 128951498455,
+        128940059963, 128930762003, 128920085543, 128908277331
       ],
       "qualifyingRunsInWindow": 14,
       "consecutiveQualifyingRuns": 14,
