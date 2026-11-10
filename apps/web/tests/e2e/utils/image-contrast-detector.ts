@@ -9,6 +9,7 @@ import {
   relativeLuminance,
   sampleRegionLuminances,
   sampleRegionPixelGrid,
+  sampleRegionStacks,
 } from './image-contrast-sample';
 
 // Invariant consumer: JOV-INV-019 `text-aware-contrast` (JOV-6916).
@@ -440,6 +441,7 @@ export async function inspectImageContrast(
       box,
       deviceScaleFactor
     );
+    const sampledStacks = await sampleRegionStacks(page, box);
 
     const color = parseCssColor(candidate.color);
     if (!color) continue;
@@ -488,6 +490,7 @@ export async function inspectImageContrast(
           backgroundLuminanceP10: Math.round(p10 * 1000) / 1000,
           backgroundLuminanceP90: Math.round(p90 * 1000) / 1000,
           sampledPixelGrid: pixelGrid,
+          sampledStacks,
         },
       });
     }

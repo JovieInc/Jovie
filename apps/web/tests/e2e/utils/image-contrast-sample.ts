@@ -111,6 +111,44 @@ export async function sampleRegionPixelGrid(
   return cells;
 }
 
+// Diagnostic: the hit-test stack (top three, described) at each grid column
+// of the sampled box's middle row, so a failing finding names the elements
+// that actually paint there (JOV-11623).
+export async function sampleRegionStacks(
+  page: Page,
+  box: ContrastBox,
+  columns = 8
+): Promise<string[]> {
+  return page.evaluate(
+    ({ box, columns }) => {
+      const describe = (element: Element): string => {
+        const parts: string[] = [];
+        let node: Element | null = element;
+        for (let depth = 0; node && depth < 3; depth += 1) {
+          const testId = node.getAttribute('data-testid');
+          const label = testId
+            ? `${node.tagName.toLowerCase()}#${testId}`
+            : node.id
+              ? `${node.tagName.toLowerCase()}#${node.id}`
+              : node.tagName.toLowerCase();
+          parts.push(label);
+          node = node.parentElement;
+        }
+        return parts.join(' > ');
+      };
+      const points: string[] = [];
+      for (let column = 0; column < columns; column += 1) {
+        const px = Math.round(box.x + ((column + 0.5) / columns) * box.width);
+        const py = Math.round(box.y + box.height / 2);
+        const stack = document.elementsFromPoint(px, py).slice(0, 3);
+        points.push(`x${px}: ${stack.map(describe).join(' | ')}`);
+      }
+      return points;
+    },
+    { box, columns }
+  );
+}
+
 export async function readContrastHideBoxes(
   page: Page,
   hideAttribute: string
