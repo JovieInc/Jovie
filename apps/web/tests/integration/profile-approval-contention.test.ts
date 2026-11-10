@@ -1,0 +1,311 @@
+import { randomUUID } from 'node:crypto';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
+import type { DbOrTransaction } from '@/lib/db';
+import { profileActionApprovals } from '@/lib/db/schema/profile-approvals';
+import {
+  authorizeRiskyProfileAction,
+  decideProfileApproval,
+  listProfileApprovals,
+  revokeProfileApproval,
+} from '@/lib/team/approvals';
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureWarning: vi.fn().mockResolvedValue(undefined),
+}));
+const url = process.env.APPROVAL_TEST_DATABASE_URL;
+const owner = randomUUID();
+const manager = randomUUID();
+const profile = randomUUID();
+const approval = randomUUID();
+
+function barrier() {
+  let release!: () => void;
+  let entered!: () => void;
+  const waiting = new Promise<void>(resolve => {
+    release = resolve;
+  });
+  const arrived = new Promise<void>(resolve => {
+    entered = resolve;
+  });
+  return {
+    release,
+    arrived,
+    pause: async () => {
+      entered();
+      await waiting;
+    },
+  };
+}
+
+// Pause after the production helper's approval SELECT, not after a test copy
+// of its predicate. A competing real transaction then commits before its UPDATE.
+function pauseApprovalRead<T extends object>(
+  target: T,
+  pause: () => Promise<void>,
+  selected = false,
+  mode: 'limit' | 'then' = 'limit'
+): T {
+  return new Proxy(target, {
+    get(object, key) {
+      const value = Reflect.get(object, key);
+      if (typeof value !== 'function') return value;
+      return (...args: unknown[]) => {
+        if (key === 'then' && selected && mode === 'then')
+          return Promise.resolve(object)
+            .then(async rows => {
+              await pause();
+              return rows;
+            })
+            .then(
+              args[0] as (value: unknown) => unknown,
+              args[1] as (reason: unknown) => unknown
+            );
+        const result = Reflect.apply(value, object, args);
+        if (key === 'limit' && selected && mode === 'limit')
+          return Promise.resolve(result).then(async rows => {
+            await pause();
+            return rows;
+          });
+        if (key === 'select' || key === 'from' || key === 'where') {
+          return pauseApprovalRead(
+            result,
+            pause,
+            key === 'from' ? args[0] === profileActionApprovals : selected,
+            mode
+          );
+        }
+        return result;
+      };
+    },
+  });
+}
+
+describe.skipIf(!url)(
+  'profile approval transitions on isolated real Postgres',
+  () => {
+    let client: ReturnType<typeof postgres>;
+    let db: ReturnType<typeof drizzle>;
+    beforeAll(async () => {
+      const parsed = new URL(url!);
+      if (
+        parsed.hostname !== '127.0.0.1' ||
+        parsed.pathname !== '/jov12105_approvals'
+      )
+        throw new Error(
+          'Only dedicated loopback approval fixtures are allowed'
+        );
+      client = postgres(url!, {
+        max: 4,
+        connection: {
+          TimeZone: 'UTC',
+          statement_timeout: 3000,
+          idle_in_transaction_session_timeout: 5000,
+        },
+      });
+      db = drizzle(client);
+      await client.unsafe(`
+      CREATE TABLE IF NOT EXISTS creator_profiles (id uuid PRIMARY KEY, user_id uuid);
+      CREATE TABLE IF NOT EXISTS user_profile_claims (user_id uuid, creator_profile_id uuid, role text);
+      CREATE TABLE IF NOT EXISTS profile_action_approvals (
+        id uuid PRIMARY KEY, creator_profile_id uuid NOT NULL, action text NOT NULL,
+        status text NOT NULL, requested_by uuid NOT NULL, decided_by uuid,
+        payload jsonb, reason text, expires_at timestamp NOT NULL, decided_at timestamp,
+        consumed_at timestamp, created_at timestamp DEFAULT now(), updated_at timestamp DEFAULT now());
+      CREATE TABLE IF NOT EXISTS profile_approval_events (
+        id uuid DEFAULT gen_random_uuid(), approval_id uuid, creator_profile_id uuid,
+        event text, actor_id uuid, metadata jsonb, created_at timestamp DEFAULT now());
+    `);
+    });
+    beforeEach(async () => {
+      await client`TRUNCATE profile_approval_events, profile_action_approvals, user_profile_claims, creator_profiles`;
+      await client`INSERT INTO creator_profiles VALUES (${profile}, ${owner})`;
+      await client`INSERT INTO user_profile_claims VALUES (${manager}, ${profile}, 'manager'), (${owner}, ${profile}, 'owner')`;
+    });
+    afterAll(async () => {
+      await client?.end({ timeout: 1 });
+    });
+    const seed = async (status: string) => {
+      await client`INSERT INTO profile_action_approvals (id, creator_profile_id, action, status, requested_by, expires_at) VALUES (${approval}, ${profile}, 'links.mutate', ${status}, ${manager}, now() + interval '1 hour')`;
+    };
+    const consume = (tx: DbOrTransaction) =>
+      authorizeRiskyProfileAction(tx, {
+        appUserId: manager,
+        profileId: profile,
+        action: 'links.mutate',
+      });
+    const revoke = (tx: DbOrTransaction) =>
+      revokeProfileApproval(tx, { approvalId: approval, actorUserId: owner });
+    const decide = (tx: DbOrTransaction) =>
+      decideProfileApproval(tx, {
+        approvalId: approval,
+        actorUserId: owner,
+        decision: 'approved',
+      });
+    const transact = <T>(operation: (tx: DbOrTransaction) => Promise<T>) =>
+      db.transaction(tx => operation(tx as unknown as DbOrTransaction), {
+        isolationLevel: 'read committed',
+      });
+
+    it('allows one consumption and one audit event after competing stale reads', async () => {
+      await seed('approved');
+      const gate = barrier();
+      const loser = transact(tx => consume(pauseApprovalRead(tx, gate.pause)));
+      await gate.arrived;
+      try {
+        expect(await transact(consume)).toMatchObject({ status: 'allowed' });
+      } finally {
+        gate.release();
+      }
+      expect(await loser).toMatchObject({ status: 'requires_approval' });
+      expect(await client`SELECT event FROM profile_approval_events`).toEqual([
+        { event: 'consumed' },
+      ]);
+    });
+
+    it('does not resurrect a revoked pending approval from a stale owner decision', async () => {
+      await seed('pending');
+      const gate = barrier();
+      const loser = transact(tx => decide(pauseApprovalRead(tx, gate.pause)));
+      await gate.arrived;
+      try {
+        expect(await transact(revoke)).toEqual({ ok: true });
+      } finally {
+        gate.release();
+      }
+      expect(await loser).toEqual({ ok: false, reason: 'not_pending' });
+      expect(await client`SELECT status FROM profile_action_approvals`).toEqual(
+        [{ status: 'revoked' }]
+      );
+      expect(await client`SELECT event FROM profile_approval_events`).toEqual([
+        { event: 'revoked' },
+      ]);
+    });
+
+    it.each(['consume-first', 'revoke-first'])(
+      'linearizes consumption versus revocation: %s',
+      async ordering => {
+        await seed('approved');
+        const gate = barrier();
+        const staleOperation = ordering === 'consume-first' ? revoke : consume;
+        const winner = ordering === 'consume-first' ? consume : revoke;
+        const loser = transact(tx =>
+          staleOperation(pauseApprovalRead(tx, gate.pause))
+        );
+        await gate.arrived;
+        try {
+          await transact(winner);
+        } finally {
+          gate.release();
+        }
+        expect(await loser).toMatchObject(
+          ordering === 'consume-first'
+            ? { ok: false, reason: 'not_pending' }
+            : { status: 'requires_approval' }
+        );
+        expect(await client`SELECT event FROM profile_approval_events`).toEqual(
+          [{ event: ordering === 'consume-first' ? 'consumed' : 'revoked' }]
+        );
+      }
+    );
+
+    it('does not overwrite revocation or emit stale expiry events', async () => {
+      await seed('approved');
+      await client`UPDATE profile_action_approvals SET expires_at = now() - interval '1 hour'`;
+      const gate = barrier();
+      const expiry = transact(tx =>
+        listProfileApprovals(pauseApprovalRead(tx, gate.pause, false, 'then'), {
+          profileId: profile,
+          appUserId: owner,
+        })
+      );
+      await gate.arrived;
+      try {
+        expect(await transact(revoke)).toEqual({ ok: true });
+      } finally {
+        gate.release();
+      }
+      await expiry;
+      expect(await client`SELECT status FROM profile_action_approvals`).toEqual(
+        [{ status: 'revoked' }]
+      );
+      expect(await client`SELECT event FROM profile_approval_events`).toEqual([
+        { event: 'revoked' },
+      ]);
+    });
+
+    it('accepts only one decision from two stale pending snapshots', async () => {
+      await seed('pending');
+      const gate = barrier();
+      const loser = transact(tx => decide(pauseApprovalRead(tx, gate.pause)));
+      await gate.arrived;
+      try {
+        expect(
+          await transact(tx =>
+            decideProfileApproval(tx, {
+              approvalId: approval,
+              actorUserId: owner,
+              decision: 'rejected',
+            })
+          )
+        ).toEqual({ ok: true });
+      } finally {
+        gate.release();
+      }
+      expect(await loser).toEqual({ ok: false, reason: 'not_pending' });
+      expect(await client`SELECT status FROM profile_action_approvals`).toEqual(
+        [{ status: 'rejected' }]
+      );
+      expect(await client`SELECT event FROM profile_approval_events`).toEqual([
+        { event: 'rejected' },
+      ]);
+    });
+
+    it('rejects a grant that expires after its eligibility read', async () => {
+      await seed('approved');
+      const gate = barrier();
+      const pendingUse = transact(tx =>
+        consume(pauseApprovalRead(tx, gate.pause))
+      );
+      await gate.arrived;
+      try {
+        await client`UPDATE profile_action_approvals SET expires_at = clock_timestamp() + interval '20 milliseconds'`;
+        // A database-clock expiry test necessarily crosses the deadline. This is
+        // isolated integration evidence, not a sleep-based UI synchronization.
+        await client`SELECT pg_sleep(0.03)`;
+      } finally {
+        gate.release();
+      }
+      expect(await pendingUse).toMatchObject({ status: 'requires_approval' });
+      expect(await client`SELECT event FROM profile_approval_events`).toEqual(
+        []
+      );
+    });
+
+    it('rolls the consumed grant and audit back with failed protected work', async () => {
+      await seed('approved');
+      await expect(
+        transact(async tx => {
+          expect(await consume(tx)).toMatchObject({ status: 'allowed' });
+          throw new Error('protected write failed');
+        })
+      ).rejects.toThrow('protected write failed');
+      expect(
+        await client`SELECT consumed_at FROM profile_action_approvals`
+      ).toEqual([{ consumed_at: null }]);
+      expect(await client`SELECT event FROM profile_approval_events`).toEqual(
+        []
+      );
+      expect(await transact(consume)).toMatchObject({ status: 'allowed' });
+    });
+  }
+);
