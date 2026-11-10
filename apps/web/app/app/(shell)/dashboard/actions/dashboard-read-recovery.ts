@@ -98,7 +98,7 @@ export function degradeDistributionEventsRead(
   profileId: string
 ): Array<{ createdAt: Date; eventType: string }> {
   if (isCommitTransportFailure(error)) {
-    Sentry.logger.warn(
+    logger.warn(
       '[Dashboard] creator_distribution_events transient commit failure after retry; skipping activation lookup',
       { profileId }
     );
@@ -106,7 +106,7 @@ export function degradeDistributionEventsRead(
   }
 
   if (isMissingCreatorDistributionEventsTableError(error)) {
-    Sentry.logger.warn(
+    logger.warn(
       '[Dashboard] creator_distribution_events table missing; skipping activation lookup',
       { profileId }
     );
@@ -153,7 +153,7 @@ export function tolerateMissingTourDatesConfirmationStatus(
   if (!isMissingTourDatesConfirmationStatusError(error)) {
     throw error;
   }
-  Sentry.logger.warn(
+  logger.warn(
     '[Dashboard] tour_dates.confirmation_status missing (migration drift); treating pending tour-date count as 0',
     { profileId }
   );
