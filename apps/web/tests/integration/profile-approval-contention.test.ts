@@ -108,6 +108,7 @@ describe.skipIf(!url)(
         max: 4,
         connection: {
           TimeZone: 'UTC',
+          application_name: 'jov-approval-contention',
           statement_timeout: 3000,
           idle_in_transaction_session_timeout: 5000,
         },
@@ -290,6 +291,53 @@ describe.skipIf(!url)(
         []
       );
     });
+
+    it.each(['consume', 'decision'])(
+      'rejects %s after waiting on a row lock beyond expiry',
+      async operation => {
+        await seed(operation === 'consume' ? 'approved' : 'pending');
+        await client`UPDATE profile_action_approvals SET expires_at = clock_timestamp() + interval '1 second'`;
+        const locked = barrier();
+        const holder = client.begin(async sql => {
+          await sql`SELECT id FROM profile_action_approvals WHERE id = ${approval} FOR UPDATE`;
+          await locked.pause();
+        });
+        await locked.arrived;
+        const protectedWrite = vi.fn();
+        const waiting = transact(async tx => {
+          const result =
+            operation === 'consume' ? await consume(tx) : await decide(tx);
+          if ('status' in result ? result.status === 'allowed' : result.ok)
+            protectedWrite();
+          return result;
+        });
+        try {
+          await expect
+            .poll(
+              async () => {
+                const rows =
+                  await client`SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE application_name = 'jov-approval-contention' AND cardinality(pg_blocking_pids(pid)) > 0`;
+                return rows[0].waiting;
+              },
+              { timeout: 2000, interval: 10 }
+            )
+            .toBeGreaterThan(0);
+          await client`SELECT pg_sleep(greatest(0, extract(epoch FROM (expires_at AT TIME ZONE 'UTC' - clock_timestamp()))) + 0.02) FROM profile_action_approvals WHERE id = ${approval}`;
+        } finally {
+          locked.release();
+        }
+        await holder;
+        expect(await waiting).toMatchObject(
+          operation === 'consume'
+            ? { status: 'requires_approval' }
+            : { ok: false, reason: 'not_pending' }
+        );
+        expect(protectedWrite).not.toHaveBeenCalled();
+        expect(await client`SELECT event FROM profile_approval_events`).toEqual(
+          []
+        );
+      }
+    );
 
     it('rolls the consumed grant and audit back with failed protected work', async () => {
       await seed('approved');

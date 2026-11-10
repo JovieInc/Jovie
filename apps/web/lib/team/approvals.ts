@@ -66,6 +66,18 @@ export type RiskyActionAuthorization =
   | { status: 'requires_approval'; role: TeamRole }
   | { status: 'denied'; role: TeamRole | null };
 
+/** PostgreSQL may evaluate UPDATE predicates before waiting for a row lock.
+ * Acquire the lock first so the next statement's clock check is authoritative.
+ * The caller's transaction retains this lock through the protected operation.
+ */
+async function lockApproval(tx: DbOrTransaction, approvalId: string) {
+  await tx
+    .select({ id: profileActionApprovals.id })
+    .from(profileActionApprovals)
+    .where(eq(profileActionApprovals.id, approvalId))
+    .for('update');
+}
+
 /**
  * Authorize a risky profile action. When the caller's role is approval-gated,
  * a single-use, unexpired owner approval is consumed to let the action
@@ -108,6 +120,7 @@ export async function authorizeRiskyProfileAction(
     return { status: 'requires_approval', role: role as TeamRole };
   }
 
+  await lockApproval(tx, approval.id);
   const [consumed] = await tx
     .update(profileActionApprovals)
     .set({ consumedAt: now, updatedAt: now })
@@ -331,6 +344,7 @@ export async function decideProfileApproval(
   }
 
   const now = new Date();
+  await lockApproval(tx, approval.id);
   const [decided] = await tx
     .update(profileActionApprovals)
     .set({

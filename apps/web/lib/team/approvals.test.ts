@@ -36,6 +36,7 @@ function createTx(
       const chain: Row = {};
       chain.from = vi.fn(() => chain);
       chain.where = vi.fn(() => chain);
+      chain.for = vi.fn(() => Promise.resolve(rows));
       chain.limit = vi.fn((n: number) => Promise.resolve(rows.slice(0, n)));
       chain.then = (f: (v: Row[]) => unknown) => Promise.resolve(rows).then(f);
       return chain;
