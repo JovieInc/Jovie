@@ -247,6 +247,21 @@ describe('connections workspace helpers', () => {
     expect(getConnectionStatus(locked).label).toBe('Limit Reached');
   });
 
+  it('pins the editable Jovie profile above external profiles needing attention', () => {
+    const jovie = surface({ id: 'jovie', kind: 'jovie', platform: 'jovie' });
+    const conflict = surface({
+      id: 'conflict',
+      qualificationStatus: 'conflicting',
+    });
+    const preview = surface({
+      id: 'preview:instagram',
+      qualificationStatus: 'suggested',
+    });
+    expect(
+      sortProfileWorkspaceRows([conflict, preview, jovie]).map(row => row.id)
+    ).toEqual(['jovie', 'conflict', 'preview:instagram']);
+  });
+
   it('retains rejected identities as non-actionable negative evidence', () => {
     expect(
       getConnectionStatus(

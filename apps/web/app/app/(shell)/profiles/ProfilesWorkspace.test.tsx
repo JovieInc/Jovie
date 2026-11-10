@@ -1,3 +1,8 @@
+import {
+  data,
+  dataWithConnector,
+  type SuggestionFixture,
+} from './profiles-workspace-fixtures';
 // Load the real lazy rail before assertions, independent of classification tests.
 import './AddConnectionRail';
 import { TooltipProvider } from '@jovie/ui';
@@ -43,123 +48,6 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/useRegisterRightPanel', () => ({
   useRegisterRightPanel: vi.fn(),
 }));
-
-const data: ProfilesWorkspaceData = {
-  profileId: '11111111-1111-4111-8111-111111111111',
-  artist: {
-    name: 'Tim White',
-    username: 'tim',
-    avatarUrl: 'https://cdn.jov.ie/tim.jpg',
-    isPublic: true,
-  },
-  rows: [
-    {
-      id: 'jovie',
-      rowType: 'surface',
-      kind: 'jovie',
-      platform: 'jovie',
-      label: 'Jovie Profile',
-      handle: '@tim',
-      url: 'https://jov.ie/tim',
-      trackedUrl: null,
-      qualificationStatus: 'qualified',
-      isOfficial: true,
-      monitoringState: 'active',
-      rank: 2,
-      previousRank: 4,
-      lastObservedAt: '2026-07-16T00:00:00.000Z',
-      identityPhoto: {
-        url: 'https://cdn.jov.ie/tim.jpg',
-        source: 'jovie',
-        kind: 'profile',
-        verified: true,
-        observedAt: '2026-07-16T00:00:00.000Z',
-        freshness: 'current',
-      },
-    },
-    {
-      id: 'spotify',
-      rowType: 'surface',
-      kind: 'dsp',
-      platform: 'spotify',
-      label: 'Spotify',
-      handle: null,
-      url: 'https://open.spotify.com/artist/tim',
-      trackedUrl: 'https://jov.ie/tim/s/spotify',
-      qualificationStatus: 'qualified',
-      isOfficial: true,
-      monitoringState: 'locked',
-      rank: 7,
-      previousRank: 9,
-      lastObservedAt: '2026-07-16T00:00:00.000Z',
-      identityPhoto: {
-        url: 'https://i.scdn.co/image/tim.jpg',
-        source: 'connector',
-        kind: 'profile',
-        verified: true,
-        observedAt: '2026-07-16T00:00:00.000Z',
-        freshness: 'current',
-      },
-    },
-    {
-      id: 'instagram',
-      rowType: 'surface',
-      kind: 'social',
-      platform: 'instagram',
-      label: 'Instagram',
-      handle: '@tim',
-      url: 'https://instagram.com/tim',
-      trackedUrl: 'https://jov.ie/tim/s/instagram',
-      qualificationStatus: 'qualified',
-      isOfficial: true,
-      monitoringState: 'active',
-      rank: 4,
-      previousRank: 5,
-      lastObservedAt: '2026-07-16T00:00:00.000Z',
-    },
-  ],
-  monitoringLimit: 5,
-  monitoredCount: 1,
-  qualifiedShare: 0.5,
-  bestJovieRank: 2,
-  lastObservedAt: '2026-07-16T00:00:00.000Z',
-  providerAvailable: true,
-};
-
-const dataWithConnector: ProfilesWorkspaceData = {
-  ...data,
-  rows: [
-    ...data.rows,
-    {
-      id: 'gmail',
-      rowType: 'connector',
-      kind: 'connector',
-      platform: 'gmail',
-      label: 'Gmail',
-      handle: 'artist@example.com',
-      url: '/app/settings/connectors',
-      status: 'connected',
-      monitoringState: 'active',
-    },
-  ],
-};
-
-type SuggestionFixture = {
-  readonly id: string;
-  readonly type:
-    | 'dsp_match'
-    | 'social_link'
-    | 'avatar'
-    | 'playlist_fallback'
-    | 'profile_ready';
-  readonly platform: string;
-  readonly platformLabel: string;
-  readonly title: string;
-  readonly subtitle: string;
-  readonly imageUrl: string | null;
-  readonly externalUrl: string | null;
-  readonly confidence: number | null;
-};
 
 function createQueryClient() {
   return new QueryClient({
@@ -462,6 +350,109 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     );
     expect(screen.getByText('Known Page')).toBeInTheDocument();
     expect(screen.queryByText('Up to Date')).not.toBeInTheDocument();
+  });
+
+  it('makes six pending identities discoverable with zero suggestions without deciding for the owner', async () => {
+    const user = userEvent.setup();
+    const base = data.rows[1];
+    if (base.rowType !== 'surface') throw new Error('Missing DSP fixture');
+    const pendingRows: ProfileWorkspaceSurfaceRow[] = Array.from(
+      { length: 6 },
+      (_, index) => ({
+        ...base,
+        id: `22222222-2222-4222-8222-${String(index + 1).padStart(12, '0')}`,
+        label: index === 0 ? '7digital' : `Pending Identity ${index + 1}`,
+        platform: index === 0 ? '7digital' : `pending_${index + 1}`,
+        qualificationStatus: index === 5 ? 'conflicting' : 'suggested',
+        isOfficial: false,
+        monitoringState: index === 0 ? 'locked' : 'active',
+        identityEvidence: {
+          sourceCount: 1,
+          sourceTypes: ['identity_link'],
+          confidence: 0.7,
+        },
+      })
+    );
+    vi.mocked(globalThis.fetch).mockImplementation(async input =>
+      jsonResponse(
+        String(input).endsWith('/source')
+          ? { status: 'unavailable' }
+          : suggestionsResponse([])
+      )
+    );
+    renderWorkspace({
+      ...data,
+      providerAvailable: false,
+      rows: [...data.rows, ...pendingRows],
+    });
+    const review = screen.getByRole('button', {
+      name: 'Review Identities (6)',
+    });
+    expect(review).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Review Suggestions (0)' })
+    ).toBeVisible();
+    // Keyboard activation opens the existing inspector, never an approval.
+    review.focus();
+    await user.keyboard('{Enter}');
+    expect(review).toHaveFocus();
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    expect(
+      (panel as ReactElement<{ row: ProfileWorkspaceSurfaceRow }>).props.row.id
+    ).toBe(pendingRows[0].id);
+    const rail = render(
+      <TooltipProvider>{panel as ReactElement}</TooltipProvider>
+    );
+    expect(screen.getByText('Is this you?')).toBeVisible();
+    expect(
+      screen.getByText('1 live source · public identity link · 70% match')
+    ).toBeVisible();
+    for (const name of ['Yes', 'No', 'Unsure']) {
+      expect(screen.getByRole('button', { name })).toBeEnabled();
+    }
+    rail.unmount();
+    // A repeated review activation preserves an already selected pending row.
+    await user.click(screen.getByRole('row', { name: /Pending Identity 3/ }));
+    await user.click(review);
+    const repeatedPanel = vi
+      .mocked(useRegisterRightPanel)
+      .mock.calls.at(-1)?.[0];
+    expect(
+      (repeatedPanel as ReactElement<{ row: ProfileWorkspaceSurfaceRow }>).props
+        .row.id
+    ).toBe(pendingRows[2].id);
+    expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(
+      10
+    );
+    expect(
+      vi
+        .mocked(globalThis.fetch)
+        .mock.calls.filter(([, init]) => init?.method === 'POST')
+    ).toHaveLength(0);
+    expect(navigationMock.refresh).not.toHaveBeenCalled();
+  });
+
+  it('does not count monitoring limits, preview rows, rejected identities or the canonical Jovie profile as pending identity work', () => {
+    const base = data.rows[1];
+    const jovie = data.rows[0];
+    if (base.rowType !== 'surface' || jovie.rowType !== 'surface') {
+      throw new Error('Missing profile fixtures');
+    }
+    renderWorkspace({
+      ...data,
+      rows: [
+        ...data.rows,
+        { ...base, id: 'preview:pending', qualificationStatus: 'suggested' },
+        { ...base, id: 'rejected', qualificationStatus: 'rejected' },
+        { ...jovie, id: 'canonical', qualificationStatus: 'suggested' },
+      ],
+    });
+    expect(
+      screen.queryByRole('button', { name: /Review Identities/ })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Review Suggestions (0)' })
+    ).toBeVisible();
   });
 
   it('persists an identity rejection and refreshes the canonical workspace', async () => {
@@ -1164,7 +1155,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(useRegisterRightPanel).not.toHaveBeenCalled();
   });
 
-  it('uses the shared semantic, contextual action slot without shifting rows', () => {
+  it('keeps the semantic action slot visible without shifting rows', () => {
     renderWorkspace(data);
 
     expect(
@@ -1177,7 +1168,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       name: 'Actions for Spotify',
     });
     expect(action.parentElement).not.toHaveClass('sm:opacity-0');
-    expect(action.closest('td')).toHaveClass(
+    expect(action.closest('td')).not.toHaveClass(
       'system-b-table-contextual-action-cell'
     );
   });
