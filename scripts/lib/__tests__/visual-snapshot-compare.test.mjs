@@ -218,6 +218,7 @@ describe('visual snapshot compare (JOV-5459)', () => {
         '      - run: node scripts/visual-snapshot-compare.mjs compare',
         '      - uses: ./.github/actions/setup-node-pnpm',
         '      - run: pnpm turbo build --filter=@jovie/web',
+        '      - run: tar -cf "${{ runner.temp }}/visual-compare-build.tar" --exclude=\'.next/cache\' -C apps/web .next',
         '      - uses: actions/upload-artifact@v7',
         '        with:',
         '          name: visual-compare-build-${{ github.run_id }}',
@@ -272,6 +273,39 @@ describe('visual snapshot compare (JOV-5459)', () => {
         ].join('\n'),
       })
     ).toEqual([]);
+
+    // Review item: an aggregate that wires all four needs but keeps only the
+    // legacy build-result check must still be rejected — every selected suite
+    // needs its own fail-closed result check.
+    const uncheckedSourceReady = gatedSourceReady
+      .replace(
+        /\n *if \[\[ "\$RUN_HOMEPAGE_VISUAL" == "true" && "\$VISUAL_HOMEPAGE_RESULT" != "success" \]\]; then exit 1; fi/,
+        ''
+      )
+      .replace(
+        /\n *if \[\[ "\$RUN_MARKETING_DOM" == "true" && "\$VISUAL_MARKETING_DOM_RESULT" != "success" \]\]; then exit 1; fi/,
+        ''
+      )
+      .replace(
+        /\n *if \[\[ "\$RUN_MARKETING_DOM" == "true" && "\$VISUAL_MARKETING_ROUTES_RESULT" != "success" \]\]; then exit 1; fi/,
+        ''
+      );
+    expect(uncheckedSourceReady).not.toBe(gatedSourceReady);
+    expect(
+      assertVisualCompareWorkflowContract({
+        visualRegressionYaml,
+        ciYaml: [
+          renderedBuildJob,
+          renderedHomepageSuiteJob,
+          marketingDomSuiteJob,
+          marketingRoutesSuiteJob,
+          fullyWiredMergeReady,
+          uncheckedSourceReady,
+        ].join('\n'),
+      })
+    ).toContain(
+      'source PR Ready must fail closed when a homepage PR skips visual snapshot compare'
+    );
   });
 
   it('passes the committed snapshot inventory and workflow contract', () => {

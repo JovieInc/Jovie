@@ -289,6 +289,9 @@ export function assertVisualCompareWorkflowContract({
     const buildContract = [
       './.github/actions/setup-node-pnpm',
       'pnpm turbo build --filter=@jovie/web',
+      // The handoff ships only what the standalone server needs; the restored
+      // Turbopack cache is build-only compiler state and must not ride along.
+      'tar -cf "${{ runner.temp }}/visual-compare-build.tar" --exclude=\'.next/cache\'',
       'actions/upload-artifact@',
       VISUAL_COMPARE_BUILD_ARTIFACT,
     ];
