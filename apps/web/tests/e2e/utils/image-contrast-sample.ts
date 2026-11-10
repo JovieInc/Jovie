@@ -172,7 +172,33 @@ export async function readContrastHideBoxes(
   }, hideAttribute);
 }
 
-export async function captureContrastScreenshot(page: Page): Promise<Buffer> {
+// The hide stylesheet, injected AT the screenshot (Playwright's `style`
+// option guarantees it applies to the copied frame): an addStyleTag + rAF
+// capture can copy a stale compositor frame still carrying pre-hide ink —
+// the identical bright pixels every dispatch kept sampling behind the
+// desktop footer credit (JOV-11623). Glyph ink is stripped in every form
+// (color, text-shadow/stroke, SVG fill/stroke, the link's underline);
+// solid control fills (background-color) stay painted so the sampled
+// region is exactly what sits behind each glyph.
+export const CONTRAST_HIDE_STYLE =
+  '[data-image-contrast-hide], [data-image-contrast-hide] * { color: transparent !important; text-shadow: none !important; -webkit-text-stroke: transparent !important; caret-color: transparent !important; background-image: none !important; fill: transparent !important; stroke: transparent !important; text-decoration: none !important; text-decoration-color: transparent !important; }';
+
+// Capture-time evidence for one inspection pass: the candidate boxes are
+// re-read after the scan (late-loading media reflows the page between the
+// scan and the capture, JOV-11623) and the screenshot carries the hide.
+export async function captureContrastEvidence(
+  page: Page,
+  candidateAttribute: string
+): Promise<{ screenshot: Buffer; freshBoxes: Record<string, ContrastBox> }> {
+  const freshBoxes = await readContrastHideBoxes(page, candidateAttribute);
+  const screenshot = await captureContrastScreenshot(page, CONTRAST_HIDE_STYLE);
+  return { screenshot, freshBoxes };
+}
+
+export async function captureContrastScreenshot(
+  page: Page,
+  hideStyle: string
+): Promise<Buffer> {
   // Headless Chromium rejects a capture with "Protocol error
   // (Page.captureScreenshot): Unable to capture screenshot" when the view has
   // no compositor frame to copy yet. Deliberate-red fixtures call
@@ -199,7 +225,14 @@ export async function captureContrastScreenshot(page: Page): Promise<Buffer> {
   for (let attempt = 1; ; attempt++) {
     await waitForCommittedFrame();
     try {
-      return await page.screenshot({ type: 'png' });
+      // `style` injects the hide AT the capture: Playwright guarantees the
+      // stylesheet applies to the frame being copied, so the screenshot can
+      // never show pre-hide ink from a stale compositor frame (JOV-11623).
+      return await page.screenshot({
+        type: 'png',
+        style: hideStyle,
+        animations: 'disabled',
+      });
     } catch (error) {
       if (
         attempt >= 4 ||

@@ -263,6 +263,7 @@ function EmptySurfaceBlock({
   );
 }
 
+// @coverage-via apps/web/tests/unit/profile/profile-desktop-surface-layout-regression.test.ts
 export function ProfileDesktopSurface({
   presentation = 'modal',
   artist,
@@ -477,12 +478,6 @@ export function ProfileDesktopSurface({
   const homeOverview = (
     <div
       className={cn(
-        // flex-none, not flex-1: this grid lives in the scrolling
-        // profile-desktop-content-scroll pane, so it must size to its own
-        // content. flex-1 (and even default flex-shrink with min-h-0)
-        // squeezes the box to the pane's viewport height, and the taller
-        // secondary column (Events) then paints past the box over the
-        // footer branding below it (JOV-11623).
         'grid min-h-0 min-w-0 flex-none gap-4',
         // Canonical Pen frame D9kdx ("Public profile / Desktop ≥1180 —
         // CANONICAL", docs/pen-stills/golden-path/manifest.json): the 4:5
@@ -1114,10 +1109,6 @@ export function ProfileDesktopSurface({
             {nonHomeContent}
             {!hideJovieBranding ? (
               <div
-                // mt-auto keeps the short-content pinning flex-1 used to
-                // give (branding at the bottom of the pane's fold) while
-                // letting tall content push it below the overview instead
-                // of under it (JOV-11623).
                 className='mt-auto flex justify-center pb-1 pt-2'
                 data-testid='profile-jovie-branding'
               >
