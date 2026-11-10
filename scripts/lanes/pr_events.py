@@ -436,11 +436,23 @@ def stale_fix_labels(pr: dict, labels: set) -> list[str]:
 
 HEAD_CHECKS_QUERY = """query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){
 pullRequest(number:$number){commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100){nodes{__typename
-... on CheckRun{name conclusion startedAt completedAt} ... on StatusContext{context state createdAt}}}}}}}}}}"""
+... on CheckRun{name conclusion startedAt completedAt} ... on StatusContext{context state createdAt}}}}}}}}}}
+"""
 RED_CHECK_STATES = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR"})
 # Advisory checks that never gate a merge: their red (Tently's provider was down all night on
 # 2026-11-01, ~100 PRs got lane-fix-red) is no repair signal.
 NON_REQUIRED_CHECKS = frozenset({"tently"})
+# A superseded (cancelled) run surfaces as FAILURE in the rollup; when its completion timestamp
+# ties a SUCCESS of the same check — the re-run that replaced it — the success is the newer
+# verdict (JOV-8492: do not label a head for a check a green rerun already superseded).
+LABEL_EPISODE_QUERY = """query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){
+pullRequest(number:$number){timelineItems(last:100,itemTypes:[LABELED_EVENT]){nodes{... on LabeledEvent{createdAt
+label{name} actor{__typename login}}}}}}}}"""
+# The relay applies lane-fix-red with GITHUB_TOKEN, so its episodes are always actor
+# github-actions[bot] — the only reds this PR-head rollup can evaluate (the queue breaker's
+# jovie-bot episode holds merge-group reds the rollup cannot see, and a human label is a human
+# hold): the relay clears neither (JOV-8492). Unreadable keeps the label — fail closed.
+RELAY_RED_LABELLER = "github-actions[bot]"
 
 
 def read_head_rollup(number: int, sh=run):
@@ -468,7 +480,9 @@ def head_red(number: int, sh=run) -> bool | None:
         state = str(node.get("conclusion") or node.get("state") or "").upper()
         if key and key.lower() in NON_REQUIRED_CHECKS:
             continue
-        if key and (key not in latest or at >= latest[key][0]):
+        if key and (key not in latest or at > latest[key][0]
+                    or (at == latest[key][0] and latest[key][1] in RED_CHECK_STATES
+                        and state not in RED_CHECK_STATES)):
             latest[key] = (at, state)
     return any(state in RED_CHECK_STATES for _, state in latest.values())
 
@@ -514,6 +528,23 @@ def red_label_justified(number: int, pr: dict, sh=run) -> bool:
     return head_red(number, sh) is not False
 
 
+def lane_fix_red_applier(number: int, sh=run) -> str | None:
+    """Login that applied the current lane-fix-red episode (one GraphQL read); None when
+    unreadable or absent. Callers fail closed: an unreadable applier keeps the label."""
+    owner, name = REPO.split("/", 1)
+    read = sh(["gh", "api", "graphql", "-f", f"query={LABEL_EPISODE_QUERY}", "-F", f"owner={owner}",
+               "-F", f"name={name}", "-F", f"number={number}"])
+    try:
+        nodes = json.loads(read.stdout)["data"]["repository"]["pullRequest"]["timelineItems"]["nodes"]
+        episodes = [node for node in nodes
+                    if str((node.get("label") or {}).get("name") or "").lower() == LANE_FIX_RED]
+        latest = max(episodes, key=lambda node: str(node.get("createdAt") or ""))
+        login = (latest.get("actor") or {}).get("login")
+    except (ValueError, KeyError, IndexError, TypeError, AttributeError):
+        return None
+    return str(login).lower() if login else None
+
+
 def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
     """Drop lane-fix-red once this head is required-green.
 
@@ -530,6 +561,13 @@ def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
     # rollup is the event's evidence. A pending or failed check keeps the label
     # until that check's own completion.
     if pr.get("mergeStateStatus") not in REQUIRED_GREEN and not head_settled_green(number, sh):
+        return False
+    # JOV-8492: this rollup can only supersede a red the relay itself applied (a PR-head check
+    # red). A jovie-bot episode is the queue breaker's merge-group hold — those reds are invisible
+    # here, and clearing one re-armed the hold/re-enroll churn that flew #24694's green head
+    # through ~35 merge-group builds — and a human label is a human hold. Unreadable keeps the
+    # label: fail closed.
+    if lane_fix_red_applier(number, sh) != RELAY_RED_LABELLER:
         return False
     deleted = sh(["gh", "api", "-X", "DELETE",
                   f"repos/{REPO}/issues/{number}/labels/{LANE_FIX_RED}"])
@@ -2668,6 +2706,7 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
     deps = open_dependencies(prs, now, lane.sh)
     attempts = read_state(host, "fix-attempts.json")
     held = read_state(host, "held.json")
+    breaker_held = read_state(host, "queue-breaker.json")
     plan = reconcile_plan(prs, attempts, disabled, lane.MAX_FIX_ATTEMPTS, now, deps, held)
     by_number = {pr["number"]: pr for pr in prs}
     labeled = []
@@ -2681,6 +2720,14 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
         if add_label(number, kind, lane.sh):
             labeled.append((number, kind))
     for number, kind in plan["unlabel"]:
+        if kind == "red":
+            # JOV-8492: the queue breaker still holds this exact head, and its reds (merge-group
+            # failures) are invisible to the required-green check above — unlabeing here re-arms
+            # the breaker's re-block and churns the head. The breaker's own sweep releases on
+            # supersession or a new head; anything else waits for that.
+            record = breaker_held.get(str(number)) if isinstance(breaker_held, dict) else None
+            if isinstance(record, dict) and record.get("head") == (by_number.get(number) or {}).get("headRefOid"):
+                continue
         consume(lane, {"number": number}, [kind])
     if plan["reset"]:
         reset = {str(number) for number in plan["reset"]}
