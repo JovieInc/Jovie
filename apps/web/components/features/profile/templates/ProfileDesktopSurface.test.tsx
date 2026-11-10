@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
@@ -1212,7 +1213,10 @@ describe('ProfileDesktopSurface', () => {
     // types the lazily-loaded desktop surface against this module's own props
     // interface; the export is the contract that keeps that loader typed.
     const source = readFileSync(
-      new URL('./ProfileDesktopSurface.tsx', import.meta.url),
+      resolve(
+        process.cwd(),
+        'components/features/profile/templates/ProfileDesktopSurface.tsx'
+      ),
       'utf8'
     );
     expect(source).toContain('export interface ProfileDesktopSurfaceProps');
