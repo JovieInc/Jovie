@@ -21,7 +21,7 @@ export async function withCaptureBrowser(run) { const { chromium } = await impor
 const browser = await chromium.launch(); try { return await run(browser); } finally { await browser.close(); } }
 /**
 * @param {import('playwright').Browser} browser
-* @param {{url: string, viewport?: string | number, mode?: string, selector?: string, mockupSelector?: string, click?: string, wait?: number}} options
+* @param {{url: string, viewport?: string | number, mode?: string, selector?: string, mockupSelector?: string, click?: string, wait?: number, expectedPath?: string}} options
 */
 export async function captureSurfacePng(browser, options) {
 const { url, viewport = 'desktop', mode, selector, mockupSelector, click, wait = 1500, expectedPath } = options;

@@ -94,7 +94,7 @@ reason: 'capture-target-missing', }); continue; } const captured = await options
 const landedPath = captured.finalUrl
   ? new URL(captured.finalUrl).pathname
   : null;
-if (frame.route && (captured.redirected || (landedPath && landedPath !== frame.route))) {
+if (captured.redirected || (landedPath && landedPath !== new URL(url).pathname)) {
   frames.push({ ...frameId(frame), verdict: 'waiting',
     reason: 'capture-redirected-off-route' }); continue; }
 // Pair like with like: the Pen still's text bands and mockup box are
@@ -146,7 +146,7 @@ args['storybook-url'] || process.env.PEN_STILL_STORYBOOK_URL; const capture = op
 ? async (frame, url) => { const { captureSurfacePng, withCaptureBrowser } = await import(
 './clef-screenshot-evaluator.mjs' ); return withCaptureBrowser(browser => captureSurfacePng(browser, { url,
 viewport: frame.viewport, mode: frame.mode, selector: frame.sectionSelector,
-mockupSelector: frame.mockupSelector, expectedPath: frame.route, }) ); } : undefined); const receipt = await evaluateManifest(manifest, {
+mockupSelector: frame.mockupSelector, expectedPath: new URL(url).pathname, }) ); } : undefined); const receipt = await evaluateManifest(manifest, {
 root: options.root ?? REPO_ROOT, strict: Boolean(args.strict), baseUrl: typeof baseUrl === 'string' ? baseUrl : undefined,
 storybookUrl: typeof storybookUrl === 'string' ? storybookUrl : undefined, capture, });
 const outDir = resolve(String(args.out ?? 'pen-still-out')); mkdirSync(outDir, { recursive: true });

@@ -117,22 +117,18 @@ const PRICING_SCHEMA = {
 
 export default function PricingPage() {
   return (
-    // Pen golden-path capture scope (JOV-11623): the pricing composition
-    // the checkout/pricing frame is diffed against.
-    <div data-pen-section='checkout/pricing'>
-      <PricingRecipeBody
-        requestAccessCopy={requestAccessCopy}
-        structuredData={
-          <script type='application/ld+json'>
-            {safeJsonLdStringify(PRICING_SCHEMA)}
-          </script>
-        }
-        plans={
-          <MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />
-        }
-        auditOffer={<VisibilityAuditOffer />}
-        comparisonChart={<PricingComparisonChart />}
-      />
-    </div>
+    <PricingRecipeBody
+      requestAccessCopy={requestAccessCopy}
+      structuredData={
+        <script type='application/ld+json'>
+          {safeJsonLdStringify(PRICING_SCHEMA)}
+        </script>
+      }
+      plans={
+        <MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />
+      }
+      auditOffer={<VisibilityAuditOffer />}
+      comparisonChart={<PricingComparisonChart />}
+    />
   );
 }

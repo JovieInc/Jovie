@@ -126,6 +126,18 @@ function runFixtureCli({ root, manifest }, strict = true, out = 'out') {
     ? JSON.parse(readFileSync(join(outDir, 'receipt.json'), 'utf8')) : null;
   return { ...result, outDir, receipt };
 }
+test('a Storybook capture compares its selected target rather than the fallback route', async t => {
+  const { root, manifest } = fixture(t);
+  const storyManifest = { ...manifest, frames: manifest.frames.map(frame => ({ ...frame, story: 'homepage--hero' })) };
+  const receipt = await evaluateManifest(storyManifest, {
+    root, baseUrl: 'http://app.invalid', storybookUrl: 'http://stories.invalid',
+    capture: async (frame, url) => {
+      assert.equal(url, 'http://stories.invalid/iframe.html?id=homepage--hero&viewMode=story');
+      return { png: readFileSync(join(root, frame.stillPath)), finalUrl: url };
+    },
+  });
+  assert.equal(receipt.frames[0].verdict, 'pass');
+});
 for (const mixed of [false, true]) test(`strict rejects ${mixed ? 'mixed pass/waiting' : 'all-waiting'} frames`, t => {
   const input = fixture(t, mixed ? ['ready', 'missing'] : ['missing']);
   input.manifest.frames.at(-1).stillPath = 'absent.png';
