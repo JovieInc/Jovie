@@ -13,6 +13,7 @@ const ROUTE_BUDGETS_PATH = resolve(
 export const HEADROOM_KB = 16;
 export const BASELINE_HEADROOM_RATIO = 0.02;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const REQUIRED_ROUTE_GROUPS = ['admin', 'dashboard', 'marketing', 'public'];
 
 export function isAuthedAppRoute(route) {
   return route === '/app' || route.startsWith('/app/');
@@ -70,6 +71,12 @@ export function loadRouteGroups(routeBudgetsPath = ROUTE_BUDGETS_PATH) {
   }
   if (Object.keys(routes).length === 0) {
     throw new Error(`${routeBudgetsPath} declares no route groups`);
+  }
+  for (const group of REQUIRED_ROUTE_GROUPS) {
+    if (!Object.hasOwn(routes, group))
+      throw new Error(
+        `route-budgets.json missing required route group ${group}`
+      );
   }
   for (const [group, definition] of Object.entries(routes)) {
     const kb = definition?.budgets?.initialJS_gzip_kb;
@@ -329,6 +336,10 @@ export function validateGroupBudgetShape(budgets, routeGroups) {
   }
   const errors = [];
   const expected = new Set(Object.keys(routeGroups));
+  for (const group of REQUIRED_ROUTE_GROUPS) {
+    if (!expected.has(group))
+      errors.push(`route-budgets.json missing required route group ${group}`);
+  }
   for (const [group, entry] of Object.entries(groups)) {
     if (!expected.has(group)) {
       errors.push(`groups.${group} has no route-budgets.json group`);

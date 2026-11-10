@@ -11,6 +11,7 @@ import {
   measureFirstLoadJs,
   readBudgetAncestor,
   routeGroupFor,
+  validateGroupBudgetShape,
 } from './route-js-budget.mjs';
 import {
   buildFirstLoadFixture,
@@ -61,6 +62,27 @@ describe('route-group budgets (JOV-8561)', () => {
       loadRouteGroups(join(malformed, 'route-budgets.json'))
     ).toThrow();
   });
+
+  it.each(['admin', 'dashboard', 'marketing', 'public'])(
+    'fails closed when the %s route group is removed',
+    group => {
+      const routes = loadRouteGroups();
+      delete routes[group];
+      const root = mkdtempSync(join(tmpdir(), 'jov-8561-missing-group-'));
+      fixtureRoots.push(root);
+      const path = join(root, 'route-budgets.json');
+      writeFileSync(path, JSON.stringify({ routes }));
+      expect(() => loadRouteGroups(path)).toThrow(
+        /missing required route group/
+      );
+      const groups = Object.fromEntries(
+        Object.keys(routes).map(key => [key, { baselineKb: 1000 }])
+      );
+      expect(validateGroupBudgetShape({ groups }, routes)).toContain(
+        `route-budgets.json missing required route group ${group}`
+      );
+    }
+  );
 
   it('deliberate red: a route over its own group baseline fails even when other groups would pass it', () => {
     // The homepage fixture route fits the per-route marketing ceiling (32)
