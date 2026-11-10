@@ -15,9 +15,11 @@ export function SidebarInboxLink({
   readonly availability?: InboxNavigationAvailability;
 }) {
   const hasRuntimeUpdate = Boolean(useRuntimeUpdate()?.available);
-  const pending = availability?.state === 'available';
+  const pendingCount = availability?.pendingCount;
+  const pending =
+    availability?.state === 'available' && typeof pendingCount === 'number';
   const label = pending
-    ? `Inbox — ${pluralize(availability.pendingCount, 'item')} ${availability.pendingCount === 1 ? 'needs' : 'need'} attention`
+    ? `Inbox — ${pluralize(pendingCount, 'item')} ${pendingCount === 1 ? 'needs' : 'need'} attention`
     : availability?.state === 'empty'
       ? 'Inbox — all caught up'
       : 'Inbox';
@@ -31,7 +33,11 @@ export function SidebarInboxLink({
         prefetch={false}
         aria-label={accessibleLabel}
         data-inbox-attention={
-          pending ? 'available' : (availability?.state ?? 'unknown')
+          pending
+            ? 'available'
+            : availability?.state === 'empty'
+              ? 'empty'
+              : 'unknown'
         }
         className='focus-ring-themed relative inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-item-foreground hover:bg-sidebar-accent focus-visible:bg-sidebar-accent'
       >
