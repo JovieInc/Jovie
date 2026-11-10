@@ -660,6 +660,18 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()), [])
         self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [], "an unreadable applier keeps the label")
 
+    def test_label_episode_query_is_structurally_valid(self):
+        # JOV-8492: an unbalanced brace in the provenance query is rejected by GitHub's GraphQL
+        # parser, the applier returns None (fail closed) and the relay never clears its own
+        # labels — so the string itself is pinned, not just the parsing of its replies.
+        events2 = load("label_episodes")
+        query = events2.LABEL_EPISODE_QUERY
+        self.assertEqual(query.count("{"), query.count("}"))
+        self.assertEqual(query.count("("), query.count(")"))
+        for token in ("timelineItems", "LABELED_EVENT", "... on LabeledEvent", "actor{__typename login}",
+                      "label{name}", "createdAt"):
+            self.assertIn(token, query)
+
     def test_a_failed_delete_leaves_lane_fix_red_in_place(self):
         view = pr(branch="cursor/fix", sha="h1", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
         shell = Shell({("gh", "pr", "view"): view, ("gh", "api", "-X", "DELETE"): (1, ""),
