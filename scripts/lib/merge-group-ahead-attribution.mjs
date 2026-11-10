@@ -322,7 +322,7 @@ export function attributeAgainstPeerRuns({
   if (lanes.length !== 1 || lanes[0] !== 'structural') {
     return no(`not-structural-only:${lanes.join(',') || 'none'}`);
   }
-  const current = parseFailedSignals(currentCiFastLog);
+  const current = parseFailedSignals(currentLog);
   if (current.length === 0) return no('structural-failure-unparsed');
   const unparsed = current.find(entry => entry.tests.size === 0);
   if (unparsed) return no(`failing-tests-unparsed:${unparsed.command}`);
