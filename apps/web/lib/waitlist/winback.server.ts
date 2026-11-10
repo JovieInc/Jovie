@@ -326,7 +326,10 @@ export async function promoteApprovedWinbackBatch(
 ): Promise<{ promoted: number }> {
   const approval = await getWinbackApprovalRecord(tx, batchId);
   const record = winbackApprovalRecordSchema.safeParse(approval);
-  if (!record.success) {
+  if (
+    !record.success ||
+    record.data.templateVersion !== WINBACK_EMAIL_TEMPLATE_VERSION
+  ) {
     throw new Error(
       `winback batch ${batchId} has no valid approval record; nothing promoted`
     );
