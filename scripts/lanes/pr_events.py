@@ -35,6 +35,7 @@ from label_episodes import RELAY_RED_LABELLER, label_episode_applier  # noqa: E4
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from atomic_state import append_json_object
+from pr_repair_evidence import ANY_HEADING, RED_HEADING, red_section_bounds, with_locking_pr
 import remediation  # noqa: E402  (classifier + non-PR intake; no lane_runner import)
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
@@ -1005,29 +1006,8 @@ def quota_failure(workflow_run: dict, sh=run, classify=None) -> str | None:
 
 
 RED_BLOCK_MARKER = "<!-- lanes:red-before-green -->"
-RED_HEADING = re.compile(r"^#{1,6}\s*red-before-green\s*$", re.I)
-ANY_HEADING = re.compile(r"^#{1,6}\s")
 JOB_URL = re.compile(r"^(https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*)(?:/job/\d+)?")
 RED_RUN_URL = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*(?:/attempts/[1-9]\d*)?")
-
-
-def red_section_bounds(lines: list[str], heading=RED_HEADING) -> tuple[int, int] | None:
-    """Match Fleet boundaries, ignoring fenced/hidden headings but preserving source line indexes."""
-    visible = re.sub(r"<!--[\s\S]*?-->", lambda match: "\n" * match.group().count("\n"), "\n".join(lines))
-    fenced = False
-    start = None
-    for index, line in enumerate(visible.split("\n")):
-        if re.match(r"^\s*(?:```|~~~)", line):
-            fenced = not fenced
-            continue
-        if fenced:
-            continue
-        if start is None:
-            if heading.match(line.strip()):
-                start = index
-        elif ANY_HEADING.match(line):
-            return start, index
-    return (start, len(lines)) if start is not None else None
 
 
 def red_section_complete(body: str) -> bool:
@@ -1113,30 +1093,7 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
             note = json.dumps(customer_decision, separators=(",", ":")).replace("<", "\\u003c").replace(">", "\\u003e")
             updated = updated.rstrip("\n") + "\n<!-- customer-changelog/v1 " + note + " -->\n"
     if locking_pr is not None:
-        if type(locking_pr) is not int or locking_pr < 1:
-            raise ValueError("locking PR requires an explicit positive PR number")
-        lines = updated.split("\n")
-        bounds = red_section_bounds(lines, re.compile(r"^#{1,6}\s+Locked areas\s*$", re.I))
-        if bounds is None:
-            updated = updated.rstrip("\n") + f"\n\n## Locked areas\n\nLocking PR: #{locking_pr}\n"
-        else:
-            start, end = bounds
-            original = "\n".join(lines[start + 1:end])
-            content = re.sub(r"<!--[\s\S]*?-->", "", original).strip()
-            # Fill explicit template declarations, preserving existing citations and
-            # unrelated notes/footer text. Never replace text inside hidden comments.
-            placeholder = r"(?:[-*][ \t]*)?(?:none|n/?a|not applicable|todo|tbd)[.!]?"
-            if not content:
-                updated = "\n".join(lines[:end] + [f"Locking PR: #{locking_pr}", ""] + lines[end:])
-            elif (re.fullmatch(placeholder, content.splitlines()[0].strip(), re.I)
-                  and not re.search(r"\b(?:GBrain|Locking PR)\s*:", content, re.I)):
-                parts = re.split(r"(<!--[\s\S]*?-->)", original)
-                for index in range(0, len(parts), 2):
-                    parts[index], count = re.subn(r"(?im)^[ \t]*" + placeholder + r"[ \t]*$",
-                                                  f"Locking PR: #{locking_pr}", parts[index], count=1)
-                    if count:
-                        break
-                updated = "\n".join(lines[:start + 1] + "".join(parts).split("\n") + lines[end:])
+        updated = with_locking_pr(updated, locking_pr)
     if previous_win_section is not None and not win_section:
         raise ValueError("Win replacement requires explicit measured win evidence")
     if win_section is not None and win_section != "":
