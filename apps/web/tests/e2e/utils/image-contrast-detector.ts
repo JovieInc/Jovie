@@ -289,6 +289,21 @@ async function scanCandidates(page: Page): Promise<PageScan> {
         if (layersBehind.length === 0) return;
         seen.add(element);
         const index = candidates.length;
+        // Hide the whole control's content, not just the candidate: a
+        // sibling subtree inside the same interactive control (the brand
+        // mark beside the credit text, a bold wordmark span) paints ink the
+        // candidate's own hide cannot remove, and the sample would read
+        // that ink as background (JOV-11623).
+        const control = element.closest(
+          'a, button, [role="button"], [role="link"], [role="menuitem"], [role="tab"], summary'
+        );
+        const hideScope =
+          control && control.contains(element)
+            ? Array.from(control.children)
+            : [element];
+        for (const sibling of hideScope) {
+          sibling.setAttribute(hideAttribute, String(index));
+        }
         element.setAttribute(hideAttribute, String(index));
         const style = getComputedStyle(element);
         const ancestorChain: string[] = [];
@@ -395,7 +410,7 @@ export async function inspectImageContrast(
   // the sample would read that ink as "background". Solid backgrounds
   // (background-color) stay painted, so control surfaces keep their fill.
   const styleTag = await page.addStyleTag({
-    content: `[${HIDE_ATTRIBUTE}], [${HIDE_ATTRIBUTE}] * { color: transparent !important; text-shadow: none !important; -webkit-text-stroke: transparent !important; caret-color: transparent !important; background-image: none !important; }`,
+    content: `[${HIDE_ATTRIBUTE}], [${HIDE_ATTRIBUTE}] * { color: transparent !important; text-shadow: none !important; -webkit-text-stroke: transparent !important; caret-color: transparent !important; background-image: none !important; fill: transparent !important; stroke: transparent !important; }`,
   });
   // Fresh boxes at capture time: late-loading media reflows the page between
   // the scan and this capture (JOV-11623). The hide tags identify candidates.
