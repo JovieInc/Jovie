@@ -1222,8 +1222,6 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
         self.assertEqual(report["removed"], [])
 
 
-if __name__ == "__main__":
-    unittest.main()
 class CleanIdleSweepTest(SweepTest):
     """JOV-10172: a clean, fully pushed checkout retires after CLEAN_IDLE_S (default 3h)
     instead of waiting the full 12h; dirty or unpushed work never uses that tier."""
@@ -1272,3 +1270,7 @@ class CleanIdleSweepTest(SweepTest):
         report = self.sweep(now=time.time() + 2 * 3600)
         self.assertTrue(path.exists())
         self.assertEqual(report["kept"], 1)
+
+
+if __name__ == "__main__":
+    unittest.main()

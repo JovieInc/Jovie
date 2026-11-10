@@ -5241,8 +5241,8 @@ def deterministic_conflict_pass(host: Host, prs: list[dict], now: float | None =
     spent or escalated PR is not left DIRTY by the thing a script can do. Each (PR, head, main)
     is tried once; every try is ledgered with the time the PR has been DIRTY-visible."""
     now = time.time() if now is None else now
-    if not worktree_hosts.allowed(HOST):
-        return []  # the deterministic pass checks a worktree out; not on a non-worktree host
+    if worktree_hosts.admission(HOST, host.repo, worktree_count_run):
+        return []  # no lane worktree may be created here: not a worktree host, or at its cap
     path = host.state / "deterministic-conflict.json"
     visits = read_json(path)
     acted = []
@@ -7993,11 +7993,12 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                "worktree": str(worktree), "branch": pr["headRefName"], "pr": pr["number"],
                "headBefore": pr["headRefOid"], "requestSource": fix_request_source(pr),
                "startedAt": now_iso()}
-    if not worktree_hosts.allowed(HOST):
-        # Repair checkouts are worktrees too: a host that may not create them returns the PR
-        # untouched (JOV-10172). No attempt, no label consumption, nothing charged.
-        receipt.update(verdict="worktree-host-held",
-                       reasons=[f"worktree-host-not-allowed:{HOST}"], endedAt=now_iso())
+    repair_held = worktree_hosts.admission(HOST, host.repo, worktree_count_run)
+    if repair_held:
+        # Repair checkouts are worktrees too: a host that may not create one (not a worktree
+        # host, or a fallback at its cap) returns the PR untouched (JOV-10172). No attempt,
+        # no label consumption, nothing charged.
+        receipt.update(verdict="worktree-host-held", reasons=[repair_held], endedAt=now_iso())
         append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
     receipt["targetStateReads"] = 1
@@ -8377,9 +8378,9 @@ def _adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim, *, sensitive: b
                "origin": AUTONOMOUS_ORIGIN, "attribution": {"category": "review-only", "provider": name},
                "worktree": str(worktree), "branch": pr.get("headRefName"), "pr": pr["number"],
                "startedAt": now_iso()}
-    if not worktree_hosts.allowed(HOST):
-        receipt.update(verdict="worktree-host-held",
-                       reasons=[f"worktree-host-not-allowed:{HOST}"], endedAt=now_iso())
+    adopt_held = worktree_hosts.admission(HOST, host.repo, worktree_count_run)
+    if adopt_held:
+        receipt.update(verdict="worktree-host-held", reasons=[adopt_held], endedAt=now_iso())
         append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
     with open(runs / f"{run_id}.log", "w") as log:

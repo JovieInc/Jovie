@@ -17904,6 +17904,37 @@ class WorktreeHostGateTest(unittest.TestCase):
                          ["worktree-host-held", "worktree-host-held"])
         self.assertFalse((self.state / "worktrees").exists(), "no checkout was made")
 
+    def test_fix_red_and_adopt_hold_a_fallback_host_at_its_cap(self):
+        listing = "worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /w1\ndetached\n\nworktree /w2\ndetached\n"
+        pr = {"number": 5, "headRefName": "codex/y", "headRefOid": "b" * 40}
+
+        def fake_sh(args, **kwargs):
+            if "worktree" in args and "list" in args:
+                return SimpleNamespace(returncode=0, stdout=listing, stderr="")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with patch.object(lane, "HOST", "mac"), patch.object(lane, "sh", fake_sh), \
+                patch.dict(os.environ, {"LANES_WORKTREE_HOSTS": "gem,mac", "LANES_MAX_WORKTREES": "2"}):
+            fix = lane._fix_red_pr(self.host, "codex", {"cmd": ["true"]}, pr)
+            adopt = lane._adopt_pr(self.host, "codex", pr, SimpleNamespace())
+            acted = lane.deterministic_conflict_pass(self.host, [])
+        for receipt in (fix, adopt):
+            self.assertEqual(receipt["verdict"], "worktree-host-held")
+            self.assertEqual(receipt["reasons"], ["worktree-cap:2/2"])
+        self.assertEqual(acted, [])
+        self.assertFalse((self.state / "worktrees").exists(), "no checkout was made")
+
+    def test_worker_lets_a_remote_lane_past_the_gate_on_a_non_worktree_host(self):
+        providers = {"hyperagent": {"enabled": True, "slots": 0, "repairs": False}}
+        reserved = patch.object(lane, "reserved_binding_pass", return_value=7)
+        reserved.start()
+        self.addCleanup(reserved.stop)
+        with patch.object(lane, "HOST", "mac"), patch.dict(os.environ, {"LANES_WORKTREE_HOSTS": "gem"}), \
+                patch.object(lane, "load_providers", return_value=providers):
+            # slots 0 routes through reserved_binding_pass, which proves worker() got past
+            # the worktree gate: a checkout lane would have returned 0 before any of this.
+            self.assertEqual(lane.worker(self.host, "hyperagent"), 7)
+
     def test_deterministic_conflict_pass_never_checks_out_on_a_non_worktree_host(self):
         with patch.object(lane, "HOST", "mac"), patch.dict(os.environ, {"LANES_WORKTREE_HOSTS": "gem"}), \
                 patch.object(lane, "sh", Mock(side_effect=AssertionError("no git should run"))):
