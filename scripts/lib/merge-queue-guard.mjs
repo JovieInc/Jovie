@@ -2008,6 +2008,9 @@ export const MERGE_GROUP_FAILURE_CONCLUSIONS = new Set([
 // retry policy below.
 export const DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS = new Set([
   'Run lanes coverage pytest',
+  // Combined floors report of the lanes coverage matrix legs (Move 3
+  // 2026-11-10); a shortfall on the unchanged head fails identically on retry.
+  'Run lanes coverage report',
   'Run deterministic brand safety scan',
   'Run deterministic Promptfoo evals',
   'Run golden eval-set CI gate',
