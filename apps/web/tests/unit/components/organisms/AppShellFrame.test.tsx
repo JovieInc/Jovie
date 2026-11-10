@@ -1,11 +1,26 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
 
+afterEach(() => {
+  document.documentElement.removeAttribute('data-desktop-runtime');
+});
+
 describe('AppShellFrame', () => {
+  it('mounts exactly one deferred titlebar in the desktop shell', async () => {
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    render(<AppShellFrame sidebar={null} main={<div>Desktop content</div>} />);
+
+    const titlebar = await screen.findByTestId('electron-titlebar-row');
+    expect(
+      screen.getByRole('main').closest('[data-app-shell-frame]')
+    ).toContainElement(titlebar);
+    expect(screen.getAllByTestId('electron-titlebar-row')).toHaveLength(1);
+  });
+
   it.each([false, true])(
     'keeps Ovie paint ownership stable while loading: %s',
     loading => {
@@ -68,15 +83,16 @@ describe('AppShellFrame', () => {
 
     const mainContent = screen.getByRole('main');
     const appShellFrame = mainContent.closest('[data-app-shell-frame]');
-    const desktopTitlebar = screen.getByTestId('electron-titlebar-row');
 
     expect(mainContent).toHaveAttribute('id', 'main-content');
     expect(mainContent).not.toHaveAttribute('tabindex');
     expect(appShellFrame).toBeInTheDocument();
-    expect(appShellFrame).toContainElement(desktopTitlebar);
+    expect(
+      screen.queryByTestId('electron-titlebar-row')
+    ).not.toBeInTheDocument();
     expect(
       appShellFrame?.querySelectorAll('[data-testid="electron-titlebar-row"]')
-    ).toHaveLength(1);
+    ).toHaveLength(0);
     const shellBody = mainContent.closest('[data-app-shell-body]');
     expect(shellBody).toHaveAttribute('data-shell-rail-motion', 'coordinated');
     expect(shellBody).toHaveAttribute(

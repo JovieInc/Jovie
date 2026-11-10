@@ -13,6 +13,7 @@ import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileComp
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 
 export interface PublicProfileFixtureProps {
+  readonly displayName?: string;
   readonly longName?: boolean;
   readonly preview?: boolean;
   readonly state?: string;
@@ -28,6 +29,7 @@ export interface PublicProfileFixtureProps {
  * desktop/mobile ownership contract without depending on a database row.
  */
 export function PublicProfileFixture({
+  displayName,
   longName = false,
   preview = false,
   state = 'unclaimed',
@@ -36,7 +38,9 @@ export function PublicProfileFixture({
   const artist = {
     ...HOMEPAGE_PROFILE_PREVIEW_ARTIST,
     id: '123e4567-e89b-12d3-a456-426614174000',
-    name: longName ? 'The Extraordinary Midnight Radio Orchestra' : 'Unfazed',
+    name:
+      displayName ??
+      (longName ? 'The Extraordinary Midnight Radio Orchestra' : 'Unfazed'),
     handle: 'unfazed',
   };
 

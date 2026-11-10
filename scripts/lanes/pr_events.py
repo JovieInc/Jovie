@@ -30,6 +30,7 @@ from urllib.parse import urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import disk_guard  # noqa: E402
 import lifecycle, pr_wip, repair_order  # noqa: E402  (pr_wip: per-producer WIP census; repair_order: fair claims)
+from label_episodes import RELAY_RED_LABELLER, label_episode_applier  # noqa: E402  (JOV-8492 provenance gate)
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -286,8 +287,7 @@ def dependency_refs(body: str | None) -> set[int]:
 
 def pr_scalar(number: int, field: str, sh=run) -> str:
     """One field of one PR ("" when unreadable): the body/deps read for stale drafts only."""
-    viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json", field,
-                 "--jq", f".{field}"])
+    viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json", field, "--jq", f".{field}"])
     return (viewed.stdout or "") if viewed.returncode == 0 else ""
 
 
@@ -416,8 +416,7 @@ def label_names(pr: dict) -> list[str]:
 def add_label(number: int, kind: str, sh=run, *, prefix: str = PREFIX) -> bool:
     """The issues API creates a missing label, so the queue needs no setup. `prefix=""` applies
     an exact label name (the human-decision hold)."""
-    return sh(["gh", "api", "-X", "POST", f"repos/{REPO}/issues/{number}/labels",
-               "-f", f"labels[]={prefix}{kind}"]).returncode == 0
+    return sh(["gh", "api", "-X", "POST", f"repos/{REPO}/issues/{number}/labels", "-f", f"labels[]={prefix}{kind}"]).returncode == 0
 
 
 def stale_fix_labels(pr: dict, labels: set) -> list[str]:
@@ -446,13 +445,13 @@ NON_REQUIRED_CHECKS = frozenset({"tently"})
 def read_head_rollup(number: int, sh=run):
     """One GraphQL read of the head check rollup. Callers own True, False, and None."""
     owner, name = REPO.split("/", 1)
-    return sh(["gh", "api", "graphql", "-f", f"query={HEAD_CHECKS_QUERY}", "-F", f"owner={owner}",
-               "-F", f"name={name}", "-F", f"number={number}"])
+    return sh(["gh", "api", "graphql", "-f", f"query={HEAD_CHECKS_QUERY}", "-F", f"owner={owner}", "-F", f"name={name}", "-F", f"number={number}"])
 
 
 def head_red(number: int, sh=run) -> bool | None:
     """True only when the latest run of some check on the head failed. GitHub's rollup counts
-    a CANCELLED (superseded) run as FAILURE even after its replacement passed. None: unreadable."""
+    a CANCELLED (superseded) run as FAILURE even after its replacement passed. None: unreadable.
+    A SUCCESS tying a FAILURE's completedAt is that replacement — the newer verdict (JOV-8492)."""
     read = read_head_rollup(number, sh)
     try:
         commits = json.loads(read.stdout)["data"]["repository"]["pullRequest"]["commits"]["nodes"]
@@ -468,7 +467,7 @@ def head_red(number: int, sh=run) -> bool | None:
         state = str(node.get("conclusion") or node.get("state") or "").upper()
         if key and key.lower() in NON_REQUIRED_CHECKS:
             continue
-        if key and (key not in latest or at >= latest[key][0]):
+        if key and (key not in latest or at > latest[key][0] or (at == latest[key][0] and latest[key][1] in RED_CHECK_STATES and state not in RED_CHECK_STATES)):
             latest[key] = (at, state)
     return any(state in RED_CHECK_STATES for _, state in latest.values())
 
@@ -531,8 +530,10 @@ def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
     # until that check's own completion.
     if pr.get("mergeStateStatus") not in REQUIRED_GREEN and not head_settled_green(number, sh):
         return False
-    deleted = sh(["gh", "api", "-X", "DELETE",
-                  f"repos/{REPO}/issues/{number}/labels/{LANE_FIX_RED}"])
+    # JOV-8492: this rollup can only supersede a red the relay itself applied (see label_episodes.py).
+    if label_episode_applier(number, LANE_FIX_RED, sh) != RELAY_RED_LABELLER:
+        return False
+    deleted = sh(["gh", "api", "-X", "DELETE", f"repos/{REPO}/issues/{number}/labels/{LANE_FIX_RED}"])
     return deleted.returncode == 0
 
 
@@ -753,8 +754,7 @@ def mark_poison(number: int, pr: dict, now: float, sh=run) -> bool:
     the enroll workflow skips it; the lanes still fix it and drop the label with their fix."""
     if POISON_LABEL in label_names(pr) or (queue_ejections(number, now, sh, head=pr.get("headRefOid")) or 0) < 2:
         return False
-    viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json",
-                 "state,isDraft,headRefName,headRefOid,isCrossRepository,labels"])
+    viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json", "state,isDraft,headRefName,headRefOid,isCrossRepository,labels"])
     try:
         live = json.loads(viewed.stdout or "{}")
     except (ValueError, TypeError):
@@ -764,8 +764,7 @@ def mark_poison(number: int, pr: dict, now: float, sh=run) -> bool:
         return False
     if sh(["gh", "api", "-X", "POST", f"repos/{REPO}/issues/{number}/labels", "-f", f"labels[]={POISON_LABEL}"]).returncode:
         return False
-    sh(["gh", "pr", "comment", str(number), "--repo", REPO, "--body",
-        f"🤖 `{POISON_LABEL}`: the merge queue ejected this source revision twice in 24 h, so it stays out of the queue "
+    sh(["gh", "pr", "comment", str(number), "--repo", REPO, "--body", f"🤖 `{POISON_LABEL}`: the merge queue ejected this source revision twice in 24 h, so it stays out of the queue "
         "until a fix lands (each re-entry fails every merge group behind it). The lanes are fixing it from "
         "the merge-group failure and remove this label when their fix pushes; remove it by hand once the "
         "failing merge-group check passes locally."])
@@ -1013,8 +1012,7 @@ RED_RUN_URL = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9
 
 
 def red_section_bounds(lines: list[str], heading=RED_HEADING) -> tuple[int, int] | None:
-    """Match Fleet's section boundaries: headings inside code fences are log text."""
-    # Ignore hidden Markdown while retaining source line indexes for replacement.
+    """Match Fleet boundaries, ignoring fenced/hidden headings but preserving source line indexes."""
     visible = re.sub(r"<!--[\s\S]*?-->", lambda match: "\n" * match.group().count("\n"), "\n".join(lines))
     fenced = False
     start = None
@@ -1051,12 +1049,8 @@ def red_section_complete(body: str) -> bool:
 
 
 def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
-    """A `## Red-before-green` section built from the PR's own red check: the failing run URL and
-    the failed jobs' error lines the fixer is shown. Preserve a command that exits nonzero
-    for the failed run: `gh run view --log-failed` only displays logs and exits successfully.
-    Repair PRs require this evidence; agents forget it (45 of 138 Fleet Rules failures on
-    2026-10-25) and the lane already has it. Conflict-only repairs use observed git merge
-    failure output instead. None without a red run or an observed merge failure."""
+    """Build proof from the PR's red run/errors or observed merge conflict; otherwise None.
+    Use a failing command; `gh run view --log-failed` only displays logs."""
     for check in pr.get("statusCheckRollup") or []:
         if str(check.get("conclusion") or "").lower() not in RED_CONCLUSIONS:
             continue
@@ -1074,8 +1068,7 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
             f"- Failing command: `gh run watch {run_url.rsplit('/', 1)[-1]} --repo {REPO} --exit-status`",
             f"- Failing run (before fix): {run_url}", "",
             "```text", *lines, "```", "", RED_BLOCK_MARKER])
-    # Conflict-only repairs have no failed CI run. Require both the observed
-    # git merge failure and a conflicting PR state; a label alone is not red proof.
+    # Conflict-only proof needs observed merge failure and conflicting state, not just a label.
     observed = str(excerpt or "").splitlines()
     conflicts = [line for line in observed if re.fullmatch(r"CONFLICT \([^)]+\): .+", line)]
     if (pr.get("mergeable") == "CONFLICTING" or pr.get("mergeStateStatus") == "DIRTY") and conflicts and (
@@ -1101,10 +1094,8 @@ def with_red_section(body: str, block: str) -> str:
 
 def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
                          locking_pr: int | None = None, win_section: str | None = None,
-                         premise: dict | None = None) -> str:
-    """Complete caller-supplied evidence without inventing outcomes or provenance.
-    Preserve existing proof and decisions; Fleet/changelog guards validate the result.
-    """
+                         premise: dict | None = None, previous_win_section: str | None = None) -> str:
+    """Complete explicit evidence; preserve proof/decisions for Fleet/changelog validation."""
     if len(re.findall(r"<!--\s*customer-changelog/v1\b[\s\S]*?-->", body)) > 1:
         raise ValueError("repair requires exactly one customer changelog decision")
     updated = body
@@ -1127,12 +1118,21 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         visible = re.sub(r"<!--[\s\S]*?-->", "", updated)
         if not re.search(r"^#{1,6}\s+Locked areas\s*$", visible, re.I | re.M):
             updated = updated.rstrip("\n") + f"\n\n## Locked areas\n\nLocking PR: #{locking_pr}\n"
+    if previous_win_section is not None and not win_section:
+        raise ValueError("Win replacement requires explicit measured win evidence")
     if win_section is not None and win_section != "":
         if not isinstance(win_section, str) or not re.match(r"\A## Win\s*\n", win_section):
             raise ValueError("measured win requires a complete ## Win section")
         if re.search(r"^#{1,6}\s+|customer-changelog/v1", win_section.split("\n", 1)[1], re.M):
             raise ValueError("measured win must contain only Win evidence; use the dedicated repair fields")
-        if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Win\s*$", re.I)) is None:
+        lines = updated.split("\n")
+        bounds = red_section_bounds(lines, re.compile(r"^#{2,3}\s*Win\s*$", re.I))
+        if previous_win_section is not None:
+            if not bounds or "\n".join(lines[bounds[0]:bounds[1]]).rstrip("\n") != previous_win_section.rstrip("\n"):
+                raise ValueError("Win section changed; re-read the evidence before replacement")
+            start, end = bounds
+            updated = "\n".join(lines[:start] + win_section.rstrip("\n").split("\n") + [""] + lines[end:])
+        elif bounds is None:
             updated = updated.rstrip("\n") + "\n\n" + win_section.rstrip("\n") + "\n"
     if premise is not None:
         fields = ("Assumption", "Falsifying test", "Result")
@@ -1192,8 +1192,7 @@ def failure_held(sha: str | None, sh=run) -> bool:
     by the enroll controller until a new head that nothing was asked to push."""
     if not sha:
         return False
-    listed = sh(["gh", "api", f"repos/{REPO}/commits/{sha}/statuses?per_page=100", "--jq",
-                 f'[.[] | select(.context == "{FAILURE_HOLD_CONTEXT}" and .state == "success") '
+    listed = sh(["gh", "api", f"repos/{REPO}/commits/{sha}/statuses?per_page=100", "--jq", f'[.[] | select(.context == "{FAILURE_HOLD_CONTEXT}" and .state == "success") '
                  '| .creator.login] | unique | join(" ")'])
     return listed.returncode == 0 and bool(set((listed.stdout or "").split()) & FAILURE_HOLD_WRITERS)
 
@@ -1232,8 +1231,7 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
             if not failure_held(sha, sh):
                 continue
             kind = "dequeued"
-        viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json",
-                     "state,isDraft,headRefName,headRefOid,isCrossRepository,mergeStateStatus,labels"])
+        viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json", "state,isDraft,headRefName,headRefOid,isCrossRepository,mergeStateStatus,labels"])
         if viewed.returncode != 0:
             continue
         pr = json.loads(viewed.stdout or "{}")
@@ -2667,6 +2665,7 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
     deps = open_dependencies(prs, now, lane.sh)
     attempts = read_state(host, "fix-attempts.json")
     held = read_state(host, "held.json")
+    breaker_held = read_state(host, "queue-breaker.json")
     plan = reconcile_plan(prs, attempts, disabled, lane.MAX_FIX_ATTEMPTS, now, deps, held)
     by_number = {pr["number"]: pr for pr in prs}
     labeled = []
@@ -2680,6 +2679,9 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
         if add_label(number, kind, lane.sh):
             labeled.append((number, kind))
     for number, kind in plan["unlabel"]:
+        # JOV-8492: the breaker still holds this head (merge-group reds invisible to the check above).
+        if kind == "red" and (breaker_held.get(str(number)) or {}).get("head") == (by_number.get(number) or {}).get("headRefOid"):
+            continue
         consume(lane, {"number": number}, [kind])
     if plan["reset"]:
         reset = {str(number) for number in plan["reset"]}
@@ -2713,8 +2715,7 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
         next_nags[str(row["pr"])] = {"head": row["head"], "at": now}
         if auto_unhold and row["auto"]:
             for name in auto_unhold_labels(by_number[row["pr"]]):
-                lane.sh(["gh", "api", "-X", "DELETE",
-                         f"repos/{lane.REPO_SLUG}/issues/{row['pr']}/labels/{name}"])
+                lane.sh(["gh", "api", "-X", "DELETE", f"repos/{lane.REPO_SLUG}/issues/{row['pr']}/labels/{name}"])
             lane.sh(["gh", "pr", "comment", str(row["pr"]), "--repo", lane.REPO_SLUG, "--body",
                      f"🤖 lanes: the automation hold went stale: CLEAN, and the head moved past it "
                      f"(head `{row['head']}`), so `hold`/`{POISON_LABEL}` are removed and the "

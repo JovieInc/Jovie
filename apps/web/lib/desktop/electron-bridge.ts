@@ -241,41 +241,23 @@ function reportMissingBridgeMethod(method: keyof ElectronAPI): void {
   );
 }
 
-function getRawElectronAPI(): Partial<ElectronAPI> | undefined {
-  if (globalThis.window === undefined) return undefined;
-  const raw = (
-    globalThis.window as Window & { electronAPI?: Partial<ElectronAPI> }
-  ).electronAPI;
-  if (!raw || typeof raw !== 'object') return undefined;
-  return raw;
-}
+// Runtime detection lives in the leaf module ./electron-runtime so the
+// browser shell can import the hook without this module's desktop wiring.
+// Everything below keeps working through the re-exports.
 
-export function getElectronAPI(): ElectronAPI | undefined {
-  const api = getRawElectronAPI();
-  if (!api) return undefined;
-  if (
-    typeof api.platform === 'string' &&
-    typeof api.electronVersion === 'string' &&
-    typeof api.onUpdateAvailable === 'function' &&
-    typeof api.onUpdateDownloaded === 'function' &&
-    typeof api.installUpdateAndRestart === 'function' &&
-    typeof api.goBack === 'function' &&
-    typeof api.goForward === 'function' &&
-    typeof api.onNavStateChanged === 'function'
-  ) {
-    return api as ElectronAPI;
-  }
-  return undefined;
-}
+export {
+  getElectronAPI,
+  getRawElectronAPI,
+  isDesktopEnvironment,
+  isElectronRuntime,
+  useIsElectronRuntime,
+} from './electron-runtime';
 
-/**
- * Returns true when running inside the Electron desktop shell (regardless of
- * which bridge methods exist). Use this to gate desktop-only UI; for actual
- * bridge calls always go through the wrappers below — never the raw object.
- */
-export function isDesktopEnvironment(): boolean {
-  return getRawElectronAPI() !== undefined;
-}
+import {
+  getElectronAPI,
+  getRawElectronAPI,
+  isElectronRuntime,
+} from './electron-runtime';
 
 /** Unknown/older shells remain safe and ordinary web tabs schedule no heartbeat. */
 export function reportDesktopWorkState(
@@ -516,25 +498,6 @@ async function safeInstallUpdateAndRestart(): Promise<boolean> {
 
   openManualDownload();
   return false;
-}
-
-export function isElectronRuntime(): boolean {
-  if (globalThis.window === undefined) return false;
-  if (isDesktopEnvironment()) return true;
-  if (/\bJovieDesktop\//.test(globalThis.navigator.userAgent)) return true;
-  return (
-    globalThis.document.documentElement.dataset.desktopRuntime === 'electron'
-  );
-}
-
-export function useIsElectronRuntime(): boolean {
-  const [isElectron, setIsElectron] = useState(false);
-
-  useEffect(() => {
-    setIsElectron(isElectronRuntime());
-  }, []);
-
-  return isElectron;
 }
 
 /**

@@ -37,6 +37,7 @@ import {
   INCIDENT_SCHEMA,
   MAX_LOOKBACK_COMMITS,
   marker,
+  openIncidents,
   parsePrNumber,
   planJump,
   REOPEN_LABEL,
@@ -443,10 +444,7 @@ async function enqueueWithJump(number) {
 // ---- incident --------------------------------------------------------------
 
 async function incident(key, title, body) {
-  const found = await api(
-    `repos/${REPO}/issues?state=open&labels=${INCIDENT_LABEL}&per_page=50`,
-    'repair'
-  );
+  const found = await openIncidents({ api, gh, repo: REPO, key });
   const existing = found.find(i => readMarker(i.body)?.key === key);
   const text = `${marker({ key })}\n${body}`;
   if (existing) {
@@ -773,27 +771,26 @@ export async function stuckHead({ doApply = false, now = Date.now() } = {}) {
     '-f',
     `labels[]=${CONFLICT_LABEL}`,
   ]);
-  await gh(
-    [
-      'workflow',
-      'run',
-      'pr-remediation-swarm.yml',
-      '-f',
-      // The swarm's workflow_dispatch input is `prs` (comma-separated); an
-      // undeclared input makes the dispatch fail with HTTP 422 (run 41122896980).
-      `prs=${head.number}`,
-    ],
+  // A workflow-disabled dispatch target is an owner-controlled state (run
+  // 42623483651: HTTP 422 on the disabled remediation swarm), not an ejector
+  // error: report it visibly and fall through to the remaining stuck-head
+  // actions; the next wake re-dispatches once the workflow is re-enabled.
+  // (An undeclared dispatch input is also HTTP 422 — run 41122896980 — hence
+  // the swarm's `prs` input name.)
+  const dispatchWorkflow = (file, input, priority) =>
+    gh(['workflow', 'run', file, '-f', input], priority).catch(error => {
+      if (!/disabled workflow/i.test(String(error.message))) throw error;
+      console.error(`::warning::workflow-disabled: ${error.message.trim()}`);
+    });
+  await dispatchWorkflow(
+    'pr-remediation-swarm.yml',
+    `prs=${head.number}`,
     'repair'
   );
   // Green Enroll re-admits the head once the conflict pass pushes and checks are green.
-  await gh(
-    [
-      'workflow',
-      'run',
-      'merge-queue-green-enroll.yml',
-      '-f',
-      `pr_number=${head.number}`,
-    ],
+  await dispatchWorkflow(
+    'merge-queue-green-enroll.yml',
+    `pr_number=${head.number}`,
     'merge'
   );
   const dequeuedAt = new Date(now).toISOString();

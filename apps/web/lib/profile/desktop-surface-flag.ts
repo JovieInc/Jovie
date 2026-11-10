@@ -1,13 +1,17 @@
 /**
- * The public profile is mobile-first (Tim, 2026-09-26). Until the desktop IA
- * is redesigned, desktop visitors see the compact profile centered in a
- * phone-width column, and the wide ProfileDesktopSurface never mounts.
+ * The canonical desktop public profile is the Pen frame
+ * "Public profile / Desktop ≥1180 — CANONICAL" (node D9kdx,
+ * docs/pen-stills/golden-path/manifest.json), implemented by the wide
+ * ProfileDesktopSurface dashboard. It ships by default (Tim, 2026-11-08:
+ * the desktop IA redesign the 2026-09-26 flag was waiting for).
  *
- * Set NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE=1 (or `true`) at build time
- * to restore the desktop surface at >= 1180px. NEXT_PUBLIC_ inlines the value
- * into both the server (ISR) render and the client bundle, so the rendered
- * layout contract and hydration always agree.
+ * Builds that must keep the 2026-09-26 mobile-first phone column opt out
+ * with NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE=0 (or `false`, or an
+ * empty value) at build time. NEXT_PUBLIC_ inlines the value into both the
+ * server (ISR) render and the client bundle, so the rendered layout
+ * contract and hydration always agree.
  */
 export const PROFILE_DESKTOP_SURFACE_ENABLED =
-  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE === '1' ||
-  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE === 'true';
+  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE !== '0' &&
+  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE !== 'false' &&
+  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE !== '';

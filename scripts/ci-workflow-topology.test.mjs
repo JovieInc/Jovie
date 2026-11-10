@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { load as yamlLoad } from 'js-yaml';
 import { buildTopology, findCycle, syncTopology, validateTopology } from './ci-workflow-topology.mjs';
+import { scan as scanAiReviewBoundary } from './company-guards/ai-review-boundary.mjs';
 
 test('Pen drafts share one editor across runs and retain pending frame jobs', () => {
   const workflow = /** @type {{jobs: {draft: {concurrency: unknown, strategy: {'max-parallel': number}}}, concurrency: {group: string}}} */ (yamlLoad(fs.readFileSync('.github/workflows/pen-draft.yml', 'utf8')));
@@ -117,3 +118,24 @@ test('generator detects missing and stale DAGs, refreshes deterministically, and
   assert.match(syncTopology(fixture, true).errors.join('\n'), /workflow names must be present and unique/);
   assert.equal(fs.readFileSync(output, 'utf8'), updated, 'invalid topology must not replace the last valid DAG');
 });
+
+test('AI review stays advisory: blocking reviewers fail the boundary scan', t => {
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'topology-ai-review-'));
+  t.after(() => fs.rmSync(fixture, { recursive: true, force: true }));
+  const workflows = path.join(fixture, '.github/workflows');
+  fs.mkdirSync(workflows, { recursive: true });
+  fs.writeFileSync(
+    path.join(workflows, 'advisory.yml'),
+    'name: Advisory AI Review\non:\n  pull_request:\njobs:\n  review:\n    steps:\n      - run: node .github/scripts/advisory-ai-review.mjs\n',
+  );
+  assert.deepEqual(scanAiReviewBoundary(fixture), []);
+  fs.writeFileSync(
+    path.join(workflows, 'warden.yml'),
+    'name: Warden\non: [pull_request]\njobs:\n  review:\n    steps:\n      - run: gh pr review $PR --request-changes\n      - run: warden --fail-on findings\n',
+  );
+  const flagged = scanAiReviewBoundary(fixture);
+  assert.equal(flagged.length, 1, JSON.stringify(flagged));
+  assert.match(flagged[0].file, /warden\.yml$/);
+  assert.match(flagged[0].signal, /request-changes/);
+});
+

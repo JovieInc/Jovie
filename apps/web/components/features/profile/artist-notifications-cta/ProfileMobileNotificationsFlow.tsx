@@ -25,6 +25,7 @@ import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 import { cn } from '@/lib/utils';
 import type { NotificationContentType } from '@/types/notifications';
 import { BirthdayInput } from './BirthdayInput';
+import { useConsentCardYield } from './consent-card-yield';
 
 export type ProfileMobileNotificationsFlowStep =
   | 'email'
@@ -449,17 +450,16 @@ export function ProfileMobileNotificationsFlow({
   const isResendCooldownActive = resendCooldownEnd > Date.now();
   useModalFocusBoundary(dialogRef, open && presentation !== 'inline');
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => setMounted(true), []);
+
+  useConsentCardYield(open);
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
-    // Inline presentations live inside an existing layout — they should not
-    // hijack body scroll the way overlay/modal presentations do.
+    // Inline flows live in-layout; they must not hijack body scroll.
     if (presentation === 'inline') {
       return;
     }
@@ -989,8 +989,8 @@ export function ProfileMobileNotificationsFlow({
         </div>
       </div>
     ) : (
-      // Inline: transparent so the sheet sits on the page's own surface with
-      // no rounded seam against a mismatched background token.
+      // Inline: transparent so the sheet sits on the page's own surface,
+      // with no rounded seam against a mismatched background token.
       <div
         className='relative flex h-full min-h-full flex-1 flex-col dark:text-white'
         data-testid='profile-mobile-notifications-flow'

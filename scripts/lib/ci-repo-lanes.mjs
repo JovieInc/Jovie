@@ -24,6 +24,7 @@ export const JOVIE_REQUIRED_CHECK_CONTEXTS = Object.freeze([
   'Migration Guard',
   'Fork PR Gate',
   'PR Size Guard',
+  'Company guards',
 ]);
 
 /** Check names that belong to other repos and must never gate Jovie merge. */
