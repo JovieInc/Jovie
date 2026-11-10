@@ -41,7 +41,9 @@ function UnwindProbe() {
   useEffect(() => {
     effects.push('mount');
     probeRevalidate('/setup-unwind-probe');
-    return () => effects.push('unmount');
+    return () => {
+      effects.push('unmount');
+    };
   }, []);
   return null;
 }
