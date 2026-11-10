@@ -50,6 +50,25 @@ class GateTest(unittest.TestCase):
         self.assertNotEqual(
             solo, "fix-red-" + hashlib.sha256(b"Source Validation|Tently").hexdigest()[:10])
 
+    def test_a_lone_pr_ready_failure_is_not_the_empty_fix_red_class(self):
+        empty = "fix-red-" + hashlib.sha256(b"").hexdigest()[:10]
+        self.assertEqual(empty, "fix-red-e3b0c44298")
+        solo = gap.check_fingerprint({"statusCheckRollup": [
+            {"name": "PR Ready", "conclusion": "FAILURE"},
+        ]})
+        self.assertEqual(solo, "fix-red-" + hashlib.sha256(b"PR Ready").hexdigest()[:10])
+        self.assertNotEqual(solo, empty)
+        beside = gap.check_fingerprint({"statusCheckRollup": [
+            {"name": "Source Validation", "conclusion": "FAILURE"},
+            {"name": "PR Ready", "conclusion": "FAILURE"},
+        ]})
+        self.assertEqual(beside, "fix-red-" + hashlib.sha256(b"Source Validation").hexdigest()[:10])
+        cancelled = gap.check_fingerprint({"statusCheckRollup": [
+            {"name": "PR Ready", "conclusion": "CANCELLED"},
+            {"name": "Fleet Rules Evidence", "conclusion": "CANCELLED"},
+        ]})
+        self.assertEqual(cancelled, "fix-red-" + hashlib.sha256(b"Fleet Rules Evidence").hexdigest()[:10])
+
     def test_fingerprint_ignores_ids_and_numbers_and_honours_explicit_labels(self):
         a = gap.fingerprint("fix: JOV-9001 sentry error 42 in profile page", [])
         b = gap.fingerprint("Fix Sentry error 77 in profile page (JOV-9100)", [])

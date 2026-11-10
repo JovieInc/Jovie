@@ -53,18 +53,42 @@ def fingerprint(title: str, labels=()) -> str:
 ADVISORY_CHECKS = frozenset({"tently"})
 
 
+def without_aggregate_sibling(checks: list, *, hard: set[str]) -> list:
+    """Drop PR Ready when another hard failure remains, or when PR Ready itself is not hard.
+
+    A lone hard PR Ready is the failure. Skipping it hashed an empty name list
+    (`fix-red-e3b0c44298`) and dispatched a model for a quota-deferred evidence
+    lookup. A cancelled-only PR Ready stays dropped. CI Summary, rollup, and
+    advisory names are the caller's filter, not this one.
+    """
+    def low(check: dict) -> str:
+        return str(check.get("name") or "").lower()
+
+    def is_hard(check: dict) -> bool:
+        return str(check.get("conclusion") or "").upper() in hard
+
+    if any(is_hard(check) and low(check) != "pr ready" for check in checks):
+        return [check for check in checks if low(check) != "pr ready"]
+    ready = [check for check in checks if low(check) == "pr ready" and is_hard(check)]
+    if ready:
+        return ready
+    return [check for check in checks if low(check) != "pr ready"]
+
+
 def check_fingerprint(pr: dict) -> str:
     """Hash the failing check names. A CANCELLED sibling does not open a second class when a
     FAILURE or TIMED_OUT is present: Fleet Rules Evidence cancelled beside Source Validation
     recorded fix-red-6c3efaf400 on seven unrelated lane runs (2026-10-29..31). A rollup that
-    is only cancelled still fingerprints those names. Advisory names are always skipped."""
+    is only cancelled still fingerprints those names. Advisory names are always skipped.
+    PR Ready is skipped the same way unless it is the only hard failure."""
     red = {"FAILURE", "TIMED_OUT", "CANCELLED"}
     hard = {"FAILURE", "TIMED_OUT"}
-    skip = {"pr ready", "ci summary", *(name.lower() for name in ADVISORY_CHECKS)}
+    skip = {"ci summary", *(name.lower() for name in ADVISORY_CHECKS)}
     checks = [c for c in pr.get("statusCheckRollup") or []
               if str(c.get("conclusion") or "").upper() in red and str(c.get("name") or "").lower() not in skip]
     if any(str(c.get("conclusion") or "").upper() in hard for c in checks):
         checks = [c for c in checks if str(c.get("conclusion") or "").upper() in hard]
+    checks = without_aggregate_sibling(checks, hard=hard)
     names = sorted({str(c.get("name")) for c in checks})
     return "fix-red-" + hashlib.sha256("|".join(names).encode()).hexdigest()[:10]
 

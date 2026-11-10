@@ -8159,6 +8159,22 @@ class FixRedTest(unittest.TestCase):
             agent2.assert_called_once()
             self.assertNotEqual(second["reasons"][:1], ["infra-rerun:changelog-metadata"])
 
+    def test_lone_pr_ready_quota_deferral_reruns_instead_of_the_empty_class(self):
+        # 2026-11-10: PR Ready was the only hard failure, its log was a quota
+        # deferral, and skipping the aggregate hashed fix-red-e3b0c44298.
+        pr = self.pr(checks=[{
+            "name": "PR Ready", "status": "COMPLETED", "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/x/actions/runs/1/job/42"}])
+        log = ("::warning::github-quota-deferred: gh api primary after 1 attempt(s)\n"
+               "::error::Fleet rule evidence is missing (github-quota-deferred or not yet complete)")
+        with tempfile.TemporaryDirectory() as tmp:
+            _, receipt, agent, again = self.run_gate(tmp, log, pr=pr)
+        self.assertEqual(receipt["reasons"], ["infra-rerun:quota-deferred"])
+        self.assertEqual(receipt["failureFingerprint"]["cls"], "quota-deferred")
+        agent.assert_not_called()
+        again.assert_called_once()
+        self.assertNotEqual(lane.machine_gap.check_fingerprint(pr), "fix-red-e3b0c44298")
+
     def test_quota_deferred_red_is_rerun_not_dispatched_and_carries_its_fingerprint(self):
         with tempfile.TemporaryDirectory() as tmp:
             host, receipt, agent, again = self.run_gate(tmp, "::error::Fleet rule evidence is missing (github-quota-deferred)")

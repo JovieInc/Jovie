@@ -26,6 +26,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import machine_gap
 import migration_renumber
 import remediation
 from atomic_state import atomic_write_text
@@ -163,6 +164,9 @@ SIGNATURES = (
 )
 BEHIND_CLASS = "stale-branch"
 AGGREGATE = ("pr ready", "ci summary", "rollup")
+# PR Ready stays in AGGREGATE for readers, but real_failures keeps a lone hard PR Ready.
+_ALWAYS_AGGREGATE = frozenset(name for name in AGGREGATE if name != "pr ready")
+_HARD_RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR"})
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "CANCELLED", "ERROR"})
 LLM_VERDICTS = frozenset({"fix-pushed", "fix-no-change", "cancelled", "failed"})
 DEFAULT_BREAKER_N, MAX_BREAKER_N, MIN_CELL_RUNS = 2, 3, 10
@@ -181,8 +185,16 @@ def error_signature(text: str) -> str:
 
 
 def real_failures(pr: dict) -> list[dict]:
-    return [check for check in pr.get("statusCheckRollup") or []
-            if str(check.get("conclusion") or "").upper() in RED and str(check.get("name") or "").lower() not in AGGREGATE]
+    """Red checks whose logs decide the class. CI Summary and rollup never do.
+
+    PR Ready is dropped while another hard failure remains. When it is the only
+    hard failure, its log is the class: a quota-deferred fleet lookup must rerun,
+    not hash to the empty fix-red class and dispatch a model.
+    """
+    reds = [check for check in pr.get("statusCheckRollup") or []
+            if str(check.get("conclusion") or "").upper() in RED
+            and str(check.get("name") or "").lower() not in _ALWAYS_AGGREGATE]
+    return machine_gap.without_aggregate_sibling(reds, hard=_HARD_RED)
 
 
 def fingerprint_key(cls: str, names: list[str], signature: str = "") -> str:
@@ -1060,8 +1072,8 @@ def _epoch(row: dict) -> float | None:
 def historic_key(row: dict) -> str:
     """Ledger rows keep the failing check names, not the log: coarser than the live fingerprint, stable."""
     source = row.get("requestSource") or {}
-    names = [name for name, verdict in source.get("checks") or []
-             if str(verdict).upper() in RED and str(name).lower() not in AGGREGATE]
+    names = [str(check.get("name")) for check in real_failures({"statusCheckRollup": [
+        {"name": name, "conclusion": verdict} for name, verdict in source.get("checks") or []]})]
     kinds = ",".join(source.get("eventKinds") or [])
     return fingerprint_key("history", names or [f"event:{kinds}"])
 
