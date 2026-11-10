@@ -141,6 +141,8 @@ describe('JOV-INV-045 gate-weakening detector', () => {
     expectKind(JSON.stringify({ ...config, scanExclusions: ['scripts/hidden/'] }), 'scan-exclusion-grew');
     expectKind(JSON.stringify({ ...config, generatedReports: [...config.generatedReports, 'scripts/ci-fast-lanes.mjs'] }), 'scan-exclusion-grew');
     expectKind(JSON.stringify({ ...config, requiredKinds: config.requiredKinds.slice(1) }), 'detector-rule-removed');
+    expectKind(JSON.stringify({ ...config, selfPaths: config.selfPaths.filter(p => !p.endsWith('gate-weakening-detector.mjs')) }), 'detector-rule-removed');
+    expectKind(JSON.stringify({ ...config, selfPaths: [] }), 'detector-rule-removed');
     expectKind(JSON.stringify({ ...config, override: { ...config.override, label: 'other' } }), 'override-policy-changed');
     expectKind(null, 'detector-config-deleted');
     assert.ok(kindsOf({ path: 'scripts/invariants/gate-weakening-detector.mjs', before: 'keep\n', after: null }).includes('detector-deleted'));

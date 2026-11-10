@@ -232,8 +232,8 @@ function inspectSelf(file) {
   if (before.schema !== after.schema || before.invariantId !== after.invariantId) {
     add('detector-rule-removed', 'identity');
   }
-  for (const kind of before.requiredKinds ?? []) {
-    if (!(after.requiredKinds ?? []).includes(kind)) add('detector-rule-removed', kind);
+  for (const list of ['requiredKinds', 'selfPaths']) {
+    for (const entry of before[list] ?? []) if (!(after[list] ?? []).includes(entry)) add('detector-rule-removed', entry);
   }
   for (const exclusion of after.scanExclusions ?? []) {
     if (!(before.scanExclusions ?? []).includes(exclusion)) {
@@ -440,7 +440,7 @@ const excluded = (path, config) => (config.scanExclusions ?? []).some(prefix => 
 // Machine-written reports (exact paths) are measurements, not gates: a refresh of
 // their numbers is not a threshold change. Growing the list is itself flagged.
 const isGeneratedReport = (path, config) => (config.generatedReports ?? []).includes(path);
-const isSelf = (path, config) => (config.selfPaths ?? []).includes(path);
+const isSelf = (path, config) => /gate-weakening-detector\.(?:mjs|config\.json|test\.mjs)$/.test(path) || (config.selfPaths ?? []).includes(path);
 const isRuleset = path => /ruleset|branch-protection|branch_protection/i.test(path);
 const isCiYaml = path => /^(\.github\/|github\/rulesets\/|scripts\/ci-|scripts\/lib\/ci-)/.test(path) && /\.(?:yml|yaml|mjs|js)$/.test(path);
 const isShrinkOnly = path => {
