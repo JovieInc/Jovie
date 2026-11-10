@@ -232,9 +232,9 @@ function inspectSelf(file) {
   if (before.schema !== after.schema || before.invariantId !== after.invariantId) {
     add('detector-rule-removed', 'identity');
   }
-  for (const list of ['requiredKinds', 'selfPaths']) {
-    for (const entry of before[list] ?? []) if (!(after[list] ?? []).includes(entry)) add('detector-rule-removed', entry);
-  }
+  for (const kind of before.requiredKinds ?? []) if (!(after.requiredKinds ?? []).includes(kind)) add('detector-rule-removed', kind);
+  for (const entry of new Set([...(before.selfPaths ?? []), ...(after.selfPaths ?? [])]))
+    if ((before.selfPaths ?? []).includes(entry) !== (after.selfPaths ?? []).includes(entry)) add('detector-selfpaths-changed', entry);
   for (const exclusion of after.scanExclusions ?? []) {
     if (!(before.scanExclusions ?? []).includes(exclusion)) {
       add('scan-exclusion-grew', exclusion);

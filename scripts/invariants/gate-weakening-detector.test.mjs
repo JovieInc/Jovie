@@ -141,8 +141,13 @@ describe('JOV-INV-045 gate-weakening detector', () => {
     expectKind(JSON.stringify({ ...config, scanExclusions: ['scripts/hidden/'] }), 'scan-exclusion-grew');
     expectKind(JSON.stringify({ ...config, generatedReports: [...config.generatedReports, 'scripts/ci-fast-lanes.mjs'] }), 'scan-exclusion-grew');
     expectKind(JSON.stringify({ ...config, requiredKinds: config.requiredKinds.slice(1) }), 'detector-rule-removed');
-    expectKind(JSON.stringify({ ...config, selfPaths: config.selfPaths.filter(p => !p.endsWith('gate-weakening-detector.mjs')) }), 'detector-rule-removed');
-    expectKind(JSON.stringify({ ...config, selfPaths: [] }), 'detector-rule-removed');
+    const stripped = JSON.stringify({ ...config, selfPaths: config.selfPaths.filter(p => !p.endsWith('gate-weakening-detector.mjs')) });
+    const rename = JSON.stringify({ ...config, selfPaths: [...config.selfPaths.slice(1), 'scripts/invariants/elsewhere.mjs'] });
+    expectKind(JSON.stringify({ ...config, selfPaths: [...config.selfPaths, '.github/workflows/ci.yml'] }), 'detector-selfpaths-changed');
+    expectKind(stripped, 'detector-selfpaths-changed');
+    expectKind(JSON.stringify({ ...config, selfPaths: [] }), 'detector-selfpaths-changed');
+    assert.ok(kindsOf({ path, before: stripped, after: JSON.stringify(config) }).includes('detector-selfpaths-changed'), 'detector path added back');
+    assert.equal(kindsOf({ path, before: JSON.stringify(config), after: rename }).filter(k => k === 'detector-selfpaths-changed').length, 2, 'rename is a removal plus an addition');
     expectKind(JSON.stringify({ ...config, override: { ...config.override, label: 'other' } }), 'override-policy-changed');
     expectKind(null, 'detector-config-deleted');
     assert.ok(kindsOf({ path: 'scripts/invariants/gate-weakening-detector.mjs', before: 'keep\n', after: null }).includes('detector-deleted'));
