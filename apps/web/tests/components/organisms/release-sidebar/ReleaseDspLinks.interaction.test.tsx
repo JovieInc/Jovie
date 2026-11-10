@@ -208,7 +208,6 @@ describe('ReleaseDspLinks interactions', () => {
       configurable: true,
     });
     const release = createMockRelease({
-      smartLinkPath: '/example/midnight-drive',
       providers: [
         {
           key: 'spotify',
