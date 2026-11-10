@@ -33,7 +33,8 @@ export function defineStorybookBrowserSelectionTests(jobBlock) {
     }
     node() { printf '%s\\n' "$*"; }
     `;
-    for (const [path, selected] of [
+    /** @type {[string, boolean][]} */
+    const cases = [
       ['apps/web/components/features/onboarding/OnboardingShell.tsx', true],
       [
         'apps/web/components/features/onboarding/OnboardingShell.recovery.stories.tsx',
@@ -43,7 +44,8 @@ export function defineStorybookBrowserSelectionTests(jobBlock) {
       ['apps/web/tests/e2e/storybook-onboarding-recovery.spec.ts', true],
       ['apps/web/components/shell/Other.tsx', false],
       ['apps/web/tests/e2e/storybook-onboarding-recovery.spec.ts.bak', false],
-    ]) {
+    ];
+    for (const [path, selected] of cases) {
       const result = spawnSync('bash', ['-c', stubs + command], {
         encoding: 'utf8',
         env: {

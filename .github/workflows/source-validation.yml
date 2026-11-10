@@ -164,7 +164,7 @@ jobs:
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
-          PLAYWRIGHT_ARTIFACT_PATHS: apps/web/test-results
+          PLAYWRIGHT_ARTIFACT_PATHS: apps/web/.cache/onboarding-recovery-results
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
@@ -174,7 +174,7 @@ jobs:
             exit 0
           fi
           node .github/scripts/guard-playwright-artifacts.mjs --run -- \
-            pnpm --filter @jovie/web exec playwright test --config=playwright.config.storybook.ts tests/e2e/storybook-onboarding-recovery.spec.ts --project=chromium --reporter=line
+            pnpm --filter @jovie/web exec playwright test --config=playwright.config.storybook.ts tests/e2e/storybook-onboarding-recovery.spec.ts --output=.cache/onboarding-recovery-results --project=chromium --reporter=line
       - name: Validate customer changelog decision from trusted base
         shell: bash
         env:
