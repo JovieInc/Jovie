@@ -15,6 +15,7 @@ vi.mock('@/lib/utils/logger', () => ({ logger: { error: vi.fn() } }));
 import { GET } from '@/app/api/connectors/suggested-actions/route';
 import { buildMobileInbox } from '@/lib/mobile/action-loop-inbox';
 import {
+  countPendingCreatorInboxActions,
   loadOpportunityInboxData,
   loadOpportunityInboxTourDateSections,
 } from './opportunity-inbox-data';
@@ -41,7 +42,9 @@ beforeEach(() => {
 
 function expectConsumerQuery(call: number) {
   const query = new PgDialect().sqlToQuery(mocks.where.mock.calls[call][0]);
-  expect(query.sql).toContain('"suggested_actions"."kind" <>');
+  // Case-insensitive exact-kind exclusion, mirroring the lowercased JS
+  // predicate in isCreatorInboxSourceKind.
+  expect(query.sql).toContain('lower("suggested_actions"."kind") <>');
   expect(query.params).toEqual([
     'owner',
     'pending',
@@ -235,4 +238,34 @@ describe('explicit operator provenance', () => {
       expect(query.params).toContain('ovie.%');
     }
   );
+});
+
+describe('creator-work badge count', () => {
+  it('counts pending rows with the feed eligibility, as an uncapped total', async () => {
+    mocks.where.mockResolvedValueOnce([{ count: 1 }]);
+    await expect(countPendingCreatorInboxActions('owner')).resolves.toBe(1);
+
+    const query = new PgDialect().sqlToQuery(mocks.where.mock.calls[0][0]);
+    // Same eligibility condition as the feed query (see expectConsumerQuery):
+    // an operator-only pending row (workflow capture, founder/ops/ovie
+    // sources) is excluded, so it can never raise a creator-work badge.
+    expect(query.sql).toContain('lower("suggested_actions"."kind") <>');
+    expect(query.params).toEqual([
+      'owner',
+      'pending',
+      'workflow_capture.request',
+      'founder.%',
+      'ops.%',
+      'ovie.%',
+    ]);
+    // The badge is the uncapped total, never derived from the feed's capped
+    // candidate page: the count query applies no limit.
+    expect(mocks.limit).not.toHaveBeenCalled();
+    expect(query.sql.toLowerCase()).not.toContain('limit');
+  });
+
+  it('reads zero when no eligible pending work exists', async () => {
+    mocks.where.mockResolvedValueOnce([{ count: 0 }]);
+    await expect(countPendingCreatorInboxActions('owner')).resolves.toBe(0);
+  });
 });

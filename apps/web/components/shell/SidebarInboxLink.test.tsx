@@ -99,4 +99,32 @@ describe('central Inbox bell', () => {
     expect(link).toHaveAttribute('href', '/app');
     expect(link.querySelector('span')).toBeNull();
   });
+
+  it('keeps a lone pending item singular (JOV-9018 class)', () => {
+    render(
+      <SidebarInboxLink
+        availability={{ state: 'available', pendingCount: 1 }}
+      />
+    );
+    expect(
+      screen.getByRole('link', { name: 'Inbox — 1 item needs attention' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the runtime-update dot independently labeled next to pending work', () => {
+    runtimeUpdate.available = true;
+    try {
+      render(
+        <SidebarInboxLink
+          availability={{ state: 'available', pendingCount: 1 }}
+        />
+      );
+      const link = screen.getByRole('link', {
+        name: 'Inbox — 1 item needs attention; app update available',
+      });
+      expect(link.querySelector('[data-runtime-update]')).not.toBeNull();
+    } finally {
+      runtimeUpdate.available = false;
+    }
+  });
 });

@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildOpportunityInboxData,
+  isCreatorReviewRenderableRow,
   mapSuggestedActionToInboxCard,
 } from './opportunity-inbox-mapper';
-import { WORKFLOW_CAPTURE_REQUEST_KIND } from './suggested-action-kinds';
+import {
+  BRAND_DEAL_OPPORTUNITY_KIND,
+  SOCIAL_REPLY_DRAFT_KIND,
+  WORKFLOW_CAPTURE_REQUEST_KIND,
+  YOUTUBE_THUMBNAIL_CANDIDATE_KIND,
+} from './suggested-action-kinds';
 
 function verifiedBrandDealPayload(
   overrides: Record<string, unknown> = {}
@@ -250,6 +256,20 @@ describe('mapSuggestedActionToInboxCard', () => {
 });
 
 describe('buildOpportunityInboxData', () => {
+  it('keeps malformed social reply drafts out of the creator review surface', () => {
+    const data = buildOpportunityInboxData([
+      {
+        id: 'social-reply-malformed',
+        kind: SOCIAL_REPLY_DRAFT_KIND,
+        payload: { title: 'Missing provenance and draft text' },
+        rationale: 'Malformed reply draft.',
+        createdAt: new Date('2026-10-02T12:00:00.000Z'),
+      },
+    ]);
+
+    expect(data.cards).toEqual([]);
+  });
+
   it('keeps malformed YouTube candidates out of the founder decision surface', () => {
     const data = buildOpportunityInboxData([
       {
@@ -397,6 +417,43 @@ describe('tour-date classification in the mapper', () => {
     expect(card.typeLabel).toBe('New Event');
     expect(card.primaryActionLabel).toBe('Add to calendar');
   });
+});
+
+describe('isCreatorReviewRenderableRow', () => {
+  const base = {
+    rationale: null,
+    createdAt: new Date('2026-10-02T12:00:00.000Z'),
+  } as const;
+
+  it('keeps payload-complete creator kinds renderable', () => {
+    expect(
+      isCreatorReviewRenderableRow({
+        ...base,
+        id: 'calendar-event',
+        kind: 'calendar.create_event',
+        payload: { title: 'Creator workflow recommendation' },
+      })
+    ).toBe(true);
+  });
+
+  it.each([
+    [SOCIAL_REPLY_DRAFT_KIND, { title: 'Missing provenance and draft text' }],
+    [WORKFLOW_CAPTURE_REQUEST_KIND, { title: 'Missing provenance' }],
+    [YOUTUBE_THUMBNAIL_CANDIDATE_KIND, { title: 'Missing artifact evidence' }],
+    [BRAND_DEAL_OPPORTUNITY_KIND, { title: 'Missing verification' }],
+  ])(
+    'drops invalid %s payloads so they never inflate creator work',
+    (kind, payload) => {
+      expect(
+        isCreatorReviewRenderableRow({
+          ...base,
+          id: `bad-${kind}`,
+          kind,
+          payload,
+        })
+      ).toBe(false);
+    }
+  );
 });
 
 describe('buildOpportunityInboxData tour-date sections', () => {
