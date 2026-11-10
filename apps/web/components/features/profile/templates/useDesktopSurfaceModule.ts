@@ -1,6 +1,7 @@
 'use client';
 
 import { createElement, useEffect, useState } from 'react';
+import type { ProfileDesktopSurfaceProps } from './ProfileDesktopSurface';
 
 /**
  * The desktop profile surface's concrete component type, resolved at the
