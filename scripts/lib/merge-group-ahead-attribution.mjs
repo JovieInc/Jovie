@@ -132,8 +132,8 @@ function failingLanes(parsed) {
  *   currentJobs: Array<{ name: string, conclusion: string | null }>,
  *   aheadJobs: Array<{ name: string, conclusion: string | null }>,
  *   aheadConclusion: string | null | undefined,
- *   currentCiFastLog?: string | null,
- *   aheadCiFastLog?: string | null,
+ *   currentCiFastLog?: string | Array<{ name: string, log: string }> | null,
+ *   aheadCiFastLog?: string | Array<{ name: string, log: string }> | null,
  * }} input
  * @returns {{ attributable: boolean, reason: string }}
  */
@@ -169,32 +169,53 @@ export function attributeAgainstAheadRun({
     return { attributable: true, reason: 'failed-jobs-passed-on-ahead-run' };
   }
   if (!currentCiFastLog || !aheadCiFastLog) return no('ci-fast-log-missing');
-  const current = parseCiFastLog(currentCiFastLog);
-  const ahead = parseCiFastLog(aheadCiFastLog);
-  const lanes = failingLanes(current);
-  if (lanes.length === 0) return no('ci-fast-failure-unparsed');
-  for (const name of lanes) {
-    if (name === 'structural') {
-      if (current.failedCommands.length === 0)
-        return no('structural-failure-unparsed');
-      for (const command of current.failedCommands) {
-        if (
-          !ahead.passedCommands.some(passed => sameCommand(passed, command))
-        ) {
-          return no(
-            `structural-command-unproven-on-base:${normalizeCommandLabel(command)}`
-          );
-        }
+  // Per-job boundaries are load-bearing: each failed evidence job must carry
+  // parsed failing-lane evidence of its own before any command witness may
+  // combine across the ahead run's shards. One parsed failure never speaks
+  // for a sibling job whose log has none (e.g. it died during base fetch).
+  const currentEntries = (
+    Array.isArray(currentCiFastLog)
+      ? currentCiFastLog
+      : [{ name: CI_FAST_REMAINING_JOB, log: currentCiFastLog }]
+  ).filter(entry => entry && typeof entry.log === 'string');
+  const ahead = parseCiFastLog(
+    // Ahead-run witnesses are positive-only evidence, so the ahead shards'
+    // passed commands legitimately combine into one union.
+    Array.isArray(aheadCiFastLog)
+      ? aheadCiFastLog.map(entry => entry?.log ?? '').join('\n')
+      : aheadCiFastLog
+  );
+  /** @type {string[]} */
+  const failingCommands = [];
+  for (const job of substantive.filter(job => isCiFastEvidenceJob(job.name))) {
+    const entry = currentEntries.find(candidate => candidate.name === job.name);
+    if (!entry) return no(`ci-fast-log-missing:${job.name}`);
+    const parsed = parseCiFastLog(entry.log);
+    const lanes = failingLanes(parsed);
+    if (lanes.length === 0) return no(`ci-fast-failure-unparsed:${job.name}`);
+    for (const name of lanes) {
+      if (name === 'structural') {
+        if (parsed.failedCommands.length === 0)
+          return no(`structural-failure-unparsed:${job.name}`);
+        failingCommands.push(...parsed.failedCommands);
+        continue;
       }
-      continue;
+      const base = ahead.lanes.get(name);
+      if (!base) return no(`lane-absent-on-ahead-run:${name}`);
+      if (base.statuses.has('failure'))
+        return no(`lane-failed-on-ahead-run:${name}`);
+      const selectionSkip =
+        base.statuses.has('skipped') && !base.failFastSkipped;
+      if (!base.statuses.has('success') && !selectionSkip) {
+        return no(`lane-unproven-on-base:${name}`);
+      }
     }
-    const base = ahead.lanes.get(name);
-    if (!base) return no(`lane-absent-on-ahead-run:${name}`);
-    if (base.statuses.has('failure'))
-      return no(`lane-failed-on-ahead-run:${name}`);
-    const selectionSkip = base.statuses.has('skipped') && !base.failFastSkipped;
-    if (!base.statuses.has('success') && !selectionSkip) {
-      return no(`lane-unproven-on-base:${name}`);
+  }
+  for (const command of failingCommands) {
+    if (!ahead.passedCommands.some(passed => sameCommand(passed, command))) {
+      return no(
+        `structural-command-unproven-on-base:${normalizeCommandLabel(command)}`
+      );
     }
   }
   return { attributable: true, reason: 'failing-signals-passed-on-ahead-run' };
@@ -258,7 +279,7 @@ export function parseFailedSignals(text) {
 /**
  * @param {{
  *   currentJobs: Array<{ name: string, conclusion: string | null }>,
- *   currentCiFastLog?: string | null,
+ *   currentCiFastLog?: string | Array<{ name: string, log: string }> | null,
  *   peers: Array<{ runId: number, conclusion: string | null, containsPr: boolean | null, ciFastLog?: string | null }>,
  * }} input
  * @returns {{ recurring: boolean, reason: string, signals?: string[], peerRunIds?: number[] }}
@@ -287,7 +308,17 @@ export function attributeAgainstPeerRuns({
     );
   }
   if (!currentCiFastLog) return no('ci-fast-log-missing');
-  const lanes = failingLanes(parseCiFastLog(currentCiFastLog));
+  // The collector hands one entry per failed evidence job; this path only
+  // proceeds for a single failed evidence job, so exactly one entry is
+  // admissible here.
+  const currentLog = Array.isArray(currentCiFastLog)
+    ? currentCiFastLog.length === 1
+      ? currentCiFastLog[0]?.log
+      : null
+    : currentCiFastLog;
+  if (typeof currentLog !== 'string' || !currentLog)
+    return no('ci-fast-log-missing');
+  const lanes = failingLanes(parseCiFastLog(currentLog));
   if (lanes.length !== 1 || lanes[0] !== 'structural') {
     return no(`not-structural-only:${lanes.join(',') || 'none'}`);
   }
