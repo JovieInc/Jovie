@@ -1,9 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import {
+  buildLibraryAskJovieDraft,
   buildLibraryEntityActions,
   libraryEntityActionsToContextMenuItems,
 } from '@/app/app/(shell)/library/library-entity-actions';
+import {
+  consumePendingChatDraft,
+  consumePendingChatPrompt,
+  openChatWithDraft,
+} from '@/lib/chat/open-chat-with-prompt';
+import {
+  applyCacheScope,
+  resetCacheIsolationForTests,
+} from '@/lib/queries/cache-isolation';
 
 function buildAsset(
   overrides: Partial<LibraryReleaseAsset> = {}
@@ -69,6 +79,41 @@ function buildActions(
 }
 
 describe('library entity actions', () => {
+  it('prepares the existing draft transport without queuing an auto-submit prompt', () => {
+    resetCacheIsolationForTests();
+    applyCacheScope({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      profileId: 'profile-1',
+      ready: true,
+    });
+    const router = { push: vi.fn() };
+    const asset = buildAsset();
+    const actions = buildActions(asset, {
+      onAskJovie: draft => {
+        openChatWithDraft(draft, router);
+      },
+    });
+    actions.find(action => action.id === 'ask-jovie')?.onExecute?.();
+    expect(consumePendingChatPrompt()).toBeNull();
+    expect(consumePendingChatDraft('profile-1')).toBe(
+      buildLibraryAskJovieDraft(asset, 'profile-1')
+    );
+    expect(router.push).toHaveBeenCalledOnce();
+    resetCacheIsolationForTests();
+  });
+
+  it('does not invoke Ask without a selected profile even if called programmatically', () => {
+    const onAskJovie = vi.fn();
+    const action = buildActions(buildAsset(), {
+      profileId: null,
+      onAskJovie,
+    }).find(action => action.id === 'ask-jovie');
+    expect(action?.disabled).toBe(true);
+    action?.onExecute?.();
+    expect(onAskJovie).not.toHaveBeenCalled();
+  });
+
   it('builds release actions in one canonical order', () => {
     const actions = buildActions(buildAsset());
 
@@ -79,6 +124,7 @@ describe('library entity actions', () => {
       'open-artwork',
       'open-primary',
       'copy',
+      'ask-jovie',
     ]);
   });
 
@@ -99,6 +145,7 @@ describe('library entity actions', () => {
       'open-artwork',
       'open-primary',
       'copy',
+      'ask-jovie',
     ]);
     expect(actions.find(action => action.id === 'open-primary')?.label).toBe(
       'Open Merch'
@@ -139,6 +186,7 @@ describe('library entity actions', () => {
       'open-artwork',
       'open-primary',
       'copy',
+      'ask-jovie',
     ]);
 
     const visibility = actions.find(
@@ -186,6 +234,7 @@ describe('library entity actions', () => {
       'open-artwork',
       'open-primary',
       'copy',
+      'ask-jovie',
       'archive',
     ]);
   });

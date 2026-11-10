@@ -274,6 +274,12 @@ export function sortProfileWorkspaceRows(
   rows: readonly ProfileWorkspaceRow[]
 ): ProfileWorkspaceRow[] {
   return [...rows].sort((left, right) => {
+    // The owned profile is the stable editing entry point, not another
+    // external source whose position changes with monitoring health.
+    const ownedProfileDifference =
+      Number(right.rowType === 'surface' && right.kind === 'jovie') -
+      Number(left.rowType === 'surface' && left.kind === 'jovie');
+    if (ownedProfileDifference !== 0) return ownedProfileDifference;
     const priorityDifference = statusPriority(left) - statusPriority(right);
     if (priorityDifference !== 0) return priorityDifference;
 
