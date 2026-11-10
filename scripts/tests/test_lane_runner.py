@@ -8159,6 +8159,30 @@ class FixRedTest(unittest.TestCase):
             agent2.assert_called_once()
             self.assertNotEqual(second["reasons"][:1], ["infra-rerun:changelog-metadata"])
 
+    def test_fleet_red_before_green_is_stamped_once_and_a_win_error_reaches_the_model(self):
+        red = "##[error]red-before-green: this repair PR has no section\n"
+        target = {**self.pr(), "body": "## Summary\nrepair\n", "statusCheckRollup": [{
+            "name": "Fleet Rules Evidence", "status": "COMPLETED", "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/JovieInc/Jovie/actions/runs/123/job/456"}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            host, receipt, agent, again = self.run_gate(tmp, red, pr=target)
+            self.assertEqual(receipt["reasons"], ["stamped-fleet-body"])
+            self.assertEqual(receipt["failureFingerprint"]["cls"], "fleet-body")
+            agent.assert_not_called()
+            again.assert_not_called()
+            written = (host.state / "runs" / "fleet-body-5.md").read_text()
+            self.assertIn("## Red-before-green", written)
+            self.assertIn("- Failing command:", written)
+            self.assertNotIn("## Win", written)
+            _, second, agent2, _ = self.run_gate(tmp, red, pr=target)
+            agent2.assert_called_once()
+            self.assertNotEqual(second["reasons"][:1], ["stamped-fleet-body"])
+        win = red + "##[error]win: this PR needs a measured win\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            host, receipt, agent, _ = self.run_gate(tmp, win, pr=target)
+            agent.assert_called_once()
+            self.assertFalse((host.state / "runs" / "fleet-body-5.md").exists())
+
     def test_quota_deferred_red_is_rerun_not_dispatched_and_carries_its_fingerprint(self):
         with tempfile.TemporaryDirectory() as tmp:
             host, receipt, agent, again = self.run_gate(tmp, "::error::Fleet rule evidence is missing (github-quota-deferred)")

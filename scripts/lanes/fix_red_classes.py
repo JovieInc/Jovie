@@ -36,12 +36,13 @@ from fix_red_source_edits import (  # noqa: F401
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, AGENT = (
-    "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent")
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, STAMP_REPAIR, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, AGENT = (
+    "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "stamp-repair-evidence",
+    "snap-spacing", "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes",
+    "atomic-write", "agent")
 DETERMINISTIC = frozenset({
-    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE})
+    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, STAMP_REPAIR, SNAP_SPACING, STRIP_CACHE,
+    MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -59,6 +60,10 @@ UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
 BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?## ?(?:Red-before-green|Blast radius)",
                        re.IGNORECASE)
+# Fleet Rules annotations. A missing Red-before-green block is stamped from the
+# red run. A missing measured win stays with the model; never invent the number.
+FLEET_BODY_ERROR = re.compile(r"##\[error\](?:red-before-green:|win:)")
+FLEET_WIN_ERROR = re.compile(r"##\[error\]win:")
 # Source Validation includes passing fixtures that print quota/network errors.
 # A concrete component error needs regression coverage, never an infra retry.
 COMPONENT_TEST_TEXT = re.compile(
@@ -159,6 +164,7 @@ SIGNATURES = (
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
     ("atomic-write", ATOMIC_TEXT, ATOMIC_WRITE),
+    ("fleet-body", FLEET_BODY_ERROR, STAMP_REPAIR),
     ("pr-body", BODY_TEXT, AGENT),
 )
 BEHIND_CLASS = "stale-branch"
@@ -227,6 +233,9 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     if cls == "quota-deferred" and CHANGELOG_QUOTA_READ.search("\n".join(logs.get(name) or "" for name in names)) \
             and stamp_internal_changelog(pr.get("body")) is not None:
         cls, action, signature = "changelog-metadata", STAMP_CHANGELOG, ""
+    # Any win annotation in the class keeps the model. The stamp must not invent a metric.
+    if cls == "fleet-body" and FLEET_WIN_ERROR.search("\n".join(logs.get(name) or "" for name in names)):
+        action = AGENT
     files = []
     if cls == "component-test-evidence":
         files = sorted({test for name in names for test in COMPONENT_TEST_TEXT.findall(logs.get(name) or "")})

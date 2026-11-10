@@ -31,11 +31,30 @@ class ClassifyTest(unittest.TestCase):
             "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence": ("census-certification", "sync-main"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "atomic-write"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
+            "##[error]red-before-green: this repair PR has no section": ("fleet-body", "stamp-repair-evidence"),
             "AssertionError: expected 1": ("other", "agent"),
         }
         for log, (cls, action) in cases.items():
             got = classes.classify(pr("Source Validation"), {"Source Validation": log})
             self.assertEqual((got["cls"], got["action"]), (cls, action), log)
+            if action == "stamp-repair-evidence":
+                self.assertIn(action, classes.DETERMINISTIC)
+
+    def test_fleet_win_annotation_stays_with_the_model(self):
+        red = "##[error]red-before-green: this repair PR has no section"
+        win = "##[error]win: this PR needs a measured win"
+        for log in (win, red + "\n" + win):
+            got = classes.classify(pr("Fleet Rules Evidence", "PR Fleet Rules"), {
+                "Fleet Rules Evidence": log, "PR Fleet Rules": log})
+            self.assertEqual(got["cls"], "fleet-body", log)
+            self.assertEqual(got["action"], "agent", log)
+            self.assertNotIn(got["action"], classes.DETERMINISTIC)
+        split = classes.classify(pr("Fleet Rules Evidence", "PR Fleet Rules"), {
+            "Fleet Rules Evidence": red, "PR Fleet Rules": win})
+        self.assertEqual((split["cls"], split["action"]), ("fleet-body", "agent"))
+        mixed = classes.classify(pr("Fleet Rules Evidence", "Source Validation"), {
+            "Fleet Rules Evidence": red, "Source Validation": "AssertionError: expected 1"})
+        self.assertEqual((mixed["cls"], mixed["action"]), ("mixed", "agent"))
 
     def test_failed_live_design_cli_syncs_main_before_retrying_fixture_infra(self):
         summary = (" FAIL  workspace-scripts lib/__tests__/design-system-source-ratchet.test.mjs"
