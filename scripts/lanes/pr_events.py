@@ -1125,6 +1125,18 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
             raise ValueError("measured win requires a complete ## Win section")
         if re.search(r"^#{1,6}\s+|customer-changelog/v1", win_section.split("\n", 1)[1], re.M):
             raise ValueError("measured win must contain only Win evidence; use the dedicated repair fields")
+        # Use the same policy as Fleet; never publish a repair that will fail it again.
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { requiredWinErrors, winSectionErrors } from './scripts/lib/wins-ledger.mjs';
+const body = readFileSync(0, 'utf8');
+console.log(JSON.stringify([
+  ...requiredWinErrors({ labels: ['compounding'], body }), ...winSectionErrors(body),
+]));
+"""], cwd=HERE.parent.parent, input=win_section, text=True, capture_output=True, check=True, timeout=10)
+        problems = json.loads(checked.stdout)
+        if problems:
+            raise ValueError("measured win policy: " + "; ".join(problems))
         lines = updated.split("\n")
         bounds = red_section_bounds(lines, re.compile(r"^#{2,3}\s*Win\s*$", re.I))
         if previous_win_section is not None:

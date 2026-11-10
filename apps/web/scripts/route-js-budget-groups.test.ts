@@ -89,6 +89,15 @@ describe('route-group budgets (JOV-8561)', () => {
     ]);
     expect(result.rows.find(row => row.group === 'public')?.ok).toBe(true);
     expect(result.rows.find(row => row.group === 'marketing')?.ok).toBe(false);
+    expect(
+      evaluateBudgets({
+        appRows: [],
+        firstRows: rows,
+        budgets,
+        ancestor: budgets,
+        now: NOW,
+      }).ok
+    ).toBe(true);
     const judged = evaluateBudgets({
       appRows: [],
       firstRows: rows,
