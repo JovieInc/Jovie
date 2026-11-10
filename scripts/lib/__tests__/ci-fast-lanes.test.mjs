@@ -34,6 +34,7 @@ import {
   LANES_COVERAGE_GROUP_SHARDS,
   LANES_PYTEST_SHARDS,
   laneFailureExcerpt,
+  lanesReceiptRanSuite,
   MARKETING_CERTIFICATION_COMMAND,
   runCommandPool,
   runDesignConformance,
@@ -44,8 +45,8 @@ import {
   STRUCTURAL_DEFAULT_CONCURRENCY,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
   STRUCTURAL_WEB_JOB_PREFIXES,
-  selectStructuralShard,
   selectSourceGuards,
+  selectStructuralShard,
   stripGitFetchNoise,
   structuralConcurrency,
   structuralLocks,
@@ -1480,6 +1481,18 @@ describe('structural command pool', () => {
       expect(second).toEqual(whole.filter((_, index) => index % 2 === 1));
     });
 
+    it('partitions a known list deterministically and rejects bad specs', () => {
+      const pool = ['a', 'b', 'c', 'd', 'e'];
+      expect(selectStructuralShard(pool, '1/2')).toEqual(['a', 'c', 'e']);
+      expect(selectStructuralShard(pool, '2/2')).toEqual(['b', 'd']);
+      expect(selectStructuralShard(pool, '1/1')).toEqual(pool);
+      for (const bad of ['0/2', '3/2', 'x', '1/0', '']) {
+        expect(() => selectStructuralShard(pool, bad)).toThrow(
+          'CI_FAST_STRUCTURAL_SHARD'
+        );
+      }
+    });
+
     it('fails closed on an invalid shard spec', async () => {
       vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
       vi.stubEnv('CI_PRODUCT_LANES', 'operations');
@@ -1547,6 +1560,94 @@ describe('structural command pool', () => {
         );
       }
       expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(23);
+    });
+
+    it('runs no leg command and reports a clean skip on a web-only head', async () => {
+      vi.stubEnv('GITHUB_EVENT_NAME', 'pull_request');
+      vi.stubEnv('CI_PRODUCT_LANES', 'web');
+      vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+      vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:ab');
+      const started = [];
+      const result = await runStructural({
+        changedFileList: ['apps/web/components/features/profile/Foo.tsx'],
+        execute: command => {
+          started.push(command);
+          return { code: 0, output: '' };
+        },
+      });
+      expect(started).toEqual([]);
+      expect(result.skipped).toBe(true);
+    });
+
+    it('runs the leg command for operations and mixed heads', async () => {
+      for (const productLanes of ['operations', 'web,operations']) {
+        vi.stubEnv('GITHUB_EVENT_NAME', 'pull_request');
+        vi.stubEnv('CI_PRODUCT_LANES', productLanes);
+        vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+        vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:cd');
+        const started = [];
+        const result = await runStructural({
+          changedFileList: ['apps/web/components/features/profile/Foo.tsx'],
+          execute: command => {
+            started.push(command);
+            return { code: 0, output: '' };
+          },
+        });
+        expect(started).toEqual([LANES_COVERAGE_GROUP_COMMANDS.cd]);
+        expect(result.skipped).not.toBe(true);
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it('skips cleanly on a no-op head and runs on manual dispatch', async () => {
+      vi.stubEnv('GITHUB_EVENT_NAME', 'merge_group');
+      vi.stubEnv('CI_PRODUCT_LANES', 'none');
+      vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+      vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:ab');
+      const started = [];
+      const skipped = await runStructural({
+        changedFileList: [],
+        execute: command => {
+          started.push(command);
+          return { code: 0, output: '' };
+        },
+      });
+      expect(started).toEqual([]);
+      expect(skipped.skipped).toBe(true);
+      vi.unstubAllEnvs();
+
+      vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+      vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+      vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:ab');
+      const dispatched = [];
+      await runStructural({
+        execute: command => {
+          dispatched.push(command);
+          return { code: 0, output: '' };
+        },
+      });
+      expect(dispatched).toEqual([LANES_COVERAGE_GROUP_COMMANDS.ab]);
+    });
+
+    it('gates evidence on the runner receipt, never a recomputed selection', () => {
+      expect(
+        lanesReceiptRanSuite({
+          lanes: [{ id: 'structural', status: 'success' }],
+        })
+      ).toBe(true);
+      expect(
+        lanesReceiptRanSuite({
+          lanes: [{ id: 'structural', status: 'skipped' }],
+        })
+      ).toBe(false);
+      expect(() =>
+        lanesReceiptRanSuite({
+          lanes: [{ id: 'structural', status: 'failure' }],
+        })
+      ).toThrow(/reported failure/);
+      expect(() => lanesReceiptRanSuite({ lanes: [] })).toThrow(
+        /missing the structural lane/
+      );
     });
   });
 
