@@ -218,17 +218,21 @@ export function DspQuietRow({
             </span>
           ) : null}
         </a>
-        <OverflowMenu
-          label={`Destination actions for ${label}`}
-          items={menuItems}
-          testId={testId ? `${testId}-actions` : undefined}
-          triggerTabIndex={closedTabIndex}
+        <span
+          aria-hidden={!showUrl || undefined}
           className={cn(
-            'shrink-0 transition-opacity duration-subtle',
+            'flex shrink-0 transition-opacity duration-subtle',
             !showUrl &&
-              'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
+              'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100'
           )}
-        />
+        >
+          <OverflowMenu
+            label={`Destination actions for ${label}`}
+            items={menuItems}
+            testId={testId ? `${testId}-actions` : undefined}
+            triggerTabIndex={closedTabIndex}
+          />
+        </span>
         {entity && previewOpen ? (
           <EntityPopover
             entity={entity}

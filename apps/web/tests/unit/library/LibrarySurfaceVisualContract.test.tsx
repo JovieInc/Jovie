@@ -42,16 +42,16 @@ describe('LibrarySurface visual contract', () => {
     );
   });
 
-  it('joins the toolbar text tools to the desktop density (one bar, one height)', () => {
+  it('rides the app-wide 28px toolbar scale with no local density overrides', () => {
     const source = readSurfaceSource();
 
-    // The Add primary pill and the YouTube Ledger ghost control both carry
-    // the same desktop density as the icon cluster they sit beside; YouTube
-    // Ledger also steps up to text-secondary so it reads as a control.
+    // One bar, one height: the 32px local density is retired (the icon
+    // squares keep their 28px w-7 track); text tools ride the canonical
+    // PAGE_TOOLBAR_ACTION_BUTTON_CLASS.
+    expect(source).not.toContain('h-8 min-h-8');
     expect(source).toContain(
-      'className={LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS}'
+      "const LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS = 'w-7 min-w-7';"
     );
-    expect(source).toContain('LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS,');
-    expect(source).toContain("'text-secondary-token'");
+    expect(source).toContain('className={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}');
   });
 });

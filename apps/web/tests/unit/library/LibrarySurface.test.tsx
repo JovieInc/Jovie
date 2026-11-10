@@ -278,21 +278,17 @@ function clickGridView() {
   fireEvent.click(screen.getByRole('radio', { name: 'Grid View' }));
 }
 
-function expectDesktop32Control(
+function expectToolbarControl(
   control: HTMLElement,
   { square = false }: { readonly square?: boolean } = {}
 ) {
-  expect(control).toHaveClass(
-    'h-8',
-    'min-h-8',
-    'lg:before:h-8',
-    'lg:before:min-w-0'
-  );
-  expect(control).not.toHaveClass('h-7');
-  expect(control).not.toHaveClass('h-7.5');
+  // One bar, one height: the app-wide 28px PageToolbar control scale (the
+  // former 32px local density is retired).
+  expect(control).toHaveClass('h-7', 'min-h-7');
+  expect(control).not.toHaveClass('h-8');
   if (square) {
-    expect(control).toHaveClass('w-8', 'min-w-8');
-    expect(control).not.toHaveClass('w-7');
+    expect(control).toHaveClass('w-7', 'min-w-7');
+    expect(control).not.toHaveClass('w-8');
   }
 }
 
@@ -690,7 +686,7 @@ describe('LibrarySurface', () => {
     );
   });
 
-  it('keeps desktop Library toolbar controls at 32px without desktop 44px hit targets', () => {
+  it('keeps desktop Library toolbar controls on the 28px scale without desktop 44px hit targets', () => {
     window.matchMedia = vi.fn().mockImplementation(query => ({
       matches: query === '(min-width: 1024px)',
       media: query,
@@ -705,25 +701,28 @@ describe('LibrarySurface', () => {
 
     renderLibrary([buildAsset()]);
 
-    expectDesktop32Control(screen.getByRole('tab', { name: 'All' }));
-    expectDesktop32Control(screen.getByRole('tab', { name: 'Ideas' }));
-    expectDesktop32Control(
+    // Stage tabs ride the shared 30px PageToolbarTabButton standard.
+    for (const name of ['All', 'Ideas']) {
+      expect(screen.getByRole('tab', { name })).toHaveClass('h-7.5');
+      expect(screen.getByRole('tab', { name })).not.toHaveClass('h-8');
+    }
+    expectToolbarControl(
       screen.getByRole('button', { name: /^Show filters/i }),
       { square: true }
     );
-    expectDesktop32Control(
+    expectToolbarControl(
       screen.getByRole('button', { name: 'Sort by Release Date' }),
       { square: true }
     );
-    expectDesktop32Control(
+    expectToolbarControl(
       screen.getByRole('button', { name: /Small cards/u }),
       { square: true }
     );
-    expectDesktop32Control(
+    expectToolbarControl(
       screen.getByRole('button', { name: /Medium cards/u }),
       { square: true }
     );
-    expectDesktop32Control(
+    expectToolbarControl(
       screen.getByRole('button', { name: /Large cards/u }),
       { square: true }
     );
@@ -2619,7 +2618,7 @@ describe('LibrarySurface', () => {
     const filterTrigger = screen.getByRole('button', {
       name: /^Show filters/i,
     });
-    expectDesktop32Control(filterTrigger, { square: true });
+    expectToolbarControl(filterTrigger, { square: true });
     expect(
       screen.queryByTestId('library-filter-active-indicator')
     ).not.toBeInTheDocument();
@@ -2807,7 +2806,7 @@ describe('LibrarySurface', () => {
     const contentFrame = screen.getByTestId('library-content-frame');
     const before = contentFrame.getBoundingClientRect();
     const trigger = screen.getByRole('button', { name: /^Show filters/i });
-    expectDesktop32Control(trigger, { square: true });
+    expectToolbarControl(trigger, { square: true });
     expect(trigger).toHaveClass(
       'before:h-full',
       'before:min-h-11',

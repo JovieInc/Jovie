@@ -244,12 +244,10 @@ const LIBRARY_CARD_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface) outline-none';
 const LIBRARY_BUTTON_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface) outline-none';
-const LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS =
-  'h-8 min-h-8 lg:before:h-8 lg:before:min-w-0';
-const LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS = cn(
-  LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS,
-  'w-8 min-w-8'
-);
+// The toolbar rides the app-wide PageToolbar control scale (28px buttons,
+// 30px tabs); the former 32px local density is retired with the rest of the
+// one-bar unification.
+const LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS = 'w-7 min-w-7';
 
 type LibrarySortKey = 'releaseDate' | 'title' | 'status' | 'providers';
 type LibraryPresetId = LibraryView;
@@ -811,7 +809,6 @@ function LibraryStageTabs({
           ariaControls='library-catalog-panel'
           onKeyDown={handleTabKeyDown}
           onClick={() => onStage(tab)}
-          className={LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS}
         />
       ))}
     </div>
@@ -1401,7 +1398,6 @@ function LibraryImportMenu({
         <Button
           type='button'
           size='sm'
-          className={LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS}
           disabled={isImportingYouTube || isSyncingSpotify}
         >
           <Plus className={PAGE_TOOLBAR_ICON_CLASS} aria-hidden='true' />
@@ -1999,11 +1995,7 @@ function YouTubeLedgerLink() {
       asChild
       variant='ghost'
       size='sm'
-      className={cn(
-        PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-        LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS,
-        'text-secondary-token'
-      )}
+      className={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
     >
       {/* Viewport prefetch of this dynamic route is two RSC requests on every
           Work visit and pushes the shell persistence budget over its cap. */}
