@@ -147,6 +147,8 @@ describe('JOV-INV-045 gate-weakening detector', () => {
     const guardKinds = evaluateGateWeakening([fileOf({ path: 'scripts/ci-fast-lanes.mjs', before: lanes, after: lanesBare })], config).map(item => item.kind);
     assert.ok(guardKinds.includes('jump-policy-changed'), guardKinds);
     assert.ok(guardKinds.includes('source-guard-removed'), guardKinds);
+    const moved = { path: 'scripts/invariants/renamed-pin.json', previousPath: pin, before, after: '{"pin":{"maxJumped":9}}\n' };
+    assert.deepEqual(evaluateGateWeakening([moved], config).map(item => item.kind), ['jump-policy-changed']);
   });
   it('treats a new shrink-only ledger as tightening but still rejects growth of an existing one', () => {
     const path = 'apps/web/new-guard.baseline.json';
@@ -166,6 +168,12 @@ describe('JOV-INV-045 gate-weakening detector', () => {
     expectKind(JSON.stringify({ ...config, generatedReports: [...config.generatedReports, 'scripts/ci-fast-lanes.mjs'] }), 'scan-exclusion-grew');
     expectKind(JSON.stringify({ ...config, requiredKinds: config.requiredKinds.slice(1) }), 'detector-rule-removed');
     expectKind(JSON.stringify({ ...config, override: { ...config.override, label: 'other' } }), 'override-policy-changed');
+    expectKind(JSON.stringify({ ...config, jumpPolicyPin: { ...config.jumpPolicyPin, paths: [] } }), 'jump-policy-changed');
+    expectKind(JSON.stringify({ ...config, jumpPolicyPin: { ...config.jumpPolicyPin, guardId: 'other-guard' } }), 'jump-policy-changed');
+    const noWatch = { ...config };
+    delete noWatch.jumpPolicyPin;
+    expectKind(JSON.stringify(noWatch), 'jump-policy-changed');
+    assert.deepEqual(kindsOf({ path, before, after: JSON.stringify({ ...config, jumpPolicyPin: { ...config.jumpPolicyPin, note: 'comment only' } }) }), []);
     expectKind(null, 'detector-config-deleted');
     assert.ok(kindsOf({ path: 'scripts/invariants/gate-weakening-detector.mjs', before: 'keep\n', after: null }).includes('detector-deleted'));
     const hidden = { path: 'scripts/invariants/fixtures/gate-weakening/sample.ts', before: 'const value = 1;\n', after: 'it.skip("works", () => {});\n' };
@@ -253,6 +261,33 @@ describe('JOV-INV-045 gate-weakening detector', () => {
       assert.ok(kinds.includes('invariant-test-deleted'));
       assert.ok(kinds.includes('detector-deleted'));
       assert.equal(kinds.includes('timeout-raised'), false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('catches a rename that moves a watched pin file out of the watched paths', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gate-weakening-rename-'));
+    const git = args => {
+      const result = spawnSync('git', ['-c', 'commit.gpgsign=false', '-c', 'user.email=dev@example.com', '-c', 'user.name=Dev', ...args], { cwd: dir, encoding: 'utf8' });
+      assert.equal(result.status, 0, result.stderr);
+    };
+    try {
+      git(['init', '-b', 'main']);
+      mkdirSync(join(dir, 'scripts/invariants'), { recursive: true });
+      writeFileSync(join(dir, 'scripts/invariants/jump-policy-pin.json'), '{"pin":{"maxJumped":2}}\n');
+      git(['add', '.']);
+      git(['commit', '-m', 'pin']);
+      git(['checkout', '-b', 'pr']);
+      git(['mv', 'scripts/invariants/jump-policy-pin.json', 'scripts/invariants/jump-policy-pin.moved.json']);
+      git(['commit', '-m', 'rename the pin out of the watched path']);
+      const renamed = loadDiffFiles(dir, 'main');
+      assert.ok(renamed.some(file => file.previousPath === 'scripts/invariants/jump-policy-pin.json'), renamed);
+      assert.ok(evaluateGateWeakening(renamed, config).some(item => item.kind === 'jump-policy-changed'));
+      writeFileSync(join(dir, 'scripts/invariants/jump-policy-pin.moved.json'), '{"pin":{"maxJumped":9}}\n');
+      git(['add', '.']);
+      git(['commit', '-m', 'loosen the pin at its new location']);
+      const kinds = evaluateGateWeakening(loadDiffFiles(dir, 'main'), config).map(item => item.kind);
+      assert.ok(kinds.includes('jump-policy-changed'), kinds);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

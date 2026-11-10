@@ -144,6 +144,7 @@ export function loadDiffFiles(cwd, baseRef) {
     const renamed = flag.startsWith('R') || flag.startsWith('C');
     files.push({
       path,
+      previousPath: renamed ? parts[1] : null,
       before: flag.startsWith('A') ? null : showFile(cwd, mergeBase, renamed ? parts[1] : path),
       after: flag.startsWith('D') ? null : showFile(cwd, 'HEAD', path),
     });
@@ -156,9 +157,7 @@ function inspectGateFile(file, config) {
   const added = addedLines(file.before, file.after);
   if (isRuleset(file.path)) findings.push(...rulesetFindings(file));
   if (file.path === config.prReadyPath) {
-    for (const name of removedNeeds(file, config.prReadyJob)) {
-      add('pr-ready-check-removed', name);
-    }
+    for (const name of removedNeeds(file, config.prReadyJob)) add('pr-ready-check-removed', name);
   }
   if (file.path === config.sourceValidationPath) {
     for (const name of removedNames(stepNames(file.before), stepNames(file.after))) {
@@ -171,6 +170,7 @@ function inspectGateFile(file, config) {
     if (removed.includes(config.jumpPolicyPin?.guardId)) add('jump-policy-changed', `${config.jumpPolicyPin.guardId} guard removed`);
   }
   if ((config.jumpPolicyPin?.paths ?? []).includes(file.path) && file.before != null && file.after !== file.before) add('jump-policy-changed', 'jump policy pin changed');
+  if ((config.jumpPolicyPin?.paths ?? []).includes(file.previousPath)) add('jump-policy-changed', `${file.previousPath} renamed out of the watched paths`);
   if (isCiYaml(file.path)) {
     for (const line of added) {
       if (/^\s*#/.test(line)) continue;
@@ -228,12 +228,11 @@ function inspectSelf(file) {
   }
   const findings = [];
   const add = (kind, detail) => findings.push(finding(kind, file.path, detail));
-  if (before.schema !== after.schema || before.invariantId !== after.invariantId) {
-    add('detector-rule-removed', 'identity');
-  }
+  if (before.schema !== after.schema || before.invariantId !== after.invariantId) add('detector-rule-removed', 'identity');
   for (const kind of before.requiredKinds ?? []) {
     if (!(after.requiredKinds ?? []).includes(kind)) add('detector-rule-removed', kind);
   }
+  if (before.jumpPolicyPin != null && (JSON.stringify(before.jumpPolicyPin.paths ?? []) !== JSON.stringify(after.jumpPolicyPin?.paths ?? []) || before.jumpPolicyPin.guardId !== after.jumpPolicyPin?.guardId)) add('jump-policy-changed', 'jumpPolicyPin watch changed');
   for (const exclusion of after.scanExclusions ?? []) {
     if (!(before.scanExclusions ?? []).includes(exclusion)) {
       add('scan-exclusion-grew', exclusion);

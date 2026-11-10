@@ -54,6 +54,7 @@
   "sourceValidationPath": ".github/workflows/source-validation.yml",
   "sourceGuardPath": "scripts/ci-fast-lanes.mjs",
   "jumpPolicyPin": {
+    "note": "watch is direction-blind on purpose: tightening the pin also needs the documented override",
     "paths": [
       "scripts/invariants/jump-policy-pin.json",
       "scripts/invariants/jump-policy-pin.test.mjs"
