@@ -61,8 +61,6 @@ describe('OverflowMenu', () => {
     });
     expect(trigger).toHaveAttribute('tabindex', '-1');
     await user.click(trigger);
-    expect(
-      screen.getByRole('menuitem', { name: 'Open' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Open' })).toBeInTheDocument();
   });
 });

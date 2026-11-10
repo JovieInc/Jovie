@@ -4,7 +4,10 @@ import { useCallback, useMemo } from 'react';
 // Leaf imports: the hook must keep working when a test mocks the
 // '@/components/feedback' barrel without its re-exported constants.
 import { type ToastOptions as FeedbackToastOptions } from '@/components/feedback';
-import { toast as feedbackToast, TOAST_DURATIONS } from '@/components/feedback/toast';
+import {
+  toast as feedbackToast,
+  TOAST_DURATIONS,
+} from '@/components/feedback/toast';
 
 /**
  * Standard toast messages for consistent UX across the application
