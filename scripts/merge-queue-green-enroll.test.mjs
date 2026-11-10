@@ -2299,9 +2299,13 @@ test('a landing on main reconciles the full roster and the hold contract without
   assert.equal(effects.mutations.length, 1);
   const contract = workflow.jobs['enforce-hold-contract'].if;
   assert.equal(workflow.on.schedule, undefined);
-  for (const event of ['push', 'pull_request_target', 'workflow_dispatch']) {
+  // JOV-8594: label events reach the hold contract only on the blocking set,
+  // so pull_request_target is matched by the equality form instead of a
+  // bare quoted event name.
+  for (const event of ['push', 'workflow_dispatch']) {
     assert.match(contract, new RegExp(`"${event}"`));
   }
+  assert.match(contract, /github\.event_name == 'pull_request_target'/);
   assert.match(contract, /workflow_run\.event == 'merge_group'/);
 });
 
@@ -2707,4 +2711,100 @@ test('marketing shares the compounding jump cap and reconciliation considers it 
     sweep.mutations.map(m => m.id),
     ['PR_2', 'PR_1']
   );
+});
+
+// JOV-8594 (REST-budget fan-out cut): label wakes that cannot change an
+// admission decision must not boot the runner or mint an app token, and a
+// merge-group SUCCESS wake has nothing to hold or enforce (only failure
+// wakes write and enforce exact-head holds, JOV-6620).
+const BLOCKING_IF_LIST = [
+  'hold',
+  'gated',
+  'incident',
+  'queue-deferred',
+  'queue-poison',
+  'lane-fix-red',
+];
+
+test('label wakes reach the controller only when they can change admission', () => {
+  const enroll = String(workflow.jobs.enroll.if);
+  // Removing a non-blocking label cannot flip any admission decision: the
+  // hold set is unchanged, the head is unchanged, and jump eligibility is
+  // label-addition-driven. Pin the blocking filter on the unlabeled wake.
+  const clause = enroll.match(
+    /github\.event\.action != 'unlabeled' \|\|\s*contains\(fromJSON\('(\[[^\]]*\])'\), github\.event\.label\.name\)/
+  );
+  assert.ok(clause, 'enroll.if gates unlabeled wakes on the blocking-label set');
+  assert.deepEqual(JSON.parse(clause[1]), BLOCKING_IF_LIST);
+  // The labeled exclusion and the draft guard stay byte-for-byte.
+  assert.match(enroll, /github\.event\.action != 'labeled'/);
+  assert.match(
+    enroll,
+    /github\.event_name != 'pull_request_target' \|\| github\.event\.pull_request\.draft == false/
+  );
+  // Hold-contract sweeps run on real hold transitions, not on every label tick.
+  const hold = String(workflow.jobs['enforce-hold-contract'].if);
+  const holdActionGate = hold.match(
+    /!contains\(fromJSON\('(\[[^\]]*\])'\), github\.event\.action\)/
+  );
+  assert.ok(holdActionGate, 'labeled and unlabeled wakes are gated');
+  assert.deepEqual(JSON.parse(holdActionGate[1]), ['labeled', 'unlabeled']);
+  const holdLabelGate = hold.match(
+    /contains\(fromJSON\('(\[[^\]]*\])'\), github\.event\.label\.name\)/
+  );
+  assert.ok(holdLabelGate, 'label wakes are gated on the blocking set');
+  assert.deepEqual(JSON.parse(holdLabelGate[1]), BLOCKING_IF_LIST);
+  // A merge-group SUCCESS cannot write, hold, or release anything: the only
+  // job it used to run was the hold-contract sweep. Failure wakes keep
+  // everything (JOV-6620 hold write + rearm ladder).
+  assert.match(
+    hold,
+    /github\.event\.workflow_run\.event == 'merge_group' &&\s*github\.event\.workflow_run\.conclusion != 'success'/
+  );
+  for (const event of ['push', 'workflow_dispatch']) {
+    assert.match(hold, new RegExp(`"${event}"`));
+  }
+  assert.match(hold, /github\.event_name == 'pull_request_target'/);
+});
+
+test('the pre-mint no-op gate sits before the app token mint and fails open', () => {
+  const steps = workflow.jobs.enroll.steps;
+  const gate = steps.find(step => step.id === 'pre-mint-gate');
+  assert.ok(gate, 'pre-mint gate step exists');
+  assert.match(
+    String(gate.if ?? ''),
+    /github\.event_name == 'workflow_run' \|\| github\.event_name == 'pull_request_target'/
+  );
+  const mint = steps.findIndex(step => step.id === 'app-token');
+  const gateIndex = steps.indexOf(gate);
+  assert.ok(gateIndex < mint, 'gate runs before the app token mint');
+  // The gate spends only the workflow's own GITHUB_TOKEN, never the shared
+  // installation budget.
+  assert.equal(gate.env.GATE_TOKEN, '${{ github.token }}');
+  // Later steps re-check the skip output; the gate body never exits
+  // non-zero, so an API error cannot strand a green wake (fail open).
+  for (const step of steps) {
+    if (step === gate) continue;
+    if (
+      step.name === 'Checkout trusted failure policy' ||
+      step.id === 'app-token' ||
+      step.name === 'Sample API quota' ||
+      step.name === 'Enqueue green PRs'
+    ) {
+      assert.match(
+        String(step.if ?? ''),
+        /steps\.pre-mint-gate\.outputs\.skip != 'true'/,
+        step.name
+      );
+    }
+  }
+  // The gate skips only provably-stuck wakes, each reproducing a decision
+  // the enroll script would make anyway (head-moved receipt / blocking-label
+  // never admitted / already-queued silent skip).
+  assert.match(gate.run, /head-moved/);
+  assert.match(gate.run, /blocking-label/);
+  assert.match(gate.run, /already-queued/);
+  // Priority-labeled queued entries keep their wake so the relabel-jump
+  // ladder (compounding / priority:marketing) is untouched (JOV-8594 scope).
+  assert.match(gate.run, /PRIORITY/);
 });
