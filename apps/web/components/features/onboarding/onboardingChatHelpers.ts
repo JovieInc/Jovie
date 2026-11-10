@@ -19,10 +19,6 @@ import { readOnboardingCatalogPreview } from '@/lib/onboarding/catalog-preview';
 import { readOnboardingProfileDraft } from '@/lib/onboarding/profile-draft';
 import { type CheckoutCardPayload } from './ChatProposeCheckoutCard';
 import { type NextStepCardPayload } from './ChatProposeNextStepCard';
-import type {
-  OnboardingProfileArtist,
-  OnboardingProfileBuilderState,
-} from './OnboardingProfileRail';
 import {
   type ArtistConfirmedOutput,
   type ArtistPickerOutput,
@@ -30,6 +26,10 @@ import {
   type OnboardingArtistSelection,
   type SocialLinkOutput,
 } from './OnboardingToolArtifacts';
+import type {
+  OnboardingProfileArtist,
+  OnboardingProfileBuilderState,
+} from './onboardingProfileRailState';
 
 export const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
 
@@ -90,6 +90,28 @@ export function isNextStepPayload(
     output !== null &&
     (output as ToolOutputWithAction).action === 'propose_next_step'
   );
+}
+
+/**
+ * Whether the transcript's latest completed `proposeNextStep` decision is
+ * terminal (`waitlist` or `instant_access`). Mirrors the claim route's
+ * `deriveTerminalDecisionKind`: such a transcript is waiting on a claim
+ * handoff, so a restored copy must claim on mount instead of waiting for a
+ * turn the visitor has no reason to send.
+ */
+export function endsInTerminalNextStep(
+  messages: readonly UIMessage[]
+): boolean {
+  for (const message of messages.toReversed()) {
+    for (const part of getToolParts(message).toReversed()) {
+      if (getToolName(part) !== 'proposeNextStep') continue;
+      if (part.state !== 'output-available') continue;
+      if (!isNextStepPayload(part.output)) continue;
+      const kind = part.output.decision?.kind;
+      return kind === 'waitlist' || kind === 'instant_access';
+    }
+  }
+  return false;
 }
 
 export function isCheckoutPayload(
@@ -344,4 +366,23 @@ export function deriveProfileBuilderState({
       (handleDraft == null ? handle : cleanHandle(handleDraft)),
     socialLinks,
   };
+}
+
+export function rollbackFailedUserTurn(
+  messages: readonly UIMessage[],
+  failedText: string | null | undefined
+): readonly UIMessage[] {
+  const trimmedFailed = failedText?.trim();
+  if (!trimmedFailed) return messages;
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role !== 'user') continue;
+    if (getMessageText(message).trim() === trimmedFailed) {
+      return messages.slice(0, index);
+    }
+    break;
+  }
+
+  return messages;
 }

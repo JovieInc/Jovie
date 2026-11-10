@@ -91,6 +91,8 @@ vi.mock('@/app/onboarding/actions/upgrade-offer', () => ({
 }));
 
 vi.mock('@/lib/entitlements/registry', () => ({
+  getLimit: (_plan: string, key: string) =>
+    key === 'analyticsRetentionDays' ? 180 : null,
   getEntitlements: () => ({
     marketing: {
       displayName: 'Artist Presence',
@@ -189,6 +191,15 @@ describe('OnboardingCheckoutClient', () => {
     );
   });
 
+  it('puts the whole checkout in its own scroll box so the button stays reachable', () => {
+    render(<OnboardingCheckoutClient {...defaultProps} />);
+    const scroll = screen.getByTestId('onboarding-checkout-scroll');
+    expect(scroll).toHaveClass('overflow-y-auto', 'min-h-0', 'flex-1');
+    expect(scroll).toContainElement(
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
+    );
+  });
+
   it('updates the displayed price when annual billing is selected', async () => {
     const user = userEvent.setup();
     render(<OnboardingCheckoutClient {...defaultProps} />);
@@ -255,14 +266,15 @@ describe('OnboardingCheckoutClient', () => {
       screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
     );
 
-    expect(
-      await screen.findByRole('alert', {
-        name: '',
-      })
-    ).toHaveTextContent('Checkout is temporarily unavailable.');
-    expect(
-      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
-    ).toBeEnabled();
+    const alert = await screen.findByRole('alert', { name: '' });
+    expect(alert).toHaveTextContent('Checkout is temporarily unavailable.');
+    const cta = screen.getByRole('button', {
+      name: 'Upgrade to Artist Presence',
+    });
+    expect(cta).toBeEnabled();
+    // The alert lands below the button, so a failure never pushes it down.
+    const below = cta.compareDocumentPosition(alert);
+    expect(below & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(hrefState.current).toBe('http://localhost/onboarding/checkout');
   });
 
@@ -347,8 +359,8 @@ describe('OnboardingCheckoutClient', () => {
 
     // Certified capabilities only (JOV-7794); monitoring is internal-only.
     for (const highlight of [
-      'Payments',
-      '90-day Analytics',
+      'Release Emails',
+      '180-day Analytics',
       'Verified Badge',
     ]) {
       expect(screen.getByText(highlight)).toBeInTheDocument();
@@ -479,7 +491,7 @@ describe('OnboardingCheckoutClient', () => {
     render(<OnboardingCheckoutClient {...defaultProps} />);
     expect(screen.queryByText(/monitoring/i)).not.toBeInTheDocument();
     expect(
-      screen.getByText('Take tips and payments on your profile')
+      screen.getByText('Email your verified subscribers when new music drops')
     ).toBeInTheDocument();
   });
 });

@@ -23,6 +23,24 @@ import {
 } from './enums';
 import { creatorProfiles } from './profiles';
 
+/**
+ * One search result that showed this lead's link page. Google matched the
+ * query against the whole indexed page, so a quoted tool domain in a SerpAPI
+ * query is evidence the page links that tool; nobody reads the page itself.
+ */
+export interface LeadSearchEvidence {
+  source: 'search_match';
+  query: string;
+  provider: 'serpapi' | 'exa' | 'none';
+  /** Buyer-signal rule ids the query's quoted domains map to. */
+  tools: string[];
+  /** Quoted domains the query named (SerpAPI only; Exa ignores quotes). */
+  domains: string[];
+  title: string | null;
+  snippet: string | null;
+  observedAt: string;
+}
+
 export interface LeadSignalSnapshot {
   verified: boolean | null;
   hasPaidTier: boolean | null;
@@ -40,6 +58,8 @@ export interface LeadSignalSnapshot {
   publicSourceRevision?: string;
   spotifyGenres?: string[];
   spotifyEnrichmentStatus?: string;
+  /** Search results that showed this page, merged across queries. */
+  searchEvidence?: LeadSearchEvidence[];
 }
 
 export interface LeadGuardrailThresholds {
@@ -134,6 +154,7 @@ export const leads = pgTable(
     // Outreach pipeline
     outreachRoute: leadOutreachRouteEnum('outreach_route'),
     outreachStatus: leadOutreachStatusEnum('outreach_status'),
+    /** @deprecated Plaintext is never written; 0160 nulls existing values. Read claimTokenHash. */
     claimToken: text('claim_token'),
     claimTokenHash: text('claim_token_hash'),
     claimTokenExpiresAt: timestamp('claim_token_expires_at'),

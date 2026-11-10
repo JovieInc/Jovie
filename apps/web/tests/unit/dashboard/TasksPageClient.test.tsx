@@ -1013,7 +1013,7 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(screen.getByTestId('task-document-pane')).toBeVisible();
-    expect(screen.getByText('Select a task')).toBeInTheDocument();
+    expect(screen.getByText('No Task Selected')).toBeInTheDocument();
     expect(screen.getByTestId('task-document-empty-state')).toHaveTextContent(
       'Choose a task from the list to view its details.'
     );
@@ -1075,7 +1075,7 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(screen.getByTestId('task-document-pane')).toBeInTheDocument();
-    expect(screen.getByText('Select a task')).toBeInTheDocument();
+    expect(screen.getByText('No Task Selected')).toBeInTheDocument();
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
 
     act(() => {
@@ -1120,7 +1120,7 @@ describe('TasksPageClient', () => {
     );
 
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
-    expect(screen.getByText('Select a task')).toBeInTheDocument();
+    expect(screen.getByText('No Task Selected')).toBeInTheDocument();
     expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
       'task-jovie',
     ]);
@@ -1908,7 +1908,7 @@ describe('TasksPageClient', () => {
 
     const searchTrigger = within(
       screen.getByTestId('header-actions-host')
-    ).getByRole('button', { name: 'Search Jovie' });
+    ).getByRole('button', { name: /^Search Jovie/ });
     expect(searchTrigger).toHaveAttribute('data-app-search-trigger', 'true');
     expect(
       within(screen.getByTestId('header-actions-host')).queryByRole('button', {
@@ -1929,7 +1929,7 @@ describe('TasksPageClient', () => {
 
     fireEvent.click(
       within(screen.getByTestId('header-actions-host')).getByRole('button', {
-        name: 'Search Jovie',
+        name: /^Search Jovie/,
       })
     );
 
@@ -2033,7 +2033,7 @@ describe('TasksPageClient', () => {
       deleteItem?.onClick?.();
     });
 
-    const dialog = screen.getByRole('dialog', { name: 'Delete task?' });
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete task?' });
     expect(dialog).toHaveTextContent('Delete task?');
     expect(dialog).toHaveTextContent(mockTaskTwo.title);
 
@@ -2076,7 +2076,7 @@ describe('TasksPageClient', () => {
   it('supports j and k keyboard navigation across visible tasks', () => {
     renderPage();
 
-    expect(screen.getByText('Select a task')).toBeInTheDocument();
+    expect(screen.getByText('No Task Selected')).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: 'j' });
     expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
@@ -2278,7 +2278,7 @@ describe('TasksPageClient', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
 
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
-    expect(screen.getByText('Select a task')).toBeInTheDocument();
+    expect(screen.getByText('No Task Selected')).toBeInTheDocument();
   });
 
   it('keeps task keyboard navigation out of text editors', () => {

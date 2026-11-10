@@ -147,11 +147,13 @@ export const REQUIRED_LEGAL_HREFS = ['/legal/privacy', '/legal/terms'] as const;
 
 export const FOOTER_LINK_BUDGET = { min: 8, max: 16 } as const;
 
-function sentenceCaseViolation(text: string): string | null {
+export function sentenceCaseViolation(text: string): string | null {
   const words = text.split(/\s+/).filter(Boolean);
   for (const [index, word] of words.entries()) {
     const bare = word.replace(/[^A-Za-z0-9]/g, '');
-    if (!bare || PROPER_NOUNS.has(bare)) continue;
+    if (!bare || PROPER_NOUNS.has(bare) || /^I(?:['\u2019]|$)/.test(word)) {
+      continue;
+    }
     if (index === 0) {
       if (/^[a-z]/.test(bare)) return 'start with a capital letter';
       continue;
@@ -163,7 +165,7 @@ function sentenceCaseViolation(text: string): string | null {
   return null;
 }
 
-function hrefViolation(href: string): string | null {
+export function hrefViolation(href: string): string | null {
   if (isExternalChromeHref(href)) {
     let url: URL;
     try {

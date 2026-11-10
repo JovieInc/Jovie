@@ -101,18 +101,15 @@ const NativeSelect = React.forwardRef<HTMLSelectElement, NativeSelectProps>(
           >
             {label}
             {required ? (
-              <span className='ml-1 text-destructive' aria-hidden='true'>
+              <span className='ms-1 text-destructive' aria-hidden='true'>
                 *
               </span>
             ) : null}
           </label>
         ) : null}
         {select}
-        <div
-          data-slot='native-select-error-slot'
-          className='min-h-5'
-          aria-live='polite'
-        >
+        {/* role=alert alone: an aria-live wrapper would announce it twice. */}
+        <div data-slot='native-select-error-slot' className='min-h-5'>
           {error ? (
             <p
               id={errorId}

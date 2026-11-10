@@ -300,7 +300,7 @@ export const COPY_RULES: readonly CopyRule[] = [
     severity: 'block',
     registers: ['jovie-marketing'],
     pattern:
-      /\b(?:unlock(?:s|ed|ing)?|reimagin(?:e|es|ed|ing)|all-in-one|one-stop shop)\b/i,
+      /\b(?:unlock(?:s|ed|ing)?|reimagin(?:e|es|ed|ing)|all-in-one|one-stop shop|quiet workspace|in one (?:quiet |simple |single |beautiful )?workspace)\b/i,
     message:
       'Generic promotion. Replace with a concrete action or consequence.',
   },
@@ -430,6 +430,18 @@ export const COPY_RULES: readonly CopyRule[] = [
     pattern:
       /\b(?:in order to|at this point in time|due to the fact that|it is important to note|please note that|basically|essentially|actually|really|very|simply|just)\b/i,
     message: 'Filler. Cut the word and reread.',
+  },
+
+  {
+    id: 'pipeline-jargon',
+    category: 'clarity',
+    severity: 'block',
+    registers: ['jovie-persona', 'jovie-marketing'],
+    // 2026-10-31 golden-path walk: "97 Spotify followers (source: enrichment)"
+    // shipped in the claim chat. Artists never see our pipeline's names.
+    pattern: /\benrichment\b|\(source:\s*[a-z_-]+\)/i,
+    message:
+      'Internal pipeline word. Name the real source ("on Spotify") or cut it.',
   },
 
   // ── Product truth (registered overclaims) ──────────────────────────────

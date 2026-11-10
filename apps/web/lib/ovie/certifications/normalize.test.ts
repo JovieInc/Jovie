@@ -62,11 +62,11 @@ describe('normalizeKernelCertificationRow', () => {
   it.each([
     [
       'Flow signup',
-      'sha256:4eef1a42d11113be250cd5f076f3d9ec0a28914e0d06212cb898093924d65832',
+      'sha256:6157c41f909cef4e7dc649a7f47009a20a11db93dbe7d3c128a2d27f32061a3d',
     ],
     [
       'L’été · 東京 🎵',
-      'sha256:b268dd194303ea0cd162eb47a1a2df013128f76b115891adbb1652b79b32ece3',
+      'sha256:bd364159c36e003410cca4d72447a391640dd7ed499bf233b578c24d596376dc',
     ],
   ])(
     'preserves the existing Node SHA-256 evidence digest for %s',
@@ -77,6 +77,69 @@ describe('normalizeKernelCertificationRow', () => {
       expect(buildCertificationDecisionDigest(packet)).toBe(digest);
     }
   );
+
+  it('maps the golden-path lifecycle state only when the summary carries one (JOV-9625)', () => {
+    const goldenPathDogfood = (
+      id: string,
+      status: 'passed' | 'failed' | 'blocked',
+      summary: string
+    ) => ({
+      id,
+      tier: 'runtime_dogfood' as const,
+      status,
+      sourceSha: FIXTURE_SHA,
+      ref: 'prod-golden-path',
+      digest: null,
+      summary,
+    });
+    const certified = fixturePacket('golden-certified', {
+      operational: {
+        runtimeDogfood: [
+          goldenPathDogfood(
+            'prod-golden-path:landing:abcdef01',
+            'passed',
+            'state=certified; 6 production checks passed as anonymous'
+          ),
+        ],
+      },
+    });
+    const certifiedRow = normalizeKernelCertificationRow({
+      domain: 'flows',
+      surface: 'Landing',
+      packet: certified,
+      admission: evaluateCertificationAdmission({ packet: certified }),
+      decisions: [],
+      auditHistory: [],
+      updatedAt: FIXTURE_NOW,
+    });
+    expect(certifiedRow.goldenPathState).toBe('certified');
+
+    const failed = fixturePacket('golden-failed', {
+      operational: {
+        runtimeDogfood: [
+          goldenPathDogfood(
+            'prod-golden-path:chat:abcdef01',
+            'failed',
+            'Failed on production: first-reply (timeout after 60s)'
+          ),
+        ],
+      },
+    });
+    const failedRow = normalizeKernelCertificationRow({
+      domain: 'flows',
+      surface: 'In-app chat first reply',
+      packet: failed,
+      admission: evaluateCertificationAdmission({ packet: failed }),
+      decisions: [],
+      auditHistory: [],
+      updatedAt: FIXTURE_NOW,
+    });
+    // A failed/blocked receipt carries no `state=` marker, so the row must
+    // not report a lifecycle state at all — 'missing' is reserved for a
+    // surface with no receipt, never for an exercised failure (JOV-9625).
+    expect('goldenPathState' in failedRow).toBe(false);
+    expect(failedRow.goldenPathState).toBeUndefined();
+  });
 
   it('projects a review-ready packet into a decidable row bound to the kernel digest', () => {
     const packet = fixturePacket('signup');

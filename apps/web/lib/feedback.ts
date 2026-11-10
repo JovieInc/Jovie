@@ -1,4 +1,5 @@
 import { and, asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { runAfterResponse } from '@/lib/customer-voice/after-response';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -55,6 +56,9 @@ const CLASSIFIER_ACTOR = 'system:classifier';
  * unclassified (disposition stays 'pending', no ledger rows).
  */
 const CLOSED_LOOP_SOURCES = new Set(['dashboard', 'chat', 'agent_cli']);
+
+/** Free-text feedback written by customers (not agents) goes to Tim. */
+const CUSTOMER_VOICE_FEEDBACK_SOURCES = new Set(['dashboard', 'chat']);
 
 /**
  * Closed-loop routing (JOV-6433), event-driven on new feedback only — no
@@ -229,6 +233,28 @@ export async function createFeedbackItem(params: {
       // Capture is already durable; leave the row pending rather than
       // silently misrouting. The ledger gap is observable via disposition.
       console.error('[feedback] routing failed:', routingError);
+    }
+
+    // Customer voice: in-app feedback reaches Tim by iMessage with a draft
+    // reply (lib/customer-voice). Isolated: it never fails the capture.
+    if (CUSTOMER_VOICE_FEEDBACK_SOURCES.has(source)) {
+      const handoff = async () => {
+        const { captureCustomerVoice } = await import(
+          '@/lib/customer-voice/capture.server'
+        );
+        await captureCustomerVoice({
+          channel: 'feedback',
+          text: params.message,
+          receivedAt: new Date(),
+          userId: params.userId,
+          surface:
+            source === 'chat'
+              ? 'feedback in chat'
+              : `feedback form${params.context.pathname ? ` on ${params.context.pathname}` : ''}`,
+          feedbackItemId: item.id,
+        });
+      };
+      runAfterResponse(handoff);
     }
 
     return item;

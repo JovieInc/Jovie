@@ -13,14 +13,14 @@ import { documentTitle } from '@/lib/seo/document-title';
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: documentTitle(`Developers - ${APP_NAME}`),
+  title: documentTitle('Developers'),
   description:
     'Jovie’s public, anonymous, read-only profile API pairs with machine-readable site resources.',
   alternates: {
     canonical: `${BASE_URL}${APP_ROUTES.DEVELOPERS}`,
   },
   openGraph: {
-    title: `Developers - ${APP_NAME}`,
+    title: `Developers | ${APP_NAME}`,
     description:
       'Jovie’s public, anonymous, read-only profile API pairs with machine-readable site resources.',
     url: `${BASE_URL}${APP_ROUTES.DEVELOPERS}`,
@@ -74,11 +74,6 @@ const RESOURCE_LINKS = [
       // "Deprecation" and "Sunset" are the literal RFC 9745/8594 HTTP header
       // names (ui-casing-allow: literal HTTP header names)
       'Active v1 lifecycle boundary, additive versus breaking changes, and future Deprecation and Sunset signals.',
-  },
-  {
-    href: APP_ROUTES.INTEGRATIONS,
-    label: 'Integrations',
-    description: 'Account integrations and the capabilities each supports.',
   },
   {
     href: '/llms.txt',

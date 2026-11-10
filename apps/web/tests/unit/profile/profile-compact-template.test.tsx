@@ -40,6 +40,7 @@ const {
   mockProfileInlineNotificationsCTA,
   mockProfileDesktopSurface,
   mockProfileUnifiedDrawer,
+  mockDrawerSlot,
   mockProfilePrimaryTabPanel,
   MockProfileDesktopSurface,
   mockClientNavigation,
@@ -74,26 +75,22 @@ const {
     mockProfileInlineNotificationsCTA: vi.fn(),
     mockProfileDesktopSurface,
     mockProfileUnifiedDrawer: vi.fn(),
+    mockDrawerSlot: (props: unknown) => mockProfileUnifiedDrawer(props),
     mockProfilePrimaryTabPanel: vi.fn(),
     MockProfileDesktopSurface,
     mockClientNavigation: vi.fn((_href: string) => false),
   };
 });
 
+vi.mock(
+  '../../../components/features/profile/templates/useProfileUnifiedDrawerModule',
+  () => ({ ProfileUnifiedDrawerSlot: mockDrawerSlot })
+);
 vi.mock('next/dynamic', () => ({
   default: (loader: unknown) => {
     const source = String(loader);
-
-    if (source.includes('ProfileUnifiedDrawer')) {
-      return (props: unknown) => mockProfileUnifiedDrawer(props);
-    }
-
     if (source.includes('ProfileInlineNotificationsCTA')) {
       return (props: unknown) => mockProfileInlineNotificationsCTA(props);
-    }
-
-    if (source.includes('ProfileDesktopSurface')) {
-      return MockProfileDesktopSurface;
     }
 
     return () => null;
@@ -1010,7 +1007,7 @@ describe('ProfileCompactTemplate', () => {
 
     const branding = await screen.findByTestId('profile-jovie-branding');
     expect(
-      within(branding).getByRole('link', { name: /Jovie home/i })
+      within(branding).getByRole('link', { name: /Made with Jovie/i })
     ).toHaveAttribute(
       'href',
       `/?utm_source=profile&utm_artist=${mockArtist.handle}`
@@ -1597,6 +1594,89 @@ describe('ProfileCompactTemplate', () => {
     replaceStateSpy.mockRestore();
   });
 
+  it('restores a stripped deep-link landing even when the strip never wakes React', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([]);
+    mockUseProfileShell.mockImplementation(() => ({
+      locationMode: 'listen',
+      notificationsContextValue: {
+        subscribedChannels: {},
+        subscriptionDetails: {},
+        setSubscribedChannels: vi.fn(),
+        setSubscriptionDetails: vi.fn(),
+        setState: vi.fn(),
+      },
+      notificationsController: {
+        contentPreferences: null,
+      },
+    }));
+    window.history.replaceState(null, '', '/artist-profiles');
+    window.history.pushState(null, '', '/test-artist?mode=listen&source=qr');
+    // Fresh trace ring: earlier tests in this file share the same window.
+    (window as unknown as Record<string, unknown>).__JOVIE_RUNTIME_TRACE__ =
+      undefined;
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    render(
+      <ProfileCompactTemplate
+        mode='listen'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          modeOverride: 'listen',
+          sourceOverride: 'qr',
+        })
+      );
+    });
+
+    const historyLengthAfterLanding = window.history.length;
+    // Next's entry updater strips the landed ?mode=… entry with a bare
+    // replaceState — no React wake, no rerender. On the standalone E2E
+    // server the strip lands LATE (post-hydration, ~seconds in): after the
+    // first fix's fixed 200/600/1400ms wake ticks had all fired, so the
+    // correction still never ran (verify run 41097577290). Delay the strip
+    // past that fixed window so only the 250ms strip detector can catch it.
+    await new Promise(resolve => setTimeout(resolve, 1800));
+    act(() => {
+      window.history.replaceState(window.history.state, '', '/test-artist');
+    });
+    pushStateSpy.mockClear();
+
+    // Deliberately NO view.rerender here: only the strip detector's wake
+    // may correct the strip.
+    await waitFor(
+      () => {
+        expect(`${window.location.pathname}${window.location.search}`).toBe(
+          '/test-artist?mode=listen&source=qr'
+        );
+      },
+      { timeout: 4500 }
+    );
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(window.history.length).toBe(historyLengthAfterLanding);
+
+    // Runtime-trace receipts (lib/testing/runtime-trace): the correction path
+    // is recorded so a red matrix run names the guard that fired.
+    const trace = (
+      window as unknown as {
+        __JOVIE_RUNTIME_TRACE__?: { events: { event: string }[] };
+      }
+    ).__JOVIE_RUNTIME_TRACE__;
+    expect(trace?.events.map(event => event.event)).toEqual(
+      expect.arrayContaining(['arrival', 'strip-correction-replace'])
+    );
+    expect(trace?.events.some(event => event.event === 'mode-push')).toBe(
+      false
+    );
+
+    pushStateSpy.mockRestore();
+  });
+
   it('does not revert a client Link navigation to a different mode', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([]);
     mockUseProfileShell.mockImplementation(() => ({
@@ -1878,7 +1958,7 @@ describe('ProfileCompactTemplate', () => {
         render(profile());
 
         const expectClaimIntent = () => {
-          expect(screen.getByTestId('claim-banner')).toHaveTextContent(
+          expect(screen.getByTestId('claim-banner-copy')).toHaveTextContent(
             'Your profile is ready. Claim it to turn on release emails.'
           );
           expect(screen.getByTestId('claim-banner-cta')).toHaveAttribute(
@@ -1934,7 +2014,7 @@ describe('ProfileCompactTemplate', () => {
           `/test-artist?claim=${claim}&source=qr&token=private-token`
         );
         render(profile());
-        expect(screen.getByTestId('claim-banner')).toHaveTextContent(
+        expect(screen.getByTestId('claim-banner-copy')).toHaveTextContent(
           'This profile is unclaimed. Is it yours? Claim it with Spotify.'
         );
         fireEvent.click(
@@ -3089,7 +3169,7 @@ describe('ProfileCompactTemplate', () => {
         expect.objectContaining({
           artist: mockArtist,
           activeMode: 'profile',
-          presentation: 'modal',
+          presentation: 'embedded',
         })
       );
     });
@@ -3482,7 +3562,7 @@ describe('ProfileCompactTemplate', () => {
     });
   });
 
-  describe('with the desktop surface flag off (shipped default)', () => {
+  describe('with the desktop surface flag off (explicit opt-out)', () => {
     beforeEach(() => {
       vi.stubEnv('NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE', '');
     });
@@ -3536,10 +3616,12 @@ describe('ProfileCompactTemplate', () => {
       expect(viewport).not.toHaveAttribute('data-desktop-ready');
       expect(viewport).not.toHaveClass('profile-viewport--desktop-surface');
       // The compact shell keeps the centered phone-column contract
-      // (max-width: --profile-shell-max-width, md:mx-auto card framing).
+      // (max-width: --profile-shell-max-width, mx-auto at every width).
+      // Embedded browser panes can be wider than the phone cap but narrower
+      // than md, so centering must not wait for tablet card framing.
       const compactShell = screen.getByTestId('profile-compact-shell');
       expect(compactShell).toHaveClass('public-profile-compact-shell');
-      expect(compactShell).toHaveClass('md:mx-auto');
+      expect(compactShell).toHaveClass('mx-auto');
       expect(screen.queryByTestId('profile-desktop-shell')).toBeNull();
       expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
       // The banner stays inside the column instead of the desktop shell.

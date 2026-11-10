@@ -102,10 +102,46 @@ describe('presence inspector content (JOV-8106)', () => {
   });
 
   it('collapses to actions plus diagnostics metadata when search is unavailable', () => {
-    const keys = sectionKeys(surface(), false);
-
-    expect(keys).toEqual(['source_identity', 'actions', 'monitoring_details']);
+    expect(sectionKeys(surface(), false)).toEqual([
+      'source_identity',
+      'actions',
+      'monitoring_details',
+    ]);
   });
+
+  it.each([
+    ['suggested', 'active', 'Needs Qualification', true],
+    ['conflicting', 'active', 'Needs Review', true],
+    ['rejected', 'active', 'Not You', false],
+    ['qualified', 'locked', 'Limit Reached', false],
+    ['qualified', 'paused', 'Paused', false],
+    ['qualified', 'unavailable', 'Unavailable', false],
+  ] as const)(
+    'keeps %s/%s guidance visible during a search outage (JOV-9021)',
+    (qualificationStatus, monitoringState, label, needsIdentityDecision) => {
+      const model = derivePresenceInspector(
+        surface({ qualificationStatus, monitoringState }),
+        false
+      );
+      const keys = model.sections.map(section => section.key);
+
+      expect(model.status.label).toBe(label);
+      expect(model.signals).toEqual(
+        expect.arrayContaining([expect.objectContaining({ label })])
+      );
+      expect(model.needsIdentityDecision).toBe(needsIdentityDecision);
+      expect(keys).toContain('observation_summary');
+      expect(keys).toContain('signals');
+      expect(keys).toContain('object_facts');
+      expect(keys).not.toContain('monitoring_details');
+      if (needsIdentityDecision) {
+        expect(keys).toContain('identity_check');
+        expect(keys.indexOf('identity_check')).toBeLessThan(
+          keys.indexOf('actions')
+        );
+      }
+    }
+  );
 
   it('exposes the resolved status, signals, and primary action for the rail', () => {
     const row = surface({ monitoringState: 'locked' });

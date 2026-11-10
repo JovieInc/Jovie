@@ -1,6 +1,6 @@
 {
-  "version": "959b6bf1a4ec",
-  "toolsListHash": "5d4c361dd8af47313af5a5f273b1bdea84b68e21e5099741df8d0f5cd90d5f94",
+  "version": "8029a0180cd9",
+  "toolsListHash": "3b449a88fcfe63cfd959490228de4b89cedfabede3ba1561c63ead05990ad371",
   "listingHash": "a7665b2f5a09882b4a03e68179c82c6e3651a971c63ad7dfb88cc10b9d213c6f",
   "regenerate": "pnpm --filter @jovie/web agent-distribution:generate",
   "icons": {
@@ -31,9 +31,9 @@
     "tools-list.snapshot.json"
   ],
   "versions": {
-    "muse": "00c0b2ff3e9e",
-    "grok": "22014ddd591f",
-    "chatgpt": "f91d69e56118",
-    "claude": "b3cc392824da"
+    "muse": "42e28ac1a6c4",
+    "grok": "da6e5c1b311a",
+    "chatgpt": "e59674c7d972",
+    "claude": "689a08dd9f17"
   }
 }

@@ -1,5 +1,10 @@
 [
   {
+    "file": ".claude/rules/anti-slop.md",
+    "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
+    "bodySha256": "17ed298ea129cb191c56f2d3ff1ebccf036817325b44c1c524230fb0b511a844"
+  },
+  {
     "file": ".claude/rules/auth.md",
     "paths": ["apps/web/**/auth/**", "apps/web/proxy.ts", "apps/web/tests/**"],
     "bodySha256": "75c6e6ebb898dfa5265b39f4a57844cd1c0fd0452adf105262e244e008650936"
@@ -7,12 +12,12 @@
   {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
-    "bodySha256": "5fabc1298ed53a98b1841258926c05b2a001435651388c5f414d2b3bb145bd54"
+    "bodySha256": "1bd8b0d403e47bcb0b23fdbd8e8afc642136d978489bb415a7db05169bb98d4c"
   },
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "d5f52bdb4af7fb39e6cf4eef8aaade5edbd285d900a3d13f9bf55f57f315d182"
+    "bodySha256": "a8260d3292af576dbc5e17b74b4ecae43c177d82c56a575650180016d1fbdec2"
   },
   {
     "file": ".claude/rules/db.md",
@@ -35,7 +40,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "3dbed7e15801a9c4e7591606fb8402bf57d040e1b2afff3996ece2ccf18e9633"
+    "bodySha256": "e9c46b96f7549ccf1a2c9a380c6cae1497bda7c6e10c9ae8e957ae7944e62d7e"
   },
   {
     "file": ".claude/rules/event-driven.md",
@@ -58,7 +63,7 @@
       "workers/**",
       "tools/**"
     ],
-    "bodySha256": "36704be616218c57d80af32db45bf43b08b5b1a609e7c5abc2a99f9124e8a581"
+    "bodySha256": "493b88d740d609d8a646d8b43bc3cb4f6759be8d3bf5e56d894819ac3b56674a"
   },
   {
     "file": ".claude/rules/gstack.md",
@@ -67,12 +72,12 @@
       ".claude/skills/**",
       "docs/agent-context/**"
     ],
-    "bodySha256": "c1eee77c7109526f0f9f48265b6e404e7e927b132d3e0bbf02bbf958c3c18c4f"
+    "bodySha256": "81ffe4da6cf4f869dd5d627f2beeb5188a982b8088b3df6b63b429c5fb29fe66"
   },
   {
     "file": ".claude/rules/hermes-air.md",
     "paths": ["docs/HERMES_AIR.md"],
-    "bodySha256": "1146534132d4a342e1ed2d00e9594d10e4e3fcf347054041bfe91323c5de98e7"
+    "bodySha256": "8f3fe75a0a77dd812481cbea13e7e2fabf83b95d48af9f5646b2fc9a2fc725f0"
   },
   {
     "file": ".claude/rules/infra.md",
@@ -85,9 +90,18 @@
     "bodySha256": "164b4bac543f555d7584cfdf8ba8e3d62767b14bbaae1f8128f98d1220470d3d"
   },
   {
+    "file": ".claude/rules/investor-deck.md",
+    "paths": [
+      "scripts/investor-deck/**",
+      "apps/web/lib/investors/**",
+      "apps/web/components/features/pitch/**"
+    ],
+    "bodySha256": "ebd4fe95307adefcf3ce0f8bf7ad5e5ff7ed876aa58a3ea6182b26d88daebabd"
+  },
+  {
     "file": ".claude/rules/ios.md",
     "paths": ["apps/ios/**", "**/*.swift"],
-    "bodySha256": "8064a84295f7bac353ab5ca2858863bee4f7e82be6e12c0e8c2df8b7d305ad7d"
+    "bodySha256": "030e26d1dbf17cde238efb27e147635a2a90ddd6434eb2196420779fb2af5135"
   },
   {
     "file": ".claude/rules/linear.md",
@@ -96,7 +110,7 @@
       "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "f0c1a664484bc6f73d8c6ab76cf8c814873c784d543dbe07ce859ed63d3bd084"
+    "bodySha256": "e5839d7117c7952d97d4954d44afa73a7005c0c6f211a170022905b91aa12f63"
   },
   {
     "file": ".claude/rules/macos.md",
@@ -108,7 +122,7 @@
       "apps/ios/Packages/JovieKit/**",
       "docs/macos/**"
     ],
-    "bodySha256": "bfabfbafb0ea988e669fba7b3ea3b4c62810855ea3f977a112746271a8ba77ab"
+    "bodySha256": "d454e6f80e8fe4322b7d03ac03ed472f69095e16e935212b1f1025bdbbdb2f17"
   },
   {
     "file": ".claude/rules/motion.md",
@@ -124,12 +138,24 @@
   {
     "file": ".claude/rules/pen.md",
     "paths": ["**/*.pen", "scripts/agent/pen*", "docs/design-system/**"],
-    "bodySha256": "6dcfcd4b052bd71873bfd431fdc265a7452384f4823f41575924c08598c53582"
+    "bodySha256": "7c5f12d61a0952c616c5f03f801a8742a61d33a9ab9a697fe3db259df5fe74a6"
   },
   {
     "file": ".claude/rules/pr-stacking.md",
     "paths": [".github/**", "scripts/*pr*", "docs/PR_FLOW.md"],
     "bodySha256": "43c5a50289369ce1152ca8716058e858fac5375a1701ab536b977bcd425840d5"
+  },
+  {
+    "file": ".claude/rules/rate-limits.md",
+    "paths": [
+      "apps/**",
+      "packages/**",
+      "scripts/**",
+      ".github/**",
+      "workers/**",
+      "tools/**"
+    ],
+    "bodySha256": "c7da1fd3f6b8e7274425e421cfcc49d402b247f44246fdcbd96ffaa2837236f7"
   },
   {
     "file": ".claude/rules/release.md",
@@ -140,7 +166,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "188a218a8f0f73a88014cdc77736cf7190cef27c7a39cfc9a950b952f79979c6"
+    "bodySha256": "ce42f3a66aef44cab5bcb7320262f97eee3255c56c93070eda90d6e13bbfc60c"
   },
   {
     "file": ".claude/rules/security.md",
@@ -177,7 +203,7 @@
       "scripts/backlog-orchestrator/**",
       ".claude/commands/qa-swarm*"
     ],
-    "bodySha256": "7cbdca7e2c0d7146e1e97cb310e271a00ee3aba4c6f3a5a06ea471e9e955d3e6"
+    "bodySha256": "b32eee913c7046abbf51b40b5601111d73e5054088d1c2150aba3827e09ddbb9"
   },
   {
     "file": ".claude/rules/testing.md",
@@ -188,7 +214,7 @@
       "**/vitest.config.*",
       "**/playwright.config.*"
     ],
-    "bodySha256": "7cf119f5b7f3df3983b22e6eb33ffbd8b67f96dd9d73696ac10481bc6574e59c"
+    "bodySha256": "b435ddb3d1618cd410c0dd3200197fec57c537bf4bfa91dc72abbfb8c1e05ce7"
   },
   {
     "file": ".claude/rules/ui.md",
@@ -199,6 +225,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "5977cfcaaf24cb34bda42944a1d99fa0953ea54a12ba4f9afcc92108ad57df93"
+    "bodySha256": "8d31145e6c638bd6e7fd89698abae04dd5e21de1ba1b50688efed603b14495f8"
   }
 ]

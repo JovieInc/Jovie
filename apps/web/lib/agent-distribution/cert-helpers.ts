@@ -1,5 +1,11 @@
 /** Pure helpers for the agent-path certification harness (scripts/agent-path-cert.ts). */
 
+/** Transport checks cannot replace these required creator outcomes (JOV-9760). */
+export const REQUIRED_OUTCOME_CHECKS = [
+  'claim outcome persisted',
+  'run-owned fixtures cleaned up',
+] as const;
+
 /** MCP Streamable HTTP may answer JSON or SSE; return the JSON-RPC document either way. */
 export function parseMcpBody(raw: string): Record<string, unknown> {
   const text = raw.trim();

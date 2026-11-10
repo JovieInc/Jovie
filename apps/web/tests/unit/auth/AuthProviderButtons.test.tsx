@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
@@ -64,10 +66,7 @@ describe('AuthProviderButtonSlots', () => {
       </div>
     );
     const button = screen.getByRole('button');
-    expect(button.querySelector('img')).toHaveAttribute(
-      'src',
-      '/auth/apple-logo.svg'
-    );
+    expect(button.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
     const touch = { changedTouches: [{ clientX: 10, clientY: 10 }] };
     Object.defineProperty(document, 'elementFromPoint', {
       configurable: true,
@@ -81,5 +80,43 @@ describe('AuthProviderButtonSlots', () => {
     expect(fireEvent.touchEnd(button, touch)).toBe(true);
     expect(fireEvent.touchEnd(button, { changedTouches: [] })).toBe(true);
     delete (document as Partial<Document>).elementFromPoint;
+  });
+
+  it('renders Apple and Google through identical classes and icon box', () => {
+    render(
+      <AuthProviderButtonSlots providers={getEnabledAuthOAuthProviders()} />
+    );
+    const google = screen.getByRole('button', { name: 'Continue with Google' });
+    const apple = screen.getByRole('button', { name: 'Continue with Apple' });
+    expect(apple.className).toBe(google.className);
+    const gi = google.querySelector('[data-auth-provider-face] img')!;
+    const ai = apple.querySelector('[data-auth-provider-face] svg')!;
+    expect(ai.getAttribute('width')).toBe('16');
+    expect(gi.getAttribute('width')).toBe('16');
+    expect(ai.getAttribute('height')).toBe(gi.getAttribute('height'));
+    expect(apple.querySelector('[data-auth-provider-face]')?.className).toBe(
+      google.querySelector('[data-auth-provider-face]')?.className
+    );
+  });
+
+  it('lists Google before Apple, as Pen oaz9c does', () => {
+    render(
+      <AuthProviderButtonSlots providers={getEnabledAuthOAuthProviders()} />
+    );
+    expect(
+      screen.getAllByRole('button').map(b => b.dataset.authProviderSlot)
+    ).toEqual(['google', 'apple']);
+  });
+
+  it('keeps type and geometry shared in theme.css, not per provider', () => {
+    const css = readFileSync(join(process.cwd(), 'styles/theme.css'), 'utf8');
+    const rules = [
+      ...css.matchAll(
+        /\.auth-provider-button\[data-auth-provider-slot[^{]*\{([^}]*)\}/g
+      ),
+    ].map(m => m[1]);
+    for (const body of rules) {
+      expect(body).not.toMatch(/font|border|min-height|padding|gap/);
+    }
   });
 });

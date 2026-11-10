@@ -5,7 +5,7 @@
  * - generateProfileStructuredData (JSON-LD for SEO)
  * - fetchProfileAndLinks (data fetching with error handling)
  * - generateMetadata (SEO metadata generation)
- * - getCachedProfileAndLinks (only caches successful results)
+ * - fresh publication authority across profile representations
  *
  * Includes the small server-rendered recovery surface used by the page.
  */
@@ -54,9 +54,8 @@ const PUBLIC_PROFILE_LAYOUT_SOURCE = readFileSync(
   path.join(WEB_ROOT, 'app/[username]/layout.tsx'),
   'utf8'
 );
-// Profile loader (cache + error class + TTL) was extracted to its own file
-// so per-mode routes can reuse it; assertions in this suite that look for
-// loader internals search across both sources.
+// Per-mode routes reuse the canonical profile loader; assertions about shared
+// rendering boundaries search across both sources.
 const PUBLIC_PROFILE_LOADER_SOURCE = readFileSync(
   path.join(WEB_ROOT, 'app/[username]/_lib/public-profile-loader.ts'),
   'utf8'
@@ -655,7 +654,10 @@ describe('Public Profile Page Logic', () => {
         mockLinks
       );
       const musicGroup2 = findInGraph(data2, 'MusicGroup')!;
-      expect(musicGroup2.description).toBe('Music by Test Artist');
+      // Bioless artists with genres reuse the page meta description.
+      expect(musicGroup2.description).toContain(
+        'rock, indie, alternative artist. Stream Test Artist'
+      );
     });
 
     it('only includes recognized social platforms in sameAs', () => {
@@ -1007,31 +1009,39 @@ describe('Public Profile Page Logic', () => {
     );
   });
 
-  describe('cache strategy', () => {
-    function shouldCache(status: 'ok' | 'not_found' | 'error') {
-      return status === 'ok';
-    }
+  describe('fresh publication route configuration', () => {
+    // Structural guard only. Warm-response withdrawal and storage failures are
+    // exercised against the real loader in its colocated behavior suite.
+    sourceTest.each([
+      'app/[username]/page.tsx',
+      'app/[username]/profile-mode-render/[profileMode]/[marker]/page.tsx',
+    ])('serves %s from ISR only behind the proxy publication gate', route => {
+      const source = readFileSync(path.join(WEB_ROOT, route), 'utf8');
+      expect(source).toMatch(/export const revalidate\s*=\s*3600\s*;/);
+      expect(source).not.toMatch(/export const dynamic\s*=/);
+      const proxy = readFileSync(path.join(WEB_ROOT, 'proxy.ts'), 'utf8');
+      expect(proxy).toMatch(/await gateProfilePublicationAtEdge\(/);
+    });
 
-    it('caches only successful results, not_found and error are always fresh', () => {
-      expect(shouldCache('ok')).toBe(true);
-      expect(shouldCache('not_found')).toBe(false);
-      expect(shouldCache('error')).toBe(false);
+    sourceTest.each([
+      'app/[username]/alerts/page.tsx',
+      'app/[username]/shop/page.tsx',
+      'app/[username]/opengraph-image.tsx',
+    ])('requires a fresh render for %s', route => {
+      const source = readFileSync(path.join(WEB_ROOT, route), 'utf8');
+      expect(source).toMatch(/export const revalidate\s*=\s*0\s*;/);
+      if (!route.endsWith('opengraph-image.tsx')) {
+        expect(source).toMatch(
+          /export const dynamic\s*=\s*['"]force-dynamic['"]\s*;/
+        );
+      }
     });
 
     sourceTest(
-      'carries the first non-ok payload through the unstable_cache throw path',
+      'keeps profile-specific cache policy out of the shared release layout',
       () => {
-        expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
-          'NonCacheableProfileResultError'
-        );
-        expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
-          'throw new NonCacheableProfileResultError(data)'
-        );
-        expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
-          'if (error instanceof NonCacheableProfileResultError)'
-        );
-        expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
-          'return error.result'
+        expect(PUBLIC_PROFILE_LAYOUT_SOURCE).not.toMatch(
+          /export const (?:dynamic|revalidate)\s*=/
         );
       }
     );
@@ -1142,7 +1152,9 @@ sourceDescribe('profile mode route redirects', () => {
     for (const [root] of staticAliasRoutes) {
       expect(reservedRoots.has(root ?? '')).toBe(true);
     }
-    expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('<AliasCollisionRecovery');
+    expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+      '<DeferredAliasCollisionRecovery'
+    );
   });
 
   it('routes legacy aliases through the collision-safe resolver after filesystem matches', async () => {
@@ -1172,7 +1184,7 @@ sourceDescribe('profile mode route redirects', () => {
     );
   });
 
-  it('server-renders bounded query modes through the private ISR route', async () => {
+  it('server-renders bounded query modes through the private profile route', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
@@ -1198,9 +1210,6 @@ sourceDescribe('profile mode route redirects', () => {
     expect(PRIVATE_PROFILE_MODE_PAGE_SOURCE).toContain('return ArtistPage({');
     expect(PRIVATE_PROFILE_MODE_PAGE_SOURCE).toContain(
       '__profileMode: initialMode'
-    );
-    expect(PRIVATE_PROFILE_MODE_PAGE_SOURCE).toContain(
-      'export const revalidate = 3600'
     );
     expect(PRIVATE_PROFILE_MODE_PAGE_SOURCE).toContain(
       'export function generateStaticParams()'

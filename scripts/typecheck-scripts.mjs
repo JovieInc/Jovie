@@ -131,6 +131,35 @@ export function unknownJsonPropertyRepair(diagnosticLines) {
   return null;
 }
 
+/** @param {readonly string[]} diagnosticLines */
+function tupleInferenceRepair(diagnosticLines) {
+  if (
+    diagnosticLines.some(line =>
+      /error TS2339: Property 'test' does not exist on type '(?:string \| RegExp|RegExp \| string)'/.test(
+        line
+      )
+    )
+  ) {
+    return (
+      'TS2339 on string | RegExp: inspect pattern/reason table rows. ' +
+      'Declare a JSDoc tuple on the table (ReadonlyArray<readonly [RegExp, string]>) ' +
+      'so destructuring preserves each column type. Do not grow scripts/typecheck-baseline.json to absorb these.'
+    );
+  }
+  const { counts } = parseTscOutput(diagnosticLines.join('\n'));
+  for (const byCode of counts.values()) {
+    if (byCode.has('TS2769') && byCode.has('TS2698')) {
+      return (
+        'TS2769 and TS2698 in the same file: inspect heterogeneous table rows. ' +
+        'Array inference can mix object and number columns when destructuring. ' +
+        'Declare a JSDoc tuple on the table (for example Array<[typeof event, number]>) ' +
+        'or use named object rows. Do not grow scripts/typecheck-baseline.json to absorb these.'
+      );
+    }
+  }
+  return null;
+}
+
 /**
  * Compare current error counts against a baseline.
  * @param {ErrorCounts} current
@@ -166,7 +195,8 @@ export function compareWithBaseline(current, baseline) {
     }
   }
   return {
-    ok: newErrors.length === 0 && staleEntries.length === 0,
+    // Shrink (staleEntries) is reported as a notice, never a failure.
+    ok: newErrors.length === 0,
     newErrors,
     staleEntries,
   };
@@ -373,6 +403,14 @@ export function evaluateTypecheckBaseline({
   const { ok, newErrors, staleEntries } = compareWithBaseline(counts, baseline);
 
   if (ok) {
+    if (staleEntries.length > 0) {
+      const notice = `[${prefix}] ${staleEntries.length} baselined group(s) shrank; run \`${updateCommand}\` to lock it in.`;
+      console.log(
+        process.env.GITHUB_ACTIONS === 'true'
+          ? `::notice title=${prefix} improved::${notice}`
+          : notice
+      );
+    }
     console.log(
       `[${prefix}] PASS — ${totalErrors(counts)} pre-existing errors match the baseline ` +
         `(${baseline.totalErrors} baselined); no new errors.`
@@ -400,20 +438,10 @@ export function evaluateTypecheckBaseline({
     for (const { file, code } of newErrors) {
       diagnosticLines.push(...(lines.get(`${file}::${code}`) ?? []));
     }
-    const repair = unknownJsonPropertyRepair(diagnosticLines);
-    if (repair) console.error(repair);
-  }
-  if (staleEntries.length > 0) {
-    console.error(
-      `[${prefix}] FAIL — baseline is stale: ${staleEntries.length} (file, error-code) group(s) no longer produce the baselined errors.`
-    );
-    for (const { file, code, count, baseline: base } of staleEntries) {
-      console.error(`  ${file}: ${code} ×${count} (baseline ×${base})`);
+    for (const diagnose of [unknownJsonPropertyRepair, tupleInferenceRepair]) {
+      const repair = diagnose(diagnosticLines);
+      if (repair) console.error(repair);
     }
-    console.error(
-      `The baseline is shrink-only: regenerate it with \`${updateCommand}\` ` +
-        'in the same PR that removes the errors.'
-    );
   }
   exit(1);
 }

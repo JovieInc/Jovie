@@ -2,14 +2,14 @@ import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-const { authLayoutMock, authShellMock, pageMock, trackMock } = vi.hoisted(
-  () => ({
+const { authLayoutMock, authShellMock, pageMock, roleFormMock, trackMock } =
+  vi.hoisted(() => ({
     authLayoutMock: vi.fn(),
     authShellMock: vi.fn(),
     pageMock: vi.fn(),
+    roleFormMock: vi.fn(),
     trackMock: vi.fn(),
-  })
-);
+  }));
 
 vi.mock('@/lib/analytics', () => ({
   page: (...args: unknown[]) => pageMock(...args),
@@ -37,6 +37,16 @@ vi.mock('@/features/auth', async () => {
     AuthShell: (props: Record<string, unknown>) => {
       authShellMock(props);
       return reactModule.createElement('div', { 'data-testid': 'auth-shell' });
+    },
+  };
+});
+
+vi.mock('./WaitlistRoleForm', async () => {
+  const reactModule = await import('react');
+  return {
+    WaitlistRoleForm: (props: Record<string, unknown>) => {
+      roleFormMock(props);
+      return reactModule.createElement('div', { 'data-testid': 'role-form' });
     },
   };
 });
@@ -87,6 +97,25 @@ describe('WaitlistPublicLanding', () => {
       'waitlist_front_door_cta_exposed',
       expect.objectContaining({
         variantIdentity: WAITLIST_FRONT_DOOR_VARIANT_ID,
+      })
+    );
+  });
+
+  it('shows the role waitlist form and a sign-in path when signup is closed', () => {
+    authLayoutMock.mockClear();
+    authShellMock.mockClear();
+    render(<WaitlistPublicLanding signupClosed />);
+
+    expect(screen.getByTestId('role-form')).toBeInTheDocument();
+    expect(roleFormMock).toHaveBeenCalledWith(
+      expect.objectContaining({ qualify: true })
+    );
+    expect(screen.queryByTestId('auth-shell')).not.toBeInTheDocument();
+    expect(authShellMock).not.toHaveBeenCalled();
+    expect(authLayoutMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        showFooterPrompt: true,
+        footerLinkHref: APP_ROUTES.SIGNIN,
       })
     );
   });

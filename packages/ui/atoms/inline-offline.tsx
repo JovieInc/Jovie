@@ -36,7 +36,7 @@ export function InlineOfflineNotice({
       )}
       {...props}
     >
-      <p className='min-w-0 flex-1 text-left leading-snug'>{message}</p>
+      <p className='min-w-0 flex-1 text-start leading-snug'>{message}</p>
       {onRetry ? (
         <Button
           type='button'

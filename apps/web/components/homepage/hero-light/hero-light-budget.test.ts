@@ -156,7 +156,12 @@ describe('homepage hero light budget', () => {
     const copy = balancedBlock(narrow, '.homepage-hero-canvas__copy');
     expect(copy).toContain('flex: 1 0 auto');
     expect(copy).toContain('min-height: 0');
-    expect(copy).toContain('overflow: hidden');
+    // Founder-directed 2026-10-28 (claim-field focus fix): the copy no longer
+    // clips. Text wraps via the width rules, and a clipping box cut the
+    // CompositeField focus ring that draws outside the pill edge.
+    expect(copy).toContain('overflow: visible');
+    // The phone is in flow, so the copy never reserves fixed space for it.
+    expect(copy).not.toMatch(/padding-bottom:\s*[\d.]+rem/);
 
     // In flow under the claim, never layered over the headline.
     const proof = balancedBlock(narrow, '.homepage-hero-canvas__proof');

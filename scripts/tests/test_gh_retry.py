@@ -53,8 +53,7 @@ def _drain_command(
     assert fake_gh.is_file(), f"test must create isolated gh fixture first: {fake_gh}"
     gh_path = tmp_path
     if backend == "native":
-        # Model the real Actions producer separately from each test's fleet API.
-        # All native tests execute the production guard; no bypass flag exists.
+        # Model the real Actions producer separately; every native test runs the production guard.
         gh_path = tmp_path / "producer-api"
         gh_path.mkdir(exist_ok=True)
         producer_gh = gh_path / "gh"
@@ -172,7 +171,7 @@ def _run_same_token_rest_fixture(
             #!/usr/bin/env bash
             set -euo pipefail
             if [[ "$1 $2" == "pr checks" ]]; then
-              echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+              echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
               exit 0
             fi
             if [[ "$1 $2" == "pr view" ]]; then
@@ -428,7 +427,7 @@ def _write_native_receipt_fakes(
               exit 0
             fi
             if [[ "$1 $2" == "pr checks" ]]; then
-              echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+              echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
               exit 0
             fi
             if [[ "$1 $2" == "pr view" ]]; then
@@ -710,7 +709,7 @@ def _write_null_creator_receipt_drain(
               exit 0
             fi
             if [[ "$1 $2" == "pr checks" ]]; then
-              echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+              echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
               exit 0
             fi
             if [[ "$1 $2" == "pr view" ]]; then
@@ -846,7 +845,7 @@ def _write_release_wave_drain_fixture(
               exit 0
             fi
             if [[ "$1 $2" == "pr checks" ]]; then
-              echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+              echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
               exit 0
             fi
             if [[ "$1 $2" == "pr edit" ]]; then
@@ -1867,7 +1866,7 @@ class TestExactHeadQueueReceipt:
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -1949,7 +1948,7 @@ class TestExactHeadQueueReceipt:
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -2036,7 +2035,7 @@ class TestExactHeadQueueReceipt:
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -2131,7 +2130,7 @@ class TestExactHeadQueueReceipt:
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -2789,7 +2788,7 @@ class TestDrainPrQueueWiring:
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -2883,7 +2882,7 @@ class TestDrainPrQueueWiring:
                 #!/usr/bin/env bash
                 set -euo pipefail
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -3121,7 +3120,7 @@ class TestDrainPrQueueWiring:
                     echo '[{{"name":"PR Ready","bucket":"fail","state":"FAILURE"}}]'
                     exit 0
                   fi
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -3241,7 +3240,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -3378,6 +3377,7 @@ JSON
                   changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
                   changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) exec "{real_node}" "$@" ;;
+                  *"pre-land-changelog.mjs"*) exec "{real_node}" "$@" ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
                 """
@@ -3399,8 +3399,8 @@ JSON
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
                   case "$3" in
-                    1004) echo '[{{"name":"PR Ready","bucket":"fail","state":"FAILURE"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]' ;;
-                    *) echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]' ;;
+                    1004) echo '[{{"name":"PR Ready","bucket":"fail","state":"FAILURE"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]' ;;
+                    *) echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]' ;;
                   esac
                   exit 0
                 fi
@@ -3592,7 +3592,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -3879,7 +3879,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" && " $* " == *" --json files "* ]]; then
@@ -4022,7 +4022,7 @@ JSON
                   echo '[{{"n":904,"t":"Controller repair","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/controller-repair","headOid":"{head}","base":"main","body":"","L":[],"fail":[],"q":false}}]'; exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'; exit 0
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'; exit 0
                 fi
                 if [[ "$1 $2" == "pr view" && " $* " == *" --json files "* ]]; then echo '["scripts/drain-pr-queue.sh"]'; exit 0; fi
                 if [[ "$1 $2" == "pr view" ]]; then echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'; exit 0; fi
@@ -4046,7 +4046,7 @@ JSON
                 if [[ "$1" == api && "$2" == *"/commits/{head}"* ]]; then echo '2026-09-05T00:00:00Z'; exit 0; fi
                 if [[ "$1" == api && "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then echo '[]'; exit 0; fi
                 if [[ "$1" == api && "$2" == "repos/JovieInc/Jovie" ]]; then echo '{{"default_branch":"main","allow_auto_merge":true,"allow_squash_merge":true}}'; exit 0; fi
-                if [[ "$1" == api && "$2" == *"/rulesets/10512119"* ]]; then echo '{{"id":10512119,"enforcement":"active","target":"branch","conditions":{{"ref_name":{{"include":["refs/heads/main"],"exclude":[]}}}},"bypass_actors":[],"rules":[{{"type":"required_status_checks","parameters":{{"strict_required_status_checks_policy":false,"required_status_checks":[{{"context":"PR Ready"}},{{"context":"Migration Guard"}},{{"context":"Fork PR Gate"}},{{"context":"PR Size Guard"}}]}}}},{{"type":"merge_queue","parameters":{{"check_response_timeout_minutes":20,"grouping_strategy":"ALLGREEN","max_entries_to_build":1,"max_entries_to_merge":10,"merge_method":"SQUASH","min_entries_to_merge":1,"min_entries_to_merge_wait_minutes":0}}}}]}}'; exit 0; fi
+                if [[ "$1" == api && "$2" == *"/rulesets/10512119"* ]]; then echo '{{"id":10512119,"enforcement":"active","target":"branch","conditions":{{"ref_name":{{"include":["refs/heads/main"],"exclude":[]}}}},"bypass_actors":[],"rules":[{{"type":"required_status_checks","parameters":{{"strict_required_status_checks_policy":false,"required_status_checks":[{{"context":"PR Ready"}},{{"context":"Migration Guard"}},{{"context":"Fork PR Gate"}},{{"context":"PR Size Guard"}},{{"context":"Company guards"}}]}}}},{{"type":"merge_queue","parameters":{{"check_response_timeout_minutes":30,"grouping_strategy":"HEADGREEN","max_entries_to_build":1,"max_entries_to_merge":10,"merge_method":"SQUASH","min_entries_to_merge":1,"min_entries_to_merge_wait_minutes":0}}}}]}}'; exit 0; fi
                 if [[ "$1" == api && "$*" == *"/contents/.github/workflows/ci.yml"* ]]; then printf 'name: CI\non:\n  pull_request:\n    branches: [main]\n  merge_group:\n    types: [checks_requested]\n'; exit 0; fi
                 if [[ "$1 $2" == "api graphql" ]]; then
                   args="$*"
@@ -4179,7 +4179,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 echo "unexpected gh args: $*" >&2
@@ -4239,7 +4239,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 echo "unexpected gh args: $*" >&2
@@ -4412,7 +4412,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -4501,7 +4501,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"enroll","bucket":"fail","state":"FAILURE","workflow":"Merge Queue Auto-Enroll","workflowDatabaseId":299216194,"appSlug":"github-actions"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}},{{"name":"enroll","bucket":"fail","state":"FAILURE","workflow":"Merge Queue Auto-Enroll","workflowDatabaseId":299216194,"appSlug":"github-actions"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -4591,7 +4591,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -4681,7 +4681,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -4736,7 +4736,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -4777,7 +4777,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{"name":"PR Ready","bucket":"pass","state":"SUCCESS"},{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}]'
+                  echo '[{"name":"PR Ready","bucket":"pass","state":"SUCCESS"},{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"},{"name":"Company guards","bucket":"pass","state":"SUCCESS"}]'
                   exit 0
                 fi
                 echo "unexpected gh args: $*" >&2
@@ -4811,7 +4811,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -4857,7 +4857,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -4950,7 +4950,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -5038,7 +5038,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1" == "api" && " $* " == *"/commits/{head}/status "* ]]; then
@@ -5141,7 +5141,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1" == "api" && " $* " == *"/commits/{head}/status "* ]]; then
@@ -5242,7 +5242,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -5337,10 +5337,10 @@ JSON
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
                   if [[ "$*" == *"902"* ]]; then
-                    echo '[{{"name":"PR Ready","bucket":"fail","state":"FAILURE"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                    echo '[{{"name":"PR Ready","bucket":"fail","state":"FAILURE"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                     exit 0
                   fi
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 echo "unexpected gh args: $*" >&2
@@ -5387,7 +5387,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -5618,7 +5618,7 @@ JSON
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
                   [[ "$3" == "101" || "$3" == "104" || "$3" == "456" || "$3" == "789" ]]
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -5700,7 +5700,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -6165,7 +6165,7 @@ class TestNativeAdmissionReceiptReconciliation:
                 #!/usr/bin/env bash
                 set -euo pipefail
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Company guards","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -6607,7 +6607,7 @@ raise SystemExit("unexpected node args: " + repr(args))
     gh = tmp_path / "gh"
     gh.write_text(prefix + '''
 if args[:2] == ["pr", "checks"]:
-    emit([{"name": name, "bucket": "fail" if name == "PR Ready" and args[2] == "101" and fixture["result"] == "source-red" else "pass", "state": "FAILURE" if name == "PR Ready" and args[2] == "101" and fixture["result"] == "source-red" else "SUCCESS"} for name in ["PR Ready", "Migration Guard", "Fork PR Gate", "PR Size Guard"]])
+    emit([{"name": name, "bucket": "fail" if name == "PR Ready" and args[2] == "101" and fixture["result"] == "source-red" else "pass", "state": "FAILURE" if name == "PR Ready" and args[2] == "101" and fixture["result"] == "source-red" else "SUCCESS"} for name in ["PR Ready", "Migration Guard", "Fork PR Gate", "PR Size Guard", "Company guards"]])
 if args[:2] == ["pr", "view"]:
     if "files" in args: emit(["CHANGELOG.md"] if args[2] == "102" else [])
     state = dict(fixture["states"][args[2]])

@@ -1,3 +1,5 @@
+import type { ConsentBasis, EmailStream } from '@/lib/email/streams';
+
 /**
  * Fan-facing subscription channel — the values a fan can choose from when
  * subscribing on a public profile and the values persisted in the DB
@@ -71,9 +73,10 @@ export interface NotificationMessage {
   subject: string;
   text: string;
   html?: string;
-  from?: string;
   replyTo?: string;
   headers?: Record<string, string>;
+  /** Required whenever the email channel is used; the gateway rejects otherwise. */
+  emailRoute?: EmailRoute;
   ctaUrl?: string;
   pushTitle?: string;
   pushBody?: string;
@@ -101,7 +104,21 @@ export interface NotificationDispatchResult {
   dedupKey?: string;
 }
 
-export interface EmailMessage {
+/**
+ * Where an email goes in the send gateway (apps/web/lib/email/gateway): the
+ * stream, why it is sent, and the recipient's consent basis. Every email
+ * declares one; the registry decides provider, sender and policy from it.
+ */
+export interface EmailRoute {
+  stream: EmailStream;
+  /** Short id of the message kind, e.g. `dunning-payment-failed`. */
+  purpose: string;
+  consent: ConsentBasis;
+  /** Approved Ovie outbound card, for streams that require one. */
+  approvalCardId?: string;
+}
+
+export interface EmailMessage extends EmailRoute {
   to: string;
   subject: string;
   text: string;
@@ -109,7 +126,11 @@ export interface EmailMessage {
   idempotencyKey?: string;
   replyTo?: string;
   headers?: Record<string, string>;
-  from?: string;
+  /** Display name only; the sending address comes from the stream registry. */
+  fromName?: string;
+  /** Only for streams that allow it (inbox). */
+  fromLocalPart?: string;
+  cc?: string[];
   attachments?: EmailAttachment[];
 }
 
@@ -120,7 +141,7 @@ export interface EmailAttachment {
 }
 
 export interface EmailProvider {
-  provider: 'resend' | 'ses' | 'mailgun' | 'debug';
+  provider: 'gateway' | 'debug';
   sendEmail(message: EmailMessage): Promise<NotificationChannelResult>;
 }
 

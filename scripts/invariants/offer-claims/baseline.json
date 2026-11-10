@@ -69,7 +69,6 @@
     "trial_claim": 2
   },
   "apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx": {
-    "trial_claim": 1,
     "free_forever_claim": 2
   },
   "apps/web/components/features/admin/FunnelMetricsStrip.tsx": {
@@ -151,7 +150,7 @@
     "refund_guarantee_claim": 1
   },
   "apps/web/data/marketing/renderedCopyCoverage.ts": {
-    "free_forever_claim": 4,
+    "free_forever_claim": 3,
     "recurring_price": 4,
     "plan_price": 3,
     "billing_claim": 4

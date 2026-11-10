@@ -20,8 +20,10 @@ import { isProdcertCanaryEmail } from './prodcert-identities';
  *   - lives at most {@link PASSAGE_TOKEN_MAX_TTL_SECONDS};
  *   - single use (jti consumed in Redis) and rate limited server-side;
  *   - its only effect is that the server verifies the Turnstile token in
- *     Cloudflare's official test mode. Every other gate and rate limit still
- *     runs, and every use is logged.
+ *     Cloudflare's official test mode (onboarding_chat) or tags a smartlink
+ *     click synthetic so it stays out of customer analytics
+ *     (smartlink_click). Every other gate and rate limit still runs, and
+ *     every use is logged.
  *
  * Wire format: `jsp1.<base64url(JSON claims)>.<base64url(HMAC-SHA256)>`.
  */
@@ -34,8 +36,23 @@ const MAX_CLOCK_SKEW_SECONDS = 30;
 const KEY_INFO = 'jovie.synthetic-passage/v1';
 const KEY_SALT = 'jovie-synthetic-passage';
 
-export const PASSAGE_TOKEN_SCOPES = ['onboarding_chat'] as const;
+export const PASSAGE_TOKEN_SCOPES = [
+  'onboarding_chat',
+  'smartlink_click',
+  // JOV-9826: canary claim-walk unblocks. `canary_reset` authorizes the
+  // internal reset endpoint that returns the claim-walk canary to its
+  // pre-claim state; `canary_checkout` authorizes the Stripe test-mode
+  // canary checkout walk. Both are consumed by internal routes that ALSO
+  // require the CRON_SECRET bearer, so holding one implies production
+  // cron authority and neither grants any customer-facing surface.
+  'canary_reset',
+  'canary_checkout',
+] as const;
 export type PassageTokenScope = (typeof PASSAGE_TOKEN_SCOPES)[number];
+
+/** JOV-9826: the single scope the canary-reset endpoint accepts. */
+export const PASSAGE_TOKEN_SCOPE_CANARY_RESET: PassageTokenScope =
+  'canary_reset';
 
 export interface PassageTokenClaims {
   /** Canary email the run acts as. */

@@ -174,7 +174,7 @@ describe('scripts-typecheck: compareWithBaseline', () => {
     ]);
   });
 
-  it('fails when the baseline is stale (shrink-only: errors fixed but baseline not regenerated)', () => {
+  it('passes with stale entries reported when errors shrink below the baseline', () => {
     const current = counts({ 'scripts/a.mjs': { TS2305: 1 } });
     const baseline = {
       files: {
@@ -183,7 +183,8 @@ describe('scripts-typecheck: compareWithBaseline', () => {
       },
     };
     const result = compareWithBaseline(current, baseline);
-    expect(result.ok).toBe(false);
+    expect(result.ok).toBe(true);
+    expect(result.newErrors).toHaveLength(0);
     expect(result.staleEntries).toEqual([
       { file: 'scripts/fixed.mjs', code: 'TS2339', count: 0, baseline: 3 },
     ]);
@@ -432,6 +433,109 @@ describe('scripts-typecheck: fail closed before baseline write (JOV-5450)', () =
     expect(result.errors).toContain(
       'Do not grow scripts/typecheck-baseline.json'
     );
+  });
+
+  it.each([
+    {
+      name: 'object/count',
+      rows: `const event = { reason: 'manual' };
+const cases = [[event, 1], [event, 3]];
+for (const [event, count] of cases) {
+  Array.from({ length: count }, () => ({ ...event }));
+}
+`,
+      annotation: 'Array<[typeof event, number]>',
+      diagnostics: ['TS2769', 'TS2698'],
+    },
+    {
+      name: 'pattern/reason',
+      rows: `const cases = [[/typecheck/, 'hosted CI']];
+for (const [pattern, reason] of cases) {
+  if (pattern.test('pnpm typecheck')) reason.toUpperCase();
+}
+`,
+      annotation: 'ReadonlyArray<readonly [RegExp, string]>',
+      diagnostics: ['TS2339'],
+    },
+  ])(
+    'diagnoses $name rows and accepts a tuple annotation with the real compiler',
+    ({ rows, annotation, diagnostics }) => {
+      const { directory, baselineFile } = makeBaselineDir();
+      const baseline = JSON.stringify({
+        schemaVersion: BASELINE_SCHEMA_VERSION,
+        totalErrors: 0,
+        files: {},
+      });
+      writeFileSync(baselineFile, baseline);
+      writeFileSync(
+        resolve(directory, 'tsconfig.json'),
+        JSON.stringify({
+          compilerOptions: {
+            allowJs: true,
+            checkJs: true,
+            noEmit: true,
+            skipLibCheck: true,
+            target: 'es2022',
+            types: [],
+          },
+          files: ['table.mjs'],
+        })
+      );
+      const fixture = resolve(directory, 'table.mjs');
+      writeFileSync(fixture, rows);
+      const red = captureEvaluate({
+        directory,
+        baselineFile,
+        updateMode: false,
+      });
+      expect(red.exits).toEqual([1]);
+      for (const diagnostic of diagnostics)
+        expect(red.errors).toContain(diagnostic);
+      expect(red.errors).toContain('JSDoc tuple');
+      expect(readFileSync(baselineFile, 'utf8')).toBe(baseline);
+      vi.restoreAllMocks();
+
+      writeFileSync(
+        fixture,
+        rows.replace(
+          'const cases =',
+          `/** @type {${annotation}} */\nconst cases =`
+        )
+      );
+      const green = captureEvaluate({
+        directory,
+        baselineFile,
+        updateMode: false,
+      });
+      expect(green.exits).toEqual([0]);
+      expect(green.errors).toBe('');
+      expect(readFileSync(baselineFile, 'utf8')).toBe(baseline);
+    }
+  );
+
+  it.each([
+    [
+      'TS2769 alone',
+      'scripts/a.mjs(1,1): error TS2769: No overload matches this call.',
+    ],
+    [
+      'TS2698 alone',
+      'scripts/a.mjs(1,1): error TS2698: Spread types may only be created from object types.',
+    ],
+    [
+      'unrelated files',
+      'scripts/a.mjs(1,1): error TS2769: No overload matches this call.\nscripts/b.mjs(2,1): error TS2698: Spread types may only be created from object types.',
+    ],
+  ])('does not suggest a tuple repair for %s', (_name, output) => {
+    const { directory, baselineFile } = makeBaselineDir();
+    const result = captureEvaluate({
+      directory,
+      baselineFile,
+      updateMode: false,
+      runTsc: () => ({ status: 2, output }),
+    });
+    expect(result.exits).toEqual([1]);
+    expect(result.errors).not.toContain('JSDoc tuple');
   });
 
   it('writes a shrink only after a real compiler produces parseable diagnostics', () => {

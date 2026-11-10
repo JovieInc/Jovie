@@ -112,7 +112,7 @@ export function AboutSection({
   if (!hasContent) {
     return (
       <div className='py-4 text-center'>
-        <p className='text-sm font-book text-white/40'>
+        <p className='text-sm font-book text-white/50'>
           No information available yet.
         </p>
       </div>

@@ -7,6 +7,7 @@ import {
   signInUser,
   waitForAuthenticatedHealth,
 } from '../../helpers/auth';
+import { describeShellReadyStall } from '../../helpers/shell-ready';
 
 describe('fillControlledInputUntilEnabled', () => {
   it('refills when hydration resets the first controlled value', async () => {
@@ -227,5 +228,66 @@ describe('waitForAuthenticatedHealth', () => {
     await expect(
       waitForAuthenticatedHealth(page, 'expected-user', { timeout: 3_000 })
     ).rejects.toThrow();
+  });
+});
+
+describe('describeShellReadyStall', () => {
+  function buildStalledPage(attributes: Record<string, string | null>) {
+    const visibleLocator = { isVisible: () => Promise.resolve(false) };
+    const boundary = {
+      getAttribute: vi.fn(async (name: string) => attributes[name] ?? null),
+    };
+    const page = {
+      url: () => 'http://localhost:3100/start',
+      locator: vi.fn((selector: string) => ({
+        first: () =>
+          selector.includes('onboarding-session-boundary')
+            ? boundary
+            : visibleLocator,
+        innerText: () => Promise.reject(new Error('no body')),
+      })),
+    } as unknown as Page;
+    return { page, boundary };
+  }
+
+  it('names the stuck restore boundary state for the nightly annotation', async () => {
+    const { page, boundary } = buildStalledPage({
+      'data-restore-state': 'failed',
+      'data-restore-error': 'status:503',
+      'data-auth-state': 'signed-in',
+    });
+    const main = {
+      isVisible: () => Promise.resolve(false),
+    } as unknown as Locator;
+    const composer = {
+      isVisible: () => Promise.resolve(false),
+    } as unknown as Locator;
+
+    const detail = await describeShellReadyStall(page, main, composer);
+
+    expect(detail).toContain('url=http://localhost:3100/start');
+    expect(detail).toContain('main=false');
+    expect(detail).toContain('composer=false');
+    expect(detail).toContain('boundary-restore-state=failed');
+    expect(detail).toContain('boundary-restore-error=status:503');
+    expect(detail).toContain('boundary-auth-state=signed-in');
+    expect(boundary.getAttribute).toHaveBeenCalledWith('data-restore-state');
+    expect(boundary.getAttribute).toHaveBeenCalledWith('data-restore-error');
+    expect(boundary.getAttribute).toHaveBeenCalledWith('data-auth-state');
+  });
+
+  it('reports an absent boundary instead of throwing when the landing never mounted it', async () => {
+    const { page } = buildStalledPage({});
+
+    const detail = await describeShellReadyStall(
+      page,
+      { isVisible: () => Promise.resolve(true) } as unknown as Locator,
+      { isVisible: () => Promise.resolve(false) } as unknown as Locator
+    );
+
+    expect(detail).toContain('main=true');
+    expect(detail).toContain('boundary-restore-state=absent');
+    expect(detail).toContain('boundary-restore-error=absent');
+    expect(detail).toContain('boundary-auth-state=absent');
   });
 });

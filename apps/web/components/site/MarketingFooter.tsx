@@ -1,8 +1,9 @@
 'use client';
 
+import type { ReactNode } from 'react';
+
 import './MarketingFooter.css';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
@@ -16,6 +17,7 @@ import {
 } from '@/data/marketingNavigation';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { isEditorialFooterCtaPath } from '@/lib/marketing/editorial-content-routes';
+import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 import { isThemeRoute } from '@/lib/theme/route-policy';
 import { cn } from '@/lib/utils';
 import { MarketingFooterControls } from './MarketingFooterControls';
@@ -74,6 +76,10 @@ interface MarketingFooterProps {
   readonly columns?: readonly MarketingFooterColumn[];
   /** Published legal row (Privacy and Terms are required by the record). */
   readonly legalLinks?: readonly MarketingFooterLink[];
+  /** Section id for the Pen design-diff gate (`data-pen-section`). */
+  readonly penSection?: string;
+  /** Static, decorative art drawn behind the footer content (aria-hidden by the caller). */
+  readonly decoration?: ReactNode;
 }
 
 type ResolvedVariant = 'expanded' | 'minimal';
@@ -201,8 +207,10 @@ export function MarketingFooter({
   showCta = true,
   columns,
   legalLinks,
+  penSection,
+  decoration,
 }: Readonly<MarketingFooterProps>) {
-  const pathname = usePathname();
+  const pathname = usePublicPathname();
   const resolvedVariant = resolveFooterVariant(variant, pathname);
   const isMinimal = resolvedVariant === 'minimal';
   const pageOwnsFinalCta =
@@ -223,8 +231,10 @@ export function MarketingFooter({
         className
       )}
       data-testid='marketing-footer'
+      data-pen-section={penSection}
       data-footer-variant={resolvedVariant}
     >
+      {decoration}
       <div
         className={cn(
           'public-container',
@@ -255,7 +265,8 @@ export function MarketingFooter({
         >
           {isMinimal ? <FooterBrandMark /> : null}
           <span className='mf-copyright'>
-            © {new Date().getFullYear()} Jovie Technology Inc.
+            {/* copy-allow: legal entity line, owned by code */}©{' '}
+            {new Date().getFullYear()} Jovie Technology Inc.
           </span>
           <div className='mf-baseband__meta'>
             {isMinimal ? (

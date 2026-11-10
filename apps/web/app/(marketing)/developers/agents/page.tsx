@@ -11,11 +11,11 @@ import { documentTitle } from '@/lib/seo/document-title';
 const PAGE_URL = `${BASE_URL}${APP_ROUTES.DEVELOPERS_AGENTS}`;
 
 export const metadata: Metadata = {
-  title: documentTitle(`${LISTING.docsPage.title} - ${APP_NAME}`),
+  title: documentTitle(LISTING.docsPage.title),
   description: LISTING.oneLiner,
   alternates: { canonical: PAGE_URL },
   openGraph: {
-    title: `${LISTING.docsPage.title} - ${APP_NAME}`,
+    title: LISTING.docsPage.title,
     description: LISTING.oneLiner,
     url: PAGE_URL,
     type: 'article',

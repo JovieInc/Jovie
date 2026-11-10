@@ -436,7 +436,7 @@ def prepare_red(a, plan: dict, pr: dict) -> int:
     if regen and action == classes.AGENT:
         plan.update(action="regen", regen=regen, cls="regen")
         action = "regen"
-    elif action == classes.RENUMBER:
+    elif action in {classes.RENUMBER, classes.REGISTER_DOMAIN}:
         skip = "deterministic-unsupported->lanes"
     elif action == classes.AGENT:
         if cls["cls"] in NOT_MODEL_FIXABLE:
@@ -864,9 +864,11 @@ def gh_version() -> str:
 
 
 def cmd_smoke(a) -> int:
-    """Runner-side canary for the log path: log the gh version and fetch a known completed job's log
-    through the exact production fetch. Exits 1 (no fan-out) if the log is empty, so client drift
-    (e.g. gh refusing escape sequences) fails loudly here instead of silently skipping every PR."""
+    """Prove the production log-read path before fanout; absent evidence fails closed.
+
+    Conclusion-filtered lists avoid skipped/cancelled firehose starvation. Bound
+    collection to two lists, forty job reads and six actual log attempts.
+    """
     version = gh_version()
     parts = tuple(int(x) for x in re.findall(r"\d+", version)[:3]) or (0,)
     print(f"gh version {version} (minimum {'.'.join(map(str, MIN_GH))})")
@@ -874,25 +876,38 @@ def cmd_smoke(a) -> int:
     if parts < MIN_GH:
         print(f"::error title=swarm smoke::gh {version} is older than the supported minimum")
         return 1
-    runs = gh_json(["api", f"repos/{REPO}/actions/runs?status=completed&per_page=20"], priority="report")["workflow_runs"]
-    tried = 0
-    for run in runs:
-        if run.get("conclusion") not in {"success", "failure"}:
-            continue
-        jobs = gh_json(["api", f"repos/{REPO}/actions/runs/{run['id']}/jobs?per_page=10"], priority="report")["jobs"]
-        for job in jobs:
-            if job.get("conclusion") not in {"success", "failure"} or not job.get("started_at"):
-                continue  # skipped/cancelled jobs have no log to read
-            log = fetch_job_log(job["id"])
-            size = len(log.stdout or "")
-            tried += 1
-            print(f"smoke job {job['id']} ({job['name']}): rc={log.returncode} bytes={size} err={(log.stderr or '')[:100]!r}")
-            if log.returncode == 0 and size > 0:
-                return 0
-            if "escape" in (log.stderr or "") or tried >= 6:
-                print(f"::error title=swarm smoke::job log fetch returned rc={log.returncode} bytes={size}; gh {version} cannot read job logs")
-                return 1
-    print("::error title=swarm smoke::no readable completed job log to smoke-test the log fetch")
+    conclusions: dict[str, int] = {}
+    scanned = eligible_runs = eligible_jobs = tried = 0
+    seen_runs = set()
+    for status in ("failure", "success"):
+        runs = gh_json(["api", f"repos/{REPO}/actions/runs?status={status}&per_page=20"], priority="report")["workflow_runs"]
+        for run in runs[:20]:
+            if run["id"] in seen_runs:
+                continue
+            seen_runs.add(run["id"])
+            conc = run.get("conclusion") or "none"
+            conclusions[conc] = conclusions.get(conc, 0) + 1
+            scanned += 1
+            if conc not in {"success", "failure"}:
+                continue
+            jobs = gh_json(["api", f"repos/{REPO}/actions/runs/{run['id']}/jobs?per_page=100"], priority="report")["jobs"]
+            eligible = [j for j in jobs[:100] if j.get("conclusion") in {"success", "failure"} and j.get("started_at")]
+            if eligible:
+                eligible_runs += 1
+            for job in eligible:
+                eligible_jobs += 1
+                log = fetch_job_log(job["id"])
+                size = len(log.stdout or "")
+                tried += 1
+                print(f"smoke job {job['id']} ({job['name']}): rc={log.returncode} bytes={size} err={(log.stderr or '')[:100]!r}")
+                if log.returncode == 0 and size > 0:
+                    return 0
+                if "escape" in (log.stderr or "") or tried >= 6:
+                    print(f"::error title=swarm smoke::job log fetch returned rc={log.returncode} bytes={size}; gh {version} cannot read job logs")
+                    return 1
+    print(f"::error title=swarm smoke::no readable completed job log to smoke-test the log fetch "
+          f"(scanned {scanned} runs, conclusions={json.dumps(conclusions, sort_keys=True)}, "
+          f"eligible_runs={eligible_runs}, eligible_jobs={eligible_jobs}, log_attempts={tried}); log path unverified")
     return 1
 
 

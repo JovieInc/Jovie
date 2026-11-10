@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   MoonIcon,
   SmallMoonIcon,
@@ -19,12 +20,13 @@ describe('ThemeIcons', () => {
     ['SmallMoonIcon', SmallMoonIcon, 'h-3.5 w-3.5'],
   ] as const)(
     '%s is decorative and keeps its optical size',
-    (_name, Icon, size) => {
+    async (_name, Icon, size) => {
       const { container } = render(<Icon />);
       const icon = container.querySelector('svg');
 
       expect(icon).toHaveAttribute('aria-hidden', 'true');
       expect(icon).toHaveClass(size);
+      await expectNoA11yViolations(container);
     }
   );
 

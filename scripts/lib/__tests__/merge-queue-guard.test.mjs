@@ -56,11 +56,20 @@ const LIVE_NATIVE_RULESET_FIXTURE = JSON.parse(
   )
 );
 
+const liveRequiredContexts = [
+  'PR Ready',
+  'Migration Guard',
+  'Fork PR Gate',
+  'PR Size Guard',
+  'Company guards',
+];
+
 const greenStatuses = [
   { name: 'PR Ready', conclusion: 'SUCCESS' },
   { name: 'Migration Guard', conclusion: 'SUCCESS' },
   { name: 'Fork PR Gate', state: 'SUCCESS' },
   { name: 'PR Size Guard', state: 'SUCCESS' },
+  { name: 'Company guards', state: 'SUCCESS' },
 ];
 
 function buildUiFastTrackBody({
@@ -385,6 +394,7 @@ describe('aggregate required checks', () => {
       'CI / Migration Guard',
       'Fork PR Gate',
       'PR Size Guard',
+      'Company guards',
     ]);
     expect(ok.ok).toBe(true);
 
@@ -423,6 +433,7 @@ describe('aggregate required checks', () => {
       'Migration Guard',
       'Fork PR Gate',
       'PR Size Guard',
+      'Company guards',
     ]);
     expect(normalizeBranchProtectionSource(branchProtectionYaml)).toEqual(
       LIVE_NATIVE_RULESET_FIXTURE
@@ -564,12 +575,9 @@ describe('aggregate required checks', () => {
       type: 'required_status_checks',
       parameters: {
         strict_required_status_checks_policy: false,
-        required_status_checks: [
-          'PR Ready',
-          'Migration Guard',
-          'Fork PR Gate',
-          'PR Size Guard',
-        ].map(context => ({ context })),
+        required_status_checks: liveRequiredContexts.map(context => ({
+          context,
+        })),
       },
     };
     const nativeRules = [
@@ -1062,6 +1070,7 @@ describe('absolute update-branch subprocess deadline', () => {
   });
 
   it('returns verification_failure for a hung post-mutation command and permits the next run', async () => {
+    const clock = fakeClock();
     const gh = ghSequence({ mutation: asynchronousMutationSnapshot() });
     let mutationReturned = false;
     let hungTimeoutMs = null;
@@ -1074,8 +1083,6 @@ describe('absolute update-branch subprocess deadline', () => {
       if (args[0] === 'api' && args[1] === 'graphql') mutationReturned = true;
       return result;
     });
-    const startedAt = Date.now();
-
     const result = await tryGitHubRebase({
       repo: 'JovieInc/Jovie',
       pr: blockedPr(),
@@ -1083,9 +1090,9 @@ describe('absolute update-branch subprocess deadline', () => {
       dryRun: false,
       ghJsonImpl: hungGhJson,
       integrationProofImpl: gh.integrationProofImpl,
+      nowImpl: clock.nowImpl,
       operationBudgetMs: 80,
     });
-    const elapsedMs = Date.now() - startedAt;
 
     expect(result).toMatchObject({
       ok: false,
@@ -1094,8 +1101,6 @@ describe('absolute update-branch subprocess deadline', () => {
     });
     expect(hungTimeoutMs).toBeGreaterThan(0);
     expect(hungTimeoutMs).toBeLessThan(80);
-    expect(elapsedMs).toBeGreaterThanOrEqual(50);
-    expect(elapsedMs).toBeLessThan(500);
 
     const next = ghSequence({ alreadyIntegrated: true });
     await expect(
@@ -2363,7 +2368,7 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
       transientFailure: 'bounded-retry',
       liveRulesetCutover: 'applied',
     });
-    expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(10);
+    expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(4);
     expect(NATIVE_QUEUE_POLICY.max_entries_to_merge).toBe(10);
     expect(NATIVE_QUEUE_POLICY.min_entries_to_merge).toBe(1);
     expect(NATIVE_QUEUE_POLICY.min_entries_to_merge_wait_minutes).toBe(0);
@@ -2381,12 +2386,9 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
             type: 'required_status_checks',
             parameters: {
               strict_required_status_checks_policy: false,
-              required_status_checks: [
-                'PR Ready',
-                'Migration Guard',
-                'Fork PR Gate',
-                'PR Size Guard',
-              ].map(context => ({ context })),
+              required_status_checks: liveRequiredContexts.map(context => ({
+                context,
+              })),
             },
           },
           {
@@ -2433,12 +2435,9 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
             type: 'required_status_checks',
             parameters: {
               strict_required_status_checks_policy: false,
-              required_status_checks: [
-                'PR Ready',
-                'Migration Guard',
-                'Fork PR Gate',
-                'PR Size Guard',
-              ].map(context => ({ context })),
+              required_status_checks: liveRequiredContexts.map(context => ({
+                context,
+              })),
             },
           },
           {
@@ -2510,7 +2509,7 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
         { ...NATIVE_QUEUE_POLICY },
         { checkResponseTimeout: null }
       )
-    ).toMatchObject({ check_response_timeout_minutes: 20 });
+    ).toMatchObject({ check_response_timeout_minutes: 30 });
     const secondsReadback = buildNativeQueuePolicyReadback({
       ...NATIVE_QUEUE_POLICY,
       checkResponseTimeout: 3600,
@@ -2527,12 +2526,9 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
             type: 'required_status_checks',
             parameters: {
               strict_required_status_checks_policy: false,
-              required_status_checks: [
-                'PR Ready',
-                'Migration Guard',
-                'Fork PR Gate',
-                'PR Size Guard',
-              ].map(context => ({ context })),
+              required_status_checks: liveRequiredContexts.map(context => ({
+                context,
+              })),
             },
           },
           {

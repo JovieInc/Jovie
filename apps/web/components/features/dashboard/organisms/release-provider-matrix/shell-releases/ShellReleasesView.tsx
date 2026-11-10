@@ -79,6 +79,7 @@ import {
   ShellReleaseRow,
   type ShellReleaseSyncStatus,
 } from './ShellReleaseRow';
+import { useInitialListPaintGate } from './useInitialListPaintGate';
 
 /**
  * Match a release against a single filter value. Field-level operator
@@ -390,7 +391,6 @@ export function ShellReleasesView({
     initialArtistName ?? null
   );
   const [isImporting, setIsImporting] = useState(initialImporting);
-  const [isInitialListPaint, setIsInitialListPaint] = useState(true);
   const [spotifySearchOpen, setSpotifySearchOpen] = useState(
     shouldOpenSpotifyConnect
   );
@@ -978,23 +978,19 @@ export function ShellReleasesView({
     isConnected && rows.length === 0 && !isImporting;
   const shouldResolveAppleMusicEligibility =
     isConnected && rows.length > 0 && !isAmConnected && !isImporting;
-  const { data: appleMusicMatches, isLoading: isAppleMusicEligibilityLoading } =
-    useDspMatchesQuery({
-      profileId: rows[0]?.profileId ?? '',
-      enabled: experienceMode !== 'demo' && shouldResolveAppleMusicEligibility,
-    });
-  const shouldGateListPaint =
-    isInitialListPaint &&
-    shouldResolveAppleMusicEligibility &&
-    isAppleMusicEligibilityLoading;
-
-  // Eligibility may start loading after Spotify import completes. Once the
-  // list is visible, keep its menus, selection and focus mounted through it.
-  useEffect(() => {
-    if (isInitialListPaint && !shouldGateListPaint) {
-      setIsInitialListPaint(false);
-    }
-  }, [isInitialListPaint, shouldGateListPaint]);
+  const {
+    data: appleMusicMatches,
+    isLoading: isAppleMusicEligibilityLoading,
+    failureCount: appleMusicEligibilityFailures,
+  } = useDspMatchesQuery({
+    profileId: rows[0]?.profileId ?? '',
+    enabled: experienceMode !== 'demo' && shouldResolveAppleMusicEligibility,
+  });
+  const shouldGateListPaint = useInitialListPaintGate({
+    shouldResolve: shouldResolveAppleMusicEligibility,
+    isLoading: isAppleMusicEligibilityLoading,
+    failureCount: appleMusicEligibilityFailures,
+  });
 
   return (
     <>
@@ -1062,6 +1058,8 @@ export function ShellReleasesView({
         setAmPaletteOpen={setAmPaletteOpen}
         spotifySearchOpen={spotifySearchOpen}
         setSpotifySearchOpen={setSpotifySearchOpen}
+        spotifyConnected={isConnected}
+        spotifyArtistName={artistName}
         onAppleMusicConnect={handleAppleMusicConnect}
         onSpotifyConnected={handleArtistConnected}
         onSpotifyImportStart={handleImportStart}

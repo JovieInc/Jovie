@@ -35,6 +35,12 @@ the only workflow that puts PRs into the merge queue. It admits an
 already-green head and skips drafts. That event does not start another source
 CI flight.
 
+A draft reaches ready on its own (Auto-Ready green-source) when its exact head
+is CLEAN with PR Ready and required checks SUCCESS, and its body carries either
+a complete writer-proof receipt or a trusted writer's on-green opt-in,
+`<!-- jovie-auto-ready: on-green -->`. Leave it off to keep a WIP draft
+parked. Holds, parks and controlled-proof markers still win.
+
 Missing ownership, stale/changed heads, failed checks, lost or duplicate events,
 and expired holds remain bounded repair/evidence outcomes. The policy digest is
 included in delivery receipts so a runtime can reject a mismatched contract.
@@ -183,8 +189,8 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 to ten green entries per merge push (`max_entries_to_merge=10`). Each entry
 still builds its own synthetic head on the entry ahead, and the changed-path
 classifier selects the Web, Mac, iOS, operations/tooling, and shared-contract
-lanes per member. The checked-in `max_entries_to_build=10` matches live (synced
-2026-10-21, see the tuning log in `.github/MERGE_QUEUE.md`); any lower live
+lanes per member. The checked-in `max_entries_to_build=4` matches live (synced
+2026-10-31, see the tuning log in `.github/MERGE_QUEUE.md`); any lower live
 count remains a supported runner-capacity brake.
 
 On 2026-09-23 the 20-minute response deadline proved shorter than required
@@ -192,10 +198,10 @@ CI paths configured for 30 and 40 minutes. The source-first repair landed and
 live ruleset `10512119` was read back at 60 minutes on 2026-09-24. On
 2026-10-21 (Tim-approved) it went back to 20 minutes: merge-group runs now
 finish well inside it (3 of 287 exceeded 20 minutes in the first 12 hours, no
-timeout removals). Watch iOS and Mac selecting groups for timeouts. Re-read the
+timeout removals); live is 30 minutes as of 2026-10-29. Watch iOS and Mac selecting groups for timeouts. Re-read the
 live ruleset before changing capacity and retain exact queue attempts and
 removal reasons as outcome evidence. This changes waiting time, not required
-checks or ALLGREEN.
+checks or the HEADGREEN grouping (ALLGREEN until 2026-10-29).
 
 Capacity figures: the 2026-09-08 Team-plan readback and
 [GitHub's published limits](https://docs.github.com/en/actions/reference/limits)
@@ -389,7 +395,7 @@ existed. Contract:
    `Exact-head Coverage` runs V8 coverage and the 60% changed-line ratchet on
    web-impacting source heads without repository secrets; the native queue
    repeats it on the synthetic combined head and must finish inside the
-   current merge-queue check budget (20 minutes since the 2026-10-21 tuning).
+   current merge-queue check budget (30 minutes, live readback 2026-10-29).
    Non-web heads emit an explicit
    non-applicable receipt. Nightly retains the global risk-surface debt check,
    so stale unrelated debt cannot deadlock promotion.

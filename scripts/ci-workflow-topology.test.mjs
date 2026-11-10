@@ -4,11 +4,28 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { buildTopology, findCycle, validateTopology } from './ci-workflow-topology.mjs';
+import { load as yamlLoad } from 'js-yaml';
+import { buildTopology, findCycle, syncTopology, validateTopology } from './ci-workflow-topology.mjs';
+import { scan as scanAiReviewBoundary } from './company-guards/ai-review-boundary.mjs';
+
+test('Pen drafts share one editor across runs and retain pending frame jobs', () => {
+  const workflow = /** @type {{jobs: {draft: {concurrency: unknown, strategy: {'max-parallel': number}}}, concurrency: {group: string}}} */ (yamlLoad(fs.readFileSync('.github/workflows/pen-draft.yml', 'utf8')));
+  assert.deepEqual(workflow.jobs.draft.concurrency, {
+    group: 'pen-draft-canonical-editor',
+    'cancel-in-progress': false,
+    queue: 'max',
+  });
+  assert.equal(workflow.jobs.draft.strategy['max-parallel'], 1);
+  assert.match(workflow.concurrency.group, /github\.event\.pull_request\.number/);
+  assert.match(workflow.concurrency.group, /github\.sha/);
+});
 
 test('repository workflows satisfy the topology and fan-out contract', () => {
   const { policy, nodes, edges } = buildTopology();
   assert.equal(nodes.find(node => node.name === 'Test Coverage Audit')?.category, 'source-validation');
+  assert.equal(nodes.find(node => node.name === 'Main Health')?.category, 'source-validation');
+  assert.deepEqual(edges.filter(edge => edge.from === 'Main Health'),
+    [{ from: 'Main Health', to: 'Main Red Eject', type: 'workflow_run' }]);
   assert.deepEqual(validateTopology({ policy, nodes, edges }).errors, []);
   const observers = new Set(nodes.filter(node => node.active && node.category === 'telemetry-aggregation').map(node => node.name));
   assert.equal(edges.some(edge => edge.type === 'workflow_run' && observers.has(edge.from)), false);
@@ -66,3 +83,59 @@ test('release opportunity requires one staging completion path and rejects paral
   const topology = buildTopology(); topology.edges = topology.edges.filter(edge => edge.to !== 'Staging Controller');
   assert.match(validateTopology(topology).errors.join('\n'), /exactly one Production Controller opportunity through completed staging/);
 });
+
+test('committed workflow DAG stays synchronized with the workflows', () => {
+  assert.deepEqual(syncTopology().errors, []);
+});
+
+test('generator detects missing and stale DAGs, refreshes deterministically, and preserves output on invalid workflows', t => {
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'topology-sync-'));
+  t.after(() => fs.rmSync(fixture, { recursive: true, force: true }));
+  const workflows = path.join(fixture, '.github/workflows');
+  fs.cpSync(new URL('../.github/workflows', import.meta.url), workflows, { recursive: true });
+  fs.copyFileSync(new URL('../.github/runner-pin-allowlist.json', import.meta.url), path.join(fixture, '.github/runner-pin-allowlist.json'));
+  const output = path.join(fixture, '.github/workflow-topology.gen.yml');
+  const stale = /generated workflow DAG is stale/;
+  assert.match(syncTopology(fixture).errors.join('\n'), stale);
+  assert.equal(fs.existsSync(output), false, 'check mode must not write');
+  assert.deepEqual(syncTopology(fixture, true).errors, []);
+  const initial = fs.readFileSync(output, 'utf8');
+  assert.deepEqual(syncTopology(fixture).errors, []);
+  assert.deepEqual(syncTopology(fixture, true).errors, []);
+  assert.equal(fs.readFileSync(output, 'utf8'), initial);
+
+  const controller = path.join(workflows, 'production-controller.yml');
+  const source = fs.readFileSync(controller, 'utf8');
+  fs.writeFileSync(controller, source + '\n  topology-regression:\n    runs-on: ubuntu-24.04\n    steps:\n      - run: "true"\n');
+  assert.match(syncTopology(fixture).errors.join('\n'), stale);
+  assert.equal(fs.readFileSync(output, 'utf8'), initial, 'stale check must not rewrite');
+  assert.deepEqual(syncTopology(fixture, true).errors, []);
+  assert.deepEqual(syncTopology(fixture).errors, []);
+  const updated = fs.readFileSync(output, 'utf8');
+  assert.notEqual(updated, initial);
+
+  fs.copyFileSync(controller, path.join(workflows, 'duplicate-controller.yml'));
+  assert.match(syncTopology(fixture, true).errors.join('\n'), /workflow names must be present and unique/);
+  assert.equal(fs.readFileSync(output, 'utf8'), updated, 'invalid topology must not replace the last valid DAG');
+});
+
+test('AI review stays advisory: blocking reviewers fail the boundary scan', t => {
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'topology-ai-review-'));
+  t.after(() => fs.rmSync(fixture, { recursive: true, force: true }));
+  const workflows = path.join(fixture, '.github/workflows');
+  fs.mkdirSync(workflows, { recursive: true });
+  fs.writeFileSync(
+    path.join(workflows, 'advisory.yml'),
+    'name: Advisory AI Review\non:\n  pull_request:\njobs:\n  review:\n    steps:\n      - run: node .github/scripts/advisory-ai-review.mjs\n',
+  );
+  assert.deepEqual(scanAiReviewBoundary(fixture), []);
+  fs.writeFileSync(
+    path.join(workflows, 'warden.yml'),
+    'name: Warden\non: [pull_request]\njobs:\n  review:\n    steps:\n      - run: gh pr review $PR --request-changes\n      - run: warden --fail-on findings\n',
+  );
+  const flagged = scanAiReviewBoundary(fixture);
+  assert.equal(flagged.length, 1, JSON.stringify(flagged));
+  assert.match(flagged[0].file, /warden\.yml$/);
+  assert.match(flagged[0].signal, /request-changes/);
+});
+

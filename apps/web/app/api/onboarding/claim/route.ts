@@ -12,6 +12,10 @@ import {
 } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
 import { materializeClaimedOnboardingProfile } from '@/lib/onboarding/claim-profile';
+import {
+  isClaimAccessControlled,
+  linkClaimReplaysBestEffort,
+} from '@/lib/onboarding/claim-side-effects';
 import { deriveClaimedOnboardingStateFromMessageRows } from '@/lib/onboarding/claimed-state';
 import { isOnboardingOwnershipError } from '@/lib/onboarding/ownership-gate';
 import {
@@ -32,7 +36,6 @@ import {
   decideGoldenPathAdmissionForArtist,
   requiresProofBeforePublic,
 } from '@/lib/waitlist/golden-path-admission.server';
-import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import {
   isWaitlistApprovedStatus,
   isWaitlistPendingStatus,
@@ -237,7 +240,7 @@ async function resolveClaimHandoff(params: {
         conversationId: params.conversationId,
         ipAddress: params.ipAddress,
         userAgent: params.userAgent,
-        ...(proofPending ? { visibility: 'unproven' as const } : {}),
+        visibility: proofPending ? 'unproven' : 'public',
       }),
       waitlist: null,
       waitlistIntakeRequired: false,
@@ -319,7 +322,7 @@ async function resolveClaimHandoff(params: {
       conversationId: params.conversationId,
       ipAddress: params.ipAddress,
       userAgent: params.userAgent,
-      ...(proofPending ? { visibility: 'unproven' as const } : {}),
+      visibility: proofPending ? 'unproven' : 'public',
     }),
     waitlist: null,
     waitlistIntakeRequired: false,
@@ -395,15 +398,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ claimed: 0 });
     }
 
-    const accessControlled = await isWaitlistGateEnabled().catch(
-      async error => {
-        await captureError('Onboarding claim gate lookup failed', error, {
-          route: '/api/onboarding/claim',
-          method: 'POST',
-        });
-        return true;
-      }
-    );
+    await linkClaimReplaysBestEffort(sessionId, userId);
+
+    const accessControlled = await isClaimAccessControlled();
     const currentDbUser = await getDbUser(userId);
     const alreadyApproved = isWaitlistApprovedUserStatus(
       currentDbUser?.userStatus

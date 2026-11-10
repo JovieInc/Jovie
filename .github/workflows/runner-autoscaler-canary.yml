@@ -28,6 +28,14 @@ jobs:
           echo "runner_os=$RUNNER_OS"
           echo "runner_arch=$RUNNER_ARCH"
 
+      - name: Reset workspace git state (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          if [[ -d .git ]]; then
+            git sparse-checkout disable 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0

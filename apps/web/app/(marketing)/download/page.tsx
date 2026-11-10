@@ -257,9 +257,10 @@ export default function DownloadPage() {
               <div className='grid gap-x-10 gap-y-10 sm:grid-cols-2'>
                 {DOWNLOAD_COPY.features.map(row => (
                   <section key={row.title}>
-                    <div className='mb-4 flex size-8 items-center justify-center rounded-full bg-surface-1/10 text-secondary-token'>
-                      <Check className='size-4' aria-hidden='true' />
-                    </div>
+                    <Check
+                      className='mb-4 size-4 text-secondary-token'
+                      aria-hidden='true'
+                    />
                     <h3 className='text-balance text-xl font-semibold tracking-normal text-(--system-b-text-primary)'>
                       {row.title}
                     </h3>

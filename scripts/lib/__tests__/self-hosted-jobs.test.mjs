@@ -57,12 +57,26 @@ test('every self-hosted job has a recorded reason, and no reason outlives its jo
   }
 });
 
-test('mutation testing runs on hosted runners and keeps its sweep state in an Actions cache', () => {
+test('mutation testing runs on the Gem pool with a recorded reason and keeps its sweep state in an Actions cache', () => {
   const workflow = load(
     readFileSync(resolve(root, '.github/workflows/mutation-diff.yml'), 'utf8')
   );
-  for (const job of ['mutate', 'sweep'])
-    assert.equal(workflow.jobs[job]['runs-on'], 'ubuntu-latest');
+  for (const job of ['mutate', 'sweep']) {
+    assert.deepEqual(workflow.jobs[job]['runs-on'], [
+      'self-hosted',
+      'Linux',
+      'X64',
+      'jovie-fixed',
+    ]);
+    assert.ok(
+      allow.jobs.some(
+        entry =>
+          entry.workflow === 'mutation-diff.yml' &&
+          (entry.job === '*' || entry.job === job)
+      ),
+      `${job} is self-hosted without a recorded reason`
+    );
+  }
   const uses = workflow.jobs.sweep.steps.map(step => step.uses ?? '');
   assert.ok(uses.some(u => u.startsWith('actions/cache/restore@')));
   assert.ok(uses.some(u => u.startsWith('actions/cache/save@')));

@@ -1,5 +1,14 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildPreviewEnvAdmission,
@@ -8,8 +17,10 @@ import {
   isLivePreviewEnvAdmission,
   PREVIEW_ENV_ADMISSION_SCHEMA,
   PREVIEW_ENV_CLEANUP_SCHEMA,
+  PREVIEW_ENV_PROJECTION_PATH,
   PREVIEW_ENV_REGISTRY_PATH,
   PREVIEW_ENV_REGISTRY_SCHEMA,
+  projectPreviewEnvRegistry,
   validatePreviewEnvAdmission,
   validatePreviewEnvCleanupReceipt,
   validatePreviewEnvRegistry,
@@ -271,6 +282,53 @@ describe('vercel git integration lock (JOV-5941)', () => {
 });
 
 describe('Ovie env-exceptions projection', () => {
+  it('CLI rejects stale projections and regenerates lanes without replacing lifecycle receipts', () => {
+    const root = mkdtempSync(join(tmpdir(), 'preview-env-projection-'));
+    const activeExceptions = [{ id: 'owned-by-lifecycle' }];
+    for (const [file, body] of [
+      [PREVIEW_ENV_REGISTRY_PATH, REGISTRY],
+      [
+        PREVIEW_ENV_PROJECTION_PATH,
+        { ...HUD_PROJECTION, lanes: [], activeExceptions },
+      ],
+    ]) {
+      mkdirSync(dirname(join(root, file)), { recursive: true });
+      writeFileSync(join(root, file), `${JSON.stringify(body, null, 2)}\n`);
+    }
+    const run = mode =>
+      spawnSync(
+        process.execPath,
+        [
+          resolve(REPO_ROOT, 'scripts/ci/preview-env-admission.mjs'),
+          'sync-projection',
+          mode,
+        ],
+        { cwd: root, encoding: 'utf8' }
+      );
+    const stale = run('--check');
+    expect(stale.error).toBeUndefined();
+    expect(stale.status).toBe(1);
+    expect(stale.stderr).toContain('projection is stale');
+    expect(run('--write').status).toBe(0);
+    expect(run('--check').status).toBe(0);
+    expect(run('--unknown').status).toBe(2);
+    const written = JSON.parse(
+      readFileSync(join(root, PREVIEW_ENV_PROJECTION_PATH), 'utf8')
+    );
+    expect(written.lanes).toEqual(HUD_PROJECTION.lanes);
+    expect(written.activeExceptions).toEqual(activeExceptions);
+  });
+
+  it('derives all lane fields without altering active lifecycle receipts', () => {
+    const activeExceptions = [{ id: 'existing-lifecycle-receipt' }];
+    const previous = { ...HUD_PROJECTION, activeExceptions, lanes: [] };
+    const projected = projectPreviewEnvRegistry(REGISTRY, previous);
+    expect(projected.lanes).toEqual(HUD_PROJECTION.lanes);
+    expect(projected.activeExceptions).toBe(activeExceptions);
+    expect(previous.lanes).toEqual([]);
+    expect(() => projectPreviewEnvRegistry({}, previous)).toThrow(/schema/);
+  });
+
   it('stays in sync with the canonical registry', () => {
     expect(HUD_PROJECTION.schema).toBe('jovie-preview-env-exceptions/v1');
     const registryLaneIds = REGISTRY.entries

@@ -17,10 +17,6 @@
       "tables": 0,
       "rates": 1
     },
-    "app/api/chat/route.ts": {
-      "tables": 4,
-      "rates": 0
-    },
     "app/api/cron/generate-insights/route.ts": {
       "tables": 4,
       "rates": 0
@@ -146,10 +142,6 @@
       "rates": 1
     },
     "components/features/dashboard/organisms/AnalyticsSidebar.tsx": {
-      "tables": 0,
-      "rates": 1
-    },
-    "components/features/dashboard/organisms/GetStartedChecklistCard.tsx": {
       "tables": 0,
       "rates": 1
     },
@@ -340,6 +332,10 @@
     "lib/testing/quarantine-ledger.ts": {
       "tables": 0,
       "rates": 1
+    },
+    "lib/track-snapshots/click-counts.ts": {
+      "tables": 8,
+      "rates": 0
     }
   }
 }

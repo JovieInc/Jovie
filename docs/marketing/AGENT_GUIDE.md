@@ -76,6 +76,27 @@ CLI, engineering, AI), only approved https social hosts, 3 to 4 columns with 8
 to 16 links, and a resolution smoke test through the shell's resolver. Layout
 and the legal row stay in code.
 
+### Page specs (`page-spec/<route-slug>`)
+
+A page is an ordered list of certified sections plus meta
+(`apps/web/lib/content-records/page-spec.ts`, one renderer in
+`components/marketing/page-spec/PageSpecSections.tsx`). Section types: hero,
+product-shot, feature-list, proof-quote, cta (link or single-field form), faq.
+Pricing-table is deferred until /pricing migrates (prices come from offer
+truth). Bans are enforced in the schema and renderer: no icon tiles (icons are
+bare glyphs), no visible step numbering, a single-field form is a title plus
+one microcopy line, no stat or filler cards, sentence case, two static matte
+backgrounds only, one primary action per section, no prices. Publish gates:
+schema, `@jovie/copy` lint, and a render smoke test (the visual critic stays
+warn-only for now). **Code is only for a new section type; content, order and
+section choice are data.** A migrated route is added to
+`data/marketing/pageSpecMigrated.ts`, and
+`tests/unit/marketing/page-spec-copy-guard.test.ts` then fails if its
+components reintroduce hardcoded copy (mark exceptions `copy-allow: <reason>`).
+Edit-to-live for data changes is the `marketing-change` stage entity
+(`lib/content-records/stage-events.ts`, `docs/metrics/stage-manifest.json`),
+compared against the shipping entity's pr-open to verified for code changes.
+
 ## The 4-step procedure
 
 ### 1. Receive a Brief

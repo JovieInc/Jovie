@@ -17,12 +17,25 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { ADMISSION_BLOCKING_LABELS } from './lib/admission-hold-labels.mjs';
+import { AGGREGATE_JOBS } from './lib/merge-group-ahead-attribution.mjs';
 
 export const REARM_CONTEXT = 'jovie-queue-victim-rearm/v1';
 export const REARM_CAP = 2;
+// The CI workflow whose merge_group and push runs gate the queue.
+export const CI_WORKFLOW_ID = 178737329;
 const SHA = /^[0-9a-f]{40}$/;
 const REARM_DESCRIPTION =
-  /^n=([1-9][0-9]*);sha=([0-9a-f]{40});run=([1-9][0-9]*)$/;
+  /^n=([1-9][0-9]*);sha=([0-9a-f]{40});run=([1-9][0-9]*)(?:;why=[a-z-]+)?$/;
+// Event-driven flake re-queue: a merge-group failure with no implicated path
+// (nothing to attribute to this PR or another) removes every PR in the group
+// via github-merge-queue[bot] while each head stays green. The enroll sweep
+// only ran on a push to main, so re-queue lag reached 24 minutes (#23562).
+// Such a victim is re-enqueued here when GitHub itself removed it within
+// DEQUEUE_FRESH_MS, under the same per-head REARM_CAP the breaker
+// (scripts/lanes/queue_breaker.py) backstops. A human or bot dequeue is a
+// deliberate stop and is never reversed.
+export const DEQUEUE_FRESH_MS = 30 * 60 * 1000;
+export const GITHUB_DEQUEUE_ACTOR = 'github-merge-queue[bot]';
 const BUDGET_FILE = /([A-Za-z0-9_./-]+\.md): \d+ bytes exceeds \d+/;
 // GitHub reports BLOCKED while any required check is pending or red, so
 // UNSTABLE means every required check is green and only a non-required context
@@ -81,8 +94,48 @@ export function trustedRearmRecords(statuses) {
   return records;
 }
 
-function classify(candidate, candidates, paths) {
-  if (paths.length === 0) return { reason: 'unclassified' };
+/**
+ * True only when every failing non-aggregate job of this group completed
+ * `success` in the CI run of the group's base (the group ahead, or main).
+ * Then the base without the front entry passed the very jobs the front entry
+ * failed, so "base-branch" by elimination is wrong for the front entry: the
+ * failure is its own. On 2026-10-31 #24072's group (run 41247973238) failed
+ * Visual Snapshot Compare, which had passed on its base's run (41247971178,
+ * still finishing an unrelated lanes flake). The failure hold deferred on the
+ * unfinished ahead run, so no receipt named #24072, and this script re-armed
+ * the culprit as base-branch. Missing or unfinished jobs prove nothing.
+ * @param {{ currentJobs?: Array<{ name?: string, conclusion?: string | null }>, baseJobs?: Array<{ name?: string, status?: string, conclusion?: string | null }> }} input
+ */
+export function frontFailurePassedOnBase({ currentJobs, baseJobs } = {}) {
+  if (!Array.isArray(currentJobs) || !Array.isArray(baseJobs)) return false;
+  const failed = currentJobs.filter(
+    job =>
+      ['failure', 'timed_out'].includes(job?.conclusion) &&
+      !AGGREGATE_JOBS.has(job.name)
+  );
+  if (failed.length === 0) return false;
+  const base = new Map(baseJobs.map(job => [job?.name, job]));
+  return failed.every(job => {
+    const match = base.get(job.name);
+    return match?.status === 'completed' && match.conclusion === 'success';
+  });
+}
+
+function classify(candidate, candidates, paths, now) {
+  if (paths.length === 0) {
+    // Flake or unattributable: only a fresh GitHub-made dequeue is positive
+    // evidence that this PR is a victim rather than the culprit.
+    const removed = candidate.dequeue;
+    if (!removed) return { reason: 'unclassified' };
+    if (removed.actor !== GITHUB_DEQUEUE_ACTOR) {
+      return { reason: 'not-github-dequeue' };
+    }
+    const age = now - removed.atMs;
+    if (!Number.isFinite(age) || age < 0 || age > DEQUEUE_FRESH_MS) {
+      return { reason: 'stale-dequeue' };
+    }
+    return { classification: 'unattributed' };
+  }
   const owns = path => (candidate.files ?? []).includes(path);
   if (paths.some(owns)) return { reason: 'own-failure' };
   const otherOwns = path =>
@@ -107,6 +160,9 @@ export function planVictimRearms({
   candidates,
   cap = REARM_CAP,
   heldRevision = null,
+  frontPr = null,
+  frontFailureOwn = false,
+  now = Date.now(),
 }) {
   if (!Number.isSafeInteger(runId) || runId < 1) fail('run id is missing');
   if (!Number.isSafeInteger(cap) || cap < 1) fail('cap is missing');
@@ -146,10 +202,17 @@ export function planVictimRearms({
     if (candidate.filesTruncated || candidate.statusesTruncated) {
       return skip('evidence-truncated');
     }
-    const verdict = classify(candidate, candidates, paths);
+    const verdict = classify(candidate, candidates, paths, now);
     if (!verdict.classification) return skip(verdict.reason);
     if (failureOwner && verdict.classification !== 'another-pr') {
       return skip('failure-owner');
+    }
+    if (
+      frontFailureOwn === true &&
+      candidate.prNumber === frontPr &&
+      verdict.classification === 'base-branch'
+    ) {
+      return skip('front-failure-passed-on-base');
     }
     const records = trustedRearmRecords(candidate.statuses).filter(
       record => record.sha === candidate.headSha
@@ -209,8 +272,11 @@ export function heldRevisionFromReceipt(raw, repository) {
   };
 }
 
-export function rearmDescription({ n, headSha, runId }) {
-  const description = `n=${n};sha=${headSha};run=${runId}`;
+export function rearmDescription({ n, headSha, runId, classification }) {
+  const why = /^[a-z-]+$/.test(classification ?? '')
+    ? `;why=${classification}`
+    : '';
+  const description = `n=${n};sha=${headSha};run=${runId}${why}`;
   if (description.length > 140)
     fail('rearm description exceeds 140 characters');
   return description;
@@ -464,12 +530,37 @@ function loadCandidates(repository, headSha, frontPr) {
       labels: (data?.labels?.nodes ?? []).map(label =>
         String(label.name ?? '').toLowerCase()
       ),
+      dequeue: lastDequeue(repository, prNumber),
       files: files.rows.map(file => file.filename).filter(Boolean),
       filesTruncated: files.truncated,
       statuses: statuses.rows,
       statusesTruncated: statuses.truncated,
     };
   });
+}
+
+/** The most recent removed_from_merge_queue event, or null when none is visible. */
+export function latestDequeue(events) {
+  let latest = null;
+  for (const event of events ?? []) {
+    if (event?.event !== 'removed_from_merge_queue') continue;
+    const atMs = Date.parse(event.created_at ?? '');
+    if (!Number.isFinite(atMs)) continue;
+    if (!latest || atMs >= latest.atMs) {
+      latest = { actor: String(event.actor?.login ?? ''), atMs };
+    }
+  }
+  return latest;
+}
+
+function lastDequeue(repository, prNumber) {
+  try {
+    return latestDequeue(
+      restPages(`repos/${repository}/issues/${prNumber}/timeline`, 5).rows
+    );
+  } catch {
+    return null;
+  }
 }
 
 function loadAnnotations(repository, runId) {
@@ -492,6 +583,35 @@ function loadAnnotations(repository, runId) {
     annotations.push(...page.rows);
   }
   return implicatedPathsFromAnnotations(annotations);
+}
+
+// Any read error keeps the pre-existing decision (false).
+function readFrontFailureOwn(repository, runId, baseSha) {
+  try {
+    const listed = ghJson([
+      'api',
+      `repos/${repository}/actions/workflows/${CI_WORKFLOW_ID}/runs?head_sha=${baseSha}&per_page=10`,
+    ]).workflow_runs;
+    const baseRun = (Array.isArray(listed) ? listed : [])
+      .filter(item => item?.head_sha === baseSha)
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+    if (!baseRun) return false;
+    const jobs = id =>
+      restPages(
+        `repos/${repository}/actions/runs/${id}/jobs?filter=latest`,
+        5,
+        'jobs'
+      );
+    const current = jobs(runId);
+    const base = jobs(baseRun.id);
+    if (current.truncated || base.truncated) return false;
+    return frontFailurePassedOnBase({
+      currentJobs: current.rows,
+      baseJobs: base.rows,
+    });
+  } catch {
+    return false;
+  }
 }
 
 function readArmState(repository, prNumber) {
@@ -550,6 +670,8 @@ function main() {
     runId: run.id,
     implicatedPaths,
     candidates,
+    frontPr: Number(front[1]),
+    frontFailureOwn: readFrontFailureOwn(repository, run.id, front[2]),
     heldRevision: heldRevisionFromReceipt(
       process.env.FAILURE_HOLD_RECEIPT,
       repository
@@ -589,7 +711,7 @@ function main() {
       for (const decision of decisions) {
         console.log(
           decision.action === 'rearm'
-            ? `rearm #${decision.prNumber} class=${decision.classification} n=${decision.n} increment=${decision.increment}`
+            ? `rearm #${decision.prNumber} class=${decision.classification} reason=${decision.classification === 'unattributed' ? 'github-dequeued-green-head-no-implicated-path' : 'victim-of-group-failure'} n=${decision.n} increment=${decision.increment} run=${decision.runId}`
             : `skip #${decision.prNumber} ${decision.reason}`
         );
       }

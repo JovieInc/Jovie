@@ -8,6 +8,7 @@ import {
   type DeliveryMergeRepo,
   type DeployHealth,
   type DeployHealthRepo,
+  type DeployLag,
   isExactSha,
   LANE_BRANCH_PREFIXES,
   LANE_BRANCH_RE,
@@ -976,10 +977,28 @@ export function parseDeployHealth(value: unknown): DeployHealth | null {
       lastSuccessAt: parseTimestamp(row.lastSuccessAt),
     });
   }
+  const lag: DeployLag[] = [];
+  if (isRecord(value.lag)) {
+    const minutes = (raw: unknown) =>
+      typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : null;
+    for (const [name, row] of Object.entries(value.lag).slice(0, 8)) {
+      if (!/^[\w.-]{1,48}\/[\w.-]{1,48}$/.test(name) || !isRecord(row))
+        continue;
+      lag.push({
+        repo: name,
+        p50Min: minutes(row.p50Min),
+        p95Min: minutes(row.p95Min),
+        samples: nullableInt(row.n) ?? 0,
+        targetP50Min: minutes(row.targetP50Min),
+        targetP95Min: minutes(row.targetP95Min),
+      });
+    }
+  }
   return {
     observedAt: parseTimestamp(value.observedAt),
     healthy: value.healthy,
     repos,
+    lag,
   };
 }
 
@@ -1071,7 +1090,7 @@ export async function readLanesStatus(io: LiveIo): Promise<AuthorityRead> {
   };
 }
 
-async function githubGraphql(
+export async function githubGraphql(
   io: LiveIo,
   sourceId: ShippingSourceId,
   query: string,
@@ -1114,7 +1133,7 @@ async function githubGraphql(
   return body.data;
 }
 
-function isAuthorityRead(value: unknown): value is AuthorityRead {
+export function isAuthorityRead(value: unknown): value is AuthorityRead {
   return (
     isRecord(value) && typeof value.status === 'string' && 'sourceId' in value
   );
@@ -1361,7 +1380,7 @@ function recentMerged(
     .slice(0, 12);
 }
 
-function issueCount(data: Record<string, unknown>, alias: string) {
+export function issueCount(data: Record<string, unknown>, alias: string) {
   const search = data[alias];
   return isRecord(search) &&
     Number.isSafeInteger(search.issueCount) &&

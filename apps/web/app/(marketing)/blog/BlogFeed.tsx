@@ -1,9 +1,5 @@
 import type { ReactNode } from 'react';
-import {
-  MarketingContainer,
-  MarketingEditorialHeroPhoto,
-  MarketingHero,
-} from '@/components/marketing';
+import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import type {
   BlogPostSummary,
@@ -20,16 +16,10 @@ interface BlogFeedProps {
   readonly entries: readonly BlogFeedEntry[];
 }
 
-/** Docked hero shell for /blog: bleeds the editorial photo to y=0 under
- * the transparent-at-top MarketingHeader (marketing routes spec, 2026-09-26). */
+/** Preserve the docked header/hero spacing on the matte page surface. */
 function BlogHeroFrame({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <div className='marketing-hero-dock relative overflow-hidden'>
-      <MarketingEditorialHeroPhoto
-        src='/images/hero/blog-index.webp'
-        opacity={0.4}
-        testId='blog-hero-photo'
-      />
       <MarketingHero
         variant='left'
         className='relative z-10'

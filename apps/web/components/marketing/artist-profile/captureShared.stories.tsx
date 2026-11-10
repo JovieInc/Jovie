@@ -28,11 +28,15 @@ export const ActionPillDone: Story = {
 };
 
 export const Pill: StoryObj<typeof AudiencePill> = {
+  // AudiencePill renders an <li>; wrap it in a <ul> so the standalone story
+  // keeps valid list semantics (axe listitem).
   render: () => (
-    <AudiencePill
-      accentIndex={0}
-      pill={ARTIST_NOTIFICATIONS_COPY.capture.audienceRails[0][0]}
-    />
+    <ul className='list-none p-0'>
+      <AudiencePill
+        accentIndex={0}
+        pill={ARTIST_NOTIFICATIONS_COPY.capture.audienceRails[0][0]}
+      />
+    </ul>
   ),
 };
 

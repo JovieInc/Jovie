@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
 import type {
   BooleanEntitlement,
@@ -7,6 +6,14 @@ import type {
 import type { CodeFlagName } from '@/lib/flags/code-flags';
 import type { AppFlagName } from '@/lib/flags/contracts';
 import type { MarketingStaticFlagName } from '@/lib/flags/marketing-static';
+import { PUBLIC_ACCESS_FLAG_CAPABILITIES } from './public-access-flags';
+import type {
+  FeatureAccessState,
+  FeatureAudienceScope,
+  FeatureMaturity,
+  PublicationPermission,
+} from './registry.constants';
+import type { Capability, Claim } from './registry.schema';
 
 /**
  * Product-truth capability + claim registry (JOV-6223 / JOV-7247).
@@ -27,34 +34,22 @@ import type { MarketingStaticFlagName } from '@/lib/flags/marketing-static';
  * entitlements no public plan grants are `proposed` + `internal_only`.
  */
 
-export const FEATURE_MATURITY_STATES = [
-  'proposed',
-  'limited_testing',
-  'public_beta',
-  'general_availability',
-] as const;
-export type FeatureMaturity = (typeof FEATURE_MATURITY_STATES)[number];
-
-/** Explicit general-versus-ICP audience scope for a capability. */
-export const FEATURE_AUDIENCE_SCOPES = ['general', 'icp'] as const;
-export type FeatureAudienceScope = (typeof FEATURE_AUDIENCE_SCOPES)[number];
-
-/** Permission to announce a feature, separate from permission to use it. */
-export const PUBLICATION_PERMISSIONS = [
-  'internal_only',
-  'unlisted',
-  'public',
-] as const;
-export type PublicationPermission = (typeof PUBLICATION_PERMISSIONS)[number];
-
-/** Permission to use a feature, separate from permission to announce it. */
-export const FEATURE_ACCESS_STATES = [
-  'unavailable',
-  'interest_capture',
-  'enrolled',
-  'open',
-] as const;
-export type FeatureAccessState = (typeof FEATURE_ACCESS_STATES)[number];
+export type {
+  ClaimKind,
+  ClaimSource,
+  FeatureAccessState,
+  FeatureAudienceScope,
+  FeatureMaturity,
+  PublicationPermission,
+} from './registry.constants';
+export {
+  CLAIM_KINDS,
+  CLAIM_SOURCES,
+  FEATURE_ACCESS_STATES,
+  FEATURE_AUDIENCE_SCOPES,
+  FEATURE_MATURITY_STATES,
+  PUBLICATION_PERMISSIONS,
+} from './registry.constants';
 
 export type EntitlementKey = BooleanEntitlement | NumericEntitlement;
 export type ProductFlagKey = AppFlagName | CodeFlagName;
@@ -97,130 +92,10 @@ export interface CapabilityDefinition {
   readonly marketing?: CapabilityMarketingProjection;
 }
 
-export const CapabilityMarketingProjectionSchema = z.strictObject({
-  audience: z.enum(FEATURE_AUDIENCE_SCOPES),
-  offerId: z.string().min(1).optional(),
-  supportedJobs: z.array(z.string().min(1)).min(1),
-  proofAuthorized: z.boolean(),
-  contentRevision: z.iso.date(),
-  accessLabel: z.string().min(1).optional(),
-});
-
-export const CapabilitySchema = z
-  .strictObject({
-    id: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u),
-    maturity: z.enum(FEATURE_MATURITY_STATES),
-    publication: z.enum(PUBLICATION_PERMISSIONS),
-    access: z.enum(FEATURE_ACCESS_STATES),
-    entitlementKeys: z.array(z.string().min(1)),
-    flagKey: z.string().min(1).optional(),
-    evidence: z.strictObject({
-      captureScenarios: z.array(z.string().min(1)),
-      routes: z.array(z.string().startsWith('/')),
-    }),
-    marketing: CapabilityMarketingProjectionSchema.optional(),
-  })
-  .superRefine((capability, ctx) => {
-    if (
-      capability.maturity === 'proposed' &&
-      (capability.access === 'open' || capability.access === 'enrolled')
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'a proposed capability cannot grant access',
-        path: ['access'],
-      });
-    }
-    if (
-      capability.marketing &&
-      capability.publication !== 'internal_only' &&
-      (capability.access === 'unavailable' ||
-        capability.access === 'interest_capture') &&
-      !capability.marketing.accessLabel
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        message:
-          'a published capability without access needs an honest accessLabel',
-        path: ['marketing', 'accessLabel'],
-      });
-    }
-  });
-export type Capability = z.infer<typeof CapabilitySchema>;
-
-export const CLAIM_KINDS = [
-  'capability',
-  'offer',
-  'metric',
-  'comparison',
-] as const;
-export type ClaimKind = (typeof CLAIM_KINDS)[number];
-
-/**
- * Where a claim's truth comes from. `offer-truth`, `entitlements`, and
- * `feature` are derived from code; `external-cited` and `measured` are the
- * only admissible sources for numbers about the world and need a citation.
- */
-export const CLAIM_SOURCES = [
-  'offer-truth',
-  'entitlements',
-  'feature',
-  'external-cited',
-  'measured',
-] as const;
-export type ClaimSource = (typeof CLAIM_SOURCES)[number];
-
-const EVIDENCED_CLAIM_SOURCES: readonly ClaimSource[] = [
-  'external-cited',
-  'measured',
-];
-
-export const ClaimSchema = z
-  .strictObject({
-    id: z.string().regex(/^[a-z0-9]+(?:[.-][a-z0-9]+)*$/u),
-    capabilityId: z.string().min(1),
-    statement: z.string().trim().min(1),
-    kind: z.enum(CLAIM_KINDS),
-    source: z.enum(CLAIM_SOURCES),
-    citation: z.string().trim().min(1).optional(),
-    validUntil: z.iso.date().optional(),
-  })
-  .superRefine((claim, ctx) => {
-    const evidenced = EVIDENCED_CLAIM_SOURCES.includes(claim.source);
-    // Metrics and comparisons describe the world, not our code. They are
-    // admissible only with measured or externally cited evidence that expires.
-    if (claim.kind === 'metric' || claim.kind === 'comparison') {
-      if (!evidenced) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `${claim.kind} claims need a measured or external-cited source`,
-          path: ['source'],
-        });
-      }
-      if (!claim.validUntil) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `${claim.kind} claims need a validUntil date`,
-          path: ['validUntil'],
-        });
-      }
-    }
-    if (evidenced && !claim.citation) {
-      ctx.addIssue({
-        code: 'custom',
-        message: `${claim.source} claims need a citation`,
-        path: ['citation'],
-      });
-    }
-    if (claim.kind === 'offer' && claim.source !== 'offer-truth') {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'offer claims must derive from lib/billing/offer-truth.ts',
-        path: ['source'],
-      });
-    }
-  });
-export type Claim = z.infer<typeof ClaimSchema>;
+// The zod schemas live in registry.schema.ts. The marketing footer and
+// navigation read this registry on every public page, so it stays free of
+// zod (a type-only re-export is erased from the bundle).
+export type { Capability, Claim };
 
 export const PRODUCT_CAPABILITIES = {
   'jovie-card': {
@@ -708,7 +583,6 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   BILLING_UPGRADE_DIRECT: { nonMarketing: 'billing checkout routing' },
   SMARTLINK_PRE_SAVE: { capabilityId: 'smart-links' },
   IOS_APPLE_MUSIC_PRIORITY: { nonMarketing: 'platform ordering heuristic' },
-  SPOTIFY_OAUTH: { nonMarketing: 'account connection plumbing' },
   STRIPE_CONNECT_ENABLED: { capabilityId: 'pay' },
   PLAYLIST_ENGINE: { nonMarketing: 'internal playlist generation job' },
   ALBUM_ART_GENERATION: { capabilityId: 'album-art-generation' },
@@ -746,12 +620,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
     nonMarketing:
       'marketing copy presentation; default on, env kill switch; does not change smart-link certification (JOV-7580)',
   },
-  OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: {
-    nonMarketing: 'OAuth dynamic client registration kill switch',
-  },
+  ...PUBLIC_ACCESS_FLAG_CAPABILITIES,
   CHATGPT_APP_DIRECTORY_MCP: {
     nonMarketing:
-      'ChatGPT directory MCP kill switch; anonymous public artist reads; default off',
+      'ChatGPT directory MCP kill switch; anonymous public creator reads; default off',
   },
   IN_HOUSE_RESOLVER: {
     nonMarketing:
@@ -781,6 +653,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   INVESTOR_PORTAL_YC_DECK: {
     nonMarketing:
       'investor brief section order; default off until founder design approval',
+  },
+  CLAIM_LEGACY_PROOF_SWEEP: {
+    nonMarketing:
+      'daily sweep over grandfathered claims; default off; no public capability claim',
   },
 } as const satisfies Readonly<Record<ProductFlagKey, FlagCapabilityBinding>>;
 

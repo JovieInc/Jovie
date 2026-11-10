@@ -148,8 +148,9 @@ export function ConnectorsClient({
           error?: string;
         };
         if (!res.ok) throw new Error(data.error ?? 'Extract failed');
+        const created = data.suggestedActionsCreated ?? 0;
         toast.success(
-          `Extraction complete — ${data.suggestedActionsCreated ?? 0} new suggestion(s)`
+          `Extraction complete. ${created} new ${created === 1 ? 'suggestion' : 'suggestions'}`
         );
         router.refresh();
       } catch (err) {
@@ -173,7 +174,7 @@ export function ConnectorsClient({
       // ui-casing-allow: sentence-case description (Found === Expected)
       description='Connect the services Jovie uses to understand and manage your work.'
     >
-      <SettingsPanel title='Connected Accounts' bodyClassName='px-4 sm:px-5'>
+      <SettingsPanel title='Connected accounts' bodyClassName='px-4 sm:px-5'>
         {oauthFailed && (
           <p role='alert' className='py-3 text-xs text-error'>
             The connection did not finish. Check the account status below, then
@@ -233,7 +234,7 @@ export function ConnectorsClient({
 
       {isDev && isGoogleConnected && (
         <SettingsPanel
-          title='Developer Tools'
+          title='Developer tools'
           bodyClassName='px-4 py-3 sm:px-5'
         >
           <div>

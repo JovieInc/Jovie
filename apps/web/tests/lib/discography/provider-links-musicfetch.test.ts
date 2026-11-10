@@ -243,7 +243,7 @@ describe('resolveProviderLinks — MusicFetch integration', () => {
 
     // DSPs without search URL templates (flo, joox, line_music, netease, qq_music, trebel)
     // are skipped in search_fallback — they can only get canonical links from MusicFetch
-    expect(links.length).toBe(24);
+    expect(links.length).toBe(26);
 
     // Spot-check key providers
     const providers = new Set(links.map(l => l.provider));

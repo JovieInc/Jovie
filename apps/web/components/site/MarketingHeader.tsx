@@ -1,7 +1,6 @@
 // @coverage-via apps/web/tests/unit/marketing/support-route-header-contract.test.ts
 'use client';
 
-import { usePathname } from 'next/navigation';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import {
@@ -9,6 +8,7 @@ import {
   HeaderNav,
   type HeaderNavCta,
 } from '@/components/organisms/HeaderNav';
+import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 import './MarketingHeader.css';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -20,6 +20,7 @@ import {
   type MarketingHeaderBrand,
   resolveMarketingHeaderBrand,
 } from '@/data/marketing/headerBrand';
+import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import {
   MARKETING_CUSTOMERS_FLYOUT,
@@ -66,8 +67,7 @@ const MARKETING_HEADER_CTA_BY_PATH: Readonly<
   // The label names the homepage's one action, the artist-profile claim
   // (EVENT 2026-10-20); marketing-header-cta-consistency pins it to the
   // shared claim-profile CTA intent label.
-  // ui-casing-allow: shared CTA intent copy (sentence case, as on /artist-profiles)
-  [APP_ROUTES.HOME]: { label: 'Claim your profile', href: APP_ROUTES.START },
+  [APP_ROUTES.HOME]: HOME_MARKETING_HEADER_CTA,
 };
 
 /**
@@ -104,6 +104,10 @@ export interface MarketingHeaderProps
      */
     readonly chromeNav?: MarketingHeaderChromeNav;
     readonly primaryCta?: MarketingHeaderCta;
+    /** Show Log in only (the invite-only homepage has one CTA, in the hero). */
+    readonly hidePrimaryCta?: boolean;
+    /** Wordmark beside the mark at the left (the homepage); the centre nav drops it. */
+    readonly leftWordmark?: boolean;
     readonly showHomepageCenterNav?: boolean;
     readonly variant?: MarketingHeaderVariant;
   }> {}
@@ -178,10 +182,12 @@ export function MarketingHeader({
   navLinks,
   chromeNav,
   primaryCta,
+  hidePrimaryCta = false,
+  leftWordmark = false,
   showHomepageCenterNav = true,
   variant = 'landing',
 }: MarketingHeaderProps) {
-  const pathname = usePathname();
+  const pathname = usePublicPathname();
   useEffect(() => {
     track(
       CANONICAL_PUBLIC_SHELL_EVENTS.EXPOSURE,
@@ -233,13 +239,16 @@ export function MarketingHeader({
     hasSimpleNav,
     centerNavDisabled,
     resolvedNavLinks,
-    iconOnly,
+    iconOnly || leftWordmark,
     chromeNav
   );
   const resolvedPrimaryCta =
     primaryCta ?? resolveMarketingHeaderPrimaryCta(pathname);
-  const resolvedLogoVariant =
-    presentation === 'marketing-glass' || isArtistProfiles || iconOnly
+  // leftWordmark (the homepage) renders the mark with its reveal wordmark; the
+  // homepage stylesheet keeps that wordmark shown beside the 28px mark.
+  const resolvedLogoVariant = leftWordmark
+    ? 'icon'
+    : presentation === 'marketing-glass' || isArtistProfiles || iconOnly
       ? 'icon'
       : logoVariant;
 
@@ -251,6 +260,7 @@ export function MarketingHeader({
         presentation === 'marketing-glass' || isArtistProfiles ? 'sm' : logoSize
       }
       logoVariant={resolvedLogoVariant}
+      logoMarkSize='marketing'
       logoReveal={resolvedLogoVariant === 'icon'}
       authMode='public-static'
       hideNav={isMinimal}
@@ -263,6 +273,7 @@ export function MarketingHeader({
       presentation={presentation}
       flyoutMenus={navConfig.flyoutMenus}
       publicCta={resolvedPrimaryCta}
+      hidePublicCta={hidePrimaryCta}
       mobileNavLinks={navConfig.mobileNavLinks}
       navLinks={navConfig.desktopNavLinks}
       showContactLink={false}
