@@ -9,6 +9,81 @@ const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 // Registered by the maintained ci-fast workflow contract test entry point.
 /** @param {(jobId: string, nextJobId: string) => string} jobBlock */
 export function defineStorybookBrowserSelectionTests(jobBlock) {
+  it('runs onboarding recovery proof in active Source Validation for affected source, stories and specs', () => {
+    const workflow = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/source-validation.yml'),
+      'utf8'
+    );
+    expect(workflow).toMatch(/on:\s*\n\s+pull_request:/);
+    const step = workflow
+      .split('      - name: Verify onboarding recovery browser behavior\n')[1]
+      ?.split('      - name:')[0];
+    expect(
+      step,
+      'the active pull_request workflow must run the proof'
+    ).toBeTruthy();
+    const command = step.split('run: |\n')[1];
+    const stubs = `git() {
+      case "$1" in
+        rev-parse) printf '%s\\n' "$EXPECTED_HEAD" ;;
+        merge-base) printf 'base\\n' ;;
+        diff) printf '%s\\n' "$CHANGED_PATHS" ;;
+        *) return 1 ;;
+      esac
+    }
+    node() { printf '%s\\n' "$*"; }
+    `;
+    /** @type {[string, boolean][]} */
+    const cases = [
+      ['apps/web/components/features/onboarding/OnboardingShell.tsx', true],
+      [
+        'apps/web/components/features/onboarding/OnboardingShell.recovery.stories.tsx',
+        true,
+      ],
+      ['apps/web/components/features/onboarding/OnboardingChat.tsx', true],
+      ['apps/web/tests/e2e/storybook-onboarding-recovery.spec.ts', true],
+      ['apps/web/components/shell/Other.tsx', false],
+      ['apps/web/tests/e2e/storybook-onboarding-recovery.spec.ts.bak', false],
+    ];
+    for (const [path, selected] of cases) {
+      const result = spawnSync('bash', ['-c', stubs + command], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CHANGED_PATHS: path,
+          EXPECTED_HEAD: 'head',
+          BASE_BRANCH: 'main',
+        },
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(
+        result.stdout.includes(
+          'tests/e2e/storybook-onboarding-recovery.spec.ts'
+        ),
+        path
+      ).toBe(selected);
+      if (selected)
+        expect(result.stdout).toContain(
+          'guard-playwright-artifacts.mjs --run -- pnpm --filter @jovie/web exec playwright test'
+        );
+    }
+    const failure = spawnSync(
+      'bash',
+      ['-c', stubs + 'node() { return 37; }\n' + command],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CHANGED_PATHS:
+            'apps/web/components/features/onboarding/OnboardingShell.tsx',
+          EXPECTED_HEAD: 'head',
+          BASE_BRANCH: 'main',
+        },
+      }
+    );
+    expect(failure.status).toBe(37);
+  });
+
   it('selects the crawler state proof through the maintained Storybook browser path', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
