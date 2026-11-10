@@ -799,6 +799,12 @@
   color: var(--color-bg-paper);
 }
 
+/* JOV-3209: hide the consent card while a profile mobile flow is open. */
+html[data-profile-flow-open="true"] .cookie-banner-card {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 @media (hover: hover) {
   :where(.profile-aeo-claim-card__cta:hover) {
     background: color-mix(
@@ -1198,13 +1204,7 @@
     display: flex;
   }
 
-  /* JOV-11623: the desktop surface card is height-pinned
-     (min(940px, 100dvh - 48px)) but the frame is min-h-dvh; items-center
-     re-centered the pinned stage whenever a mode's content height changed
-     (the top chrome moved 52px between Events and Home — the
-     JOV-6571/6572 mode-history contract). Top-align the desktop stage like
-     the compact desktop canvas: optical vertical position stays constant
-     across mode switches. */
+  /* JOV-11623: top-align the desktop stage across mode switches. */
   .profile-viewport--desktop-surface:not(.profile-viewport--embedded)
   .public-profile-layout-frame--desktop {
     align-items: flex-start;
