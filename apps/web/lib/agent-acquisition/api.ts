@@ -55,7 +55,7 @@ const GOLDEN_PATH_DRAFT_TOOLS = [
     name: 'claim_handle' as const,
     title: 'Claim a handle',
     description:
-      'Check and reserve jov.ie/<handle> for the draft artist. Returns availability with numbered suggested alternatives when taken. High-reach artists are routed to the existing verification path. The reservation completes when the artist signs in through claim_url; nothing is public until they publish.',
+      'Check and reserve jov.ie/<username> for the draft artist. Returns availability with numbered suggested alternatives when taken. High-reach artists are routed to the existing verification path. The reservation completes when the artist signs in through claim_url; nothing is public until they publish.',
     inputSchema: z.toJSONSchema(claimHandleSchema),
     annotations: {
       title: 'Claim a handle',

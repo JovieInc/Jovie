@@ -2,10 +2,7 @@
   "schema": "jovie-domain-write-registry/v1",
   "doc": "One place per domain write. Direct DB writes to coreTables belong in a listed module (scripts/domain-write-guard.mjs). Every chat/MCP tool maps to a domain function, a read, a generator, or a named debt (apps/web/lib/domain/write-registry.test.ts). Rule: .claude/rules/domain-writes.md",
   "sideEffects": {
-    "socialLinks": [
-      "invalidateSocialLinksCache",
-      "invalidateProfileCache"
-    ]
+    "socialLinks": ["invalidateSocialLinksCache", "invalidateProfileCache"]
   },
   "sideEffectWaivers": {
     "apps/web/app/[username]/s/[platform]/route.ts": "click counter increment; no public-profile content changes",
@@ -37,11 +34,7 @@
         "upsertReleaseTrack",
         "purgeOrphanRecordings"
       ],
-      "tables": [
-        "discogReleases",
-        "discogTracks",
-        "discogRecordings"
-      ]
+      "tables": ["discogReleases", "discogTracks", "discogRecordings"]
     },
     {
       "id": "release.metadata",
@@ -51,20 +44,14 @@
         "updateOwnedReleaseMetadata",
         "updateOwnedReleaseGeneratedPitches"
       ],
-      "tables": [
-        "discogReleases"
-      ]
+      "tables": ["discogReleases"]
     },
     {
       "id": "release.create",
       "entity": "release",
       "module": "apps/web/lib/domain/releases.ts",
-      "exports": [
-        "createReleaseForProfile"
-      ],
-      "tables": [
-        "discogReleases"
-      ]
+      "exports": ["createReleaseForProfile"],
+      "tables": ["discogReleases"]
     },
     {
       "id": "profile.fields",
@@ -76,57 +63,35 @@
         "holdLeadBuiltProfileInTx",
         "publishProfile"
       ],
-      "tables": [
-        "creatorProfiles"
-      ]
+      "tables": ["creatorProfiles"]
     },
     {
       "id": "profile.edit",
       "entity": "profile",
       "module": "apps/web/lib/domain/profile.ts",
-      "exports": [
-        "applyProfileUpdate"
-      ],
-      "tables": [
-        "creatorProfiles"
-      ]
+      "exports": ["applyProfileUpdate"],
+      "tables": ["creatorProfiles"]
     },
     {
       "id": "profile.test-cleanup",
       "entity": "profile",
       "module": "apps/web/lib/services/profile/test-profile-unpublish.ts",
-      "exports": [
-        "buildUnpublishTestProfilesQuery"
-      ],
-      "tables": [
-        "creatorProfiles"
-      ]
+      "exports": ["buildUnpublishTestProfilesQuery"],
+      "tables": ["creatorProfiles"]
     },
     {
       "id": "social-links",
       "entity": "link",
       "module": "apps/web/lib/services/social-links/mutations.ts",
-      "exports": [
-        "createLink",
-        "updateLink",
-        "deleteLink",
-        "reorderLinks"
-      ],
-      "tables": [
-        "socialLinks"
-      ]
+      "exports": ["createLink", "updateLink", "deleteLink", "reorderLinks"],
+      "tables": ["socialLinks"]
     },
     {
       "id": "tour-dates",
       "entity": "tour date",
       "module": "apps/web/lib/events/insert.ts",
-      "exports": [
-        "insertEvent",
-        "bulkInsertSyncedEvents"
-      ],
-      "tables": [
-        "tourDates"
-      ]
+      "exports": ["insertEvent", "bulkInsertSyncedEvents"],
+      "tables": ["tourDates"]
     },
     {
       "id": "subscriptions",
@@ -138,10 +103,7 @@
         "unsubscribeFromNotificationsDomain",
         "updateNotificationPreferencesDomain"
       ],
-      "tables": [
-        "notificationSubscriptions",
-        "audienceMembers"
-      ]
+      "tables": ["notificationSubscriptions", "audienceMembers"]
     },
     {
       "id": "waitlist.admission",
@@ -152,58 +114,35 @@
         "disapproveWaitlistEntryInTx",
         "stampWaitlistAcquisitionId"
       ],
-      "tables": [
-        "waitlistEntries",
-        "creatorProfiles"
-      ]
+      "tables": ["waitlistEntries", "creatorProfiles"]
     },
     {
       "id": "waitlist.role-intake",
       "entity": "waitlist/role-intake",
       "module": "apps/web/lib/waitlist/role-entry.ts",
-      "exports": [
-        "joinWaitlistWithRole"
-      ],
-      "tables": [
-        "waitlistEntries"
-      ]
+      "exports": ["joinWaitlistWithRole"],
+      "tables": ["waitlistEntries"]
     },
     {
       "id": "waitlist.invite-funnel",
       "entity": "waitlist/invite-funnel",
       "module": "apps/web/lib/waitlist/invite-funnel.ts",
-      "exports": [
-        "recordInviteOpened",
-        "recordInviteRedeemed"
-      ],
-      "tables": [
-        "waitlistEntries"
-      ]
+      "exports": ["recordInviteOpened", "recordInviteRedeemed"],
+      "tables": ["waitlistEntries"]
     },
     {
       "id": "synthetic.admitted-canary",
       "entity": "admitted production canary fixture",
       "module": "apps/web/lib/synthetic/admitted-canary.server.ts",
-      "exports": [
-        "reconcileAdmittedCanary",
-        "verifyAdmittedCanaryOwnership"
-      ],
-      "tables": [
-        "creatorProfiles",
-        "userProfileClaims"
-      ]
+      "exports": ["reconcileAdmittedCanary", "verifyAdmittedCanaryOwnership"],
+      "tables": ["creatorProfiles", "userProfileClaims"]
     },
     {
       "id": "synthetic.canary-reset",
       "entity": "claim-walk canary reset (JOV-9826)",
       "module": "apps/web/lib/synthetic/canary-reset.server.ts",
-      "exports": [
-        "executeCanaryReset"
-      ],
-      "tables": [
-        "creatorProfiles",
-        "userProfileClaims"
-      ]
+      "exports": ["executeCanaryReset"],
+      "tables": ["creatorProfiles", "userProfileClaims"]
     },
     {
       "id": "claim.finalize",
@@ -213,32 +152,21 @@
         "reservePrebuiltProfileForUser",
         "claimPrebuiltProfileForUser"
       ],
-      "tables": [
-        "creatorProfiles",
-        "userProfileClaims"
-      ]
+      "tables": ["creatorProfiles", "userProfileClaims"]
     },
     {
       "id": "claim.legacy-verification",
       "entity": "claim",
       "module": "apps/web/lib/claim/legacy-verification.server.ts",
-      "exports": [
-        "runLegacyClaimVerificationSweep"
-      ],
-      "tables": [
-        "creatorProfiles"
-      ]
+      "exports": ["runLegacyClaimVerificationSweep"],
+      "tables": ["creatorProfiles"]
     },
     {
       "id": "billing.status",
       "entity": "subscription/payment",
       "module": "apps/web/lib/stripe/customer-sync/update-status.ts",
-      "exports": [
-        "updateUserBillingStatus"
-      ],
-      "tables": [
-        "users"
-      ]
+      "exports": ["updateUserBillingStatus"],
+      "tables": ["users"]
     },
     {
       "id": "merch.cards",
@@ -258,59 +186,43 @@
       "id": "tasks",
       "entity": "tasks",
       "module": "apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts",
-      "exports": [
-        "createTask"
-      ],
+      "exports": ["createTask"],
       "tables": []
     },
     {
       "id": "feedback.submit",
       "entity": "feedback",
       "module": "apps/web/lib/chat/submit-feedback.ts",
-      "exports": [
-        "submitChatFeedback"
-      ],
+      "exports": ["submitChatFeedback"],
       "tables": []
     },
     {
       "id": "agent.draft-claim",
       "entity": "agent draft claim",
       "module": "apps/web/lib/agent-acquisition/draft-claim.server.ts",
-      "exports": [
-        "claimAgentDraft"
-      ],
-      "tables": [
-        "creatorProfiles"
-      ]
+      "exports": ["claimAgentDraft"],
+      "tables": ["creatorProfiles"]
     },
     {
       "id": "agent.draft",
       "entity": "agent draft",
       "module": "apps/web/lib/agent-acquisition/draft-store.ts",
-      "exports": [
-        "createAgentDraft"
-      ],
+      "exports": ["createAgentDraft"],
       "tables": []
     },
     {
       "id": "youtube.thumbnail-review",
       "entity": "youtube",
       "module": "apps/web/lib/youtube-library/thumbnail-review.ts",
-      "exports": [
-        "registerThumbnailCandidateReview"
-      ],
+      "exports": ["registerThumbnailCandidateReview"],
       "tables": []
     },
     {
       "id": "leads.lead-claim-token",
       "entity": "lead claim token",
       "module": "apps/web/lib/leads/lead-claim-token.ts",
-      "exports": [
-        "persistLeadClaimToken"
-      ],
-      "tables": [
-        "creatorProfiles"
-      ]
+      "exports": ["persistLeadClaimToken"],
+      "tables": ["creatorProfiles"]
     }
   ],
   "agentTools": {
