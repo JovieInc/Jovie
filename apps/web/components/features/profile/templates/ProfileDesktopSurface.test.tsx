@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
@@ -1204,5 +1205,16 @@ describe('ProfileDesktopSurface', () => {
     expect(
       screen.queryByTestId('profile-desktop-payments-card')
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps its props interface exported for the lazy module loader (JOV-12207)', () => {
+    // apps/web/components/features/profile/templates/useDesktopSurfaceModule.ts
+    // types the lazily-loaded desktop surface against this module's own props
+    // interface; the export is the contract that keeps that loader typed.
+    const source = readFileSync(
+      new URL('./ProfileDesktopSurface.tsx', import.meta.url),
+      'utf8'
+    );
+    expect(source).toContain('export interface ProfileDesktopSurfaceProps');
   });
 });
