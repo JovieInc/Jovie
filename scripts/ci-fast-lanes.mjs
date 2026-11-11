@@ -1109,8 +1109,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
 ]);
 export const DEPRECATION_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/deprecation-clearance.mjs --test-coverage-include=scripts/lib/deprecation-observation.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/deprecation-clearance.test.mjs';
-// Keep the existing native Node suite discoverable for affected PR guards;
-// structural CI executes it once with measured coverage and a fixed floor.
+// Discoverable for affected PR guards; structural CI runs it once with coverage and a fixed floor.
 export const ASSURANCE_MATRIX_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/invariants/assurance-matrix.mjs --test-coverage-lines=90 --test-coverage-branches=55 --test-coverage-functions=100 scripts/invariants/assurance-matrix.test.mjs';
 export const PR_OPEN_COVERAGE_COMMAND =
