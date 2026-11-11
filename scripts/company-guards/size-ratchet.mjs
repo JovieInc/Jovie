@@ -113,7 +113,7 @@ function main(argv) {
     if (growth.length) process.exitCode = 1;
     return;
   }
-  throw new Error('usage: size-baseline.mjs --no-raise <base-ref> | --tighten');
+  throw new Error('usage: size-ratchet.mjs --no-raise <base-ref> | --tighten');
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url))

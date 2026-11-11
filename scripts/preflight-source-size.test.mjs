@@ -5,7 +5,7 @@ import {
   measure,
   parseRenames,
   raisedEntries,
-} from './company-guards/size-baseline.mjs';
+} from './company-guards/size-ratchet.mjs';
 import { companionChecklist } from './lib/preflight-changed.mjs';
 import { tightenBaseline } from './lib/shrink-only-baseline.mjs';
 
