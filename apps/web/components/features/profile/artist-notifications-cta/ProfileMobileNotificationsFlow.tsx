@@ -162,6 +162,16 @@ function formatCountdown(endTime: number) {
   return `Resend in ${remainingSeconds}s`;
 }
 
+// Shared by the live inline flow and its loading skeleton so the skeleton
+// reserves the email step's exact footprint.
+const INLINE_FLOW_ROOT_CLASS =
+  'relative flex h-full min-h-full flex-1 flex-col dark:text-white';
+const FLOW_BODY_BASE_CLASS =
+  'relative mx-auto flex w-full max-w-108 flex-col px-5';
+const FLOW_BODY_INSET_CLASS = 'h-full pb-8 pt-6';
+const FLOW_HEADER_CLASS = 'flex items-center justify-between pb-5';
+const FLOW_STEP_CLASS = 'flex min-h-0 flex-1 flex-col';
+
 function ScreenShell({
   title,
   body,
@@ -275,6 +285,54 @@ function SecondaryTextButton({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * Loading state for the inline flow. It lays out the email step with the
+ * same classes as the live flow, so swapping it for the form moves nothing
+ * below it (the old short skeleton pushed the profile footer down on phones).
+ */
+export function InlineNotificationsFlowSkeleton() {
+  return (
+    <output
+      className={INLINE_FLOW_ROOT_CLASS}
+      aria-busy='true'
+      data-testid='profile-mobile-notifications-flow-skeleton'
+    >
+      <span className='sr-only'>Loading subscription form</span>
+      <div
+        className={cn(FLOW_BODY_BASE_CLASS, FLOW_BODY_INSET_CLASS)}
+        aria-hidden='true'
+      >
+        <div className={FLOW_HEADER_CLASS}>
+          <span className='h-10 w-10' />
+          <span className='h-10 w-10' />
+        </div>
+        <div className={FLOW_STEP_CLASS}>
+          <ScreenShell
+            compact
+            title={'\u00a0'}
+            body={'\u00a0'}
+            footer={
+              <div className='space-y-2'>
+                <p className='invisible text-xs leading-4'>
+                  {CAPTURE_CONSENT_COPY.email} Privacy
+                </p>
+                <div className='h-11' />
+              </div>
+            }
+          >
+            <div className='space-y-3'>
+              <div className='rounded-(--profile-action-radius) border border-white/10 bg-white/[0.035] p-1'>
+                <div className='min-h-14 animate-pulse' />
+              </div>
+              <div className='h-11 w-full animate-pulse rounded-full bg-white/[0.08]' />
+            </div>
+          </ScreenShell>
+        </div>
+      </div>
+    </output>
   );
 }
 
@@ -530,7 +588,10 @@ export function ProfileMobileNotificationsFlow({
     };
   }, [onClose, open]);
 
-  if (!mounted || !open) {
+  // Only the portalled presentations need a mounted document. Inline renders
+  // in place, so gating it on mount would paint an empty frame between the
+  // loading skeleton and the form and shift everything below it.
+  if (!open || (!mounted && presentation !== 'inline')) {
     return null;
   }
 
@@ -899,14 +960,14 @@ export function ProfileMobileNotificationsFlow({
 
       <div
         className={cn(
-          'relative mx-auto flex w-full max-w-108 flex-col px-5',
+          FLOW_BODY_BASE_CLASS,
           presentation === 'overlay'
             ? 'h-full pb-[max(env(safe-area-inset-bottom),28px)] pt-[max(env(safe-area-inset-top),18px)]'
-            : 'h-full pb-8 pt-6',
+            : FLOW_BODY_INSET_CLASS,
           presentation === 'modal' && 'min-[1180px]:max-w-130'
         )}
       >
-        <header className='flex items-center justify-between pb-5'>
+        <header className={FLOW_HEADER_CLASS}>
           {showBackButton ? (
             <button
               type='button'
@@ -936,7 +997,7 @@ export function ProfileMobileNotificationsFlow({
 
         <div
           key={step}
-          className='flex min-h-0 flex-1 flex-col'
+          className={FLOW_STEP_CLASS}
           data-testid={`profile-mobile-notifications-step-${step}`}
         >
           {screen}
@@ -992,7 +1053,7 @@ export function ProfileMobileNotificationsFlow({
       // Inline: transparent so the sheet sits on the page's own surface,
       // with no rounded seam against a mismatched background token.
       <div
-        className='relative flex h-full min-h-full flex-1 flex-col dark:text-white'
+        className={INLINE_FLOW_ROOT_CLASS}
         data-testid='profile-mobile-notifications-flow'
         data-shell-variant='inline-full-height'
         style={contentStyle}
