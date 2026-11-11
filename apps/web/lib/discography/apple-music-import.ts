@@ -10,7 +10,7 @@
 
 import 'server-only';
 
-import { and, sql as drizzleSql, eq, gt, inArray, isNull } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, gt, inArray } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 import { createPublicReleasesTag } from '@/lib/cache/tags';
 import { type DbOrTransaction, db } from '@/lib/db';
@@ -35,6 +35,8 @@ import { upsertProviderLink, upsertRelease } from './queries';
 import { generateUniqueSlug } from './slug';
 
 const PROVIDER_ID = 'apple_music';
+/** Scan key when Apple fields exist but no artist id is bound. */
+const UNBOUND_ARTIST_ID = 'unbound';
 /** Cap per profile per run; the next weekly run picks up the rest. */
 const MAX_IMPORTS_PER_RUN = 25;
 const ALBUM_FETCH_LIMIT = 100;
@@ -51,6 +53,8 @@ export interface AppleImportResult {
 }
 
 async function loadLibrary(dbConn: DbOrTransaction, creatorProfileId: string) {
+  // Archived rows stay in the match set. Omitting them inserts a second,
+  // active copy of a release the artist already removed.
   const releases = await dbConn
     .select({
       id: discogReleases.id,
@@ -58,12 +62,7 @@ async function loadLibrary(dbConn: DbOrTransaction, creatorProfileId: string) {
       upc: discogReleases.upc,
     })
     .from(discogReleases)
-    .where(
-      and(
-        eq(discogReleases.creatorProfileId, creatorProfileId),
-        isNull(discogReleases.deletedAt)
-      )
-    );
+    .where(eq(discogReleases.creatorProfileId, creatorProfileId));
   if (releases.length === 0) return [];
 
   const links = await dbConn
@@ -149,17 +148,31 @@ async function recordRun(
   externalArtistId: string,
   result: AppleImportResult
 ) {
-  await db.insert(dspCatalogScans).values({
-    creatorProfileId,
-    providerId: PROVIDER_ID,
-    externalArtistId,
-    status: result.status === 'failed' ? 'failed' : 'completed',
-    albumsScanned: result.albumsScanned,
-    missingCount: result.imported.length,
-    error: result.error ?? null,
-    startedAt: new Date(),
-    completedAt: new Date(),
-  });
+  const settled =
+    result.status === 'imported' || result.status === 'up_to_date';
+  try {
+    await db.insert(dspCatalogScans).values({
+      creatorProfileId,
+      providerId: PROVIDER_ID,
+      externalArtistId,
+      // `failed` keeps a no-authority row out of catalog-evidence reads, which
+      // treat only `completed` scans as proof the profile has a catalog.
+      status: settled ? 'completed' : 'failed',
+      albumsScanned: result.albumsScanned,
+      missingCount: result.imported.length,
+      error:
+        result.status === 'no_authority'
+          ? 'no_authority'
+          : (result.error ?? null),
+      startedAt: new Date(),
+      completedAt: new Date(),
+    });
+  } catch (error) {
+    logger.warn('Apple Music import run not recorded', {
+      creatorProfileId,
+      error,
+    });
+  }
 }
 
 /** Add Apple Music releases the profile's Library is missing. */
@@ -171,7 +184,15 @@ export async function importMissingAppleMusicReleases(
   if (!isAppleMusicAvailable()) return { ...base, status: 'unavailable' };
 
   const artistId = await getBoundAppleMusicArtistId(dbConn, creatorProfileId);
-  if (!artistId) return { ...base, status: 'no_authority' };
+  if (!artistId) {
+    const result: AppleImportResult = { ...base, status: 'no_authority' };
+    // A profile with Apple fields but no bound artist must still leave a scan
+    // row. The weekly batch is a fixed 15, ordered by id, and skips only
+    // profiles scanned in the last week. Returning here without a row picks
+    // the same profiles forever and starves the rest.
+    await recordRun(creatorProfileId, UNBOUND_ARTIST_ID, result);
+    return result;
+  }
 
   let result: AppleImportResult;
   try {
@@ -209,12 +230,7 @@ export async function importMissingAppleMusicReleases(
     };
   }
 
-  await recordRun(creatorProfileId, artistId, result).catch(error =>
-    logger.warn('Apple Music import run not recorded', {
-      creatorProfileId,
-      error,
-    })
-  );
+  await recordRun(creatorProfileId, artistId, result);
   logger.info('Apple Music catalog completeness', {
     creatorProfileId,
     status: result.status,

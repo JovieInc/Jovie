@@ -180,8 +180,10 @@ def error_signature(text: str) -> str:
 
 
 def real_failures(pr: dict) -> list[dict]:
-    return [check for check in pr.get("statusCheckRollup") or []
-            if str(check.get("conclusion") or "").upper() in RED and str(check.get("name") or "").lower() not in AGGREGATE]
+    """Latest run per check. A superseded CANCELLED run is not a failure."""
+    import machine_gap
+    return [check for check in machine_gap.latest_checks(pr.get("statusCheckRollup"), AGGREGATE)
+            if str(check.get("conclusion") or "").upper() in RED]
 
 
 def fingerprint_key(cls: str, names: list[str], signature: str = "") -> str:

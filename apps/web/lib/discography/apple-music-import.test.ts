@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
   links: vi.fn(),
   due: vi.fn(),
   selectCalls: 0,
+  releaseWhere: undefined as unknown,
 }));
 
 vi.mock('server-only', () => ({}));
@@ -36,8 +37,9 @@ vi.mock('./slug', () => ({ generateUniqueSlug: h.slug }));
 // then their Apple provider links. The sweep adds orderBy().limit().
 const selectChain = () => ({
   from: () => ({
-    where: () => {
+    where: (clause: unknown) => {
       h.selectCalls += 1;
+      if (h.selectCalls === 1) h.releaseWhere = clause;
       const rows = h.selectCalls === 1 ? h.library() : h.links();
       return Object.assign(Promise.resolve(rows), {
         orderBy: () => ({ limit: async () => h.due() }),
@@ -57,6 +59,19 @@ import {
   importMissingAppleMusicReleases,
   sweepAppleMusicCatalogCompletenessForCron,
 } from './apple-music-import';
+
+function clauseText(value: unknown, seen = new Set<object>()): string {
+  if (typeof value === 'string') return value;
+  if (typeof value !== 'object' || value === null) return '';
+  if (seen.has(value)) return '';
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value.map(item => clauseText(item, seen)).join(' ');
+  }
+  const record = value as { name?: unknown; queryChunks?: unknown };
+  const name = typeof record.name === 'string' ? record.name : '';
+  return `${name} ${clauseText(record.queryChunks, seen)}`;
+}
 
 const profileId = '00000000-0000-4000-8000-000000000001';
 const appleAlbum = (id: string, name: string) => ({
@@ -154,13 +169,31 @@ describe('importMissingAppleMusicReleases', () => {
     );
   });
 
-  it('never fetches or writes without a bound Apple Music artist', async () => {
+  it('records no authority so the weekly batch can move on', async () => {
     h.bound.mockResolvedValue(null);
     const result = await importMissingAppleMusicReleases(profileId);
     expect(result.status).toBe('no_authority');
     expect(h.albums).not.toHaveBeenCalled();
     expect(h.upsertRelease).not.toHaveBeenCalled();
-    expect(h.insertValues).not.toHaveBeenCalled();
+    expect(h.insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        creatorProfileId: profileId,
+        providerId: 'apple_music',
+        externalArtistId: 'unbound',
+        status: 'failed',
+        error: 'no_authority',
+        albumsScanned: 0,
+      })
+    );
+  });
+
+  it('matches archived releases so a removed album is not imported again', async () => {
+    h.albums.mockResolvedValue([appleAlbum('9', 'Seaside Heights - Single')]);
+    await importMissingAppleMusicReleases(profileId);
+    const clause = clauseText(h.releaseWhere);
+    expect(clause).toMatch(/creator_profile_id/);
+    expect(clause).not.toMatch(/deleted_at|deletedAt/);
+    expect(h.upsertRelease).not.toHaveBeenCalled();
   });
 
   it('does nothing when Apple Music is unavailable', async () => {
