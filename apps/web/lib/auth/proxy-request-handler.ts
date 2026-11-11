@@ -18,7 +18,6 @@ import { buildFinalResponse } from '@/lib/auth/final-response';
 import { captureError } from '@/lib/error-tracking';
 import { resolveLegacyRootPathRedirect } from '@/lib/routing/legacy-root-path-redirects';
 import { resolveProfileModeAliasAtEdge } from '@/lib/routing/profile-alias-edge';
-import { resolveProfileModeQueryRewrite } from '@/lib/routing/profile-mode-query-rewrite';
 import {
   analyzeHost,
   categorizePath,
@@ -317,17 +316,6 @@ export async function handleProxyRequest(
       }
     }
 
-    // `/<username>?mode=<mode>` must render that mode on the server, also for
-    // profiles prerendered at build time (see resolveProfileModeQueryRewrite).
-    const passThrough = () => {
-      const profileModeRewrite = resolveProfileModeQueryRewrite(req);
-      return profileModeRewrite
-        ? NextResponse.rewrite(profileModeRewrite, {
-            request: { headers: requestHeaders },
-          })
-        : NextResponse.next({ request: { headers: requestHeaders } });
-    };
-
     // ========================================================================
     // Unauthenticated user handling (no getCookieCache call needed)
     // ========================================================================
@@ -368,7 +356,7 @@ export async function handleProxyRequest(
       // Unauthenticated user on public path — build response with CSP if needed
       return buildFinalResponse(
         req,
-        passThrough(),
+        NextResponse.next({ request: { headers: requestHeaders } }),
         pathInfo,
         startTime,
         null,
@@ -402,7 +390,7 @@ export async function handleProxyRequest(
     // redirects; proxy no longer does DB/Redis work).
     return buildFinalResponse(
       req,
-      passThrough(),
+      NextResponse.next({ request: { headers: requestHeaders } }),
       pathInfo,
       startTime,
       userId,
