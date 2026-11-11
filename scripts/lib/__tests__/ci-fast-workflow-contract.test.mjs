@@ -2508,7 +2508,9 @@ describe('ci-fast bounded parallel workflow', () => {
         new RegExp(`^readonly ${name}='[0-9a-f]{64}'$`, 'm')
       );
     }
-    expect(script.match(/sha256sum --check --status/g)?.length).toBe(2);
+    // download(), the vendored queue patch, and the extracted shellcheck binary.
+    expect(script).toContain('vendored queue patch sha256 mismatch');
+    expect(script.match(/sha256sum --check --status/g)?.length).toBe(3);
     expect(script).toContain('--fail');
     expect(script).toContain('-shellcheck="$tool_dir/shellcheck"');
     expect(script).toContain('-pyflakes="$tool_dir/pyflakes"');

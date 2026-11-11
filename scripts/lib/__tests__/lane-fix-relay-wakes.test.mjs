@@ -173,10 +173,15 @@ test('a green wake needs Source Validation; failures wake from every listed work
   assert.equal(workflow.jobs.relay.steps[0].run, 'sleep 20');
 });
 
-test('a CI success clears a settled lane-fix-red without sleeping', () => {
+test('a Source Validation success clears a settled lane-fix-red without sleeping', () => {
   const job = workflow.jobs['clear-settled-red'];
   assert.equal(job['timeout-minutes'], 3);
-  assert.match(job.if, /workflow_run\.name == 'CI'/);
+  // JOV-12220 / JOV-8492 follow-up (2026-11-10): the wake keys off the required-check
+  // producer's workflow ID, not its name. ci.yml ('CI') lost its pull_request trigger on
+  // 2026-09-29 (JOV-5940, #19436), so a workflow_run named 'CI' never completes on a PR
+  // event and the name-based wake was dead for six weeks while green heads sat labeled.
+  assert.doesNotMatch(job.if, /workflow_run\.name == 'CI'/);
+  assert.match(job.if, /workflow_run\.workflow_id == \d+/);
   assert.match(job.if, /conclusion == 'success'/);
   assert.equal(
     job.steps.some(step => /sleep/.test(step.run ?? '')),
@@ -191,6 +196,24 @@ test('a CI success clears a settled lane-fix-red without sleeping', () => {
   assert.equal(job['runs-on'], 'ubuntu-24.04');
   const mint = job.steps.find(step => step.id === 'read-token');
   assert.equal(mint['continue-on-error'], undefined);
+});
+
+test('the clear-settled-red wake keys off a workflow that can complete on a pull_request event', () => {
+  // The identity must belong to a workflow that still has a pull_request trigger.
+  // 'CI' (ci.yml) has been merge_group/push/workflow_dispatch only since JOV-5940
+  // (2026-09-29, #19436), which is exactly why the name-based wake could never fire.
+  const ci = load(
+    readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8')
+  );
+  assert.equal(ci.on['pull_request'], undefined);
+  assert.ok(ci.on['merge_group']);
+  const sourceValidation = load(
+    readFileSync(
+      resolve(root, '.github/workflows/source-validation.yml'),
+      'utf8'
+    )
+  );
+  assert.ok(sourceValidation.on['pull_request']);
 });
 
 test('a red check wakes the lane host immediately', () => {

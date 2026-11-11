@@ -65,6 +65,7 @@ import hyperagent_repair  # noqa: E402
 import migration_renumber  # noqa: E402  (no-model fix for migration number collisions)
 import fix_red_rewrite  # noqa: E402
 import fix_red_failure_routing  # noqa: E402
+import fix_red_biome  # noqa: E402  (no-model biome format / import-sort repair)
 import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
 import sourced_shell_conflict  # noqa: E402  (source-vs-inline shell conflict; ports retry into the helper)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
@@ -7145,6 +7146,12 @@ def strip_cache_exports_fix(host: Host, pr: dict, route: dict, worktree: Path, l
         "fix(ci): drop added legacy cache segment exports", "stripped-cache-exports", "strippedFiles")
 
 
+def biome_format_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """The no-model fix for a biome format or import-sort failure: rewrite the cited files."""
+    return fix_red_biome.format_commit_push(
+        sh, pr, worktree, log, receipt, route.get("files") or [])
+
+
 
 def claim_route(host: Host, pr: dict, action: str) -> bool:
     """True once per (PR, head, action): a deterministic route is tried once, then the model gets the head."""
@@ -8175,7 +8182,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                          fix_red_classes.SNAP_SPACING: snap_spacing_fix,
                          fix_red_classes.STRIP_CACHE: strip_cache_exports_fix,
                          fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix,
-                         fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix}.get((route or {}).get("action"))
+                         fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix,
+                         fix_red_classes.BIOME_FORMAT: biome_format_fix}.get((route or {}).get("action"))
                 agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
                 agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),

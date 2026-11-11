@@ -107,7 +107,7 @@ function installFixture(mode = 'success') {
     'shasum',
     `input=$(cat)
     printf '%s\\n' "$input" >> "$TEST_CHECKSUMS"
-    if [ "$TEST_MODE" = queue-checksum-failure ] && [[ "$input" == *actionlint-queue.patch ]]; then exit 1; fi`
+    if [ "$TEST_MODE" = queue-checksum-failure ] && [[ "$input" == *queue-*.patch ]]; then exit 1; fi`
   );
   executable(
     'patch',

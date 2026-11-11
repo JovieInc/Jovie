@@ -33,6 +33,14 @@ readonly SHELLCHECK_BINARY_SHA256='4da528ddb3a4d1b7b24a59d4e16eb2f5fd960f4bd9a37
 readonly PYFLAKES_VERSION='3.4.0'
 readonly PYFLAKES_WHEEL_SHA256='f742a7dbd0d9cb9ea41e9a24a918996e8170c799fa528688d40dd582c8265f4f'
 
+# The queue patch is vendored at .github/scripts/actionlint/ (fetched once from
+# api.github.com's v3.patch rendering, byte-identical to github.com's .patch endpoint):
+# github.com's web .patch endpoint 429s for minutes on the runners' shared egress IPs
+# (2026-11-10, run 42871254633: eight 429s in a row failed the step), so nothing is
+# fetched from github.com for it at run time. The checksum still pins the exact
+# upstream bytes.
+readonly VENDORED_QUEUE_PATCH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/actionlint/queue-${ACTIONLINT_QUEUE_COMMIT}.patch"
+
 fail() {
   echo "::error title=actionlint toolchain::$*" >&2
   exit 1
@@ -99,9 +107,9 @@ download \
   "$tool_dir/actionlint-source.tar.gz" "$ACTIONLINT_SOURCE_SHA256"
 mkdir "$tool_dir/actionlint-source"
 tar -xzf "$tool_dir/actionlint-source.tar.gz" -C "$tool_dir/actionlint-source" --strip-components=1
-download \
-  "https://github.com/rhysd/actionlint/commit/${ACTIONLINT_QUEUE_COMMIT}.patch" \
-  "$tool_dir/actionlint-queue.patch" "$ACTIONLINT_QUEUE_PATCH_SHA256"
+printf '%s  %s\n' "$ACTIONLINT_QUEUE_PATCH_SHA256" "$VENDORED_QUEUE_PATCH" |
+  sha256sum --check --status || fail 'vendored queue patch sha256 mismatch'
+cp "$VENDORED_QUEUE_PATCH" "$tool_dir/actionlint-queue.patch"
 command -v go >/dev/null || fail 'Go is required to build the source-pinned actionlint (see its verified go.mod)'
 (
   cd "$tool_dir/actionlint-source"

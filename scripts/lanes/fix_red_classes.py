@@ -31,6 +31,7 @@ import remediation
 from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, alias_owner_metadata,
                                      error_signature, fingerprint_key, owner_handoff_reason)
 from atomic_state import atomic_write_text
+from fix_red_biome import BIOME_FORMAT_TEXT, cited_paths
 from fix_red_source_edits import (  # noqa: F401
     snap_added_conservative_spacing, strip_added_legacy_cache_exports,
     resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict,
@@ -38,12 +39,12 @@ from fix_red_source_edits import (  # noqa: F401
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, BIOME_FORMAT, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent")
+    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "biome-format", "agent")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE, ALIAS_ACTION})
+    REGISTER_DOMAIN, ATOMIC_WRITE, ALIAS_ACTION, BIOME_FORMAT})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -96,12 +97,8 @@ SPACING_RATCHET_TEXT = re.compile(
 # raise the ceiling. Checked before platform text: the count can look like HTTP 5xx.
 CACHE_SURFACE_TEXT = re.compile(
     r"legacy Cache Components surface grew to \d+ \(maximum \d+\)")
-# Source Validation's merge probe. Deterministic unions:
-# - NARROWED vitest command in scripts/preflight-changed.mjs
-# - shell && chains (node --test or vitest paths, plus added prefixes)
-# - quoted list entries (both sides only add 'path', lines, or one NAME = ["a", "b", line)
-# - one-line comma-separated identifier lists (main order, then head-only tokens)
-# Any other hunk stays a model fix.
+# Source Validation's merge probe unions a NARROWED vitest command, shell && chains,
+# quoted list entries, and one-line identifier lists. Any other hunk stays a model fix.
 NARROWED_PREFLIGHT = "scripts/preflight-changed.mjs"
 NARROWED_CONFLICT = re.compile(
     r"This PR conflicts with \S+ in: scripts/preflight-changed\.mjs\s*\. "
@@ -132,7 +129,7 @@ _NARROWED_SIDE = re.compile(
     r"\A(?P<prefix>(?:[ \t]*command:\n)?)(?P<cindent>[ \t]*)'(?P<command>[^'\n]+)',\n"
     r"(?P<nindent>[ \t]*)note: '(?P<note>[^'\n]+)',\n?\Z")
 _QUOTED_LIST_ENTRY = re.compile(r"^[ \t]*'[^'\n]+',[ \t]*$")
-_IDENT_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9-]*")
+_IDENT_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
 _AND_CHAIN_LINE = re.compile(
     r"""^(?P<indent>[ \t]*)(?P<prefix>(?:"[^"\n]+"\s*:\s*)?)(?P<q>['"])(?P<command>[^'"\n]*&&[^'"\n]*)(?P=q)(?P<suffix>,?)\s*$""")
 # Plain workflow run scalars use the same union. Limit their alphabet so YAML
@@ -146,6 +143,7 @@ _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 SIGNATURES = (
     ("alias-review-deadline", ALIAS_REVIEW_FAILURE, ALIAS_ACTION),
     ("component-test-evidence", COMPONENT_TEST_TEXT, AGENT),
+    ("biome-format", BIOME_FORMAT_TEXT, BIOME_FORMAT),  # before platform text; fixtures echo it
     ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),
     # Before platform-infra: a Source Validation log can carry passing-test rate-limit lines beside the guard error that actually failed the job.
     ("domain-write", DOMAIN_WRITE, REGISTER_DOMAIN),
@@ -223,6 +221,8 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         files = sorted(set(files))
     elif cls == "domain-write":
         files = sorted(_domain_write_hits("\n".join(logs.get(name) or "" for name in names)))
+    elif cls == "biome-format":
+        files = cited_paths("\n".join(logs.get(name) or "" for name in names))
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
             "checks": names, "signature": signature, "files": files, **({"evidenceOwner": owner} if owner else {})}
 

@@ -207,16 +207,17 @@ jobs:
             -f "client_payload[pr]=$PR" -f "client_payload[sha]=$SHA"
           echo "swarm-remediate pr=$PR sha=$SHA first_failed=$WORKFLOW at=$(date -u +%FT%TZ)"
 
-  # CI can finish after Source Validation. That completion is the event that
-  # settles the rollup. This job does not sleep and does not run for the fast
-  # producers. A head with no lane-fix-red returns after one read.
+  # Source Validation (workflow 369845917) is the pull_request gate.
+  # ci.yml has no pull_request trigger, so a name == 'CI' wake never runs.
+  # This job does not sleep and does not run for the fast producers.
+  # A head with no lane-fix-red returns after one read.
   clear-settled-red:
     name: Clear lane-fix-red when CI succeeded
     if: >-
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.name == 'CI'
+      github.event.workflow_run.workflow_id == 369845917
     # A new job cannot float. The control-plane expression stays on the two
     # jobs already listed in the runner-pin allowlist.
     runs-on: ubuntu-24.04
