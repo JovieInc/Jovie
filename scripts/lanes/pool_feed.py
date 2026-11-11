@@ -14,7 +14,8 @@ were 'none-eligible' while work is waiting").
     routes; that order already carries cost, quota pressure and the use-or-lose pace discount)
       - a pool with a free new-issue seat left takes it; the seat is then spent for this pass
       - a pool whose free seats are spent hands the issue to the next pool
-      - a pool that went idle after it was offered this issue has declined it, and stays declined
+      - a pool whose claim scan came up empty (none-eligible) after it was offered this issue has
+        declined it, and stays declined
         while the issue waits (even after the offer moved on); next pool
     an issue no pool can seat waits for its chosen pool, as before
 
@@ -224,9 +225,18 @@ def _declined_by(row) -> list[str]:
     return [name for name in names if isinstance(name, str)] if isinstance(names, list) else []
 
 
+# Idle-exit reasons (lane_runner.record_idle_exit) from a claim scan that evaluated the backlog,
+# offered issues included, and took nothing. Exits before or instead of that scan (linear-rate-limited,
+# disk-unobservable, a budget gate, maintenance-only-idle, in-flight-unknown, routing preflight, overlap
+# inventory) say nothing about an offer, so they never decline one.
+DECLINING_EXITS = frozenset({"none-eligible"})
+
+
 def idle_exits(rows: dict) -> dict:
-    """{lane: last idle exit time} from the worker idle record (lane -> {at, ...})."""
-    return {lane: row.get("at") for lane, row in (rows or {}).items() if isinstance(row, dict)}
+    """{lane: last idle exit time} from the worker idle record (lane -> {at, reason}), counting only
+    exits whose scan saw the offers (DECLINING_EXITS)."""
+    return {lane: row.get("at") for lane, row in (rows or {}).items()
+            if isinstance(row, dict) and row.get("reason") in DECLINING_EXITS}
 
 
 def declined_offers(offers: dict, idle_at: dict) -> frozenset:

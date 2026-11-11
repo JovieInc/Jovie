@@ -147,3 +147,79 @@ export const AboveComposer: Story = {
   parameters: { layout: 'fullscreen' },
   render: () => <DockedSuggestions />,
 };
+
+/** Docked with nothing above the composer: only the reserved blank space. */
+export const EmptyDockedRegion: Story = {
+  args: {
+    stableDocked: true,
+    showDockedWelcome: false,
+    children: <StoryComposerDock />,
+  },
+};
+
+const LONG_SUGGESTION_CARDS = [
+  {
+    id: 'release-checklist',
+    signalType: 'other',
+    typeLabel: 'Suggestion',
+    title:
+      'Review the release checklist for the summer single before distribution locks the metadata',
+    why: 'Artwork, songwriter and producer credits, ISRC codes, pre-save links and the lyric sheet all still need a final pass before Friday.',
+    createdAt: '2026-01-15T12:00:00.000Z',
+    primaryActionLabel: 'Review',
+    status: 'pending',
+    category: 'suggestion',
+  },
+  {
+    id: 'tour-announce',
+    signalType: 'other',
+    typeLabel: 'Suggestion',
+    title:
+      'Announce the autumn tour dates to fans who opted into city alerts across every region',
+    why: 'Fans in twelve cities asked for alerts; drafting one announcement per region keeps each message local and relevant.',
+    createdAt: '2026-01-15T12:00:00.000Z',
+    primaryActionLabel: 'Draft',
+    status: 'pending',
+    category: 'suggestion',
+  },
+  {
+    id: 'bio-refresh',
+    signalType: 'other',
+    typeLabel: 'Suggestion',
+    title:
+      'Refresh the artist bio with the new label partnership and residency',
+    why: 'Your press kit mentions details the public profile does not yet show.',
+    createdAt: '2026-01-15T12:00:00.000Z',
+    primaryActionLabel: 'Update',
+    status: 'pending',
+    category: 'suggestion',
+  },
+] as const;
+
+/** Long suggestions scroll inside the region while the composer stays docked. */
+export const LongContentAboveComposer: Story = {
+  parameters: { layout: 'fullscreen' },
+  render: () => (
+    <div className='h-96'>
+      <ChatEmptyStateComposerRegion
+        stableDocked
+        above={
+          <ChatEmptyStateOpportunityCards
+            cards={[...LONG_SUGGESTION_CARDS]}
+            onSelect={fn()}
+          />
+        }
+      >
+        <StoryComposerDock />
+      </ChatEmptyStateComposerRegion>
+    </div>
+  ),
+};
+
+export const RtlCentered: Story = {
+  render: args => (
+    <div dir='rtl'>
+      <ChatEmptyStateComposerRegion {...args} />
+    </div>
+  ),
+};
