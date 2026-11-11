@@ -188,3 +188,12 @@ test('tracker signatures: the session replay call is approved by vendor id', () 
 test('tracker signatures: this repo has no unapproved company-catalog hit', () => {
   assert.deepEqual(scanRepo(), []);
 });
+
+test('tracker catalog pin matches the company-guards workflow pin', () => {
+  const workflow = readFileSync(
+    new URL('../../.github/workflows/company-guards.yml', import.meta.url),
+    'utf8'
+  );
+  const pin = workflow.match(/^# ci-ref: ([0-9a-f]{40})$/m)?.[1];
+  assert.equal(pin, catalog.pin);
+});

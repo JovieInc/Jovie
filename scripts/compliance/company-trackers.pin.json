@@ -1,6 +1,6 @@
 {
   "schema": "company-trackers/v1",
-  "pin": "91b8065847117e18102d440199f9511788ca6800",
+  "pin": "9891c0ec01d1a19bc441977f2fa58c24d2611e4e",
   "notes": "Mirror of JovieInc/ci canon/trackers.json at the company-guards pin. The company guard does not scan this JSON. tracker-signature-scan.mjs reads it.",
   "signatures": [
     {
