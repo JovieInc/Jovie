@@ -9,6 +9,23 @@ vi.mock('server-only', () => ({}));
 const mocks = vi.hoisted(() => ({
   createFeedbackItem: vi.fn(),
   captureError: vi.fn(),
+  existing: [] as Array<{ id: string }>,
+}));
+vi.mock('@/lib/db', () => {
+  const chain = {
+    from: () => chain,
+    where: () => chain,
+    limit: async () => mocks.existing,
+  };
+  return { db: { select: () => chain } };
+});
+vi.mock('@/lib/db/schema/feedback', () => ({
+  feedbackItems: {
+    id: 'id',
+    source: 'source',
+    fingerprint: 'fp',
+    context: 'ctx',
+  },
 }));
 vi.mock('@/lib/feedback', () => ({
   createFeedbackItem: mocks.createFeedbackItem,
@@ -20,6 +37,7 @@ vi.mock('@/lib/error-tracking', () => ({
 describe('captureOnboardingWant', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.existing = [];
     mocks.createFeedbackItem.mockResolvedValue({ id: 'feedback_1' });
     mocks.captureError.mockResolvedValue(undefined);
   });
@@ -42,6 +60,15 @@ describe('captureOnboardingWant', () => {
         matchedCapability: WANT_NOT_AVAILABLE,
       }),
     });
+  });
+
+  it('does not log a want this session already logged', async () => {
+    mocks.existing = [{ id: 'feedback_0' }];
+    await captureOnboardingWant('session-1', {
+      text: 'Sell paid fan memberships',
+      capability: WANT_NOT_AVAILABLE,
+    });
+    expect(mocks.createFeedbackItem).not.toHaveBeenCalled();
   });
 
   it('caps the stored want text', async () => {

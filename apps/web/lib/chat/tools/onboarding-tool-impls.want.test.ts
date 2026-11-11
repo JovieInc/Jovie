@@ -15,6 +15,14 @@ vi.mock('@/lib/feedback', () => ({
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mocks.captureError,
 }));
+vi.mock('@/lib/db', () => {
+  const chain = {
+    from: () => chain,
+    where: () => chain,
+    limit: async () => [],
+  };
+  return { db: { select: () => chain } };
+});
 vi.mock('@/lib/onboarding/catalog-preview.server', () => ({
   fetchOnboardingCatalogPreview: vi.fn().mockResolvedValue(null),
 }));
