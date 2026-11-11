@@ -311,6 +311,26 @@
       "partial": "FormError has one content field: a message renders the alert (Default) and no message renders nothing (NoMessage); id and className are wiring and styling, so nothing can be partially present.",
       "permission-denied": "FormError only shows a caller's validation message and has no gated action or permission input; the detector matched role='alert'."
     },
+    "apps/web/components/atoms/AnimatedIconSwap.tsx": {
+      "empty": "AnimatedIconSwap renders exactly one keyed icon and never a collection; the detector matched the items-center class.",
+      "long-content": "AnimatedIconSwap wraps one icon in a box its caller sizes and lays out no text; every caller passes a lucide glyph, so there is no content to overflow (the detector matched the children prop).",
+      "rtl-overflow": "AnimatedIconSwap lays out no text and has no start or end placement, only one centred icon, so writing direction changes nothing it renders."
+    },
+    "apps/web/components/atoms/RailToggleButton.tsx": {
+      "partial": "RailToggleButton draws one icon button from its required side, open state and labels; its optional props (pinned, previewTrigger, iconOverride, controlsId, shortcut, disabled, test ids) are behaviour and wiring flags with defaults, so no data can be partially present."
+    },
+    "apps/web/components/organisms/sidebar/context.tsx": {
+      "partial": "SidebarProvider holds no data: its optional props (defaultOpen, open, onOpenChange) choose uncontrolled or controlled open state, and Default and DefaultClosed show both starting states."
+    },
+    "apps/web/components/atoms/DspLogo.tsx": {
+      "partial": "DspLogo takes one required provider key and draws that platform's fixed glyph and name together; its optional props (className, height) are styling with defaults, so nothing can be partially present, and an unmapped provider renders nothing (UnmappedProvider)."
+    },
+    "apps/web/components/atoms/ReleaseArtworkThumb.tsx": {
+      "long-content": "ReleaseArtworkThumb paints no text: the release title is only the image alt and a screen-reader label on the fallback inside a fixed square, so a long title cannot overflow it."
+    },
+    "apps/web/components/molecules/drawer/EntityHeader.tsx": {
+      "permission-denied": "EntityHeader has no gated action or permission input; callers choose what goes in the actions slot, and the detector matched role='img' on the thumbnail and status glyph."
+    },
     "apps/web/components/features/profile/artist-notifications-cta/BirthdayInput.tsx": {
       "long-content": "BirthdayInput always renders exactly eight single-digit boxes (MM/DD/YYYY) under fixed Month, Day and Year labels; it takes no caller text, and useSegmentedInput strips non-digits and drops anything past the eighth digit, which BirthdayInput.test.tsx covers, so nothing can grow.",
       "offline": "BirthdayInput never fetches or submits; onSubmit is a callback fired on Enter and the notifications flow that owns it saves the birthday and reports connectivity. The detector matched onSubmit."
