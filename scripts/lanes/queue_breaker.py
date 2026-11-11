@@ -301,17 +301,11 @@ def _file_intake(run, event: dict):
 
 def main_poison(state: Path, run, runs: list[dict], now: float, repo: str, cache: dict, file_intake=None,
                 greens: dict | None = None) -> list[dict]:
-    """File one remediation intake per poisoning EPISODE so a fix lane repairs main (the base-branch class of
-    canon/MERGE_QUEUE_STEWARD.md invariant 4) instead of every lane waiting.
-
-    An episode is one run of a signal's failures: it starts when the signal first shows up and continues while each
-    newest failure lands within SHARED_WINDOW_S of the episode's last one. The intake fingerprint hashes the signal
-    AND the episode's first failure, so a recurrence after main was fixed (a gap longer than the window) files a fresh
-    intake and a fresh Linear issue; it never lands on the completed issue of the previous episode, which
-    ensure_linear_intake would otherwise reuse because its issue id is derived from the fingerprint. Within an episode
-    the intake is filed once, and again only if the signal is still failing a full SHARED_WINDOW_S after the last
-    filing (same fingerprint, so upsert_intake dedupes an open intake). State: POISON_FILE, keyed by a hash of the
-    signal; episodes idle for more than SHARED_WINDOW_S are dropped."""
+    """File one remediation intake per poisoning EPISODE so a fix lane repairs main (canon/MERGE_QUEUE_STEWARD.md
+    invariant 4, base-branch class). An episode lasts while each newest failure lands within SHARED_WINDOW_S of its
+    last one. The fingerprint (which ensure_linear_intake turns into the Linear issue id) hashes the signal and the
+    episode's first failure, so a recurrence after main was fixed gets a new issue, never the completed one. Within an
+    episode it is filed once, and again only if still failing a full window after the last filing."""
     signals = poison_signals(run, repo, runs, now, cache, greens)
     import hashlib
     try:
