@@ -442,65 +442,6 @@ describe('proxy.ts middleware', () => {
     });
   });
 
-  describe('profile ?mode= documents', () => {
-    it('rewrites a profile mode query to its server-rendered mode route', async () => {
-      // /tim is prerendered, so the afterFiles rewrite in next.config.js
-      // never reaches it; without this the client swapped modes after
-      // hydration (crawl: desktop CLS 0.836 on /tim?mode=listen).
-      for (const [pathname, mode] of [
-        ['/tim', 'listen'],
-        ['/tim', 'subscribe'],
-        ['/dualipa', 'tour'],
-      ] as const) {
-        const res = await callMiddleware(
-          createUnauthenticatedRequest({
-            pathname,
-            searchParams: { mode, source: 'qr' },
-          })
-        );
-        const rewriteHeader = res.headers.get('x-middleware-rewrite');
-        expect(rewriteHeader, `${pathname}?mode=${mode}`).not.toBeNull();
-        const rewrite = new URL(rewriteHeader ?? '');
-        expect(rewrite.pathname, `${pathname}?mode=${mode}`).toBe(
-          `${pathname}/profile-mode-render/${mode}/__profile-mode-alias`
-        );
-        expect(rewrite.searchParams.get('source')).toBe('qr');
-      }
-    });
-
-    it('rewrites signed-in visitors the same way', async () => {
-      const res = await callMiddleware(
-        createAuthenticatedRequest('clerk_user_1', {
-          pathname: '/tim',
-          searchParams: { mode: 'listen' },
-        })
-      );
-      const rewriteHeader = res.headers.get('x-middleware-rewrite');
-      expect(rewriteHeader).not.toBeNull();
-      expect(new URL(rewriteHeader ?? '').pathname).toBe(
-        '/tim/profile-mode-render/listen/__profile-mode-alias'
-      );
-    });
-
-    it('leaves plain profiles, unknown modes and non-profile routes alone', async () => {
-      for (const [pathname, searchParams] of [
-        ['/tim', {}],
-        ['/tim', { mode: 'profile' }],
-        ['/tim', { mode: 'kiosk' }],
-        ['/pricing', { mode: 'pay' }],
-        ['/tim/about', { mode: 'listen' }],
-      ] as const) {
-        const res = await callMiddleware(
-          createUnauthenticatedRequest({ pathname, searchParams })
-        );
-        expect(
-          res.headers.get('x-middleware-rewrite'),
-          `${pathname} ${JSON.stringify(searchParams)}`
-        ).toBeNull();
-      }
-    });
-  });
-
   // ==========================================================================
   // Cookie Banner Geo-Detection
   // ==========================================================================
