@@ -81,9 +81,13 @@ describe('teleprompter take routes', () => {
   });
 
   it('returns the auth error before touching storage', async () => {
-    const denied = NextResponse.json({}, { status: 401 });
-    mocks.requireAuth.mockResolvedValue({ userId: null, error: denied });
-    expect((await GET()).status).toBe(401);
+    mocks.requireAuth.mockImplementation(async () => ({
+      userId: null,
+      error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+    }));
+    const denied = await GET();
+    expect(denied.status).toBe(401);
+    expect(await denied.json()).toEqual({ error: 'Unauthorized' });
     expect((await DELETE(jsonRequest('DELETE', {}), params)).status).toBe(401);
     expect(mocks.listTeleprompterTakes).not.toHaveBeenCalled();
   });

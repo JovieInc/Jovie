@@ -2,8 +2,12 @@ import {
   type HandleUploadPresignedBody,
   handleUploadPresigned,
 } from '@vercel/blob/client';
-import { type NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth/require-auth';
+import { NextResponse } from 'next/server';
+import { defineRoute } from '@/lib/api/route-pipeline';
+import {
+  type SignedInRouteInput,
+  signedInAccess,
+} from '@/lib/api/signed-in-access';
 import { issueBlobPutUploadToken } from '@/lib/blob-presigned';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
@@ -16,30 +20,30 @@ import { TeleprompterTakeError } from '@/lib/teleprompter/takes/server';
 
 export const runtime = 'nodejs';
 
-export async function POST(request: NextRequest) {
-  const { userId, error } = await requireAuth();
-  if (error) return error;
-  try {
-    const body = (await request.json()) as HandleUploadPresignedBody;
-    const response = await handleUploadPresigned({
-      body,
-      request,
-      getSignedToken: async pathname => {
-        if (!isOwnedTakeVideoPath(userId, pathname)) {
-          throw new TeleprompterTakeError('invalid-take-path', 422);
-        }
-        return issueBlobPutUploadToken({
-          pathname,
-          allowedContentTypes: TELEPROMPTER_TAKE_ALLOWED_CONTENT_TYPES,
-          maximumSizeInBytes: TELEPROMPTER_TAKE_MAX_BYTES,
-        });
-      },
-    });
-    return NextResponse.json(response, { headers: NO_STORE_HEADERS });
-  } catch (error_) {
-    return teleprompterTakeErrorResponse(
-      error_,
-      '/api/teleprompter/takes/upload-token'
-    );
+const ROUTE = '/api/teleprompter/takes/upload-token';
+
+export const POST = defineRoute(
+  { route: ROUTE, access: signedInAccess() },
+  async ({ auth, request }: SignedInRouteInput) => {
+    try {
+      const body = (await request.json()) as HandleUploadPresignedBody;
+      const response = await handleUploadPresigned({
+        body,
+        request,
+        getSignedToken: async pathname => {
+          if (!isOwnedTakeVideoPath(auth.userId, pathname)) {
+            throw new TeleprompterTakeError('invalid-take-path', 422);
+          }
+          return issueBlobPutUploadToken({
+            pathname,
+            allowedContentTypes: TELEPROMPTER_TAKE_ALLOWED_CONTENT_TYPES,
+            maximumSizeInBytes: TELEPROMPTER_TAKE_MAX_BYTES,
+          });
+        },
+      });
+      return NextResponse.json(response, { headers: NO_STORE_HEADERS });
+    } catch (error) {
+      return teleprompterTakeErrorResponse(error, ROUTE);
+    }
   }
-}
+);
