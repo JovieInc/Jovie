@@ -344,7 +344,6 @@ test.describe('canonical /start onboarding chat', () => {
     await expect(page.locator(CHAT_PANEL)).toBeVisible();
     expect(navigations.length).toBeLessThanOrEqual(3);
 
-    // One flow: signed-out /waitlist hands off to the /start chat.
     await page.goto('/waitlist', { waitUntil: 'domcontentloaded' });
     await expect(page).toHaveURL(/\/start(?:\?|$)/);
     await expect(page.locator(CHAT_PANEL)).toBeVisible();
