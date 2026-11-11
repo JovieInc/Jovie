@@ -14,8 +14,16 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(search.value),
 }));
 vi.mock('../dashboard/releases/ReleaseCatalogPageClient', () => ({
-  ReleaseCatalogPageClient: ({ view }: { readonly view: string }) => (
-    <div data-catalog-view={view}>Catalog panel</div>
+  ReleaseCatalogPageClient: ({
+    view,
+    teleprompterTakes = [],
+  }: {
+    readonly view: string;
+    readonly teleprompterTakes?: readonly unknown[];
+  }) => (
+    <div data-catalog-view={view} data-take-count={teleprompterTakes.length}>
+      Catalog panel
+    </div>
   ),
 }));
 vi.mock('./CreatorDocumentsWorkspace', () => ({
@@ -55,6 +63,32 @@ describe('LibraryPageClient stages', () => {
     expect(screen.queryByRole('button', { name: 'Artist Rules' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Import YouTube' })).toBeNull();
     expect(screen.getByRole('tabpanel')).toHaveTextContent('Catalog panel');
+  });
+
+  it('hands private studio takes to the Work catalog', () => {
+    const take = {
+      takeId: 'take_1',
+      takeNumber: 1,
+      title: 'Intro',
+      kind: 'promo' as const,
+      source: 'script' as const,
+      durationMs: 1000,
+      kept: false,
+      createdAt: '2026-11-08T00:00:00.000Z',
+      mediaUrl: '/api/teleprompter/takes/take_1/media',
+    };
+    render(
+      <LibraryPageClient
+        creatorProfileId='profile-1'
+        merchCards={[]}
+        teleprompterTakes={[take]}
+      />
+    );
+
+    expect(screen.getByText('Catalog panel')).toHaveAttribute(
+      'data-take-count',
+      '1'
+    );
   });
 
   it('opens the releases matrix for the /app/releases library alias', () => {

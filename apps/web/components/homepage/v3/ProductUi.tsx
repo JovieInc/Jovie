@@ -3,7 +3,6 @@ import {
   Bell,
   Building2,
   Calendar,
-  CircleCheck,
   Clock,
   Ellipsis,
   House,
@@ -222,10 +221,7 @@ export function ReleaseInspector({
         <Cover src={release.src} size={56} eager={eager} />
         <div>
           <b>{release.title}</b>
-          <span>
-            {release.artist}
-            <CircleCheck className='hv3-ui-i hv3-insp__ok' />
-          </span>
+          <span>{release.artist}</span>
         </div>
         <Ellipsis className='hv3-ui-i hv3-insp__more' />
       </div>
@@ -319,10 +315,7 @@ export function CatalogPlate() {
           <ReleaseTitle release={release} />
           <RowServices />
           {release.selected ? (
-            <>
-              <Anchor id='rowR' className='hv3-anchor--row-end' />
-              <Anchor id='row' className='hv3-anchor--row-start' />
-            </>
+            <Anchor id='rowR' className='hv3-anchor--row-end' />
           ) : null}
         </div>
       ))}

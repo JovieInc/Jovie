@@ -33,6 +33,20 @@ export const ChatAmbientGradient: Story = {
   args: { chatAmbientGradient: true, containerClassName: 'h-dvh' },
 };
 
+/** Suspense placeholder: the frame paints without the live landmark id or
+ * frame attribute while the signed-in shell resolves. */
+export const LoadingPlaceholder: Story = {
+  args: {
+    placeholder: true,
+    header: <header className='px-3 py-2'>Loading workspace</header>,
+    main: (
+      <div className='p-3' aria-busy='true'>
+        Loading chat
+      </div>
+    ),
+  },
+};
+
 export const WithInspector: Story = {
   args: {
     rightPanel: <aside className='h-full w-80 p-3'>Entity details</aside>,

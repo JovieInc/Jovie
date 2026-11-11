@@ -271,12 +271,6 @@ export function HomepageReleasesChapter({
             <ReleasePage />
           </div>
         </div>
-        <Callout
-          anchor='row'
-          side='left'
-          label={media.rowCallout}
-          className='hv3-callout--row'
-        />
         <svg
           aria-hidden
           className='hv3-connector'

@@ -31,6 +31,7 @@ const CATEGORIES = [
   { value: 'commercial', label: 'Sponsors And Brands' },
   { value: 'safety', label: 'Safety' },
   { value: 'workflow', label: 'Workflow' },
+  { value: 'people', label: 'People Not To Feature' },
 ] as const;
 
 function ruleStatusLabel(rule: ArtistRuleView): string {
@@ -212,12 +213,20 @@ export function ArtistRulesSheet({
                 </Select>
               </div>
               <div className='space-y-1 text-xs text-secondary-token'>
-                <label htmlFor='artist-rule-key'>Rule label</label>
+                <label htmlFor='artist-rule-key'>
+                  {category === 'people'
+                    ? 'Name and other names'
+                    : 'Rule label'}
+                </label>
                 <Input
                   id='artist-rule-key'
                   value={ruleKey}
                   onChange={event => setRuleKey(event.target.value)}
-                  placeholder='Palette, casing, sponsors'
+                  placeholder={
+                    category === 'people'
+                      ? 'Name, nickname, handle'
+                      : 'Palette, casing, sponsors'
+                  }
                   maxLength={80}
                   required
                   className='h-9'
