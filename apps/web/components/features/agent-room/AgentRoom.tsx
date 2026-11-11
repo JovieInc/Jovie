@@ -184,7 +184,9 @@ export function AgentRoom({
         className='min-w-0'
       >
         <div className='flex items-center justify-between gap-2 px-3 pt-3'>
-          <h2 className='text-2xs font-semibold text-balance text-tertiary-token'>Agents</h2>
+          <h2 className='text-2xs font-semibold text-balance text-tertiary-token'>
+            Agents
+          </h2>
           <p className='text-2xs tabular-nums text-tertiary-token'>
             {view.counts.active} active
             {view.counts.blocked > 0 ? ` · ${view.counts.blocked} blocked` : ''}

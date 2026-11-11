@@ -725,6 +725,13 @@
       "to": "holdout",
       "at": "2026-10-29T18:00:00Z",
       "evidence": "Proof-stat methodology page generated from the stat registry; source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/app/(shell)/admin/room/page.tsx",
+      "from": null,
+      "to": "migrating",
+      "at": "2026-11-11T22:50:00Z",
+      "evidence": "Ovie fleet room page behind OVIE_FLEET_ROOM joins the admin group; source registration only, not rendered certification."
     }
   ]
 }
