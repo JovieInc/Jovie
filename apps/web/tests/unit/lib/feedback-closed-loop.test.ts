@@ -22,10 +22,11 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-// The customer-voice handoff runs detached after capture and queries the db
-// on its own; left live, it can land in a later test's select assertions.
-vi.mock('@/lib/customer-voice/after-response', () => ({
-  runAfterResponse: vi.fn(),
+// The customer-voice handoff runs after the response (fire and forget). Left
+// real, a handoff from one test can reach the shared db mock during the next
+// test and race its assertions; this suite covers routing, not customer voice.
+vi.mock('@/lib/customer-voice/capture.server', () => ({
+  captureCustomerVoice: vi.fn().mockResolvedValue(null),
 }));
 
 const ctx = {

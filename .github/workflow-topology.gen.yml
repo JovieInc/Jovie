@@ -737,8 +737,8 @@ nodes:
     triggeringStateTransition:
       - push
       - workflow_dispatch
-    terminalReceipt: job:health
-    jobCount: 1
+    terminalReceipt: job:structural
+    jobCount: 2
   - name: Main Red Eject
     path: .github/workflows/main-red-eject.yml
     active: true
