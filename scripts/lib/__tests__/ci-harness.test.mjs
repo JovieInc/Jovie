@@ -200,8 +200,7 @@ describe('ci-harness manifest', () => {
       'PR Size Guard',
       'Company guards',
     ]);
-    // Individual harness merge-gate job names must stay in the forbidden pin list so
-    // a batch failure bisects. ci-fast (JOV-3464) is real but never pinned alone.
+    // Keep individual jobs unpinned so batch failures bisect (JOV-3464).
     for (const name of EXPECTED_MERGE_GATE_NAMES) {
       if (REQUIRED_MERGE_STATUSES.includes(name)) continue;
       expect(
@@ -288,8 +287,7 @@ describe('ci-harness manifest', () => {
       expect(controller).toContain("github.event_name == 'workflow_dispatch'");
       expect(controller).not.toContain("github.event_name == 'pull_request'");
     }
-    // JOV-6002: dashboard/onboarding Lighthouse are merge-group launch gates
-    // keyed on the launch-gate path flag, never source-PR events.
+    // JOV-6002: launch-gate paths select merge-group-only Lighthouse checks.
     for (const jobId of [
       'ci-lighthouse-dashboard-pr',
       'ci-lighthouse-onboarding-pr',
@@ -381,8 +379,7 @@ describe('ci-harness manifest', () => {
       'name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}'
     );
 
-    // The matrix cap changes process-level fan-out only; full-suite Playwright
-    // workers and the smoke override remain unchanged.
+    // Matrix fan-out preserves Playwright workers and the smoke override.
     expect(playwrightConfig).toContain('return isSmokeOnly ? 8 : 4;');
     expect(playwrightConfig).toContain('workers: getWorkers(),');
   });

@@ -230,8 +230,6 @@ const BLOBLESS_BASE_FETCH_JOBS = new Set([
   'ci-fast-remaining',
 ]);
 
-// Jobs whose full base fetch runs in the background during dependency
-// install; "Fetch base-branch history" then awaits it before any consumer.
 const BACKGROUND_BASE_FETCH_JOBS = new Set(['ci-fast-remaining']);
 
 describe('merge_group workflow contract', () => {
@@ -4522,8 +4520,7 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
   });
 });
 
-// Each case builds a 40+ commit fixture repo with real git subprocesses;
-// the default 5s timeout flaked under load and ejected merge-queue groups.
+// Real 40+ commit fixtures need more than 5s under load.
 describe('Storybook Surface Matrix shallow diff-base history', {
   timeout: 30_000,
 }, () => {

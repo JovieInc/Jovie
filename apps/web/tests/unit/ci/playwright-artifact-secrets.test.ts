@@ -131,10 +131,7 @@ const producerStageRequired = [
   'synthetic-monitoring.yml:synthetic-test',
   'visual-regression.yml:visual-regression',
 ];
-// Image and Markdown evidence widen what an artifact may carry; each job
-// that opts in is reviewed here.
-// An expression-valued flag can evaluate true, so anything but an explicit
-// false counts as an allowance.
+// Reviewed image/Markdown allowances; any flag except explicit false can opt in.
 const allowanceEnabled = (value: unknown) =>
   value !== undefined &&
   value !== false &&
