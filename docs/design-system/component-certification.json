@@ -278,6 +278,44 @@
     "apps/web/components/features/dashboard/dashboard-nav/InboxAttentionLink.tsx": {
       "offline": "InboxAttentionLink never fetches or mutates; it renders the pending count its owner passes, and with no connection that count stays unloaded, which the Partial story shows.",
       "permission-denied": "InboxAttentionLink links to the signed-in Inbox that every account can open and has no gated action; a viewer who cannot reach the dashboard never sees the app rail."
+    },
+    "packages/ui/atoms/common-dropdown-item-renderers.tsx": {
+      "empty": "The renderers draw one menu row per caller item and never decide what an empty menu shows; CommonDropdown owns that message (its EmptyState story). The detector matched the .map( over an action row's or radio group's own items.",
+      "offline": "The renderers never fetch or submit; a row only shows loading when its owner sets the loading flag (LoadingRows), so lost connectivity reaches them only as caller state."
+    },
+    "apps/web/components/atoms/Icon.tsx": {
+      "empty": "Icon renders one named glyph and takes no collection; the detector matched the .map( over name segments in resolveIconName. An unknown name renders nothing, which Icon.test.tsx covers.",
+      "partial": "Icon's only data input is name; ariaLabel, ariaHidden, size and className are accessibility and presentation options with defaults, so a glyph is either drawn whole or not at all.",
+      "long-content": "Icon lays out no text; its only other string input, ariaLabel, is announced rather than rendered, so there is no content to overflow.",
+      "permission-denied": "Icon has no gated action or permission input; the detector matched role='img' on a labelled glyph."
+    },
+    "apps/web/components/atoms/ArtworkFrame.tsx": {
+      "long-content": "ArtworkFrame renders no text of its own: children is one square media slot clipped by overflow-hidden at the size the caller sets, so its content cannot grow; the detector matched the children prop."
+    },
+    "apps/web/components/molecules/Avatar/Avatar.tsx": {
+      "loading": "While the image loads, Avatar shows an aria-hidden shimmer over the still-transparent image in the same frame; a static story cannot hold an image request in flight, so Avatar.test.tsx covers the shimmer-to-image swap.",
+      "offline": "Avatar never fetches or mutates; lost connectivity reaches it only as an image that fails to load, which the ErrorState story shows.",
+      "permission-denied": "Avatar only renders an identity image or initials and has no gated action or permission input; the detector matched role='img' on the named avatar frame."
+    },
+    "apps/web/components/atoms/AppIconButton.tsx": {
+      "empty": "AppIconButton wraps one icon child and takes no collection; the detector matched the items-center class in APP_CONTROL_BUTTON_CLASS.",
+      "partial": "Its required accessible label is its only data; the optional tooltip label and shortcut are presentation, and a tooltip label without a shortcut is the existing WithTooltip story, so nothing can be partially present.",
+      "long-content": "The control is a fixed 28px or 32px icon square; its label is announced through aria-label rather than rendered, and tooltip text layout belongs to TooltipShortcut, so no content can overflow the button.",
+      "rtl-overflow": "The control is a symmetric icon square with no text or inline-direction classes and its tooltip opens below it, so it renders the same under dir='rtl'; mirroring a directional glyph is the caller's choice of child icon."
+    },
+    "apps/web/components/atoms/ImageWithFallback.tsx": {
+      "partial": "ImageWithFallback renders exactly one image or one placeholder: a source is present, absent (EmptySource) or broken (ErrorBrokenSource); its other optional props are styling and an error callback, so nothing can be partially present.",
+      "long-content": "It lays out no text; alt is the accessible name of the image or placeholder rather than rendered copy, so there is no content to overflow.",
+      "permission-denied": "It only draws an image or a placeholder glyph and has no gated action or permission input; the detector matched role='img' on the labelled placeholder.",
+      "rtl-overflow": "It renders no text and uses no inline-direction classes: the placeholder glyph is centered with flex inside a full-size or inset-0 box, so dir='rtl' renders it the same."
+    },
+    "apps/web/components/features/auth/AuthShell.tsx": {
+      "empty": "Providers come from the hardcoded allowlist in lib/auth/oauth-providers.ts (Google and Apple always on), so the zero-provider email-only branch is a fail-safe no real render reaches and a story cannot reach without mocking that module; AuthShell.test.tsx covers it by mocking the allowlist.",
+      "permission-denied": "AuthShell has no permission input or gated action; the detector matched the offer plan. A provider that denies consent returns to the page with ?error=, which SignInOauthErrorBanner on the sign-in page classifies outside this shell."
+    },
+    "apps/web/components/features/auth/atoms/FormError.tsx": {
+      "partial": "FormError has one content field: a message renders the alert (Default) and no message renders nothing (NoMessage); id and className are wiring and styling, so nothing can be partially present.",
+      "permission-denied": "FormError only shows a caller's validation message and has no gated action or permission input; the detector matched role='alert'."
     }
   }
 }

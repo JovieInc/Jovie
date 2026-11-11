@@ -15,7 +15,14 @@ export const dynamic = 'force-dynamic';
 
 const createSchema = z.object({
   creatorProfileId: z.string().uuid(),
-  category: z.enum(['visual', 'voice', 'commercial', 'safety', 'workflow']),
+  category: z.enum([
+    'visual',
+    'voice',
+    'commercial',
+    'safety',
+    'workflow',
+    'people',
+  ]),
   ruleKey: z.string().trim().min(1).max(80),
   instruction: z.string().trim().min(1).max(500),
   strength: z.enum(['hard_constraint', 'preference']),

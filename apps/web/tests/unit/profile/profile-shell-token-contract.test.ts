@@ -102,7 +102,8 @@ describe('profile shell token contract', () => {
       /@media \(min-width: 1180px\) \{([\s\S]*?)\n\}/
     )?.[1];
 
-    // With NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE off (the default) the
+    // With NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE opted out ('0', the
+    // non-shipped presentation) the
     // viewport has no --desktop-surface class, so nothing at 1180px+ hides the
     // compact surface or widens the frame: the compact shell keeps its base
     // phone-column width token, centered like the md card.

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, type Page, type TestInfo } from '@playwright/test';
+import { inspectImageContrast } from '../e2e/utils/image-contrast-detector';
 import {
   inspectRouteDom,
   MARKETING_TASTE_FINDING_KINDS,
@@ -160,5 +161,78 @@ export const busyImg = svg(
       `<rect x="${(i % 8) * 75}" y="${Math.floor(i / 8) * 80}" width="60" height="60" fill="hsl(${i * 9} 60% ${20 + (i % 5) * 12}%)"/>`
   ).join('')
 );
+/** Outcome-detector finding kinds for a marketing fixture. */
+const markupKindsAsIs = async (page: Page) =>
+  (await inspectRouteDom(page, { surface: 'marketing' })).findings.map(
+    finding => finding.kind
+  );
+export const markupKinds = async (page: Page, html: string) => {
+  await page.setContent(html);
+  return markupKindsAsIs(page);
+};
+/**
+ * A busy image that lands 1.5s after domcontentloaded, as a receipt sees a
+ * priority hero from a cold image optimizer. Blank-media must wait for it.
+ */
+export const slowImageBlankMedia = async (page: Page) => {
+  const url = 'https://blank-media.fixture.test/slow-hero.svg';
+  await page.route(url, async route => {
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    await route.fulfill({
+      contentType: 'image/svg+xml',
+      body: decodeURIComponent(busyImg.slice(busyImg.indexOf(',') + 1)),
+    });
+  });
+  await page.setContent(
+    `<main><section data-pen-section="hero" style="background:#0b0b0d"><h1>Product</h1><img src="${url}" width="600" height="400" alt="Dashboard"></section></main>`,
+    { waitUntil: 'domcontentloaded' }
+  );
+  // The receipt's race: the image is still in flight when inspection starts.
+  expect(
+    await page.evaluate(() => document.querySelector('img')?.complete)
+  ).toBe(false);
+  return markupKindsAsIs(page);
+};
+// JOV-7710 / AM-017: one semantic level reads as one material.
+export const plane = (inner: string) =>
+  `<main id="main-content" style="width:1000px;height:600px;background:rgb(16,17,20)">${inner}</main>`;
 export const axisSection = (align: string, attrs = '') =>
   `<section ${attrs} style="text-align:${align}"><h2>Heading ${align}</h2><p>A lede that is long enough to count as copy.</p></section>`;
+
+// Exercise the production capture path with real browser pixels and sibling boxes.
+export async function expectAtomicContrastCapture(page: Page): Promise<void> {
+  await page.setContent(
+    '<main><div style="position:fixed;inset:0;background-image:linear-gradient(#050505,#050505)"></div>' +
+      '<a style="position:relative;display:flex;align-items:center;gap:16px;width:300px;height:80px;color:white;text-decoration:underline;text-decoration-thickness:12px">' +
+      '<span data-testid="credit" style="font:24px monospace">Made with</span>' +
+      '<svg width="80" height="60"><rect width="80" height="60" fill="white" /></svg>' +
+      '<span data-testid="brand" style="font:32px monospace">Jovie</span></a></main>'
+  );
+  const expectedBoxes = await Promise.all(
+    ['credit', 'brand'].map(id => page.getByTestId(id).boundingBox())
+  );
+  const capture = page.screenshot.bind(page);
+  let captureCount = 0;
+  page.screenshot = async options => {
+    expect(options?.style).toContain('text-decoration: none !important');
+    captureCount++;
+    return capture(options);
+  };
+
+  const snapshot = await inspectImageContrast(page);
+  expect(captureCount).toBe(1);
+  expect(snapshot.findings).toEqual([]);
+  for (const [index, text] of ['Made with', 'Jovie'].entries()) {
+    const receipt = snapshot.receipts.find(item => item.text === text);
+    expect(receipt).toBeDefined();
+    expect(receipt?.box.width).toBeCloseTo(
+      expectedBoxes[index]?.width ?? -1,
+      1
+    );
+    expect(receipt?.backgroundLuminance.p90).toBeLessThan(0.01);
+  }
+  await expect(page.getByTestId('credit')).toHaveCSS(
+    'color',
+    'rgb(255, 255, 255)'
+  );
+}

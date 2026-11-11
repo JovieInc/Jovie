@@ -89,25 +89,20 @@ export const summerCardInputSchema = z
      * Risk and confidence (`jovie.ship-policy/v1`). Declared together and
      * with no `decideBy`/`defaultDecision`, they set the card's deadline and
      * default instead: most things ship, outbound and spend never do on
-     * silence.
+     * silence. Left absent (not null) when undeclared, so cards parsed
+     * before these fields existed compare equal on replay.
      */
-    risk: z
-      .enum(SHIP_RISKS)
-      .optional()
-      .transform(value => value ?? null),
-    confidence: z
-      .enum(SHIP_CONFIDENCES)
-      .optional()
-      .transform(value => value ?? null),
+    risk: z.enum(SHIP_RISKS).optional(),
+    confidence: z.enum(SHIP_CONFIDENCES).optional(),
   })
   .strict()
-  .refine(card => (card.risk === null) === (card.confidence === null), {
+  .refine(card => (card.risk == null) === (card.confidence == null), {
     path: ['confidence'],
     message: 'risk and confidence are declared together',
   })
   .refine(
     card =>
-      card.risk === null ||
+      card.risk == null ||
       (card.decideBy === null &&
         card.defaultDecision === null &&
         card.defaultIfSilent === null),

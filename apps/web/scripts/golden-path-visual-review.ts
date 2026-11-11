@@ -19,6 +19,10 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
+import {
+  reviewKeyframeTraced,
+  type TrackedModelReview,
+} from './golden-path-review-routing.ts';
 
 export const RUBRIC_VERSION = 'golden-path-user-blocking/v3';
 /** Public catalog artist claimed by the golden-path journey. */
@@ -277,44 +281,47 @@ export async function reviewWithModel(input: {
   }
 }
 
-/**
- * Reviewer A with provider failover: Workers AI first (Cloudflare credits),
- * the Gateway when Workers AI is unconfigured or answers `unknown` (out of
- * credit, rate limited, outage, off-contract). A Gateway out of credit is
- * already `unknown`, so neither provider's balance can silence the review.
- */
-export async function reviewWithFailover(
-  frame: {
-    readonly png: Buffer;
-    readonly stepId: string;
-    readonly path: string;
-    readonly expectedArtistName?: string;
-    readonly fetchImpl?: typeof fetch;
-  },
-  keys: {
-    readonly gatewayKey: string | undefined;
-    readonly gatewayBaseUrl: string;
-    readonly workersAiToken: string | undefined;
-  }
-): Promise<ModelVerdict> {
-  if (keys.workersAiToken) {
-    const viaWorkers = await reviewWithModel({
-      ...frame,
-      apiKey: keys.workersAiToken,
-      baseUrl: WORKERS_AI_REVIEW_BASE_URL,
-      model: WORKERS_AI_REVIEW_MODEL,
-      provider: 'workers-ai',
-    });
-    if (viaWorkers.verdict !== 'unknown') return viaWorkers;
-    console.log(
-      `[golden-path-review] workers-ai unavailable (${viaWorkers.reason}); using the gateway`
-    );
-  }
-  return reviewWithModel({
-    ...frame,
-    apiKey: keys.gatewayKey,
-    baseUrl: keys.gatewayBaseUrl,
-  });
+export interface KeyframeReviewInput {
+  readonly png: Buffer;
+  readonly stepId: string;
+  readonly path: string;
+  readonly expectedArtistName?: string;
+  readonly fetchImpl?: typeof fetch;
+}
+
+/** One keyframe review input as main() reads it, and the provider keys the failover reads. */
+export interface ReviewerProviderKeys {
+  readonly gatewayKey: string | undefined;
+  readonly gatewayBaseUrl: string;
+  readonly workersAiToken: string | undefined;
+}
+
+/** Reviewer A's verdict without routing attribution (see ./golden-path-review-routing.ts). */
+export const reviewWithFailover = async (
+  frame: KeyframeReviewInput,
+  keys: ReviewerProviderKeys
+): Promise<ModelVerdict> => (await reviewKeyframe(frame, keys)).model;
+
+/** The traced failover result for one keyframe, on the reviewer's verdict type. */
+export function reviewKeyframe(
+  frame: KeyframeReviewInput,
+  keys: ReviewerProviderKeys
+): Promise<TrackedModelReview<ModelVerdict>> {
+  return reviewKeyframeTraced(
+    provider =>
+      reviewWithModel({
+        ...frame,
+        ...(provider === 'workers-ai'
+          ? {
+              apiKey: keys.workersAiToken,
+              baseUrl: WORKERS_AI_REVIEW_BASE_URL,
+              model: WORKERS_AI_REVIEW_MODEL,
+              provider: 'workers-ai' as const,
+            }
+          : { apiKey: keys.gatewayKey, baseUrl: keys.gatewayBaseUrl }),
+      }),
+    keys.workersAiToken !== undefined
+  );
 }
 
 export function readManifest(dir: string): KeyframeRecord[] {
@@ -381,12 +388,17 @@ export async function main(
   const baseUrl =
     env.VISUAL_REVIEW_BASE_URL ?? 'https://ai-gateway.vercel.sh/v1';
   const verdicts: KeyframeVerdict[] = [];
+  const routing = {
+    viaWorkersAi: 0,
+    viaGateway: 0,
+    workersAiFallbackReasons: [] as string[],
+  };
   for (const record of records) {
     const layout = reviewLayout(record);
     const png = readFileSync(join(values.dir, record.file));
     const modelSamples: ModelVerdict[] = [];
     for (let i = 0; i < MODEL_SAMPLES; i += 1) {
-      const raw = await reviewWithFailover(
+      const tracked = await reviewKeyframe(
         {
           png,
           stepId: record.id,
@@ -400,6 +412,12 @@ export async function main(
           workersAiToken: env.WORKERS_AI_TOKEN,
         }
       );
+      const raw = tracked.model;
+      if (tracked.provider === 'workers-ai') routing.viaWorkersAi += 1;
+      else routing.viaGateway += 1;
+      const { workersAiFallbackReason: fallback } = tracked;
+      if (fallback && !routing.workersAiFallbackReasons.includes(fallback))
+        routing.workersAiFallbackReasons.push(fallback);
       if (raw.verdict === 'blocker') {
         for (const finding of raw.findings) {
           if (isKnownArtistIdentityFalsePositive(finding))
@@ -449,6 +467,7 @@ export async function main(
         reviewers: {
           model: REVIEW_MODEL,
           layout: 'golden-path-layout-audit/v1',
+          routing,
         },
         reviewedAt: new Date().toISOString(),
         phase: first ? 'replay' : 'first',
@@ -462,6 +481,9 @@ export async function main(
   );
   console.log(
     `[golden-path-review] ${verdicts.length} keyframes, suspected=${suspected.length}${first ? `, confirmed=${confirmed.length}` : ''}`
+  );
+  console.log(
+    `[golden-path-review] routing: ${routing.viaWorkersAi} via Workers AI, ${routing.viaGateway} via Gateway${routing.workersAiFallbackReasons.join('; ') ? ` (${routing.workersAiFallbackReasons.join('; ')})` : ''}`
   );
   if (first && confirmed.length > 0) process.exit(1);
 }
