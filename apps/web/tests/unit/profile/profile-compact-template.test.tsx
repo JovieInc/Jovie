@@ -528,7 +528,7 @@ describe('ProfileCompactTemplate', () => {
   it('keeps the floating back control on nested modes with a profile-root destination', async () => {
     render(
       <ProfileCompactTemplate
-        mode='listen'
+        mode='releases'
         artist={mockArtist}
         socialLinks={[]}
         contacts={[]}
@@ -1270,7 +1270,7 @@ describe('ProfileCompactTemplate', () => {
 
     render(
       <ProfileCompactTemplate
-        mode='listen'
+        mode='releases'
         artist={mockArtist}
         socialLinks={[]}
         contacts={[]}
@@ -1389,14 +1389,14 @@ describe('ProfileCompactTemplate', () => {
     vi.unstubAllGlobals();
   });
 
-  it('returns nested listen mode to the profile root instead of leaving the profile', async () => {
+  it('returns nested releases mode to the profile root instead of leaving the profile', async () => {
     const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
       // noop
     });
 
     render(
       <ProfileCompactTemplate
-        mode='listen'
+        mode='releases'
         artist={mockArtist}
         socialLinks={[]}
         contacts={[]}
