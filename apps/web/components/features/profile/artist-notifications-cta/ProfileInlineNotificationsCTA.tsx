@@ -22,8 +22,8 @@ import {
 } from '@/lib/queries/useNotificationStatusQuery';
 import type { Artist } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
+import { InlineNotificationsFlowSkeleton } from './InlineNotificationsFlowSkeleton';
 import {
-  InlineNotificationsFlowSkeleton,
   ProfileMobileNotificationsFlow,
   type ProfileMobileNotificationsFlowStep,
 } from './ProfileMobileNotificationsFlow';

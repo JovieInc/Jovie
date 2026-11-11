@@ -5,10 +5,8 @@ import { render, screen } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { COUNTRY_OPTIONS } from '@/features/profile/notifications';
-import {
-  InlineNotificationsFlowSkeleton,
-  ProfileMobileNotificationsFlow,
-} from './ProfileMobileNotificationsFlow';
+import { InlineNotificationsFlowSkeleton } from './InlineNotificationsFlowSkeleton';
+import { ProfileMobileNotificationsFlow } from './ProfileMobileNotificationsFlow';
 
 // Exercise the actual initial frame; the global Motion stub drops its wrapper.
 vi.unmock('motion/react');

@@ -7,8 +7,7 @@ import { EmptyState } from '@/components/molecules/EmptyState';
 import { AboutSection } from '@/features/profile/AboutSection';
 import { AlertsSettingsView } from '@/features/profile/AlertsSettingsView';
 import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
-import { InlineNotificationsFlowSkeleton } from '@/features/profile/artist-notifications-cta/ProfileMobileNotificationsFlow';
-import { SubscriptionFormSkeleton } from '@/features/profile/artist-notifications-cta/shared';
+import { NotificationsFlowSkeleton } from '@/features/profile/artist-notifications-cta/InlineNotificationsFlowSkeleton';
 import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
 import type { NotificationSourceContext } from '@/features/profile/artist-notifications-cta/types';
 import type {
@@ -256,11 +255,7 @@ function SubscribePanel({
       <ProfileStayCloseCard accent={accent}>
         <div className='-mx-4 -mb-4'>
           {!visitorAssignmentResolved ? (
-            subscribeTwoStep ? (
-              <SubscriptionFormSkeleton />
-            ) : (
-              <InlineNotificationsFlowSkeleton />
-            )
+            <NotificationsFlowSkeleton twoStep={subscribeTwoStep} />
           ) : subscribeTwoStep ? (
             <TwoStepNotificationsCTA
               artist={artist}
