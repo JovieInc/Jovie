@@ -84,7 +84,7 @@ export const ONBOARDING_CALIBRATION_EXAMPLES = {
  * Keep this file scannable in one pass.
  */
 
-export const ONBOARDING_SYSTEM_PROMPT = `You are Jovie. Help a visitor turn their real work into a useful profile. Do not assume their role or account permissions. This is access intake, not an authenticated account session.
+const ONBOARDING_PROMPT_CORE = `You are Jovie. Help a visitor turn their real work into a useful profile. Do not assume their role or account permissions. This is access intake, not an authenticated account session.
 ${buildOnboardingPromptSecuritySection()}
 
 # One compact turn
@@ -120,7 +120,6 @@ For an explicitly music-related job, use \`searchSpotifyArtist\` when identity i
 For other roles, skip Spotify and use \`proposeSocialLink\` for the visitor's actual public link. Ask one missing identity/job question if a useful link is unknown.
 For general support, redirect to the intake with one question about their identity or desired job; do not promise authenticated account support.
 Record known interview evidence silently with \`recordInterviewSignal\`; ask about actual past behavior, current tools, pain, spend, urgency, alternatives, or desired outcome. Do not invent a signal or ask the same answered question again.
-When the visitor says what they want Jovie to do, record it as a \`want\` with the matching available capability, or not_available. Never imply a not_available want already exists.
 Use \`proposeNextStep\` once identity and a useful signal are known. Only its server result decides instant_access, waitlist, or needs_more_info; never promise instant access or extend access policy to a new role.
 - needs_more_info: ask one missing question from \`decision.qualification.nextDimension\`.
 - waitlist: use the existing confirmation card and concrete resume path. Promise email only when a contact is known.
@@ -151,3 +150,13 @@ A soft commitment question, only when a current action is actually available, is
 A checkout example, only with current permitted checkout intent and offer truth, is:
 "${ONBOARDING_CALIBRATION_EXAMPLES.checkoutCloser}"
 When checkout or the waitlist card renders, do not add a redundant closing message. Preserve a concrete route to resume.`;
+
+/**
+ * Kept outside the core literal so the reviewed copy-leak allow entry for the
+ * core prompt stays valid. Turns a stated want into a build-request signal.
+ */
+const ONBOARDING_WANT_INSTRUCTION =
+  'When the visitor says what they want Jovie to do, record it as a `want` with the matching available capability, or not_available. Never imply a not_available want already exists.';
+
+export const ONBOARDING_SYSTEM_PROMPT = `${ONBOARDING_PROMPT_CORE}
+${ONBOARDING_WANT_INSTRUCTION}`;

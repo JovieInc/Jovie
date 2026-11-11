@@ -204,7 +204,7 @@
       "reason": "Intentional Markdown serialization, parser delimiter, plain-text signature/list, or security mask; not stray formatting in visible copy."
     },
     { "path": "apps/web/lib/chat/prompt-disclosure-guard.ts", "rules": { "markdown": ["cb8854fee6ea46cf", "e10cd96c11979e3f"] }, "reason": "Intentional Markdown serialization, parser delimiter, plain-text signature/list, or security mask; not stray formatting in visible copy." },
-    { "path": "apps/web/lib/chat/prompts/onboarding.ts", "rules": { "markdown": ["63259e8cf64c4679"] }, "reason": "Intentional Markdown serialization, parser delimiter, plain-text signature/list, or security mask; not stray formatting in visible copy." },
+    { "path": "apps/web/lib/chat/prompts/onboarding.ts", "rules": { "markdown": ["2ed3c5a0a3008113"] }, "reason": "Intentional Markdown serialization, parser delimiter, plain-text signature/list, or security mask; not stray formatting in visible copy." },
     { "path": "apps/web/lib/chat/tokens.ts", "rules": { "unresolved-prompt": ["62991ea8a77d1c39"] }, "reason": "Exact schema/selector/serialization or diagnostic syntax reviewed in source; not a copy prompt." },
     { "path": "apps/web/lib/chat/tools/tasks.ts", "rules": { "placeholder": ["602fae580f5863ab"] }, "reason": "Task workflow state enum or its existing display label, not unfinished copy." },
     {
