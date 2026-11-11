@@ -38,6 +38,7 @@ import {
   sitemapPaths,
   strangerDiscovery,
 } from './sample-params.mjs';
+import { judgeOnQuietReload, wasThrottled } from './throttle.mjs';
 
 const { values: args } = parseArgs({
   options: {
@@ -93,9 +94,23 @@ function concrete(route) {
 
 // Runs in the page, so it is a string: these scripts type-check as Node.
 const OBSERVE = `
-  window.__crawl = { cls: 0, lcp: 0, longest: 0 };
+  window.__crawl = { cls: 0, lcp: 0, longest: 0, shifts: {} };
   const watch = (type, fn) => new PerformanceObserver(l => l.getEntries().forEach(fn)).observe({ type, buffered: true });
-  watch('layout-shift', e => { if (!e.hadRecentInput) window.__crawl.cls += e.value; });
+  // Names the elements that moved, so a layout-shift finding says what to fix.
+  const label = n => {
+    if (!n || n.nodeType !== 1) return null;
+    const cls = typeof n.className === 'string' ? n.className.split(' ').filter(Boolean).slice(0, 2).join('.') : '';
+    const testId = n.getAttribute('data-testid');
+    return (n.tagName.toLowerCase() + (n.id ? '#' + n.id : '') + (testId ? '[data-testid=' + testId + ']' : '') + (cls ? '.' + cls : '')).slice(0, 100);
+  };
+  watch('layout-shift', e => {
+    if (e.hadRecentInput) return;
+    window.__crawl.cls += e.value;
+    for (const s of e.sources ?? []) {
+      const k = label(s.node);
+      if (k) window.__crawl.shifts[k] = (window.__crawl.shifts[k] ?? 0) + e.value;
+    }
+  });
   watch('largest-contentful-paint', e => { window.__crawl.lcp = Math.max(window.__crawl.lcp, e.startTime); });
   watch('longtask', e => { window.__crawl.longest = Math.max(window.__crawl.longest, e.duration); });
 `;
@@ -171,6 +186,10 @@ async function visit({ route, target, viewport, identity, fixture, collect }) {
     await page.waitForTimeout(2500); // let late shifts and stalls land
     const m = await page.evaluate(MEASURE);
     row.cls = Number(m.cls.toFixed(4));
+    row.clsSources = Object.entries(m.shifts ?? {})
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([node, value]) => ({ node, value: Number(value.toFixed(4)) }));
     row.lcpMs = Math.round(m.lcp);
     row.longestTaskMs = Math.round(m.longest);
     row.placeholder = m.text.match(PLACEHOLDER)?.[0] ?? null;
@@ -338,6 +357,27 @@ for (const [k, row] of suspects.entries()) {
   row.lcpMs = median(row.lcpSamplesMs);
   row.longestTaskMs = median(row.longestTaskSamplesMs);
 }
+// A page whose request got a 429 is judged on one quiet reload (throttle.mjs).
+const throttled = pages.filter(wasThrottled);
+let throttleRechecksLeft = 0;
+if (throttled.length && Date.now() + 61_000 < DEADLINE) {
+  console.log(
+    `[crawl] re-loading ${throttled.length} rate-limited pages after a quiet minute, ${minutes()}m`
+  );
+  await new Promise(r => setTimeout(r, 61_000));
+  for (const [k, row] of throttled.entries()) {
+    if (pastDeadline()) {
+      throttleRechecksLeft = throttled.length - k;
+      break;
+    }
+    const again = await safeVisit(jobs.get(row));
+    if (!again.error) judgeOnQuietReload(row, again);
+  }
+} else throttleRechecksLeft = throttled.length;
+if (throttleRechecksLeft)
+  console.warn(
+    `[crawl] ${throttleRechecksLeft} rate-limited pages judged without a quiet reload`
+  );
 await browser.close();
 
 const receipt = {

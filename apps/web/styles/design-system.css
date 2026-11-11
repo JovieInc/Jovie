@@ -826,7 +826,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   .cookie-banner-card--above-public-profile-dock {
     top: auto;
     bottom: var(--profile-bottom-nav-height);
-    left: min(50vw, calc(var(--profile-shell-max-width) / 2));
+    left: 50%;
     right: auto !important;
     /* Same edges as the claim bar and dock below it. */
     width: min(358px, calc(100vw - 32px)) !important;

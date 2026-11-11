@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import type { NotificationContentType } from '@/types/notifications';
 import { BirthdayInput } from './BirthdayInput';
 import { useConsentCardYield } from './consent-card-yield';
+import { INLINE_FLOW } from './inline-flow-layout';
 
 export type ProfileMobileNotificationsFlowStep =
   | 'email'
@@ -162,7 +163,7 @@ function formatCountdown(endTime: number) {
   return `Resend in ${remainingSeconds}s`;
 }
 
-function ScreenShell({
+export function ScreenShell({
   title,
   body,
   children,
@@ -530,9 +531,8 @@ export function ProfileMobileNotificationsFlow({
     };
   }, [onClose, open]);
 
-  if (!mounted || !open) {
-    return null;
-  }
+  // Inline needs no mount gate (no portal); an empty frame shifts the page.
+  if (!open || (!mounted && presentation !== 'inline')) return null;
 
   const updatePromise = describeUpdatePromise(artistName, availableContent);
 
@@ -899,14 +899,14 @@ export function ProfileMobileNotificationsFlow({
 
       <div
         className={cn(
-          'relative mx-auto flex w-full max-w-108 flex-col px-5',
+          INLINE_FLOW.body,
           presentation === 'overlay'
             ? 'h-full pb-[max(env(safe-area-inset-bottom),28px)] pt-[max(env(safe-area-inset-top),18px)]'
-            : 'h-full pb-8 pt-6',
+            : INLINE_FLOW.inset,
           presentation === 'modal' && 'min-[1180px]:max-w-130'
         )}
       >
-        <header className='flex items-center justify-between pb-5'>
+        <header className={INLINE_FLOW.topBar}>
           {showBackButton ? (
             <button
               type='button'
@@ -936,7 +936,7 @@ export function ProfileMobileNotificationsFlow({
 
         <div
           key={step}
-          className='flex min-h-0 flex-1 flex-col'
+          className={INLINE_FLOW.step}
           data-testid={`profile-mobile-notifications-step-${step}`}
         >
           {screen}
@@ -992,7 +992,7 @@ export function ProfileMobileNotificationsFlow({
       // Inline: transparent so the sheet sits on the page's own surface,
       // with no rounded seam against a mismatched background token.
       <div
-        className='relative flex h-full min-h-full flex-1 flex-col dark:text-white'
+        className={INLINE_FLOW.root}
         data-testid='profile-mobile-notifications-flow'
         data-shell-variant='inline-full-height'
         style={contentStyle}

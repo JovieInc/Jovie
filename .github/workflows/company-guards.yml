@@ -1,8 +1,8 @@
 # Shared company guard suite from JovieInc/ci (canon/COMPANY.md).
 # Pin is bumped by a bot PR; a pin more than 72h behind the newest canon/guard
 # commit fails this check. The bot rewrites these two lines only:
-# company-guards.yml@9a65527bbc2e6036d4d09e787c83ccf2feba8634
-# ci-ref: 9a65527bbc2e6036d4d09e787c83ccf2feba8634
+# company-guards.yml@ba6ecacf5833a50cc1f13998ba4f08153b322916
+# ci-ref: ba6ecacf5833a50cc1f13998ba4f08153b322916
 # Source Validation classifies with the trusted base, which has no
 # .company-guards/ rule. The baseline is committed under scripts/company-guards/
 # and this job copies it to the path guards/size.mjs reads.
@@ -62,6 +62,11 @@ jobs:
           else
             echo "::warning::could not fetch $BASE_SHA; size-500 runs repo-wide"
           fi
+      # Budgets only shrink: a PR that raises or adds an entry is growth. A PR
+      # that keeps or shrinks a file leaves the baseline alone.
+      - name: Size budgets never rise
+        if: env.SIZE_BASE_SHA != ''
+        run: node scripts/company-guards/size-ratchet.mjs --no-raise "$SIZE_BASE_SHA"
       - name: Run guards
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
