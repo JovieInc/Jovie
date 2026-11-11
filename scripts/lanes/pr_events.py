@@ -35,6 +35,7 @@ from label_episodes import RELAY_RED_LABELLER, label_episode_applier  # noqa: E4
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from atomic_state import append_json_object
+from pr_body_markup import ANY_HEADING, quote_revision_references, red_section_bounds, with_red_section
 import remediation  # noqa: E402  (classifier + non-PR intake; no lane_runner import)
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
@@ -1005,29 +1006,8 @@ def quota_failure(workflow_run: dict, sh=run, classify=None) -> str | None:
 
 
 RED_BLOCK_MARKER = "<!-- lanes:red-before-green -->"
-RED_HEADING = re.compile(r"^#{1,6}\s*red-before-green\s*$", re.I)
-ANY_HEADING = re.compile(r"^#{1,6}\s")
 JOB_URL = re.compile(r"^(https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*)(?:/job/\d+)?")
 RED_RUN_URL = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*(?:/attempts/[1-9]\d*)?")
-
-
-def red_section_bounds(lines: list[str], heading=RED_HEADING) -> tuple[int, int] | None:
-    """Match Fleet boundaries, ignoring fenced/hidden headings but preserving source line indexes."""
-    visible = re.sub(r"<!--[\s\S]*?-->", lambda match: "\n" * match.group().count("\n"), "\n".join(lines))
-    fenced = False
-    start = None
-    for index, line in enumerate(visible.split("\n")):
-        if re.match(r"^\s*(?:```|~~~)", line):
-            fenced = not fenced
-            continue
-        if fenced:
-            continue
-        if start is None:
-            if heading.match(line.strip()):
-                start = index
-        elif ANY_HEADING.match(line):
-            return start, index
-    return (start, len(lines)) if start is not None else None
 
 
 def red_section_complete(body: str) -> bool:
@@ -1082,16 +1062,6 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
     return None
 
 
-def with_red_section(body: str, block: str) -> str:
-    """Replace an empty/placeholder Red-before-green section with the block, or append one."""
-    lines = (body or "").split("\n")
-    bounds = red_section_bounds(lines)
-    if bounds is None:
-        return (body or "").rstrip("\n") + "\n\n" + block + "\n"
-    start, end = bounds
-    return "\n".join(lines[:start] + block.split("\n") + [""] + lines[end:])
-
-
 def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
                          locking_pr: int | None = None, win_section: str | None = None,
                          premise: dict | None = None, previous_win_section: str | None = None) -> str:
@@ -1140,7 +1110,7 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Premise check\s*$", re.I)) is None:
             block = "## Premise check\n\n" + "\n".join(f"- {field}: {premise[field]}" for field in fields)
             updated = updated.rstrip("\n") + "\n\n" + block + "\n"
-    return updated
+    return quote_revision_references(updated)
 
 
 def api_gh(args, **_):

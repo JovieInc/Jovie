@@ -8,6 +8,7 @@ import {
   cleanupFixtures,
   firstLoadBudgets,
   NOW,
+  validRaise,
   writeChunk,
 } from './route-js-budget-fixtures';
 
@@ -78,6 +79,27 @@ function runCli(nextDir: string, budgetPath: string, env = process.env) {
 }
 
 describe('route-group policy reaches the existing evaluator and CLI', () => {
+  it.each(['2024-1-5', '2024/01/05', '2099-99-99', '2099-02-30'])(
+    'rejects group baseline and target raises with malformed expiry %s',
+    expiresOn => {
+      const input = control();
+      input.budgets.groups.marketing.baselineKb = 60;
+      input.routeGroups.marketing.budgets.initialJS_gzip_kb = 200;
+      input.budgets.raises = {
+        'groups.marketing.baselineKb': validRaise({ expiresOn }),
+        'routeBudgets.marketing.initialJS_gzip_kb': validRaise({ expiresOn }),
+      };
+      const result = evaluateBudgets(input);
+      expect(result.first.violations).toEqual([]);
+      expect(result.app.violations).toEqual([]);
+      expect(result.growth).toEqual([
+        'groups.marketing.baselineKb grew 50 -> 60',
+        'routeBudgets.marketing.initialJS_gzip_kb grew 150 -> 200',
+      ]);
+      expect(result.ok).toBe(false);
+    }
+  );
+
   it('rejects a target raise even when every individual route still passes', () => {
     const input = control();
     expect(evaluateBudgets(input).ok).toBe(true);

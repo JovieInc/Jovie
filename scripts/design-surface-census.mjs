@@ -58,17 +58,68 @@ export function expandCensus(census) {
     .sort((a, b) => a.source.localeCompare(b.source));
 }
 
-export function sourceDigest(root, row) {
-  const hash = createHash('sha256');
-  for (const source of [
-    ...new Set([row.source, ...row.expectedOwners]),
-  ].sort()) {
-    hash
-      .update(source)
-      .update('\0')
-      .update(readFileSync(join(root, source)));
+// Certification evidence is one small file per certified source file:
+//   <EVIDENCE_DIR>/<group id>/<source path with / as __>.json
+//   { "file", "sha256", "at", "ref" }
+// A canonical row is current when every file it is made of (its page and its
+// expected owners) has an entry whose sha256 matches the bytes on disk.
+//
+// It used to be one digest over all of a row's files, stored on one line of
+// surfaceCensus.json. A PR that changed one owner renewed that line against
+// its own base, so a second PR changing another owner made the combined head
+// stale even though both had renewed (and both rewrote the same line). With
+// one entry per file, a PR renews only the files it changed, two PRs touch
+// different entries, and the combined head is current without a third edit.
+export const EVIDENCE_DIR = 'apps/web/data/designSystem/surfaceCensus.evidence';
+
+/** The files a census row is certified against, sorted and unique. */
+export function certifiedFiles(row) {
+  return [...new Set([row.source, ...row.expectedOwners])].sort();
+}
+
+export function fileDigest(root, file) {
+  return createHash('sha256')
+    .update(readFileSync(join(root, file)))
+    .digest('hex');
+}
+
+export function evidenceEntryPath(groupId, file) {
+  return `${EVIDENCE_DIR}/${groupId}/${file.replaceAll('/', '__')}.json`;
+}
+
+/** Evidence entries recorded for a group, keyed by certified file. */
+export function readEvidence(root, groupId) {
+  const directory = join(root, EVIDENCE_DIR, groupId);
+  const entries = new Map();
+  if (!existsSync(directory)) return entries;
+  for (const name of readdirSync(directory).sort()) {
+    if (!name.endsWith('.json')) continue;
+    const entry = JSON.parse(readFileSync(join(directory, name), 'utf8'));
+    requireValue(
+      nonempty(entry.file) &&
+        evidenceEntryPath(groupId, entry.file).endsWith(`/${name}`),
+      `${EVIDENCE_DIR}/${groupId}/${name}: entry name must match its file`
+    );
+    requireValue(
+      /^[0-9a-f]{64}$/.test(entry.sha256 ?? '') &&
+        timestamp(entry.at) &&
+        nonempty(entry.ref),
+      `${EVIDENCE_DIR}/${groupId}/${name}: needs sha256, at and ref`
+    );
+    entries.set(entry.file, entry);
   }
-  return hash.digest('hex');
+  return entries;
+}
+
+/** Certified files of a row whose bytes no longer match recorded evidence. */
+export function staleFiles(root, row, evidence = readEvidence(root, row.id)) {
+  return certifiedFiles(row)
+    .map(file => ({
+      file,
+      sha256: fileDigest(root, file),
+      recorded: evidence.get(file)?.sha256 ?? null,
+    }))
+    .filter(item => item.sha256 !== item.recorded);
 }
 
 export function validateCensus(
@@ -344,9 +395,31 @@ export function checkCensus(root = process.cwd(), baseRef = 'origin/main') {
       );
     }
     if (row.status === 'canonical') {
+      const stale = staleFiles(root, row);
       requireValue(
-        row.evidence.sourceDigest === sourceDigest(root, row),
-        `${row.source}: source changed; renew certification evidence`
+        stale.length === 0,
+        `${row.source}: source changed; renew certification evidence ` +
+          `(${stale.map(item => item.file).join(', ')}). After checking the rendered surface, run: ` +
+          'node scripts/surface-recertify.mjs renew --ref "<what changed and how you verified it>"'
+      );
+    }
+  }
+  // Evidence for a file that is no longer certified would look current forever.
+  const certified = new Map();
+  for (const row of rows) {
+    if (row.status !== 'canonical') continue;
+    const files = certified.get(row.id) ?? new Set();
+    for (const file of certifiedFiles(row)) files.add(file);
+    certified.set(row.id, files);
+  }
+  const evidenceRoot = join(root, EVIDENCE_DIR);
+  for (const groupId of existsSync(evidenceRoot)
+    ? readdirSync(evidenceRoot).sort()
+    : []) {
+    for (const file of readEvidence(root, groupId).keys()) {
+      requireValue(
+        certified.get(groupId)?.has(file),
+        `${evidenceEntryPath(groupId, file)}: evidence for a file that is not certified; delete it`
       );
     }
   }

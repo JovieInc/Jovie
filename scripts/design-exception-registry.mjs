@@ -97,8 +97,12 @@ function readBaseFile(repoRoot, ref, relativePath) {
 }
 
 function expiryMs(expiresOn) {
-  if (!ISO_DATE.test(expiresOn ?? '')) return NaN;
-  return Date.parse(`${expiresOn}T23:59:59.999Z`);
+  if (typeof expiresOn !== 'string' || !ISO_DATE.test(expiresOn)) return NaN;
+  const expiry = Date.parse(`${expiresOn}T23:59:59.999Z`);
+  return Number.isFinite(expiry) &&
+    new Date(expiry).toISOString().slice(0, 10) === expiresOn
+    ? expiry
+    : NaN;
 }
 
 export function exceptionMetadataIssues(entry, prefix) {
@@ -116,7 +120,10 @@ export function exceptionMetadataIssues(entry, prefix) {
   const hasRemoval =
     typeof entry?.removalCondition === 'string' &&
     entry.removalCondition.trim() !== '';
-  const hasExpiry = ISO_DATE.test(entry?.expiresOn ?? '');
+  const hasExpiry = Number.isFinite(expiryMs(entry?.expiresOn));
+  if (entry?.expiresOn !== undefined && entry.expiresOn !== '' && !hasExpiry) {
+    issues.push(`${prefix}: expiresOn must be a valid date (YYYY-MM-DD)`);
+  }
   if (!hasRemoval && !hasExpiry) {
     issues.push(`${prefix}: removal condition or expiry is required`);
   }

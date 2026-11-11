@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 
 const workflow = readFileSync(
@@ -187,4 +194,48 @@ test('a completed evidence run re-triggers PR Ready for its PR', () => {
   });
   assert.equal(noTok.status, 0);
   assert.match(noTok.stdout, /#24184/);
+});
+
+test('a deferred evidence lookup is exit 75 and is not read as an empty run list', () => {
+  const run = workflow
+    .match(
+      / {6}- name: Require fleet-rule evidence[\s\S]*?\n {8}run: \|\n([\s\S]*?)(?=\n {6}\S|\n {4}\S|$)/
+    )?.[1]
+    .replace(/^ {10}/gm, '');
+  assert.ok(run, 'fleet evidence run block');
+  assert.match(run, /"\$rc" -eq 75/);
+  assert.doesNotMatch(run, /\|\| runs='\{"workflow_runs":\[\]\}'/);
+  const dir = mkdtempSync(join(tmpdir(), 'fleet-deferred-'));
+  try {
+    mkdirSync(join(dir, '.github/workflows'), { recursive: true });
+    writeFileSync(
+      join(dir, '.github/workflows/fleet-rules-evidence.yml'),
+      'trusted'
+    );
+    mkdirSync(join(dir, 'packages/api-client'), { recursive: true });
+    writeFileSync(
+      join(dir, 'packages/api-client/cli.ts'),
+      'process.stderr.write("github-quota-deferred until 2026-11-10T12:59:15.000Z\\n"); process.exit(75);\n'
+    );
+    const deferred = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', run], {
+      cwd: dir,
+      encoding: 'utf8',
+      env: {
+        PATH: process.env.PATH,
+        HEAD_SHA: 'a'.repeat(40),
+        BASE_SHA: 'b'.repeat(40),
+        PR_NUMBER: '24777',
+        HEAD_REF: 'glm/jov-12120-doctor-blocker-dedup',
+        HEAD_REPO_ID: '1',
+        REPOSITORY: 'JovieInc/Jovie',
+        EVENT_UPDATED_AT: '2026-11-10T12:46:53Z',
+      },
+    });
+    assert.equal(deferred.status, 75, deferred.stdout + deferred.stderr);
+    assert.match(deferred.stdout, /github-quota-deferred/);
+    assert.doesNotMatch(deferred.stdout, /Fleet rules passed/);
+    assert.doesNotMatch(deferred.stdout, /evidence is missing/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

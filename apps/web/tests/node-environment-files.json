@@ -1065,6 +1065,7 @@
   "tests/unit/lib/fit-scoring/service.test.ts",
   "tests/unit/lib/flag-registration-guardrail.test.ts",
   "tests/unit/lib/flags/",
+  "tests/unit/lib/founder-welcome/founder-welcome.test.ts",
   "tests/unit/lib/geo.test.ts",
   "tests/unit/lib/github/hud-token.server.test.ts",
   "tests/unit/lib/growth/attribution-chain.test.ts",

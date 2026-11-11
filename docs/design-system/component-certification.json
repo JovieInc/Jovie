@@ -310,6 +310,306 @@
     "apps/web/components/features/auth/atoms/FormError.tsx": {
       "partial": "FormError has one content field: a message renders the alert (Default) and no message renders nothing (NoMessage); id and className are wiring and styling, so nothing can be partially present.",
       "permission-denied": "FormError only shows a caller's validation message and has no gated action or permission input; the detector matched role='alert'."
+    },
+    "apps/web/components/atoms/AnimatedIconSwap.tsx": {
+      "empty": "AnimatedIconSwap renders exactly one keyed icon and never a collection; the detector matched the items-center class.",
+      "long-content": "AnimatedIconSwap wraps one icon in a box its caller sizes and lays out no text; every caller passes a lucide glyph, so there is no content to overflow (the detector matched the children prop).",
+      "rtl-overflow": "AnimatedIconSwap lays out no text and has no start or end placement, only one centred icon, so writing direction changes nothing it renders."
+    },
+    "apps/web/components/atoms/RailToggleButton.tsx": {
+      "partial": "RailToggleButton draws one icon button from its required side, open state and labels; its optional props (pinned, previewTrigger, iconOverride, controlsId, shortcut, disabled, test ids) are behaviour and wiring flags with defaults, so no data can be partially present."
+    },
+    "apps/web/components/organisms/sidebar/context.tsx": {
+      "partial": "SidebarProvider holds no data: its optional props (defaultOpen, open, onOpenChange) choose uncontrolled or controlled open state, and Default and DefaultClosed show both starting states."
+    },
+    "apps/web/components/atoms/DspLogo.tsx": {
+      "partial": "DspLogo takes one required provider key and draws that platform's fixed glyph and name together; its optional props (className, height) are styling with defaults, so nothing can be partially present, and an unmapped provider renders nothing (UnmappedProvider)."
+    },
+    "apps/web/components/atoms/ReleaseArtworkThumb.tsx": {
+      "long-content": "ReleaseArtworkThumb paints no text: the release title is only the image alt and a screen-reader label on the fallback inside a fixed square, so a long title cannot overflow it."
+    },
+    "apps/web/components/molecules/drawer/EntityHeader.tsx": {
+      "permission-denied": "EntityHeader has no gated action or permission input; callers choose what goes in the actions slot, and the detector matched role='img' on the thumbnail and status glyph."
+    },
+    "apps/web/components/atoms/InlineIconButton.tsx": {
+      "partial": "InlineIconButton draws one icon control from its required icon child and accessible name; its optional props (className, fadeOnParentHover, size, href and native button or anchor attributes) are styling, behaviour and wiring with defaults, so no data can be partially present.",
+      "long-content": "It lays out no visible text: every caller passes one icon glyph (at most with an sr-only word) and the name lives in aria-label, so there is no content to overflow; the detector matched the children and label props.",
+      "rtl-overflow": "It renders one centred icon in a fixed square with symmetric padding and no inline-direction classes, so dir='rtl' renders it the same and there is no text to overflow."
+    },
+    "apps/web/components/atoms/SkipToContent.tsx": {
+      "partial": "SkipToContent renders one link from two optional props that both have defaults (targetId 'main-content', linkText 'Skip to content') plus className, so nothing can be partially present."
+    },
+    "apps/web/components/molecules/AuthActions.tsx": {
+      "empty": "AuthActions always renders its fixed links (Log in and Sign up when signed out, Open App when signed in) and never a collection; the detector matched the items-center class."
+    },
+    "apps/web/components/site/MarketingFooterCta.tsx": {
+      "partial": "MarketingFooterCta renders one link; label and href default to the shared claim-profile intent and the other optional props (analytics event and source, prefetch, sectionVariant, className) only add attributes, so the link is never partially present."
+    },
+    "apps/web/components/site/MarketingHeader.tsx": {
+      "permission-denied": "MarketingHeader is public site chrome with no gated action or permission input; the detector matched 'locked' in the homepage conversion-lock comment."
+    },
+    "apps/web/components/site/theme-toggle/ThemeToggleSkeleton.tsx": {
+      "empty": "ThemeToggleSkeleton always reserves a fixed shape (one icon button or exactly three segments) and never a collection; the detector matched the items-center class.",
+      "partial": "It holds no data: appearance picks the icon or segmented shape and size and className are styling, so nothing can be partially present.",
+      "long-content": "Its only copy is the fixed sr-only name 'Loading theme toggle' and the 'Theme' toolbar label; no caller text reaches it, so nothing can overflow.",
+      "offline": "It is a hydration placeholder that never fetches or mutates; it shows only until the client-side theme state mounts, which needs no network.",
+      "permission-denied": "It has no gated action or permission input; the detector matched role='toolbar' on the segment row."
+    },
+    "apps/web/components/marketing/ProductScreenshotFrame.tsx": {
+      "loading": "While the capture loads, the frame shows an aria-hidden skeleton in the capture's aspect ratio; a static story cannot hold a local image request in flight, so ProductScreenshotFrame.test.tsx covers the skeleton-to-image swap.",
+      "partial": "The required scenarioId resolves the whole capture record (URL, size, alt, optional focus) from the screenshot registry, which throws on an incomplete record; the other optional props are presentation flags, so a frame is never partially drawn.",
+      "offline": "It never fetches or mutates; lost connectivity reaches it only as a capture that fails to load, which the ErrorPreviewUnavailable story shows.",
+      "permission-denied": "It only frames a product capture and has no gated action or permission input; the detector matched role='img' on the fallback and 'locked' in the founder-locked recipe comment."
+    },
+    "apps/web/components/molecules/drawer/ShareableLinkRow.tsx": {
+      "empty": "ShareableLinkRow always renders one required URL with its copy (and optional open) action and never a collection; the detector matched the items-center class.",
+      "partial": "It renders one required url: displayValue falls back to that url and the other optional props are density, surface, visibility, labels and callbacks with defaults, so nothing can be partially present (NoOpenButton shows the copy-only row)."
+    },
+    "apps/web/components/features/waitlist/WaitlistPublicLanding.tsx": {
+      "long-content": "Its only input is the signupClosed flag and all of its own copy is fixed; long typed values belong to the forms it hosts (AuthShell and WaitlistRoleForm), so the page itself has no caller text to overflow.",
+      "permission-denied": "The page's only gate is closed public signup, which the SignupClosed and RtlSignupClosed stories show (the role form plus a Log in path); signed-in visitors are redirected by AuthenticatedAuthEntryGuard. The detector matched the WaitlistRoleForm name."
+    },
+    "apps/web/components/features/waitlist/WaitlistSuccessView.tsx": {
+      "loading": "It mounts only once its owner already has an outcome (the /waitlist server route after resolving user state, or WaitlistIntakeChat after the request settles), so it never shows a loading state; 'pending' is the waitlist review status that Web214AuthenticatedPending shows, not a request in flight."
+    },
+    "apps/web/components/organisms/PricingRecipeBody.tsx": {
+      "partial": "The canonical Pricing story already renders the partial composition: the optional structuredData and auditOffer slots are both absent there (the audit offer renders nothing while it is off), and every other prop is required.",
+      "permission-denied": "PricingRecipeBody is a public marketing page with no gated action or permission input; the detector matched the word plan in its pricing copy."
+    },
+    "apps/web/components/atoms/Logo.tsx": {
+      "empty": "Logo draws the fixed Jovie wordmark or mark and takes no collection; the detector matched the .map( over the wordmark's own glyph paths from wordmarkGeometry, which always holds the five letters, so there is nothing that can be empty.",
+      "permission-denied": "Logo only draws the brand wordmark or mark and has no permission input or gated action; the detector matched role='img' on the labelled svg."
+    },
+    "apps/web/components/features/waitlist/WaitlistQualifyingSteps.tsx": {
+      "offline": "WaitlistQualifyingSteps never fetches or submits by itself: the submit button posts the parent WaitlistRoleForm, which owns the join request and its failed and offline recovery, and the artist search's own request state belongs to WaitlistSpotifySearch. Lost connectivity reaches this step only as the parent's submitting flag, which disables every action (WaitlistQualifyingSteps.certificate.test.tsx).",
+      "permission-denied": "The three questions are open to every visitor requesting access and have no gated action or permission input; the detector matched 'role' in the @/lib/waitlist/role-qualification import path."
+    },
+    "apps/web/components/features/auth/AuthBrandPanel.tsx": {
+      "empty": "AuthBrandPanel renders one static product frame and an optional headline block and takes no collection; the detector matched 'releases' in the frame's scenario id. Hidden text is the TextHidden story."
+    },
+    "apps/web/components/features/auth/AuthLayout.tsx": {
+      "empty": "AuthLayout is the auth chrome around one children slot and takes no collection; the detector matched the items-center and items-stretch classes. An absent title and footer is the PartialFormOnly story."
+    },
+    "apps/web/components/features/waitlist/WaitlistOutcomeView.tsx": {
+      "empty": "WaitlistOutcomeView renders one outcome from a fixed copy table and its next steps are a fixed three-item list; it takes no collection that can be empty. The detector matched 'list' in the pending title and the list-decimal class."
+    },
+    "apps/web/components/organisms/MarketingSignInLink.tsx": {
+      "partial": "The link renders one label and one fixed sign-in route; variant and label are presentation choices with defaults, so there is no data to be partially present.",
+      "long-content": "The label prop is typed as the two fixed strings 'Sign in' and 'Log in', so no caller can pass longer copy."
+    },
+    "apps/web/components/features/auth/AuthProviderButtons.tsx": {
+      "empty": "The only product caller that renders a provider group, AuthShell, renders it only when at least one provider is enabled and otherwise leads with the email form (AuthShell.test.tsx, 'leads with the email form when no provider is enabled'); AuthProviderButtonSlots has no other caller, so an empty group never renders.",
+      "partial": "A slot takes one required provider and reads its label and glyph from the provider registry, so a pill is drawn whole or not at all; disabled-without-pending is the AppleDisabled hydration story.",
+      "long-content": "Pill labels come from the provider registry's two fixed strings ('Continue with Google', 'Continue with Apple'); callers cannot pass copy.",
+      "offline": "The pills never fetch; a press calls the owner's onClick and AuthShell starts OAuth, so a dropped connection reaches the pills only as AuthShell's failed-start state (its OfflineProviderStart story)."
+    },
+    "apps/web/components/features/auth/atoms/AuthInput.tsx": {
+      "partial": "AuthInput is one text field whose optional props are keyboard hints and styling with defaults, so nothing can be partially present; an empty field is Email and a filled one is LongContentEmail."
+    },
+    "apps/web/app/desktop-auth/DesktopAuthCodeForm.tsx": {
+      "long-content": "maxLength 9 caps the code at XXXX-XXXX and every label in the form is fixed product copy; the longest status copy renders in the owner's DesktopAuthStatus line (DesktopAuthClient's LongCopyPhoneSignIn story)."
+    },
+    "apps/web/app/desktop-auth/DesktopAuthClient.tsx": {
+      "permission-denied": "The handoff has no gated action, role or entitlement input; the detector matched role='img' on the QR tile. A refused Touch ID prompt falls back to the browser method with error copy, which tests/unit/app/desktop-auth-page.test.tsx covers."
+    },
+    "apps/web/components/marketing/MarketingContainer.tsx": {
+      "partial": "MarketingContainer holds no data: width picks one of three boxes and children is whatever the caller places; its optional props (bleed, className) are layout and styling flags with defaults, so nothing can be partially present."
+    },
+    "apps/web/components/site/MarketingFooter.tsx": {
+      "permission-denied": "MarketingFooter is the public footer with no gated action or permission input; every visitor sees the same links. The detector matched the word 'locked' in the Pen node comment."
+    },
+    "apps/web/components/site/MarketingFooterControls.tsx": {
+      "empty": "MarketingFooterControls renders the fixed theme toggle and the single supported locale; it renders no collection. The detector matched 'list' in a comment, and enabled={false} renders nothing by route policy, not because data is missing.",
+      "long-content": "MarketingFooterControls takes no text: the only label is the code-owned locale name 'English' from MARKETING_SUPPORTED_LOCALES and the theme toggle's fixed accessible names, so no caller or record can lengthen it."
+    },
+    "apps/web/components/site/theme-toggle/ThemeToggle.tsx": {
+      "empty": "ThemeToggle always offers the same three themes (system, light, dark) and renders no data collection; the detector matched the items-center class.",
+      "long-content": "ThemeToggle shows no caller text: its labels ('Toggle theme', the theme names) are fixed in code and shortcutKey is a single key, so there is nothing that can grow long."
+    },
+    "apps/web/components/features/landing/LandingCTAButton.tsx": {
+      "partial": "LandingCTAButton draws one link from its required href, label, eventName and section; its optional props (variant, className, testId) are styling and test wiring with defaults, so no data can be partially present."
+    },
+    "apps/web/components/homepage/HomepageProfilePhone.tsx": {
+      "permission-denied": "HomepageProfilePhone is a static marketing picture of the demo artist's profile with no gated action or permission input; the detector matched role='img'."
+    },
+    "apps/web/components/homepage/HomepageSpecSections.tsx": {
+      "empty": "HomepageSpecSections cannot receive an empty spec: the content-record schema requires one to twelve sections with the hero first (lib/content-records/marketing-page.ts), and the code default always has all four.",
+      "permission-denied": "HomepageSpecSections renders the public homepage with no gated action or permission input; the detector matched 'locked headline', which is a copy rule, not access control."
+    },
+    "apps/web/components/homepage/v3/Orbit.tsx": {
+      "empty": "Orbit is decorative, aria-hidden geometry: every call site passes a fixed, non-empty literal ring list (homepage chapters, specs moment, home layout footer), so there is no data-driven collection that could be empty."
+    },
+    "apps/web/components/homepage/v3/ProductUi.tsx": {
+      "loading": "ProductUi is a static HTML mirror of Jovie for Mac built from code constants in data/homepageProductUi.ts; it fetches nothing. The detector matched the image loading attribute (eager or lazy).",
+      "empty": "ProductUi's rows come from the code-owned HOMEPAGE_CATALOG and fixed sidebar and inspector lists, which are never empty; no runtime data reaches it.",
+      "partial": "ProductUi takes no data props: AppWindow and CatalogPlate take none and ReleaseInspector takes only an anchor id and an eager flag, so no data can be partially present.",
+      "long-content": "ProductUi has no runtime text input: every string is fixed marketing copy in data/homepageProductUi.ts, reviewed at the approved 1440 and 390 frames, so no caller or record can lengthen it.",
+      "offline": "ProductUi makes no request and holds no live data, so being offline changes nothing it renders; the detector matched the image loading attribute."
+    },
+    "apps/web/components/homepage/v3/SpecsChapter.tsx": {
+      "empty": "SpecsChapter's meter and sheet rows come from the DSP registry and code-owned HOMEPAGE_SPECS_COPY, which are never empty; the chapter takes no props.",
+      "partial": "SpecsChapter takes no props and has no copy slots; its cells are code-owned copy whose optional mono and derived fields are formatting flags, and derived facts read from code constants that are always present.",
+      "long-content": "SpecsChapter has no runtime text input: its headline, rows and captions are fixed copy in data/homepageProductUi.ts and its numbers derive from the DSP registry, so no caller or record can lengthen them."
+    },
+    "apps/web/components/homepage/v3/Surfaces.tsx": {
+      "empty": "ReleasePage lists the fixed RELEASE_PAGE_SERVICES and CommandPaletteCard lists the fixed palette rows from data/homepageProductUi.ts; neither list is data-driven, so neither can be empty.",
+      "partial": "ReleasePage and CommandPaletteCard take no props; Callout's optional side and className are placement and styling flags with defaults, and both palette row shapes (with and without a shortcut) render in CommandPalette, so nothing can be partially present."
+    },
+    "apps/web/components/marketing/MarketingPageShell.tsx": {
+      "partial": "MarketingPageShell holds no data: it wraps children, and its optional props (className, penContractId) are class hooks and a design-diff id with defaults, so nothing can be partially present.",
+      "permission-denied": "MarketingPageShell is a layout wrapper with no gated action or permission input; the detector matched the word 'role' in its comment."
+    },
+    "apps/web/components/features/profile/artist-notifications-cta/BirthdayInput.tsx": {
+      "long-content": "BirthdayInput always renders exactly eight single-digit boxes (MM/DD/YYYY) under fixed Month, Day and Year labels; it takes no caller text, and useSegmentedInput strips non-digits and drops anything past the eighth digit, which BirthdayInput.test.tsx covers, so nothing can grow.",
+      "offline": "BirthdayInput never fetches or submits; onSubmit is a callback fired on Enter and the notifications flow that owns it saves the birthday and reports connectivity. The detector matched onSubmit."
+    },
+    "apps/web/components/molecules/UpgradeButton.tsx": {
+      "empty": "UpgradeButton renders one button and an optional error line and takes no collection; the detector matched the items-center class.",
+      "partial": "Its optional props are presentation (className, variant, size), a defaulted label, and priceId, which only chooses direct checkout over the pricing page; no data payload can be partially present, and both flows are tested.",
+      "permission-denied": "UpgradeButton is the upgrade affordance itself and has no gated or permission-dependent state: it is always pressable unless checkout is in flight. The detector matched upgrade and plan in its copy."
+    },
+    "apps/web/components/molecules/UsageMeter.tsx": {
+      "error": "UsageMeter only draws a valid UsageMeterModel; createUsageMeterModel returns null for invalid counts and the owner (UsageMenuItem) shows the unavailable or unverified copy instead of a meter. The detector matched the bg-error exhausted tone, which the Exhausted story shows."
+    },
+    "apps/web/components/site/MarketingPageContractMarkers.tsx": {
+      "long-content": "The marker is a hidden, aria-hidden metadata node read only by route-contract tests; it is never painted, so no label length can lay out or overflow.",
+      "rtl-overflow": "The marker is hidden and aria-hidden and never painted, so text direction cannot affect any layout; the detector matched the CTA label attribute."
+    },
+    "apps/web/components/features/auth/AuthenticatedAuthEntryGuard.tsx": {
+      "loading": "While the Better Auth session is still pending the guard deliberately keeps rendering its children unchanged (JOV-6450) and draws no spinner or skeleton of its own, so the loading frame is the SignedOut story; the detector matched 'pending' in a comment.",
+      "error": "The guard has no error UI: it only decides between passing its children through and returning null while it redirects. The detector matched 'error' in comments about hydration error #418 and duplicate error banners.",
+      "long-content": "The guard renders no box or text of its own; it passes its children through unchanged, so any long content belongs to and is shown by the child surface's stories.",
+      "offline": "The guard never fetches or mutates; it reads the session from useAuthSafe and the session cookie and calls router.replace, so lost connectivity can only leave the children rendered, which the SignedOut story shows.",
+      "rtl-overflow": "The guard renders no box or text of its own and passes its children through unchanged, so direction and overflow belong to the child surface."
+    },
+    "apps/web/components/features/profile/StaticListenInterface.tsx": {
+      "error": "Every failure in a provider press (cookie or storage write, analytics, deep link) is caught and falls back to opening the provider URL in a new tab; the row has no error UI. The detector matched those catch blocks.",
+      "offline": "StaticListenInterface never fetches; a press only stores the preference and opens the provider URL in a new tab, so connectivity only affects that tab. The detector matched the local isLoading flag, which LoadingOpeningProvider shows."
+    },
+    "apps/web/components/features/tracking/SignupFunnelBeacon.tsx": {
+      "error": "SignupFunnelBeacon renders no markup; trackFunnelStep and postJsonBeacon swallow a failed send by design (JOV-6585 fail-open), and the detector matched the catch in isSignupEntryHref, which returns false for an unparseable href as SignupFunnelBeacon.test.tsx covers."
+    },
+    "apps/web/components/features/waitlist/WaitlistJoinedConfirmation.tsx": {
+      "empty": "The confirmation always shows one heading and the echoed email and takes no collection; the detector matched the word list in its \"You're on the list\" heading.",
+      "permission-denied": "The confirmation only reports a request that already landed and has no gated action or permission input; the detector matched role='status'."
+    },
+    "apps/web/components/jovie/components/ChatEmptyStateComposerRegion.tsx": {
+      "partial": "The region carries no data payload: its sample is a built-in constant and its optional props (fullBleed, stableDocked, showDockedWelcome, hideWelcomeHeader, alignAbove, onSelectSample) are layout switches, each shown by the JustAsk, AboveComposer and EmptyDockedRegion stories.",
+      "permission-denied": "The region has no gated action or permission input; the detector matched 'Role-neutral' and the 'locked Just ask heading' in a doc comment."
+    },
+    "apps/web/components/features/teleprompter-studio/StudioCameraBlocked.tsx": {
+      "empty": "Renders one fixed message for one camera error and no collection; the detector matched the items-start layout class.",
+      "long-content": "Title and body come only from cameraErrorCopy for the error code, never from caller text, so no copy can grow past what the PermissionDenied, ErrorNoCamera, ErrorInUse, ErrorUnsupported and ErrorUnknown stories show."
+    },
+    "apps/web/components/features/teleprompter-studio/StudioDock.tsx": {
+      "error": "The dock has no failure surface; 'error' matched only the bg-error token on the record dot. Camera failures render in StudioCameraBlocked and save failures in StudioTakesSheet, which have Error stories."
+    },
+    "apps/web/components/features/teleprompter-studio/StudioHeader.tsx": {
+      "error": "The header shows no failure; 'error' matched only the recording badge's error tone, which the Recording story shows. Save failures render in StudioTakesSheet's ErrorNoneSaved story."
+    },
+    "apps/web/components/features/teleprompter-studio/StudioLightPanel.tsx": {
+      "long-content": "Every label is fixed copy and every value is a bounded number (brightness 0 to 100%, warmth in kelvin, edge width in px), so no caller text reaches the panel and nothing can grow past the Edges and FullWhite stories.",
+      "empty": "The light panel always has settings: it opens with saved or default ring light values, so there is no empty state."
+    },
+    "apps/web/components/features/onboarding/OnboardingSecurityCheckRecovery.tsx": {
+      "empty": "OnboardingSecurityCheckRecovery always renders one fixed heading, one status line and the retry button, and never a collection; the detector matched the items-start and items-center classes."
+    },
+    "apps/web/components/jovie/components/ChatEmptyStateGreeting.tsx": {
+      "offline": "ChatEmptyStateGreeting never fetches or mutates; its owner resolves the next step, and when that read cannot complete the owner passes no action, which the EmptyNoNextStep story shows (the profile review link).",
+      "permission-denied": "The greeting has no gated action or permission input: the only actions are the owner-supplied draft prompt and the profile review link; the detector matched role='status' on the loading line."
+    },
+    "apps/web/components/jovie/components/ChatDropZoneOverlay.tsx": {
+      "permission-denied": "The drop overlay only mirrors an active file drag and has no gated action or permission input; upload limits are enforced by the attachment hook before files reach it, and the detector matched role='status' on the live region."
+    },
+    "apps/web/components/jovie/components/ErrorDisplay.tsx": {
+      "empty": "ErrorDisplay renders exactly one required ChatError and never a collection; the only .filter is over the two parts of the support reference, and the detector matched the items-start and items-center classes."
+    },
+    "apps/web/components/jovie/source-evidence-context.tsx": {
+      "loading": "The provider is pending only while the code-split source-facts module resolves, a microtask after mount; a static story cannot hold a resolved dynamic import, so source-evidence-context.test.tsx asserts data-source-evidence='pending' before 'ready'. Its children render unchanged either way.",
+      "offline": "The provider never fetches; it projects facts it was handed through a lazily imported pure module, so lost connectivity can only stop that chunk from loading, and its children still render with no evidence (the Default story's content without source chips)."
+    },
+    "apps/web/app/app/(shell)/chat/DeferredJovieChat.tsx": {
+      "error": "The wrapper only defers loading JovieChat; a chunk that fails to load throws to the chat route's error.tsx boundary, and every chat error is JovieChat's own state.",
+      "long-content": "The wrapper renders no text of its own: the skeleton has no copy and the mounted chat is JovieChat, which owns message length.",
+      "offline": "The wrapper never fetches or mutates; the only network it causes is the chunk request, whose failure is the error boundary's, and offline sends are JovieChat's.",
+      "rtl-overflow": "The wrapper renders no text or input of its own; the composer and messages are JovieChat's. The detector matched words in its doc comment."
+    },
+    "apps/web/app/(auth)/DesktopAuthRouteHandoff.tsx": {
+      "empty": "The route handoff takes no data and renders a fixed heading, status line and action set from DesktopAuthHandoffActions; there is no collection to empty. The detector matched the items-center class on its section."
+    },
+    "apps/web/app/(auth)/signin/SignInPageClient.tsx": {
+      "empty": "The sign-in page renders one AuthShell and at most one error banner; it owns no collection that could be empty. The detector matched the words links and list in its doc comments, and the provider list belongs to AuthShell (whose zero-provider branch AuthShell.test.tsx covers)."
+    },
+    "apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx": {
+      "permission-denied": "Anyone can subscribe to the changelog: the form has no account, role or gated action. The detector matched role='status' and role='alert'; a failed security check is shown as the error state (ErrorRejectedAddress, and the unavailable form in ChangelogEmailSignup.test.tsx)."
+    },
+    "apps/web/app/desktop-auth/DesktopAuthMethodOptions.tsx": {
+      "empty": "The options list is a fixed set of buttons, and Copy Sign-in Link always renders, so an open list is never empty; the stories show the copy-only and full sets. The detector matched the items-center class on the utility row."
+    },
+    "apps/web/app/desktop-auth/DesktopAuthSharedView.tsx": {
+      "permission-denied": "The heading, status line and cancel button have no gated action or permission input; cancelling is always allowed. The detector matched role='status' on the live status line."
+    },
+    "apps/web/app/desktop-auth/MacCinematicSurface.tsx": {
+      "empty": "MacCinematicSurface is a visual shell around one handoff child and takes no collection; the detector matched the place-items-center class on its main landmark."
+    },
+    "apps/web/components/features/pricing/MarketingPricingPlans.tsx": {
+      "empty": "Plans are the three checked-in public plans filtered by NEXT_PUBLIC_MARKETING_VISIBLE_PLANS, and a filter naming no known plan falls back to all three, so the card list cannot be empty. A plan with no features drops its list, which PartialPlanDetails shows.",
+      "permission-denied": "Public pricing has no gated action: every visitor sees every visible plan and its CTA. The detector matched the word plan; entitlement checks happen after the CTA, in checkout."
+    },
+    "apps/web/components/homepage/HomepageEditorial.tsx": {
+      "empty": "Every list in the chapters (chapter index, profile rows, release captions, invite steps) maps over typed copy checked into data/homepageEditorialCopy.ts and is never fetched, so none can be empty; the detector matched those .map( calls.",
+      "partial": "Each chapter takes one complete copy object whose fields are all required strings (HeroCopy maps every key to string; chapter copy needs headline and body), defaulting to HOMEPAGE_EDITORIAL_COPY, so a chapter cannot render with part of its copy. The detector counted the optional copy and headingId props.",
+      "permission-denied": "The homepage chapters are public marketing with no gated action; whether an invite is granted is decided after the request, outside this component. The detector matched role='img' on the product mockups and the word locked in a comment."
+    },
+    "apps/web/components/marketing/MarketingHero.tsx": {
+      "permission-denied": "The hero renders public copy and links with no gated action or permission input. The detector matched the word permission in the logos prop's doc comment, which is about a page's permission to show distributor logos, decided by the caller."
+    },
+    "packages/ui/atoms/common-dropdown-renderer.tsx": {
+      "offline": "The renderer never fetches or submits: it draws the search field and the rows its owner passes, and a submenu shows loading only when the caller sets isLoading (LoadingItems), so lost connectivity reaches it only as caller state.",
+      "permission-denied": "The renderer has no permission input or gated action; the detector matched role='menuitem' on the loading and empty rows. A caller that withholds a submenu passes disabled, which Radix renders as an inert trigger."
+    },
+    "apps/web/components/molecules/QRCode.tsx": {
+      "loading": "The skeleton shows only while the third-party image request is in flight, and a static story cannot hold that request open; QRCode.test.tsx renders the skeleton before onLoad and asserts it clears on load.",
+      "offline": "QRCode never fetches or mutates from JS; lost connectivity reaches it only as an <img> that fails to load, which the ErrorImageUnavailable story shows with the same-size fallback."
+    },
+    "apps/web/components/features/profile/DesktopQrOverlayClient.tsx": {
+      "loading": "The wrapper renders null on the server and on first paint by design (JOV-2273, no CSR bailout), then shows the icon once matchMedia resolves in an effect, so there is no loading chrome to capture; DesktopQrOverlayClient.test.tsx asserts the empty server render."
+    },
+    "apps/web/components/features/profile/AliasCollisionRecovery.tsx": {
+      "error": "Recovery returns null in every state; a failed, non-OK or malformed alias decision only leaves the visitor on the mode page, which has no pixels of its own to show. AliasCollisionRecovery.certificate.test.tsx asserts no navigation or history change and an axe-clean page for each failure."
+    },
+    "apps/web/components/features/profile/AnonCookieBootstrap.tsx": {
+      "error": "The bootstrap returns null; a rejected or non-OK assignment request keeps the ISR default variant and still fires onResolved, so the error has no visual output. AnonCookieBootstrap.certificate.test.tsx covers both failures with axe."
+    },
+    "apps/web/components/features/profile/ProfileViewTracker.tsx": {
+      "error": "The tracker returns null; a refused beacon falls back to the tracking mutation and nothing is shown to the visitor, so there is no error state to render. ProfileViewTracker.certificate.test.tsx asserts the fallback and an axe-clean page.",
+      "offline": "Offline the browser refuses the sendBeacon and the tracker hands the view to the tracking mutation without rendering anything; ProfileViewTracker.certificate.test.tsx covers that path, and the story shows the chrome-free mount."
+    },
+    "apps/web/components/features/profile/ProfileWebVitalsReporter.tsx": {
+      "error": "The reporter returns null and swallows a failed web-vitals import or start so the profile keeps rendering; there is nothing to draw for the failure, and ProfileWebVitalsReporter.test.tsx asserts the swallowed failure with axe."
+    },
+    "apps/web/components/jovie/components/AssistantMessageText.tsx": {
+      "offline": "AssistantMessageText makes no request and has no connectivity input: it parses the reply string it is given. The only thing it loads is the markdown chunk, and while that is pending the Suspense fallback shows the same text as plain prose (LoadingMarkdownChunk); a reply that never arrives is the chat transport's state, not this component's."
+    },
+    "apps/web/components/jovie/components/ChatAlbumArtSwipeReview.tsx": {
+      "error": "The swipe deck has no error state of its own: its catch blocks only guard the localStorage read and write of the swipe-mode preference and fall back to 'undecided' or in-session state. Applying a candidate is the owner's mutation, and ChatAlbumArtCard renders that failure next to the deck."
+    },
+    "apps/web/components/jovie/components/ChatFeedbackControl.tsx": {
+      "partial": "Every optional prop (turnId, conversationId, toolCallId, toolName, modelUsed, excerpt) is attribution sent with the vote and none is rendered, so a target with only messageId draws the same two thumbs as a full one.",
+      "long-content": "The control draws two fixed-size icon buttons with fixed labels and tooltips. The only free text, excerpt, is never rendered; it is sliced to 500 characters and sent in the vote payload."
+    },
+    "apps/web/components/jovie/components/ChatLinkConfirmationCard.tsx": {
+      "empty": "The card always confirms exactly one proposed link, which the tool call must supply (platform and URL are required). Its only .map draws the invisible status reservers that hold the row height, so there is no list that can be empty."
+    },
+    "apps/web/components/jovie/components/ChatMerchCard.tsx": {
+      "offline": "The options and selection cards never fetch: Save, Publish, Hoodie and Hat dispatch a jovie-chat-submit-prompt event that the chat composer sends as the next turn, so a lost connection is the chat transport's state. The nested publish confirmation is ChatMerchActionCard, which owns its own request states.",
+      "permission-denied": "Neither card has a permission or entitlement input; the detector matched role='status' on the mockup placeholder. An option that may not be published yet shows a disabled Publish button with its blocked reasons, which the Options and ErrorMockupFailed stories show."
+    },
+    "apps/web/components/jovie/components/ChatMerchDesignCarousel.tsx": {
+      "permission-denied": "The carousel has no permission or entitlement input; the detector matched role='status' on the rendering and mockup-failed placeholders. Without a profileId it does not call the merch action route at all and sends the choice as a chat prompt instead."
+    },
+    "apps/web/components/jovie/components/ChatToolSurface.tsx": {
+      "partial": "ChatToolSurface is a slot wrapper: it renders whatever children its card passes and its optional props are only tone, className and a test id, so there is no data that can be partly present. Partial states belong to the cards that fill it, such as ChatLinkConfirmationCard."
     }
   }
 }

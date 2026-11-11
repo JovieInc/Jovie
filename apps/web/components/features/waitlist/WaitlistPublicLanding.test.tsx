@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 const { authLayoutMock, authShellMock, pageMock, roleFormMock, trackMock } =
   vi.hoisted(() => ({
@@ -56,8 +57,8 @@ import { WAITLIST_FRONT_DOOR_VARIANT_ID } from '@/data/homepageFrontDoorCta';
 import { WaitlistPublicLanding } from './WaitlistPublicLanding';
 
 describe('WaitlistPublicLanding', () => {
-  it('renders the shared sign-up shell on the waitlist URL without a second Get started', () => {
-    render(<WaitlistPublicLanding />);
+  it('renders the shared sign-up shell on the waitlist URL without a second Get started', async () => {
+    const { container } = render(<WaitlistPublicLanding />);
 
     expect(authLayoutMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -99,16 +100,18 @@ describe('WaitlistPublicLanding', () => {
         variantIdentity: WAITLIST_FRONT_DOOR_VARIANT_ID,
       })
     );
+    await expectNoA11yViolations(container);
   });
 
-  it('shows the role waitlist form and a sign-in path when signup is closed', () => {
+  it('shows the role waitlist form and a sign-in path when signup is closed', async () => {
     authLayoutMock.mockClear();
     authShellMock.mockClear();
-    render(<WaitlistPublicLanding signupClosed />);
+    const { container } = render(<WaitlistPublicLanding signupClosed />);
 
     expect(screen.getByTestId('role-form')).toBeInTheDocument();
+    // Same invite words as the homepage form, and sentence case sign-in.
     expect(roleFormMock).toHaveBeenCalledWith(
-      expect.objectContaining({ qualify: true })
+      expect.objectContaining({ qualify: true, title: 'Request an invite' })
     );
     expect(screen.queryByTestId('auth-shell')).not.toBeInTheDocument();
     expect(authShellMock).not.toHaveBeenCalled();
@@ -116,7 +119,9 @@ describe('WaitlistPublicLanding', () => {
       expect.objectContaining({
         showFooterPrompt: true,
         footerLinkHref: APP_ROUTES.SIGNIN,
+        footerLinkText: 'Log in',
       })
     );
+    await expectNoA11yViolations(container);
   });
 });
