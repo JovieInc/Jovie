@@ -10,6 +10,10 @@ import {
   summarizeCensus,
   validateCensus,
 } from '../../design-surface-census.mjs';
+import {
+  buildAffectedTestPlan,
+  buildSelectedTestCommands,
+} from '../../run-affected-tests.mjs';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const now = Date.parse('2026-10-22T04:36:00Z');
@@ -223,4 +227,29 @@ test('rolling windows exclude their boundary and ETA waits for real throughput',
   assert.equal(summary.rolling7d.completedWeight, 27);
   assert.equal(summary.eta.days, 7 / 3);
   assert.deepEqual(summary.eta.rangeDays, [14 / 9, 14 / 3]);
+});
+
+test('a renewal that touches only evidence entries selects the census validator', () => {
+  const entry =
+    'apps/web/data/designSystem/surfaceCensus.evidence/pricing/apps__web__components__site__MarketingFooter.tsx.json';
+  const plan = buildAffectedTestPlan([entry]);
+  assert.equal(plan.mode, 'selected');
+  assert.equal(plan.censusValidation, true);
+  assert.ok(
+    plan.scriptVitestTests.includes(
+      'scripts/lib/__tests__/design-surface-census.test.mjs'
+    )
+  );
+  assert.ok(
+    buildSelectedTestCommands(plan, '2').some(
+      ([cmd, args]) =>
+        cmd === 'node' && args[0] === 'scripts/design-surface-census.mjs'
+    )
+  );
+  // Unrelated data JSON keeps its own handling.
+  assert.equal(
+    buildAffectedTestPlan(['apps/web/data/designSystem/other.json'])
+      .censusValidation,
+    false
+  );
 });

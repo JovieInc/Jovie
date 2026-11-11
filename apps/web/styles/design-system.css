@@ -1421,7 +1421,10 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
     overflow: visible;
   }
 
-  /* The tab's content (Home rail, Music, Events, About) is the right column. */
+  /* The tab's content (Home rail, Music, Events, About) is the right column.
+     The grid owns the inline padding here, so the Music panel's mobile bleed
+     (-mx-(--page-pad), which cancels the phone scrollport padding) would
+     shift it left of the column by --page-pad; reset it. */
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
@@ -1434,6 +1437,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
     grid-row: 1;
     min-width: 0;
     width: 100%;
+    margin-inline: 0;
   }
 
   .profile-viewport:not(.profile-viewport--embedded):not(
