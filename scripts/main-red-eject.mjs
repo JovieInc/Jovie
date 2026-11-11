@@ -27,6 +27,7 @@ import {
   decideFailingHead,
   detectConsecutiveGroupFailure,
   detectStuckHead,
+  detectUnattributedRed,
   FIX_RED_LABEL,
   failingHeadComment,
   failingRequiredChecks,
@@ -35,6 +36,7 @@ import {
   headDwell,
   INCIDENT_LABEL,
   INCIDENT_SCHEMA,
+  INTAKE_LABEL,
   MAX_LOOKBACK_COMMITS,
   marker,
   openIncidents,
@@ -43,6 +45,7 @@ import {
   REOPEN_LABEL,
   REVERT_LABEL,
   readMarker,
+  remediationIntake,
   shouldFailOver,
   titles,
   verifyJump,
@@ -192,12 +195,29 @@ export async function plan({
   const trigger = detectConsecutiveGroupFailure(
     recent.map(r => ({ ...r, signature: r.signature }))
   );
-  if (!trigger.triggered)
+  if (!trigger.triggered) {
+    // No shared readable signature. Mixed failures of a few PRs are theirs; the
+    // newest groups all red on different PRs is main (2026-11-10: 8 h of this
+    // returned `none` here and nothing was dispatched).
+    const unattributed = detectUnattributedRed(recent);
+    if (!unattributed.triggered)
+      return {
+        ...result,
+        action: 'none',
+        reason: 'failures-do-not-share-a-signature',
+      };
     return {
       ...result,
-      action: 'none',
-      reason: 'failures-do-not-share-a-signature',
+      trigger: { groups: unattributed.groups, signature: [] },
+      check: null,
+      culprit: null,
+      unattributed,
+      decision: {
+        action: mode === 'apply' ? 'remediate' : 'dry-remediate',
+        reason: 'failures-do-not-share-a-signature',
+      },
     };
+  }
   const check = checkKey(trigger.signature);
 
   const commits = await mainCommits();
@@ -477,6 +497,62 @@ async function incident(key, title, body) {
   return created.number;
 }
 
+/**
+ * File the remediation intake for a red main with nothing to revert. One open
+ * issue per fingerprint (same dedupe as pr_events.upsert_intake); a filing
+ * failure is reported, never thrown: the incident above already paged.
+ */
+async function fileIntake(p, reason) {
+  const intake = remediationIntake({
+    repo: REPO,
+    check: p.check ?? null,
+    reason,
+    groups: p.trigger?.groups ?? [],
+    prs: p.unattributed?.prs ?? [],
+    day: String(p.at ?? new Date().toISOString()).slice(0, 10),
+  });
+  try {
+    const open = await api(
+      `repos/${REPO}/issues?state=open&labels=${INTAKE_LABEL}&per_page=100`,
+      'repair'
+    );
+    const existing = open.find(i =>
+      String(i.body ?? '').includes(`fingerprint=${intake.fingerprint} -->`)
+    );
+    if (existing)
+      return {
+        fingerprint: intake.fingerprint,
+        issue: existing.number,
+        created: false,
+      };
+    const created = JSON.parse(
+      await gh([
+        'api',
+        '-X',
+        'POST',
+        `repos/${REPO}/issues`,
+        '-f',
+        `title=${intake.title}`,
+        '-f',
+        `body=${intake.body}`,
+        '-f',
+        `labels[]=${INTAKE_LABEL}`,
+      ])
+    );
+    return {
+      fingerprint: intake.fingerprint,
+      issue: created.number,
+      created: true,
+    };
+  } catch (error) {
+    console.error(`::warning::remediation intake failed: ${error.message}`);
+    return {
+      fingerprint: intake.fingerprint,
+      error: String(error.message).slice(0, 200),
+    };
+  }
+}
+
 const git = (...args) =>
   execFileSync('git', args, {
     encoding: 'utf8',
@@ -489,17 +565,36 @@ export async function apply(p) {
   if (!p.decision) return { ...p, applied: false };
   const { culprit, check, decision } = p;
   if (decision.action !== 'revert') {
-    if (
-      decision.action === 'alert' ||
-      decision.action === 'skip' ||
-      decision.action === 'dry-revert'
-    )
-      if (decision.action === 'alert')
-        await incident(
-          `alert:${check}`,
-          `main-red: ${check} (manual: ${decision.reason})`,
-          `Main is red on \`${check}\`. Automatic revert not taken: ${decision.reason}. Culprit candidate: ${culprit ? `#${culprit.pr} ${culprit.sha}` : 'unknown'}.`
-        );
+    if (decision.action === 'remediate') {
+      // Red on unrelated PRs with no readable shared signature: nothing to
+      // revert, so page and hand main to a fix lane.
+      const groups = p.trigger.groups;
+      const issue = await incident(
+        'unattributed-red',
+        `main-red: last ${groups.length} merge groups failed on different PRs`,
+        `The last ${groups.length} merge groups all failed (PRs ${p.unattributed.prs.map(n => `#${n}`).join(', ')}) with no shared readable signature, so no culprit can be reverted. Runs: ${groups
+          .slice(0, 6)
+          .map(id => `https://github.com/${REPO}/actions/runs/${id}`)
+          .join(', ')}. A remediation intake routes the fix to a lane.`
+      );
+      const intake = await fileIntake(p, decision.reason);
+      return { ...p, applied: false, incident: issue, intake };
+    }
+    if (decision.action === 'alert') {
+      await incident(
+        `alert:${check}`,
+        `main-red: ${check} (manual: ${decision.reason})`,
+        `Main is red on \`${check}\`. Automatic revert not taken: ${decision.reason}. Culprit candidate: ${culprit ? `#${culprit.pr} ${culprit.sha}` : 'unknown'}.`
+      );
+      // No commit made it red (clock or environment break on an unchanged
+      // main): a revert can never fix it, so file the fix instead of waiting.
+      if (decision.reason === 'no-culprit' && p.mode === 'apply')
+        return {
+          ...p,
+          applied: false,
+          intake: await fileIntake(p, decision.reason),
+        };
+    }
     return { ...p, applied: false };
   }
   const t = p.titles;

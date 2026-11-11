@@ -8,6 +8,10 @@ Alarms (each names its stage and carries its evidence):
   throughput-no-push:<repo>:<lane>   demand > 0, seats configured, zero lane pushes for 60 min
   throughput-queue-no-merge          merge queue > 0, zero merges in the last 60 min with the current
                                      entries past the merge SLO (or unknown), or ejection churn without a landing
+  throughput-queue-empty-red         merge queue EMPTY, zero merges in the last 60 min, and the last merge groups were
+                                     mostly red on several PRs or held PRs wait behind a red group (2026-11-10: one test
+                                     failed every group 20:11Z-04:13Z; the breaker and the failure hold ejected every entry,
+                                     so depth was 0 and throughput-queue-no-merge, which needs depth > 0, read healthy)
   throughput-queue-unmergeable      an UNMERGEABLE queue entry the sweep could not dequeue (it dequeues, comments and
                                      routes to lane-fix-conflict after 10 min; #23519 stalled the queue 3h)
   throughput-queue-starved           merge queue depth <= 1 while CLEAN unqueued PRs wait, for > 10 min (supply-side:
@@ -236,6 +240,45 @@ def sample_release_flow(state: Path, now: float, run=None, repo: str = REPO) -> 
         os.replace(tmp, path)
         return signal, None
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        return (cached or None), f"{type(error).__name__}: {error}"[:200]
+
+
+GROUP_OUTCOMES_FILE, GROUP_OUTCOMES_REFRESH_S, GROUP_OUTCOMES_RUNS = "merge-group-outcomes.json", 300, 6
+EMPTY_RED_MIN_FAILED, EMPTY_RED_MIN_PRS, EMPTY_RED_HELD, EMPTY_RED_FRESH_S = 3, 2, 3, 6 * 3600
+GROUP_BRANCH_PR = "gh-readonly-queue/main/pr-"
+
+
+def sample_group_outcomes(state: Path, now: float, run=None, repo: str = REPO) -> tuple[dict | None, str | None]:
+    """Conclusions of the newest GROUP_OUTCOMES_RUNS decided merge groups (success or failure; a cancelled or
+    skipped group says nothing), whatever their age: one REST read per 5 min. The release-flow sampler only looks
+    at the trailing hour, which is empty exactly when a red main has emptied the queue."""
+    path = Path(state) / GROUP_OUTCOMES_FILE
+    try:
+        cached = json.loads(path.read_text())
+    except (OSError, ValueError):
+        cached = {}
+    if isinstance(cached.get("observedAt"), (int, float)) and 0 <= now - cached["observedAt"] < GROUP_OUTCOMES_REFRESH_S:
+        return cached, None
+    try:
+        rows = _gh_json(run, f"repos/{repo}/actions/workflows/ci.yml/runs?event=merge_group&status=completed&per_page=30")
+        decided = [row for row in sorted(rows.get("workflow_runs") or [], key=lambda r: str(r.get("updated_at")), reverse=True)
+                   if row.get("conclusion") in ("success", "failure", "timed_out", "startup_failure")][:GROUP_OUTCOMES_RUNS]
+        failed = [row for row in decided if row.get("conclusion") != "success"]
+        prs = set()
+        for row in failed:
+            branch = str(row.get("head_branch") or "")
+            if branch.startswith(GROUP_BRANCH_PR):
+                prs.add(branch[len(GROUP_BRANCH_PR):].split("-")[0])
+        last_green = next((row for row in decided if row.get("conclusion") == "success"), None)
+        signal = {"schema": "symphony-merge-group-outcomes/v1", "observedAt": now, "decided": len(decided),
+                  "failed": len(failed), "failedPrs": sorted(prs),
+                  "newestConclusion": decided[0].get("conclusion") if decided else None,
+                  "newestEndedAt": _iso_epoch(decided[0].get("updated_at")) if decided else None,
+                  "lastGreenAt": _iso_epoch(last_green.get("updated_at")) if last_green else None,
+                  "failedRunIds": [row.get("id") for row in failed][:3]}
+        atomic_write_text(path, json.dumps(signal, sort_keys=True))
+        return signal, None
+    except (OSError, ValueError, TypeError, RuntimeError, subprocess.SubprocessError) as error:
         return (cached or None), f"{type(error).__name__}: {error}"[:200]
 
 
@@ -605,9 +648,10 @@ def observe(state: Path, now: float, receipts: list[dict], limits: dict, run=Non
         except Exception as error:  # noqa: BLE001  (a sweep failure must never stop the sentinel)
             queue_unmergeable = {"seen": [], "dequeued": [], "errors": [f"{type(error).__name__}: {error}"[:160]]}
     flow, flow_error = (sample_release_flow(state, now, run) if fetch_remote else (None, None))
-    supply, supply_error, backstop, remediation = (None, None, None, None)
+    supply, supply_error, backstop, remediation, groups = (None, None, None, None, None)
     if fetch_remote:
         sample_queue_timings(state, now, run)
+        groups = sample_group_outcomes(state, now, run)[0]
         supply, supply_error = sample_supply_flow(state, now, run)
         backstop = backstop_enroll(state, supply, now, run)
         remediation = remediation_liveness(state, supply, now, run)
@@ -630,7 +674,7 @@ def observe(state: Path, now: float, receipts: list[dict], limits: dict, run=Non
             "idleExitsByProvider1h": {name: dict(Counter(r["reason"] for r in exits if r.get("provider") == name))
                                       for name in sorted({r.get("provider") for r in exits if r.get("provider")})},
             "supplyFlow": supply, "supplyFlowError": supply_error, "enrollBackstop": backstop, "remediation": remediation,
-            "releaseFlow": flow, "releaseFlowError": flow_error, "repos": repos, "repoErrors": repo_errors,
+            "releaseFlow": flow, "releaseFlowError": flow_error, "groupOutcomes": groups, "repos": repos, "repoErrors": repo_errors,
             "growth": growth_bounds(state, limits)}
 
 
@@ -690,8 +734,30 @@ def judge(obs: dict) -> dict[str, str]:
             f"stage queued->merged: {merge['queueDepth']} PRs in the merge queue, zero merges in the last 60 min "
             f"(queue wait p50 {merge.get('queueWaitP50Minutes')} min, ejection rate {merge.get('ejectionRate')}); "
             f"evidence: node scripts/promotion-loss-metrics.mjs --since 1h --json")
-    # 2b. Supply side: the queue is nearly empty while admissible PRs wait unqueued, and per-state dwell.
+    # 2a. An EMPTY queue is not a healthy queue when the last groups were red: once the breaker and the failure hold
+    # eject everything, depth is 0 and rule 2 can never fire (2026-11-10, 8 h, zero merges). The stall is "nothing
+    # merged, the newest decided group failed, and either most recent groups failed on several PRs or held PRs wait".
     supply = sentinel.get("supplyFlow") or {}
+    groups = sentinel.get("groupOutcomes") or {}
+    if isinstance(merge.get("observedAt"), (int, float)) and obs["now"] - merge["observedAt"] < 1800 \
+            and merge.get("queueDepth") == 0 and merge.get("mergedPerHour") == 0 \
+            and isinstance(groups.get("observedAt"), (int, float)) and obs["now"] - groups["observedAt"] < 900 \
+            and groups.get("newestConclusion") not in (None, "success"):
+        failed, decided = groups.get("failed") or 0, groups.get("decided") or 0
+        fresh_supply = isinstance(supply.get("observedAt"), (int, float)) and obs["now"] - supply["observedAt"] < 900
+        held = (supply.get("counts") or {}).get("held", 0) if fresh_supply else 0
+        waiting = held + (len(supply.get("cleanUnqueued") or []) if fresh_supply else 0)
+        mostly_red = failed >= EMPTY_RED_MIN_FAILED and failed * 2 > decided \
+            and len(groups.get("failedPrs") or []) >= EMPTY_RED_MIN_PRS
+        recent = obs["now"] - (groups.get("newestEndedAt") or 0) < EMPTY_RED_FRESH_S
+        if (mostly_red and (recent or waiting)) or held >= EMPTY_RED_HELD:
+            alerts["throughput-queue-empty-red"] = (
+                f"stage queued->merged: the merge queue is empty and nothing merged in the last 60 min, but {failed} of the last "
+                f"{decided} decided merge groups failed (PRs {', '.join('#' + n for n in (groups.get('failedPrs') or [])[:6]) or 'unknown'}; "
+                f"runs {groups.get('failedRunIds')}) and {held} held + {waiting - held} green-unqueued PR(s) wait: main itself is "
+                "probably red, so re-enqueueing cannot help. Fix main (queue_breaker files the merge-group-shared intake; "
+                "main-red-eject raises the incident); do not edit the victim PRs")
+    # 2b. Supply side: the queue is nearly empty while admissible PRs wait unqueued, and per-state dwell.
     if isinstance(supply.get("observedAt"), (int, float)) and obs["now"] - supply["observedAt"] < 900:
         if (supply.get("starvedForS") or 0) > QUEUE_STARVED_S:
             alerts["throughput-queue-starved"] = (
