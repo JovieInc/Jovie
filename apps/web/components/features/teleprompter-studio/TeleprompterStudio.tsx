@@ -86,6 +86,7 @@ export function TeleprompterStudio({
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const cameraRequestRef = useRef(0);
   const recordingRef = useRef<TakeRecording | null>(null);
   const speedRef = useRef<{ startedAt: number; startIndex: number } | null>(
     null
@@ -135,6 +136,7 @@ export function TeleprompterStudio({
 
   // Camera + mic. Opened once; released on close.
   const startCamera = useCallback(async () => {
+    const request = ++cameraRequestRef.current;
     setCamera({ status: 'starting' });
     if (!canUseStudioCamera()) {
       setCamera({ status: 'blocked', error: 'unsupported' });
@@ -142,6 +144,7 @@ export function TeleprompterStudio({
     }
     try {
       const stream = await openStudioCamera();
+      if (request !== cameraRequestRef.current) return stopStream(stream);
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -150,6 +153,7 @@ export function TeleprompterStudio({
       setCamera({ status: 'live' });
       await detectVoice();
     } catch (error) {
+      if (request !== cameraRequestRef.current) return;
       const reason = classifyCameraError(error);
       setCamera({ status: 'blocked', error: reason });
       trackTeleprompterFunnel('teleprompter_studio_camera_blocked', {
@@ -171,6 +175,7 @@ export function TeleprompterStudio({
     void startCamera();
   });
   const onUnmount = useEffectEvent(() => {
+    cameraRequestRef.current += 1;
     recordingRef.current?.cancel();
     stopStream(streamRef.current);
     const focusTarget = previousFocusRef.current;

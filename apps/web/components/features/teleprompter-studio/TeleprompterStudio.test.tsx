@@ -70,6 +70,24 @@ describe('TeleprompterStudio', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('releases a camera that opens after the studio closed', async () => {
+    let resolveCamera: (stream: unknown) => void = () => undefined;
+    mocks.openStudioCamera.mockReturnValue(
+      new Promise(resolve => {
+        resolveCamera = resolve;
+      })
+    );
+    const stop = vi.fn();
+    const { unmount } = render(
+      <TeleprompterStudio context={context} onClose={vi.fn()} />
+    );
+
+    unmount();
+    resolveCamera({ getTracks: () => [{ stop }, { stop }] });
+
+    await waitFor(() => expect(stop).toHaveBeenCalledTimes(2));
+  });
+
   it('explains a blocked camera', async () => {
     mocks.openStudioCamera.mockRejectedValue(
       new DOMException('denied', 'NotAllowedError')
