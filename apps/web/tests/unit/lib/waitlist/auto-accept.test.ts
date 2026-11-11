@@ -16,7 +16,9 @@ const {
   mockIsNotNull,
   mockCountOpenCohortLearnings,
   mockReadCachedAcquisitionEligibility,
+  mockReadSupportLoadCapacity,
 } = vi.hoisted(() => ({
+  mockReadSupportLoadCapacity: vi.fn(),
   mockReadCachedAcquisitionEligibility: vi.fn(),
   mockIsNotNull: vi.fn((column: unknown) => ({ op: 'isNotNull', column })),
   mockCountOpenCohortLearnings: vi.fn(),
@@ -117,6 +119,10 @@ vi.mock('@/lib/waitlist/settings', () => ({
   tryReserveAutoAcceptSlot: mockTryReserveAutoAcceptSlot,
 }));
 
+vi.mock('@/lib/waitlist/support-load.server', () => ({
+  readSupportLoadCapacity: mockReadSupportLoadCapacity,
+}));
+
 vi.mock('@/lib/waitlist/approval', () => ({
   approveWaitlistEntryInTx: mockApproveWaitlistEntryInTx,
   finalizeWaitlistApproval: mockFinalizeWaitlistApproval,
@@ -215,6 +221,10 @@ describe('runWaitlistAutoAccept', () => {
       autoAcceptedToday: 0,
     });
     mockCountOpenCohortLearnings.mockResolvedValue(0);
+    mockReadSupportLoadCapacity.mockImplementation(async (base: number) => ({
+      band: 'normal',
+      dailyLimit: base,
+    }));
     mockReadCachedAcquisitionEligibility.mockReset();
     mockReadCachedAcquisitionEligibility.mockResolvedValue({
       eligible: true,
@@ -504,6 +514,51 @@ describe('runWaitlistAutoAccept', () => {
       expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
     }
   );
+
+  it('pauses the drain while open bug reports hold admission', async () => {
+    mockReadSupportLoadCapacity.mockResolvedValue({
+      band: 'hold',
+      dailyLimit: 0,
+    });
+    candidateRows = [
+      { id: 'artist', email: 'artist@example.com', status: 'waitlisted' },
+    ];
+
+    const { runWaitlistAutoAccept } = await import(
+      '@/lib/waitlist/auto-accept'
+    );
+    const result = await runWaitlistAutoAccept({
+      now: new Date('2026-09-29T00:00:00Z'),
+    });
+
+    expect(result).toMatchObject({
+      approved: 0,
+      capacityRemaining: 0,
+      pausedReason: 'support_load',
+    });
+    expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
+  });
+
+  it('stops at the narrowed budget while bug reports pile up', async () => {
+    mockReadSupportLoadCapacity.mockResolvedValue({
+      band: 'narrow',
+      dailyLimit: 1,
+    });
+    candidateRows = [
+      { id: 'a', email: 'a@example.com', status: 'waitlisted' },
+      { id: 'b', email: 'b@example.com', status: 'waitlisted' },
+    ];
+
+    const { runWaitlistAutoAccept } = await import(
+      '@/lib/waitlist/auto-accept'
+    );
+    const result = await runWaitlistAutoAccept({
+      now: new Date('2026-09-29T00:00:00Z'),
+    });
+
+    expect(result).toMatchObject({ approved: 1, capacityRemaining: 0 });
+    expect(mockApproveWaitlistEntryInTx).toHaveBeenCalledTimes(1);
+  });
 
   it('only auto-admits entries with a Spotify artist profile', async () => {
     const { runWaitlistAutoAccept } = await import(

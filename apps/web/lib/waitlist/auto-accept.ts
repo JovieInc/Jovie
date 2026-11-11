@@ -35,6 +35,7 @@ import {
   getWaitlistSettings,
   tryReserveAutoAcceptSlot,
 } from '@/lib/waitlist/settings';
+import { readSupportLoadCapacity } from '@/lib/waitlist/support-load.server';
 
 const AUTO_ACCEPT_ELIGIBLE_STATUSES = ['new', 'waitlisted'] as const;
 
@@ -49,7 +50,8 @@ export interface WaitlistAutoAcceptResult {
   pausedReason?:
     | 'open_learnings'
     | 'learnings_unavailable'
-    | 'golden_path_not_green';
+    | 'golden_path_not_green'
+    | 'support_load';
 }
 
 function getCutoffDate(days: number, now: Date): Date {
@@ -125,9 +127,11 @@ export async function runWaitlistAutoAccept(
 ): Promise<WaitlistAutoAcceptResult> {
   const now = options.now ?? new Date();
   const settings = await getWaitlistSettings();
+  // Spend the budget the support-load knob allows, not the stored limit.
+  const capacity = await readSupportLoadCapacity(settings.autoAcceptDailyLimit);
   const capacityRemaining = Math.max(
     0,
-    settings.autoAcceptDailyLimit - settings.autoAcceptedToday
+    capacity.dailyLimit - settings.autoAcceptedToday
   );
 
   if (
@@ -142,6 +146,7 @@ export async function runWaitlistAutoAccept(
       skipped: 0,
       failed: 0,
       capacityRemaining,
+      ...(capacity.band === 'hold' ? { pausedReason: 'support_load' } : {}),
     };
   }
 
@@ -212,6 +217,7 @@ export async function runWaitlistAutoAccept(
   ]);
 
   for (const candidate of candidates) {
+    if (approved >= capacityRemaining) break;
     const normalizedEmail = candidate.email.trim().toLowerCase();
     if (
       hasProductionWaitlistCanaryNamespace(normalizedEmail) ||
