@@ -7,6 +7,8 @@ import {
 import {
   isPublicProfileRootLevel,
   isPublicProfileSiblingTab,
+  resolveTabBackAction,
+  shouldShowTabBackChevron,
 } from '@/features/profile/sibling-tabs';
 
 describe('public profile back destination', () => {
@@ -139,5 +141,30 @@ describe('public profile back destination', () => {
       expect(isPublicProfileSiblingTab(mode)).toBe(false);
       expect(isPublicProfileRootLevel(mode)).toBe(false);
     }
+  });
+
+  it("gives sibling tabs Home's chevron and exit, and nested modes a Back home", () => {
+    for (const mode of ['profile', 'listen', 'tour', 'about'] as const) {
+      expect(
+        shouldShowTabBackChevron({ mode, hasHistoryDestination: false })
+      ).toBe(false);
+      expect(
+        resolveTabBackAction({
+          mode,
+          historyLength: 1,
+          referrer: '',
+          isSignedIn: true,
+        })
+      ).toBe('app-fallback');
+    }
+    expect(
+      shouldShowTabBackChevron({
+        mode: 'releases',
+        hasHistoryDestination: false,
+      })
+    ).toBe(true);
+    expect(
+      resolveTabBackAction({ mode: 'releases', historyLength: 1, referrer: '' })
+    ).toBe('profile-root');
   });
 });

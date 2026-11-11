@@ -83,6 +83,27 @@ describe('evaluateRouting', () => {
     });
   });
 
+  it('reports the request volume next to the spend so call-count drift is visible', () => {
+    const result = evaluateRouting({
+      ...calm,
+      keyRows: [
+        {
+          api_key_name: 'jovie-golden-path-review',
+          total_cost: 2.8,
+          request_count: 3000,
+        },
+      ],
+    });
+    expect(result.byKey['jovie-golden-path-review']).toMatchObject({
+      usdPerDay: 1.4,
+      requestsPerDay: 1500,
+    });
+    expect(result.findings[0]).toMatchObject({
+      type: 'gateway-over-ceiling',
+      requestsPerDay: 1500,
+    });
+  });
+
   it('flags undeclared keys and models, and an unhealthy relay', () => {
     const { findings } = evaluateRouting({
       ...calm,

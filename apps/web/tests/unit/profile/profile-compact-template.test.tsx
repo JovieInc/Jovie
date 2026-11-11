@@ -538,27 +538,6 @@ describe('ProfileCompactTemplate', () => {
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
 
-  // Walk 2026-11-09 (jov.ie/tim): Music, Events and About sit beside Home in
-  // the tab row, so they are siblings and carry Home's top chrome, not a Back.
-  it.each(['listen', 'tour', 'about'] as const)(
-    'shows no back control on the %s sibling tab first landing',
-    async mode => {
-      render(
-        <ProfileCompactTemplate
-          mode={mode}
-          artist={mockArtist}
-          socialLinks={[]}
-          contacts={[]}
-        />
-      );
-
-      expect(screen.getByTestId('profile-bottom-nav')).toBeInTheDocument();
-      expect(
-        screen.queryByRole('button', { name: 'Back' })
-      ).not.toBeInTheDocument();
-    }
-  );
-
   // Regression: JOV-4103 — public profile hero must show social media icons
   // when the artist has Instagram/Twitter links (missed-ship recovery).
   it('renders identity social icons for Instagram and Twitter profile links', async () => {
@@ -1408,35 +1387,6 @@ describe('ProfileCompactTemplate', () => {
     backSpy.mockRestore();
     goSpy.mockRestore();
     vi.unstubAllGlobals();
-  });
-
-  it('exits from a sibling tab exactly as Home does for a signed-in arrival', async () => {
-    mockUseIsAuthenticated.mockReturnValue(true);
-    Object.defineProperty(window.history, 'length', {
-      configurable: true,
-      value: 1,
-    });
-    const assignSpy = vi.fn();
-    vi.stubGlobal('location', {
-      ...window.location,
-      assign: assignSpy,
-    });
-
-    try {
-      render(
-        <ProfileCompactTemplate
-          mode='tour'
-          artist={mockArtist}
-          socialLinks={[]}
-          contacts={[]}
-        />
-      );
-
-      fireEvent.click(screen.getByRole('button', { name: 'Back' }));
-      expect(assignSpy).toHaveBeenCalledWith('/app');
-    } finally {
-      vi.unstubAllGlobals();
-    }
   });
 
   it('returns nested releases mode to the profile root instead of leaving the profile', async () => {
@@ -3219,7 +3169,7 @@ describe('ProfileCompactTemplate', () => {
         expect.objectContaining({
           artist: mockArtist,
           activeMode: 'profile',
-          presentation: 'modal',
+          presentation: 'embedded',
         })
       );
     });
@@ -3612,7 +3562,7 @@ describe('ProfileCompactTemplate', () => {
     });
   });
 
-  describe('with the desktop surface flag off (shipped default)', () => {
+  describe('with the desktop surface flag off (explicit opt-out)', () => {
     beforeEach(() => {
       vi.stubEnv('NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE', '');
     });
@@ -3666,10 +3616,12 @@ describe('ProfileCompactTemplate', () => {
       expect(viewport).not.toHaveAttribute('data-desktop-ready');
       expect(viewport).not.toHaveClass('profile-viewport--desktop-surface');
       // The compact shell keeps the centered phone-column contract
-      // (max-width: --profile-shell-max-width, md:mx-auto card framing).
+      // (max-width: --profile-shell-max-width, mx-auto at every width).
+      // Embedded browser panes can be wider than the phone cap but narrower
+      // than md, so centering must not wait for tablet card framing.
       const compactShell = screen.getByTestId('profile-compact-shell');
       expect(compactShell).toHaveClass('public-profile-compact-shell');
-      expect(compactShell).toHaveClass('md:mx-auto');
+      expect(compactShell).toHaveClass('mx-auto');
       expect(screen.queryByTestId('profile-desktop-shell')).toBeNull();
       expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
       // The banner stays inside the column instead of the desktop shell.

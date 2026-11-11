@@ -799,6 +799,12 @@
   color: var(--color-bg-paper);
 }
 
+/* JOV-3209: hide the consent card while a profile mobile flow is open. */
+html[data-profile-flow-open="true"] .cookie-banner-card {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 @media (hover: hover) {
   :where(.profile-aeo-claim-card__cta:hover) {
     background: color-mix(
@@ -1196,6 +1202,12 @@
   .profile-viewport--desktop-surface:not(.profile-viewport--embedded)
     .public-profile-layout-desktop-shell {
     display: flex;
+  }
+
+  /* JOV-11623: top-align the desktop stage across mode switches. */
+  .profile-viewport--desktop-surface:not(.profile-viewport--embedded)
+  .public-profile-layout-frame--desktop {
+    align-items: flex-start;
   }
 }
 

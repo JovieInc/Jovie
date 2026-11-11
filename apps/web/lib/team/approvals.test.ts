@@ -22,7 +22,11 @@ const APPROVAL_ID = '00000000-0000-4000-8000-0000000000ff';
 type Row = Record<string, unknown>;
 
 /** Fake tx: each select() pops the next row list; where() is thenable. */
-function createTx(selects: Row[][], insertReturn: Row[] = []) {
+function createTx(
+  selects: Row[][],
+  insertReturn: Row[] = [],
+  updateReturn: Row[] = [{ id: APPROVAL_ID }]
+) {
   const queue = [...selects];
   const updates: Row[] = [];
   const inserts: unknown[] = [];
@@ -32,6 +36,7 @@ function createTx(selects: Row[][], insertReturn: Row[] = []) {
       const chain: Row = {};
       chain.from = vi.fn(() => chain);
       chain.where = vi.fn(() => chain);
+      chain.for = vi.fn(() => Promise.resolve(rows));
       chain.limit = vi.fn((n: number) => Promise.resolve(rows.slice(0, n)));
       chain.then = (f: (v: Row[]) => unknown) => Promise.resolve(rows).then(f);
       return chain;
@@ -42,7 +47,10 @@ function createTx(selects: Row[][], insertReturn: Row[] = []) {
         updates.push(v);
         return chain;
       });
-      chain.where = vi.fn(() => Promise.resolve());
+      chain.where = vi.fn(() => ({
+        returning: vi.fn(() => Promise.resolve(updateReturn)),
+        then: (f: () => unknown) => Promise.resolve().then(f),
+      }));
       return chain;
     }),
     insert: vi.fn(() => ({
@@ -301,5 +309,49 @@ describe('listProfileApprovals', () => {
     });
     expect(r).toEqual({ ok: true, approvals: [pending] });
     expect(updates[0]).toMatchObject({ status: 'expired' });
+  });
+});
+
+describe('conditional approval transitions', () => {
+  it('does not authorize or audit consumption when another transaction won', async () => {
+    const state = createTx(
+      [managerClaims, ownerProfile, [], [{ id: APPROVAL_ID }]],
+      [],
+      []
+    );
+    expect(
+      await authorizeRiskyProfileAction(state.tx, {
+        ...mutate,
+        appUserId: MANAGER,
+      })
+    ).toEqual({ status: 'requires_approval', role: 'manager' });
+    expect(state.inserts).toHaveLength(0);
+  });
+
+  it('does not resurrect or audit a pending grant after concurrent revocation', async () => {
+    const state = createTx([[pending], ownerClaims, ownerProfile, []], [], []);
+    expect(
+      await decideProfileApproval(state.tx, {
+        approvalId: APPROVAL_ID,
+        actorUserId: OWNER,
+        decision: 'approved',
+      })
+    ).toEqual({ ok: false, reason: 'not_pending' });
+    expect(state.inserts).toHaveLength(0);
+  });
+
+  it('does not revoke or audit an approval already consumed by another transaction', async () => {
+    const state = createTx(
+      [[{ ...pending, status: 'approved' }], ownerClaims, ownerProfile],
+      [],
+      []
+    );
+    expect(
+      await revokeProfileApproval(state.tx, {
+        approvalId: APPROVAL_ID,
+        actorUserId: OWNER,
+      })
+    ).toEqual({ ok: false, reason: 'not_pending' });
+    expect(state.inserts).toHaveLength(0);
   });
 });

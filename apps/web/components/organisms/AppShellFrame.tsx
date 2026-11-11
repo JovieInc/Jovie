@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import { memo } from 'react';
 import { AppShellFrameDedupe } from '@/components/organisms/AppShellFrameDedupe';
-import { DesktopTitlebar } from '@/components/organisms/DesktopTitlebar';
+import { DesktopTitlebarSlot } from '@/components/organisms/DesktopTitlebarSlot';
 import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
 import { OverlayInteractionGuard } from '@/components/shell/OverlayInteractionGuard';
 import {
@@ -95,7 +95,7 @@ export const AppShellFrame = memo(function AppShellFrame({
       )}
     >
       {placeholder ? null : <AppShellFrameDedupe />}
-      <DesktopTitlebar />
+      <DesktopTitlebarSlot />
       <div
         data-app-shell-body='true'
         data-electron-top-gap-owner='titlebar'
