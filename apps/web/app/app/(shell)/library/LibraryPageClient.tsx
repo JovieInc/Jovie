@@ -26,6 +26,7 @@ import {
 import type { LibraryProfileVisibility } from '@/lib/library/profile-visibility';
 import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import type { LibraryMerchCard } from '@/lib/merch/types';
+import type { TeleprompterTakeSummary } from '@/lib/teleprompter/takes/contract';
 import type { PublicVideoListItem } from '@/lib/youtube-library/queries';
 import { ReleaseCatalogPageClient } from '../dashboard/releases/ReleaseCatalogPageClient';
 import { CreatorDocumentsWorkspace } from './CreatorDocumentsWorkspace';
@@ -45,6 +46,7 @@ export function LibraryPageClient({
   creatorDocumentsLoadFailed = false,
   youtubeVideos = [],
   youtubeConnected = false,
+  teleprompterTakes = [],
   relationships = [],
   postReleaseBundle = EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
 }: {
@@ -64,6 +66,7 @@ export function LibraryPageClient({
   readonly creatorDocumentsLoadFailed?: boolean;
   readonly youtubeVideos?: readonly PublicVideoListItem[];
   readonly youtubeConnected?: boolean;
+  readonly teleprompterTakes?: readonly TeleprompterTakeSummary[];
   readonly relationships?: readonly LibraryRelationshipView[];
   readonly postReleaseBundle?: LibraryPostReleaseBundle;
 }) {
@@ -263,6 +266,7 @@ export function LibraryPageClient({
             assetShareByAssetId={assetShareByAssetId}
             creatorDocuments={creatorDocuments}
             youtubeVideos={youtubeVideos}
+            teleprompterTakes={teleprompterTakes}
             merchProducts={merchCards.map(card => ({
               id: card.id,
               title: card.title,
