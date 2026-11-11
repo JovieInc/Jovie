@@ -242,14 +242,17 @@ describe('CapacityBoard', () => {
   });
 
   it('flags stale reads instead of presenting them as current', () => {
-    const later = evaluateRegistry(ops, { now: NOW + 10 * 86_400_000, spend });
+    // The gateway pool's spend snapshot is dated 2026-10-31
+    // (ops/registry/spend.json); +16d puts it past the 8-day
+    // manualMaxAgeDays threshold, so the read must render as Stale.
+    const later = evaluateRegistry(ops, { now: NOW + 16 * 86_400_000, spend });
     render(
       <CapacityBoard
         view={later}
         order={routingOrder(later)}
         selectedId='vercel-ai-gateway'
         basePath='/app/ov/capacity'
-        now={NOW + 10 * 86_400_000}
+        now={NOW + 16 * 86_400_000}
         registryUpdatedAt={ops.updatedAt}
         liveOverlay='none'
       />

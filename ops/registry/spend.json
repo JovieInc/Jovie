@@ -1,7 +1,7 @@
 {
   "schema": "jovie.spend-ledger/v1",
   "description": "Per-provider balance, burn, runway and caps. Metadata only. Snapshots are dated readings; the live check overlays fresh reads where a read path exists.",
-  "updatedAt": "2026-10-30T00:30:00Z",
+  "updatedAt": "2026-11-09T08:00:00Z",
   "thresholds": {
     "runwayAlertDays": 14,
     "runwayPageDays": 3,
@@ -17,22 +17,23 @@
       "owner": "tim",
       "kind": "prepaid-credit",
       "cap": null,
+      "runwayStatus": "drained",
       "snapshot": {
-        "observedAt": "2026-10-25T02:42:00Z",
-        "balanceUsd": 12.06,
+        "observedAt": "2026-10-31T07:00:00Z",
+        "balanceUsd": 4.27,
         "totalUsedUsd": null,
-        "source": "Vercel dashboard, jovie team AI Gateway overview (browser read; the live /v1/credits read has failed with no-gateway-token on every lanes check)"
+        "source": "ai-gateway /v1/report balance, recorded in ops/registry/ai-provider-spend.jsonl (label: before)"
       },
       "burnPerDayUsd": {
-        "value": 2.04,
-        "source": "observed balance fall $21.23 (2026-10-20T19:51Z) to $12.06 (2026-10-25T02:42Z) over 4.3 days; no top-up",
-        "observedAt": "2026-10-25T02:42:00Z"
+        "value": 0.59,
+        "source": "measured ai-gateway /v1/report, window 2026-10-30..2026-10-31 (ops/registry/ai-provider-spend.jsonl, label: now-before-this-work), after the workers-first routing change (#23990) and the Summer pause; the 2026-10-24..30 window burned 2.71/day",
+        "observedAt": "2026-10-31T07:10:00Z"
       },
       "readPath": {
         "method": "GET https://ai-gateway.vercel.sh/v1/credits with AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN",
         "live": "gateway-credits"
       },
-      "notes": "Shared by every Gateway key and project, including Summer. Auto-reload is off/unverified. The live check measures burn as the total_used slope from this snapshot."
+      "notes": "Shared by every Gateway key and project, including Summer. Auto-reload is off/unverified. The live check measures burn as the total_used slope from this snapshot. Drained (JOV-10239): the balance fell from $4.27 (2026-10-31) to cents by 2026-11-08, when the lanes live read paged 0.1 days of runway and then 0 days; the standing budget authority is existing credits only, no top-up (credentials.json summer-gateway-budget, 2026-10-20), so the pool is terminal and runway paging is resolved as drained. Two-provider credit failover is live for every caller with a Workers AI twin (apps/web/lib/ai/credit-failover.ts; workers-first routes in apps/web/lib/ai/routing.json), so the drain is a non-event for the product. Callers with no twin (summer.planner kimi-k3.1-pro, summer.jev-critic) are owned in JovieInc/summer-config. scripts/lib/ai-routing-drift.mjs keeps its own independent gateway-runway page and is unaffected by this status."
     },
     {
       "id": "summer-gateway-monthly",
