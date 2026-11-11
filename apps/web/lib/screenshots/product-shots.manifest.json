@@ -4,7 +4,7 @@
     "profile-hero-desktop": {
       "width": 1640,
       "height": 1172,
-      "sourceHash": "46c710b30e3fd924481d76fad35b99dbc46116ff06be80180f2179bc67e744b0",
+      "sourceHash": "65c2473ce460aadb4068cff635e13b0e12e2a8f419fbb28492d84db6ad079137",
       "specHash": "431d2bbda1f7a334f405179ebdc85d1f63359bf2683879cf776aa248037d998c",
       "renderedAt": "2026-11-05T21:47:18.256Z",
       "sources": [
@@ -20,6 +20,12 @@
       "bytes": {
         "avif": 28848,
         "webp": 43542
+      },
+      "sourceEquivalence": {
+        "capturedSourceHash": "46c710b30e3fd924481d76fad35b99dbc46116ff06be80180f2179bc67e744b0",
+        "sourceCommit": "4370e5295b18092ac45b72e0857eef9650ff1cbe",
+        "change": "Image bytes stay the 2026-11-05 capture. They were not re-rendered. ProfileIdentityHeader.tsx and ProfilePacCard.tsx are unchanged. ProfileCompactTemplate.tsx from origin/main only changes the back click handler (resolveTabBackAction; profile mode still passes isProfileRoot true and the handler is not painted), the compact shell class (mx-auto instead of md:mx-auto, the same margin at the 1440px capture viewport), and desktop surface plus desktop credits presentation (embedded, outside the identity-header and profile-pac crop). Commits 4370e5295b1, fb530032d89, and ca703faac2e.",
+        "evidence": "code-diff of ProfileCompactTemplate.tsx between 1e62e8d0dea and 2144845de67; no screenshot was taken"
       }
     },
     "setup-claim-handle": {
