@@ -11,10 +11,13 @@ name: Auto-Ready Agent Drafts
 #    jovie-writer-pr-proof/v1 receipt does. The owning writer's successful path
 #    is scripts/writer-owned-pr-promote.sh. This job never waits for green.
 #
-# 2. Green-source undraft (event-driven). When a draft on JovieInc/Jovie has
-#    persisted exact-author/head proof, PR Ready + required checks SUCCESS and
-#    mergeable CLEAN, undraft it so Merge Queue Green Enroll can pick it up. This job never enables auto-merge
-#    and never enrolls the merge queue.
+# 2. Green-source undraft (event-driven). When a draft on JovieInc/Jovie is
+#    shippable (a trusted writer in ON_GREEN_WRITERS ships on green by default,
+#    any other author needs persisted exact-author/head proof), has PR Ready +
+#    required checks SUCCESS and mergeable CLEAN, undraft it so Merge Queue
+#    Green Enroll can pick it up. This job never enables auto-merge and never
+#    enrolls the merge queue. Tim, Nov 11 2026: "all prs must merge
+#    automatically on green" (scripts/lib/auto-ready-provenance.mjs).
 #
 # Green-source never mutates HOLD #17156. Tim-hold / machine hold labels
 # (GREEN_SOURCE_HOLD_LABELS) cover other open holds; merged PR numbers are
@@ -22,8 +25,10 @@ name: Auto-Ready Agent Drafts
 #
 # Manual dispatch without pr_number remains writer-proof recovery. Dispatch
 # with pr_number + head_sha is a targeted green-source undraft. Opt out
-# per-PR with machine/security/hold labels or controlled-proof/canary markers.
-# Missing proof is always ineligible; the author need not opt out while working.
+# per-PR with `<!-- jovie-auto-ready: park -->` in the body, machine/security/
+# hold labels, converting back to draft after the last push, or
+# controlled-proof/canary markers. An untrusted author without proof is always
+# ineligible.
 
 # Wake only on the workflows that publish the required source contexts
 # (Source Validation: PR Ready + Migration Guard; Fork PR Gate; PR Size Guard).
