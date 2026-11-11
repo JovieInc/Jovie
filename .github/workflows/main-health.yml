@@ -59,5 +59,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+      # component-rendered-evaluator launches Chromium, as it does in the CI structural lane.
+      - uses: ./.github/actions/setup-playwright
       - name: Run main-health checks with the script contracts
         run: node scripts/main-health.mjs --structural --out "$RUNNER_TEMP/main-health.json"

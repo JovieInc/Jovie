@@ -129,10 +129,9 @@ export const groupPr = branch =>
 
 /**
  * Red with no readable shared signature: the newest n decided merge groups all
- * failed, each for a different PR, and none of those n named a test or a
- * specific gate. One PR failing its own groups is that PR's problem (the queue
- * breaker holds it), and so are n PRs that each failed a readable test of
- * their own; n unreadable failures on n PRs in a row is main's.
+ * failed, each for a different PR, and none named a test or a specific gate.
+ * One PR failing its own groups, or n PRs each failing a readable test of
+ * their own, is theirs (the queue breaker holds them); otherwise it is main's.
  * @param {Array<{id:number, conclusion:string, branch?:string, signature?:string[]}>} groups newest first
  */
 export function detectUnattributedRed(groups, n = UNATTRIBUTED_MIN_GROUPS) {
