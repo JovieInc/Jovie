@@ -1,12 +1,16 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { MENU_MOTION_ANCHORED } from '../lib/dropdown-styles';
 import { CommonDropdown } from './common-dropdown';
-import { MenuScrollBody } from './common-dropdown-scroll-body';
+import {
+  MENU_SCROLL_BODY,
+  MenuScrollBody,
+} from './common-dropdown-scroll-body';
 import type { CommonDropdownItem } from './common-dropdown-types';
 
 /**
  * The scroll region behind `CommonDropdown`'s `scrollBody` prop: a
  * fixed-width list with the search pinned on top. Only the rows scroll, and
- * the list fades at whichever edge still hides rows. `motion="anchored"`
+ * the list fades at whichever edge still hides rows. `motion={MENU_MOTION_ANCHORED}`
  * scales the panel from its trigger.
  */
 const meta: Meta<typeof MenuScrollBody> = {
@@ -62,8 +66,8 @@ function ScrollBodyMenu({
       modal={false}
       searchable
       searchPlaceholder='Search'
-      scrollBody
-      motion='anchored'
+      scrollBody={MENU_SCROLL_BODY}
+      motion={MENU_MOTION_ANCHORED}
       maxHeight='20rem'
       emptyMessage={emptyMessage}
     />

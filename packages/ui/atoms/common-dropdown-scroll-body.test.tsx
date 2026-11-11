@@ -2,14 +2,16 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { run as axe } from 'axe-core';
 import { describe, expect, it, vi } from 'vitest';
+import { MENU_MOTION_ANCHORED } from '../lib/dropdown-styles';
 import { CommonDropdown } from './common-dropdown';
 import {
   getMenuScrollEdges,
   getMenuScrollMask,
+  getScrollBodyWidth,
+  MENU_SCROLL_BODY,
   MENU_SCROLL_FADE_SIZE,
 } from './common-dropdown-scroll-body';
 import type { CommonDropdownItem } from './common-dropdown-types';
-import { getScrollBodyWidth } from './common-dropdown-utils';
 
 function historyItems(count: number): CommonDropdownItem[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -103,7 +105,12 @@ describe('getMenuScrollMask', () => {
 describe('CommonDropdown scrollBody', () => {
   it('pins the search header outside the scrolling list', () => {
     render(
-      <CommonDropdown items={historyItems(30)} open searchable scrollBody />
+      <CommonDropdown
+        items={historyItems(30)}
+        open
+        searchable
+        scrollBody={MENU_SCROLL_BODY}
+      />
     );
 
     const content = document.querySelector<HTMLElement>(
@@ -129,7 +136,7 @@ describe('CommonDropdown scrollBody', () => {
         items={historyItems(3)}
         open
         searchable
-        scrollBody
+        scrollBody={MENU_SCROLL_BODY}
         minWidth={420}
       />
     );
@@ -162,7 +169,12 @@ describe('CommonDropdown scrollBody', () => {
 
   it('fades the bottom while rows are below and clears it at the end', () => {
     render(
-      <CommonDropdown items={historyItems(30)} open searchable scrollBody />
+      <CommonDropdown
+        items={historyItems(30)}
+        open
+        searchable
+        scrollBody={MENU_SCROLL_BODY}
+      />
     );
     const body = document.querySelector<HTMLElement>(
       '[data-slot="common-dropdown-scroll-body"]'
@@ -195,7 +207,7 @@ describe('CommonDropdown scrollBody', () => {
         items={historyItems(4)}
         open
         searchable
-        scrollBody
+        scrollBody={MENU_SCROLL_BODY}
         emptyMessage='No Matching Chats'
       />
     );
@@ -216,7 +228,7 @@ describe('CommonDropdown scrollBody', () => {
         open
         modal={false}
         searchable
-        scrollBody
+        scrollBody={MENU_SCROLL_BODY}
       />
     );
     await expectNoNewA11yViolations(await screen.findByRole('menu'));
@@ -230,7 +242,7 @@ describe('CommonDropdown scrollBody', () => {
         open
         modal={false}
         searchable
-        scrollBody
+        scrollBody={MENU_SCROLL_BODY}
       />
     );
     await user.type(screen.getByPlaceholderText('Search...'), 'zzz');
@@ -244,7 +256,7 @@ describe('CommonDropdown scrollBody', () => {
         open
         modal={false}
         searchable
-        scrollBody
+        scrollBody={MENU_SCROLL_BODY}
         isLoading
       />
     );
@@ -256,7 +268,12 @@ describe('CommonDropdown type to filter', () => {
   it('sends a printable key pressed on a row to the search field', async () => {
     const user = userEvent.setup({ delay: null });
     render(
-      <CommonDropdown items={historyItems(6)} open searchable scrollBody />
+      <CommonDropdown
+        items={historyItems(6)}
+        open
+        searchable
+        scrollBody={MENU_SCROLL_BODY}
+      />
     );
     const input = screen.getByPlaceholderText('Search...');
 
@@ -277,7 +294,14 @@ describe('CommonDropdown type to filter', () => {
 
   it('sends Backspace on a row to the search field', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<CommonDropdown items={historyItems(6)} open searchable />);
+    render(
+      <CommonDropdown
+        scrollBody={MENU_SCROLL_BODY}
+        items={historyItems(6)}
+        open
+        searchable
+      />
+    );
     const input = screen.getByPlaceholderText('Search...');
 
     await user.type(input, 'chat');
@@ -295,6 +319,7 @@ describe('CommonDropdown type to filter', () => {
   it('leaves keys from a nested menu or a field inside a row alone', () => {
     render(
       <CommonDropdown
+        scrollBody={MENU_SCROLL_BODY}
         items={[
           {
             type: 'custom',
@@ -329,6 +354,7 @@ describe('CommonDropdown type to filter', () => {
     const user = userEvent.setup({ delay: null });
     render(
       <CommonDropdown
+        scrollBody={MENU_SCROLL_BODY}
         items={[{ type: 'action', id: 'one', label: 'One', onClick: onSelect }]}
         open
         searchable
@@ -348,11 +374,31 @@ describe('CommonDropdown type to filter', () => {
     expect(input).toHaveValue('');
     expect(onSelect).toHaveBeenCalledTimes(1);
   });
+  it('leaves typing to the menu itself without a scroll body', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<CommonDropdown items={historyItems(6)} open searchable />);
+    const input = screen.getByPlaceholderText('Search...');
+
+    await user.click(input);
+    await user.keyboard('{ArrowDown}');
+    await waitFor(() =>
+      expect(screen.getByRole('menuitem', { name: 'Chat 0' })).toHaveFocus()
+    );
+    await user.keyboard('r');
+
+    expect(input).toHaveValue('');
+  });
 });
 
 describe('CommonDropdown motion', () => {
   it('scales from the trigger with motion="anchored"', () => {
-    render(<CommonDropdown items={historyItems(2)} open motion='anchored' />);
+    render(
+      <CommonDropdown
+        items={historyItems(2)}
+        open
+        motion={MENU_MOTION_ANCHORED}
+      />
+    );
     const content = document.querySelector(
       '[data-slot="common-dropdown-content"]'
     );

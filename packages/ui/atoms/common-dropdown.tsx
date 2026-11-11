@@ -10,11 +10,9 @@ import {
   contextMenuContentCompactClasses,
   dropdownMenuContentClasses,
   dropdownMenuContentCompactClasses,
-  MENU_ANCHORED_MOTION,
   MENU_ICON_TRIGGER_BASE,
   MENU_ITEM_BASE,
   MENU_ITEM_COMPACT,
-  MENU_SCROLL_BODY_CONTENT,
   OVERLAY_COLLISION_PADDING,
   SELECT_TRIGGER_BASE,
 } from '../lib/dropdown-styles';
@@ -26,7 +24,6 @@ import {
   renderRootBody,
   SearchableContent,
 } from './common-dropdown-renderer';
-import { MenuScrollBody } from './common-dropdown-scroll-body';
 import type {
   CommonDropdownItem,
   CommonDropdownProps,
@@ -35,7 +32,6 @@ import {
   filterItems,
   flattenMenuItems,
   getContentStyle,
-  getScrollBodyWidth,
   MENU_MAX_SUBMENU_DEPTH,
   menuNeedsSearch,
   menuSubmenuDepth,
@@ -77,8 +73,8 @@ export function CommonDropdown(props: CommonDropdownProps) {
     disabled = false,
     minWidth,
     maxHeight,
-    scrollBody = false,
-    motion = 'fade',
+    scrollBody,
+    motion,
     children,
   } = props;
   const deepMenu = menuSubmenuDepth(items) > MENU_MAX_SUBMENU_DEPTH;
@@ -243,45 +239,13 @@ export function CommonDropdown(props: CommonDropdownProps) {
     );
   }
 
-  function renderDropdownBody() {
-    return renderRootBody({
+  function renderDropdownContent() {
+    const dropdownBody = renderRootBody({
       isLoading,
       items: filteredItems,
       emptyMessage,
       renderItems: itemsToRender => renderItems(itemsToRender, 'dropdown'),
     });
-  }
-
-  /**
-   * Type to filter: a printable key (or Backspace) pressed on a row goes to
-   * the search field instead of Radix typeahead, so the list keeps filtering
-   * wherever focus sits. Arrow keys, Enter and Escape keep their menu behavior.
-   */
-  function redirectTypingToSearch(event: React.KeyboardEvent<HTMLDivElement>) {
-    const input = rootSearchInputRef.current;
-    if (!input || event.target === input) return;
-    if (event.metaKey || event.ctrlKey || event.altKey) return;
-    // React bubbles keys out of portaled submenus and custom fields; only
-    // this menu's own rows hand typing to the search (Radix's own check).
-    const target = event.target as HTMLElement;
-    if (target.closest('[data-radix-menu-content]') !== event.currentTarget)
-      return;
-    if (
-      target.isContentEditable ||
-      target.closest('input, textarea, select, [contenteditable="true"]')
-    )
-      return;
-    const isPrintable = event.key.length === 1 && event.key !== ' ';
-    if (!isPrintable && event.key !== 'Backspace') return;
-    event.preventDefault();
-    const current = searchQueryRef.current;
-    handleSearchChange(
-      event.key === 'Backspace' ? current.slice(0, -1) : current + event.key
-    );
-    input.focus();
-  }
-
-  function renderDropdownContent() {
     const content = (
       <DropdownMenuPrimitive.Content
         align={align}
@@ -292,22 +256,29 @@ export function CommonDropdown(props: CommonDropdownProps) {
         data-slot='common-dropdown-content'
         aria-busy={isLoading || undefined}
         data-scroll-body={scrollBody ? 'true' : undefined}
-        data-motion={motion}
+        data-motion={motion?.name ?? 'fade'}
         className={cn(
           dropdownContentBase,
-          scrollBody && MENU_SCROLL_BODY_CONTENT,
-          motion === 'anchored' && MENU_ANCHORED_MOTION,
+          scrollBody?.contentClassName,
+          motion?.className,
           contentClassName
         )}
         style={
           scrollBody
-            ? {
-                ...getContentStyle(undefined, maxHeight, 'dropdown', 'hidden'),
-                width: getScrollBodyWidth(minWidth),
-              }
+            ? scrollBody.getContentStyle(minWidth, maxHeight)
             : getContentStyle(minWidth, maxHeight, 'dropdown')
         }
-        onKeyDown={searchable ? redirectTypingToSearch : undefined}
+        onKeyDown={
+          searchable && scrollBody
+            ? event =>
+                scrollBody.redirectTyping(
+                  event,
+                  rootSearchInputRef.current,
+                  searchQueryRef.current,
+                  handleSearchChange
+                )
+            : undefined
+        }
         onEscapeKeyDown={event => {
           if (searchQuery) {
             event.preventDefault();
@@ -325,9 +296,9 @@ export function CommonDropdown(props: CommonDropdownProps) {
           />
         ) : null}
         {scrollBody ? (
-          <MenuScrollBody>{renderDropdownBody()}</MenuScrollBody>
+          <scrollBody.Body>{dropdownBody}</scrollBody.Body>
         ) : (
-          renderDropdownBody()
+          dropdownBody
         )}
       </DropdownMenuPrimitive.Content>
     );

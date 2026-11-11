@@ -4,6 +4,8 @@ import {
   CommonDropdown,
   type CommonDropdownItem,
   type CommonDropdownProps,
+  MENU_MOTION_ANCHORED,
+  MENU_SCROLL_BODY,
   TitleMenuTrigger,
 } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
@@ -173,8 +175,8 @@ export function ChatHistorySwitcher({
       filterItem={showError ? keepEveryItem : matchTitle}
       isLoading={isLoading && !conversations}
       emptyMessage={getChatHistoryEmptyMessage({ query, isError: showError })}
-      scrollBody
-      motion='anchored'
+      scrollBody={MENU_SCROLL_BODY}
+      motion={MENU_MOTION_ANCHORED}
       maxHeight={MAX_LIST_HEIGHT}
       trigger={
         // The header title truncates (overflow hidden), so the atom keeps

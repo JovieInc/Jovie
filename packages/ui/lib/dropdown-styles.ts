@@ -328,7 +328,7 @@ export const MENU_BADGE_BASE =
 export const MENU_SCROLL_BODY_CONTENT = 'flex flex-col overflow-y-hidden p-0';
 
 /**
- * `motion='anchored'`: a subtle scale and fade from the trigger
+ * Anchored motion: a subtle scale and fade from the trigger
  * (DROPDOWN_TRANSFORM_ORIGIN). Enter uses the dropdown duration, exit the
  * faster one. Reduced motion removes both states' animation.
  */
@@ -336,6 +336,12 @@ export const MENU_ANCHORED_MOTION =
   'data-[state=open]:zoom-in-97 data-[state=closed]:zoom-out-97 ' +
   'data-[state=open]:duration-subtle data-[state=closed]:duration-fast ease-out ' +
   'motion-reduce:data-[state=open]:animate-none motion-reduce:data-[state=closed]:animate-none';
+
+/** `motion` preset for CommonDropdown: scale and fade from the trigger. */
+export const MENU_MOTION_ANCHORED = {
+  name: 'anchored',
+  className: MENU_ANCHORED_MOTION,
+} as const;
 
 /**
  * Search header and input styles shared by root menus and searchable submenus
