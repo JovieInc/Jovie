@@ -2668,6 +2668,24 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
     );
 }
 
+/* Compact mode card (empty states): no reserved height, so a short message
+   never sits under a large blank gradient. One accent glow at the top right
+   only, and a hairline rim, so the corner glow cannot read as a smear past an
+   edge the dark card would otherwise not show (walk 2026-11-09, Events). */
+.profile-mode-card.profile-mode-card--compact {
+  --profile-mode-card-min-height: 0;
+  box-shadow: inset 0 0 0 var(--space-px) var(--profile-mode-card-hairline);
+}
+
+.profile-mode-card.profile-mode-card--compact::before {
+  background: radial-gradient(
+    80% 60% at 100% 0%,
+    var(--profile-mode-card-accent-center) 0%,
+    var(--profile-mode-card-accent-shade) 42%,
+    transparent 100%
+  );
+}
+
 .profile-mode-card[data-accent="ultra"] {
   --profile-mode-card-accent: var(--noir-ion-ultra);
 }
