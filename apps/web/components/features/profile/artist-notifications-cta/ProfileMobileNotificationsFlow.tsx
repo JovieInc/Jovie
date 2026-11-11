@@ -577,7 +577,7 @@ export function ProfileMobileNotificationsFlow({
                   ) : (
                     <MessageCircle className='size-3.5' />
                   )}
-                  {isSms ? 'Use email' : 'Use SMS'}
+                  {isSms ? 'Switch to email' : 'Switch to SMS'}
                 </button>
                 {onDismissCapture ? (
                   <button

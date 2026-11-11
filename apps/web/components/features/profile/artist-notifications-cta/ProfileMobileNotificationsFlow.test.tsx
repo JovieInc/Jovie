@@ -81,7 +81,7 @@ describe('ProfileMobileNotificationsFlow', () => {
     renderFlow({ step: 'email', onDismissCapture: vi.fn() });
 
     expect(screen.getByText('Get updates')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Use SMS' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Switch to SMS' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Not now' })).toBeVisible();
     // CompositeField owns the focus ring, so the input paints none inside it.
     const field = screen
