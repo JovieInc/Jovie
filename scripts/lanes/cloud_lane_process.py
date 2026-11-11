@@ -1,5 +1,6 @@
 """Bounded subprocess output for the pinned cloud CLI."""
-# api-budget: github-user-graphql 16/hr - at most 8 daily tasks, one PR create and readback each
+# api-budget: github-user-graphql 20/hr - planning estimate: 2 carried + 8 new tasks, 2 gh calls each
+# Completion bursts and gh HTTP request cost are unmeasured; this is not a runtime limit.
 import os
 import select
 import subprocess
