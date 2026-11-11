@@ -1,9 +1,16 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TeleprompterRecordingContext } from '@/lib/teleprompter/types';
 
 const mocks = vi.hoisted(() => ({
   openStudioCamera: vi.fn(),
+  startTakeRecording: vi.fn(),
   track: vi.fn(),
 }));
 
@@ -26,6 +33,7 @@ vi.mock('@/lib/teleprompter/studio-recorder', async importOriginal => ({
   >()),
   canUseStudioCamera: () => true,
   openStudioCamera: mocks.openStudioCamera,
+  startTakeRecording: mocks.startTakeRecording,
 }));
 
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
@@ -69,6 +77,31 @@ describe('TeleprompterStudio', () => {
 
     fireEvent.click(screen.getByTestId('teleprompter-studio-close'));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('keeps the take clock running when the speed changes mid-take', async () => {
+    mocks.openStudioCamera.mockResolvedValue({ getTracks: () => [] });
+    mocks.startTakeRecording.mockReturnValue({
+      stop: vi.fn(),
+      cancel: vi.fn(),
+    });
+    render(<TeleprompterStudio context={context} onClose={vi.fn()} />);
+    await waitFor(() =>
+      expect(screen.getByLabelText('Start recording')).not.toBeDisabled()
+    );
+
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    try {
+      fireEvent.click(screen.getByLabelText('Start recording'));
+      act(() => vi.advanceTimersByTime(3000));
+      expect(screen.getByText(/Take 1 · 0:03/)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /Speed/ }));
+      act(() => vi.advanceTimersByTime(1000));
+      expect(screen.getByText(/Take 1 · 0:04/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('releases a camera that opens after the studio closed', async () => {

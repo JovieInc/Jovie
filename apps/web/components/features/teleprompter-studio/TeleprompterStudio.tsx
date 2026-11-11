@@ -194,12 +194,21 @@ export function TeleprompterStudio({
     if (camera.status === 'live') recordButtonRef.current?.focus();
   }, [camera.status]);
 
-  // Recording clock + speed-scroll fallback.
+  // Take clock: keyed on the phase alone so a speed change never resets it.
   useEffect(() => {
     if (phase !== 'recording') return;
     const startedAt = Date.now();
+    const timer = globalThis.setInterval(
+      () => setElapsedMs(Date.now() - startedAt),
+      200
+    );
+    return () => globalThis.clearInterval(timer);
+  }, [phase]);
+
+  // Speed-scroll fallback.
+  useEffect(() => {
+    if (phase !== 'recording') return;
     const timer = globalThis.setInterval(() => {
-      setElapsedMs(Date.now() - startedAt);
       const speed = speedRef.current;
       if (mode === 'script' && followMode === 'speed' && speed) {
         const next = autoScrollWordIndex({
