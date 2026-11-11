@@ -311,7 +311,7 @@ describe('merge_group workflow contract', () => {
     );
 
     const consumers =
-      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-fast-structural-lanes ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare drizzle-migration-guard';
+      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-fast-structural-lanes ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes drizzle-migration-guard';
     for (const jobId of consumers.split(' ')) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
       expect(job, jobId).toContain('ci-merge-group-workspace');
@@ -3477,6 +3477,9 @@ ${selectedGateScript}`,
       'ci-secret-scan',
       'ci-golden-path-lock',
       'ci-visual-snapshot-compare',
+      'ci-visual-snapshot-homepage',
+      'ci-visual-marketing-dom',
+      'ci-visual-marketing-routes',
       'drizzle-migration-guard',
       'ci-unit-tests',
       'ci-merge-group-ready',

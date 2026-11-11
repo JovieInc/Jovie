@@ -214,6 +214,20 @@ export function inventoryMissingBaselines({
 }
 
 /**
+ * Job ids of the split visual compare lane: one shared build plus three
+ * parallel rendered suites (merge-time move 2). The build job keeps the
+ * historical id/name so every external consumer of `ci-visual-snapshot-compare`
+ * keeps pointing at the lane root.
+ */
+export const VISUAL_COMPARE_BUILD_JOB = 'ci-visual-snapshot-compare';
+export const VISUAL_HOMEPAGE_COMPARE_JOB = 'ci-visual-snapshot-homepage';
+export const VISUAL_MARKETING_DOM_JOB = 'ci-visual-marketing-dom';
+export const VISUAL_MARKETING_ROUTES_JOB = 'ci-visual-marketing-routes';
+
+/** Artifact name prefix that carries the shared build to every suite job. */
+export const VISUAL_COMPARE_BUILD_ARTIFACT = 'visual-compare-build-';
+
+/**
  * @param {VisualCompareWorkflowContractInput} [input]
  * @returns {string[]}
  */
@@ -240,41 +254,78 @@ export function assertVisualCompareWorkflowContract({
     issues.push('--update-snapshots must be gated on REFRESH_MODE');
   }
 
-  const compareJob = extractJobBlock(ciYaml, 'ci-visual-snapshot-compare');
-  if (!compareJob) {
-    issues.push('ci.yml must define ci-visual-snapshot-compare');
-  } else {
+  /** Every job in the split lane shares the same fail-closed rules. */
+  const forEveryVisualJob = (jobId, label) => {
+    const block = extractJobBlock(ciYaml, jobId);
+    if (!block) {
+      issues.push(`ci.yml must define ${jobId}`);
+      return null;
+    }
     if (
-      /^\s+- run:.*--update-snapshots/m.test(compareJob) ||
-      compareJob.includes('UPDATE_FLAG="--update-snapshots"')
+      /^\s+- run:.*--update-snapshots/m.test(block) ||
+      block.includes('UPDATE_FLAG="--update-snapshots"')
     ) {
-      issues.push('compare job must not pass --update-snapshots');
+      issues.push(`${label} must not pass --update-snapshots`);
     }
-    if (compareJob.includes('continue-on-error')) {
-      issues.push('compare job must not be advisory continue-on-error');
+    if (block.includes('continue-on-error')) {
+      issues.push(`${label} must not be advisory continue-on-error`);
     }
-    if (!compareJob.includes("github.event_name == 'merge_group'")) {
+    if (block.includes('neon-create-branch')) {
+      issues.push(`${label} must not provision Neon`);
+    }
+    return block;
+  };
+
+  const buildJob = forEveryVisualJob(VISUAL_COMPARE_BUILD_JOB, 'compare job');
+  if (buildJob) {
+    if (!buildJob.includes("github.event_name == 'merge_group'")) {
       issues.push('compare job must run on merge_group');
     }
-    if (!compareJob.includes(`${HOMEPAGE_VISUAL_SELECTION_OUTPUT} == 'true'`)) {
+    if (!buildJob.includes(`${HOMEPAGE_VISUAL_SELECTION_OUTPUT} == 'true'`)) {
       issues.push(
         'compare job must run on homepage pull_request paths (run_homepage_visual)'
       );
     }
-    if (compareJob.includes('neon-create-branch')) {
-      issues.push('compare job must not provision Neon');
+    const buildContract = [
+      './.github/actions/setup-node-pnpm',
+      'pnpm turbo build --filter=@jovie/web',
+      // The handoff ships only what the standalone server needs; the restored
+      // Turbopack cache is build-only compiler state and must not ride along.
+      'tar -cf "${{ runner.temp }}/visual-compare-build.tar" --exclude=\'.next/cache\'',
+      'actions/upload-artifact@',
+      VISUAL_COMPARE_BUILD_ARTIFACT,
+    ];
+    if (buildContract.some(fragment => !buildJob.includes(fragment))) {
+      issues.push(
+        'compare job must build once and publish the shared visual compare build artifact'
+      );
+    }
+  }
+
+  const homepageJob = forEveryVisualJob(
+    VISUAL_HOMEPAGE_COMPARE_JOB,
+    'homepage visual compare suite'
+  );
+  if (homepageJob) {
+    if (
+      !homepageJob.includes(`${HOMEPAGE_VISUAL_SELECTION_OUTPUT} == 'true'`)
+    ) {
+      issues.push(
+        'homepage visual compare suite must run on homepage pull_request paths (run_homepage_visual)'
+      );
     }
     const renderedHomepageContract = [
       './.github/actions/setup-node-pnpm',
       './.github/actions/setup-playwright',
-      'pnpm turbo build --filter=@jovie/web',
+      'actions/download-artifact@',
+      VISUAL_COMPARE_BUILD_ARTIFACT,
       '.github/scripts/guard-playwright-artifacts.mjs',
       'playwright test tests/e2e/visual-regression.spec.ts',
       '--project=chromium',
       '--grep homepage',
     ];
     if (
-      renderedHomepageContract.some(fragment => !compareJob.includes(fragment))
+      renderedHomepageContract.some(fragment => !homepageJob.includes(fragment))
     ) {
       issues.push(
         'homepage visual compare must render and compare the Playwright homepage snapshots'
@@ -282,19 +333,119 @@ export function assertVisualCompareWorkflowContract({
     }
   }
 
+  const marketingDomJob = forEveryVisualJob(
+    VISUAL_MARKETING_DOM_JOB,
+    'marketing DOM certification suite'
+  );
+  if (marketingDomJob) {
+    const marketingDomContract = [
+      'actions/download-artifact@',
+      VISUAL_COMPARE_BUILD_ARTIFACT,
+      '.github/scripts/guard-playwright-artifacts.mjs',
+      'tests/product-screenshots/route-dom-certification.spec.ts',
+      '--workers=1',
+    ];
+    if (
+      marketingDomContract.some(fragment => !marketingDomJob.includes(fragment))
+    ) {
+      issues.push(
+        'marketing DOM certification suite must run the route DOM certification spec on the shared build'
+      );
+    }
+  }
+
+  const marketingRoutesJob = forEveryVisualJob(
+    VISUAL_MARKETING_ROUTES_JOB,
+    'marketing route capture suite'
+  );
+  if (marketingRoutesJob) {
+    const marketingRoutesContract = [
+      'actions/download-artifact@',
+      VISUAL_COMPARE_BUILD_ARTIFACT,
+      '.github/scripts/guard-playwright-artifacts.mjs',
+      'tests/product-screenshots/marketing-routes.spec.ts',
+      '--workers=4',
+    ];
+    if (
+      marketingRoutesContract.some(
+        fragment => !marketingRoutesJob.includes(fragment)
+      )
+    ) {
+      issues.push(
+        'marketing route capture suite must run the exact marketing route spec on the shared build'
+      );
+    }
+  }
+
   const mergeReady = extractJobBlock(ciYaml, 'ci-merge-group-ready');
-  if (!mergeReady.includes('ci-visual-snapshot-compare')) {
-    issues.push('merge-group PR Ready must require visual snapshot compare');
+  const mergeReadyRequiredJobs = [
+    VISUAL_COMPARE_BUILD_JOB,
+    VISUAL_HOMEPAGE_COMPARE_JOB,
+    VISUAL_MARKETING_DOM_JOB,
+    VISUAL_MARKETING_ROUTES_JOB,
+  ];
+  for (const jobId of mergeReadyRequiredJobs) {
+    if (!mergeReady.includes(jobId)) {
+      issues.push('merge-group PR Ready must require visual snapshot compare');
+      break;
+    }
+  }
+  // Listing the needs — or merely assigning each suite's result to a shell
+  // variable — is not enough: the merge-group aggregate must route every
+  // selected suite's result through the enforcing selected-gate loop, or a
+  // failing/skipped suite rides through on the shared build's success.
+  const mergeReadySuiteValidations = [
+    [
+      'needs.ci-visual-snapshot-homepage.result',
+      '"Homepage Visual Compare:$RUN_HOMEPAGE_VISUAL:$VISUAL_HOMEPAGE_RESULT"',
+    ],
+    [
+      'needs.ci-visual-marketing-dom.result',
+      '"Marketing DOM Certification:$RUN_MARKETING_DOM:$VISUAL_MARKETING_DOM_RESULT"',
+    ],
+    [
+      'needs.ci-visual-marketing-routes.result',
+      '"Marketing Route Capture:$RUN_MARKETING_DOM:$VISUAL_MARKETING_ROUTES_RESULT"',
+    ],
+  ];
+  for (const [needRef, gateEntry] of mergeReadySuiteValidations) {
+    if (!mergeReady.includes(needRef) || !mergeReady.includes(gateEntry)) {
+      issues.push(
+        'merge-group PR Ready must validate every selected visual suite result'
+      );
+      break;
+    }
+  }
+  // The selected-gate entries must feed a loop that actually exits nonzero on
+  // a selected failure/skip and on an unselected run.
+  const mergeReadyEnforcingLoop = [
+    'for selected_gate in',
+    '"$selected" == "true" && "$result" != "success"',
+    '"$selected" != "true" && "$result" != "skipped"',
+    'exit 1',
+  ];
+  if (
+    mergeReadyEnforcingLoop.some(fragment => !mergeReady.includes(fragment))
+  ) {
+    issues.push(
+      'merge-group PR Ready must validate every selected visual suite result'
+    );
   }
   const sourceReady = extractJobBlock(ciYaml, 'ci-pr-ready');
-  if (!sourceReady.includes('ci-visual-snapshot-compare')) {
-    issues.push(
-      'source PR Ready must require visual snapshot compare on homepage paths'
-    );
+  for (const jobId of mergeReadyRequiredJobs) {
+    if (!sourceReady.includes(jobId)) {
+      issues.push(
+        'source PR Ready must require visual snapshot compare on homepage paths'
+      );
+      break;
+    }
   }
   if (
     !sourceReady.includes(HOMEPAGE_VISUAL_SELECTION_OUTPUT) ||
-    !/"\$VISUAL_COMPARE_RESULT" != "success"/.test(sourceReady)
+    !/"\$VISUAL_COMPARE_RESULT" != "success"/.test(sourceReady) ||
+    !/"\$VISUAL_HOMEPAGE_RESULT" != "success"/.test(sourceReady) ||
+    !/"\$VISUAL_MARKETING_DOM_RESULT" != "success"/.test(sourceReady) ||
+    !/"\$VISUAL_MARKETING_ROUTES_RESULT" != "success"/.test(sourceReady)
   ) {
     issues.push(
       'source PR Ready must fail closed when a homepage PR skips visual snapshot compare'

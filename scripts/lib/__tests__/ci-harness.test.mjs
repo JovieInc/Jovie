@@ -36,6 +36,9 @@ const EXPECTED_MERGE_GATE_NAMES = [
   'Secret Scan (gitleaks + trufflehog)',
   'Golden Path Lock',
   'Visual Snapshot Compare',
+  'Visual Snapshot Compare (homepage)',
+  'Visual Snapshot Compare (marketing DOM)',
+  'Visual Snapshot Compare (marketing routes)',
   'Migration Guard',
   'Unit Tests',
   'Exact-head Coverage',
@@ -223,7 +226,7 @@ describe('ci-harness manifest', () => {
     const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
 
     expect(prReady).toContain(
-      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-pen-diff, ci-slop-guard]'
+      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-visual-snapshot-homepage, ci-visual-marketing-dom, ci-visual-marketing-routes, ci-pen-diff, ci-slop-guard]'
     );
     expect(prReady).toContain('needs.ci-exact-head-coverage.result');
     expect(prReady).toContain('Evaluate deterministic source PR checks');
