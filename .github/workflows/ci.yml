@@ -2228,6 +2228,18 @@ jobs:
             mv "$BASE_FETCH_DIR/status.tmp" "$BASE_FETCH_DIR/status"
           ) < /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &
           echo "Base-branch history fetch started in the background (pid $!)."
+      # Pinned actionlint downloads (source, patch, shellcheck, pyflakes) from the
+      # cache main writes in tsc-cache-warm.yml. Warm: none of them is fetched, so
+      # a GitHub release outage cannot fail this step (29 merge groups on
+      # 2026-11-08 and 2026-11-10). Read-only here; every entry is re-verified
+      # against its sha256 pin before use, so an older key is safe to restore.
+      - name: Restore pinned actionlint downloads
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /tmp/jovie-pinned-downloads
+          key: pinned-downloads-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/scripts/run-actionlint.sh') }}
+          restore-keys: |
+            pinned-downloads-${{ runner.os }}-${{ runner.arch }}-
       - uses: ./.github/actions/setup-node-pnpm
         with:
           reuse_merge_group_workspace: 'true'
@@ -2247,6 +2259,7 @@ jobs:
         env:
           # Read-only token for the release-download fallback.
           RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
+          PINNED_DOWNLOAD_CACHE_DIR: /tmp/jovie-pinned-downloads
         run: bash .github/scripts/run-actionlint.sh
       - name: Fetch base-branch history
         # Await the background fetch. Fails closed on a non-zero fetch exit,
