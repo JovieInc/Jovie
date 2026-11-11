@@ -13,12 +13,12 @@ def execution_gate(runner, host, issue, linear, name, claimed) -> dict | None:
     ordinary intake and recovery path before any provider call (R4); the claim is
     retained asynchronously and only a human clears it.
     """
-    if not cloud_lane.enabled():
-        return None
     live = cloud_lane.live_claim(issue.identifier)
     if live is not None:
         return {"verdict": live["stage"], "reason": f"cloud-claim-live:{live.get('reason', 'active')}",
                 "pr": live.get("pr"), "prUrl": live.get("prUrl"), "issue": issue.identifier}
+    if not cloud_lane.enabled():
+        return None
     labels = {str(label).lower() for label in issue.labels}
     if cloud_lane.OPT_IN_LABEL not in labels:
         return None
@@ -84,7 +84,7 @@ def execute_claimed_issue(runner, host, name, spec, linear, issue):
     try:
         # A live cloud claim blocks the epic path too (JOV-10357 R4): run_issue's gate
         # then returns the retained disposition instead of a second provider call.
-        cloud_blocked = cloud_lane.enabled() and cloud_lane.live_claim(issue.identifier) is not None
+        cloud_blocked = cloud_lane.live_claim(issue.identifier) is not None
         receipt = (runner.epics.run_epic(runner, host, name, spec, linear, issue, host.repo)
                    if runner.epics.is_epic(issue) and not cloud_blocked
                    else runner.run_issue(host, name, spec, linear, issue))

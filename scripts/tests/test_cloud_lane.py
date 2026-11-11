@@ -32,6 +32,9 @@ from test_cloud_lane_cases.__tests__.cloud_lane_publication_cases import CloudPu
 from test_cloud_lane_cases.__tests__.cloud_lane_reconcile_cases import CloudReconcileTest
 
 
+from test_cloud_lane_cases.__tests__.cloud_lane_occupancy_cases import CloudOccupancyTest
+
+
 class CloudLaneTest(CloudLaneFixture):
     def test_command_pins_env_attempts_branch_main_and_separator(self):
         self.assertEqual(c.command("codex", "goal"),
@@ -150,7 +153,7 @@ import cloud_lane as c
 def run(*a, **kw):
     with open(sys.argv[3], 'a') as f: f.write('called\\n')
     return subprocess.CompletedProcess(a, 0, 'task_abc', '')
-out = c.route('J-1', 'codex', ['cloud-lane'], 'typo', 'fix typo', run=run,
+out = c._submit('J-1', 'codex', ['cloud-lane'], 'typo', 'fix typo', run=run,
               main_sha='b' * 40, path=sys.argv[2], fencing_token='tok')
 print(out['route'])
 """
@@ -164,58 +167,58 @@ print(out['route'])
         self.assertEqual(Path(calls).read_text().splitlines(), ["called"])
 
     def test_status_maps_only_the_anchored_first_line_grammar(self):
-        self.assertEqual(c.status("J-1", path=self.p)["state"], "unknown")
+        self.assertEqual(c._status("J-1", path=self.p)["state"], "unknown")
         self.seed_accepted()
         for out, code, state in (("[READY] fix typo", 0, "ready"), ("[PENDING] fix typo", 1, "pending"),
                                  ("[APPLIED] fix typo", 1, "applied"), ("[ERROR] fix typo", 1, "error")):
             with self.subTest(state=state):
-                result = c.status("J-1", run=done(out, code), path=self.p)
+                result = c._status("J-1", run=done(out, code), path=self.p)
                 self.assertEqual(result["state"], state)
         for out, code in (("[ready] lower", 0), ("READY no brackets", 0), ("[READY]", 1),
                           ("[PENDING] x", 0), ("[WEIRD] x", 1), ("", 0), ("junk", 1)):
             with self.subTest(out=out):
-                self.assertEqual(c.status("J-1", run=done(out, code), path=self.p)["state"], "unknown")
+                self.assertEqual(c._status("J-1", run=done(out, code), path=self.p)["state"], "unknown")
         detail = "[READY] fix typo\nenv_test  •  2m\n+1/-0 • 1 file"
-        self.assertEqual(c.status("J-1", run=done(detail), path=self.p)["state"], "ready")
+        self.assertEqual(c._status("J-1", run=done(detail), path=self.p)["state"], "ready")
         def boom(*a, **k):
             raise OSError("offline")
-        self.assertEqual(c.status("J-1", run=boom, path=self.p)["state"], "unknown")
+        self.assertEqual(c._status("J-1", run=boom, path=self.p)["state"], "unknown")
         with patch.dict(os.environ, {"CODEX_CLOUD_BINARY": ""}):
-            self.assertEqual(c.status("J-1", path=self.p)["reason"], "provider-unconfigured")
+            self.assertEqual(c._status("J-1", path=self.p)["reason"], "provider-unconfigured")
 
     def test_collect_binds_identity_through_bounded_pagination(self):
         self.seed_accepted()
-        collected = c.collect("J-1", run=self.codex(diff="diff --git a/x b/x\n"), path=self.p)
+        collected = c._collect("J-1", run=self.codex(diff="diff --git a/x b/x\n"), path=self.p)
         self.assertEqual((collected["ok"], collected["remote"], collected["baseSha"]),
                          (True, "task_abc12345", "b" * 40))
         calls = []
         run = self.codex(diff="x", calls=calls, cursors=2)
-        c.collect("J-1", run=run, path=self.p)
+        c._collect("J-1", run=run, path=self.p)
         self.assertEqual(sum("cursor" in arg for call in calls for arg in call), 2)
         self.assertTrue(all("--limit" in call for call in calls if "list" in call))
 
     def test_collect_holds_on_identity_and_truncation(self):
         self.seed_accepted()
         rows = [{"id": "task_abc12345", "environment_id": "other-env", "attempt_total": 1}]
-        self.assertEqual(c.collect("J-1", run=self.codex(task_rows=rows), path=self.p)["reason"],
+        self.assertEqual(c._collect("J-1", run=self.codex(task_rows=rows), path=self.p)["reason"],
                          "environment-mismatch")
         rows = [{"id": "task_abc12345", "environment_id": "env_test", "attempt_total": 2}]
-        self.assertEqual(c.collect("J-1", run=self.codex(task_rows=rows), path=self.p)["reason"],
+        self.assertEqual(c._collect("J-1", run=self.codex(task_rows=rows), path=self.p)["reason"],
                          "attempt-mismatch")
-        self.assertEqual(c.collect("J-1", run=self.codex(task_rows=[]), path=self.p)["reason"],
+        self.assertEqual(c._collect("J-1", run=self.codex(task_rows=[]), path=self.p)["reason"],
                          "task-not-listed")
         endless = lambda *a, **k: subprocess.CompletedProcess(
             a, 0, json.dumps({"tasks": [], "cursor": "forever"}), "")
-        self.assertEqual(c.collect("J-1", run=endless, path=self.p)["reason"], "list-truncated")
+        self.assertEqual(c._collect("J-1", run=endless, path=self.p)["reason"], "list-truncated")
         for run, why in ((done("[]", 1), "list-unavailable"),
                          (done("not json"), "list-unparseable"),
                          (done('{"tasks": "nope"}'), "list-unparseable"),
                          (lambda *a, **k: (_ for _ in ()).throw(OSError("x")), "list-unavailable")):
             with self.subTest(why=why):
-                self.assertEqual(c.collect("J-1", run=run, path=self.p)["reason"], why)
-        self.assertEqual(c.collect("J-1", run=self.codex(diff_code=1), path=self.p)["reason"],
+                self.assertEqual(c._collect("J-1", run=run, path=self.p)["reason"], why)
+        self.assertEqual(c._collect("J-1", run=self.codex(diff_code=1), path=self.p)["reason"],
                          "diff-unavailable")
-        self.assertEqual(c.collect("missing", run=done(), path=self.p)["reason"], "remote-id-missing")
+        self.assertEqual(c._collect("missing", run=done(), path=self.p)["reason"], "remote-id-missing")
 
     def test_stream_run_bounds_output_and_time_while_streaming(self):
         noisy = [sys.executable, "-c", "print('x' * (12 * 1024 * 1024))"]

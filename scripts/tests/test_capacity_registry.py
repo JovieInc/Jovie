@@ -403,6 +403,15 @@ class LiveReads(unittest.TestCase):
         self.assertEqual(rows["openai-codex/lyb-pro"]["quota"]["remainingPercent"], 41)
         self.assertEqual(rows["openai-codex/lyb-pro"]["quota"]["live"], "codex-ledger")
 
+    def test_codex_projects_every_window_and_uses_the_tightest_allowance(self):
+        row = ledger_row("7f31f3ffca1c", 90, 1793382060)
+        row["capacityLease"]["usableCapacityRemaining"]["secondary"] = {
+            "remainingPercent": 0, "resetsAt": 1793381060, "windowDurationMins": 10080}
+        quota = CL.read_codex(REGISTRY, {"lyb-pro": row})["openai-codex/lyb-pro"]["quota"]
+        self.assertEqual(quota["remainingPercent"], 0)
+        self.assertEqual(set(quota["windows"]), {"primary", "secondary"})
+        self.assertEqual(quota["windowMins"], 10080)
+
     def test_grok_reader_drives_tmux_and_always_cleans_up(self):
         calls = []
 

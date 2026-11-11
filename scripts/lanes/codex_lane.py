@@ -28,6 +28,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 ACCOUNTS_ROOT = Path(os.environ.get("CODEX_ACCOUNTS_ROOT", Path.home() / ".codex-accounts"))
 STATE = Path(os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes")) / "codex-accounts.json"
 DEFAULT_COOLDOWN_S = int(os.environ.get("CODEX_DEFAULT_COOLDOWN_S", 5 * 3600))
@@ -1064,23 +1066,9 @@ def _slot_paths(name: str) -> list[Path]:
 
 
 def lease(name: str):
-    """One flock per concurrent run slot; released by the kernel if the run dies."""
-    profile = subscription_profiles()[name] if subscription_pool_mode() else None
-    if profile is not None:
-        update_state(lambda state: bind_subscription_alias(state, name, profile))
-    (STATE.parent / "codex-locks").mkdir(parents=True, exist_ok=True)
-    for path in _slot_paths(name):
-        handle = open(path, "w")
-        try:
-            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            handle.close()
-            continue
-        if subscription_pool_mode():
-            handle.subscription_name = name
-            handle.subscription_profile = profile
-        return handle
-    return None
+    from codex_slot_lease import lease as acquire
+    from types import SimpleNamespace
+    return acquire(SimpleNamespace(**globals()), name)
 
 
 def reverify_auth_bank(state: dict, now: float) -> dict:
@@ -1546,21 +1534,9 @@ def status(now: float | None = None, names: list[str] | None = None, state: dict
 
 
 def _free_slots(name: str) -> int:
-    """Slots nobody holds right now; probe each with a non-blocking flock and release it."""
-    free = 0
-    for path in _slot_paths(name):
-        if not path.exists():
-            free += 1
-            continue
-        handle = open(path, "a")
-        try:
-            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            free += 1
-        except BlockingIOError:
-            pass
-        finally:
-            handle.close()
-    return free
+    from codex_slot_lease import free_slots
+    from types import SimpleNamespace
+    return free_slots(SimpleNamespace(**globals()), name)
 
 
 def main(argv=None) -> int:

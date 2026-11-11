@@ -79,8 +79,8 @@ def _remote_for(issue, path=None):
     return (accepted[-1]["task"], accepted[-1]) if accepted else (None, None)
 
 
-def route(issue, provider, labels, text, prompt, *, run=None, now=time.time, path=None,
-          main_sha=None, url=DEFAULT_PUSH_URL, run_git=None, fencing_token=None):
+def _submit(issue, provider, labels, text, prompt, *, run=None, now=time.time, path=None,
+          main_sha=None, url=DEFAULT_PUSH_URL, run_git=None, fencing_token=None, reservation_id=None):
     """Reserve and submit once; single-writer per issue across processes.
 
     The deny-text re-read at submit time covers the issue's title + description
@@ -103,7 +103,9 @@ def route(issue, provider, labels, text, prompt, *, run=None, now=time.time, pat
             events = read(path)
         except (ValueError, OSError):
             return {"route": "held", "reason": "ledger-unreadable"}
-        if any(e.get("issue") == issue and e["stage"] != "limit" for e in events):
+        reservation = next((e for e in reversed(events) if reservation_id and e.get("reservationId") == reservation_id), {})
+        events = [e for e in events if e.get("reservationId") != reservation_id or reservation_id is None]
+        if not reservation.get("predecessor") and any(e.get("issue") == issue and e["stage"] != "limit" for e in events):
             return {"route": "held", "reason": "already-submitted"}
         stamp = now()
         ok, why = admit(provider, stamp, events)
@@ -111,7 +113,7 @@ def route(issue, provider, labels, text, prompt, *, run=None, now=time.time, pat
             return {"route": "gem", "reason": why}
         append({"issue": issue, "task": issue, "provider": provider, "stage": "submitted",
                 "repo": REPO, "env": os.environ.get("CODEX_CLOUD_ENV", ""), "baseSha": base,
-                "attempt": 1, "at": stamp}, path)
+                "attempt": 1, "at": stamp}, path, locked=True)
     try:
         result = _resolve(run, cmd, timeout=300)
     except Exception as error:
@@ -133,7 +135,7 @@ def route(issue, provider, labels, text, prompt, *, run=None, now=time.time, pat
     return {"route": "cloud", "reason": "ok", "remote": remote, "branch": branch, "baseSha": base}
 
 
-def status(issue, *, run=None, path=None):
+def _status(issue, *, run=None, path=None):
     """Remote status on demand. Only the anchored first-line grammar is authority."""
     try:
         remote, _row = _remote_for(issue, path)
@@ -192,7 +194,7 @@ def _locate_task(remote, *, run=None, env=None, binary=None):
     return None, "list-truncated"
 
 
-def collect(issue, *, run=None, path=None):
+def _collect(issue, *, run=None, path=None):
     """Identity binding (list) + the pinned-attempt diff. Never trusts a status summary."""
     try:
         remote, submitted = _remote_for(issue, path)
@@ -262,6 +264,11 @@ def _fence(path, issue, task, stage, token, extra=None):
         claims = [e for e in events if e.get("issue") == issue and e["stage"] in CLAIM_STAGES]
         if not claims or claims[-1].get("fencingToken") != token:
             return "stale-token"
+        if any(e["stage"] == "account-occupancy" and e["issue"] == issue for e in events):
+            from codex_cloud_occupancy import publication_reason
+            reason = publication_reason(events, issue, task, token, time.time())
+            if reason:
+                return reason
         results = {"intent:push": ("pushed",), "intent:pr": ("pr_opened",)}
         for intent, done in results.items():
             if any(e["stage"] == intent and e.get("task") == task for e in events) and \
@@ -270,11 +277,11 @@ def _fence(path, issue, task, stage, token, extra=None):
         row = {"issue": issue, "task": task, "stage": stage, "fencingToken": token, "at": time.time()}
         if extra:
             row.update(extra)
-        append(row, path)
+        append(row, path, locked=True)
         return None
 
 
-def publish_candidate(issue, task, quarantine, cand_tree, base_sha, branch, *, repo_dir,
+def _publish_candidate(issue, task, quarantine, cand_tree, base_sha, branch, *, repo_dir,
                       url=DEFAULT_PUSH_URL, path=None, fencing_token=None, gh=None,
                       run_git=None, now=time.time, paths=()):
     """Draft-only publication: verified object transfer, one commit, expected-absent push."""
@@ -367,7 +374,7 @@ def publish_candidate(issue, task, quarantine, cand_tree, base_sha, branch, *, r
             "branch": branch}
 
 
-def reconcile(*, path=None, repo_dir=None, url=DEFAULT_PUSH_URL, run=None, gh=None,
+def _reconcile(*, path=None, repo_dir=None, url=DEFAULT_PUSH_URL, run=None, gh=None,
               run_git=None, guard=None, now=time.time):
     """The worker's reconciliation turn for live cloud claims: status -> collect ->
     authorize -> draft-publish, or an explicit held_* disposition. Never resubmits."""
@@ -405,12 +412,12 @@ def _reconcile_one(claim, *, path, repo_dir, url, run, gh, run_git, guard, now):
         if any(e["stage"] == stage and e.get("task") == task for e in events) and \
                 not any(e["stage"] == done and e.get("task") == task for e in events):
             return held("reconcile")
-    state = status(issue, run=run, path=path)
+    state = _status(issue, run=run, path=path)
     if state["state"] in ("pending", "applied", "unknown"):
         return {"issue": issue, "disposition": "wait", "state": state["state"]}
     if state["state"] == "error":
         return held("cloud-error")
-    collected = collect(issue, run=run, path=path)
+    collected = _collect(issue, run=run, path=path)
     if not collected.get("ok"):
         return held(collected.get("reason", "collect-failed"))
     base_sha = claim.get("baseSha") or collected.get("baseSha")
@@ -435,7 +442,7 @@ def _reconcile_one(claim, *, path, repo_dir, url, run, gh, run_git, guard, now):
             return held("held_oversize:" + reason, extra)
         return held(reason, extra)
     try:
-        result = publish_candidate(issue, task, verdict["quarantine"], verdict["candTree"],
+        result = _publish_candidate(issue, task, verdict["quarantine"], verdict["candTree"],
                                    base_sha, branch, repo_dir=repo_dir, url=url, path=path,
                                    fencing_token=claim.get("fencingToken"), gh=gh, run_git=run_git,
                                    now=now, paths=verdict["paths"])
@@ -453,6 +460,10 @@ def main(argv=None):
         return 2
     print(json.dumps(stats(read()), indent=1))
     return 0
+
+
+# Public entrypoints require durable account authority; private functions are transport seams.
+from codex_cloud_runtime import route, reconcile, publish_candidate  # noqa: E402
 
 
 if __name__ == "__main__":

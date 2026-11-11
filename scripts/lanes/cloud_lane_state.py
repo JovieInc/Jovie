@@ -1,4 +1,6 @@
 """Strict cloud ledger, admission limits, origin evidence and disposition summaries."""
+import fcntl
+from contextlib import contextmanager
 import json
 import math
 import os
@@ -33,7 +35,7 @@ PROVIDER_STAGES = frozenset({"submitted", "accepted", "held", "limit"})
 
 CLAIM_STAGES = frozenset({"cloud-pending", "cloud-held", "cloud-draft-created"})
 
-STAGES = ADMISSION_STAGES | CLAIM_STAGES | {"intent:push", "pushed", "intent:pr"}
+STAGES = ADMISSION_STAGES | CLAIM_STAGES | {"intent:push", "pushed", "intent:pr", "account-occupancy"}
 
 UNREADABLE = object()
 
@@ -95,6 +97,9 @@ def _valid_event(event):
         return False
     if event["stage"] in ("intent:push", "intent:pr") and not event.get("fencingToken"):
         return False
+    if event["stage"] == "account-occupancy":
+        from codex_cloud_evidence import valid_record
+        return valid_record(event)
     return True
 
 def read(path=None):
@@ -110,20 +115,42 @@ def read(path=None):
         out.append(event)
     return out
 
-def append(event, path=None):
-    path = Path(path or ledger_path())
+@contextmanager
+def locked(path):
+    path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    with path.with_suffix(path.suffix + ".lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
+
+
+def append(event, path=None, *, locked=False):
+    path = Path(path or ledger_path())
     if not _valid_event(event):
         raise ValueError("invalid cloud ledger event")
+    if not locked:
+        with globals()["locked"](path):
+            return append(event, path, locked=True)
     with path.open("a") as handle:
-        handle.write(json.dumps(event, sort_keys=True) + "\n")
+        handle.write(json.dumps(event, sort_keys=True, allow_nan=False) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
 
 def admit(provider, now, events):
     """(ok, reason): concurrency, daily cap and limit backoff from the ledger alone."""
     cap = LIMITS.get(provider)
     if not cap:
         return False, "unknown-provider"
-    mine = [e for e in events if e.get("provider") == provider]
+    mine = [e for e in events if e.get("provider") == provider and e["stage"] != "account-occupancy"]
+    from codex_cloud_occupancy import reservations
+    # Reservations before transport count against concurrency too; never count them twice.
+    active = {r["issue"]: r for r in reservations(events).values() if r["phase"] != "completed"}
+    mine += [r for issue, r in active.items() if not any(e["issue"] == issue for e in mine)]
     hits, last_hit = 0, 0.0
     for event in mine:
         if event["stage"] == "limit":
@@ -157,8 +184,12 @@ def live_claim(issue, path=None):
     """The latest cloud claim for an issue; live claims block every ordinary lane."""
     try:
         events = read(path)
+        from codex_cloud_occupancy import reservations
+        pending = [r for r in reservations(events).values() if r["issue"] == issue and r["phase"] != "completed"]
     except (ValueError, OSError):
         return {"issue": issue, "stage": "cloud-held", "reason": "ledger-unreadable"}
+    if pending:
+        return {**pending[-1], "stage": "cloud-held", "reason": "account-occupancy"}
     claims = [e for e in events if e.get("issue") == issue and e["stage"] in CLAIM_STAGES]
     return claims[-1] if claims else None
 

@@ -23,7 +23,6 @@ from atomic_state import atomic_write_text  # noqa: E402
 ALLOWED = {
     ("bindings.py", "run", "open-w"): "per-run agent log, private to the run",
     ("claude_lane.py", "record_run", "open-w"): "flock sentinel, no content",
-    ("codex_lane.py", "lease", "open-w"): "flock slot file, no content",
     ("codex_lane.py", "update_state", "open-w"): "flock sentinel, no content (state goes through write_state)",
     ("epics.py", "_decompose", "open-w"): "per-run agent log, private to the run",
     ("lane_runner.py", "_adopt_pr", "open-w"): "per-run agent log, private to the run",

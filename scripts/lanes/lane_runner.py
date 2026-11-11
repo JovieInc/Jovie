@@ -169,7 +169,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_pytest_hook_names.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
-RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-host-git.sh",
+RELEASE_EXTRAS = ["scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_occupancy_cases.py", "scripts/shipping_origin.py", "scripts/hostops/install-lane-host-git.sh",
                   "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_fixtures.py", "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_runner_cases.py",
                   "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_authorization_cases.py",
                   "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_publication_cases.py",

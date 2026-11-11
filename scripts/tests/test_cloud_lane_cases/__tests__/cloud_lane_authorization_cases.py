@@ -227,7 +227,8 @@ class CloudAuthorizationTest(CloudLaneFixture):
 
     def test_extracted_safety_cases_remain_protected_by_existing_policy(self):
         base = Base(self.tmp.name)
-        for file in sorted((ROOT / "scripts/tests/test_cloud_lane_cases").rglob("*.py")):
+        files = (ROOT / "scripts/tests/test_cloud_lane_cases").rglob("*")
+        for file in sorted(p for p in files if p.suffix in {".py", ".mjs"}):
             path = file.relative_to(ROOT).as_posix()
             with self.subTest(path=path):
                 result = self.auth(base.patch(mutate_add(path)), base)

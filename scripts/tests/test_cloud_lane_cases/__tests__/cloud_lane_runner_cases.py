@@ -54,16 +54,15 @@ class CloudLaneGateMixin:
         self.assertFalse(any("/real/codex" in " ".join(c) for c in self.calls),
                          "the pinned cloud binary is never invoked while disabled")
 
-    def test_opted_in_issue_submits_to_cloud_and_stays_pending(self):
+    def test_opted_in_issue_stays_held_without_supported_account_adapter(self):
         submitted = subprocess.CompletedProcess([], 0, "https://chatgpt.com/codex/tasks/task_abc12345\n", "")
         with patch.object(self.runner.cloud_lane, "ls_remote_main", lambda *a, **k: "f" * 40), \
                 patch.object(self.runner.cloud_lane, "stream_run", lambda *a, **k: submitted):
             receipt = self.runner.run_issue(self.host, "devin", {"cmd": ["true"]}, self.linear_fixture([]),
                                      self.issue_fixture("JOV-10357", labels=["cloud-lane"]))
-        self.assertEqual(receipt["verdict"], "cloud-pending")
-        self.assertEqual(receipt["cloud"]["branch"], "cloud/jov-10357-task_abc")
-        stages = [json.loads(line)["stage"] for line in self.ledger.read_text().splitlines()]
-        self.assertEqual(stages, ["submitted", "cloud-pending"])
+        self.assertEqual(receipt["verdict"], "cloud-held")
+        self.assertEqual(receipt["cloud"]["reason"], "cloud-compatibility-unverified")
+        self.assertFalse(self.ledger.exists())
         self.assertFalse(any(c[:3] == ["git", "worktree", "add"] for c in self.calls),
                          "no worktree is taken for a cloud issue")
 

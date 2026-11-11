@@ -70,7 +70,7 @@ class CloudPublicationTest(CloudLaneFixture):
         base, remote, publish = self.remote()
         verdict = self.auth(base.patch(mutate_add("docs/n.md")), base)
         with patch.object(c, "PUSH_URL_RE", re.compile(r"https://github\.com/JovieInc/Jovie")):
-            self.assertEqual(c.publish_candidate(
+            self.assertEqual(c._publish_candidate(
                 "J-1", "task_abc12345", verdict["quarantine"], verdict["candTree"], base.sha,
                 "cloud/jov-1-task_abc1", repo_dir=publish, url="https://github.com/Evil/Repo.git",
                 path=self.p, fencing_token="tok1", paths=verdict["paths"])["reason"],

@@ -97,7 +97,7 @@ class CloudLaneFixture(unittest.TestCase):
 
     def go(self, issue="J-1", labels=("cloud-lane",), text="fix typo", prompt="do it",
            run=None, t=1000.0, provider="codex", main_sha="b" * 40, token="tok1"):
-        return c.route(issue, provider, labels, text, prompt, run=run or done("task_abc"),
+        return c._submit(issue, provider, labels, text, prompt, run=run or done("task_abc"),
                        now=lambda: t, main_sha=main_sha, fencing_token=token)
 
     def seed_accepted(self, task="task_abc12345", branch="cloud/j-1-task_abc1"):
@@ -173,7 +173,7 @@ class CloudLaneFixture(unittest.TestCase):
                       "env": "env_test", "branch": branch, "baseSha": base.sha,
                       "fencingToken": token, "at": 10}, self.p)
         with patch.object(c, "PUSH_URL_RE", re.compile(re.escape(str(remote)))):
-            return c.publish_candidate(issue, task, verdict["quarantine"], verdict["candTree"],
+            return c._publish_candidate(issue, task, verdict["quarantine"], verdict["candTree"],
                                        base.sha, branch, repo_dir=publish, url=str(remote),
                                        path=self.p, fencing_token=token, gh=gh or self.gh(
                                            head="will-be-set", branch=branch),
@@ -187,7 +187,7 @@ class CloudLaneFixture(unittest.TestCase):
 
     def reconcile_now(self, base, remote, publish, run, gh=None, guard=None):
         with patch.object(c, "PUSH_URL_RE", re.compile(re.escape(str(remote)))):
-            return c.reconcile(repo_dir=publish, url=str(remote), run=run,
+            return c._reconcile(repo_dir=publish, url=str(remote), run=run,
                                gh=gh or self.gh(branch="cloud/jov-1-task_abc1"), guard=guard)
 
     def pr(self, branch="devin/jov-1-x", body=""):

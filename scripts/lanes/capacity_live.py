@@ -51,7 +51,11 @@ def read_codex(registry: dict, ledger: dict) -> dict:
         digest = str((row.get("subscriptionBinding") or {}).get("emailSha256") or "")[:12]
         lease = row.get("capacityLease") or {}
         capacity = (lease.get("sources") or {}).get("capacity") or {}
-        primary = (lease.get("usableCapacityRemaining") or {}).get("primary") or {}
+        windows = lease.get("usableCapacityRemaining") or {}
+        if not windows or any(not isinstance(w, dict) or type(w.get("remainingPercent")) not in (int, float)
+                              or not w.get("resetsAt") for w in windows.values()):
+            continue
+        primary = min(windows.values(), key=lambda w: w["remainingPercent"])
         observed = capacity_registry._epoch(capacity.get("observedAt"))
         if digest not in by_hash or observed is None or observed < MIN_EPOCH:
             continue
@@ -60,6 +64,7 @@ def read_codex(registry: dict, ledger: dict) -> dict:
         provider_id, account_id = by_hash[digest]
         out[f"{provider_id}/{account_id}"] = {"quota": {
             "remainingPercent": primary["remainingPercent"], "resetsAt": _iso(primary["resetsAt"]),
+            "windows": {key: {**window, "resetsAt": _iso(window["resetsAt"])} for key, window in windows.items()},
             "windowMins": primary.get("windowDurationMins"), "observedAt": capacity["observedAt"],
             "source": "gem codex-accounts.json account/rateLimits/read", "live": "codex-ledger"}}
     return out

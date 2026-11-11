@@ -47,6 +47,7 @@ import {
   VALIDATION_LIFECYCLE_COVERAGE_COMMAND,
   webCiContractTestsCommand,
 } from '../../ci-fast-lanes.mjs';
+import { assertLaneCoverageFloors } from '../../tests/test_cloud_lane_cases/__tests__/cloud_lane_coverage_assertions.mjs';
 
 it('selects capacity behavior and coverage on collector, fixture and registry changes', () => {
   for (const file of [
@@ -1424,18 +1425,9 @@ describe('structural command pool', () => {
       },
     });
     expect(started).toEqual([LANES_COVERAGE_COMMAND]);
-    // Every per-module coverage floor still runs, after the shards combine.
-    expect(LANES_COVERAGE_COMMAND).toContain('coverage combine');
-    expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(23);
-    expect(LANES_COVERAGE_COMMAND).toContain('cloud_lane*.py" --fail-under=90');
-    expect(LANES_COVERAGE_COMMAND).toContain(
-      'priority_admission.py" --fail-under=80'
-    );
-    expect(LANES_COVERAGE_COMMAND).toContain(
-      'board_intake.py" --fail-under=85'
-    );
-    expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0]).toBe(
-      LANES_COVERAGE_COMMAND
+    assertLaneCoverageFloors(
+      LANES_COVERAGE_COMMAND,
+      STRUCTURAL_PYTHON_REGRESSION_COMMANDS
     );
   });
 
