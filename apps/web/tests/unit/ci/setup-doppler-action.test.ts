@@ -3,6 +3,7 @@ import {
   chmodSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -90,6 +91,41 @@ describe('Doppler keyring installer', () => {
       'mv -f -- "$destination_candidate" "$keyring_path"'
     );
     expect(installer).not.toMatch(/curl[^\n]*\|[^\n]*gpg/);
+  });
+
+  it('installs a cached, version-pinned CLI without apt and never refreshes the Ubuntu mirrors', () => {
+    const action = readFileSync(actionPath, 'utf8');
+
+    expect(action).toMatch(/DOPPLER_CLI_VERSION: '\d+\.\d+\.\d+'/);
+    expect(action).toContain(
+      'uses: ./.github/actions/vendor/actions-cache/restore'
+    );
+    expect(action).toContain(
+      'uses: ./.github/actions/vendor/actions-cache/save'
+    );
+    expect(action).toContain('sudo dpkg -i "$DOPPLER_DEB"');
+    expect(action).toContain(
+      '"Package: doppler Version: ${DOPPLER_CLI_VERSION} "'
+    );
+    expect(action).toContain(
+      '-o Dir::Etc::sourcelist=sources.list.d/doppler-cli.list'
+    );
+    expect(action).toContain('"doppler=${DOPPLER_CLI_VERSION}"');
+    expect(action).not.toContain(
+      'sudo apt-get update && sudo apt-get install doppler'
+    );
+  });
+
+  it('is the only place a workflow installs the Doppler CLI', () => {
+    const workflowsDir = resolve(repoRoot, '.github/workflows');
+    const inline = readdirSync(workflowsDir)
+      .filter(file => /\.ya?ml$/.test(file))
+      .filter(file =>
+        readFileSync(resolve(workflowsDir, file), 'utf8').includes(
+          'packages.doppler.com'
+        )
+      );
+    expect(inline).toEqual([]);
   });
 
   it('preserves an existing keyring when a successful HTTP response is not a key', () => {
