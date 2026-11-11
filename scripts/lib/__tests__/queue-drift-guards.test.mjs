@@ -100,6 +100,7 @@ test('only shrink-only guards are tightened, by a command that cannot raise a ba
       'marketing-route-source-invariants',
       'offer-claims',
       'stat-claims',
+      'size-500',
     ]
   );
   for (const { id, tighten } of commands) {
