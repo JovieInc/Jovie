@@ -719,6 +719,10 @@
       "empty": "A fixed skeleton with no props: TaskWorkspaceLoadingRows draws five constant rows, so there is no collection that can be empty. The detector matched the items-center layout class.",
       "long-content": "It renders skeleton bars and a fixed Loading Tasks label only, with no text from any caller, so nothing can overflow. The detector matched aria-label.",
       "offline": "A static loading frame with no fetch or mutation; the Tasks route that shows it owns any network failure. The detector matched the skeleton classes (Loading)."
+    },
+    "apps/web/components/features/profile/artist-notifications-cta/InlineNotificationsFlowSkeleton.tsx": {
+      "long-content": "The skeleton renders no caller text: its title and body are fixed non-breaking spaces and the consent line is invisible, so there is no content that can run long.",
+      "offline": "The skeleton never fetches; it stands in while the visitor's assignment resolves, and the live form that replaces it reports connectivity."
     }
   }
 }

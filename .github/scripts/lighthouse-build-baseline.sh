@@ -16,7 +16,8 @@
 # In place, not in a second worktree: node_modules resolves workspace packages
 # by path, so a base tree elsewhere would compile head's packages, and
 # Turbopack's build cache is only warm at the same path. That is also why a
-# change to any dependency manifest skips the baseline.
+# change to what pnpm installs skips the baseline
+# (.github/scripts/lighthouse-install-scope.mjs).
 set -euo pipefail
 export LC_ALL=C
 
@@ -25,10 +26,14 @@ state_dir="${RUNNER_TEMP:?}/lighthouse-baseline-state"
 
 # The build checks another commit out over this file, and the base commit may
 # not have it at all. Run from a copy outside the workspace; the workflow's
-# restore step calls that copy.
+# restore step calls that copy. Its install-scope helper travels with it.
 stable_copy="$RUNNER_TEMP/lighthouse-build-baseline.sh"
+install_scope="$RUNNER_TEMP/lighthouse-install-scope.mjs"
 if [ "$(realpath "$0")" != "$(realpath -m "$stable_copy")" ]; then
   cp "$0" "$stable_copy"
+  # A missing helper means "cannot tell", which skips the baseline.
+  cp "$(dirname "$0")/lighthouse-install-scope.mjs" "$install_scope" 2>/dev/null ||
+    rm -f "$install_scope"
   exec bash "$stable_copy" "$@"
 fi
 head_file="$state_dir/head-sha"
@@ -81,9 +86,15 @@ case "$mode" in
       skip "the workspace has modified tracked files"
     git fetch --quiet --no-tags --depth=1 origin "$base_sha" ||
       skip "could not fetch base $base_sha"
-    if git diff --name-only "$base_sha" "$head_sha" |
-      grep -qE '(^|/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|\.npmrc|\.nvmrc)$|^patches/'; then
-      skip "dependency manifests differ between base and head"
+    # Only a change to what pnpm installs (lockfile, workspace config, a
+    # workspace package's dependency fields) makes the in-place base build
+    # wrong. A version bump, a script edit or a package.json outside the
+    # workspace does not; skipping on those enforced noisy absolute budgets
+    # (run 43008412182: scripts/security/deepsec/package.json).
+    install_change="$(node "$install_scope" "$base_sha" "$head_sha")" ||
+      skip "could not compare dependency installs between base and head"
+    if [ "$install_change" != "same" ]; then
+      skip "dependency installs differ between base and head (${install_change#changed })"
     fi
 
     list_untracked > "$before_file"

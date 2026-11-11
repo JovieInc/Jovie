@@ -27,48 +27,58 @@ console.log(JSON.stringify([
         raise ValueError("measured win policy: " + "; ".join(problems))
 
 
-def company_guard_pin_win(before_pin: str, after_pin: str, before: dict, after: dict) -> str:
-    """Measure pinned company registries for pin-bump repairs; never infer a CI pass.
+def company_guard_pin(files: list[dict], comparison: dict) -> str:
+    """Generate a measured Win for a pin-only workflow edit, never a speed claim.
 
-    The caller reads canon/guards.json at each exact JovieInc/ci pin. Reuse the
-    result with pr_events.repair_evidence_body; publication still runs Fleet.
-    A no-growth pin needs its own measured evidence, not an invented win.
+    Pass fresh REST PR files and `node packages/api-client/cli.ts gh --priority repair -- api repos/JovieInc/ci/compare/OLD...NEW`.
+    Feed the returned section to pr_events.repair_evidence_body(win_section=...).
+    The caller owns the GitHub read and exact-head binding; this helper does no I/O
+    except the existing canonical Win validation. Mismatched evidence fails closed.
     """
-    if any(not isinstance(pin, str) or not re.fullmatch(r"[0-9a-f]{40}", pin)
-           for pin in (before_pin, after_pin)) or before_pin == after_pin:
-        raise ValueError("pin measurement requires two distinct exact company pins")
-
-    def enforcing(registry):
-        if not isinstance(registry, dict) or registry.get("schema") != "company-guards/v1":
-            raise ValueError("pin measurement requires the company guard registry")
-        rows = registry.get("guards")
-        if not isinstance(rows, list) or any(
-                not isinstance(row, dict) or not isinstance(row.get("id"), str)
-                or not re.fullmatch(r"[a-z0-9-]+", row["id"])
-                or row.get("mode") not in {"enforce", "ratchet", "shadow"} for row in rows):
-            raise ValueError("pin measurement requires complete guard modes and identifiers")
-        if len({row["id"] for row in rows}) != len(rows):
-            raise ValueError("pin measurement requires unique guard identifiers")
-        return {row["id"] for row in rows if row["mode"] in {"enforce", "ratchet"}}
-
-    old, new = enforcing(before), enforcing(after)
-    if not old < new:
-        raise ValueError("pin measurement cannot claim growth without preserving existing enforcing guards")
-    compare = f"https://github.com/JovieInc/ci/compare/{before_pin}...{after_pin}"
-    query = (
-        "python3 -c 'import base64,json,subprocess; "
-        f"pins=(\"{before_pin}\",\"{after_pin}\"); "
-        "[print(p,sum(g[\"mode\"] in (\"enforce\",\"ratchet\") for g in "
-        "json.loads(base64.b64decode(subprocess.check_output([\"gh\",\"api\","
-        "\"repos/JovieInc/ci/contents/canon/guards.json?ref=\"+p,\"--jq\",\".content\"])))"
-        "[\"guards\"])) for p in pins]'"
-    )
+    workflows = [file for file in files if file.get("filename") == ".github/workflows/company-guards.yml"]
+    if len(workflows) != 1 or workflows[0].get("status") != "modified":
+        raise ValueError("company guard Win requires one modified workflow pin")
+    patch = workflows[0].get("patch")
+    if not isinstance(patch, str):
+        raise ValueError("company guard pin patch unavailable")
+    changed = [line for line in patch.splitlines() if line.startswith(("+", "-"))]
+    pins = {}
+    for sign in ("-", "+"):
+        for marker in ("company-guards.yml@", "ci-ref: "):
+            matches = [re.fullmatch(re.escape(sign + "# " + marker) + r"([0-9a-f]{40})", line)
+                       for line in changed]
+            matches = [match.group(1) for match in matches if match]
+            if len(matches) != 1:
+                raise ValueError("company guard Win requires both exact old and new pins")
+            pins[sign, marker] = matches[0]
+    old, new = pins["-", "ci-ref: "], pins["+", "ci-ref: "]
+    if len(changed) != 4 or old == new or any(
+            pins[sign, "company-guards.yml@"] != pins[sign, "ci-ref: "] for sign in ("-", "+")):
+        raise ValueError("company guard workflow change is not a consistent pin-only bump")
+    url = f"https://github.com/JovieInc/ci/compare/{old}...{new}"
+    count = comparison.get("ahead_by")
+    commits = comparison.get("commits")
+    if (comparison.get("html_url") != url or comparison.get("status") != "ahead"
+            or type(count) is not int or count <= 0
+            or type(comparison.get("behind_by")) is not int or comparison["behind_by"] != 0
+            or type(comparison.get("total_commits")) is not int or comparison["total_commits"] != count
+            or (comparison.get("base_commit") or {}).get("sha") != old
+            or (comparison.get("merge_base_commit") or {}).get("sha") != old
+            or not isinstance(commits, list) or len(commits) != count
+            or any(not isinstance(commit, dict) or not isinstance(commit.get("sha"), str)
+                   or not re.fullmatch(r"[0-9a-f]{40}", commit["sha"]) for commit in commits)
+            or len({commit["sha"] for commit in commits}) != count
+            or commits[-1]["sha"] != new):
+        raise ValueError("upstream comparison must completely match the workflow's forward pin bump")
     section = "\n".join([
-        "## Win", "", "- Claim: The company pin adds registered enforcing guards without removing existing ones.",
-        "- Area: quality", "- Theme: company-guard-policy",
-        f"- Metric: Registered enforcing company guards | count | higher | {len(old)} | {len(new)} | "
-        f"JovieInc/ci canon/guards.json at both exact pins (shadow excluded) | {query}",
-        f"- Verify: {compare}", "",
+        "## Win", "",
+        "- Claim: Bring the shared company guard pin up to the verified upstream target.",
+        "- Area: ci", "- Theme: guard-freshness",
+        f"- Metric: upstream guard commits behind target | commits | lower | {count} | 0 | "
+        f"GitHub compare API, old pin versus adopted target | "
+        f"node packages/api-client/cli.ts gh --priority repair -- api repos/JovieInc/ci/compare/{old}...{new} --jq .ahead_by && "
+        f"node packages/api-client/cli.ts gh --priority repair -- api repos/JovieInc/ci/compare/{new}...{new} --jq .ahead_by",
+        f"- Verify: {url}", "",
     ])
     validate(section)
     return section
