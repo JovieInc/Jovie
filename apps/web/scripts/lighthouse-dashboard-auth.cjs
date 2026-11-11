@@ -1,5 +1,11 @@
 const { spawnSync } = require('node:child_process');
-const { existsSync, mkdirSync, readFileSync } = require('node:fs');
+const {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+} = require('node:fs');
 const path = require('node:path');
 
 // Keep these literals synchronized with lib/auth/test-mode-constants.ts and
@@ -252,24 +258,92 @@ async function seedDashboardAuth(browser, { url }) {
   }
 }
 
+function resolveCollectRuns() {
+  const configured = process.env.LIGHTHOUSE_COLLECT_RUNS?.trim();
+  if (!configured) return null;
+  const runs = Number(configured);
+  if (!Number.isInteger(runs) || runs < 1 || runs > 10) {
+    throw new Error(
+      `LIGHTHOUSE_COLLECT_RUNS must be an integer from 1 to 10; got "${configured}"`
+    );
+  }
+  return runs;
+}
+
+// Collect-only mode for the relative-budget gate
+// (scripts/lighthouse-relative-gate.mjs): measure, keep every run's report in
+// LIGHTHOUSE_COLLECT_DIR, and leave the verdict to the gate, which compares
+// head with base. `lhci assert` is not run here.
+function collectOnly({ collectDir, config, chromePath, collectUrls, env }) {
+  const runs = resolveCollectRuns();
+  const collected = spawnSync(
+    'pnpm',
+    [
+      'exec',
+      'lhci',
+      'collect',
+      `--config=${config}`,
+      `--chromePath=${chromePath}`,
+      ...(runs === null ? [] : [`--numberOfRuns=${runs}`]),
+      ...collectUrls.map(url => `--url=${url}`),
+    ],
+    { cwd: webRoot, env, stdio: 'inherit' }
+  );
+  if ((collected.status ?? 1) !== 0) return collected.status ?? 1;
+
+  const lhciDir = path.resolve(webRoot, '.lighthouseci');
+  const target = path.isAbsolute(collectDir)
+    ? collectDir
+    : path.resolve(webRoot, collectDir);
+  mkdirSync(target, { recursive: true });
+  const reports = readdirSync(lhciDir).filter(name =>
+    /^lhr-.*\.json$/.test(name)
+  );
+  if (reports.length === 0) {
+    console.error(`lhci collect left no reports in ${lhciDir}.`);
+    return 1;
+  }
+  for (const name of reports) {
+    copyFileSync(path.join(lhciDir, name), path.join(target, name));
+  }
+
+  if (process.env.LIGHTHOUSE_COLLECT_UPLOAD !== '1') return 0;
+  // Same filesystem dump `lhci autorun` makes, for the report summary step
+  // and the uploaded artifact.
+  const uploaded = spawnSync(
+    'pnpm',
+    ['exec', 'lhci', 'upload', `--config=${config}`],
+    { cwd: webRoot, env, stdio: 'inherit' }
+  );
+  return uploaded.status ?? 1;
+}
+
 function main() {
   const baseUrl = resolveBaseUrl();
   const authStatePath = ensureAuthState(baseUrl);
   const chromePath = ensureChromiumPath();
   const collectUrls = resolveCollectUrls(baseUrl);
+  const config =
+    process.env.LIGHTHOUSE_CONFIG || '.lighthouserc.dashboard.pr.json';
   const env = {
     ...process.env,
     BASE_URL: baseUrl,
     LIGHTHOUSE_AUTH_STATE_PATH: authStatePath,
     NODE_PATH: buildNodePath(),
   };
+  const collectDir = process.env.LIGHTHOUSE_COLLECT_DIR?.trim();
+  if (collectDir) {
+    process.exit(
+      collectOnly({ collectDir, config, chromePath, collectUrls, env })
+    );
+  }
   const result = spawnSync(
     'pnpm',
     [
       'exec',
       'lhci',
       'autorun',
-      `--config=${process.env.LIGHTHOUSE_CONFIG || '.lighthouserc.dashboard.pr.json'}`,
+      `--config=${config}`,
       `--healthcheck.chromePath=${chromePath}`,
       `--collect.chromePath=${chromePath}`,
       ...collectUrls.map(url => `--collect.url=${url}`),

@@ -944,7 +944,7 @@ jobs:
             echo "run_public_lighthouse=false" >> "$GITHUB_OUTPUT"
           fi
 
-          DASHBOARD_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/(\.lighthouserc\.(dashboard|chat|onboarding)\.pr\.json|scripts/lighthouse-dashboard-auth\.cjs))$'
+          DASHBOARD_LIGHTHOUSE_PATTERN='^(\.github/(workflows/ci\.yml|scripts/lighthouse-.*)|apps/web/(\.lighthouserc\.(dashboard|chat|onboarding)\.pr\.json|scripts/lighthouse-.*))$'
           dash_lh=false
           if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$DASHBOARD_LIGHTHOUSE_PATTERN"; then dash_lh=true; fi
           echo "run_dashboard_lighthouse=$dash_lh" >> "$GITHUB_OUTPUT"
@@ -4953,6 +4953,48 @@ jobs:
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
+      # Same read-only Turbopack compiler cache Build + Layout restores (writer:
+      # next-build-cache-warm.yml; keep the key scheme identical). This job
+      # now compiles twice, base then head, and head reuses base's state.
+      - name: Resolve Next build cache hour (Lighthouse)
+        id: next-build-cache-hour
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
+      - name: Restore Next build cache for Lighthouse (read-only)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        continue-on-error: true
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.next/cache/turbopack
+          key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-hour.outputs.hour }}
+          restore-keys: |
+            ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-
+            ${{ runner.os }}-next-build-web-v1-
+
+      # Timing budgets are judged against the commit this change lands on,
+      # built and measured in this job on this runner, so a busy runner slows
+      # both sides instead of failing the change. No baseline (no base commit,
+      # changed dependencies, failed base build) is not a failure: the gate
+      # then enforces every configured budget as it is.
+      - name: Build base commit for relative Lighthouse budgets
+        id: lighthouse-baseline
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        continue-on-error: true
+        timeout-minutes: 10
+        run: bash .github/scripts/lighthouse-build-baseline.sh build
+        env:
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          BASELINE_DIR: ${{ runner.temp }}/lighthouse-baseline
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          SKIP_SKILLS_CATALOG_SYNC: '1'
+
+      # Blocking: everything after this must run on the exact head tree.
+      - name: Restore workspace to the exact head
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: bash .github/scripts/lighthouse-build-baseline.sh restore
+
       - name: Download build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
         id: download-build
@@ -4963,11 +5005,13 @@ jobs:
           path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
-        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome == 'success'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome == 'success' && steps.lighthouse-baseline.outputs.built != 'true'
         run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
+      # With a baseline, head is always built here: same command and env as
+      # the base build, so the two differ only by the change.
       - name: Build app fallback for dashboard Lighthouse
-        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome != 'success'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && (steps.download-build.outcome != 'success' || steps.lighthouse-baseline.outputs.built == 'true')
         run: pnpm --filter=@jovie/web run build
         env:
           NEXT_IGNORE_ESLINT: '1'
@@ -4975,7 +5019,7 @@ jobs:
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
           SKIP_SKILLS_CATALOG_SYNC: '1'
 
-      - name: Run signed-in shell navigation and dashboard Lighthouse
+      - name: Run signed-in shell navigation
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
           cd apps/web
@@ -5024,17 +5068,6 @@ jobs:
             tests/e2e/releases-first-paint-visual.spec.ts \
             --config=playwright.config.noauth.ts --project=chromium --reporter=line
 
-          # Chat and onboarding Lighthouse reuse this signed-in server. Their
-          # own jobs need an identity secret and skip green without it, so
-          # these runs are what hold the pages to their budgets. Onboarding
-          # needs the creator persona, which has not finished onboarding.
-          # Every page runs so one miss still prints the others; any miss
-          # fails the step.
-          lh_failed=0
-          pnpm run test:lighthouse:dashboard:pr || lh_failed=1
-          pnpm run test:lighthouse:chat:pr || lh_failed=1
-          LIGHTHOUSE_TEST_PERSONA=creator pnpm run test:lighthouse:onboarding:pr || lh_failed=1
-          exit "$lh_failed"
         env:
           CI: true
           BASE_URL: http://localhost:3000
@@ -5047,6 +5080,38 @@ jobs:
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           E2E_SKIP_SEED: '1'
           E2E_SKIP_WARMUP: '1'
+
+      # Its own step, so a budget miss is not reported as a navigation
+      # failure or the other way round. Dashboard, chat and onboarding are
+      # measured here: chat's and onboarding's own jobs need an identity
+      # secret and skip green without it. The gate starts the head server,
+      # measures every page, then measures the base build on the same port
+      # and database. Timing audits fail on a regression against base beyond
+      # runner noise or past a ceiling derived from the configured budget;
+      # accessibility, best practices and layout shift keep their configured
+      # budgets. Rules: apps/web/scripts/lighthouse-relative-budget.mjs.
+      # Every page runs so one miss still prints the others.
+      - name: Run signed-in Lighthouse budgets
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: |
+          cd apps/web
+
+          export E2E_USE_TEST_AUTH_BYPASS=1
+          export NEXT_PUBLIC_AUTH_MOCK=1
+          export NEXT_PUBLIC_AUTH_PROXY_DISABLED=1
+
+          node scripts/lighthouse-relative-gate.mjs
+        env:
+          CI: true
+          BASE_URL: http://localhost:3000
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          URL_ENCRYPTION_KEY: lighthouse-dashboard-ci-url-encryption-key
+          AI_GATEWAY_API_KEY: lighthouse-dashboard-ci
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          E2E_SKIP_SEED: '1'
+          E2E_SKIP_WARMUP: '1'
+          LIGHTHOUSE_BASELINE_SERVER: ${{ steps.lighthouse-baseline.outputs.server }}
+          LIGHTHOUSE_BASELINE_SHA: ${{ steps.lighthouse-baseline.outputs.sha }}
 
       - name: Upload shell navigation failure evidence
         if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && hashFiles('apps/web/test-results/**') != '' }}
@@ -5076,6 +5141,7 @@ jobs:
             apps/web/.lighthouseci/dashboard-pr/
             apps/web/.lighthouseci/chat-pr/
             apps/web/.lighthouseci/onboarding-pr/
+            apps/web/.lighthouseci/relative/
           if-no-files-found: ignore
           retention-days: 3
 

@@ -8,6 +8,7 @@ import { join, resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
+import { SUITES } from '../../../scripts/lighthouse-relative-gate.mjs';
 
 interface LighthouseStep {
   id?: string;
@@ -28,6 +29,7 @@ interface SelectOptions {
   relevant?: boolean;
   failed?: boolean;
   branch?: string;
+  baseline?: boolean;
 }
 
 const REPO_ROOT = resolve(process.cwd(), '../..');
@@ -51,12 +53,13 @@ describe('Lighthouse identity admission', () => {
       relevant = true,
       failed = false,
       branch = 'fixture-branch',
+      baseline = false,
     }: SelectOptions = {}
   ): boolean => {
     const expression = (step?.if ?? 'success()')
       .replace(/\$\{\{|\}\}/g, '')
       .replace(
-        /\.(lighthouse-identity|download-build|neon-branch|ci-path-changes|neon-db)\b/g,
+        /\.(lighthouse-identity|lighthouse-baseline|download-build|neon-branch|ci-path-changes|neon-db)\b/g,
         "['$1']"
       );
     // Actions implicitly applies success() unless the expression explicitly
@@ -68,6 +71,7 @@ describe('Lighthouse identity admission', () => {
       always: () => true,
       steps: {
         'lighthouse-identity': { outputs: { available } },
+        'lighthouse-baseline': { outputs: { built: String(baseline) } },
         check_changes: { outputs: { run_full_ci: String(relevant) } },
         'download-build': { outcome: download },
         'neon-branch': { outputs: { branch_id: branch } },
@@ -80,7 +84,7 @@ describe('Lighthouse identity admission', () => {
   };
 
   const PROBE_NAMES = {
-    dashboard: 'Run signed-in shell navigation and dashboard Lighthouse',
+    dashboard: 'Run signed-in shell navigation',
     onboarding: 'Run authenticated onboarding Lighthouse',
   } as const;
 
@@ -102,26 +106,99 @@ describe('Lighthouse identity admission', () => {
     expect(probe.run).toContain(
       'tests/e2e/releases-first-paint-visual.spec.ts'
     );
-    const lighthouse = probe.run.indexOf(
-      'pnpm run test:lighthouse:dashboard:pr'
-    );
     const serverReady = probe.run.indexOf('SERVER_READY" = "false"');
     expect(nav).toBeGreaterThan(serverReady);
-    expect(lighthouse).toBeGreaterThan(nav);
-    // Chat and onboarding have no identity-free job of their own, so the
-    // dashboard gate holds them to their budgets on the same server.
-    const chat = probe.run.indexOf('pnpm run test:lighthouse:chat:pr');
-    const onboarding = probe.run.indexOf(
-      'LIGHTHOUSE_TEST_PERSONA=creator pnpm run test:lighthouse:onboarding:pr'
-    );
-    expect(chat).toBeGreaterThan(lighthouse);
-    expect(onboarding).toBeGreaterThan(lighthouse);
-    expect(probe.run).not.toMatch(/test:lighthouse:[a-z]+:pr[^\n]*\|\|\s*true/);
     expect(probe.run).not.toMatch(
       /click-(?:navigation|through)[^\n]*\|\|\s*true/
     );
+    // Lighthouse is its own step after navigation, so a budget miss and a
+    // navigation failure are reported under their own names.
+    expect(probe.run).not.toContain('test:lighthouse');
+    const budgets = stepNamed(job, 'Run signed-in Lighthouse budgets');
+    expect(job.steps.indexOf(budgets)).toBeGreaterThan(
+      job.steps.indexOf(probe)
+    );
+    expect(selected(budgets, 'false')).toBe(true);
+    expect(selected(budgets, 'false', { failed: true })).toBe(false);
+    expect(selected(budgets, 'false', { relevant: false })).toBe(false);
+    expect(budgets.run).toContain('node scripts/lighthouse-relative-gate.mjs');
+    expect(budgets.run).not.toMatch(/\|\|/);
+    expect(budgets['continue-on-error']).toBeUndefined();
+    expect(budgets.env.BASE_URL).toBe('http://localhost:3000');
+    expect(budgets.env.LIGHTHOUSE_BASELINE_SERVER).toBe(
+      '${{ steps.lighthouse-baseline.outputs.server }}'
+    );
+    // Chat and onboarding have no identity-free job of their own, so the
+    // dashboard gate holds them to their budgets on the same server.
+    expect(SUITES).toEqual([
+      { name: 'dashboard', script: 'test:lighthouse:dashboard:pr' },
+      { name: 'chat', script: 'test:lighthouse:chat:pr' },
+      {
+        name: 'onboarding',
+        script: 'test:lighthouse:onboarding:pr',
+        env: { LIGHTHOUSE_TEST_PERSONA: 'creator' },
+      },
+    ]);
     expect(probe['continue-on-error']).toBeUndefined();
     expect(job['continue-on-error']).toBeUndefined();
+  });
+
+  it('dashboard: a missing baseline cannot fail the job, and nothing runs off the head tree', () => {
+    const job = workflow.jobs['ci-lighthouse-dashboard-pr'];
+    const names = job.steps.map(step => step.name);
+    const baseline = stepNamed(
+      job,
+      'Build base commit for relative Lighthouse budgets'
+    );
+    const restore = stepNamed(job, 'Restore workspace to the exact head');
+    expect(baseline['continue-on-error']).toBe(true);
+    expect(baseline.run).toBe(
+      'bash .github/scripts/lighthouse-build-baseline.sh build'
+    );
+    expect(baseline.env.BASE_SHA).toBe(
+      '${{ github.event.merge_group.base_sha }}'
+    );
+    // The restore is blocking and runs whether or not the base build worked.
+    expect(restore['continue-on-error']).toBeUndefined();
+    expect(restore.run).toBe(
+      'bash .github/scripts/lighthouse-build-baseline.sh restore'
+    );
+    expect(restore.if).toBe(baseline.if);
+    expect(names.indexOf(restore.name)).toBe(names.indexOf(baseline.name) + 1);
+    for (const later of [
+      'Extract build artifact',
+      'Build app fallback for dashboard Lighthouse',
+      'Run signed-in shell navigation',
+      'Run signed-in Lighthouse budgets',
+    ]) {
+      expect(names.indexOf(later), later).toBeGreaterThan(
+        names.indexOf(restore.name)
+      );
+    }
+    // Base and head are built by the same command with the same env, so the
+    // prebuilt artifact (other env) is not used once a baseline exists.
+    const fallback = stepNamed(
+      job,
+      'Build app fallback for dashboard Lighthouse'
+    );
+    expect(fallback.run).toBe('pnpm --filter=@jovie/web run build');
+    for (const key of Object.keys(fallback.env)) {
+      expect(baseline.env[key], key).toBe(fallback.env[key]);
+    }
+    expect(
+      selected(fallback, 'true', { download: 'success', baseline: true })
+    ).toBe(true);
+    expect(
+      selected(stepNamed(job, 'Extract build artifact'), 'true', {
+        download: 'success',
+        baseline: true,
+      })
+    ).toBe(false);
+    const script = readFileSync(
+      join(REPO_ROOT, '.github/scripts/lighthouse-build-baseline.sh'),
+      'utf8'
+    );
+    expect(script).toContain('pnpm --filter=@jovie/web run build');
   });
 
   it('dashboard: a change to any Lighthouse config it runs turns its measuring steps on', () => {
@@ -139,6 +216,9 @@ describe('Lighthouse identity admission', () => {
       'apps/web/.lighthouserc.chat.pr.json',
       'apps/web/.lighthouserc.onboarding.pr.json',
       'apps/web/scripts/lighthouse-dashboard-auth.cjs',
+      'apps/web/scripts/lighthouse-relative-budget.mjs',
+      'apps/web/scripts/lighthouse-relative-gate.mjs',
+      '.github/scripts/lighthouse-build-baseline.sh',
     ]) {
       expect(pattern.test(path), path).toBe(true);
     }
@@ -213,7 +293,9 @@ describe('Lighthouse identity admission', () => {
       const probe = byName(PROBE_NAMES[surface]);
       expect(selected(probe, 'true')).toBe(true);
       expect(selected(probe, 'true', { failed: true })).toBe(false);
-      expect(probe.run).toContain(`pnpm run test:lighthouse:${surface}:pr`);
+      if (surface !== 'dashboard') {
+        expect(probe.run).toContain(`pnpm run test:lighthouse:${surface}:pr`);
+      }
       expect(probe.run).toContain('Standalone server');
       expect(probe.run).toContain(
         "trap 'kill $SERVER_PID 2>/dev/null || true' EXIT"
