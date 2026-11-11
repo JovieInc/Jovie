@@ -23,16 +23,19 @@ import {
   isExternalBaseUrl,
   primeOriginBoundVercelBypass,
 } from '../helpers/vercel-preview';
+import { registerBlankMediaFixtures } from './route-dom-blank-media-fixtures';
 import {
   axisSection,
   busyImg,
   certificationScope,
   deploymentId,
   exactBaseUrl,
+  expectAtomicContrastCapture,
   expectDeliberateRed,
-  flatImg,
   isTasteKind,
+  markupKinds,
   outputRoot,
+  plane,
   prepareProfileState,
   profileRoute,
   profileStates,
@@ -52,10 +55,6 @@ import {
 test.describe.configure({ retries: 0 });
 
 test.describe('Route DOM detector deliberate-red fixtures', () => {
-  // JOV-7710 / AM-017: one semantic level reads as one material.
-  const plane = (inner: string) =>
-    `<main id="main-content" style="width:1000px;height:600px;background:rgb(16,17,20)">${inner}</main>`;
-
   test('rejects an inset header strip on the main plane (JOV-7207)', async ({
     page,
   }) => {
@@ -290,37 +289,13 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     await expectDeliberateRed(page, 'marketing', 'placeholder-copy');
   });
 
-  const kindsOf = async (html: string): Promise<string[]> => {
-    await page_ref.setContent(html);
-    return (
-      await inspectRouteDom(page_ref, { surface: 'marketing' })
-    ).findings.map(finding => finding.kind);
-  };
+  const kindsOf = (html: string) => markupKinds(page_ref, html);
   let page_ref: Page;
   test.beforeEach(({ page }) => {
     page_ref = page;
   });
 
-  test('blank-media: flags a near-uniform image in a designed section', async () => {
-    expect(
-      await kindsOf(
-        `<main><section data-pen-section="hero"><h1>Product</h1><img src="${flatImg}" width="600" height="400" alt="Dashboard"></section></main>`
-      )
-    ).toContain('blank-media');
-  });
-
-  test('blank-media: ignores a busy image and a data-decorative image', async () => {
-    expect(
-      await kindsOf(
-        `<main><section data-pen-section="hero"><h1>Product</h1><img src="${busyImg}" width="600" height="400" alt="Dashboard"></section></main>`
-      )
-    ).not.toContain('blank-media');
-    expect(
-      await kindsOf(
-        `<main><section data-pen-section="hero"><h1>Product</h1><img data-decorative src="${flatImg}" width="600" height="400" alt=""></section></main>`
-      )
-    ).not.toContain('blank-media');
-  });
+  registerBlankMediaFixtures();
 
   test('placeholder-copy: flags common placeholders in text, alt and aria', async () => {
     for (const html of [
@@ -473,9 +448,7 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     expect(snapshot.findings).toEqual([]);
   });
 
-  // JOV-6916: text-aware-contrast deliberate-red. R01 painted a bright
-  // upper-right corner exactly where the docked header renders Log in and
-  // the primary CTA; light glyphs over that corner must reproduce red.
+  // JOV-6916: light glyphs over R01's bright header corner must reproduce red.
   test('reproduces the R01 bright header corner behind Log in and the CTA', async ({
     page,
   }) => {
@@ -500,6 +473,12 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     expect(snapshot.findings).toEqual([]);
     expect(snapshot.receipts.length).toBeGreaterThan(0);
     expect(snapshot.receipts.every(receipt => receipt.pass)).toBe(true);
+  });
+
+  test('hides control ink at capture while retaining each candidate box (JOV-11623)', async ({
+    page,
+  }) => {
+    await expectAtomicContrastCapture(page);
   });
 
   // JOV-INV-019 (2026-09-29): a real /unfazed pass surfaced three detector
