@@ -2345,6 +2345,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/cron/cleanup-dogfood-accounts/route.ts",
+      "kind": "handler",
+      "route": "/api/cron/cleanup-dogfood-accounts",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/cron/cleanup-idempotency-keys/route.ts",
       "kind": "handler",
       "route": "/api/cron/cleanup-idempotency-keys",
