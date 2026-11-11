@@ -33,7 +33,7 @@ export function AuthBrandPanel({
         // shell. Tooltip tokens stay dark in both root themes because auth
         // is dark regardless of root theme.
         'auth-showcase-panel relative flex h-full min-h-[34rem] flex-col overflow-hidden rounded-xl bg-(--color-bg-tooltip) text-(--color-text-tooltip)',
-        'border border-white/[0.05]',
+        'border border-on-media/[0.05]',
         'lg:min-h-[calc(100svh-1rem)]',
         className
       )}
@@ -84,7 +84,7 @@ function AuthBrandFrame({
           sizes='(min-width: 1280px) 540px, (min-width: 1024px) 44vw, 88vw'
           priority
           fill
-          className='border-white/[0.12] bg-(--color-bg-base)'
+          className='border-on-media/[0.12] bg-(--color-bg-base)'
         />
       </div>
 

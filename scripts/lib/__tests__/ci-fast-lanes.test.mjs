@@ -1426,7 +1426,7 @@ describe('structural command pool', () => {
     expect(started).toEqual([LANES_COVERAGE_COMMAND]);
     // Every per-module coverage floor still runs, after the shards combine.
     expect(LANES_COVERAGE_COMMAND).toContain('coverage combine');
-    expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(25);
+    expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(26);
     expect(LANES_COVERAGE_COMMAND).toContain('cloud_lane.py" --fail-under=90');
     expect(LANES_COVERAGE_COMMAND).toContain(
       'priority_admission.py" --fail-under=80'
