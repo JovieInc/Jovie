@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { type ReactNode, useId } from 'react';
 
 import './MarketingFooter.css';
 import Link from 'next/link';
@@ -128,6 +128,9 @@ export function FooterColumnsNav({
   columns: readonly MarketingFooterColumn[];
   hasCta: boolean;
 }>) {
+  // Column titles may be non-Latin (e.g. Arabic), which a slug of [a-z0-9]
+  // collapses to the same id, so key each label by the nav's id and position.
+  const columnIdPrefix = useId();
   return (
     <nav
       className={cn(
@@ -146,10 +149,8 @@ export function FooterColumnsNav({
       )}
       aria-label='Footer'
     >
-      {footerColumns.map(column => {
-        const columnLabelId = `footer-column-${column.title
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')}`;
+      {footerColumns.map((column, index) => {
+        const columnLabelId = `${columnIdPrefix}-footer-column-${index}`;
         return (
           <section key={column.title} aria-labelledby={columnLabelId}>
             <p id={columnLabelId} className='mf-eyebrow'>
