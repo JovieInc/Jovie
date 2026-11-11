@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server';
 import { type AccessPolicy, defineRoute } from '@/lib/api/route-pipeline';
-import {
-  buildFounderWelcomeServerDeps,
-  loadAdmittedVisitors,
-  runFounderWelcome,
-} from '@/lib/founder-welcome/server';
+import { founderWelcomeJob } from '@/lib/founder-welcome/server';
 import { verifySummerOidcRequest } from '@/lib/ovie/summer-oidc.server';
 
 export const runtime = 'nodejs';
@@ -27,11 +23,7 @@ const summerAccess: AccessPolicy<null> = {
 export const POST = defineRoute(
   { route: '/api/internal/ovie/founder-welcome', access: summerAccess },
   async () => {
-    const now = new Date();
-    const visitors = await loadAdmittedVisitors(now);
-    const result = await runFounderWelcome(
-      buildFounderWelcomeServerDeps(visitors, now)
-    );
+    const result = await founderWelcomeJob();
     return NextResponse.json({ contract: 'founder-welcome/v1', result });
   }
 );

@@ -137,3 +137,16 @@ export function buildFounderWelcomeServerDeps(
 }
 
 export { runFounderWelcome };
+
+/**
+ * One pass, shared by the frequent cron and Summer's route: files a card per
+ * newly admitted visitor and sends only where that person's card is approved.
+ */
+export async function founderWelcomeJob(
+  now: Date = new Date()
+): Promise<Record<string, unknown>> {
+  const visitors = await loadAdmittedVisitors(now);
+  return {
+    ...(await runFounderWelcome(buildFounderWelcomeServerDeps(visitors, now))),
+  };
+}
