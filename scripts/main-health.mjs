@@ -118,8 +118,9 @@ export function failureLine(output) {
 }
 
 /**
+ * @param {string} root
  * @param {Array<{check:string, command:string, args:string[]}>} commands
- * @param {{run?: typeof spawnSync, print?: (text: string) => void}} [options]
+ * @param {{run?: (command: string, args: string[], options: object) => {status: number|null, stdout?: string, stderr?: string, error?: Error}, print?: (text: string) => unknown}} [seams]
  */
 export function runStructural(
   root,

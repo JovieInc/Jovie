@@ -1186,6 +1186,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/design-surface-census.test.mjs',
   'scripts/lib/__tests__/main-red-eject.test.mjs',
   'scripts/lib/__tests__/main-red-eject-failing-head.test.mjs',
+  'scripts/lib/__tests__/main-red-eject-unattributed.test.mjs',
   'scripts/lib/__tests__/main-health.test.mjs',
   'scripts/lib/__tests__/surface-recertify.test.mjs',
   'scripts/lib/__tests__/doc-freshness.test.mjs',

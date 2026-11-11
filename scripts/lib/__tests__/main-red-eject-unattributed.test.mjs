@@ -22,7 +22,10 @@ vi.mock('../../../packages/api-client/gh.ts', () => ({
   }),
 }));
 
-const { apply, plan } = await import('../../main-red-eject.mjs');
+const eject = await import('../../main-red-eject.mjs');
+const { apply } = eject;
+/** plan() returns a union of result shapes; these cases read the decided one. @returns {Promise<any>} */
+const plan = options => eject.plan(options);
 const { detectUnattributedRed, groupPr, INTAKE_LABEL, remediationIntake } =
   await import('../main-red-eject.mjs');
 
