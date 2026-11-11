@@ -460,7 +460,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(whole).toContain('scripts/tests/test_factory_intake.py');
     expect(whole).toContain('scripts/tests/test_cloud_lane.py');
     expect(command).toContain(
-      'coverage report --include="*/scripts/lanes/cloud_lane.py" --fail-under=90'
+      'coverage report --include="*/scripts/lanes/cloud_lane*.py" --fail-under=90'
     );
     expect(whole).toContain('scripts/tests/test_hyperagent_cli.py');
     expect(whole).toContain('scripts/tests/test_model_radar.py');

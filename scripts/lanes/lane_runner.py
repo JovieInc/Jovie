@@ -76,7 +76,7 @@ import escalation_reconcile  # noqa: E402  (lane-fix-escalating is consumed, nev
 import board_intake  # noqa: E402  (mesh board work for codex, closed on verified outcomes)
 import ownership  # noqa: E402  (started-state live-owner invariant)
 import fleet_ledger  # noqa: E402  (external agent claims, stranded-claim view)
-import cloud_lane  # noqa: E402  (JOV-10357 dormant adapter; every effect gated by LANES_CLOUD_ENABLED)
+import cloud_lane_dispatch, cloud_lane  # noqa: E402  (JOV-10357 dormant adapter; every effect gated by LANES_CLOUD_ENABLED)
 import pr_events  # noqa: E402
 import repair_order  # noqa: E402  (one fair claim order for event and polling repair)
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
@@ -170,6 +170,12 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-host-git.sh",
+                  "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_fixtures.py", "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_runner_cases.py",
+                  "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_authorization_cases.py",
+                  "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_publication_cases.py",
+                  "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_reconcile_cases.py",
+                  "scripts/tests/test_cloud_lane_cases/__init__.py",
+                  "scripts/tests/test_cloud_lane_cases/__tests__/__init__.py",
                   # Subsidy pool burn policy (floor, burn order) that codex_lane reads at runtime.
                   "apps/web/lib/ai/routing.json",
                   # Shared client layer (budgeted gh) used by the throughput sentinel.
@@ -3527,43 +3533,6 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear: Linear | 
     return receipt
 
 
-def _cloud_execution_gate(host: Host, issue: Issue, linear: Linear, name: str,
-                           claimed: dict) -> dict | None:
-    """JOV-10357: the single cloud chokepoint in the claimed execution path.
-
-    Runs after the durable execution claim and before any lane launch (worktree take,
-    install, prompt, agent). Fully dormant unless LANES_CLOUD_ENABLED is set: the gate
-    returns None and the local lane runs unchanged. A live cloud claim blocks every
-    ordinary intake and recovery path before any provider call (R4); the claim is
-    retained asynchronously and only a human clears it.
-    """
-    if not cloud_lane.enabled():
-        return None
-    live = cloud_lane.live_claim(issue.identifier)
-    if live is not None:
-        return {"verdict": live["stage"], "reason": f"cloud-claim-live:{live.get('reason', 'active')}",
-                "pr": live.get("pr"), "prUrl": live.get("prUrl"), "issue": issue.identifier}
-    labels = {str(label).lower() for label in issue.labels}
-    if cloud_lane.OPT_IN_LABEL not in labels:
-        return None
-    ok, _why = cloud_lane.eligible(issue.labels, issue.title + "\n" + (issue.description or ""))
-    if not ok:
-        return None
-    prompt = render_prompt(issue, "main", context_pack(issue), provider=name,
-                           prior_attempts=prior_attempts_context(host, linear, issue),
-                           machine=machine_gate(host, issue.identifier, issue.title, issue.labels,
-                                                issue.description or "", name))
-    route = cloud_lane.route(issue.identifier, "codex", issue.labels,
-                             issue.title + "\n" + (issue.description or ""), prompt,
-                             fencing_token=claimed.get("fencingToken"))
-    if route.get("route") == "gem":
-        return None  # headroom or provider configuration fell back: the local lane runs
-    if route.get("route") == "cloud":
-        return {"verdict": "cloud-pending", "reason": f"submitted:{route['remote']}",
-                "remote": route["remote"], "branch": route["branch"], "issue": issue.identifier}
-    return {"verdict": "cloud-held", "reason": route.get("reason", "unknown"), "issue": issue.identifier}
-
-
 def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -> dict:
     if name == "hyperagent":
         return run_hyperagent_issue(host, spec, issue, linear)
@@ -3621,16 +3590,9 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                        result={"verdict": verdict, "commit": None, "pr": None, "prUrl": None})
         append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
-    cloud = _cloud_execution_gate(host, issue, linear, name, claimed)
+    cloud = cloud_lane_dispatch.execution_gate(THIS, host, issue, linear, name, claimed)
     if cloud is not None:
-        # JOV-10357 (R4): cloud dispositions are explicit and never return to Todo; the
-        # durable execution claim stays live with the cloud claim so cleanup and retry skip.
-        receipt.update(verdict=cloud["verdict"], reasons=[cloud["reason"]], cloud=cloud,
-                       endedAt=now_iso(),
-                       result={"verdict": cloud["verdict"], "pr": cloud.get("pr"),
-                               "commit": cloud.get("commitSha"), "prUrl": cloud.get("prUrl")})
-        append_json_object(runs / "ledger.jsonl", receipt)
-        return receipt
+        return cloud_lane_dispatch.record_receipt(THIS, runs, receipt, cloud)
     receipt["offer"]["accepted"] = True
     with open(runs / f"{run_id}.log", "w") as log:
         try:
@@ -9646,14 +9608,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     # Publication can await canonical policy and native queue reads. Keep those
     # outside the global claim lock, then refresh inventory for ordinary admission.
     requeue_verified(host, lane_prs(name))
-    if cloud_lane.enabled():
-        # JOV-10357 reconciliation turn (R7): the worker slot's reconciliation step
-        # (requeue_verified above) is immediately followed by the cloud lane's
-        # status -> collect -> authorize -> draft-publish pass. Dormant by default.
-        try:
-            cloud_lane.reconcile(repo_dir=host.repo)
-        except Exception as error:
-            print(f"cloud reconcile failed: {type(error).__name__}: {error}"[:300], file=sys.stderr)
+    cloud_lane_dispatch.reconcile_turn(host)
     repair_inventory = capture_repair_inventory(name) if spec.get("repairs") is not False else None
     scan_summary = repair_inventory["summary"] if repair_inventory is not None else _SUMMARY
     # Scope-only evidence is optional. Never fetch it while holding claim.lock or
@@ -9875,31 +9830,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     _RUN_LEASES.append(ownership.acquire_run_lease(host.state, issue.id, issue.identifier, name))
     linear = linear_sync.Outboxed(host.state, linear)  # every disposition write waits in the outbox
     notify_issue_claim(linear, issue, name, spec)
-    receipt = {}
-    try:
-        # A live cloud claim blocks the epic path too (JOV-10357 R4): run_issue's gate
-        # then returns the retained disposition instead of a second provider call.
-        cloud_blocked = cloud_lane.enabled() and cloud_lane.live_claim(issue.identifier) is not None
-        receipt = (epics.run_epic(THIS, host, name, spec, linear, issue, host.repo)
-                   if epics.is_epic(issue) and not cloud_blocked
-                   else run_issue(host, name, spec, linear, issue))
-    finally:
-        if receipt.get("verdict") != "cloud-pending":
-            # R4: an overlap reservation is not released while an issue is cloud-pending.
-            file_overlap.release_task(host.state, issue.identifier)
+    receipt = cloud_lane_dispatch.execute_claimed_issue(THIS, host, name, spec, linear, issue)
     verdict = receipt.get("verdict")
     note_event_outcome(host, issue, verdict, receipt=receipt)
-    if verdict in cloud_lane.RETAINED_VERDICTS:
-        # JOV-10357 (R4): cloud-pending / cloud-held / cloud-draft-created never fall
-        # through to the failure handler, never return to Todo, and never fail over to
-        # another lane; the durable cloud claim is the hold until a human clears it.
-        if verdict == "cloud-held":
-            held = receipt.get("cloud") or {}
-            paths = "".join(f"\n- `{path}`" for path in held.get("paths", []))
-            linear.comment(issue.id, f"🤖 cloud lane held {issue.identifier} "
-                                     f"({', '.join(receipt.get('reasons', []))}); retained for a human "
-                                     f"decision.{paths}")
-        slot.release()
+    if cloud_lane_dispatch.retain_disposition(linear, issue, receipt, slot):
         return 1
     if verdict in epics.SETTLED_VERDICTS:
         slot.release()

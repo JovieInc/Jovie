@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from pr_event_queries import linear_issue, RETIREMENT_QUERY
 import cloud_lane  # noqa: E402  (JOV-10357 draft-only origin check; leaf module, no runner import)
 import disk_guard  # noqa: E402
 import lifecycle, pr_wip, repair_order  # noqa: E402  (pr_wip: per-producer WIP census; repair_order: fair claims)
@@ -2008,19 +2009,6 @@ def ready_green(host, lane, pr: dict, held: dict, now: float) -> str:
                "endedAt": lane.now_iso()}
     ledger(host, receipt)
     return receipt["verdict"]
-
-
-def linear_issue(linear, identifier: str) -> dict | None:
-    team, _, number = identifier.upper().partition("-")
-    data = linear.gql('query($n:Float!,$t:String!){issues(filter:{team:{key:{eq:$t}},number:{eq:$n}})'
-                      '{nodes{id state{name type} comments(last:20){nodes{body}}}}}', {"n": float(number), "t": team})
-    nodes = data["issues"]["nodes"]
-    return nodes[0] if nodes else None
-
-
-RETIREMENT_QUERY = """query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){
-pullRequest(number:$number){number state headRefOid headRefName isCrossRepository isInMergeQueue
-labels(first:100){pageInfo{hasNextPage} nodes{name}}}}}"""
 
 
 def duplicate_authorized(pr: dict) -> bool:
