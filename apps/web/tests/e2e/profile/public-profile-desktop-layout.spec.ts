@@ -161,6 +161,9 @@ describeCompactDesktop('desktop artist profile layout', () => {
         };
       });
     const home = await readIdentity();
+    const homeArtLeft = await page
+      .getByTestId('profile-pac-featured-art')
+      .evaluate(el => el.getBoundingClientRect().left);
     const nav = page.getByTestId('profile-bottom-nav');
     for (const label of ['Music', 'Events', 'About']) {
       await nav.getByRole('button', { name: label }).click();
@@ -168,6 +171,16 @@ describeCompactDesktop('desktop artist profile layout', () => {
         page.getByTestId('profile-compact-surface')
       ).not.toHaveAttribute('data-mode', 'profile');
       const tab = await readIdentity();
+      if (label === 'Music') {
+        // The Music panel's mobile bleed must not pull it left of column 2.
+        const panelLeft = await page
+          .locator(
+            '[data-testid="profile-primary-tab-releases"], [data-testid="profile-primary-tab-listen"]'
+          )
+          .first()
+          .evaluate(el => el.getBoundingClientRect().left);
+        expect(Math.abs(panelLeft - homeArtLeft), label).toBeLessThanOrEqual(1);
+      }
       expect(Math.abs(tab.portrait.left - home.portrait.left), label).toBe(0);
       expect(Math.abs(tab.portrait.top - home.portrait.top), label).toBe(0);
       expect(tab.portrait.width, label).toBeCloseTo(home.portrait.width, 0);
