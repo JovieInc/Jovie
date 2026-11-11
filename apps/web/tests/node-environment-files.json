@@ -734,6 +734,7 @@
   "tests/unit/ci/no-clerk-build-env.test.ts",
   "tests/unit/ci/node-runtime-contract.test.ts",
   "tests/unit/ci/pr-visual-review-workflow.test.ts",
+  "tests/unit/ci/preflight-local-guards.test.ts",
   "tests/unit/ci/production-marker-state.test.ts",
   "tests/unit/ci/public-lighthouse-config.test.ts",
   "tests/unit/ci/ready-gates.test.ts",

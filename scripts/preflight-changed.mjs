@@ -710,7 +710,7 @@ export async function main({
       deferred.push(g.id);
       continue;
     }
-    cmd(g.id, g.name, g.command, g.phase ?? 1);
+    cmd(g.id, g.name, g.command, g.phase ?? 1, g.timeoutMs);
   }
 
   const bio = biomeTargets(files);
