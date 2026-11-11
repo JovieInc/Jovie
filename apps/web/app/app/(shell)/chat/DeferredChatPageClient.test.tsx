@@ -23,6 +23,12 @@ vi.mock('@/components/jovie/JovieChat', () => ({
     );
   },
 }));
+// ChatPageClient loads JovieChat through DeferredJovieChat's own chunk; point
+// that boundary at the stub above so the route shell renders it directly.
+vi.mock(
+  '@/app/app/(shell)/chat/DeferredJovieChat',
+  () => import('@/components/jovie/JovieChat')
+);
 vi.mock('next/dynamic', () => ({
   default: () =>
     function DynamicStub(props: Record<string, unknown>) {
