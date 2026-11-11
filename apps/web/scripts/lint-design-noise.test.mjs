@@ -1,10 +1,13 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   BASELINE_PATH,
   collect,
   compareToBaseline,
   findNoise,
+  main,
 } from './lint-design-noise.mjs';
 
 const rules = src => findNoise(src, 'x.tsx').map(f => f.rule);
@@ -70,17 +73,97 @@ describe('findNoise deliberate-red cases', () => {
 });
 
 describe('ratchet', () => {
-  it('fails new debt and stale headroom', () => {
+  it('fails new debt', () => {
     expect(compareToBaseline({ 'a.tsx': { 'icon-tile': 1 } }, {})).toHaveLength(
       1
     );
-    expect(compareToBaseline({}, { 'a.tsx': { 'icon-tile': 1 } })).toHaveLength(
-      1
-    );
+    expect(
+      compareToBaseline(
+        { 'a.tsx': { 'icon-tile': 3 } },
+        { 'a.tsx': { 'icon-tile': 2 } }
+      )
+    ).toEqual([expect.stringContaining('a.tsx: icon-tile x3 (baseline 2)')]);
   });
 
-  it('matches the committed baseline exactly', () => {
+  it('passes removed debt without a baseline rewrite', () => {
+    // 19 merge groups failed 2026-11-04..11 on "debt shrank (0 < 2)" for a
+    // file another PR had cleaned up. Stale headroom is tightened later by
+    // scripts/baselines-tighten.mjs; it is not a reason to fail a group.
+    expect(compareToBaseline({}, { 'a.tsx': { 'icon-tile': 2 } })).toEqual([]);
+    expect(
+      compareToBaseline(
+        { 'a.tsx': { 'icon-tile': 1 } },
+        { 'a.tsx': { 'icon-tile': 2 } }
+      )
+    ).toEqual([]);
+  });
+
+  it('has no growth beyond the committed baseline', () => {
     const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).files;
     expect(compareToBaseline(collect(), baseline)).toEqual([]);
+  });
+
+  describe('cli', () => {
+    const run = (argv, baseline, current) => {
+      const baselinePath = join(
+        mkdtempSync(join(tmpdir(), 'design-noise-')),
+        'baseline.json'
+      );
+      writeFileSync(baselinePath, JSON.stringify({ files: baseline }));
+      const out = [];
+      const code = main(argv, {
+        baselinePath,
+        current,
+        log: line => out.push(line),
+        error: line => out.push(line),
+      });
+      return {
+        code,
+        out: out.join('\n'),
+        files: JSON.parse(readFileSync(baselinePath, 'utf8')).files,
+      };
+    };
+    const baseline = {
+      'a.tsx': { 'icon-tile': 2 },
+      'b.tsx': { 'icon-tile': 1 },
+    };
+
+    it('passes a shrink with a notice and leaves the baseline alone', () => {
+      const result = run([], baseline, { 'a.tsx': { 'icon-tile': 1 } });
+      expect(result.code).toBe(0);
+      expect(result.out).toContain('a.tsx > icon-tile 2 -> 1');
+      expect(result.files).toEqual(baseline);
+    });
+
+    it('fails growth', () => {
+      const result = run([], baseline, { 'a.tsx': { 'icon-tile': 3 } });
+      expect(result.code).toBe(1);
+      expect(result.out).toContain('a.tsx: icon-tile x3 (baseline 2)');
+    });
+
+    it('--tighten lowers entries and passes a clean tree', () => {
+      const result = run(['--tighten'], baseline, {
+        'a.tsx': { 'icon-tile': 1 },
+      });
+      expect(result.code).toBe(0);
+      expect(result.files).toEqual({ 'a.tsx': { 'icon-tile': 1 } });
+    });
+
+    it('--tighten still fails growth and never adopts it', () => {
+      const result = run(['--tighten'], baseline, {
+        'a.tsx': { 'icon-tile': 3 },
+        'new.tsx': { 'step-label': 1 },
+      });
+      expect(result.code).toBe(1);
+      expect(result.out).toContain('new.tsx: step-label x1 (baseline 0)');
+      expect(result.files).toEqual({ 'a.tsx': { 'icon-tile': 2 } });
+    });
+
+    it('--update is the explicit floor raise', () => {
+      const current = { 'new.tsx': { 'step-label': 1 } };
+      const result = run(['--update', '--list'], baseline, current);
+      expect(result.code).toBe(0);
+      expect(result.files).toEqual(current);
+    });
   });
 });

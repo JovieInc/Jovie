@@ -17,8 +17,10 @@ class HealthChecksTests(unittest.TestCase):
         providers = {
             "deployHealth": health.deploy_health, "releaseEvidence": health.release_evidence,
             "releaseGates": health.release_gates, "mainHealth": health.main_health,
+            "groupOutcomes": health.queue_empty_red,
         }
         with ExitStack() as stack:
+            probe = stack.enter_context(mock.patch.object(health.main_health, "idle_probe", return_value=None))
             calls = {key: stack.enter_context(mock.patch.object(provider, "sample", return_value=({"provider": key}, None)))
                      for key, provider in providers.items()}
             with mock.patch.dict(os.environ, {"LANES_SELFTEST": ""}):
@@ -27,10 +29,14 @@ class HealthChecksTests(unittest.TestCase):
             for call in calls.values():
                 call.assert_called_once_with(Path("fixture"), 1000)
                 call.reset_mock()
+            # The idle clock for Main Health runs on the doctor tick, fed the sample just read.
+            probe.assert_called_once_with(Path("fixture"), {"provider": "mainHealth"}, 1000)
+            probe.reset_mock()
             with mock.patch.dict(os.environ, {"LANES_SELFTEST": "1"}):
                 self.assertEqual(health.observe(Path("fixture"), 1000), dict.fromkeys(providers))
             for call in calls.values():
                 call.assert_not_called()
+            probe.assert_not_called()
 
     def test_all_incidents_reach_the_doctor_and_green_main_clears_its_key(self):
         sample = {"status": "failing", "failedStreak": 2, "failingSince": "2026-11-07T00:00:00Z",
