@@ -436,11 +436,15 @@ export const SOURCE_GUARDS = Object.freeze([
     // outside the allowlisted mesh executors (JOV-10091).
     // Also runs price-literal-guard: a `$<digits>` price typed into apps/web app/components
     // source fails; prices derive from lib/config/plan-prices.ts (JOV-10183).
+    // Also runs wall-clock-test-guard: a test that reads the real clock and pins a calendar
+    // date without controlling the clock fails (44 merge groups on 2026-11-10).
+    // Also runs hermetic-ci-guard: live network, unpinned tools, floating runner images,
+    // unprovisioned toolchains, shared temp state and unseeded randomness (.claude/rules/hermetic-ci.md).
     // Also runs the model-pool guard: an Anthropic model routed through the Vercel AI Gateway or a
     // metered API key in lane config, registries or workflows fails (scripts/lanes/model-pools.json).
-    command: `node ${shellQuote(fileURLToPath(new URL('./external-api-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./model-id-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./ai-call-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./subscription-cli-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./price-literal-guard.mjs', import.meta.url)))} && python3 ${shellQuote(fileURLToPath(new URL('./lanes/model_pools.py', import.meta.url)))} check`,
+    command: `node ${shellQuote(fileURLToPath(new URL('./external-api-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./model-id-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./ai-call-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./subscription-cli-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./price-literal-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./wall-clock-test-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./hermetic-ci-guard.mjs', import.meta.url)))} && python3 ${shellQuote(fileURLToPath(new URL('./lanes/model_pools.py', import.meta.url)))} check`,
     inputs:
-      /(?:\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$|^packages\/api-client\/providers\.json$|^apps\/web\/lib\/email\/stream-registry\.json$|^scripts\/lib\/(?:external-api-guard|mail-send-guard)\.|^scripts\/lib\/subscription-cli-guard\.json$|^scripts\/lib\/price-literal-guard\.ratchet\.json$|^scripts\/(?:lanes|hyperagent)\/[^/]+\.json$|^scripts\/backlog-orchestrator\/config\/model-registry\.json$|^ops\/(?:models\/task-registry|registry\/capacity)\.json$|^ops\/agents\/)/u,
+      /(?:\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$|^packages\/api-client\/providers\.json$|^apps\/web\/lib\/email\/stream-registry\.json$|^scripts\/lib\/(?:external-api-guard|mail-send-guard)\.|^scripts\/lib\/subscription-cli-guard\.json$|^scripts\/lib\/(?:price-literal-guard|wall-clock-test-guard|hermetic-ci-guard)\.ratchet\.json$|^scripts\/(?:lanes|hyperagent)\/[^/]+\.json$|^scripts\/backlog-orchestrator\/config\/model-registry\.json$|^ops\/(?:models\/task-registry|registry\/capacity)\.json$|^ops\/agents\/)/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -1192,6 +1196,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/main-red-eject-failing-head.test.mjs',
   'scripts/lib/__tests__/main-health.test.mjs',
   'scripts/lib/__tests__/surface-recertify.test.mjs',
+  'scripts/lib/__tests__/shrink-only-baseline.test.mjs',
+  'scripts/lib/__tests__/queue-drift-guards.test.mjs',
   'scripts/lib/__tests__/doc-freshness.test.mjs',
   'scripts/lib/__tests__/flaky-test-filing.test.mjs',
   'scripts/lib/__tests__/gbrain-pool-env.test.mjs',
@@ -1299,6 +1305,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ai-gateway-report.test.mjs',
   'scripts/lib/__tests__/ai-call-guard.test.mjs',
   'scripts/lib/__tests__/price-literal-guard.test.mjs',
+  'scripts/lib/__tests__/hermetic-ci-guard.test.mjs',
+  'scripts/lib/__tests__/wall-clock-test-guard.test.mjs',
   'scripts/lib/__tests__/subscription-cli-guard.test.mjs',
   'scripts/lib/__tests__/api-budget.test.mjs',
   'scripts/lib/__tests__/domain-write-guard.test.mjs',
