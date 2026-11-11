@@ -5,7 +5,10 @@ import { InsightsPanelView } from './InsightsPanel';
 const meta = {
   title: 'Dashboard/Insights/Workspace',
   component: InsightsPanelView,
-  parameters: { layout: 'fullscreen' },
+  parameters: {
+    layout: 'fullscreen',
+    nextjs: { navigation: { pathname: '/app/insights' } },
+  },
   args: {
     insights: [],
     isLoading: false,
