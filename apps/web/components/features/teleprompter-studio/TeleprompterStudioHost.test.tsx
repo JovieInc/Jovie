@@ -20,6 +20,7 @@ vi.mock('next/dynamic', () => ({
 
 import { TeleprompterStudioHost } from '@/components/features/teleprompter-studio/TeleprompterStudioHost';
 import { TELEPROMPTER_START_EVENT } from '@/lib/teleprompter/recorder';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 const context = {
   profileId: 'profile_1',
@@ -58,5 +59,17 @@ describe('TeleprompterStudioHost', () => {
       );
     });
     expect(screen.queryByTestId('studio-stub')).toBeNull();
+  });
+
+  it('passes axe idle and with the studio open', async () => {
+    const { container } = render(<TeleprompterStudioHost />);
+    await expectNoA11yViolations(container);
+    act(() => {
+      globalThis.window.dispatchEvent(
+        new CustomEvent(TELEPROMPTER_START_EVENT, { detail: context })
+      );
+    });
+    expect(screen.getByTestId('studio-stub')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 });

@@ -496,6 +496,20 @@
     "apps/web/components/jovie/components/ChatEmptyStateComposerRegion.tsx": {
       "partial": "The region carries no data payload: its sample is a built-in constant and its optional props (fullBleed, stableDocked, showDockedWelcome, hideWelcomeHeader, alignAbove, onSelectSample) are layout switches, each shown by the JustAsk, AboveComposer and EmptyDockedRegion stories.",
       "permission-denied": "The region has no gated action or permission input; the detector matched 'Role-neutral' and the 'locked Just ask heading' in a doc comment."
+    },
+    "apps/web/components/features/teleprompter-studio/StudioCameraBlocked.tsx": {
+      "empty": "Renders one fixed message for one camera error and no collection; the detector matched the items-start layout class.",
+      "long-content": "Title and body come only from cameraErrorCopy for the error code, never from caller text, so no copy can grow past what the PermissionDenied, ErrorNoCamera, ErrorInUse, ErrorUnsupported and ErrorUnknown stories show."
+    },
+    "apps/web/components/features/teleprompter-studio/StudioDock.tsx": {
+      "error": "The dock has no failure surface; 'error' matched only the bg-error token on the record dot. Camera failures render in StudioCameraBlocked and save failures in StudioTakesSheet, which have Error stories."
+    },
+    "apps/web/components/features/teleprompter-studio/StudioHeader.tsx": {
+      "error": "The header shows no failure; 'error' matched only the recording badge's error tone, which the Recording story shows. Save failures render in StudioTakesSheet's ErrorNoneSaved story."
+    },
+    "apps/web/components/features/teleprompter-studio/StudioLightPanel.tsx": {
+      "long-content": "Every label is fixed copy and every value is a bounded number (brightness 0 to 100%, warmth in kelvin, edge width in px), so no caller text reaches the panel and nothing can grow past the Edges and FullWhite stories.",
+      "empty": "The light panel always has settings: it opens with saved or default ring light values, so there is no empty state."
     }
   }
 }

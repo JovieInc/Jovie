@@ -344,14 +344,6 @@ export function TeleprompterStudio({
     setPhase('ready');
   };
 
-  const seek = (index: number) => {
-    follower.resume(index);
-    setWordIndex(index);
-    if (speedRef.current) {
-      speedRef.current = { startedAt: Date.now(), startIndex: index };
-    }
-  };
-
   const cycleSpeed = () => {
     if (followMode === 'voice') {
       setFollowMode('speed');
@@ -387,7 +379,7 @@ export function TeleprompterStudio({
       role='dialog'
       aria-modal='true'
       aria-label={`Record ${context.title}`}
-      className='fixed inset-0 z-modal overflow-hidden bg-base text-white/95'
+      className='teleprompter-studio fixed inset-0 z-modal overflow-hidden bg-base text-on-media/95'
       style={style}
       data-testid='teleprompter-studio'
       data-phase={phase}
@@ -436,16 +428,12 @@ export function TeleprompterStudio({
           ) : mode === 'answer' ? (
             <StudioAnswerCue question={currentQuestion} />
           ) : (
-            <StudioScript
-              words={words}
-              nextWordIndex={wordIndex}
-              onSeek={seek}
-            />
+            <StudioScript words={words} nextWordIndex={wordIndex} />
           )}
         </main>
 
         {notice ? (
-          <p role='status' className='mx-auto mb-3 text-app text-white/70'>
+          <p role='status' className='mx-auto mb-3 text-app text-on-media/70'>
             {notice}
           </p>
         ) : null}

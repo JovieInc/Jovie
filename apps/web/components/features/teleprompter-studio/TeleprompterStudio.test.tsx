@@ -28,6 +28,7 @@ vi.mock('@/lib/teleprompter/studio-recorder', async importOriginal => ({
   openStudioCamera: mocks.openStudioCamera,
 }));
 
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { TeleprompterStudio } from './TeleprompterStudio';
 
 const context: TeleprompterRecordingContext = {
@@ -101,5 +102,24 @@ describe('TeleprompterStudio', () => {
       'teleprompter_studio_camera_blocked',
       expect.objectContaining({ reason: 'denied' })
     );
+  });
+
+  it('passes axe with the camera live and with the camera blocked', async () => {
+    mocks.openStudioCamera.mockResolvedValue({ getTracks: () => [] });
+    const live = render(
+      <TeleprompterStudio context={context} onClose={vi.fn()} />
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText('Start recording')).not.toBeDisabled()
+    );
+    await expectNoA11yViolations(document.body);
+    live.unmount();
+
+    mocks.openStudioCamera.mockRejectedValue(
+      new DOMException('denied', 'NotAllowedError')
+    );
+    render(<TeleprompterStudio context={context} onClose={vi.fn()} />);
+    await screen.findByText('Jovie needs your camera and mic');
+    await expectNoA11yViolations(document.body);
   });
 });
