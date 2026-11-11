@@ -36,3 +36,19 @@ test('start keeps its first-HTML heading when a forged passage token is sent', a
   expect(html).not.toContain('data-testid="start-loading-skeleton"');
   expect(html).not.toMatch(/<template id="B:\d+"><\/template>/);
 });
+
+// One flow, no separate waitlist (Tim, 2026-11-09): an anonymous visitor
+// stays on /start and gets the chat, whether or not public signup is closed.
+// Only FEATURE_ONE_FLOW_ONBOARDING=false brings back the /waitlist handoff.
+test('anonymous start stays on the chat instead of handing off to the waitlist', async ({
+  request,
+}) => {
+  test.skip(
+    process.env.FEATURE_ONE_FLOW_ONBOARDING === 'false',
+    'one-flow onboarding is switched off for this run'
+  );
+  const response = await request.get('/start');
+  expect(response.ok()).toBe(true);
+  expect(new URL(response.url()).pathname).toBe('/start');
+  expect(await response.text()).toContain('What are you working on?');
+});

@@ -101,8 +101,7 @@ import {
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
 import { readGoldenPathTurnContext } from '@/lib/waitlist/golden-path-admission.server';
-import { mustControlAnonymousAccess } from '@/lib/waitlist/public-signup-gate';
-import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
+import { isChatAccessControlled } from '@/lib/waitlist/onboarding-access-gate';
 
 /** Existing Statsig kill switch for all `/api/chat` traffic. */
 const CHAT_DISABLED_GATE = 'ai_chat_disabled';
@@ -636,19 +635,10 @@ export async function tryHandleAnonymousOnboardingChat(
     );
   }
   const clientTurnCount = clientMessages.filter(m => m.role === 'user').length;
-  // One-flow onboarding: while signup is closed an anonymous visitor always
-  // gets the controlled golden-path admission, so the chat cannot promise
-  // instant access that the claim would hold.
-  const accessControlled =
-    mustControlAnonymousAccess(Boolean(signedInSession?.user.id)) ||
-    (await isWaitlistGateEnabled().catch(error => {
-      // Fail closed: a settings outage must never grant anonymous instant access.
-      Sentry.captureException(error, {
-        tags: { context: 'onboarding_waitlist_gate' },
-        extra: { requestId },
-      });
-      return true;
-    }));
+  const accessControlled = await isChatAccessControlled(
+    Boolean(signedInSession?.user.id),
+    requestId
+  );
 
   let conversationId: string;
   try {
