@@ -206,6 +206,19 @@ All must hold for two consecutive 30-day windows:
 
 Otherwise keep the monorepo and address the measured payload, build, or ownership problem directly.
 
+## CI event fan-out budget
+
+One event should start a known, small number of runs. Workflow chains (`workflow_run`) and pull-request metadata triggers (`edited`, `labeled`, `unlabeled`) multiply runs, and every run, even a skipped one, spends the shared GitHub event pipeline and run list; cancelled and successful bookkeeping runs also take the hosted job slots (about 60) and the shared `GITHUB_TOKEN` bucket that merge-gate jobs need.
+
+Measured 2026-11-04 to 2026-11-10: 111,600 workflow runs for 415 merged PRs, 269 runs per merged PR; 32,213 runs (29%) skipped every job. Four workflows were over 95% skipped (Cheap Fixer, Legacy Human Hold Scrub, Security Suppression Audit, Auto-Merge Base Guard); their filters moved to the trigger in `fix/ci-skip-at-trigger`.
+
+Budget: **60 runs per merged PR** across all workflows. The registry ceiling starts at today's declared total and only goes down toward the target.
+
+- Registry: `scripts/ci-trigger-registry.json` lists every workflow file, the exact triggers that may start it (`event`, `event:type`, or `workflow_run:<upstream>`) and its expected `runsPerMergedPr`. `budget.runsPerMergedPr` is the target; `budget.ceiling` caps the declared total.
+- Gate: `scripts/ci-workflow-topology.test.mjs` fails when a workflow or trigger is not registered (fan-out triggers are named in the error), when a registered trigger no longer exists, when `runsPerMergedPr` is missing, or when the declared total passes the ceiling.
+- Adding a trigger: run `node scripts/ci-trigger-registry.mjs --write`, which syncs triggers and leaves a new workflow's `runsPerMergedPr` null, then fill in the measured or estimated number. A new `workflow_run`, `edited` or `labeled` trigger needs a reason in the PR body. Prefer an event filter (`types`, `branches`, `paths`) or a reusable call from a workflow that already wakes on the event over a job-level `if:` that skips.
+- Lowering the ceiling: after a fan-out cut lands, re-measure and lower `budget.ceiling` and the affected `runsPerMergedPr` in the same PR.
+
 ## Safe cleanup playbook
 
 1. Run `node scripts/repo-hygiene-guard.mjs --diff-base origin/main --report repo-health-receipt.json` from exact main.
