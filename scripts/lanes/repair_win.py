@@ -65,7 +65,10 @@ def company_guard_pin(files: list[dict], comparison: dict) -> str:
             or (comparison.get("base_commit") or {}).get("sha") != old
             or (comparison.get("merge_base_commit") or {}).get("sha") != old
             or not isinstance(commits, list) or len(commits) != count
-            or not isinstance(commits[-1], dict) or commits[-1].get("sha") != new):
+            or any(not isinstance(commit, dict) or not isinstance(commit.get("sha"), str)
+                   or not re.fullmatch(r"[0-9a-f]{40}", commit["sha"]) for commit in commits)
+            or len({commit["sha"] for commit in commits}) != count
+            or commits[-1]["sha"] != new):
         raise ValueError("upstream comparison must completely match the workflow's forward pin bump")
     section = "\n".join([
         "## Win", "",
