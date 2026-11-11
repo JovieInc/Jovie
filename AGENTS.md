@@ -62,7 +62,6 @@ Context guidance: [agent context](docs/agent-context/README.md).
 | iOS/macOS | [ios](.claude/rules/ios.md) / [macos](.claude/rules/macos.md) |
 | Pen canvas/registry | [pen](.claude/rules/pen.md) |
 | Skills | [gstack](.claude/rules/gstack.md) |
-| Chat tools vs Jovie skills | [code or skill](canon/ENGINEERING.md#code-or-skill-thin-harness-thick-skills) |
 | New fact (price, limit, copy) | [owner first](.claude/rules/source-of-truth.md): `canon/sources-of-truth.json`; derive, never copy |
 
 Other: ci-branching, event-driven, infra, linear, motion,
