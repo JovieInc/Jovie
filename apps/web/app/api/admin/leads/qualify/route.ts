@@ -1,10 +1,11 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { operatorAccess } from '@/lib/api/route-access';
+import { defineRoute } from '@/lib/api/route-pipeline';
 import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { processLeadBatch } from '@/lib/leads/process-batch';
-import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -14,21 +15,7 @@ export const maxDuration = 300;
 /**
  * POST /api/admin/leads/qualify — Trigger qualification for discovered leads.
  */
-export async function POST() {
-  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
-
+async function postHandler() {
   try {
     const discoveredLeads = await db
       .select({ id: leads.id })
@@ -60,3 +47,12 @@ export async function POST() {
     );
   }
 }
+
+export const POST = defineRoute(
+  {
+    route: '/api/admin/leads/qualify',
+    access: operatorAccess({ session: 'fresh' }),
+    legacy: { cache: 'pipeline-responses-only', unhandledErrors: 'rethrow' },
+  },
+  postHandler
+);
