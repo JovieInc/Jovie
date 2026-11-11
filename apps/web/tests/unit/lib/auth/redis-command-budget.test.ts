@@ -225,8 +225,6 @@ describe('redis command budget', () => {
     });
 
     expect(session?.user.email).toBe('redis-budget@example.com');
-    // better-auth 1.7.18 findSession GETs the session, then
-    // revoked-sessions-before-<userId>.
     expect(tally).toEqual({ ...emptyTally(), get: 2 });
   });
 
