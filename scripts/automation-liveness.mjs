@@ -679,8 +679,8 @@ const MERGEABLE_GREEN = new Set(['CLEAN', 'UNSTABLE', 'HAS_HOOKS']);
 const ADMISSION_BLOCKING = new Set(ADMISSION_BLOCKING_LABELS);
 const GREEN_TIMING_MAX_PRS = 10;
 const FAILURE_HOLD_CONTEXT = 'jovie-queue-failure-hold/v1';
-// Match revisionFailureDisposition: a product failure needs a new source head,
-// even when the failed product test is classified as retryable.
+// Like revisionFailureDisposition, product failures (including retryable tests)
+// require a new source head or an explicit human release before re-admission.
 const DEFECT_HOLD_CLASSES = new Set([
   'deterministic-source',
   'retryable-product',

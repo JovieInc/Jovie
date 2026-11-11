@@ -1428,7 +1428,7 @@ describe('dead-man liveness', () => {
     expect(waiting.status).toBe('stale');
     expect(waiting.ageMinutes).toBe(30);
     expect(waiting.reason).toContain('#1:30m');
-    for (const conclusion of ['pending', 'failure']) {
+    for (const conclusion of [null, 'failure']) {
       const runs = heads(30);
       runs.check_runs.find(
         check => check.name === 'Company guards'
