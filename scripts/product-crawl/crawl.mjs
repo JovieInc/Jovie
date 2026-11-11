@@ -38,6 +38,7 @@ import {
   sitemapPaths,
   strangerDiscovery,
 } from './sample-params.mjs';
+import { judgeOnQuietReload, wasThrottled } from './throttle.mjs';
 
 const { values: args } = parseArgs({
   options: {
@@ -338,6 +339,27 @@ for (const [k, row] of suspects.entries()) {
   row.lcpMs = median(row.lcpSamplesMs);
   row.longestTaskMs = median(row.longestTaskSamplesMs);
 }
+// A page whose request got a 429 is judged on one quiet reload (throttle.mjs).
+const throttled = pages.filter(wasThrottled);
+let throttleRechecksLeft = 0;
+if (throttled.length && Date.now() + 61_000 < DEADLINE) {
+  console.log(
+    `[crawl] re-loading ${throttled.length} rate-limited pages after a quiet minute, ${minutes()}m`
+  );
+  await new Promise(r => setTimeout(r, 61_000));
+  for (const [k, row] of throttled.entries()) {
+    if (pastDeadline()) {
+      throttleRechecksLeft = throttled.length - k;
+      break;
+    }
+    const again = await safeVisit(jobs.get(row));
+    if (!again.error) judgeOnQuietReload(row, again);
+  }
+} else throttleRechecksLeft = throttled.length;
+if (throttleRechecksLeft)
+  console.warn(
+    `[crawl] ${throttleRechecksLeft} rate-limited pages judged without a quiet reload`
+  );
 await browser.close();
 
 const receipt = {
