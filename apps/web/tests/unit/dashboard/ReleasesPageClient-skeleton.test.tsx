@@ -47,7 +47,7 @@ vi.mock('@/features/feedback/PageErrorState', () => ({
   PageErrorState: () => <div data-testid='page-error-state' />,
 }));
 
-vi.mock('@/app/app/(shell)/library/LibrarySurface', () => ({
+vi.mock('@/app/app/(shell)/library/DeferredLibrarySurface', () => ({
   LibrarySurface: () => (
     <div data-testid='library-surface'>
       <input aria-label='Asset draft' />

@@ -1,8 +1,8 @@
 'use client';
 
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { LibrarySurface } from '@/app/app/(shell)/library/DeferredLibrarySurface';
 import { LibraryLoadingState } from '@/app/app/(shell)/library/LibraryLoadingState';
-import { LibrarySurface } from '@/app/app/(shell)/library/LibrarySurface';
 import {
   buildLibraryDocumentAssets,
   buildLibraryMerchAssets,
