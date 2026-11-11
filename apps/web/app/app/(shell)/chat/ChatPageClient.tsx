@@ -8,6 +8,7 @@ import {
 } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { Archive, Check, Copy, Ellipsis } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChatEntityPanelProvider } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
@@ -22,7 +23,6 @@ import {
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
-import { JovieChat } from '@/components/jovie/JovieChat';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
@@ -51,6 +51,12 @@ import {
 } from '@/lib/queries';
 import { addBreadcrumb, captureMessage } from '@/lib/sentry/client-lite';
 import { getHometownFromSettings } from '@/types/db';
+
+// Scratch experiment (JOV-10150): evaluate and hydrate JovieChat outside the
+// shell's blocking hydration task.
+const JovieChat = dynamic(() =>
+  import('@/components/jovie/JovieChat').then(module => module.JovieChat)
+);
 
 interface ChatPageClientProps {
   readonly conversationId?: string;
