@@ -445,6 +445,16 @@ describe('Auto-Ready App-token workflow', () => {
     expect(workflow).toContain('persist-credentials: false');
   });
 
+  it('resolves bot review threads on the green head after the undraft', () => {
+    const step = workflow.split(
+      '- name: Resolve bot review threads on the green head'
+    )[1];
+    expect(step).toContain("github.event_name == 'workflow_run'");
+    expect(step).toContain(
+      'node scripts/lib/bot-review-threads.mjs --repo "$REPO" --pr "$TARGET_PR" --head "$TARGET_HEAD"'
+    );
+  });
+
   it('keeps workflow recovery manual-only and never source-event driven', () => {
     // Manual recovery plus completed source-check runs; no PR, schedule or
     // ready_for_review wake can start a cascade.

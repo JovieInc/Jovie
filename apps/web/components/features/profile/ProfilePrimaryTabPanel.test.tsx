@@ -232,6 +232,10 @@ describe('ProfilePrimaryTabPanel', () => {
     renderPanel({ mode: 'subscribe', visitorAssignmentResolved: false });
 
     expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
+    // The inline form's full-height placeholder, so the swap shifts nothing.
+    expect(
+      screen.getByTestId('profile-mobile-notifications-flow-skeleton')
+    ).toBeInTheDocument();
     expect(
       screen.queryByTestId('mock-artist-notifications-cta')
     ).not.toBeInTheDocument();
@@ -248,6 +252,9 @@ describe('ProfilePrimaryTabPanel', () => {
     });
 
     expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('profile-mobile-notifications-flow-skeleton')
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('mock-two-step-notifications-cta')
     ).not.toBeInTheDocument();

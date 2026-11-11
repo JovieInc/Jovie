@@ -6,6 +6,11 @@
 //                 p50/p95 are measurable per run.
 //   intake        file or reopen one fingerprinted Linear issue (and post to
 //                 Slack) on red; resolve it on green.
+//   layout-intake the same for the layout-shift budget (perf class), under
+//                 its own fingerprint, so a layout breach never reopens or
+//                 resolves the revenue journey's P0.
+//   layout-outcome success|failure|unmeasured from the layout spec's exit
+//                 status and Playwright JSON report (skipped is unmeasured).
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -19,6 +24,7 @@ import {
 import { parseStageEventFeed } from './lib/stage-events.mjs';
 
 export const CLAIM_DOGFOOD_KEY = 'claim-checkout-dogfood';
+export const CLAIM_LAYOUT_BUDGET_KEY = 'claim-checkout-layout-budget';
 const ENTITY = 'claim-dogfood';
 const SOURCE = 'claim-dogfood-receipts';
 
@@ -170,6 +176,95 @@ export async function reportClaimDogfoodResult(
   });
 }
 
+/**
+ * Layout step verdict from Playwright's exit status and its JSON report.
+ * Green only when every layout test ran and passed: getStripeContextOrSkip
+ * skips the tests when Stripe test prerequisites are unavailable and
+ * Playwright still exits 0, so a skipped or empty run is `unmeasured`.
+ */
+export function layoutBudgetOutcome(status, report) {
+  if (Number(status) !== 0) return 'failure';
+  const count = key => Number(report?.stats?.[key] ?? 0) || 0;
+  const ran = count('expected') + count('flaky');
+  return ran > 0 && count('skipped') === 0 && count('unexpected') === 0
+    ? 'success'
+    : 'unmeasured';
+}
+
+function readLayoutReport(path) {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Layout-shift budget (perf class) for /claim and /billing/success. Its own
+ * fingerprinted issue: green resolves it, a breach files or reopens it, and
+ * an unmeasured run (tests skipped) leaves it as it is; the layout-budget
+ * check is red for that run.
+ */
+export async function reportClaimLayoutBudgetResult(
+  { outcome, runUrl = '', runId = '' },
+  {
+    env = process.env,
+    upsert = upsertLinearIssueByTitleFingerprint,
+    close = closeLinearIssueByFingerprint,
+    notify = postSlack,
+  } = {}
+) {
+  const key = CLAIM_LAYOUT_BUDGET_KEY;
+  if (outcome !== 'success' && outcome !== 'failure') {
+    console.log(
+      `claim-dogfood: layout budget ${outcome || 'missing'}; ${key} left as it is`
+    );
+    return { ok: true, action: 'unmeasured', key };
+  }
+  const enabled = remediationTriggersEnabled(env);
+  if (outcome === 'success') {
+    if (!enabled) {
+      return logRemediationDryRun({ action: 'resolve', key, fingerprint: key });
+    }
+    return close({
+      fingerprint: key,
+      labelKey: key,
+      comment: 'Claim checkout layout-shift budget is green.',
+      runId,
+      apiKey: env.LINEAR_API_KEY,
+    });
+  }
+  await notify(
+    env,
+    `Claim checkout layout-shift budget is breached (perf; checkout itself is reported separately). Run: ${runUrl}`
+  );
+  if (!enabled) {
+    return logRemediationDryRun({ action: 'upsert', key, fingerprint: key });
+  }
+  return upsert({
+    fingerprint: key,
+    labelKey: key,
+    title: `Perf: claim checkout layout-shift budget breached (${key})`,
+    description: [
+      '## Source',
+      '- Workflow: claim-checkout-dogfood.yml, check "Claim checkout layout budget (perf)"',
+      `- Run: ${runUrl}`,
+      '',
+      '## Why it matters',
+      'Cumulative layout shift on /claim or /billing/success reached the 0.1 Web Vitals ceiling. A paying artist sees the screen jump. The functional checkout is a separate check and is not implied broken.',
+      '',
+      '## Repro',
+      'Run apps/web/tests/e2e/claim-checkout-layout.perf.spec.ts with Stripe test keys against a local server with E2E_USE_TEST_AUTH_BYPASS=1.',
+      '',
+      `Fingerprint: ${key}`,
+    ].join('\n'),
+    priority: 3,
+    createStateName: 'Todo',
+    reopenTerminal: true,
+    apiKey: env.LINEAR_API_KEY,
+  });
+}
+
 async function postSlack(env, text) {
   if (!env.SLACK_WEBHOOK_URL) return;
   try {
@@ -186,6 +281,29 @@ async function postSlack(env, text) {
   }
 }
 
+/**
+ * `layout-intake`: a Linear or Slack failure is a warning, never a failure of
+ * the dogfood job, so the revenue journey and the perf class never share one
+ * red. The layout-budget check carries the perf verdict on its own.
+ */
+export async function layoutIntakeCommand(
+  env = process.env,
+  report = reportClaimLayoutBudgetResult
+) {
+  const outcome = await report({
+    outcome: env.LAYOUT_OUTCOME,
+    runUrl: env.RUN_URL,
+    runId: env.RUN_ID,
+  });
+  console.log(JSON.stringify(outcome));
+  if (outcome && outcome.ok === false) {
+    console.log(
+      `::warning::Claim layout Linear intake failed: ${outcome.reason}`
+    );
+  }
+  return outcome;
+}
+
 async function main(command) {
   if (command === 'stage-events') return writeStageEvents();
   if (command === 'intake') {
@@ -200,8 +318,19 @@ async function main(command) {
     }
     return;
   }
+  if (command === 'layout-intake') {
+    await layoutIntakeCommand();
+    return;
+  }
+  if (command === 'layout-outcome') {
+    // layout-outcome <playwright exit status> <playwright JSON report>
+    console.log(
+      layoutBudgetOutcome(process.argv[3], readLayoutReport(process.argv[4]))
+    );
+    return;
+  }
   throw new Error(
-    `usage: claim-dogfood-report.mjs stage-events|intake (got ${command})`
+    `usage: claim-dogfood-report.mjs stage-events|intake|layout-intake|layout-outcome (got ${command})`
   );
 }
 

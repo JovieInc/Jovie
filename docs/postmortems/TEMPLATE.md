@@ -4,6 +4,7 @@ status: draft
 severity: sev2
 detected: YYYY-MM-DDTHH:MMZ
 repaired: YYYY-MM-DDTHH:MMZ
+revert_opened: YYYY-MM-DDTHH:MMZ
 failure_classes: []
 detectable_before_human: false
 detection_gaps: []
@@ -29,6 +30,7 @@ Two or three sentences: what broke, for how long, and the one-line root cause.
 | Start (first bad event) | |
 | Time to detect (first machine or human signal) | |
 | Time to own (first incident record with an owner) | |
+| Revert opened at (or why no culprit existed) | |
 | Time to repair (user-facing recovery) | |
 | What was blocked | |
 
@@ -36,6 +38,15 @@ Two or three sentences: what broke, for how long, and the one-line root cause.
 
 | Time | Event | Evidence |
 | --- | --- | --- |
+
+## Revert first
+
+When the culprit commit was known, when was its revert PR opened (target: within 15 minutes of
+Main Health or the merge-group ejector naming it, see
+[`canon/MERGE_QUEUE_STEWARD.md`](../../canon/MERGE_QUEUE_STEWARD.md#revert-first))? If a forward fix
+landed instead, say whether it landed before the revert would have. If no culprit commit existed (a
+test that expired by the clock, an environment or tool break), say so here; `revert_opened` then
+reads `none: <why>`. A dependency bump is always reverted, never debugged in place.
 
 ## Root cause
 
