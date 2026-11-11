@@ -112,12 +112,15 @@ function snippetAt(lines: readonly string[], line: number, column: number) {
 
 const APP_SOURCE = /^(apps\/web|packages)\//u;
 
-/** The longest stretch of consecutive non-idle samples: one long task. */
-export function longestBusyRun(profile: CpuProfile): {
+interface BusyRun {
   readonly start: number;
   readonly end: number;
+  readonly atMs: number;
   readonly ms: number;
-} {
+}
+
+/** Stretches of consecutive non-idle samples, longest first: long tasks. */
+export function busyRuns(profile: CpuProfile): BusyRun[] {
   const samples = profile.samples ?? [];
   const deltas = profile.timeDeltas ?? [];
   const idle = new Set(
@@ -125,20 +128,27 @@ export function longestBusyRun(profile: CpuProfile): {
       .filter(node => node.callFrame.functionName === '(idle)')
       .map(node => node.id)
   );
-  let best = { start: 0, end: 0, ms: 0 };
+  const runs: BusyRun[] = [];
   let start = 0;
+  let startUs = 0;
+  let elapsedUs = 0;
   let us = 0;
   for (let index = 1; index <= samples.length; index += 1) {
+    const delta = deltas[index] ?? 0;
     const busy = index < samples.length && !idle.has(samples[index - 1]);
     if (busy) {
-      us += deltas[index] ?? 0;
-      continue;
+      us += delta;
+    } else {
+      if (us > 0) {
+        runs.push({ start, end: index, atMs: startUs / 1000, ms: us / 1000 });
+      }
+      start = index;
+      startUs = elapsedUs + delta;
+      us = 0;
     }
-    if (us / 1000 > best.ms) best = { start, end: index, ms: us / 1000 };
-    start = index;
-    us = 0;
+    elapsedUs += delta;
   }
-  return best;
+  return runs.sort((x, y) => y.ms - x.ms);
 }
 
 interface MappedFrame {
@@ -166,18 +176,20 @@ async function mapFrame(
   };
 }
 
+const DESCRIBED_RUNS = 3;
+const OWNERS_PER_RUN = 8;
+
 /**
- * Splits the longest task's samples by the nearest app or package frame on
- * each sample's stack, so React's own frames are charged to the component
- * that called into them.
+ * Splits each of the longest tasks' samples by the nearest app or package
+ * frame on each sample's stack, so React's own frames are charged to the
+ * component that called into them, and names the frame that entered the task.
  */
-async function describeLongestTask(
+async function describeLongestTasks(
   page: Page,
   origin: string,
   profile: CpuProfile,
   chunks: Map<string, LoadedChunk>
 ): Promise<string> {
-  const run = longestBusyRun(profile);
   const samples = profile.samples ?? [];
   const deltas = profile.timeDeltas ?? [];
   const byId = new Map(profile.nodes.map(node => [node.id, node]));
@@ -186,35 +198,61 @@ async function describeLongestTask(
     for (const child of node.children ?? []) parent.set(child, node.id);
   }
   const owner = new Map<number, string>();
-  const byOwner = new Map<string, number>();
-  for (let index = run.start + 1; index < run.end; index += 1) {
-    const leaf = samples[index - 1];
-    let label = owner.get(leaf);
-    if (label === undefined) {
-      label = '(no app frame on stack)';
-      for (
-        let id: number | undefined = leaf;
-        id !== undefined;
-        id = parent.get(id)
-      ) {
-        const node = byId.get(id);
-        if (!node) break;
-        const frame = await mapFrame(page, origin, node, chunks);
-        if (frame && APP_SOURCE.test(frame.source)) {
-          label = frame.label;
-          break;
-        }
-      }
-      owner.set(leaf, label);
+  const stackOf = (leaf: number): ProfileNode[] => {
+    const stack: ProfileNode[] = [];
+    for (
+      let id: number | undefined = leaf;
+      id !== undefined;
+      id = parent.get(id)
+    ) {
+      const node = byId.get(id);
+      if (!node || node.callFrame.functionName === '(root)') break;
+      stack.push(node);
     }
-    byOwner.set(label, (byOwner.get(label) ?? 0) + (deltas[index] ?? 0) / 1000);
+    return stack;
+  };
+  const describeFrame = async (node: ProfileNode | undefined) => {
+    if (!node) return '(none)';
+    const frame = await mapFrame(page, origin, node, chunks);
+    return frame?.label ?? (node.callFrame.functionName || '(anonymous)');
+  };
+
+  const sections: string[] = [];
+  for (const run of busyRuns(profile).slice(0, DESCRIBED_RUNS)) {
+    const byOwner = new Map<string, number>();
+    const entries = new Map<string, number>();
+    for (let index = run.start + 1; index < run.end; index += 1) {
+      const leaf = samples[index - 1];
+      const ms = (deltas[index] ?? 0) / 1000;
+      const stack = stackOf(leaf);
+      const entry = await describeFrame(stack.at(-1));
+      entries.set(entry, (entries.get(entry) ?? 0) + ms);
+      let label = owner.get(leaf);
+      if (label === undefined) {
+        label = '(no app frame on stack)';
+        for (const node of stack) {
+          const frame = await mapFrame(page, origin, node, chunks);
+          if (frame && APP_SOURCE.test(frame.source)) {
+            label = frame.label;
+            break;
+          }
+        }
+        owner.set(leaf, label);
+      }
+      byOwner.set(label, (byOwner.get(label) ?? 0) + ms);
+    }
+    const top = (map: Map<string, number>, count: number) =>
+      [...map]
+        .sort((x, y) => y[1] - x[1])
+        .slice(0, count)
+        .map(([key, ms]) => `    ${formatMs(ms)} ${key}`)
+        .join('\n');
+    sections.push(
+      `  task ${formatMs(run.ms)} at +${formatMs(run.atMs)}; entered by:\n${top(entries, 2)}\n` +
+        `  by nearest app frame:\n${top(byOwner, OWNERS_PER_RUN)}`
+    );
   }
-  const rows = [...byOwner]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, TOP_FUNCTIONS)
-    .map(([key, ms]) => `  ${formatMs(ms)} ${key}`)
-    .join('\n');
-  return `longest task ${formatMs(run.ms)}, by nearest app frame:\n${rows}`;
+  return `longest tasks:\n${sections.join('\n')}`;
 }
 
 function formatMs(ms: number): string {
@@ -291,7 +329,7 @@ export async function printColdLoadProfile(
         `(${[...new Set([...chunks.values()].map(chunk => chunk.mapStatus))].join(', ')})\n` +
         `[cold-load-profile] ${label} by source:\n${top(bySource, TOP_SOURCES)}\n` +
         `[cold-load-profile] ${label} by function:\n${top(byFunction, TOP_FUNCTIONS)}\n` +
-        `[cold-load-profile] ${label} ${await describeLongestTask(page, origin, profile, chunks)}\n`
+        `[cold-load-profile] ${label} ${await describeLongestTasks(page, origin, profile, chunks)}\n`
     );
   } catch (error) {
     process.stdout.write(

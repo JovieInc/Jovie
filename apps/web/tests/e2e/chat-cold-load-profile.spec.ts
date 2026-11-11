@@ -31,6 +31,10 @@ test('cold chat load prints a source-mapped CPU profile', async ({ page }) => {
     await expect(page.getByTestId('chat-content').last()).toBeVisible({
       timeout: 30_000,
     });
+    // The production long frame can land after first paint, once data arrives.
+    await page
+      .waitForLoadState('networkidle', { timeout: 10_000 })
+      .catch(() => undefined);
   });
   await printServerDomWeight(page, 'chat cold load');
 });
