@@ -65,3 +65,59 @@
     transition: none;
   }
 }
+
+/* Creator Identity must fit the remaining route beside the inspector, not
+   assume that a desktop viewport means a wide table. Company tables unchanged. */
+.identityContainer {
+  container-type: inline-size;
+}
+@container (max-width: 639px) {
+  .identityContainer .identityNameColumn {
+    width: auto !important;
+  }
+  .identityContainer .identityActionsColumn {
+    width: 112px !important;
+  }
+  .identityContainer .statusColumn,
+  .identityContainer .identityDetailColumn {
+    display: none;
+  }
+  .identityContainer .mobileStatus {
+    display: flex;
+    align-items: center;
+  }
+  .identityContainer .identityLabel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 1rem 1rem;
+    width: 100%;
+  }
+  .identityContainer .identityLabel > :first-child {
+    width: auto;
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+  .identityContainer .identityLabel > [data-testid="presence-page-identity"] {
+    max-width: 5rem;
+    line-height: 1rem;
+  }
+  .identityContainer .mobileStatus {
+    grid-column: 1 / -1;
+    line-height: 1rem;
+    white-space: nowrap;
+  }
+  .identityContainer .mobileStatus > span {
+    min-height: 0;
+    line-height: 1rem;
+    white-space: nowrap;
+  }
+}
+
+@container (max-width: 360px) {
+  .identityContainer .profilePhoto {
+    display: none;
+  }
+  .identityContainer .identityLabel > [data-testid="presence-page-identity"] {
+    max-width: 3rem;
+  }
+}

@@ -83,6 +83,27 @@ describe('ProfileMobileNotificationsFlow', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('marks the root while the flow is open so the consent card cannot stack over it (JOV-3209)', () => {
+    const { unmount } = renderFlow({ presentation: 'inline', step: 'email' });
+
+    expect(
+      document.documentElement.getAttribute('data-profile-flow-open')
+    ).toBe('true');
+
+    unmount();
+    expect(
+      document.documentElement.hasAttribute('data-profile-flow-open')
+    ).toBe(false);
+  });
+
+  it('leaves the root unmarked when the flow is closed', () => {
+    renderFlow({ open: false, presentation: 'inline', step: 'email' });
+
+    expect(
+      document.documentElement.hasAttribute('data-profile-flow-open')
+    ).toBe(false);
+  });
+
   it('makes the capture screen immediately visible without a sliding transition', () => {
     renderFlow({ step: 'email' });
 

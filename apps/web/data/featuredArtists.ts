@@ -1,9 +1,9 @@
 /**
  * The opt-in featured slot on marketing surfaces.
  *
- * Tim (2026-11-08): until we have users, the homepage features invented demo
- * artists; then it switches to the top real artists who opt in to be
- * featured, with their content certified.
+ * Tim (2026-11-08): the homepage does not feature him. Until a real artist
+ * opts in, the slot shows the labeled example artist in `demoArtists.ts`,
+ * then the top opted-in artists whose content is certified.
  *
  * A real artist reaches the homepage only through a record in
  * `FEATURED_ARTIST_OPT_INS` that passes `featuredArtistCertificationFailures`.

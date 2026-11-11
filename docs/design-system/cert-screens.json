@@ -437,7 +437,7 @@
     "apps/web/components/shell/ArtistProfileRailToggle.tsx": "a11y,tests",
     "apps/web/components/shell/AudioBar.tsx": "a11y,states,tests",
     "apps/web/components/shell/AudioPlayControl.tsx": "a11y,states",
-    "apps/web/components/shell/ContextMenuOverlay.tsx": "a11y,ds-owner,forced-caps,states,tokens",
+    "apps/web/components/shell/ContextMenuOverlay.tsx": "a11y,ds-owner,forced-caps,states",
     "apps/web/components/shell/DashboardSegmentSkeleton.tsx": "a11y,states",
     "apps/web/components/shell/DictationWaveform.tsx": "a11y,states,tokens",
     "apps/web/components/shell/HeaderSearchSurfaceFromContext.tsx": "a11y,ds-owner,states",

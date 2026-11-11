@@ -87,6 +87,19 @@ describe('ContextMenuOverlay', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it('paints a danger item with the AA error text token', () => {
+    const state: ContextMenuState = {
+      x: 0,
+      y: 0,
+      items: [{ label: 'Delete', tone: 'danger', onSelect: () => undefined }],
+    };
+    render(<ContextMenuOverlay state={state} onClose={() => undefined} />);
+    const item = screen.getByRole('menuitem', { name: 'Delete' });
+    const classes = item.className.split(/\s+/);
+    expect(classes).toContain('text-error-text');
+    expect(classes).not.toContain('text-rose-300');
+  });
+
   it('renders an icon when supplied', () => {
     const state: ContextMenuState = {
       x: 0,

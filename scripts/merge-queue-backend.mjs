@@ -12,9 +12,8 @@ import {
   NATIVE_QUEUE_POLICY,
 } from './lib/merge-queue-guard.mjs';
 
-// The live repository variable and active ruleset both use GitHub native.
-// Keep bare read-only/local callers aligned with that canon; mutations still
-// require the dedicated native authorization below.
+// The live repository variable and active ruleset both use GitHub native; keep bare
+// read-only/local callers on that canon; mutations need the dedicated native auth below.
 export const DEFAULT_MERGE_QUEUE_BACKEND = 'native';
 export const MERGE_QUEUE_BACKENDS = Object.freeze(['native']);
 export const CANONICAL_NATIVE_MUTATION_ACTOR = 'jovie-bot[bot]';
@@ -44,6 +43,7 @@ const REQUIRED_CHECKS = Object.freeze([
   'Migration Guard',
   'Fork PR Gate',
   'PR Size Guard',
+  'Company guards',
 ]);
 const NATIVE_QUEUE_ENTRY_STATES = new Set([
   'QUEUED',

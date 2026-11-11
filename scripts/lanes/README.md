@@ -877,6 +877,15 @@ MusicFetch.
 alert `escalation-surfaced` for the lanes repair owner (never a human by default); PRs
 that merged or closed drop out once the reconcile pass has a complete open-PR view.
 
+The bounded public `lanes-status.json` projection replaces the historical
+`remediation.byFingerprint` index with `byFingerprintSummary` counts and a
+`byFingerprintRef` into the same publication's `lanes-status-details.json`.
+The reference binds through `publicProjection.fullEvidence`; absence of the index
+is not an empty or partial result. Full evidence and active ownership/escalation
+arrays remain unchanged. If essential data still exceeds the 256 KiB budget,
+size alerts retain its `requiredBytes`, separately from the small published
+unavailable envelope's `publishedBytes`, until the actual snapshot fits again.
+
 ## Fleet work ledger (`fleet_ledger.py`)
 
 One read-only view of every claim (lanes run leases, repo-binding issue locks, the claim ledger and

@@ -1,5 +1,5 @@
 {
-  "toolsListHash": "87e4a522b0ed1415e0ca53e123958ef35b15b35f4eeff2fe72cc35d3cafe32f6",
+  "toolsListHash": "3b449a88fcfe63cfd959490228de4b89cedfabede3ba1561c63ead05990ad371",
   "tools": [
     {
       "name": "artist.search_or_import",
@@ -303,6 +303,286 @@
         "readOnlyHint": false,
         "destructiveHint": false,
         "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "claim_handle",
+      "title": "Claim a handle",
+      "description": "Check and reserve the draft artist’s jov.ie handle (the profile URL). Returns availability with numbered suggested alternatives when taken. High-reach artists are routed to the existing verification path. The reservation completes when the artist signs in through claim_url; nothing is public until they publish.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "draft_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "draft_token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8192
+          },
+          "handle": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "draft_id",
+          "draft_token",
+          "handle"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Claim a handle",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "answer_onboarding_question",
+      "title": "Record a Mom Test answer",
+      "description": "Record one onboarding Mom Test answer on the draft: lastGrowthAttempt (the artist's most recent growth attempt and how it went) or promoSpend (what they pay each month to promote their music, one of none, under_50, 50_plus). The exact question wording ships in the Jovie skill. Ask in your own voice; never lead or ask willingness-to-pay.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "draft_id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "draft_token": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 8192
+              },
+              "question": {
+                "type": "string",
+                "const": "lastGrowthAttempt"
+              },
+              "answer": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 600
+              }
+            },
+            "required": [
+              "draft_id",
+              "draft_token",
+              "question",
+              "answer"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "draft_id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "draft_token": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 8192
+              },
+              "question": {
+                "type": "string",
+                "const": "promoSpend"
+              },
+              "answer": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "under_50",
+                  "50_plus"
+                ]
+              }
+            },
+            "required": [
+              "draft_id",
+              "draft_token",
+              "question",
+              "answer"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "annotations": {
+        "title": "Record a Mom Test answer",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "get_qualification",
+      "title": "Get qualification",
+      "description": "Run the shared onboarding qualification for the draft artist. Returns qualified or queued with a reason; queued carries the locked line \"Your handle is reserved. You're on the waitlist.\"",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "draft_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "draft_token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8192
+          }
+        },
+        "required": [
+          "draft_id",
+          "draft_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Get qualification",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "build_profile",
+      "title": "Build profile preview",
+      "description": "Build the draft profile from the artist's public data, including the real catalog preview when available. Read-only preview for the artist; nothing is published.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "draft_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "draft_token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8192
+          }
+        },
+        "required": [
+          "draft_id",
+          "draft_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Build profile preview",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "publish_profile",
+      "title": "Publish profile",
+      "description": "Publish step. Agents never publish: show claim_url so the artist signs in on Jovie and publishes from their dashboard. Returns claim_required until the draft is claimed.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "draft_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "draft_token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8192
+          },
+          "confirmed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "draft_id",
+          "draft_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Publish profile",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "share_profile",
+      "title": "Share a profile",
+      "description": "Return the public jov.ie profile URL plus a factual share line for an already-public profile. Never shares a private or unpublished profile.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "username"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Share a profile",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "start_upgrade",
+      "title": "Start upgrade",
+      "description": "Return the existing Jovie checkout entry for the draft artist (claim/start). Plans and prices are shown on Jovie from offer truth; never state a price yourself.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "draft_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "draft_token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8192
+          }
+        },
+        "required": [
+          "draft_id",
+          "draft_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Start upgrade",
+        "readOnlyHint": true,
+        "destructiveHint": false,
         "openWorldHint": true
       }
     }

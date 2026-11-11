@@ -5,8 +5,8 @@ import { PayLanding } from '@/features/pay/PayLanding';
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = 'Turn Every Payment Into a Follower';
-  const ogTitle = `${APP_NAME} — Turn Every Payment Into a Follower`;
+  const title = 'Turn every payment into a follower';
+  const ogTitle = `${title} | ${APP_NAME}`;
   const description =
     'Scan the code, pay in seconds, and turn a stranger into a follower. Perfect for market stalls, service providers, live events, and pop-up shops.';
 

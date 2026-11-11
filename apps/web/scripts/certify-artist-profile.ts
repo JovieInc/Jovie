@@ -5,6 +5,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   discoveryApiSchema,
   inspectDiscoveryGuide,
@@ -75,14 +76,29 @@ async function referenceReleaseFields(
 
 /**
  * Redirects the codebase declares on purpose: the stable `/artists/:id`
- * entity route (survives claims and renames) and the profile mode
- * redirect-sinks registered in route-config. Only these get one followed
- * hop, and only to a same-origin 200. Every other redirect still fails.
+ * entity route (survives claims and renames), route-config redirect sinks,
+ * and the closed-signup waitlist handoff. Only these get one followed hop,
+ * and only to a same-origin 200. Every other redirect still fails.
  */
-export function isDeclaredRedirect(url: URL, handle: string): boolean {
+export function isDeclaredRedirect(
+  url: URL,
+  handle: string,
+  location?: string | null
+): boolean {
   if (STABLE_ARTIST_ROUTE.test(url.pathname)) return true;
-  return REDIRECT_SINK_ROUTE_KEYS.some(
-    key => PROFILE_ROUTE_CONFIG[key].buildPath(handle) === url.pathname
+  if (
+    REDIRECT_SINK_ROUTE_KEYS.some(
+      key => PROFILE_ROUTE_CONFIG[key].buildPath(handle) === url.pathname
+    )
+  ) {
+    return true;
+  }
+  // Closed public signup (canon/PRODUCT.md, 2026-11-02, PR #24224): /start +
+  // /signup 307 to /waitlist; malformed Location throws to the link catch.
+  if (!/^\/(?:start|signup)$/.test(url.pathname) || !location) return false;
+  return (
+    new URL(location, TIM_WHITE_PROFILE.publicProfileUrl).pathname ===
+    APP_ROUTES.WAITLIST
   );
 }
 
@@ -350,7 +366,7 @@ export async function certifyArtistProfile(
               result.status >= 300 &&
               result.status < 400 &&
               location &&
-              isDeclaredRedirect(new URL(url), handle)
+              isDeclaredRedirect(new URL(url), handle, location)
             ) {
               await result.body?.cancel();
               const target = new URL(location, url);
