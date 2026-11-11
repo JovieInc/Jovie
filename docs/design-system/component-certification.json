@@ -459,6 +459,44 @@
       "partial": "MarketingPageShell holds no data: it wraps children, and its optional props (className, penContractId) are class hooks and a design-diff id with defaults, so nothing can be partially present.",
       "permission-denied": "MarketingPageShell is a layout wrapper with no gated action or permission input; the detector matched the word 'role' in its comment."
     },
+    "apps/web/components/features/profile/artist-notifications-cta/BirthdayInput.tsx": {
+      "long-content": "BirthdayInput always renders exactly eight single-digit boxes (MM/DD/YYYY) under fixed Month, Day and Year labels; it takes no caller text, and useSegmentedInput strips non-digits and drops anything past the eighth digit, which BirthdayInput.test.tsx covers, so nothing can grow.",
+      "offline": "BirthdayInput never fetches or submits; onSubmit is a callback fired on Enter and the notifications flow that owns it saves the birthday and reports connectivity. The detector matched onSubmit."
+    },
+    "apps/web/components/molecules/UpgradeButton.tsx": {
+      "empty": "UpgradeButton renders one button and an optional error line and takes no collection; the detector matched the items-center class.",
+      "partial": "Its optional props are presentation (className, variant, size), a defaulted label, and priceId, which only chooses direct checkout over the pricing page; no data payload can be partially present, and both flows are tested.",
+      "permission-denied": "UpgradeButton is the upgrade affordance itself and has no gated or permission-dependent state: it is always pressable unless checkout is in flight. The detector matched upgrade and plan in its copy."
+    },
+    "apps/web/components/molecules/UsageMeter.tsx": {
+      "error": "UsageMeter only draws a valid UsageMeterModel; createUsageMeterModel returns null for invalid counts and the owner (UsageMenuItem) shows the unavailable or unverified copy instead of a meter. The detector matched the bg-error exhausted tone, which the Exhausted story shows."
+    },
+    "apps/web/components/site/MarketingPageContractMarkers.tsx": {
+      "long-content": "The marker is a hidden, aria-hidden metadata node read only by route-contract tests; it is never painted, so no label length can lay out or overflow.",
+      "rtl-overflow": "The marker is hidden and aria-hidden and never painted, so text direction cannot affect any layout; the detector matched the CTA label attribute."
+    },
+    "apps/web/components/features/auth/AuthenticatedAuthEntryGuard.tsx": {
+      "loading": "While the Better Auth session is still pending the guard deliberately keeps rendering its children unchanged (JOV-6450) and draws no spinner or skeleton of its own, so the loading frame is the SignedOut story; the detector matched 'pending' in a comment.",
+      "error": "The guard has no error UI: it only decides between passing its children through and returning null while it redirects. The detector matched 'error' in comments about hydration error #418 and duplicate error banners.",
+      "long-content": "The guard renders no box or text of its own; it passes its children through unchanged, so any long content belongs to and is shown by the child surface's stories.",
+      "offline": "The guard never fetches or mutates; it reads the session from useAuthSafe and the session cookie and calls router.replace, so lost connectivity can only leave the children rendered, which the SignedOut story shows.",
+      "rtl-overflow": "The guard renders no box or text of its own and passes its children through unchanged, so direction and overflow belong to the child surface."
+    },
+    "apps/web/components/features/profile/StaticListenInterface.tsx": {
+      "error": "Every failure in a provider press (cookie or storage write, analytics, deep link) is caught and falls back to opening the provider URL in a new tab; the row has no error UI. The detector matched those catch blocks.",
+      "offline": "StaticListenInterface never fetches; a press only stores the preference and opens the provider URL in a new tab, so connectivity only affects that tab. The detector matched the local isLoading flag, which LoadingOpeningProvider shows."
+    },
+    "apps/web/components/features/tracking/SignupFunnelBeacon.tsx": {
+      "error": "SignupFunnelBeacon renders no markup; trackFunnelStep and postJsonBeacon swallow a failed send by design (JOV-6585 fail-open), and the detector matched the catch in isSignupEntryHref, which returns false for an unparseable href as SignupFunnelBeacon.test.tsx covers."
+    },
+    "apps/web/components/features/waitlist/WaitlistJoinedConfirmation.tsx": {
+      "empty": "The confirmation always shows one heading and the echoed email and takes no collection; the detector matched the word list in its \"You're on the list\" heading.",
+      "permission-denied": "The confirmation only reports a request that already landed and has no gated action or permission input; the detector matched role='status'."
+    },
+    "apps/web/components/jovie/components/ChatEmptyStateComposerRegion.tsx": {
+      "partial": "The region carries no data payload: its sample is a built-in constant and its optional props (fullBleed, stableDocked, showDockedWelcome, hideWelcomeHeader, alignAbove, onSelectSample) are layout switches, each shown by the JustAsk, AboveComposer and EmptyDockedRegion stories.",
+      "permission-denied": "The region has no gated action or permission input; the detector matched 'Role-neutral' and the 'locked Just ask heading' in a doc comment."
+    },
     "packages/ui/atoms/common-dropdown-renderer.tsx": {
       "offline": "The renderer never fetches or submits: it draws the search field and the rows its owner passes, and a submenu shows loading only when the caller sets isLoading (LoadingItems), so lost connectivity reaches it only as caller state.",
       "permission-denied": "The renderer has no permission input or gated action; the detector matched role='menuitem' on the loading and empty rows. A caller that withholds a submenu passes disabled, which Radix renders as an inert trigger."
