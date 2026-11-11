@@ -53,11 +53,15 @@ function runLiveness(options) {
   });
 }
 
+/** @typedef {{ rules: Array<{ type: string, parameters?: { required_status_checks?: Array<{ context: string }> } }> }} SourceRuleset */
+
 export function assertRequiredSourceChecks() {
-  const policy = load(
-    readFileSync(
-      join(repoRoot, '.github/rulesets/branch-protection.yml'),
-      'utf8'
+  const policy = /** @type {SourceRuleset} */ (
+    load(
+      readFileSync(
+        join(repoRoot, '.github/rulesets/branch-protection.yml'),
+        'utf8'
+      )
     )
   );
   const required = policy.rules
