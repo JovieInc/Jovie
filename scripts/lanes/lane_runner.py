@@ -215,7 +215,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-ho
                   "scripts/lib/playwright-png.mjs", "scripts/invariants/screen-proof-final-paths.mjs", "scripts/invariants/screen-proof-attempt-checks.mjs",
                   # Six-hourly credentials/spend check (credentials_spend.py) reads the reviewed registry.
                   "scripts/credentials-spend-check.mjs", "scripts/lib/credentials-live-reads.mjs",
-                  "scripts/lib/credentials-registry.mjs", "scripts/lib/linear-issue-intake.mjs",
+                  "scripts/lib/credentials-registry.mjs", "scripts/lib/credentials-registry-rules.mjs", "scripts/lib/linear-issue-intake.mjs",
                   "scripts/lib/linear-cooldown.mjs", "ops/registry/credentials.json",
                   "ops/registry/spend.json", "ops/registry/capacity.json",
                   "scripts/backlog-orchestrator/config/model-registry.json",

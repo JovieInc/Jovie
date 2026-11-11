@@ -72,6 +72,9 @@ run_affected() {
   pnpm design:authority:check
   # Keep pushes independent of the full repository suite while catching the
   # changed surface before CI has to spend a runner on it.
+  # Company Guards size ratchet. Fail before heavier steps when a baselined
+  # source file grows (the hosted job is still the authority).
+  node scripts/company-guards/size.mjs
   run_lint
   # JOV-4421: hard ship gate (diff match + story quality + multi-root ratchet).
   echo "[pre-push-gate] running component-ship-gate"
@@ -104,6 +107,9 @@ run_publication() {
     return 1
   fi
   git diff --check "${publication_base}..HEAD"
+  # Same 500-line ceiling Company Guards enforces. A grown baselined file
+  # fails here instead of after the next hosted round.
+  node scripts/company-guards/size.mjs
   # Reuse the changed-file Biome guard so formatter failures never reach CI.
   bash scripts/hooks/biome-pre-push.sh
   # Catch missing component tests/stories before another Source Validation run.

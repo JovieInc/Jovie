@@ -1,7 +1,7 @@
 {
   "schema": "jovie.spend-ledger/v1",
   "description": "Per-provider balance, burn, runway and caps. Metadata only. Snapshots are dated readings; the live check overlays fresh reads where a read path exists.",
-  "updatedAt": "2026-10-30T00:30:00Z",
+  "updatedAt": "2026-11-07T21:05:00Z",
   "thresholds": {
     "runwayAlertDays": 14,
     "runwayPageDays": 3,
@@ -334,13 +334,15 @@
         {
           "id": "banked-reset-1",
           "label": "banked rate-limit reset redemption deadline",
-          "expiresAt": "2026-10-29T19:10:07Z"
+          "expiresAt": "2026-10-29T19:10:07Z",
+          "status": "lapsed"
         }
       ],
       "readPath": {
         "method": "Gem codex-accounts.json (account/rateLimits/read)",
         "live": "codex-ledger"
-      }
+      },
+      "notes": "Banked reset 1's redemption deadline (2026-10-29T19:10:07Z) passed; no registry read records it redeemed, so it is marked lapsed and stops alerting (JOV-9872). Confirm on the Gem host codex-accounts.json whether it was redeemed before the deadline; a live read overlays only credits still marked available."
     },
     {
       "id": "codex-jovie",
