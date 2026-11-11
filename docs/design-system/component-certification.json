@@ -330,6 +330,26 @@
     },
     "apps/web/components/molecules/drawer/EntityHeader.tsx": {
       "permission-denied": "EntityHeader has no gated action or permission input; callers choose what goes in the actions slot, and the detector matched role='img' on the thumbnail and status glyph."
+    },
+    "apps/web/components/molecules/QRCode.tsx": {
+      "loading": "The skeleton shows only while the third-party image request is in flight, and a static story cannot hold that request open; QRCode.test.tsx renders the skeleton before onLoad and asserts it clears on load.",
+      "offline": "QRCode never fetches or mutates from JS; lost connectivity reaches it only as an <img> that fails to load, which the ErrorImageUnavailable story shows with the same-size fallback."
+    },
+    "apps/web/components/features/profile/DesktopQrOverlayClient.tsx": {
+      "loading": "The wrapper renders null on the server and on first paint by design (JOV-2273, no CSR bailout), then shows the icon once matchMedia resolves in an effect, so there is no loading chrome to capture; DesktopQrOverlayClient.test.tsx asserts the empty server render."
+    },
+    "apps/web/components/features/profile/AliasCollisionRecovery.tsx": {
+      "error": "Recovery returns null in every state; a failed, non-OK or malformed alias decision only leaves the visitor on the mode page, which has no pixels of its own to show. AliasCollisionRecovery.certificate.test.tsx asserts no navigation or history change and an axe-clean page for each failure."
+    },
+    "apps/web/components/features/profile/AnonCookieBootstrap.tsx": {
+      "error": "The bootstrap returns null; a rejected or non-OK assignment request keeps the ISR default variant and still fires onResolved, so the error has no visual output. AnonCookieBootstrap.certificate.test.tsx covers both failures with axe."
+    },
+    "apps/web/components/features/profile/ProfileViewTracker.tsx": {
+      "error": "The tracker returns null; a refused beacon falls back to the tracking mutation and nothing is shown to the visitor, so there is no error state to render. ProfileViewTracker.certificate.test.tsx asserts the fallback and an axe-clean page.",
+      "offline": "Offline the browser refuses the sendBeacon and the tracker hands the view to the tracking mutation without rendering anything; ProfileViewTracker.certificate.test.tsx covers that path, and the story shows the chrome-free mount."
+    },
+    "apps/web/components/features/profile/ProfileWebVitalsReporter.tsx": {
+      "error": "The reporter returns null and swallows a failed web-vitals import or start so the profile keeps rendering; there is nothing to draw for the failure, and ProfileWebVitalsReporter.test.tsx asserts the swallowed failure with axe."
     }
   }
 }
