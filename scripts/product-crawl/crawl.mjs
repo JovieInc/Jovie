@@ -20,6 +20,7 @@ import { chromium } from 'playwright';
 import { skipSignedIn, uncoveredEntry } from './accepted-uncovered.mjs';
 import {
   CLAIM_BANNER,
+  causeOf,
   fromThirdPartyFrame,
   median,
   PLACEHOLDER,
@@ -94,7 +95,7 @@ function concrete(route) {
 
 // Runs in the page, so it is a string: these scripts type-check as Node.
 const OBSERVE = `
-  window.__crawl = { cls: 0, lcp: 0, longest: 0, shifts: {}, moves: {} };
+  window.__crawl = { cls: 0, lcp: 0, longest: 0, shifts: {}, moves: {}, added: [] };
   const watch = (type, fn) => new PerformanceObserver(l => l.getEntries().forEach(fn)).observe({ type, buffered: true });
   // Names the elements that moved, so a layout-shift finding says what to fix.
   const label = n => {
@@ -116,10 +117,24 @@ const OBSERVE = `
         window.__crawl.moves[k] = { dy: Math.round(b.y - a.y), atMs: Math.round(e.startTime) };
     }
   });
+  // Elements inserted after first paint, so a shift can name what appeared
+  // just before it (the usual cause: a late block pushing the rest down).
+  new MutationObserver(records => {
+    const t = performance.now();
+    for (const r of records)
+      for (const n of r.addedNodes)
+        if (n.nodeType === 1 && window.__crawl.added.length < 5000)
+          window.__crawl.added.push({ n, node: label(n), atMs: Math.round(t) });
+  }).observe(document, { childList: true, subtree: true });
   watch('largest-contentful-paint', e => { window.__crawl.lcp = Math.max(window.__crawl.lcp, e.startTime); });
   watch('longtask', e => { window.__crawl.longest = Math.max(window.__crawl.longest, e.duration); });
 `;
-const MEASURE = `({ ...window.__crawl, text: document.body?.innerText ?? '',
+const MEASURE = `({ ...window.__crawl,
+  added: window.__crawl.added
+    .filter(a => a.node && a.n.isConnected)
+    .map(a => ({ node: a.node, atMs: a.atMs, h: Math.round(a.n.getBoundingClientRect().height) }))
+    .filter(a => a.h >= 24),
+  text: document.body?.innerText ?? '',
   overflow: document.documentElement.scrollWidth > window.innerWidth + 1 })`;
 
 const browser = await chromium.launch();
@@ -198,7 +213,13 @@ async function visit({ route, target, viewport, identity, fixture, collect }) {
         node,
         value: Number(value.toFixed(4)),
         ...m.moves?.[node],
-      }));
+      }))
+      .map(s => {
+        const cause = causeOf(m.added, s.atMs);
+        return cause
+          ? { ...s, after: { node: cause.node, h: cause.h, atMs: cause.atMs } }
+          : s;
+      });
     row.lcpMs = Math.round(m.lcp);
     row.longestTaskMs = Math.round(m.longest);
     row.placeholder = m.text.match(PLACEHOLDER)?.[0] ?? null;

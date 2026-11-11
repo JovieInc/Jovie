@@ -36,6 +36,21 @@ export function timingSuspect(page) {
 }
 
 /** Median of the samples; the lower middle for an even count. */
+/**
+ * The tallest element inserted in the half second before a shift at `atMs`,
+ * which is usually what pushed the moved element.
+ * @param {{ node: string, atMs: number, h: number }[] | undefined} added
+ * @param {number | undefined} atMs
+ */
+export function causeOf(added, atMs) {
+  if (!Number.isFinite(atMs)) return undefined;
+  let best;
+  for (const a of added ?? [])
+    if (a.atMs <= atMs && a.atMs >= atMs - 500 && (!best || a.h > best.h))
+      best = a;
+  return best;
+}
+
 export function median(xs) {
   const s = [...xs].sort((a, b) => a - b);
   return s[Math.floor((s.length - 1) / 2)];
@@ -82,7 +97,11 @@ export const IDENTITIES = Object.freeze(['stranger', 'signed-in']);
 
 const movedHow = s =>
   Number.isFinite(s.dy) && Number.isFinite(s.atMs)
-    ? `, ${Math.abs(s.dy)}px ${s.dy < 0 ? 'up' : 'down'} at ${s.atMs}ms`
+    ? `, ${Math.abs(s.dy)}px ${s.dy < 0 ? 'up' : 'down'} at ${s.atMs}ms${
+        s.after
+          ? ` after ${s.after.node} (${s.after.h}px) appeared at ${s.after.atMs}ms`
+          : ''
+      }`
     : '';
 
 const shiftedBy = page =>
@@ -100,7 +119,8 @@ const ofSamples = page =>
  *   failedRequests?: string[], placeholder?: string|null,
  *   horizontalOverflow?: boolean, url?: string, expectClaimBanner?: boolean,
  *   claimBanner?: boolean, timingSamples?: number,
- *   clsSources?: { node: string, value: number, dy?: number, atMs?: number }[] }} page
+ *   clsSources?: { node: string, value: number, dy?: number, atMs?: number,
+ *     after?: { node: string, h: number, atMs: number } }[] }} page
  * @returns {{ route: string, identity: string, viewport: string, kind: string, detail: string }[]}
  */
 export function pageFindings(page, closed = []) {
