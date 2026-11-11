@@ -50,7 +50,6 @@ import {
   roundTripCopy,
   roundTripFromRequest,
 } from '../helpers/chat-performance-probe';
-import { printColdLoadProfile } from './utils/cold-load-profile';
 import { waitForHydration } from './utils/smoke-test-utils';
 
 const CONVERSATION_ID = 'conv-chat-performance';
@@ -560,6 +559,7 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
 
   const chatApi = trackChatApiRequests(page);
   await setTestAuthBypassSession(page, 'creator-ready', 'e2e-chat-performance');
+  await page.goto('/app/chat', { waitUntil: 'domcontentloaded' });
 
   const chatContent = page.getByTestId('chat-content').last();
   const composer = chatContent.locator(
@@ -568,12 +568,7 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
   const sendButton = chatContent.getByRole('button', {
     name: /send message/i,
   });
-  // Unscored cold load: print what the main thread ran, by source file, so
-  // the production cert's long chat frame can be traced to a component.
-  await printColdLoadProfile(page, 'chat cold load', async () => {
-    await page.goto('/app/chat', { waitUntil: 'domcontentloaded' });
-    await waitForChatRouteReady(page, chatContent, composer, chatApi);
-  });
+  await waitForChatRouteReady(page, chatContent, composer, chatApi);
 
   for (
     let warmupIndex = 0;
