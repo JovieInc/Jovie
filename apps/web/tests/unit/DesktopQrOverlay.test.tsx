@@ -50,13 +50,35 @@ describe('DesktopQrOverlay', () => {
     ).toBeNull();
   });
 
-  it('preloads the QR image URL on mount', () => {
+  it('preloads the QR image URL on mount once the page has loaded', () => {
     render(<DesktopQrOverlay handle='tim' />);
     expect(imageSrcSetter).toHaveBeenCalledWith(
       expect.stringContaining(
         encodeURIComponent(`${globalThis.location.origin}/tim`)
       )
     );
+  });
+
+  it('waits for the window load event before fetching the third-party QR image', () => {
+    // A slow api.qrserver.com response must never hold the profile's load
+    // event: the product crawl saw /[username] time out at 30s on desktop.
+    const readyState = vi
+      .spyOn(document, 'readyState', 'get')
+      .mockReturnValue('loading');
+    try {
+      render(<DesktopQrOverlay handle='tim' />);
+      expect(screen.getByLabelText('Open On Phone')).toBeInTheDocument();
+      expect(imageSrcSetter).not.toHaveBeenCalled();
+
+      readyState.mockReturnValue('complete');
+      globalThis.dispatchEvent(new Event('load'));
+
+      expect(imageSrcSetter).toHaveBeenCalledWith(
+        expect.stringContaining('api.qrserver.com')
+      );
+    } finally {
+      readyState.mockRestore();
+    }
   });
 
   it('opens the QR code on desktop when the profile is in pay mode', async () => {
