@@ -7,7 +7,7 @@
 //   --no-raise <base-ref>  fail when this tree's baseline raises an entry or
 //                          adds a file, compared with <base-ref>. Raising a
 //                          budget is growth: extract a module instead. A file
-//                          that was renamed may carry its old budget.
+//                          git sees as renamed may carry its old budget.
 //   --tighten              lower every entry to the file's current line count
 //                          and drop files at or under 500 lines or deleted.
 //                          Never raises; fails if a baselined file grew.
@@ -31,28 +31,30 @@ export function countLines(text) {
 }
 
 /**
- * Entries in `head` above `base`. A new key is allowed only when it takes the
- * budget of a key the same change removed (a rename), at most that budget.
+ * Entries in `head` above `base`. A new key is allowed only when git saw it as
+ * a rename of a removed key (`renames`: new path -> old path) and it keeps at
+ * most that budget. Budget freed by an unrelated deletion is never reused.
  */
-export function raisedEntries(base, head) {
-  const removed = Object.keys(base)
-    .filter(key => !Object.hasOwn(head, key))
-    .map(key => base[key])
-    .sort((a, b) => b - a);
+export function raisedEntries(base, head, renames = {}) {
   const raised = [];
-  const added = Object.keys(head)
-    .filter(key => !Object.hasOwn(base, key))
-    .sort((a, b) => head[b] - head[a]);
-  for (const key of added) {
-    const slot = removed.findIndex(budget => budget >= head[key]);
-    if (slot === -1) raised.push({ file: key, base: null, head: head[key] });
-    else removed.splice(slot, 1);
-  }
   for (const [key, value] of Object.entries(head)) {
-    if (Object.hasOwn(base, key) && value > base[key])
-      raised.push({ file: key, base: base[key], head: value });
+    const from = Object.hasOwn(base, key) ? key : renames[key];
+    const was =
+      from !== undefined && Object.hasOwn(base, from) ? base[from] : null;
+    if (was === null || value > was)
+      raised.push({ file: key, base: was, head: value });
   }
   return raised.sort((a, b) => a.file.localeCompare(b.file));
+}
+
+/** {new path: old path} for renames between `ref` and HEAD (git -M). */
+export function parseRenames(nameStatus) {
+  const renames = {};
+  for (const line of nameStatus.split('\n')) {
+    const [status, from, to] = line.split('\t');
+    if (status?.startsWith('R') && from && to) renames[to] = from;
+  }
+  return renames;
 }
 
 /** Measured counts for baselined files; 0 for gone or within the limit. */
@@ -84,7 +86,14 @@ function main(argv) {
         maxBuffer: 1 << 26,
       })
     );
-    const raised = raisedEntries(base, baseline);
+    const renames = parseRenames(
+      execFileSync('git', ['diff', '-M', '--name-status', ref, 'HEAD'], {
+        cwd: root,
+        encoding: 'utf8',
+        maxBuffer: 1 << 26,
+      })
+    );
+    const raised = raisedEntries(base, baseline, renames);
     for (const { file, base: was, head } of raised)
       console.error(
         `::error file=${BASELINE}::size-500 budget for ${file} raised ${was ?? 'unbaselined'} -> ${head}; budgets only shrink, extract a cohesive module instead`

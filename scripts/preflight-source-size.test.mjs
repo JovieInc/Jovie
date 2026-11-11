@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   countLines,
   measure,
+  parseRenames,
   raisedEntries,
 } from './company-guards/size-baseline.mjs';
 import { companionChecklist } from './lib/preflight-changed.mjs';
@@ -114,11 +115,18 @@ test('size-500 budgets never rise: a raise or a new entry fails', () => {
   ]);
 });
 
-test('a renamed file keeps at most its old budget', () => {
+test('only a git-detected rename keeps at most its old budget', () => {
   const base = { 'old.ts': 600, 'b.ts': 700 };
-  assert.deepEqual(raisedEntries(base, { 'new.ts': 600, 'b.ts': 700 }), []);
-  assert.deepEqual(raisedEntries(base, { 'new.ts': 650, 'b.ts': 700 }), [
-    { file: 'new.ts', base: null, head: 650 },
+  const head = budget => ({ 'new.ts': budget, 'b.ts': 700 });
+  const renames = parseRenames('R097\told.ts\tnew.ts\nM\tb.ts\n');
+  assert.deepEqual(renames, { 'new.ts': 'old.ts' });
+  assert.deepEqual(raisedEntries(base, head(600), renames), []);
+  assert.deepEqual(raisedEntries(base, head(650), renames), [
+    { file: 'new.ts', base: 600, head: 650 },
+  ]);
+  // Deleting old.ts frees no budget for an unrelated new file.
+  assert.deepEqual(raisedEntries(base, head(600)), [
+    { file: 'new.ts', base: null, head: 600 },
   ]);
 });
 
