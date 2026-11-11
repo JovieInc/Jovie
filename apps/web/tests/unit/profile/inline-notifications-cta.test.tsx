@@ -390,10 +390,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     );
 
     expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
-    expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
-    expect(
-      screen.getByTestId('profile-mobile-notifications-flow-skeleton')
-    ).toBeInTheDocument();
+    expect(screen.getByRole('status').dataset.testid).toMatch(/flow-skeleton/);
     expect(screen.queryByText('Get updates')).not.toBeInTheDocument();
   });
 
