@@ -331,6 +331,51 @@
     "apps/web/components/molecules/drawer/EntityHeader.tsx": {
       "permission-denied": "EntityHeader has no gated action or permission input; callers choose what goes in the actions slot, and the detector matched role='img' on the thumbnail and status glyph."
     },
+    "apps/web/components/atoms/InlineIconButton.tsx": {
+      "partial": "InlineIconButton draws one icon control from its required icon child and accessible name; its optional props (className, fadeOnParentHover, size, href and native button or anchor attributes) are styling, behaviour and wiring with defaults, so no data can be partially present.",
+      "long-content": "It lays out no visible text: every caller passes one icon glyph (at most with an sr-only word) and the name lives in aria-label, so there is no content to overflow; the detector matched the children and label props.",
+      "rtl-overflow": "It renders one centred icon in a fixed square with symmetric padding and no inline-direction classes, so dir='rtl' renders it the same and there is no text to overflow."
+    },
+    "apps/web/components/atoms/SkipToContent.tsx": {
+      "partial": "SkipToContent renders one link from two optional props that both have defaults (targetId 'main-content', linkText 'Skip to content') plus className, so nothing can be partially present."
+    },
+    "apps/web/components/molecules/AuthActions.tsx": {
+      "empty": "AuthActions always renders its fixed links (Log in and Sign up when signed out, Open App when signed in) and never a collection; the detector matched the items-center class."
+    },
+    "apps/web/components/site/MarketingFooterCta.tsx": {
+      "partial": "MarketingFooterCta renders one link; label and href default to the shared claim-profile intent and the other optional props (analytics event and source, prefetch, sectionVariant, className) only add attributes, so the link is never partially present."
+    },
+    "apps/web/components/site/MarketingHeader.tsx": {
+      "permission-denied": "MarketingHeader is public site chrome with no gated action or permission input; the detector matched 'locked' in the homepage conversion-lock comment."
+    },
+    "apps/web/components/site/theme-toggle/ThemeToggleSkeleton.tsx": {
+      "empty": "ThemeToggleSkeleton always reserves a fixed shape (one icon button or exactly three segments) and never a collection; the detector matched the items-center class.",
+      "partial": "It holds no data: appearance picks the icon or segmented shape and size and className are styling, so nothing can be partially present.",
+      "long-content": "Its only copy is the fixed sr-only name 'Loading theme toggle' and the 'Theme' toolbar label; no caller text reaches it, so nothing can overflow.",
+      "offline": "It is a hydration placeholder that never fetches or mutates; it shows only until the client-side theme state mounts, which needs no network.",
+      "permission-denied": "It has no gated action or permission input; the detector matched role='toolbar' on the segment row."
+    },
+    "apps/web/components/marketing/ProductScreenshotFrame.tsx": {
+      "loading": "While the capture loads, the frame shows an aria-hidden skeleton in the capture's aspect ratio; a static story cannot hold a local image request in flight, so ProductScreenshotFrame.test.tsx covers the skeleton-to-image swap.",
+      "partial": "The required scenarioId resolves the whole capture record (URL, size, alt, optional focus) from the screenshot registry, which throws on an incomplete record; the other optional props are presentation flags, so a frame is never partially drawn.",
+      "offline": "It never fetches or mutates; lost connectivity reaches it only as a capture that fails to load, which the ErrorPreviewUnavailable story shows.",
+      "permission-denied": "It only frames a product capture and has no gated action or permission input; the detector matched role='img' on the fallback and 'locked' in the founder-locked recipe comment."
+    },
+    "apps/web/components/molecules/drawer/ShareableLinkRow.tsx": {
+      "empty": "ShareableLinkRow always renders one required URL with its copy (and optional open) action and never a collection; the detector matched the items-center class.",
+      "partial": "It renders one required url: displayValue falls back to that url and the other optional props are density, surface, visibility, labels and callbacks with defaults, so nothing can be partially present (NoOpenButton shows the copy-only row)."
+    },
+    "apps/web/components/features/waitlist/WaitlistPublicLanding.tsx": {
+      "long-content": "Its only input is the signupClosed flag and all of its own copy is fixed; long typed values belong to the forms it hosts (AuthShell and WaitlistRoleForm), so the page itself has no caller text to overflow.",
+      "permission-denied": "The page's only gate is closed public signup, which the SignupClosed and RtlSignupClosed stories show (the role form plus a Log in path); signed-in visitors are redirected by AuthenticatedAuthEntryGuard. The detector matched the WaitlistRoleForm name."
+    },
+    "apps/web/components/features/waitlist/WaitlistSuccessView.tsx": {
+      "loading": "It mounts only once its owner already has an outcome (the /waitlist server route after resolving user state, or WaitlistIntakeChat after the request settles), so it never shows a loading state; 'pending' is the waitlist review status that Web214AuthenticatedPending shows, not a request in flight."
+    },
+    "apps/web/components/organisms/PricingRecipeBody.tsx": {
+      "partial": "The canonical Pricing story already renders the partial composition: the optional structuredData and auditOffer slots are both absent there (the audit offer renders nothing while it is off), and every other prop is required.",
+      "permission-denied": "PricingRecipeBody is a public marketing page with no gated action or permission input; the detector matched the word plan in its pricing copy."
+    },
     "apps/web/components/jovie/components/AssistantMessageText.tsx": {
       "offline": "AssistantMessageText makes no request and has no connectivity input: it parses the reply string it is given. The only thing it loads is the markdown chunk, and while that is pending the Suspense fallback shows the same text as plain prose (LoadingMarkdownChunk); a reply that never arrives is the chat transport's state, not this component's."
     },
