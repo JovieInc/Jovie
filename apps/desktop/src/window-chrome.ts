@@ -1,4 +1,4 @@
-// @coverage-via apps/desktop/scripts/desktop-titlebar-contract.test.mjs
+// @coverage-via apps/desktop/scripts/desktop-shell-contract.test.mjs
 
 import { BrowserWindow, type IpcMainInvokeEvent, ipcMain } from 'electron';
 

@@ -295,4 +295,4 @@ apps/web/.agent-distribution-out/
 scripts/copy-inventory/inventory.gen.json
 
 # Focused native titlebar regression suite.
-!apps/desktop/scripts/desktop-titlebar-contract.test.mjs
+!apps/desktop/scripts/desktop-titlebar-contract.cases.mjs

@@ -22,6 +22,7 @@
 
 import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import { registerElectronTitlebarFullscreenTest } from './utils/electron-titlebar-fullscreen';
 import {
   gotoShellRoute,
   installElectronRuntime,
@@ -29,6 +30,7 @@ import {
 } from './utils/electron-titlebar-runtime';
 
 test.use({ storageState: { cookies: [], origins: [] } });
+registerElectronTitlebarFullscreenTest();
 
 async function assertElectronShellControls(
   page: Page,

@@ -11,6 +11,7 @@ import { build } from 'esbuild';
 import ts from 'typescript';
 import { bundleDesktopPreload } from './bundle-preload.mjs';
 import { deriveStagingReleaseVersion } from './sync-version.mjs';
+import './desktop-titlebar-contract.cases.mjs';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const execFileAsync = promisify(execFile);
