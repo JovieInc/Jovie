@@ -57,6 +57,7 @@ const visitor = (over: Partial<AdmittedVisitor> = {}): AdmittedVisitor => ({
   artistName: 'Sam and the Tides',
   pageUrl: PAGE,
   suppressed: false,
+  alreadyWelcomed: false,
   ...over,
 });
 const alice = visitor();
@@ -107,6 +108,7 @@ function harness(
 ) {
   const store = cardStore();
   const sends: FounderWelcomeSend[] = [];
+  const welcomed: string[] = [];
   const backend = memoryRecordBackend();
   const deps = (): FounderWelcomeDeps => ({
     visitors,
@@ -120,9 +122,12 @@ function harness(
       sends.push(email);
       return { ok: true };
     },
+    async markWelcomed(entryId) {
+      welcomed.push(entryId);
+    },
     ...over,
   });
-  return { store, sends, deps };
+  return { store, sends, welcomed, deps };
 }
 
 describe('founder welcome copy', () => {
@@ -228,6 +233,8 @@ describe('runFounderWelcome', () => {
     expect(h.sends).toHaveLength(1);
     expect(h.sends[0]?.to).toBe(alice.email);
     expect(h.sends[0]?.cardKey).toBe(keyOf(alice));
+    // Stamped where the signup welcome looks, so Alice never gets a second one.
+    expect(h.welcomed).toEqual([alice.entryId]);
     expect(h.sends.some(send => send.to === bob.email)).toBe(false);
   });
 
@@ -302,6 +309,7 @@ describe('runFounderWelcome', () => {
     const h = harness([
       alice,
       visitor({ entryId: 'e-suppressed', suppressed: true }),
+      visitor({ entryId: 'e-welcomed', alreadyWelcomed: true }),
       visitor({ entryId: 'e-no-profile', pageUrl: null }),
       visitor({ entryId: 'e-no-artist', artistName: '  ' }),
     ]);
@@ -309,6 +317,7 @@ describe('runFounderWelcome', () => {
     expect(first.cardsFiled).toBe(1);
     expect(first.skipped).toEqual({
       suppressed: 1,
+      already_welcomed: 1,
       no_claimed_profile: 1,
       no_artist_name: 1,
     });

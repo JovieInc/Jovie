@@ -51,6 +51,7 @@ export async function loadAdmittedVisitors(
       spotifyArtistName: waitlistEntries.spotifyArtistName,
       userName: users.name,
       outboundSuppressedAt: users.outboundSuppressedAt,
+      founderWelcomeSentAt: users.founderWelcomeSentAt,
       profileId: creatorProfiles.id,
       isClaimed: creatorProfiles.isClaimed,
       displayName: creatorProfiles.displayName,
@@ -89,6 +90,7 @@ export async function loadAdmittedVisitors(
       artistName: row.spotifyArtistName ?? row.displayName ?? null,
       pageUrl: row.profileId && row.isClaimed ? FOUNDER_WELCOME_PAGE_URL : null,
       suppressed: suppression.suppressed || row.outboundSuppressedAt !== null,
+      alreadyWelcomed: row.founderWelcomeSentAt !== null,
     });
   }
   return out;
@@ -132,6 +134,18 @@ export function buildFounderWelcomeServerDeps(
         idempotencyKey: email.idempotencyKey,
       });
       return { ok: result.status === 'sent' };
+    },
+    async markWelcomed(entryId) {
+      // The signup welcome (lib/waitlist/email-jobs.ts) skips when this is set.
+      await db
+        .update(users)
+        .set({ founderWelcomeSentAt: now, updatedAt: now })
+        .where(
+          and(
+            eq(users.waitlistEntryId, entryId),
+            isNull(users.founderWelcomeSentAt)
+          )
+        );
     },
   };
 }

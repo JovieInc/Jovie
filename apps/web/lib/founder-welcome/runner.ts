@@ -28,6 +28,8 @@ export interface AdmittedVisitor {
   /** Their own page in the app; null when they own no claimed profile yet. */
   readonly pageUrl: string | null;
   readonly suppressed: boolean;
+  /** Already got a founder welcome: the signup one or this one. */
+  readonly alreadyWelcomed: boolean;
 }
 
 /** The parts of a filed card the runner checks before it sends. */
@@ -64,10 +66,13 @@ export interface FounderWelcomeDeps {
   readCard(idempotencyKey: string): Promise<FiledCard | null>;
   fileCard(card: SummerCardInput): Promise<'filed' | 'conflict'>;
   send(email: FounderWelcomeSend): Promise<{ ok: boolean }>;
+  /** Records the send where the signup welcome also looks, so it skips. */
+  markWelcomed(entryId: string): Promise<void>;
 }
 
 type FounderWelcomeSkip =
   | 'suppressed'
+  | 'already_welcomed'
   | 'no_claimed_profile'
   | 'no_artist_name'
   | 'card_conflict'
@@ -162,6 +167,10 @@ export async function runFounderWelcome(
       skip('suppressed');
       continue;
     }
+    if (visitor.alreadyWelcomed) {
+      skip('already_welcomed');
+      continue;
+    }
     const pageUrl = visitor.pageUrl;
     if (!pageUrl) {
       skip('no_claimed_profile');
@@ -223,6 +232,7 @@ export async function runFounderWelcome(
       delivered = result.ok;
       if (delivered) {
         await deps.ledger.markSent(visitor.entryId, deps.now);
+        await deps.markWelcomed(visitor.entryId);
         sent += 1;
       } else {
         skip('send_failed');
