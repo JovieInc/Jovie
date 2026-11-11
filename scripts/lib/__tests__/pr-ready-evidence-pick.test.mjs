@@ -44,6 +44,9 @@ function pick(runs) {
       '--argjson',
       'repo',
       '1',
+      '--arg',
+      'sha',
+      'head',
       program,
     ],
     { input: JSON.stringify({ workflow_runs: runs }), encoding: 'utf8' }
@@ -57,6 +60,7 @@ const run = (id, conclusion, created = '1970-01-01T00:05:00Z') => ({
   display_title: 'fleet-rules #7 base=main',
   head_branch: 'b',
   head_repository: { id: 1 },
+  head_sha: 'head',
   created_at: created,
   status: 'completed',
   conclusion,
@@ -78,6 +82,23 @@ test('a cancelled twin created in the same second never wins the tie', {
     pick([run(2, 'cancelled'), run(1, 'success')]),
     'completed\tsuccess\tu1'
   );
+});
+
+// #24886 (2026-11-11): jovie-bot merged main and dropped a label in the same second,
+// so two evidence runs shared a created_at. The stale-head run failed ("re-run with
+// current PR metadata") and had the higher id, so PR Ready stayed red on re-run.
+test('a same-second run for the current head beats a stale-head run with a higher id', {
+  skip: !have,
+}, () => {
+  const stale = { ...run(9, 'failure'), head_sha: 'previous' };
+  assert.equal(pick([run(1, 'success'), stale]), 'completed\tsuccess\tu1');
+  assert.equal(pick([stale, run(1, 'success')]), 'completed\tsuccess\tu1');
+  // A genuinely newer run still wins whatever head_sha it carries.
+  const later = {
+    ...run(9, 'failure', '1970-01-01T00:06:00Z'),
+    head_sha: 'base',
+  };
+  assert.equal(pick([run(1, 'success'), later]), 'completed\tfailure\tu9');
 });
 
 test('the newest non-cancelled run decides, and only cancelled runs mean missing', {

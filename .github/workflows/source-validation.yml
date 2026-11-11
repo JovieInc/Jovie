@@ -1127,7 +1127,9 @@ jobs:
           if [ "$rc" -ne 0 ]; then
             runs='{"workflow_runs":[]}'
           fi
-          row="$(jq -r --argjson floor "$floor" --arg title "fleet-rules #$PR_NUMBER base=main" --arg ref "$HEAD_REF" --argjson repo "$HEAD_REPO_ID" '[.workflow_runs[] | select(.path == ".github/workflows/fleet-rules-evidence.yml" and .display_title == $title and .head_branch == $ref and .head_repository.id == $repo and (.created_at | fromdateiso8601) >= ($floor - 10) and .conclusion != "cancelled")] | sort_by([.created_at, .id]) | last // {status: "missing"} | "\(.status)\t\(.conclusion // "")\t\(.html_url // "")"' <<<"$runs" 2>/dev/null || echo 'missing')"
+          # Two evidence runs can share a created_at second (bot merges main and drops a label at once).
+          # Ties go to the run for the current head, so the stale-head run's id cannot win (#24886).
+          row="$(jq -r --argjson floor "$floor" --arg title "fleet-rules #$PR_NUMBER base=main" --arg ref "$HEAD_REF" --argjson repo "$HEAD_REPO_ID" --arg sha "$HEAD_SHA" '[.workflow_runs[] | select(.path == ".github/workflows/fleet-rules-evidence.yml" and .display_title == $title and .head_branch == $ref and .head_repository.id == $repo and (.created_at | fromdateiso8601) >= ($floor - 10) and .conclusion != "cancelled")] | sort_by([.created_at, (.head_sha == $sha), .id]) | last // {status: "missing"} | "\(.status)\t\(.conclusion // "")\t\(.html_url // "")"' <<<"$runs" 2>/dev/null || echo 'missing')"
           IFS=$'\t' read -r status conclusion url <<<"$row"
           case "$status/$conclusion" in
             completed/success) echo "Fleet rules passed: $url" ;;
