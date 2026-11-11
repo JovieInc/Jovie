@@ -109,8 +109,8 @@ async function openSubscribeFlow(page: Page) {
   });
 
   // If the flow defaulted to SMS (Pro creator, smsEnabled=true), switch to email.
-  // The "Use Email" button is visible only when channel='sms'.
-  const useEmailBtn = flow.getByRole('button', { name: 'Use Email' });
+  // The "Use email" button is visible only when channel='sms'.
+  const useEmailBtn = flow.getByRole('button', { name: 'Use email' });
   if (await useEmailBtn.isVisible().catch(() => false)) {
     await useEmailBtn.click();
     await flow

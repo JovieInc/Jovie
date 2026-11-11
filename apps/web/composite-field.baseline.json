@@ -17,7 +17,6 @@
     "apps/web/components/features/demo/DemoReleaseDetail.tsx": 1,
     "apps/web/components/features/dev/DevToolbar.tsx": 1,
     "apps/web/components/features/onboarding/OnboardingToolArtifacts.tsx": 3,
-    "apps/web/components/features/profile/artist-notifications-cta/ProfileMobileNotificationsFlow.tsx": 1,
     "apps/web/components/jovie/components/ChatInput.tsx": 1,
     "apps/web/components/jovie/components/SlashCommandMenu.tsx": 1,
     "apps/web/components/molecules/GenrePicker.tsx": 1,

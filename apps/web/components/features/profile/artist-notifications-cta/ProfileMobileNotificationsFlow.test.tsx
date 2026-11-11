@@ -77,6 +77,21 @@ describe('ProfileMobileNotificationsFlow', () => {
     }
   );
 
+  it('opens on a sentence-case Get updates sheet with one field ring', () => {
+    renderFlow({ step: 'email', onDismissCapture: vi.fn() });
+
+    expect(screen.getByText('Get updates')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use SMS' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Not now' })).toBeVisible();
+    // CompositeField owns the focus ring, so the input paints none inside it.
+    const field = screen
+      .getByTestId('mobile-email-input')
+      .closest('[data-component="composite-field"]');
+    expect(field).not.toBeNull();
+    expect(field).toHaveAttribute('data-surface', 'field');
+    expect(field).toHaveAttribute('data-shape', 'pill');
+  });
+
   it('keeps the inline flow outside modal dialog semantics', () => {
     renderFlow({ presentation: 'inline', step: 'email' });
 

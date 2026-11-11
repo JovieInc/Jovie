@@ -1,6 +1,7 @@
 'use client';
 
 import { Switch } from '@jovie/ui';
+import { CompositeField } from '@jovie/ui/atoms/composite-field';
 import {
   CalendarDays,
   Check,
@@ -112,21 +113,21 @@ const PROMISE_LABEL: Record<PromisedContent, string> = {
   merch: 'merch',
 };
 
-/** Promise only the content types this artist actually has. */
+/** Heading matches the Get updates action; body promises only what exists. */
 export function describeUpdatePromise(
   artistName: string,
   available: readonly PromisedContent[]
 ): { readonly title: string; readonly body: string } {
   const types = available.length > 0 ? available : (['newMusic'] as const);
   if (types.length === 1 && types[0] === 'newMusic') {
-    return { title: 'Get New Music', body: `New music from ${artistName}.` };
+    return { title: 'Get updates', body: `New music from ${artistName}.` };
   }
   const labels = types.map(type => PROMISE_LABEL[type]);
   const list =
     labels.length > 1
       ? `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}`
       : labels[0];
-  return { title: 'Get Updates', body: `${artistName}: ${list}.` };
+  return { title: 'Get updates', body: `${artistName}: ${list}.` };
 }
 
 const PREFERENCE_META: Record<
@@ -347,40 +348,38 @@ function InlineCaptureField({
 }>) {
   return (
     <div className='space-y-3'>
-      <div className='rounded-(--profile-action-radius) border border-white/10 bg-white/[0.035] p-1'>
-        <div className='flex min-h-14 items-center gap-1'>
-          {channel === 'sms' ? (
-            <CountrySelector
-              country={country}
-              isOpen={isCountryOpen}
-              onOpenChange={onCountryOpenChange}
-              onSelect={onCountrySelect}
-            />
-          ) : (
-            <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/60'>
-              <Mail className='size-4.5' />
-            </span>
-          )}
-          <input
-            data-testid='mobile-email-input'
-            type={channel === 'sms' ? 'tel' : 'email'}
-            inputMode={channel === 'sms' ? 'tel' : 'email'}
-            autoComplete={channel === 'sms' ? 'tel' : 'email'}
-            value={value}
-            placeholder={placeholder}
-            onChange={event => onValueChange(event.target.value)}
-            onKeyDown={event => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                onSubmit();
-              }
-            }}
-            disabled={isSubmitting}
-            aria-label={channel === 'sms' ? 'Phone Number' : 'Email Address'}
-            className='h-11 min-w-0 flex-1 bg-transparent px-1 text-base font-medium tracking-[-0.005em] dark:text-white placeholder:text-(--profile-aeo-muted) focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
+      <CompositeField shape='pill' surface='field' className='w-full'>
+        {channel === 'sms' ? (
+          <CountrySelector
+            country={country}
+            isOpen={isCountryOpen}
+            onOpenChange={onCountryOpenChange}
+            onSelect={onCountrySelect}
           />
-        </div>
-      </div>
+        ) : (
+          <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/60'>
+            <Mail className='size-4.5' />
+          </span>
+        )}
+        <input
+          data-testid='mobile-email-input'
+          type={channel === 'sms' ? 'tel' : 'email'}
+          inputMode={channel === 'sms' ? 'tel' : 'email'}
+          autoComplete={channel === 'sms' ? 'tel' : 'email'}
+          value={value}
+          placeholder={placeholder}
+          onChange={event => onValueChange(event.target.value)}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              onSubmit();
+            }
+          }}
+          disabled={isSubmitting}
+          aria-label={channel === 'sms' ? 'Phone Number' : 'Email Address'}
+          className='h-11 min-w-0 flex-1 bg-transparent px-1 text-base font-medium tracking-[-0.005em] dark:text-white placeholder:text-(--profile-aeo-muted) focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
+        />
+      </CompositeField>
       <button
         type='button'
         onClick={onSubmit}
@@ -578,7 +577,7 @@ export function ProfileMobileNotificationsFlow({
                   ) : (
                     <MessageCircle className='size-3.5' />
                   )}
-                  {isSms ? 'Use Email' : 'Use SMS'}
+                  {isSms ? 'Use email' : 'Use SMS'}
                 </button>
                 {onDismissCapture ? (
                   <button
@@ -587,7 +586,7 @@ export function ProfileMobileNotificationsFlow({
                     disabled={isSubmitting}
                     className='inline-flex h-11 items-center rounded-full text-xs font-semibold text-white/60 transition-colors duration-subtle hover:text-white/70 disabled:cursor-not-allowed disabled:opacity-50'
                   >
-                    Not Now
+                    Not now
                   </button>
                 ) : null}
               </div>
@@ -614,7 +613,7 @@ export function ProfileMobileNotificationsFlow({
       return (
         <ScreenShell
           compact
-          title='You’re On The List'
+          title='You’re on the list'
           body={
             successContactEcho
               ? `Updates are on for ${successContactEcho}.`
