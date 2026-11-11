@@ -1,5 +1,5 @@
 import { SourceMap, type SourceMapPayload } from 'node:module';
-import type { Page } from '@playwright/test';
+import type { CDPSession, Page } from '@playwright/test';
 
 /**
  * Names the code behind a cold load's main-thread time (JOV-10150).
@@ -96,7 +96,7 @@ export async function printColdLoadProfile(
   label: string,
   load: () => Promise<void>
 ): Promise<void> {
-  let cdp: Awaited<ReturnType<Page['context']>['newCDPSession']> | undefined;
+  let cdp: CDPSession | undefined;
   try {
     cdp = await page.context().newCDPSession(page);
     await cdp.send('Profiler.enable');
