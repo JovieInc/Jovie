@@ -1188,6 +1188,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/main-red-eject-failing-head.test.mjs',
   'scripts/lib/__tests__/main-health.test.mjs',
   'scripts/lib/__tests__/surface-recertify.test.mjs',
+  'scripts/lib/__tests__/shrink-only-baseline.test.mjs',
+  'scripts/lib/__tests__/queue-drift-guards.test.mjs',
   'scripts/lib/__tests__/doc-freshness.test.mjs',
   'scripts/lib/__tests__/flaky-test-filing.test.mjs',
   'scripts/lib/__tests__/gbrain-pool-env.test.mjs',

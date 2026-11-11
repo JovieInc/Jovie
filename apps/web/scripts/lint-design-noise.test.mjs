@@ -70,16 +70,32 @@ describe('findNoise deliberate-red cases', () => {
 });
 
 describe('ratchet', () => {
-  it('fails new debt and stale headroom', () => {
+  it('fails new debt', () => {
     expect(compareToBaseline({ 'a.tsx': { 'icon-tile': 1 } }, {})).toHaveLength(
       1
     );
-    expect(compareToBaseline({}, { 'a.tsx': { 'icon-tile': 1 } })).toHaveLength(
-      1
-    );
+    expect(
+      compareToBaseline(
+        { 'a.tsx': { 'icon-tile': 3 } },
+        { 'a.tsx': { 'icon-tile': 2 } }
+      )
+    ).toEqual([expect.stringContaining('a.tsx: icon-tile x3 (baseline 2)')]);
   });
 
-  it('matches the committed baseline exactly', () => {
+  it('passes removed debt without a baseline rewrite', () => {
+    // 19 merge groups failed 2026-11-04..11 on "debt shrank (0 < 2)" for a
+    // file another PR had cleaned up. Stale headroom is tightened later by
+    // scripts/baselines-tighten.mjs; it is not a reason to fail a group.
+    expect(compareToBaseline({}, { 'a.tsx': { 'icon-tile': 2 } })).toEqual([]);
+    expect(
+      compareToBaseline(
+        { 'a.tsx': { 'icon-tile': 1 } },
+        { 'a.tsx': { 'icon-tile': 2 } }
+      )
+    ).toEqual([]);
+  });
+
+  it('has no growth beyond the committed baseline', () => {
     const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).files;
     expect(compareToBaseline(collect(), baseline)).toEqual([]);
   });

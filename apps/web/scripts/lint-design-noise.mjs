@@ -17,12 +17,21 @@
  * Rendered counterparts (text-layer budget, icon tiles, step labels) live in
  * tests/e2e/marketing-noise-budget.spec.ts.
  *
- *   node scripts/lint-design-noise.mjs [--list] [--update]
+ *   node scripts/lint-design-noise.mjs [--list] [--tighten] [--update]
+ *
+ * --tighten only lowers or removes baseline entries (safe to run any time).
+ * --update rewrites the baseline to the current counts, growth included, so
+ * it is a floor raise that needs review.
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  announceShrink,
+  compareToBaseline as compareCounts,
+  tightenBaseline,
+} from '../../../scripts/lib/shrink-only-baseline.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..', '..', '..');
@@ -153,29 +162,16 @@ export function collect() {
   return result;
 }
 
+/**
+ * Growth only. A count below its baseline is stale headroom, not a failure:
+ * the PR that removes debt must not have to rewrite this shared file, or two
+ * green PRs go red together in a merge group (scripts/lib/shrink-only-baseline.mjs).
+ */
 export function compareToBaseline(current, baseline) {
-  const problems = [];
-  const keys = new Set([...Object.keys(current), ...Object.keys(baseline)]);
-  for (const file of keys) {
-    const rules = new Set([
-      ...Object.keys(current[file] ?? {}),
-      ...Object.keys(baseline[file] ?? {}),
-    ]);
-    for (const rule of rules) {
-      const now = current[file]?.[rule] ?? 0;
-      const was = baseline[file]?.[rule] ?? 0;
-      if (now > was) {
-        problems.push(
-          `${file}: ${rule} x${now} (baseline ${was}). ${HINTS[rule]}`
-        );
-      } else if (now < was) {
-        problems.push(
-          `${file}: ${rule} debt shrank (${now} < ${was}); run node scripts/lint-design-noise.mjs --update.`
-        );
-      }
-    }
-  }
-  return problems;
+  return compareCounts(current, baseline).growth.map(
+    ({ path: [file, rule], count, baseline: was }) =>
+      `${file}: ${rule} x${count} (baseline ${was}). ${HINTS[rule]}`
+  );
 }
 
 const HINTS = {
@@ -204,11 +200,23 @@ function main() {
     return;
   }
   const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).files;
+  if (args.has('--tighten')) {
+    const next = tightenBaseline(current, baseline);
+    if (next.tightened.length > 0) {
+      writeFileSync(
+        BASELINE_PATH,
+        `${JSON.stringify({ files: next.baseline }, null, 2)}\n`
+      );
+    }
+    console.log(`design-noise: tightened ${next.tightened.length} entries`);
+    return;
+  }
   const problems = compareToBaseline(current, baseline);
   if (problems.length) {
     console.error(problems.join('\n'));
     process.exit(1);
   }
+  announceShrink('design-noise', compareCounts(current, baseline).shrink);
   console.log(
     `design-noise guard ok (${Object.keys(baseline).length} baselined files)`
   );

@@ -126,13 +126,15 @@ describe('stat-claims ratchet', () => {
     );
     assert.match(errors[0], /Bind the number to a proof stat/);
   });
-  it('fails a stale baseline entry (it only shrinks)', () => {
-    const errors = evaluate(
-      { unbound: {}, bound: {} },
-      { 'f.md': { count_claim: 1 } },
+  it('passes a removed claim without a baseline edit, and still fails growth', () => {
+    const baseline = { 'f.md': { count_claim: 2 } };
+    assert.deepEqual(evaluate({ unbound: {}, bound: {} }, baseline, ids), []);
+    const grown = evaluate(
+      { unbound: { 'f.md': { count_claim: 3 } }, bound: {} },
+      baseline,
       ids
     );
-    assert.match(errors[0], /only shrinks/);
+    assert.match(grown[0], /3 hand-written count_claim claim\(s\), baseline 2/);
   });
   it('fails a binding to an unregistered stat', () => {
     const errors = evaluate(

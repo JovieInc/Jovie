@@ -5,8 +5,10 @@
 // cancellation, refunds or guarantees must be a registered claim rendered from
 // the canonical offer (apps/web/lib/billing/offer). This guard finds such
 // prose written by hand anywhere else and ratchets: a file may never gain
-// hits, and baseline entries that no longer hit must be removed. The baseline
-// is the migration backlog; `baseline.json` changes need code-owner review.
+// hits. Removing a hit passes without a baseline edit; `--tighten` (run by
+// scripts/baselines-tighten.mjs) lowers the entry afterwards and can never
+// raise one. The baseline is the migration backlog; `baseline.json` changes
+// need code-owner review.
 //
 // Deterministic: no network, no model, no feature flag. Whole-tree scan.
 import { execFileSync } from 'node:child_process';
@@ -14,6 +16,11 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  announceShrink,
+  compareToBaseline,
+  tightenBaseline,
+} from '../../lib/shrink-only-baseline.mjs';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 export const config = JSON.parse(
@@ -199,29 +206,12 @@ export function scan(cwd = process.cwd(), files = listFiles(cwd)) {
   return result;
 }
 
-/** Ratchet: no new files, no increases, no stale baseline entries. */
+/** Ratchet: no new files, no increases. A shrink passes (stale headroom is tightened later). */
 export function evaluate(current, baseline) {
-  const errors = [];
-  for (const [file, counts] of Object.entries(current)) {
-    for (const [id, n] of Object.entries(counts)) {
-      const allowed = baseline[file]?.[id] ?? 0;
-      if (n > allowed) {
-        errors.push(
-          `${file}: ${n} hand-written ${id} claim(s), baseline ${allowed}. Render it from apps/web/lib/billing/offer (registered claim id) instead.`
-        );
-      }
-    }
-  }
-  for (const [file, counts] of Object.entries(baseline)) {
-    for (const [id, n] of Object.entries(counts)) {
-      const now = current[file]?.[id] ?? 0;
-      if (now < n) {
-        errors.push(
-          `${file}: baseline ${id}=${n} but only ${now} now. Lower baseline.json (it only shrinks).`
-        );
-      }
-    }
-  }
+  const errors = compareToBaseline(current, baseline).growth.map(
+    ({ path: [file, id], count, baseline: allowed }) =>
+      `${file}: ${count} hand-written ${id} claim(s), baseline ${allowed}. Render it from apps/web/lib/billing/offer (registered claim id) instead.`
+  );
   return errors;
 }
 
@@ -242,6 +232,16 @@ export function main(argv = process.argv.slice(2), cwd = process.cwd()) {
     return 0;
   }
   const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
+  const { shrink } = compareToBaseline(current, baseline);
+  if (argv.includes('--tighten')) {
+    // Lowers or removes entries only, so it cannot absorb a new claim.
+    if (shrink.length > 0) {
+      const next = tightenBaseline(current, baseline).baseline;
+      writeFileSync(BASELINE_PATH, `${JSON.stringify(next, null, 2)}\n`);
+    }
+    console.log(`offer-claims: tightened ${shrink.length} entries`);
+    return 0;
+  }
   const errors = evaluate(current, baseline);
   if (errors.length) {
     console.error(
@@ -253,6 +253,7 @@ export function main(argv = process.argv.slice(2), cwd = process.cwd()) {
     (s, c) => s + Object.values(c).reduce((a, b) => a + b, 0),
     0
   );
+  announceShrink('offer-claims', shrink);
   console.log(
     `offer-claims: ok (${total} baselined hand-written claims in ${Object.keys(baseline).length} files)`
   );

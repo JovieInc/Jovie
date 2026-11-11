@@ -84,7 +84,7 @@ test('exclusions: offer module, tests and editorial; messages catalogs stay in s
   assert.ok(!isExcluded('apps/web/messages/en.json'));
 });
 
-test('ratchet: new file, increase and stale entry fail; equal passes', () => {
+test('ratchet: new file and increase fail; equal and removed claims pass', () => {
   const base = { 'a.ts': { trial_claim: 1 } };
   assert.deepEqual(evaluate({ 'a.ts': { trial_claim: 1 } }, base), []);
   assert.equal(evaluate({ 'a.ts': { trial_claim: 2 } }, base).length, 1);
@@ -93,7 +93,9 @@ test('ratchet: new file, increase and stale entry fail; equal passes', () => {
       .length,
     1
   );
-  assert.equal(evaluate({}, base).length, 1);
+  // A removed claim leaves stale headroom; it never fails the tree that
+  // removed it (8 merge groups failed on exactly that, 2026-11-04..11).
+  assert.deepEqual(evaluate({}, base), []);
 });
 
 test('deliberate red: the original incident closer in a new file fails the guard', () => {
@@ -117,6 +119,6 @@ test('deliberate red: the original incident closer in a new file fails the guard
   );
 });
 
-test('the committed baseline matches the tree', () => {
+test('the tree has no growth beyond the committed baseline', () => {
   assert.equal(main([], cwd), 0);
 });
