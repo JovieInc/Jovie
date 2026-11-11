@@ -41,14 +41,19 @@ test.beforeAll(() => {
   ).toBe('1');
 });
 
+/** Set once the fixture history has been served, whenever that happens. */
+const historyServed = new WeakMap<Page, boolean>();
+
 async function openNewChat(page: Page) {
-  await page.route('**/api/chat/conversations?*', route =>
-    route.fulfill({
+  historyServed.set(page, false);
+  await page.route('**/api/chat/conversations?*', async route => {
+    await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ conversations: FIXTURE_CHATS }),
-    })
-  );
+    });
+    historyServed.set(page, true);
+  });
   await setTestAuthBypassSession(page, 'creator-ready');
   await page.goto(APP_ROUTES.CHAT, { waitUntil: 'domcontentloaded' });
   await expect(page.locator(TRIGGER)).toBeVisible({ timeout: 60_000 });
@@ -105,12 +110,12 @@ test('chat title opens history: search, select and close without jank', async ({
   const trigger = page.locator(TRIGGER);
   await expect(trigger).toHaveText(/New Chat/);
 
-  // Hovering prefetches; wait for it so the open measures the menu only.
-  const historyLoaded = page.waitForResponse(response =>
-    response.url().includes('/api/chat/conversations?')
-  );
+  // Hovering prefetches; wait until the history has been served (by the
+  // hover or by an earlier load) so the open measures the menu only.
   await trigger.hover();
-  await historyLoaded;
+  await expect
+    .poll(() => historyServed.get(page), { timeout: 30_000 })
+    .toBe(true);
 
   const before = await trigger.boundingBox();
   const stop = await startJankProbe(page);
