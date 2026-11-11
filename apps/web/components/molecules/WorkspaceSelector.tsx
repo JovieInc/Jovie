@@ -46,7 +46,11 @@ export function WorkspaceSelector<Id extends string>({
           )}
         >
           <BrandLogo
-            size='chrome'
+            // The brand-row mark shares the nav icon scale
+            // (--app-shell-sidebar-icon-size, 1rem) so mark, wordmark, bell
+            // and search read as one optical line (founder note 2026-11-09:
+            // the sidebar brand row is not the 20px app-chrome slot).
+            size='compact'
             tone='auto'
             variant={currentWorkspace.brandVariant}
             rounded={false}

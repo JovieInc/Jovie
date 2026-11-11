@@ -14,7 +14,13 @@ export function SidebarInboxLink({
   readonly availability?: InboxNavigationAvailability;
 }) {
   const hasRuntimeUpdate = Boolean(useRuntimeUpdate()?.available);
-  const pending = availability?.state === 'available';
+  // A badge is earned only by a real pending count. 'empty' and the
+  // fail-open 'unknown' state render no badge at all (shell-ia.md: chrome
+  // recedes), and a downloaded-but-unapplied update alone is a quiet dot,
+  // not the count treatment.
+  const pendingCount =
+    availability?.state === 'available' ? (availability.pendingCount ?? 0) : 0;
+  const pending = pendingCount > 0;
   const label = pending
     ? `Inbox — ${availability?.pendingCount} items need attention`
     : availability?.state === 'empty'
@@ -38,7 +44,17 @@ export function SidebarInboxLink({
           className='size-(--app-shell-sidebar-icon-size)'
           aria-hidden='true'
         />
-        {pending || hasRuntimeUpdate ? (
+        {pending ? (
+          // The canonical count treatment (matches InboxAttentionLink, the
+          // non-header bell) — a real number, never a bare status disc.
+          <span
+            role='status'
+            aria-label={`${pendingCount} pending items`}
+            className='absolute -right-0.5 -top-0.5 flex min-w-3.5 h-3.5 items-center justify-center rounded-full bg-accent tabular-nums text-(length:--app-shell-sidebar-badge-font-size) font-bold text-(--color-bg-base)'
+          >
+            {Math.min(pendingCount, 99)}
+          </span>
+        ) : hasRuntimeUpdate ? (
           <span
             data-runtime-update={hasRuntimeUpdate || undefined}
             aria-hidden='true'

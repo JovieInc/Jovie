@@ -90,7 +90,9 @@ describe('WorkspaceSelector', () => {
     expect(trigger.querySelector('svg.lucide-chevron-down')).toBeNull();
     expect(trigger.querySelector('[data-brand-mark-size]')).toHaveAttribute(
       'data-brand-mark-size',
-      '20'
+      // The trigger mark shares the rail's nav icon scale (16px) so the
+      // brand row reads as one optical line with the bell and search icons.
+      '16'
     );
   });
 

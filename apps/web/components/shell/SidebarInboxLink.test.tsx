@@ -38,12 +38,14 @@ describe('central Inbox bell', () => {
     expect(link).toHaveClass('size-7', 'items-center', 'justify-center');
     expect(link).toHaveAttribute('href', '/app');
     expect(link).toHaveAttribute('data-prefetch', 'false');
-    expect(link.querySelector('span')).toHaveClass(
-      'absolute',
-      'bottom-1',
-      'right-1'
+    expect(link.querySelector('span[role="status"]')).toHaveTextContent('3');
+    expect(link.querySelector('span[role="status"]')).toHaveClass(
+      'min-w-3.5',
+      'rounded-full',
+      'bg-accent',
+      'tabular-nums'
     );
-    expect(link.querySelector('span')).not.toHaveClass('top-1');
+    expect(link.querySelectorAll('[data-runtime-update]')).toHaveLength(0);
     await userEvent.tab();
     expect(link).toHaveFocus();
     expect(link).toHaveAttribute('data-inbox-attention', 'available');
@@ -81,10 +83,11 @@ describe('central Inbox bell', () => {
       const link = screen.getByRole('link', {
         name: 'Inbox — 3 items need attention; app update available',
       });
-      expect(link.querySelectorAll('[data-runtime-update]')).toHaveLength(1);
-      expect(link.querySelector('[data-runtime-update]')).toHaveClass(
-        'bottom-1'
-      );
+      expect(link.querySelectorAll('span[role="status"]')).toHaveLength(1);
+      expect(link.querySelector('span[role="status"]')).toHaveTextContent('3');
+      // The count pill is the single indicator; the runtime-update dot
+      // stands down while real pending work owns the badge.
+      expect(link.querySelectorAll('[data-runtime-update]')).toHaveLength(0);
     } finally {
       runtimeUpdate.available = false;
     }

@@ -491,9 +491,9 @@ export function TrackSidebar({
       ) : activeTab === 'links' && track ? (
         <div className='space-y-2'>
           <TrackPlatformLinksSection
+            track={track}
             providers={canonicalProviders}
             missingProviders={unresolvedProviders.map(key => ({ key }))}
-            findQuery={track.title}
             title='Canonical DSPs'
           />
           {fallbackProviders.length > 0 ? (

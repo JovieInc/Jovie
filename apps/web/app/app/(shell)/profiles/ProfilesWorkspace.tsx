@@ -73,6 +73,7 @@ import {
   type ContextMenuItemType,
   convertContextMenuItems,
   convertToCommonDropdownItems,
+  PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbar,
   TableEmptyState,
   UnifiedTable,
@@ -1788,7 +1789,7 @@ function ProfilesWorkspaceContent({
           startClassName='flex-none'
           endClassName='max-w-full flex-wrap max-sm:ml-0 max-sm:justify-start'
           start={
-            <span className='text-app tabular-nums text-secondary-token'>
+            <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
               {rows.length === 1 ? '1 profile' : `${rows.length} profiles`}
             </span>
           }
@@ -1814,8 +1815,6 @@ function ProfilesWorkspaceContent({
                   ? 'Close Suggestions'
                   : `Review Suggestions (${connectionSuggestions.length})`}
               </Button>
-              {/* JOV-8964: moved out of the floating shell-header slot into
-                  the page toolbar where the table it targets lives. */}
               <DashboardHeaderActionButton
                 ariaLabel='Add Profile Or Site'
                 onClick={handleAddConnection}
