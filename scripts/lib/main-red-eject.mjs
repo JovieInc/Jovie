@@ -135,17 +135,17 @@ export const groupPr = branch =>
  * @param {Array<{id:number, conclusion:string, branch?:string, signature?:string[]}>} groups newest first
  */
 export function detectUnattributedRed(groups, n = UNATTRIBUTED_MIN_GROUPS) {
-  const streak = [];
-  for (const g of groups.filter(g => !ABORTED.has(g.conclusion))) {
-    if (!RED.has(g.conclusion)) break;
-    streak.push(g);
-  }
-  const prs = [...new Set(streak.map(g => groupPr(g.branch)).filter(Boolean))];
+  const real = groups.filter(g => !ABORTED.has(g.conclusion));
+  const green = real.findIndex(g => !RED.has(g.conclusion));
+  const streak = green < 0 ? real : real.slice(0, green);
+  const head = streak.slice(0, n);
+  const prsOf = rows =>
+    new Set(rows.map(g => groupPr(g.branch)).filter(Boolean));
+  const prs = [...prsOf(streak)];
   return {
     triggered:
-      streak.length >= n &&
-      prs.length >= n &&
-      streak.slice(0, n).every(g => !specific(g.signature ?? []).length),
+      prsOf(head).size >= n &&
+      head.every(g => !specific(g.signature ?? []).length),
     groups: streak.map(g => g.id),
     prs,
   };

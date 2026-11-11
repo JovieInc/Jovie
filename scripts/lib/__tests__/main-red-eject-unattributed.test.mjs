@@ -135,6 +135,17 @@ describe('detectUnattributedRed', () => {
       ]).triggered
     ).toBe(false);
   });
+  it('counts PRs in the newest three only: one PR failing three times is its own problem', () => {
+    expect(
+      detectUnattributedRed([
+        row(5, 10),
+        row(4, 10),
+        row(3, 10),
+        row(2, 20),
+        row(1, 30),
+      ]).triggered
+    ).toBe(false);
+  });
   it('leaves three PRs that each failed their own readable test alone', () => {
     const own = (id, pr, test) => ({
       ...row(id, pr),
