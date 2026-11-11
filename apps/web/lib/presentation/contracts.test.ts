@@ -1,6 +1,4 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { buildLibraryAskJovieDraft } from '@/app/app/(shell)/library/library-chat-context';
-import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import { PRODUCT_ONTOLOGY } from '@/data/productOntology';
 import {
   type ConnectionFact,
@@ -18,40 +16,21 @@ import { toLibraryAgentRequest } from './library-display';
 import { productNomenclature } from './product-nomenclature';
 
 describe('presentation foundations', () => {
-  it('detects the current source builder leak while keeping the new request text clean', () => {
-    const asset: LibraryReleaseAsset = {
+  it('detects the raw-JSON baseline without requiring the old source to keep leaking', () => {
+    const asset = {
       id: 'release-1',
       title: 'Tidal Drift',
       artist: 'Luna Waves',
-      artworkUrl: null,
-      previewUrl: null,
-      videoUrl: null,
-      waveformSeed: 1,
-      smartLinkPath: '/fixture',
-      releaseDate: null,
-      releaseType: 'single',
-      status: 'released',
-      approvalStatus: 'draft',
-      profileVisibility: 'visible',
-      trackCount: 1,
-      providerCount: 0,
-      providers: [],
-      hasLyrics: false,
-      hasArtwork: false,
-      hasVideoLinks: false,
-      assetKinds: [],
-      genres: [],
-      spotifyPopularity: null,
-      targetPlaylistCount: 0,
-      isExplicit: false,
-      label: null,
-      upc: null,
-      distributor: null,
-      totalDurationMs: null,
     };
-    expect(
-      machineTextReasons(buildLibraryAskJovieDraft(asset, 'profile-1'))
-    ).toContain('json');
+    // Fixture of the aac92c18 library-chat-context.ts shape. A later owner can
+    // fix that builder without a test requiring the defect to remain present.
+    const legacyFixture = `Help me with this library item.\n${JSON.stringify({
+      kind: 'release',
+      ...asset,
+      profileId: 'profile-1',
+      revision: null,
+    })}`;
+    expect(machineTextReasons(legacyFixture)).toContain('json');
     const request = toLibraryAgentRequest(asset, 'profile-1');
     expect(machineTextReasons(request.message)).toEqual([]);
     expect(request.contextAttachments[0].entityId).toBe(asset.id);
