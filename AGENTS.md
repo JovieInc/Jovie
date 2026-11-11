@@ -98,8 +98,8 @@ Done means the user's outcome works, not that a PR exists.
    pr-visual-review-<pr>-<sha>` (desktop and mobile), compare with the
    [Pen](.claude/rules/pen.md) frame, and fix jank (shift, flicker, overflow,
    clipped text) first. Doc evals aren't UI proof.
-3. Ship it yourself: when required checks are green, mark the PR ready and
-   request merge. Nobody reviews; green merges. Your PR's red CI is yours.
+3. Ship on green: mark it ready; nobody reviews. Your red CI is yours. Fix or
+   answer bot review threads, then resolve them; never a human's.
 4. Work the given task, not receipts, freshness markers or self-checks.
 5. Report before/after, exact checks and gaps. Don't infer source, CI, queue,
    deploy or runtime from each other.
