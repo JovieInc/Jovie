@@ -145,11 +145,11 @@ describe('LibraryPageClient stages', () => {
     expect(screen.getByRole('tabpanel')).toHaveTextContent('Catalog panel');
   });
 
-  it('guards leaving a document editor with an unsaved draft', () => {
+  it('guards leaving a document editor with an unsaved draft', async () => {
     search.value = 'document=doc-1';
     render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
     fireEvent.click(
-      screen.getByRole('button', { name: 'Mark document dirty' })
+      await screen.findByRole('button', { name: 'Mark document dirty' })
     );
 
     fireEvent.click(screen.getByRole('tab', { name: 'All' }));
@@ -159,11 +159,11 @@ describe('LibraryPageClient stages', () => {
     expect(discardDrafts).not.toHaveBeenCalled();
   });
 
-  it('purges persisted drafts after confirmed destructive navigation', () => {
+  it('purges persisted drafts after confirmed destructive navigation', async () => {
     search.value = 'document=doc-1';
     render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
     fireEvent.click(
-      screen.getByRole('button', { name: 'Mark document dirty' })
+      await screen.findByRole('button', { name: 'Mark document dirty' })
     );
 
     fireEvent.click(screen.getByRole('tab', { name: 'All' }));
