@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 
 from atomic_state import atomic_write_text
+from split_helper_import import resolve_split_helper_conflict
 
 LEGACY_CACHE_EXPORT = re.compile(
     r"^\s*export const (?:dynamic|fetchCache|revalidate)\s*=")
@@ -353,7 +354,7 @@ def resolve_subtractive_screen_debt(worktree: Path, rel: str, sh) -> str | None:
 
 
 def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merge_entries, guard=lambda: None) -> bool:
-    """Union quoted lists, node:test blocks, waiver rows, or dropped screen-debt rows.
+    """Union quoted lists, node:test blocks, waiver rows, dropped screen-debt rows, or split helper imports.
 
     Main's order stays, then head-only lines. A prose hunk or any other shape aborts
     and leaves the PR to the model. The push is a fast-forward of the PR branch."""
@@ -365,6 +366,7 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
         resolved: dict[str, str] = {}
+        extras: dict[str, str] = {}
         for path in conflicted:
             target = worktree / path
             try:
@@ -375,6 +377,17 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
                     text = resolve_additive_certificate_waivers(worktree, path, sh)
                 if text is None:
                     text = resolve_subtractive_screen_debt(worktree, path, sh)
+                if text is None:
+                    split = resolve_split_helper_conflict(worktree, path)
+                    if split is not None:
+                        candidate, writes = split
+                        clash = any(extra in conflicted or extras.get(extra, writes[extra]) != writes[extra]
+                                    for extra in writes)
+                        if clash:
+                            candidate = None
+                        if candidate is not None:
+                            text = candidate
+                            extras.update(writes)
             except OSError:
                 text = None
             if text is None:
@@ -384,11 +397,13 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
         try:
             for path, text in resolved.items():
                 atomic_write_text(worktree / path, text)
+            for path, text in extras.items():
+                atomic_write_text(worktree / path, text)
         except OSError:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
         guard()
-        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
+        if sh(["git", "add", "--", *conflicted, *extras], cwd=worktree, log=log).returncode != 0 \
                 or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False

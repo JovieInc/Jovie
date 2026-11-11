@@ -113,7 +113,7 @@
       "gh-shell": 1
     },
     ".github/workflows/ci.yml": {
-      "gh-shell": 3,
+      "gh-shell": 2,
       "github-script": 1,
       "provider-host": 1
     },

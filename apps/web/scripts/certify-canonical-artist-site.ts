@@ -7,6 +7,7 @@ import {
   type CanonicalArtistSiteReceipt,
   evaluateCanonicalArtistSiteCertification,
 } from '@/lib/acquisition/canonical-artist-site-certification';
+import { countJourneyTests } from '../../../scripts/lib/journey-evidence-builder.mjs';
 
 export interface CanonicalArtistSiteCliOptions {
   readonly candidateId: string;
@@ -24,6 +25,12 @@ export interface CanonicalArtistSiteCliOptions {
   readonly outputPath: string;
   /** Newest-first SHAs from the certified revision. Empty means equality only. */
   readonly sourceHistory?: readonly string[];
+  /**
+   * Playwright JSON report of the golden-path run. When present, the revenue
+   * checks read the spec that proves them instead of the whole step outcome,
+   * so an unrelated spec (e.g. /start layout) cannot flip them.
+   */
+  readonly journeyReportPath?: string;
 }
 
 interface M2Receipt {
@@ -129,6 +136,7 @@ function parseOptions(argv: readonly string[]): CanonicalArtistSiteCliOptions {
     profileResultPath: required(argv, '--profile-result'),
     outputPath: required(argv, '--output'),
     sourceHistory: loadSourceHistory(optional(argv, '--source-history')),
+    journeyReportPath: optional(argv, '--journey-report'),
   };
 }
 
@@ -155,6 +163,33 @@ export function certifyCanonicalArtistSite(
     : null;
 
   const goldenPassed = options.goldenPathStatus === 'success';
+  const journeyReportRequested = options.journeyReportPath !== undefined;
+  const journeyReport = options.journeyReportPath
+    ? readJson(options.journeyReportPath)
+    : null;
+  // Use the existing journey verifier's strict executed-test semantics.
+  // Explicitly requested evidence cannot fall back to a green aggregate.
+  const specOk = (file: string) => {
+    try {
+      const { tests } = countJourneyTests(journeyReport, file);
+      return (
+        tests.total > 0 &&
+        tests.passed === tests.total &&
+        tests.failed === 0 &&
+        tests.skipped === 0
+      );
+    } catch {
+      return false;
+    }
+  };
+  const billingJourneyOk = journeyReportRequested
+    ? specOk('golden-path.spec.ts')
+    : goldenPassed;
+  const freeStateOk = journeyReportRequested
+    ? specOk('claim-prebuilt.smoke.spec.ts') &&
+      specOk('golden-path-home-welcome.spec.ts') &&
+      specOk('golden-path.spec.ts')
+    : goldenPassed;
   const claimContractPassed = options.claimContractStatus === 'success';
   const deployedRevision = profileReport?.snapshot?.releaseSha ?? null;
   const profileHealthy =
@@ -331,8 +366,23 @@ export function certifyCanonicalArtistSite(
       [...claimAndJourney, ...navigationEvidence],
       'canonical-artist-site-refresh-back-retry'
     ),
-    ...(['free_state_value', 'payment_entitlement'] as const).map(checkId =>
-      row(checkId, goldenPassed, journeyDetail, goldenEvidence)
+    row(
+      'free_state_value',
+      freeStateOk,
+      freeStateOk
+        ? journeyDetail
+        : 'Free-state specs (claim-prebuilt, home-welcome, golden-path) did not all pass.',
+      goldenEvidence
+    ),
+    row(
+      'payment_entitlement',
+      billingJourneyOk &&
+        (journeyReportRequested ? proPassed && activationPassed : true),
+      billingJourneyOk &&
+        (journeyReportRequested ? proPassed && activationPassed : true)
+        ? journeyDetail
+        : 'Checkout, entitlement or activation proof failed (golden-path billing spec or revenue-path steps).',
+      [...goldenEvidence, ...m2Evidence]
     ),
     row(
       'pro_handoff_199',
@@ -345,12 +395,12 @@ export function certifyCanonicalArtistSite(
     ),
     row(
       'immediate_value',
-      goldenPassed && activationPassed,
-      goldenPassed && activationPassed
+      freeStateOk && activationPassed,
+      freeStateOk && activationPassed
         ? 'Claim first value and the live post-checkout activation state passed.'
         : 'Claim first value or the live post-checkout activation state failed.',
       [...goldenEvidence, ...m2Evidence],
-      goldenPassed ? 'JOV-6439' : 'JOV-7192'
+      freeStateOk ? 'JOV-6439' : 'JOV-7192'
     ),
   ];
 

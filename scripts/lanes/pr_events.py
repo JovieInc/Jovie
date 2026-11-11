@@ -36,6 +36,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from atomic_state import append_json_object
 from pr_body_markup import ANY_HEADING, quote_revision_references, red_section_bounds, with_red_section
+from pr_repair_evidence import with_locking_pr
 import remediation  # noqa: E402  (classifier + non-PR intake; no lane_runner import)
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
@@ -1083,11 +1084,7 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
             note = json.dumps(customer_decision, separators=(",", ":")).replace("<", "\\u003c").replace(">", "\\u003e")
             updated = updated.rstrip("\n") + "\n<!-- customer-changelog/v1 " + note + " -->\n"
     if locking_pr is not None:
-        if type(locking_pr) is not int or locking_pr < 1:
-            raise ValueError("locking PR requires an explicit positive PR number")
-        visible = re.sub(r"<!--[\s\S]*?-->", "", updated)
-        if not re.search(r"^#{1,6}\s+Locked areas\s*$", visible, re.I | re.M):
-            updated = updated.rstrip("\n") + f"\n\n## Locked areas\n\nLocking PR: #{locking_pr}\n"
+        updated = with_locking_pr(updated, locking_pr)
     if previous_win_section is not None and not win_section:
         raise ValueError("Win replacement requires explicit measured win evidence")
     if win_section is not None and win_section != "":
