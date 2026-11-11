@@ -65,7 +65,6 @@ import hyperagent_repair  # noqa: E402
 import migration_renumber  # noqa: E402  (no-model fix for migration number collisions)
 import fix_red_rewrite  # noqa: E402
 import fix_red_failure_routing  # noqa: E402
-from fix_red_failure_routing import classify_unpushed_repair, not_shippable_reason  # noqa: E402
 import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
 import sourced_shell_conflict  # noqa: E402  (source-vs-inline shell conflict; ports retry into the helper)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
@@ -1493,6 +1492,14 @@ def gate_assessment(changes: list[Change], max_reviewable_lines: int = MAX_REVIE
     if reviewable > max_reviewable_lines:
         failures.append(f"diff-too-large:{reviewable}")
     return failures, versions
+
+
+# Why a fix run that pushed nothing changed nothing (Gem ledger, 253 fix-no-change runs in
+# 3.5 days all carried reasons=[]): 105 were a codex_lane crash before the agent started
+# (account/read app-server timeout, exit 1), 112 were the agent's own NOT-SHIPPABLE decline
+# (infrastructure red or a failure main already has), 17 found the head already green. A
+# specific reason lets the budget, the backoff and the ledger treat each differently.
+from fix_red_failure_routing import classify_unpushed_repair, not_shippable_reason  # noqa: E402
 
 
 def parse_numstat(text: str) -> list[Change]:

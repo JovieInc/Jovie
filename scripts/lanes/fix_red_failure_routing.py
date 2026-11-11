@@ -189,11 +189,6 @@ def not_shippable_reason(output: str) -> str | None:
     return found[-1].strip()[:500] if found else None
 
 
-# Why a fix run that pushed nothing changed nothing (Gem ledger, 253 fix-no-change runs in
-# 3.5 days all carried reasons=[]): 105 were a codex_lane crash before the agent started
-# (account/read app-server timeout, exit 1), 112 were the agent's own NOT-SHIPPABLE decline
-# (infrastructure red or a failure main already has), 17 found the head already green. A
-# specific reason lets the budget, the backoff and the ledger treat each differently.
 LANE_CRASH_SIGNATURES = (
     ("codex-account-metadata-timeout", re.compile(r"TimeoutError: account/read: app-server response unavailable")),
 )
