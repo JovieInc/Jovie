@@ -4460,7 +4460,7 @@
       "source": "apps/web/app/api/promo-downloads/confirm/route.ts",
       "kind": "handler",
       "route": "/api/promo-downloads/confirm",
-      "methods": ["POST"],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },

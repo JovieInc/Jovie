@@ -414,10 +414,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/profile/DesktopQrOverlayClient.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/profile/ProfileAboutShare.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -427,10 +423,6 @@
     },
     {
       "path": "apps/web/components/features/profile/ProfileRedirectSurface.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/features/profile/ProfileWebVitalsReporter.tsx",
       "linearIssue": "JOV-8847"
     },
     {
@@ -455,10 +447,6 @@
     },
     {
       "path": "apps/web/components/jovie/components/ChatAvatarUploadCard.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/jovie/components/ChatFeedbackControl.tsx",
       "linearIssue": "JOV-8847"
     },
     {
