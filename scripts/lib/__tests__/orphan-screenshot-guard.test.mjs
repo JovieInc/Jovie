@@ -150,6 +150,23 @@ describe('findOrphanReviewImages', () => {
     assert.deepEqual(orphans, ['docs/screenshots/jov-1/after.png']);
   });
 
+  it('never treats a review root as a bundle (Seer review on #25014)', () => {
+    // Policy prose names docs/screenshots and docs/pen-stills all the time;
+    // that must not keep a root-level image that only a root README lists.
+    const orphans = orphansIn({
+      'docs/screenshots/README.md': '![old](stale.png)',
+      'docs/screenshots/stale.png': PNG,
+      'docs/pen-stills/README.md': 'see old.webp',
+      'docs/pen-stills/old.webp': PNG,
+      'docs/ci/repository-health.md':
+        'Images under docs/screenshots and docs/pen-stills must be referenced.',
+    });
+    assert.deepEqual(orphans, [
+      'docs/pen-stills/old.webp',
+      'docs/screenshots/stale.png',
+    ]);
+  });
+
   it('names the policy doc and where PR evidence belongs', () => {
     const { root, trackedPaths } = fixture({ 'docs/screenshots/a.png': PNG });
     const [error] = findOrphanReviewImages({

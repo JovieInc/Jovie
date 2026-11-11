@@ -136,11 +136,14 @@ export function findOrphanReviewImages({
       }
     }
   );
+  // A review root is never a bundle: policy prose names docs/screenshots and
+  // docs/pen-stills everywhere, so a root-level image must be named itself.
   const bundleDirs = [
     ...new Set(
       [...listedBySibling]
         .filter(image => !live.has(image))
         .map(image => posix.dirname(image))
+        .filter(dir => !REVIEW_IMAGE_ROOTS.includes(`${dir}/`))
     ),
   ];
   if (bundleDirs.length > 0) {
