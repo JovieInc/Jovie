@@ -2551,6 +2551,18 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   -webkit-backdrop-filter: blur(var(--space-4));
 }
 
+/* One brand footer per profile (walk 2026-11-09): from md up, where the
+   "Jovie · Claim yours" footer renders under the card, it already carries the
+   Jovie mark, so the in-card "Made with Jovie" line steps aside instead of
+   stacking a second brand footer above it. Phones keep "Made with Jovie"
+   (the claim footer is md+ only). */
+@media (min-width: 768px) {
+  .profile-viewport:has([data-testid="profile-claim-footer"])
+    [data-testid="profile-jovie-branding"] {
+    display: none;
+  }
+}
+
 /* Public-profile mode cards (Pen D14lo6 / NdEbB / GTSIc / QZvG7). One accent
    per card, set by lib/profile/mode-card-accent.ts through data-accent. The
    gradient centers on the exact accent token; the only contrast lever is
