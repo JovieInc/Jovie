@@ -79,6 +79,34 @@ test('frontmatter id must match the filename slug', () => {
   assert.match(errors[0], /filename slug/);
 });
 
+test('post-mortems from 2026-11-12 state when the revert opened or why no culprit existed', () => {
+  const path = 'docs/postmortems/2026-11-12-widget-outage.md';
+  const base = VALID_FRONTMATTER.replaceAll(
+    '2026-09-30-widget-outage',
+    '2026-11-12-widget-outage'
+  );
+  const errors = lintPostmortem(path, base);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /revert_opened/);
+  const opened = base.replace(
+    'failure_classes:',
+    'revert_opened: 2026-11-12T01:09Z\nfailure_classes:'
+  );
+  assert.deepEqual(lintPostmortem(path, opened), []);
+  const none = base.replace(
+    'failure_classes:',
+    'revert_opened: none: a test expired by the clock on an unchanged main\nfailure_classes:'
+  );
+  assert.deepEqual(lintPostmortem(path, none), []);
+  const vague = base.replace(
+    'failure_classes:',
+    'revert_opened: none\nfailure_classes:'
+  );
+  assert.equal(lintPostmortem(path, vague).length, 1);
+  // Older records predate the rule (VALID_PATH is 2026-09-30).
+  assert.deepEqual(lintPostmortem(VALID_PATH, VALID_FRONTMATTER), []);
+});
+
 test('linkage flags an incident PR with no post-mortem (deliberate red fixture)', () => {
   const violations = evaluateLinkage({
     changedFiles: ['apps/web/lib/foo.ts'],

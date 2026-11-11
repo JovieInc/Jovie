@@ -45,9 +45,11 @@ UI path.
 
 Components that already have no adjacent story are the baseline allowlist in
 `.github/ui-story-coverage-policy.json`. Every entry maps to
-[JOV-8847](https://linear.app/jovie/issue/JOV-8847). Do not add paths. Remove
-an entry in the same change that adds its story.
-`assertBaselineAllowlist` fails when the list and the tree disagree. A changed
+[JOV-8847](https://linear.app/jovie/issue/JOV-8847). Do not add paths. The
+list is shrink-only: `assertBaselineAllowlist` fails when a component without
+an adjacent story is missing from it. A change that adds a story does not have
+to remove the entry; `node scripts/ui-story-coverage-policy.mjs --tighten`
+drops stale entries in one sweep, and never adds one. A changed
 component that is not on the list fails the audit. Route surfaces are not
 allowlisted.
 

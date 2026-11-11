@@ -133,3 +133,19 @@ test('eu: a missing bar fails only where something consent-gated runs', () => {
     0
   );
 });
+
+test('shared Sentry ingestion hosts retain replay input-page restrictions', () => {
+  const host = 'o1.ingest.sentry.io';
+  assert.equal(vendorFor(host, registry)?.id, 'sentry-replay');
+  const snapshot = cleanControlSnapshot();
+  snapshot.pages.push({
+    ...snapshot.pages[1],
+    scenario: 'eu-accept',
+    third_party_requests: [{ host, phase: 'after-accept', count: 1 }],
+  });
+  assert.ok(
+    evaluate(snapshot, registry).some(
+      r => r.rule === 'no-tracker-on-input-page' && r.status === 'fail'
+    )
+  );
+});
