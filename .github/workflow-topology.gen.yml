@@ -146,7 +146,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - workflow_run
+      - workflow_call
     terminalReceipt: job:fix
     jobCount: 1
   - name: CI Duration Ratchet
@@ -180,7 +180,6 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
-      - Cheap Fixer
       - iOS CI
       - Mac CI
       - Component Certificate
@@ -209,8 +208,8 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:dogfood
-    jobCount: 1
+    terminalReceipt: job:layout-budget
+    jobCount: 2
   - name: CLI Chaos Nightly
     path: .github/workflows/cli-chaos-nightly.yml
     active: true
@@ -637,7 +636,9 @@ nodes:
     authoritativeProducer: Lane Fix Relay
     authoritativeFor:
       - remediation-dispatch
-    allowedConsumers: []
+    allowedConsumers:
+      - Cheap Fixer
+      - Security Suppression Audit
     triggeringStateTransition:
       - deployment_status
       - pull_request_review
@@ -648,7 +649,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:wake-red
-    jobCount: 4
+    jobCount: 6
   - name: Legacy Human Hold Scrub
     path: .github/workflows/legacy-human-hold-scrub.yml
     active: true
@@ -657,8 +658,8 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - issues
-      - pull_request_target
+      - label
+      - push
       - workflow_dispatch
     terminalReceipt: job:sweep
     jobCount: 2
@@ -858,7 +859,6 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
-      - Cheap Fixer
       - Lane Fix Relay
       - Test Flakiness Report
     triggeringStateTransition:
@@ -1349,6 +1349,7 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - pull_request_review
+      - workflow_call
       - workflow_dispatch
     terminalReceipt: job:roster-audit
     jobCount: 2
@@ -1445,7 +1446,6 @@ nodes:
       - source-validation
     allowedConsumers:
       - Auto-Ready Agent Drafts
-      - Cheap Fixer
       - Dependabot Pin Sync
       - Fleet Rules Evidence
       - Lane Fix Relay
@@ -1667,15 +1667,6 @@ edges:
   - from: Production Continuity Guard
     to: Automation Liveness
     type: workflow_run
-  - from: Source Validation
-    to: Cheap Fixer
-    type: workflow_run
-  - from: CI
-    to: Cheap Fixer
-    type: workflow_run
-  - from: Changed-Evidence Test Suites
-    to: Cheap Fixer
-    type: workflow_run
   - from: CI
     to: iOS CI
     type: workflow_call
@@ -1757,6 +1748,12 @@ edges:
   - from: Changed-Evidence Test Suites
     to: Lane Fix Relay
     type: workflow_run
+  - from: Lane Fix Relay
+    to: Cheap Fixer
+    type: workflow_call
+  - from: Lane Fix Relay
+    to: Security Suppression Audit
+    type: workflow_call
   - from: Production Controller
     to: Linear Sync on Merge
     type: workflow_run

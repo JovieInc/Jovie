@@ -49,9 +49,10 @@ forward fix queued behind the stall it was fixing. A revert is minutes.
 1. **A named culprit gets a revert PR within 15 minutes, automatically.** A culprit is named when
    Main Health's first red push run is exactly one commit on top of its last green run
    (`scripts/lanes/revert_first.py`), or when the merge-group ejector attributes it
-   (`scripts/lib/main-red-eject.mjs`). The revert is labeled `compounding` and `main-red-revert` so
-   Green Enroll jumps it to the head of the queue, and the original change is re-landed as a repair PR
-   once the revert merges.
+   (`scripts/lib/main-red-eject.mjs`). `main-red-eject.yml` opens it under the Jovie Bot
+   (`scripts/main_health_revert.py` for Main Health, `scripts/main-red-eject.mjs` for merge groups),
+   labeled `compounding` and `main-red-revert` so Green Enroll jumps it to the head of the queue once its
+   checks pass, and the original change is re-landed as a repair PR once the revert merges.
 2. **A forward fix replaces the revert only if it lands first.** An open fix PR never holds the revert
    back. When the fix lands and main is green again, the revert is closed as superseded.
 3. **Dependency bumps are always reverted, never debugged in place.** Dependabot or Renovate bumps
@@ -107,7 +108,8 @@ What the machines already do, so the steward does not repeat it:
 - `merge-group-failure-hold` classifies each failed group (`deterministic-source`,
   `retryable-product`, `transient-infrastructure`, `base-branch`, `unclassified`), holds
   culprits, retries bounded infrastructure failures once, and uses ahead-run attribution.
-- `main-red-eject` dequeues a failing head when main is green; victim re-arm and green-head
+- `main-red-eject` reverts a named culprit (Main Health or merge groups) and dequeues a failing head
+  when main is green; victim re-arm and green-head
   re-enrollment put non-culprits back.
 - Shrink-only baselines pass when debt is removed, so a fix never needs a baseline edit to stay
   green in a group. Nothing lowers them automatically yet: run `node scripts/baselines-tighten.mjs`

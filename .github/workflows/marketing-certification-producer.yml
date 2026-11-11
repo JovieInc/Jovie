@@ -123,9 +123,12 @@ jobs:
           echo "path=$out" >> "$GITHUB_OUTPUT"
           wc -l < "$out"
 
-      - name: Install Playwright Chromium for Storybook render proof
-        working-directory: apps/web
-        run: pnpm exec playwright install --with-deps chromium
+      # Certified captures need Chromium's system fonts, so system_deps keeps
+      # them; the shared action caches the browser by Playwright version.
+      - name: Setup Playwright Chromium for Storybook render proof
+        uses: ./.github/actions/setup-playwright
+        with:
+          system_deps: 'true'
 
       - name: Install Doppler CLI
         run: |

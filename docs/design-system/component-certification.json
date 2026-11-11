@@ -610,6 +610,115 @@
     },
     "apps/web/components/jovie/components/ChatToolSurface.tsx": {
       "partial": "ChatToolSurface is a slot wrapper: it renders whatever children its card passes and its optional props are only tone, className and a test id, so there is no data that can be partly present. Partial states belong to the cards that fill it, such as ChatLinkConfirmationCard."
+    },
+    "apps/web/app/app/(shell)/DashboardShellContent.tsx": {
+      "loading": "DashboardShellContent is an async server component awaited inside the shell layout's Suspense boundary, so it never renders a loading frame of its own; that fallback is shell-route-skeleton.tsx, which carries the loading stories.",
+      "offline": "DashboardShellContent runs only on the server for a request, so browser connectivity never reaches it. A server read that stalls past 10 seconds returns the PageErrorState branch, asserted in DashboardShellContent.test.tsx.",
+      "long-content": "Its only copy of its own is the fixed workspace-load PageErrorState message; everything else it renders is route children passed through, which certify their own long-content states.",
+      "rtl-overflow": "Its only copy of its own is the fixed English workspace-load message; text direction comes from the route children it passes through, which certify their own right-to-left states."
+    },
+    "apps/web/app/app/(shell)/shell-route-skeleton.tsx": {
+      "empty": "resolveShellRouteSkeleton maps a pathname to a route skeleton and renders no data collection; the detector matched the imported ReleaseTableSkeleton and LinksRouteSkeleton names. An unknown path returns undefined so the layout keeps its generic AppShellSkeleton.",
+      "offline": "Route skeletons paint as the shell layout's Suspense fallback before any request runs. The resolver never fetches or submits, so connectivity cannot reach it."
+    },
+    "apps/web/components/features/feedback/PageErrorState.tsx": {
+      "empty": "PageErrorState renders one title, one message and one retry action and takes no collection; the detector matched the items-center utility class.",
+      "permission-denied": "PageErrorState has no gated action or permission input; it is the error surface that owners render. The detector matched role='alert'."
+    },
+    "apps/web/components/organisms/AppShellFrame.tsx": {
+      "offline": "AppShellFrame is a presentational frame that never fetches or submits; the detector matched 'loading' and 'Suspense' in its doc comments. Connectivity reaches the shell only through the routes and rails it slots, which own their offline states."
+    },
+    "apps/web/components/organisms/AppShellFrameDedupe.tsx": {
+      "long-content": "AppShellFrameDedupe renders null. It only strips the frame attribute, duplicate test ids and retained text from hidden shell copies, so it has no text or box of its own that can overflow; the detector matched the textContent walk.",
+      "rtl-overflow": "AppShellFrameDedupe renders null and lays nothing out, so text direction never reaches it; the dedupe pass is direction-agnostic DOM bookkeeping on the frames it finds."
+    },
+    "apps/web/components/organisms/SharedCommandPalette.tsx": {
+      "permission-denied": "The palette renders caller-ranked sections and has no locked, gated or entitlement row; entitlement filtering happens before sections reach it. The detector matched role='option' and role='listbox'."
+    },
+    "apps/web/components/shell/AppShellRightRail.tsx": {
+      "partial": "AppShellRightRail is a layout slot. Its only optional props are className and the belowHeader placement flag, and it renders whatever drawer it is given, so the rail itself has no partially loaded state; each drawer owns its own."
+    },
+    "apps/web/components/jovie/components/ChatMessage.tsx": {
+      "offline": "ChatMessage renders the parts it is handed and never fetches; a lost connection reaches the transcript as a chat-level request error that ErrorDisplay shows (its NetworkOffline story), and a tool that could not reach its service arrives as a failed tool part, which ToolPartsRenderer's OfflineServiceUnreachable story shows."
+    },
+    "apps/web/components/jovie/components/ChatMarkdown.tsx": {
+      "offline": "ChatMarkdown never fetches; its only async step is importing the bundled SourceEvidence component maps, and until (or unless) that chunk loads it renders the same content through plain Streamdown, so connectivity changes nothing it draws."
+    },
+    "apps/web/components/jovie/components/ChatArtifactErrorCard.tsx": {
+      "offline": "The card never fetches: Try again only dispatches the jovie-chat-submit-prompt window event, and the chat that receives it owns the request and its network error (ErrorDisplay's NetworkOffline story). A tool that failed for lack of connectivity reaches the card as an ordinary error title and message, which ErrorRecoverableRetry shows."
+    },
+    "apps/web/components/jovie/components/ChatPresenceArtifactCard.tsx": {
+      "offline": "It renders a finished presence-build tool event and never fetches; a lookup that failed for lack of connectivity arrives as state 'error' with that message, which ErrorStepFailed shows, and Copy Draft only writes to the local clipboard."
+    },
+    "apps/web/components/jovie/components/ChatStepLimitAffordance.tsx": {
+      "error": "It takes no props and has no failure path: Continue only dispatches the jovie-chat-submit-prompt window event, and useJovieChat owns the resulting request and its errors. The detector matched 'submit' in that event name.",
+      "long-content": "Its only copy is the fixed CHAT_TOOL_STEP_LIMIT_AFFORDANCE_MESSAGE constant and the Continue label; no caller or model text reaches it, so nothing can overflow.",
+      "offline": "It never fetches or mutates; Continue hands the prompt to the chat through a window event, and the chat's own request shows any network error.",
+      "permission-denied": "It has no gated action or permission input; the detector matched role='status' on its live region."
+    },
+    "apps/web/components/molecules/drawer/DrawerButton.tsx": {
+      "partial": "DrawerButton holds no data: it forwards its children label and native button props to the shared Button and only maps tone and size (both defaulted) to classes, so nothing can be partially present."
+    },
+    "apps/web/app/[username]/[slug]/PreferredDspRedirect.tsx": {
+      "error": "The redirect returns null in every state; unreadable session storage or Performance API falls through to a single redirect, so there is no failure to draw. PreferredDspRedirect.test.tsx asserts the one redirect when storage throws and an axe-clean page."
+    },
+    "apps/web/app/[username]/[slug]/PreserveSearchRedirect.tsx": {
+      "offline": "It never fetches: it paints the shared SmartLink loading shell (Loading) and hands the hop to location.replace, a full navigation whose offline failure the browser shows on its own error page, outside this component."
+    },
+    "apps/web/components/features/release/SmartLinkLoadingState.tsx": {
+      "empty": "The skeleton draws a fixed five provider rows from a constant key list and takes no props, so there is no collection that can be empty; the detector matched that .map(.",
+      "long-content": "It renders skeleton bars only, with no text from any caller; the detector matched the text-center class, so nothing can overflow.",
+      "offline": "A static skeleton with no fetch or mutation; the route that shows it owns any network failure. The detector matched 'skeleton' in its row keys."
+    },
+    "apps/web/components/organisms/public-surface/PublicSurfaceStage.tsx": {
+      "empty": "The stage holds no data: children is required and is the profile card itself. The detector matched the items-stretch and items-center layout classes.",
+      "partial": "Nothing can be partially present: className and panelClassName are styling and afterPanel is one optional slot, which Default shows absent and WithAfterPanel shows present."
+    },
+    "apps/web/components/features/release/MusicServiceDial.tsx": {
+      "error": "The dial has no failure UI: its only catch skips the localStorage copy of the choice when storage is unavailable, and the cookie still remembers it. MusicServiceDial.test.tsx streams and checks the cookie with storage throwing, with axe."
+    },
+    "apps/web/components/features/alerts/UnpublishedEntityAlerts.tsx": {
+      "offline": "The copy and its fallback never fetch; the alert sign-up it hosts, AlertGrowthLanding, owns the subscribe request and its network error. The detector matched the loading test id on the Suspense fallback (Loading).",
+      "permission-denied": "It is a public opt-in with no gated action or permission input; the detector matched role='status' on the loading fallback."
+    },
+    "apps/web/components/features/profile/PublicProfileFixture.tsx": {
+      "permission-denied": "The fixture is a public profile with no gated action; claimed, owner and unclaimed only change the claim banner (Claimed, Unclaimed). The detector matched role: 'producer' in the release credit."
+    },
+    "apps/web/components/features/release/AlbumArtworkContextMenu.tsx": {
+      "error": "The menu has no error UI: a failed download falls back to opening the artwork URL in a new tab, and AlbumArtworkContextMenu.test.tsx asserts that fallback.",
+      "offline": "An offline download fails like any other and takes the same new-tab fallback, so there is nothing to draw; the menu itself never fetches until a size is picked."
+    },
+    "apps/web/components/features/admin/OvieRouteUsageBeacon.tsx": {
+      "error": "The beacon renders null in every state and is fire-and-forget: a failed POST is swallowed by its .catch, so there is no failure to draw. OvieRouteUsageBeacon.test.tsx rejects the fetch and asserts the page is unchanged and axe-clean."
+    },
+    "apps/web/components/features/dashboard/NavigationDestinationReady.tsx": {
+      "offline": "It never fetches or mutates: it renders null and only reports readiness once the caller's ready flag flips (LoadingDestinationData shows it held). The detector matched the word loading in its doc comment; the destination that owns the data owns any network failure."
+    },
+    "apps/web/components/molecules/drawer/DrawerSectionHeading.tsx": {
+      "partial": "The heading holds one required label (children); as and className only choose the element and extra classes, so nothing can be partially present. Default and SemanticHeading show both element choices."
+    },
+    "apps/web/components/molecules/drawer/DrawerInlineNote.tsx": {
+      "partial": "The note holds one required message string; tone, inset, className and testId are presentation options shown by Default, ErrorTone and EmptyListNote, so there is no second piece of data that can be missing."
+    },
+    "apps/web/components/organisms/table/organisms/UnifiedTableHeader.tsx": {
+      "empty": "Its only caller, UnifiedTable, passes table.getHeaderGroups(), which TanStack always returns with at least one group, and hides the header with hideHeader instead. The length-0 guard is defensive; UnifiedTableHeader.test.tsx asserts it renders no thead. The detector matched headerGroups.map(."
+    },
+    "apps/web/components/atoms/DotBadge.tsx": {
+      "partial": "label and variant are required, and size, title and className are presentation options, so the badge has no data that can be partially present. LongContent and Rtl cover the label's limits; DotBadge.test.tsx covers the title."
+    },
+    "apps/web/components/organisms/table/atoms/TableCell.tsx": {
+      "partial": "A cell wraps one required children slot; width, align, multiline, hideOnMobile, as and className are layout options, so there is nothing to be partially present. An empty or partial row is the caller's data, drawn by the cells it passes."
+    },
+    "apps/web/components/organisms/table/molecules/SemanticTable.tsx": {
+      "partial": "Each part (TableRoot, TableHead, TableBody, TableRow) wraps one required children slot; className and rowMode are styling and geometry options, so nothing can be partially present. Partial rows are the caller's cells."
+    },
+    "apps/web/components/shell/SidebarInboxLink.tsx": {
+      "offline": "The link never fetches: pending work arrives from the server as availability, and an unreadable status falls back to the plain Inbox bell (StatusUnavailable). Opening it is a normal navigation. The detector matched the pending flag."
+    },
+    "apps/web/components/shell/TasksRouteSkeleton.tsx": {
+      "empty": "A fixed skeleton with no props: TaskWorkspaceLoadingRows draws five constant rows, so there is no collection that can be empty. The detector matched the items-center layout class.",
+      "long-content": "It renders skeleton bars and a fixed Loading Tasks label only, with no text from any caller, so nothing can overflow. The detector matched aria-label.",
+      "offline": "A static loading frame with no fetch or mutation; the Tasks route that shows it owns any network failure. The detector matched the skeleton classes (Loading)."
     }
   }
 }
