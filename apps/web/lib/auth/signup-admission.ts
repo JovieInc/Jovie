@@ -11,6 +11,7 @@ import {
   isNull,
   ne,
 } from 'drizzle-orm';
+import { dogfoodAdmissionAudit } from '@/lib/accounts/dogfood-account';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
@@ -40,6 +41,15 @@ export async function assertNewAccountAdmission(user: {
   // Production canaries prove ownership with the same random OTP as users.
   // This existing predicate does not grant a deterministic production OTP.
   if (isProdcertCanaryEmail(email)) return;
+
+  // Founder dogfood mailboxes live on the founder's own domain, whose
+  // catch-all only he reads, so the verified OTP above proves it is him.
+  // Audited server-side with the domain only, never the address.
+  const dogfood = dogfoodAdmissionAudit(user.email);
+  if (dogfood) {
+    console.info(`[auth] dogfood account admitted ${JSON.stringify(dogfood)}`);
+    return;
+  }
 
   // Never use the cached post-auth gate here: pending/noncanonical entries,
   // expired/redeemed invitations and revoked approval cannot admit a user.
