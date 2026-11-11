@@ -86,7 +86,7 @@ def _ranked(decision: dict) -> list[dict]:
     return rows
 
 
-def plan(issues, decide, *, lane: str, free: dict, declined=frozenset(), order=None) -> dict:
+def plan(issues, decide, *, lane: str, free: dict, declined=frozenset(), order=None, providers=None) -> dict:
     """Pure seat assignment for one worker pass.
 
     issues: admissible issues in claim order (objects with `.identifier`).
@@ -96,6 +96,8 @@ def plan(issues, decide, *, lane: str, free: dict, declined=frozenset(), order=N
     declined: {(identifier, lane)} offers that lane already passed on.
     order(rows): optional re-ordering of an issue's candidate rows (an expiry-order selector plugs in
     here); the default keeps the router's order.
+    providers: the provider table; a moved decision takes alias and costClass from the route config of
+    (its new lane, model), since the router's candidate rows do not carry them.
 
     Returns {take, decision, pools, held, waiting, offers, backlog}. `take` is the first issue seated
     on this worker's own seat, `decision` its routing decision with `chosen` moved to this lane and a
@@ -124,7 +126,7 @@ def plan(issues, decide, *, lane: str, free: dict, declined=frozenset(), order=N
             name = row.get("lane")
             if name == lane and own_seat_open:
                 placed, own_seat_open = name, False
-                take, take_decision = issue, _moved(decision, row, skipped)
+                take, take_decision = issue, _moved(decision, row, skipped, providers)
                 break
             if (issue.identifier, name) in declined:
                 passed[name] += 1
@@ -159,13 +161,20 @@ def plan(issues, decide, *, lane: str, free: dict, declined=frozenset(), order=N
             "offers": offers, "backlog": len(issues)}
 
 
-def _moved(decision: dict, row: dict, skipped: list[dict]) -> dict:
+def _route(providers, lane, model) -> dict:
+    """The provider route config for (lane, model), as model_pools.balanced reads it; {} when absent."""
+    return next((item for item in ((providers or {}).get(lane) or {}).get("routes") or ()
+                 if isinstance(item, dict) and item.get("model") == model), {})
+
+
+def _moved(decision: dict, row: dict, skipped: list[dict], providers=None) -> dict:
     """The decision as this lane runs it. Unchanged when this lane was the router's choice."""
     chosen = decision["chosen"]
     if row.get("lane") == chosen.get("lane"):
         return decision
-    moved = {**chosen, **{key: row[key] for key in chosen if key in row}, "alias": row.get("alias"),
-             "costClass": row.get("costClass")}
+    route = _route(providers, row.get("lane"), row.get("model"))
+    moved = {**chosen, **{key: row[key] for key in chosen if key in row},
+             "alias": route.get("alias", row.get("alias")), "costClass": route.get("costClass", row.get("costClass"))}
     return {**decision, "chosen": moved,
             "feed": {"from": chosen.get("lane"), "skipped": skipped},
             "rationale": f"{decision.get('rationale', '')}; fed to {moved['lane']}: "
@@ -257,7 +266,7 @@ def record(state: Path, lane: str, result: dict, feed_mode: str, backlog: set, n
     return row
 
 
-def attach(route, *, state: Path, lane: str, free, idle_at=None, order=None, env=None, now=None):
+def attach(route, *, state: Path, lane: str, free, idle_at=None, order=None, env=None, now=None, providers=None):
     """Wrap an issue router so `pick_issue` can feed from it. `free(lane)` counts that lane's free
     new-issue seats; `idle_at()` returns {lane: last idle exit time}. Off, or no router: unchanged."""
     feed_mode = mode(env)
@@ -284,7 +293,7 @@ def attach(route, *, state: Path, lane: str, free, idle_at=None, order=None, env
             declined = declined_offers(offers, (idle_at() if idle_at else {}) or {})
         except Exception:
             declined = frozenset()  # Unreadable offers keep the plain seat count.
-        result = plan(issues, decide, lane=lane, free=counts, declined=declined, order=order)
+        result = plan(issues, decide, lane=lane, free=counts, declined=declined, order=order, providers=providers)
         if feed_mode == "observe":
             take = next((issue for issue in issues if (decide(issue).get("chosen") or {}).get("lane") == lane), None)
             result = {**result, "take": take, "decision": decide(take) if take else None,

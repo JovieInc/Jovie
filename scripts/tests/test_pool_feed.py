@@ -298,6 +298,14 @@ class FreeIntakeSeatsTest(unittest.TestCase):
                 self.assertTrue(callable(router.feed))
                 picked = lane.pick_issue(backlog(3), {}, provider="hyperagent", route=router)
                 self.assertIsNotNone(picked)
+                # A fed issue runs on the route config of the lane it moved to, not with alias/costClass blanked.
+                chosen = router.decisions[picked.identifier]["chosen"]
+                self.assertEqual((chosen["lane"], chosen["model"], chosen["costClass"], chosen["alias"]),
+                                 ("hyperagent", "z-ai/glm-5.3", "subsidized", None))
+                plan = pool_feed.plan(backlog(2), replay_router(STRETCH["replay"]), lane="claude",
+                                      free={"grok": 1}, providers=PROVIDERS)
+                self.assertEqual({key: plan["decision"]["chosen"][key] for key in ("lane", "alias", "costClass")},
+                                 {"lane": "claude", "alias": "sonnet", "costClass": "subscription"})
 
 
 if __name__ == "__main__":

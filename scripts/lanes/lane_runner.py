@@ -9563,7 +9563,7 @@ def fed_router(host: Host, name: str):
     """The issue router with pool_feed attached: a lane's free seats, not one free slot, decide how much
     of the backlog it holds, and every pass records why a seat stayed idle."""
     providers = load_providers()
-    return pool_feed.attach(issue_router(host, name, providers), state=host.state, lane=name,
+    return pool_feed.attach(issue_router(host, name, providers), state=host.state, lane=name, providers=providers,
                             idle_at=lambda: pool_feed.idle_exits(read_json(host.state / "worker-idle.json")),
                             free=lambda lane: free_intake_seats(host, lane, providers.get(lane) or {}))
 
