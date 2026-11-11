@@ -50,6 +50,22 @@ test('a clean crawl of every route, as a stranger and signed in, is ready', () =
   assert.deepEqual(r, { ready: true, reasons: [], findings: [] });
 });
 
+test('a layout-shift finding names the elements that moved', () => {
+  const [finding] = pageFindings({
+    ...clean('/tim', 'stranger'),
+    cls: 0.114,
+    clsSources: [
+      { node: 'div.subscribe-card', value: 0.09 },
+      { node: 'footer', value: 0.024 },
+    ],
+  });
+  assert.equal(finding.kind, 'layout-shift');
+  assert.equal(
+    finding.detail,
+    'CLS 0.114 > 0.1; moved: div.subscribe-card (0.090), footer (0.024)'
+  );
+});
+
 test('jank, a stale or wrong build, or a gap in coverage is not ready', () => {
   const janky = {
     ...clean('/', 'stranger'),
