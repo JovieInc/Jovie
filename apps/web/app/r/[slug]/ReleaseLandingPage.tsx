@@ -30,7 +30,11 @@ import {
 } from '@/features/release/SmartLinkShell';
 import { PublicShareActionList } from '@/features/share/PublicShareMenu';
 import { formatReleaseArtistLine } from '@/lib/discography/formatting';
-import type { ProviderConfidence, ProviderKey } from '@/lib/discography/types';
+import type { ProviderKey } from '@/lib/discography/types';
+import {
+  type StorefrontProvider as Provider,
+  useStorefrontProviders,
+} from '@/lib/discography/useStorefrontProviders';
 import { canonicalizeReleaseArtistHandle } from '@/lib/profile/opaque-internal-profile-handle';
 import { buildReleaseShareContext } from '@/lib/share/context';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
@@ -40,14 +44,6 @@ import {
   resolveSmartLinkOutboundUtmParams,
   SMART_LINK_DEFAULT_UTM_PARAMS,
 } from '@/lib/utm';
-
-interface Provider {
-  key: ProviderKey;
-  label: string;
-  accent: string;
-  url: string | null;
-  confidence?: ProviderConfidence;
-}
 
 export interface FeaturedArtist {
   readonly name: string;
@@ -329,13 +325,7 @@ export function ReleaseLandingPage({
     setMenuOpen(initialMenuOpen);
   }, [initialMenuOpen]);
 
-  const clickableProviders = useMemo(
-    () =>
-      providers.filter((provider): provider is Provider & { url: string } =>
-        Boolean(provider.url)
-      ),
-    [providers]
-  );
+  const clickableProviders = useStorefrontProviders(providers);
   const resolvedUtmParams = useMemo(
     () => resolveReleaseUtmParams(utmParams),
     [utmParams]
