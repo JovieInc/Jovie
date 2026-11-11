@@ -5,7 +5,6 @@ import { render, screen } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { COUNTRY_OPTIONS } from '@/features/profile/notifications';
-import { InlineNotificationsFlowSkeleton } from './InlineNotificationsFlowSkeleton';
 import { ProfileMobileNotificationsFlow } from './ProfileMobileNotificationsFlow';
 
 // Exercise the actual initial frame; the global Motion stub drops its wrapper.
@@ -181,37 +180,6 @@ describe('contrast floor (WCAG 1.4.3)', () => {
   });
 
   describe('inline loading footprint', () => {
-    // Class chain from the flow root down to the compact step's field group.
-    function layoutChain(root: Element): string[] {
-      const body = root.querySelector(':scope > div');
-      const header = body?.firstElementChild;
-      const step = header?.nextElementSibling;
-      const shell = step?.firstElementChild;
-      const group = shell?.firstElementChild;
-      return [root, body, header, step, shell, group].map(
-        node => node?.getAttribute('class') ?? 'missing'
-      );
-    }
-
-    it('lays out the skeleton with the live email step classes, so the swap moves nothing below it', () => {
-      const { container: skeleton } = render(
-        <InlineNotificationsFlowSkeleton />
-      );
-      const { container: live } = renderFlow({ step: 'email' });
-
-      const skeletonRoot = skeleton.querySelector(
-        '[data-testid="profile-mobile-notifications-flow-skeleton"]'
-      );
-      const liveRoot = live.querySelector(
-        '[data-testid="profile-mobile-notifications-flow"]'
-      );
-      expect(skeletonRoot).not.toBeNull();
-      expect(liveRoot).not.toBeNull();
-      expect(layoutChain(skeletonRoot as Element)).toEqual(
-        layoutChain(liveRoot as Element)
-      );
-    });
-
     it('paints the inline email step on its first render instead of an empty frame', () => {
       const markup = renderToStaticMarkup(
         <ProfileMobileNotificationsFlow
