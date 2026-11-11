@@ -50,3 +50,32 @@ type Story = StoryObj<typeof meta>;
 
 export const Mixed: Story = {};
 export const Empty: Story = { args: { takes: [] } };
+export const ErrorNoneSaved: Story = {
+  args: {
+    takes: TAKES.map(take => ({ ...take, status: 'failed', kept: false })),
+  },
+};
+export const LongTakeList: Story = {
+  args: {
+    title:
+      'Release day shout-out for Save the Night, the extended club mix with the live strings',
+    takes: Array.from({ length: 24 }, (_, index) => ({
+      id: `take-long-${index + 1}`,
+      number: index + 1,
+      source: index % 2 === 0 ? 'script' : 'answer',
+      question:
+        'When you were driving home that night with the windows down, what was the one line you kept singing?',
+      durationMs: 30_000 + index * 4_000,
+      localUrl: '',
+      status: 'saved',
+      kept: index % 5 === 0,
+    })) satisfies StudioTake[],
+  },
+};
+export const Rtl: Story = {
+  render: args => (
+    <div dir='rtl'>
+      <StudioTakesSheet {...args} />
+    </div>
+  ),
+};
