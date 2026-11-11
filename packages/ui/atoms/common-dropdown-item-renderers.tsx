@@ -79,7 +79,7 @@ export function CommonDropdownItemLabel({
   }
 
   return (
-    <span className='flex min-w-0 flex-1 flex-col gap-0.5 text-left'>
+    <span className='flex min-w-0 flex-1 flex-col gap-0.5 text-start'>
       <span className='truncate'>{label}</span>
       <span className={MENU_ITEM_DESCRIPTION_BASE}>{description}</span>
     </span>
@@ -151,7 +151,7 @@ export function renderLabel(
     <Label
       key={item.id}
       data-slot='common-dropdown-label'
-      className={cn(MENU_LABEL_BASE, item.inset && 'pl-10', item.className)}
+      className={cn(MENU_LABEL_BASE, item.inset && 'ps-10', item.className)}
     >
       {item.label}
     </Label>
@@ -279,7 +279,7 @@ export function renderCheckboxItem(
       disabled={isDisabled}
       className={cn(CHECKBOX_RADIO_ITEM_BASE, 'gap-1.5', item.className)}
     >
-      <span className='absolute left-2 flex h-4 w-4 items-center justify-center'>
+      <span className='absolute start-2 flex h-4 w-4 items-center justify-center'>
         <ItemIndicator>
           <Check className='h-4 w-4' />
         </ItemIndicator>
@@ -345,7 +345,7 @@ function renderRadioItem(
       disabled={isDisabled}
       className={cn(CHECKBOX_RADIO_ITEM_BASE, 'gap-1.5', item.className)}
     >
-      <span className='absolute left-2 flex h-4 w-4 items-center justify-center'>
+      <span className='absolute start-2 flex h-4 w-4 items-center justify-center'>
         <ItemIndicator>
           <Circle className='h-2 w-2 fill-current' />
         </ItemIndicator>

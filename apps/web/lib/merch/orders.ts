@@ -3,6 +3,7 @@ import 'server-only';
 import crypto from 'node:crypto';
 import { and, asc, sql as drizzleSql, eq, inArray, ne } from 'drizzle-orm';
 import type Stripe from 'stripe';
+import { kickQueue } from '@/lib/cron/kick-queue';
 import { db } from '@/lib/db';
 import {
   type MerchCard,
@@ -40,7 +41,12 @@ import {
   estimateStripeFeeCents,
   MERCH_DEFAULT_REFUND_RESERVE_CENTS,
 } from './pricing';
-import { getMerchCardSellability, getMerchOrderSellability } from './safety';
+import {
+  assertMerchCardCheckoutSellable,
+  assertMerchOrderSellable,
+  getMerchCardSellability,
+  getMerchOrderSellability,
+} from './safety';
 import { refreshMerchRank, resolveVariantId } from './service';
 import type {
   MerchCheckoutInput,
@@ -102,31 +108,6 @@ function validateShippingAddress(
       address.postalCode &&
       address.country
   );
-}
-
-function assertMerchCardCheckoutSellable(card: MerchCard): void {
-  const result = getMerchCardSellability(card);
-  if (!result.sellable) {
-    throw new Error(`Merch item is not sellable: ${result.reasons.join(' ')}`);
-  }
-}
-
-function assertMerchOrderSellable(
-  order: Pick<
-    MerchOrder,
-    | 'quantity'
-    | 'subtotalCents'
-    | 'printfulProductCostCents'
-    | 'stripeFeeEstimateCents'
-    | 'refundReserveCents'
-    | 'artistPayoutEstimateCents'
-    | 'jovieShareEstimateCents'
-  >
-): void {
-  const result = getMerchOrderSellability(order);
-  if (!result.sellable) {
-    throw new Error(`Merch order is not sellable: ${result.reasons.join(' ')}`);
-  }
 }
 
 function toPrintfulTechnique(technique: string): string {
@@ -526,6 +507,10 @@ export async function handleMerchCheckoutCompleted(
       updatedAt: paidAt,
     })
     .where(eq(merchOrders.id, orderId));
+
+  // Kick only once the order is `paid` with its shipping address, so the
+  // worker never sees a half-written order if an earlier step threw.
+  kickQueue('merch');
 
   await notifyFirstMerchSaleBestEffort({
     creatorProfileId: existing.order.creatorProfileId,

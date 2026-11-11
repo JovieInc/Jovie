@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { Input } from './input';
 
@@ -171,13 +173,20 @@ describe('Input', () => {
     it('shows loading state with spinner', () => {
       render(<Input loading data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input).toBeDisabled();
+      expect(input).toHaveAttribute('readonly');
       expect(input).toHaveAttribute('aria-busy', 'true');
     });
 
-    it('disables input when loading', () => {
-      render(<Input loading data-testid='input' />);
-      expect(screen.getByTestId('input')).toBeDisabled();
+    it('keeps focus and value while loading instead of disabling', () => {
+      const { rerender } = render(
+        <Input data-testid='input' defaultValue='tim' />
+      );
+      const input = screen.getByTestId('input');
+      input.focus();
+      rerender(<Input loading data-testid='input' defaultValue='tim' />);
+      expect(input).not.toBeDisabled();
+      expect(input).toHaveFocus();
+      expect(input).toHaveValue('tim');
     });
   });
 
@@ -302,7 +311,9 @@ describe('Input', () => {
       expect(container.querySelector('.min-h-5')).toBeInTheDocument();
       const alert = screen.getByRole('alert');
       expect(alert).toHaveTextContent('Invalid email');
-      expect(alert.parentElement).toHaveAttribute('aria-live', 'polite');
+      // role=alert alone: an aria-live wrapper would announce it twice.
+      expect(alert.parentElement).not.toHaveAttribute('aria-live');
+      expect(alert.closest('[aria-live]')).toBeNull();
     });
   });
 
@@ -372,5 +383,104 @@ describe('Input', () => {
       const input = screen.getByLabelText('Email');
       expect(input).toHaveAttribute('id');
     });
+  });
+});
+
+function ControlledInputHarness({ note }: { readonly note: string }) {
+  const [value, setValue] = React.useState('');
+  return (
+    <div>
+      <p>{note}</p>
+      <Input
+        label='Search'
+        value={value}
+        onChange={event => setValue(event.target.value)}
+      />
+    </div>
+  );
+}
+
+describe('Input certificate evidence', () => {
+  it('keeps typed input and focus across a parent rerender, feedback, Escape, and blur', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <Input id='retention-input' label='Artist name' helpText='Public' />
+    );
+    const input = screen.getByLabelText('Artist name');
+
+    await user.type(input, 'hello');
+    expect(input).toHaveValue('hello');
+
+    // Same props: the parent re-renders without remounting the control.
+    rerender(
+      <Input id='retention-input' label='Artist name' helpText='Public' />
+    );
+    expect(screen.getByLabelText('Artist name')).toBe(input);
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue('hello');
+
+    // Validation feedback arriving must not remount the control either.
+    rerender(
+      <Input
+        id='retention-input'
+        label='Artist name'
+        helpText='Public'
+        error='Name is taken'
+      />
+    );
+    expect(screen.getByLabelText('Artist name')).toBe(input);
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue('hello');
+
+    await user.keyboard('{Escape}');
+    expect(input).toHaveValue('hello');
+    expect(input).toHaveFocus();
+
+    await user.tab();
+    expect(input).not.toHaveFocus();
+    expect(input).toHaveValue('hello');
+  });
+
+  it('keeps a controlled value when an unrelated parent state changes', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<ControlledInputHarness note='first' />);
+    const input = screen.getByLabelText('Search');
+
+    await user.type(input, 'hello');
+    rerender(<ControlledInputHarness note='second' />);
+
+    expect(screen.getByText('second')).toBeInTheDocument();
+    expect(screen.getByLabelText('Search')).toBe(input);
+    expect(input).toHaveValue('hello');
+    expect(input).toHaveFocus();
+  });
+
+  it('has no axe violations across labelled, help, error, read-only, and loading states', async () => {
+    const { container } = render(
+      <div>
+        <Input id='a11y-default' label='Artist name' placeholder='Your name' />
+        <Input
+          id='a11y-help'
+          label='Artist URL'
+          helpText='Search by track, artist, or album.'
+        />
+        <Input
+          id='a11y-error'
+          label='Email'
+          required
+          defaultValue='bad'
+          error='Enter a valid email address.'
+        />
+        <Input
+          id='a11y-readonly'
+          label='Profile handle'
+          readOnly
+          defaultValue='jovie'
+          helpText='Only workspace owners can change the profile handle.'
+        />
+        <Input id='a11y-loading' aria-label='Checking handle' loading />
+      </div>
+    );
+    await expectNoA11yViolations(container);
   });
 });

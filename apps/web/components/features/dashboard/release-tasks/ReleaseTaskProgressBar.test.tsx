@@ -30,4 +30,12 @@ describe('ReleaseTaskProgressBar', () => {
 
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('confirms a finished campaign without an exclamation mark', () => {
+    render(<ReleaseTaskProgressBar done={4} total={4} />);
+
+    expect(
+      screen.getByText('Campaign complete. All 4 tasks done.')
+    ).toBeInTheDocument();
+  });
 });

@@ -254,6 +254,24 @@ describe('AuthLayout', () => {
     expect(screen.getByLabelText('Go to homepage')).toBeInTheDocument();
   });
 
+  it('paints the Pen gradient backdrop behind the stack auth column only', () => {
+    const { container, rerender } = render(
+      <AuthLayout formTitle='Sign In' layoutVariant='stack'>
+        <div>Auth form body</div>
+      </AuthLayout>
+    );
+    const backdrop = container.querySelector('[data-auth-backdrop]');
+    expect(backdrop).toHaveAttribute('aria-hidden', 'true');
+    expect(backdrop).toHaveClass('pointer-events-none', 'fixed', '-z-10');
+
+    rerender(
+      <AuthLayout formTitle='Sign In' chrome='splash-b'>
+        <div>Auth form body</div>
+      </AuthLayout>
+    );
+    expect(container.querySelector('[data-auth-backdrop]')).toBeNull();
+  });
+
   it('keeps default stack placement distinct from centered stack placement', async () => {
     const { container, rerender } = render(
       <AuthLayout formTitle='Sign In' layoutVariant='stack'>

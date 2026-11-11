@@ -1,0 +1,32 @@
+{
+  "schema": "jovie.route-dom-outcome-evidence/v1",
+  "measuredAt": "2026-11-07",
+  "target": "https://jov.ie/ (live homepage, build the day of 71bd82f)",
+  "method": "inspectRouteDom surface=marketing at 1440x900 and 390x844, consent banner present",
+  "homepage": {
+    "blank-media": {
+      "1440": "fires: releases-dashboard-full.png 62% flat cells",
+      "390": "not fired (image hidden at 390)"
+    },
+    "placeholder-copy": {
+      "1440": "fires x2: p and img alt carry jov.ie/you",
+      "390": "fires x2"
+    },
+    "axis-mixing": {
+      "1440": "fires: center > left > left > left",
+      "390": "fires"
+    },
+    "overlay-on-proof": {
+      "1440": "fires: cookie-banner aside over template-profile phone image",
+      "390": "fires"
+    }
+  },
+  "knownGoodPages": {
+    "/support": "no findings at 1440 or 390",
+    "/developers": "no findings at 1440 or 390",
+    "/legal/privacy": "no findings at 1440 or 390"
+  },
+  "routeSweep": "34 marketing routes x 2 viewports on the live site; recorded in route-dom-marketing-baseline.json, raised to the merge-queue count (CI run 42424205763, standalone build) wherever CI measured more, '/' included; counts can only fall from here",
+  "precision": "unproven. blank-media fires on dark product screenshots on /artist-profiles and /solutions/artists (63-79% flat cells); all four kinds stay calibrating (ratcheted; '/' starts at today's CI counts and must ratchet to 0) until calibrate.mjs labels reach the promotion floors",
+  "limits": "public-profile and other golden-path surfaces are not covered yet; only the marketing surface runs these detectors"
+}

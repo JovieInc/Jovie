@@ -14,6 +14,8 @@ const challenge = vi.hoisted(() => ({
     | ((state: InvisibleTurnstileState) => void)
     | undefined,
 }));
+// Read the latest handler without the caller's narrowing sticking to it.
+const currentStateHandler = () => challenge.onStateChange;
 vi.mock('@/components/atoms/InvisibleTurnstile', () => ({
   InvisibleTurnstile: ({
     onStateChange,
@@ -122,8 +124,9 @@ describe('WaitlistRoleForm', () => {
       email: 'person@example.com',
     });
     expect(
-      screen.getByRole('heading', { level: 3, name: 'Request received' })
+      screen.getByRole('heading', { level: 3, name: "You're on the list" })
     ).toBeVisible();
+    expect(confirmation).toHaveTextContent('person@example.com');
   });
 
   it('requires a useful name on the general form before sending a join', async () => {
@@ -174,6 +177,22 @@ describe('WaitlistRoleForm', () => {
     });
   });
 
+  it('sends an artist straight through when the host does not ask the questions', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ state: 'joined' }), { status: 201 })
+    );
+    render(<WaitlistRoleForm />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Artist' }));
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'artist@example.com' },
+    });
+    expect(screen.queryByTestId('waitlist-step-counter')).toBeNull();
+    fireEvent.submit(screen.getByTestId('waitlist-role-form'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).not.toHaveProperty('momTest');
+  });
+
   it('recovers a stalled join after 15 seconds and preserves input for retry', async () => {
     vi.useFakeTimers();
     const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
@@ -203,7 +222,11 @@ describe('WaitlistRoleForm', () => {
       target: { value: 'person@example.com' },
     });
     fireEvent.submit(screen.getByTestId('waitlist-role-form'));
-    expect(screen.getByRole('button')).toBeDisabled();
+    // Submitting keeps the button and email field focusable (aria-disabled,
+    // readOnly) instead of native disabled, so focus is not dropped.
+    expect(screen.getByRole('button')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button')).not.toBeDisabled();
+    expect(screen.getByLabelText('Email address')).toHaveAttribute('readonly');
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15_000);
     });
@@ -222,9 +245,16 @@ describe('WaitlistRoleForm', () => {
       new Response(JSON.stringify({ state: 'joined' }), { status: 201 })
     );
     fireEvent.submit(screen.getByTestId('waitlist-role-form'));
-    expect(
-      await screen.findByTestId('waitlist-role-form-joined')
-    ).toHaveFocus();
+    // Focus moves in an effect after the confirmation renders.
+    const confirmation = await screen.findByTestId('waitlist-role-form-joined');
+    await waitFor(() => expect(confirmation).toHaveFocus());
+  });
+
+  it('loads the security check only once the visitor touches the form', () => {
+    render(<WaitlistRoleForm />);
+    expect(screen.queryByTestId('turnstile-mock')).toBeNull();
+    fireEvent.focus(screen.getByLabelText('Email address'));
+    expect(screen.getByTestId('turnstile-mock')).toBeInTheDocument();
   });
 
   it('keeps the focused confirmation after a queued challenge failure arrives', async () => {
@@ -232,7 +262,9 @@ describe('WaitlistRoleForm', () => {
       new Response(JSON.stringify({ state: 'joined' }), { status: 201 })
     );
     render(<WaitlistRoleForm />);
-    const lateFailure = challenge.onStateChange;
+    challenge.onStateChange = undefined;
+    fireEvent.focus(screen.getByLabelText('Email address'));
+    const lateFailure = currentStateHandler();
     expect(lateFailure).toBeTypeOf('function');
     fireEvent.click(screen.getByRole('radio', { name: 'Artist' }));
     fireEvent.change(screen.getByLabelText('Email address'), {
@@ -249,6 +281,19 @@ describe('WaitlistRoleForm', () => {
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.queryByTestId('turnstile-mock')).toBeNull();
     expect(screen.getByTestId('waitlist-role-form')).toHaveAttribute('inert');
+  });
+
+  it('asks for a full email instead of sending one without a domain', () => {
+    render(<WaitlistRoleForm />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Artist' }));
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'person@gmail' },
+    });
+    fireEvent.submit(screen.getByTestId('waitlist-role-form'));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Enter a full email address, like name@example.com.'
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('keeps the input and shows the server error on failure', async () => {
@@ -269,5 +314,33 @@ describe('WaitlistRoleForm', () => {
     expect(screen.getByLabelText('Email address')).toHaveValue(
       'person@example.com'
     );
+  });
+
+  it('chips presentation preselects Artist and maps Producer and Songwriter to one role', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ state: 'joined' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <WaitlistRoleForm
+        presentation='chips'
+        headingLevel={2}
+        title='Jovie opens by invitation.'
+        submitLabel='Request invite'
+        note='One email when your invite is ready. Nothing else.'
+      />
+    );
+    expect(screen.getByRole('radio', { name: 'Artist' })).toBeChecked();
+    fireEvent.click(screen.getByRole('radio', { name: 'Songwriter' }));
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'tim@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Request invite' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).role).toBe(
+      'producer_songwriter'
+    );
+    vi.unstubAllGlobals();
   });
 });

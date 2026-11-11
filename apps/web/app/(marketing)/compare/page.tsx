@@ -13,14 +13,14 @@ export const revalidate = false;
 
 export const metadata: Metadata = {
   robots: NOINDEX_FOLLOW_ROBOTS,
-  title: documentTitle(`Compare — ${APP_NAME}`),
+  title: documentTitle('Compare'),
   description:
     'See how Jovie compares with the tools musicians already use to share music.',
   alternates: {
     canonical: `${BASE_URL}${APP_ROUTES.COMPARE}`,
   },
   openGraph: {
-    title: `Compare — ${APP_NAME}`,
+    title: `Compare | ${APP_NAME}`,
     description:
       'See how Jovie compares with the tools musicians already use to share music.',
     url: `${BASE_URL}${APP_ROUTES.COMPARE}`,

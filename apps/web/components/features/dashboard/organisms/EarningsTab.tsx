@@ -21,6 +21,7 @@ import { ContentMetricCardSkeleton } from '@/components/molecules/ContentMetricC
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
 import { TableEmptyState, UnifiedTable } from '@/components/organisms/table';
+import { PersonCell } from '@/components/organisms/table/atoms/PersonCell';
 import { BASE_URL } from '@/constants/domains';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -42,29 +43,44 @@ import { Money } from '@/lib/workspace-lock/money-visibility';
 const QR_DISPLAY_SIZE = 200;
 const QR_PRINT_SIZE = 1024;
 
+function formatTipDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
 const tipperColumnHelper = createColumnHelper<TipperRow>();
 
-const tipperColumns = [
-  tipperColumnHelper.accessor('tipperName', {
-    header: 'Name',
-    size: 160,
-    cell: ({ getValue }) => (
-      <span className='text-primary-token'>{getValue() ?? 'Anonymous'}</span>
-    ),
-  }),
-  tipperColumnHelper.accessor('contactEmail', {
-    header: 'Email',
-    size: 200,
-    cell: ({ getValue }) => (
-      <span className='text-secondary-token'>{getValue() ?? '--'}</span>
-    ),
+/**
+ * Tippers on the shared people table: one PersonCell (name with email as its
+ * quiet secondary fact) in the dense 32px row, then right-aligned tabular
+ * amount and date.
+ */
+const TIPPER_COLUMNS = [
+  tipperColumnHelper.display({
+    id: 'tipper',
+    header: 'Tipper',
+    size: 320,
+    minSize: 200,
+    cell: ({ row }) => {
+      const { tipperName, contactEmail } = row.original;
+      return (
+        <PersonCell
+          name={tipperName ?? 'Anonymous'}
+          anonymous={!tipperName}
+          secondary={contactEmail ?? undefined}
+        />
+      );
+    },
   }),
   tipperColumnHelper.accessor('amountCents', {
     header: 'Amount',
     size: 100,
     meta: { align: 'right' },
     cell: ({ getValue }) => (
-      <span className='text-right font-caption tabular-nums text-primary-token'>
+      <span className='font-caption tabular-nums text-primary-token'>
         <Money>{formatAmount(getValue())}</Money>
       </span>
     ),
@@ -74,24 +90,12 @@ const tipperColumns = [
     size: 120,
     meta: { align: 'right' },
     cell: ({ getValue }) => (
-      <span className='text-right text-secondary-token'>
-        {formatDate(getValue())}
+      <span className='tabular-nums text-secondary-token'>
+        {formatTipDate(getValue())}
       </span>
     ),
   }),
-];
-
-// =============================================================================
-// Helpers
-// =============================================================================
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
+] as ColumnDef<TipperRow, unknown>[];
 
 // =============================================================================
 // Sub-components
@@ -312,15 +316,17 @@ export function EarningsTab() {
       <ContentSurfaceCard className='overflow-hidden'>
         <UnifiedTable
           data={tippers}
-          columns={tipperColumns as ColumnDef<TipperRow, unknown>[]}
+          columns={TIPPER_COLUMNS}
+          rowMode='dense'
+          caption='Tips'
           isLoading={isEarningsLoading}
           getRowId={row => row.id}
           enableVirtualization={false}
           emptyState={
             <TableEmptyState
               icon={<Users className='h-5 w-5' />}
-              heading='No tips yet'
-              description='Share your tip link to get started.'
+              heading='No Tips Yet'
+              description='Fans who tip you through your profile show up here.'
             />
           }
         />

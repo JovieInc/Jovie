@@ -3,7 +3,7 @@
  * the production golden-path certification. Extracted from
  * scripts/lib/prod-cert.mjs to keep that module at its company-guards size
  * baseline; prod-cert.mjs consumes these checks and re-exports
- * EXPECTED_BROWSER_CHECKS, so no consumer import path changes.
+ * the browser-check contract and served-build reader without changing imports.
  */
 /**
  * Error text that means a Next.js error page rendered instead of the surface.
@@ -235,5 +235,59 @@ export const EXPECTED_BROWSER_CHECKS = Object.freeze({
     'profile-edit-save-readback',
   ],
   smartlink: ['click-analytics-capture'],
-  checkout: ['checkout-entry-renders'],
+  // fresh-user-checkout-entry: an account that signed up through the public
+  // path reaches checkout. Blocked until the browser run walks it (truthful
+  // certification, 2026-11-08); the seeded canary alone proves nothing.
+  checkout: ['checkout-entry-renders', 'fresh-user-checkout-entry'],
 });
+
+export function missingBrowserChecks({
+  surface,
+  present,
+  authStatus,
+  now,
+  capabilities = null,
+  producerSourceSha = null,
+}) {
+  const expected = EXPECTED_BROWSER_CHECKS[surface] ?? [];
+  const at = now();
+  const declared =
+    capabilities instanceof Set
+      ? capabilities
+      : capabilities
+        ? new Set(capabilities)
+        : null;
+  return expected
+    .filter(id => !present.some(c => c.id === id))
+    .map(id => ({
+      id,
+      status: 'blocked',
+      startedAt: at,
+      endedAt: at,
+      summary:
+        declared && !declared.has(id)
+          ? `served build predates browser check ${id} (its auth smoke does not implement it${
+              producerSourceSha
+                ? `; producer checkout ${producerSourceSha.slice(0, 8)}`
+                : ''
+            }); certifies once production is promoted past it`
+          : authStatus === 'not-configured'
+            ? 'sanctioned production identity (E2E_PROD_USER_EMAIL + DATABASE_URL in Doppler jovie-web/prd) is not configured for this run'
+            : `browser step did not run (auth smoke ${authStatus || 'unknown'})`,
+    }));
+}
+
+export async function readServedBuild(origin, fetchImpl = fetch) {
+  const response = await fetchImpl(new URL('/api/health/build-info', origin));
+  if (response.status !== 200)
+    throw new Error(`build-info HTTP ${response.status}`);
+  /** @type {any} */
+  const json = await response.json();
+  if (!/^[0-9a-f]{40}$/.test(json.commitSha ?? ''))
+    throw new Error('build-info has no commit sha');
+  return { sha: json.commitSha, deploymentId: json.deploymentId ?? null };
+}
+
+/**
+ * Build one receipt per surface in launch order.
+ */

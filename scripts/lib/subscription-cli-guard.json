@@ -12,6 +12,10 @@
     "apps/web/scripts/hermes-cli-worker.ts": {
       "executor": "hermes:cli-worker",
       "reason": "Hermes/Summer mesh dispatch worker: runs the CLI runtime a dispatched fleet task names (codex-cli, claude-code, ruflo) inside an allowed-path workspace."
+    },
+    "scripts/pen-review/run.mjs": {
+      "executor": "mac:pen-review-fixer",
+      "reason": "Pen PROPOSAL review loop on the Pen Mac: one headless Claude Code fixer per review round under the single-writer lease, scoped to the pencil MCP tools on one frame; every round is ledgered in ~/.local/state/jovie-pen-review/ledger.jsonl."
     }
   },
   "ratchet": {

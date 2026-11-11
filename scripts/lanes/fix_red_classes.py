@@ -11,6 +11,7 @@ machine instead of another run).
 Pure functions over parsed values; lane_runner owns every side effect (gh, git, state files).
 
     python3 fix_red_classes.py measure [--state DIR] [--days N]   # before/after numbers from the ledger
+    python3 fix_red_classes.py split-plan --plan FILE           # validate measured, ordered PR layers
 """
 from __future__ import annotations
 
@@ -28,6 +29,10 @@ from pathlib import Path
 import migration_renumber
 import remediation
 from atomic_state import atomic_write_text
+from fix_red_source_edits import (  # noqa: F401
+    snap_added_conservative_spacing, strip_added_legacy_cache_exports,
+    resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict,
+)
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
@@ -43,7 +48,12 @@ DETERMINISTIC = frozenset({
 # design gate to a model (test_engineering_credential_removal_is_not_a_founder_gate).
 PLATFORM_TEXT = re.compile(
     remediation.INFRA_TEXT.pattern + r"|API rate limit exceeded|HTTP 408|you must provide a token|"
-    r"timed out fetching|lost communication with the server|ECONNRESET", re.IGNORECASE)
+    r"timed out fetching|lost communication with the server|ECONNRESET|"
+    r"Could not fetch gitleaks after \d+ attempts", re.IGNORECASE)
+# Dependency review fails an SPDX OR when any disjunct is denied, including a
+# bump whose license expression did not change. The repair is an election in
+# scripts/security/dual-license-elections.json. Never drop a deny-licenses id.
+DEPENDENCY_LICENSE = re.compile(r"Dependency review detected incompatible licenses")
 QUOTA_TEXT = re.compile(r"github-quota-deferred|Fleet rule evidence is (?:missing|deferred)", re.IGNORECASE)
 UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
@@ -68,6 +78,13 @@ CHANGELOG_QUOTA_READ = re.compile(r"github-quota-deferred: PR metadata read hit 
 # lines. A branch that already contains main fails update-branch and still
 # reaches a model, which is the only path that may renew a digest the PR owns.
 CENSUS_CERTIFICATION = re.compile(r"source changed; renew certification evidence")
+# The CLI compares source with origin/main as well as the committed baseline.
+# An inherited identity removed on main can fail a stale branch (#24406).
+# Match the failed-test summary, never passing-test titles or fixture API errors.
+# The existing sync route tries once per head, then falls back to the agent.
+DESIGN_SOURCE_CLI = re.compile(
+    r"\bFAIL\b[^\n]*lib/__tests__/design-system-source-ratchet\.test\.mjs[^\n]*"
+    r">[^\n]*exits zero from the CLI on the live tree")
 # Armed spacing ratchet (spacing-scale-ratchet.test.ts). The count grew because a
 # PR added a 10px/14px utility. Snap those added utilities; do not raise the floor.
 SPACING_RATCHET_TEXT = re.compile(
@@ -77,27 +94,10 @@ SPACING_RATCHET_TEXT = re.compile(
 # raise the ceiling. Checked before platform text: the count can look like HTTP 5xx.
 CACHE_SURFACE_TEXT = re.compile(
     r"legacy Cache Components surface grew to \d+ \(maximum \d+\)")
-LEGACY_CACHE_EXPORT = re.compile(
-    r"^\s*export const (?:dynamic|fetchCache|revalidate)\s*=")
-CACHE_SCAN_PREFIXES = ("apps/web/app/", "apps/web/lib/")
-CACHE_SOURCE = re.compile(r"\.(?:cjs|js|json|mjs|ts|tsx)$")
-# Same skip as stackAdoptionCoverage: tests and stories are not legacy surfaces.
-CACHE_SKIP = re.compile(r"\.(?:stories|test)\.[^.]+$")
-# Same utility shape as apps/web/scripts/optical-grid-scanners.ts, limited to the
-# armed conservative steps. Longer prefixes are not required: `p` fails closed on
-# `px-2.5` because the step hyphen does not follow `p`.
-CONSERVATIVE_UTILITY = re.compile(
-    r"(?<![\w-])(?P<sign>-)?(?P<prefix>p|px|py|pt|pr|pb|pl|ps|pe|m|mx|my|mt|mr|mb|ml|ms|me|"
-    r"gap|gap-x|gap-y|space-x|space-y)-(?P<step>2\.5|3\.5)(?![\w./%])")
-# 10px and 14px sit halfway between canonical seams. Tie-break toward the lower
-# seam (8px / 12px) so the rewrite is deterministic and stays on the 4px grid.
-SNAP_STEP = {"2.5": "2", "3.5": "3"}
-SPACING_SCAN_PREFIXES = ("apps/web/app/", "apps/web/components/", "packages/ui/")
-NON_PRODUCT_SPACING = re.compile(r"\.(?:test|spec|stories)\.[tj]sx?$")
 # Source Validation's merge probe. Deterministic unions:
 # - NARROWED vitest command in scripts/preflight-changed.mjs
 # - shell && chains (node --test or vitest paths, plus added prefixes)
-# - quoted list entries (both sides only add 'path', lines)
+# - quoted list entries (both sides only add 'path', lines, or one NAME = ["a", "b", line)
 # - one-line comma-separated identifier lists (main order, then head-only tokens)
 # Any other hunk stays a model fix.
 NARROWED_PREFLIGHT = "scripts/preflight-changed.mjs"
@@ -133,6 +133,11 @@ _QUOTED_LIST_ENTRY = re.compile(r"^[ \t]*'[^'\n]+',[ \t]*$")
 _IDENT_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9-]*")
 _AND_CHAIN_LINE = re.compile(
     r"""^(?P<indent>[ \t]*)(?P<prefix>(?:"[^"\n]+"\s*:\s*)?)(?P<q>['"])(?P<command>[^'"\n]*&&[^'"\n]*)(?P=q)(?P<suffix>,?)\s*$""")
+# Plain workflow run scalars use the same union. Limit their alphabet so YAML
+# comments, shell expansion, redirection and other operators remain unresolved.
+_YAML_AND_CHAIN_LINE = re.compile(
+    r"^(?P<indent>[ \t]*)(?P<prefix>run: )(?P<q>)"
+    r"(?P<command>[\w./@=:\t -]+(?:&&[\w./@=:\t -]+)+)(?P<suffix>)$")
 _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 
 # (class, pattern, action). First match wins per check; order is most specific first.
@@ -145,8 +150,11 @@ SIGNATURES = (
     ("cache-surface", CACHE_SURFACE_TEXT, STRIP_CACHE),
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
+    ("design-source-cli", DESIGN_SOURCE_CLI, SYNC_MAIN),
     # Inventory assertion outranks quota/infra noise echoed in the same log.
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
+    # The license error is the job failure. A passing fixture can echo quota text.
+    ("dependency-license", DEPENDENCY_LICENSE, AGENT),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
@@ -233,180 +241,6 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
             "checks": names, "signature": signature, "files": files}
 
 
-def _snap_spacing_line(line: str) -> str:
-    def repl(match: re.Match) -> str:
-        sign = match.group("sign") or ""
-        return f"{sign}{match.group('prefix')}-{SNAP_STEP[match.group('step')]}"
-    return CONSERVATIVE_UTILITY.sub(repl, line)
-
-
-def _spacing_product_path(path: str) -> bool:
-    """Product TS/TSX under the spacing ratchet's scan roots. Tests and stories are debt-free."""
-    rel = str(path or "").replace("\\", "/")
-    if not rel or rel.startswith("/") or ".." in Path(rel).parts:
-        return False
-    if not rel.endswith((".ts", ".tsx")) or NON_PRODUCT_SPACING.search(rel):
-        return False
-    return rel.startswith(SPACING_SCAN_PREFIXES)
-
-
-def _added_spacing_edits(diff: str) -> dict[str, dict[int, tuple[str, str]]]:
-    """Map eligible file -> {new 1-based line: (added text, snapped text)} for utilities the diff adds."""
-    edits: dict[str, dict[int, tuple[str, str]]] = {}
-    rel = ""
-    eligible = False
-    new_line = 0
-    in_hunk = False
-    for raw in str(diff or "").splitlines():
-        if raw.startswith("+++ b/"):
-            rel = raw[6:]
-            eligible = _spacing_product_path(rel)
-            in_hunk = False
-            continue
-        if raw.startswith("--- ") or raw.startswith("diff --git "):
-            continue
-        header = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", raw)
-        if header:
-            new_line = int(header.group(1))
-            in_hunk = True
-            continue
-        if not in_hunk:
-            continue
-        if raw.startswith("\\"):
-            continue  # "\ No newline at end of file" is not a source line
-        if raw.startswith("+"):
-            added = raw[1:]
-            snapped = _snap_spacing_line(added)
-            if eligible and snapped != added:
-                edits.setdefault(rel, {})[new_line] = (added, snapped)
-            new_line += 1
-        elif raw.startswith("-"):
-            continue
-        else:
-            # A context line (rare with -U0) still occupies a new-file line.
-            new_line += 1
-    return edits
-
-
-def snap_added_conservative_spacing(root: Path, diff: str) -> list[str]:
-    """Snap conservative spacing utilities on lines this diff adds. Returns the files written.
-
-    Grandfathered lines are left alone, including an identical `gap-2.5` elsewhere in the
-    file. A line that no longer matches the diff is left alone so a stale patch cannot
-    rewrite a neighbor. 2.5 -> 2 (10px -> 8px) and 3.5 -> 3 (14px -> 12px).
-    """
-    changed = []
-    root = Path(root)
-    for rel, lines in _added_spacing_edits(diff).items():
-        path = root / rel
-        try:
-            original = path.read_text()
-        except OSError:
-            continue
-        file_lines = original.splitlines(keepends=True)
-        dirty = False
-        for lineno, (added, snapped) in lines.items():
-            index = lineno - 1
-            if index < 0 or index >= len(file_lines):
-                continue
-            ending = "\r\n" if file_lines[index].endswith("\r\n") else "\n" if file_lines[index].endswith("\n") else ""
-            current = file_lines[index][: len(file_lines[index]) - len(ending)]
-            if current != added:
-                continue
-            file_lines[index] = snapped + ending
-            dirty = True
-        if not dirty:
-            continue
-        try:
-            atomic_write_text(path, "".join(file_lines))
-        except OSError:
-            continue
-        changed.append(rel)
-    return sorted(changed)
-
-
-def _legacy_cache_path(path: str) -> bool:
-    """Product source under the Cache Components scan. Tests and stories are not counted."""
-    rel = str(path or "").replace("\\", "/")
-    if not rel or rel.startswith("/") or ".." in Path(rel).parts:
-        return False
-    if not CACHE_SOURCE.search(rel) or CACHE_SKIP.search(rel):
-        return False
-    return rel.startswith(CACHE_SCAN_PREFIXES)
-
-
-def _added_legacy_cache_exports(diff: str) -> dict[str, dict[int, str]]:
-    """Map eligible file -> {new 1-based line: added text} for cache exports the diff adds."""
-    edits: dict[str, dict[int, str]] = {}
-    rel = ""
-    eligible = False
-    new_line = 0
-    in_hunk = False
-    for raw in str(diff or "").splitlines():
-        if raw.startswith("+++ b/"):
-            rel = raw[6:]
-            eligible = _legacy_cache_path(rel)
-            in_hunk = False
-            continue
-        if raw.startswith("--- ") or raw.startswith("diff --git "):
-            continue
-        header = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", raw)
-        if header:
-            new_line = int(header.group(1))
-            in_hunk = True
-            continue
-        if not in_hunk:
-            continue
-        if raw.startswith("\\"):
-            continue
-        if raw.startswith("+"):
-            added = raw[1:]
-            if eligible and LEGACY_CACHE_EXPORT.match(added):
-                edits.setdefault(rel, {})[new_line] = added
-            new_line += 1
-        elif raw.startswith("-"):
-            continue
-        else:
-            new_line += 1
-    return edits
-
-
-def strip_added_legacy_cache_exports(root: Path, diff: str) -> list[str]:
-    """Delete route-segment cache exports on lines this diff adds. Returns the files written.
-
-    Grandfathered exports stay, including an identical line elsewhere in the file.
-    A line that no longer matches the diff stays, so a stale patch cannot delete a
-    neighbor. `export const runtime` is not a legacy surface and is left alone.
-    """
-    changed = []
-    root = Path(root)
-    for rel, lines in _added_legacy_cache_exports(diff).items():
-        path = root / rel
-        try:
-            original = path.read_text()
-        except OSError:
-            continue
-        file_lines = original.splitlines(keepends=True)
-        drop: set[int] = set()
-        for lineno, added in lines.items():
-            index = lineno - 1
-            if index < 0 or index >= len(file_lines):
-                continue
-            ending = "\r\n" if file_lines[index].endswith("\r\n") else "\n" if file_lines[index].endswith("\n") else ""
-            current = file_lines[index][: len(file_lines[index]) - len(ending)]
-            if current == added:
-                drop.add(index)
-        if not drop:
-            continue
-        kept = [line for index, line in enumerate(file_lines) if index not in drop]
-        try:
-            atomic_write_text(path, "".join(kept))
-        except OSError:
-            continue
-        changed.append(rel)
-    return sorted(changed)
-
-
 def _split_shell_and(command: str) -> list[str] | None:
     """Split a `&&` chain. Quoted or empty segments fail closed."""
     if "'" in command or '"' in command or "\n" in command:
@@ -454,6 +288,8 @@ def _file_list_prefix_and_files(segment: str) -> tuple[str, list[str]] | None:
 def _opaque_command_key(segment: str) -> tuple[str, ...]:
     """Identity of one && segment. Flags-only commands key on the executable."""
     tokens = segment.split()
+    if len(tokens) >= 4 and tokens[:2] == ["pnpm", "--filter"]:
+        return tuple(tokens[:4])
     if len(tokens) >= 2 and not tokens[1].startswith("-"):
         return tokens[0], tokens[1]
     return (tokens[0],)
@@ -527,7 +363,7 @@ def _and_chain_commands(lines: list[str]) -> tuple[list[re.Match[str]], list[str
     found = []
     other = []
     for line in lines:
-        match = _AND_CHAIN_LINE.match(line)
+        match = _AND_CHAIN_LINE.match(line) or _YAML_AND_CHAIN_LINE.match(line)
         if match:
             found.append(match)
         else:
@@ -564,6 +400,8 @@ def _resolve_and_chain_hunk(ours: str, theirs: str) -> str | None:
             or ours_match.group("prefix") != theirs_match.group("prefix") \
             or ours_match.group("suffix") != theirs_match.group("suffix"):
         return None
+    if ours_match.group("q") == "" and ours_other != theirs_other:
+        return None
     if _json_key_conflicts(ours_other, theirs_other):
         return None
     merged = merge_and_chain(ours_match.group("command"), theirs_match.group("command"))
@@ -574,7 +412,7 @@ def _resolve_and_chain_hunk(ours: str, theirs: str) -> str | None:
         f"{theirs_match.group('q')}{merged}{theirs_match.group('q')}{theirs_match.group('suffix')}")
     lines = []
     for line in theirs.splitlines():
-        match = _AND_CHAIN_LINE.match(line)
+        match = _AND_CHAIN_LINE.match(line) or _YAML_AND_CHAIN_LINE.match(line)
         lines.append(command_line if match else line)
     for line in ours_other:
         if line not in lines:
@@ -846,8 +684,36 @@ def resolve_additive_identifier_list_text(text: str) -> str | None:
     return resolved
 
 
+def merge_additive_quoted_path_line(ours: str, theirs: str) -> str | None:
+    """Union one `NAME = ["a", "b",` line (main order, then head-only paths); a second line, prose, a reordered shared path, or a repeated path returns None."""
+
+    def parse(side: str):
+        if not str(side or "").endswith("\n") or "\n" in side[:-1]:
+            return None
+        indent, bracket, rest = side[:-1].partition("[")
+        if not bracket or re.fullmatch(r"[ \t]*[A-Za-z_][A-Za-z0-9_]* = ", indent) is None:
+            return None
+        trail, body = rest.endswith(","), (rest[:-1] if rest.endswith(",") else rest).rstrip()
+        parts = [part.strip() for part in body.split(",")] if body else []
+        if any(len(part) < 2 or part[0] != '"' or part[-1] != '"' or part.count('"') != 2 or any(ch.isspace() for ch in part) for part in parts):
+            return None
+        tokens = [part[1:-1] for part in parts]
+        if not tokens or len(tokens) != len(set(tokens)) or body != ", ".join(f'"{t}"' for t in tokens):
+            return None
+        return indent, tokens, trail
+
+    left, right = parse(ours), parse(theirs)
+    if not left or not right or left[0] != right[0] or left[2] != right[2]:
+        return None
+    # `t in shared` for t in left[1]/right[1] is exactly `t in` the other side's list.
+    if [t for t in left[1] if t in right[1]] != [t for t in right[1] if t in left[1]]:
+        return None
+    merged = list(dict.fromkeys([*right[1], *left[1]]))
+    return left[0] + "[" + ", ".join(f'"{token}"' for token in merged) + ("," if left[2] else "") + "\n"
+
+
 def resolve_additive_quoted_list_text(text: str) -> str | None:
-    """Replace conflict hunks that are only quoted list entries. None when any hunk
+    """Replace quoted-entry hunks or one `NAME = ["a", "b",` line. None when any hunk
     has another shape, so the caller leaves that merge to a model."""
     if "<<<<<<<" not in str(text or ""):
         return None
@@ -859,7 +725,8 @@ def resolve_additive_quoted_list_text(text: str) -> str | None:
     pieces = []
     last = 0
     for hunk in hunks:
-        merged = merge_additive_quoted_entries(hunk.group("ours"), hunk.group("theirs"))
+        merged = (merge_additive_quoted_entries(hunk.group("ours"), hunk.group("theirs"))
+                  or merge_additive_quoted_path_line(hunk.group("ours"), hunk.group("theirs")))
         if merged is None:
             return None
         pieces.append(text[last:hunk.start()])
@@ -1282,13 +1149,51 @@ def costs_from_metrics(state: Path) -> dict:
     return out
 
 
+def reviewable_split(changes: dict[str, int], layers: list[list[str]], cap: int = 1500) -> list[int]:
+    """Validate an exhaustive split, counting tests. Caller measures generated paths as zero.
+
+    This plans file-level layers only; each layer still owes dependency/build/test proof.
+    No Git mutation or policy exception is authorized by a passing plan.
+    """
+    if type(cap) is not int or cap < 1 or not changes or not layers:
+        raise ValueError("nonempty measurements/layers and a positive integer cap required")
+    if any(type(count) is not int or count < 0 for count in changes.values()):
+        raise ValueError("unknown, binary or negative line count")
+    seen, totals = set(), []
+    for layer in layers:
+        if not isinstance(layer, list) or not layer:
+            raise ValueError("empty or invalid layer")
+        for path in layer:
+            if path not in changes or path in seen:
+                raise ValueError(f"unknown or duplicate path: {path}")
+            seen.add(path)
+        total = sum(changes[path] for path in layer)
+        if total > cap:
+            raise ValueError(f"layer {len(totals) + 1} exceeds cap: {total}/{cap}")
+        totals.append(total)
+    if seen != set(changes):
+        raise ValueError(f"unassigned paths: {sorted(set(changes) - seen)}")
+    return totals
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("command", choices=["measure"])
+    parser.add_argument("command", choices=["measure", "split-plan"])
+    parser.add_argument("--plan", type=Path, help="JSON {changes: {path: measured lines}, layers: [[path]]}")
     parser.add_argument("--state", default=str(Path.home() / ".local/state/jovie-lanes"))
     parser.add_argument("--days", type=int, default=5)
     parser.add_argument("--now", type=float, default=None)
     args = parser.parse_args(argv)
+    if args.command == "split-plan":
+        if args.plan is None:
+            parser.error("split-plan requires --plan")
+        plan = json.loads(args.plan.read_text())
+        try:
+            totals = reviewable_split(plan["changes"], plan["layers"])
+        except ValueError as error:
+            parser.error(str(error))
+        print(json.dumps({"reviewableLines": totals, "cap": 1500, "testsIncluded": True}))
+        return 0
     now = args.now or datetime.now(timezone.utc).timestamp()
     print(json.dumps(measure(read_ledger(Path(args.state)), now, args.days, costs_from_metrics(Path(args.state))), indent=1))
     return 0
