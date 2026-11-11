@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { SummerCardInput } from '@/lib/ovie/summer-cards';
 import {
   buildFounderWelcomeBody,
@@ -11,10 +12,11 @@ import {
 /**
  * Founder welcome runner: pure, every effect injected.
  *
- * One approval card per admitted visitor, keyed by their waitlist entry id.
- * Approval is per card, never per template: a send goes out only on the
- * approved card filed for that exact person, and only when that card still
- * names the same address and the same body. Nothing else unlocks a send.
+ * One approval card per admitted visitor and wording, keyed by their waitlist
+ * entry id plus a digest of the exact address and body. Approval is per card,
+ * never per template: a send goes out only on the approved card filed for that
+ * exact person and those exact words. If the words change (a renamed artist),
+ * a fresh card is filed for Tim and the old approval sends nothing.
  */
 
 /** A /start visitor the golden path admitted (`qualified_golden_path_resolved_artist`). */
@@ -83,8 +85,16 @@ interface FounderWelcomeResult {
   readonly skipped: Readonly<Partial<Record<FounderWelcomeSkip, number>>>;
 }
 
-export function founderWelcomeCardKey(entryId: string): string {
-  return `founder-welcome-${entryId}`;
+export function founderWelcomeCardKey(
+  entryId: string,
+  recipient: string,
+  body: string
+): string {
+  const digest = createHash('sha256')
+    .update(`${recipient}\n${body}`)
+    .digest('hex')
+    .slice(0, 12);
+  return `founder-welcome-${entryId}-${digest}`;
 }
 
 /** The card Tim sees: exact recipient, subject and body. Silence never sends. */
@@ -99,7 +109,7 @@ export function buildFounderWelcomeCard(
   });
   const who = greetingName(visitor.firstName) ?? artistName;
   return {
-    idempotencyKey: founderWelcomeCardKey(visitor.entryId),
+    idempotencyKey: founderWelcomeCardKey(visitor.entryId, visitor.email, body),
     kind: 'outbound',
     product: 'jov',
     title: `Welcome email to ${who}`.slice(0, 80),

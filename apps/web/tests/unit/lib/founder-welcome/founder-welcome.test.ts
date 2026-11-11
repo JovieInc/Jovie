@@ -66,6 +66,10 @@ const bob = visitor({
   firstName: 'Bo',
   artistName: 'Bo Lumen',
 });
+/** The card key the runner files for a visitor's current wording. */
+const keyOf = (v: AdmittedVisitor) =>
+  buildFounderWelcomeCard({ ...v, pageUrl: PAGE }, v.artistName ?? '')
+    .idempotencyKey;
 
 /** In-memory Ovie inbox: one card per key, decided per card. */
 function cardStore() {
@@ -194,7 +198,9 @@ describe('founder welcome card', () => {
     expect(card.body).toContain('Subject: Welcome to Jovie');
     expect(card.body).toContain(body);
     expect(card.defaultDecision).toBeNull();
-    expect(card.idempotencyKey).toBe(founderWelcomeCardKey(alice.entryId));
+    expect(card.idempotencyKey).toBe(
+      founderWelcomeCardKey(alice.entryId, alice.email, body)
+    );
   });
 });
 
@@ -214,21 +220,21 @@ describe('runFounderWelcome', () => {
   it("card A's approval sends A's email only; B stays unsent", async () => {
     const h = harness([alice, bob]);
     await runFounderWelcome(h.deps());
-    h.store.decide(founderWelcomeCardKey(alice.entryId), 'approved');
+    h.store.decide(keyOf(alice), 'approved');
 
     const result = await runFounderWelcome(h.deps());
     expect(result.sent).toBe(1);
     expect(result.awaitingApproval).toBe(1);
     expect(h.sends).toHaveLength(1);
     expect(h.sends[0]?.to).toBe(alice.email);
-    expect(h.sends[0]?.cardKey).toBe(founderWelcomeCardKey(alice.entryId));
+    expect(h.sends[0]?.cardKey).toBe(keyOf(alice));
     expect(h.sends.some(send => send.to === bob.email)).toBe(false);
   });
 
   it("an approved card for A never unlocks B, even if B's lookup returns it", async () => {
     const h = harness([alice, bob]);
     await runFounderWelcome(h.deps());
-    const aliceKey = founderWelcomeCardKey(alice.entryId);
+    const aliceKey = keyOf(alice);
     h.store.decide(aliceKey, 'approved');
     // Misrouted lookup: every key resolves to Alice's approved card.
     const result = await runFounderWelcome({
@@ -239,23 +245,31 @@ describe('runFounderWelcome', () => {
     expect(result.skipped.card_mismatch).toBe(1);
   });
 
-  it('does not send when the approved words no longer match', async () => {
+  it('new words get a fresh card; the old approval sends nothing', async () => {
     const h = harness([alice]);
     await runFounderWelcome(h.deps());
-    h.store.decide(founderWelcomeCardKey(alice.entryId), 'approved');
+    h.store.decide(keyOf(alice), 'approved');
     const renamed = { ...alice, artistName: 'Sam Solo' };
     const result = await runFounderWelcome({
       ...h.deps(),
       visitors: [renamed],
     });
-    expect(result.skipped.card_mismatch).toBe(1);
+    expect(result.cardsFiled).toBe(1);
+    expect(result.awaitingApproval).toBe(1);
     expect(h.sends).toEqual([]);
+    h.store.decide(keyOf(renamed), 'approved');
+    const sent = await runFounderWelcome({
+      ...h.deps(),
+      visitors: [renamed],
+    });
+    expect(sent.sent).toBe(1);
+    expect(h.sends[0]?.text).toContain('Sam Solo');
   });
 
   it('sends once per person across runs', async () => {
     const h = harness([alice]);
     await runFounderWelcome(h.deps());
-    h.store.decide(founderWelcomeCardKey(alice.entryId), 'approved');
+    h.store.decide(keyOf(alice), 'approved');
     expect((await runFounderWelcome(h.deps())).sent).toBe(1);
     const again = await runFounderWelcome(h.deps());
     expect(again.sent).toBe(0);
@@ -266,7 +280,7 @@ describe('runFounderWelcome', () => {
   it('retries a send that did not go out', async () => {
     const h = harness([alice]);
     await runFounderWelcome(h.deps());
-    h.store.decide(founderWelcomeCardKey(alice.entryId), 'approved');
+    h.store.decide(keyOf(alice), 'approved');
     const failed = await runFounderWelcome({
       ...h.deps(),
       send: async () => ({ ok: false }),
@@ -278,7 +292,7 @@ describe('runFounderWelcome', () => {
   it('holds approved sends without a postal address', async () => {
     const h = harness([alice], { mailingAddress: null });
     await runFounderWelcome(h.deps());
-    h.store.decide(founderWelcomeCardKey(alice.entryId), 'approved');
+    h.store.decide(keyOf(alice), 'approved');
     const result = await runFounderWelcome(h.deps());
     expect(result.held).toBe('compliance_mailing_address');
     expect(h.sends).toEqual([]);
@@ -298,10 +312,25 @@ describe('runFounderWelcome', () => {
       no_claimed_profile: 1,
       no_artist_name: 1,
     });
-    h.store.decide(founderWelcomeCardKey(alice.entryId), 'rejected');
+    h.store.decide(keyOf(alice), 'rejected');
     const second = await runFounderWelcome(h.deps());
     expect(second.skipped.rejected).toBe(1);
     expect(h.sends).toEqual([]);
+  });
+});
+
+describe('founder welcome ledger', () => {
+  it('takes over a crashed in-flight claim only once it is stale', async () => {
+    const ledger = createFounderWelcomeLedger(memoryRecordBackend());
+    const id = alice.entryId;
+    expect(await ledger.reserve(id, NOW)).toBe(true);
+    const soon = new Date(NOW.getTime() + 5 * 60 * 1000);
+    expect(await ledger.reserve(id, soon)).toBe(false);
+    const later = new Date(NOW.getTime() + 20 * 60 * 1000);
+    expect(await ledger.reserve(id, later)).toBe(true);
+    await ledger.markSent(id, later);
+    const muchLater = new Date(NOW.getTime() + 24 * 3600 * 1000);
+    expect(await ledger.reserve(id, muchLater)).toBe(false);
   });
 });
 
@@ -315,15 +344,15 @@ describe('server deps', () => {
       subject: 'Welcome to Jovie',
       text: 'x',
       headers: {},
-      cardKey: founderWelcomeCardKey(alice.entryId),
-      idempotencyKey: founderWelcomeCardKey(alice.entryId),
+      cardKey: keyOf(alice),
+      idempotencyKey: keyOf(alice),
     });
     expect(mocks.sendStreamEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         stream: 'lifecycle',
         to: alice.email,
         approval: {
-          cardId: summerCardId(founderWelcomeCardKey(alice.entryId)),
+          cardId: summerCardId(keyOf(alice)),
         },
       })
     );
