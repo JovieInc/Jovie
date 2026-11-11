@@ -5002,6 +5002,7 @@ jobs:
         run: >-
           pnpm --filter @jovie/web exec vitest run
           tests/unit/ci/lighthouse-launch-gates.test.ts
+          tests/unit/ci/lighthouse-background-build.test.ts
 
       - name: Setup Playwright (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -5044,7 +5045,7 @@ jobs:
       # Runs whenever the background build was launched (the started output
       # above), after migrations. The wait protocol itself lives in
       # scripts/ci/wait-background-build.sh and is executable-tested in
-      # apps/web/tests/unit/ci/lighthouse-launch-gates.test.ts.
+      # apps/web/tests/unit/ci/lighthouse-background-build.test.ts.
       - name: Wait for background fallback build
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.background-build-start.outputs.started == 'true'
         shell: bash

@@ -10,7 +10,7 @@
 # status to <exit-file> atomically (tmp + mv). NEXT_BUILD_WAIT_TIMEOUT_SECONDS
 # (default 720) bounds the total wait; the job's own timeout-minutes stays
 # the hard ceiling. Executable-tested by
-# apps/web/tests/unit/ci/lighthouse-launch-gates.test.ts.
+# apps/web/tests/unit/ci/lighthouse-background-build.test.ts.
 set -euo pipefail
 
 if [[ $# -ne 3 ]]; then
