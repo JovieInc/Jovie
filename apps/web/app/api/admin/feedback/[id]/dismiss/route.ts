@@ -1,23 +1,17 @@
 import { NextResponse } from 'next/server';
+import {
+  type OperatorRouteInput,
+  operatorAccess,
+} from '@/lib/api/route-access';
+import { defineRoute } from '@/lib/api/route-pipeline';
 import { dismissFeedbackItem } from '@/lib/feedback';
-import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 export const runtime = 'nodejs';
 
-export async function POST(
-  _request: Request,
+async function postHandler(
+  _input: OperatorRouteInput,
   context: { params: Promise<{ id: string }> }
 ) {
-  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
-
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  if (!entitlements.isAdmin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
   const { id } = await context.params;
   const result = await dismissFeedbackItem(id);
 
@@ -27,3 +21,12 @@ export async function POST(
 
   return NextResponse.json({ ok: true });
 }
+
+export const POST = defineRoute(
+  {
+    route: '/api/admin/feedback/[id]/dismiss',
+    access: operatorAccess({ session: 'fresh' }),
+    legacy: { cache: 'none', unhandledErrors: 'rethrow' },
+  },
+  postHandler
+);
