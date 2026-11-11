@@ -1,5 +1,7 @@
 'use client';
 
+import type { ReactNode } from 'react';
+
 import './MarketingFooter.css';
 import Link from 'next/link';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -74,6 +76,10 @@ interface MarketingFooterProps {
   readonly columns?: readonly MarketingFooterColumn[];
   /** Published legal row (Privacy and Terms are required by the record). */
   readonly legalLinks?: readonly MarketingFooterLink[];
+  /** Section id for the Pen design-diff gate (`data-pen-section`). */
+  readonly penSection?: string;
+  /** Static, decorative art drawn behind the footer content (aria-hidden by the caller). */
+  readonly decoration?: ReactNode;
 }
 
 type ResolvedVariant = 'expanded' | 'minimal';
@@ -140,10 +146,11 @@ export function FooterColumnsNav({
       )}
       aria-label='Footer'
     >
-      {footerColumns.map(column => {
-        const columnLabelId = `footer-column-${column.title
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')}`;
+      {footerColumns.map((column, index) => {
+        // Key by position, not a slug of the title: non-Latin titles (Arabic)
+        // collapse to the same [a-z0-9] slug. Not useId(), so server and
+        // client markup stay identical whatever the route (hydration test).
+        const columnLabelId = `footer-column-${index}`;
         return (
           <section key={column.title} aria-labelledby={columnLabelId}>
             <p id={columnLabelId} className='mf-eyebrow'>
@@ -201,6 +208,8 @@ export function MarketingFooter({
   showCta = true,
   columns,
   legalLinks,
+  penSection,
+  decoration,
 }: Readonly<MarketingFooterProps>) {
   const pathname = usePublicPathname();
   const resolvedVariant = resolveFooterVariant(variant, pathname);
@@ -223,8 +232,10 @@ export function MarketingFooter({
         className
       )}
       data-testid='marketing-footer'
+      data-pen-section={penSection}
       data-footer-variant={resolvedVariant}
     >
+      {decoration}
       <div
         className={cn(
           'public-container',

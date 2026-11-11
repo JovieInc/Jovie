@@ -67,12 +67,16 @@ run_test() {
 }
 
 run_affected() {
+  # Certified source/owner edits need renewed browser evidence on this branch.
+  # Catch stale census digests before typecheck, rather than in the merge group.
+  pnpm design:authority:check
   # Keep pushes independent of the full repository suite while catching the
   # changed surface before CI has to spend a runner on it.
   run_lint
   # JOV-4421: hard ship gate (diff match + story quality + multi-root ratchet).
   echo "[pre-push-gate] running component-ship-gate"
   pnpm component-ship-gate
+  pnpm component-certificate:gate
   # One pass over every changed-file step Source Validation runs, listing all
   # failures (derived from the workflow, so it cannot drift). JOVIE_PREFLIGHT=0
   # skips it; JOVIE_SKIP_PRE_PUSH_GATE is the only other escape hatch.

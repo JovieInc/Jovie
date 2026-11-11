@@ -31,9 +31,9 @@ interface PublicProfileLayoutShellProps {
   readonly shouldRenderHeading: boolean;
   readonly profileAccentStyle: CSSProperties;
   readonly compactSurface: ReactNode;
-  /** Wide desktop surface. `null` (the default while
-   *  NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE is off) keeps every width on
-   *  the compact surface, centered in a phone-width column at desktop widths. */
+  /** Wide desktop surface. `null` keeps every width on
+   *  the compact surface, centered in a phone-width column at desktop widths
+   *  (the opt-out build: NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE=0). */
   readonly desktopSurface?: ReactNode;
   readonly desktopBanner?: ReactNode;
   readonly previewExitHref?: string;

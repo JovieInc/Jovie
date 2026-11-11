@@ -103,7 +103,15 @@ async function assertAuthShellReady(page: Page, mode: 'sign-in' | 'sign-up') {
 }
 
 test.describe('Auth signup onboarding canary', () => {
-  test('signup /signup renders the owned auth shell', async ({ page }) => {
+  // Public signup is open (canon/PRODUCT.md, 2026-11-09): anonymous /signup
+  // renders the auth shell and the tests below assert it directly. While the
+  // FEATURE_PUBLIC_SIGNUP_CLOSED kill switch is on, /signup canonically
+  // hands off to the /waitlist role form instead, so the canary asserts the
+  // canonical handoff — the settled URL is /waitlist and its role form
+  // renders live interactive controls.
+  test('signup lands on the live waitlist role form while public signup is closed', async ({
+    page,
+  }) => {
     test.setTimeout(90_000);
     await allowAnalyticsPassthrough(page);
 
@@ -114,7 +122,27 @@ test.describe('Auth signup onboarding canary', () => {
     );
 
     expect(ok, `/signup returned ${status}`).toBe(true);
-    await assertAuthShellReady(page, 'sign-up');
+    if (process.env.FEATURE_PUBLIC_SIGNUP_CLOSED === 'true') {
+      await expect(page).toHaveURL(/\/waitlist$/, {
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      });
+      const form = page.getByTestId('waitlist-role-form');
+      await expect(
+        form,
+        'closed-signup waitlist role form never rendered'
+      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+      await expect(
+        form.locator('input:not([disabled]), button:not([disabled])').first(),
+        'waitlist role form never rendered a live control'
+      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+    } else {
+      // Open signup (Tim, 2026-11-09): /signup must stay on /signup and
+      // render the sign-up shell.
+      await expect(page).toHaveURL(/\/signup(\?|$)/, {
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      });
+      await assertAuthShellReady(page, 'sign-up');
+    }
 
     hydrationErrors.cleanup();
     expect(hydrationErrors.messages).toHaveLength(0);
@@ -188,27 +216,34 @@ test.describe('Auth signup onboarding canary', () => {
       );
       expect(ok, `/start returned ${status}`).toBe(true);
 
-      // Container present...
-      await expect(page.getByTestId('onboarding-chat')).toBeVisible({
-        timeout: SMOKE_TIMEOUTS.VISIBILITY,
-      });
+      // Public signup is open (Tim, 2026-11-09): anonymous /start must
+      // initialize the onboarding interview itself. While the
+      // FEATURE_PUBLIC_SIGNUP_CLOSED kill switch is on, anonymous /start
+      // canonically hands off to the /waitlist role form (JOV-7973) —
+      // signed-in and invited users keep the interview, whose authenticated
+      // initialization the nightly's auth.setup + onboarding robot specs
+      // cover. Assert the canonical handoff and that the handoff destination
+      // is alive.
+      if (process.env.FEATURE_PUBLIC_SIGNUP_CLOSED === 'true') {
+        await expect(page).toHaveURL(/\/waitlist$/, {
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        });
+        const form = page.getByTestId('waitlist-role-form');
+        await expect(
+          form,
+          'closed-signup waitlist role form never rendered'
+        ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+      } else {
+        await expect(page).not.toHaveURL(/\/waitlist/, {
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        });
+        await expect(
+          page.getByRole('textbox').first(),
+          'onboarding composer never rendered while signup is open'
+        ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+      }
 
-      // ...AND the interview initialized: the starter intro/suggestions render.
-      await expect(
-        page.getByTestId('onboarding-empty-intro'),
-        'onboarding interview never initialized its starter prompt'
-      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-
-      // ...AND the visitor can actually answer: the composer input is enabled.
-      const composer = page.getByRole('textbox', {
-        name: /chat message input/i,
-      });
-      await expect(
-        composer,
-        'onboarding composer never became editable (stuck loading)'
-      ).toBeEditable({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-
-      // No silent breakage behind a rendered shell. Gate on real app errors;
+      // No silent breakage behind the handoff. Gate on real app errors;
       // browser CSP-policy reports are captured (packet) but not gated.
       const gatingErrors = consoleErrors.filter(e => !isBenignConsoleNoise(e));
       expect(gatingErrors, 'uncaught app errors on /start').toHaveLength(0);

@@ -217,7 +217,7 @@ export {
   type FounderPenVideoAtomId,
 } from './atoms/founder-pen-atoms';
 // IconButton
-export type { IconButtonProps } from './atoms/icon-button';
+export type { IconButtonName, IconButtonProps } from './atoms/icon-button';
 export { IconButton, iconButtonVariants } from './atoms/icon-button';
 export {
   ICON_BUTTON_FADE_CLASSNAME,
@@ -422,3 +422,5 @@ export {
   text,
   typography,
 } from './theme/tokens';
+
+export { UpdatingScreen, type UpdatingScreenProps } from './updating-screen';

@@ -359,5 +359,10 @@ its committed baselines match. Don't loosen thresholds. Adopt CI's own render in
    same name, and reports unknown or ambiguous names instead of guessing.
 3. Review the image diff and commit the updated baselines in the same PR.
 
+The adopt tool refuses Pen stills (`docs/pen-stills/`) and the baselines of any
+route that has Pen stills in `docs/design-system/pen-bindings.json`. Routes
+with `enforce: true` are judged by the blocking `Pen Diff` check against the
+committed Pen still; other routes are diffed and reported without failing (`pnpm design:pen-diff`; thresholds in `scripts/invariants/pen-diff.config.json`).
+
 The scheduled `visual-regression.yml` refresh remains the only
 `--update-snapshots` path for drift on main.

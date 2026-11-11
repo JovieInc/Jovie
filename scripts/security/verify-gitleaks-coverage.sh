@@ -13,23 +13,10 @@ if [[ -z "$GITLEAKS_BIN" ]]; then
   if command -v gitleaks >/dev/null 2>&1; then
     GITLEAKS_BIN="$(command -v gitleaks)"
   else
-    # CI / local fallback: download release binary
-    VERSION="${GITLEAKS_VERSION:-8.21.2}"
-    OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
-    ARCH="$(uname -m)"
-    case "$ARCH" in
-      x86_64) ARCH="x64" ;;
-      aarch64 | arm64) ARCH="arm64" ;;
-    esac
-    CACHE_DIR="${TMPDIR:-/tmp}/gitleaks-${VERSION}"
-    mkdir -p "$CACHE_DIR"
-    TARBALL="gitleaks_${VERSION}_${OS}_${ARCH}.tar.gz"
-    if [[ ! -x "$CACHE_DIR/gitleaks" ]]; then
-      curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/${TARBALL}" \
-        | tar -xz -C "$CACHE_DIR" gitleaks
-      chmod +x "$CACHE_DIR/gitleaks"
-    fi
-    GITLEAKS_BIN="$CACHE_DIR/gitleaks"
+    # CI / local fallback: cached, checksum-pinned, with a non-release fallback.
+    # shellcheck source=scripts/security/fetch-scanner.sh
+    source "$REPO_ROOT/scripts/security/fetch-scanner.sh"
+    GITLEAKS_BIN="$(fetch_scanner gitleaks "${GITLEAKS_VERSION:-8.21.2}")"
   fi
 fi
 

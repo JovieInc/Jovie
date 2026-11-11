@@ -97,6 +97,49 @@ describe('workflow runner pins', () => {
     );
     assert.match(errors[0], /runs Playwright on floating ubuntu-latest/);
   });
+  it('flags a floating job whose script installs Playwright itself', () => {
+    // pen-golden-path.mjs runs `playwright install --with-deps`, so the
+    // Golden Path cert job broke on ubuntu-latest (26.04) unflagged.
+    const paths = fixture(
+      {
+        'a.yml':
+          'jobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node tools/record.mjs --out x\n',
+      },
+      ['a.yml#x']
+    );
+    const repoRoot = path.dirname(paths.workflowsDir);
+    mkdirSync(path.join(repoRoot, 'tools'));
+    writeFileSync(
+      path.join(repoRoot, 'tools/record.mjs'),
+      "run('pnpm', ['exec', 'playwright', 'install', '--with-deps', 'chromium']);\n"
+    );
+    const errors = checkRunnerPins({ ...paths, repoRoot });
+    assert.match(
+      errors[0],
+      /a\.yml#x runs Playwright on floating ubuntu-latest/
+    );
+  });
+  it('follows other interpreters and one level of imports', () => {
+    const paths = fixture({
+      'a.yml':
+        'jobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - run: pnpm exec tsx tools/record.ts\n      - run: bash tools/go.sh\n',
+    });
+    const repoRoot = path.dirname(paths.workflowsDir);
+    mkdirSync(path.join(repoRoot, 'tools'));
+    writeFileSync(
+      path.join(repoRoot, 'tools/record.ts'),
+      "import { setup } from './setup.ts';\n"
+    );
+    writeFileSync(
+      path.join(repoRoot, 'tools/setup.ts'),
+      "run('pnpm', ['exec', 'playwright', 'install', 'chromium']);\n"
+    );
+    writeFileSync(path.join(repoRoot, 'tools/go.sh'), 'echo hi\n');
+    assert.match(
+      checkRunnerPins({ ...paths, repoRoot })[0],
+      /runs Playwright on floating/
+    );
+  });
   it('does not match unrelated names', () => {
     assert.deepEqual(
       checkRunnerPins(

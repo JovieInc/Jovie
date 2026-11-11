@@ -475,11 +475,7 @@ export function TeleprompterStudio({
       </div>
 
       {lightOpen ? (
-        <StudioLightPanel
-          settings={light}
-          onChange={setLight}
-          onClose={() => setLightOpen(false)}
-        />
+        <StudioLightPanel settings={light} onChange={setLight} />
       ) : null}
 
       {sheetOpen ? (
@@ -488,7 +484,6 @@ export function TeleprompterStudio({
           takes={takes}
           onToggleKept={takeId => void toggleKept(takeId)}
           onRetry={retrySave}
-          onClose={() => setSheetOpen(false)}
           onDone={close}
         />
       ) : null}

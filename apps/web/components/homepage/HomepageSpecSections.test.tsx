@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_HOME_SPEC } from '@/lib/content-records/marketing-page';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { HomepageSpecSections } from './HomepageSpecSections';
 
 vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
@@ -33,7 +34,7 @@ describe('HomepageSpecSections', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Jovie helps you move your music forward.',
+        name: 'Move your music forward.',
       })
     ).toBeTruthy();
     expect(screen.getByText('Spec subhead.')).toBeTruthy();
@@ -43,7 +44,7 @@ describe('HomepageSpecSections', () => {
     expect(screen.getByText('Spec close headline.')).toBeTruthy();
   });
 
-  it('renders sections in spec order', () => {
+  it('renders sections in spec order', async () => {
     const spec = structuredClone(DEFAULT_HOME_SPEC);
     const { container } = render(
       <HomepageSpecSections sections={[spec.sections[0]!, spec.sections[3]!]} />
@@ -53,5 +54,14 @@ describe('HomepageSpecSections', () => {
     );
     expect(headings).toEqual(['H1', 'H2']);
     expect(container.querySelector('#request-invite')).toBeTruthy();
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders the full code-default spec with no axe violations', async () => {
+    const { container } = render(
+      <HomepageSpecSections sections={DEFAULT_HOME_SPEC.sections} />
+    );
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    await expectNoA11yViolations(container);
   });
 });

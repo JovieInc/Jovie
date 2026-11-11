@@ -12,13 +12,7 @@ const settings: RingLightSettings = {
 
 describe('StudioLightPanel', () => {
   it('shows brightness, warmth and edge width', () => {
-    render(
-      <StudioLightPanel
-        settings={settings}
-        onChange={vi.fn()}
-        onClose={vi.fn()}
-      />
-    );
+    render(<StudioLightPanel settings={settings} onChange={vi.fn()} />);
 
     expect(screen.getByText('80%')).toBeInTheDocument();
     expect(screen.getByText('48px')).toBeInTheDocument();
@@ -27,13 +21,7 @@ describe('StudioLightPanel', () => {
 
   it('reports a brightness change', () => {
     const onChange = vi.fn();
-    render(
-      <StudioLightPanel
-        settings={settings}
-        onChange={onChange}
-        onClose={vi.fn()}
-      />
-    );
+    render(<StudioLightPanel settings={settings} onChange={onChange} />);
 
     fireEvent.change(screen.getByLabelText(/Brightness/), {
       target: { value: '0.6' },
@@ -46,7 +34,6 @@ describe('StudioLightPanel', () => {
       <StudioLightPanel
         settings={{ ...settings, mode: 'full' }}
         onChange={vi.fn()}
-        onClose={vi.fn()}
       />
     );
 

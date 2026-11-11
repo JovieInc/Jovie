@@ -14,12 +14,17 @@ vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpointDown: () => false,
 }));
 
+vi.mock('@/lib/desktop/electron-runtime', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/desktop/electron-runtime')>();
+  return { ...actual, useIsElectronRuntime: () => runtime.electron };
+});
+
 vi.mock('@/lib/desktop/electron-bridge', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/lib/desktop/electron-bridge')>();
   return {
     ...actual,
-    useIsElectronRuntime: () => runtime.electron,
     useDesktopNavigation: () => ({
       canGoBack: false,
       canGoForward: false,

@@ -58,7 +58,7 @@ export function StudioDock({
   onToggleTakes,
 }: StudioDockProps) {
   return (
-    <nav
+    <section
       aria-label='Studio Controls'
       className={cn(
         'mx-auto flex items-center gap-0.5 rounded-full border border-default bg-surface-3 p-1.5 text-primary-token shadow-xl backdrop-blur-md transition-opacity duration-slow ease-out motion-reduce:transition-none',
@@ -153,6 +153,6 @@ export function StudioDock({
         Takes {takeCount > 0 ? takeCount : ''}
       </Button>
       <Kbd className='ml-1 hidden md:inline-flex'>Space</Kbd>
-    </nav>
+    </section>
   );
 }

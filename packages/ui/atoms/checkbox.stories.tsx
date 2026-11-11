@@ -73,3 +73,70 @@ export const StateMatrix: Story = {
     </div>
   ),
 };
+
+export const EmptySelection: Story = {
+  render: () => (
+    <fieldset className='grid gap-3'>
+      <legend className='mb-1 text-app text-secondary-token'>
+        No tracks selected
+      </legend>
+      {[
+        { id: 'cb-empty-intro', label: 'Intro' },
+        { id: 'cb-empty-night', label: 'Night drive' },
+        { id: 'cb-empty-outro', label: 'Outro' },
+      ].map(item => (
+        <div className='flex items-center gap-2' key={item.id}>
+          <Checkbox id={item.id} />
+          <Label htmlFor={item.id}>{item.label}</Label>
+        </div>
+      ))}
+    </fieldset>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'An empty selection: every checkbox in the list is unchecked and the legend says nothing is selected yet.',
+      },
+    },
+  },
+};
+
+export const LongContent: Story = {
+  render: () => (
+    <div className='flex w-56 items-start gap-2'>
+      <Checkbox id='cb-long' className='mt-0.5' />
+      <Label htmlFor='cb-long' className='leading-snug'>
+        Send me an email whenever a new release, presave, or tour date is
+        published to my profile
+      </Label>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A long label in a narrow column wraps beside the checkbox, which keeps its 16px size and stays aligned to the first line.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl' className='flex w-56 items-start gap-2'>
+      <Checkbox id='cb-rtl' className='mt-0.5' defaultChecked />
+      <Label htmlFor='cb-rtl' className='leading-snug'>
+        أرسل لي بريدًا إلكترونيًا عند نشر إصدار جديد أو موعد حفل في ملفي الشخصي
+      </Label>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'An Arabic label in a narrow right-to-left column: the checkbox sits at the start edge and the label wraps beside it.',
+      },
+    },
+  },
+};

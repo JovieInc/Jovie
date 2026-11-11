@@ -29,7 +29,10 @@ import {
   SCRIPT_CONTRACT_VITEST_TESTS,
   scriptContractNodeArgs,
 } from '../ci-fast-lanes.mjs';
-import { testsAffectedBy } from './test-file-dependencies.mjs';
+import {
+  directDependencies,
+  testsAffectedBy,
+} from './test-file-dependencies.mjs';
 
 // The CLI runs from the checkout root; Source Validation may load this file
 // from a trusted base archive elsewhere on disk.
@@ -40,16 +43,88 @@ const REPO_ROOT = process.cwd();
 const FULL_RUN_INPUT =
   /^(?:\.github\/.+|package\.json|pnpm-lock\.yaml|biome\.json|scripts\/.+\.(?:mjs|cjs|js|ts|mts|tsx))$/u;
 
+// extract.mjs is at the size ceiling, so this predicate lives with the
+// selector and must stay aligned with allowed() there. A public marketing
+// source, or anything under scripts/copy-inventory/ (ids.gen.json is not a
+// FULL_RUN_INPUT), selects the inventory contract without the full lists.
+export const COPY_INVENTORY_TEST = 'scripts/copy-inventory/extract.test.mjs';
+
+/** @param {string} file */
+export function copyInventoryScanPath(file) {
+  if (file.startsWith('scripts/copy-inventory/')) return true;
+  if (!/^apps\/web\/.+\.(?:tsx?|jsx?)$/u.test(file)) return false;
+  if (/(?:\.test\.|\.stories\.|\.d\.ts$|\.gen\.)/u.test(file)) return false;
+  const rel = file.slice('apps/web/'.length);
+  if (/^components\/(?:ui|atoms|icons)\//u.test(rel)) return false;
+  if (/^data\/(?:marketing|product-truth|designSystem)\//u.test(rel))
+    return false;
+  if (rel.startsWith('lib/')) {
+    if (rel.startsWith('lib/content-records/')) return false;
+    return /copy|content|labels/iu.test(rel);
+  }
+  return /^(?:app|components|data)\//u.test(rel);
+}
+
+/**
+ * @param {readonly string[]} catalog
+ * @param {readonly string[]} selected
+ * @param {readonly string[]} changed
+ * @returns {string[]}
+ */
+function unionCopyInventory(catalog, selected, changed) {
+  if (
+    !catalog.includes(COPY_INVENTORY_TEST) ||
+    selected.includes(COPY_INVENTORY_TEST) ||
+    !changed.some(copyInventoryScanPath)
+  ) {
+    return [...selected];
+  }
+  return [...selected, COPY_INVENTORY_TEST];
+}
+
+/**
+ * Local pre-push scope: tests that are the changed file, import it directly, or
+ * import a script module that imports it (its direct importers). The full
+ * transitive closure (testsAffectedBy) stays CI's job; on a hub module like
+ * scripts/lib/remote-hint.mjs it selects 33 contracts, this selects 7.
+ * @param {readonly string[]} tests @param {readonly string[]} changed @param {string} root
+ */
+export function testsNearChange(tests, changed, root) {
+  const changes = new Set(changed);
+  const near = (/** @type {string} */ file) => {
+    try {
+      return directDependencies(file, root);
+    } catch {
+      return new Set();
+    }
+  };
+  return tests.filter(test => {
+    if (changes.has(test)) return true;
+    for (const dep of near(test)) {
+      if (changes.has(dep)) return true;
+      if (/^scripts\/.+\.(?:mjs|cjs|js)$/u.test(dep))
+        for (const upstream of near(dep))
+          if (changes.has(upstream)) return true;
+    }
+    return false;
+  });
+}
+
 /**
  * @param {readonly string[] | null} changed null = unreadable diff
- * @param {{ root?: string, node?: readonly string[], vitest?: readonly string[] }} [options]
+ * @param {{ root?: string, node?: readonly string[], vitest?: readonly string[], derivedOnly?: boolean }} [options]
  * @returns {{ full: boolean, node: string[], vitest: string[] }}
  */
 export function selectScriptContracts(changed, options = {}) {
   const root = options.root ?? REPO_ROOT;
   const node = options.node ?? SCRIPT_CONTRACT_NODE_TESTS;
   const vitest = options.vitest ?? SCRIPT_CONTRACT_VITEST_TESTS;
-  if (changed === null || changed.some(file => FULL_RUN_INPUT.test(file))) {
+  // derivedOnly is the local pre-push scope: contracts whose files or
+  // importers changed. CI never passes it, so CI keeps the full-list rule.
+  if (
+    !options.derivedOnly &&
+    (changed === null || changed.some(file => FULL_RUN_INPUT.test(file)))
+  ) {
     // Partial checkouts (fixtures, sparse archives) run what they contain.
     const present = (/** @type {string} */ test) =>
       existsSync(join(root, test));
@@ -59,10 +134,16 @@ export function selectScriptContracts(changed, options = {}) {
       vitest: vitest.filter(present),
     };
   }
+  const select = options.derivedOnly ? testsNearChange : testsAffectedBy;
+  const changedFiles = changed ?? [];
   return {
     full: false,
-    node: testsAffectedBy(node, changed, root),
-    vitest: testsAffectedBy(vitest, changed, root),
+    node: unionCopyInventory(
+      node,
+      select(node, changedFiles, root),
+      changedFiles
+    ),
+    vitest: select(vitest, changedFiles, root),
   };
 }
 
@@ -79,9 +160,12 @@ function run(command, args) {
 async function main(args) {
   const paths = args.filter(arg => !arg.startsWith('--'));
   const changed = paths.length > 0 ? paths : listAllChangedFiles(REPO_ROOT);
-  const { full, node, vitest } = selectScriptContracts(changed);
+  const derivedOnly = args.includes('--derived-only');
+  const { full, node, vitest } = selectScriptContracts(changed, {
+    derivedOnly,
+  });
   console.log(
-    `[script-contracts] ${full ? 'full' : 'affected'}: ${node.length} node, ${vitest.length} vitest`
+    `[script-contracts] ${full ? 'full' : 'affected'}: ${node.length} node, ${vitest.length} vitest${derivedOnly ? ' (local scope; full list deferred to CI)' : ''}`
   );
   if (args.includes('--list')) {
     for (const test of [...node, ...vitest]) console.log(test);

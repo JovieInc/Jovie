@@ -130,7 +130,7 @@ describe('ContextMenu', () => {
 
       await waitFor(() => {
         const label = screen.getByTestId('label');
-        expect(label.className).toContain('pl-10');
+        expect(label.className).toContain('ps-10');
       });
     });
   });
@@ -174,7 +174,7 @@ describe('ContextMenu', () => {
 
       await waitFor(() => {
         const item = screen.getByTestId('item');
-        expect(item.className).toContain('pl-10');
+        expect(item.className).toContain('ps-10');
       });
     });
   });
@@ -410,7 +410,7 @@ describe('ContextMenu', () => {
 
       await waitFor(() => {
         const subtrigger = screen.getByTestId('subtrigger');
-        expect(subtrigger.className).toContain('pl-10');
+        expect(subtrigger.className).toContain('ps-10');
       });
     });
   });
