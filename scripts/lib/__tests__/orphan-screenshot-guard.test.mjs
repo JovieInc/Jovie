@@ -192,6 +192,16 @@ describe('findOrphanReviewImages', () => {
     assert.deepEqual(orphans, []);
   });
 
+  it("a ./ link in one review folder never keeps another folder's image (Seer review on #25126)", () => {
+    const orphans = orphansIn({
+      'docs/screenshots/jov-7/README.md': '![a](./after.png)',
+      'docs/screenshots/jov-7/after.png': PNG,
+      'docs/screenshots/jov-8/after.png': PNG,
+      'docs/ci/census.md': 'Evidence: docs/screenshots/jov-7',
+    });
+    assert.deepEqual(orphans, ['docs/screenshots/jov-8/after.png']);
+  });
+
   it('names the policy doc and where PR evidence belongs', () => {
     const { root, trackedPaths } = fixture({ 'docs/screenshots/a.png': PNG });
     const [error] = findOrphanReviewImages({

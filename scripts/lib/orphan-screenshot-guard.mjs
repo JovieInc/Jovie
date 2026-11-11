@@ -134,7 +134,10 @@ export function findOrphanReviewImages({
           if (live.has(image) || !tailMatches(image.split('/'), tokenSegments))
             continue;
           if (posix.dirname(image) === sourceDir) listedBySibling.add(image);
-          else if (!(bareIsLocal && !token.includes('/'))) live.add(image);
+          else if (
+            !(bareIsLocal && !token.replace(/^(\.\/)+/, '').includes('/'))
+          )
+            live.add(image);
         }
       }
     }
