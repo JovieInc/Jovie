@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { load as yamlLoad } from 'js-yaml';
 import { buildTopology, findCycle, syncTopology, validateTopology } from './ci-workflow-topology.mjs';
+import { scan as scanAiReviewBoundary } from './company-guards/ai-review-boundary.mjs';
 
 test('Pen drafts share one editor across runs and retain pending frame jobs', () => {
   const workflow = /** @type {{jobs: {draft: {concurrency: unknown, strategy: {'max-parallel': number}}}, concurrency: {group: string}}} */ (yamlLoad(fs.readFileSync('.github/workflows/pen-draft.yml', 'utf8')));
@@ -117,3 +118,84 @@ test('generator detects missing and stale DAGs, refreshes deterministically, and
   assert.match(syncTopology(fixture, true).errors.join('\n'), /workflow names must be present and unique/);
   assert.equal(fs.readFileSync(output, 'utf8'), updated, 'invalid topology must not replace the last valid DAG');
 });
+
+test('AI review stays advisory: blocking reviewers fail the boundary scan', t => {
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'topology-ai-review-'));
+  t.after(() => fs.rmSync(fixture, { recursive: true, force: true }));
+  const workflows = path.join(fixture, '.github/workflows');
+  fs.mkdirSync(workflows, { recursive: true });
+  fs.writeFileSync(
+    path.join(workflows, 'advisory.yml'),
+    'name: Advisory AI Review\non:\n  pull_request:\njobs:\n  review:\n    steps:\n      - run: node .github/scripts/advisory-ai-review.mjs\n',
+  );
+  assert.deepEqual(scanAiReviewBoundary(fixture), []);
+  fs.writeFileSync(
+    path.join(workflows, 'warden.yml'),
+    'name: Warden\non: [pull_request]\njobs:\n  review:\n    steps:\n      - run: gh pr review $PR --request-changes\n      - run: warden --fail-on findings\n',
+  );
+  const flagged = scanAiReviewBoundary(fixture);
+  assert.equal(flagged.length, 1, JSON.stringify(flagged));
+  assert.match(flagged[0].file, /warden\.yml$/);
+  assert.match(flagged[0].signal, /request-changes/);
+});
+
+
+// ---- Trigger budget (audit finding 4): runs start only when work can happen ----
+const workflowYaml = file => /** @type {any} */ (yamlLoad(fs.readFileSync(`.github/workflows/${file}`, 'utf8')));
+
+test('trigger budget: always-skipped hops start no run of their own', () => {
+  // 2026-11-11: these four started ~3,900 runs a week; all but a handful skipped.
+  const guard = workflowYaml('auto-merge-base-guard.yml');
+  assert.deepEqual(guard.on.pull_request_target['branches-ignore'], ['main']);
+  assert.deepEqual(Object.keys(workflowYaml('cheap-fixer.yml').on), ['workflow_call']);
+  const audit = workflowYaml('security-suppression-audit.yml');
+  assert.deepEqual(audit.on.pull_request_review.types, ['edited', 'dismissed']);
+  assert.ok('workflow_call' in audit.on && 'workflow_dispatch' in audit.on);
+  assert.match(audit.concurrency['cancel-in-progress'], /github\.workflow == 'Security Suppression Audit'/);
+  const scrub = workflowYaml('legacy-human-hold-scrub.yml');
+  assert.deepEqual(Object.keys(scrub.on).sort(), ['label', 'push', 'workflow_dispatch']);
+  // Lane Fix Relay already wakes on the events the hosted hops need.
+  const relay = workflowYaml('lane-fix-relay.yml');
+  const ran = relay.on.workflow_run.workflows;
+  for (const name of ['Source Validation', 'CI', 'Changed-Evidence Test Suites']) assert.ok(ran.includes(name), name);
+  assert.equal(relay.jobs['cheap-fix'].uses, './.github/workflows/cheap-fixer.yml');
+  assert.match(relay.jobs['cheap-fix'].if, /vars\.CHEAP_FIXER_MODE == 'shadow'/);
+  assert.match(relay.jobs['cheap-fix'].if, /github\.event\.workflow_run\.conclusion == 'failure'/);
+  assert.deepEqual(relay.on.pull_request_review.types, ['submitted']);
+  assert.equal(relay.jobs['security-suppression-audit'].uses, './.github/workflows/security-suppression-audit.yml');
+  assert.match(relay.jobs['security-suppression-audit'].if, /github\.event\.action == 'submitted'/);
+});
+// ---- end trigger budget ----
+
+// ---- Trigger registry (audit finding 4): fan-out needs a declared budget ----
+test('trigger registry: every workflow declares its triggers within the run budget', async () => {
+  const { checkRegistry, readRegistry, scanWorkflows } = await import('./lib/ci-trigger-registry.mjs');
+  const { errors, expectedRunsPerMergedPr } = checkRegistry(readRegistry('.'), scanWorkflows('.'));
+  assert.deepEqual(errors, [], 'run: node scripts/ci-trigger-registry.mjs --write, then fill runsPerMergedPr');
+  assert.ok(expectedRunsPerMergedPr > 0);
+});
+
+test('trigger registry: a new workflow_run, edited or labeled trigger fails until registered', async t => {
+  const { checkRegistry, isFanOut, scanWorkflows } = await import('./lib/ci-trigger-registry.mjs');
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'trigger-registry-'));
+  t.after(() => fs.rmSync(fixture, { recursive: true, force: true }));
+  const dir = path.join(fixture, '.github/workflows');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'a.yml'), 'name: A\non:\n  push:\n  workflow_run:\n    workflows: [CI]\n    types: [completed]\n');
+  fs.writeFileSync(path.join(dir, 'b.yml'), 'name: B\non:\n  pull_request:\n    types: [opened, edited, labeled]\n');
+  const scanned = scanWorkflows(fixture);
+  assert.deepEqual(scanned['a.yml'], ['push', 'workflow_run:CI']);
+  assert.deepEqual(scanned['b.yml'].filter(isFanOut), ['pull_request:edited', 'pull_request:labeled']);
+  const budget = { runsPerMergedPr: 60, ceiling: 5 };
+  const registered = { budget, workflows: { 'a.yml': { triggers: ['push'], runsPerMergedPr: 1 } } };
+  const { errors } = checkRegistry(registered, scanned);
+  assert.ok(errors.some(e => /a\.yml: trigger workflow_run:CI \(fan-out\) is not registered/.test(e)), errors.join('\n'));
+  assert.ok(errors.some(e => /b\.yml: not in .*fan-out: pull_request:edited, pull_request:labeled/.test(e)), errors.join('\n'));
+  const complete = { budget, workflows: { 'a.yml': { triggers: scanned['a.yml'], runsPerMergedPr: 2 }, 'b.yml': { triggers: scanned['b.yml'], runsPerMergedPr: 2 } } };
+  assert.deepEqual(checkRegistry(complete, scanned).errors, []);
+  complete.workflows['b.yml'].runsPerMergedPr = 4;
+  assert.match(checkRegistry(complete, scanned).errors.join('\n'), /declared 6 runs per merged PR exceeds the ceiling 5/);
+  complete.workflows['b.yml'].runsPerMergedPr = null;
+  assert.match(checkRegistry(complete, scanned).errors.join('\n'), /b\.yml: runsPerMergedPr must be a number/);
+});
+// ---- end trigger registry ----

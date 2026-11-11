@@ -30,6 +30,42 @@ export const Default: Story = {
   },
 };
 
+const LONG_ACTIVITY = Array.from(
+  { length: 40 },
+  (_, index) =>
+    `Pitch update ${index + 1}: Midnight City (Extended Club Mix) was added to the Late Night Electronic Discoveries editorial playlist`
+);
+
+/** A long panel clips inside the rail; the drawer owns its own scroll. */
+export const LongContent: Story = {
+  args: {
+    children: (
+      <div className='h-96 w-80 overflow-auto p-3 text-sm'>
+        <ul className='space-y-2'>
+          {LONG_ACTIVITY.map(line => (
+            <li key={line} className='truncate'>
+              {line}
+            </li>
+          ))}
+        </ul>
+      </div>
+    ),
+  },
+};
+
+export const RtlContextPanel: Story = {
+  args: {
+    children: (
+      <div dir='rtl' lang='ar' className='w-80 p-3 text-sm'>
+        <p className='truncate'>
+          تفاصيل الإصدار: منتصف الليل في المدينة — النسخة الممتدة للنوادي
+        </p>
+        <p>آخر تحديث قبل خمس دقائق</p>
+      </div>
+    ),
+  },
+};
+
 function OwnedMenuPreviewFixture() {
   const [pinned, setPinned] = useState(false);
   const { isPreview, dismissPreview } = useRailPreview({

@@ -1,9 +1,13 @@
 import { eq } from 'drizzle-orm';
-import { type NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import {
+  type OperatorRouteInput,
+  operatorAccess,
+} from '@/lib/api/route-access';
+import { defineRoute } from '@/lib/api/route-pipeline';
 import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
-import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -12,24 +16,10 @@ export const runtime = 'nodejs';
 /**
  * PATCH /api/admin/leads/[id]/skip — Skip a lead from outreach.
  */
-export async function PATCH(
-  _request: NextRequest,
+async function patchHandler(
+  _input: OperatorRouteInput,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
-
   try {
     const { id } = await params;
     const now = new Date();
@@ -67,3 +57,12 @@ export async function PATCH(
     );
   }
 }
+
+export const PATCH = defineRoute(
+  {
+    route: '/api/admin/leads/[id]/skip',
+    access: operatorAccess({ session: 'fresh' }),
+    legacy: { cache: 'pipeline-responses-only', unhandledErrors: 'rethrow' },
+  },
+  patchHandler
+);
