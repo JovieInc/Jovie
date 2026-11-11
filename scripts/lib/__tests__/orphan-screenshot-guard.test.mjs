@@ -181,6 +181,17 @@ describe('findOrphanReviewImages', () => {
     assert.deepEqual(orphans, ['docs/screenshots/recert-1029/pricing-390.jpg']);
   });
 
+  it('a ../ reference from a bundle README keeps the parent image (Seer review on #25121)', () => {
+    const orphans = orphansIn({
+      'docs/screenshots/jov-9/README.md':
+        '![a](after.png) ![shared](../shared.png)',
+      'docs/screenshots/jov-9/after.png': PNG,
+      'docs/screenshots/shared.png': PNG,
+      'docs/ci/census.md': 'Evidence: docs/screenshots/jov-9',
+    });
+    assert.deepEqual(orphans, []);
+  });
+
   it('names the policy doc and where PR evidence belongs', () => {
     const { root, trackedPaths } = fixture({ 'docs/screenshots/a.png': PNG });
     const [error] = findOrphanReviewImages({
