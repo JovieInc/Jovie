@@ -51,25 +51,55 @@ test('hosted repair restores the exact candidate dependency store', () => {
   assert.match(workflow, /cache-dependency-path: candidate\/pnpm-lock\.yaml/);
 });
 
-// pr-visual-review.yml is deliberately absent: its capture job runs
-// PR-controlled code, and its trust-boundary contract
-// (apps/web/tests/unit/ci/pr-visual-review-workflow.test.ts) forbids any
-// actions/cache step there.
-test('Chromium download steps restore a Playwright cache first', () => {
-  for (const file of ['.github/workflows/screenshots.yml']) {
-    const workflow = read(file);
-    const cache = workflow.indexOf('Cache Playwright Browsers');
-    const install = workflow.indexOf('playwright install');
-    assert.ok(cache >= 0, `${file} must restore the browser cache`);
-    assert.ok(install > cache, `${file} must restore before browser install`);
+// Font-exact producers keep Chromium's apt system packages through the shared
+// action's system_deps input, not `playwright install --with-deps`, which ran
+// apt-get update against one Ubuntu mirror on every run (DNS failures,
+// 2026-11-11). pr-visual-review.yml runs PR-controlled code, so it only
+// restores caches there and never saves one.
+test('font-exact producers install system packages through setup-playwright', () => {
+  for (const file of [
+    'marketing-certification-producer.yml',
+    'pr-visual-review.yml',
+    'screenshots.yml',
+  ]) {
+    const workflow = read(`.github/workflows/${file}`);
+    assert.match(
+      workflow,
+      /uses: \.\/\.github\/actions\/setup-playwright\n\s+with:\n\s+system_deps: 'true'/,
+      file
+    );
+    assert.doesNotMatch(workflow, /--with-deps|ms-playwright/, file);
   }
+  assert.match(
+    read('.github/workflows/pr-visual-review.yml'),
+    /system_deps: 'true'\n\s+cache: restore\n/
+  );
+  const action = read('.github/actions/setup-playwright/action.yml');
+  assert.match(
+    action,
+    /if: steps\.runner-prereqs\.outputs\.playwright_warm != 'true' && inputs\.cache == 'true'/
+  );
+  assert.match(action, /install-deps --dry-run chromium/);
+  // Cached .debs install with no network; only a save needs cache 'true'.
+  assert.match(
+    action,
+    /apt-get install -y --no-install-recommends --no-download/
+  );
+  assert.match(
+    action,
+    /name: Restore Playwright system packages\n.*\n\s+if: .*inputs\.cache != 'false'/
+  );
+  assert.match(
+    action,
+    /name: Save Playwright system packages\n\s+if: .*inputs\.cache == 'true'/
+  );
 });
 
 // One owner for the hosted Chromium cache: .github/actions/setup-playwright
 // keys it by Playwright version. A hand-rolled lockfile-hashed key saved one
 // identical 260 MB entry per Dependabot lockfile and evicted merge-group
-// workspaces (2026-10-10). Exceptions keep apt `--with-deps` for font-exact
-// rendering, or run PR-controlled code where caches are forbidden.
+// workspaces (2026-10-10). Exceptions keep apt `--with-deps` for browsers the
+// shared action does not install. Font-exact producers use its system_deps.
 const HAND_ROLLED_PLAYWRIGHT = new Map([
   ['agent-tick.yml', 'disabled_manually; deleted by #21442'],
   [
@@ -77,12 +107,6 @@ const HAND_ROLLED_PLAYWRIGHT = new Map([
     'Firefox needs apt deps; Chromium already uses the shared action',
   ],
   ['ios-app-store-graphics.yml', 'App Store renders need system fonts'],
-  [
-    'marketing-certification-producer.yml',
-    'certified captures need system fonts',
-  ],
-  ['pr-visual-review.yml', 'runs PR-controlled code; no actions/cache allowed'],
-  ['screenshots.yml', 'committed screenshots need system fonts'],
 ]);
 
 test('hosted Chromium setup goes through the shared setup-playwright action', () => {
@@ -102,7 +126,10 @@ test('hosted Chromium setup goes through the shared setup-playwright action', ()
   );
   for (const file of [
     'canary-health-gate.yml',
+    'marketing-certification-producer.yml',
     'nightly-tests.yml',
+    'pr-visual-review.yml',
+    'screenshots.yml',
     'synthetic-monitoring.yml',
     'visual-a11y.yml',
   ]) {

@@ -1,8 +1,20 @@
 name: 'Setup Playwright (Chromium)'
 description: 'Restores the Playwright browser cache and installs Chromium for @jovie/web'
 
-# Chromium only, no apt-based `--with-deps`: slow font package mirrors can
-# consume tight job budgets before tests run (see ci-layout-guard).
+# Chromium only, no apt-based `--with-deps` by default: slow font package
+# mirrors can consume tight job budgets before tests run (see ci-layout-guard).
+# Font-exact producers opt in with system_deps instead of running
+# `playwright install --with-deps`; their apt packages come from a cache.
+inputs:
+  system_deps:
+    description: "Also install Chromium's apt system packages (fonts, shared libraries) for font-exact captures"
+    required: false
+    default: 'false'
+  cache:
+    description: "'true' restores and saves caches; 'restore' only restores them (jobs that run PR-controlled code); 'false' uses none"
+    required: false
+    default: 'true'
+
 runs:
   using: 'composite'
   steps:
@@ -24,7 +36,7 @@ runs:
     # workspaces mid-group.
     - name: Resolve Playwright version
       id: playwright-version
-      if: steps.runner-prereqs.outputs.playwright_warm != 'true'
+      if: steps.runner-prereqs.outputs.playwright_warm != 'true' || inputs.system_deps == 'true'
       shell: bash
       run: |
         version="$(node -p "require('@playwright/test/package.json').version" 2>/dev/null || true)"
@@ -32,7 +44,7 @@ runs:
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
     - name: Cache Playwright Browsers
-      if: steps.runner-prereqs.outputs.playwright_warm != 'true'
+      if: steps.runner-prereqs.outputs.playwright_warm != 'true' && inputs.cache == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ms-playwright
@@ -44,6 +56,83 @@ runs:
       if: steps.runner-prereqs.outputs.playwright_warm != 'true'
       shell: bash
       run: pnpm --filter=@jovie/web exec playwright install chromium
+
+    # Font-exact producers need Chromium's apt packages (9 font packages on
+    # ubuntu-24.04, about 21 MB). `--with-deps` fetched them from the Ubuntu
+    # mirrors on every run, and while azure.archive.ubuntu.com stopped
+    # resolving (2026-11-11, about 13:40 to 16:50 UTC) every screenshot
+    # producer failed. The .debs are now cached per image and Playwright
+    # version, so a warm run never reaches apt's mirrors. The dry run reads
+    # local package state only, so a runner that already has them skips both.
+    - name: Check Playwright system packages
+      id: system-deps
+      if: inputs.system_deps == 'true'
+      shell: bash
+      env:
+        PLAYWRIGHT_VERSION: ${{ steps.playwright-version.outputs.version }}
+      run: |
+        if pnpm --filter=@jovie/web exec playwright install-deps --dry-run chromium; then
+          echo "missing=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        {
+          echo "missing=true"
+          echo "dir=$HOME/.cache/jovie-playwright-system-debs"
+          echo "key=${RUNNER_OS}-${RUNNER_ARCH}-playwright-system-debs-v1-${ImageOS:-unknown}-${PLAYWRIGHT_VERSION}"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Restore Playwright system packages
+      id: system-debs-cache
+      if: steps.system-deps.outputs.missing == 'true' && inputs.cache != 'false' && runner.environment == 'github-hosted'
+      uses: ./.github/actions/vendor/actions-cache/restore # actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 v6.1.0 (vendored, JOV-8754)
+      with:
+        path: ${{ steps.system-deps.outputs.dir }}
+        key: ${{ steps.system-deps.outputs.key }}
+
+    - name: Install Playwright system packages
+      id: system-install
+      if: steps.system-deps.outputs.missing == 'true'
+      shell: bash
+      env:
+        DEB_DIR: ${{ steps.system-deps.outputs.dir }}
+      run: |
+        set -euo pipefail
+        pw() { pnpm --filter=@jovie/web exec playwright "$@"; }
+        shopt -s nullglob
+        debs=("$DEB_DIR"/*.deb)
+        if (( ${#debs[@]} )) &&
+          sudo apt-get install -y --no-install-recommends --no-download "${debs[@]}" &&
+          pw install-deps --dry-run chromium; then
+          echo "Installed ${#debs[@]} cached system packages; Ubuntu mirrors not contacted."
+          exit 0
+        fi
+        # Cold or stale cache: fetch from the mirrors with retries and keep
+        # the downloaded .debs for the save step.
+        printf 'Acquire::Retries "3";\nAPT::Keep-Downloaded-Packages "true";\n' |
+          sudo tee /etc/apt/apt.conf.d/80-jovie-playwright-system-deps >/dev/null
+        for attempt in 1 2 3; do
+          if pw install-deps chromium; then
+            mkdir -p "$DEB_DIR"
+            rm -f "$DEB_DIR"/*.deb
+            fetched=(/var/cache/apt/archives/*.deb)
+            if (( ${#fetched[@]} )); then
+              cp "${fetched[@]}" "$DEB_DIR"/
+              echo "fetched=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit 0
+          fi
+          [[ "$attempt" -lt 3 ]] || break
+          sleep $((attempt * 20))
+        done
+        echo "::error title=Playwright system packages failed::apt could not fetch Chromium's system packages after 3 attempts and no cached copy was available"
+        exit 1
+
+    - name: Save Playwright system packages
+      if: steps.system-install.outputs.fetched == 'true' && inputs.cache == 'true' && runner.environment == 'github-hosted'
+      uses: ./.github/actions/vendor/actions-cache/save # actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 v6.1.0 (vendored, JOV-8754)
+      with:
+        path: ${{ steps.system-deps.outputs.dir }}
+        key: ${{ steps.system-deps.outputs.key }}
 
     - name: Name the runner image when Playwright cannot install
       if: failure()
