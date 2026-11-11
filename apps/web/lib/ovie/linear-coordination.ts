@@ -56,6 +56,11 @@ export type LinearCoordinationResult =
       readonly status: 'failed';
       readonly code: 'provider-error' | 'readback-missing';
       readonly message: string;
+      /**
+       * readback-missing only: what the mutation itself returned. The issue
+       * exists, so callers must not file it again.
+       */
+      readonly mutated?: LinearIssueSnapshot;
     };
 
 export class LinearCoordinationDeniedError extends Error {
@@ -168,12 +173,25 @@ export async function coordinateLinearWork(
     };
   }
 
-  const readBack = await deps.readIssue(mutated.id);
+  let readBack: LinearIssueSnapshot | null;
+  try {
+    readBack = await deps.readIssue(mutated.id);
+  } catch (error) {
+    return {
+      status: 'failed',
+      code: 'readback-missing',
+      message: `Linear mutation succeeded but readback failed: ${
+        error instanceof Error ? error.message : 'unknown error'
+      }`,
+      mutated,
+    };
+  }
   if (!readBack) {
     return {
       status: 'failed',
       code: 'readback-missing',
       message: 'Linear mutation succeeded but readback returned no issue',
+      mutated,
     };
   }
   if (

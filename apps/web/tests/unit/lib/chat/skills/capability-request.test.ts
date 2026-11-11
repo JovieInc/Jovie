@@ -62,6 +62,23 @@ describe('submitCapabilityRequest', () => {
     expect(mockFeedback).not.toHaveBeenCalled();
   });
 
+  it('never files twice when the issue was created but not read back', async () => {
+    mockCoordinate.mockResolvedValue({
+      status: 'failed',
+      code: 'readback-missing',
+      message: 'readback failed',
+      mutated: { id: 'issue_1', identifier: 'JOV-2' },
+    });
+    const result = await submitCapabilityRequest({ ...base, founder: true });
+    expect(result).toEqual({
+      success: true,
+      routedTo: 'summer',
+      priority: 'founder',
+      identifier: 'JOV-2',
+    });
+    expect(mockFeedback).not.toHaveBeenCalled();
+  });
+
   it('falls back to the feedback loop when Linear refuses', async () => {
     mockCoordinate.mockResolvedValue({
       status: 'denied',

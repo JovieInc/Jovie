@@ -95,6 +95,19 @@ export async function submitCapabilityRequest(
           identifier: result.receipt.identifier,
         };
       }
+      // Created but not read back: the issue exists, so never file it twice.
+      if (result.status === 'failed' && result.mutated) {
+        console.error(
+          '[chat] founder capability request unverified:',
+          result.code
+        );
+        return {
+          success: true,
+          routedTo: 'summer',
+          priority: 'founder',
+          identifier: result.mutated.identifier,
+        };
+      }
       console.error('[chat] founder capability request denied:', result.code);
     } catch (error) {
       console.error('[chat] founder capability request failed:', error);

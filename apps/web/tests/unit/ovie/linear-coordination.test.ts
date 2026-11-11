@@ -74,6 +74,31 @@ describe('Summer bounded Linear coordination', () => {
     });
   });
 
+  it('keeps the created issue when the readback throws', async () => {
+    const deps = depsWith({
+      readIssue: vi.fn(async () => {
+        throw new Error('Linear timeout');
+      }),
+    });
+    const result = await coordinateLinearWork(
+      {
+        action: 'create',
+        title: 'Bounded recovery follow-up',
+        body: 'Track remaining human decision after Cursor recovery.',
+        teamId: 'team_1',
+        founderIntentRef: 'intent:founder:recovery-followup',
+        sourceRefs: ['receipt:cursor-recovery#run_1'],
+        author: 'summer',
+      },
+      deps
+    );
+    expect(result).toMatchObject({
+      status: 'failed',
+      code: 'readback-missing',
+      mutated: { id: 'issue_1', identifier: 'JOV-9001' },
+    });
+  });
+
   it('updates an issue with readback', async () => {
     const deps = depsWith();
     const result = await coordinateLinearWork(
