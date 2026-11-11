@@ -531,7 +531,7 @@ exclusions.
 
 Each lane's `routes` in `providers.json` give a model, the capability it clears (`bounded` < `standard` < `frontier`), a cost class and a base cost: Devin SWE-2 free 0, Hyperagent GLM 5.3 subsidized 1, Sonnet 5.5 2, Opus 5.5 frontier 3, Codex xhigh frontier 3.5 (headroom for the Codex-only sensitive labels). No route calls a raw model API key. `routing.json` sets the floor: JOV-7343 protected surfaces and orchestration labels are frontier, frozen plans and docs are bounded (a frozen plan on a protected surface stays frontier), the rest is standard.
 
-Effective cost = base x (1 + quota pressure): Claude runs in its 5h window, banked Codex accounts, Hyperagent runs per day. Banked, cooling, unhealthy, saturated, budget-blocked or slotless lanes are unavailable; the next cheapest qualifying route takes the work. Frontier work with no frontier route is held (`route-held:frontier`), never downgraded. `route:<lane>[:<alias>]` or the lane label pins a route that clears the floor. Each claim writes the decision to `runs/routing.jsonl`, the receipt (`route`) and the Linear claim comment; the doctor uses the same router for idle capacity. Claude and Hyperagent lanes:
+Effective cost = base x (1 + quota pressure): Claude runs in its 5h window, banked Codex accounts, Hyperagent runs per day. Banked, cooling, unhealthy, saturated, budget-blocked or slotless lanes are unavailable; the next cheapest qualifying route takes the work, except that within a capability class the pool whose allowance expires first wins (see Model pools). Frontier work with no frontier route is held (`route-held:frontier`), never downgraded. `route:<lane>[:<alias>]` or the lane label pins a route that clears the floor. Each claim writes the decision to `runs/routing.jsonl`, the receipt (`route`) and the Linear claim comment; the doctor uses the same router for idle capacity. Claude and Hyperagent lanes:
 
 `claude_lane.py run --model <id>` runs `claude -p` (`bypassPermissions`, JSON output, no session files, hooks on) on the host's claude.ai subscription or a `claude setup-token` in `~/.config/jovie-lanes/claude.env`. Anthropic API credentials are stripped and `health` refuses an API-key login. A usage limit banks the lane until its reset (default 5h); a burst limit backs off 5 minutes; a banked run exits 75 so the harness fails over. Repairs use Sonnet.
 
@@ -560,6 +560,10 @@ row says what quota or credit is behind the pool and where its reset or expiry i
   agent entry points (pool executors and the table's `agentRunners`); a gate command such as
   `git commit -m ...` is read only for a long `--model` value. CI runs the agent check on every
   configured `cmd`.
+- Direct API calls: `model_pool_calls.py` checks every model request body before it is sent
+  (`scripts/apiclient`, the PR remediation swarm's model pick, the outcome judge). An Anthropic model
+  addressed to the Gateway or `api.anthropic.com`, or a model request there whose model cannot be
+  read, is refused and recorded.
 - Selection: among available routes of the chosen capability class that still have soft allowance
   left, the pool whose unused allowance is lost first takes the run (Claude's 5 hour window while one is open; an idle lane has no expiry,
   Hyperagent's UTC day cap and credit expiry, the weekly reset of Codex and Grok from the capacity
