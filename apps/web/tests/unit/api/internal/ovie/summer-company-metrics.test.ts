@@ -1,3 +1,4 @@
+import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
@@ -69,7 +70,7 @@ beforeEach(() => {
 describe('GET /api/internal/ovie/summer-company/metrics', () => {
   it('returns 401 without reading when OIDC fails', async () => {
     hoisted.verify.mockResolvedValue(false);
-    const response = await metricsRoute.GET(new Request(`${BASE}/metrics`));
+    const response = await metricsRoute.GET(new NextRequest(`${BASE}/metrics`));
     expect(response.status).toBe(401);
     expect(hoisted.read).not.toHaveBeenCalled();
   });
@@ -77,7 +78,7 @@ describe('GET /api/internal/ovie/summer-company/metrics', () => {
   it('reads the asked metrics and windows from the cache', async () => {
     hoisted.read.mockResolvedValue(readback());
     const response = await metricsRoute.GET(
-      new Request(`${BASE}/metrics?metric=ai_spend,nope&days=30`)
+      new NextRequest(`${BASE}/metrics?metric=ai_spend,nope&days=30`)
     );
     expect(response.status).toBe(200);
     expect(hoisted.read).toHaveBeenCalledWith(['ai_spend'], [30]);
@@ -89,11 +90,11 @@ describe('GET /api/internal/ovie/summer-company/metrics', () => {
   it('says unavailable on a cold cache or a failed read', async () => {
     hoisted.read.mockResolvedValue(null);
     expect(
-      (await metricsRoute.GET(new Request(`${BASE}/metrics`))).status
+      (await metricsRoute.GET(new NextRequest(`${BASE}/metrics`))).status
     ).toBe(503);
     hoisted.read.mockRejectedValue(new Error('redis down'));
     expect(
-      (await metricsRoute.GET(new Request(`${BASE}/metrics`))).status
+      (await metricsRoute.GET(new NextRequest(`${BASE}/metrics`))).status
     ).toBe(503);
     expect(hoisted.captureError).toHaveBeenCalledOnce();
   });
@@ -102,7 +103,7 @@ describe('GET /api/internal/ovie/summer-company/metrics', () => {
 describe('GET /api/internal/ovie/summer-company/charts/metric', () => {
   it('rejects an unknown metric before reading', async () => {
     const response = await chartRoute.GET(
-      new Request(`${BASE}/charts/metric?metric=__proto__`)
+      new NextRequest(`${BASE}/charts/metric?metric=__proto__`)
     );
     expect(response.status).toBe(400);
     expect(hoisted.read).not.toHaveBeenCalled();
@@ -112,7 +113,7 @@ describe('GET /api/internal/ovie/summer-company/charts/metric', () => {
     hoisted.read.mockResolvedValue(readback());
     hoisted.render.mockResolvedValue(new Response(new Uint8Array([137, 80])));
     const response = await chartRoute.GET(
-      new Request(`${BASE}/charts/metric?metric=ai_spend&days=30`)
+      new NextRequest(`${BASE}/charts/metric?metric=ai_spend&days=30`)
     );
     expect(response.status).toBe(200);
     expect(hoisted.read).toHaveBeenCalledWith(['ai_spend'], [30]);
@@ -130,7 +131,7 @@ describe('GET /api/internal/ovie/summer-company/charts/metric', () => {
     expect(
       (
         await chartRoute.GET(
-          new Request(`${BASE}/charts/metric?metric=signups`)
+          new NextRequest(`${BASE}/charts/metric?metric=signups`)
         )
       ).status
     ).toBe(503);
@@ -139,7 +140,7 @@ describe('GET /api/internal/ovie/summer-company/charts/metric', () => {
     expect(
       (
         await chartRoute.GET(
-          new Request(`${BASE}/charts/metric?metric=ai_spend&days=30`)
+          new NextRequest(`${BASE}/charts/metric?metric=ai_spend&days=30`)
         )
       ).status
     ).toBe(503);
