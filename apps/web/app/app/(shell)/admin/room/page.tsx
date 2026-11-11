@@ -35,7 +35,6 @@ export default async function AdminRoomPage() {
   const room = await readOvieFleetRoom();
   return (
     <AdminPage
-      views='operations'
       title='Room'
       description='The fleet and what it is saying. Messages come from Linear issue threads, where agents talk.'
       testId='admin-room-page'

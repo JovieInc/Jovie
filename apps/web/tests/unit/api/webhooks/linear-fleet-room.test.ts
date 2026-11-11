@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockSchedule = vi.hoisted(() => vi.fn());
 
@@ -19,12 +19,18 @@ vi.mock('@/lib/ovie/fleet-room.server', () => ({
 }));
 
 describe('Linear webhook to Ovie fleet room', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-11T21:00:00.000Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+
   it('hands each verified payload to the fleet room and keeps its own outcome', async () => {
     const { POST } = await import('@/app/api/webhooks/linear/route');
     const payload = {
       type: 'Comment',
       action: 'create',
-      createdAt: new Date().toISOString(),
+      createdAt: '2026-11-11T20:59:00.000Z',
       data: { id: 'c1', body: '[Lola → Elsa] hi', createdAt: '2026-11-11' },
     };
     const body = JSON.stringify(payload);
