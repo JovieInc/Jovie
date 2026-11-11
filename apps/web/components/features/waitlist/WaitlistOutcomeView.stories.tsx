@@ -31,3 +31,42 @@ export const SaveFailedRetry: Story = {
     onRetry: () => undefined,
   },
 };
+
+/** A receipt with no contact email: the next steps ask for one instead. */
+export const PartialNoContactEmail: Story = {
+  args: {
+    outcome: 'pending',
+    email: null,
+  },
+};
+
+/** A long contact email and the capacity-full copy wrap inside the card. */
+export const LongContactEmail: Story = {
+  args: {
+    outcome: 'waitlisted_capacity_full',
+    email: 'booking.and.management.team@example-records-group.com',
+  },
+};
+
+/**
+ * The intake request never reached the server: WaitlistIntakeChat maps a
+ * thrown fetch to save_failed, so offline shows the retry receipt.
+ */
+export const OfflineSaveFailed: Story = {
+  args: {
+    outcome: 'save_failed',
+    email: null,
+    onRetry: () => undefined,
+  },
+};
+
+/** The pending receipt inside a right-to-left page. */
+export const Rtl: Story = {
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};
