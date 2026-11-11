@@ -12,7 +12,10 @@
 
 import { expect, test } from '@playwright/test';
 import { setTestAuthBypassSession } from '../helpers/auth';
-import { printColdLoadProfile } from './utils/cold-load-profile';
+import {
+  printColdLoadProfile,
+  printServerDomWeight,
+} from './utils/cold-load-profile';
 import { waitForHydration } from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -29,4 +32,5 @@ test('cold chat load prints a source-mapped CPU profile', async ({ page }) => {
       timeout: 30_000,
     });
   });
+  await printServerDomWeight(page, 'chat cold load');
 });

@@ -192,3 +192,50 @@ export async function printColdLoadProfile(
     await cdp.detach().catch(() => undefined);
   }
 }
+
+/**
+ * Prints which regions of the server HTML hold the most elements. Hydration
+ * cost grows with the server-rendered tree, and React's own frames (beginWork,
+ * getNextHydratable) carry the time without naming the component, so this
+ * names the subtrees that the first render has to walk.
+ */
+export async function printServerDomWeight(
+  page: Page,
+  label: string
+): Promise<void> {
+  try {
+    const weight = await page.evaluate(async () => {
+      const html = await (await fetch(location.href)).text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const all = doc.body.getElementsByTagName('*');
+      const named = doc.body.querySelectorAll(
+        '[data-testid], main, nav, aside, header, footer, [role="dialog"], [hidden], template'
+      );
+      const rows = [...named].map(el => {
+        const testId = el.getAttribute('data-testid');
+        const tag = el.tagName.toLowerCase();
+        const hidden =
+          el.hasAttribute('hidden') ||
+          el.getAttribute('aria-hidden') === 'true' ||
+          /\b(hidden|invisible|sr-only)\b/u.test(
+            el.getAttribute('class') ?? ''
+          );
+        return {
+          name: `${testId ? `[${testId}]` : tag}${hidden ? ' (hidden)' : ''}`,
+          count: el.getElementsByTagName('*').length,
+        };
+      });
+      rows.sort((a, b) => b.count - a.count);
+      return { total: all.length, top: rows.slice(0, 25) };
+    });
+    process.stdout.write(
+      `[cold-load-profile] ${label} server DOM: ${weight.total} elements in body\n` +
+        weight.top.map(row => `  ${row.count} ${row.name}`).join('\n') +
+        '\n'
+    );
+  } catch (error) {
+    process.stdout.write(
+      `[cold-load-profile] ${label} server DOM failed (${String(error).slice(0, 120)})\n`
+    );
+  }
+}
