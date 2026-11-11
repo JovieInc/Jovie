@@ -27,6 +27,11 @@ export async function syncConfiguredCompanyHistory(now = new Date()) {
   return { ...history, metrics };
 }
 
+const UNCONFIGURED_REASONS = new Set([
+  'redis-unavailable',
+  'github-owner-unconfigured',
+]);
+
 type SubJobRunner<T> = (
   name: string,
   fn: () => Promise<Record<string, unknown>>
@@ -46,11 +51,11 @@ export async function companyHistoryCronJob<T>(
   return run('companyHistory', async () => {
     const result: Record<string, unknown> = { ...(await sync(new Date())) };
     // The sync reports failures as receipts; a merged-PR sync that wrote
-    // nothing must still reach the sub-job's error capture. No Redis is a
-    // local or preview environment, not an alert.
+    // nothing must still reach the sub-job's error capture. No Redis or no
+    // GitHub owner is an environment without the integration, not an alert.
     if (
       result.status === 'unavailable' &&
-      result.reason !== 'redis-unavailable'
+      !UNCONFIGURED_REASONS.has(String(result.reason))
     ) {
       throw new Error(
         `company history sync unavailable: ${String(result.reason ?? 'unknown')}`

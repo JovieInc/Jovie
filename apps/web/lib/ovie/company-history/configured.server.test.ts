@@ -44,6 +44,14 @@ describe('companyHistoryCronJob', () => {
     await expect(companyHistoryCronJob(0, run, sync)).rejects.toThrow(
       'company history sync unavailable: github-unavailable'
     );
+    const noOwner = vi.fn(async () => ({
+      status: 'unavailable',
+      reason: 'github-owner-unconfigured',
+    }));
+    await expect(companyHistoryCronJob(0, run, noOwner)).resolves.toEqual({
+      status: 'unavailable',
+      reason: 'github-owner-unconfigured',
+    });
     const partial = vi.fn(async () => ({ status: 'partial', reason: 'x' }));
     await expect(companyHistoryCronJob(0, run, partial)).resolves.toEqual({
       status: 'partial',
