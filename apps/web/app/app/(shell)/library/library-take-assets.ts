@@ -17,6 +17,17 @@ export function isLibraryTakeAsset(asset: Pick<LibraryReleaseAsset, 'id'>) {
   return asset.id.startsWith(LIBRARY_TAKE_ID_PREFIX);
 }
 
+/** Whether the drawer shows a private take, and its public presentation. */
+export function libraryWorkView(asset: LibraryReleaseAsset | null): {
+  readonly isTake: boolean;
+  readonly presentation: WorkInspectorPresentation | null;
+} {
+  return {
+    isTake: asset !== null && isLibraryTakeAsset(asset),
+    presentation: libraryWorkPresentation(asset),
+  };
+}
+
 /** The Work rail's public presentation; a private take has none. */
 export function libraryWorkPresentation(
   asset: LibraryReleaseAsset | null
