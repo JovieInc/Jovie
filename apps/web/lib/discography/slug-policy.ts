@@ -43,6 +43,16 @@ export type VersionType =
 /** A numeric disambiguation suffix such as `-2` or `-12`. Never generated. */
 export const NUMERIC_SUFFIX = /-\d{1,3}$/;
 
+/**
+ * Track slugs that collide with static segments under a release
+ * (`/[username]/[slug]/sounds`, `/download`). Next.js resolves the static
+ * segment first, so a track with one of these slugs would be unreachable.
+ */
+export const RESERVED_TRACK_SLUGS: ReadonlySet<string> = new Set([
+  'sounds',
+  'download',
+]);
+
 export function slugify(value: string, maxLength = 50): string {
   return value
     .toLowerCase()

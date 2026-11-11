@@ -17,19 +17,15 @@ import {
 } from '@/lib/db/schema/content';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import { logger } from '@/lib/utils/logger';
-import { qualifierCandidates, type VersionType } from './slug-policy';
+import {
+  qualifierCandidates,
+  RESERVED_TRACK_SLUGS,
+  type VersionType,
+} from './slug-policy';
 
 export type ContentType = 'release' | 'track' | 'release_track';
 
-/**
- * Reserved slugs that conflict with static route segments at the track level.
- * Tracks with these slugs would be unreachable because Next.js
- * resolves static segments (e.g. /sounds/) before dynamic [trackSlug].
- * Only applies to tracks/release_tracks — releases don't conflict.
- */
-const RESERVED_TRACK_SLUGS = new Set(['sounds']);
-
-/** Check if a slug is reserved at the track level. */
+/** Check if a slug is reserved at the track level (releases don't conflict). */
 export function isReservedTrackSlug(slug: string): boolean {
   return RESERVED_TRACK_SLUGS.has(generateBaseSlug(slug));
 }
