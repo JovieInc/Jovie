@@ -181,9 +181,14 @@ describe('OnboardingChat states', () => {
       />
     );
 
-    expect(
-      await screen.findByText('That name is open. What do you release?')
-    ).toBeInTheDocument();
+    // The thread remounts its rows once the initial messages settle, so read
+    // the live container rather than holding the first node found.
+    await waitFor(() =>
+      expect(container).toHaveTextContent(
+        'That name is open. What do you release?'
+      )
+    );
+    expect(container).toHaveTextContent('I want to claim jov.ie/timwhite');
     await expectNoA11yViolations(container);
   });
 
