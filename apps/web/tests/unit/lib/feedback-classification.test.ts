@@ -49,6 +49,25 @@ describe('classifyFeedbackMessage', () => {
     );
   });
 
+  it('forces onboarding wants to feature_or_change, never a bug report', () => {
+    const source = 'onboarding_want';
+    for (const message of [
+      'My current link page is broken, I want one that works',
+      'ok',
+      'Fix the crash on my store',
+    ]) {
+      expect(classifyFeedbackMessage(message, { source })).toBe(
+        'feature_or_change'
+      );
+    }
+    expect(
+      classifyFeedbackMessage('anything', {
+        source,
+        context: { exitCode: 1, status: 500 },
+      })
+    ).toBe('feature_or_change');
+  });
+
   it('classifies low-signal text as noise', () => {
     expect(classifyFeedbackMessage('ok')).toBe('noise');
     expect(classifyFeedbackMessage('👍')).toBe('noise');
