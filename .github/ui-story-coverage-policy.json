@@ -450,10 +450,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/jovie/components/ChatFeedbackControl.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/jovie/components/ChatPinnedOpportunityHeader.tsx",
       "linearIssue": "JOV-8847"
     },
