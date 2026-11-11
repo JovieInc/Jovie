@@ -84,7 +84,9 @@ async function loadChunk(
     const chunk = await page.request.get(url);
     const text = chunk.ok() ? await chunk.text() : '';
     lines = text.split('\n');
-    const comment = /\/\/# sourceMappingURL=(\S+)\s*$/u.exec(text)?.[1];
+    const comment = [...text.matchAll(/\/\/# sourceMappingURL=(\S+)/gu)].at(
+      -1
+    )?.[1];
     const mapUrl = new URL(comment ?? `${url.split('?')[0]}.map`, url).href;
     const response = await page.request.get(mapUrl);
     mapStatus = `${comment ? 'comment' : 'guessed'} map HTTP ${response.status()}`;
