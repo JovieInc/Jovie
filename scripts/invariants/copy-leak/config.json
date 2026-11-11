@@ -197,6 +197,12 @@
     { "path": "apps/web/lib/canaries/public-profile.ts", "rules": { "unresolved-prompt": ["cf0456aad793801c"] }, "reason": "Exact diagnostic tag, redaction marker, schema path or security literal; not an authoring prompt." },
     { "path": "apps/web/lib/canonical-surfaces.ts", "rules": { "unresolved-prompt": ["d020f5126c55de7b", "e4eca94d7154f16e"] }, "reason": "Exact source route template in the engineering inventory; not displayed page copy." },
     { "path": "apps/web/lib/changelog-parser.ts", "rules": { "markdown": ["983987033f0e1170"] }, "reason": "Intentional Markdown serialization, parser delimiter, plain-text signature/list, or security mask; not stray formatting in visible copy." },
+    {
+      "path": "apps/web/lib/chat/capability-request.ts",
+      "rules": { "markdown": ["2342782323a965dc", "307c96a4d2abd4a9", "f1b901847390b0ed"], "unresolved-prompt": ["0e29768c4363652e"] },
+      "reason": "Markdown body of a Linear issue filed for the founder, including a path template and a fenced skill draft; never rendered as product copy."
+    },
+    { "path": "apps/web/lib/chat/skills/registry.ts", "rules": { "markdown": ["c6e0d20fa67094ef"] }, "reason": "Model-only system prompt section listing skills as a Markdown list; not a rendered response." },
     { "path": "apps/web/lib/chat/entity-hydration.ts", "rules": { "markdown": ["521c522d76d265f2", "57efb92b7bbd527e", "748776274edc6aab"] }, "reason": "Intentional Markdown serialization, parser delimiter, plain-text signature/list, or security mask; not stray formatting in visible copy." },
     {
       "path": "apps/web/lib/chat/pinned-opportunity.ts",

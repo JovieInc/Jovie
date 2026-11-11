@@ -96,7 +96,7 @@ export function buildSkillsPromptSection(
     skills.length > 0
       ? `
 ## Skills
-Skills are step-by-step methods for work artists ask for often. When a request fits one, call useSkill with its name first, then follow it.
+Each one is a step-by-step method for work artists ask for often. When a request fits one, call useSkill with its name first, then follow it.
 ${skills.map(skill => `- ${skill.name}${skill.paidOnly ? ' (Pro plan)' : ''}: ${skill.description}`).join('\n')}
 `
       : '';
