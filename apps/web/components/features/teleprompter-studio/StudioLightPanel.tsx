@@ -12,7 +12,6 @@ import {
 interface StudioLightPanelProps {
   readonly settings: RingLightSettings;
   readonly onChange: (settings: RingLightSettings) => void;
-  readonly onClose: () => void;
 }
 
 const MODE_OPTIONS = [

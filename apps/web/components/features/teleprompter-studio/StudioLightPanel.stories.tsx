@@ -9,7 +9,6 @@ const meta = {
   args: {
     settings: DEFAULT_RING_LIGHT,
     onChange: () => {},
-    onClose: () => {},
   },
 } satisfies Meta<typeof StudioLightPanel>;
 

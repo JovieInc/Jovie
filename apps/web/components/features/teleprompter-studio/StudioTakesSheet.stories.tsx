@@ -41,7 +41,6 @@ const meta = {
     takes: TAKES,
     onToggleKept: () => {},
     onRetry: () => {},
-    onClose: () => {},
     onDone: () => {},
   },
 } satisfies Meta<typeof StudioTakesSheet>;

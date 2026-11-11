@@ -23,7 +23,6 @@ interface StudioTakesSheetProps {
   readonly takes: readonly StudioTake[];
   readonly onToggleKept: (takeId: string) => void;
   readonly onRetry: (takeId: string) => void;
-  readonly onClose: () => void;
   readonly onDone: () => void;
 }
 
@@ -49,7 +48,7 @@ export function StudioTakesSheet({
   const total = takes.reduce((sum, take) => sum + take.durationMs, 0);
 
   return (
-    <aside
+    <section
       aria-label='Takes'
       style={{
         top: 'calc(var(--studio-ring-width) + 10px)',
@@ -146,6 +145,6 @@ export function StudioTakesSheet({
           Done
         </Button>
       </footer>
-    </aside>
+    </section>
   );
 }

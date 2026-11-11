@@ -32,7 +32,6 @@ function renderSheet(
     takes,
     onToggleKept: vi.fn(),
     onRetry: vi.fn(),
-    onClose: vi.fn(),
     onDone: vi.fn(),
     ...overrides,
   };
