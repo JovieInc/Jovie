@@ -29,6 +29,13 @@
       "semantic": "shrink-only",
       "check": "node scripts/invariants/stat-claims/check.mjs",
       "tighten": "node scripts/invariants/stat-claims/check.mjs --tighten"
+    },
+    {
+      "id": "size-500",
+      "baseline": "scripts/company-guards/size-baseline.json",
+      "semantic": "shrink-only",
+      "check": "node scripts/company-guards/size-baseline.mjs --no-raise origin/main",
+      "tighten": "node scripts/company-guards/size-baseline.mjs --tighten"
     }
   ],
   "combineSafe": {
@@ -118,7 +125,6 @@
       "docs/pen-stills/pen-variable-baseline.json",
       "docs/performance/bundle-baseline.json",
       "ops/registry/secrets-lint-baseline.json",
-      "scripts/company-guards/size-baseline.json",
       "scripts/design-authority-interactive-baseline.json",
       "scripts/invariants/overlay-layer-contract.baseline.json",
       "scripts/mutation-score-baseline.json",
