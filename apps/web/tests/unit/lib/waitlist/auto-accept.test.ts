@@ -57,17 +57,10 @@ vi.mock('@/lib/acquisition/eligibility.server', () => ({
   readCachedAcquisitionEligibility: mockReadCachedAcquisitionEligibility,
 }));
 
-vi.mock('@/lib/db', () => ({
-  db: {
-    select: mockDbSelect,
-  },
-}));
+vi.mock('@/lib/db', () => ({ db: { select: mockDbSelect } }));
 
 vi.mock('@/lib/db/schema/auth', () => ({
-  users: {
-    email: 'users.email',
-    userStatus: 'users.user_status',
-  },
+  users: { email: 'users.email', userStatus: 'users.user_status' },
 }));
 
 vi.mock('@/lib/db/schema/suppression', () => ({
@@ -117,6 +110,12 @@ vi.mock('@/lib/waitlist/settings', () => ({
   tryReserveAutoAcceptSlot: mockTryReserveAutoAcceptSlot,
 }));
 
+vi.mock('@/lib/waitlist/support-load.server', () => ({
+  readSupportLoadCapacity: async (s: { autoAcceptDailyLimit: number }) => ({
+    dailyLimit: s.autoAcceptDailyLimit,
+    remaining: s.autoAcceptDailyLimit,
+  }),
+}));
 vi.mock('@/lib/waitlist/approval', () => ({
   approveWaitlistEntryInTx: mockApproveWaitlistEntryInTx,
   finalizeWaitlistApproval: mockFinalizeWaitlistApproval,
