@@ -15,7 +15,6 @@ import {
   isBlogContentCandidatePath,
 } from './lib/blog-content-ci.mjs';
 
-import { censusEvidenceTests, touchesCensus } from './lib/census-affected.mjs';
 import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
 import { ONBOARDING_TEST_PRODUCERS } from './lib/onboarding-test-producers.mjs';
 
@@ -123,8 +122,14 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
     ['apps/web/tests/unit/e2e/golden-path-tracking.test.ts'],
   ],
 ]);
+// Census evidence entries (surfaceCensus.evidence/) select the census validator.
+const CENSUS =
+  /^apps\/web\/data\/designSystem\/surfaceCensus\.(json$|evidence\/)/;
+const touchesCensus = files => files.some(file => CENSUS.test(file));
 const fixtureTestsFor = file =>
-  censusEvidenceTests(file) ?? KNOWN_VITEST_FIXTURE_TESTS.get(file);
+  CENSUS.test(file) && !file.endsWith('surfaceCensus.json')
+    ? ['scripts/lib/__tests__/design-surface-census.test.mjs']
+    : KNOWN_VITEST_FIXTURE_TESTS.get(file);
 // Any web source that uses TanStack Virtual must stay out of React Compiler
 // memoization (JOV-6702); the invariant has no import edge to such files.
 const VIRTUALIZER_COMPILER_INVARIANT_TEST =
