@@ -8,15 +8,16 @@ import { db } from '@/lib/db';
 import { feedbackItems } from '@/lib/db/schema/feedback';
 import { captureError } from '@/lib/error-tracking';
 import { createFeedbackItem } from '@/lib/feedback';
-import {
-  feedbackFingerprint,
-  ONBOARDING_WANT_FEEDBACK_SOURCE,
-} from '@/lib/feedback-classification';
+import { ONBOARDING_WANT_FEEDBACK_SOURCE } from '@/lib/feedback-classification';
 
 /** Longest want text stored on a build request row. */
 export const ONBOARDING_WANT_MAX_LENGTH = 500;
 
-/** True when this session already logged the same want (by fingerprint). */
+/**
+ * True when this session already logged the same want. Compares the stored
+ * text case-insensitively rather than by the ASCII-only feedback
+ * fingerprint, so two different non-Latin wants never collide.
+ */
 async function sessionAlreadyLoggedWant(
   sessionId: string,
   message: string
@@ -27,7 +28,7 @@ async function sessionAlreadyLoggedWant(
     .where(
       and(
         eq(feedbackItems.source, ONBOARDING_WANT_FEEDBACK_SOURCE),
-        eq(feedbackItems.fingerprint, feedbackFingerprint(message)),
+        drizzleSql`lower(${feedbackItems.message}) = lower(${message})`,
         drizzleSql`${feedbackItems.context}->>'onboardingSessionId' = ${sessionId}`
       )
     )
