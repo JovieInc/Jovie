@@ -80,6 +80,13 @@ console.log(JSON.stringify(['', win].map(body => evaluateFleetRules({
             with self.subTest(missing=key), self.assertRaises(ValueError):
                 repair_win.company_guard_pin(self.files, comparison)
 
+    def test_rejects_duplicate_or_malformed_intermediate_commit_identifiers(self):
+        for intermediate in (None, {}, {"sha": "c" * 8}, {"sha": False}, {"sha": self.NEW}):
+            comparison = {**self.comparison, "ahead_by": 2, "total_commits": 2,
+                          "commits": [intermediate, {"sha": self.NEW}]}
+            with self.subTest(intermediate=intermediate), self.assertRaises(ValueError):
+                repair_win.company_guard_pin(self.files, comparison)
+
     def test_rejects_missing_truncated_or_non_pin_workflow_changes(self):
         patch = self.files[0]["patch"]
         for changed in [[], [self.files[0], self.files[0]],
