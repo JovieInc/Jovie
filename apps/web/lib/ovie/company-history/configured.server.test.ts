@@ -32,6 +32,25 @@ describe('companyHistoryCronJob', () => {
     expect(sync).toHaveBeenCalledOnce();
   });
 
+  it('throws a merged-PR sync that wrote nothing so the sub-job reports it', async () => {
+    const run = vi.fn(
+      async (_name: string, fn: () => Promise<Record<string, unknown>>) => fn()
+    );
+    const sync = vi.fn(async () => ({
+      status: 'unavailable',
+      reason: 'github-unavailable',
+      metrics: {},
+    }));
+    await expect(companyHistoryCronJob(0, run, sync)).rejects.toThrow(
+      'company history sync unavailable: github-unavailable'
+    );
+    const partial = vi.fn(async () => ({ status: 'partial', reason: 'x' }));
+    await expect(companyHistoryCronJob(0, run, partial)).resolves.toEqual({
+      status: 'partial',
+      reason: 'x',
+    });
+  });
+
   it('fails closed without Redis on the configured path', async () => {
     const run = vi.fn(
       async (_name: string, fn: () => Promise<Record<string, unknown>>) => fn()

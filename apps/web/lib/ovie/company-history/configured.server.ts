@@ -43,5 +43,19 @@ export async function companyHistoryCronJob<T>(
   sync: (now: Date) => Promise<object> = syncConfiguredCompanyHistory
 ): Promise<T | { success: true; skipped: true }> {
   if (minute >= 15) return { success: true, skipped: true };
-  return run('companyHistory', async () => ({ ...(await sync(new Date())) }));
+  return run('companyHistory', async () => {
+    const result: Record<string, unknown> = { ...(await sync(new Date())) };
+    // The sync reports failures as receipts; a merged-PR sync that wrote
+    // nothing must still reach the sub-job's error capture. No Redis is a
+    // local or preview environment, not an alert.
+    if (
+      result.status === 'unavailable' &&
+      result.reason !== 'redis-unavailable'
+    ) {
+      throw new Error(
+        `company history sync unavailable: ${String(result.reason ?? 'unknown')}`
+      );
+    }
+    return result;
+  });
 }
