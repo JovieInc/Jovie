@@ -243,6 +243,28 @@ describe('Auto-Ready provenance selector', () => {
     ).toEqual({ eligible: false, reason: 'controlled-proof' });
   });
 
+  it('ships a trusted writer draft on green by default unless it parks', () => {
+    const park = '<!-- jovie-auto-ready: park -->';
+    const verdict = o =>
+      promotion({ body: 'Opened via REST.', greenSource: true, ...o });
+    expect(verdict()).toEqual({
+      eligible: true,
+      reason: 'writer-on-green-default',
+    });
+    expect(verdict({ authorLogin: 'jovie-bot[bot]' }).eligible).toBe(true);
+    // Park wins over the default, the marker and even a complete receipt.
+    for (const body of [park, `${proofBody()}\n${park}`]) {
+      expect(verdict({ body })).toEqual({
+        eligible: false,
+        reason: 'writer-parked',
+      });
+    }
+    expect(verdict({ authorLogin: 'outside-contributor' }).eligible).toBe(
+      false
+    );
+    expect(verdict({ greenSource: false }).eligible).toBe(false);
+  });
+
   it('allows an exact author-owned proof receipt on any branch', () => {
     expect(promotion()).toEqual({
       eligible: true,

@@ -108,19 +108,19 @@ describe('green-source draft classifier', () => {
     });
   });
 
-  it('promotes a trusted writer that opted in to ship on green, with no receipt', () => {
-    const body = 'Ships when green.\n\n<!-- jovie-auto-ready: on-green -->';
-    expect(classifyGreenSourceDraft(draft({ body }))).toEqual({
-      eligible: true,
-      reason: 'green-source-clean',
-    });
-    expect(
-      classifyGreenSourceDraft(draft({ body, authorLogin: 'jovie-bot[bot]' }))
-    ).toEqual({ eligible: true, reason: 'green-source-clean' });
+  it.each([
+    ['without the marker (REST-opened)', 'Ships when green.'],
+    ['with the marker', 'Ships.\n\n<!-- jovie-auto-ready: on-green -->'],
+  ])('ships a trusted writer draft on green %s, no receipt', (_n, body) => {
+    const verdict = b => classifyGreenSourceDraft(draft({ body: b })).reason;
+    expect(verdict(body)).toBe('green-source-clean');
+    expect(verdict(`${body}\n<!-- jovie-auto-ready: park -->`)).toBe(
+      'writer-parked'
+    );
   });
 
-  it('keeps every other gate when a draft opts in to ship on green', () => {
-    const body = '<!-- jovie-auto-ready: on-green -->';
+  it('keeps every other gate when a draft ships on green by default', () => {
+    const body = 'Opened through the REST API.';
     const refused = (overrides, reason) =>
       expect(classifyGreenSourceDraft(draft({ body, ...overrides }))).toEqual({
         eligible: false,
