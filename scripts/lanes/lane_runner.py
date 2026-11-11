@@ -3114,7 +3114,7 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
     stopped run can never be published later (JOV-5060).
     """
     # Before anything starts: an Anthropic model outside an allowed pool is refused and recorded.
-    model_pools.command_guard(cmd)
+    model_pools.command_guard(cmd, env=os.environ)
     if _fleet_observation is not None:
         if (timeout != 60 or log is not None or guard is not None or on_kill is not None
                 or _lifecycle_helper or _lifecycle_terminal or stderr != subprocess.STDOUT):

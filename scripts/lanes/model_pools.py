@@ -37,7 +37,6 @@ SCHEMA = "jovie.model-pools/v1"
 REFUSAL_SCHEMA = "jovie.model-pool-refusal/v1"
 REFUSALS_FILE = "model-pool-refusals.jsonl"
 FALLBACK_PATTERN = r"(?i)(?<![a-z])(claude|fable|opus|sonnet|haiku|anthropic)(?![a-z])"
-MODEL_FLAGS = ("--model", "-m")
 
 
 class ModelPoolRefused(RuntimeError):
@@ -91,13 +90,26 @@ def pool_for_signal(value, table: dict) -> str | None:
     return None
 
 
+ASSIGNMENT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", re.S)
+MODEL_FLAG = re.compile(r"^(?:--model|-m)(?:=(.*))?$", re.S)
+MODEL_CONFIG = re.compile(r"^(?:(?:-c|--config)=)?model=(.*)$", re.S)
+_PYTHON = re.compile(r"python[\d.]*")
+
+
+def _program(cmd) -> tuple[list[str], int]:
+    """The arguments and the index of the program: past `env`, NAME=VALUE prefixes and a Python interpreter."""
+    args = [str(arg) for arg in cmd or ()]
+    index = 0
+    while index < len(args) and (args[index] == "env" or ASSIGNMENT.match(args[index])
+                                 or _PYTHON.fullmatch(args[index].rsplit("/", 1)[-1])):
+        index += 1
+    return args, index
+
+
 def executor(cmd) -> str | None:
-    """The program a command runs: the first argument that is not a Python interpreter."""
-    for arg in cmd or ():
-        name = str(arg).rsplit("/", 1)[-1]
-        if not re.fullmatch(r"python[\d.]*", name):
-            return name
-    return None
+    """The program a command runs: the first argument that is not `env`, an assignment or a Python interpreter."""
+    args, index = _program(cmd)
+    return args[index].rsplit("/", 1)[-1] if index < len(args) else None
 
 
 def pool_for_command(cmd, table: dict) -> str | None:
@@ -108,14 +120,20 @@ def pool_for_command(cmd, table: dict) -> str | None:
     return None
 
 
-def command_models(cmd) -> list[str]:
-    """Model ids a command selects. Only the value of a model flag counts; prompt text never does."""
-    found, args = [], [str(arg) for arg in cmd or ()]
-    for index, arg in enumerate(args):
-        if arg in MODEL_FLAGS and index + 1 < len(args):
-            found.append(args[index + 1])
-        elif arg.startswith("--model="):
-            found.append(arg.split("=", 1)[1])
+def command_models(cmd, env=None, names=()) -> list[str | None]:
+    """Every model a command selects, in any spelling: `-m X`, `-m=X`, `--model X`, `--model=X`, a
+    `model=X` config override, and the environment variables in `names` (set inline or in `env`).
+    A selection with no value is None: the model cannot be resolved. Prompt text never counts."""
+    args, start = _program(cmd)
+    found: list[str | None] = [match.group(2) for match in map(ASSIGNMENT.match, args[:start]) if match and match.group(1) in names]
+    found += [value for name in names if (value := (env or {}).get(name)) and f"{name}=" not in "\0".join(args[:start])]
+    for index in range(start + 1, len(args)):
+        flag, config = MODEL_FLAG.match(args[index]), MODEL_CONFIG.match(args[index])
+        if flag:
+            value = flag.group(1) if flag.group(1) is not None else (args[index + 1] if index + 1 < len(args) else None)
+            found.append(value or None)
+        elif config and (args[index].startswith("-") or args[index - 1] in ("-c", "--config")):
+            found.append(config.group(1).strip("\"'") or None)
     return found
 
 
@@ -163,25 +181,37 @@ def refusal(model, pool: str | None, *, site: str, table: dict | None = None, st
     return record_refusal({"model": str(model), "pool": pool, "site": site, "reason": reason}, state_dir)
 
 
-def command_guard(cmd, *, table: dict | None = None, state_dir=None) -> str | None:
-    """Refuse an agent command that would run an Anthropic model outside an allowed pool.
-
-    Returns the pool name for an Anthropic command that may run and None for any other command.
-    The pool is read from the executor: only a declared executor of an allowed pool passes, so a
-    raw `claude` binary (no credential scrub) or any other CLI given an Anthropic id is refused.
-    """
-    models = command_models(cmd)
+def command_refusal(cmd, env=None, table: dict | None = None) -> dict | None:
+    """Why a command may not run, as {model, pool, site, reason}; None when it may. Fails closed: a raw
+    Anthropic CLI (its default model is Anthropic, and it skips the lane's credential scrub) and a model
+    selection with no value are refused outside an allowed pool, since the model cannot be resolved."""
     table = load() if table is None else table
-    wanted = [model for model in models if is_anthropic(model, table)]
-    if not wanted:
-        return None
+    name, pool = executor(cmd), pool_for_command(cmd, table)
+    row = _pools(table).get(pool or "") or {}
+    models = command_models(cmd, env, tuple(row.get("modelEnv") or ()))
+    wanted = [model for model in models if model and is_anthropic(model, table)]
+    reasons = [verdict(model, pool, table) for model in wanted]
+    if row.get("anthropic") != "allowed":
+        if name in ((table.get("anthropic") or {}).get("runners") or ("claude",)):
+            reasons.insert(0, f"{name} is an Anthropic CLI and not the declared executor of an allowed pool; "
+                              "run the Claude lane (claude_lane.py) or Hyperagent")
+        elif None in models:
+            reasons.insert(0, f"the model {name} would run cannot be resolved (a model flag with no value)")
+    reason = next((item for item in reasons if item), None)
+    return reason and {"model": (wanted or ["unresolved"])[0], "pool": pool, "site": f"command:{name}", "reason": reason}
+
+
+def command_guard(cmd, *, env=None, table: dict | None = None, state_dir=None) -> str | None:
+    """Refuse an agent command that would, or could, run an Anthropic model outside an allowed pool.
+    Returns the pool name for an Anthropic command that may run and None for any other command. The pool
+    is read from the executor: only a declared executor of an allowed pool passes."""
+    table = load() if table is None else table
+    refused = command_refusal(cmd, env, table)
+    if refused:
+        raise ModelPoolRefused(record_refusal(refused, state_dir))
     pool = pool_for_command(cmd, table)
-    for model in wanted:
-        reason = verdict(model, pool, table)
-        if reason:
-            raise ModelPoolRefused(record_refusal(
-                {"model": model, "pool": pool, "site": f"command:{executor(cmd)}", "reason": reason}, state_dir))
-    return pool
+    return pool if any(model and is_anthropic(model, table) for model in command_models(
+        cmd, env, tuple((_pools(table).get(pool or "") or {}).get("modelEnv") or ()))) else None
 
 
 def pool_for_lane(spec: dict, table: dict | None = None) -> str | None:

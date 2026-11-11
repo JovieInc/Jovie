@@ -117,11 +117,33 @@ class RuntimeGuardTest(unittest.TestCase):
                     ["grok", "-m", "claude-sonnet-5-5"], ["python3", "codex_lane.py", "run", "--model=claude-fable-5-2"]):
             with self.assertRaises(pools.ModelPoolRefused) as caught:
                 pools.command_guard(cmd, table=TABLE, state_dir=self.state)
-            self.assertRegex(str(caught.exception), "undeclared pool|may not run on")
+            self.assertRegex(str(caught.exception), "undeclared pool|may not run on|declared executor")
         rows = self.refusals()
         self.assertEqual(len(rows), 4)
         self.assertEqual(rows[0]["schema"], pools.REFUSAL_SCHEMA)
         self.assertEqual((rows[0]["model"], rows[0]["site"], rows[0]["pool"]), ("claude-opus-5-5", "command:claude", None))
+
+    def test_every_model_selection_form_is_read(self):
+        for cmd in (["grok", "-m=claude-sonnet-5-5"], ["grok", "-m", "claude-sonnet-5-5"], ["grok", "--model", "claude-opus-5-5"],
+                    ["grok", "--model=claude-opus-5-5"], ["codex", "exec", "-c", 'model="claude-opus-5-5"'],
+                    ["codex", "exec", "--config=model=claude-opus-5-5"], ["env", "CODEX_LANE_MODEL=claude-haiku-5", "python3", "codex_lane.py", "run"]):
+            with self.subTest(cmd=cmd), self.assertRaises(pools.ModelPoolRefused):
+                pools.command_guard(cmd, table=TABLE, state_dir=self.state)
+        with self.assertRaises(pools.ModelPoolRefused):  # the lane reads its model from the environment
+            pools.command_guard(["python3", "codex_lane.py", "run"], env={"CODEX_LANE_MODEL": "claude-fable-5-2"}, table=TABLE, state_dir=self.state)
+        self.assertIsNone(pools.command_guard(["python3", "codex_lane.py", "run"], env={"CODEX_LANE_MODEL": "gpt-6", "ANTHROPIC_MODEL": "claude-opus-5-5"},
+                                              table=TABLE, state_dir=self.state))
+        self.assertEqual(pools.command_guard(["hyperagent", "run"], env={"HYPERAGENT_MODEL": "fable-5.1"}, table=TABLE, state_dir=self.state), "hyperagent")
+        self.assertIsNone(pools.command_guard(["python3", "-m", "pytest", "-m=slow"], table=TABLE, state_dir=self.state))
+
+    def test_an_unresolved_model_fails_closed(self):
+        # A raw Anthropic CLI picks its own default model, and a model flag with no value hides the choice.
+        for cmd in (["claude", "-p", "hi"], ["/usr/local/bin/claude"], ["grok", "--model"], ["fx", "-m="], ["codex", "exec", "--model", ""]):
+            with self.subTest(cmd=cmd), self.assertRaises(pools.ModelPoolRefused) as caught:
+                pools.command_guard(cmd, table=TABLE, state_dir=self.state)
+            self.assertRegex(str(caught.exception), "cannot be resolved|declared executor")
+        self.assertEqual(len(self.refusals()), 5)
+        self.assertIsNone(pools.command_guard(["hyperagent", "--model"], table=TABLE, state_dir=self.state))  # allowed pool either way
 
     def test_unreadable_table_refuses_at_runtime(self):
         with self.assertRaises(pools.ModelPoolRefused):

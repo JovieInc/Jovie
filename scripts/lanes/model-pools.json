@@ -3,7 +3,8 @@
   "about": "The one table of the fleet's model pools: every provider the lanes use, the quota or credit behind it, and where its reset or expiry is read from. Two rules live here. (1) Tim, 2026-11-11: Anthropic models (Fable, Opus, Sonnet, Haiku, any claude-*) run only on the Claude subscription that is already paid for, or on Hyperagent; never the Vercel AI Gateway or a metered API key. (2) Among available routes of one capability class, the pool whose unused allowance is lost first takes the run. Read by scripts/lanes/model_pools.py: `check` is the CI guard, `command_guard` and `refusal` are the runtime checks, `balanced` is the selector, `utilization` is the per-pool summary. Product chat has its own fail-closed allowlist (apps/web/lib/ai/sdk.ts, JOV-7119). Summer carries the same Anthropic rule in JovieInc/summer-config apps/summer/agent/lib/model-pools.ts.",
   "anthropic": {
     "idPattern": "(?i)(?<![a-z])(claude|fable|opus|sonnet|haiku|anthropic)(?![a-z])",
-    "tiers": ["fable", "opus", "sonnet", "haiku"]
+    "tiers": ["fable", "opus", "sonnet", "haiku"],
+    "runners": ["claude"]
   },
   "pools": {
     "claude-subscription": {
@@ -29,7 +30,8 @@
         "note": "Daily run cap (HYPERAGENT_RUNS_PER_DAY, per UTC day) and the credit expiry in ops/registry/capacity.json."
       },
       "quota": "Given credits (Founding 500) with a daily run cap (HYPERAGENT_RUNS_PER_DAY)",
-      "registryProvider": "hyperagent"
+      "registryProvider": "hyperagent",
+      "modelEnv": ["HYPERAGENT_MODEL"]
     },
     "codex-subscription": {
       "anthropic": "forbidden",
@@ -42,7 +44,8 @@
         "source": "registry-quota-reset",
         "note": "Earliest future resetsAt across active accounts, from the live overlay (capacity-live.json) or the registry snapshot. A reading whose reset is already past gives no expiry."
       },
-      "fix": "Codex seats run OpenAI models. Run Anthropic models on the Claude lane or on Hyperagent."
+      "fix": "Codex seats run OpenAI models. Run Anthropic models on the Claude lane or on Hyperagent.",
+      "modelEnv": ["CODEX_LANE_MODEL"]
     },
     "grok-subscription": {
       "anthropic": "forbidden",

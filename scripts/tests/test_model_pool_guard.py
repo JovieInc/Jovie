@@ -144,6 +144,12 @@ class GuardTest(unittest.TestCase):
             (root / "scripts/lanes/providers.json").write_text("{")
             self.assertEqual([row["rule"] for row in guard.scan(root)], ["config-unreadable"])
 
+    def test_config_commands_fail_closed_like_the_runner(self):
+        for cmd in (["claude", "-p", "--prompt-file", "{prompt_file}"], ["grok", "-m=claude-sonnet-5-5"], ["fx", "--model"]):
+            with self.subTest(cmd=cmd), tempfile.TemporaryDirectory() as tmp:
+                found = guard.scan(repo(Path(tmp), **{"scripts/lanes/providers.json": {"x": {"cmd": cmd}}}))
+                self.assertEqual([row["rule"] for row in found], ["anthropic-on-forbidden-pool"])
+
     def test_a_partial_checkout_is_judged_on_the_files_it_has(self):
         # The trusted guard also scans trees without most config (a scripts-only base, source admission
         # fixtures): absent files route nothing, a present offender or broken file still fails.

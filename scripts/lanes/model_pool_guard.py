@@ -70,12 +70,17 @@ def scan_commands(path: str, data, table: dict) -> list[dict]:
         if not isinstance(node.get("cmd"), list):
             continue
         routes = [route for route in node.get("routes") or () if isinstance(route, dict)]
+        where = _label(pointer, node)
+        refused = pools.command_refusal(node["cmd"], None, table)  # the same check the runner makes at spawn
+        if refused:
+            found.append({"path": path, "rule": "anthropic-on-forbidden-pool", "fix": refused["reason"],
+                          "detail": f"{where}: {refused['model']} run by {pools.executor(node['cmd'])}"})
+            continue
         models = ([node["model"]] if isinstance(node.get("model"), str) else []) + \
             [route["model"] for route in routes if isinstance(route.get("model"), str)] + pools.command_models(node["cmd"])
-        models = [model for model in models if pools.is_anthropic(model, table)]
+        models = [model for model in models if model and pools.is_anthropic(model, table)]
         if not models:
             continue
-        where = _label(pointer, node)
         pool = pools.pool_for_command(node["cmd"], table)
         reason = pools.verdict(models[0], pool, table)
         if reason:
