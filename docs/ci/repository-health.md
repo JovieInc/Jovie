@@ -76,6 +76,7 @@ File count, checkout/history size, dependency/build complexity, and organization
 | Canonical visual baselines | 100 files / 12 MiB |
 | Forbidden tracked outputs | Zero new violations |
 | New repository-root entries | Only names in `scripts/repo-root-allowlist.json` |
+| Orphan review images | Zero images under `docs/screenshots/` or `docs/pen-stills/` that nothing outside their folder references |
 
 The 10,000-file failure is retired, not raised. `scripts/repo-health-baseline.json` records the 10,014 exact-main total, 9,945 old compatibility count, and legacy findings by rule/area. Receipts show the current total and delta. Existing PR-size, generated-placement, payload, binary, and visual gates still fail normally; there is no `continue-on-error`.
 
@@ -177,6 +178,10 @@ Pruned under this rule (JOV-6671): historical `apps/web/drizzle/migrations/meta/
 2026-10-20 hygiene pass: pruned `0117`–`0136` snapshots (16 files, ~16 MiB) back to the 8-snapshot cap after main drifted to 24; the cap test had been failing on main.
 
 2026-10-26 hygiene pass: main was 198.00 MiB of 198 MiB and the drizzle cap test failing (12 snapshots, cap 8) after #23277 and neighbours. Pruned 0137-0140 (4 files, ~4.6 MiB) per the JOV-6671 rule; 0141-0148 remain. Tracked bytes 198.00 -> 193.54 MiB (4.46 MiB headroom). The vendored actions (JOV-8754, #22504, already merged) stay vendored: they exist to avoid GITHUB_TOKEN REST calls and are hash-verified against upstream, so deduping the two actions-cache bundles would need a custom build; budget unchanged.
+
+### Review images: PR evidence stays on the PR
+
+One-off PR evidence (before/after captures, QA stills, review screenshots) belongs on the PR as an attachment or an uploaded CI artifact, not in the tree. Committed copies outlive the review, nothing points at them, and they spend the shrink-only tracked-bytes budget; 2026-11 removed 55 such files (#25003). `scripts/lib/orphan-screenshot-guard.mjs`, run by `scripts/repo-hygiene-guard.mjs` (pre-commit and PR Size Guard), fails any `png`/`jpg`/`jpeg`/`webp`/`gif` under `docs/screenshots/` or `docs/pen-stills/` that no tracked file outside the image's own folder references by path or file name. An evidence bundle still counts as referenced: an image listed by a sibling file (README, `capture.json`, `holdout.json`) is live when a tracked file outside the folder names the folder (surface-census evidence, a test that reads the folder). A README inside the folder alone is not a reference. To fix a failure, delete the image and attach it to the PR, or link it from the doc, census entry or test that actually needs it. Tests: `scripts/lib/__tests__/orphan-screenshot-guard.test.mjs`.
 
 ### Repository-root allowlist
 
