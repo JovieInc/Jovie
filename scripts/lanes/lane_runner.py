@@ -65,6 +65,7 @@ import hyperagent_repair  # noqa: E402
 import migration_renumber  # noqa: E402  (no-model fix for migration number collisions)
 import fix_red_rewrite  # noqa: E402
 import fix_red_failure_routing  # noqa: E402
+from fix_red_failure_routing import classify_unpushed_repair, not_shippable_reason  # noqa: E402
 import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
 import sourced_shell_conflict  # noqa: E402  (source-vs-inline shell conflict; ports retry into the helper)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
@@ -1492,49 +1493,6 @@ def gate_assessment(changes: list[Change], max_reviewable_lines: int = MAX_REVIE
     if reviewable > max_reviewable_lines:
         failures.append(f"diff-too-large:{reviewable}")
     return failures, versions
-
-
-def not_shippable_reason(output: str) -> str | None:
-    """The agent's explicit decline, e.g. already fixed on main; routed to Triage, never retried."""
-    found = re.findall(r"NOT-SHIPPABLE:\s*(.+)", output)
-    return found[-1].strip()[:500] if found else None
-
-
-# Why a fix run that pushed nothing changed nothing (Gem ledger, 253 fix-no-change runs in
-# 3.5 days all carried reasons=[]): 105 were a codex_lane crash before the agent started
-# (account/read app-server timeout, exit 1), 112 were the agent's own NOT-SHIPPABLE decline
-# (infrastructure red or a failure main already has), 17 found the head already green. A
-# specific reason lets the budget, the backoff and the ledger treat each differently.
-LANE_CRASH_SIGNATURES = (
-    ("codex-account-metadata-timeout", re.compile(r"TimeoutError: account/read: app-server response unavailable")),
-)
-DECLINE_INFRA = re.compile(
-    r"rate limit|HTTP 40[38]|HTTP 5\d\d|infrastructure|timed out fetching|outage|flak|Doppler",
-    re.IGNORECASE)
-DECLINE_BASE_RED = re.compile(
-    r"origin/main|untouched main|\bmain\b|merge base|pre-existing|preexisting|inherited|unrelated|"
-    r"identically|already fixed", re.IGNORECASE)
-
-
-def classify_unpushed_repair(exit_code, log_text: str) -> list[str]:
-    """Specific reason codes for a fix run that pushed nothing. The first code is the cause.
-
-    lane-crash:<signature>      the provider wrapper died before an agent worked (attempt refunded)
-    agent-exit:<n>              the agent exited non-zero without pushing
-    agent-declined:<class>:<why> NOT-SHIPPABLE; class infra | base-red | other (infra and
-                                base-red spend the head's budget: a second read declines again)
-    no-change:agent-ended-without-push  the agent finished cleanly and pushed nothing
-    """
-    if exit_code not in (0, None):
-        for name, pattern in LANE_CRASH_SIGNATURES:
-            if pattern.search(log_text):
-                return [f"lane-crash:{name}", f"agent-exit:{exit_code}"]
-        return [f"agent-exit:{exit_code}"]
-    declined = not_shippable_reason(log_text)
-    if declined:
-        kind = "infra" if DECLINE_INFRA.search(declined) else "base-red" if DECLINE_BASE_RED.search(declined) else "other"
-        return [f"agent-declined:{kind}:{declined[:160]}"]
-    return ["no-change:agent-ended-without-push"]
 
 
 def parse_numstat(text: str) -> list[Change]:
