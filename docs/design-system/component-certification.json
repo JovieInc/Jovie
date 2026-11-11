@@ -376,6 +376,14 @@
       "partial": "The canonical Pricing story already renders the partial composition: the optional structuredData and auditOffer slots are both absent there (the audit offer renders nothing while it is off), and every other prop is required.",
       "permission-denied": "PricingRecipeBody is a public marketing page with no gated action or permission input; the detector matched the word plan in its pricing copy."
     },
+    "apps/web/components/atoms/Logo.tsx": {
+      "empty": "Logo draws the fixed Jovie wordmark or mark and takes no collection; the detector matched the .map( over the wordmark's own glyph paths from wordmarkGeometry, which always holds the five letters, so there is nothing that can be empty.",
+      "permission-denied": "Logo only draws the brand wordmark or mark and has no permission input or gated action; the detector matched role='img' on the labelled svg."
+    },
+    "apps/web/components/features/waitlist/WaitlistQualifyingSteps.tsx": {
+      "offline": "WaitlistQualifyingSteps never fetches or submits by itself: the submit button posts the parent WaitlistRoleForm, which owns the join request and its failed and offline recovery, and the artist search's own request state belongs to WaitlistSpotifySearch. Lost connectivity reaches this step only as the parent's submitting flag, which disables every action (WaitlistQualifyingSteps.certificate.test.tsx).",
+      "permission-denied": "The three questions are open to every visitor requesting access and have no gated action or permission input; the detector matched 'role' in the @/lib/waitlist/role-qualification import path."
+    },
     "apps/web/app/(auth)/DesktopAuthRouteHandoff.tsx": {
       "empty": "The route handoff takes no data and renders a fixed heading, status line and action set from DesktopAuthHandoffActions; there is no collection to empty. The detector matched the items-center class on its section."
     },
