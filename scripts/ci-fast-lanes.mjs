@@ -436,9 +436,13 @@ export const SOURCE_GUARDS = Object.freeze([
     // outside the allowlisted mesh executors (JOV-10091).
     // Also runs price-literal-guard: a `$<digits>` price typed into apps/web app/components
     // source fails; prices derive from lib/config/plan-prices.ts (JOV-10183).
-    command: `node ${shellQuote(fileURLToPath(new URL('./external-api-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./model-id-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./ai-call-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./subscription-cli-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./price-literal-guard.mjs', import.meta.url)))}`,
+    // Also runs wall-clock-test-guard: a test that reads the real clock and pins a calendar
+    // date without controlling the clock fails (44 merge groups on 2026-11-10).
+    // Also runs hermetic-ci-guard: live network, unpinned tools, floating runner images,
+    // unprovisioned toolchains, shared temp state and unseeded randomness (.claude/rules/hermetic-ci.md).
+    command: `node ${shellQuote(fileURLToPath(new URL('./external-api-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./model-id-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./ai-call-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./subscription-cli-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./price-literal-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./wall-clock-test-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./hermetic-ci-guard.mjs', import.meta.url)))}`,
     inputs:
-      /(?:\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$|^packages\/api-client\/providers\.json$|^apps\/web\/lib\/email\/stream-registry\.json$|^scripts\/lib\/(?:external-api-guard|mail-send-guard)\.|^scripts\/lib\/subscription-cli-guard\.json$|^scripts\/lib\/price-literal-guard\.ratchet\.json$)/u,
+      /(?:\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$|^packages\/api-client\/providers\.json$|^apps\/web\/lib\/email\/stream-registry\.json$|^scripts\/lib\/(?:external-api-guard|mail-send-guard)\.|^scripts\/lib\/subscription-cli-guard\.json$|^scripts\/lib\/(?:price-literal-guard|wall-clock-test-guard|hermetic-ci-guard)\.ratchet\.json$)/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -1297,6 +1301,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ai-gateway-report.test.mjs',
   'scripts/lib/__tests__/ai-call-guard.test.mjs',
   'scripts/lib/__tests__/price-literal-guard.test.mjs',
+  'scripts/lib/__tests__/hermetic-ci-guard.test.mjs',
+  'scripts/lib/__tests__/wall-clock-test-guard.test.mjs',
   'scripts/lib/__tests__/subscription-cli-guard.test.mjs',
   'scripts/lib/__tests__/api-budget.test.mjs',
   'scripts/lib/__tests__/domain-write-guard.test.mjs',
