@@ -87,9 +87,40 @@ describe('WaitlistPage', () => {
     }
   );
 
-  test('renders the public waitlist entry for signed-out visitors', async () => {
-    mockRedirect.mockClear();
-    mockNotFound.mockClear();
+  test('hands signed-out visitors to the /start chat (one flow)', async () => {
+    mockResolveUserState.mockResolvedValue({
+      state: CanonicalUserState.UNAUTHENTICATED,
+      context: { email: null },
+    });
+
+    await expect(WaitlistPage()).rejects.toThrow('NEXT_REDIRECT');
+    expect(mockRedirect).toHaveBeenCalledTimes(1);
+    expect(mockRedirect).toHaveBeenCalledWith('/start');
+    expect(mockGetWaitlistAccess).not.toHaveBeenCalled();
+  });
+
+  test('keeps the visitor query string on the /start handoff', async () => {
+    mockResolveUserState.mockResolvedValue({
+      state: CanonicalUserState.UNAUTHENTICATED,
+      context: { email: null },
+    });
+
+    await expect(
+      WaitlistPage({
+        searchParams: Promise.resolve({
+          source: 'profile',
+          utm_source: 'footer',
+          utm_artist: ['tim', 'tim-white'],
+        }),
+      })
+    ).rejects.toThrow('NEXT_REDIRECT');
+    expect(mockRedirect).toHaveBeenCalledWith(
+      '/start?source=profile&utm_source=footer&utm_artist=tim&utm_artist=tim-white'
+    );
+  });
+
+  test('renders the public landing for signed-out visitors while signup is closed', async () => {
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
     mockResolveUserState.mockResolvedValue({
       state: CanonicalUserState.UNAUTHENTICATED,
       context: { email: null },
@@ -99,6 +130,7 @@ describe('WaitlistPage', () => {
       '@/components/features/waitlist/WaitlistPublicLanding'
     );
 
+    // The kill switch sends anonymous /start here, so no /start redirect.
     const result = await WaitlistPage();
 
     expect(result.type.name).toBe('WaitlistRouteWithContract');
