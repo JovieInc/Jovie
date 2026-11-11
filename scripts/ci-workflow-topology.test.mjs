@@ -7,6 +7,7 @@ import test from 'node:test';
 import { load as yamlLoad } from 'js-yaml';
 import { buildTopology, findCycle, syncTopology, validateTopology } from './ci-workflow-topology.mjs';
 import { scan as scanAiReviewBoundary } from './company-guards/ai-review-boundary.mjs';
+import { evaluateIf, jobName, loadPolicy, loadWorkflows, parityClock, requiredContexts, validateQueueParity } from './lib/queue-parity.mjs';
 
 test('Pen drafts share one editor across runs and retain pending frame jobs', () => {
   const workflow = /** @type {{jobs: {draft: {concurrency: unknown, strategy: {'max-parallel': number}}}, concurrency: {group: string}}} */ (yamlLoad(fs.readFileSync('.github/workflows/pen-draft.yml', 'utf8')));
@@ -166,3 +167,67 @@ test('trigger budget: always-skipped hops start no run of their own', () => {
   assert.match(relay.jobs['security-suppression-audit'].if, /github\.event\.action == 'submitted'/);
 });
 // ---- end trigger budget ----
+
+// Queue parity (audit finding 2, .github/MERGE_QUEUE.md "Queue parity"): the
+// queue re-checks the combined head; it is not where a PR's own checks first run.
+test('every merge_group-required job has a required PR twin or a dated exemption, and PR-only inputs stay off the queue', () => {
+  const policy = loadPolicy();
+  const result = validateQueueParity({ workflows: loadWorkflows(), contexts: requiredContexts(), policy });
+  assert.deepEqual(result.errors, []);
+  assert.ok(result.queueRequired.includes('ci.yml#ci-merge-group-ready'));
+  assert.ok(result.prRequired.includes('source-validation.yml#ready'));
+  assert.equal(parityClock(policy, {}).toISOString().slice(0, 10),
+    [...policy.exemptions, ...policy.prOnlyExemptions].map(e => e.createdOn).sort().at(-1),
+    'expiry reads the newest createdOn, not the wall clock, outside the time-bomb scan');
+});
+
+test('queue parity evaluates if: per event with unknowns kept unknown', () => {
+  assert.equal(evaluateIf("github.event_name == 'merge_group'", 'merge_group'), true);
+  assert.equal(evaluateIf("${{ github.event_name == 'workflow_dispatch' && inputs.x == true }}", 'merge_group'), false);
+  assert.equal(evaluateIf("always() && (github.event_name != 'merge_group' || needs.a.result == 'success')", 'merge_group'), null);
+  assert.equal(evaluateIf("!cancelled() && needs.a.result == 'success'", 'pull_request'), null);
+  assert.equal(evaluateIf("github.event_name == 'pull_request' && startsWith(github.head_ref, 'x')", 'merge_group'), false);
+  assert.equal(evaluateIf(undefined, 'merge_group'), true);
+  const job = { name: "${{ github.event_name == 'merge_group' && 'PR Ready' || 'PR Ready (merge-group inactive)' }}" };
+  assert.equal(jobName(job, 'ready', 'merge_group'), 'PR Ready');
+  assert.equal(jobName(job, 'ready', 'pull_request'), 'PR Ready (merge-group inactive)');
+});
+
+test('queue parity rejects queue-only jobs, missing commands, PR-only inputs on the queue, and lapsed exemptions', () => {
+  const run = cmd => ({ 'runs-on': 'ubuntu-24.04', steps: [{ run: cmd }] });
+  const workflows = new Map([
+    ['ci.yml', { on: { merge_group: {} }, jobs: {
+      lint: run('pnpm lint'),
+      e2e: run('pnpm e2e'),
+      size: run('node size.mjs'),
+      ready: { name: "${{ github.event_name == 'merge_group' && 'PR Ready' || 'x' }}", needs: ['lint', 'e2e', 'size'], ...run('true') },
+      manual: { if: "github.event_name == 'workflow_dispatch'", ...run('pnpm manual') },
+    } }],
+    ['pr.yml', { on: { pull_request: {} }, jobs: { lint: run('pnpm lint && pnpm format'), sizeguard: run('node size.mjs'), ready: { name: 'PR Ready', needs: ['lint', 'sizeguard'], ...run('true') } } }],
+  ]);
+  const base = {
+    parity: { 'ci.yml#lint': { pr: 'pr.yml#lint', command: 'pnpm lint' } },
+    exemptions: [{ job: 'ci.yml#e2e', kind: 'gap', reason: 'Browser e2e runs only in the queue; a PR job should run it.', createdOn: '2026-11-01', expiresOn: '2026-12-01' },
+      { job: 'ci.yml#ready', kind: 'combined-head', reason: 'Aggregates the combined-head leaves into the queue PR Ready context.', createdOn: '2026-10-20', expiresOn: '2026-12-01' }],
+    prOnlyInputs: [{ job: 'ci.yml#size', pr: 'pr.yml#sizeguard', why: 'Measures only the PR diff size.' }],
+    prOnlyExemptions: [{ job: 'ci.yml#size', reason: 'Still carries an admission-time label check that must move first.', createdOn: '2026-11-01', expiresOn: '2026-12-01' }],
+  };
+  const check = (policy, asOf = new Date('2026-11-15T00:00:00Z')) =>
+    validateQueueParity({ workflows, contexts: ['PR Ready'], policy, asOf }).errors.join('\n');
+  assert.equal(check(base), '');
+  const ready = check({ ...base, exemptions: [] }, new Date('2026-10-20T00:00:00Z'));
+  assert.match(ready, /ci\.yml#e2e: required on merge_group with no matching required pull_request job/);
+  assert.match(ready, /ci\.yml#ready: required on merge_group/, 'the aggregate itself needs a classification');
+  assert.match(check({ ...base, parity: { 'ci.yml#lint': { pr: 'pr.yml#lint', command: 'pnpm typecheck' } } }), /shared command "pnpm typecheck" is not in ci\.yml#lint/);
+  assert.match(check({ ...base, prOnlyExemptions: [] }), /ci\.yml#size: reads only the PR .* but runs on merge_group/);
+  assert.match(check({ ...base, prOnlyInputs: [{ ...base.prOnlyInputs[0], pr: 'pr.yml#missing' }] }), /must stay required on pull_request/);
+  assert.match(check(base, new Date('2026-12-02T00:00:00Z')), /ci\.yml#e2e: exemption expired on 2026-12-01/);
+  const withE2e = e2e => ({ ...base, exemptions: [{ ...base.exemptions[0], ...e2e }, base.exemptions[1]] });
+  assert.match(check(withE2e({ expiresOn: '2027-03-01' })), /lifetime must be 0 to 90 days/);
+  assert.match(check(withE2e({ reason: 'later' })), /reason must say/);
+  assert.match(check(withE2e({ kind: 'someday' })), /exemption kind must be/);
+  assert.match(check({ ...base, exemptions: [...base.exemptions, { ...base.exemptions[0], job: 'ci.yml#manual' }] }), /ci\.yml#manual: stale exemption/);
+  assert.match(check(base).concat(validateQueueParity({ workflows, contexts: ['PR Ready', 'Gone'], policy: base, asOf: new Date('2026-11-15T00:00:00Z') }).errors.join('\n')), /"Gone" has no producing job on pull_request/);
+  assert.equal(parityClock(base, {}).toISOString(), '2026-11-01T00:00:00.000Z');
+  assert.ok(parityClock(base, { CALENDAR_DEADLINE_SCAN: '1' }) instanceof Date);
+});
