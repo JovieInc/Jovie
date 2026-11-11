@@ -186,7 +186,7 @@ async function expectReachable(controls: Record<string, Locator>) {
 }
 
 async function expectWaitlistUsable(page: Page, desktop: boolean) {
-  const form = page.getByRole('form', { name: /request access/i });
+  const form = page.getByRole('form', { name: /request (access|an invite)/i });
   await expect(form).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
   // One Tap only mounts on the sign-in shell; password managers go anywhere.
   const overlays = await showOverlays(page, [PASSWORD_MANAGER_BAR]);
@@ -240,7 +240,9 @@ for (const pathname of ['/signin', '/signup']) {
         await page.setViewportSize(viewport);
         await open(page, pathname);
         const shell = page.locator('[data-auth-shell-hydrated="true"]').first();
-        const waitlist = page.getByRole('form', { name: /request access/i });
+        const waitlist = page.getByRole('form', {
+          name: /request (access|an invite)/i,
+        });
         await expect(shell.or(waitlist).first()).toBeVisible({
           timeout: SMOKE_TIMEOUTS.VISIBILITY,
         });
