@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {
+  countLines,
+  measure,
+  raisedEntries,
+} from './company-guards/size-baseline.mjs';
 import { companionChecklist } from './lib/preflight-changed.mjs';
+import { tightenBaseline } from './lib/shrink-only-baseline.mjs';
 
 const source = 'apps/web/tests/e2e/profile-visual-audit.spec.ts';
 const baselinePath = 'scripts/company-guards/size-baseline.json';
@@ -93,4 +99,47 @@ test('files outside the changed set do not create size failures', () => {
     ),
     []
   );
+});
+
+test('size-500 budgets never rise: a raise or a new entry fails', () => {
+  const base = { 'a.ts': 600, 'b.ts': 700 };
+  assert.deepEqual(raisedEntries(base, base), []);
+  assert.deepEqual(raisedEntries(base, { 'a.ts': 590, 'b.ts': 700 }), []);
+  assert.deepEqual(raisedEntries(base, { 'b.ts': 700 }), []);
+  assert.deepEqual(raisedEntries(base, { 'a.ts': 601, 'b.ts': 700 }), [
+    { file: 'a.ts', base: 600, head: 601 },
+  ]);
+  assert.deepEqual(raisedEntries(base, { ...base, 'c.ts': 520 }), [
+    { file: 'c.ts', base: null, head: 520 },
+  ]);
+});
+
+test('a renamed file keeps at most its old budget', () => {
+  const base = { 'old.ts': 600, 'b.ts': 700 };
+  assert.deepEqual(raisedEntries(base, { 'new.ts': 600, 'b.ts': 700 }), []);
+  assert.deepEqual(raisedEntries(base, { 'new.ts': 650, 'b.ts': 700 }), [
+    { file: 'new.ts', base: null, head: 650 },
+  ]);
+});
+
+test('tightening lowers to the measured size and drops small or gone files', () => {
+  const baseline = { 'a.ts': 600, 'b.ts': 700, 'gone.ts': 900, 'c.ts': 800 };
+  const files = {
+    'a.ts': 'x\n'.repeat(550),
+    'b.ts': 'x\n'.repeat(400),
+    'c.ts': 'x\n'.repeat(800),
+  };
+  const current = measure(baseline, file => files[file] ?? null);
+  assert.deepEqual(current, {
+    'a.ts': 550,
+    'b.ts': 0,
+    'gone.ts': 0,
+    'c.ts': 800,
+  });
+  assert.deepEqual(tightenBaseline(current, baseline).baseline, {
+    'a.ts': 550,
+    'c.ts': 800,
+  });
+  assert.equal(countLines('a\nb'), 2);
+  assert.equal(countLines('a\nb\n'), 2);
 });
